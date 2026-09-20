@@ -129,8 +129,8 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 3 }))
   const stalledDispatchRecovery = await isolatedStep('stalled_dispatch_recovery', () =>
     recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 5 }))
-  const recovery = slowMaintenanceDue
-    ? await isolatedStep('campaign_recovery', () => recoverMassDistillationCampaigns({ now, maxCampaigns: 3 }))
+  let recovery: Record<string, any> = slowMaintenanceDue
+    ? await isolatedStep('campaign_recovery', () => recoverMassDistillationCampaigns({ now, maxCampaigns: 4 }))
     : { ok: true, skipped: true, step: 'campaign_recovery', reason: 'maintenance_not_due' }
   // Dispatch is the critical path. Do it before semantic/curriculum maintenance so an already
   // authorized prepared batch cannot be starved by slow reconciliation or replenishment work.
@@ -158,7 +158,42 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       authorityExpanded: false,
     }
   }
-  const result = await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })
+  const initialResult = await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })
+  let result: Record<string, any> = initialResult
+  let capacityRecovery: Record<string, any> = { ok: true, skipped: true, reason: 'capacity_recovery_not_needed' }
+  let postRecoveryAuthorization: Record<string, any> = { ok: true, authorized: false, skipped: true, reason: 'capacity_recovery_not_needed' }
+  let postRecoveryConsumer: Record<string, any> = { ok: true, skipped: true, reason: 'capacity_recovery_not_needed', dispatched: 0 }
+
+  // A full topology with nothing claimable is not healthy utilization: stale/failed campaigns can
+  // occupy every concurrency slot while prepared work waits. Repair this synchronously instead of
+  // waiting for the five-minute maintenance cadence or a separate Supervisor observation.
+  const capacityBlockedWithoutWork = dispatchReadiness.ready
+    && rollingAuthorization.reason === 'dynamic_capacity_full'
+    && ['no_authorized_campaign', 'no_claimable_campaign'].includes(String(initialResult.reason || ''))
+  if (capacityBlockedWithoutWork) {
+    capacityRecovery = await isolatedStep('capacity_recovery', () =>
+      recoverMassDistillationCampaigns({ now, maxCampaigns: 4 }))
+    if (capacityRecovery.ok === true) {
+      try {
+        postRecoveryAuthorization = { ...(await authorizeAvailableUniversityMassDistillationCampaigns()) }
+      } catch (error) {
+        postRecoveryAuthorization = {
+          ok: false,
+          authorized: false,
+          reason: 'post_recovery_authorization_failed',
+          error: safeError(error),
+          automaticPromotionAuthorized: false,
+          runpodMutationAuthorized: false,
+          authorityExpanded: false,
+        }
+      }
+      if (postRecoveryAuthorization.ok === true && postRecoveryAuthorization.authorized === true) {
+        postRecoveryConsumer = await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })
+        result = postRecoveryConsumer
+      }
+    }
+  }
+
   const semanticReconciliation = slowMaintenanceDue
     ? await isolatedStep('semantic_reconciliation', () => reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 20 }))
     : { ok: true, skipped: true, step: 'semantic_reconciliation', reason: 'maintenance_not_due' }
@@ -234,8 +269,9 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const diagnosticsSkipped = 'skipped' in diagnostics && diagnostics.skipped === true
   const stalledDispatchRecoverySkipped = 'skipped' in stalledDispatchRecovery && stalledDispatchRecovery.skipped === true
   const recoverySkipped = 'skipped' in recovery && recovery.skipped === true
+  const capacityRecoverySkipped = 'skipped' in capacityRecovery && capacityRecovery.skipped === true
   const skipped = consumerSkipped && reconciliationSkipped && diagnosticsSkipped
-    && stalledDispatchRecoverySkipped && recoverySkipped
+    && stalledDispatchRecoverySkipped && recoverySkipped && capacityRecoverySkipped
   const invocationSucceeded = result.ok === true
     && reconciliation.ok === true
     && diagnostics.ok === true
@@ -247,6 +283,9 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     && curriculum.ok === true
     && curriculumReplenishment.ok === true
     && rollingAuthorization.ok === true
+    && capacityRecovery.ok === true
+    && postRecoveryAuthorization.ok === true
+    && postRecoveryConsumer.ok === true
 
   return {
     response: {
@@ -254,6 +293,10 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       ok: invocationSucceeded,
       skipped,
       consumer: result,
+      initialConsumer: initialResult,
+      capacityRecovery,
+      postRecoveryAuthorization,
+      postRecoveryConsumer,
       reconciliation,
       diagnostics,
       stalledDispatchRecovery,
@@ -271,7 +314,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       rollingAuthorization,
       slowMaintenanceDue,
       workflowSource: input.source,
-      workflowSemantics: 'detect_repair_fill_available_dynamic_capacity_dispatch_any_compatible_lane_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
+      workflowSemantics: 'detect_repair_evict_inert_capacity_same_tick_reauthorize_dispatch_fill_available_dynamic_capacity_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
     },
     invocationSucceeded,
     skipped,

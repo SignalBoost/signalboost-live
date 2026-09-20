@@ -411,7 +411,11 @@ type EndpointCallBudget = { used:number; readonly max:number }
 // bounded excerpt of the raw model text lets that case be diagnosed without another paid run. Holdout is
 // deliberately excluded below: its content is pinned dataset material, not model output to quote back.
 type ModelAnswers = Readonly<{ answers:Map<string,string>; responseHash:string; rawExcerpts:readonly string[] }>
-function transientGateway(error:unknown){return /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error instanceof Error?error.message:String(error))}
+function transientGateway(error:unknown){
+  const message=error instanceof Error?error.message:String(error)
+  return /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(message)
+    || /^mass_distilled_evaluation_runpod_timeout:/.test(message)
+}
 function mergeAnswerResult(target:Map<string,string>,hashes:string[],result:ModelAnswers){for(const [id,answer] of result.answers)target.set(id,answer);hashes.push(result.responseHash)}
 
 async function answersFor(input:{endpointId:string;model:string;cases:readonly EvalCase[];maxGroups:number;minGroups?:number;reserveCallsAfter:number;budget:EndpointCallBudget;claim:MassEvaluationClaim;feature:string;candidate:boolean;deadlineMs:number}):Promise<ModelAnswers>{

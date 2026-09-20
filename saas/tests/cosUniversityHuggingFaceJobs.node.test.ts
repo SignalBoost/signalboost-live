@@ -261,12 +261,14 @@ test('routes keep owner confirmation, signed callbacks and the global dispatch s
   assert.match(worker, /load_in_4bit=True/)
 })
 
-test('HF jobs fetch the worker from the authenticated delivery route, never from raw GitHub', () => {
+test('HF jobs bind worker delivery to the immutable Vercel deployment, never the moving Production alias', () => {
   const config = huggingFaceJobsConfigFromEnv(hfEnv({ ITMOUNTS_PUBLIC_ORIGIN: 'https://itmounts.com' }))!
-  assert.equal(config.workerUrl, `https://itmounts.com${COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX}/${deriveHfWorkerDeliveryToken(token)}/cos-university-hf-worker.py`)
+  assert.equal(config.workerUrl, `https://signalboost-live-example.vercel.app${COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX}/${deriveHfWorkerDeliveryToken(token)}/cos-university-hf-worker.py`)
+  assert.doesNotMatch(config.workerUrl, /^https:\/\/itmounts\.com/)
   assert.doesNotMatch(config.workerUrl, /raw\.githubusercontent\.com/)
   assert.ok(!config.workerUrl.includes(token), 'the HF token itself never appears in the job')
   const source = readFileSync(new URL('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts', import.meta.url), 'utf8')
+  assert.match(source, /immutableWorkerOrigin/)
   assert.doesNotMatch(source, /raw\.githubusercontent\.com/)
 })
 

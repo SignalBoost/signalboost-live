@@ -21,10 +21,6 @@ import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUnivers
 import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
 import { terminalizeFailedMassDistillationCampaignRuns } from './cosUniversityMassDistillationTerminalCleanup.ts'
 import { reconcilePreparedMassDistillationSemanticCohesion } from './cosUniversityMassDistillationSemanticReconciliation.ts'
-import {
-  claimUniversityMassDistillationWorkflowLease,
-  releaseUniversityMassDistillationWorkflowLease,
-} from './cosUniversityMassDistillationWorkflowLease.ts'
 
 export type MassDistillationWorkflowSource = 'scheduled_cron' | 'self_healing_supervisor'
 
@@ -106,7 +102,7 @@ async function preparedMassDistillationInventory(target: number): Promise<number
  * preparation still maintains buyer/owner-configured ready inventory independently of paid authority.
  * Paid dispatch remains bounded by the University's separate owner-approved rolling policy.
  */
-async function runOwnedCosUniversityMassDistillationWorkflow(input: {
+export async function runCosUniversityMassDistillationWorkflow(input: {
   source: MassDistillationWorkflowSource
   now?: Date
 }): Promise<{
@@ -322,84 +318,5 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
     },
     invocationSucceeded,
     skipped,
-  }
-}
-
-export async function runCosUniversityMassDistillationWorkflow(input: {
-  source: MassDistillationWorkflowSource
-  now?: Date
-}): Promise<{
-  response: Record<string, unknown>
-  invocationSucceeded: boolean
-  skipped: boolean
-}> {
-  let lease: Awaited<ReturnType<typeof claimUniversityMassDistillationWorkflowLease>>
-  try {
-    lease = await claimUniversityMassDistillationWorkflowLease()
-  } catch (error) {
-    const message = safeError(error)
-    console.error('[cos-university-mass-distillation-lease]', JSON.stringify({
-      ok: false,
-      reason: 'workflow_lease_unavailable',
-      error: message,
-    }))
-    return {
-      response: {
-        ok: false,
-        skipped: false,
-        reason: 'workflow_lease_unavailable',
-        error: message,
-        workflowSource: input.source,
-        workflowLease: { acquired: false, failClosed: true },
-      },
-      invocationSucceeded: false,
-      skipped: false,
-    }
-  }
-
-  if (!lease.acquired) {
-    return {
-      response: {
-        ok: true,
-        skipped: true,
-        reason: 'workflow_lease_held',
-        workflowSource: input.source,
-        workflowLease: {
-          acquired: false,
-          expiresAt: lease.expiresAt,
-          ttlSeconds: lease.ttlSeconds,
-        },
-        automaticPromotionAuthorized: false,
-        runpodMutationAuthorized: false,
-        authorityExpanded: false,
-      },
-      invocationSucceeded: true,
-      skipped: true,
-    }
-  }
-
-  try {
-    const outcome = await runOwnedCosUniversityMassDistillationWorkflow(input)
-    return {
-      ...outcome,
-      response: {
-        ...outcome.response,
-        workflowLease: {
-          acquired: true,
-          expiresAt: lease.expiresAt,
-          ttlSeconds: lease.ttlSeconds,
-        },
-      },
-    }
-  } finally {
-    try {
-      await releaseUniversityMassDistillationWorkflowLease(lease.ownerToken)
-    } catch (error) {
-      console.error('[cos-university-mass-distillation-lease]', JSON.stringify({
-        ok: false,
-        reason: 'workflow_lease_release_failed',
-        error: safeError(error),
-      }))
-    }
   }
 }

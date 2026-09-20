@@ -9,61 +9,30 @@ import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationCon
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
-// 2026-09-20 owner direction: remove the evaluator throughput bottleneck after Production measured
-// 245 completed mass-training runs in 24h, 46 evaluator completions, 173 evaluation_pending artifacts,
-// and 43 already past the 12h retention delay. A 24/day cap cannot keep pace even when the evaluator is
-// healthy, so the queue grows by design.
+// 2026-09-19: raised 12 -> 24 by owner decision. Production stopped evaluating at 02:31 with 27
+// canary-proven artifacts waiting and 59 pending: not a defect, the rolling window was simply spent
+// (17 approvals recorded in the trailing 24h against a cap of 12, the extra ones pre-dating the cap).
+// At 12/day a 59-artifact backlog takes about five days; 24/day clears it in about two and a half.
 //
-// Set the rolling ceiling to 300/day: above the observed 245/day training rate with enough headroom to
-// reduce the existing backlog. Claim concurrency is separately bounded so minute ticks may use the approved
-// budget without creating an unbounded evaluator fan-out.
+// The owner chose 24 over 60 deliberately: each approval authorizes at most $0.20 of runtime wake, so
+// 24/day is up to $4.80/day of wake authorization where 60/day would be up to $12/day, and 24 leaves
+// room to observe whether the repaired 18-call evaluator stays stable under increased load before
+// going further.
 //
-// Financial boundary: every evaluation still authorizes at most one RunPod wake and at most $0.20 of
-// estimated wake cost. Therefore 300/day is a hard theoretical wake-authorization ceiling of $60/day
-// if every approval used the full bound. Scoring, exact-artifact binding, retry limits, delayed retention,
-// promotion gates, rollback evidence and Production-traffic authority are unchanged.
+// This is a THROUGHPUT ceiling only. Per-evaluation limits are untouched: maxRuntimeWakeAttempts 1,
+// maxEstimatedRuntimeWakeCostUsd 0.20, maxJudgeCalls 4, the 12-hour retention delay, exact-artifact
+// binding, one verdict per artifact, and the Production-traffic prohibition all stand.
 //
 // Unlike the endpoint-call ceiling, this constant has NO database counterpart: the claim function
-// asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the per-evaluation cost ceiling,
-// but never the rolling cap, which is enforced here alone.
-export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
-export const MASS_EVALUATION_MAX_IN_FLIGHT = 4
-export const MASS_EVALUATION_FRONTIER_PROOF_SAMPLE = 4
+// asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the cost ceiling, but never the
+// rolling cap, which is enforced here alone. Verified against supabase/migrations before changing it.
+export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 24
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
 // resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case
 // (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
 // compute each time and learning nothing. Identical repeats stop; a different failure resets the count.
 export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
-// The identical-failure stop above had no time bound: once four identical failures were recorded, the artifact
-// was skipped on every subsequent tick forever, with nothing in the system able to release it except a
-// hand-inserted reopen event. That is correct for a permanent defect and wrong for a transient one, and the
-// most common infrastructure failure on this lane - mass_distilled_evaluation_runtime_not_ready - is exactly
-// the transient kind: RunPod scheduling or a cold image pull leaves no worker bound inside the ready window,
-// the artifact is untouched, and four unlucky ticks permanently sideline an artifact that nothing is wrong with.
-//
-// So the stop becomes a decaying cooldown rather than a wall. Past the fourth identical failure the artifact
-// waits, and each further identical failure waits longer, capped. A transient condition clears itself without a
-// human; a genuinely permanent one settles at roughly two attempts a day instead of one every two minutes.
-// A different failure still resets the run to zero, as before.
-//
-// This changes WHEN an artifact may be retried and nothing else: the substantive-attempt budget, the 24h
-// rolling approval window/300-per-day ceiling, the per-evaluation wake and judge ceilings, exact-artifact binding, one verdict per
-// artifact and every promotion gate are untouched.
-const MASS_EVALUATION_IDENTICAL_FAILURE_COOLDOWNS_MS = Object.freeze([
-  30 * 60_000,
-  60 * 60_000,
-  2 * 3_600_000,
-  4 * 3_600_000,
-  12 * 3_600_000,
-])
-
-export function identicalInfrastructureFailureCooldownMs(identical: number): number {
-  if (!Number.isFinite(identical) || identical < MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES) return 0
-  const step = Math.floor(identical) - MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES
-  const ladder = MASS_EVALUATION_IDENTICAL_FAILURE_COOLDOWNS_MS
-  return ladder[Math.min(step, ladder.length - 1)]
-}
 // #2457 repaired the baseline seven-case transport regression introduced while preserving retry headroom.
 // Failures from before that Production generation must not permanently suppress the artifact; only failures observed
 // after the repaired baseline split is live count toward the identical-infrastructure circuit breaker.
@@ -77,7 +46,7 @@ export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
 const REPAIRED_SUSPENSION_REASON = 'candidate_502_pending_runpod_worker_logs' as const
 
-export type RollingArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string; frontierRecipe?: boolean }>
+export type RollingArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string }>
 export type RollingEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 
 export type RollingDecision =
@@ -98,7 +67,6 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error.startsWith('mass_distilled_evaluation_endpoint_call_ceiling_plan:')
     || error.includes("maximum context length is 8192 tokens")
     || error === 'the operation was aborted due to timeout'
-    || error.startsWith('mass_distilled_evaluation_runpod_timeout:')
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
     // A missing judge result after the inference provider rejects/overloads the request is evaluator infrastructure,
@@ -118,11 +86,6 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // fingerprinted failure would fall through to model-quality handling and wrongly consume the artifact's
     // substantive-attempt budget and the 24h rolling approval window.
     || error.startsWith('mass_distilled_evaluation_holdout_format_invalid')
-    // The holdout reference is an immutable commit. Before the pinned-read repair, the evaluator
-    // compared that commit to the dataset's moving HEAD and failed when unrelated later writes advanced HEAD.
-    // No model inference occurred, so historical revision_moved events are evaluator infrastructure and must
-    // not consume substantive attempts or the 24h approval window.
-    || error === 'mass_distilled_evaluation_holdout_revision_moved'
     // The pre-fix evaluator reconstructed a bare hash-only candidate name. The exact runtime serves a runtime-keyed alias,
     // so this 404 proves evaluator/runtime identity drift, not model quality. Keep the exclusion narrow to that known shape.
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)
@@ -203,113 +166,11 @@ function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly 
   return !evaluatorInfrastructureFailure(terminal)
 }
 
-type ArtifactHistory = Readonly<{
-  mine: readonly RollingEvent[]
-  inCurrentGeneration: (event: RollingEvent) => boolean
-  hasVerdict: boolean
-  liveStart: boolean
-  substantiveFailures: number
-  lastError: string
-}>
-
-// Shared by the approval decision and the exhaustion sweep so the two can never disagree about how many real
-// attempts an artifact has spent. Divergence here would either strand an artifact that still has budget or
-// dispose one that does not.
-function artifactHistory(artifact: RollingArtifact, events: readonly RollingEvent[], nowMs: number): ArtifactHistory {
-  const hash = artifact.artifactHash.toLowerCase()
-  const mine = events.filter(event => event.candidateId === artifact.candidateId
-    && String(event.evidence?.artifactHash || '').toLowerCase() === hash)
-
-  const reopenedAt = mine
-    .filter(event => event.verifier === 'host_controller'
-      && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
-      && event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF)
-    .map(event => at(event.observedAt))
-    .filter(Number.isFinite)
-    .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY
-  const inCurrentGeneration = (event: RollingEvent) => at(event.observedAt) >= reopenedAt
-
-  const hasVerdict = mine.some(event => inCurrentGeneration(event)
-      && event.verifier === 'independent_scorer'
-      && event.evidence?.claim === 'independent_evaluation')
-    || mine.some(event => inCurrentGeneration(event)
-      && event.evidence?.claim === 'mass_distilled_independent_evaluation_completed')
-
-  const liveStart = Boolean(mine
-    .filter(event => inCurrentGeneration(event) && evaluationStarted(event) && at(event.expiresAt) > nowMs)
-    .sort((a, b) => at(b.observedAt) - at(a.observedAt))
-    .find(start => !mine.some(event => evaluationTerminal(event)
-      && at(event.observedAt) >= at(start.observedAt)
-      && at(event.observedAt) <= nowMs)))
-
-  const firstRolling = mine
-    .filter(event => inCurrentGeneration(event) && event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)
-    .map(event => at(event.observedAt))
-    .sort((a, b) => a - b)[0]
-  const substantiveFailures = firstRolling === undefined ? 0 : mine.filter(event => inCurrentGeneration(event)
-    && event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
-    && at(event.observedAt) >= firstRolling
-    && !evaluatorInfrastructureFailure(event)).length
-
-  const lastError = mine
-    .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed')
-    .sort((a, b) => at(b.observedAt) - at(a.observedAt))
-    .map(event => String(event.evidence?.error || '').trim())[0] || ''
-
-  return Object.freeze({ mine, inCurrentGeneration, hasVerdict, liveStart, substantiveFailures, lastError })
-}
-
-export type ExhaustedMassEvaluationArtifact = Readonly<{
-  candidateId: string
-  subjectId: string
-  artifactHash: string
-  reason: typeof MASS_EVALUATION_EXHAUSTED_REASON
-  failedAttempts: number
-  lastError: string
-}>
-
-export const MASS_EVALUATION_EXHAUSTED_REASON = 'substantive_evaluation_attempts_exhausted' as const
-
-// An artifact that has spent its substantive attempt budget can never be approved again - only a
-// hand-inserted reopen event releases it - yet nothing ever moved it out of `evaluation_pending`. It stayed
-// in the lane's selection window forever, reported as waiting while no tick could ever pick it, and because
-// a bounded front-of-queue window can contain enough permanently ineligible rows to starve newer
-// artifacts behind them. Naming them here lets the caller give them a terminal status and a recorded reason,
-// which is also what makes a real failure visible to curriculum work instead of silently disappearing.
-//
-// This decides nothing about quality and grants nothing: it reports artifacts the approval policy has
-// already refused permanently, using the same counter that refused them.
-export function decideExhaustedMassEvaluationArtifacts(input: {
-  artifacts: readonly RollingArtifact[]
-  events: readonly RollingEvent[]
-  now: Date
-}): readonly ExhaustedMassEvaluationArtifact[] {
-  const nowMs = input.now.getTime()
-  const exhausted: ExhaustedMassEvaluationArtifact[] = []
-  for (const artifact of input.artifacts) {
-    if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
-    const history = artifactHistory(artifact, input.events, nowMs)
-    // A verdict has its own lifecycle write, and a live run must be left alone.
-    if (history.hasVerdict || history.liveStart) continue
-    if (history.substantiveFailures < MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
-    exhausted.push(Object.freeze({
-      candidateId: artifact.candidateId,
-      subjectId: artifact.subjectId,
-      artifactHash: artifact.artifactHash.toLowerCase(),
-      reason: MASS_EVALUATION_EXHAUSTED_REASON,
-      failedAttempts: history.substantiveFailures,
-      lastError: history.lastError.slice(0, 500),
-    }))
-  }
-  return Object.freeze(exhausted)
-}
-
 export function decideRollingMassEvaluationApproval(input: {
   enabled: boolean
   artifacts: readonly RollingArtifact[]
   events: readonly RollingEvent[]
   now: Date
-  frontierProofCompletions?: number
 }): RollingDecision {
   if (!input.enabled) return { issue: false, reason: 'rolling_mass_evaluation_authorization_disabled' }
   const nowMs = input.now.getTime()
@@ -321,26 +182,14 @@ export function decideRollingMassEvaluationApproval(input: {
   const issuedInWindow = rollingApprovalsInWindow.filter(approval => rollingApprovalConsumesWindow(approval, input.events, nowMs)).length
   if (issuedInWindow >= MASS_EVALUATION_ROLLING_MAX_APPROVALS) return { issue: false, reason: 'rolling_mass_evaluation_window_exhausted' }
 
-  const proofCompletions = Math.max(0, Math.floor(Number(input.frontierProofCompletions ?? MASS_EVALUATION_FRONTIER_PROOF_SAMPLE)))
-  const frontierProofNeeded = proofCompletions < MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
-  const ordered = [...input.artifacts].sort((a, b) => {
-    // Until four current-recipe artifacts have produced an actual independent evaluation result,
-    // keep frontier artifacts ahead of legacy backlog work. A prior start that ended in evaluator
-    // infrastructure failure is not proof and must remain retryable/preferred. This is only a bounded
-    // scheduling preference; once four durable frontier results exist, oldest-first resumes.
-    if (frontierProofNeeded) {
-      const aProof = a.frontierRecipe === true
-      const bProof = b.frontierRecipe === true
-      if (aProof !== bProof) return aProof ? -1 : 1
-    }
-    return at(a.createdAt) - at(b.createdAt)
-  })
+  const ordered = [...input.artifacts].sort((a, b) => at(a.createdAt) - at(b.createdAt))
   for (const artifact of ordered) {
     if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
     if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) continue
     const hash = artifact.artifactHash.toLowerCase()
-    const history = artifactHistory(artifact, input.events, nowMs)
-    const mine = history.mine
+    const mine = input.events.filter(event => event.candidateId === artifact.candidateId
+      && String(event.evidence?.artifactHash || '').toLowerCase() === hash)
+
     const reopenedAt = mine
       .filter(event => event.verifier === 'host_controller'
         && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
@@ -348,9 +197,10 @@ export function decideRollingMassEvaluationApproval(input: {
       .map(event => at(event.observedAt))
       .filter(Number.isFinite)
       .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY
-    const inCurrentGeneration = history.inCurrentGeneration
+    const inCurrentGeneration = (event: RollingEvent) => at(event.observedAt) >= reopenedAt
 
-    if (history.hasVerdict) continue
+    if (mine.some(event => inCurrentGeneration(event) && event.verifier === 'independent_scorer' && event.evidence?.claim === 'independent_evaluation')) continue
+    if (mine.some(event => inCurrentGeneration(event) && event.evidence?.claim === 'mass_distilled_independent_evaluation_completed')) continue
 
     const canary = mine.some(event => event.verifier === 'host_production_verifier'
       && event.evidence?.claim === 'production_canary_healthy'
@@ -360,9 +210,21 @@ export function decideRollingMassEvaluationApproval(input: {
 
     // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.
     // Do not mint another approval while this exact artifact already has a live started reservation.
-    if (history.liveStart) continue
+    const liveStart = mine
+      .filter(event => inCurrentGeneration(event) && evaluationStarted(event) && at(event.expiresAt) > nowMs)
+      .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+      .find(start => !mine.some(event => evaluationTerminal(event)
+        && at(event.observedAt) >= at(start.observedAt)
+        && at(event.observedAt) <= nowMs))
+    if (liveStart) continue
 
-    const failures = history.substantiveFailures
+    const firstRolling = mine
+      .filter(event => inCurrentGeneration(event) && event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)
+      .map(event => at(event.observedAt))
+      .sort((a, b) => a - b)[0]
+    const failures = firstRolling === undefined ? 0 : mine.filter(event => inCurrentGeneration(event) && event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+      && at(event.observedAt) >= firstRolling
+      && !evaluatorInfrastructureFailure(event)).length
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
     // Before the repair exists, preserve the historical circuit breaker. At/after the named repair epoch, only failures
@@ -370,11 +232,11 @@ export function decideRollingMassEvaluationApproval(input: {
     const infrastructureGenerationStart = Math.max(reopenedAt, nowMs >= MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
       ? MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
       : Number.NEGATIVE_INFINITY)
-    const recentFailures = mine
+    const recentErrors = mine
       .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
         && at(event.observedAt) >= infrastructureGenerationStart)
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
-    const recentErrors = recentFailures.map(event => String(event.evidence?.error || '').trim().toLowerCase())
+      .map(event => String(event.evidence?.error || '').trim().toLowerCase())
     const newest = recentErrors[0]
     if (newest) {
       let identical = 0
@@ -382,13 +244,7 @@ export function decideRollingMassEvaluationApproval(input: {
         if (error !== newest) break
         identical += 1
       }
-      if (identical >= MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES) {
-        // Wait out the cooldown instead of skipping forever. An unreadable timestamp is treated as still
-        // cooling: releasing an artifact on evidence we cannot read is the unsafe reading.
-        const newestFailureAt = at(recentFailures[0].observedAt)
-        if (!Number.isFinite(newestFailureAt)) continue
-        if (nowMs - newestFailureAt < identicalInfrastructureFailureCooldownMs(identical)) continue
-      }
+      if (identical >= MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES) continue
     }
 
     const controls = mine

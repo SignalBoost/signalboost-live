@@ -117,11 +117,8 @@ test('the runner stays inside the approved endpoint-call ceiling and reserves ca
   assert.match(source, /endpointCalls:budget\.used/)
 })
 
-test('transient RunPod gateway failures and inference timeouts retry the same bounded group before spending two calls on a split', () => {
+test('transient RunPod gateway failures retry the same bounded group before spending two calls on a split', () => {
   assert.match(source, /mass_distilled_evaluation_runpod_http_\(502\|503\|504\)/)
-  assert.match(source, /mass_distilled_evaluation_runpod_timeout:/)
-  assert.match(source, /name==='TimeoutError'\|\|name==='AbortError'/)
-  assert.match(source, /transientGateway[\s\S]*mass_distilled_evaluation_runpod_timeout/)
   const retry = source.indexOf('if(input.budget.used+1+reserve<=input.budget.max)')
   const split = source.indexOf('if(group.length>1&&input.budget.used+2+reserve<=input.budget.max)')
   assert.ok(retry >= 0, 'bounded same-group retry exists')

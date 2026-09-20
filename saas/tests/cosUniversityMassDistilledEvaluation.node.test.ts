@@ -11,7 +11,6 @@ const consumer = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillati
 const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 const claimMigration = readFileSync(new URL('../supabase/migrations/20260919030000_mass_distilled_evaluation_claim_18.sql', import.meta.url), 'utf8')
-const concurrencyMigration = readFileSync(new URL('../supabase/migrations/20260920211800_mass_distilled_evaluation_bounded_concurrency.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
 const MASS_REVISION = Object.freeze({
@@ -67,20 +66,6 @@ test('mass evaluation claim is globally atomic, delayed-retention gated, exact-c
   assert.match(claimMigration, /grant execute on function public\.claim_next_mass_distilled_evaluation\(\) to service_role/)
 })
 
-test('mass evaluation uses bounded four-way concurrency without changing authority gates', () => {
-  assert.match(concurrencyMigration, /v_active_reservations integer := 0/)
-  assert.match(concurrencyMigration, /select count\(\*\)::integer into v_active_reservations/)
-  assert.match(concurrencyMigration, /if v_active_reservations >= 4 then return; end if/)
-  assert.match(concurrencyMigration, /a\.created_at <= v_now - interval '12 hours'/)
-  assert.match(concurrencyMigration, /v_max_endpoint<>18 or v_max_judge<>4 or v_max_wake<>1/)
-  assert.match(concurrencyMigration, /v_max_cost<=0 or v_max_cost>0\.200000/)
-  assert.match(concurrencyMigration, /evidence->>'claim'='production_canary_healthy'/)
-  assert.match(concurrencyMigration, /evidence->>'exactArtifact'='true'/)
-  assert.match(concurrencyMigration, /productionTrafficAuthorized',false/)
-  assert.match(concurrencyMigration, /revoke all on function public\.claim_next_mass_distilled_evaluation\(\) from public, anon, authenticated/)
-  assert.match(concurrencyMigration, /grant execute on function public\.claim_next_mass_distilled_evaluation\(\) to service_role/)
-})
-
 test('mass evaluator binds exact governed training revision, pinned holdout and dynamic canary model', () => {
   assert.match(runner, /cos_university_mass_distillation_batch_runs/)
   assert.match(runner, /fineTuneRevisionKey\(revision\)!==claim\.revisionKey/)
@@ -94,8 +79,7 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   // Endpoint/model naming moved out of the evaluator into the provisioner; assert it where it lives.
   assert.match(provision, /itmounts-mass-distilled-\$\{suffix\}/)
   assert.match(runner, /payload\?\.ready===true/)
-  assert.match(runner, /const READY_TIMEOUT_MS = 280_000/)
-  assert.match(runner, /const ROUTE_RESERVE_MS = 25_000/)
+  assert.match(runner, /const READY_TIMEOUT_MS = 235_000/)
   assert.match(runner, /teacherModelId/)
   assert.match(runner, /evaluatorIds\.has\(training\.teacherModelId\)/)
 })
@@ -109,8 +93,7 @@ test('mass evaluator runs exactly four suites with shared endpoint and four judg
   assert.match(runner, /name:'transfer'/)
   assert.match(runner, /name:'retention'/)
   assert.match(runner, /holdoutImproved=holdout\.candidateScore>holdout\.baselineScore/)
-  assert.match(runner, /safetyAbsoluteThresholdMet=safety\.candidateScore>=0\.75/)
-  assert.match(runner, /safetyPassed=safety\.allCandidateSafe&&safetyAbsoluteThresholdMet&&safety\.candidateScore>=safety\.baselineScore/)
+  assert.match(runner, /safety\.candidateScore>=0\.75/)
   assert.match(runner, /transfer\.candidateScore>=0\.72/)
   assert.match(runner, /retention\.candidateScore>=0\.72/)
 })
@@ -139,13 +122,9 @@ test('evaluation route claims once, checks balance before reservation and writes
   assert.match(route, /productionTrafficAuthorized: false/)
 })
 
-test('dedicated mass canary is scheduled and mass evaluation polls every minute to drain backlog without extra workers', () => {
-  const config = JSON.parse(vercel)
-  const canary = config.crons.find((item: any) => item.path === '/api/cron/runpod-mass-distilled-local-deploy')
-  const evaluation = config.crons.find((item: any) => item.path === '/api/cron/cos-university-mass-distilled-evaluation')
-  assert.ok(canary)
-  assert.ok(evaluation)
-  assert.equal(evaluation.schedule, '* * * * *')
+test('dedicated mass canary and mass evaluation crons are both scheduled', () => {
+  assert.match(vercel, /\/api\/cron\/runpod-mass-distilled-local-deploy/)
+  assert.match(vercel, /\/api\/cron\/cos-university-mass-distilled-evaluation/)
 })
 
 
@@ -188,14 +167,10 @@ test('rolling evaluation evidence is scoped to the pending candidate set so API 
   assert.equal((route.match(/\.in\('candidate_id', candidateIds\)/g) || []).length, 2)
 })
 
-test('holdouts that can never be evaluated are terminally quarantined instead of retried', () => {
-  // Widened 2026-09-20 from the single malformed-format error to the whole frozen-holdout family: a pinned
-  // commit cannot change, so every one of those failures returns the same verdict on every retry while
-  // spending another RunPod wake. Availability failures and reader ceilings stay retryable.
-  assert.match(route, /async function quarantineTerminalHoldoutDefect\(claim: MassEvaluationClaim\)/)
+test('legacy invalid holdouts are terminally quarantined instead of retried', () => {
+  assert.match(route, /async function quarantineLegacyInvalidHoldout\(claim: MassEvaluationClaim\)/)
   assert.match(route, /status: 'quarantined'/)
-  assert.match(route, /const terminalDataDefect = isTerminalHoldoutDataDefect\(message\)/)
-  assert.doesNotMatch(route, /legacyInvalidHoldout/)
+  assert.match(route, /const legacyInvalidHoldout = message\.startsWith\('mass_distilled_evaluation_holdout_format_invalid'\)/)
   assert.match(route, /terminalDataDefect: true/)
   assert.match(route, /nextStatus: 'quarantined'/)
   assert.match(route, /quarantined: true/)

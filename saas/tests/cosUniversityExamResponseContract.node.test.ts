@@ -5,7 +5,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { stripTypeScriptTypes } from 'node:module'
 import { universityExamResponseContract, universityIndependentLearnerPrompt } from '../lib/ai/cos/cosUniversityExamResponseContract.ts'
-import { countUniversityResponseWords, universityLengthRevisionPrompt } from '../lib/ai/cos/cosUniversityAgentCapstone.ts'
 import { boundExecutionBindingFailure, scoredReplyHash } from '../lib/ai/cos/cosUniversityExecutionBinding.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -78,7 +77,7 @@ test('actual unchanged scorer still rejects the same over-limit answer and enfor
 })
 
 /** Actual source functions, with only external model/database/turn I/O injected. */
-async function runActualExam(agentId: string, selectedExam: Record<string, any> = exam, revisionReply?: string) {
+async function runActualExam(agentId: string, selectedExam: Record<string, any> = exam) {
   const source = process.env.UNIVERSITY_RESPONSE_RUNNER_BASELINE
     ? fs.readFileSync(process.env.UNIVERSITY_RESPONSE_RUNNER_BASELINE, 'utf8')
     : read('lib/ai/cos/cosUniversityIndependentExamRunner.ts')
@@ -114,17 +113,11 @@ async function runActualExam(agentId: string, selectedExam: Record<string, any> 
     SOFTWARE_CAPSTONE_RUNTIME: 'university_software_specialist_v1', DEFAULT_AGENT_ID: 'cos',
     universityExamValidUntil: () => '2026-10-01T00:00:00Z',
     universityIndependentLearnerPrompt, universityExamResponseContract,
-    countUniversityResponseWords, universityLengthRevisionPrompt,
     beginEvidenceSourceUseTurn: () => {}, flushCapturedEvidenceSourceUse: () => {},
     peekEvidenceSourceUseTurnId: () => 'fixture-turn',
     ensureLocalInferenceRuntimeReady: async () => {}, generateLocalEmbedding: async (prompt: string) => { embeddings.push(prompt) },
-    tryCOSFirstAnswer: async (input: any) => {
-      sent.push(input)
-      // The second call is the disclosed-length rewrite of COS's own draft.
-      const text = sent.length > 1 && revisionReply !== undefined ? revisionReply : reply
-      return { handled: true, reply: text, confidence: .5,
-        provenance: { localModelInvoked: true, externalAiInvoked: false, responseSource: 'local_cos_reasoning' } }
-    },
+    tryCOSFirstAnswer: async (input: any) => { sent.push(input); return { handled: true, reply, confidence: .5,
+      provenance: { localModelInvoked: true, externalAiInvoked: false, responseSource: 'local_cos_reasoning' } } },
     decideCosTurnExperience: () => ({ routeClass: 'fixture', evidence: {} }), recordTurnLearningEnrichment: () => {},
     attachTurnOutcome: async () => {}, asRecord: (value: unknown) => value || {},
   }
@@ -136,22 +129,9 @@ async function runActualExam(agentId: string, selectedExam: Record<string, any> 
 for (const agentId of ['cos', 'software-specialist']) {
   test(`actual ${agentId} executor receives the existing word ceiling before inference and retains an honest failure`, async () => {
     const result = await runActualExam(agentId)
-    // COS now gets the one disclosed-length rewrite the bound executor already had, so its lane makes a second
-    // call. The fixture returns the same over-limit text, which is not shorter, so the rewrite is discarded and
-    // the failure below must stand exactly as before - the point of this test is that it stays honest.
-    assert.equal(result.sent.length, agentId === 'cos' ? 2 : 1)
+    assert.equal(result.sent.length, 1)
     assert.match(result.sent[0].prompt, /at most 260 words/)
     assert.doesNotMatch(result.sent[0].prompt, /private-scorer-sentinel/)
-    if (agentId === 'cos') {
-      assert.match(result.sent[1].prompt, /at most 260 words/)
-      assert.match(result.sent[1].prompt, /YOUR OVER-LIMIT DRAFT:/)
-      assert.doesNotMatch(result.sent[1].prompt, /private-scorer-sentinel/)
-      assert.equal(result.sent[1].disableCache, true)
-      const lengthRevision = result.assessments[0].evidence.lengthRevision
-      assert.equal(lengthRevision.limit, 260)
-      assert.equal(lengthRevision.revisionApplied, false)
-      assert.equal(lengthRevision.reason, 'revision_not_shorter')
-    }
     assert.equal(result.result.status, 'failed')
     assert.equal(result.result.reasons.length, 2)
     assert.equal(result.result.reasons[0], 'word_limit_exceeded')
@@ -164,40 +144,6 @@ for (const agentId of ['cos', 'software-specialist']) {
     else assert.ok(result.embeddings.every(prompt => prompt === result.sent[0].prompt))
   })
 }
-
-test('a shorter rewrite of COS\'s own over-limit draft is what gets submitted and scored', async () => {
-  // Production showed word_limit_exceeded again and again on remediation retests. COS was the only learner
-  // answering without the disclosed-length rewrite every bound specialist already got, so an answer one word
-  // over the ceiling was submitted as-is and failed on length rather than on knowledge.
-  const within = Array(258).fill('evidence').join(' ')
-  const result = await runActualExam('cos', exam, within)
-  assert.equal(result.sent.length, 2)
-  // The rewrite sees only its own draft and the case - never the private rubric.
-  assert.match(result.sent[1].prompt, /YOUR OVER-LIMIT DRAFT:/)
-  assert.doesNotMatch(result.sent[1].prompt, /private-scorer-sentinel/)
-  assert.equal(result.result.status, 'passed')
-  assert.equal(result.result.passed, true)
-  assert.deepEqual(result.result.reasons, [])
-  const lengthRevision = result.assessments[0].evidence.lengthRevision
-  assert.equal(lengthRevision.revisionApplied, true)
-  assert.equal(lengthRevision.limit, 260)
-  assert.equal(lengthRevision.draftWords, 261)
-  assert.equal(lengthRevision.finalWords, 258)
-  assert.equal(lengthRevision.reason, undefined)
-  assert.equal(result.assessments[0].passed, true)
-})
-
-test('a draft already inside the ceiling is submitted with no rewrite at all', async () => {
-  const source = read('lib/ai/cos/cosUniversityIndependentExamRunner.ts')
-  // The rewrite is reached only by an over-limit draft, and a failed rewrite can never fail the exam.
-  assert.match(source, /draftWords > responseContract\.maxWords/)
-  assert.match(source, /revision_not_shorter/)
-  assert.match(source, /revision_provenance_rejected/)
-  assert.match(source, /revision_error:/)
-  const capstone = read('lib/ai/cos/cosUniversityAgentCapstone.ts')
-  // The bound lane accepted any non-empty rewrite, including a longer one. It must now be shorter.
-  assert.match(capstone, /countUniversityResponseWords\(revised\) < draftWords/)
-})
 
 test('invalid response constraints fail before either learner is called or receives academic credit', async () => {
   for (const agent of ['cos', 'software-specialist']) {

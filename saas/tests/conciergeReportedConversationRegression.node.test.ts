@@ -2,9 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { isConciergeVisualObjective } from '../lib/visuals/intent.ts'
-import { resolveSemanticVisualRequest, shouldResolveSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
+import { resolveSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
 import { publicConciergeIdentityReply } from '../lib/ai/cos/publicConciergeIdentity.ts'
-import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } from '../lib/ai/cos/publicConciergeIdentityIntent.ts'
+import { resolveSemanticPublicIdentity } from '../lib/ai/cos/publicConciergeIdentityIntent.ts'
 
 const semanticReasoner = (verdict: { visual_request: boolean; anchor_user_turn: number | null }, seen?: any[]) => (async (args: any) => {
   seen?.push(args)
@@ -150,8 +150,6 @@ test('public company identity uses iTMounts and the public model prompt cannot r
 test('deep semantic identity routing separates current identity from naming work', async () => {
   const currentIdentity = 'Remind me what service I am using right now'
   assert.equal(publicConciergeIdentityReply(currentIdentity), null)
-  assert.equal(shouldResolveSemanticPublicIdentity(currentIdentity), true)
-  assert.equal(shouldResolveSemanticPublicIdentity('What is photosynthesis?'), false)
   assert.deepEqual(
     await resolveSemanticPublicIdentity(currentIdentity, async () => ({
       text: JSON.stringify({ identity_intent: 'platform_identity', language: 'en' }),
@@ -172,13 +170,11 @@ test('deep semantic identity routing separates current identity from naming work
   assert.match(route, /identity_routing: deterministicIdentity \? 'deterministic' : 'deep-semantic'/)
 })
 
-test('new semantic-only public visual requests still reach bounded semantic detection without pre-classifying ordinary questions', async () => {
+test('new semantic-only public visual requests still reach deep semantic visual detection without pre-classifying owner Assistant', async () => {
   const source = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(source, /const directVisual = isConciergeVisualObjective\(prompt\)/)
-  assert.match(source, /const semanticVisualEligible =[\s\S]*shouldResolveSemanticVisualRequest\(messages, prompt\)/)
-  assert.match(source, /const semanticResolution = semanticVisualEligible[\s\S]*await resolveSemanticVisualRequest\(messages, prompt\)/)
+  assert.match(source, /const semanticResolution = directVisual \|\| browserSurface === 'assistant'[\s\S]*\? null[\s\S]*: await resolveSemanticVisualRequest\(messages, prompt\)/)
   assert.match(source, /const visualObjective = browserSurface === 'assistant'[\s\S]*\? null[\s\S]*: directVisual \? prompt : semanticResolution\?\.objective \?\? null/)
-  assert.equal(shouldResolveSemanticVisualRequest([{ role: 'user', content: 'What is photosynthesis?' }], 'What is photosynthesis?'), false)
 })
 
 test('visual success copy is blocked without a renderable preview', async () => {

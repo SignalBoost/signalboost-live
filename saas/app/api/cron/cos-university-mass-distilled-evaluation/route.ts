@@ -1,7 +1,6 @@
 // saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
 import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
-import { isTerminalHoldoutDataDefect } from '@/lib/ai/cos/cosUniversityMassEvaluationTerminalDefect'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
@@ -16,10 +15,7 @@ import {
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
-  MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
-  decideExhaustedMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
-  type ExhaustedMassEvaluationArtifact,
   type RollingArtifact,
   type RollingEvent,
 } from '@/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority'
@@ -31,7 +27,6 @@ export const maxDuration = 600
 const PROFILE = 'cos_mass_distilled_independent_evaluation_runtime_v1'
 const COMPLETED = 'mass_distilled_independent_evaluation_completed'
 const FAILED = 'mass_distilled_independent_evaluation_failed'
-const EXHAUSTED = 'mass_distilled_evaluation_attempts_exhausted'
 const ROUTE_BUDGET_MS = 570_000
 const ROUTE_RESERVE_MS = 25_000
 const RUNTIME_WAKE_TIMEOUT_MS = 20_000
@@ -125,81 +120,19 @@ type RawClaim = Readonly<{
   reservation_event_key: string
 }>
 
-// An artifact that has spent its substantive attempt budget can never be approved again, yet nothing moved it
-// out of `evaluation_pending`. It stayed in this lane's selection window - the bounded pending selection window - so a
-// run of dead artifacts at the front of the queue starves every newer artifact behind them, while the lane
-// reports them as waiting. Give them the terminal status their verdict already implies, and record WHY in the
-// same ledger the evaluation writes to, so a real failure is visible to curriculum work instead of vanishing.
-//
-// The status write is conditioned on `evaluation_pending`, so re-running it changes nothing, and the event is
-// upserted on a deterministic key. This disposes; it never evaluates, scores, promotes or spends.
-async function disposeExhaustedArtifacts(
-  items: readonly ExhaustedMassEvaluationArtifact[],
-  now: Date,
-): Promise<ExhaustedMassEvaluationArtifact[]> {
-  const db = cosServiceDb()
-  if (!db) throw new Error('service_database_unavailable')
-  const disposed: ExhaustedMassEvaluationArtifact[] = []
-  for (const item of items) {
-    const updated = await db.from('cos_local_distillation_artifacts')
-      .update({ status: 'quarantined', updated_at: now.toISOString() })
-      .eq('candidate_id', item.candidateId)
-      .eq('trained_artifact_hash', item.artifactHash)
-      .eq('status', 'evaluation_pending')
-    if (updated.error) throw updated.error
-
-    const body = {
-      profile: PROFILE,
-      claim: EXHAUSTED,
-      candidateId: item.candidateId,
-      artifactHash: item.artifactHash,
-      reason: item.reason,
-      failedAttempts: item.failedAttempts,
-      lastError: clean(item.lastError, 500),
-      nextStatus: 'quarantined',
-      terminalDisposition: true,
-      evaluationPassed: false,
-      productionTrafficAuthorized: false,
-      authorityExpanded: false,
-    }
-    const inserted = await db.from('cos_university_learning_assurance_events').upsert({
-      event_key: hash([PROFILE, EXHAUSTED, item.candidateId, item.artifactHash]),
-      event_type: 'fine_tune',
-      subject_id: item.subjectId || null,
-      candidate_id: item.candidateId,
-      evidence_hash: hash(body),
-      evidence: body,
-      verifier: 'host_controller',
-      observed_at: now.toISOString(),
-    }, { onConflict: 'event_key', ignoreDuplicates: true })
-    if (inserted.error) throw inserted.error
-    disposed.push(item)
-  }
-  return disposed
-}
-
-type RollingOutcome = Readonly<{
-  issued: boolean
-  reason?: string
-  candidateId?: string
-  artifactHash?: string
-  disposed?: number
-}>
-
-async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
+async function ensureRollingMassEvaluationApproval() {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const artifacts = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
     .eq('status', 'evaluation_pending')
     .like('candidate_id', 'mass:%')
     .order('created_at', { ascending: true })
-    .limit(500)
+    .limit(50)
   if (artifacts.error) throw artifacts.error
   const rows: RollingArtifact[] = (artifacts.data || []).map((row: any) => ({
     candidateId: clean(row.candidate_id, 240), subjectId: clean(row.subject_id, 240),
     artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
-    frontierRecipe: row.intended_use?.trainingReceipt?.profile === 'cos_university_frontier_gkd_v1',
   }))
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
   // Scope evidence to the pending candidates being evaluated this tick. Supabase/PostgREST can cap
@@ -256,57 +189,13 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     verifier: clean(row.verifier, 80), evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
   }))
   const now = new Date()
-
-  // The current frontier recipe cannot improve itself until it receives independent measurements.
-  // A start is not proof: Production 2026-09-20 launched four frontier reservations, but three ended in
-  // RunPod readiness failures before any evaluation row existed. Count distinct durable evaluation results
-  // across all frontier artifact statuses so infrastructure failures remain retryable/preferred until the
-  // bounded four-result proof cohort actually exists. Failure to read this optional scheduling signal falls
-  // back to normal oldest-first order rather than blocking evaluation.
-  let frontierProofCompletions = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
-  try {
-    const frontierArtifacts = await db.from('cos_local_distillation_artifacts')
-      .select('candidate_id')
-      .contains('intended_use', { trainingReceipt: { profile: 'cos_university_frontier_gkd_v1' } })
-      .like('candidate_id', 'mass:%')
-      .limit(500)
-    if (!frontierArtifacts.error) {
-      const frontierIds = (frontierArtifacts.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)
-      if (frontierIds.length) {
-        const frontierResults = await db.from('cos_university_distilled_evaluation_runs')
-          .select('candidate_id')
-          .in('candidate_id', frontierIds)
-          .limit(1000)
-        if (!frontierResults.error) frontierProofCompletions = new Set((frontierResults.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
-      }
-    }
-  } catch {
-    frontierProofCompletions = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
-  }
-
-  // Clear artifacts the approval policy has already refused permanently before choosing this tick's work, so
-  // the selection window holds only artifacts that can still be evaluated.
-  const exhausted = decideExhaustedMassEvaluationArtifacts({ artifacts: rows, events: all, now })
-  const disposed = exhausted.length ? await disposeExhaustedArtifacts(exhausted, now) : []
-  if (disposed.length) {
-    console.info('[cos-mass-distilled-exhausted-disposition]', JSON.stringify({
-      disposed: disposed.length,
-      candidates: disposed.map(item => item.candidateId).slice(0, 20),
-    }))
-  }
-  const remaining = disposed.length
-    ? rows.filter(row => !disposed.some(item => item.candidateId === row.candidateId
-      && item.artifactHash === row.artifactHash))
-    : rows
-  if (!remaining.length) return { issued: false, reason: 'no_mass_artifact_pending', disposed: disposed.length }
   const decision = decideRollingMassEvaluationApproval({
     enabled: process.env.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false',
-    artifacts: remaining,
+    artifacts: rows,
     events: all,
     now,
-    frontierProofCompletions,
   })
-  if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }
+  if ('reason' in decision) return { issued: false, reason: decision.reason }
   const inserted = await db.from('cos_university_learning_assurance_events').insert({
     event_key: hash(['mass-rolling-evaluation-approval', decision.artifact.candidateId, decision.artifact.artifactHash, now.toISOString()]),
     event_type: 'fine_tune',
@@ -319,7 +208,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     expires_at: new Date(now.getTime() + MASS_EVALUATION_APPROVAL_TTL_MS).toISOString(),
   })
   if (inserted.error) throw inserted.error
-  return { issued: true, candidateId: decision.artifact.candidateId, artifactHash: decision.artifact.artifactHash, disposed: disposed.length }
+  return { issued: true, candidateId: decision.artifact.candidateId, artifactHash: decision.artifact.artifactHash }
 }
 
 async function claimNext(): Promise<MassEvaluationClaim | null> {
@@ -370,7 +259,7 @@ async function claimNext(): Promise<MassEvaluationClaim | null> {
   })
 }
 
-async function quarantineTerminalHoldoutDefect(claim: MassEvaluationClaim) {
+async function quarantineLegacyInvalidHoldout(claim: MassEvaluationClaim) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const updated = await db.from('cos_local_distillation_artifacts')
@@ -537,22 +426,19 @@ export async function GET(req: NextRequest) {
       ? String(error.stack || '').split('\n').filter(line => line.trim().startsWith('at ')).slice(0, 4)
         .map(line => clean(line.replace(/^\s*at\s+/, ''), 160)).filter(Boolean)
       : []
-    // A holdout is pinned to an immutable commit, so a failure that is a property of that frozen data can
-    // never succeed on a later attempt: every retry re-reads the same bytes, spends another RunPod wake and
-    // reaches the same verdict. Only the malformed-format case was recognised here; the rest of that family
-    // now ends the same way instead of circling on the retry ladder. Availability failures and reader
-    // ceilings are deliberately excluded and stay retryable - see the predicate for why.
-    const terminalDataDefect = isTerminalHoldoutDataDefect(message)
+    // Prefix, not equality: the evaluator appends a structural fingerprint to this error (2026-09-20), and an
+    // exact comparison would stop quarantining the very holdouts this branch exists to set aside.
+    const legacyInvalidHoldout = message.startsWith('mass_distilled_evaluation_holdout_format_invalid')
     if (claim) {
-      if (terminalDataDefect) {
-        await quarantineTerminalHoldoutDefect(claim).catch(() => undefined)
+      if (legacyInvalidHoldout) {
+        await quarantineLegacyInvalidHoldout(claim).catch(() => undefined)
       }
       await recordTerminal({
         claim,
         eventClaim: FAILED,
         evidence: {
           error: clean(message, 500),
-          ...(terminalDataDefect ? { terminalDataDefect: true, nextStatus: 'quarantined' } : {}),
+          ...(legacyInvalidHoldout ? { terminalDataDefect: true, nextStatus: 'quarantined' } : {}),
           ...(frames.length ? { errorFrames: frames } : {}),
         },
       }).catch(() => undefined)
@@ -564,7 +450,7 @@ export async function GET(req: NextRequest) {
       ...(claim ? { candidateId: claim.candidateId, artifactHash: claim.artifactHash } : {}),
     }).catch(() => undefined)
     console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: clean(message, 500) }))
-    if (claim && terminalDataDefect) {
+    if (claim && legacyInvalidHoldout) {
       return NextResponse.json({
         ok: false,
         quarantined: true,

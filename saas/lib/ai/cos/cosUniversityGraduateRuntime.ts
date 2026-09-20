@@ -306,7 +306,7 @@ export async function activateGraduateRuntime(input: GraduateRuntimeBindingInput
     runtime_health_evidence_hash: healthEvidenceHash,
     activation_evidence_hash: activationEvidenceHash,
     platform_scope: {
-      kind: decision.workerRoles.includes('primary') ? 'cos_generalist_primary' : 'subject_relevant_cos_capability',
+      kind: 'subject_relevant_cos_capability',
       subjectId: row.subject_id,
       owner: 'itmounts',
       orchestrator: 'cos',
@@ -344,7 +344,7 @@ function scopeArray(scope: unknown, key: string): string[] {
   return Array.isArray(value) ? uniqueStrings(value, 160) : []
 }
 
-/** Read only graduates that are already active and whose host-recorded scope matches this request. A governed COS-primary graduate may use the explicit '*' generalist scope. */
+/** Read only graduates that are already active and whose host-recorded scope matches this request. */
 export async function activeGraduateRuntimesForRole(
   role: CosReasoningWorkerRole,
   objective: string,

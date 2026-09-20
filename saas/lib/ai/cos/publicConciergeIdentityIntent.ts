@@ -8,60 +8,42 @@ export type SemanticPublicIdentity = Readonly<{
   language: IdentityLanguage
 }>
 
-// Routing classifiers are optional control-plane verdicts, not answer generation.
-// Keep them compact, no-thinking, and actually abortable so they can never consume the
-// response budget that belongs to the user's answer.
-const ROUTING_CLASSIFIER_DEFAULT_MS = 2_500
+// Routing classifiers are short JSON verdicts that run BEFORE the answer path on the public browser
+// ingress. Unbounded, a slow model turn here consumed the time the answer needed and Vercel killed
+// the request at maxDuration ("the page stopped waiting"). A verdict not reached within this window
+// is treated exactly like any other missing verdict: fail closed to "not a match" and the request
+// continues to the normal answer path. Shared env var across both routing classifiers.
+const ROUTING_CLASSIFIER_DEFAULT_MS = 15_000
 
 function routingClassifierDeadlineMs(): number {
   const configured = Number(process.env.COS_ROUTING_CLASSIFIER_TIMEOUT_MS)
   if (!Number.isFinite(configured) || configured <= 0) return ROUTING_CLASSIFIER_DEFAULT_MS
-  return Math.min(5_000, Math.max(750, Math.floor(configured)))
+  return Math.min(30_000, Math.max(2_000, Math.floor(configured)))
+}
+
+async function withinRoutingDeadline<T>(stage: string, run: Promise<T | null>): Promise<T | null> {
+  const deadlineMs = routingClassifierDeadlineMs()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<'expired'>((resolve) => { timer = setTimeout(() => resolve('expired'), deadlineMs) })
+  try {
+    const outcome = await Promise.race([run.catch(() => null), expired])
+    if (outcome === 'expired') {
+      console.warn('[cos-routing-classifier-deadline]', JSON.stringify({ at: new Date().toISOString(), stage, deadlineMs, action: 'verdict_abandoned_request_continues_to_answer_path' }))
+      return null
+    }
+    return outcome
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 async function defaultReasoner(args: Record<string, unknown>) {
   const { callCosReasoner } = await import('./cosReasoner.ts')
-  const deadlineMs = routingClassifierDeadlineMs()
-  const startedAt = Date.now()
-  const result = await callCosReasoner({
-    ...args,
-    usageContext: { feature: 'cos_routing_classifier', purpose: 'public_identity' },
-    disableThinking: true,
-    timeoutMs: deadlineMs,
-    allowConfiguredFallback: false,
-    persistUsage: false,
-  } as never).catch(() => null)
-  if (!result && Date.now() - startedAt >= deadlineMs - 50) {
-    console.warn('[cos-routing-classifier-deadline]', JSON.stringify({
-      at: new Date().toISOString(),
-      stage: 'public_identity',
-      deadlineMs,
-      action: 'transport_aborted_request_continues_to_answer_path',
-    }))
-  }
-  return result
+  return withinRoutingDeadline('public_identity', callCosReasoner(args as never))
 }
 
 const SUPPORTED_LANGUAGES = new Set<IdentityLanguage>(['en', 'es', 'pt', 'pl', 'ru'])
 const MAX_IDENTITY_PROMPT_CHARS = 300
-
-const SEMANTIC_IDENTITY_CANDIDATE = [
-  /\b(?:who|what) (?:are|is) (?:you|this (?:service|platform|company))\b/i,
-  /\b(?:what|which) (?:service|platform|company|site)\b/i,
-  /\b(?:your|our|this) (?:name|company|platform|brand|employer)\b/i,
-  /\b(?:who (?:owns|operates|employs)|work for|called)\b/i,
-  /\b(?:quien|cual|como)\b[^\n]{0,80}\b(?:asistente|empresa|plataforma|marca|empleador|llama)\b/i,
-  /\b(?:quem|qual|como)\b[^\n]{0,80}\b(?:assistente|empresa|plataforma|marca|empregador|chama)\b/i,
-  /\b(?:kto|jak|jaka|jaki)\b[^\n]{0,80}\b(?:asystent|firma|platforma|marka|pracodawca|nazywa)\b/i,
-  /(?:^|\s)(?:кто|что|как)\b[^\n]{0,80}\b(?:ассистент|компания|платформа|бренд|работодатель|называется)\b/i,
-]
-
-export function shouldResolveSemanticPublicIdentity(prompt: string): boolean {
-  const value = String(prompt || '').trim()
-  return Boolean(value)
-    && value.length <= MAX_IDENTITY_PROMPT_CHARS
-    && SEMANTIC_IDENTITY_CANDIDATE.some(pattern => pattern.test(value))
-}
 
 const SYSTEM_PROMPT = [
   'You are the deep-learning intent router for the public Concierge.',

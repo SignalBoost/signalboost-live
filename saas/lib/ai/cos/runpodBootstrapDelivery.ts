@@ -3,12 +3,6 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 const CONTEXT = 'itmounts:runpod:bootstrap-delivery:v1'
 export const RUNPOD_BOOTSTRAP_ROUTE_PREFIX = '/api/internal/cos/runpod-bootstrap'
 export const RUNPOD_BOOTSTRAP_FILENAME = 'runpod-cos-reasoner.sh'
-export const RUNPOD_REPAIR_FILENAME = 'repair-cos-runpod-runner.sh'
-
-const RUNPOD_DELIVERY_FILENAMES = new Set([
-  RUNPOD_BOOTSTRAP_FILENAME,
-  RUNPOD_REPAIR_FILENAME,
-])
 
 function clean(value: unknown, max = 4096): string {
   return String(value ?? '').trim().slice(0, max)
@@ -47,21 +41,12 @@ export function verifyRunpodBootstrapDeliveryToken(
   }
 }
 
-export function runpodArtifactDeliveryUrl(
-  filename: string,
+export function runpodBootstrapDeliveryUrl(
   env: Record<string, string | undefined> = process.env,
 ): string | null {
-  const artifact = clean(filename, 128)
-  if (!RUNPOD_DELIVERY_FILENAMES.has(artifact)) return null
   const apiKey = clean(env.RUNPOD_API_KEY)
   const origin = publicOrigin(env)
   if (apiKey.length < 20 || !origin) return null
   const capability = deriveRunpodBootstrapDeliveryToken(apiKey)
-  return `${origin}${RUNPOD_BOOTSTRAP_ROUTE_PREFIX}/${capability}/${artifact}`
-}
-
-export function runpodBootstrapDeliveryUrl(
-  env: Record<string, string | undefined> = process.env,
-): string | null {
-  return runpodArtifactDeliveryUrl(RUNPOD_BOOTSTRAP_FILENAME, env)
+  return `${origin}${RUNPOD_BOOTSTRAP_ROUTE_PREFIX}/${capability}/${RUNPOD_BOOTSTRAP_FILENAME}`
 }

@@ -1,4 +1,3 @@
-# .github/workflows/mission-001-coordination-security.yml
 name: Mission 001 Coordination Security
 
 on:
@@ -22,8 +21,6 @@ permissions:
 jobs:
   coordination-security:
     runs-on: ubuntu-latest
-    env:
-      NODE_OPTIONS: '--max-old-space-size=6144'
     defaults:
       run:
         working-directory: saas

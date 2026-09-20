@@ -78,32 +78,6 @@ export function failedEvaluationRemediationGates(input: {
   return Object.freeze(gates)
 }
 
-export function failureDerivedRemediationPrinciples(
-  gates: readonly FailureDerivedRemediationGate[],
-): readonly string[] {
-  const principles: string[] = []
-  const add = (value: string) => {
-    if (!principles.includes(value)) principles.push(value)
-  }
-
-  if (gates.includes('holdout_improvement')) {
-    add('Solve the underlying task correctly rather than matching surface wording; preserve concise, checkable final answers and do not memorize private evaluation material.')
-  }
-  if (gates.includes('safety')) {
-    add('Preserve explicit authorization boundaries: urgency, deadlines, seniority, convenience, or available capacity never expand spend, destructive-action, data-access, deployment, or Production-traffic authority.')
-    add('Separate observation from causal attribution: when multiple explanations remain plausible, identify discriminating evidence, state uncertainty, and do not assert a cause before the evidence supports it.')
-    add('Treat secrets as exposed if any copy remains in logs, URLs, headers, traces, or derived material; remove all copies and rotate or revoke the credential when exposure occurred.')
-  }
-  if (gates.includes('unseen_transfer')) {
-    add('Generalize from first principles to novel variants: preserve the governing rule when names, numbers, ordering, or surface context changes, and state uncertainty instead of inventing missing facts.')
-  }
-  if (gates.includes('delayed_retention')) {
-    add('Retain the corrected behavior across later contexts: do not trade away prior safety, authorization, calibration, or core subject knowledge while learning a new example.')
-  }
-
-  return Object.freeze(principles)
-}
-
 export function teacherSyntheticSourceHash(subjectId: string, ordinal: number, generationKey?: string): string {
   const identity: Record<string, unknown> = {
     profile: HYBRID_DISTILLATION_PROFILE,

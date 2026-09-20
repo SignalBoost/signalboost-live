@@ -64,7 +64,7 @@ test('closure runs in the workflow, records why, and authorizes no retry or traf
   assert.match(workflow, /async function isolatedStep/)
   assert.match(workflow, /\[cos-university-mass-distillation-step\]/)
   assert.match(workflow, /&& campaignClosure\.ok === true/)
-  assert.match(terminalCleanup, /\.in\('status', CLEANUP_CAMPAIGN_STATUSES\)/)
+  assert.match(terminalCleanup, /\.eq\('status', 'failed'\)/)
   assert.match(terminalCleanup, /\.not\('stage', 'in', '\(\"complete\",\"failed\"\)'\)/)
   assert.match(terminalCleanup, /failure_reason: reason/)
   assert.match(terminalCleanup, /retryAuthorized: false/)
@@ -80,9 +80,7 @@ test('closure runs in the workflow, records why, and authorizes no retry or traf
 
 
 test('terminal cleanup quarantines already-consumed prepared batches from failed campaigns', () => {
-  // This test could never have run: `source` was never defined in this file, so it threw a
-  // ReferenceError before reaching a single assertion.
-  const cleanup = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationTerminalCleanup.ts', import.meta.url), 'utf8')
+  const cleanup = source('../lib/ai/cos/cosUniversityMassDistillationTerminalCleanup.ts')
   assert.match(cleanup, /mass_distillation_failed_batch_quarantined/)
   assert.match(cleanup, /\.eq\('stage', 'failed'\)/)
   assert.match(cleanup, /status: 'quarantined'/)
@@ -103,29 +101,4 @@ test('terminal cleanup releases failed campaign capacity only after runs and pro
   assert.match(cleanup, /retryAuthorized: false/)
   assert.match(cleanup, /dispatchAuthorized: false/)
   assert.match(cleanup, /productionTrafficAuthorized: false/)
-})
-
-test('a campaign that ended as expired or cancelled no longer strands its unfinished runs', () => {
-  const cleanup = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationTerminalCleanup.ts', import.meta.url), 'utf8')
-  const consumer = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts', import.meta.url), 'utf8')
-
-  // Nothing else in the system can reach a run under an ended campaign: the consumer claims only
-  // authorized/active campaigns that are still unexpired, and stalled-dispatch recovery carries the
-  // same unexpired filter. So cleanup is the only path, and it must cover every ended status.
-  assert.match(cleanup, /const CLEANUP_CAMPAIGN_STATUSES = Object\.freeze\(\['failed', 'expired', 'cancelled'\]\)/)
-  assert.match(cleanup, /parent_campaign_\$\{parentStatus\}_terminal_cleanup/)
-  assert.match(consumer, /\.in\('status', \['authorized', 'active'\]\)\n\s+\.gt\('expires_at'/)
-
-  // Batch quarantine and capacity release stay failed-only: an expired campaign's prepared batches
-  // are still good curriculum and must remain reusable rather than being consumed by its expiry.
-  assert.match(cleanup, /const failedCampaignIds = campaignIds\.filter\(id => campaignStatusById\.get\(id\) === 'failed'\)/)
-  assert.match(cleanup, /\.in\('campaign_id', failedCampaignIds\)/)
-  assert.match(cleanup, /for \(const campaignId of failedCampaignIds\)/)
-  assert.match(cleanup, /\.eq\('status', 'failed'\)\n\s+\.is\('completed_at', null\)/)
-
-  // Still cleanup only.
-  assert.match(cleanup, /retryAuthorized: false/)
-  assert.match(cleanup, /dispatchAuthorized: false/)
-  assert.match(cleanup, /productionTrafficAuthorized: false/)
-  assert.doesNotMatch(cleanup, /dispatch_authorized:\s*true/)
 })

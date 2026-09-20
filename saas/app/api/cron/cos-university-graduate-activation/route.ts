@@ -6,11 +6,9 @@ import { servedCandidateModelFromCanary, type CanaryEventRow } from '@/lib/ai/co
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduateModelRegistry'
 import { decideMassGraduateRegistration, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
-import { decideGraduateArtifactLifecycleSync } from '@/lib/ai/cos/cosUniversityGraduateArtifactSync'
 import { GRADUATE_ROLLBACK_PROOF_CLAIM, GRADUATE_ROLLBACK_PROOF_PROFILE, proveGraduateRollbackReference } from '@/lib/ai/cos/cosUniversityGraduateRollbackProof'
 import { COS_UNIVERSITY_SUBJECTS } from '@/lib/ai/cos/cosUniversity'
 import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
-import { readCosUniversityGeneralistGraduationStatus } from '@/lib/ai/cos/cosUniversityGraduationRunner'
 import { createHash } from 'node:crypto'
 
 export const runtime = 'nodejs'
@@ -29,7 +27,6 @@ export const maxDuration = 300
  * owner switch is the environment flag below — fail-closed when absent.
  */
 const ACTIVATION_ENABLED_FLAG = 'COS_GRADUATE_ACTIVATION_ENABLED'
-const GENERALIST_PRIMARY_ENABLED_FLAG = 'COS_GENERALIST_PRIMARY_ACTIVATION_ENABLED'
 
 
 /**
@@ -72,14 +69,12 @@ async function resolvePendingGraduateServingIdentity(db: any, graduate: {
 }
 
 /**
- * Subject graduates activate into bounded expert roles. COS-primary is the one deliberate
- * exception: a Reasoning & Decision Science graduate may become the generalist primary worker only
- * after COS itself holds a current A/A+ generalist credential with no pending remediation. That
- * combines artifact-level improvement/safety/transfer/retention/canary gates with cross-domain
- * University qualification instead of pretending that one narrow subject artifact is a brain.
- *
- * Computer Science and Cybersecurity graduates may assist Builder as coder workers; other subject
- * graduates enter the specialist mesh as critic/verifier/researcher capabilities.
+ * Graduates activate into bounded subject-relevant roles only. No graduate becomes a competing
+ * generalist brain and no subject is granted primary authority by activation alone. Computer
+ * Science and Cybersecurity graduates may assist Builder as coder workers; other graduates enter
+ * the COS specialist mesh as critic/verifier/researcher capabilities. University-subject markers
+ * are matched against the same classifier that generated the curriculum, so learned capability
+ * can actually be selected without widening it to unrelated work.
  */
 const SUBJECT_WORKER_SCOPE: Record<string, { workerRoles: string[]; problemClasses: string[] }> = {
   computer_science: {
@@ -148,115 +143,7 @@ function canonicalGraduateSubjectId(value: unknown): string {
   return subject?.id || raw
 }
 
-type GraduateWorkerScope = { workerRoles: string[]; problemClasses: string[] }
-
-async function resolveGraduateWorkerScope(
-  canonicalSubjectId: string,
-  baseScope: GraduateWorkerScope,
-): Promise<{ scope: GraduateWorkerScope; cosPrimary: boolean; primaryGate: string }> {
-  if (canonicalSubjectId !== 'reasoning_decision_science') {
-    return { scope: baseScope, cosPrimary: false, primaryGate: 'specialist_subject' }
-  }
-  if (String(process.env[GENERALIST_PRIMARY_ENABLED_FLAG] || '').trim() !== 'true') {
-    return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_primary_disabled' }
-  }
-
-  try {
-    const status = await readCosUniversityGeneralistGraduationStatus(new Date(), 'cos')
-    const credentialStanding = status.credential?.standing || 'not_graduated'
-    const currentStanding = status.currentCompetenceStanding
-    const remediationClear = status.remediation?.pendingCount === 0
-    const qualified = status.graduated === true
-      && (credentialStanding === 'A' || credentialStanding === 'A+')
-      && (currentStanding === 'A' || currentStanding === 'A+')
-      && remediationClear
-
-    if (!qualified) {
-      return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_A_current_competence_required' }
-    }
-
-    return {
-      scope: {
-        workerRoles: ['primary', ...baseScope.workerRoles],
-        problemClasses: ['*', ...baseScope.problemClasses],
-      },
-      cosPrimary: true,
-      primaryGate: `generalist_${credentialStanding}_current_${currentStanding}_remediation_clear`,
-    }
-  } catch (error) {
-    console.warn('[cos-generalist-primary-gate] status read failed; retaining specialist scope',
-      error instanceof Error ? error.message : String(error))
-    return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_gate_unavailable' }
-  }
-}
-
-function activeWorkerRoles(scope: unknown): string[] {
-  if (!scope || typeof scope !== 'object' || Array.isArray(scope)) return []
-  const roles = (scope as Record<string, unknown>).workerRoles
-  return Array.isArray(roles) ? roles.map(value => String(value || '').trim()).filter(Boolean) : []
-}
-
 /** Writes the graduate registry row for the oldest mass artifact whose recorded evidence clears every gate. */
-// The two ledgers describing one trained model never agreed automatically. The registry moves to `active` when
-// activateGraduateRuntime proves health, identity and rollback; the artifact row is left at `runtime_pending`
-// by everyone. Besides being wrong on its face, that stalls the queue below: registerNextMassGraduate reads the
-// oldest 50 runtime_pending artifacts, so every already-activated artifact that never advanced occupies a slot
-// in the window that finds the NEXT graduate.
-//
-// Advance the artifact to `active` only where its OWN registry row (same candidate, same artifact hash) proves a
-// live runtime, and only from `runtime_pending`. The write is conditioned on that status, so it is idempotent and
-// can never overwrite a quarantined, retired or still-evaluating artifact. It proves nothing and promotes
-// nothing: activateGraduateRuntime already did that, and this only records the consequence.
-async function reconcileGraduateArtifactLifecycle() {
-  const db = cosServiceDb()
-  if (!db) return { synced: 0, reason: 'service_database_unavailable' as const }
-
-  const registry = await db.from('cos_university_graduate_model_registry')
-    .select('candidate_id,trained_artifact_hash,status')
-    .eq('status', 'active')
-    .order('updated_at', { ascending: false })
-    .limit(200)
-  if (registry.error) throw registry.error
-  const registryRows = (registry.data || []).map((row: any) => ({
-    candidateId: String(row.candidate_id || ''),
-    artifactHash: String(row.trained_artifact_hash || '').toLowerCase(),
-    status: String(row.status || ''),
-  }))
-  if (!registryRows.length) return { synced: 0, reason: 'no_active_graduate' as const }
-
-  const artifacts = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,trained_artifact_hash,status')
-    .eq('status', 'runtime_pending')
-    .in('candidate_id', registryRows.map(row => row.candidateId))
-    .limit(200)
-  if (artifacts.error) throw artifacts.error
-  const artifactRows = (artifacts.data || []).map((row: any) => ({
-    candidateId: String(row.candidate_id || ''),
-    artifactHash: String(row.trained_artifact_hash || '').toLowerCase(),
-    status: String(row.status || ''),
-  }))
-
-  const sync = decideGraduateArtifactLifecycleSync({ registry: registryRows, artifacts: artifactRows })
-  if (!sync.length) return { synced: 0, reason: 'already_in_agreement' as const }
-
-  const nowIso = new Date().toISOString()
-  const synced: string[] = []
-  for (const item of sync) {
-    const updated = await db.from('cos_local_distillation_artifacts')
-      .update({ status: item.toStatus, updated_at: nowIso })
-      .eq('candidate_id', item.candidateId)
-      .eq('trained_artifact_hash', item.artifactHash)
-      .eq('status', item.fromStatus)
-      .select('candidate_id')
-    if (updated.error) throw updated.error
-    if ((updated.data || []).length) synced.push(item.candidateId)
-  }
-  if (synced.length) {
-    console.info('[cos-graduate-artifact-lifecycle-sync]', JSON.stringify({ synced: synced.length, candidates: synced.slice(0, 20) }))
-  }
-  return { synced: synced.length, candidates: synced.slice(0, 20) }
-}
-
 async function registerNextMassGraduate() {
   const db = cosServiceDb()
   if (!db) return { registered: false as const, reason: 'service_database_unavailable' }
@@ -386,84 +273,31 @@ export async function GET(req: NextRequest) {
   try {
     // Registration is a durable record, not a runtime: it writes one pending_runtime row and spends nothing, so it
     // runs before the activation flag. Activation itself stays behind that flag and its own evidence gates.
-    // Reconciliation is a bookkeeping write about an activation that ALREADY happened and behind its own
-    // status guard, so like registration it runs before the activation flag and spends nothing.
-    const lifecycleSync = await reconcileGraduateArtifactLifecycle()
     const massRegistration = await registerNextMassGraduate()
     const rollbackProof = await proveNextGraduateRollback()
 
     if (String(process.env[ACTIVATION_ENABLED_FLAG] || '').trim() !== 'true') {
-      await recordCosUniversityProductionPath({
-        path: 'graduate_runtime_activation',
-        invocationSucceeded: true,
-        evidence: {
-          skipped: true,
-          reason: 'graduate_activation_disabled',
-          lifecycleSync,
-          massRegistration,
-          rollbackProof,
-        },
-      })
-      return NextResponse.json({ ok: true, skipped: true, reason: 'graduate_activation_disabled', lifecycleSync, massRegistration, rollbackProof })
+      return NextResponse.json({ ok: true, skipped: true, reason: 'graduate_activation_disabled', massRegistration, rollbackProof })
     }
 
     const db = cosServiceDb()
     if (!db) throw new Error('service_database_unavailable')
 
-    let graduate: any = null
-    let precomputedScopeDecision: Awaited<ReturnType<typeof resolveGraduateWorkerScope>> | null = null
-
-    if (String(process.env[GENERALIST_PRIMARY_ENABLED_FLAG] || '').trim() === 'true') {
-      // A qualified COS-primary upgrade outranks ordinary pending specialist activation. Otherwise
-      // a continually replenished specialist queue could leave COS nominally "the brain" forever.
-      const active = await db.from('cos_university_graduate_model_registry')
-        .select('candidate_id,subject_id,trained_artifact_hash,status,platform_scope,updated_at')
-        .eq('status', 'active')
-        .order('updated_at', { ascending: false })
-        .limit(20)
-      if (active.error) throw active.error
-      const primaryCandidate = (active.data || []).find((row: any) =>
-        canonicalGraduateSubjectId(row.subject_id) === 'reasoning_decision_science'
-        && !activeWorkerRoles(row.platform_scope).includes('primary')) || null
-      if (primaryCandidate) {
-        const candidateScope = SUBJECT_WORKER_SCOPE.reasoning_decision_science
-        const decision = await resolveGraduateWorkerScope('reasoning_decision_science', candidateScope)
-        if (decision.cosPrimary) {
-          graduate = primaryCandidate
-          precomputedScopeDecision = decision
-        }
-      }
+    const pending = await db.from('cos_university_graduate_model_registry')
+      .select('candidate_id,subject_id,trained_artifact_hash,status')
+      .eq('status', 'pending_runtime')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (pending.error) throw pending.error
+    if (!pending.data) {
+      return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_graduate', massRegistration, rollbackProof })
     }
 
-    if (!graduate) {
-      const pending = await db.from('cos_university_graduate_model_registry')
-        .select('candidate_id,subject_id,trained_artifact_hash,status,platform_scope')
-        .eq('status', 'pending_runtime')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-      if (pending.error) throw pending.error
-      graduate = pending.data || null
-    }
-
-    if (!graduate) {
-      await recordCosUniversityProductionPath({
-        path: 'graduate_runtime_activation',
-        invocationSucceeded: true,
-        evidence: {
-          skipped: true,
-          reason: 'no_pending_runtime_or_primary_upgrade_candidate',
-          lifecycleSync,
-          massRegistration,
-          rollbackProof,
-        },
-      })
-      return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_or_primary_upgrade_candidate', lifecycleSync, massRegistration, rollbackProof })
-    }
-
+    const graduate: any = pending.data
     const canonicalSubjectId = canonicalGraduateSubjectId(graduate.subject_id)
-    const baseScope = SUBJECT_WORKER_SCOPE[canonicalSubjectId]
-    if (!baseScope) {
+    const scope = SUBJECT_WORKER_SCOPE[canonicalSubjectId]
+    if (!scope) {
       // A subject without a declared scope is a decision, not a default. Record and stop.
       await recordCosUniversityProductionPath({
         path: 'graduate_runtime_activation',
@@ -471,34 +305,6 @@ export async function GET(req: NextRequest) {
         evidence: { error: 'graduate_subject_scope_undeclared', subjectId: graduate.subject_id, canonicalSubjectId },
       })
       return NextResponse.json({ ok: false, error: 'graduate_subject_scope_undeclared', subjectId: graduate.subject_id, canonicalSubjectId }, { status: 422 })
-    }
-
-    const scopeDecision = precomputedScopeDecision
-      ?? await resolveGraduateWorkerScope(canonicalSubjectId, baseScope)
-    const scope = scopeDecision.scope
-    if (graduate.status === 'active' && !scopeDecision.cosPrimary) {
-      await recordCosUniversityProductionPath({
-        path: 'graduate_runtime_activation',
-        invocationSucceeded: true,
-        evidence: {
-          skipped: true,
-          reason: scopeDecision.primaryGate,
-          candidateId: graduate.candidate_id,
-          subjectId: canonicalSubjectId,
-          cosPrimary: false,
-          lifecycleSync,
-          massRegistration,
-          rollbackProof,
-        },
-      })
-      return NextResponse.json({
-        ok: true,
-        skipped: true,
-        reason: scopeDecision.primaryGate,
-        candidateId: graduate.candidate_id,
-        massRegistration,
-        rollbackProof,
-      })
     }
 
     const serving = await resolvePendingGraduateServingIdentity(db, graduate)
@@ -528,8 +334,6 @@ export async function GET(req: NextRequest) {
         sourceSubjectId: graduate.subject_id,
         activated: result.activated,
         blockers: result.blockers,
-        cosPrimary: scopeDecision.cosPrimary,
-        primaryGate: scopeDecision.primaryGate,
         servingEndpointId: serving.endpointId,
         servingModelId: serving.modelId,
         servingBaseUrl: serving.baseUrl,
@@ -543,7 +347,7 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ ok: true, activated: result.activated, blockers: result.blockers, cosPrimary: scopeDecision.cosPrimary, primaryGate: scopeDecision.primaryGate })
+    return NextResponse.json({ ok: true, activated: result.activated, blockers: result.blockers })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     await recordCosUniversityProductionPath({

@@ -4,7 +4,6 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
-  MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
   MASS_EVALUATION_REOPEN_CLAIM,
@@ -21,77 +20,6 @@ const artifactA = { candidateId: 'mass:cs:1', subjectId: 'Computer Science & Cod
 const artifactB = { candidateId: 'mass:cyber:1', subjectId: 'Cybersecurity', artifactHash: hashB, createdAt: '2026-09-15T18:26:00Z' }
 const ev = (candidateId: string, verifier: string, evidence: Record<string, unknown>, observedAt = '2026-09-16T10:00:00Z', expiresAt: string | null = null): RollingEvent => ({ candidateId, verifier, evidence, observedAt, expiresAt })
 const canary = (a: typeof artifactA) => ev(a.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: a.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
-
-test('rolling throughput ceiling matches the owner-approved backlog-drain budget', () => {
-  assert.equal(MASS_EVALUATION_ROLLING_MAX_APPROVALS, 300)
-  // 300 approvals * the unchanged $0.20 per-evaluation wake ceiling = $60/day maximum authorization.
-  // This test pins throughput authority; the per-evaluation claim test below pins the $0.20 boundary itself.
-})
-
-
-test('frontier proof sampling is bounded and then returns to oldest-first order', () => {
-  assert.equal(MASS_EVALUATION_FRONTIER_PROOF_SAMPLE, 4)
-  const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
-  const frontier = { ...artifactA, candidateId: 'mass:frontier:1', artifactHash: '9'.repeat(64), createdAt: '2026-09-15T22:34:00Z', frontierRecipe: true }
-  const frontierCanary = ev(frontier.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: frontier.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
-
-  const proof = decideRollingMassEvaluationApproval({
-    enabled: true,
-    artifacts: [legacy, frontier],
-    events: [canary(legacy as typeof artifactA), frontierCanary],
-    now,
-    frontierProofCompletions: 0,
-  })
-  assert.equal(proof.issue && proof.artifact.candidateId, frontier.candidateId)
-
-  const normal = decideRollingMassEvaluationApproval({
-    enabled: true,
-    artifacts: [legacy, frontier],
-    events: [canary(legacy as typeof artifactA), frontierCanary],
-    now,
-    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
-  })
-  assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
-})
-
-test('an infrastructure-failed frontier start remains proof-prioritized until a real result exists', () => {
-  const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
-  const frontier = { ...artifactA, candidateId: 'mass:frontier:retry', artifactHash: '7'.repeat(64), createdAt: '2026-09-15T22:34:00Z', frontierRecipe: true }
-  const frontierCanary = ev(frontier.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: frontier.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
-  const priorApproval = ev(frontier.candidateId, 'host_controller', {
-    claim: 'distilled_independent_evaluation_approved',
-    artifactHash: frontier.artifactHash,
-    authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
-  }, '2026-09-16T14:00:00Z', '2026-09-16T15:00:00Z')
-  const priorStart = ev(frontier.candidateId, 'host_controller', {
-    claim: 'mass_distilled_independent_evaluation_started',
-    artifactHash: frontier.artifactHash,
-  }, '2026-09-16T14:00:10Z', '2026-09-16T14:12:10Z')
-  const infraFailure = ev(frontier.candidateId, 'host_controller', {
-    claim: 'mass_distilled_independent_evaluation_failed',
-    artifactHash: frontier.artifactHash,
-    error: 'mass_distilled_evaluation_runtime_not_ready:network',
-  }, '2026-09-16T14:05:00Z')
-
-  const decision = decideRollingMassEvaluationApproval({
-    enabled: true,
-    artifacts: [legacy, frontier],
-    events: [canary(legacy as typeof artifactA), frontierCanary, priorApproval, priorStart, infraFailure],
-    now,
-    frontierProofCompletions: 1,
-  })
-  assert.equal(decision.issue && decision.artifact.candidateId, frontier.candidateId)
-})
-
-test('cron scans the full bounded pending population and measures frontier proof completions durably', () => {
-  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /\.select\('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use'\)/)
-  assert.match(route, /\.limit\(500\)/)
-  assert.match(route, /frontierRecipe: row\.intended_use\?\.trainingReceipt\?\.profile === 'cos_university_frontier_gkd_v1'/)
-  assert.match(route, /cos_university_distilled_evaluation_runs/)
-  assert.match(route, /frontierProofCompletions = new Set/)
-  assert.match(route, /MASS_EVALUATION_FRONTIER_PROOF_SAMPLE/)
-})
 
 test('issues exactly the claim-compatible shape for a canary-proven artifact past the 12h retention delay', () => {
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now })
@@ -349,32 +277,6 @@ test('holdout format failures are evaluator infrastructure and do not consume mo
 })
 
 
-test('moving-head holdout revision failures are evaluator infrastructure and release rolling authority', () => {
-  const approval = ev(artifactA.candidateId, 'host_controller', {
-    claim: 'distilled_independent_evaluation_approved',
-    authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
-    artifactHash: hashA,
-  }, '2026-09-20T08:29:00Z', '2026-09-20T10:29:00Z')
-  const started = ev(artifactA.candidateId, 'host_controller', {
-    claim: 'mass_distilled_independent_evaluation_started',
-    artifactHash: hashA,
-  }, '2026-09-20T08:29:10Z', '2026-09-20T08:41:10Z')
-  const failed = ev(artifactA.candidateId, 'host_controller', {
-    claim: 'mass_distilled_independent_evaluation_failed',
-    artifactHash: hashA,
-    error: 'mass_distilled_evaluation_holdout_revision_moved',
-  }, '2026-09-20T08:29:20Z')
-  const decision = decideRollingMassEvaluationApproval({
-    enabled: true,
-    artifacts: [artifactA],
-    events: [canary(artifactA), approval, started, failed],
-    now: new Date('2026-09-20T15:40:00Z'),
-  })
-  assert.equal(decision.issue, true)
-  if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
-})
-
-
 test('rolling approval evidence is candidate-scoped and paginated so old exact canaries cannot fall out of a global row cap', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const candidateIds = rows\.map\(row => row\.candidateId\)/)
@@ -444,27 +346,4 @@ test('mass evaluator evidence reads have a candidate-first fine_tune index', () 
   assert.match(migration, /where event_type = 'fine_tune'/i)
   assert.match(route, /\.in\('candidate_id', candidateIds\)/)
   assert.match(route, /\.gte\('observed_at', new Date\(Date\.now\(\) - 30 \* 86_400_000\)\.toISOString\(\)\)/)
-})
-
-
-test('frontier proof claim priority is enforced atomically before returning to oldest-first', () => {
-  const migration = readFileSync(
-    new URL('../supabase/migrations/20260920225500_frontier_evaluation_proof_completions.sql', import.meta.url),
-    'utf8',
-  )
-  assert.match(migration, /v_frontier_completions integer := 0/)
-  assert.match(migration, /cos_university_distilled_evaluation_runs/)
-  assert.match(migration, /count\(distinct r\.candidate_id\)/)
-  assert.match(migration, /cos_university_frontier_gkd_v1/)
-  assert.match(migration, /v_frontier_completions < 4/)
-  assert.match(
-    migration,
-    /case[\s\S]*v_frontier_completions < 4[\s\S]*cos_university_frontier_gkd_v1[\s\S]*then 0 else 1[\s\S]*a\.created_at asc/i,
-  )
-  assert.match(migration, /v_active_reservations >= 4/)
-  assert.match(migration, /a\.created_at <= v_now - interval '12 hours'/)
-  assert.match(migration, /v_max_endpoint<>18/)
-  assert.match(migration, /v_max_judge<>4/)
-  assert.match(migration, /v_max_wake<>1/)
-  assert.match(migration, /v_max_cost>0\.200000/)
 })

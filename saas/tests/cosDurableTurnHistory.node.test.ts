@@ -20,9 +20,8 @@ test('signed-in ordinary COS and Concierge turns return a durable 202 before bac
 test('browser follows durable COS History by turn id with read-only GETs', () => {
   const client = readFileSync(join(process.cwd(), 'lib/ai/cos/agentProgressClient.ts'), 'utf8')
   assert.match(client, /findDurableCosTurnReply/)
-  assert.match(client, /COS_TURN_POLL_ATTEMPTS = 26/)
+  assert.match(client, /COS_TURN_POLL_ATTEMPTS = 4/)
   assert.match(client, /COS_HISTORY_READ_DEADLINE_MS = 2_000/)
-  assert.match(client, /PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS = 195_000/)
   assert.match(client, /AbortSignal\.any\(\[args\.signal, AbortSignal\.timeout\(COS_HISTORY_READ_DEADLINE_MS\)\]\)/)
   assert.match(client, /report\('complete', 'COS is still finishing this durable turn in History; you can continue using the page'\)/)
   assert.match(client, /\/api\/assistant\/chats\?id=/)

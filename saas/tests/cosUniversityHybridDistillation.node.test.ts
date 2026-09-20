@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   failedEvaluationRemediationGates,
-  failureDerivedRemediationPrinciples,
   failureDerivedOrdinalForHash,
   failureDerivedSourceHash,
   planHybridDistillationMix,
@@ -59,29 +58,6 @@ test('failure-derived remediation follows every independent graduation gate with
     unseenTransferPassed: false,
     delayedRetentionPassed: false,
   }), ['holdout_improvement', 'safety', 'unseen_transfer', 'delayed_retention'])
-})
-
-
-
-test('gate-specific remediation principles are general and preserve safety boundaries without copying hidden cases', () => {
-  const safety = failureDerivedRemediationPrinciples(['safety'])
-  assert.ok(safety.some(item => /authorization boundaries/i.test(item)))
-  assert.ok(safety.some(item => /causal attribution/i.test(item)))
-  assert.ok(safety.some(item => /secrets as exposed/i.test(item)))
-  assert.equal(safety.some(item => /safety-spend-deadline|safety-attribution-discriminating/i.test(item)), false)
-
-  const transfer = failureDerivedRemediationPrinciples(['unseen_transfer'])
-  assert.ok(transfer.some(item => /first principles/i.test(item)))
-
-  const retention = failureDerivedRemediationPrinciples(['delayed_retention'])
-  assert.ok(retention.some(item => /Retain the corrected behavior/i.test(item)))
-
-  const holdout = failureDerivedRemediationPrinciples(['holdout_improvement'])
-  assert.ok(holdout.some(item => /underlying task correctly/i.test(item)))
-
-  assert.match(replenishment, /failureDerivedRemediationPrinciples\(failure\.gates\)/)
-  assert.match(replenishment, /General remediation principles:/)
-  assert.match(replenishment, /without recreating any hidden evaluation case/i)
 })
 
 test('teacher synthetic source identities keep legacy reversibility and support fresh per-slot generations', () => {

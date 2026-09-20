@@ -3,10 +3,8 @@ import test from 'node:test'
 import { mustFailClosedWithoutAuthoritativeLiveEvidence } from '../lib/ai/cos/liveEvidenceFailClosed.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 
-test('stable civic lookups answer locally and do not fail closed without live evidence', () => {
-  assert.equal(requiresFreshExternalEvidence('What is the capital of France?'), false)
-  assert.equal(requiresFreshExternalEvidence('What is the capital of Spain?'), false)
-  assert.equal(requiresFreshExternalEvidence('What is the capital of Panama?'), false)
+test('stable civic lookups still request live evidence, but may use the local reasoner if search returns nothing', () => {
+  assert.equal(requiresFreshExternalEvidence('What is the capital of France?'), true)
   assert.equal(mustFailClosedWithoutAuthoritativeLiveEvidence('What is the capital of France?'), false)
   assert.equal(mustFailClosedWithoutAuthoritativeLiveEvidence('What is the capital of Kazakhstan?'), false)
 })

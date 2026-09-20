@@ -45,17 +45,23 @@ Port `8888` is Jupyter. Port `11434` is the authenticated COS reasoner gateway.
 
 The persistent volume should include `/workspace`.
 
-## Governed startup
+## One-command startup
 
-Production installs the bootstrap automatically through the authenticated iTMounts RunPod-delivery route. Repository visibility does not participate in startup.
-
-For a manual restart on an already-provisioned pod:
+After the script is available on `main`, run this in a RunPod Jupyter terminal:
 
 ```bash
-/workspace/cos-runpod-reasoner.sh
+curl -fsSL https://raw.githubusercontent.com/SignalBoost/signalboost-live/main/saas/scripts/runpod-cos-reasoner.sh -o /workspace/run-cos-reasoner.sh \
+  && chmod 700 /workspace/run-cos-reasoner.sh \
+  && /workspace/run-cos-reasoner.sh
 ```
 
-If that governed file is missing, reapply the Production RunPod startup contract rather than downloading repository content directly or placing GitHub tokens on the pod.
+If the repository is not anonymously readable from RunPod, copy the script into `/workspace/run-cos-reasoner.sh` through an authenticated repository workflow instead. Do not put GitHub tokens in the command line or in this document.
+
+The final output should contain:
+
+```text
+[cos-runpod] COS independent reasoner is READY.
+```
 
 ## Vercel environment variables
 

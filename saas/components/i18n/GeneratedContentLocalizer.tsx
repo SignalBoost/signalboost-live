@@ -42,8 +42,6 @@ const CACHE_KEY = 'signalboost_generated_content_translations_v1'
 const CACHE_LIMIT = 500
 const MAX_BATCH_SEGMENTS = 30
 const MAX_BATCH_CHARS = 16_000
-const TRANSLATION_AUTH_BACKOFF_MS = 60_000
-let translationAuthRetryAfter = 0
 
 const EXPLICIT_ROOT_SELECTOR = [
   '[data-sb-generated-content]',
@@ -268,8 +266,7 @@ function batches(entries: NodeEntry[]): NodeEntry[][] {
 async function requestTranslations(
   entries: NodeEntry[],
   targetLanguage: SupportedLanguage,
-): Promise<Map<string, string> | null> {
-  if (Date.now() < translationAuthRetryAfter) return null
+): Promise<Map<string, string>> {
   const sharedSourceLanguage = entries.every((entry) => entry.sourceLanguage === entries[0]?.sourceLanguage)
     ? entries[0]?.sourceLanguage
     : null
@@ -286,12 +283,7 @@ async function requestTranslations(
     }),
   })
 
-  if (response.status === 401) {
-    translationAuthRetryAfter = Date.now() + TRANSLATION_AUTH_BACKOFF_MS
-    return null
-  }
   if (!response.ok) return new Map()
-  translationAuthRetryAfter = 0
   const payload = await response.json().catch(() => null) as TranslationResponse | null
   if (!payload?.ok || !Array.isArray(payload.segments)) return new Map()
   return new Map(payload.segments.map((segment) => [String(segment.id), String(segment.text || '')]))
@@ -341,13 +333,6 @@ export default function GeneratedContentLocalizer() {
           if (cancelled || documentIsHidden()) break
           const translated = await requestTranslations(batch, targetLanguage)
           if (cancelled) break
-          if (translated === null) {
-            // A signed-out or expired browser session must not hammer the auth-only
-            // translation route on every DOM mutation. Preserve the source text and
-            // retry only after a bounded quiet period or a later page event.
-            rerun = false
-            break
-          }
 
           for (const entry of batch) {
             const value = translated.get(entry.id)

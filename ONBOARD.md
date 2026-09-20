@@ -45,17 +45,15 @@ University training
 -> exact-artifact Production canary + rollback proof
 -> graduate registry (pending_runtime)
 -> evidence-gated runtime activation
--> COS-primary generalist routing or subject-relevant COS / Builder worker routing
+-> subject-relevant COS / Builder worker routing
 -> provider + graduate ownership telemetry
 -> verified Production outcomes
 -> continuing education / remediation / recertification
 ```
 
-Production configuration explicitly enables `COS_GRADUATE_ACTIVATION_ENABLED=true`; the activation route still fails closed when the switch is absent and cannot bypass promotion, rollback, served-identity, health, or authority gates. `COS_GENERALIST_PRIMARY_ACTIVATION_ENABLED=true` separately permits COS-primary adoption only after the generalist gate below is satisfied.
+Production configuration explicitly enables `COS_GRADUATE_ACTIVATION_ENABLED=true`; the activation route still fails closed when the switch is absent and cannot bypass promotion, rollback, served-identity, health, or authority gates.
 
-Every canonical COS University subject has an explicit bounded activation scope. Computer Science and Cybersecurity graduates may enter the `coder` lane for Builder work; other qualified subject graduates enter critic/verifier/researcher lanes. The single deliberate primary exception is a promoted `reasoning_decision_science` artifact for COS itself: it may receive `primary` plus generalist (`*`) routing only when COS holds an awarded A/A+ generalist undergraduate credential, current generalist competence is still A/A+, and undergraduate remediation is clear. Artifact-level improvement, safety, unseen-transfer, delayed-retention, exact-canary, rollback, served-identity and runtime-health gates remain mandatory. If the generalist gate is absent, stale, or unreadable, the artifact remains a bounded specialist rather than silently becoming the brain.
-
-This makes the architecture operational rather than nominal: once the qualified COS-primary graduate is active, it is selected ahead of the base reasoner for ordinary primary reasoning; specialists remain subordinate expert workers; the ordinary RunPod model remains fallback compute; DeepInfra remains bounded fallback/exception compute rather than COS's default intelligence. Runtime selection for specialists still matches the bounded problem-class taxonomy and `university:<subject_id>` markers. Unknown subjects remain blocked rather than receiving wildcard scope.
+Every canonical COS University subject has an explicit bounded activation scope. Activation never grants `primary` authority by itself. Computer Science and Cybersecurity graduates may enter the `coder` lane for Builder work; other qualified graduates enter subject-relevant critic/verifier/researcher lanes. Runtime selection matches both the existing bounded problem-class taxonomy and `university:<subject_id>` scope markers produced from the same University subject classifier that drives curriculum. Unknown subjects remain blocked rather than receiving a wildcard scope.
 
 A graduate that fails its independent gates remains quarantined and receives no Production traffic. An active graduate that fails or becomes unhealthy must fall back to the ordinary approved runtime and retain exact candidate/artifact attribution for outcome measurement and rollback.
 
@@ -90,8 +88,6 @@ Production distillation runtime invariant (2026-09-20 hotfix):
 - Repository pooling may create at most one bootstrap pool repository only when no compatible pool repository exists; a provider 429/rate-limit response fails closed rather than launching repeated repository-creation attempts.
 - Exact-artifact identity remains `repo + immutable Hub commit revision + artifact hash`; pooling may reduce repository count but may never weaken exact-artifact canary, evaluation, provenance, rollback, or promotion gates.
 - HF worker delivery must use the authenticated **public application origin** when one is configured. Deployment-specific Vercel hostnames may be protected before the application capability-token route executes and can return login HTML to external HF Jobs. The derived HF capability token remains mandatory, raw GitHub remains forbidden, and the job bootstrap must validate worker-source contract markers before executing downloaded bytes. The worker/base-worker dependency contract remains versioned and fail-closed; a source mismatch must terminate before training rather than execute HTML or a mismatched worker.
-- The every-minute mass-distillation cron is a **wake-up signal, not concurrent execution authority**. The canonical workflow must acquire a service-role-only durable lease before reconciliation/recovery/dispatch/maintenance. If another healthy invocation owns the lease, the tick returns a successful `workflow_lease_held` skip. The lease is fenced by an opaque UUID, expires automatically after the Vercel execution ceiling, and is released on normal completion so a killed invocation cannot block the University indefinitely.
-- Mass-distilled independent evaluation may run at most **four unresolved reservations concurrently**. This is a throughput control only: the 300 approvals/24h rolling ceiling, 12-hour delayed-retention gate, exact-artifact Production canary, 18 endpoint calls, 4 judge calls, one runtime wake, <=$0.20 wake ceiling, scoring thresholds, rollback/promotion gates and Production-traffic prohibition remain unchanged. The database advisory lock still serializes claim creation so concurrent ticks cannot over-allocate the four slots.
 
 ## University Self-Healing progress invariant — 2026-09-19
 
@@ -157,33 +153,6 @@ Canonical latency rules:
 - University exams, controlled evaluations, training/distillation, Builder batch work, and other non-interactive workloads keep their own routing and evaluation policies.
 
 A user-facing turn that spends tens of seconds in RunPod lifecycle or RunPod inference before answering is a latency regression, not expected COS behavior.
-
-## Answerability-first cognitive mode invariant — 2026-09-20
-
-Interactive COS must decide **what kind of cognition the task requires before spending the answer budget**.
-
-Canonical order:
-
-```text
-deterministic/scope facts already supplied or governed
--> local answerability attempt from COS knowledge/memory/University capability
--> fresh verification only when the claim is mutable/current or explicitly requested
--> external fallback only when the governed local answer is unavailable/insufficient
-```
-
-Routing classifiers are not answers and may not monopolize the primary reasoner. Obvious deterministic identity/visual/software/authoring routes stay zero-cost. Optional semantic identity/visual classifiers are admitted only for requests shaped like those domains, must preserve their requested compact token ceiling, disable model thinking, use an actual transport deadline (default 2.5 seconds), and must not leave orphan model work after the route has continued.
-
-Cognitive mode is task-sensitive:
-
-- deterministic extraction, classification, translation/edit fidelity, permission and strict-JSON control decisions use temperature 0/low, no hidden reasoning, compact output and hard deadlines;
-- ordinary factual/explanatory work uses bounded normal reasoning;
-- diagnostic/root-cause/planning work may use deeper analytical reasoning when evidence and complexity justify it;
-- explicitly creative writing/brainstorming/naming/concept work uses a higher-diversity creative profile while preserving supplied facts and constraints;
-- current/live facts use verification rather than model-memory confidence;
-- stable reference facts such as country capitals and immutable historical facts stay on the local answerability path by default; a direct-question grammar alone must never manufacture a freshness requirement;
-- code, Builder, visuals and University workloads retain their specialized governed lanes.
-
-Telemetry must distinguish **pre-answer routing time** from actual answer time and record whether the completed turn was locally answerable, required fresh verification, required external fallback, or remained unresolved. A long response to a locally answerable ordinary question is a performance regression even if the browser timeout did not fire.
 
 ## COS Direct Editor fast capability — 2026-09-18
 

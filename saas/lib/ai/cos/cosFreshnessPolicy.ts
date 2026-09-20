@@ -38,7 +38,7 @@ const LIVE_NEWS = /\b(?:latest|today(?:'s)?|live|breaking|recent|updated)\s+(?:n
 
 // High-frequency public data that should use a structured real-time provider when available.
 const WEATHER_STATE = /\b(?:weather|weather forecast|forecast(?:s)?|temperature|rainfall|snowfall|storm warning|hurricane warning)\b/i
-const FINANCIAL_STATE = /\b(?:exchange rate|exchange rates|forex rate|forex rates|stock price|stock prices|share price|share prices|crypto price|crypto prices|cryptocurrency price|cryptocurrency prices|market data|market quote|market quotes|stock market|financial market|index value|index values|price\s+of\s+[a-z0-9._-]{1,20}\s+(?:stock|shares?))\b/i
+const FINANCIAL_STATE = /\b(?:exchange rate|exchange rates|forex rate|forex rates|stock price|stock prices|share price|share prices|crypto price|crypto prices|cryptocurrency price|cryptocurrency prices|market data|market quote|market quotes|stock market|financial market|index value|index values)\b/i
 const TICKER_PRICE = /\b[A-Z]{1,6}(?:['’]s)?\s+(?:stock\s+)?price\b/
 const CRYPTO_PRICE = /\b(?:bitcoin|btc|ethereum|eth|solana|sol|cryptocurrency|crypto)\b.{0,35}\b(?:price|quote|rate)\b|\b(?:price|quote|rate)\b.{0,35}\b(?:bitcoin|btc|ethereum|eth|solana|sol|cryptocurrency|crypto)\b/i
 const SPORTS_STATE = /\b(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa|sports?|game|match)\b.{0,45}\b(?:score|scores|standings|schedule)\b|\b(?:score|scores|standings)\b.{0,45}\b(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa|sports?|game|match)\b/i
@@ -55,7 +55,7 @@ const ROUTE_DIRECTNESS = /\b(?:direct|non[- ]?stop|nonstop|directos?|directas?|d
 const TRANSPORT_ROUTE_NOUN = /\b(?:flights?|routes?|connections?|services?|trains?|ferr(?:y|ies)|buses|coach(?:es)?|rail|airlines?|carriers?|vuelos?|v[o\u00f4]os?|trenes?|comboios?|loty|lot[o\u00f3]w|poci[\u0105a]g[a-z\u00f3\u017c]*|\u0440\u0435\u0439\u0441[\u0430-\u044f]*|\u043f\u043e\u0435\u0437\u0434[\u0430-\u044f]*)\b/iu
 const TRIP_VOLATILITY = /\b(?:prices?|costs?|cheap(?:est|er)?|fares?|when|what\s+time|schedules?|timetables?|status|delay(?:ed|s)?|cancel(?:led|ed|s|lation)?|land(?:ed|s|ing)?|arriv(?:e|ed|al|es)|depart(?:ed|s|ure)?|board(?:ing)?|on\s+time|book(?:ing)?|available|availability|today|tonight|tomorrow|next|this\s+(?:week|weekend|month)|cu[a\u00e1]nto|precios?|barat[oa]s?|horarios?|cu[a\u00e1]ndo|quando|pre[\u00e7c]os?|ile\s+kosztuj|kiedy|ceny?|\u0446\u0435\u043d[\u0430-\u044f]|\u0441\u043a\u043e\u043b\u044c\u043a\u043e|\u043a\u043e\u0433\u0434\u0430|\u0440\u0430\u0441\u043f\u0438\u0441\u0430\u043d\u0438[\u0435\u044f])\b/iu
 const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
-const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements|e-?verify)\b/i
+const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements)\b/i
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
 const HIGH_STAKES_SECURITY_RELEASE = /\b(?:zero[- ]day|high[- ]severity\s+vulnerabilit|unauthorized\s+(?:read|access)|tenant\s+(?:metadata|data)|infosec|security\s+lead)\b/i
 // A supplied incident scenario asks COS to assess stated facts, not discover a real-world incident.
@@ -178,17 +178,6 @@ export function isPlatformSelfKnowledgePrompt(input: string): boolean {
 // consume a public search merely because they begin with "what".
 const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i
 const LOCAL_CLOCK_OR_DATE = /^\s*(?:what(?:'s|\s+is)?\s+)?(?:the\s+)?(?:current\s+)?(?:date|time|day)(?:\s+(?:today|now|is\s+it))?\s*[?!.]*\s*$/i
-
-/**
- * Direct lookups are not fresh merely because they are phrased as a question. These markers
- * identify reference facts whose answer can materially change without the user saying "current".
- * Stable reference knowledge (for example a country's capital or a historical founding date)
- * remains locally answerable unless a separate temporal/live rule above requires verification.
- */
-const MUTABLE_REFERENCE_STATE = /\b(?:population|how\s+many\s+people|people\s+live\s+in|residents?|headquarter(?:ed|s)?|owns?|ownership|parent\s+company|subsidiar(?:y|ies)|member\s+of|membership|largest\s+population|smallest\s+population|most\s+populous|official(?:ly)?\s+recognized\s+languages?|official\s+languages?|languages?\s+(?:are\s+)?official(?:ly)?\s+recognized)\b/i
-const SUBJECTIVE_RANKING_LOOKUP = /(?:\b(?:highest[-\s]?rated|top[-\s]?rated|most\s+popular)\b|^\s*(?:what|which|who)\b[^?!.]{0,100}\b(?:best|greatest)\b(?![-\s]?case\b)|^\s*(?:qual|quais)\b[^?!.]{0,100}\bmelhor(?:es)?\b|^\s*(?:cu[aá]l|cu[aá]les)\b[^?!.]{0,100}\bmejor(?:es)?\b|^\s*(?:jaki|jaka|jakie|kt[oó]ry|kt[oó]ra|kt[oó]re)\b[^?!.]{0,100}\bnajlepsz[\p{L}]*\b|^\s*(?:какой|какая|какие|кто)\b[^?!.]{0,100}\bлуч[\p{L}]*\b)/iu
-const STABLE_REFERENCE_LOOKUP = /(?:^\s*(?:what|which)\b[^?!.]{0,80}\bcapital\s+of\b|^\s*when\b[^?!.]{1,120}\b(?:founded|established|created|invented|built|published)\b|^\s*who\s+(?:founded|created|invented|designed|wrote|painted|composed)\b|^\s*(?:qual|quais|cu[aá]l|cu[aá]les)\b[^?!.]{0,80}\bcapital\s+(?:de|do|da)\b|^\s*(?:jaki|jaka|jakie)\b[^?!.]{0,80}\bstolic[\p{L}]*\b|^\s*(?:какой|какая|какие)\b[^?!.]{0,80}\bстолиц[\p{L}]*\b)/iu
-const STABLE_TECHNICAL_REFERENCE = /\b(?:rank\s+of\s+(?:(?:this|the|a)\s+)?matrix|top[-\s]?level\s+domain|(?:best|worst|average)[-\s]?case\s+time\s+complexity)\b/i
 
 function normalizedText(input: string): string {
   return englishNormalizedForClassification(String(input || '')).replace(/\s+/g, ' ').trim()
@@ -319,9 +308,6 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   // state, current rules/security state, and recent events. Domain-specific checks below remain as
   // additional safeguards for terse lookups without explicit temporal wording.
   if (classifyTemporalSensitivity(text).sensitive) return true
-  // If the user explicitly asks for current/latest/live state, do not override that request merely
-  // because the underlying fact is usually stable (for example, "current capital of X").
-  if (LOOKUP_INTENT.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
 
   if (PRESENT_TENSE_OFFICE_HOLDER.test(text)) return true
   if (TERSE_CURRENT_OFFICE_HOLDER.test(text)) return true
@@ -333,14 +319,6 @@ export function requiresFreshExternalEvidence(input: string): boolean {
 
   if (CONCEPTUAL_OR_CREATIVE.test(text)) return false
 
-  // Mutable reference state and subjective/current ranking questions may benefit from live evidence
-  // even without an explicit "current" marker. This is intentionally narrower than the old blanket
-  // rule that forced every direct factual lookup through public search.
-  if (LOOKUP_INTENT.test(text) && MUTABLE_REFERENCE_STATE.test(text)) return true
-  // Ranking/evaluative questions are comparative by nature and may depend on current evidence.
-  // Keep this multilingual and independent of English-only LOOKUP_INTENT.
-  if (SUBJECTIVE_RANKING_LOOKUP.test(text)) return true
-
   if (structuredLiveDataKind(text)) return true
   if (LOOKUP_INTENT.test(text) && OUTAGE_STATE.test(text)) return true
   if (isDirectOrTerseLookup(text, TRAVEL_STATE)) return true
@@ -350,13 +328,9 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (LOOKUP_INTENT.test(text) && SOFTWARE_SECURITY_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
   if (LOOKUP_INTENT.test(text) && LIFE_STATUS_STATE.test(text)) return true
 
-  // Positively identified stable reference facts are locally answerable. Keep this list narrow:
-  // unknown direct external lookups remain conservatively live-verified so a new mutable fact class
-  // cannot silently fall back to model memory.
-  if (STABLE_REFERENCE_LOOKUP.test(text)) return false
-  if (STABLE_TECHNICAL_REFERENCE.test(text)) return false
-
-  // Conservative stale-world protection for any direct lookup not proven stable above.
+  // General stale-world protection: any remaining direct external factual lookup is verified live by
+  // default. It is intentionally last so internal, historical, conceptual, and deterministic
+  // requests keep their correct specialized routes.
   if (LOOKUP_INTENT.test(text)) return true
 
   return false

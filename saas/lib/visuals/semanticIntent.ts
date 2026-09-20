@@ -3,7 +3,6 @@
 // module graph uses path aliases the plain test runner cannot resolve, and this
 // classifier must stay unit-testable without booting the whole COS stack.
 import { boundedRecentUserTurns, composeUserAuthoredVisualObjective } from './conversationIntent.ts'
-import { hasVisualActionToken, isConciergeVisualObjective } from './intent.ts'
 
 type VisualIntentReasoner = (args: Record<string, unknown>) => Promise<{ text?: string } | null>
 type ConversationMessage = Readonly<{ role?: unknown; content?: unknown }>
@@ -14,55 +13,38 @@ export type SemanticVisualResolution = Readonly<{
   continuation: boolean
 }>
 
-// Semantic visual routing is an optional control verdict, not the answer.
-// Only genuinely visual-shaped ambiguity reaches it, and the underlying model call itself is
-// bounded/no-thinking so a timeout cannot leave an orphan inference blocking the answer.
-const ROUTING_CLASSIFIER_DEFAULT_MS = 2_500
+// Routing classifiers are short JSON verdicts that run BEFORE the answer path on the public browser
+// ingress. Unbounded, a slow model turn here consumed the time the answer needed and Vercel killed
+// the request at maxDuration ("the page stopped waiting"). A verdict not reached within this window
+// is treated exactly like any other missing verdict: fail closed to "not a match" and the request
+// continues to the normal answer path. Shared env var across both routing classifiers.
+const ROUTING_CLASSIFIER_DEFAULT_MS = 15_000
 
 function routingClassifierDeadlineMs(): number {
   const configured = Number(process.env.COS_ROUTING_CLASSIFIER_TIMEOUT_MS)
   if (!Number.isFinite(configured) || configured <= 0) return ROUTING_CLASSIFIER_DEFAULT_MS
-  return Math.min(5_000, Math.max(750, Math.floor(configured)))
+  return Math.min(30_000, Math.max(2_000, Math.floor(configured)))
+}
+
+async function withinRoutingDeadline<T>(stage: string, run: Promise<T | null>): Promise<T | null> {
+  const deadlineMs = routingClassifierDeadlineMs()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<'expired'>((resolve) => { timer = setTimeout(() => resolve('expired'), deadlineMs) })
+  try {
+    const outcome = await Promise.race([run.catch(() => null), expired])
+    if (outcome === 'expired') {
+      console.warn('[cos-routing-classifier-deadline]', JSON.stringify({ at: new Date().toISOString(), stage, deadlineMs, action: 'verdict_abandoned_request_continues_to_answer_path' }))
+      return null
+    }
+    return outcome
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 async function defaultReasoner(args: Record<string, unknown>) {
   const { callCosReasoner } = await import('../ai/cos/cosReasoner.ts')
-  const deadlineMs = routingClassifierDeadlineMs()
-  const startedAt = Date.now()
-  const result = await callCosReasoner({
-    ...args,
-    usageContext: { feature: 'cos_routing_classifier', purpose: 'visual_intent' },
-    disableThinking: true,
-    timeoutMs: deadlineMs,
-    allowConfiguredFallback: false,
-    persistUsage: false,
-  } as never).catch(() => null)
-  if (!result && Date.now() - startedAt >= deadlineMs - 50) {
-    console.warn('[cos-routing-classifier-deadline]', JSON.stringify({
-      at: new Date().toISOString(),
-      stage: 'visual_intent',
-      deadlineMs,
-      action: 'transport_aborted_request_continues_to_answer_path',
-    }))
-  }
-  return result
-}
-
-const SEMANTIC_VISUAL_ACTION_HINT = /(?:\b(?:narysuj\p{L}*|narysow\p{L}*|rysow\p{L}*|naszkicuj\p{L}*|dibuj\p{L}*|draw\p{L}*|sketch\p{L}*|illustrat\p{L}*|render\p{L}*|paint\p{L}*|narisovat\p{L}*)\b|(?:нарис|изобраз|визуализ|проиллюстр))/iu
-
-export function shouldResolveSemanticVisualRequest(
-  messages: readonly ConversationMessage[],
-  latestPrompt: string,
-): boolean {
-  const current = String(latestPrompt || '').trim()
-  if (!current || isConciergeVisualObjective(current)) return false
-  if (hasVisualActionToken(current) || SEMANTIC_VISUAL_ACTION_HINT.test(current)) return true
-
-  // Short elliptical follow-ups deserve semantic continuity only when recent USER context was
-  // already visual-shaped. Ordinary questions never pay this classifier cost.
-  if (current.length > 320) return false
-  const turns = boundedRecentUserTurns(messages, current)
-  return turns.slice(0, -1).some(turn => isConciergeVisualObjective(turn) || hasVisualActionToken(turn))
+  return withinRoutingDeadline('visual_intent', callCosReasoner(args as never))
 }
 
 /**

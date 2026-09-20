@@ -12,7 +12,6 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
-import { countUniversityResponseWords, universityLengthRevisionPrompt } from './cosUniversityAgentCapstone.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
 import type { CosPlatformLanguage, CosPlatformLanguageDimension } from './cosUniversityLanguages.ts'
@@ -346,58 +345,7 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
     return { runId: row.id, target, status: 'error', passed: null, assessmentRecorded: false, manifestHash: exam.manifestHash, reasons, latencyMs: Date.now() - started }
   }
 
-  const draftReply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
-  // COS was the only learner answering these exams without the disclosed-length revision every bound
-  // specialist already gets. The case states its word limit in the learner prompt, COS's answers exceeded it,
-  // and the scorer counted the over-limit text as submitted - so `word_limit_exceeded` failures were a missing
-  // step in the exam recipe, not a knowledge gap. One rewrite of its own draft, by the same learner on the same
-  // model, with the same limit the case already disclosed. It adds no knowledge, sees no rubric and grades
-  // nothing; the score below still counts exactly the text that is submitted.
-  const responseContract = universityExamResponseContract(exam)
-  const draftWords = countUniversityResponseWords(draftReply)
-  let reply = draftReply
-  let lengthRevision: Readonly<{
-    limit: number; draftWords: number; finalWords: number; revisionApplied: boolean; reason?: string
-  }> | null = null
-  if (responseContract && draftReply.trim() && draftWords > responseContract.maxWords) {
-    let revisionApplied = false
-    let reason: string | undefined
-    try {
-      const revised = await tryCOSFirstAnswer({
-        prompt: universityLengthRevisionPrompt({
-          limit: responseContract.maxWords, draftWords, casePrompt: learnerPrompt, draft: draftReply,
-        }),
-        language: target.kind === 'language' ? target.language : 'en',
-        privileged: true,
-        disableCache: true,
-      })
-      const revisedReply = revised.handled ? revised.reply : ('bestEffortReply' in revised ? revised.bestEffortReply ?? '' : '')
-      // The rewrite must come from the same local reasoning path as the draft, and must actually be
-      // shorter. A longer or cache-replayed "revision" is discarded and the original draft is submitted.
-      const revisedLocally = revised.provenance.localModelInvoked
-        && !revised.provenance.externalAiInvoked
-        && revised.provenance.responseSource !== 'semantic_cache'
-        && revised.provenance.responseSource !== 'semantic_similarity'
-      const revisedWords = countUniversityResponseWords(revisedReply)
-      if (!revisedReply.trim()) reason = 'revision_empty'
-      else if (!revisedLocally) reason = 'revision_provenance_rejected'
-      else if (revisedWords >= draftWords) reason = 'revision_not_shorter'
-      else {
-        reply = revisedReply
-        revisionApplied = true
-      }
-    } catch (error) {
-      // A failed rewrite must never fail the exam: the original draft is submitted and scored as before.
-      reason = `revision_error:${error instanceof Error ? error.message : String(error)}`
-    }
-    lengthRevision = Object.freeze({
-      limit: responseContract.maxWords,
-      draftWords,
-      finalWords: countUniversityResponseWords(reply),
-      revisionApplied,
-      ...(reason ? { reason } : {}),
-    })
-  }
+  const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
   const turnId = peekEvidenceSourceUseTurnId()
   const provenance = {
     localReasoning: result.provenance.localModelInvoked,
@@ -467,7 +415,6 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
         responseSource: result.provenance.responseSource,
         localModelInvoked: result.provenance.localModelInvoked,
         externalAiInvoked: result.provenance.externalAiInvoked,
-        ...(lengthRevision ? { lengthRevision } : {}),
         reasons: score.reasons,
       },
       observedAt: observedAt.toISOString(),

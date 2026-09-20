@@ -171,11 +171,7 @@ export async function executeBoundSoftwareCapstone(request: AgentCapstoneRequest
   if (wordLimit !== undefined && draftWords > wordLimit) {
     const revisionPrompt = universityLengthRevisionPrompt({ limit: wordLimit, draftWords, casePrompt: inferencePrompt, draft })
     const revised = await ports.infer({ prompt: revisionPrompt, systemPrompt, maxTokens: 4096 }, model)
-    // A rewrite was accepted whenever it was non-empty, including when it came back LONGER than the draft it
-    // was meant to shorten - so the one revision this lane is allowed could make the word-limit failure worse.
-    // Accept it only when it is actually shorter; otherwise submit the original draft.
     const revisionApplied = typeof revised === 'string' && Boolean(revised.trim())
-      && countUniversityResponseWords(revised) < draftWords
     if (revisionApplied) reply = revised as string
     lengthRevision = Object.freeze({
       limit: wordLimit, draftWords, finalWords: countUniversityResponseWords(reply),

@@ -9,23 +9,12 @@ function hash(value: unknown): string {
 }
 
 /**
- * Terminalize orphaned nonterminal runs whose parent campaign has already ended.
- *
- * This used to look at `failed` campaigns only. A campaign that ends as `expired` (its window closed
- * with partial progress) or `cancelled` keeps every run that never finished - teacher_pending,
- * preparation_pending, training_pending, or a *_dispatching claim - sitting nonterminal forever:
- * the consumer only claims campaigns that are still authorized/active AND unexpired, and the stalled
- * dispatch recovery carries the same unexpired filter, so nothing in the system can ever reach those
- * rows again. They are reported as pending work that no tick will ever pick up.
- *
- * Batch quarantine and campaign capacity release stay scoped to `failed` campaigns exactly as before.
- * That distinction is deliberate: a failed parent terminally consumes its batch identity, while an
- * expired campaign's prepared batches are still good curriculum and must stay reusable.
+ * Terminalize orphaned nonterminal runs whose parent campaign is already failed.
  *
  * This is cleanup only: it retries nothing, dispatches nothing, authorizes no spend, and does not
- * touch a campaign that is still inside its own window.
+ * touch active/authorized campaigns. It closes stale run-state left behind when a campaign reaches
+ * a failed terminal state before every child row was itself terminalized.
  */
-const CLEANUP_CAMPAIGN_STATUSES = Object.freeze(['failed', 'expired', 'cancelled'])
 export async function terminalizeFailedMassDistillationCampaignRuns(input: { maxCampaigns?: number } = {}) {
   const db = cosServiceDb()
   if (!db) return Object.freeze({
@@ -38,24 +27,17 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
   })
 
   const campaigns = await db.from('cos_university_mass_distillation_campaigns')
-    .select('id,status')
-    .in('status', CLEANUP_CAMPAIGN_STATUSES)
+    .select('id')
+    .eq('status', 'failed')
     .order('updated_at', { ascending: true })
     .limit(Math.max(1, Math.min(input.maxCampaigns ?? 20, 100)))
   if (campaigns.error) throw campaigns.error
 
-  const campaignStatusById = new Map<string, string>()
-  for (const row of (campaigns.data || []) as any[]) {
-    const id = String(row.id || '')
-    if (id) campaignStatusById.set(id, String(row.status || ''))
-  }
-  const campaignIds = [...campaignStatusById.keys()]
-  // Batch quarantine and capacity release keep their original failed-only scope.
-  const failedCampaignIds = campaignIds.filter(id => campaignStatusById.get(id) === 'failed')
+  const campaignIds = (campaigns.data || []).map((row: any) => String(row.id || '')).filter(Boolean)
   if (!campaignIds.length) return Object.freeze({
     ok: true as const,
     skipped: true as const,
-    reason: 'no_terminal_campaign',
+    reason: 'no_failed_campaign',
     campaignsInspected: 0,
     terminalizedRuns: 0,
     runs: [] as unknown[],
@@ -73,8 +55,7 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
   for (const raw of pending.data || []) {
     const row: any = raw
     const now = new Date().toISOString()
-    const parentStatus = campaignStatusById.get(String(row.campaign_id)) || 'failed'
-    const reason = `parent_campaign_${parentStatus}_terminal_cleanup`
+    const reason = 'parent_campaign_failed_terminal_cleanup'
     const updated = await db.from('cos_university_mass_distillation_batch_runs')
       .update({
         stage: 'failed',
@@ -132,11 +113,11 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
   // "prepared" is misleading and can make inventory/monitoring report stock that rolling
   // authorization is forbidden to reuse. Quarantine every still-prepared batch whose run is
   // already terminal-failed under a failed campaign.
-  const failedRuns = failedCampaignIds.length ? await db.from('cos_university_mass_distillation_batch_runs')
+  const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')
     .select('id,campaign_id,batch_key,candidate_id,subject_id,stage,failure_reason')
-    .in('campaign_id', failedCampaignIds)
+    .in('campaign_id', campaignIds)
     .eq('stage', 'failed')
-    .limit(500) : { data: [] as any[], error: null }
+    .limit(500)
   if (failedRuns.error) throw failedRuns.error
 
   const quarantinedBatches: Array<{ batchKey: string; runId: string; campaignId: string }> = []
@@ -194,18 +175,18 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
   // A failed campaign with only terminal runs and no unsettled provider job is fully terminal.
   // Marking completed_at releases the rolling admission slot; otherwise the database correctly
   // fences it as an in-flight failed campaign and can deadlock all four dynamic campaign slots.
-  const remainingNonterminal = failedCampaignIds.length ? await db.from('cos_university_mass_distillation_batch_runs')
+  const remainingNonterminal = await db.from('cos_university_mass_distillation_batch_runs')
     .select('campaign_id')
-    .in('campaign_id', failedCampaignIds)
+    .in('campaign_id', campaignIds)
     .not('stage', 'in', '("complete","failed")')
-    .limit(500) : { data: [] as any[], error: null }
+    .limit(500)
   if (remainingNonterminal.error) throw remainingNonterminal.error
 
-  const unsettledJobs = failedCampaignIds.length ? await db.from('cos_university_mass_distillation_provider_jobs')
+  const unsettledJobs = await db.from('cos_university_mass_distillation_provider_jobs')
     .select('campaign_id')
-    .in('campaign_id', failedCampaignIds)
+    .in('campaign_id', campaignIds)
     .is('settled_at', null)
-    .limit(500) : { data: [] as any[], error: null }
+    .limit(500)
   if (unsettledJobs.error) throw unsettledJobs.error
 
   const blockedCampaigns = new Set<string>([
@@ -214,7 +195,7 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
   ].filter(Boolean))
   const completedCampaigns: string[] = []
 
-  for (const campaignId of failedCampaignIds) {
+  for (const campaignId of campaignIds) {
     if (blockedCampaigns.has(campaignId)) continue
     const now = new Date().toISOString()
     const completed = await db.from('cos_university_mass_distillation_campaigns')
@@ -257,7 +238,7 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
     ok: true as const,
     skipped: terminalized.length === 0 && quarantinedBatches.length === 0 && completedCampaigns.length === 0,
     reason: terminalized.length === 0 && quarantinedBatches.length === 0 && completedCampaigns.length === 0
-      ? 'no_orphaned_nonterminal_terminal_campaign_run'
+      ? 'no_orphaned_nonterminal_failed_campaign_run'
       : null,
     campaignsInspected: campaignIds.length,
     terminalizedRuns: terminalized.length,

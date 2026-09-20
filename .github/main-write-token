@@ -1,2 +1,2 @@
-base_sha=9c53b78bf0a5a89c15765af77f92da973ac6df23
-branch=fix/restore-supabase-load-shed-cadence
+base_sha=00d7276edd254950f3e6739f3e97286a3d430dd9
+branch=fix/mass-evaluator-runpod-timeout-recovery-v3

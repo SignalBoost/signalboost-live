@@ -36,12 +36,14 @@ test('v2 preserves the proven LoRA shape so the experiment isolates optimizer ex
   assert.match(worker, /TRAINING_INPUT_PROFILE = "student_chat_template_v1"/)
 })
 
-test('the exact training recipe becomes immutable artifact evidence', () => {
+test('the exact executed training recipe becomes immutable artifact evidence for legacy and frontier modes', () => {
   assert.match(worker, /itmounts_training_profile\.json/)
   assert.match(worker, /profile_path\.write_text/)
   assert.match(worker, /artifact_hash = base\.directory_hash\(output_dir\)/)
   assert.ok(worker.indexOf('profile_path.write_text') < worker.indexOf('artifact_hash = base.directory_hash(output_dir)'))
-  assert.match(worker, /"trainingProfile": TRAINING_PROFILE/)
+  assert.match(worker, /FRONTIER_TRAINING_PROFILE = "cos_university_frontier_gkd_v1"/)
+  assert.match(worker, /recipe\["profile"\] = TRAINING_PROFILE/)
+  assert.match(worker, /"trainingProfile": recipe\["profile"\]/)
   assert.match(worker, /"trainingRecipe": recipe/)
 })
 

@@ -300,7 +300,7 @@ export function buildHuggingFaceJobSpec(input: {
     command = workerBootstrap([
       'huggingface_hub>=0.34,<2',
       'datasets>=3,<5',
-      'transformers>=4.55,<6',
+      'transformers>=4.56.2,<6',
       'accelerate>=1.10,<2',
       'peft>=0.17,<1',
       'trl==1.10.0',

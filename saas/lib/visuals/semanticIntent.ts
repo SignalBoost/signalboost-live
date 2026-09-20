@@ -48,13 +48,15 @@ async function defaultReasoner(args: Record<string, unknown>) {
   return result
 }
 
+const SEMANTIC_VISUAL_ACTION_HINT = /(?:\b(?:narysuj\p{L}*|naszkicuj\p{L}*|dibuj\p{L}*|draw\p{L}*|sketch\p{L}*|illustrat\p{L}*|render\p{L}*|paint\p{L}*|narisovat\p{L}*)\b|(?:нарис|изобраз|визуализ|проиллюстр))/iu
+
 export function shouldResolveSemanticVisualRequest(
   messages: readonly ConversationMessage[],
   latestPrompt: string,
 ): boolean {
   const current = String(latestPrompt || '').trim()
   if (!current || isConciergeVisualObjective(current)) return false
-  if (hasVisualActionToken(current)) return true
+  if (hasVisualActionToken(current) || SEMANTIC_VISUAL_ACTION_HINT.test(current)) return true
 
   // Short elliptical follow-ups deserve semantic continuity only when recent USER context was
   // already visual-shaped. Ordinary questions never pay this classifier cost.

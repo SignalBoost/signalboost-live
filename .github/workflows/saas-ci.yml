@@ -1,3 +1,4 @@
+# .github/workflows/saas-ci.yml
 name: SaaS CI
 
 # Runs on every push to main (the working branch) and on pull requests.
@@ -265,6 +266,9 @@ jobs:
     runs-on: ubuntu-latest
     # Build can compile without real secrets; placeholders satisfy module-load client init.
     env:
+      # Next 16 isolated build workers strip max-old-space-size from NODE_OPTIONS.
+      # max-heap-size propagates to the worker and prevents the default ~2 GB heap OOM.
+      NODE_OPTIONS: '--max-heap-size=4096'
       NEXT_TELEMETRY_DISABLED: '1'
       NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'
@@ -303,10 +307,3 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify Issue #205 architecture
         run: npm run verify:issue-205
-
-
-
-
-
-
-

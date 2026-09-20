@@ -325,7 +325,6 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   }
 }
 
-
 export async function runCosUniversityMassDistillationWorkflow(input: {
   source: MassDistillationWorkflowSource
   now?: Date
@@ -339,7 +338,11 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     lease = await claimUniversityMassDistillationWorkflowLease()
   } catch (error) {
     const message = safeError(error)
-    console.error('[cos-university-mass-distillation-lease]', JSON.stringify({ ok: false, reason: 'workflow_lease_unavailable', error: message }))
+    console.error('[cos-university-mass-distillation-lease]', JSON.stringify({
+      ok: false,
+      reason: 'workflow_lease_unavailable',
+      error: message,
+    }))
     return {
       response: {
         ok: false,
@@ -361,7 +364,11 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
         skipped: true,
         reason: 'workflow_lease_held',
         workflowSource: input.source,
-        workflowLease: { acquired: false, expiresAt: lease.expiresAt, ttlSeconds: lease.ttlSeconds },
+        workflowLease: {
+          acquired: false,
+          expiresAt: lease.expiresAt,
+          ttlSeconds: lease.ttlSeconds,
+        },
         automaticPromotionAuthorized: false,
         runpodMutationAuthorized: false,
         authorityExpanded: false,
@@ -377,14 +384,22 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       ...outcome,
       response: {
         ...outcome.response,
-        workflowLease: { acquired: true, expiresAt: lease.expiresAt, ttlSeconds: lease.ttlSeconds },
+        workflowLease: {
+          acquired: true,
+          expiresAt: lease.expiresAt,
+          ttlSeconds: lease.ttlSeconds,
+        },
       },
     }
   } finally {
     try {
       await releaseUniversityMassDistillationWorkflowLease(lease.ownerToken)
     } catch (error) {
-      console.error('[cos-university-mass-distillation-lease]', JSON.stringify({ ok: false, reason: 'workflow_lease_release_failed', error: safeError(error) }))
+      console.error('[cos-university-mass-distillation-lease]', JSON.stringify({
+        ok: false,
+        reason: 'workflow_lease_release_failed',
+        error: safeError(error),
+      }))
     }
   }
 }

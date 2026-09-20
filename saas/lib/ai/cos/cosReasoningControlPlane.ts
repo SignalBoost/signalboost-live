@@ -12,6 +12,13 @@ export type CosReasoningRequest = {
   jsonObject?: boolean
   /** Preserve inference routing/billing attribution through worker selection. */
   usageContext?: LocalInferenceUsageContext
+  /** Preserve deterministic/latency-sensitive inference controls through worker selection. */
+  frequencyPenalty?: number
+  presencePenalty?: number
+  disableThinking?: boolean
+  timeoutMs?: number
+  allowConfiguredFallback?: boolean
+  persistUsage?: boolean
   requestedRole?: CosReasoningWorkerRole
   allowExternalEscalation?: boolean
 }

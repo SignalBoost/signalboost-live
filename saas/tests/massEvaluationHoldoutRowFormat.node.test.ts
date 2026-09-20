@@ -86,11 +86,12 @@ test('an unparsed row reports its structure so the shape can be identified witho
   assert.doesNotMatch(thrown, /text\.slice\(/)
 })
 
-test('holdout integrity and count checks are untouched by the parse widening', () => {
-  // Widening what parses must never widen what is trusted.
+test('holdout integrity is pinned to the recorded commit rather than the dataset moving HEAD', () => {
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_integrity_failed/)
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_count_invalid/)
-  assert.match(SOURCE, /mass_distilled_evaluation_holdout_revision_moved/)
+  assert.match(SOURCE, /readPinnedHfParquetRows\(\{repoId,revision,split,token\}\)/)
+  assert.doesNotMatch(SOURCE, /mass_distilled_evaluation_holdout_revision_moved/)
+  assert.doesNotMatch(SOURCE, /api\/datasets\/\$\{repoId\.split/)
   assert.match(SOURCE, /sha256Raw\(text\)\s*!==\s*itemHash/)
 })
 

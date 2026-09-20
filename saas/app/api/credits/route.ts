@@ -33,33 +33,44 @@ export async function GET() {
       }
     )
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: claimsData, error: authError } = await supabase.auth.getClaims()
+    if (authError) {
+      const status = Number((authError as { status?: number }).status || 0)
+      if (status === 0 || status === 408 || status === 429 || status >= 500) {
+        return NextResponse.json(
+          { error: 'auth_temporarily_unavailable' },
+          { status: 503, headers: { 'Retry-After': '2' } },
+        )
+      }
+      return NextResponse.json(
+        { credits: 0, plan: 'free', name: null, role: 'guest', isAdmin: false, isOwner: false },
+        { status: 401 },
+      )
+    }
 
-    if (!user?.id) {
+    const claims = claimsData?.claims as { sub?: string; email?: string; user_metadata?: Record<string, any> } | undefined
+    const userId = String(claims?.sub || '').trim()
+    const email = String(claims?.email || '').trim().toLowerCase()
+    if (!userId) {
       return NextResponse.json(
         { credits: 0, plan: 'free', name: null, role: 'guest', isAdmin: false, isOwner: false },
         { status: 401 }
       )
     }
 
-    // The user above has already been verified by Supabase for this request.
-    // Reuse that trusted identity instead of issuing another auth lookup.
-    const access = accessFromVerifiedIdentity(user.id, user.email)
-
-    const meta = (user.user_metadata || {}) as Record<string, any>
+    const access = accessFromVerifiedIdentity(userId, email)
+    const meta = (claims?.user_metadata || {}) as Record<string, any>
     const name =
       meta.full_name ||
       meta.name ||
-      (user.email ? user.email.split('@')[0] : null)
+      (email ? email.split('@')[0] : null)
 
     // Credit state is best-effort. Passing the already-verified email also
     // prevents getCreditState() from doing a service-role getUserById() merely
     // to rediscover owner/admin credit bypass.
     let state: Awaited<ReturnType<typeof getCreditState>> | null = null
     try {
-      state = await getCreditState(user.id, { verifiedEmail: user.email })
+      state = await getCreditState(userId, { verifiedEmail: email })
     } catch {
       state = null
     }

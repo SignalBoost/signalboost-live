@@ -83,6 +83,7 @@ test('evaluator infrastructure failures do not exhaust the artifact retry budget
     'The operation was aborted due to timeout',
     'mass_distilled_evaluation_runpod_http_502:baseline:cases=4:gateway',
     'mass_distilled_evaluation_answer_missing:0a546e1b26656083',
+    'mass_distilled_evaluation_holdout_format_invalid',
     'mass_distilled_evaluation_runtime_not_ready:204',
   ].map((error, i) => ev(artifactA.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashA, error }, `2026-09-16T1${i}:00:00Z`))
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), rollingApproval, ...failures], now })
@@ -238,4 +239,30 @@ test('a hard rolling denial exits before the atomic claim while an armed/no-elig
   assert.ok(denial >= 0 && claim > denial && preflight > claim && wake > preflight)
   assert.match(route, /rolling_mass_evaluation_window_exhausted/)
   assert.doesNotMatch(route.slice(route.indexOf('const hardRollingDenial'), claim), /no_mass_artifact_eligible_for_rolling_evaluation/)
+})
+
+
+test('holdout format failures are evaluator infrastructure and do not consume model retry or rolling-window authority', () => {
+  const approval = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'distilled_independent_evaluation_approved',
+    authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+    artifactHash: hashA,
+  }, '2026-09-16T12:00:00Z', '2026-09-16T14:00:00Z')
+  const started = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_started',
+    artifactHash: hashA,
+  }, '2026-09-16T12:00:10Z', '2026-09-16T12:12:10Z')
+  const failed = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_failed',
+    artifactHash: hashA,
+    error: 'mass_distilled_evaluation_holdout_format_invalid',
+  }, '2026-09-16T12:00:20Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA), approval, started, failed],
+    now,
+  })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
 })

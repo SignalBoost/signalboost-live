@@ -91,9 +91,22 @@ test('holdout integrity and count checks are untouched by the parse widening', (
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_integrity_failed/)
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_count_invalid/)
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_revision_moved/)
-  assert.match(SOURCE, /sha256Raw\(text\)!==itemHash/)
+  assert.match(SOURCE, /sha256Raw\(text\)\s*!==\s*itemHash/)
 })
 
 test('structured prompt/response columns still take precedence over text parsing', () => {
-  assert.match(SOURCE, /structuredPrompt&&structuredReference\?\{prompt:structuredPrompt,reference:structuredReference\}:parseTrainingText\(text\)/)
+  assert.match(SOURCE, /const structuredPrompt = clean\(row\.prompt, 100_000\)/)
+  assert.match(SOURCE, /const structuredReference = clean\(row\.response, 100_000\)/)
+  assert.match(SOURCE, /structuredPrompt && structuredReference/)
+  assert.match(SOURCE, /parseTrainingText\(text\)/)
 })
+
+test('response-only legacy hosted rows are recovered only after immutable manifest validation', () => {
+  assert.match(SOURCE, /legacyHostedPromptByResponseHash/)
+  const manifestGate = SOURCE.indexOf('manifestHash(observed) !== input.expectedManifestHash')
+  const legacyRecovery = SOURCE.indexOf('await legacyHostedPromptByResponseHash')
+  assert.ok(manifestGate >= 0 && legacyRecovery > manifestGate)
+  assert.match(SOURCE, /reference: row\.text/)
+})
+
+// Legacy hosted rows are immutable response-only evidence; prompt recovery must stay exact-bound and fail closed.

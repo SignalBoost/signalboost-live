@@ -1,2 +1,2 @@
-base_sha=87fc7f250b2ac8f51b707b2937799cdab6b02d71
-branch=fix/graduate-adoption-loop
+base_sha=94a92593bf8bd6cb8e64d201902c5b5985b427ea
+branch=fix/graduate-legacy-scope-routing

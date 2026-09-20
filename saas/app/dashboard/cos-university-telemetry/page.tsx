@@ -1,7 +1,7 @@
 // saas/app/dashboard/cos-university-telemetry/page.tsx
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import {
   COS_UNIVERSITY_TELEMETRY_COPY,
@@ -62,7 +62,8 @@ type Telemetry = {
   runs?: Run[]
 }
 
-const REFRESH_MS = 10_000
+const REFRESH_MS = 60_000
+const MAX_REFRESH_MS = 300_000
 
 function money(value: number | null | undefined): string {
   return '$' + Number(value || 0).toFixed(4)
@@ -109,8 +110,12 @@ export default function CosUniversityTelemetryPage() {
   const [data, setData] = useState<Telemetry | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const inFlight = useRef(false)
+  const consecutiveFailures = useRef(0)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<boolean> => {
+    if (inFlight.current) return true
+    inFlight.current = true
     setBusy(true)
     try {
       const response = await fetch('/api/admin/cos-university-telemetry', {
@@ -119,18 +124,36 @@ export default function CosUniversityTelemetryPage() {
       })
       const body = await response.json().catch(() => ({})) as Telemetry
       setData(body)
-      setError(response.ok && body.ok ? '' : body.error || copy.requestFailed)
+      const ok = response.ok && body.ok === true
+      setError(ok ? '' : body.error || copy.requestFailed)
+      consecutiveFailures.current = ok ? 0 : consecutiveFailures.current + 1
+      return ok
     } catch (err) {
+      consecutiveFailures.current += 1
       setError(err instanceof Error ? err.message : copy.requestFailed)
+      return false
     } finally {
+      inFlight.current = false
       setBusy(false)
     }
   }, [copy.requestFailed])
 
   useEffect(() => {
-    void load()
-    const timer = window.setInterval(() => { void load() }, REFRESH_MS)
-    return () => window.clearInterval(timer)
+    let cancelled = false
+    let timer: number | undefined
+    const tick = async () => {
+      const ok = await load()
+      if (cancelled) return
+      const delay = ok
+        ? REFRESH_MS
+        : Math.min(MAX_REFRESH_MS, REFRESH_MS * (2 ** Math.min(consecutiveFailures.current, 3)))
+      timer = window.setTimeout(() => { void tick() }, delay)
+    }
+    void tick()
+    return () => {
+      cancelled = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
   }, [load])
 
   const summary = data?.summary || {}

@@ -158,6 +158,22 @@ export async function claimBuilderJob(jobId: string, userId: string): Promise<Bu
   return row ? toJob(row) : null
 }
 
+export async function deferBuilderJobForCapacity(input: {
+  job: BuilderJobRecord
+  reason: 'builder_runpod_primary_busy' | 'builder_turn_timeout'
+}): Promise<boolean> {
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.rpc('defer_builder_job_capacity', {
+    p_job_id: input.job.id,
+    p_user_id: input.job.userId,
+    p_generation: input.job.claimGeneration,
+    p_reason: input.reason,
+  })
+  if (error) throw new Error(`builder_job_capacity_defer: ${error.message}`)
+  return data === true
+}
+
 export async function reconcileStaleBuilderJobs(input: {
   userId: string
   jobId?: string | null

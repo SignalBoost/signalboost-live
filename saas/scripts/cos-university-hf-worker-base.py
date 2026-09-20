@@ -91,6 +91,34 @@ def row_text(row: dict[str, Any]) -> str:
     return canonical(row)
 
 
+def supervised_pair(row: dict[str, Any], text: str) -> tuple[str, str]:
+    prompt = clean(row.get("prompt"), 100_000)
+    response = clean(row.get("response"), 100_000)
+    if not prompt or not response:
+        messages = row.get("messages")
+        if isinstance(messages, list):
+            for message in messages:
+                if not isinstance(message, dict):
+                    continue
+                role = clean(message.get("role"), 40).lower()
+                content = clean(message.get("content"), 100_000)
+                if role == "user" and content and not prompt:
+                    prompt = content
+                elif role == "assistant" and content:
+                    response = content
+    if (not prompt or not response) and text:
+        user_marker = "<user>\n"
+        assistant_marker = "\n\n<assistant>\n"
+        user_at = 0 if text.startswith(user_marker) else text.find("\n\n" + user_marker)
+        if user_at >= 0:
+            candidate = text[user_at + (0 if user_at == 0 else 2):]
+            assistant_at = candidate.find(assistant_marker)
+            if candidate.startswith(user_marker) and assistant_at > len(user_marker):
+                prompt = prompt or clean(candidate[len(user_marker):assistant_at], 100_000)
+                response = response or clean(candidate[assistant_at + len(assistant_marker):], 100_000)
+    return prompt, response
+
+
 def manifest_hash(items: list[str]) -> str:
     return sha256(json.dumps({"items": sorted(items)}, separators=(",", ":")))
 
@@ -353,21 +381,12 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
         text = row_text(raw_row)
         if not text:
             continue
-        digest = sha256(text)
-        prompt = clean(raw_row.get("prompt"), 100_000)
-        response = clean(raw_row.get("response"), 100_000)
+        prompt, response = supervised_pair(raw_row, text)
+        # A training/holdout row without both sides of a supervised pair cannot be graded later.
+        # Do not partition canonical JSON or answer-only material into a supervised dataset.
         if not prompt or not response:
-            messages = raw_row.get("messages")
-            if isinstance(messages, list):
-                for message in messages:
-                    if not isinstance(message, dict):
-                        continue
-                    role = clean(message.get("role"), 40).lower()
-                    content = clean(message.get("content"), 100_000)
-                    if role == "user" and content and not prompt:
-                        prompt = content
-                    elif role == "assistant" and content:
-                        response = content
+            continue
+        digest = sha256(text)
         by_hash.setdefault(digest, {
             "text": text,
             "item_hash": digest,

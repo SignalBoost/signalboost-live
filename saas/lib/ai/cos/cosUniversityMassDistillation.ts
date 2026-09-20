@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 // actually needs a client loads it lazily below, where Next resolves the alias normally.
 import type { cosServiceDb as CosServiceDbFactory } from '@/lib/cos-core/storage/supabase'
 import { classifyCosUniversitySubjects, cosUniversitySubjectById, type CosUniversitySubjectId } from './cosUniversity.ts'
+import { planHybridDistillationMix, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const
 export const MASS_DISTILLATION_SOURCE_POLICY = 'public_domain_cc0_v1' as const
@@ -216,6 +217,39 @@ export function retainedIdentityEligibleForMassDistillation(row: RetainedDistill
     && classifyMassDistillationRights(row.license) !== null
 }
 
+function massDistillationHybridOrigin(sourceKind: string): HybridDistillationOrigin {
+  if (sourceKind === 'failure_derived_curriculum') return 'failure_derived'
+  if (sourceKind === 'teacher_synthetic_curriculum' || sourceKind === 'teacher_hosted_curriculum') return 'teacher_synthetic'
+  return 'real_source'
+}
+
+function selectHybridDistillationChunk(rows: readonly NormalizedIdentity[]): NormalizedIdentity[] {
+  if (rows.length < MASS_DISTILLATION_MIN_BATCH) return []
+  const ordered = [...rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
+  const failureCount = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'failure_derived').length
+  // Remediation must not be diluted inside a large 128-item batch. When any independently-derived
+  // failure curriculum is available, package a minimum-sized corrective cohort first; once those
+  // rows are consumed, normal high-throughput batch sizing resumes.
+  const targetSize = Math.min(
+    failureCount > 0 ? MASS_DISTILLATION_MIN_BATCH : MASS_DISTILLATION_MAX_BATCH,
+    ordered.length,
+  )
+  const real = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'real_source')
+  const failure = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'failure_derived')
+  const synthetic = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'teacher_synthetic')
+  const mix = planHybridDistillationMix({
+    batchSize: targetSize,
+    realSourceAvailable: real.length,
+    failureDerivedAvailable: failure.length,
+  })
+  const selected = [
+    ...real.slice(0, mix.realSource),
+    ...failure.slice(0, mix.failureDerived),
+    ...synthetic.slice(0, mix.teacherSynthetic),
+  ].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
+  return selected.length === targetSize ? selected : []
+}
+
 function normalizeIdentity(raw: RetainedDistillationIdentity): NormalizedIdentity {
   return Object.freeze({
     contentHash: clean(raw.contentHash, 64).toLowerCase(),
@@ -345,10 +379,12 @@ export function buildMassDistillationBatches(
   const requestedMax = positiveSafeInteger(maxBatches, MASS_DISTILLATION_MAX_BATCHES_PER_RUN)
   const orderedGroups = [...groups.entries()].sort((a, b) => b[1].rows.length - a[1].rows.length || a[0].localeCompare(b[0]))
   for (const [subjectKey, group] of orderedGroups) {
-    const ordered = [...group.rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
-    for (let offset = 0; offset + MASS_DISTILLATION_MIN_BATCH <= ordered.length; offset += MASS_DISTILLATION_MAX_BATCH) {
-      const chunk = ordered.slice(offset, offset + MASS_DISTILLATION_MAX_BATCH)
+    let remaining = [...group.rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
+    while (remaining.length >= MASS_DISTILLATION_MIN_BATCH) {
+      const chunk = selectHybridDistillationChunk(remaining)
       if (chunk.length < MASS_DISTILLATION_MIN_BATCH) break
+      const selectedHashes = new Set(chunk.map(item => item.contentHash))
+      remaining = remaining.filter(item => !selectedHashes.has(item.contentHash))
       const sourceHashes = chunk.map(item => item.contentHash)
       const rightsClasses = [...new Set(chunk.map(item => classifyMassDistillationRights(item.license)).filter((value): value is DistillationRightsClass => Boolean(value)))].sort()
       const curriculumHash = hash({

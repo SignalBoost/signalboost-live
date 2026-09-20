@@ -604,6 +604,8 @@ def _force_trainable_fp32(model) -> int:
     The 4-bit base still computes in FP16. AMP/GradScaler is deliberately disabled for this lane
     because T4-class CUDA cannot unscale BF16 gradients. Only trainable parameters are upcast.
     """
+    import torch
+
     changed = 0
     for parameter in model.parameters():
         if not parameter.requires_grad:

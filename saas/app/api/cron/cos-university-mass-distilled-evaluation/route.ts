@@ -15,7 +15,6 @@ import {
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
-  MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   decideRollingMassEvaluationApproval,
   type RollingArtifact,
   type RollingEvent,
@@ -337,13 +336,7 @@ export async function GET(req: NextRequest) {
     }
 
     const rolling = await ensureRollingMassEvaluationApproval()
-    // Production 2026-09-20 recorded 87 approvals against a 24/day cap, spread across artifacts each burning
-  // its four attempts on an unparseable holdout. Counting the approvals actually visible in this window makes
-  // that observable from the log line instead of only from a database query after the fact.
-  const rollingApprovalMarker = { authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF }
-  const approvalsInWindow = all.filter(row => row.evidence
-    && (row.evidence as Record<string, unknown>).authorizationRef === rollingApprovalMarker.authorizationRef).length
-  console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify({ ...rolling, approvalsInWindow }))
+    console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
     // No provider/runtime work may occur unless this invocation actually obtained rolling
     // authorization. Treat every non-issued decision as a hard stop, not only today's known
     // reason strings, so a new authority reason cannot accidentally fall through to claim/wake.

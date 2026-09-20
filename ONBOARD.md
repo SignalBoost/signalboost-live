@@ -27,6 +27,7 @@ Changing `SignalBoost/signalboost-live` between public and private must **not** 
 
 - Production bootstrap, worker delivery, probes, recovery and Self-Healing may not depend on unauthenticated `raw.githubusercontent.com` or another public-repository-only transport.
 - RunPod bootstrap delivery must use an authenticated iTMounts public application route with a derived capability token; the RunPod account control credential itself must never be exposed to the Pod or URL.
+- A running Pod whose stored startup command still contains the retired raw-GitHub bootstrap is a one-time migration case: the Production probe may replace that exact legacy contract in place, then return to the normal rule that ordinary running-contract mismatches preserve scarce capacity rather than reset it.
 - Hugging Face worker delivery remains on its separately authenticated iTMounts public route.
 - Repository visibility changes must not cause retry storms, repeated repair loops, Supabase write/read amplification, provider mutation, or runtime reconfiguration.
 - Private-repository reads needed by owner tools must use authenticated GitHub APIs and fail closed with bounded retries.

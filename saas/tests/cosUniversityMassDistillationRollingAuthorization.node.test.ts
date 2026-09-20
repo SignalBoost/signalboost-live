@@ -141,3 +141,18 @@ test('workflow fills dynamic campaign capacity before dispatching available work
   assert.match(workflow, /maxDispatches: 5/)
   assert.match(workflow, /fill_available_dynamic_capacity_dispatch_any_compatible_lane/)
 })
+
+
+test('workflow repairs inert full capacity in the same tick before waiting for maintenance', () => {
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  assert.match(workflow, /rollingAuthorization\.reason === 'dynamic_capacity_full'/)
+  assert.match(workflow, /no_authorized_campaign/)
+  assert.match(workflow, /no_claimable_campaign/)
+  assert.match(workflow, /isolatedStep\('capacity_recovery'[\s\S]*recoverMassDistillationCampaigns\(\{ now, maxCampaigns: 4 \}\)/)
+  assert.match(workflow, /postRecoveryAuthorization = \{ \.\.\.\(await authorizeAvailableUniversityMassDistillationCampaigns\(\)\) \}/)
+  assert.match(workflow, /postRecoveryConsumer = await runMassDistillationCampaignConsumer\(\{ now, maxDispatches: 5 \}\)/)
+  assert.match(workflow, /capacityRecovery\.ok === true/)
+  assert.match(workflow, /postRecoveryAuthorization\.ok === true/)
+  assert.match(workflow, /postRecoveryConsumer\.ok === true/)
+  assert.match(workflow, /evict_inert_capacity_same_tick_reauthorize_dispatch/)
+})

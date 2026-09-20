@@ -60,11 +60,6 @@ function safeModelName(value: string | undefined | null, fallback: string): stri
   return model
 }
 
-function bootstrapRef(): string {
-  const value = String(process.env.RUNPOD_BOOTSTRAP_REF || process.env.VERCEL_GIT_COMMIT_SHA || 'main').trim()
-  return /^[a-f0-9]{40}$/i.test(value) ? value : 'main'
-}
-
 /**
  * Derive an inference-only credential from the RunPod control credential. The root RunPod API key is
  * never sent to the model gateway. Compromise of this derived token grants only access to the
@@ -89,7 +84,6 @@ export function desiredRunpodStartupContract(options: RunpodStartupOptions = {})
   const reasonerModel = safeModelName(options.reasonerModel || process.env.RUNPOD_PRIMARY_MODEL, 'qwen2.5-coder:32b')
   const embeddingModel = safeModelName(options.embeddingModel || process.env.RUNPOD_PRIMARY_EMBEDDING_MODEL, 'nomic-embed-text')
   const gatewayKey = runpodGatewayKey()
-  const ref = bootstrapRef()
   const bootstrapUrl = runpodBootstrapDeliveryUrl(process.env)
   if (!bootstrapUrl) throw new Error('runpod_bootstrap_delivery_not_configured')
   const command = [

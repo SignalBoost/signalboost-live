@@ -186,7 +186,8 @@ const LOCAL_CLOCK_OR_DATE = /^\s*(?:what(?:'s|\s+is)?\s+)?(?:the\s+)?(?:current\
  * remains locally answerable unless a separate temporal/live rule above requires verification.
  */
 const MUTABLE_REFERENCE_STATE = /\b(?:population|how\s+many\s+people|people\s+live\s+in|residents?|headquarter(?:ed|s)?|owns?|ownership|parent\s+company|subsidiar(?:y|ies)|member\s+of|membership|largest\s+population|smallest\s+population|most\s+populous|official(?:ly)?\s+recognized\s+languages?|official\s+languages?|languages?\s+(?:are\s+)?official(?:ly)?\s+recognized)\b/i
-const SUBJECTIVE_RANKING_LOOKUP = /\b(?:best|top|greatest|highest[-\s]?rated|most\s+popular|rank(?:ed|ing)?|melhor(?:es)?|mejor(?:es)?|najlepsz[\p{L}]*|луч[\p{L}]*)\b/iu
+const SUBJECTIVE_RANKING_LOOKUP = /(?:\b(?:highest[-\s]?rated|top[-\s]?rated|most\s+popular)\b|^\s*(?:what|which|who)\b[^?!.]{0,100}\b(?:best|greatest)\b(?![-\s]?case\b)|^\s*(?:qual|quais)\b[^?!.]{0,100}\bmelhor(?:es)?\b|^\s*(?:cu[aá]l|cu[aá]les)\b[^?!.]{0,100}\bmejor(?:es)?\b|^\s*(?:jaki|jaka|jakie|kt[oó]ry|kt[oó]ra|kt[oó]re)\b[^?!.]{0,100}\bnajlepsz[\p{L}]*\b|^\s*(?:какой|какая|какие|кто)\b[^?!.]{0,100}\bлуч[\p{L}]*\b)/iu
+const STABLE_REFERENCE_LOOKUP = /(?:^\s*(?:what|which)\b[^?!.]{0,80}\bcapital\s+of\b|^\s*when\b[^?!.]{1,120}\b(?:founded|established|created|invented|built|published)\b|^\s*who\s+(?:founded|created|invented|designed|wrote|painted|composed)\b|^\s*(?:qual|quais|cu[aá]l|cu[aá]les)\b[^?!.]{0,80}\bcapital\s+(?:de|do|da)\b|^\s*(?:jaki|jaka|jakie)\b[^?!.]{0,80}\bstolic[\p{L}]*\b|^\s*(?:какой|какая|какие)\b[^?!.]{0,80}\bстолиц[\p{L}]*\b)/iu
 
 function normalizedText(input: string): string {
   return englishNormalizedForClassification(String(input || '')).replace(/\s+/g, ' ').trim()
@@ -348,8 +349,13 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (LOOKUP_INTENT.test(text) && SOFTWARE_SECURITY_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
   if (LOOKUP_INTENT.test(text) && LIFE_STATUS_STATE.test(text)) return true
 
-  // Remaining direct lookups are answerability-first: stable reference knowledge is allowed to use
-  // COS/local knowledge immediately. Fresh verification is reserved for the explicit volatile,
-  // temporal, governed, structured-live, or ranking categories above.
+  // Positively identified stable reference facts are locally answerable. Keep this list narrow:
+  // unknown direct external lookups remain conservatively live-verified so a new mutable fact class
+  // cannot silently fall back to model memory.
+  if (STABLE_REFERENCE_LOOKUP.test(text)) return false
+
+  // Conservative stale-world protection for any direct lookup not proven stable above.
+  if (LOOKUP_INTENT.test(text)) return true
+
   return false
 }

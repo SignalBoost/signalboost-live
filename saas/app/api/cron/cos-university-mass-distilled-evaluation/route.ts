@@ -15,6 +15,7 @@ import {
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
+  MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   decideExhaustedMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
   type ExhaustedMassEvaluationArtifact,
@@ -124,7 +125,7 @@ type RawClaim = Readonly<{
 }>
 
 // An artifact that has spent its substantive attempt budget can never be approved again, yet nothing moved it
-// out of `evaluation_pending`. It stayed in this lane's selection window - the OLDEST 50 pending rows - so a
+// out of `evaluation_pending`. It stayed in this lane's selection window - the bounded pending selection window - so a
 // run of dead artifacts at the front of the queue starves every newer artifact behind them, while the lane
 // reports them as waiting. Give them the terminal status their verdict already implies, and record WHY in the
 // same ledger the evaluation writes to, so a real failure is visible to curriculum work instead of vanishing.
@@ -188,15 +189,16 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const artifacts = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
+    .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
     .eq('status', 'evaluation_pending')
     .like('candidate_id', 'mass:%')
     .order('created_at', { ascending: true })
-    .limit(50)
+    .limit(500)
   if (artifacts.error) throw artifacts.error
   const rows: RollingArtifact[] = (artifacts.data || []).map((row: any) => ({
     candidateId: clean(row.candidate_id, 240), subjectId: clean(row.subject_id, 240),
     artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
+    frontierRecipe: row.intended_use?.trainingReceipt?.profile === 'cos_university_frontier_gkd_v1',
   }))
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
   // Scope evidence to the pending candidates being evaluated this tick. Supabase/PostgREST can cap
@@ -253,6 +255,35 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     verifier: clean(row.verifier, 80), evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
   }))
   const now = new Date()
+
+  // The current frontier recipe cannot improve itself until it receives independent measurements.
+  // Production 2026-09-20 had 34 retention-eligible frontier artifacts with zero evaluation starts while
+  // legacy retries occupied the bounded queue window. Count distinct frontier starts across all statuses so
+  // completed/quarantined proof artifacts still satisfy the sample; failure to read this optional scheduling
+  // signal falls back to normal oldest-first order rather than blocking evaluation.
+  let frontierProofStarts = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
+  try {
+    const frontierArtifacts = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id')
+      .contains('intended_use', { trainingReceipt: { profile: 'cos_university_frontier_gkd_v1' } })
+      .like('candidate_id', 'mass:%')
+      .limit(500)
+    if (!frontierArtifacts.error) {
+      const frontierIds = (frontierArtifacts.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)
+      if (frontierIds.length) {
+        const frontierStarts = await db.from('cos_university_learning_assurance_events')
+          .select('candidate_id')
+          .eq('event_type', 'fine_tune')
+          .in('candidate_id', frontierIds)
+          .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1', claim: 'mass_distilled_independent_evaluation_started' })
+          .limit(1000)
+        if (!frontierStarts.error) frontierProofStarts = new Set((frontierStarts.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
+      }
+    }
+  } catch {
+    frontierProofStarts = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
+  }
+
   // Clear artifacts the approval policy has already refused permanently before choosing this tick's work, so
   // the selection window holds only artifacts that can still be evaluated.
   const exhausted = decideExhaustedMassEvaluationArtifacts({ artifacts: rows, events: all, now })
@@ -273,6 +304,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     artifacts: remaining,
     events: all,
     now,
+    frontierProofStarts,
   })
   if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }
   const inserted = await db.from('cos_university_learning_assurance_events').insert({

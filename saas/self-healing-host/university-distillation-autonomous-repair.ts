@@ -13,7 +13,11 @@ const MAX_AUTOMATIC_RETRIES = 3
 const STARTING_PATHS = Object.freeze([
   'saas/lib/ai/cos/cosUniversityMassDistillation.ts',
   'saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts',
+  'saas/lib/ai/cos/cosUniversityMassDistillationTerminalCleanup.ts',
+  'saas/lib/ai/cos/cosUniversityMassDistillationRollingAuthorization.ts',
   'saas/lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts',
+  'saas/app/api/cron/cos-university-mass-distillation/route.ts',
+  'saas/scripts/cos-university-hf-worker-base.py',
   'saas/self-healing-host/university-distillation-monitoring.ts',
   'saas/tests/cosUniversityMassDistillation.node.test.ts',
   'saas/tests/cosUniversityDistillationSelfHealing.node.test.ts',
@@ -42,18 +46,26 @@ function stringMeta(incident: SupervisorIncident, key: string): string {
   return String(incident.metadata?.[key] || '').trim()
 }
 
-export function isUniversityDistillationPackagingStallIncident(incident: SupervisorIncident): boolean {
+export function isUniversityDistillationRepairableIncident(incident: SupervisorIncident): boolean {
   const reasons = Array.isArray(incident.metadata?.healthReasons)
-    ? incident.metadata.healthReasons.map(value => String(value))
+    ? incident.metadata.healthReasons.map(value => String(value)).filter(Boolean)
     : []
   return incident.errorCode === UNIVERSITY_DISTILLATION_HEALTH_ERROR_CODE
     && incident.metadata?.nativeProbe === 'cos-university-mass-distillation'
-    && reasons.includes('curriculum_packaging_stalled')
-    && incident.metadata?.curriculumPackagingStalled === true
+    && reasons.length > 0
     && incident.metadata?.recoveryPreauthorized === true
     && incident.metadata?.authorityExpanded === false
     && incident.metadata?.automaticPromotionAuthorized === false
     && incident.metadata?.runpodMutationAuthorized === false
+}
+
+export function isUniversityDistillationPackagingStallIncident(incident: SupervisorIncident): boolean {
+  const reasons = Array.isArray(incident.metadata?.healthReasons)
+    ? incident.metadata.healthReasons.map(value => String(value))
+    : []
+  return isUniversityDistillationRepairableIncident(incident)
+    && reasons.includes('curriculum_packaging_stalled')
+    && incident.metadata?.curriculumPackagingStalled === true
 }
 
 async function resolveOwnerUserId(): Promise<string> {
@@ -74,13 +86,22 @@ async function resolveOwnerUserId(): Promise<string> {
 
 function remediationKey(incident: SupervisorIncident): string {
   const revision = String(process.env.VERCEL_GIT_COMMIT_SHA || '').trim().toLowerCase() || 'unknown'
+  const reasons = Array.isArray(incident.metadata?.healthReasons)
+    ? incident.metadata.healthReasons.map(value => String(value)).sort()
+    : []
   const evidence = [
+    reasons.join(','),
     stringMeta(incident, 'curriculumProgressSubject'),
     numberMeta(incident, 'curriculumProgressShortfallToBatch'),
     numberMeta(incident, 'curriculumProgressInsertedForSubject'),
     stringMeta(incident, 'curriculumProgressObservedAt'),
+    numberMeta(incident, 'activeCampaigns'),
+    numberMeta(incident, 'failedCampaigns'),
+    numberMeta(incident, 'unsettledProviderJobs'),
+    numberMeta(incident, 'overdueProviderJobs'),
+    numberMeta(incident, 'preparedBatches'),
   ].join(':')
-  return `${revision}:university-packaging:${createHash('sha256').update(evidence).digest('hex').slice(0, 20)}`
+  return `${revision}:university-distillation:${createHash('sha256').update(evidence).digest('hex').slice(0, 20)}`
 }
 
 async function existingAttempt(key: string): Promise<{ disposition: 'already_active' | 'recently_attempted'; jobId: string } | null> {
@@ -109,30 +130,45 @@ async function existingAttempt(key: string): Promise<{ disposition: 'already_act
 }
 
 function objectiveFor(incident: SupervisorIncident, diagnosis: string): string {
+  const reasons = Array.isArray(incident.metadata?.healthReasons)
+    ? incident.metadata.healthReasons.map(value => String(value)).filter(Boolean)
+    : []
+  const packaging = reasons.includes('curriculum_packaging_stalled') && incident.metadata?.curriculumPackagingStalled === true
   const subject = stringMeta(incident, 'curriculumProgressSubject') || 'unknown subject'
   const shortfall = numberMeta(incident, 'curriculumProgressShortfallToBatch')
   const inserted = numberMeta(incident, 'curriculumProgressInsertedForSubject')
   const before = numberMeta(incident, 'curriculumProgressPreparedBefore')
   const after = numberMeta(incident, 'curriculumProgressPreparedAfter')
   const observedAt = stringMeta(incident, 'curriculumProgressObservedAt') || incident.detectedAt
+  const operational = [
+    `healthReasons=${reasons.join(',') || 'unknown'}`,
+    `activeCampaigns=${numberMeta(incident, 'activeCampaigns')}`,
+    `failedCampaigns=${numberMeta(incident, 'failedCampaigns')}`,
+    `unsettledProviderJobs=${numberMeta(incident, 'unsettledProviderJobs')}`,
+    `overdueProviderJobs=${numberMeta(incident, 'overdueProviderJobs')}`,
+    `preparedBatches=${numberMeta(incident, 'preparedBatches')}`,
+  ].join('; ')
+
   return [
-    'Repair the COS University distillation packaging defect detected by the Self-Healing Supervisor in Production.',
-    `Verified progress invariant: subject "${subject}" had a recorded batch shortfall of ${shortfall}; the same maintenance cycle inserted ${inserted} governed same-subject curriculum item(s), yet prepared inventory stayed ${before} -> ${after}. Evidence time: ${observedAt}.`,
+    'Repair the COS University mass-distillation defect detected by the Self-Healing Supervisor in Production after bounded runtime recovery failed to restore health.',
+    `Verified operational state: ${operational}. Evidence time: ${observedAt}.`,
+    ...(packaging ? [`Packaging invariant: subject "${subject}" had a recorded batch shortfall of ${shortfall}; the same maintenance cycle inserted ${inserted} governed same-subject curriculum item(s), yet prepared inventory stayed ${before} -> ${after}.`] : []),
     `Supervisor diagnosis: ${String(diagnosis || '').slice(0, 900)}`,
     `Repository starting points (inspect first, not exclusive): ${STARTING_PATHS.join(', ')}.`,
-    'Read ONBOARD.md and scan the current repository before editing. Reproduce the progress contradiction against current code/evidence before changing source.',
-    'Repair the root cause with the smallest safe repository change. Do not lower the 20-item batch minimum, weaken rights/provenance/confidence/deduplication/semantic-cohesion checks, manufacture curriculum, hard-code a passing result, suppress the monitor, or expand provider/spend/promotion/Production authority.',
+    'Read ONBOARD.md and scan the current repository before editing. Inspect current Production assurance/provider evidence and reproduce the exact failure against the deployed revision before changing source.',
+    'Repair the root cause with the smallest safe repository change. This may include scheduler/control-loop state accounting, campaign terminalization, provider lifecycle handling, bounded retry/recovery logic, or worker/provider integration defects.',
+    'Do not lower the 20-item batch minimum, weaken rights/provenance/confidence/deduplication/semantic-cohesion checks, manufacture curriculum, hard-code a passing result, suppress the monitor, or expand provider/spend/promotion/Production authority.',
     'Preserve Dynamic Pipeline Router provider neutrality. A provider failure may reroute only within existing authority.',
     'Run the narrowest directly relevant University/Self-Healing tests and a targeted typecheck/build proof as appropriate. The normal repair PR pipeline owns the complete CI gates.',
-    'Success requires a real prepared batch or other objectively valid downstream progress from governed curriculum, followed by independent Production re-observation. If current Production already proves the defect superseded, make no unnecessary code change.',
+    'Success requires independent Production re-observation showing the University health state no longer requires repair. If current Production already proves the incident was superseded, make no unnecessary code change.',
   ].join('\n')
 }
 
-export async function enqueueUniversityDistillationPackagingRepair(
+export async function enqueueUniversityDistillationRepair(
   incident: SupervisorIncident,
   diagnosis: string,
 ): Promise<UniversityDistillationCodeRepairResult> {
-  if (!isUniversityDistillationPackagingStallIncident(incident)) {
+  if (!isUniversityDistillationRepairableIncident(incident)) {
     throw new Error('university_distillation_code_repair_incident_not_authorized')
   }
   const key = remediationKey(incident)
@@ -164,13 +200,24 @@ export async function enqueueUniversityDistillationPackagingRepair(
       selfHealingUniversityDistillation: true,
       selfHealingKey: key,
       selfHealingIncidentId: incident.incidentId,
-      selfHealingSource: 'university-distillation-packaging',
+      selfHealingSource: 'university-distillation',
       universityRepairRetryAttempt: 0,
     },
   }).eq('id', job.jobId).eq('user_id', userId)
   if (tagged.error) throw new Error(`university_self_healing_tag_failed:${tagged.error.message}`)
 
   return Object.freeze({ disposition: 'queued', jobId: job.jobId, remediationKey: key })
+}
+
+
+export async function enqueueUniversityDistillationPackagingRepair(
+  incident: SupervisorIncident,
+  diagnosis: string,
+): Promise<UniversityDistillationCodeRepairResult> {
+  if (!isUniversityDistillationPackagingStallIncident(incident)) {
+    throw new Error('university_distillation_packaging_repair_incident_not_authorized')
+  }
+  return enqueueUniversityDistillationRepair(incident, diagnosis)
 }
 
 export async function retryFailedUniversityDistillationRepair(admin: any): Promise<UniversityDistillationCodeRepairRetry> {
@@ -222,7 +269,7 @@ export async function retryFailedUniversityDistillationRepair(admin: any): Promi
         selfHealingUniversityDistillation: true,
         selfHealingKey: String(metadata.selfHealingKey || ''),
         selfHealingIncidentId: String(metadata.selfHealingIncidentId || ''),
-        selfHealingSource: 'university-distillation-packaging-retry',
+        selfHealingSource: 'university-distillation-retry',
         universityRepairRetryAttempt: attempt,
         universityRepairRetrySourceJobId: String(row.id),
       },

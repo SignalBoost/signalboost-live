@@ -103,11 +103,14 @@ test('canonicalizes durable subject titles before scope lookup without widening 
 })
 
 
-test('an already-active reasoning graduate can be upgraded to COS-primary without retraining', () => {
+test('an already-active qualified reasoning graduate upgrades to COS-primary before specialist backlog work', () => {
   assert.match(route, /\.eq\('status', 'active'\)/)
   assert.match(route, /canonicalGraduateSubjectId\(row\.subject_id\) === 'reasoning_decision_science'/)
   assert.match(route, /!activeWorkerRoles\(row\.platform_scope\)\.includes\('primary'\)/)
-  assert.match(route, /graduate\.status === 'active' && !scopeDecision\.cosPrimary/)
+  assert.match(route, /if \(decision\.cosPrimary\)/)
+  const activeLookup = route.indexOf(".eq('status', 'active')")
+  const pendingLookup = route.indexOf(".eq('status', 'pending_runtime')")
+  assert.ok(activeLookup > 0 && pendingLookup > activeLookup)
 })
 
 test('primary graduate scope is recorded distinctly and wildcard routing is explicit', () => {

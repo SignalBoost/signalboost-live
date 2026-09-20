@@ -453,6 +453,8 @@ test('frontier proof claim priority is enforced atomically before returning to o
     'utf8',
   )
   assert.match(migration, /v_frontier_completions integer := 0/)
+  assert.match(migration, /cos_university_distilled_evaluation_runs/)
+  assert.match(migration, /count\(distinct r\.candidate_id\)/)
   assert.match(migration, /cos_university_frontier_gkd_v1/)
   assert.match(migration, /v_frontier_completions < 4/)
   assert.match(

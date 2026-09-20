@@ -24,7 +24,7 @@ async function defaultReasoner(args: Record<string, unknown>) {
   const deadlineMs = routingClassifierDeadlineMs()
   const startedAt = Date.now()
   const result = await callCosReasoner({
-    ...(args as never),
+    ...args,
     usageContext: { feature: 'cos_routing_classifier', purpose: 'public_identity' },
     disableThinking: true,
     timeoutMs: deadlineMs,

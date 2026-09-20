@@ -93,6 +93,22 @@ function deploymentOrigin(env: Env): string | null {
   }
 }
 
+function immutableWorkerOrigin(env: Env): string | null {
+  // An HF job can outlive the Vercel deployment that dispatched it. Always bind worker delivery
+  // to the immutable deployment hostname when VERCEL_URL exists; otherwise an old job can install
+  // dependency set A and later fetch worker B after the Production alias moves.
+  const vercelHost = clean(env.VERCEL_URL, 1000)
+  if (vercelHost) {
+    try {
+      const url = new URL(`https://${vercelHost}`)
+      if (url.protocol === 'https:' && url.hostname && !url.username && !url.password && !url.hash) return url.origin
+    } catch {
+      return null
+    }
+  }
+  return deploymentOrigin(env)
+}
+
 export function deriveHuggingFaceTrainingExecutorSecret(token: string): string {
   const normalized = clean(token, 4096)
   if (normalized.length < 20) throw new Error('huggingface_training_token_invalid')
@@ -136,7 +152,7 @@ export function huggingFaceJobsConfigFromEnv(env: Env = process.env): HuggingFac
   // 2026-09-17 03:29-13:11 UTC: the raw GitHub bootstrap returned 404 and every preparation and teacher job
   // (468) exited on its first line. Delivery depends only on this deployment and HF_TOKEN.
   const explicitWorker = clean(env.COS_UNIVERSITY_HF_WORKER_URL, 2000)
-  const origin = deploymentOrigin(env)
+  const origin = immutableWorkerOrigin(env)
   const workerUrl = explicitWorker
     || (origin ? `${origin}${COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX}/${deriveHfWorkerDeliveryToken(token)}/cos-university-hf-worker.py` : '')
   if (!workerUrl) return null

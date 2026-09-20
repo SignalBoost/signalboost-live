@@ -73,17 +73,29 @@ test('the writer still emits the role-block shape this parser now accepts', () =
 test('an unparsed row reports its structure so the shape can be identified without reading the dataset', () => {
   // Production 2026-09-20 01:25-01:29: holdout_format_invalid repeated every two minutes, each attempt
   // consuming a rolling claim, and named nothing about the offending row - so the real shape could not be
-  // told apart from the one already fixed. The error now carries structure and never content.
+  // told apart from one already handled. The error now carries structure and never content.
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_format_invalid:\$\{shape\}/)
-  assert.match(SOURCE, /cols=\$\{\[structuredPrompt\?'prompt':''/)
-  assert.match(SOURCE, /len=\$\{text\.length\}/)
-  assert.match(SOURCE, /opens=\$\{opener\?opener\[1\]\.toLowerCase\(\):'plain'\}/)
-  assert.match(SOURCE, /user=\$\{text\.includes\('<user>/)
-  assert.match(SOURCE, /assistant=\$\{marker>=0\?1:0\}/)
+  assert.match(SOURCE, /cols=\$\{\[parsed\.prompt \? 'prompt' : ''/)
+  assert.match(SOURCE, /len=\$\{rowText\.length\}/)
+  assert.match(SOURCE, /opens=\$\{opener \? opener\[1\]\.toLowerCase\(\) : 'plain'\}/)
+  assert.match(SOURCE, /user=\$\{rowText\.includes\('<user>/)
+  assert.match(SOURCE, /assistant=\$\{marker >= 0 \? 1 : 0\}/)
   // Structure only: the row's own text must never be interpolated into the error.
-  const thrown = SOURCE.slice(SOURCE.indexOf('if(!parsed){'), SOURCE.indexOf('observed.push(itemHash)'))
-  assert.doesNotMatch(thrown, /\$\{text\}/)
-  assert.doesNotMatch(thrown, /text\.slice\(/)
+  const thrown = SOURCE.slice(SOURCE.indexOf('if (!parsed.prompt || !parsed.reference)'), SOURCE.indexOf('`mass_distilled_evaluation_holdout_format_invalid:${shape}`'))
+  assert.doesNotMatch(thrown, /\$\{rowText\}/)
+  assert.doesNotMatch(thrown, /rowText\.slice\(/)
+})
+
+test('both the rolling authority and the quarantine branch match this error by prefix', () => {
+  // The fingerprint suffix would otherwise fall out of an exact-equality comparison, and each fingerprinted
+  // failure would consume the artifact's substantive attempts and the 24h approval window instead of being
+  // released as evaluator infrastructure - and the poisoned holdout would never be quarantined.
+  const authority = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts', import.meta.url), 'utf8')
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  assert.match(authority, /error\.startsWith\('mass_distilled_evaluation_holdout_format_invalid'\)/)
+  assert.match(route, /message\.startsWith\('mass_distilled_evaluation_holdout_format_invalid'\)/)
+  assert.doesNotMatch(authority, /error === 'mass_distilled_evaluation_holdout_format_invalid'/)
+  assert.doesNotMatch(route, /message === 'mass_distilled_evaluation_holdout_format_invalid'/)
 })
 
 test('holdout integrity and count checks are untouched by the parse widening', () => {

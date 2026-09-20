@@ -48,7 +48,7 @@ async function defaultReasoner(args: Record<string, unknown>) {
   return result
 }
 
-const SEMANTIC_VISUAL_ACTION_HINT = /(?:\b(?:narysuj\p{L}*|naszkicuj\p{L}*|dibuj\p{L}*|draw\p{L}*|sketch\p{L}*|illustrat\p{L}*|render\p{L}*|paint\p{L}*|narisovat\p{L}*)\b|(?:нарис|изобраз|визуализ|проиллюстр))/iu
+const SEMANTIC_VISUAL_ACTION_HINT = /(?:\b(?:narysuj\p{L}*|narysow\p{L}*|rysow\p{L}*|naszkicuj\p{L}*|dibuj\p{L}*|draw\p{L}*|sketch\p{L}*|illustrat\p{L}*|render\p{L}*|paint\p{L}*|narisovat\p{L}*)\b|(?:нарис|изобраз|визуализ|проиллюстр))/iu
 
 export function shouldResolveSemanticVisualRequest(
   messages: readonly ConversationMessage[],

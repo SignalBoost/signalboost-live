@@ -33,6 +33,8 @@ import {
   readMassHostedTeacherRows,
   runMassHostedTeacherStage,
 } from './cosUniversityMassHostedTeacherStage.ts'
+import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
+import { buildFrontierDistillationPlan } from './cosUniversityFrontierDistillation.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
 export const MASS_DISTILLATION_CALLBACK_PATH = '/api/internal/cos/mass-distillation/evidence' as const
@@ -592,7 +594,40 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     }
     const revision = { baseModel: run.student_model_id, baseModelRevision, datasetHash, trainingManifestHash, holdoutManifestHash }
     const revisionKey = hash(revision)
-    idempotencyKey = hash([COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE, claim.campaign_id, claim.batch_key, 'train', revisionKey])
+
+    // Frontier faculty can create diverse high-quality synthetic curriculum, but hosted APIs do not
+    // provide the full next-token distributions required by true on-policy distillation. Bind every
+    // mass run to a separate pinned open-weight dense teacher for GKD while preserving faculty
+    // provenance in the source dataset.
+    const denseTeacherModelId = clean(process.env.COS_UNIVERSITY_HF_DENSE_TEACHER_MODEL, 240)
+      || clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240)
+      || MASS_DISTILLATION_TEACHER_MODEL
+    const denseTeacher = await resolveHuggingFaceModelMetadata({ modelId: denseTeacherModelId, token: hf.token, fetchImpl })
+    if (denseTeacher.license !== 'apache-2.0' || denseTeacher.modelId === run.student_model_id) {
+      throw new Error('mass_distillation_dense_teacher_rights_invalid')
+    }
+    const frontierFaculty = universityTeacherPoolStatus().activeProviders
+      .filter(item => item.massDistillationEligible === true && item.transport !== 'huggingface_job')
+      .map(item => item.id)
+    const distillationPlan = buildFrontierDistillationPlan({
+      studentModelId: run.student_model_id,
+      denseTeacherModelId: denseTeacher.modelId,
+      denseTeacherRevision: denseTeacher.revision,
+      denseTeacherLicense: denseTeacher.license,
+      frontierFaculty,
+    })
+
+    idempotencyKey = hash([
+      COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
+      claim.campaign_id,
+      claim.batch_key,
+      'frontier-train',
+      revisionKey,
+      distillationPlan.profile,
+      distillationPlan.denseTeacherRevision,
+      distillationPlan.onPolicyFraction,
+      distillationPlan.beta,
+    ])
     envelope = {
       profile: 'cos_university_training_executor_v1',
       operation: 'train',
@@ -603,11 +638,17 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       revisionKey,
       trainingDataRef,
       holdoutDataRef,
+      distillationPlan,
       distillation: {
-        teacherModelId: run.teacher_model_id,
+        teacherModelId: denseTeacher.modelId,
         studentModelId: run.student_model_id,
         datasetHash,
-        provenanceRefs: [`mass-batch:${run.batch_key}`, `mass-campaign:${run.campaign_id}`],
+        provenanceRefs: [
+          `mass-batch:${run.batch_key}`,
+          `mass-campaign:${run.campaign_id}`,
+          `source-teacher:${clean(run.teacher_model_id, 240) || 'unknown'}`,
+          `frontier-plan:${distillationPlan.profile}`,
+        ],
         trainingRights: 'open_license',
         studentControlledByBuyer: true,
         containsPrivateProductionData: false,
@@ -665,6 +706,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       timeoutSeconds: spec.timeoutSeconds,
       maxEstimatedCostUsd,
       reservedCostCeilingUsd: expectedCeiling,
+      distillationPlan: (envelope as any).distillationPlan || null,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
     },

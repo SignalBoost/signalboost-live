@@ -9,24 +9,23 @@ import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationCon
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
-// 2026-09-19: raised 12 -> 24 by owner decision. Production stopped evaluating at 02:31 with 27
-// canary-proven artifacts waiting and 59 pending: not a defect, the rolling window was simply spent
-// (17 approvals recorded in the trailing 24h against a cap of 12, the extra ones pre-dating the cap).
-// At 12/day a 59-artifact backlog takes about five days; 24/day clears it in about two and a half.
+// 2026-09-20 owner direction: remove the evaluator throughput bottleneck after Production measured
+// 245 completed mass-training runs in 24h, 46 evaluator completions, 173 evaluation_pending artifacts,
+// and 43 already past the 12h retention delay. A 24/day cap cannot keep pace even when the evaluator is
+// healthy, so the queue grows by design.
 //
-// The owner chose 24 over 60 deliberately: each approval authorizes at most $0.20 of runtime wake, so
-// 24/day is up to $4.80/day of wake authorization where 60/day would be up to $12/day, and 24 leaves
-// room to observe whether the repaired 18-call evaluator stays stable under increased load before
-// going further.
+// Set the rolling ceiling to 300/day: above the observed 245/day training rate with enough headroom to
+// reduce the existing backlog while preserving the existing globally single-active claim lane.
 //
-// This is a THROUGHPUT ceiling only. Per-evaluation limits are untouched: maxRuntimeWakeAttempts 1,
-// maxEstimatedRuntimeWakeCostUsd 0.20, maxJudgeCalls 4, the 12-hour retention delay, exact-artifact
-// binding, one verdict per artifact, and the Production-traffic prohibition all stand.
+// Financial boundary: every evaluation still authorizes at most one RunPod wake and at most $0.20 of
+// estimated wake cost. Therefore 300/day is a hard theoretical wake-authorization ceiling of $60/day
+// if every approval used the full bound. Scoring, exact-artifact binding, retry limits, delayed retention,
+// promotion gates, rollback evidence and Production-traffic authority are unchanged.
 //
 // Unlike the endpoint-call ceiling, this constant has NO database counterpart: the claim function
-// asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the cost ceiling, but never the
-// rolling cap, which is enforced here alone. Verified against supabase/migrations before changing it.
-export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 24
+// asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the per-evaluation cost ceiling,
+// but never the rolling cap, which is enforced here alone.
+export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
 // resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case
@@ -46,7 +45,7 @@ export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
 // A different failure still resets the run to zero, as before.
 //
 // This changes WHEN an artifact may be retried and nothing else: the substantive-attempt budget, the 24h
-// rolling approval cap, the per-evaluation wake and judge ceilings, exact-artifact binding, one verdict per
+// rolling approval window/300-per-day ceiling, the per-evaluation wake and judge ceilings, exact-artifact binding, one verdict per
 // artifact and every promotion gate are untouched.
 const MASS_EVALUATION_IDENTICAL_FAILURE_COOLDOWNS_MS = Object.freeze([
   30 * 60_000,

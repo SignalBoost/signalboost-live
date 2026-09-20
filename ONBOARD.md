@@ -67,6 +67,14 @@ Reliability invariant: prepared work must continuously fill available healthy tr
 
 Performance invariant: concurrency, faculty parallelism, prepared-buffer depth and training hardware are throughput controls, not learning-quality shortcuts. Scale them from measured queue depth, provider health, training yield and evaluator outcomes while preserving deterministic admission, idempotency, provenance and rollback.
 
+Production distillation runtime invariant (2026-09-20 hotfix):
+
+- Production frontier distillation uses TRL's **stable `DistillationTrainer`** on-policy path; experimental GKD trainer imports are not permitted in the paid mass-distillation lane unless separately validated and release-gated.
+- The current HF single-GPU QLoRA lane uses deterministic FP16 compute for student/teacher generation and distillation; BF16 must not be auto-selected on this lane after the observed BF16/Float generation failure.
+- HF datasets and trained adapters use a bounded buyer-owned repository pool. A normal campaign must **reuse a repository and write an isolated per-run branch**, then pin the exact returned Hub commit SHA in evidence. It must not create one Hub repository per batch, teacher output, or trained artifact.
+- Repository pooling may create at most one bootstrap pool repository only when no compatible pool repository exists; a provider 429/rate-limit response fails closed rather than launching repeated repository-creation attempts.
+- Exact-artifact identity remains `repo + immutable Hub commit revision + artifact hash`; pooling may reduce repository count but may never weaken exact-artifact canary, evaluation, provenance, rollback, or promotion gates.
+
 ## University Self-Healing progress invariant — 2026-09-19
 
 Self-Healing Supervisor must distinguish **lack of supply** from **failure to convert valid upstream progress into downstream work**.

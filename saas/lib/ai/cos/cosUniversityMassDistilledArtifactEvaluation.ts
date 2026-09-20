@@ -311,7 +311,23 @@ async function pinnedHoldout(input:{
       prompt: legacyPrompts.get(row.itemHash) || '',
       reference: row.text,
     }
-    if (!parsed.prompt || !parsed.reference) throw new Error('mass_distilled_evaluation_holdout_format_invalid')
+    if (!parsed.prompt || !parsed.reference) {
+      // Production 2026-09-20 01:25-01:29: this error repeated every two minutes, each attempt consuming a
+      // rolling approval, and named nothing about the row that caused it - so the shape could not be told
+      // apart from one already handled. Report the STRUCTURE of the offending row, never its content. The
+      // rolling authority and the route's quarantine branch both match this error by PREFIX for that reason.
+      const rowText = String(row.text || '')
+      const marker = rowText.indexOf('\n\n<assistant>\n')
+      const opener = /^<([a-z_]{1,20})>/i.exec(rowText)
+      const shape = [
+        `cols=${[parsed.prompt ? 'prompt' : '', parsed.reference ? 'response' : '', rowText ? 'text' : ''].filter(Boolean).join('+') || 'none'}`,
+        `len=${rowText.length}`,
+        `opens=${opener ? opener[1].toLowerCase() : 'plain'}`,
+        `user=${rowText.includes('<user>\n') ? 1 : 0}`,
+        `assistant=${marker >= 0 ? 1 : 0}`,
+      ].join(':')
+      throw new Error(`mass_distilled_evaluation_holdout_format_invalid:${shape}`)
+    }
     return Object.freeze({ id: row.itemHash.slice(0, 16), prompt: parsed.prompt, reference: parsed.reference })
   })
 }

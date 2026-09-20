@@ -18,8 +18,12 @@ const failures = (error: string) => Array.from({ length: MASS_EVALUATION_MAX_FAI
   ev('host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hash, error }, `2026-09-17T0${i + 1}:00:00Z`))
 const started = ev('host_controller', { claim: 'mass_distilled_independent_evaluation_started', artifactHash: hash }, '2026-09-17T00:21:00Z')
 
-test('runtime-not-ready failures (worker never bound) do not exhaust the artifact retry budget', () => {
-  for (const error of ['mass_distilled_evaluation_runtime_not_ready:network', 'mass_distilled_evaluation_runtime_not_ready:503']) {
+test('runtime and RunPod transport failures do not exhaust the artifact retry budget', () => {
+  for (const error of [
+    'mass_distilled_evaluation_runtime_not_ready:network',
+    'mass_distilled_evaluation_runtime_not_ready:503',
+    'mass_distilled_evaluation_runpod_timeout:candidate:cases=4',
+  ]) {
     const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifact], events: [canary, rolling, started, ...failures(error)], now })
     assert.equal(decision.issue, true, error)
     if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)

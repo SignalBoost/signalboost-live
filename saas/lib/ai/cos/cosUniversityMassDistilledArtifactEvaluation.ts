@@ -93,6 +93,17 @@ async function withinDeadline<T>(promise:Promise<T>,deadlineMs:number,ceilingMs:
 
 function parseTrainingText(text:string):{prompt:string;reference:string}|null{
   const prefix='<user>\n';const marker='\n\n<assistant>\n'
+  // Production 2026-09-20: the evaluation cron returned 500 with mass_distilled_evaluation_holdout_format_invalid,
+  // which fails the WHOLE evaluation for one unparsed row and blocks the artifact backlog from draining. The
+  // writer and this reader disagreed: the HF worker renders a chat row as role blocks joined by blank lines
+  // (scripts/cos-university-hf-worker-base.py), so a row carrying a system message produces
+  // "<system>\n...\n\n<user>\n...\n\n<assistant>\n...", while this parser demanded the text START with the
+  // user block. Locate the user turn instead of requiring it first; everything after it parses exactly as before,
+  // so plain and multi-turn rows are unaffected and a row with no user turn at all is still rejected.
+  const opensWithUser=text.startsWith(prefix)
+  const userAt=opensWithUser?0:text.indexOf('\n\n'+prefix)
+  if(userAt<0)return null
+  if(!opensWithUser)text=text.slice(userAt+2)
   if(!text.startsWith(prefix))return null
   const index=text.indexOf(marker);if(index<=prefix.length)return null
   const prompt=text.slice(prefix.length,index).trim();const reference=text.slice(index+marker.length).trim()

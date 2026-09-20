@@ -1,2 +1,2 @@
-base_sha=9c53b78bf0a5a89c15765af77f92da973ac6df23
-branch=fix/restore-supabase-load-shed-cadence
+base_sha=5427b51364b2a39e79b2f8e446a2fc789786b32e
+branch=fix/supabase-access-path-resilience-v2

@@ -78,3 +78,8 @@ test('HF worker executes real GKD for frontier mass distillation and fails close
   assert.match(worker, /worker_frontier_distillation_tokenizer_mismatch_requires_gold/)
   assert.match(worker, /legacy_bootstrap_sft/)
 })
+
+test('HF frontier runtime pins the validated TRL GKD API', () => {
+  const jobs = source('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts')
+  assert.match(jobs, /'trl==0\.23\.0'/)
+})

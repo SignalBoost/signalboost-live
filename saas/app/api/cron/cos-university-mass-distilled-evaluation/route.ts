@@ -15,6 +15,8 @@ import {
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
+  MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+  MASS_EVALUATION_ROLLING_WINDOW_HOURS,
   decideRollingMassEvaluationApproval,
   type RollingArtifact,
   type RollingEvent,
@@ -118,6 +120,23 @@ type RawClaim = Readonly<{
   reservation_event_key: string
 }>
 
+
+const ROLLING_EVENT_PAGE_SIZE = 1000
+const ROLLING_EVENT_MAX_PAGES = 10
+
+async function readPagedRollingEvents(buildQuery: (from: number, to: number) => PromiseLike<any>, ceilingError: string) {
+  const rows: any[] = []
+  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+    const from = page * ROLLING_EVENT_PAGE_SIZE
+    const result = await buildQuery(from, from + ROLLING_EVENT_PAGE_SIZE - 1)
+    if (result.error) throw result.error
+    const data = Array.isArray(result.data) ? result.data : []
+    rows.push(...data)
+    if (data.length < ROLLING_EVENT_PAGE_SIZE) return rows
+  }
+  throw new Error(ceilingError)
+}
+
 async function ensureRollingMassEvaluationApproval() {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -133,25 +152,58 @@ async function ensureRollingMassEvaluationApproval() {
     artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
   }))
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
-  const events = await db.from('cos_university_learning_assurance_events')
-    .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
-    .eq('event_type', 'fine_tune')
-    .like('candidate_id', 'mass:%')
-    .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
-    .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
-    .order('observed_at', { ascending: false })
-    .limit(2000)
-  if (events.error) throw events.error
-  const reservations = await db.from('cos_university_learning_assurance_events')
-    .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
-    .eq('event_type', 'fine_tune')
-    .like('candidate_id', 'mass:%')
-    .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
-    .order('observed_at', { ascending: false })
-    .limit(1000)
-  if (reservations.error) throw reservations.error
+  const candidateIds = rows.map(row => row.candidateId)
+  const candidateSince = new Date(Date.now() - 30 * 86_400_000).toISOString()
+  // Production 2026-09-20: the oldest 50 pending artifacts had 40 valid exact canaries,
+  // but a global event read silently exposed only the newest slice of the mass-event stream.
+  // The rolling authority therefore saw no canary for old eligible artifacts and returned
+  // no_mass_artifact_eligible_for_rolling_evaluation indefinitely. Read the evidence for the
+  // selected candidates directly and page it; never infer candidate eligibility from a truncated
+  // global history window.
+  const candidateEvents = await readPagedRollingEvents(
+    (from, to) => db.from('cos_university_learning_assurance_events')
+      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+      .eq('event_type', 'fine_tune')
+      .in('candidate_id', candidateIds)
+      .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
+      .gte('observed_at', candidateSince)
+      .order('observed_at', { ascending: false })
+      .range(from, to),
+    'mass_evaluation_candidate_event_history_page_ceiling',
+  )
+
+  // The 24-hour approval ceiling is global, so preserve its global evidence separately instead of
+  // widening candidate eligibility. Runtime start/terminal events are needed to decide whether an
+  // approval actually consumed the rolling window.
+  const rollingSince = new Date(Date.now() - (MASS_EVALUATION_ROLLING_WINDOW_HOURS + 1) * 3_600_000).toISOString()
+  const rollingApprovals = await readPagedRollingEvents(
+    (from, to) => db.from('cos_university_learning_assurance_events')
+      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+      .eq('event_type', 'fine_tune')
+      .like('candidate_id', 'mass:%')
+      .eq('verifier', 'host_controller')
+      .contains('evidence', {
+        claim: 'distilled_independent_evaluation_approved',
+        authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+      })
+      .gte('observed_at', rollingSince)
+      .order('observed_at', { ascending: false })
+      .range(from, to),
+    'mass_evaluation_rolling_approval_history_page_ceiling',
+  )
+  const reservations = await readPagedRollingEvents(
+    (from, to) => db.from('cos_university_learning_assurance_events')
+      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+      .eq('event_type', 'fine_tune')
+      .like('candidate_id', 'mass:%')
+      .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
+      .gte('observed_at', rollingSince)
+      .order('observed_at', { ascending: false })
+      .range(from, to),
+    'mass_evaluation_runtime_history_page_ceiling',
+  )
   const seenEventKeys = new Set<string>()
-  const uniqueRows = [...(events.data || []), ...(reservations.data || [])].filter((row: any) => {
+  const uniqueRows = [...candidateEvents, ...rollingApprovals, ...reservations].filter((row: any) => {
     const key = String(row?.event_key || '')
     if (!key) return true
     if (seenEventKeys.has(key)) return false

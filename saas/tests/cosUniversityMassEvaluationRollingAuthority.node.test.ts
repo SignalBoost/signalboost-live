@@ -267,3 +267,16 @@ test('holdout format failures are evaluator infrastructure and do not consume mo
   assert.equal(decision.issue, true)
   if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
 })
+
+
+test('rolling approval evidence is candidate-scoped and paginated so old exact canaries cannot fall out of a global row cap', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /const candidateIds = rows\.map\(row => row\.candidateId\)/)
+  assert.match(route, /\.in\('candidate_id', candidateIds\)/)
+  assert.match(route, /\.range\(from, to\)/)
+  assert.match(route, /ROLLING_EVENT_PAGE_SIZE = 1000/)
+  assert.match(route, /MASS_EVALUATION_ROLLING_AUTHORIZATION_REF/)
+  assert.match(route, /authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF/)
+  assert.match(route, /profile: 'cos_mass_distilled_independent_evaluation_runtime_v1'/)
+  assert.doesNotMatch(route, /\.limit\(2000\)/)
+})

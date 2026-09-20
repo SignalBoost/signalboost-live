@@ -272,8 +272,8 @@ export const MASS_EVALUATION_EXHAUSTED_REASON = 'substantive_evaluation_attempts
 // An artifact that has spent its substantive attempt budget can never be approved again - only a
 // hand-inserted reopen event releases it - yet nothing ever moved it out of `evaluation_pending`. It stayed
 // in the lane's selection window forever, reported as waiting while no tick could ever pick it, and because
-// that window is the OLDEST 50 pending rows, enough of them at the front of the queue starve every newer
-// artifact behind them. Naming them here lets the caller give them a terminal status and a recorded reason,
+// a bounded front-of-queue window can contain enough permanently ineligible rows to starve newer
+// artifacts behind them. Naming them here lets the caller give them a terminal status and a recorded reason,
 // which is also what makes a real failure visible to curriculum work instead of silently disappearing.
 //
 // This decides nothing about quality and grants nothing: it reports artifacts the approval policy has

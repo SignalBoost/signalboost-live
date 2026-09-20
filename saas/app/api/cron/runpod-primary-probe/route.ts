@@ -3,7 +3,7 @@ import { checkLocalInferenceHealth } from '@/lib/ai/local-inference'
 import { configuredRunpodApiKey, configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
 import { runpodOrphanGuardEnabled } from '@/lib/ai/cos/runpodLifecycle'
 import { runpodPrimaryConfig, runpodPrimaryEnabled, runpodPrimaryModel } from '@/lib/ai/cos/runpodPrimaryInference'
-import { configurePodStartupContract } from '@/lib/hub/runpodTelemetry'
+import { configurePodStartupContract, queryPodRuntimeConfig } from '@/lib/hub/runpodTelemetry'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -107,17 +107,34 @@ export async function GET(req: NextRequest) {
     const configuredPod = configuredPodId ? pods.find(pod => pod.id === configuredPodId) : null
     const hardServingFailure = Boolean(inferenceError && /^HTTP 502\b/.test(inferenceError))
     const graceSeconds = unhealthyRepairGraceSeconds()
+    let legacyPublicRepoBootstrap = false
+    if (configuredPod?.running) {
+      try {
+        const runtimeConfig = await queryPodRuntimeConfig()
+        legacyPublicRepoBootstrap = runtimeConfig.dockerStartCmd.some(command =>
+          command.includes('raw.githubusercontent.com/SignalBoost/signalboost-live/'))
+      } catch {
+        // The ordinary health path still decides runtime availability. Failure to inspect the
+        // startup contract alone must not mutate or stop a healthy Pod.
+      }
+    }
 
     // HTTP 502 means the external RunPod proxy has no usable serving process behind it. This is
     // materially different from a slow/busy inference timeout, which must never cause us to throw
     // away scarce GPU capacity. RunPod's Pod update operation applies the desired startup contract
     // and resets a RUNNING container in place, so repair does not Stop -> Start or release the GPU.
     // The next probe proves readiness before normal traffic relies on the repaired runtime.
-    if (configuredPod?.running
+    const legacyBootstrapMigrationRequired = Boolean(
+      configuredPod?.running
+      && legacyPublicRepoBootstrap
+      && runpodOrphanGuardEnabled(),
+    )
+
+    if (legacyBootstrapMigrationRequired || (configuredPod?.running
       && !inferenceReady
       && hardServingFailure
       && configuredPod.uptimeSeconds >= graceSeconds
-      && runpodOrphanGuardEnabled()) {
+      && runpodOrphanGuardEnabled())) {
       repairAttempted = true
       try {
         const repaired = await configurePodStartupContract({
@@ -129,7 +146,7 @@ export async function GET(req: NextRequest) {
         console.warn('[runpod-primary-repair]', JSON.stringify({
           ok: true,
           podId: configuredPodId,
-          reason: inferenceError,
+          reason: legacyBootstrapMigrationRequired ? 'legacy_public_repo_bootstrap' : inferenceError,
           previousUptimeSeconds: configuredPod.uptimeSeconds,
           repairMode: 'in_place_update_reset',
           desiredStatus: repaired.desiredStatus,
@@ -139,7 +156,7 @@ export async function GET(req: NextRequest) {
         console.error('[runpod-primary-repair]', JSON.stringify({
           ok: false,
           podId: configuredPodId,
-          reason: inferenceError,
+          reason: legacyBootstrapMigrationRequired ? 'legacy_public_repo_bootstrap' : inferenceError,
           repairMode: 'in_place_update_reset',
           error: repairError,
         }))
@@ -157,6 +174,7 @@ export async function GET(req: NextRequest) {
       repairAttempted,
       repairStarted,
       repairError,
+      legacyPublicRepoBootstrap,
       account: {
         clientBalance: typeof account.clientBalance === 'number' ? account.clientBalance : null,
         currentSpendPerHr: typeof account.currentSpendPerHr === 'number' ? account.currentSpendPerHr : null,

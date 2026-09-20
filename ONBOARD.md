@@ -21,6 +21,19 @@ University exact-artifact serving, canary, and evaluation paths continue to use 
 
 Runtime identity and health must still be verified from live configuration/telemetry before making Production claims; this invariant defines intended routing priority, not proof that any particular provider is healthy at a given moment.
 
+### Private-repository runtime invariance — 2026-09-20
+
+Changing `SignalBoost/signalboost-live` between public and private must **not** change Production runtime health.
+
+- Production bootstrap, worker delivery, probes, recovery and Self-Healing may not depend on unauthenticated `raw.githubusercontent.com` or another public-repository-only transport.
+- RunPod bootstrap delivery must use an authenticated iTMounts public application route with a derived capability token; the RunPod account control credential itself must never be exposed to the Pod or URL.
+- A running Pod whose stored startup command still contains the retired raw-GitHub bootstrap is a one-time migration case: the Production probe may replace that exact legacy contract in place, then return to the normal rule that ordinary running-contract mismatches preserve scarce capacity rather than reset it.
+- Hugging Face worker delivery remains on its separately authenticated iTMounts public route.
+- Repository visibility changes must not cause retry storms, repeated repair loops, Supabase write/read amplification, provider mutation, or runtime reconfiguration.
+- Private-repository reads needed by owner tools must use authenticated GitHub APIs and fail closed with bounded retries.
+- Runtime bootstrap artifacts must be validated before execution; HTML/login/error responses must never be executed as shell/Python.
+- Repository privacy is a governance choice, not an availability switch.
+
 
 ## University graduate adoption loop invariant — 2026-09-20
 

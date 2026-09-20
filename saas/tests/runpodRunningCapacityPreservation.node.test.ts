@@ -3,6 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 
 const lifecycle = readFileSync(new URL('../lib/ai/cos/runpodLifecycle.ts', import.meta.url), 'utf8')
+const probe = readFileSync(new URL('../app/api/cron/runpod-primary-probe/route.ts', import.meta.url), 'utf8')
 
 test('running pod contract mismatch preserves scarce GPU allocation instead of stopping it', () => {
   const guard = lifecycle.indexOf('if (before.running && !contractMatches)')
@@ -22,4 +23,15 @@ test('explicit stop API remains available for owner-controlled shutdowns', () =>
   const explicitStop = lifecycle.indexOf('export async function stopRunpodReasoner')
   assert.ok(explicitStop >= 0)
   assert.match(lifecycle.slice(explicitStop), /await stopPod\(\)/)
+})
+
+
+test('legacy public-GitHub RunPod bootstrap is migrated in place even when inference is still healthy', () => {
+  assert.match(probe, /queryPodRuntimeConfig/)
+  assert.match(probe, /raw\.githubusercontent\.com\/SignalBoost\/signalboost-live\//)
+  assert.match(probe, /legacyPublicRepoBootstrap/)
+  assert.match(probe, /legacyBootstrapMigrationRequired/)
+  assert.match(probe, /legacy_public_repo_bootstrap/)
+  assert.match(probe, /configurePodStartupContract/)
+  assert.match(probe, /repairMode: 'in_place_update_reset'/)
 })

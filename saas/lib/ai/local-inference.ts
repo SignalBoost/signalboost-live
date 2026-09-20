@@ -122,6 +122,17 @@ function interactiveReasoningEffort(args: LocalModelCallArgs): 'none' | 'low' | 
   return 'low'
 }
 
+function runpodSmallBudgetThinkingOff(args: LocalModelCallArgs, provider: string): boolean {
+  const maxTokens = Number(args.maxTokens)
+  return provider === 'runpod' && Number.isFinite(maxTokens) && maxTokens > 0 && maxTokens <= 1024
+}
+
+function isEmptyThinkingTruncation(error: unknown): boolean {
+  return error instanceof Error
+    && error.message === LOCAL_MODEL_OUTPUT_TRUNCATED
+    && (error as Error & { emptyContent?: boolean }).emptyContent === true
+}
+
 function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: number): number {
   const directEdit = directTextTransformation(args)
   const authoring = interactiveAuthoring(args)
@@ -257,7 +268,8 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     // configured for deeper reasoning or prose-oriented repetition penalties.
     const enforceJsonObject = strictJsonObjectRequested(args)
     const independentEvaluation = protectedIndependentEvaluation(args)
-    const reasoningEffort = args.disableThinking === true
+    const thinkingOff = args.disableThinking === true || runpodSmallBudgetThinkingOff(args, provider)
+    const reasoningEffort = thinkingOff
       ? 'none'
       : provider === 'deepinfra'
         ? (independentEvaluation ? 'none' : interactiveUserResponse(args) ? interactiveReasoningEffort(args) : configuredReasoningEffort())
@@ -277,9 +289,11 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
         ? Math.max(0, Math.min(2, args.presencePenalty))
         : parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
     const baseSystemPrompt = args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.'
-    const systemPrompt = independentEvaluation && enforceJsonObject
+    const qwenThinkingOff = thinkingOff && /qwen/i.test(model)
+    const governedSystemPrompt = independentEvaluation && enforceJsonObject
       ? `${baseSystemPrompt} Output exactly the requested JSON schema. Do not add explanations, rationale, analysis, prose, repeated inputs, or extra keys.`
       : baseSystemPrompt
+    const systemPrompt = qwenThinkingOff ? `${governedSystemPrompt} /no_think` : governedSystemPrompt
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
@@ -292,6 +306,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
         presence_penalty: presencePenalty,
         ...(enforceJsonObject ? { response_format: { type: 'json_object' } } : {}),
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+        ...(qwenThinkingOff ? { think: false, chat_template_kwargs: { enable_thinking: false } } : {}),
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: args.prompt },
@@ -368,7 +383,11 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     }
   }
 
-  if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
+  if (finishReason === 'length') {
+    const error = new Error(LOCAL_MODEL_OUTPUT_TRUNCATED) as Error & { emptyContent?: boolean }
+    error.emptyContent = !text
+    throw error
+  }
   return text
 }
 
@@ -388,8 +407,18 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       ownedAttempted = true
       const runpodConfig = await primary.resolveReadyRunpodPrimaryConfig('reasoner')
       if (runpodConfig) {
-        const text = await callConfiguredModel(args, runpodConfig)
-        if (text?.trim()) return text
+        try {
+          const text = await callConfiguredModel(args, runpodConfig)
+          if (text?.trim()) return text
+        } catch (error) {
+          if (!isEmptyThinkingTruncation(error) || args.disableThinking === true || runpodSmallBudgetThinkingOff(args, 'runpod')) throw error
+          console.warn('[runpod-primary-thinking-retry]', JSON.stringify({
+            feature: args.usageContext?.feature || 'unattributed_local_inference',
+            reason: 'empty_hidden_reasoning_exhausted_token_budget',
+          }))
+          const text = await callConfiguredModel({ ...args, disableThinking: true }, runpodConfig)
+          if (text?.trim()) return text
+        }
       }
     }
   } catch (error) {

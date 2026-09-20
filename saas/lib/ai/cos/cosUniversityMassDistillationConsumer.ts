@@ -33,7 +33,6 @@ import {
   readMassHostedTeacherRows,
   runMassHostedTeacherStage,
 } from './cosUniversityMassHostedTeacherStage.ts'
-import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
 import { buildFrontierDistillationPlan } from './cosUniversityFrontierDistillation.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
@@ -655,15 +654,21 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     if (denseTeacher.license !== 'apache-2.0' || denseTeacher.modelId === run.student_model_id) {
       throw new Error('mass_distillation_dense_teacher_rights_invalid')
     }
-    const frontierFaculty = universityTeacherPoolStatus().activeProviders
-      .filter(item => item.massDistillationEligible === true && item.transport !== 'huggingface_job')
-      .map(item => item.id)
+    const hostedTeacherSource = clean(run.teacher_source_ref, 2000)
+      .startsWith('itmounts://cos-university/mass-hosted-teacher/')
+    const actualFrontierFaculty = hostedTeacherSource
+      ? [...new Set((await readMassHostedTeacherRows({
+          db: cosServiceDb(),
+          runId: run.id,
+          promptSetHash: clean(run.prompt_set_hash, 64).toLowerCase(),
+        })).map(row => clean(row.teacherId, 80)).filter(Boolean))]
+      : []
     const distillationPlan = buildFrontierDistillationPlan({
       studentModelId: run.student_model_id,
       denseTeacherModelId: denseTeacher.modelId,
       denseTeacherRevision: denseTeacher.revision,
       denseTeacherLicense: denseTeacher.license,
-      frontierFaculty,
+      frontierFaculty: actualFrontierFaculty,
     })
 
     idempotencyKey = hash([
@@ -1316,7 +1321,7 @@ export async function recordMassDistillationWorkerEvidence(
     || datasetHash !== clean(run.dataset_hash, 64).toLowerCase()
     || trainingManifestHash !== clean(run.training_manifest_hash, 64).toLowerCase()
     || holdoutManifestHash !== clean(run.holdout_manifest_hash, 64).toLowerCase()
-    || !trainedArtifactId || !HEX64.test(trainedArtifactHash) || !evidenceRef) {
+    || !trainedArtifactId || !HEX64.test(trainedArtifactHash) || !evidenceRef || !trainingReceipt) {
     throw new Error('mass_distillation_training_callback_invalid')
   }
 

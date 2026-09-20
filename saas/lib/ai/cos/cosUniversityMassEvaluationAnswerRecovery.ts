@@ -15,3 +15,19 @@ export function recoverStoppedOpenAnswer(text: string, caseId: string, finish: s
   if (!tail || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(tail)) return null
   return tail
 }
+
+
+/**
+ * A solo retry has exactly one requested case. Production 2026-09-20 returned finish=stop with
+ * exactly one complete ANSWER/END block, but copied a different 16-hex case marker. With one requested
+ * case and one complete block there is no answer-to-case ambiguity, so recover the body while keeping
+ * truncated, thinking, plain-text, partial-marker and multi-block output fail-closed.
+ */
+export function recoverStoppedSoloMismatchedMarkerAnswer(text: string, caseId: string, finish: string): string | null {
+  if (finish !== 'stop' || /<\/?think>/i.test(text)) return null
+  const match = text.match(/^\s*<<<ANSWER:([0-9a-f]{16})>>>\s*([\s\S]*?)\s*<<<END:\1>>>\s*$/i)
+  if (!match || match[1].toLowerCase() === caseId.toLowerCase()) return null
+  const answer = match[2].trim()
+  if (!answer || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(answer)) return null
+  return answer
+}

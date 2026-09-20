@@ -308,7 +308,7 @@ export function decideRollingMassEvaluationApproval(input: {
   artifacts: readonly RollingArtifact[]
   events: readonly RollingEvent[]
   now: Date
-  frontierProofStarts?: number
+  frontierProofCompletions?: number
 }): RollingDecision {
   if (!input.enabled) return { issue: false, reason: 'rolling_mass_evaluation_authorization_disabled' }
   const nowMs = input.now.getTime()
@@ -320,17 +320,16 @@ export function decideRollingMassEvaluationApproval(input: {
   const issuedInWindow = rollingApprovalsInWindow.filter(approval => rollingApprovalConsumesWindow(approval, input.events, nowMs)).length
   if (issuedInWindow >= MASS_EVALUATION_ROLLING_MAX_APPROVALS) return { issue: false, reason: 'rolling_mass_evaluation_window_exhausted' }
 
-  const proofStarts = Math.max(0, Math.floor(Number(input.frontierProofStarts ?? MASS_EVALUATION_FRONTIER_PROOF_SAMPLE)))
-  const frontierProofNeeded = proofStarts < MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
+  const proofCompletions = Math.max(0, Math.floor(Number(input.frontierProofCompletions ?? MASS_EVALUATION_FRONTIER_PROOF_SAMPLE)))
+  const frontierProofNeeded = proofCompletions < MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
   const ordered = [...input.artifacts].sort((a, b) => {
-    // Until four current-recipe artifacts have received a first independent start, give an unstarted
-    // frontier artifact precedence over legacy retries. This is a bounded scheduling preference only.
-    // After the sample is reached, strict oldest-first ordering resumes automatically.
+    // Until four current-recipe artifacts have produced an actual independent evaluation result,
+    // keep frontier artifacts ahead of legacy backlog work. A prior start that ended in evaluator
+    // infrastructure failure is not proof and must remain retryable/preferred. This is only a bounded
+    // scheduling preference; once four durable frontier results exist, oldest-first resumes.
     if (frontierProofNeeded) {
-      const aStarted = input.events.some(event => event.candidateId === a.candidateId && evaluationStarted(event))
-      const bStarted = input.events.some(event => event.candidateId === b.candidateId && evaluationStarted(event))
-      const aProof = a.frontierRecipe === true && !aStarted
-      const bProof = b.frontierRecipe === true && !bStarted
+      const aProof = a.frontierRecipe === true
+      const bProof = b.frontierRecipe === true
       if (aProof !== bProof) return aProof ? -1 : 1
     }
     return at(a.createdAt) - at(b.createdAt)

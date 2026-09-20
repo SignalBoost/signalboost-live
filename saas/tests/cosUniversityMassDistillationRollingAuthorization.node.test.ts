@@ -156,3 +156,12 @@ test('workflow repairs inert full capacity in the same tick before waiting for m
   assert.match(workflow, /postRecoveryConsumer\.ok === true/)
   assert.match(workflow, /evict_inert_capacity_same_tick_reauthorize_dispatch/)
 })
+
+
+test('recovery never spends bounded campaign budget on already terminal campaigns', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  const migration = source('../supabase/migrations/20260920043000_skip_terminal_mass_distillation_recovery.sql')
+  assert.match(consumer, /\.in\('status', \['authorized', 'active', 'failed'\]\)[\s\S]*\.is\('completed_at', null\)/)
+  assert.match(migration, /if v_campaign\.completed_at is not null then[\s\S]*'reason','campaign_already_terminal'/)
+  assert.match(migration, /and c\.completed_at is null[\s\S]*and c\.status in \('authorized','active','running','failed'\)/)
+})

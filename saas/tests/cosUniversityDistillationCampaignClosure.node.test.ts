@@ -89,3 +89,16 @@ test('terminal cleanup quarantines already-consumed prepared batches from failed
   assert.match(cleanup, /quarantinedBatches/)
   assert.doesNotMatch(cleanup, /dispatch_authorized:\s*true/)
 })
+
+
+test('terminal cleanup releases failed campaign capacity only after runs and provider jobs are terminal', () => {
+  const cleanup = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationTerminalCleanup.ts', import.meta.url), 'utf8')
+  assert.match(cleanup, /mass_distillation_failed_campaign_completed/)
+  assert.match(cleanup, /all_runs_terminal_and_provider_jobs_settled/)
+  assert.match(cleanup, /\.is\('settled_at', null\)/)
+  assert.match(cleanup, /\.is\('completed_at', null\)/)
+  assert.match(cleanup, /completedCampaigns/)
+  assert.match(cleanup, /retryAuthorized: false/)
+  assert.match(cleanup, /dispatchAuthorized: false/)
+  assert.match(cleanup, /productionTrafficAuthorized: false/)
+})

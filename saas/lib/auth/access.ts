@@ -29,6 +29,17 @@ export type GuardResult = {
   ctx: AccessContext
 }
 
+type VerifiedClaims = Readonly<{
+  sub?: string
+  email?: string | null
+}>
+
+function isAnonymousClaimsError(error: unknown): boolean {
+  const name = String((error as { name?: string } | null)?.name || '')
+  const status = Number((error as { status?: number } | null)?.status || 0)
+  return name === 'AuthSessionMissingError' || status === 400 || status === 401
+}
+
 // The owner list lives in lib/auth/ownerEmails.ts so authorization and credit
 // metering share one definition. The primary owner must retain access even when
 // deployment configuration is incomplete or has been reset.
@@ -81,9 +92,9 @@ function buildContext(userId: string | null, email: string | null, role: Role, a
   }
 }
 
-// Reuse an identity that has already been verified by Supabase in the current
-// request. This avoids issuing a second auth.getUser() call when a route needs
-// both the authenticated user object and the canonical SignalBoost role.
+// Reuse an identity that has already been cryptographically verified by Supabase in
+// the current request. This avoids issuing a regional Auth-server lookup merely to
+// derive the canonical SignalBoost role.
 export function accessFromVerifiedIdentity(
   userId: string,
   emailValue: string | null | undefined,
@@ -101,19 +112,28 @@ export async function getAccess(): Promise<AccessContext> {
   const supabase = await getServerSupabase()
   let timeout: ReturnType<typeof setTimeout> | null = null
   try {
-    const auth = await Promise.race([
-      supabase.auth.getUser(),
+    // Supabase recommends getClaims() for protecting server-rendered pages/data. It verifies the
+    // access-token signature and expiry, using cached JWKS/local WebCrypto for asymmetric signing
+    // keys, instead of making a regional Auth-server request on every protected route.
+    const verified = await Promise.race([
+      supabase.auth.getClaims(),
       new Promise<null>(resolve => {
         timeout = setTimeout(() => resolve(null), ACCESS_AUTH_TIMEOUT_MS)
       }),
     ])
-    if (!auth) {
-      console.warn('[auth-access-timeout]', JSON.stringify({ timeoutMs: ACCESS_AUTH_TIMEOUT_MS }))
+    if (!verified) {
+      console.warn('[auth-access-timeout]', JSON.stringify({ timeoutMs: ACCESS_AUTH_TIMEOUT_MS, verifier: 'getClaims' }))
       return buildContext(null, null, 'guest', 'unavailable')
     }
-    const { data: { user } } = auth
-    if (!user?.id) return buildContext(null, null, 'guest', 'anonymous')
-    return accessFromVerifiedIdentity(user.id, user.email)
+    if (verified.error) {
+      if (isAnonymousClaimsError(verified.error)) return buildContext(null, null, 'guest', 'anonymous')
+      console.warn('[auth-access-failed]', verified.error.message || String(verified.error))
+      return buildContext(null, null, 'guest', 'unavailable')
+    }
+    const claims = verified.data?.claims as VerifiedClaims | undefined
+    const userId = String(claims?.sub || '').trim()
+    if (!userId) return buildContext(null, null, 'guest', 'anonymous')
+    return accessFromVerifiedIdentity(userId, claims?.email)
   } catch (error) {
     console.warn('[auth-access-failed]', error instanceof Error ? error.message : String(error))
     return buildContext(null, null, 'guest', 'unavailable')

@@ -172,10 +172,72 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
     })
   }
 
+  // A failed campaign with only terminal runs and no unsettled provider job is fully terminal.
+  // Marking completed_at releases the rolling admission slot; otherwise the database correctly
+  // fences it as an in-flight failed campaign and can deadlock all four dynamic campaign slots.
+  const remainingNonterminal = await db.from('cos_university_mass_distillation_batch_runs')
+    .select('campaign_id')
+    .in('campaign_id', campaignIds)
+    .not('stage', 'in', '("complete","failed")')
+    .limit(500)
+  if (remainingNonterminal.error) throw remainingNonterminal.error
+
+  const unsettledJobs = await db.from('cos_university_mass_distillation_provider_jobs')
+    .select('campaign_id')
+    .in('campaign_id', campaignIds)
+    .is('settled_at', null)
+    .limit(500)
+  if (unsettledJobs.error) throw unsettledJobs.error
+
+  const blockedCampaigns = new Set<string>([
+    ...(remainingNonterminal.data || []).map((row: any) => String(row.campaign_id || '')),
+    ...(unsettledJobs.data || []).map((row: any) => String(row.campaign_id || '')),
+  ].filter(Boolean))
+  const completedCampaigns: string[] = []
+
+  for (const campaignId of campaignIds) {
+    if (blockedCampaigns.has(campaignId)) continue
+    const now = new Date().toISOString()
+    const completed = await db.from('cos_university_mass_distillation_campaigns')
+      .update({ completed_at: now, updated_at: now })
+      .eq('id', campaignId)
+      .eq('status', 'failed')
+      .is('completed_at', null)
+      .select('id')
+      .maybeSingle()
+    if (completed.error) throw completed.error
+    if (!completed.data) continue
+
+    const evidence = {
+      profile: MASS_DISTILLATION_TERMINAL_CLEANUP_PROFILE,
+      claim: 'mass_distillation_failed_campaign_completed',
+      campaignId,
+      reason: 'all_runs_terminal_and_provider_jobs_settled',
+      retryAuthorized: false,
+      dispatchAuthorized: false,
+      productionTrafficAuthorized: false,
+      authorityExpanded: false,
+    }
+    const evidenceHash = hash(evidence)
+    const eventKey = hash([MASS_DISTILLATION_TERMINAL_CLEANUP_PROFILE, 'failed-campaign-completed', campaignId])
+    const recorded = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: eventKey,
+      event_type: 'fine_tune',
+      subject_id: 'distillation_campaign',
+      candidate_id: `mass-campaign:${campaignId}`,
+      evidence_hash: evidenceHash,
+      evidence,
+      verifier: 'host_controller',
+      observed_at: now,
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (recorded.error) throw recorded.error
+    completedCampaigns.push(campaignId)
+  }
+
   return Object.freeze({
     ok: true as const,
-    skipped: terminalized.length === 0 && quarantinedBatches.length === 0,
-    reason: terminalized.length === 0 && quarantinedBatches.length === 0
+    skipped: terminalized.length === 0 && quarantinedBatches.length === 0 && completedCampaigns.length === 0,
+    reason: terminalized.length === 0 && quarantinedBatches.length === 0 && completedCampaigns.length === 0
       ? 'no_orphaned_nonterminal_failed_campaign_run'
       : null,
     campaignsInspected: campaignIds.length,
@@ -183,6 +245,8 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
     runs: Object.freeze(terminalized),
     quarantinedBatches: quarantinedBatches.length,
     batchQuarantines: Object.freeze(quarantinedBatches),
+    completedCampaigns: completedCampaigns.length,
+    completedCampaignIds: Object.freeze(completedCampaigns),
     retryAuthorized: false,
     dispatchAuthorized: false,
     productionTrafficAuthorized: false,

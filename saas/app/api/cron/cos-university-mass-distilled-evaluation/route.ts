@@ -37,6 +37,20 @@ const ENDPOINT_ID = /^[A-Za-z0-9_-]{3,120}$/
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const clean = (value: unknown, max = 1000) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 
+function boundedErrorMessage(error: unknown): string {
+  if (error instanceof Error) return clean(error.message, 500)
+  if (error && typeof error === 'object') {
+    const row = error as Record<string, unknown>
+    const code = clean(row.code, 80)
+    const message = clean(row.message, 400)
+    if (message) return clean(code ? `${code}:${message}` : message, 500)
+    const name = clean(row.name, 80)
+    if (name) return name
+    return 'structured_error_without_message'
+  }
+  return clean(String(error), 500)
+}
+
 async function recordProduction(invocationSucceeded: boolean, evidence: Record<string, unknown>) {
   await recordCosUniversityProductionPath({
     path: 'mass_distilled_independent_evaluation',
@@ -344,7 +358,7 @@ export async function GET(req: NextRequest) {
     console.info('[cos-mass-distilled-independent-evaluation]', JSON.stringify(result))
     return NextResponse.json(result, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = boundedErrorMessage(error)
     // A defect in our own code (2026-09-17 20:01 UTC: "Cannot read properties of undefined (reading 'length')")
     // is indistinguishable from a provider failure without the throw site. Record the first frames of our own
     // stack, and nothing else from the error: no provider bodies, prompts, answers or credentials.

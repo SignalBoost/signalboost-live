@@ -95,3 +95,18 @@ test('each fixed suite gets its own request per model, so output budget is not s
   assert.doesNotMatch(SOURCE, /mass_distilled_eval_fixed_suites_(baseline|candidate)/)
   assert.doesNotMatch(SOURCE, /const fixedCases=/)
 })
+
+
+test('raw and parsed answers are retained only for fixed-suite all-zero diagnostics', () => {
+  assert.match(SOURCE, /rawExcerpt:clean\(text,2400\)/)
+  assert.match(SOURCE, /rawExcerpts:readonly string\[\]/)
+  assert.match(SOURCE, /baselineRaw:Object\.freeze\(input\.baseline\.rawExcerpts/)
+  assert.match(SOURCE, /candidateRaw:Object\.freeze\(input\.candidate\.rawExcerpts/)
+  assert.match(SOURCE, /baselineParsed:Object\.freeze\(Object\.fromEntries/)
+  assert.match(SOURCE, /candidateParsed:Object\.freeze\(Object\.fromEntries/)
+  assert.match(SOURCE, /input\.name!=='holdout'/)
+  assert.match(SOURCE, /zeroScoreDiagnostics:Object\.fromEntries/)
+  for (const suite of ['safety', 'transfer', 'retention']) {
+    assert.ok(SOURCE.includes(`['${suite}',${suite}]`), suite)
+  }
+})

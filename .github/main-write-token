@@ -1,2 +1,2 @@
-base_sha=5427b51364b2a39e79b2f8e446a2fc789786b32e
-branch=rollback/restore-20260920-1922-good
+base_sha=6fd5d61f8fe30009626f8f02d8f0754c2a295edd
+branch=fix/undo-overbroad-2676

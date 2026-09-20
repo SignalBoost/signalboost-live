@@ -90,7 +90,9 @@ test('holdout integrity is pinned to the recorded commit rather than the dataset
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_integrity_failed/)
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_count_invalid/)
   assert.match(SOURCE, /readPinnedHfParquetRows\(\{repoId,revision,split,token\}\)/)
-  assert.doesNotMatch(SOURCE, /mass_distilled_evaluation_holdout_revision_moved/)
+  // The comment above the pinned read deliberately names the retired error, so assert the THROW is gone
+  // rather than the string: matching the bare name fails on the explanation that records why it was removed.
+  assert.doesNotMatch(SOURCE, /throw new Error\('mass_distilled_evaluation_holdout_revision_moved'\)/)
   assert.doesNotMatch(SOURCE, /api\/datasets\/\$\{repoId\.split/)
   assert.match(SOURCE, /sha256Raw\(text\)\s*!==\s*itemHash/)
 })

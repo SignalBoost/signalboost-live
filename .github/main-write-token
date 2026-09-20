@@ -1,2 +1,2 @@
-base_sha=6fd5d61f8fe30009626f8f02d8f0754c2a295edd
-branch=fix/undo-overbroad-2676
+base_sha=4a9652d0f9b3e69882005ba3e3da208f1d4813c9
+branch=fix/recent-supabase-coldstart-regression

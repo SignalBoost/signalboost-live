@@ -1,2 +1,2 @@
-base_sha=f7f560dc7613a9da67a916eddd2df3841d83a3cc
-branch=fix/hf-t4-qlora-no-amp-v2
+base_sha=84a1c1c86c80cb8d697f1fba9591bc65bcb58b37
+branch=fix/private-repo-runtime-bootstrap

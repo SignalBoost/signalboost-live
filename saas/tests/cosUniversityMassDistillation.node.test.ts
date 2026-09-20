@@ -160,6 +160,44 @@ test('mass distillation batches are bounded, deterministic and do not reuse assi
   assert.ok(remaining[0].sourceCount >= MASS_DISTILLATION_MIN_BATCH)
 })
 
+
+test('failure-derived material is concentrated into a minimum-sized hybrid remediation batch', () => {
+  const real = Array.from({ length: 118 }, (_, index) => ({
+    contentHash: h(index + 70_000),
+    materialHash: h(index + 80_000),
+    subject: 'Cybersecurity',
+    sourceKind: 'scientific_journal',
+    license: 'Public Domain',
+    confidence: 0.95,
+  }))
+  const failure = Array.from({ length: 6 }, (_, index) => ({
+    contentHash: h(index + 90_000),
+    materialHash: h(index + 91_000),
+    subject: 'Cybersecurity',
+    sourceKind: 'failure_derived_curriculum',
+    license: 'synthetic-benchmark-fixture',
+    confidence: 1,
+  }))
+  const synthetic = Array.from({ length: 4 }, (_, index) => ({
+    contentHash: h(index + 92_000),
+    materialHash: h(index + 93_000),
+    subject: 'Cybersecurity',
+    sourceKind: 'teacher_synthetic_curriculum',
+    license: 'synthetic-benchmark-fixture',
+    confidence: 1,
+  }))
+  const prepared = buildMassDistillationBatches([...real, ...failure, ...synthetic])
+  assert.equal(prepared.length, 2)
+  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MIN_BATCH)
+  assert.equal(prepared[1].sourceCount, 108)
+
+  const first = new Set(prepared[0].sourceHashes)
+  assert.equal(real.filter(row => first.has(row.contentHash)).length, 10)
+  assert.equal(failure.filter(row => first.has(row.contentHash)).length, 6)
+  assert.equal(synthetic.filter(row => first.has(row.contentHash)).length, 4)
+  assert.deepEqual(buildMassDistillationBatches([...real, ...failure, ...synthetic]), prepared)
+})
+
 test('subject aliases package through the canonical University subject family without lowering the minimum', () => {
   const rows = [
     ...Array.from({ length: 10 }, (_, index) => ({

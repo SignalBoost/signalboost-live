@@ -114,6 +114,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
   const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
   const startedAt=Date.now()
+  const cognitiveMode=fastAuthoringCognitiveMode(input)
   for(const model of models){
     const remaining=Math.max(0,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt))
     if(remaining<1_000)break
@@ -138,7 +139,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
       const reasonerLabel=provider&&provider!=='self_hosted'
         ? `managed-open-model:${provider}:${model}`
         : `independent-local:${model}`
-      return{reply,reasonerLabel}
+      return{reply,reasonerLabel,cognitiveMode}
     }
   }
   return null
@@ -148,7 +149,15 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
 export const FAST_AUTHORING_TIMEOUT_MS = 18_000
 export const FAST_AUTHORING_ATTEMPT_MS = 9_000
 
-async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
+type FastAuthoringCognitiveMode = 'deterministic' | 'creative'
+
+function fastAuthoringCognitiveMode(input:string):FastAuthoringCognitiveMode{
+  return /\b(?:brainstorm|creative|creatively|imaginative|story|poem|poetry|slogan|tagline|ideas?|concepts?|names?|naming|campaign|humorous|funny|invent|original|criativ|hist[oó]ria|poema|ideias?|conceitos?|nomes?|creativ|cuento|poema|ideas?|conceptos?|nombres?|kreatywn|wiersz|pomys[lł]|nazw|креатив|стих|иде[яи]|назван)\b/iu.test(input)
+    ? 'creative'
+    : 'deterministic'
+}
+
+async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabel:string;cognitiveMode:FastAuthoringCognitiveMode}|null>{
   const config=localInferenceConfigFromEnv()
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
   const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
@@ -159,15 +168,21 @@ async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabe
     if(remaining<1_000)break
     const attemptMs=Math.min(FAST_AUTHORING_ATTEMPT_MS,remaining)
     const text=await callLocalModel({
-      temperature:.35,
+      temperature:cognitiveMode==='creative'?.75:.35,
       maxTokens:900,
       disableThinking:true,
       timeoutMs:attemptMs,
       allowConfiguredFallback:false,
       persistUsage:false,
       jsonObject:true,
-      usageContext:{feature:'cos_fast_authoring',purpose:model===preferredModel?'fast_authoring_primary':'fast_authoring_retry'},
-      systemPrompt:'You are COS fast authoring. Complete the user\'s self-contained writing, drafting, composition, or translation request using only facts the user supplied. If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      usageContext:{feature:'cos_fast_authoring',purpose:cognitiveMode==='creative'?'creative_authoring':model===preferredModel?'fast_authoring_primary':'fast_authoring_retry'},
+      systemPrompt:[
+        'You are COS fast authoring. Complete the user\'s self-contained writing, drafting, composition, or translation request using only facts the user supplied.',
+        cognitiveMode==='creative'
+          ? 'The user is asking for creative generation: explore original wording and varied ideas while respecting every supplied constraint.'
+          : 'The task is precision-oriented: prefer faithful, controlled wording over novelty.',
+        'If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      ].join(' '),
       prompt:input,
     },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
     if(!text)continue
@@ -184,12 +199,12 @@ async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabe
   return null
 }
 
-function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;reasonerLabel:string},source='cos-fast-authoring'){
+function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;reasonerLabel:string;cognitiveMode:FastAuthoringCognitiveMode},source='cos-fast-authoring'){
   const executionProvenance=authoritativeProvenance(null,{invoked:false})
   ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:1}
   ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
   const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
-  return NextResponse.json({ok:true,reply:fast.reply,source,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+  return NextResponse.json({ok:true,reply:fast.reply,source,cognitive_mode:fast.cognitiveMode,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
 }
 
 async function runCompletionFirstRescue(input:string,language:string):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{

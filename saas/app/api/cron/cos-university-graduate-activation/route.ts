@@ -335,28 +335,40 @@ export async function GET(req: NextRequest) {
     const db = cosServiceDb()
     if (!db) throw new Error('service_database_unavailable')
 
-    const pending = await db.from('cos_university_graduate_model_registry')
-      .select('candidate_id,subject_id,trained_artifact_hash,status,platform_scope')
-      .eq('status', 'pending_runtime')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    if (pending.error) throw pending.error
+    let graduate: any = null
+    let precomputedScopeDecision: Awaited<ReturnType<typeof resolveGraduateWorkerScope>> | null = null
 
-    let graduate: any = pending.data || null
-    if (!graduate && String(process.env[GENERALIST_PRIMARY_ENABLED_FLAG] || '').trim() === 'true') {
-      // Upgrade an already-active Reasoning graduate once COS earns the generalist gate. This closes
-      // the historical gap where artifacts activated before primary promotion existed could never
-      // become the brain without being retrained or manually edited.
+    if (String(process.env[GENERALIST_PRIMARY_ENABLED_FLAG] || '').trim() === 'true') {
+      // A qualified COS-primary upgrade outranks ordinary pending specialist activation. Otherwise
+      // a continually replenished specialist queue could leave COS nominally "the brain" forever.
       const active = await db.from('cos_university_graduate_model_registry')
         .select('candidate_id,subject_id,trained_artifact_hash,status,platform_scope,updated_at')
         .eq('status', 'active')
         .order('updated_at', { ascending: false })
         .limit(20)
       if (active.error) throw active.error
-      graduate = (active.data || []).find((row: any) =>
+      const primaryCandidate = (active.data || []).find((row: any) =>
         canonicalGraduateSubjectId(row.subject_id) === 'reasoning_decision_science'
         && !activeWorkerRoles(row.platform_scope).includes('primary')) || null
+      if (primaryCandidate) {
+        const candidateScope = SUBJECT_WORKER_SCOPE.reasoning_decision_science
+        const decision = await resolveGraduateWorkerScope('reasoning_decision_science', candidateScope)
+        if (decision.cosPrimary) {
+          graduate = primaryCandidate
+          precomputedScopeDecision = decision
+        }
+      }
+    }
+
+    if (!graduate) {
+      const pending = await db.from('cos_university_graduate_model_registry')
+        .select('candidate_id,subject_id,trained_artifact_hash,status,platform_scope')
+        .eq('status', 'pending_runtime')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (pending.error) throw pending.error
+      graduate = pending.data || null
     }
 
     if (!graduate) {
@@ -375,7 +387,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'graduate_subject_scope_undeclared', subjectId: graduate.subject_id, canonicalSubjectId }, { status: 422 })
     }
 
-    const scopeDecision = await resolveGraduateWorkerScope(canonicalSubjectId, baseScope)
+    const scopeDecision = precomputedScopeDecision
+      ?? await resolveGraduateWorkerScope(canonicalSubjectId, baseScope)
     const scope = scopeDecision.scope
     if (graduate.status === 'active' && !scopeDecision.cosPrimary) {
       return NextResponse.json({

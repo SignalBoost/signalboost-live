@@ -42,6 +42,11 @@ async function supabaseForRefresh(req: NextRequest) {
           return req.cookies.getAll()
         },
         setAll(cookiesToSet) {
+          // Supabase SSR requires refreshed cookies on both sides of the boundary:
+          // mutate the current request so the route sees the new token immediately,
+          // then persist those same cookies on the response for the browser.
+          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
+          res = NextResponse.next({ request: { headers: req.headers } })
           cookiesToSet.forEach(({ name, value, options }) => {
             res.cookies.set(name, value, options)
           })
@@ -60,7 +65,7 @@ function isTransientAuthError(error: unknown): boolean {
 async function refreshAuthCookies(req: NextRequest) {
   try {
     const { supabase, response } = await supabaseForRefresh(req)
-    const { error } = await supabase.auth.getUser()
+    const { error } = await supabase.auth.getClaims()
 
     // Supabase may attempt cookie mutations while refreshing. A retryable transport/5xx/429
     // failure is NOT evidence that the user's session is invalid, so discard every mutation
@@ -161,14 +166,14 @@ export async function proxy(req: NextRequest) {
   const { supabase, response } = await supabaseForRefresh(req)
   const res = response()
 
-  const { data, error } = await supabase.auth.getUser()
+  const { data, error } = await supabase.auth.getClaims()
   if (error && isTransientAuthError(error)) {
     return NextResponse.json(
       { error: 'auth_temporarily_unavailable' },
       { status: 503, headers: { 'Retry-After': '2' } },
     )
   }
-  const email = data?.user?.email?.toLowerCase() || ''
+  const email = String((data?.claims as { email?: string } | undefined)?.email || '').toLowerCase()
 
   if (email && OWNER_EMAILS.includes(email)) {
     return res

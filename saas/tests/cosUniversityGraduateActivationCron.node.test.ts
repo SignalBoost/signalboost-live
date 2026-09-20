@@ -46,7 +46,8 @@ test('activation binds to the exact canary-proven RunPod endpoint and served mod
   assert.doesNotMatch(route, /COS_GRADUATE_AI_BASE_URL/)
   assert.doesNotMatch(route, /DISTILLED_MODEL_NAME/)
   assert.doesNotMatch(route, /DISTILLED_ADAPTER_MODEL_ID/)
-  assert.doesNotMatch(route, /provisionMassDistilledRuntime|ensureMassDistilledEndpoint24Gb/)
+  assert.match(route, /ensureMassDistilledEndpoint24Gb\(serving\.endpointId\)/)
+  assert.doesNotMatch(route, /provisionMassDistilledRuntime/)
 })
 
 test('exact serving identity is resolved only after the owner activation switch', () => {
@@ -71,4 +72,15 @@ test('canonicalizes durable subject titles before scope lookup without widening 
   assert.match(route, /sourceSubjectId: graduate\.subject_id/)
   assert.match(route, /subjectId: canonicalSubjectId/)
   assert.match(route, /graduate_subject_scope_undeclared/)
+})
+
+
+test('restores only the canary-proven endpoint capacity after identity resolution and before activation', () => {
+  const resolved = route.indexOf('const serving = await resolvePendingGraduateServingIdentity')
+  const restored = route.indexOf('const runtimePolicy = await ensureMassDistilledEndpoint24Gb(serving.endpointId)')
+  const activated = route.indexOf('const result = await activateGraduateRuntime({')
+  assert.ok(resolved >= 0 && restored > resolved && activated > restored)
+  assert.match(route, /servingWorkersMin: runtimePolicy\.workersMin/)
+  assert.match(route, /servingWorkersMax: runtimePolicy\.workersMax/)
+  assert.doesNotMatch(route, /provisionMassDistilledRuntime/)
 })

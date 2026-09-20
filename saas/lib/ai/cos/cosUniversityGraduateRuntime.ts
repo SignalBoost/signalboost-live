@@ -7,6 +7,7 @@ import {
   type LocalInferenceConfig,
 } from '@/lib/ai/local-inference'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
+import { classifyCosUniversitySubjects } from '@/lib/ai/cos/cosUniversity'
 import { classifyInferenceHost } from '@/lib/ai/cos/reasonerHostingDisclosure'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import type { CosReasonerConfig } from '@/lib/ai/cos/cosReasoner'
@@ -351,6 +352,7 @@ export async function activeGraduateRuntimesForRole(
   const db = cosServiceDb()
   if (!db) return []
   const problemClass = classifyProblemClass(objective)
+  const universitySubjects = classifyCosUniversitySubjects(objective)
   const rows = await db.from('cos_university_graduate_model_registry')
     .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,status,runtime_profile,runtime_provider,runtime_model_id,runtime_health_evidence_hash,activation_evidence_hash,platform_scope,updated_at')
     .eq('status', 'active')
@@ -367,7 +369,8 @@ export async function activeGraduateRuntimesForRole(
     const workerRoles = scopeArray(row.platform_scope, 'workerRoles')
     const problemClasses = scopeArray(row.platform_scope, 'problemClasses')
     if (!workerRoles.includes(role)) continue
-    if (!(problemClasses.includes(problemClass) || problemClasses.includes('*'))) continue
+    const universityScoped = universitySubjects.some(subjectId => problemClasses.includes(`university:${subjectId}`))
+    if (!(problemClasses.includes(problemClass) || problemClasses.includes('*') || universityScoped)) continue
     if (!HEX64.test(clean(row.runtime_health_evidence_hash, 64))) continue
     if (!HEX64.test(clean(row.activation_evidence_hash, 64))) continue
     const runtimeProfile = clean(row.runtime_profile, 40) as GraduateRuntimeProfile

@@ -1,2 +1,2 @@
-base_sha=289c634827854ecbbaedfde0ac712dc685859841
-branch=fix/graduate-legacy-scope-routing
+base_sha=5ea8383f79582c03c08ed48adfd7c92c41213f9a
+branch=hotfix/hf-distillation-runtime-reliability-v3

@@ -277,6 +277,32 @@ test('holdout format failures are evaluator infrastructure and do not consume mo
 })
 
 
+test('moving-head holdout revision failures are evaluator infrastructure and release rolling authority', () => {
+  const approval = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'distilled_independent_evaluation_approved',
+    authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+    artifactHash: hashA,
+  }, '2026-09-20T08:29:00Z', '2026-09-20T10:29:00Z')
+  const started = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_started',
+    artifactHash: hashA,
+  }, '2026-09-20T08:29:10Z', '2026-09-20T08:41:10Z')
+  const failed = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_failed',
+    artifactHash: hashA,
+    error: 'mass_distilled_evaluation_holdout_revision_moved',
+  }, '2026-09-20T08:29:20Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA), approval, started, failed],
+    now: new Date('2026-09-20T15:40:00Z'),
+  })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
+})
+
+
 test('rolling approval evidence is candidate-scoped and paginated so old exact canaries cannot fall out of a global row cap', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const candidateIds = rows\.map\(row => row\.candidateId\)/)

@@ -265,6 +265,7 @@ jobs:
     runs-on: ubuntu-latest
     # Build can compile without real secrets; placeholders satisfy module-load client init.
     env:
+      NODE_OPTIONS: '--max-old-space-size=6144'
       NEXT_TELEMETRY_DISABLED: '1'
       NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'

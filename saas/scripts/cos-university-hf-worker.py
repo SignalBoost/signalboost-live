@@ -709,6 +709,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
                 structured_items += 1
         if not rendered_training:
             raise RuntimeError("worker_training_dataset_empty")
+        training_for_trainer = Dataset.from_list(rendered_training)
         recipe["profile"] = TRAINING_PROFILE
         recipe["optimizer"] = "legacy_bootstrap_sft"
         recipe["structuredItems"] = structured_items
@@ -744,7 +745,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         trainer = SFTTrainer(
             model=model,
             args=args,
-            train_dataset=Dataset.from_list(rendered_training),
+            train_dataset=training_for_trainer,
             processing_class=tokenizer,
             peft_config=peft_config,
         )

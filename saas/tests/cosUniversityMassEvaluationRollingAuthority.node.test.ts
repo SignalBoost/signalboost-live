@@ -84,6 +84,7 @@ test('evaluator infrastructure failures do not exhaust the artifact retry budget
     'mass_distilled_evaluation_runpod_http_502:baseline:cases=4:gateway',
     'mass_distilled_evaluation_answer_missing:0a546e1b26656083',
     'mass_distilled_evaluation_holdout_format_invalid',
+    'mass_distilled_evaluation_legacy_hosted_prompt_binding_missing',
     'mass_distilled_evaluation_runtime_not_ready:204',
   ].map((error, i) => ev(artifactA.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashA, error }, `2026-09-16T1${i}:00:00Z`))
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), rollingApproval, ...failures], now })

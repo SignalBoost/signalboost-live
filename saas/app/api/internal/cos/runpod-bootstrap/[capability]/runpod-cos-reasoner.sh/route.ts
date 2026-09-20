@@ -15,9 +15,7 @@ export async function GET(
 ) {
   const { capability } = await context.params
   const apiKey = String(process.env.RUNPOD_API_KEY || '').trim()
-  const podId = String(process.env.RUNPOD_PRIMARY_POD_ID || process.env.RUNPOD_POD_ID || '').trim()
-
-  if (!apiKey || !podId || !verifyRunpodBootstrapDeliveryToken(capability, apiKey, podId)) {
+  if (!apiKey || !verifyRunpodBootstrapDeliveryToken(capability, apiKey)) {
     return new Response('not found', {
       status: 404,
       headers: { 'cache-control': 'no-store' },

@@ -15,6 +15,7 @@ import {
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
+  MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   decideRollingMassEvaluationApproval,
   type RollingArtifact,
   type RollingEvent,
@@ -31,6 +32,8 @@ const ROUTE_BUDGET_MS = 570_000
 const ROUTE_RESERVE_MS = 25_000
 const RUNTIME_WAKE_TIMEOUT_MS = 20_000
 const MIN_BALANCE_USD = 1
+const ROLLING_EVENT_PAGE_SIZE = 1000
+const ROLLING_EVENT_MAX_PAGES = 10
 const HEX64 = /^[a-f0-9]{64}$/i
 const ENDPOINT_ID = /^[A-Za-z0-9_-]{3,120}$/
 
@@ -137,25 +140,44 @@ async function ensureRollingMassEvaluationApproval() {
   // broad result sets below the requested limit; a global newest-events query can therefore evict
   // older exact-canary evidence and make eligible artifacts appear permanently ineligible.
   const candidateIds = rows.map(row => row.candidateId)
-  const events = await db.from('cos_university_learning_assurance_events')
-    .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
-    .eq('event_type', 'fine_tune')
-    .in('candidate_id', candidateIds)
-    .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
-    .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
-    .order('observed_at', { ascending: false })
-    .limit(2000)
-  if (events.error) throw events.error
-  const reservations = await db.from('cos_university_learning_assurance_events')
-    .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
-    .eq('event_type', 'fine_tune')
-    .in('candidate_id', candidateIds)
-    .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
-    .order('observed_at', { ascending: false })
-    .limit(1000)
-  if (reservations.error) throw reservations.error
+  // A single global row cap silently drops the OLDEST rows first, which is exactly where an artifact's exact
+  // canary lives. Scope every read to the candidates actually under consideration and page through them, so an
+  // older canary can never fall out of the window and make a genuinely eligible artifact look unproven.
+  const eventRows: any[] = []
+  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+    const from = page * ROLLING_EVENT_PAGE_SIZE
+    const to = from + ROLLING_EVENT_PAGE_SIZE - 1
+    const result = await db.from('cos_university_learning_assurance_events')
+      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+      .eq('event_type', 'fine_tune')
+      .in('candidate_id', candidateIds)
+      .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
+      .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+      .order('observed_at', { ascending: false })
+      .range(from, to)
+    if (result.error) throw result.error
+    const batch = result.data || []
+    eventRows.push(...batch)
+    if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+  }
+  const reservationRows: any[] = []
+  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+    const from = page * ROLLING_EVENT_PAGE_SIZE
+    const to = from + ROLLING_EVENT_PAGE_SIZE - 1
+    const result = await db.from('cos_university_learning_assurance_events')
+      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+      .eq('event_type', 'fine_tune')
+      .in('candidate_id', candidateIds)
+      .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
+      .order('observed_at', { ascending: false })
+      .range(from, to)
+    if (result.error) throw result.error
+    const batch = result.data || []
+    reservationRows.push(...batch)
+    if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+  }
   const seenEventKeys = new Set<string>()
-  const uniqueRows = [...(events.data || []), ...(reservations.data || [])].filter((row: any) => {
+  const uniqueRows = [...eventRows, ...reservationRows].filter((row: any) => {
     const key = String(row?.event_key || '')
     if (!key) return true
     if (seenEventKeys.has(key)) return false
@@ -315,7 +337,13 @@ export async function GET(req: NextRequest) {
     }
 
     const rolling = await ensureRollingMassEvaluationApproval()
-    console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
+    // Production 2026-09-20 recorded 87 approvals against a 24/day cap, spread across artifacts each burning
+  // its four attempts on an unparseable holdout. Counting the approvals actually visible in this window makes
+  // that observable from the log line instead of only from a database query after the fact.
+  const rollingApprovalMarker = { authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF }
+  const approvalsInWindow = all.filter(row => row.evidence
+    && (row.evidence as Record<string, unknown>).authorizationRef === rollingApprovalMarker.authorizationRef).length
+  console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify({ ...rolling, approvalsInWindow }))
     // No provider/runtime work may occur unless this invocation actually obtained rolling
     // authorization. Treat every non-issued decision as a hard stop, not only today's known
     // reason strings, so a new authority reason cannot accidentally fall through to claim/wake.

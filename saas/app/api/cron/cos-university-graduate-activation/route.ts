@@ -6,6 +6,7 @@ import { servedCandidateModelFromCanary, type CanaryEventRow } from '@/lib/ai/co
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduateModelRegistry'
 import { decideMassGraduateRegistration, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
+import { decideGraduateArtifactLifecycleSync } from '@/lib/ai/cos/cosUniversityGraduateArtifactSync'
 import { GRADUATE_ROLLBACK_PROOF_CLAIM, GRADUATE_ROLLBACK_PROOF_PROFILE, proveGraduateRollbackReference } from '@/lib/ai/cos/cosUniversityGraduateRollbackProof'
 import { COS_UNIVERSITY_SUBJECTS } from '@/lib/ai/cos/cosUniversity'
 import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
@@ -196,6 +197,66 @@ function activeWorkerRoles(scope: unknown): string[] {
 }
 
 /** Writes the graduate registry row for the oldest mass artifact whose recorded evidence clears every gate. */
+// The two ledgers describing one trained model never agreed automatically. The registry moves to `active` when
+// activateGraduateRuntime proves health, identity and rollback; the artifact row is left at `runtime_pending`
+// by everyone. Besides being wrong on its face, that stalls the queue below: registerNextMassGraduate reads the
+// oldest 50 runtime_pending artifacts, so every already-activated artifact that never advanced occupies a slot
+// in the window that finds the NEXT graduate.
+//
+// Advance the artifact to `active` only where its OWN registry row (same candidate, same artifact hash) proves a
+// live runtime, and only from `runtime_pending`. The write is conditioned on that status, so it is idempotent and
+// can never overwrite a quarantined, retired or still-evaluating artifact. It proves nothing and promotes
+// nothing: activateGraduateRuntime already did that, and this only records the consequence.
+async function reconcileGraduateArtifactLifecycle() {
+  const db = cosServiceDb()
+  if (!db) return { synced: 0, reason: 'service_database_unavailable' as const }
+
+  const registry = await db.from('cos_university_graduate_model_registry')
+    .select('candidate_id,trained_artifact_hash,status')
+    .eq('status', 'active')
+    .order('updated_at', { ascending: false })
+    .limit(200)
+  if (registry.error) throw registry.error
+  const registryRows = (registry.data || []).map((row: any) => ({
+    candidateId: String(row.candidate_id || ''),
+    artifactHash: String(row.trained_artifact_hash || '').toLowerCase(),
+    status: String(row.status || ''),
+  }))
+  if (!registryRows.length) return { synced: 0, reason: 'no_active_graduate' as const }
+
+  const artifacts = await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,trained_artifact_hash,status')
+    .eq('status', 'runtime_pending')
+    .in('candidate_id', registryRows.map(row => row.candidateId))
+    .limit(200)
+  if (artifacts.error) throw artifacts.error
+  const artifactRows = (artifacts.data || []).map((row: any) => ({
+    candidateId: String(row.candidate_id || ''),
+    artifactHash: String(row.trained_artifact_hash || '').toLowerCase(),
+    status: String(row.status || ''),
+  }))
+
+  const sync = decideGraduateArtifactLifecycleSync({ registry: registryRows, artifacts: artifactRows })
+  if (!sync.length) return { synced: 0, reason: 'already_in_agreement' as const }
+
+  const nowIso = new Date().toISOString()
+  const synced: string[] = []
+  for (const item of sync) {
+    const updated = await db.from('cos_local_distillation_artifacts')
+      .update({ status: item.toStatus, updated_at: nowIso })
+      .eq('candidate_id', item.candidateId)
+      .eq('trained_artifact_hash', item.artifactHash)
+      .eq('status', item.fromStatus)
+      .select('candidate_id')
+    if (updated.error) throw updated.error
+    if ((updated.data || []).length) synced.push(item.candidateId)
+  }
+  if (synced.length) {
+    console.info('[cos-graduate-artifact-lifecycle-sync]', JSON.stringify({ synced: synced.length, candidates: synced.slice(0, 20) }))
+  }
+  return { synced: synced.length, candidates: synced.slice(0, 20) }
+}
+
 async function registerNextMassGraduate() {
   const db = cosServiceDb()
   if (!db) return { registered: false as const, reason: 'service_database_unavailable' }
@@ -325,11 +386,14 @@ export async function GET(req: NextRequest) {
   try {
     // Registration is a durable record, not a runtime: it writes one pending_runtime row and spends nothing, so it
     // runs before the activation flag. Activation itself stays behind that flag and its own evidence gates.
+    // Reconciliation is a bookkeeping write about an activation that ALREADY happened and behind its own
+    // status guard, so like registration it runs before the activation flag and spends nothing.
+    const lifecycleSync = await reconcileGraduateArtifactLifecycle()
     const massRegistration = await registerNextMassGraduate()
     const rollbackProof = await proveNextGraduateRollback()
 
     if (String(process.env[ACTIVATION_ENABLED_FLAG] || '').trim() !== 'true') {
-      return NextResponse.json({ ok: true, skipped: true, reason: 'graduate_activation_disabled', massRegistration, rollbackProof })
+      return NextResponse.json({ ok: true, skipped: true, reason: 'graduate_activation_disabled', lifecycleSync, massRegistration, rollbackProof })
     }
 
     const db = cosServiceDb()
@@ -372,7 +436,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!graduate) {
-      return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_or_primary_upgrade_candidate', massRegistration, rollbackProof })
+      return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_or_primary_upgrade_candidate', lifecycleSync, massRegistration, rollbackProof })
     }
 
     const canonicalSubjectId = canonicalGraduateSubjectId(graduate.subject_id)

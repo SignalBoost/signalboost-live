@@ -69,6 +69,12 @@ function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistR
     ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
     ...(request.jsonObject === undefined ? {} : { jsonObject: request.jsonObject }),
     ...(request.usageContext === undefined ? {} : { usageContext: request.usageContext }),
+    ...(request.frequencyPenalty === undefined ? {} : { frequencyPenalty: request.frequencyPenalty }),
+    ...(request.presencePenalty === undefined ? {} : { presencePenalty: request.presencePenalty }),
+    ...(request.disableThinking === undefined ? {} : { disableThinking: request.disableThinking }),
+    ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+    ...(request.allowConfiguredFallback === undefined ? {} : { allowConfiguredFallback: request.allowConfiguredFallback }),
+    ...(request.persistUsage === undefined ? {} : { persistUsage: request.persistUsage }),
   }
 }
 

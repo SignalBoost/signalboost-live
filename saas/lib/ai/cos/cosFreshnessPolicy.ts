@@ -179,6 +179,15 @@ export function isPlatformSelfKnowledgePrompt(input: string): boolean {
 const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i
 const LOCAL_CLOCK_OR_DATE = /^\s*(?:what(?:'s|\s+is)?\s+)?(?:the\s+)?(?:current\s+)?(?:date|time|day)(?:\s+(?:today|now|is\s+it))?\s*[?!.]*\s*$/i
 
+/**
+ * Direct lookups are not fresh merely because they are phrased as a question. These markers
+ * identify reference facts whose answer can materially change without the user saying "current".
+ * Stable reference knowledge (for example a country's capital or a historical founding date)
+ * remains locally answerable unless a separate temporal/live rule above requires verification.
+ */
+const MUTABLE_REFERENCE_STATE = /\b(?:population|how\s+many\s+people|people\s+live\s+in|residents?|headquarter(?:ed|s)?|owns?|ownership|parent\s+company|subsidiar(?:y|ies)|member\s+of|membership|largest\s+population|smallest\s+population|most\s+populous|official(?:ly)?\s+recognized\s+languages?|official\s+languages?)\b/i
+const SUBJECTIVE_RANKING_LOOKUP = /\b(?:best|top|greatest|highest[-\s]?rated|most\s+popular|rank(?:ed|ing)?)\b/i
+
 function normalizedText(input: string): string {
   return englishNormalizedForClassification(String(input || '')).replace(/\s+/g, ' ').trim()
 }
@@ -319,6 +328,12 @@ export function requiresFreshExternalEvidence(input: string): boolean {
 
   if (CONCEPTUAL_OR_CREATIVE.test(text)) return false
 
+  // Mutable reference state and subjective/current ranking questions may benefit from live evidence
+  // even without an explicit "current" marker. This is intentionally narrower than the old blanket
+  // rule that forced every direct factual lookup through public search.
+  if (LOOKUP_INTENT.test(text) && MUTABLE_REFERENCE_STATE.test(text)) return true
+  if (LOOKUP_INTENT.test(text) && SUBJECTIVE_RANKING_LOOKUP.test(text)) return true
+
   if (structuredLiveDataKind(text)) return true
   if (LOOKUP_INTENT.test(text) && OUTAGE_STATE.test(text)) return true
   if (isDirectOrTerseLookup(text, TRAVEL_STATE)) return true
@@ -328,10 +343,8 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (LOOKUP_INTENT.test(text) && SOFTWARE_SECURITY_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
   if (LOOKUP_INTENT.test(text) && LIFE_STATUS_STATE.test(text)) return true
 
-  // General stale-world protection: any remaining direct external factual lookup is verified live by
-  // default. It is intentionally last so internal, historical, conceptual, and deterministic
-  // requests keep their correct specialized routes.
-  if (LOOKUP_INTENT.test(text)) return true
-
+  // Remaining direct lookups are answerability-first: stable reference knowledge is allowed to use
+  // COS/local knowledge immediately. Fresh verification is reserved for the explicit volatile,
+  // temporal, governed, structured-live, or ranking categories above.
   return false
 }

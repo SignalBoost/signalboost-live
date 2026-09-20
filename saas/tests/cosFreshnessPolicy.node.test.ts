@@ -43,21 +43,39 @@ test('general mutable external facts route live even when the user does not say 
   }
 })
 
-test('ordinary external factual lookups are live-verified by default', () => {
+test('mutable external reference facts are live-verified even without the word current', () => {
   for (const prompt of [
     "What is Poland's population?",
     'Where is OpenAI headquartered?',
     'Who owns Volvo Cars?',
-    'What is the capital of Kazakhstan?',
     'Which country has the largest population?',
-    'Tell me about Nvidia.',
     'How many people live in Warsaw?',
     'What languages are officially recognized in South Africa?',
-    'When was SpaceX founded?',
     'Is Lufthansa a member of Star Alliance?',
   ]) {
     assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
   }
+})
+
+test('stable reference facts stay on the local answerability path', () => {
+  for (const prompt of [
+    'What is the capital of Spain?',
+    'what is the capital of Panama?',
+    'What is the capital of France?',
+    'What is the capital of Kazakhstan?',
+    'When was SpaceX founded?',
+    'Who created Python?',
+    'Where is Mount Everest?',
+    'Tell me about Nvidia.',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
+  }
+  assert.equal(requiresFreshExternalEvidence('What is the current capital of Kazakhstan?'), true)
+})
+
+test('subjective ranking lookups may use current comparative evidence', () => {
+  assert.equal(requiresFreshExternalEvidence("What is the best Denzel Washington's movie?"), true)
+  assert.equal(requiresFreshExternalEvidence('What are the top rated Denzel Washington movies?'), true)
 })
 
 test('explicit freshness wording forces live verification across volatile public domains', () => {

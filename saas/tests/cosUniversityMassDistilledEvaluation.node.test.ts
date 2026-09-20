@@ -188,10 +188,14 @@ test('rolling evaluation evidence is scoped to the pending candidate set so API 
   assert.equal((route.match(/\.in\('candidate_id', candidateIds\)/g) || []).length, 2)
 })
 
-test('legacy invalid holdouts are terminally quarantined instead of retried', () => {
-  assert.match(route, /async function quarantineLegacyInvalidHoldout\(claim: MassEvaluationClaim\)/)
+test('holdouts that can never be evaluated are terminally quarantined instead of retried', () => {
+  // Widened 2026-09-20 from the single malformed-format error to the whole frozen-holdout family: a pinned
+  // commit cannot change, so every one of those failures returns the same verdict on every retry while
+  // spending another RunPod wake. Availability failures and reader ceilings stay retryable.
+  assert.match(route, /async function quarantineTerminalHoldoutDefect\(claim: MassEvaluationClaim\)/)
   assert.match(route, /status: 'quarantined'/)
-  assert.match(route, /const legacyInvalidHoldout = message\.startsWith\('mass_distilled_evaluation_holdout_format_invalid'\)/)
+  assert.match(route, /const terminalDataDefect = isTerminalHoldoutDataDefect\(message\)/)
+  assert.doesNotMatch(route, /legacyInvalidHoldout/)
   assert.match(route, /terminalDataDefect: true/)
   assert.match(route, /nextStatus: 'quarantined'/)
   assert.match(route, /quarantined: true/)

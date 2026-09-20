@@ -258,11 +258,12 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const now = new Date()
 
   // The current frontier recipe cannot improve itself until it receives independent measurements.
-  // Production 2026-09-20 had 34 retention-eligible frontier artifacts with zero evaluation starts while
-  // legacy retries occupied the bounded queue window. Count distinct frontier starts across all statuses so
-  // completed/quarantined proof artifacts still satisfy the sample; failure to read this optional scheduling
-  // signal falls back to normal oldest-first order rather than blocking evaluation.
-  let frontierProofStarts = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
+  // A start is not proof: Production 2026-09-20 launched four frontier reservations, but three ended in
+  // RunPod readiness failures before any evaluation row existed. Count distinct durable evaluation results
+  // across all frontier artifact statuses so infrastructure failures remain retryable/preferred until the
+  // bounded four-result proof cohort actually exists. Failure to read this optional scheduling signal falls
+  // back to normal oldest-first order rather than blocking evaluation.
+  let frontierProofCompletions = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
   try {
     const frontierArtifacts = await db.from('cos_local_distillation_artifacts')
       .select('candidate_id')
@@ -272,17 +273,15 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     if (!frontierArtifacts.error) {
       const frontierIds = (frontierArtifacts.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)
       if (frontierIds.length) {
-        const frontierStarts = await db.from('cos_university_learning_assurance_events')
+        const frontierResults = await db.from('cos_university_distilled_evaluation_runs')
           .select('candidate_id')
-          .eq('event_type', 'fine_tune')
           .in('candidate_id', frontierIds)
-          .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1', claim: 'mass_distilled_independent_evaluation_started' })
           .limit(1000)
-        if (!frontierStarts.error) frontierProofStarts = new Set((frontierStarts.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
+        if (!frontierResults.error) frontierProofCompletions = new Set((frontierResults.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
       }
     }
   } catch {
-    frontierProofStarts = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
+    frontierProofCompletions = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
   }
 
   // Clear artifacts the approval policy has already refused permanently before choosing this tick's work, so
@@ -305,7 +304,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     artifacts: remaining,
     events: all,
     now,
-    frontierProofStarts,
+    frontierProofCompletions,
   })
   if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }
   const inserted = await db.from('cos_university_learning_assurance_events').insert({

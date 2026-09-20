@@ -22,6 +22,29 @@ University exact-artifact serving, canary, and evaluation paths continue to use 
 Runtime identity and health must still be verified from live configuration/telemetry before making Production claims; this invariant defines intended routing priority, not proof that any particular provider is healthy at a given moment.
 
 
+## University graduate adoption loop invariant — 2026-09-20
+
+Training is not operationally complete when a distilled artifact merely exists. The canonical closed loop is:
+
+```text
+University training
+-> independent improvement / safety / transfer / retention evaluation
+-> exact-artifact Production canary + rollback proof
+-> graduate registry (pending_runtime)
+-> evidence-gated runtime activation
+-> subject-relevant COS / Builder worker routing
+-> provider + graduate ownership telemetry
+-> verified Production outcomes
+-> continuing education / remediation / recertification
+```
+
+Production configuration explicitly enables `COS_GRADUATE_ACTIVATION_ENABLED=true`; the activation route still fails closed when the switch is absent and cannot bypass promotion, rollback, served-identity, health, or authority gates.
+
+Every canonical COS University subject has an explicit bounded activation scope. Activation never grants `primary` authority by itself. Computer Science and Cybersecurity graduates may enter the `coder` lane for Builder work; other qualified graduates enter subject-relevant critic/verifier/researcher lanes. Runtime selection matches both the existing bounded problem-class taxonomy and `university:<subject_id>` scope markers produced from the same University subject classifier that drives curriculum. Unknown subjects remain blocked rather than receiving a wildcard scope.
+
+A graduate that fails its independent gates remains quarantined and receives no Production traffic. An active graduate that fails or becomes unhealthy must fall back to the ordinary approved runtime and retain exact candidate/artifact attribution for outcome measurement and rollback.
+
+
 ## Frontier adaptive distillation invariant — 2026-09-19
 
 COS University mass distillation is a **frontier-supervised adaptive learning system**, not an SFT pipeline with a distillation label.

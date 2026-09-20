@@ -69,14 +69,69 @@ async function resolvePendingGraduateServingIdentity(db: any, graduate: {
 }
 
 /**
- * Initial capability scope per subject, deliberately narrow: the reasoning graduate advises as
- * critic/verifier inside the worker mesh; it does not take over primary reasoning by being
- * activated. Scope widening is a separate, explicit owner decision — never a side effect here.
+ * Graduates activate into bounded subject-relevant roles only. No graduate becomes a competing
+ * generalist brain and no subject is granted primary authority by activation alone. Computer
+ * Science and Cybersecurity graduates may assist Builder as coder workers; other graduates enter
+ * the COS specialist mesh as critic/verifier/researcher capabilities. University-subject markers
+ * are matched against the same classifier that generated the curriculum, so learned capability
+ * can actually be selected without widening it to unrelated work.
  */
 const SUBJECT_WORKER_SCOPE: Record<string, { workerRoles: string[]; problemClasses: string[] }> = {
+  computer_science: {
+    workerRoles: ['coder', 'critic', 'verifier'],
+    problemClasses: ['university:computer_science', 'code and implementation', 'incident diagnosis'],
+  },
+  mathematics: {
+    workerRoles: ['critic', 'verifier'],
+    problemClasses: ['university:mathematics', 'math and calculation'],
+  },
+  statistics_data_science: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:statistics_data_science', 'math and calculation'],
+  },
+  physics_natural_sciences: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:physics_natural_sciences'],
+  },
+  quantum_computing: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:quantum_computing'],
+  },
+  cybersecurity: {
+    workerRoles: ['coder', 'critic', 'verifier', 'researcher'],
+    problemClasses: ['university:cybersecurity', 'code and implementation', 'incident diagnosis'],
+  },
+  politics_government_international_relations: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:politics_government_international_relations', 'current public facts'],
+  },
+  social_behavioral_sciences: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:social_behavioral_sciences'],
+  },
+  economics_finance: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:economics_finance', 'math and calculation'],
+  },
+  business_operations: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:business_operations', 'planning and strategy'],
+  },
+  law_regulation_governance: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:law_regulation_governance'],
+  },
+  language_communication: {
+    workerRoles: ['critic', 'verifier'],
+    problemClasses: ['university:language_communication', 'writing and content'],
+  },
+  history_culture_philosophy_religion: {
+    workerRoles: ['critic', 'verifier', 'researcher'],
+    problemClasses: ['university:history_culture_philosophy_religion'],
+  },
   reasoning_decision_science: {
     workerRoles: ['critic', 'verifier'],
-    problemClasses: ['reasoning_decision_science'],
+    problemClasses: ['university:reasoning_decision_science', 'opinion and judgment', 'planning and strategy'],
   },
 }
 

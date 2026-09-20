@@ -14,10 +14,11 @@ test('the activation caller exists and is scheduled — promoted graduates canno
   assert.match(vercel, /"path": "\/api\/cron\/cos-university-graduate-activation",[\s\S]{0,120}"schedule": "7,17,27,37,47,57 \* \* \* \*"/)
 })
 
-test('fail-closed owner switch, no new approval SQL class', () => {
+test('activation remains fail-closed in code and is explicitly enabled by Production configuration', () => {
   assert.match(route, /COS_GRADUATE_ACTIVATION_ENABLED/)
   assert.match(route, /!== 'true'/)
   assert.match(route, /graduate_activation_disabled/)
+  assert.match(vercel, /"COS_GRADUATE_ACTIVATION_ENABLED": "true"/)
 })
 
 test('every hard gate stays inside activateGraduateRuntime, not the route', () => {
@@ -28,11 +29,28 @@ test('every hard gate stays inside activateGraduateRuntime, not the route', () =
   assert.doesNotMatch(route, /status: 'active'/)
 })
 
-test('initial scope is narrow and per-subject; an undeclared subject halts rather than defaults', () => {
-  assert.match(route, /workerRoles: \['critic', 'verifier'\]/)
-  assert.match(route, /problemClasses: \['reasoning_decision_science'\]/)
+test('every University subject has a bounded activation scope and none silently becomes primary', () => {
+  const subjects = [
+    'computer_science',
+    'mathematics',
+    'statistics_data_science',
+    'physics_natural_sciences',
+    'quantum_computing',
+    'cybersecurity',
+    'politics_government_international_relations',
+    'social_behavioral_sciences',
+    'economics_finance',
+    'business_operations',
+    'law_regulation_governance',
+    'language_communication',
+    'history_culture_philosophy_religion',
+    'reasoning_decision_science',
+  ]
+  for (const subject of subjects) assert.match(route, new RegExp(`university:${subject}`))
+  assert.match(route, /computer_science:[\s\S]{0,180}workerRoles: \['coder', 'critic', 'verifier'\]/)
+  assert.match(route, /cybersecurity:[\s\S]{0,180}workerRoles: \['coder', 'critic', 'verifier', 'researcher'\]/)
   assert.match(route, /graduate_subject_scope_undeclared/)
-  assert.doesNotMatch(route, /'primary'/)
+  assert.doesNotMatch(route, /workerRoles: \[[^\]]*'primary'/)
 })
 
 test('activation binds to the exact canary-proven RunPod endpoint and served model without static endpoint config', () => {
@@ -83,4 +101,12 @@ test('restores only the canary-proven endpoint capacity after identity resolutio
   assert.match(route, /servingWorkersMin: runtimePolicy\.workersMin/)
   assert.match(route, /servingWorkersMax: runtimePolicy\.workersMax/)
   assert.doesNotMatch(route, /provisionMassDistilledRuntime/)
+})
+
+
+test('active graduate routing matches the University subject classifier as well as legacy problem classes', () => {
+  assert.match(runtime, /classifyCosUniversitySubjects/)
+  assert.match(runtime, /const universitySubjects = classifyCosUniversitySubjects\(objective\)/)
+  assert.match(runtime, /problemClasses\.includes\(\`university:\$\{subjectId\}\`\)/)
+  assert.match(runtime, /problemClasses\.includes\(problemClass\)[\s\S]{0,100}universityScoped/)
 })

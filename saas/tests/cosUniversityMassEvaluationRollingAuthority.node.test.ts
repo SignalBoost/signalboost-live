@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs'
 import {
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+  MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
+  MASS_EVALUATION_REOPEN_CLAIM,
   MASS_EVALUATION_ROLLING_MAX_APPROVALS,
   decideRollingMassEvaluationApproval,
   type RollingEvent,
@@ -280,4 +282,53 @@ test('rolling approval evidence is candidate-scoped and paginated so old exact c
   assert.match(route, /authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF/)
   assert.match(route, /profile: 'cos_mass_distilled_independent_evaluation_runtime_v1'/)
   assert.doesNotMatch(route, /\.limit\(2000\)/)
+})
+
+
+test('a repair reopen marker preserves old verdict evidence but permits one new judge generation', () => {
+  const oldVerdict = ev(artifactA.candidateId, 'independent_scorer', {
+    claim: 'independent_evaluation',
+    artifactHash: hashA,
+  }, '2026-09-16T15:00:00Z')
+  const oldCompleted = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_completed',
+    artifactHash: hashA,
+  }, '2026-09-16T15:01:00Z')
+  const reopened = ev(artifactA.candidateId, 'host_controller', {
+    claim: MASS_EVALUATION_REOPEN_CLAIM,
+    artifactHash: hashA,
+    repairRef: MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
+  }, '2026-09-16T16:00:00Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA), oldVerdict, oldCompleted, reopened],
+    now,
+  })
+  assert.equal(decision.issue, true)
+})
+
+test('zero-collapse judge failures are evaluator infrastructure, not model-quality attempts', () => {
+  const approval = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'distilled_independent_evaluation_approved',
+    authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+    artifactHash: hashA,
+  }, '2026-09-16T12:00:00Z', '2026-09-16T14:00:00Z')
+  const started = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_started',
+    artifactHash: hashA,
+  }, '2026-09-16T12:00:10Z', '2026-09-16T12:12:10Z')
+  const failed = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_failed',
+    artifactHash: hashA,
+    error: 'mass_distilled_evaluation_judge_zero_collapse:retention',
+  }, '2026-09-16T12:00:20Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA), approval, started, failed],
+    now,
+  })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
 })

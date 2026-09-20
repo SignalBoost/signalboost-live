@@ -79,3 +79,18 @@ test('a case that cannot be scored still cannot become a pass', () => {
 test('the all-zero excerpt capture is retained, since it is what surfaced this', () => {
   assert.match(SOURCE, /judgeExcerpt:judged\.scored\.every\(item=>item\.baseline===0&&item\.candidate===0\)\?judged\.rawExcerpt:null/)
 })
+
+
+test('the judge scores baseline and candidate independently rather than choosing a winner', () => {
+  const prompt = SOURCE.slice(SOURCE.indexOf('You are an independent final-answer scorer'), SOURCE.indexOf('Return ONLY strict JSON'))
+  assert.match(prompt, /Score EACH answer ABSOLUTELY and INDEPENDENTLY against the reference/)
+  assert.match(prompt, /not opponents, are not ranked against each other/)
+  assert.match(prompt, /baseline=1 and candidate=1 when both are correct/)
+  assert.match(prompt, /one wrong case cannot lower another case/)
+})
+
+test('an all-zero fixed suite fails as evaluator infrastructure instead of quarantining the artifact', () => {
+  assert.match(SOURCE, /mass_distilled_evaluation_judge_zero_collapse:\$\{input\.name\}/)
+  assert.match(SOURCE, /input\.name!==['"]holdout['"]&&zeroCollapse/)
+  assert.match(SOURCE, /cos-mass-distilled-exact-artifact-evaluator-v2/)
+})

@@ -197,6 +197,9 @@ test('training uses bounded GPU defaults only after immutable materialized datas
   assert.match(spec.dockerImage, /pytorch/)
   assert.equal(spec.secrets.HF_TOKEN, token)
   assert.ok(spec.command.join(' ').includes('itmounts_hf_worker.py'))
+  assert.match(spec.command.join(' '), /hf_worker_delivery_artifact_invalid/)
+  assert.match(spec.command.join(' '), /BASE_WORKER_FILENAME/)
+  assert.match(spec.command.join(' '), /ITMOUNTS_TRAINING_REQUEST/)
 })
 
 test('large teacher envelopes are gzip/base64url transported without truncating curriculum material', () => {
@@ -261,14 +264,14 @@ test('routes keep owner confirmation, signed callbacks and the global dispatch s
   assert.match(worker, /load_in_4bit=True/)
 })
 
-test('HF jobs bind worker delivery to the immutable Vercel deployment, never the moving Production alias', () => {
+test('HF jobs use the authenticated public worker origin before protected Vercel deployment hosts', () => {
   const config = huggingFaceJobsConfigFromEnv(hfEnv({ ITMOUNTS_PUBLIC_ORIGIN: 'https://itmounts.com' }))!
-  assert.equal(config.workerUrl, `https://signalboost-live-example.vercel.app${COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX}/${deriveHfWorkerDeliveryToken(token)}/cos-university-hf-worker.py`)
-  assert.doesNotMatch(config.workerUrl, /^https:\/\/itmounts\.com/)
+  assert.equal(config.workerUrl, `https://itmounts.com${COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX}/${deriveHfWorkerDeliveryToken(token)}/cos-university-hf-worker.py`)
+  assert.doesNotMatch(config.workerUrl, /^https:\/\/signalboost-live-example\.vercel\.app/)
   assert.doesNotMatch(config.workerUrl, /raw\.githubusercontent\.com/)
   assert.ok(!config.workerUrl.includes(token), 'the HF token itself never appears in the job')
   const source = readFileSync(new URL('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts', import.meta.url), 'utf8')
-  assert.match(source, /immutableWorkerOrigin/)
+  assert.match(source, /ITMOUNTS_PUBLIC_ORIGIN \|\| env\.NEXT_PUBLIC_APP_URL/)
   assert.doesNotMatch(source, /raw\.githubusercontent\.com/)
 })
 

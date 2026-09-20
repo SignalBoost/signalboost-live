@@ -6,7 +6,7 @@ import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
-import { finishBuilderJob, claimBuilderJob, pauseBuilderJob, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
+import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
 import { isRepairObjective } from './regression-gate.ts'
@@ -25,6 +25,32 @@ import { recordBuilderUniversityProductionOutcome } from './university-outcome.t
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
+
+function selfHealingCapacityJob(job: BuilderJobRecord): boolean {
+  return job.ownerAuthorized && (
+    job.metadata.selfHealingUniversityDistillation === true
+    || job.metadata.selfHealingOwnedSite === true
+    || job.metadata.selfHealingOwnedAudit === true
+  )
+}
+
+function capacityDeferrable(error: string | null, trace: readonly unknown[]): error is 'builder_runpod_primary_busy' | 'builder_turn_timeout' {
+  return error === 'builder_runpod_primary_busy'
+    || (error === BUILDER_TURN_TIMEOUT_ERROR && trace.length === 0)
+}
+
+async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | null, trace: readonly unknown[]): Promise<boolean> {
+  if (!selfHealingCapacityJob(job) || !capacityDeferrable(error, trace)) return false
+  const deferred = await deferBuilderJobForCapacity({ job, reason: error })
+  if (deferred) {
+    console.info('[builder_self_healing_capacity_deferred]', {
+      jobId: job.id,
+      claimGeneration: job.claimGeneration,
+      reason: error,
+    })
+  }
+  return deferred
+}
 
 const emptyCognitiveContext = (): CognitiveSkillContextResult => ({ retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] })
 
@@ -230,6 +256,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       const error = typeof payload.error === 'string' ? payload.error : null
       const succeeded = execution.status >= 200 && execution.status < 300 && !error
       const safeTrace = Array.isArray(payload.trace) ? payload.trace as ReturnType<typeof publicTrace> : []
+      if (!succeeded && await deferSelfHealingCapacity(job, error, safeTrace)) return
       const baseReply = typeof payload.reply === 'string'
         ? payload.reply
         : fallbackFailureReply(error || 'builder_repository_repair_failed', safeTrace)
@@ -416,7 +443,15 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     const message = error instanceof Error ? error.message : 'builder_job_failed'
     console.error('[builder_job_execution_failed]', { jobId, message })
     if (job) {
-      await terminalFailure(job, message === BUILDER_TURN_TIMEOUT_ERROR ? BUILDER_TURN_TIMEOUT_ERROR : message, lastTrace.length ? lastTrace : job.checkpoint?.trace || []).catch(finishError => {
+      const trace = lastTrace.length ? lastTrace : job.checkpoint?.trace || []
+      if (await deferSelfHealingCapacity(job, message, trace).catch(deferError => {
+        console.error('[builder_self_healing_capacity_defer_failed]', {
+          jobId,
+          message: deferError instanceof Error ? deferError.message : 'unknown',
+        })
+        return false
+      })) return
+      await terminalFailure(job, message === BUILDER_TURN_TIMEOUT_ERROR ? BUILDER_TURN_TIMEOUT_ERROR : message, trace).catch(finishError => {
         console.error('[builder_job_terminal_persist_failed]', {
           jobId,
           message: finishError instanceof Error ? finishError.message : 'unknown',

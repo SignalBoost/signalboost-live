@@ -109,8 +109,8 @@ async function existingAttempt(key: string): Promise<{ disposition: 'already_act
   const active = await admin.from('builder_jobs')
     .select('id,status')
     .in('status', ['queued', 'running', 'paused'])
-    .contains('metadata', { selfHealingUniversityDistillation: true, selfHealingKey: key })
-    .order('created_at', { ascending: false })
+    .contains('metadata', { selfHealingUniversityDistillation: true })
+    .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
   if (active.error) throw new Error(`university_self_healing_dedupe_failed:${active.error.message}`)
@@ -221,6 +221,18 @@ export async function enqueueUniversityDistillationPackagingRepair(
 }
 
 export async function retryFailedUniversityDistillationRepair(admin: any): Promise<UniversityDistillationCodeRepairRetry> {
+  // Single-flight: capacity-deferred or otherwise active University repair work owns the lane.
+  // Never create retry-job fan-out while an existing repair is queued/running/paused.
+  const active = await admin.from('builder_jobs')
+    .select('id')
+    .in('status', ['queued', 'running', 'paused'])
+    .contains('metadata', { selfHealingUniversityDistillation: true })
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (active.error) return { retried: false, jobId: '', sourceJobId: '', attempt: 0, error: `university_self_healing_active_lookup_failed:${active.error.message}` }
+  if (active.data?.id) return { retried: false, jobId: String(active.data.id), sourceJobId: '', attempt: 0, error: '' }
+
   const failed = await admin.from('builder_jobs')
     .select('id,user_id,objective,metadata,error,updated_at')
     .eq('status', 'failed')

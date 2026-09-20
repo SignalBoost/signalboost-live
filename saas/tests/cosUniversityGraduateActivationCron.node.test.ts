@@ -59,3 +59,15 @@ test('outcomes are recorded either way — success, blockers, and throws all lea
   assert.ok(recordCount >= 3, `expected 3 recording sites, found ${recordCount}`)
   assert.match(route, /path: 'graduate_runtime_activation'/)
 })
+
+
+test('canonicalizes durable subject titles before scope lookup without widening authority', () => {
+  assert.match(route, /COS_UNIVERSITY_SUBJECTS/)
+  assert.match(route, /canonicalGraduateSubjectId/)
+  assert.match(route, /item\.id\.toLowerCase\(\) === normalized/)
+  assert.match(route, /item\.title\.toLowerCase\(\) === normalized/)
+  assert.match(route, /const scope = SUBJECT_WORKER_SCOPE\[canonicalSubjectId\]/)
+  assert.match(route, /sourceSubjectId: graduate\.subject_id/)
+  assert.match(route, /subjectId: canonicalSubjectId/)
+  assert.match(route, /graduate_subject_scope_undeclared/)
+})

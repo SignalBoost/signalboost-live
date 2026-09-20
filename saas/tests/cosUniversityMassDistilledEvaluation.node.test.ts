@@ -121,3 +121,13 @@ test('dedicated mass canary and mass evaluation crons are both scheduled', () =>
   assert.match(vercel, /\/api\/cron\/runpod-mass-distilled-local-deploy/)
   assert.match(vercel, /\/api\/cron\/cos-university-mass-distilled-evaluation/)
 })
+
+
+test('structured evaluator errors retain bounded code and message instead of [object Object]', () => {
+  assert.match(route, /function boundedErrorMessage\(error: unknown\)/)
+  assert.match(route, /const code = clean\(row\.code, 80\)/)
+  assert.match(route, /const message = clean\(row\.message, 400\)/)
+  assert.match(route, /structured_error_without_message/)
+  assert.match(route, /const message = boundedErrorMessage\(error\)/)
+  assert.doesNotMatch(route, /const message = error instanceof Error \? error\.message : String\(error\)/)
+})

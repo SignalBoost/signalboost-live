@@ -7,6 +7,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduateModelRegistry'
 import { decideMassGraduateRegistration, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
 import { GRADUATE_ROLLBACK_PROOF_CLAIM, GRADUATE_ROLLBACK_PROOF_PROFILE, proveGraduateRollbackReference } from '@/lib/ai/cos/cosUniversityGraduateRollbackProof'
+import { COS_UNIVERSITY_SUBJECTS } from '@/lib/ai/cos/cosUniversity'
 import { createHash } from 'node:crypto'
 
 export const runtime = 'nodejs'
@@ -86,6 +87,14 @@ const SUBJECT_WORKER_SCOPE: Record<string, { workerRoles: string[]; problemClass
     workerRoles: ['critic', 'verifier'],
     problemClasses: ['reasoning_decision_science'],
   },
+}
+
+function canonicalGraduateSubjectId(value: unknown): string {
+  const raw = String(value || '').trim()
+  const normalized = raw.toLowerCase().replace(/\s+/g, ' ')
+  const subject = COS_UNIVERSITY_SUBJECTS.find(item =>
+    item.id.toLowerCase() === normalized || item.title.toLowerCase() === normalized)
+  return subject?.id || raw
 }
 
 /** Writes the graduate registry row for the oldest mass artifact whose recorded evidence clears every gate. */
@@ -240,15 +249,16 @@ export async function GET(req: NextRequest) {
     }
 
     const graduate: any = pending.data
-    const scope = SUBJECT_WORKER_SCOPE[String(graduate.subject_id || '')]
+    const canonicalSubjectId = canonicalGraduateSubjectId(graduate.subject_id)
+    const scope = SUBJECT_WORKER_SCOPE[canonicalSubjectId]
     if (!scope) {
       // A subject without a declared scope is a decision, not a default. Record and stop.
       await recordCosUniversityProductionPath({
         path: 'graduate_runtime_activation',
         invocationSucceeded: false,
-        evidence: { error: 'graduate_subject_scope_undeclared', subjectId: graduate.subject_id },
+        evidence: { error: 'graduate_subject_scope_undeclared', subjectId: graduate.subject_id, canonicalSubjectId },
       })
-      return NextResponse.json({ ok: false, error: 'graduate_subject_scope_undeclared', subjectId: graduate.subject_id }, { status: 422 })
+      return NextResponse.json({ ok: false, error: 'graduate_subject_scope_undeclared', subjectId: graduate.subject_id, canonicalSubjectId }, { status: 422 })
     }
 
     const serving = await resolvePendingGraduateServingIdentity(db, graduate)
@@ -269,7 +279,8 @@ export async function GET(req: NextRequest) {
       invocationSucceeded: true,
       evidence: {
         candidateId: graduate.candidate_id,
-        subjectId: graduate.subject_id,
+        subjectId: canonicalSubjectId,
+        sourceSubjectId: graduate.subject_id,
         activated: result.activated,
         blockers: result.blockers,
         servingEndpointId: serving.endpointId,

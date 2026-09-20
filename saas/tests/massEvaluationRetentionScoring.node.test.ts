@@ -62,3 +62,14 @@ test('a case that cannot be scored still cannot become a pass', () => {
 test('the all-zero excerpt capture is retained, since it is what surfaced this', () => {
   assert.match(SOURCE, /judgeExcerpt:judged\.scored\.every\(item=>item\.baseline===0&&item\.candidate===0\)\?judged\.rawExcerpt:null/)
 })
+
+
+test('a repeated all-zero retention run preserves the full scoring path', () => {
+  assert.match(SOURCE, /zeroScoreDiagnostic=allZero&&input\.name!=='holdout'/)
+  assert.match(SOURCE, /baselineRaw:/)
+  assert.match(SOURCE, /candidateRaw:/)
+  assert.match(SOURCE, /baselineParsed:/)
+  assert.match(SOURCE, /candidateParsed:/)
+  assert.match(SOURCE, /judge:judged\.rawExcerpt/)
+  assert.match(SOURCE, /zeroScoreDiagnostics:Object\.fromEntries/)
+})

@@ -86,6 +86,11 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // fingerprinted failure would fall through to model-quality handling and wrongly consume the artifact's
     // substantive-attempt budget and the 24h rolling approval window.
     || error.startsWith('mass_distilled_evaluation_holdout_format_invalid')
+    // The holdout reference is an immutable commit. Before the pinned-read repair, the evaluator
+    // compared that commit to the dataset's moving HEAD and failed when unrelated later writes advanced HEAD.
+    // No model inference occurred, so historical revision_moved events are evaluator infrastructure and must
+    // not consume substantive attempts or the 24h approval window.
+    || error === 'mass_distilled_evaluation_holdout_revision_moved'
     // The pre-fix evaluator reconstructed a bare hash-only candidate name. The exact runtime serves a runtime-keyed alias,
     // so this 404 proves evaluator/runtime identity drift, not model quality. Keep the exclusion narrow to that known shape.
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)

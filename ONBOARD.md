@@ -178,6 +178,7 @@ Cognitive mode is task-sensitive:
 - diagnostic/root-cause/planning work may use deeper analytical reasoning when evidence and complexity justify it;
 - explicitly creative writing/brainstorming/naming/concept work uses a higher-diversity creative profile while preserving supplied facts and constraints;
 - current/live facts use verification rather than model-memory confidence;
+- stable reference facts such as country capitals and immutable historical facts stay on the local answerability path by default; a direct-question grammar alone must never manufacture a freshness requirement;
 - code, Builder, visuals and University workloads retain their specialized governed lanes.
 
 Telemetry must distinguish **pre-answer routing time** from actual answer time and record whether the completed turn was locally answerable, required fresh verification, required external fallback, or remained unresolved. A long response to a locally answerable ordinary question is a performance regression even if the browser timeout did not fire.

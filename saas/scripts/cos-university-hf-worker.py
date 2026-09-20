@@ -222,8 +222,11 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
         normalized_prompts.append((prompt_id, prompt))
 
     token = os.environ["HF_TOKEN"]
-    use_bf16 = bool(torch.cuda.is_available() and torch.cuda.is_bf16_supported())
-    compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+    # Production 2026-09-20: GKD generation crashed with
+    # "expected scalar type BFloat16 but found Float". Keep this single-GPU QLoRA lane in FP16;
+    # it is supported by the current T4-class hardware and avoids mixed BF16/FP32 PEFT generation.
+    use_bf16 = False
+    compute_dtype = torch.float16
     quantization = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
@@ -371,10 +374,23 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
     job_id = base.clean(os.environ.get("JOB_ID"), 240)
     if not job_id:
         raise RuntimeError("worker_job_id_missing")
-    output_repo = f"{namespace}/itmounts-teacher-{base.sha256(candidate_id + ':' + job_id)[:12]}"
-    api.create_repo(output_repo, repo_type="dataset", private=True, exist_ok=True, token=token)
-    Dataset.from_list(rows).push_to_hub(output_repo, split="train", private=True, token=token)
-    info = api.dataset_info(output_repo, token=token)
+    output_repo, output_branch = _pooled_hub_repo(
+        base,
+        api,
+        namespace,
+        "dataset",
+        "itmounts-teacher-",
+        f"{candidate_id}:{job_id}",
+        token,
+    )
+    Dataset.from_list(rows).push_to_hub(
+        output_repo,
+        split="train",
+        private=True,
+        token=token,
+        revision=output_branch,
+    )
+    info = api.dataset_info(output_repo, revision=output_branch, token=token)
     pinned_revision = base.clean(getattr(info, "sha", None), 40).lower()
     if not base.HEX40.match(pinned_revision):
         raise RuntimeError("worker_teacher_dataset_revision_missing")
@@ -544,12 +560,50 @@ def _tokenizers_exactly_compatible(student_tokenizer, teacher_tokenizer) -> bool
     return student_vocab == teacher_vocab
 
 
+def _pooled_hub_repo(base, api, namespace: str, repo_type: str, prefix: str, identity: str, token: str) -> tuple[str, str]:
+    if repo_type == "model":
+        listed = api.list_models(author=namespace, search=prefix, limit=500, token=token)
+    elif repo_type == "dataset":
+        listed = api.list_datasets(author=namespace, search=prefix, limit=500, token=token)
+    else:
+        raise RuntimeError("worker_repo_pool_type_invalid")
+
+    repos = sorted({
+        base.clean(getattr(item, "id", None), 240)
+        for item in listed
+        if base.clean(getattr(item, "id", None), 240).startswith(f"{namespace}/{prefix}")
+    })
+    if repos:
+        repo_id = repos[int(base.sha256(identity)[:8], 16) % len(repos)]
+    else:
+        # Fresh installations may create exactly one stable pool repository. Normal jobs reuse it;
+        # they never create one repository per campaign/artifact.
+        repo_id = f"{namespace}/{prefix}pool-00"
+        try:
+            api.create_repo(repo_id, repo_type=repo_type, private=True, exist_ok=True, token=token)
+        except Exception as exc:
+            message = str(exc)
+            if "429" in message or "rate limit" in message.lower():
+                raise RuntimeError("worker_repo_pool_unavailable_rate_limited") from exc
+            raise
+
+    branch_name = f"run-{base.sha256(identity)[:24]}"
+    api.create_branch(
+        repo_id=repo_id,
+        branch=branch_name,
+        repo_type=repo_type,
+        token=token,
+        exist_ok=True,
+    )
+    return repo_id, branch_name
+
+
 def train_student(base, envelope: dict[str, Any]) -> None:
     import torch
     from huggingface_hub import HfApi
     from peft import LoraConfig
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-    from trl import GKDConfig, GKDTrainer, SFTConfig, SFTTrainer
+    from trl import DistillationConfig, DistillationTrainer, SFTConfig, SFTTrainer
     from datasets import Dataset
 
     token = os.environ["HF_TOKEN"]
@@ -598,23 +652,21 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     output_dir = Path("/tmp/itmounts-trained-adapter")
 
     if frontier_plan is not None:
-        # Hybrid GKD: frontier faculty supplies diverse off-policy anchor examples while the student
-        # generates most trajectories itself. A pinned open-weight teacher provides dense token-level
-        # distributions on those student trajectories. No API teacher is falsely treated as a logit source.
-        messages: list[dict[str, Any]] = []
+        # Stable frontier distillation: hosted frontier faculty supplies diverse curriculum and
+        # remediation; the student then generates its own trajectories and a pinned open-weight
+        # teacher supplies dense next-token supervision through TRL's stable DistillationTrainer.
+        prompts: list[dict[str, str]] = []
         for raw in training:
             row = dict(raw)
             prompt = base.clean(row.get("prompt"), 100_000)
             response = base.clean(row.get("response"), 100_000)
             if not prompt or not response:
                 raise RuntimeError("worker_frontier_distillation_structured_row_required")
-            messages.append({
-                "messages": [
-                    {"role": "user", "content": prompt},
-                    {"role": "assistant", "content": response},
-                ]
-            })
-        if not messages:
+            rendered_prompt = _render_chat(tokenizer, [{"role": "user", "content": prompt}])
+            if not rendered_prompt:
+                raise RuntimeError("worker_frontier_distillation_prompt_render_failed")
+            prompts.append({"prompt": rendered_prompt})
+        if not prompts:
             raise RuntimeError("worker_training_dataset_empty")
 
         teacher_tokenizer = AutoTokenizer.from_pretrained(
@@ -626,18 +678,9 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         if teacher_tokenizer.pad_token is None:
             teacher_tokenizer.pad_token = teacher_tokenizer.eos_token
         if not _tokenizers_exactly_compatible(tokenizer, teacher_tokenizer):
-            # GOLD/ULD is the future cross-tokenizer path. Until that executor is independently
-            # validated, fail closed rather than silently falling back to SFT.
+            # GOLD/ULD is the governed future cross-tokenizer path. Do not silently fall back.
             raise RuntimeError("worker_frontier_distillation_tokenizer_mismatch_requires_gold")
 
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model,
-            token=token,
-            quantization_config=quantization,
-            device_map="auto",
-            torch_dtype=compute_dtype,
-        )
-        model.config.use_cache = False
         teacher_model = AutoModelForCausalLM.from_pretrained(
             frontier_plan["teacherModelId"],
             revision=frontier_plan["teacherRevision"],
@@ -651,50 +694,56 @@ def train_student(base, envelope: dict[str, Any]) -> None:
 
         recipe.update({
             "profile": FRONTIER_TRAINING_PROFILE,
-            "optimizer": "gkd_on_policy",
+            "optimizer": "stable_on_policy_distillation",
             "denseTeacherModelId": frontier_plan["teacherModelId"],
             "denseTeacherRevision": frontier_plan["teacherRevision"],
-            "onPolicyFraction": frontier_plan["onPolicyFraction"],
-            "offPolicyAnchorFraction": frontier_plan["offPolicyAnchorFraction"],
+            "onPolicyFraction": 1.0,
+            "offPolicyAnchorFraction": 0.0,
             "beta": frontier_plan["beta"],
             "temperature": frontier_plan["temperature"],
             "maxNewTokens": frontier_plan["maxNewTokens"],
             "frontierFaculty": frontier_plan["frontierFaculty"],
             "maxLength": FRONTIER_GKD_MAX_LENGTH,
             "learningRate": FRONTIER_GKD_LEARNING_RATE,
-            "structuredItems": len(messages),
+            "structuredItems": len(prompts),
             "fallbackItems": 0,
+            "computeDtype": "float16",
+            "trlTrainer": "DistillationTrainer",
         })
         print(f"itmounts_training_profile:{json.dumps(recipe, ensure_ascii=True, separators=(',', ':'))}", flush=True)
 
-        args = GKDConfig(
+        args = DistillationConfig(
             output_dir=str(output_dir),
             num_train_epochs=recipe["epochs"],
             per_device_train_batch_size=recipe["perDeviceTrainBatchSize"],
             gradient_accumulation_steps=recipe["gradientAccumulationSteps"],
             learning_rate=recipe["learningRate"],
-            **_warmup_arguments(GKDConfig, recipe),
+            **_warmup_arguments(DistillationConfig, recipe),
             lr_scheduler_type=recipe["lrSchedulerType"],
             max_grad_norm=recipe["maxGradNorm"],
             logging_steps=10,
             save_strategy="no",
             report_to="none",
-            bf16=use_bf16,
-            fp16=not use_bf16,
+            bf16=False,
+            fp16=True,
             gradient_checkpointing=True,
-            max_length=recipe["maxLength"],
+            use_cache=False,
             temperature=recipe["temperature"],
-            lmbda=recipe["onPolicyFraction"],
             beta=recipe["beta"],
-            max_new_tokens=recipe["maxNewTokens"],
-            seq_kd=False,
+            max_completion_length=recipe["maxNewTokens"],
+            model_init_kwargs={
+                "token": token,
+                "torch_dtype": compute_dtype,
+                "device_map": "auto",
+            },
         )
-        trainer = GKDTrainer(
-            model=model,
+        trainer = DistillationTrainer(
+            model=base_model,
             teacher_model=teacher_model,
             args=args,
-            train_dataset=Dataset.from_list(messages),
+            train_dataset=Dataset.from_list(prompts),
             processing_class=tokenizer,
+            quantization_config=quantization,
             peft_config=peft_config,
         )
     else:
@@ -761,10 +810,25 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     namespace = api.whoami()["name"]
     candidate_id = base.clean(envelope.get("candidateId"), 200)
     job_id = base.clean(os.environ.get("JOB_ID"), 240)
-    output_repo = f"{namespace}/itmounts-student-{base.sha256(candidate_id + ':' + job_id)[:12]}"
-    api.create_repo(output_repo, repo_type="model", private=True, exist_ok=True, token=token)
-    api.upload_folder(repo_id=output_repo, folder_path=str(output_dir), repo_type="model", token=token)
-    info = api.model_info(output_repo, token=token)
+    if not candidate_id or not job_id:
+        raise RuntimeError("worker_artifact_identity_missing")
+    output_repo, output_branch = _pooled_hub_repo(
+        base,
+        api,
+        namespace,
+        "model",
+        "itmounts-student-",
+        f"{candidate_id}:{job_id}",
+        token,
+    )
+    api.upload_folder(
+        repo_id=output_repo,
+        folder_path=str(output_dir),
+        repo_type="model",
+        revision=output_branch,
+        token=token,
+    )
+    info = api.model_info(output_repo, revision=output_branch, token=token)
     model_revision = base.clean(getattr(info, "sha", None), 120)
     artifact_hash = base.directory_hash(output_dir)
     evidence_ref = f"hf://models/{output_repo}@{model_revision}" if model_revision else f"hf://models/{output_repo}"

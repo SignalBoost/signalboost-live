@@ -1,6 +1,7 @@
 // saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
 import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
+import { isTerminalHoldoutDataDefect } from '@/lib/ai/cos/cosUniversityMassEvaluationTerminalDefect'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
@@ -370,7 +371,7 @@ async function claimNext(): Promise<MassEvaluationClaim | null> {
   })
 }
 
-async function quarantineLegacyInvalidHoldout(claim: MassEvaluationClaim) {
+async function quarantineTerminalHoldoutDefect(claim: MassEvaluationClaim) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const updated = await db.from('cos_local_distillation_artifacts')
@@ -537,19 +538,22 @@ export async function GET(req: NextRequest) {
       ? String(error.stack || '').split('\n').filter(line => line.trim().startsWith('at ')).slice(0, 4)
         .map(line => clean(line.replace(/^\s*at\s+/, ''), 160)).filter(Boolean)
       : []
-    // Prefix, not equality: the evaluator appends a structural fingerprint to this error (2026-09-20), and an
-    // exact comparison would stop quarantining the very holdouts this branch exists to set aside.
-    const legacyInvalidHoldout = message.startsWith('mass_distilled_evaluation_holdout_format_invalid')
+    // A holdout is pinned to an immutable commit, so a failure that is a property of that frozen data can
+    // never succeed on a later attempt: every retry re-reads the same bytes, spends another RunPod wake and
+    // reaches the same verdict. Only the malformed-format case was recognised here; the rest of that family
+    // now ends the same way instead of circling on the retry ladder. Availability failures and reader
+    // ceilings are deliberately excluded and stay retryable - see the predicate for why.
+    const terminalDataDefect = isTerminalHoldoutDataDefect(message)
     if (claim) {
-      if (legacyInvalidHoldout) {
-        await quarantineLegacyInvalidHoldout(claim).catch(() => undefined)
+      if (terminalDataDefect) {
+        await quarantineTerminalHoldoutDefect(claim).catch(() => undefined)
       }
       await recordTerminal({
         claim,
         eventClaim: FAILED,
         evidence: {
           error: clean(message, 500),
-          ...(legacyInvalidHoldout ? { terminalDataDefect: true, nextStatus: 'quarantined' } : {}),
+          ...(terminalDataDefect ? { terminalDataDefect: true, nextStatus: 'quarantined' } : {}),
           ...(frames.length ? { errorFrames: frames } : {}),
         },
       }).catch(() => undefined)
@@ -561,7 +565,7 @@ export async function GET(req: NextRequest) {
       ...(claim ? { candidateId: claim.candidateId, artifactHash: claim.artifactHash } : {}),
     }).catch(() => undefined)
     console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: clean(message, 500) }))
-    if (claim && legacyInvalidHoldout) {
+    if (claim && terminalDataDefect) {
       return NextResponse.json({
         ok: false,
         quarantined: true,

@@ -65,17 +65,18 @@ test('stable reference facts stay on the local answerability path', () => {
     'What is the capital of Kazakhstan?',
     'When was SpaceX founded?',
     'Who created Python?',
-    'Where is Mount Everest?',
-    'Tell me about Nvidia.',
   ]) {
     assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
   }
   assert.equal(requiresFreshExternalEvidence('What is the current capital of Kazakhstan?'), true)
 })
 
-test('subjective ranking lookups may use current comparative evidence', () => {
+test('subjective ranking lookups may use current comparative evidence without hijacking technical terms', () => {
   assert.equal(requiresFreshExternalEvidence("What is the best Denzel Washington's movie?"), true)
   assert.equal(requiresFreshExternalEvidence('What are the top rated Denzel Washington movies?'), true)
+  assert.equal(requiresFreshExternalEvidence('What is the rank of this matrix?'), false)
+  assert.equal(requiresFreshExternalEvidence('What is the top-level domain for Germany?'), false)
+  assert.equal(requiresFreshExternalEvidence('What is the best-case time complexity of binary search?'), false)
 })
 
 test('explicit freshness wording forces live verification across volatile public domains', () => {

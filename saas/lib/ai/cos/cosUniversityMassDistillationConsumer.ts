@@ -381,8 +381,12 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   if (!MASS_CANDIDATE.test(claim.candidate_id) || !HEX64.test(claim.batch_key)) {
     throw new Error('mass_distillation_claim_identity_invalid')
   }
-  const expectedCeiling = stageCeiling(claim.stage)
-  if (Math.abs(Number(claim.stage_cost_ceiling_usd) - expectedCeiling) > 0.000001) {
+  const maximumCeiling = stageCeiling(claim.stage)
+  const expectedCeiling = Number(claim.stage_cost_ceiling_usd)
+  // First attempts retain the exact stage ceiling in the claim RPC. A training retry may use only
+  // the campaign's remaining already-authorized dollars, so accept a positive ceiling no larger
+  // than the normal stage maximum. boundedConfigForStage still enforces the minimum viable runtime.
+  if (!Number.isFinite(expectedCeiling) || expectedCeiling <= 0 || expectedCeiling > maximumCeiling + 0.000001) {
     throw new Error('mass_distillation_claim_cost_ceiling_mismatch')
   }
 

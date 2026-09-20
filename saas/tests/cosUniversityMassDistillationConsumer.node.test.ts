@@ -129,3 +129,22 @@ test('artifact source attribution uses stored source kinds so rotating synthetic
   assert.match(consumer, /sourceKind === 'teacher_synthetic_curriculum' \|\| sourceKind === 'teacher_hosted_curriculum'/)
   assert.match(consumer, /declaredOrigins,/)
 })
+
+
+test('training retry can consume only remaining campaign authority without raising the stage or campaign maximum', () => {
+  const migration = source('../supabase/migrations/20260920044500_mass_distillation_retry_remaining_budget.sql')
+  assert.match(migration, /v_stage_max:=1\.610000/)
+  assert.match(migration, /v_cost:=case when v_training_attempts > 0 then least\(v_stage_max,v_remaining\) else v_stage_max end/)
+  assert.match(migration, /v_minimum_retry_cost:=round\(v_retry_hourly_cost\*900\/3600,6\)/)
+  assert.match(migration, /if v_remaining_authority < v_minimum_retry_cost then/)
+  assert.match(migration, /mass_distillation_stage_budget_too_small_for_hardware/)
+  assert.match(migration, /automaticRetryAuthorized',not v_campaign_terminalized/)
+  assert.doesNotMatch(migration, /set max_total_cost_usd=/)
+})
+
+test('consumer accepts a positive bounded retry reserve but never more than the normal stage maximum', () => {
+  assert.match(consumer, /const maximumCeiling = stageCeiling\(claim\.stage\)/)
+  assert.match(consumer, /const expectedCeiling = Number\(claim\.stage_cost_ceiling_usd\)/)
+  assert.match(consumer, /expectedCeiling <= 0 \|\| expectedCeiling > maximumCeiling \+ 0\.000001/)
+  assert.match(consumer, /boundedConfigForStage\(hf, claim\.stage, price\.hourlyCostUsd, expectedCeiling\)/)
+})

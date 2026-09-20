@@ -1,2 +1,2 @@
-base_sha=00d7276edd254950f3e6739f3e97286a3d430dd9
-branch=fix/mass-evaluator-runpod-timeout-recovery-v3
+base_sha=7295142971e5854a81c1623436c27d5d4a6827db
+branch=fix/restore-absolute-safety-graduation-gate-v2

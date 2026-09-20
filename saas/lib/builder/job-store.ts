@@ -160,7 +160,7 @@ export async function claimBuilderJob(jobId: string, userId: string): Promise<Bu
 
 export async function deferBuilderJobForCapacity(input: {
   job: BuilderJobRecord
-  reason: 'builder_runpod_primary_busy' | 'builder_turn_timeout'
+  reason: 'builder_runpod_primary_busy' | 'builder_turn_timeout' | 'builder_model_round_timeout'
 }): Promise<boolean> {
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')

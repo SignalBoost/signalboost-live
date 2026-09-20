@@ -142,3 +142,24 @@ test('University failed code repairs are retried only while live Production heal
   assert.match(retry, /universityRepairRetrySuppressedHealthState: health\.state/)
   assert.match(retry, /university_self_healing_retry_health_read_failed/)
 })
+
+
+test('Self-Healing Builder retries productive execution timeouts without unbounded looping', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../supabase/migrations/20260920052000_builder_self_healing_execution_timeout_deferral.sql', import.meta.url), 'utf8')
+  assert.match(runner, /MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS = 3/)
+  assert.match(runner, /builderExecutionTimeoutDeferrals/)
+  assert.match(runner, /builder_model_round_timeout/)
+  assert.doesNotMatch(runner, /BUILDER_TURN_TIMEOUT_ERROR && trace\.length === 0/)
+  assert.match(store, /builder_model_round_timeout/)
+  assert.match(migration, /builderExecutionTimeoutDeferrals/)
+  assert.match(migration, /v_timeout_deferrals >= 3/)
+  assert.match(migration, /builder_model_round_timeout/)
+})
+
+test('Self-Healing repository repair gets a larger but still bounded Vercel-safe execution window', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(runner, /SELF_HEALING_REPOSITORY_BUDGET_MS = 285_000/)
+  assert.match(runner, /deadlineAtMs: Date\.now\(\) \+ SELF_HEALING_REPOSITORY_BUDGET_MS/)
+})

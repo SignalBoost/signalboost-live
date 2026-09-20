@@ -33,6 +33,7 @@ import {
   readMassHostedTeacherRows,
   runMassHostedTeacherStage,
 } from './cosUniversityMassHostedTeacherStage.ts'
+import { buildFrontierDistillationPlan } from './cosUniversityFrontierDistillation.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
 export const MASS_DISTILLATION_CALLBACK_PATH = '/api/internal/cos/mass-distillation/evidence' as const
@@ -76,6 +77,55 @@ function hash(value: unknown): string {
 function safeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   return clean(message, 300) || 'mass_distillation_unknown_error'
+}
+
+function durableTrainingReceipt(profileValue: unknown, recipeValue: unknown) {
+  const profile = clean(profileValue, 120)
+  const raw = recipeValue && typeof recipeValue === 'object' && !Array.isArray(recipeValue)
+    ? recipeValue as Record<string, unknown>
+    : null
+  if (!profile || !raw) return null
+
+  const number = (key: string, min: number, max: number): number | null => {
+    const value = Number(raw[key])
+    return Number.isFinite(value) && value >= min && value <= max ? value : null
+  }
+  const integer = (key: string, min: number, max: number): number | null => {
+    const value = number(key, min, max)
+    return value != null && Number.isInteger(value) ? value : null
+  }
+  const faculty = Array.isArray(raw.frontierFaculty)
+    ? [...new Set(raw.frontierFaculty.map(value => clean(value, 80)).filter(Boolean))].slice(0, 32)
+    : []
+
+  return Object.freeze({
+    profile,
+    optimizer: clean(raw.optimizer, 80) || null,
+    denseTeacherModelId: clean(raw.denseTeacherModelId, 240) || null,
+    denseTeacherRevision: clean(raw.denseTeacherRevision, 40).toLowerCase() || null,
+    onPolicyFraction: number('onPolicyFraction', 0, 1),
+    offPolicyAnchorFraction: number('offPolicyAnchorFraction', 0, 1),
+    beta: number('beta', 0, 1),
+    temperature: number('temperature', 0.01, 4),
+    maxNewTokens: integer('maxNewTokens', 1, 8192),
+    frontierFaculty: Object.freeze(faculty),
+    trainingItems: integer('trainingItems', 1, 100_000),
+    holdoutItems: integer('holdoutItems', 1, 100_000),
+    epochs: number('epochs', 0.01, 100),
+    perDeviceTrainBatchSize: integer('perDeviceTrainBatchSize', 1, 1024),
+    gradientAccumulationSteps: integer('gradientAccumulationSteps', 1, 100_000),
+    learningRate: number('learningRate', 0, 1),
+    warmupRatio: number('warmupRatio', 0, 1),
+    lrSchedulerType: clean(raw.lrSchedulerType, 80) || null,
+    maxGradNorm: number('maxGradNorm', 0, 1000),
+    maxLength: integer('maxLength', 1, 1_000_000),
+    loraR: integer('loraR', 1, 8192),
+    loraAlpha: integer('loraAlpha', 1, 65_536),
+    loraDropout: number('loraDropout', 0, 1),
+    targetModules: clean(raw.targetModules, 240) || null,
+    structuredItems: integer('structuredItems', 0, 100_000),
+    fallbackItems: integer('fallbackItems', 0, 100_000),
+  })
 }
 
 /** Read the same provider/dispatch gates used by the paid consumer before allocating new authority. */
@@ -592,7 +642,46 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     }
     const revision = { baseModel: run.student_model_id, baseModelRevision, datasetHash, trainingManifestHash, holdoutManifestHash }
     const revisionKey = hash(revision)
-    idempotencyKey = hash([COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE, claim.campaign_id, claim.batch_key, 'train', revisionKey])
+
+    // Frontier faculty can create diverse high-quality synthetic curriculum, but hosted APIs do not
+    // provide the full next-token distributions required by true on-policy distillation. Bind every
+    // mass run to a separate pinned open-weight dense teacher for GKD while preserving faculty
+    // provenance in the source dataset.
+    const denseTeacherModelId = clean(process.env.COS_UNIVERSITY_HF_DENSE_TEACHER_MODEL, 240)
+      || clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240)
+      || MASS_DISTILLATION_TEACHER_MODEL
+    const denseTeacher = await resolveHuggingFaceModelMetadata({ modelId: denseTeacherModelId, token: hf.token, fetchImpl })
+    if (denseTeacher.license !== 'apache-2.0' || denseTeacher.modelId === run.student_model_id) {
+      throw new Error('mass_distillation_dense_teacher_rights_invalid')
+    }
+    const hostedTeacherSource = clean(run.teacher_source_ref, 2000)
+      .startsWith('itmounts://cos-university/mass-hosted-teacher/')
+    const actualFrontierFaculty: string[] = hostedTeacherSource
+      ? [...new Set<string>((await readMassHostedTeacherRows({
+          db: cosServiceDb(),
+          runId: run.id,
+          promptSetHash: clean(run.prompt_set_hash, 64).toLowerCase(),
+        })).map(row => clean(row.teacherId, 80)).filter((teacherId): teacherId is string => Boolean(teacherId)))]
+      : []
+    const distillationPlan = buildFrontierDistillationPlan({
+      studentModelId: run.student_model_id,
+      denseTeacherModelId: denseTeacher.modelId,
+      denseTeacherRevision: denseTeacher.revision,
+      denseTeacherLicense: denseTeacher.license,
+      frontierFaculty: actualFrontierFaculty,
+    })
+
+    idempotencyKey = hash([
+      COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
+      claim.campaign_id,
+      claim.batch_key,
+      'frontier-train',
+      revisionKey,
+      distillationPlan.profile,
+      distillationPlan.denseTeacherRevision,
+      distillationPlan.onPolicyFraction,
+      distillationPlan.beta,
+    ])
     envelope = {
       profile: 'cos_university_training_executor_v1',
       operation: 'train',
@@ -603,11 +692,17 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       revisionKey,
       trainingDataRef,
       holdoutDataRef,
+      distillationPlan,
       distillation: {
-        teacherModelId: run.teacher_model_id,
+        teacherModelId: denseTeacher.modelId,
         studentModelId: run.student_model_id,
         datasetHash,
-        provenanceRefs: [`mass-batch:${run.batch_key}`, `mass-campaign:${run.campaign_id}`],
+        provenanceRefs: [
+          `mass-batch:${run.batch_key}`,
+          `mass-campaign:${run.campaign_id}`,
+          `source-teacher:${clean(run.teacher_model_id, 240) || 'unknown'}`,
+          `frontier-plan:${distillationPlan.profile}`,
+        ],
         trainingRights: 'open_license',
         studentControlledByBuyer: true,
         containsPrivateProductionData: false,
@@ -665,6 +760,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       timeoutSeconds: spec.timeoutSeconds,
       maxEstimatedCostUsd,
       reservedCostCeilingUsd: expectedCeiling,
+      distillationPlan: (envelope as any).distillationPlan || null,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
     },
@@ -1220,11 +1316,12 @@ export async function recordMassDistillationWorkerEvidence(
   const trainedArtifactId = clean(body.trainedArtifactId, 500)
   const trainedArtifactHash = clean(body.artifactHash, 64).toLowerCase()
   const evidenceRef = clean(body.evidenceRef, 2000)
+  const trainingReceipt = durableTrainingReceipt(body.trainingProfile, body.trainingRecipe)
   if (baseModel !== run.student_model_id
     || datasetHash !== clean(run.dataset_hash, 64).toLowerCase()
     || trainingManifestHash !== clean(run.training_manifest_hash, 64).toLowerCase()
     || holdoutManifestHash !== clean(run.holdout_manifest_hash, 64).toLowerCase()
-    || !trainedArtifactId || !HEX64.test(trainedArtifactHash) || !evidenceRef) {
+    || !trainedArtifactId || !HEX64.test(trainedArtifactHash) || !evidenceRef || !trainingReceipt) {
     throw new Error('mass_distillation_training_callback_invalid')
   }
 
@@ -1244,7 +1341,7 @@ export async function recordMassDistillationWorkerEvidence(
         campaignId: run.campaign_id, batchKey: run.batch_key, jobId, evidenceRef,
         baseModel, datasetHash, trainingManifestHash, holdoutManifestHash,
         revisionKey: run.revision_key, trainedArtifactId, artifactHash: trainedArtifactHash,
-        trainingMode: 'distillation',
+        trainingMode: 'distillation', trainingReceipt,
       },
       verifier: 'training_executor',
     })
@@ -1294,6 +1391,7 @@ export async function recordMassDistillationWorkerEvidence(
       canonicalBaseModel: run.student_model_id,
       adapterModel: trainedArtifactId,
       teacherModel: run.teacher_model_id || null,
+      trainingReceipt,
       trafficAuthorized: false,
       nextGate: 'independent_evaluation',
     },
@@ -1314,7 +1412,7 @@ export async function recordMassDistillationWorkerEvidence(
       campaignId: run.campaign_id, batchKey: run.batch_key, jobId, evidenceRef,
       baseModel, datasetHash, trainingManifestHash, holdoutManifestHash,
       revisionKey: run.revision_key, trainedArtifactId, artifactHash: trainedArtifactHash,
-      rollbackArtifactRef, trainingMode: 'distillation', trafficAuthorized: false,
+      rollbackArtifactRef, trainingMode: 'distillation', trainingReceipt, trafficAuthorized: false,
     },
     verifier: 'training_executor',
   })

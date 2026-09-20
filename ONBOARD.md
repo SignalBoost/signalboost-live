@@ -22,6 +22,28 @@ University exact-artifact serving, canary, and evaluation paths continue to use 
 Runtime identity and health must still be verified from live configuration/telemetry before making Production claims; this invariant defines intended routing priority, not proof that any particular provider is healthy at a given moment.
 
 
+## Frontier adaptive distillation invariant — 2026-09-19
+
+COS University mass distillation is a **frontier-supervised adaptive learning system**, not an SFT pipeline with a distillation label.
+
+Canonical training architecture:
+
+- explicitly enabled frontier hosted models (OpenAI, Anthropic, Gemini, xAI, DeepSeek and compatible buyer-configured providers) form a governed **faculty** for diverse synthetic curriculum, critique and failure-derived remediation;
+- hosted API faculty outputs are curriculum/provenance inputs only unless a provider exposes the exact dense next-token distributions required by the selected optimizer; an API answer must never be falsely treated as token-level teacher logits;
+- mass-distillation training binds each run to an immutable, rights-cleared, pinned open-weight **dense teacher** and a buyer-controlled student;
+- **on-policy GKD is the default mass optimizer**: the student generates its own trajectories and the dense teacher supplies token-level supervision on those trajectories;
+- a bounded off-policy anchor may retain frontier-faculty examples for capabilities the student does not yet visit by itself, but off-policy SFT is not the default mass-learning algorithm;
+- cross-tokenizer teacher/student pairs must fail closed until the governed GOLD/ULD-compatible path is independently validated; tokenizer mismatch must never silently fall back to SFT;
+- every training recipe, teacher revision, student revision, dataset/holdout manifest, optimizer profile and artifact hash is durable evidence;
+- the independent evaluator, not the teacher or training worker, decides whether the trained artifact beat its baseline;
+- failed evaluations feed failure-derived curriculum back into the next governed learning cycle;
+- safety regression, unseen transfer, delayed retention, exact-artifact canary and rollback proof remain mandatory before graduation/promotion;
+- training never grants automatic promotion, Production traffic, wider spend authority or new provider authority.
+
+Reliability invariant: prepared work must continuously fill available healthy training capacity; an inert campaign may not occupy a concurrency slot indefinitely while eligible work waits. Self-Healing must repair/reclaim such capacity without weakening training or evaluation gates.
+
+Performance invariant: concurrency, faculty parallelism, prepared-buffer depth and training hardware are throughput controls, not learning-quality shortcuts. Scale them from measured queue depth, provider health, training yield and evaluator outcomes while preserving deterministic admission, idempotency, provenance and rollback.
+
 ## University Self-Healing progress invariant — 2026-09-19
 
 Self-Healing Supervisor must distinguish **lack of supply** from **failure to convert valid upstream progress into downstream work**.

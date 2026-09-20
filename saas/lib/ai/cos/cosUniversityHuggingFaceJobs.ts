@@ -303,7 +303,7 @@ export function buildHuggingFaceJobSpec(input: {
       'transformers>=4.55,<6',
       'accelerate>=1.10,<2',
       'peft>=0.17,<1',
-      'trl>=0.23,<1',
+      'trl==0.23.0',
       'bitsandbytes>=0.46,<1',
     ])
   } else {

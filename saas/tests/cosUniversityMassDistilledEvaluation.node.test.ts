@@ -159,10 +159,15 @@ test('system-prefixed holdout rows remain parseable instead of blocking the back
 })
 
 
+test('rolling evaluation evidence is scoped to the pending candidate set so API row caps cannot starve old canaries', () => {
+  assert.match(route, /const candidateIds = rows\.map\(row => row\.candidateId\)/)
+  assert.equal((route.match(/\.in\('candidate_id', candidateIds\)/g) || []).length, 2)
+})
+
 test('legacy invalid holdouts are terminally quarantined instead of retried', () => {
   assert.match(route, /async function quarantineLegacyInvalidHoldout\(claim: MassEvaluationClaim\)/)
   assert.match(route, /status: 'quarantined'/)
-  assert.match(route, /message === 'mass_distilled_evaluation_holdout_format_invalid'/)
+  assert.match(route, /const legacyInvalidHoldout = message === 'mass_distilled_evaluation_holdout_format_invalid'/)
   assert.match(route, /terminalDataDefect: true/)
   assert.match(route, /nextStatus: 'quarantined'/)
   assert.match(route, /quarantined: true/)

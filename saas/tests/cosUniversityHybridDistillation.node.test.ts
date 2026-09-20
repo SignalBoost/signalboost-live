@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
+  failedEvaluationRemediationGates,
   failureDerivedOrdinalForHash,
   failureDerivedSourceHash,
   planHybridDistillationMix,
@@ -33,6 +34,30 @@ test('failure-derived source identities are deterministic and self-attributing w
   assert.equal(failureDerivedSourceHash('Computer Science & Coding', 2), hash)
   assert.equal(failureDerivedOrdinalForHash('Computer Science & Coding', hash), 2)
   assert.equal(failureDerivedOrdinalForHash('Cybersecurity', hash), null)
+  const fresh = failureDerivedSourceHash('Computer Science & Coding', 2, 'candidate:a:safety')
+  assert.notEqual(fresh, hash)
+  assert.equal(failureDerivedSourceHash('Computer Science & Coding', 2, 'candidate:a:safety'), fresh)
+})
+
+test('failure-derived remediation follows every independent graduation gate without weakening any gate', () => {
+  assert.deepEqual(failedEvaluationRemediationGates({
+    holdoutImproved: true,
+    safetyPassed: false,
+    unseenTransferPassed: true,
+    delayedRetentionPassed: true,
+  }), ['safety'])
+  assert.deepEqual(failedEvaluationRemediationGates({
+    holdoutImproved: true,
+    safetyPassed: true,
+    unseenTransferPassed: true,
+    delayedRetentionPassed: true,
+  }), [])
+  assert.deepEqual(failedEvaluationRemediationGates({
+    holdoutImproved: false,
+    safetyPassed: false,
+    unseenTransferPassed: false,
+    delayedRetentionPassed: false,
+  }), ['holdout_improvement', 'safety', 'unseen_transfer', 'delayed_retention'])
 })
 
 test('teacher synthetic source identities keep legacy reversibility and support fresh per-slot generations', () => {
@@ -66,7 +91,10 @@ test('curriculum replenishment keeps real acquisition first, adds verified-failu
   assert.match(replenishment, /source_kind: 'failure_derived_curriculum'/)
   assert.match(replenishment, /origin: 'failure_derived'/)
   assert.match(replenishment, /cos_university_distilled_evaluation_runs/)
-  assert.match(replenishment, /\.eq\('holdout_improved', false\)/)
+  assert.doesNotMatch(replenishment, /\.eq\('holdout_improved', false\)/)
+  assert.match(replenishment, /failedEvaluationRemediationGates/)
+  assert.match(replenishment, /remediationKey =/)
+  assert.match(replenishment, /remediationGates: failure\.gates/)
   assert.match(replenishment, /titleById = new Map\(COS_UNIVERSITY_SUBJECTS\.map/)
   assert.match(replenishment, /titleById\.get\(rawSubject as any\) \|\| rawSubject/)
   assert.match(replenishment, /no_raw_chat_no_private_holdout_no_hidden_exam/)

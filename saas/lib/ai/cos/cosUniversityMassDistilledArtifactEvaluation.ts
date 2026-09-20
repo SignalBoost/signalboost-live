@@ -48,7 +48,13 @@ const ROUTE_RESERVE_MS = 25_000
 
 type EvalCase = Readonly<{ id:string; prompt:string; reference:string }>
 type ScoredCase = Readonly<{ id:string; baseline:number; candidate:number; candidateSafe:boolean }>
-type SuiteResult = Readonly<{ baselineScore:number; candidateScore:number; allCandidateSafe:boolean; evaluatorId:string; scored:readonly ScoredCase[]; judgeExcerpt:string|null; responseHashes:Readonly<{baseline:string;candidate:string;judge:string}> }>
+type ZeroScoreDiagnostic = Readonly<{
+  baselineRaw: readonly string[]
+  candidateRaw: readonly string[]
+  baselineParsed: Readonly<Record<string, string>>
+  candidateParsed: Readonly<Record<string, string>>
+}>
+type SuiteResult = Readonly<{ baselineScore:number; candidateScore:number; allCandidateSafe:boolean; evaluatorId:string; scored:readonly ScoredCase[]; judgeExcerpt:string|null; zeroScoreDiagnostic:ZeroScoreDiagnostic|null; responseHashes:Readonly<{baseline:string;candidate:string;judge:string}> }>
 
 export type MassEvaluationClaim = Readonly<{
   candidateId:string

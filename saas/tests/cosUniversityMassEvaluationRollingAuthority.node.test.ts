@@ -128,18 +128,21 @@ test('infrastructure-failed approvals are released from the rolling window while
   assert.equal(!blocked.issue && blocked.reason, 'rolling_mass_evaluation_window_exhausted')
 })
 
-test('the cron issues at most one approval before the unchanged atomic claim, with an env kill switch', () => {
+test('the cron may drain already-issued bounded approvals while preserving the authorization kill switch', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  assert.ok(route.indexOf('await ensureRollingMassEvaluationApproval()') < route.indexOf('claim = await claimNext()'))
-  // 2026-09-20: the route no longer enumerates the three known denial reasons; EVERY non-issued decision is a
-  // hard stop, so a newly added authority reason cannot fall through to claim/wake. Strictly stronger.
-  assert.match(route, /if \(!rolling\.issued\) \{/)
-  assert.ok(route.indexOf('if (!rolling.issued)') < route.indexOf('claim = await claimNext()'))
-  assert.match(route, /status: 'not_claimed'/)
-  assert.match(route, /reason: rolling\.reason/)
+  const rolling = route.indexOf('await ensureRollingMassEvaluationApproval()')
+  const drain = route.indexOf('const mayDrainExistingApproval')
+  const denial = route.indexOf('if (!rolling.issued && !mayDrainExistingApproval)')
+  const claim = route.indexOf('claim = await claimNext()')
+  assert.ok(rolling >= 0 && drain > rolling && denial > drain && claim > denial)
+  assert.match(route, /rolling\.reason === 'no_mass_artifact_eligible_for_rolling_evaluation'/)
+  assert.match(route, /rolling\.reason === 'rolling_mass_evaluation_window_exhausted'/)
+  assert.match(route, /if \(!rolling\.issued && !mayDrainExistingApproval\)/)
   assert.match(route, /enabled: process\.env\.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false'/)
-  assert.match(route, /verifier: 'host_controller'/)
   assert.match(route, /db\.rpc\('claim_next_mass_distilled_evaluation'\)/)
+  assert.match(route, /maxEndpointCalls/)
+  assert.match(route, /maxJudgeCalls/)
+  assert.match(route, /maxRuntimeWakeAttempts/)
 })
 
 test('an event returned by both cron reads is counted once, so two real failures cannot trip the three-failure stop', () => {
@@ -235,14 +238,16 @@ test('RunPod max-worker quota preflight failures do not consume the paid evaluat
 })
 
 
-test('a hard rolling denial exits before the atomic claim while an armed/no-eligible state may still be claimed', () => {
+test('unknown or disabled rolling denial still exits before atomic claim, but armed queue states reach the claim path', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  const denial = route.indexOf('if (!rolling.issued)')
+  const denial = route.indexOf('if (!rolling.issued && !mayDrainExistingApproval)')
   const claim = route.indexOf('claim = await claimNext()')
   const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
   const wake = route.indexOf('wakeMassDistilledRuntime(claim.endpointId')
   assert.ok(denial >= 0 && claim > denial && preflight > claim && wake > preflight)
   assert.match(route, /return NextResponse\.json\(\{ ok: true, skipped: true, reason: rolling\.reason \}\)/)
+  assert.match(route, /mayDrainExistingApproval = !rolling\.issued/)
+  assert.doesNotMatch(route, /rolling\.reason === 'rolling_mass_evaluation_authorization_disabled'\s*\|\|/)
 })
 
 

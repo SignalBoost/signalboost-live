@@ -656,12 +656,12 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     }
     const hostedTeacherSource = clean(run.teacher_source_ref, 2000)
       .startsWith('itmounts://cos-university/mass-hosted-teacher/')
-    const actualFrontierFaculty = hostedTeacherSource
-      ? [...new Set((await readMassHostedTeacherRows({
+    const actualFrontierFaculty: string[] = hostedTeacherSource
+      ? [...new Set<string>((await readMassHostedTeacherRows({
           db: cosServiceDb(),
           runId: run.id,
           promptSetHash: clean(run.prompt_set_hash, 64).toLowerCase(),
-        })).map(row => clean(row.teacherId, 80)).filter(Boolean))]
+        })).map(row => clean(row.teacherId, 80)).filter((teacherId): teacherId is string => Boolean(teacherId)))]
       : []
     const distillationPlan = buildFrontierDistillationPlan({
       studentModelId: run.student_model_id,

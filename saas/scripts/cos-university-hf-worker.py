@@ -598,6 +598,24 @@ def _pooled_hub_repo(base, api, namespace: str, repo_type: str, prefix: str, ide
     return repo_id, branch_name
 
 
+def _force_trainable_fp32(model) -> int:
+    """Keep QLoRA adapter parameters/gradients in FP32 on pre-Ampere GPUs.
+
+    The 4-bit base still computes in FP16. AMP/GradScaler is deliberately disabled for this lane
+    because T4-class CUDA cannot unscale BF16 gradients. Only trainable parameters are upcast.
+    """
+    import torch
+
+    changed = 0
+    for parameter in model.parameters():
+        if not parameter.requires_grad:
+            continue
+        if parameter.dtype != torch.float32:
+            parameter.data = parameter.data.to(torch.float32)
+            changed += 1
+    return changed
+
+
 def train_student(base, envelope: dict[str, Any]) -> None:
     import torch
     from huggingface_hub import HfApi
@@ -628,8 +646,9 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     recipe["holdoutItems"] = len(holdout)
     recipe["trainingMode"] = training_mode or "unknown"
 
-    # Production 2026-09-20: on-policy PEFT generation failed with a BF16/Float dtype mismatch.
-    # Keep the governed training lane deterministic in FP16 on the current T4-class HF hardware.
+    # Production 2026-09-20: T4 QLoRA exposed two BF16 failure modes. Keep the 4-bit
+    # quantized forward/backward compute deterministic in FP16, disable AMP/GradScaler entirely,
+    # and upcast only trainable adapter parameters to FP32 before the optimizer is built.
     use_bf16 = False
     compute_dtype = torch.float16
     quantization = BitsAndBytesConfig(
@@ -727,7 +746,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             save_strategy="no",
             report_to="none",
             bf16=False,
-            fp16=True,
+            fp16=False,
             gradient_checkpointing=True,
             use_cache=False,
             temperature=recipe["temperature"],
@@ -787,8 +806,8 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             logging_steps=10,
             save_strategy="no",
             report_to="none",
-            bf16=use_bf16,
-            fp16=not use_bf16,
+            bf16=False,
+            fp16=False,
             gradient_checkpointing=True,
             dataset_text_field="training_text",
             max_length=recipe["maxLength"],
@@ -800,6 +819,15 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             processing_class=tokenizer,
             peft_config=peft_config,
         )
+
+    trainable_fp32_tensors = _force_trainable_fp32(trainer.model)
+    recipe["ampEnabled"] = False
+    recipe["trainableParameterDtype"] = "float32"
+    recipe["trainableFp32TensorCount"] = trainable_fp32_tensors
+    print(
+        f"itmounts_training_precision:{json.dumps({'quantizedComputeDtype':'float16','ampEnabled':False,'trainableParameterDtype':'float32','trainableFp32TensorCount':trainable_fp32_tensors}, ensure_ascii=True, separators=(',', ':'))}",
+        flush=True,
+    )
 
     trainer.train()
     trainer.save_model(str(output_dir))

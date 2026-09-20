@@ -1,2 +1,2 @@
-base_sha=238861cdbf52c2f120b9cc6467c6109c0591ea7d
-branch=feat/frontier-adaptive-distillation
+base_sha=ad0df645b429445aa8488a1c8ebd8dcef8365c4a
+branch=fix/graduate-adoption-loop

@@ -26,9 +26,9 @@ import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'
 import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
-import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
+import { resolveSemanticVisualRequest, shouldResolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } from '@/lib/ai/cos/publicConciergeIdentity'
-import { resolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
+import { resolveSemanticPublicIdentity, shouldResolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
@@ -151,6 +151,9 @@ export async function POST(req: NextRequest) {
   const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
     ? String(body.context.language).toLowerCase()
     : 'en'
+  const ingressStartedAt = Date.now()
+  let semanticIdentityInvoked = false
+  let semanticVisualInvoked = false
 
   // Explicit text transformations are fully scoped by the user's command and supplied source.
   // They require no identity/visual/software classification and no privileged authority. Execute
@@ -202,7 +205,9 @@ export async function POST(req: NextRequest) {
 
   if (browserSurface === 'concierge') {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
-    const semanticIdentity = deterministicIdentity ? null : await resolveSemanticPublicIdentity(prompt)
+    const semanticIdentityEligible = !deterministicIdentity && shouldResolveSemanticPublicIdentity(prompt)
+    semanticIdentityInvoked = semanticIdentityEligible
+    const semanticIdentity = semanticIdentityEligible ? await resolveSemanticPublicIdentity(prompt) : null
     const identity = deterministicIdentity || (semanticIdentity
       ? publicConciergeIdentityReplyForIntent(semanticIdentity.intent, semanticIdentity.language)
       : null)
@@ -340,9 +345,13 @@ export async function POST(req: NextRequest) {
     // bounded recent user-authored conversation context. Deterministic code only validates and
     // preserves the user's exact words; it does not infer the continuation itself.
     const directVisual = isConciergeVisualObjective(prompt)
-    const semanticResolution = directVisual || browserSurface === 'assistant'
-      ? null
-      : await resolveSemanticVisualRequest(messages, prompt)
+    const semanticVisualEligible = !directVisual
+      && browserSurface === 'concierge'
+      && shouldResolveSemanticVisualRequest(messages, prompt)
+    semanticVisualInvoked = semanticVisualEligible
+    const semanticResolution = semanticVisualEligible
+      ? await resolveSemanticVisualRequest(messages, prompt)
+      : null
     const visualObjective = browserSurface === 'assistant'
       ? null
       : directVisual ? prompt : semanticResolution?.objective ?? null
@@ -369,6 +378,19 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId))
   }
 
+  // ANSWERABILITY FIRST: ordinary questions reach COS before optional semantic routers. The
+  // routers above are admitted only when the request is identity/visual-shaped. This timestamp
+  // makes it visible whether time was spent understanding/routing or actually answering.
+  console.info('[cos-answerability-first]', JSON.stringify({
+    at: new Date().toISOString(),
+    stage: 'local_answer_attempt',
+    answerability: 'model_knowledge_or_reasoning_candidate',
+    preAnswerRoutingMs: Math.max(0, Date.now() - ingressStartedAt),
+    semanticIdentityInvoked,
+    semanticVisualInvoked,
+    promptChars: prompt.length,
+  }))
+
   // ONE BRAIN: Assistant is the owner's COS interface; Concierge is only the public mouth.
   // Both surfaces execute the same COS reasoning endpoint. Public scope changes authority,
   // memory/tool visibility, disclosure, and presentation — never which brain answers.
@@ -376,6 +398,27 @@ export async function POST(req: NextRequest) {
   const response = access?.isOwner && browserSurface === 'assistant'
     ? await executeCosRequest()
     : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => executeCosRequest()))
+
+  try {
+    const outcome: any = await response.clone().json()
+    const answerability = outcome?.live_evidence_retrieved_this_turn === true
+      ? 'fresh_verification_required'
+      : outcome?.external_fallback_invoked === true
+        ? 'local_answer_insufficient'
+        : String(outcome?.reply || '').trim()
+          ? 'local_answer_available'
+          : 'unresolved'
+    console.info('[cos-answerability-outcome]', JSON.stringify({
+      at: new Date().toISOString(),
+      answerability,
+      source: String(outcome?.source || ''),
+      confidence: Number.isFinite(Number(outcome?.confidence_score)) ? Number(outcome.confidence_score) : null,
+      localModelInvoked: outcome?.local_model_invoked === true,
+      externalFallbackInvoked: outcome?.external_fallback_invoked === true,
+      totalMs: Math.max(0, Date.now() - ingressStartedAt),
+    }))
+  } catch {}
+
   const decorated = await withSuggestedFollowups(response, prompt, auditUserId)
   return browserSurface === 'concierge' ? publicConciergePresentation(decorated) : decorated
 }

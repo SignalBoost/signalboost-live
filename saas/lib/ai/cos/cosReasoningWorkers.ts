@@ -10,6 +10,7 @@ import {
 } from '@/lib/ai/cos/cosReasoningControlPlane'
 import {
   boundedRoleMaxTokens,
+  COS_ROLE_TOKEN_CAPS,
   selectCosReasoningWorkerRole,
   type CosReasoningRoleDecision,
   type CosSpecialistRole,
@@ -61,7 +62,11 @@ function roleSystemPrompt(request: CosReasoningRequest, role: CosSpecialistRole)
 
 function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistRole): LocalModelCallArgs {
   const systemPrompt = roleSystemPrompt(request, role)
-  const maxTokens = boundedRoleMaxTokens(role, request.maxTokens)
+  const deterministicControl = request.disableThinking === true && request.jsonObject === true
+  const requestedTokens = Number(request.maxTokens)
+  const maxTokens = deterministicControl && Number.isFinite(requestedTokens) && requestedTokens > 0
+    ? Math.max(8, Math.min(Math.floor(requestedTokens), COS_ROLE_TOKEN_CAPS[role]))
+    : boundedRoleMaxTokens(role, request.maxTokens)
   return {
     prompt: request.prompt,
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
@@ -69,6 +74,12 @@ function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistR
     ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
     ...(request.jsonObject === undefined ? {} : { jsonObject: request.jsonObject }),
     ...(request.usageContext === undefined ? {} : { usageContext: request.usageContext }),
+    ...(request.frequencyPenalty === undefined ? {} : { frequencyPenalty: request.frequencyPenalty }),
+    ...(request.presencePenalty === undefined ? {} : { presencePenalty: request.presencePenalty }),
+    ...(request.disableThinking === undefined ? {} : { disableThinking: request.disableThinking }),
+    ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+    ...(request.allowConfiguredFallback === undefined ? {} : { allowConfiguredFallback: request.allowConfiguredFallback }),
+    ...(request.persistUsage === undefined ? {} : { persistUsage: request.persistUsage }),
   }
 }
 

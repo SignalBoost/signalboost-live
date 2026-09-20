@@ -156,6 +156,32 @@ Canonical latency rules:
 
 A user-facing turn that spends tens of seconds in RunPod lifecycle or RunPod inference before answering is a latency regression, not expected COS behavior.
 
+## Answerability-first cognitive mode invariant — 2026-09-20
+
+Interactive COS must decide **what kind of cognition the task requires before spending the answer budget**.
+
+Canonical order:
+
+```text
+deterministic/scope facts already supplied or governed
+-> local answerability attempt from COS knowledge/memory/University capability
+-> fresh verification only when the claim is mutable/current or explicitly requested
+-> external fallback only when the governed local answer is unavailable/insufficient
+```
+
+Routing classifiers are not answers and may not monopolize the primary reasoner. Obvious deterministic identity/visual/software/authoring routes stay zero-cost. Optional semantic identity/visual classifiers are admitted only for requests shaped like those domains, must preserve their requested compact token ceiling, disable model thinking, use an actual transport deadline (default 2.5 seconds), and must not leave orphan model work after the route has continued.
+
+Cognitive mode is task-sensitive:
+
+- deterministic extraction, classification, translation/edit fidelity, permission and strict-JSON control decisions use temperature 0/low, no hidden reasoning, compact output and hard deadlines;
+- ordinary factual/explanatory work uses bounded normal reasoning;
+- diagnostic/root-cause/planning work may use deeper analytical reasoning when evidence and complexity justify it;
+- explicitly creative writing/brainstorming/naming/concept work uses a higher-diversity creative profile while preserving supplied facts and constraints;
+- current/live facts use verification rather than model-memory confidence;
+- code, Builder, visuals and University workloads retain their specialized governed lanes.
+
+Telemetry must distinguish **pre-answer routing time** from actual answer time and record whether the completed turn was locally answerable, required fresh verification, required external fallback, or remained unresolved. A long response to a locally answerable ordinary question is a performance regression even if the browser timeout did not fire.
+
 ## COS Direct Editor fast capability — 2026-09-18
 
 Short explicit edit/proofread/polish requests are a bounded COS capability, not a second brain. Assistant and Concierge invoke the same canonical editor inside `cos-primary`; browser ingress must not run a competing text reasoner and fail the turn before COS gets it.

@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { detectConciergeVisualIntent, hasVisualActionToken, isConciergeVisualObjective } from '../lib/visuals/intent.ts'
-import { isSemanticVisualRequest, resolveSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
+import { isSemanticVisualRequest, resolveSemanticVisualRequest, shouldResolveSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
 import { readRepoFile, requireWiring } from './helpers/requiredWiring.ts'
 
 const reasoner = (verdict: unknown, seen?: string[]) => (async (args: any) => {
@@ -35,6 +35,7 @@ test('a generic verb with a depictable subject is admitted only semantically', a
     'generate a golden retriever wearing sunglasses',
   ]) {
     assert.equal(isConciergeVisualObjective(prompt), false, prompt)
+    assert.equal(shouldResolveSemanticVisualRequest([{ role: 'user', content: prompt }], prompt), true, prompt)
     assert.equal(detectConciergeVisualIntent(prompt), null, prompt)
     assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: true })), true, prompt)
     assert.deepEqual(detectConciergeVisualIntent(prompt, { semanticVisual: true }), { filename: 'visual.png', mode: 'generate' }, prompt)
@@ -78,6 +79,7 @@ test('inflected phrasings the verb list cannot enumerate reach the network and a
   ]) {
     assert.equal(hasVisualActionToken(prompt), false, prompt)
     assert.equal(isConciergeVisualObjective(prompt), false, prompt)
+    assert.equal(shouldResolveSemanticVisualRequest([{ role: 'user', content: prompt }], prompt), true, prompt)
     assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: true })), true, prompt)
     assert.deepEqual(detectConciergeVisualIntent(prompt, { semanticVisual: true }), { filename: 'visual.png', mode: 'generate' }, prompt)
   }
@@ -123,13 +125,25 @@ test('conversation follow-ups are resolved semantically from recent user context
   assert.match(seen[0] || '', /RECENT USER TURNS:/)
 })
 
+
+test('ordinary known-answer questions do not pay the semantic visual router', () => {
+  for (const prompt of [
+    'What is photosynthesis?',
+    'Explain compound interest.',
+    'Why is the sky blue?',
+    'Qual é a capital de Portugal?',
+  ]) {
+    assert.equal(shouldResolveSemanticVisualRequest([{ role: 'user', content: prompt }], prompt), false, prompt)
+  }
+})
+
 test('the public Concierge uses the deep semantic visual gate while owner Assistant goes directly to COS', async () => {
   const route = await readRepoFile('app/api/cos-browser/route.ts')
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
     purpose: 'Use the deep semantic conversation verdict only for the public mouth; owner Assistant is COS and must not pay a separate visual-classifier call.',
-    expect: /const semanticResolution = directVisual \|\| browserSurface === 'assistant'[\s\S]*\? null[\s\S]*: await resolveSemanticVisualRequest\(messages, prompt\)/,
-    insert: "    const semanticResolution = directVisual || browserSurface === 'assistant' ? null : await resolveSemanticVisualRequest(messages, prompt)",
+    expect: /const semanticVisualEligible =[\s\S]*shouldResolveSemanticVisualRequest\(messages, prompt\)[\s\S]*const semanticResolution = semanticVisualEligible[\s\S]*await resolveSemanticVisualRequest\(messages, prompt\)/,
+    insert: "    const semanticVisualEligible = !directVisual && browserSurface === 'concierge' && shouldResolveSemanticVisualRequest(messages, prompt)",
     after: '    const directVisual = isConciergeVisualObjective(prompt)',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })

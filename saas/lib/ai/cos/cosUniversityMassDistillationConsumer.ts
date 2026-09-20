@@ -80,6 +80,55 @@ function safeError(error: unknown): string {
   return clean(message, 300) || 'mass_distillation_unknown_error'
 }
 
+function durableTrainingReceipt(profileValue: unknown, recipeValue: unknown) {
+  const profile = clean(profileValue, 120)
+  const raw = recipeValue && typeof recipeValue === 'object' && !Array.isArray(recipeValue)
+    ? recipeValue as Record<string, unknown>
+    : null
+  if (!profile || !raw) return null
+
+  const number = (key: string, min: number, max: number): number | null => {
+    const value = Number(raw[key])
+    return Number.isFinite(value) && value >= min && value <= max ? value : null
+  }
+  const integer = (key: string, min: number, max: number): number | null => {
+    const value = number(key, min, max)
+    return value != null && Number.isInteger(value) ? value : null
+  }
+  const faculty = Array.isArray(raw.frontierFaculty)
+    ? [...new Set(raw.frontierFaculty.map(value => clean(value, 80)).filter(Boolean))].slice(0, 32)
+    : []
+
+  return Object.freeze({
+    profile,
+    optimizer: clean(raw.optimizer, 80) || null,
+    denseTeacherModelId: clean(raw.denseTeacherModelId, 240) || null,
+    denseTeacherRevision: clean(raw.denseTeacherRevision, 40).toLowerCase() || null,
+    onPolicyFraction: number('onPolicyFraction', 0, 1),
+    offPolicyAnchorFraction: number('offPolicyAnchorFraction', 0, 1),
+    beta: number('beta', 0, 1),
+    temperature: number('temperature', 0.01, 4),
+    maxNewTokens: integer('maxNewTokens', 1, 8192),
+    frontierFaculty: Object.freeze(faculty),
+    trainingItems: integer('trainingItems', 1, 100_000),
+    holdoutItems: integer('holdoutItems', 1, 100_000),
+    epochs: number('epochs', 0.01, 100),
+    perDeviceTrainBatchSize: integer('perDeviceTrainBatchSize', 1, 1024),
+    gradientAccumulationSteps: integer('gradientAccumulationSteps', 1, 100_000),
+    learningRate: number('learningRate', 0, 1),
+    warmupRatio: number('warmupRatio', 0, 1),
+    lrSchedulerType: clean(raw.lrSchedulerType, 80) || null,
+    maxGradNorm: number('maxGradNorm', 0, 1000),
+    maxLength: integer('maxLength', 1, 1_000_000),
+    loraR: integer('loraR', 1, 8192),
+    loraAlpha: integer('loraAlpha', 1, 65_536),
+    loraDropout: number('loraDropout', 0, 1),
+    targetModules: clean(raw.targetModules, 240) || null,
+    structuredItems: integer('structuredItems', 0, 100_000),
+    fallbackItems: integer('fallbackItems', 0, 100_000),
+  })
+}
+
 /** Read the same provider/dispatch gates used by the paid consumer before allocating new authority. */
 export function massDistillationDispatchReadiness(): MassDistillationDispatchReadiness {
   installHuggingFaceTrainingExecutorEnv()
@@ -1262,6 +1311,7 @@ export async function recordMassDistillationWorkerEvidence(
   const trainedArtifactId = clean(body.trainedArtifactId, 500)
   const trainedArtifactHash = clean(body.artifactHash, 64).toLowerCase()
   const evidenceRef = clean(body.evidenceRef, 2000)
+  const trainingReceipt = durableTrainingReceipt(body.trainingProfile, body.trainingRecipe)
   if (baseModel !== run.student_model_id
     || datasetHash !== clean(run.dataset_hash, 64).toLowerCase()
     || trainingManifestHash !== clean(run.training_manifest_hash, 64).toLowerCase()
@@ -1286,7 +1336,7 @@ export async function recordMassDistillationWorkerEvidence(
         campaignId: run.campaign_id, batchKey: run.batch_key, jobId, evidenceRef,
         baseModel, datasetHash, trainingManifestHash, holdoutManifestHash,
         revisionKey: run.revision_key, trainedArtifactId, artifactHash: trainedArtifactHash,
-        trainingMode: 'distillation',
+        trainingMode: 'distillation', trainingReceipt,
       },
       verifier: 'training_executor',
     })
@@ -1336,6 +1386,7 @@ export async function recordMassDistillationWorkerEvidence(
       canonicalBaseModel: run.student_model_id,
       adapterModel: trainedArtifactId,
       teacherModel: run.teacher_model_id || null,
+      trainingReceipt,
       trafficAuthorized: false,
       nextGate: 'independent_evaluation',
     },
@@ -1356,7 +1407,7 @@ export async function recordMassDistillationWorkerEvidence(
       campaignId: run.campaign_id, batchKey: run.batch_key, jobId, evidenceRef,
       baseModel, datasetHash, trainingManifestHash, holdoutManifestHash,
       revisionKey: run.revision_key, trainedArtifactId, artifactHash: trainedArtifactHash,
-      rollbackArtifactRef, trainingMode: 'distillation', trafficAuthorized: false,
+      rollbackArtifactRef, trainingMode: 'distillation', trainingReceipt, trafficAuthorized: false,
     },
     verifier: 'training_executor',
   })

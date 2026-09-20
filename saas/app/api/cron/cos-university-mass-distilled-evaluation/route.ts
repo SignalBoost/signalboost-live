@@ -133,10 +133,14 @@ async function ensureRollingMassEvaluationApproval() {
     artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
   }))
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
+  // Scope evidence to the pending candidates being evaluated this tick. Supabase/PostgREST can cap
+  // broad result sets below the requested limit; a global newest-events query can therefore evict
+  // older exact-canary evidence and make eligible artifacts appear permanently ineligible.
+  const candidateIds = rows.map(row => row.candidateId)
   const events = await db.from('cos_university_learning_assurance_events')
     .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
     .eq('event_type', 'fine_tune')
-    .like('candidate_id', 'mass:%')
+    .in('candidate_id', candidateIds)
     .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
     .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
     .order('observed_at', { ascending: false })
@@ -145,7 +149,7 @@ async function ensureRollingMassEvaluationApproval() {
   const reservations = await db.from('cos_university_learning_assurance_events')
     .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
     .eq('event_type', 'fine_tune')
-    .like('candidate_id', 'mass:%')
+    .in('candidate_id', candidateIds)
     .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
     .order('observed_at', { ascending: false })
     .limit(1000)

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
+  MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
   MASS_EVALUATION_REOPEN_CLAIM,
@@ -27,6 +28,40 @@ test('rolling throughput ceiling matches the owner-approved backlog-drain budget
   // This test pins throughput authority; the per-evaluation claim test below pins the $0.20 boundary itself.
 })
 
+
+test('frontier proof sampling is bounded and then returns to oldest-first order', () => {
+  assert.equal(MASS_EVALUATION_FRONTIER_PROOF_SAMPLE, 4)
+  const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
+  const frontier = { ...artifactA, candidateId: 'mass:frontier:1', artifactHash: '9'.repeat(64), createdAt: '2026-09-15T22:34:00Z', frontierRecipe: true }
+  const frontierCanary = ev(frontier.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: frontier.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
+
+  const proof = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, frontier],
+    events: [canary(legacy as typeof artifactA), frontierCanary],
+    now,
+    frontierProofStarts: 0,
+  })
+  assert.equal(proof.issue && proof.artifact.candidateId, frontier.candidateId)
+
+  const normal = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, frontier],
+    events: [canary(legacy as typeof artifactA), frontierCanary],
+    now,
+    frontierProofStarts: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+  })
+  assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
+})
+
+test('cron scans the full bounded pending population and measures frontier proof starts durably', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /\.select\('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use'\)/)
+  assert.match(route, /\.limit\(500\)/)
+  assert.match(route, /frontierRecipe: row\.intended_use\?\.trainingReceipt\?\.profile === 'cos_university_frontier_gkd_v1'/)
+  assert.match(route, /frontierProofStarts = new Set/)
+  assert.match(route, /MASS_EVALUATION_FRONTIER_PROOF_SAMPLE/)
+})
 
 test('issues exactly the claim-compatible shape for a canary-proven artifact past the 12h retention delay', () => {
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now })

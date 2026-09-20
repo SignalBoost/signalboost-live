@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMassDistillationWorkflowLease.ts
 import { randomUUID } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
@@ -35,7 +36,9 @@ export async function claimUniversityMassDistillationWorkflowLease(): Promise<Un
 export async function releaseUniversityMassDistillationWorkflowLease(ownerToken: string): Promise<boolean> {
   const db = cosServiceDb()
   if (!db || !ownerToken) return false
-  const { data, error } = await db.rpc('release_cos_university_mass_distillation_workflow_lease', { p_owner: ownerToken })
+  const { data, error } = await db.rpc('release_cos_university_mass_distillation_workflow_lease', {
+    p_owner: ownerToken,
+  })
   if (error) throw new Error(`mass_distillation_workflow_lease_release_failed:${clean(error.message || error.code)}`)
   return data === true
 }

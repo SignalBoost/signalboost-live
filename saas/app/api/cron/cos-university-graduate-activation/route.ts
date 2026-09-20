@@ -19,29 +19,14 @@ export const maxDuration = 300
 /**
  * The missing caller: promotion writes graduates as `pending_runtime`, COS routing already consumes
  * `active` graduates, and nothing in between ever invoked activateGraduateRuntime — a promoted
- * graduate would sit pending forever. This cron binds the newest pending graduate to the
- * operator-configured serving profile. All hard gates (promotion evidence, rollback, authority,
+ * graduate would sit pending forever. This cron binds the newest pending graduate to the exact
+ * serving identity already proven by its Production canary. All hard gates (promotion evidence, rollback, authority,
  * live health, exact served-model identity) live inside activateGraduateRuntime itself; this route
  * only feeds it and records the outcome, activation is idempotent per registry row, and the
  * owner switch is the environment flag below — fail-closed when absent.
  */
 const ACTIVATION_ENABLED_FLAG = 'COS_GRADUATE_ACTIVATION_ENABLED'
 
-
-const RUNPOD_SERVERLESS_HOST = /^([a-z0-9]+)\.api\.runpod\.ai$/i
-
-function configuredGraduateRunpodEndpointId(): string | null {
-  const raw = String(process.env.COS_GRADUATE_AI_BASE_URL || '').trim()
-  if (!raw) return null
-  try {
-    const url = new URL(raw)
-    const match = RUNPOD_SERVERLESS_HOST.exec(url.hostname)
-    if (!match || url.protocol !== 'https:' || !/^\/v1\/?$/.test(url.pathname)) return null
-    return match[1].toLowerCase()
-  } catch {
-    return null
-  }
-}
 
 /**
  * Bind activation to the exact mass-artifact serving identity already proven by its canary.
@@ -51,10 +36,7 @@ function configuredGraduateRunpodEndpointId(): string | null {
 async function resolvePendingGraduateServingIdentity(db: any, graduate: {
   candidate_id: unknown
   trained_artifact_hash: unknown
-}): Promise<{ endpointId: string; modelId: string }> {
-  const endpointId = configuredGraduateRunpodEndpointId()
-  if (!endpointId) throw new Error('graduate_runtime_exact_runpod_endpoint_not_configured')
-
+}): Promise<{ endpointId: string; modelId: string; baseUrl: string }> {
   const candidateId = String(graduate.candidate_id || '').trim()
   const artifactHash = String(graduate.trained_artifact_hash || '').trim().toLowerCase()
   if (!candidateId || !/^[a-f0-9]{64}$/.test(artifactHash)) throw new Error('graduate_runtime_identity_invalid')
@@ -64,17 +46,25 @@ async function resolvePendingGraduateServingIdentity(db: any, graduate: {
     .eq('event_type', 'fine_tune')
     .eq('candidate_id', candidateId)
     .eq('verifier', 'host_controller')
-    .contains('evidence', { claim: 'local_distilled_runtime_canary_passed', exactArtifact: true, endpointId })
+    .contains('evidence', { claim: 'local_distilled_runtime_canary_passed', exactArtifact: true })
     .order('observed_at', { ascending: false })
     .limit(100)
   if (canaries.error) throw canaries.error
 
-  const modelId = servedCandidateModelFromCanary((canaries.data || []) as CanaryEventRow[], {
-    candidateId,
-    artifactHash,
-    endpointId,
-  })
-  return { endpointId, modelId }
+  const rows = (canaries.data || []) as CanaryEventRow[]
+  for (const row of rows) {
+    const endpointId = String(row.evidence?.endpointId || '').trim().toLowerCase()
+    if (!/^[a-z0-9_-]{3,120}$/.test(endpointId)) continue
+    if (String(row.evidence?.candidateId || '') !== candidateId) continue
+    if (String(row.evidence?.artifactHash || '').toLowerCase() !== artifactHash) continue
+    try {
+      const modelId = servedCandidateModelFromCanary(rows, { candidateId, artifactHash, endpointId })
+      return { endpointId, modelId, baseUrl: `https://${endpointId}.api.runpod.ai/v1` }
+    } catch {
+      continue
+    }
+  }
+  throw new Error('graduate_runtime_exact_canary_identity_missing')
 }
 
 /**
@@ -268,6 +258,7 @@ export async function GET(req: NextRequest) {
       // The exact served identity comes from this artifact's passing host canary on the same
       // configured RunPod endpoint; never infer it from an artifact hash or a static legacy name.
       runtimeModelId: serving.modelId,
+      runtimeBaseUrl: serving.baseUrl,
       runtimeProfile: 'graduate_ai',
       workerRoles: scope.workerRoles as never,
       problemClasses: scope.problemClasses,
@@ -285,6 +276,7 @@ export async function GET(req: NextRequest) {
         blockers: result.blockers,
         servingEndpointId: serving.endpointId,
         servingModelId: serving.modelId,
+        servingBaseUrl: serving.baseUrl,
         ...(result.activated ? {
           provider: (result as any).provider,
           healthEvidenceHash: (result as any).healthEvidenceHash,

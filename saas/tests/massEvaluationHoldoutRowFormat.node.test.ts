@@ -81,3 +81,11 @@ test('holdout integrity and count checks are untouched by the parse widening', (
 test('structured prompt/response columns still take precedence over text parsing', () => {
   assert.match(SOURCE, /structuredPrompt&&structuredReference\?\{prompt:structuredPrompt,reference:structuredReference\}:parseTrainingText\(text\)/)
 })
+
+test('response-only legacy hosted rows are recovered only after immutable manifest validation', () => {
+  assert.match(SOURCE, /legacyHostedPromptByResponseHash/)
+  const manifestGate = SOURCE.indexOf('manifestHash(observed) !== input.expectedManifestHash')
+  const legacyRecovery = SOURCE.indexOf('await legacyHostedPromptByResponseHash')
+  assert.ok(manifestGate >= 0 && legacyRecovery > manifestGate)
+  assert.match(SOURCE, /reference: row\.text/)
+})

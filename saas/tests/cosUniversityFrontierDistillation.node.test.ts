@@ -64,6 +64,8 @@ test('mass distillation carries the frontier plan into the governed training env
   assert.match(consumer, /frontier-train/)
   assert.match(consumer, /source-teacher:/)
   assert.match(consumer, /frontier-plan:/)
+  assert.match(consumer, /actualFrontierFaculty/)
+  assert.match(consumer, /readMassHostedTeacherRows/)
 })
 
 test('HF worker executes real GKD for frontier mass distillation and fails closed on tokenizer mismatch', () => {
@@ -90,5 +92,6 @@ test('mass artifact evidence durably records the executed frontier training reci
   assert.match(consumer, /function durableTrainingReceipt/)
   assert.match(consumer, /trainingReceipt = durableTrainingReceipt\(body\.trainingProfile, body\.trainingRecipe\)/)
   assert.match(consumer, /trainingMode: 'distillation', trainingReceipt/)
+  assert.match(consumer, /\|\| !trainingReceipt\)/)
   assert.match(consumer, /teacherModel: run\.teacher_model_id \|\| null,[\s\S]*trainingReceipt,[\s\S]*nextGate: 'independent_evaluation'/)
 })

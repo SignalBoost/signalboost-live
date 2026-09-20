@@ -79,6 +79,7 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // canonical prompt/response as structured columns. Rejecting that transport shape is an
     // evaluator compatibility defect, not evidence about model quality.
     || error === 'mass_distilled_evaluation_holdout_format_invalid'
+    || error.startsWith('mass_distilled_evaluation_legacy_hosted_')
     // The pre-fix evaluator reconstructed a bare hash-only candidate name. The exact runtime serves a runtime-keyed alias,
     // so this 404 proves evaluator/runtime identity drift, not model quality. Keep the exclusion narrow to that known shape.
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)

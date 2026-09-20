@@ -21,7 +21,8 @@ test('HF mass distillation control loop wakes every minute while governance rema
 test('every-minute wake is protected by one durable expiring workflow lease', () => {
   const workflow = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts', import.meta.url), 'utf8')
   const lease = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationWorkflowLease.ts', import.meta.url), 'utf8')
-  const migration = readFileSync(new URL('../supabase/migrations/20260920211000_mass_distillation_workflow_singleflight.sql', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../supabase/migrations/20260920053700_mass_distillation_workflow_singleflight.sql', import.meta.url), 'utf8')
+
   assert.match(workflow, /claimUniversityMassDistillationWorkflowLease/)
   assert.match(workflow, /reason: 'workflow_lease_held'/)
   assert.match(workflow, /releaseUniversityMassDistillationWorkflowLease\(lease\.ownerToken\)/)

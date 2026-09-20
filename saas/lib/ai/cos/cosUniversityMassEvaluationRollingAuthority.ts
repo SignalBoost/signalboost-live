@@ -91,6 +91,10 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)
       && error.includes('the model `itmounts-mass-distilled-')
       && error.includes('does not exist'))
+    // A legacy hosted-teacher row whose prompt cannot be recovered through its durable evidence binding is an
+    // evaluator/dataset-lineage defect: the artifact was never asked anything, so the failure says nothing about
+    // model quality and must not spend its substantive attempts or the rolling approval window.
+    || error === 'mass_distilled_evaluation_legacy_hosted_prompt_binding_missing'
     // No worker became ready inside the window (RunPod scheduling/cold start): nothing reached the artifact, so it
     // says nothing about model quality. bootstrap_failed is deliberately NOT here — a bad adapter can cause it.
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')

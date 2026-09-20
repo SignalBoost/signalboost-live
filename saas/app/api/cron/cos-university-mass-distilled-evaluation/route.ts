@@ -124,7 +124,7 @@ type RawClaim = Readonly<{
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
 
-async function readPagedRollingEvents(buildQuery: (from: number, to: number) => Promise<any>, ceilingError: string) {
+async function readPagedRollingEvents(buildQuery: (from: number, to: number) => PromiseLike<any>, ceilingError: string) {
   const rows: any[] = []
   for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
     const from = page * ROLLING_EVENT_PAGE_SIZE

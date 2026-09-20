@@ -139,13 +139,15 @@ test('evaluation route claims once, checks balance before reservation and writes
   assert.match(route, /productionTrafficAuthorized: false/)
 })
 
-test('dedicated mass canary is scheduled and mass evaluation polls every minute to drain backlog without extra workers', () => {
+test('mass evaluation keeps the Production load-shed cadence while preserving backlog capacity', () => {
   const config = JSON.parse(vercel)
   const canary = config.crons.find((item: any) => item.path === '/api/cron/runpod-mass-distilled-local-deploy')
   const evaluation = config.crons.find((item: any) => item.path === '/api/cron/cos-university-mass-distilled-evaluation')
   assert.ok(canary)
   assert.ok(evaluation)
-  assert.equal(evaluation.schedule, '* * * * *')
+  assert.equal(evaluation.schedule, '1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59 * * * *')
+  // 720 evaluator ticks/day still exceed the 300/day rolling approval ceiling, so this halves
+  // hot Supabase/PostgREST polling without reducing authorized evaluation throughput.
 })
 
 

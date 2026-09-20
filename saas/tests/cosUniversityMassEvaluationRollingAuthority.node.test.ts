@@ -337,3 +337,13 @@ test('zero-collapse judge failures are evaluator infrastructure, not model-quali
   assert.equal(decision.issue, true)
   if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
 })
+
+
+test('mass evaluator evidence reads have a candidate-first fine_tune index', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../supabase/migrations/20260920050000_mass_evaluation_candidate_evidence_index.sql', import.meta.url), 'utf8')
+  assert.match(migration, /candidate_id, verifier, observed_at desc/i)
+  assert.match(migration, /where event_type = 'fine_tune'/i)
+  assert.match(route, /\.in\('candidate_id', candidateIds\)/)
+  assert.match(route, /\.gte\('observed_at', new Date\(Date\.now\(\) - 30 \* 86_400_000\)\.toISOString\(\)\)/)
+})

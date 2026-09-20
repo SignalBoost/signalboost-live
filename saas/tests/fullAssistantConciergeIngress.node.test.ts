@@ -18,7 +18,7 @@ test('Assistant is COS: ordinary owner turns do not enter a separate Concierge b
   assert.match(browserRoute, /const executeCosRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
   assert.match(browserRoute, /withPublicDeliveryScope\(\(\) => executeCosRequest\(\)\)/)
   assert.doesNotMatch(browserRoute, /publicConciergePost/)
-  assert.match(browserRoute, /directVisual \|\| browserSurface === 'assistant'[\s\S]*resolveSemanticVisualRequest/)
+  assert.match(browserRoute, /const semanticVisualEligible =[\s\S]*browserSurface === 'concierge'[\s\S]*shouldResolveSemanticVisualRequest\(messages, prompt\)[\s\S]*resolveSemanticVisualRequest\(messages, prompt\)/)
 })
 
 test('Full Assistant passive operational logs are diagnosis-only until explicit repair intent', () => {

@@ -76,10 +76,7 @@ test('RunPod startup contract rejects shell metacharacters in primary model conf
 test('RunPod bootstrap delivery token is derived and never exposes the RunPod account key', async () => {
   configure()
   const delivery = await import('../lib/ai/cos/runpodBootstrapDelivery.ts')
-  const token = delivery.deriveRunpodBootstrapDeliveryToken(
-    String(process.env.RUNPOD_API_KEY),
-    String(process.env.RUNPOD_PRIMARY_POD_ID),
-  )
+  const token = delivery.deriveRunpodBootstrapDeliveryToken(String(process.env.RUNPOD_API_KEY))
   assert.equal(token.length, 64)
   assert.notEqual(token, process.env.RUNPOD_API_KEY)
   const url = delivery.runpodBootstrapDeliveryUrl(process.env)

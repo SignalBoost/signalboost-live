@@ -2,15 +2,15 @@
 
 Use this only when the RunPod endpoint and model list are reachable but a real completion fails with an error such as `llama-server process has terminated: signal: killed`.
 
-The repair script installs the current standard reasoner bootstrap, persists conservative Ollama runtime guardrails under `/workspace`, restarts the reasoner, and performs a real authenticated completion smoke test before reporting success. It never prints the API key.
+The governed RunPod startup contract delivers both the standard reasoner bootstrap and the recovery tool through the authenticated iTMounts application route. Recovery never depends on anonymous GitHub access and never overwrites the governed bootstrap.
 
 From a RunPod terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/SignalBoost/signalboost-live/main/saas/scripts/repair-cos-runpod-runner.sh -o /workspace/repair-cos-runpod-runner.sh \
-  && chmod 700 /workspace/repair-cos-runpod-runner.sh \
-  && COS_REASONER_MODEL=qwen2.5-coder:32b /workspace/repair-cos-runpod-runner.sh
+COS_REASONER_MODEL=qwen3:30b /workspace/repair-cos-runpod-runner.sh
 ```
+
+If the recovery tool is missing, reapply the Production RunPod startup contract. Do not download repository scripts directly onto the pod.
 
 Default guardrails:
 

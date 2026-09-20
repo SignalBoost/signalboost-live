@@ -168,6 +168,7 @@ async function ensureRollingMassEvaluationApproval() {
       .eq('event_type', 'fine_tune')
       .in('candidate_id', candidateIds)
       .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
+      .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
       .order('observed_at', { ascending: false })
       .range(from, to)
     if (result.error) throw result.error

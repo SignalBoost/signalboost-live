@@ -1,2 +1,2 @@
-base_sha=81dc4d6419bc85d05aee0b4f979aa96cbe56075f
-branch=hotfix/hf-distillation-fp16-finalize-v2
+base_sha=4d5ae88642a9578a580c1224bfe842c581850c3a
+branch=fix/hf-worker-public-delivery

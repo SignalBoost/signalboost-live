@@ -15,8 +15,10 @@ import {
   HYBRID_DISTILLATION_PROFILE,
   HYBRID_FAILURE_DERIVED_TARGET,
   failedEvaluationRemediationGates,
+  failureDerivedRemediationPrinciples,
   failureDerivedSourceHash,
   teacherSyntheticSourceHash,
+  type FailureDerivedRemediationGate,
 } from './cosUniversityHybridDistillation.ts'
 
 const DISTILLATION_OPENALEX_RESULTS_PER_QUERY = 10
@@ -60,7 +62,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   if (rows.error) throw rows.error
 
   const titleById = new Map(COS_UNIVERSITY_SUBJECTS.map(subject => [subject.id, subject.title] as const))
-  const failuresByTitle = new Map<string, Array<{ candidateId: string; gates: readonly string[] }>>()
+  const failuresByTitle = new Map<string, Array<{ candidateId: string; gates: readonly FailureDerivedRemediationGate[] }>>()
   for (const row of (rows.data || []) as any[]) {
     const rawSubject = String(row.subject_id || '').trim()
     const subject = titleById.get(rawSubject as any) || rawSubject
@@ -96,6 +98,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
       // Re-running the same evidence is idempotent; a newly failed artifact produces fresh curriculum.
       const remediationKey = `${failure.candidateId}:${failure.gates.join(',')}`
       const contentHash = failureDerivedSourceHash(target.subject, ordinal, remediationKey)
+      const remediationPrinciples = failureDerivedRemediationPrinciples(failure.gates)
       const row = {
         content_hash: contentHash,
         source_kind: 'failure_derived_curriculum',
@@ -106,11 +109,18 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
         summary: [
           `Independent evaluation shows a remediation need in ${target.subject} for graduation gate classes: ${failure.gates.join(', ')}.`,
           'Generate a distinct self-contained expert teaching example that targets the relevant failure class while preserving correct, safe, transferable, and retainable behavior.',
-          'Do not reproduce training examples, raw conversations, private holdouts, hidden exams, evaluator output, user data, or private evidence.',
+          `General remediation principles: ${remediationPrinciples.join(' ')}`,
+          'Use those general principles without recreating any hidden evaluation case. Do not reproduce training examples, raw conversations, private holdouts, hidden exams, evaluator output, user data, or private evidence.',
         ].join(' '),
         facts: [
-          { origin: 'failure_derived', profile: HYBRID_DISTILLATION_PROFILE, ordinal, remediationGates: failure.gates },
-          { constraint: 'subject_level_remediation_only_no_raw_chat_no_private_holdout_no_hidden_exam' },
+          {
+            origin: 'failure_derived',
+            profile: HYBRID_DISTILLATION_PROFILE,
+            ordinal,
+            remediationGates: failure.gates,
+            remediationPrinciples,
+          },
+          { constraint: 'subject_level_remediation_general_principles_only_no_raw_chat_no_private_holdout_no_hidden_exam' },
         ],
         confidence: 1,
         license: 'synthetic-benchmark-fixture',

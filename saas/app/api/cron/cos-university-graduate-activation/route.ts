@@ -8,6 +8,7 @@ import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduat
 import { decideMassGraduateRegistration, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
 import { GRADUATE_ROLLBACK_PROOF_CLAIM, GRADUATE_ROLLBACK_PROOF_PROFILE, proveGraduateRollbackReference } from '@/lib/ai/cos/cosUniversityGraduateRollbackProof'
 import { COS_UNIVERSITY_SUBJECTS } from '@/lib/ai/cos/cosUniversity'
+import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import { createHash } from 'node:crypto'
 
 export const runtime = 'nodejs'
@@ -252,6 +253,10 @@ export async function GET(req: NextRequest) {
     }
 
     const serving = await resolvePendingGraduateServingIdentity(db, graduate)
+    // The exact canary endpoint may have been retired to max=0 by later mass-evaluation capacity
+    // rotation. Restore only this already-proven endpoint to the existing scale-to-zero/max-1
+    // safety envelope. This creates no endpoint and does not widen the worker ceiling.
+    const runtimePolicy = await ensureMassDistilledEndpoint24Gb(serving.endpointId)
     const result = await activateGraduateRuntime({
       candidateId: String(graduate.candidate_id || ''),
       trainedArtifactHash: String(graduate.trained_artifact_hash || ''),
@@ -277,6 +282,8 @@ export async function GET(req: NextRequest) {
         servingEndpointId: serving.endpointId,
         servingModelId: serving.modelId,
         servingBaseUrl: serving.baseUrl,
+        servingWorkersMin: runtimePolicy.workersMin,
+        servingWorkersMax: runtimePolicy.workersMax,
         ...(result.activated ? {
           provider: (result as any).provider,
           healthEvidenceHash: (result as any).healthEvidenceHash,

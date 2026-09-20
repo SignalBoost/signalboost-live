@@ -11,6 +11,7 @@ const consumer = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillati
 const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 const claimMigration = readFileSync(new URL('../supabase/migrations/20260919030000_mass_distilled_evaluation_claim_18.sql', import.meta.url), 'utf8')
+const concurrencyMigration = readFileSync(new URL('../supabase/migrations/20260920211800_mass_distilled_evaluation_bounded_concurrency.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
 const MASS_REVISION = Object.freeze({
@@ -64,6 +65,20 @@ test('mass evaluation claim is globally atomic, delayed-retention gated, exact-c
   assert.match(claimMigration, /reservationOnly',true/)
   assert.match(claimMigration, /revoke all on function public\.claim_next_mass_distilled_evaluation\(\) from public, anon, authenticated/)
   assert.match(claimMigration, /grant execute on function public\.claim_next_mass_distilled_evaluation\(\) to service_role/)
+})
+
+test('mass evaluation uses bounded four-way concurrency without changing authority gates', () => {
+  assert.match(concurrencyMigration, /v_active_reservations integer := 0/)
+  assert.match(concurrencyMigration, /select count\(\*\)::integer into v_active_reservations/)
+  assert.match(concurrencyMigration, /if v_active_reservations >= 4 then return; end if/)
+  assert.match(concurrencyMigration, /a\.created_at <= v_now - interval '12 hours'/)
+  assert.match(concurrencyMigration, /v_max_endpoint<>18 or v_max_judge<>4 or v_max_wake<>1/)
+  assert.match(concurrencyMigration, /v_max_cost<=0 or v_max_cost>0\.200000/)
+  assert.match(concurrencyMigration, /evidence->>'claim'='production_canary_healthy'/)
+  assert.match(concurrencyMigration, /evidence->>'exactArtifact'='true'/)
+  assert.match(concurrencyMigration, /productionTrafficAuthorized',false/)
+  assert.match(concurrencyMigration, /revoke all on function public\.claim_next_mass_distilled_evaluation\(\) from public, anon, authenticated/)
+  assert.match(concurrencyMigration, /grant execute on function public\.claim_next_mass_distilled_evaluation\(\) to service_role/)
 })
 
 test('mass evaluator binds exact governed training revision, pinned holdout and dynamic canary model', () => {

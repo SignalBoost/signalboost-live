@@ -127,3 +127,18 @@ test('Self-Healing Builder capacity contention requeues the same job instead of 
   assert.match(migration, /selfHealingUniversityDistillation/)
   assert.match(migration, /status = 'paused'[\s\S]*claim_generation < 4/)
 })
+
+
+test('University failed code repairs are retried only while live Production health still requires repair', () => {
+  assert.match(universityCodeRepair, /readUniversityMassDistillationHealth/)
+  const retry = universityCodeRepair.slice(universityCodeRepair.indexOf('export async function retryFailedUniversityDistillationRepair'))
+  const healthAt = retry.indexOf('readUniversityMassDistillationHealth({ db: admin })')
+  const failedReadAt = retry.indexOf("const failed = await admin.from('builder_jobs')")
+  assert.ok(healthAt >= 0)
+  assert.ok(failedReadAt > healthAt)
+  assert.match(retry, /health\.state !== 'repair_required'/)
+  assert.match(retry, /production_health_recovered_before_retry/)
+  assert.match(retry, /universityRepairRetryClaimedAt: suppressedAt/)
+  assert.match(retry, /universityRepairRetrySuppressedHealthState: health\.state/)
+  assert.match(retry, /university_self_healing_retry_health_read_failed/)
+})

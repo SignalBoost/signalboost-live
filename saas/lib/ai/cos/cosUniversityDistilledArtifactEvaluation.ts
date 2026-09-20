@@ -454,7 +454,11 @@ async function fetchPinnedHoldout(input: {
     if (!text || !HEX64.test(itemHash) || sha256Raw(text) !== itemHash || !expected.has(itemHash)) {
       throw new Error('distilled_evaluation_holdout_integrity_failed')
     }
-    const parsed = parseTrainingText(text)
+    const structuredPrompt = clean(row?.prompt, 100_000)
+    const structuredReference = clean(row?.response, 100_000)
+    const parsed = structuredPrompt && structuredReference
+      ? { prompt: structuredPrompt, reference: structuredReference }
+      : parseTrainingText(text)
     if (!parsed) throw new Error('distilled_evaluation_holdout_format_invalid')
     observed.push(itemHash)
     cases.push(Object.freeze({ id: itemHash.slice(0, 16), prompt: parsed.prompt, reference: parsed.reference }))

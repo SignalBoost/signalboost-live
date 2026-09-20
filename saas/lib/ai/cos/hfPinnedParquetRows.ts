@@ -8,7 +8,7 @@ const MAX_ROWS = 100
 type HfSibling = Readonly<{ rfilename?: unknown }>
 type HfTreeEntry = Readonly<{ path?: unknown; type?: unknown }>
 
-export type PinnedParquetRow = Readonly<{ text: string; item_hash: string }>
+export type PinnedParquetRow = Readonly<{ text: string; item_hash: string; prompt?: string; response?: string }>
 
 function clean(value: unknown, max = 2000): string {
   return String(value ?? '').trim().slice(0, max)
@@ -154,10 +154,17 @@ export async function readPinnedHfParquetRows(input: {
       const row = raw as Record<string, unknown>
       const text = clean(row.text, 500_000)
       const itemHash = clean(row.item_hash, 64).toLowerCase()
+      const prompt = clean(row.prompt, 100_000)
+      const reference = clean(row.response, 100_000)
       if (!text || !/^[a-f0-9]{64}$/.test(itemHash)) {
         throw new Error('distilled_evaluation_hf_pinned_parquet_row_invalid')
       }
-      rows.push(Object.freeze({ text, item_hash: itemHash }))
+      rows.push(Object.freeze({
+        text,
+        item_hash: itemHash,
+        ...(prompt ? { prompt } : {}),
+        ...(reference ? { response: reference } : {}),
+      }))
       if (rows.length > MAX_ROWS) throw new Error('distilled_evaluation_hf_pinned_parquet_row_ceiling')
     }
   }

@@ -70,6 +70,9 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.match(runner, /fineTuneRevisionKey\(revision\)!==claim\.revisionKey/)
   assert.match(runner, /readPinnedHfParquetRows/)
   assert.match(runner, /sha256Raw\(text\)!==itemHash/)
+  assert.match(runner, /structuredPrompt=clean\(row\.prompt,100_000\)/)
+  assert.match(runner, /structuredReference=clean\(row\.response,100_000\)/)
+  assert.match(runner, /structuredPrompt&&structuredReference\?\{prompt:structuredPrompt,reference:structuredReference\}:parseTrainingText\(text\)/)
   assert.match(runner, /manifestHash\(observed\)!==input\.expectedManifestHash/)
   // Endpoint/model naming moved out of the evaluator into the provisioner; assert it where it lives.
   assert.match(provision, /itmounts-mass-distilled-\$\{suffix\}/)
@@ -130,4 +133,14 @@ test('structured evaluator errors retain bounded code and message instead of [ob
   assert.match(route, /structured_error_without_message/)
   assert.match(route, /const message = boundedErrorMessage\(error\)/)
   assert.doesNotMatch(route, /const message = error instanceof Error \? error\.message : String\(error\)/)
+})
+
+
+test('hard rolling denials do not reach RunPod claim, preflight or wake', () => {
+  const denial = route.indexOf('if (hardRollingDenial)')
+  const claim = route.indexOf('claim = await claimNext()')
+  const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
+  const wake = route.indexOf('wakeMassDistilledRuntime(claim.endpointId')
+  assert.ok(denial >= 0 && claim > denial && preflight > claim && wake > preflight)
+  assert.match(route, /return NextResponse\.json\(\{ ok: true, skipped: true, reason: rolling\.reason \}\)/)
 })

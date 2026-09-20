@@ -301,6 +301,20 @@ export async function GET(req: NextRequest) {
 
     const rolling = await ensureRollingMassEvaluationApproval()
     console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
+    const hardRollingDenial = !rolling.issued && (
+      rolling.reason === 'rolling_mass_evaluation_authorization_disabled'
+      || rolling.reason === 'rolling_mass_evaluation_window_exhausted'
+      || rolling.reason === 'no_mass_artifact_pending'
+    )
+    if (hardRollingDenial) {
+      await recordProduction(true, {
+        runnerInvoked: false,
+        skipped: true,
+        status: 'not_claimed',
+        reason: rolling.reason,
+      }).catch(() => undefined)
+      return NextResponse.json({ ok: true, skipped: true, reason: rolling.reason })
+    }
     claim = await claimNext()
     if (!claim) {
       await recordProduction(true, {

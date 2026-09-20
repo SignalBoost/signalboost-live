@@ -83,6 +83,7 @@ test('evaluator infrastructure failures do not exhaust the artifact retry budget
     'The operation was aborted due to timeout',
     'mass_distilled_evaluation_runpod_http_502:baseline:cases=4:gateway',
     'mass_distilled_evaluation_answer_missing:0a546e1b26656083',
+    'mass_distilled_evaluation_holdout_format_invalid',
     'mass_distilled_evaluation_runtime_not_ready:204',
   ].map((error, i) => ev(artifactA.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashA, error }, `2026-09-16T1${i}:00:00Z`))
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), rollingApproval, ...failures], now })
@@ -127,6 +128,10 @@ test('infrastructure-failed approvals are released from the rolling window while
 test('the cron issues at most one approval before the unchanged atomic claim, with an env kill switch', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.ok(route.indexOf('await ensureRollingMassEvaluationApproval()') < route.indexOf('claim = await claimNext()'))
+  assert.match(route, /rolling\.reason === 'rolling_mass_evaluation_window_exhausted'/)
+  assert.match(route, /rolling\.reason === 'rolling_mass_evaluation_authorization_disabled'/)
+  assert.match(route, /rolling\.reason === 'no_mass_artifact_pending'/)
+  assert.ok(route.indexOf('if (hardRollingDenial)') < route.indexOf('claim = await claimNext()'))
   assert.match(route, /enabled: process\.env\.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false'/)
   assert.match(route, /verifier: 'host_controller'/)
   assert.match(route, /db\.rpc\('claim_next_mass_distilled_evaluation'\)/)
@@ -222,4 +227,42 @@ test('RunPod max-worker quota preflight failures do not consume the paid evaluat
     now,
   })
   assert.equal(decision.issue, true)
+})
+
+
+test('a hard rolling denial exits before the atomic claim while an armed/no-eligible state may still be claimed', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  const denial = route.indexOf('if (hardRollingDenial)')
+  const claim = route.indexOf('claim = await claimNext()')
+  const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
+  const wake = route.indexOf('wakeMassDistilledRuntime(claim.endpointId')
+  assert.ok(denial >= 0 && claim > denial && preflight > claim && wake > preflight)
+  assert.match(route, /rolling_mass_evaluation_window_exhausted/)
+  assert.doesNotMatch(route.slice(route.indexOf('const hardRollingDenial'), claim), /no_mass_artifact_eligible_for_rolling_evaluation/)
+})
+
+
+test('holdout format failures are evaluator infrastructure and do not consume model retry or rolling-window authority', () => {
+  const approval = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'distilled_independent_evaluation_approved',
+    authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+    artifactHash: hashA,
+  }, '2026-09-16T12:00:00Z', '2026-09-16T14:00:00Z')
+  const started = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_started',
+    artifactHash: hashA,
+  }, '2026-09-16T12:00:10Z', '2026-09-16T12:12:10Z')
+  const failed = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_failed',
+    artifactHash: hashA,
+    error: 'mass_distilled_evaluation_holdout_format_invalid',
+  }, '2026-09-16T12:00:20Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA), approval, started, failed],
+    now,
+  })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
 })

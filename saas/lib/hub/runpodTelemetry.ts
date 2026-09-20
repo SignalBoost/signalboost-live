@@ -1,6 +1,7 @@
 // saas/lib/hub/runpodTelemetry.ts
 import { createHmac } from 'node:crypto'
 import { configuredRunpodApiKey, configuredRunpodPodId, runpodControlConfigured } from '../ai/cos/runpodConfig.ts'
+import { runpodBootstrapDeliveryUrl } from '../ai/cos/runpodBootstrapDelivery.ts'
 
 const GRAPHQL_ENDPOINT = 'https://api.runpod.io/graphql'
 const REST_ENDPOINT = 'https://rest.runpod.io/v1'
@@ -80,15 +81,17 @@ export function runpodGatewayKey(podId = configuredRunpodPodId()): string {
 
 /**
  * The Pod's container disk is recreated when RunPod restarts it, while /workspace persists.
- * Every start downloads the bootstrap from the exact Vercel Git commit, making Pod behavior
- * reproducible instead of trusting whatever script happened to remain on persistent storage.
+ * Every start downloads the bootstrap through iTMounts' authenticated public delivery route.
+ * Repository visibility is therefore irrelevant to runtime startup; the app deployment supplies
+ * the governed bootstrap artifact without exposing a GitHub credential to the Pod.
  */
 export function desiredRunpodStartupContract(options: RunpodStartupOptions = {}): RunpodStartupContract {
   const reasonerModel = safeModelName(options.reasonerModel || process.env.RUNPOD_PRIMARY_MODEL, 'qwen2.5-coder:32b')
   const embeddingModel = safeModelName(options.embeddingModel || process.env.RUNPOD_PRIMARY_EMBEDDING_MODEL, 'nomic-embed-text')
   const gatewayKey = runpodGatewayKey()
   const ref = bootstrapRef()
-  const bootstrapUrl = `https://raw.githubusercontent.com/SignalBoost/signalboost-live/${ref}/saas/scripts/runpod-cos-reasoner.sh`
+  const bootstrapUrl = runpodBootstrapDeliveryUrl(process.env)
+  if (!bootstrapUrl) throw new Error('runpod_bootstrap_delivery_not_configured')
   const command = [
     'set -euo pipefail',
     'if [ -x /start.sh ]; then nohup /start.sh >/workspace/runpod-base-start.log 2>&1 & fi',

@@ -272,10 +272,12 @@ async function pinnedHoldout(input:{
   const token=clean(process.env.HF_TOKEN,4096);if(token.length<20)throw new Error('mass_distilled_evaluation_hf_token_missing')
   const match=HF_DATASET_REF.exec(input.holdoutDataRef);if(!match)throw new Error('mass_distilled_evaluation_holdout_ref_invalid')
   const [,repoId,revision,split]=match;if(!HEX40.test(revision))throw new Error('mass_distilled_evaluation_holdout_revision_invalid')
-  const metadataResponse=await withinDeadline(fetch(`https://huggingface.co/api/datasets/${repoId.split('/').map(encodeURIComponent).join('/')}`,{headers:{Authorization:`Bearer ${token}`},redirect:'error',signal:AbortSignal.timeout(15_000)}),input.deadlineMs,15_000)
-  if(!metadataResponse.ok)throw new Error(`mass_distilled_evaluation_hf_metadata_http_${metadataResponse.status}`)
-  const metadata:any=await metadataResponse.json();if(clean(metadata?.sha,40).toLowerCase()!==revision.toLowerCase())throw new Error('mass_distilled_evaluation_holdout_revision_moved')
-  const rows=await withinDeadline(readPinnedHfParquetRows({repoId,revision,split,token,siblings:Array.isArray(metadata?.siblings)?metadata.siblings:[]}),input.deadlineMs,60_000)
+  // holdoutDataRef already pins an immutable 40-char commit. Comparing that commit to the repository's
+  // current HEAD is incorrect: later curriculum writes legitimately advance HEAD and previously caused
+  // mass_distilled_evaluation_holdout_revision_moved before the evaluator read a single case.
+  // Read the exact pinned tree/revision directly. The parquet reader resolves /tree/<revision> and
+  // /resolve/<revision>/<path>; row hashes plus the recorded holdout manifest remain the integrity gates.
+  const rows=await withinDeadline(readPinnedHfParquetRows({repoId,revision,split,token}),input.deadlineMs,60_000)
   if(!rows.length||rows.length>100)throw new Error('mass_distilled_evaluation_holdout_count_invalid')
 
   const normalized = rows.map(row => {

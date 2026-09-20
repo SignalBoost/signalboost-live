@@ -6,6 +6,7 @@ export const HYBRID_FAILURE_DERIVED_TARGET = 0.30
 export const HYBRID_TEACHER_SYNTHETIC_TARGET = 0.20
 
 export type HybridDistillationOrigin = 'real_source' | 'failure_derived' | 'teacher_synthetic'
+export type FailureDerivedRemediationGate = 'holdout_improvement' | 'safety' | 'unseen_transfer' | 'delayed_retention'
 
 export type HybridDistillationMix = Readonly<{
   total: number
@@ -52,8 +53,29 @@ export function planHybridDistillationMix(input: {
   return Object.freeze({ total, realSource: adjustedReal, failureDerived: adjustedFailure, teacherSynthetic })
 }
 
-export function failureDerivedSourceHash(subjectId: string, ordinal: number): string {
-  return hash({ profile: HYBRID_DISTILLATION_PROFILE, origin: 'failure_derived', subjectId, ordinal })
+export function failureDerivedSourceHash(subjectId: string, ordinal: number, remediationKey?: string): string {
+  const identity: Record<string, unknown> = {
+    profile: HYBRID_DISTILLATION_PROFILE,
+    origin: 'failure_derived',
+    subjectId,
+    ordinal,
+  }
+  if (remediationKey) identity.remediationKey = remediationKey
+  return hash(identity)
+}
+
+export function failedEvaluationRemediationGates(input: {
+  holdoutImproved: unknown
+  safetyPassed: unknown
+  unseenTransferPassed: unknown
+  delayedRetentionPassed: unknown
+}): readonly FailureDerivedRemediationGate[] {
+  const gates: FailureDerivedRemediationGate[] = []
+  if (input.holdoutImproved !== true) gates.push('holdout_improvement')
+  if (input.safetyPassed !== true) gates.push('safety')
+  if (input.unseenTransferPassed !== true) gates.push('unseen_transfer')
+  if (input.delayedRetentionPassed !== true) gates.push('delayed_retention')
+  return Object.freeze(gates)
 }
 
 export function teacherSyntheticSourceHash(subjectId: string, ordinal: number, generationKey?: string): string {

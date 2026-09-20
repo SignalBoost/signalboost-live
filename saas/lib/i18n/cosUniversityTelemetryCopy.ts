@@ -39,7 +39,7 @@ type Copy = Readonly<{
 export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguage, Copy> = {
   en: {
     title: 'COS University — Distillation Telemetry',
-    subtitle: 'Read-only Production view. Auto-refreshes every 10 seconds.',
+    subtitle: 'Read-only Production view. Auto-refreshes every 60 seconds.',
     updated: 'Updated',
     refresh: 'Refresh',
     refreshing: 'Refreshing…',
@@ -73,7 +73,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
   },
   es: {
     title: 'COS University — Telemetría de destilación',
-    subtitle: 'Vista de Producción de solo lectura. Se actualiza automáticamente cada 10 segundos.',
+    subtitle: 'Vista de Producción de solo lectura. Se actualiza automáticamente cada 60 segundos.',
     updated: 'Actualizado',
     refresh: 'Actualizar',
     refreshing: 'Actualizando…',
@@ -107,7 +107,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
   },
   pt: {
     title: 'COS University — Telemetria de destilação',
-    subtitle: 'Visualização de Produção somente leitura. Atualização automática a cada 10 segundos.',
+    subtitle: 'Visualização de Produção somente leitura. Atualização automática a cada 60 segundos.',
     updated: 'Atualizado',
     refresh: 'Atualizar',
     refreshing: 'Atualizando…',
@@ -141,7 +141,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
   },
   pl: {
     title: 'COS University — Telemetria destylacji',
-    subtitle: 'Widok Produkcji tylko do odczytu. Automatyczne odświeżanie co 10 sekund.',
+    subtitle: 'Widok Produkcji tylko do odczytu. Automatyczne odświeżanie co 60 sekund.',
     updated: 'Zaktualizowano',
     refresh: 'Odśwież',
     refreshing: 'Odświeżanie…',
@@ -175,7 +175,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
   },
   ru: {
     title: 'COS University — Телеметрия дистилляции',
-    subtitle: 'Производственный режим только для чтения. Автообновление каждые 10 секунд.',
+    subtitle: 'Производственный режим только для чтения. Автообновление каждые 60 секунд.',
     updated: 'Обновлено',
     refresh: 'Обновить',
     refreshing: 'Обновление…',

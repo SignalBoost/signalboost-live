@@ -39,6 +39,10 @@ TRAINING_LR_SCHEDULER = "cosine"
 TRAINING_MAX_GRAD_NORM = 1.0
 TRAINING_MAX_LENGTH = 2048
 
+FRONTIER_TRAINING_PROFILE = "cos_university_frontier_gkd_v1"
+FRONTIER_GKD_MAX_LENGTH = 1024
+FRONTIER_GKD_LEARNING_RATE = 5e-5
+
 BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"
 BASE_WORKER_PATH = Path("/tmp/itmounts_hf_worker_base.py")
 BASE_CONTRACT_MARKERS = (
@@ -480,14 +484,74 @@ def _student_training_text(base, tokenizer, row: dict[str, Any]) -> tuple[str, b
         raise RuntimeError("worker_training_text_missing")
     return fallback, False
 
+def _frontier_distillation_plan(base, envelope: dict[str, Any], base_model: str) -> dict[str, Any] | None:
+    plan = envelope.get("distillationPlan")
+    if not isinstance(plan, dict):
+        return None
+    if base.clean(plan.get("profile"), 120) != "cos-university-frontier-adaptive-distillation-v1":
+        raise RuntimeError("worker_frontier_distillation_profile_invalid")
+    if base.clean(plan.get("optimizer"), 80) != "gkd_on_policy":
+        raise RuntimeError("worker_frontier_distillation_optimizer_invalid")
+    if base.clean(plan.get("studentModelId"), 240) != base_model:
+        raise RuntimeError("worker_frontier_distillation_student_mismatch")
+
+    teacher_id = base.clean(plan.get("denseTeacherModelId"), 240)
+    teacher_revision = base.clean(plan.get("denseTeacherRevision"), 40).lower()
+    teacher_license = base.clean(plan.get("denseTeacherLicense"), 80).lower()
+    if not teacher_id or teacher_id == base_model or not base.HEX40.match(teacher_revision):
+        raise RuntimeError("worker_frontier_distillation_teacher_invalid")
+    if teacher_license != "apache-2.0":
+        raise RuntimeError("worker_frontier_distillation_teacher_rights_invalid")
+
+    on_policy_fraction = float(plan.get("onPolicyFraction", 0.85))
+    beta = float(plan.get("beta", 0.5))
+    temperature = float(plan.get("temperature", 0.8))
+    max_new_tokens = int(plan.get("maxNewTokens", 256))
+    if not 0.50 <= on_policy_fraction <= 1.0:
+        raise RuntimeError("worker_frontier_distillation_on_policy_fraction_invalid")
+    if not 0.0 <= beta <= 1.0:
+        raise RuntimeError("worker_frontier_distillation_beta_invalid")
+    if not 0.10 <= temperature <= 1.50:
+        raise RuntimeError("worker_frontier_distillation_temperature_invalid")
+    if not 64 <= max_new_tokens <= 512:
+        raise RuntimeError("worker_frontier_distillation_max_new_tokens_invalid")
+
+    return {
+        "profile": FRONTIER_TRAINING_PROFILE,
+        "optimizer": "gkd_on_policy",
+        "teacherModelId": teacher_id,
+        "teacherRevision": teacher_revision,
+        "onPolicyFraction": on_policy_fraction,
+        "offPolicyAnchorFraction": round(1.0 - on_policy_fraction, 6),
+        "beta": beta,
+        "temperature": temperature,
+        "maxNewTokens": max_new_tokens,
+        "frontierFaculty": [
+            base.clean(value, 80)
+            for value in plan.get("frontierFaculty", [])
+            if base.clean(value, 80)
+        ][:32] if isinstance(plan.get("frontierFaculty"), list) else [],
+    }
+
+
+def _tokenizers_exactly_compatible(student_tokenizer, teacher_tokenizer) -> bool:
+    if len(student_tokenizer) != len(teacher_tokenizer):
+        return False
+    if student_tokenizer.special_tokens_map != teacher_tokenizer.special_tokens_map:
+        return False
+    student_vocab = student_tokenizer.get_vocab()
+    teacher_vocab = teacher_tokenizer.get_vocab()
+    return student_vocab == teacher_vocab
+
+
 def train_student(base, envelope: dict[str, Any]) -> None:
     import torch
     from huggingface_hub import HfApi
     from peft import LoraConfig
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-    from trl import SFTConfig, SFTTrainer
-
+    from trl import GKDConfig, GKDTrainer, SFTConfig, SFTTrainer
     from datasets import Dataset
+
     token = os.environ["HF_TOKEN"]
     revision = envelope.get("revision") if isinstance(envelope.get("revision"), dict) else {}
     base_model = base.clean(revision.get("baseModel"), 240)
@@ -504,9 +568,11 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     if base.manifest_hash(observed_training) != training_manifest or base.manifest_hash(observed_holdout) != holdout_manifest:
         raise RuntimeError("worker_partition_manifest_mismatch")
 
+    training_mode = base.clean(envelope.get("trainingMode"), 40)
+    frontier_plan = _frontier_distillation_plan(base, envelope, base_model) if training_mode == "distillation" else None
     recipe = _training_recipe(len(training))
     recipe["holdoutItems"] = len(holdout)
-    print(f"itmounts_training_profile:{json.dumps(recipe, ensure_ascii=True, separators=(',', ':'))}", flush=True)
+    recipe["trainingMode"] = training_mode or "unknown"
 
     use_bf16 = bool(torch.cuda.is_available() and torch.cuda.is_bf16_supported())
     compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
@@ -519,48 +585,8 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     tokenizer = AutoTokenizer.from_pretrained(base_model, token=token, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
 
-    rendered_training: list[dict[str, str]] = []
-    structured_items = 0
-    for row in training:
-        training_text, structured = _student_training_text(base, tokenizer, dict(row))
-        rendered_training.append({"training_text": training_text})
-        if structured:
-            structured_items += 1
-    if not rendered_training:
-        raise RuntimeError("worker_training_dataset_empty")
-    training_for_trainer = Dataset.from_list(rendered_training)
-    recipe["structuredItems"] = structured_items
-    recipe["fallbackItems"] = len(rendered_training) - structured_items
-
-    model = AutoModelForCausalLM.from_pretrained(
-        base_model,
-        token=token,
-        quantization_config=quantization,
-        device_map="auto",
-        torch_dtype=compute_dtype,
-    )
-    model.config.use_cache = False
-
-    output_dir = Path("/tmp/itmounts-trained-adapter")
-    args = SFTConfig(
-        output_dir=str(output_dir),
-        num_train_epochs=recipe["epochs"],
-        per_device_train_batch_size=recipe["perDeviceTrainBatchSize"],
-        gradient_accumulation_steps=recipe["gradientAccumulationSteps"],
-        learning_rate=recipe["learningRate"],
-        **_warmup_arguments(SFTConfig, recipe),
-        lr_scheduler_type=recipe["lrSchedulerType"],
-        max_grad_norm=recipe["maxGradNorm"],
-        logging_steps=10,
-        save_strategy="no",
-        report_to="none",
-        bf16=use_bf16,
-        fp16=not use_bf16,
-        gradient_checkpointing=True,
-        dataset_text_field="training_text",
-        max_length=recipe["maxLength"],
-    )
     peft_config = LoraConfig(
         r=recipe["loraR"],
         lora_alpha=recipe["loraAlpha"],
@@ -569,13 +595,160 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         task_type="CAUSAL_LM",
         target_modules=recipe["targetModules"],
     )
-    trainer = SFTTrainer(
-        model=model,
-        args=args,
-        train_dataset=training_for_trainer,
-        processing_class=tokenizer,
-        peft_config=peft_config,
-    )
+    output_dir = Path("/tmp/itmounts-trained-adapter")
+
+    if frontier_plan is not None:
+        # Hybrid GKD: frontier faculty supplies diverse off-policy anchor examples while the student
+        # generates most trajectories itself. A pinned open-weight teacher provides dense token-level
+        # distributions on those student trajectories. No API teacher is falsely treated as a logit source.
+        messages: list[dict[str, Any]] = []
+        for raw in training:
+            row = dict(raw)
+            prompt = base.clean(row.get("prompt"), 100_000)
+            response = base.clean(row.get("response"), 100_000)
+            if not prompt or not response:
+                raise RuntimeError("worker_frontier_distillation_structured_row_required")
+            messages.append({
+                "messages": [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": response},
+                ]
+            })
+        if not messages:
+            raise RuntimeError("worker_training_dataset_empty")
+
+        teacher_tokenizer = AutoTokenizer.from_pretrained(
+            frontier_plan["teacherModelId"],
+            revision=frontier_plan["teacherRevision"],
+            token=token,
+            use_fast=True,
+        )
+        if teacher_tokenizer.pad_token is None:
+            teacher_tokenizer.pad_token = teacher_tokenizer.eos_token
+        if not _tokenizers_exactly_compatible(tokenizer, teacher_tokenizer):
+            # GOLD/ULD is the future cross-tokenizer path. Until that executor is independently
+            # validated, fail closed rather than silently falling back to SFT.
+            raise RuntimeError("worker_frontier_distillation_tokenizer_mismatch_requires_gold")
+
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model,
+            token=token,
+            quantization_config=quantization,
+            device_map="auto",
+            torch_dtype=compute_dtype,
+        )
+        model.config.use_cache = False
+        teacher_model = AutoModelForCausalLM.from_pretrained(
+            frontier_plan["teacherModelId"],
+            revision=frontier_plan["teacherRevision"],
+            token=token,
+            quantization_config=quantization,
+            device_map="auto",
+            torch_dtype=compute_dtype,
+        )
+        teacher_model.config.use_cache = False
+        teacher_model.eval()
+
+        recipe.update({
+            "profile": FRONTIER_TRAINING_PROFILE,
+            "optimizer": "gkd_on_policy",
+            "denseTeacherModelId": frontier_plan["teacherModelId"],
+            "denseTeacherRevision": frontier_plan["teacherRevision"],
+            "onPolicyFraction": frontier_plan["onPolicyFraction"],
+            "offPolicyAnchorFraction": frontier_plan["offPolicyAnchorFraction"],
+            "beta": frontier_plan["beta"],
+            "temperature": frontier_plan["temperature"],
+            "maxNewTokens": frontier_plan["maxNewTokens"],
+            "frontierFaculty": frontier_plan["frontierFaculty"],
+            "maxLength": FRONTIER_GKD_MAX_LENGTH,
+            "learningRate": FRONTIER_GKD_LEARNING_RATE,
+            "structuredItems": len(messages),
+            "fallbackItems": 0,
+        })
+        print(f"itmounts_training_profile:{json.dumps(recipe, ensure_ascii=True, separators=(',', ':'))}", flush=True)
+
+        args = GKDConfig(
+            output_dir=str(output_dir),
+            num_train_epochs=recipe["epochs"],
+            per_device_train_batch_size=recipe["perDeviceTrainBatchSize"],
+            gradient_accumulation_steps=recipe["gradientAccumulationSteps"],
+            learning_rate=recipe["learningRate"],
+            **_warmup_arguments(GKDConfig, recipe),
+            lr_scheduler_type=recipe["lrSchedulerType"],
+            max_grad_norm=recipe["maxGradNorm"],
+            logging_steps=10,
+            save_strategy="no",
+            report_to="none",
+            bf16=use_bf16,
+            fp16=not use_bf16,
+            gradient_checkpointing=True,
+            max_length=recipe["maxLength"],
+            temperature=recipe["temperature"],
+            lmbda=recipe["onPolicyFraction"],
+            beta=recipe["beta"],
+            max_new_tokens=recipe["maxNewTokens"],
+            seq_kd=False,
+        )
+        trainer = GKDTrainer(
+            model=model,
+            teacher_model=teacher_model,
+            args=args,
+            train_dataset=Dataset.from_list(messages),
+            processing_class=tokenizer,
+            peft_config=peft_config,
+        )
+    else:
+        # Kept only for legacy/one-time jobs that do not carry the frontier mass-distillation plan.
+        # Mass campaigns must never silently arrive here after the frontier planner is enabled.
+        rendered_training: list[dict[str, str]] = []
+        structured_items = 0
+        for row in training:
+            training_text, structured = _student_training_text(base, tokenizer, dict(row))
+            rendered_training.append({"training_text": training_text})
+            if structured:
+                structured_items += 1
+        if not rendered_training:
+            raise RuntimeError("worker_training_dataset_empty")
+        recipe["profile"] = TRAINING_PROFILE
+        recipe["optimizer"] = "legacy_bootstrap_sft"
+        recipe["structuredItems"] = structured_items
+        recipe["fallbackItems"] = len(rendered_training) - structured_items
+        print(f"itmounts_training_profile:{json.dumps(recipe, ensure_ascii=True, separators=(',', ':'))}", flush=True)
+
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model,
+            token=token,
+            quantization_config=quantization,
+            device_map="auto",
+            torch_dtype=compute_dtype,
+        )
+        model.config.use_cache = False
+        args = SFTConfig(
+            output_dir=str(output_dir),
+            num_train_epochs=recipe["epochs"],
+            per_device_train_batch_size=recipe["perDeviceTrainBatchSize"],
+            gradient_accumulation_steps=recipe["gradientAccumulationSteps"],
+            learning_rate=recipe["learningRate"],
+            **_warmup_arguments(SFTConfig, recipe),
+            lr_scheduler_type=recipe["lrSchedulerType"],
+            max_grad_norm=recipe["maxGradNorm"],
+            logging_steps=10,
+            save_strategy="no",
+            report_to="none",
+            bf16=use_bf16,
+            fp16=not use_bf16,
+            gradient_checkpointing=True,
+            dataset_text_field="training_text",
+            max_length=recipe["maxLength"],
+        )
+        trainer = SFTTrainer(
+            model=model,
+            args=args,
+            train_dataset=Dataset.from_list(rendered_training),
+            processing_class=tokenizer,
+            peft_config=peft_config,
+        )
+
     trainer.train()
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))
@@ -605,7 +778,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         "holdoutManifestHash": holdout_manifest,
         "trainedArtifactId": output_repo,
         "artifactHash": artifact_hash,
-        "trainingProfile": TRAINING_PROFILE,
+        "trainingProfile": recipe["profile"],
         "trainingRecipe": recipe,
     }
     base.callback({"claim": "trained_artifact_registered", **common})

@@ -92,7 +92,7 @@ async function branchExists(branch: string): Promise<boolean> {
 
 async function readFileOnBranch(path: string, branch: string): Promise<string | null> {
   try {
-    const clean = String(path || '').trim().replace(/^\\/+/, '')
+    const clean = String(path || '').trim().replace(/^\/+/, '')
     if (!clean || clean.includes('..')) return null
     const encodedPath = clean.split('/').map(part => encodeURIComponent(part)).join('/')
     const res = await fetch(

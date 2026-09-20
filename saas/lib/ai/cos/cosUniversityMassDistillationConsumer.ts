@@ -280,7 +280,7 @@ async function loadRunBundle(runId: string) {
   return { run, batch, sourceHashes }
 }
 
-export export async function buildTeacherPrompts(subjectId: string, sourceHashes: readonly string[]) {
+export async function buildTeacherPrompts(subjectId: string, sourceHashes: readonly string[]) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const rows = await db.from('cos_continuous_learning')

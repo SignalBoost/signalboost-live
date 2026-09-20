@@ -89,3 +89,5 @@ test('response-only legacy hosted rows are recovered only after immutable manife
   assert.ok(manifestGate >= 0 && legacyRecovery > manifestGate)
   assert.match(SOURCE, /reference: row\.text/)
 })
+
+// Legacy hosted rows are immutable response-only evidence; prompt recovery must stay exact-bound and fail closed.

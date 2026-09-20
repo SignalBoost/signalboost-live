@@ -136,3 +136,21 @@ test('active graduate routing matches University subjects and accepts pre-namesp
   assert.match(runtime, /problemClasses\.includes\(subjectId\)/)
   assert.match(runtime, /problemClasses\.includes\(problemClass\)[\s\S]{0,100}universityScoped/)
 })
+
+
+test('healthy idle activation ticks still emit Production-path evidence for Self-Healing', () => {
+  const idleReason = "reason: 'no_pending_runtime_or_primary_upgrade_candidate'"
+  const idleAt = route.indexOf(idleReason)
+  assert.ok(idleAt > 0)
+  const idleWindow = route.slice(Math.max(0, idleAt - 900), idleAt + 500)
+  assert.match(idleWindow, /recordCosUniversityProductionPath\(\{/)
+  assert.match(idleWindow, /path: 'graduate_runtime_activation'/)
+  assert.match(idleWindow, /invocationSucceeded: true/)
+  assert.match(idleWindow, /skipped: true/)
+
+  const primaryGateAt = route.indexOf("reason: scopeDecision.primaryGate")
+  assert.ok(primaryGateAt > 0)
+  const primaryWindow = route.slice(Math.max(0, primaryGateAt - 900), primaryGateAt + 500)
+  assert.match(primaryWindow, /recordCosUniversityProductionPath\(\{/)
+  assert.match(primaryWindow, /invocationSucceeded: true/)
+})

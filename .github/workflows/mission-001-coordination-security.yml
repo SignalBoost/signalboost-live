@@ -21,6 +21,8 @@ permissions:
 jobs:
   coordination-security:
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: '--max-old-space-size=6144'
     defaults:
       run:
         working-directory: saas

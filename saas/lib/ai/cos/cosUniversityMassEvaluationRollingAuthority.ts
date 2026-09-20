@@ -37,6 +37,8 @@ export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
 // Failures from before that Production generation must not permanently suppress the artifact; only failures observed
 // after the repaired baseline split is live count toward the identical-infrastructure circuit breaker.
 export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_judge_timeout_headroom' as const
+export const MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF = 'mass_evaluation_absolute_per_answer_judge_v2' as const
+export const MASS_EVALUATION_REOPEN_CLAIM = 'mass_distilled_independent_evaluation_reopened' as const
 export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-18T01:48:45.894Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
@@ -71,6 +73,7 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // not model quality. Release it from both the artifact retry budget and the 24h rolling approval window.
     || error === 'mass_distilled_evaluation_judge_unavailable'
     || error.startsWith('mass_distilled_evaluation_judge_timeout:')
+    || error.startsWith('mass_distilled_evaluation_judge_zero_collapse:')
     // Evaluator protocol/output-budget defects are not evidence of model quality. They must fail closed, but they may retry
     // after the evaluator is repaired without consuming the model's substantive-attempt budget or the rolling approval window.
     || error.startsWith('mass_distilled_evaluation_answer_missing:')
@@ -149,7 +152,13 @@ function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly 
       && at(event.observedAt) < nextStartAt)
     .sort((a, b) => at(a.observedAt) - at(b.observedAt))[0]
   if (!terminal) return at(start.expiresAt) > nowMs
-  if (terminal.evidence?.claim === 'mass_distilled_independent_evaluation_completed') return true
+  if (terminal.evidence?.claim === 'mass_distilled_independent_evaluation_completed') {
+    const reopenedAfter = candidateEvents.some(event => event.verifier === 'host_controller'
+      && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
+      && event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF
+      && at(event.observedAt) > at(terminal.observedAt))
+    return !reopenedAfter
+  }
   return !evaluatorInfrastructureFailure(terminal)
 }
 
@@ -177,8 +186,17 @@ export function decideRollingMassEvaluationApproval(input: {
     const mine = input.events.filter(event => event.candidateId === artifact.candidateId
       && String(event.evidence?.artifactHash || '').toLowerCase() === hash)
 
-    if (mine.some(event => event.verifier === 'independent_scorer' && event.evidence?.claim === 'independent_evaluation')) continue
-    if (mine.some(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_completed')) continue
+    const reopenedAt = mine
+      .filter(event => event.verifier === 'host_controller'
+        && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
+        && event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF)
+      .map(event => at(event.observedAt))
+      .filter(Number.isFinite)
+      .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY
+    const inCurrentGeneration = (event: RollingEvent) => at(event.observedAt) >= reopenedAt
+
+    if (mine.some(event => inCurrentGeneration(event) && event.verifier === 'independent_scorer' && event.evidence?.claim === 'independent_evaluation')) continue
+    if (mine.some(event => inCurrentGeneration(event) && event.evidence?.claim === 'mass_distilled_independent_evaluation_completed')) continue
 
     const canary = mine.some(event => event.verifier === 'host_production_verifier'
       && event.evidence?.claim === 'production_canary_healthy'
@@ -189,7 +207,7 @@ export function decideRollingMassEvaluationApproval(input: {
     // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.
     // Do not mint another approval while this exact artifact already has a live started reservation.
     const liveStart = mine
-      .filter(event => evaluationStarted(event) && at(event.expiresAt) > nowMs)
+      .filter(event => inCurrentGeneration(event) && evaluationStarted(event) && at(event.expiresAt) > nowMs)
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
       .find(start => !mine.some(event => evaluationTerminal(event)
         && at(event.observedAt) >= at(start.observedAt)
@@ -197,19 +215,19 @@ export function decideRollingMassEvaluationApproval(input: {
     if (liveStart) continue
 
     const firstRolling = mine
-      .filter(event => event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)
+      .filter(event => inCurrentGeneration(event) && event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)
       .map(event => at(event.observedAt))
       .sort((a, b) => a - b)[0]
-    const failures = firstRolling === undefined ? 0 : mine.filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+    const failures = firstRolling === undefined ? 0 : mine.filter(event => inCurrentGeneration(event) && event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
       && at(event.observedAt) >= firstRolling
       && !evaluatorInfrastructureFailure(event)).length
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
     // Before the repair exists, preserve the historical circuit breaker. At/after the named repair epoch, only failures
     // from the repaired generation count so the fixed evaluator gets one honest retry without erasing prior evidence.
-    const infrastructureGenerationStart = nowMs >= MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
+    const infrastructureGenerationStart = Math.max(reopenedAt, nowMs >= MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
       ? MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
-      : Number.NEGATIVE_INFINITY
+      : Number.NEGATIVE_INFINITY)
     const recentErrors = mine
       .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
         && at(event.observedAt) >= infrastructureGenerationStart)
@@ -226,7 +244,7 @@ export function decideRollingMassEvaluationApproval(input: {
     }
 
     const controls = mine
-      .filter(event => event.verifier === 'host_controller'
+      .filter(event => inCurrentGeneration(event) && event.verifier === 'host_controller'
         && (event.evidence?.claim === 'distilled_independent_evaluation_approved' || event.evidence?.claim === 'distilled_independent_evaluation_suspended'))
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
     const latest = controls[0]
@@ -234,7 +252,7 @@ export function decideRollingMassEvaluationApproval(input: {
       && String(latest.evidence?.reason || '') === REPAIRED_SUSPENSION_REASON
     if (latest?.evidence?.claim === 'distilled_independent_evaluation_suspended' && !repairedSuspension) continue
     if (latest && latest.evidence?.claim === 'distilled_independent_evaluation_approved') {
-      const startedAfter = mine.some(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_started' && at(event.observedAt) >= at(latest.observedAt))
+      const startedAfter = mine.some(event => inCurrentGeneration(event) && event.evidence?.claim === 'mass_distilled_independent_evaluation_started' && at(event.observedAt) >= at(latest.observedAt))
       // An armed approval only reserves the slot while it is still CLAIMABLE. The claim validator accepts an approval
       // only at the current endpoint-call ceiling, so one issued under a previous ceiling can never start an attempt —
       // yet it used to hold the slot for its full 2h TTL, stalling the artifact for no reason. Production 2026-09-18

@@ -327,3 +327,12 @@ test('missing teacher work reroutes to another available provider instead of wai
   assert.ok(second.failures.every(item => item.teacherId === 'claude'))
 })
 
+
+
+test('dataset preparation excludes rows without a supervised prompt-response pair', () => {
+  assert.match(worker, /def supervised_pair\(row: dict\[str, Any\], text: str\)/)
+  assert.match(worker, /prompt, response = supervised_pair\(raw_row, text\)/)
+  assert.match(worker, /if not prompt or not response:\n\s+continue/)
+  assert.match(worker, /user_marker = "<user>\\n"/)
+  assert.match(worker, /assistant_marker = "\\n\\n<assistant>\\n"/)
+})

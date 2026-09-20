@@ -1,2 +1,2 @@
-base_sha=b2488bfd899a4bee28c4279a94563e51ac3dd4d2
-branch=fix/university-holdout-auth-order-20260920
+base_sha=8da6e4f569987db0370d281ba2ef7645bd3205dc
+branch=fix/university-eval-authorization-and-holdout-regression-20260920

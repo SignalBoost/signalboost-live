@@ -136,11 +136,32 @@ test('structured evaluator errors retain bounded code and message instead of [ob
 })
 
 
-test('hard rolling denials do not reach RunPod claim, preflight or wake', () => {
-  const denial = route.indexOf('if (hardRollingDenial)')
+test('every non-issued rolling decision exits before claim, RunPod preflight or wake', () => {
+  const denial = route.indexOf('if (!rolling.issued)')
   const claim = route.indexOf('claim = await claimNext()')
   const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
   const wake = route.indexOf('wakeMassDistilledRuntime(claim.endpointId')
   assert.ok(denial >= 0 && claim > denial && preflight > claim && wake > preflight)
   assert.match(route, /return NextResponse\.json\(\{ ok: true, skipped: true, reason: rolling\.reason \}\)/)
+  assert.doesNotMatch(route, /const hardRollingDenial/)
+})
+
+
+test('system-prefixed holdout rows remain parseable instead of blocking the backlog', () => {
+  assert.match(runner, /const opensWithUser=text\.startsWith\(prefix\)/)
+  assert.match(runner, /text\.indexOf\('\\n\\n'\+prefix\)/)
+  assert.match(runner, /if\(userAt<0\)return null/)
+  assert.match(runner, /if\(!opensWithUser\)text=text\.slice\(userAt\+2\)/)
+  assert.match(runner, /structuredPrompt&&structuredReference\?\{prompt:structuredPrompt,reference:structuredReference\}:parseTrainingText\(text\)/)
+})
+
+
+test('legacy invalid holdouts are terminally quarantined instead of retried', () => {
+  assert.match(route, /async function quarantineLegacyInvalidHoldout\(claim: MassEvaluationClaim\)/)
+  assert.match(route, /status: 'quarantined'/)
+  assert.match(route, /message === 'mass_distilled_evaluation_holdout_format_invalid'/)
+  assert.match(route, /terminalDataDefect: true/)
+  assert.match(route, /nextStatus: 'quarantined'/)
+  assert.match(route, /quarantined: true/)
+  assert.match(route, /\}, \{ status: 200 \}\)/)
 })

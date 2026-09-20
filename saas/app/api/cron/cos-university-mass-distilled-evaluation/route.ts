@@ -233,6 +233,17 @@ async function claimNext(): Promise<MassEvaluationClaim | null> {
   })
 }
 
+async function quarantineLegacyInvalidHoldout(claim: MassEvaluationClaim) {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const updated = await db.from('cos_local_distillation_artifacts')
+    .update({ status: 'quarantined', updated_at: new Date().toISOString() })
+    .eq('candidate_id', claim.candidateId)
+    .eq('trained_artifact_hash', claim.artifactHash)
+    .eq('status', 'evaluation_pending')
+  if (updated.error) throw updated.error
+}
+
 async function recordTerminal(input: {
   claim: MassEvaluationClaim
   eventClaim: typeof COMPLETED | typeof FAILED
@@ -301,12 +312,10 @@ export async function GET(req: NextRequest) {
 
     const rolling = await ensureRollingMassEvaluationApproval()
     console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
-    const hardRollingDenial = !rolling.issued && (
-      rolling.reason === 'rolling_mass_evaluation_authorization_disabled'
-      || rolling.reason === 'rolling_mass_evaluation_window_exhausted'
-      || rolling.reason === 'no_mass_artifact_pending'
-    )
-    if (hardRollingDenial) {
+    // No provider/runtime work may occur unless this invocation actually obtained rolling
+    // authorization. Treat every non-issued decision as a hard stop, not only today's known
+    // reason strings, so a new authority reason cannot accidentally fall through to claim/wake.
+    if (!rolling.issued) {
       await recordProduction(true, {
         runnerInvoked: false,
         skipped: true,
@@ -380,11 +389,19 @@ export async function GET(req: NextRequest) {
       ? String(error.stack || '').split('\n').filter(line => line.trim().startsWith('at ')).slice(0, 4)
         .map(line => clean(line.replace(/^\s*at\s+/, ''), 160)).filter(Boolean)
       : []
+    const legacyInvalidHoldout = message === 'mass_distilled_evaluation_holdout_format_invalid'
     if (claim) {
+      if (legacyInvalidHoldout) {
+        await quarantineLegacyInvalidHoldout(claim).catch(() => undefined)
+      }
       await recordTerminal({
         claim,
         eventClaim: FAILED,
-        evidence: { error: clean(message, 500), ...(frames.length ? { errorFrames: frames } : {}) },
+        evidence: {
+          error: clean(message, 500),
+          ...(legacyInvalidHoldout ? { terminalDataDefect: true, nextStatus: 'quarantined' } : {}),
+          ...(frames.length ? { errorFrames: frames } : {}),
+        },
       }).catch(() => undefined)
     }
     await recordProduction(false, {
@@ -394,6 +411,14 @@ export async function GET(req: NextRequest) {
       ...(claim ? { candidateId: claim.candidateId, artifactHash: claim.artifactHash } : {}),
     }).catch(() => undefined)
     console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: clean(message, 500) }))
+    if (claim && legacyInvalidHoldout) {
+      return NextResponse.json({
+        ok: false,
+        quarantined: true,
+        error: clean(message, 500),
+        nextStatus: 'quarantined',
+      }, { status: 200 })
+    }
     return NextResponse.json({ ok: false, error: clean(message, 500) }, { status: 500 })
   }
 }

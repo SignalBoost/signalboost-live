@@ -20,8 +20,8 @@ test('frontier distillation defaults to on-policy GKD with a bounded off-policy 
   })
   assert.equal(plan.profile, COS_UNIVERSITY_FRONTIER_DISTILLATION_PROFILE)
   assert.equal(plan.optimizer, 'gkd_on_policy')
-  assert.equal(plan.onPolicyFraction, 0.85)
-  assert.equal(plan.offPolicyAnchorFraction, 0.15)
+  assert.equal(plan.onPolicyFraction, 1)
+  assert.equal(plan.offPolicyAnchorFraction, 0)
   assert.equal(plan.beta, 0.5)
   assert.equal(plan.temperature, 0.8)
   assert.deepEqual(plan.frontierFaculty, ['openai', 'claude', 'gemini', 'grok'])
@@ -68,22 +68,34 @@ test('mass distillation carries the frontier plan into the governed training env
   assert.match(consumer, /readMassHostedTeacherRows/)
 })
 
-test('HF worker executes real GKD for frontier mass distillation and fails closed on tokenizer mismatch', () => {
+test('HF worker uses stable on-policy DistillationTrainer and fails closed on tokenizer mismatch', () => {
   const worker = source('../scripts/cos-university-hf-worker.py')
-  assert.match(worker, /from trl import GKDConfig, GKDTrainer, SFTConfig, SFTTrainer/)
-  assert.match(worker, /optimizer": "gkd_on_policy"/)
-  assert.match(worker, /studentGenerated|frontier_plan/)
-  assert.match(worker, /GKDTrainer\(/)
+  assert.match(worker, /from trl import DistillationConfig, DistillationTrainer, SFTConfig, SFTTrainer/)
+  assert.match(worker, /optimizer": "stable_on_policy_distillation"/)
+  assert.match(worker, /DistillationTrainer\(/)
   assert.match(worker, /teacher_model=teacher_model/)
-  assert.match(worker, /lmbda=recipe\["onPolicyFraction"\]/)
   assert.match(worker, /beta=recipe\["beta"\]/)
+  assert.match(worker, /max_completion_length=recipe\["maxNewTokens"\]/)
+  assert.match(worker, /use_bf16 = False/)
+  assert.match(worker, /compute_dtype = torch\.float16/)
   assert.match(worker, /worker_frontier_distillation_tokenizer_mismatch_requires_gold/)
   assert.match(worker, /legacy_bootstrap_sft/)
 })
 
-test('HF frontier runtime pins the validated TRL GKD API', () => {
+test('HF frontier runtime pins the stable TRL distillation API', () => {
   const jobs = source('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts')
-  assert.match(jobs, /'trl==0\.23\.0'/)
+  assert.match(jobs, /'trl==1\.10\.0'/)
+})
+
+test('HF worker reuses bounded Hub repositories and pins isolated run revisions', () => {
+  const worker = source('../scripts/cos-university-hf-worker.py')
+  assert.match(worker, /def _pooled_hub_repo/)
+  assert.match(worker, /api\.list_models\(author=namespace, search=prefix, limit=500, token=token\)/)
+  assert.match(worker, /api\.list_datasets\(author=namespace, search=prefix, limit=500, token=token\)/)
+  assert.match(worker, /branch_name = f"run-\{base\.sha256\(identity\)\[:24\]\}"/)
+  assert.match(worker, /revision=output_branch/)
+  assert.match(worker, /worker_repo_pool_unavailable_rate_limited/)
+  assert.doesNotMatch(worker, /output_repo = f"\{namespace\}\/itmounts-student-\{base\.sha256\(candidate_id \+ ':' \+ job_id\)\[:12\]\}"/)
 })
 
 

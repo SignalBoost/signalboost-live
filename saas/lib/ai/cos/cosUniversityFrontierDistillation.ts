@@ -100,12 +100,11 @@ export function buildFrontierDistillationPlan(input: {
 
   // GKD literature and TRL both support mixing on-policy student generations with a smaller
   // off-policy anchor fraction. Keep on-policy dominant; evaluation may later tune this empirically.
-  const onPolicyFraction = boundedFloat(
-    env.COS_UNIVERSITY_GKD_ON_POLICY_FRACTION,
-    0.85,
-    0.50,
-    1.00,
-  )
+  // Stable Production distillation is fully on-policy. The frontier faculty still provides
+  // curriculum/critique supervision, but the paid optimizer must not depend on the experimental
+  // mixed-rollout GKD surface. A future off-policy anchor can be reintroduced only after its own
+  // independently validated executor exists.
+  const onPolicyFraction = 1.0
   const beta = boundedFloat(env.COS_UNIVERSITY_GKD_BETA, 0.50, 0.00, 1.00)
   const temperature = boundedFloat(env.COS_UNIVERSITY_GKD_TEMPERATURE, 0.80, 0.10, 1.50)
   const maxNewTokens = boundedInt(env.COS_UNIVERSITY_GKD_MAX_NEW_TOKENS, 256, 64, 512)

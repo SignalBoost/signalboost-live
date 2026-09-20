@@ -42,7 +42,12 @@ const ENDPOINT_CALL_TIMEOUT_MS = 50_000
 // the provider-failure band, and still capped by withinDeadline against the route's remaining budget.
 // Scoring prompts, evaluator identity, call count, thresholds, and promotion authority are unchanged.
 const JUDGE_CALL_TIMEOUT_MS = 110_000
-const READY_TIMEOUT_MS = 235_000
+// Production 2026-09-20 readiness telemetry shows successful exact-artifact cold starts at 120.4s median,
+// 170.6s p90 and as late as 249.5s, while runtime_not_ready failures begin around 256s. The prior 235s
+// readiness window plus preflight/wake overhead therefore clipped a real transient cold-start band.
+// Extend only the readiness wait to 280s. maxDuration remains 600s, the route keeps a 25s reserve,
+// and endpoint/judge calls remain independently bounded, so this adds no worker, call, score or promotion authority.
+const READY_TIMEOUT_MS = 280_000
 const READY_POLL_MS = 3_000
 const ROUTE_RESERVE_MS = 25_000
 

@@ -94,9 +94,18 @@ function deploymentOrigin(env: Env): string | null {
 }
 
 function immutableWorkerOrigin(env: Env): string | null {
-  // An HF job can outlive the Vercel deployment that dispatched it. Always bind worker delivery
-  // to the immutable deployment hostname when VERCEL_URL exists; otherwise an old job can install
-  // dependency set A and later fetch worker B after the Production alias moves.
+  // Production's public origin must win over VERCEL_URL. Deployment-specific Vercel hosts can be
+  // protected before our capability-token route executes; HF then downloads Vercel login HTML
+  // instead of Python. The public route remains authenticated by the derived HF capability token.
+  const explicit = clean(env.ITMOUNTS_PUBLIC_ORIGIN || env.NEXT_PUBLIC_APP_URL, 2000)
+  if (explicit) {
+    try {
+      const url = new URL(explicit)
+      if (url.protocol === 'https:' && url.hostname && !url.username && !url.password && !url.hash) return url.origin
+    } catch {
+      return null
+    }
+  }
   const vercelHost = clean(env.VERCEL_URL, 1000)
   if (vercelHost) {
     try {
@@ -106,7 +115,7 @@ function immutableWorkerOrigin(env: Env): string | null {
       return null
     }
   }
-  return deploymentOrigin(env)
+  return null
 }
 
 export function deriveHuggingFaceTrainingExecutorSecret(token: string): string {
@@ -203,8 +212,9 @@ function requestDigest(input: TrainingEnvelope): string {
 function workerBootstrap(packages: readonly string[]): readonly string[] {
   const install = packages.map(item => JSON.stringify(item)).join(' ')
   const worker = `python -c "import os,base64,gzip,runpy; e=os.environ.pop('ITMOUNTS_TRAINING_REQUEST_GZIP_B64'); p='='*(-len(e)%4); raw=gzip.decompress(base64.urlsafe_b64decode(e+p)); assert len(raw)<=${MAX_WORKER_REQUEST_JSON_BYTES}; os.environ['ITMOUNTS_TRAINING_REQUEST_B64']=base64.urlsafe_b64encode(raw).rstrip(b'=').decode(); runpy.run_path('/tmp/itmounts_hf_worker.py', run_name='__main__')"`
+  const fetchWorker = `python -c "import os,urllib.request,pathlib; u=os.environ['ITMOUNTS_HF_WORKER_URL']; b=urllib.request.urlopen(u,timeout=30).read(); legacy=(b'ITMOUNTS_TRAINING_REQUEST' in b and b'HF_TOKEN' in b); wrapper=(b'BASE_WORKER_FILENAME' in b and b'BASE_CONTRACT_MARKERS' in b and b'base.main()' in b and b'HF_TOKEN' in b); assert legacy or wrapper, 'hf_worker_delivery_artifact_invalid'; pathlib.Path('/tmp/itmounts_hf_worker.py').write_bytes(b)"`
   const shell = [
-    `python -c "import os,urllib.request; urllib.request.urlretrieve(os.environ['ITMOUNTS_HF_WORKER_URL'],'/tmp/itmounts_hf_worker.py')"`,
+    fetchWorker,
     `pip install --quiet --disable-pip-version-check --no-cache-dir ${install}`,
     worker,
   ].join(' && ')

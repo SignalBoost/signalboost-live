@@ -10,6 +10,7 @@ import {
 } from '@/lib/ai/cos/cosReasoningControlPlane'
 import {
   boundedRoleMaxTokens,
+  COS_ROLE_TOKEN_CAPS,
   selectCosReasoningWorkerRole,
   type CosReasoningRoleDecision,
   type CosSpecialistRole,
@@ -61,7 +62,11 @@ function roleSystemPrompt(request: CosReasoningRequest, role: CosSpecialistRole)
 
 function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistRole): LocalModelCallArgs {
   const systemPrompt = roleSystemPrompt(request, role)
-  const maxTokens = boundedRoleMaxTokens(role, request.maxTokens)
+  const deterministicControl = request.disableThinking === true && request.jsonObject === true
+  const requestedTokens = Number(request.maxTokens)
+  const maxTokens = deterministicControl && Number.isFinite(requestedTokens) && requestedTokens > 0
+    ? Math.max(8, Math.min(Math.floor(requestedTokens), COS_ROLE_TOKEN_CAPS[role]))
+    : boundedRoleMaxTokens(role, request.maxTokens)
   return {
     prompt: request.prompt,
     ...(systemPrompt === undefined ? {} : { systemPrompt }),

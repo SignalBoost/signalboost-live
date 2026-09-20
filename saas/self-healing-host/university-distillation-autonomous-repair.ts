@@ -6,6 +6,7 @@ import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-
 import { signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import {
   UNIVERSITY_DISTILLATION_HEALTH_ERROR_CODE,
+  readUniversityMassDistillationHealth,
 } from './university-distillation-monitoring.ts'
 
 const RETRY_SUPPRESSION_MS = 15 * 60 * 1000
@@ -232,6 +233,57 @@ export async function retryFailedUniversityDistillationRepair(admin: any): Promi
     .maybeSingle()
   if (active.error) return { retried: false, jobId: '', sourceJobId: '', attempt: 0, error: `university_self_healing_active_lookup_failed:${active.error.message}` }
   if (active.data?.id) return { retried: false, jobId: String(active.data.id), sourceJobId: '', attempt: 0, error: '' }
+
+  // A failed code-repair attempt is not authority to keep editing forever. Re-observe the governed
+  // Production health state before every retry. If the operational incident has recovered (or moved
+  // into a non-repair state such as waiting_for_curriculum/budget_paused), permanently suppress the
+  // stale failed repair so a later unrelated incident must create its own fresh, evidence-bound job.
+  let health
+  try {
+    health = await readUniversityMassDistillationHealth({ db: admin })
+  } catch (error) {
+    return {
+      retried: false,
+      jobId: '',
+      sourceJobId: '',
+      attempt: 0,
+      error: `university_self_healing_retry_health_read_failed:${error instanceof Error ? error.message : 'unknown'}`,
+    }
+  }
+
+  if (health.state !== 'repair_required') {
+    const stale = await admin.from('builder_jobs')
+      .select('id,metadata,updated_at')
+      .eq('status', 'failed')
+      .eq('job_kind', 'standard')
+      .eq('owner_authorized', true)
+      .contains('metadata', { selfHealingUniversityDistillation: true })
+      .order('updated_at', { ascending: true })
+      .limit(20)
+    if (stale.error) {
+      return { retried: false, jobId: '', sourceJobId: '', attempt: 0, error: `university_self_healing_retry_suppression_read_failed:${stale.error.message}` }
+    }
+
+    const suppressedAt = new Date().toISOString()
+    for (const candidate of stale.data || []) {
+      const metadata = candidate?.metadata && typeof candidate.metadata === 'object' && !Array.isArray(candidate.metadata)
+        ? candidate.metadata
+        : {}
+      if (metadata.universityRepairRetryClaimedAt) continue
+      await admin.from('builder_jobs').update({
+        metadata: {
+          ...metadata,
+          universityRepairRetryClaimedAt: suppressedAt,
+          universityRepairRetrySuppressedAt: suppressedAt,
+          universityRepairRetrySuppressedReason: 'production_health_recovered_before_retry',
+          universityRepairRetrySuppressedHealthState: health.state,
+          universityRepairRetrySuppressedHealthReasons: health.reasons,
+        },
+      }).eq('id', candidate.id).eq('status', 'failed').eq('updated_at', candidate.updated_at)
+    }
+
+    return { retried: false, jobId: '', sourceJobId: '', attempt: 0, error: '' }
+  }
 
   const failed = await admin.from('builder_jobs')
     .select('id,user_id,objective,metadata,error,updated_at')

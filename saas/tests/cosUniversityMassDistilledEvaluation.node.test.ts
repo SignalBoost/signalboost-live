@@ -79,7 +79,8 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   // Endpoint/model naming moved out of the evaluator into the provisioner; assert it where it lives.
   assert.match(provision, /itmounts-mass-distilled-\$\{suffix\}/)
   assert.match(runner, /payload\?\.ready===true/)
-  assert.match(runner, /const READY_TIMEOUT_MS = 235_000/)
+  assert.match(runner, /const READY_TIMEOUT_MS = 280_000/)
+  assert.match(runner, /const ROUTE_RESERVE_MS = 25_000/)
   assert.match(runner, /teacherModelId/)
   assert.match(runner, /evaluatorIds\.has\(training\.teacherModelId\)/)
 })

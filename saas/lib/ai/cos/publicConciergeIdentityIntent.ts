@@ -47,6 +47,7 @@ const MAX_IDENTITY_PROMPT_CHARS = 300
 
 const SEMANTIC_IDENTITY_CANDIDATE = [
   /\b(?:who|what) (?:are|is) (?:you|this (?:service|platform|company))\b/i,
+  /\b(?:what|which) (?:service|platform|company|site)\b/i,
   /\b(?:your|our|this) (?:name|company|platform|brand|employer)\b/i,
   /\b(?:who (?:owns|operates|employs)|work for|called)\b/i,
   /\b(?:quien|cual|como)\b[^\n]{0,80}\b(?:asistente|empresa|plataforma|marca|empleador|llama)\b/i,

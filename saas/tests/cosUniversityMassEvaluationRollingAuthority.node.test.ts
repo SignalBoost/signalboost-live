@@ -415,3 +415,24 @@ test('mass evaluator evidence reads have a candidate-first fine_tune index', () 
   assert.match(route, /\.in\('candidate_id', candidateIds\)/)
   assert.match(route, /\.gte\('observed_at', new Date\(Date\.now\(\) - 30 \* 86_400_000\)\.toISOString\(\)\)/)
 })
+
+
+test('frontier proof claim priority is enforced atomically before returning to oldest-first', () => {
+  const migration = readFileSync(
+    new URL('../supabase/migrations/20260920222000_frontier_evaluation_atomic_claim_priority.sql', import.meta.url),
+    'utf8',
+  )
+  assert.match(migration, /v_frontier_starts integer := 0/)
+  assert.match(migration, /cos_university_frontier_gkd_v1/)
+  assert.match(migration, /v_frontier_starts < 4/)
+  assert.match(
+    migration,
+    /case[\s\S]*v_frontier_starts < 4[\s\S]*cos_university_frontier_gkd_v1[\s\S]*then 0 else 1[\s\S]*a\.created_at asc/i,
+  )
+  assert.match(migration, /v_active_reservations >= 4/)
+  assert.match(migration, /a\.created_at <= v_now - interval '12 hours'/)
+  assert.match(migration, /v_max_endpoint<>18/)
+  assert.match(migration, /v_max_judge<>4/)
+  assert.match(migration, /v_max_wake<>1/)
+  assert.match(migration, /v_max_cost>0\.200000/)
+})

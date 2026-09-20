@@ -78,8 +78,11 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // Prepared holdouts may preserve immutable source text in a legacy shape while carrying the
     // canonical prompt/response as structured columns. Rejecting that transport shape is an
     // evaluator compatibility defect, not evidence about model quality.
-    || error === 'mass_distilled_evaluation_holdout_format_invalid'
-    || error.startsWith('mass_distilled_evaluation_legacy_hosted_')
+    // 2026-09-20: the evaluator now appends a structural fingerprint (cols/len/opens/user/assistant) so the
+    // offending row shape can be identified without reading the pinned dataset. Match by prefix, or every
+    // fingerprinted failure would fall through to model-quality handling and wrongly consume the artifact's
+    // substantive-attempt budget and the 24h rolling approval window.
+    || error.startsWith('mass_distilled_evaluation_holdout_format_invalid')
     // The pre-fix evaluator reconstructed a bare hash-only candidate name. The exact runtime serves a runtime-keyed alias,
     // so this 404 proves evaluator/runtime identity drift, not model quality. Keep the exclusion narrow to that known shape.
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)

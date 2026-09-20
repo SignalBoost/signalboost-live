@@ -337,10 +337,21 @@ export async function GET(req: NextRequest) {
 
     const rolling = await ensureRollingMassEvaluationApproval()
     console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
-    // No provider/runtime work may occur unless this invocation actually obtained rolling
-    // authorization. Treat every non-issued decision as a hard stop, not only today's known
-    // reason strings, so a new authority reason cannot accidentally fall through to claim/wake.
-    if (!rolling.issued) {
+    // A previous tick may already have issued a bounded approval that has not yet been atomically
+    // claimed. Draining that approval does not mint new authority or expand spend: claimNext() re-validates
+    // the exact unexpired approval, canary, artifact identity, 18-call ceiling, 4 judge calls, 1 wake and
+    // <= $0.20 wake budget under the database advisory lock.
+    //
+    // Only the two queue-state reasons below may fall through to the existing-approval claim path:
+    // - no_mass_artifact_eligible_for_rolling_evaluation: commonly means every eligible artifact is already armed;
+    // - rolling_mass_evaluation_window_exhausted: no NEW approval may be issued, but already-issued approvals
+    //   inside that same window must still be allowed to execute.
+    //
+    // The authorization kill switch, no-pending-work state and any future/unknown denial remain fail-closed.
+    const mayDrainExistingApproval = !rolling.issued
+      && (rolling.reason === 'no_mass_artifact_eligible_for_rolling_evaluation'
+        || rolling.reason === 'rolling_mass_evaluation_window_exhausted')
+    if (!rolling.issued && !mayDrainExistingApproval) {
       await recordProduction(true, {
         runnerInvoked: false,
         skipped: true,

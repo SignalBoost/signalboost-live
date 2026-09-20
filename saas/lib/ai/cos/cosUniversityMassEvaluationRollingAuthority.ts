@@ -199,6 +199,107 @@ function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly 
   return !evaluatorInfrastructureFailure(terminal)
 }
 
+type ArtifactHistory = Readonly<{
+  mine: readonly RollingEvent[]
+  inCurrentGeneration: (event: RollingEvent) => boolean
+  hasVerdict: boolean
+  liveStart: boolean
+  substantiveFailures: number
+  lastError: string
+}>
+
+// Shared by the approval decision and the exhaustion sweep so the two can never disagree about how many real
+// attempts an artifact has spent. Divergence here would either strand an artifact that still has budget or
+// dispose one that does not.
+function artifactHistory(artifact: RollingArtifact, events: readonly RollingEvent[], nowMs: number): ArtifactHistory {
+  const hash = artifact.artifactHash.toLowerCase()
+  const mine = events.filter(event => event.candidateId === artifact.candidateId
+    && String(event.evidence?.artifactHash || '').toLowerCase() === hash)
+
+  const reopenedAt = mine
+    .filter(event => event.verifier === 'host_controller'
+      && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
+      && event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF)
+    .map(event => at(event.observedAt))
+    .filter(Number.isFinite)
+    .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY
+  const inCurrentGeneration = (event: RollingEvent) => at(event.observedAt) >= reopenedAt
+
+  const hasVerdict = mine.some(event => inCurrentGeneration(event)
+      && event.verifier === 'independent_scorer'
+      && event.evidence?.claim === 'independent_evaluation')
+    || mine.some(event => inCurrentGeneration(event)
+      && event.evidence?.claim === 'mass_distilled_independent_evaluation_completed')
+
+  const liveStart = Boolean(mine
+    .filter(event => inCurrentGeneration(event) && evaluationStarted(event) && at(event.expiresAt) > nowMs)
+    .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+    .find(start => !mine.some(event => evaluationTerminal(event)
+      && at(event.observedAt) >= at(start.observedAt)
+      && at(event.observedAt) <= nowMs)))
+
+  const firstRolling = mine
+    .filter(event => inCurrentGeneration(event) && event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)
+    .map(event => at(event.observedAt))
+    .sort((a, b) => a - b)[0]
+  const substantiveFailures = firstRolling === undefined ? 0 : mine.filter(event => inCurrentGeneration(event)
+    && event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+    && at(event.observedAt) >= firstRolling
+    && !evaluatorInfrastructureFailure(event)).length
+
+  const lastError = mine
+    .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed')
+    .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+    .map(event => String(event.evidence?.error || '').trim())[0] || ''
+
+  return Object.freeze({ mine, inCurrentGeneration, hasVerdict, liveStart, substantiveFailures, lastError })
+}
+
+export type ExhaustedMassEvaluationArtifact = Readonly<{
+  candidateId: string
+  subjectId: string
+  artifactHash: string
+  reason: typeof MASS_EVALUATION_EXHAUSTED_REASON
+  failedAttempts: number
+  lastError: string
+}>
+
+export const MASS_EVALUATION_EXHAUSTED_REASON = 'substantive_evaluation_attempts_exhausted' as const
+
+// An artifact that has spent its substantive attempt budget can never be approved again - only a
+// hand-inserted reopen event releases it - yet nothing ever moved it out of `evaluation_pending`. It stayed
+// in the lane's selection window forever, reported as waiting while no tick could ever pick it, and because
+// that window is the OLDEST 50 pending rows, enough of them at the front of the queue starve every newer
+// artifact behind them. Naming them here lets the caller give them a terminal status and a recorded reason,
+// which is also what makes a real failure visible to curriculum work instead of silently disappearing.
+//
+// This decides nothing about quality and grants nothing: it reports artifacts the approval policy has
+// already refused permanently, using the same counter that refused them.
+export function decideExhaustedMassEvaluationArtifacts(input: {
+  artifacts: readonly RollingArtifact[]
+  events: readonly RollingEvent[]
+  now: Date
+}): readonly ExhaustedMassEvaluationArtifact[] {
+  const nowMs = input.now.getTime()
+  const exhausted: ExhaustedMassEvaluationArtifact[] = []
+  for (const artifact of input.artifacts) {
+    if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
+    const history = artifactHistory(artifact, input.events, nowMs)
+    // A verdict has its own lifecycle write, and a live run must be left alone.
+    if (history.hasVerdict || history.liveStart) continue
+    if (history.substantiveFailures < MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
+    exhausted.push(Object.freeze({
+      candidateId: artifact.candidateId,
+      subjectId: artifact.subjectId,
+      artifactHash: artifact.artifactHash.toLowerCase(),
+      reason: MASS_EVALUATION_EXHAUSTED_REASON,
+      failedAttempts: history.substantiveFailures,
+      lastError: history.lastError.slice(0, 500),
+    }))
+  }
+  return Object.freeze(exhausted)
+}
+
 export function decideRollingMassEvaluationApproval(input: {
   enabled: boolean
   artifacts: readonly RollingArtifact[]
@@ -220,9 +321,8 @@ export function decideRollingMassEvaluationApproval(input: {
     if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
     if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) continue
     const hash = artifact.artifactHash.toLowerCase()
-    const mine = input.events.filter(event => event.candidateId === artifact.candidateId
-      && String(event.evidence?.artifactHash || '').toLowerCase() === hash)
-
+    const history = artifactHistory(artifact, input.events, nowMs)
+    const mine = history.mine
     const reopenedAt = mine
       .filter(event => event.verifier === 'host_controller'
         && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
@@ -230,10 +330,9 @@ export function decideRollingMassEvaluationApproval(input: {
       .map(event => at(event.observedAt))
       .filter(Number.isFinite)
       .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY
-    const inCurrentGeneration = (event: RollingEvent) => at(event.observedAt) >= reopenedAt
+    const inCurrentGeneration = history.inCurrentGeneration
 
-    if (mine.some(event => inCurrentGeneration(event) && event.verifier === 'independent_scorer' && event.evidence?.claim === 'independent_evaluation')) continue
-    if (mine.some(event => inCurrentGeneration(event) && event.evidence?.claim === 'mass_distilled_independent_evaluation_completed')) continue
+    if (history.hasVerdict) continue
 
     const canary = mine.some(event => event.verifier === 'host_production_verifier'
       && event.evidence?.claim === 'production_canary_healthy'
@@ -243,21 +342,9 @@ export function decideRollingMassEvaluationApproval(input: {
 
     // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.
     // Do not mint another approval while this exact artifact already has a live started reservation.
-    const liveStart = mine
-      .filter(event => inCurrentGeneration(event) && evaluationStarted(event) && at(event.expiresAt) > nowMs)
-      .sort((a, b) => at(b.observedAt) - at(a.observedAt))
-      .find(start => !mine.some(event => evaluationTerminal(event)
-        && at(event.observedAt) >= at(start.observedAt)
-        && at(event.observedAt) <= nowMs))
-    if (liveStart) continue
+    if (history.liveStart) continue
 
-    const firstRolling = mine
-      .filter(event => inCurrentGeneration(event) && event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)
-      .map(event => at(event.observedAt))
-      .sort((a, b) => a - b)[0]
-    const failures = firstRolling === undefined ? 0 : mine.filter(event => inCurrentGeneration(event) && event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
-      && at(event.observedAt) >= firstRolling
-      && !evaluatorInfrastructureFailure(event)).length
+    const failures = history.substantiveFailures
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
     // Before the repair exists, preserve the historical circuit breaker. At/after the named repair epoch, only failures

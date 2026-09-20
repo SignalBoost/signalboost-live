@@ -330,6 +330,7 @@ test('missing teacher work reroutes to another available provider instead of wai
 
 
 test('dataset preparation excludes rows without a supervised prompt-response pair', () => {
+  const worker = fs.readFileSync(path.join(import.meta.dirname, '../scripts/cos-university-hf-worker-base.py'), 'utf8')
   assert.match(worker, /def supervised_pair\(row: dict\[str, Any\], text: str\)/)
   assert.match(worker, /prompt, response = supervised_pair\(raw_row, text\)/)
   assert.match(worker, /if not prompt or not response:\n\s+continue/)

@@ -114,7 +114,6 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
   const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
   const startedAt=Date.now()
-  const cognitiveMode=fastAuthoringCognitiveMode(input)
   for(const model of models){
     const remaining=Math.max(0,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt))
     if(remaining<1_000)break
@@ -139,7 +138,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
       const reasonerLabel=provider&&provider!=='self_hosted'
         ? `managed-open-model:${provider}:${model}`
         : `independent-local:${model}`
-      return{reply,reasonerLabel,cognitiveMode}
+      return{reply,reasonerLabel}
     }
   }
   return null
@@ -163,6 +162,7 @@ async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabe
   const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
   const startedAt=Date.now()
+  const cognitiveMode=fastAuthoringCognitiveMode(input)
   for(const model of models){
     const remaining=Math.max(0,FAST_AUTHORING_TIMEOUT_MS-(Date.now()-startedAt))
     if(remaining<1_000)break
@@ -193,7 +193,7 @@ async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabe
       const reasonerLabel=provider&&provider!=='self_hosted'
         ? `managed-open-model:${provider}:${model}`
         : `independent-local:${model}`
-      return{reply,reasonerLabel}
+      return{reply,reasonerLabel,cognitiveMode}
     }
   }
   return null

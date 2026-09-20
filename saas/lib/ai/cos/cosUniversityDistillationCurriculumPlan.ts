@@ -117,7 +117,10 @@ export function buildMassDistillationReplenishmentGaps(
         id: `distillation-curriculum:${subject.id}:q${queryIndex + 1}`,
         subject: subject.title,
         question: `What rigorous, reusable ${lens} strengthen ${theme} within ${subject.title}?`,
-        discoveryQuery: `${theme} ${lens} ${subject.title}`,
+        // OpenAlex compacts every query to its first eight terms. Keep the canonical University
+        // subject first so long themes/lenses cannot truncate the domain anchor and return unrelated
+        // rights-cleared papers that the strict title admission layer must later discard.
+        discoveryQuery: `${subject.title} ${theme} ${lens}`,
         portableIds: ['cos'],
         expectedReuse: 100,
         expectedAvoidedCostUsd: 10,

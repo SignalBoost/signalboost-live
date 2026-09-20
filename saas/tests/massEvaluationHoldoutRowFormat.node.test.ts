@@ -70,6 +70,22 @@ test('the writer still emits the role-block shape this parser now accepts', () =
   assert.match(WORKER, /<user>\\n\{prompt\}\\n\\n<assistant>\\n\{answer\}/)
 })
 
+test('an unparsed row reports its structure so the shape can be identified without reading the dataset', () => {
+  // Production 2026-09-20 01:25-01:29: holdout_format_invalid repeated every two minutes, each attempt
+  // consuming a rolling claim, and named nothing about the offending row - so the real shape could not be
+  // told apart from the one already fixed. The error now carries structure and never content.
+  assert.match(SOURCE, /mass_distilled_evaluation_holdout_format_invalid:\$\{shape\}/)
+  assert.match(SOURCE, /cols=\$\{\[structuredPrompt\?'prompt':''/)
+  assert.match(SOURCE, /len=\$\{text\.length\}/)
+  assert.match(SOURCE, /opens=\$\{opener\?opener\[1\]\.toLowerCase\(\):'plain'\}/)
+  assert.match(SOURCE, /user=\$\{text\.includes\('<user>/)
+  assert.match(SOURCE, /assistant=\$\{marker>=0\?1:0\}/)
+  // Structure only: the row's own text must never be interpolated into the error.
+  const thrown = SOURCE.slice(SOURCE.indexOf('if(!parsed){'), SOURCE.indexOf('observed.push(itemHash)'))
+  assert.doesNotMatch(thrown, /\$\{text\}/)
+  assert.doesNotMatch(thrown, /text\.slice\(/)
+})
+
 test('holdout integrity and count checks are untouched by the parse widening', () => {
   // Widening what parses must never widen what is trusted.
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_integrity_failed/)

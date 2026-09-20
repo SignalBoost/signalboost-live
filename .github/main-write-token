@@ -1,2 +1,2 @@
-base_sha=00d7276edd254950f3e6739f3e97286a3d430dd9
-branch=fix/mass-evaluator-runpod-timeout-recovery-v3
+base_sha=5427b51364b2a39e79b2f8e446a2fc789786b32e
+branch=rollback/restore-20260920-1922-good

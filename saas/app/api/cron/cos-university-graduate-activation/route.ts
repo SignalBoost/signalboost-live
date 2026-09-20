@@ -393,6 +393,17 @@ export async function GET(req: NextRequest) {
     const rollbackProof = await proveNextGraduateRollback()
 
     if (String(process.env[ACTIVATION_ENABLED_FLAG] || '').trim() !== 'true') {
+      await recordCosUniversityProductionPath({
+        path: 'graduate_runtime_activation',
+        invocationSucceeded: true,
+        evidence: {
+          skipped: true,
+          reason: 'graduate_activation_disabled',
+          lifecycleSync,
+          massRegistration,
+          rollbackProof,
+        },
+      })
       return NextResponse.json({ ok: true, skipped: true, reason: 'graduate_activation_disabled', lifecycleSync, massRegistration, rollbackProof })
     }
 
@@ -436,6 +447,17 @@ export async function GET(req: NextRequest) {
     }
 
     if (!graduate) {
+      await recordCosUniversityProductionPath({
+        path: 'graduate_runtime_activation',
+        invocationSucceeded: true,
+        evidence: {
+          skipped: true,
+          reason: 'no_pending_runtime_or_primary_upgrade_candidate',
+          lifecycleSync,
+          massRegistration,
+          rollbackProof,
+        },
+      })
       return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_or_primary_upgrade_candidate', lifecycleSync, massRegistration, rollbackProof })
     }
 
@@ -455,6 +477,20 @@ export async function GET(req: NextRequest) {
       ?? await resolveGraduateWorkerScope(canonicalSubjectId, baseScope)
     const scope = scopeDecision.scope
     if (graduate.status === 'active' && !scopeDecision.cosPrimary) {
+      await recordCosUniversityProductionPath({
+        path: 'graduate_runtime_activation',
+        invocationSucceeded: true,
+        evidence: {
+          skipped: true,
+          reason: scopeDecision.primaryGate,
+          candidateId: graduate.candidate_id,
+          subjectId: canonicalSubjectId,
+          cosPrimary: false,
+          lifecycleSync,
+          massRegistration,
+          rollbackProof,
+        },
+      })
       return NextResponse.json({
         ok: true,
         skipped: true,

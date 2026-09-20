@@ -25,6 +25,8 @@ import { recordBuilderUniversityProductionOutcome } from './university-outcome.t
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
+const SELF_HEALING_REPOSITORY_BUDGET_MS = 285_000
+const MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS = 3
 
 function selfHealingCapacityJob(job: BuilderJobRecord): boolean {
   return job.ownerAuthorized && (
@@ -34,19 +36,30 @@ function selfHealingCapacityJob(job: BuilderJobRecord): boolean {
   )
 }
 
-function capacityDeferrable(error: string | null, trace: readonly unknown[]): error is 'builder_runpod_primary_busy' | 'builder_turn_timeout' {
-  return error === 'builder_runpod_primary_busy'
-    || (error === BUILDER_TURN_TIMEOUT_ERROR && trace.length === 0)
+type SelfHealingDeferralReason = 'builder_runpod_primary_busy' | 'builder_turn_timeout' | 'builder_model_round_timeout'
+
+function metadataCount(job: BuilderJobRecord, key: string): number {
+  const value = Number(job.metadata[key])
+  return Number.isInteger(value) && value >= 0 ? value : 0
+}
+
+function capacityDeferrable(job: BuilderJobRecord, error: string | null): error is SelfHealingDeferralReason {
+  if (error === 'builder_runpod_primary_busy') return true
+  if (error !== BUILDER_TURN_TIMEOUT_ERROR && error !== 'builder_model_round_timeout') return false
+  return metadataCount(job, 'builderExecutionTimeoutDeferrals') < MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS
 }
 
 async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | null, trace: readonly unknown[]): Promise<boolean> {
-  if (!selfHealingCapacityJob(job) || !capacityDeferrable(error, trace)) return false
+  if (!selfHealingCapacityJob(job) || !capacityDeferrable(job, error)) return false
   const deferred = await deferBuilderJobForCapacity({ job, reason: error })
   if (deferred) {
     console.info('[builder_self_healing_capacity_deferred]', {
       jobId: job.id,
       claimGeneration: job.claimGeneration,
       reason: error,
+      productiveTraceSteps: trace.length,
+      executionTimeoutDeferrals: metadataCount(job, 'builderExecutionTimeoutDeferrals')
+        + (error === 'builder_runpod_primary_busy' ? 0 : 1),
     })
   }
   return deferred
@@ -245,6 +258,9 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         rawObjective: job.objective,
         workspaceId: job.workspaceId,
         target,
+        ...(selfHealingCapacityJob(job)
+          ? { deadlineAtMs: Date.now() + SELF_HEALING_REPOSITORY_BUDGET_MS }
+          : {}),
         // Null when Vercel credentials are absent, which auto-merge refuses on.
         snapshotPort: builderAutoMergeSnapshotPort(),
       })

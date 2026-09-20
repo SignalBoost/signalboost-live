@@ -40,3 +40,11 @@ test('browser polling is bounded to about thirty seconds and never controls exec
   assert.match(boundary, /method: 'GET'/)
   assert.match(boundary, /The page does not wait for the entire debug lifecycle/)
 })
+
+
+test('Self-Healing repository repairs may use most of the 300s worker without crossing it', () => {
+  const selfHealingBudget = numericConstant(runner, 'SELF_HEALING_REPOSITORY_BUDGET_MS')
+  assert.ok(selfHealingBudget >= 280_000)
+  assert.ok(selfHealingBudget < 300_000)
+  assert.match(runner, /selfHealingCapacityJob\(job\)[\s\S]*deadlineAtMs: Date\.now\(\) \+ SELF_HEALING_REPOSITORY_BUDGET_MS/)
+})

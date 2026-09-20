@@ -104,9 +104,10 @@ test('restores only the canary-proven endpoint capacity after identity resolutio
 })
 
 
-test('active graduate routing matches the University subject classifier as well as legacy problem classes', () => {
+test('active graduate routing matches University subjects and accepts pre-namespace active scopes', () => {
   assert.match(runtime, /classifyCosUniversitySubjects/)
   assert.match(runtime, /const universitySubjects = classifyCosUniversitySubjects\(objective\)/)
   assert.match(runtime, /problemClasses\.includes\(\`university:\$\{subjectId\}\`\)/)
+  assert.match(runtime, /problemClasses\.includes\(subjectId\)/)
   assert.match(runtime, /problemClasses\.includes\(problemClass\)[\s\S]{0,100}universityScoped/)
 })

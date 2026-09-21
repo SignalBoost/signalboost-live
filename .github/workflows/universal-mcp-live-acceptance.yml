@@ -10,9 +10,11 @@ on:
       - 'saas/provider-hub-host/mcp-streamable-http-transport.ts'
       - 'saas/provider-hub-host/universal-mcp-profiles.ts'
       - 'saas/provider-hub-host/universal-mcp-gateway.ts'
+      - 'saas/provider-hub-host/mcp-certification.ts'
       - 'saas/provider-hub-host/mcp-gateway-audit.ts'
       - 'saas/scripts/mcp-gateway/run-universal-mcp-acceptance.ts'
       - 'saas/tests/providerHubMcpHttpTransport.node.test.ts'
+      - 'saas/tests/mcpCertification.node.test.ts'
       - 'saas/tests/universalMcpGateway.node.test.ts'
   push:
     branches: [main]
@@ -23,6 +25,7 @@ on:
       - 'saas/provider-hub-host/mcp-streamable-http-transport.ts'
       - 'saas/provider-hub-host/universal-mcp-profiles.ts'
       - 'saas/provider-hub-host/universal-mcp-gateway.ts'
+      - 'saas/provider-hub-host/mcp-certification.ts'
       - 'saas/provider-hub-host/mcp-gateway-audit.ts'
       - 'saas/scripts/mcp-gateway/run-universal-mcp-acceptance.ts'
 

@@ -1,2 +1,2 @@
-base_sha=293a3420327f2db46152337befdc6db074f44b40
-branch=fix/cos-live-travel-planning-grounding-v4-20260921
+base_sha=70643555976c0a3bb2e3b264d2f3f285d845dd8b
+branch=ci/pr-run-concurrency-20260921

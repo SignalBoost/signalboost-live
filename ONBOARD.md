@@ -35,6 +35,17 @@ Changing `SignalBoost/signalboost-live` between public and private must **not** 
 - Repository privacy is a governance choice, not an availability switch.
 
 
+## Supabase Disk I/O saturation runbook — 2026-09-20/21 UTC
+
+Production experienced Supabase Disk I/O budget exhaustion while the Pro project was still running on legacy **Nano** compute. The database was about 505 MB with CPU near 93%, memory near 74%, and Disk I/O at 100%; storage capacity itself was not exhausted. The immediate Production repair was to resize the database from **Nano to Small**, then verify the Postgres restart/effective tier from SQL and confirm normal live activity.
+
+Do not infer a runaway learning loop merely from large historical write/WAL counters. In this incident, roughly 10.9k learned-corpus embedding updates were later matched almost one-for-one by rows legitimately embedded in the current model space, so the suspected embedding rewrite loop was not established.
+
+If the Disk I/O warning recurs, follow `docs/runbooks/supabase-disk-io-budget-exhaustion.md` before changing University, Self-Healing, embedding, audit, or evidence semantics. Restore infrastructure headroom when the compute tier is undersized, use bounded SQL diagnostics, distinguish disk capacity from Disk I/O capacity, distinguish legitimate batch work from redundant writes, and preserve immutable governance/evaluation evidence. Do not delete evidence, disable learning, add read replicas, or buy extra IOPS as a first reaction without measurements.
+
+For the current workload, **Small is the Production compute floor until live measurements justify a deliberate change**. Future engineers must verify current Supabase tier limits and pricing rather than assuming the 2026 limits are permanent.
+
+
 ## University graduate adoption loop invariant — 2026-09-20
 
 Training is not operationally complete when a distilled artifact merely exists. The canonical closed loop is:

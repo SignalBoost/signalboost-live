@@ -504,7 +504,7 @@ def _frontier_distillation_plan(base, envelope: dict[str, Any], base_model: str)
     plan = envelope.get("distillationPlan")
     if not isinstance(plan, dict):
         return None
-    if base.clean(plan.get("profile"), 120) != "cos-university-frontier-adaptive-distillation-v1":
+    if base.clean(plan.get("profile"), 120) != "cos-university-frontier-adaptive-distillation-v2":
         raise RuntimeError("worker_frontier_distillation_profile_invalid")
     if base.clean(plan.get("optimizer"), 80) != "gkd_on_policy":
         raise RuntimeError("worker_frontier_distillation_optimizer_invalid")
@@ -519,11 +519,24 @@ def _frontier_distillation_plan(base, envelope: dict[str, Any], base_model: str)
     if teacher_license != "apache-2.0":
         raise RuntimeError("worker_frontier_distillation_teacher_rights_invalid")
 
-    on_policy_fraction = float(plan.get("onPolicyFraction", 0.85))
+    on_policy_fraction = float(plan.get("onPolicyFraction", 1.0))
+    frontier_faculty = [
+        base.clean(value, 80)
+        for value in plan.get("frontierFaculty", [])
+        if base.clean(value, 80)
+    ][:32] if isinstance(plan.get("frontierFaculty"), list) else []
+    anchor_required = plan.get("frontierResponseAnchorRequired") is True
+    anchor_epochs = float(plan.get("frontierResponseAnchorEpochs", 0))
+    if bool(frontier_faculty) != anchor_required:
+        raise RuntimeError("worker_frontier_response_anchor_contract_invalid")
+    if anchor_required and anchor_epochs != 1.0:
+        raise RuntimeError("worker_frontier_response_anchor_epochs_invalid")
+    if not anchor_required and anchor_epochs != 0.0:
+        raise RuntimeError("worker_frontier_response_anchor_epochs_invalid")
     beta = float(plan.get("beta", 0.5))
     temperature = float(plan.get("temperature", 0.8))
     max_new_tokens = int(plan.get("maxNewTokens", 256))
-    if not 0.50 <= on_policy_fraction <= 1.0:
+    if on_policy_fraction != 1.0:
         raise RuntimeError("worker_frontier_distillation_on_policy_fraction_invalid")
     if not 0.0 <= beta <= 1.0:
         raise RuntimeError("worker_frontier_distillation_beta_invalid")
@@ -539,14 +552,12 @@ def _frontier_distillation_plan(base, envelope: dict[str, Any], base_model: str)
         "teacherRevision": teacher_revision,
         "onPolicyFraction": on_policy_fraction,
         "offPolicyAnchorFraction": round(1.0 - on_policy_fraction, 6),
+        "frontierResponseAnchorRequired": anchor_required,
+        "frontierResponseAnchorEpochs": anchor_epochs,
         "beta": beta,
         "temperature": temperature,
         "maxNewTokens": max_new_tokens,
-        "frontierFaculty": [
-            base.clean(value, 80)
-            for value in plan.get("frontierFaculty", [])
-            if base.clean(value, 80)
-        ][:32] if isinstance(plan.get("frontierFaculty"), list) else [],
+        "frontierFaculty": frontier_faculty,
     }
 
 
@@ -673,10 +684,12 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     output_dir = Path("/tmp/itmounts-trained-adapter")
 
     if frontier_plan is not None:
-        # Stable frontier distillation: hosted frontier faculty supplies diverse curriculum and
-        # remediation; the student then generates its own trajectories and a pinned open-weight
-        # teacher supplies dense next-token supervision through TRL's stable DistillationTrainer.
+        # Frontier responses and dense-teacher logits are different supervision surfaces. Verified
+        # hosted prompt/response pairs receive one bounded SFT anchor pass before fully on-policy GKD.
+        # Fail closed on tokenizer incompatibility BEFORE the paid anchor starts so an impossible GKD
+        # run cannot consume SFT budget/capacity first.
         prompts: list[dict[str, str]] = []
+        anchor_training: list[dict[str, str]] = []
         for raw in training:
             row = dict(raw)
             prompt = base.clean(row.get("prompt"), 100_000)
@@ -686,10 +699,16 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             rendered_prompt = _render_chat(tokenizer, [{"role": "user", "content": prompt}])
             if not rendered_prompt:
                 raise RuntimeError("worker_frontier_distillation_prompt_render_failed")
+            training_text, structured = _student_training_text(base, tokenizer, row)
+            if not structured:
+                raise RuntimeError("worker_frontier_response_anchor_structured_row_required")
             prompts.append({"prompt": rendered_prompt})
+            anchor_training.append({"training_text": training_text})
         if not prompts:
             raise RuntimeError("worker_training_dataset_empty")
 
+        # P2 guard: teacher/student tokenizer compatibility is a prerequisite for the entire anchored
+        # GKD recipe, so validate it before any anchor training consumes paid GPU time.
         teacher_tokenizer = AutoTokenizer.from_pretrained(
             frontier_plan["teacherModelId"],
             revision=frontier_plan["teacherRevision"],
@@ -701,6 +720,56 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         if not _tokenizers_exactly_compatible(tokenizer, teacher_tokenizer):
             # GOLD/ULD is the governed future cross-tokenizer path. Do not silently fall back.
             raise RuntimeError("worker_frontier_distillation_tokenizer_mismatch_requires_gold")
+
+        anchored_student = None
+        anchor_trainable_fp32_tensors = 0
+        if frontier_plan["frontierResponseAnchorRequired"]:
+            anchor_recipe = {
+                **recipe,
+                "epochs": frontier_plan["frontierResponseAnchorEpochs"],
+                "learningRate": FRONTIER_GKD_LEARNING_RATE,
+                "maxLength": FRONTIER_GKD_MAX_LENGTH,
+            }
+            anchor_model = AutoModelForCausalLM.from_pretrained(
+                base_model,
+                token=token,
+                quantization_config=quantization,
+                device_map="auto",
+                torch_dtype=compute_dtype,
+            )
+            anchor_model.config.use_cache = False
+            anchor_args = SFTConfig(
+                output_dir=str(output_dir / "frontier-response-anchor"),
+                num_train_epochs=anchor_recipe["epochs"],
+                per_device_train_batch_size=anchor_recipe["perDeviceTrainBatchSize"],
+                gradient_accumulation_steps=anchor_recipe["gradientAccumulationSteps"],
+                learning_rate=anchor_recipe["learningRate"],
+                **_warmup_arguments(SFTConfig, anchor_recipe),
+                lr_scheduler_type=anchor_recipe["lrSchedulerType"],
+                max_grad_norm=anchor_recipe["maxGradNorm"],
+                logging_steps=10,
+                save_strategy="no",
+                report_to="none",
+                bf16=False,
+                fp16=False,
+                gradient_checkpointing=True,
+                dataset_text_field="training_text",
+                max_length=anchor_recipe["maxLength"],
+            )
+            anchor_trainer = SFTTrainer(
+                model=anchor_model,
+                args=anchor_args,
+                train_dataset=Dataset.from_list(anchor_training),
+                processing_class=tokenizer,
+                peft_config=peft_config,
+            )
+            anchor_trainable_fp32_tensors = _force_trainable_fp32(anchor_trainer.model)
+            anchor_trainer.train()
+            anchored_student = anchor_trainer.model
+            anchored_student.config.use_cache = False
+            del anchor_trainer
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         teacher_model = AutoModelForCausalLM.from_pretrained(
             frontier_plan["teacherModelId"],
@@ -715,11 +784,16 @@ def train_student(base, envelope: dict[str, Any]) -> None:
 
         recipe.update({
             "profile": FRONTIER_TRAINING_PROFILE,
-            "optimizer": "stable_on_policy_distillation",
+            "optimizer": "frontier_response_anchor_then_stable_on_policy_distillation",
             "denseTeacherModelId": frontier_plan["teacherModelId"],
             "denseTeacherRevision": frontier_plan["teacherRevision"],
             "onPolicyFraction": 1.0,
             "offPolicyAnchorFraction": 0.0,
+            "frontierResponseAnchorRequired": frontier_plan["frontierResponseAnchorRequired"],
+            "frontierResponseAnchorEpochs": frontier_plan["frontierResponseAnchorEpochs"],
+            "frontierResponseAnchorItems": len(anchor_training) if frontier_plan["frontierResponseAnchorRequired"] else 0,
+            "frontierResponseAnchorTrainer": "SFTTrainer" if frontier_plan["frontierResponseAnchorRequired"] else None,
+            "frontierResponseAnchorTrainableFp32TensorCount": anchor_trainable_fp32_tensors,
             "beta": frontier_plan["beta"],
             "temperature": frontier_plan["temperature"],
             "maxNewTokens": frontier_plan["maxNewTokens"],
@@ -733,40 +807,53 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         })
         print(f"itmounts_training_profile:{json.dumps(recipe, ensure_ascii=True, separators=(',', ':'))}", flush=True)
 
-        args = DistillationConfig(
-            output_dir=str(output_dir),
-            num_train_epochs=recipe["epochs"],
-            per_device_train_batch_size=recipe["perDeviceTrainBatchSize"],
-            gradient_accumulation_steps=recipe["gradientAccumulationSteps"],
-            learning_rate=recipe["learningRate"],
+        # Build through a dictionary so the same bounded config works whether the student is freshly
+        # instantiated or is the already-anchored PEFT model. Tests assert dictionary construction.
+        distillation_args: dict[str, Any] = {
+            "output_dir": str(output_dir),
+            "num_train_epochs": recipe["epochs"],
+            "per_device_train_batch_size": recipe["perDeviceTrainBatchSize"],
+            "gradient_accumulation_steps": recipe["gradientAccumulationSteps"],
+            "learning_rate": recipe["learningRate"],
             **_warmup_arguments(DistillationConfig, recipe),
-            lr_scheduler_type=recipe["lrSchedulerType"],
-            max_grad_norm=recipe["maxGradNorm"],
-            logging_steps=10,
-            save_strategy="no",
-            report_to="none",
-            bf16=False,
-            fp16=False,
-            gradient_checkpointing=True,
-            use_cache=False,
-            temperature=recipe["temperature"],
-            beta=recipe["beta"],
-            max_completion_length=recipe["maxNewTokens"],
-            model_init_kwargs={
+            "lr_scheduler_type": recipe["lrSchedulerType"],
+            "max_grad_norm": recipe["maxGradNorm"],
+            "logging_steps": 10,
+            "save_strategy": "no",
+            "report_to": "none",
+            "bf16": False,
+            "fp16": False,
+            "gradient_checkpointing": True,
+            "use_cache": False,
+            "temperature": recipe["temperature"],
+            "beta": recipe["beta"],
+            "max_completion_length": recipe["maxNewTokens"],
+        }
+        if anchored_student is None:
+            distillation_args["model_init_kwargs"] = {
                 "token": token,
                 "torch_dtype": compute_dtype,
                 "device_map": "auto",
-            },
-        )
-        trainer = DistillationTrainer(
-            model=base_model,
-            teacher_model=teacher_model,
-            args=args,
-            train_dataset=Dataset.from_list(prompts),
-            processing_class=tokenizer,
-            quantization_config=quantization,
-            peft_config=peft_config,
-        )
+            }
+        args = DistillationConfig(**distillation_args)
+        if anchored_student is not None:
+            trainer = DistillationTrainer(
+                model=anchored_student,
+                teacher_model=teacher_model,
+                args=args,
+                train_dataset=Dataset.from_list(prompts),
+                processing_class=tokenizer,
+            )
+        else:
+            trainer = DistillationTrainer(
+                model=base_model,
+                teacher_model=teacher_model,
+                args=args,
+                train_dataset=Dataset.from_list(prompts),
+                processing_class=tokenizer,
+                quantization_config=quantization,
+                peft_config=peft_config,
+            )
     else:
         # Kept only for legacy/one-time jobs that do not carry the frontier mass-distillation plan.
         # Mass campaigns must never silently arrive here after the frontier planner is enabled.

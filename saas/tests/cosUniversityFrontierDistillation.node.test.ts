@@ -9,7 +9,7 @@ import {
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-test('frontier distillation defaults to on-policy GKD with a bounded off-policy anchor', () => {
+test('frontier distillation keeps GKD on-policy and requires a bounded frontier-response anchor', () => {
   const plan = buildFrontierDistillationPlan({
     studentModelId: 'Qwen/Qwen3-4B',
     denseTeacherModelId: 'Qwen/Qwen3-8B',
@@ -22,6 +22,8 @@ test('frontier distillation defaults to on-policy GKD with a bounded off-policy 
   assert.equal(plan.optimizer, 'gkd_on_policy')
   assert.equal(plan.onPolicyFraction, 1)
   assert.equal(plan.offPolicyAnchorFraction, 0)
+  assert.equal(plan.frontierResponseAnchorRequired, true)
+  assert.equal(plan.frontierResponseAnchorEpochs, 1)
   assert.equal(plan.beta, 0.5)
   assert.equal(plan.temperature, 0.8)
   assert.deepEqual(plan.frontierFaculty, ['openai', 'claude', 'gemini', 'grok'])
@@ -31,6 +33,21 @@ test('frontier distillation defaults to on-policy GKD with a bounded off-policy 
   assert.equal(plan.rollbackProofRequired, true)
   assert.equal(plan.automaticPromotionAuthorized, false)
   assert.equal(plan.authorityExpanded, false)
+})
+
+test('frontier response anchor is disabled when no hosted faculty produced verified responses', () => {
+  const plan = buildFrontierDistillationPlan({
+    studentModelId: 'Qwen/Qwen3-4B',
+    denseTeacherModelId: 'Qwen/Qwen3-8B',
+    denseTeacherRevision: 'a'.repeat(40),
+    denseTeacherLicense: 'apache-2.0',
+    frontierFaculty: [],
+    env: {},
+  })
+  assert.equal(plan.onPolicyFraction, 1)
+  assert.equal(plan.offPolicyAnchorFraction, 0)
+  assert.equal(plan.frontierResponseAnchorRequired, false)
+  assert.equal(plan.frontierResponseAnchorEpochs, 0)
 })
 
 test('frontier plan refuses an unpinned, same-model or non-open dense teacher', () => {
@@ -68,14 +85,22 @@ test('mass distillation carries the frontier plan into the governed training env
   assert.match(consumer, /readMassHostedTeacherRows/)
 })
 
-test('HF worker uses stable on-policy DistillationTrainer and fails closed on tokenizer mismatch', () => {
+test('HF worker anchors verified responses, validates tokenizer compatibility first, then continues on-policy GKD', () => {
   const worker = source('../scripts/cos-university-hf-worker.py')
   assert.match(worker, /from trl import DistillationConfig, DistillationTrainer, SFTConfig, SFTTrainer/)
-  assert.match(worker, /optimizer": "stable_on_policy_distillation"/)
+  assert.match(worker, /cos-university-frontier-adaptive-distillation-v2/)
+  assert.match(worker, /optimizer": "frontier_response_anchor_then_stable_on_policy_distillation"/)
+  assert.match(worker, /frontierResponseAnchorRequired/)
+  assert.match(worker, /frontierResponseAnchorEpochs/)
+  assert.match(worker, /frontierResponseAnchorItems/)
+  assert.match(worker, /anchor_trainer = SFTTrainer\(/)
+  assert.match(worker, /anchor_trainer\.train\(\)/)
+  assert.match(worker, /anchored_student = anchor_trainer\.model/)
   assert.match(worker, /DistillationTrainer\(/)
   assert.match(worker, /teacher_model=teacher_model/)
-  assert.match(worker, /beta=recipe\["beta"\]/)
-  assert.match(worker, /max_completion_length=recipe\["maxNewTokens"\]/)
+  // P1 regression: DistillationConfig is intentionally constructed from a dictionary.
+  assert.match(worker, /"beta": recipe\["beta"\]/)
+  assert.match(worker, /"max_completion_length": recipe\["maxNewTokens"\]/)
   const trainingFunction = worker.slice(worker.indexOf('def train_student'), worker.indexOf('def main()'))
   assert.match(trainingFunction, /use_bf16 = False/)
   assert.match(trainingFunction, /compute_dtype = torch\.float16/)
@@ -86,6 +111,13 @@ test('HF worker uses stable on-policy DistillationTrainer and fails closed on to
   assert.match(worker, /def _force_trainable_fp32\(model\)/)
   assert.match(worker, /parameter\.data = parameter\.data\.to\(torch\.float32\)/)
   assert.match(worker, /worker_frontier_distillation_tokenizer_mismatch_requires_gold/)
+  assert.match(worker, /worker_frontier_response_anchor_contract_invalid/)
+  assert.match(worker, /worker_frontier_response_anchor_epochs_invalid/)
+  const tokenizerGuard = trainingFunction.indexOf('if not _tokenizers_exactly_compatible(tokenizer, teacher_tokenizer):')
+  const anchorTrain = trainingFunction.indexOf('anchor_trainer.train()')
+  const denseTeacherLoad = trainingFunction.indexOf('teacher_model = AutoModelForCausalLM.from_pretrained')
+  const gkdTrainer = trainingFunction.indexOf('trainer = DistillationTrainer(')
+  assert.ok(tokenizerGuard > 0 && anchorTrain > tokenizerGuard && denseTeacherLoad > anchorTrain && gkdTrainer > denseTeacherLoad)
   assert.match(worker, /legacy_bootstrap_sft/)
 })
 

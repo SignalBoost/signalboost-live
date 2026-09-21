@@ -142,6 +142,11 @@ test('HF worker reuses bounded Hub repositories and pins isolated run revisions'
 test('mass artifact evidence durably records the executed frontier training recipe', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   assert.match(consumer, /function durableTrainingReceipt/)
+  assert.match(consumer, /frontierResponseAnchorRequired: boolean\('frontierResponseAnchorRequired'\)/)
+  assert.match(consumer, /frontierResponseAnchorEpochs: number\('frontierResponseAnchorEpochs', 0, 100\)/)
+  assert.match(consumer, /frontierResponseAnchorItems: integer\('frontierResponseAnchorItems', 0, 100_000\)/)
+  assert.match(consumer, /frontierResponseAnchorTrainer: clean\(raw\.frontierResponseAnchorTrainer, 80\) \|\| null/)
+  assert.match(consumer, /frontierResponseAnchorTrainableFp32TensorCount: integer\('frontierResponseAnchorTrainableFp32TensorCount', 0, 1_000_000\)/)
   assert.match(consumer, /trainingReceipt = durableTrainingReceipt\(body\.trainingProfile, body\.trainingRecipe\)/)
   assert.match(consumer, /trainingMode: 'distillation', trainingReceipt/)
   assert.match(consumer, /\|\| !trainingReceipt\)/)

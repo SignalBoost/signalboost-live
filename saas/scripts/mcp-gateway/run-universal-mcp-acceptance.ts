@@ -6,6 +6,7 @@ import {
   FIGMA_MCP_PROFILE,
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
+  VERCEL_MCP_PROFILE,
 } from '../../provider-hub-host/universal-mcp-profiles.ts'
 
 const checks: Array<{ name: string; passed: boolean; detail: string }> = []
@@ -90,8 +91,27 @@ async function run() {
     }
   }
 
+  const vercelReady = gateway.readiness.find(item => item.providerId === 'vercel-mcp')?.configured === true
+  const vercelCertification = vercelReady
+    ? await certifyMcpProvider(gateway, {
+        providerId: 'vercel-mcp',
+        expectedCapabilities: VERCEL_MCP_PROFILE.tools.map(item => `mcp.vercel-mcp.${item.capabilityName}`),
+        probes: [{
+          id: 'scoped_project_read',
+          capabilityId: 'mcp.vercel-mcp.project.read',
+          args: {},
+          expect: { ok: true },
+        }],
+      })
+    : null
+  if (vercelCertification) {
+    for (const item of vercelCertification.checks) {
+      add(`vercel_certification_${item.id.replace(/[^a-z0-9_-]+/gi, '_')}`, item.passed, item.detail)
+    }
+  }
+
   const evidence = {
-    schemaVersion: 'universal-mcp-live-acceptance-v3',
+    schemaVersion: 'universal-mcp-live-acceptance-v4',
     observedAt: new Date().toISOString(),
     providers: gateway.readiness.map(item => ({
       providerId: item.providerId,
@@ -99,7 +119,7 @@ async function run() {
       reason: item.reason,
       authentication: item.authentication,
     })),
-    certifications: [githubCertification, supabaseCertification, context7Certification, ...(figmaCertification ? [figmaCertification] : [])],
+    certifications: [githubCertification, supabaseCertification, context7Certification, ...(figmaCertification ? [figmaCertification] : []), ...(vercelCertification ? [vercelCertification] : [])],
     checks,
   }
   await mkdir('artifacts', { recursive: true })

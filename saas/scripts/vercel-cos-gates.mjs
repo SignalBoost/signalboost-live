@@ -110,6 +110,7 @@ const tests = [
   'tests/cosDomainAvailability.node.test.ts',
   'tests/assistantTransportClient.node.test.ts',
   'tests/cosDurableTurnHistory.node.test.ts',
+  'tests/cosInteractiveGraduateLatency.node.test.ts',
   'tests/cosWholeTurnDeadline.node.test.ts',
   'tests/operationalSystemsLearning.node.test.ts',
   'tests/advisoryDiagnosisPolicy.node.test.ts',

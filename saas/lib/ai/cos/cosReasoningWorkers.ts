@@ -87,6 +87,24 @@ function workerId(role: CosSpecialistRole): string {
   return role === 'primary' ? 'cos-primary-reasoner' : `cos-${role}-worker`
 }
 
+const INTERACTIVE_GRADUATE_ATTEMPT_MS = 8_000
+const INTERACTIVE_GRADUATE_FEATURES = new Set([
+  'cos_interactive_answer',
+  'cos_interactive_authoring',
+  'direct_text_transformation',
+  'cos_fast_authoring',
+  'cos_fast_text_transform',
+])
+
+function interactiveGraduateAttemptTimeout(request: CosReasoningRequest, inheritedTimeoutMs?: number): number | undefined {
+  const feature = String(request.usageContext?.feature || '').trim().toLowerCase()
+  if (!INTERACTIVE_GRADUATE_FEATURES.has(feature)) return inheritedTimeoutMs
+  const inherited = Number(inheritedTimeoutMs)
+  return Number.isFinite(inherited) && inherited > 0
+    ? Math.max(250, Math.min(Math.floor(inherited), INTERACTIVE_GRADUATE_ATTEMPT_MS))
+    : INTERACTIVE_GRADUATE_ATTEMPT_MS
+}
+
 /**
  * One approved open-model runtime can expose several COS-owned capabilities. The role changes the
  * bounded reasoning contract, not the provider. This is intentionally different from pretending
@@ -153,11 +171,14 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
       const effective = toLocalModelCallArgs(request, role)
       const turnId = randomUUID()
       const startedAt = Date.now()
+      const graduateTimeoutMs = interactiveGraduateAttemptTimeout(request, effective.timeoutMs)
       const text = await callLocalModel({
         ...effective,
+        ...(graduateTimeoutMs === undefined ? {} : { timeoutMs: graduateTimeoutMs }),
         usageContext: {
           feature: 'cos_university_graduate_worker',
           purpose: `${runtime.subjectId}:${role}`,
+          correlationId: request.usageContext?.correlationId,
         },
       }, runtime.inference).catch(error => {
         console.warn('[cos-graduate-worker] inference failed; base worker may take over', error instanceof Error ? error.message : String(error))

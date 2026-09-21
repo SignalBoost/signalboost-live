@@ -19,10 +19,25 @@ Direction: retain SignalBoost governance/Provider Hub as the authority layer; ge
 Playwright MCP and Chrome DevTools MCP are now first-class governed browser-tool profiles for COS / Software Specialist / Builder-style portables.
 
 - Canonical profiles: `saas/provider-hub-host/browser-mcp-profiles.ts`.
-- Playwright MCP package contract is pinned to `@playwright/mcp@0.0.81`; Chrome DevTools MCP is pinned to `chrome-devtools-mcp@1.9.0`. Both are stdio-first and use host-owned logical `transportRef` values.
+- Playwright MCP package contract is pinned to `@playwright/mcp@0.0.82`; Chrome DevTools MCP is pinned to `chrome-devtools-mcp@1.9.0`. Both are stdio-first and use host-owned logical `transportRef` values.
 - Remote MCP tool discovery is never authorization. Only the exact tools mapped by the profile can become Provider Hub capabilities.
 - Read-only diagnostics (snapshot, screenshot, console, network, CSS/Lighthouse/performance where applicable) do not require write approval.
 - Navigation, click/type/form/dialog and other interaction tools are `write` capabilities and require the existing Portable Connector Runtime approval gate.
 - Arbitrary Playwright code execution, file upload, Chrome extension/PWA mutation, third-party developer-tool execution and nested WebMCP execution are absent from the default allowlist.
 - Exact approved-origin enforcement remains a host/browser security boundary. An upstream server's own allow-origin setting is defense in depth, not authorization.
 - These profiles do not install npm packages, launch Chrome, store credentials, or make Production enablement claims. The host transport/process lifecycle and Production acceptance remain separate evidence-gated work.
+
+
+## Browser MCP live host — 2026-09-21
+
+A concrete host-owned stdio runtime is now implemented for browser MCP servers. The reference execution environment is GitHub Actions because long-lived Chrome/stdin processes are not a Vercel serverless responsibility.
+
+- `mcp-stdio-transport.ts` owns one bounded child process for an MCP session, sends `notifications/initialized`, correlates JSON-RPC responses, bounds output and terminates the child explicitly.
+- `browser-mcp-stdio-host.ts` is the runtime security boundary: registry metadata cannot choose arbitrary commands, remote discovery is filtered again, filesystem-writing/script arguments are rejected, and explicit navigation URLs are checked before execution.
+- Chrome DevTools MCP is pinned to `1.9.0`; Playwright MCP is pinned to `0.0.82`.
+- Chrome runs isolated/headless with JavaScript evaluation disabled, network headers redacted, usage statistics disabled, CrUX disabled, and machine-readable structured MCP results enabled.
+- The live reference host exposes diagnostics plus bounded page navigation only. Click/type/fill/upload/arbitrary evaluation remain unavailable there even though broader governed mappings may exist for future reviewed hosts.
+- Chrome's structured page evidence is authoritative for page id/final URL. After `new_page` or `navigate_page`, the host verifies the final page origin and terminates the process if a redirect escaped the approved origin set.
+- `.github/workflows/chrome-devtools-mcp-live-acceptance.yml` launches the real pinned server and Chromium and probes only approved iTMounts origins through Provider Hub and Portable Connector Runtime.
+- Retained acceptance evidence is metadata-only: page text, console bodies, network headers, screenshots, prompts and credentials are not persisted.
+- The first live run on PR #2696 correctly exposed a brittle text parser after Chrome DevTools MCP changed titled page rendering. The repair uses `structuredContent.pages`; live acceptance must pass on the repair revision before the runtime is called accepted.

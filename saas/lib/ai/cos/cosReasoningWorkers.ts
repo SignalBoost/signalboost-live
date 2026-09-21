@@ -90,6 +90,7 @@ function workerId(role: CosSpecialistRole): string {
 const INTERACTIVE_GRADUATE_ATTEMPT_MS = 8_000
 const INTERACTIVE_GRADUATE_FEATURES = new Set([
   'cos_interactive_answer',
+  'cos_fresh_grounded_task',
   'cos_interactive_authoring',
   'direct_text_transformation',
   'cos_fast_authoring',

@@ -21,7 +21,7 @@ test('grounded interactive task completion is bounded, JSON-enforced and disable
   assert.match(route, /jsonObject:true/)
   assert.match(route, /disableThinking:true/)
   assert.match(route, /timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS/)
-  assert.match(route, /usageContext:\{feature:'cos_interactive_answer',purpose:'fresh_grounded_task'\}/)
+  assert.match(route, /usageContext:\{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'\}/)
   assert.match(route, /\/no_think/)
 })
 

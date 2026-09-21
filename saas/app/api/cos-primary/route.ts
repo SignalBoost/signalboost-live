@@ -256,7 +256,7 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
     disableThinking:true,
     timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS,
     allowConfiguredFallback:true,
-    usageContext:{feature:'cos_interactive_answer',purpose:'fresh_grounded_task'},
+    usageContext:{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'},
     systemPrompt:[
       'You are COS. Live web sources were retrieved this turn for the user request below. /no_think',
       travelTask

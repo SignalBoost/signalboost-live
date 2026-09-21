@@ -3,6 +3,7 @@ import { certifyMcpProvider } from '../../provider-hub-host/mcp-certification.ts
 import { createUniversalMcpGateway } from '../../provider-hub-host/universal-mcp-gateway.ts'
 import {
   CONTEXT7_MCP_PROFILE,
+  FIGMA_MCP_PROFILE,
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
 } from '../../provider-hub-host/universal-mcp-profiles.ts'
@@ -70,6 +71,25 @@ async function run() {
     add(`supabase_certification_${item.id.replace(/[^a-z0-9_-]+/gi, '_')}`, item.passed, item.detail)
   }
 
+  const figmaReady = gateway.readiness.find(item => item.providerId === 'figma-mcp')?.configured === true
+  const figmaCertification = figmaReady
+    ? await certifyMcpProvider(gateway, {
+        providerId: 'figma-mcp',
+        expectedCapabilities: FIGMA_MCP_PROFILE.tools.map(item => `mcp.figma-mcp.${item.capabilityName}`),
+        probes: [{
+          id: 'authenticated_identity',
+          capabilityId: 'mcp.figma-mcp.identity.read',
+          args: {},
+          expect: { ok: true },
+        }],
+      })
+    : null
+  if (figmaCertification) {
+    for (const item of figmaCertification.checks) {
+      add(`figma_certification_${item.id.replace(/[^a-z0-9_-]+/gi, '_')}`, item.passed, item.detail)
+    }
+  }
+
   const evidence = {
     schemaVersion: 'universal-mcp-live-acceptance-v3',
     observedAt: new Date().toISOString(),
@@ -79,7 +99,7 @@ async function run() {
       reason: item.reason,
       authentication: item.authentication,
     })),
-    certifications: [githubCertification, supabaseCertification, context7Certification],
+    certifications: [githubCertification, supabaseCertification, context7Certification, ...(figmaCertification ? [figmaCertification] : [])],
     checks,
   }
   await mkdir('artifacts', { recursive: true })

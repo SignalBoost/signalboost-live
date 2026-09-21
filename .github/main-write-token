@@ -1,2 +1,2 @@
-base_sha=401cde65e5b7f41d436a82bb1508679bcd4db20d
-branch=fix/university-evaluator-infra-retry-fairness-20260920
+base_sha=0e9b5256fb61767b69c776db8d99194a5998ab6b
+branch=fix/university-candidate-output-exhaustion-20260920

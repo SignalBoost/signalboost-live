@@ -373,6 +373,18 @@ function answerFailureFingerprint(text:string,item:EvalCase,finish:string,cap:nu
   const other=/<<<ANSWER:[0-9a-f]{16}>>>/i.test(text)&&!open?1:0
   return `finish=${finish||'unknown'}:think=${think}:open=${open}:close=${close}:other=${other}:cap=${cap}`
 }
+
+// Production 2026-09-21: exact artifact bc9e93c8f088 repeatedly answered one immutable holdout
+// case until the FULL 1,024-token solo allowance was exhausted: HTTP 200, finish_reason=length,
+// expected answer marker open, no closer, no thinking block, no wrong marker. The baseline recovered
+// the same holdout path successfully, and the immutable teacher/reference was produced in 384 tokens.
+// Once the bounded solo retry reproduces this exact shape on the CANDIDATE, more evaluator retries are
+// model-quality evidence rather than transport evidence. Keep the predicate deliberately narrow: a
+// baseline truncation, grouped candidate truncation, missing marker, thinking leak, non-length finish,
+// smaller cap, 502, timeout or any other shape remains on the existing fail-closed infrastructure path.
+function candidateSoloOutputExhaustion(error:string){
+  return /^mass_distilled_evaluation_answer_missing:[^:]+:finish=length:think=0:open=1:close=0:other=0:cap=1024$/.test(error)
+}
 function parseAnswersPartial(text:string,cases:readonly EvalCase[],finish:string,cap:number){
   const answers=new Map<string,string>();const missing:string[]=[];const errors:Record<string,string>={}
   for(const item of cases){
@@ -440,7 +452,11 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
         const item=cases.find(entry=>entry.id===id)
         if(!item||input.budget.used+1+reserve>input.budget.max)throw new Error(first.errors[id])
         input.budget.used+=1;const solo=await raw([item])
-        if(solo.missing.length)throw new Error(solo.errors[id])
+        if(solo.missing.length){
+          const failure=solo.errors[id]
+          if(input.candidate&&candidateSoloOutputExhaustion(failure))throw new Error(failure.replace('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_output_exhausted:'))
+          throw new Error(failure)
+        }
         for(const [key,answer] of solo.answers)recovered.set(key,answer);parts.push(solo.responseHash);rawExcerpts.push(solo.rawExcerpt);if(solo.rawExcerpt)excerpts.push(solo.rawExcerpt)
       }
       return {answers:recovered,responseHash:sha256Raw(parts.join(':')),rawExcerpts:Object.freeze(rawExcerpts)}

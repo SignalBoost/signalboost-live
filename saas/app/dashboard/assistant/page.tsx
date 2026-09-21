@@ -11,7 +11,7 @@ import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/age
 import VoiceInputButton from '@/components/VoiceInputButton'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-type Msg = { role: 'user' | 'assistant'; content: string; builderWorkspaceId?: string; builderFiles?: string[] }
+type Msg = { role: 'user' | 'assistant'; content: string; sourceLanguage?: Lang; builderWorkspaceId?: string; builderFiles?: string[] }
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string }
 type ConvSummary = { id: string; title: string; summary: string; message_count: number; updated_at: string }
@@ -359,7 +359,7 @@ export default function AssistantPage() {
         if (!directReply) {
           const recovered = await recoverCompletedTurn(conversationId, content, sentAtMs)
           if (recovered) {
-            setMessages([...next, { role: 'assistant', content: recovered }])
+            setMessages([...next, { role: 'assistant', content: recovered, sourceLanguage: l }])
             return
           }
         }
@@ -378,6 +378,7 @@ export default function AssistantPage() {
         setMessages([...next, {
           role: 'assistant',
           content: reply,
+          sourceLanguage: l,
           ...(builderWorkspaceId && builderFiles.length ? { builderWorkspaceId, builderFiles } : {}),
         }])
       } catch (err: any) {
@@ -395,13 +396,13 @@ export default function AssistantPage() {
         }
 
         const failure = `${c(COPY.error, l)} [${String(err?.name || '')}] ${String(err?.message || '')}`.trim()
-        setMessages([...next, { role: 'assistant', content: aborted ? (hitDeadline ? c(COPY.timedOut, l) : c(COPY.stopped, l)) : failure }])
+        setMessages([...next, { role: 'assistant', content: aborted ? (hitDeadline ? c(COPY.timedOut, l) : c(COPY.stopped, l)) : failure, sourceLanguage: l }])
       } finally {
         clearTimeout(deadline)
         abortRef.current = null
       }
     } catch {
-      setMessages([...next, { role: 'assistant', content: c(COPY.error, l) }])
+      setMessages([...next, { role: 'assistant', content: c(COPY.error, l), sourceLanguage: l }])
     } finally {
       setLoading(false)
       setActivity(null)
@@ -559,7 +560,7 @@ export default function AssistantPage() {
 
           {messages.map((msg, i) => (
             <div key={`${msg.role}-${i}`} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{ maxWidth: msg.role === 'user' ? '80%' : '100%', width: msg.role === 'assistant' ? '100%' : 'auto', padding: '12px 16px', borderRadius: 16, borderTopRightRadius: msg.role === 'user' ? 4 : 16, borderTopLeftRadius: msg.role === 'user' ? 16 : 4, background: msg.role === 'user' ? 'rgba(255,195,0,.12)' : 'rgba(26,240,255,.07)', border: `1px solid ${msg.role === 'user' ? 'rgba(255,195,0,.28)' : 'rgba(26,240,255,.2)'}`, color: '#fff', fontSize: 14, lineHeight: 1.7, whiteSpace: msg.role === 'user' ? 'pre-wrap' : 'normal' }}>
+              <div data-ai-content={msg.role === 'assistant' ? 'true' : undefined} data-sb-source-language={msg.role === 'assistant' ? msg.sourceLanguage : undefined} style={{ maxWidth: msg.role === 'user' ? '80%' : '100%', width: msg.role === 'assistant' ? '100%' : 'auto', padding: '12px 16px', borderRadius: 16, borderTopRightRadius: msg.role === 'user' ? 4 : 16, borderTopLeftRadius: msg.role === 'user' ? 16 : 4, background: msg.role === 'user' ? 'rgba(255,195,0,.12)' : 'rgba(26,240,255,.07)', border: `1px solid ${msg.role === 'user' ? 'rgba(255,195,0,.28)' : 'rgba(26,240,255,.2)'}`, color: '#fff', fontSize: 14, lineHeight: 1.7, whiteSpace: msg.role === 'user' ? 'pre-wrap' : 'normal' }}>
                 {msg.role === 'assistant' ? (
                   <>
                     <VideoJsonMessage content={msg.content} />

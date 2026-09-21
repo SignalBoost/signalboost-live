@@ -162,7 +162,18 @@ Do not call an artifact v2 without that receipt.
 
 ### Builder canary priority
 
-PR #2690 is merged. Until two post-remediation Computer Science artifacts have durable exact-artifact canary passes, the canary scheduler gives that bounded proof cohort priority instead of forcing it behind the full legacy backlog. This changes scheduling only and does not bypass evaluation, canary, rollback, promotion or Production-traffic gates.
+PR #2690 introduced the bounded Builder proof lane, but its original date-only definition has now been proven too broad: two old-recipe Computer Science artifacts created after the cutoff already obtained canary passes at approximately 14:57 UTC and 15:00 UTC, consuming that quota before a true response-anchor v2 artifact existed.
+
+The current invariant therefore counts only **confirmed v2** Computer Science artifacts whose durable receipt proves:
+
+```text
+optimizer = frontier_response_anchor_then_stable_on_policy_distillation
+frontierResponseAnchorRequired = true
+frontierResponseAnchorEpochs = 1
+frontierResponseAnchorItems > 0
+```
+
+Until two such v2 Computer Science artifacts have durable exact-artifact canary passes, they receive bounded priority over the legacy backlog. This remains scheduling only and does not bypass independent evaluation, one-canary concurrency, spend ceilings, exact-artifact binding, rollback, promotion or Production-traffic gates.
 
 ### Canary refresh / graduate runtime protection
 
@@ -184,31 +195,68 @@ That exact commit is Production READY, and the forward Supabase migration `mass_
 
 PR #2689 is merged and Production-live. Hosted-teacher routing balances expected dollars rather than equal call counts, gives Claude bounded completion headroom, and avoids immediately repurchasing a failed primary provider on partial retries.
 
-## First v2 artifact timeline
+## First confirmed v2 Computer Science artifact
 
-The 12-hour delayed-retention gate remains the dominant clock.
+The first fully proven response-anchor v2 Computer Science artifact now exists.
 
-After #2691 Production readiness:
+Candidate:
 
-1. identify the first Computer Science batch dispatched after the exact Production-ready timestamp;
-2. verify the resulting artifact's durable training receipt proves the v2 anchor;
-3. record its artifact creation timestamp;
-4. earliest independent retention eligibility = artifact creation + 12 hours;
-5. run/verify independent evaluation;
-6. if all gates pass, run exact-artifact canary and rollback proof;
-7. register and activate;
-8. immediately assign one narrow, reversible Builder apprenticeship task.
+`mass:58de5633-bf37-421d-bfb1-3eb1b4102c4b:aebeadfae8866e8a`
 
-A Computer Science training dispatch at 2026-09-21 15:44:45 UTC occurred before #2691 became Production READY at 15:45:03 UTC and must **not** be assumed to be v2. The first confirmed post-ready dispatch observed at this checkpoint was Statistics & Data Science at 15:46:45 UTC. Wait for the first post-ready Computer Science artifact with the v2 receipt before starting the 12-hour clock.
+Artifact:
+
+`cadomos/itmounts-student-0136e0e0c5af`
+
+Artifact hash:
+
+`f54f03ccb1de40de3e89f3c19cb09e8d3cde01ac9c01380f107ef00aabb64d6e`
+
+Created:
+
+`2026-09-21 17:20:26.126267Z`
+
+Its durable receipt proves:
+
+```text
+optimizer = frontier_response_anchor_then_stable_on_policy_distillation
+frontierResponseAnchorRequired = true
+frontierResponseAnchorEpochs = 1
+frontierResponseAnchorItems = 16
+frontierResponseAnchorTrainer = SFTTrainer
+```
+
+The artifact is currently `evaluation_pending`. Its mandatory 12-hour delayed-retention eligibility begins at approximately:
+
+`2026-09-22 05:20:26Z` / `2026-09-22 01:20:26 EDT`
+
+Do not evaluate it as graduation-ready before that boundary.
+
+### Remediation material defect found during this run
+
+The artifact's source attribution was 90% teacher-synthetic, 10% real-source and 0% failure-derived even though independently verified Computer Science failures had generated remediation rows.
+
+The cause was not the retained-material de-duplication fence. The generator created a new provenance/content hash for each failed candidate, but repeated gate patterns could emit effectively identical retained teaching material. Material de-duplication correctly collapsed those duplicates before packaging.
+
+The repair must therefore preserve de-duplication and make the remediation **material itself** distinct. The corrected remediation-v2 design uses only bounded general subject-level practice context, verification mode and difficulty variation derived from failed gate classes plus an opaque one-way identity input. Candidate IDs, raw chats, private holdouts, hidden exams, evaluator output and private evidence never enter retained training material. The remediation identity is versioned so already-verified failures can be re-seeded once under the corrected format.
+
+### Current timeline
+
+1. the exact v2 artifact above is already trained;
+2. exact-artifact canary may run before the 12-hour retention deadline when the canary semaphore is free;
+3. earliest independent delayed-retention evaluation is approximately 2026-09-22 05:20:26Z;
+4. if improvement, safety, unseen-transfer and delayed-retention all pass, verify canary/rollback evidence, graduate registry and runtime activation;
+5. immediately assign one narrow, reversible Builder apprenticeship task.
+
+The retention clock is now anchored to the exact artifact creation timestamp above. It is no longer an estimate from merge or dispatch time.
 
 ## Exact continuation runbook
 
 1. Read current `ONBOARD.md`, this handoff and `SKILLS.md`.
 2. Re-query current `main`, University PRs, Vercel Production and Supabase.
-3. Verify the first post-#2691 Computer Science training receipt proves the anchored v2 recipe.
-4. Track that exact candidate through the 12-hour delay.
-5. Never manually bypass retention or evaluator gates.
-6. If evaluation fails, inspect holdout/safety/transfer/retention evidence and feed the failure into remediation.
+3. Track exact candidate `mass:58de5633-bf37-421d-bfb1-3eb1b4102c4b:aebeadfae8866e8a` and artifact `cadomos/itmounts-student-0136e0e0c5af`.
+4. Confirm its exact-artifact canary is prioritized by the v2-only Builder proof lane when the global canary semaphore is available.
+5. Do not independently evaluate it before the 12-hour delayed-retention boundary.
+6. If evaluation fails, inspect holdout/safety/transfer/retention evidence and verify corrected failure-derived remediation is packaged without weakening material de-duplication.
 7. If evaluation passes, verify exact artifact hash/revision, canary and rollback.
 8. Verify graduate registry -> activation -> served identity/health.
 9. Route one bounded real Builder task immediately.

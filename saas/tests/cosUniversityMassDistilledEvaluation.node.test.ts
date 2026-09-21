@@ -13,6 +13,7 @@ const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distille
 const claimMigration = readFileSync(new URL('../supabase/migrations/20260919030000_mass_distilled_evaluation_claim_18.sql', import.meta.url), 'utf8')
 const concurrencyMigration = readFileSync(new URL('../supabase/migrations/20260920211800_mass_distilled_evaluation_bounded_concurrency.sql', import.meta.url), 'utf8')
 const builderV2PriorityMigration = readFileSync(new URL('../supabase/migrations/20260921185000_mass_distilled_v2_cs_evaluation_priority.sql', import.meta.url), 'utf8')
+const singleEndpointStabilityMigration = readFileSync(new URL('../supabase/migrations/20260921193000_mass_distilled_evaluation_single_endpoint_stability.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
 const MASS_REVISION = Object.freeze({
@@ -80,6 +81,20 @@ test('mass evaluation uses bounded four-way concurrency without changing authori
   assert.match(concurrencyMigration, /productionTrafficAuthorized',false/)
   assert.match(concurrencyMigration, /revoke all on function public\.claim_next_mass_distilled_evaluation\(\) from public, anon, authenticated/)
   assert.match(concurrencyMigration, /grant execute on function public\.claim_next_mass_distilled_evaluation\(\) to service_role/)
+})
+
+test('evaluator claim serializes unresolved RunPod endpoint ownership without weakening gates', () => {
+  assert.match(singleEndpointStabilityMigration, /v_active_reservations integer := 0/)
+  assert.match(singleEndpointStabilityMigration, /if v_active_reservations >= 1 then return; end if;/)
+  assert.match(singleEndpointStabilityMigration, /a\.created_at <= v_now - interval '12 hours'/)
+  assert.match(singleEndpointStabilityMigration, /evidence->>'claim'='production_canary_healthy'/)
+  assert.match(singleEndpointStabilityMigration, /evidence->>'exactArtifact'='true'/)
+  assert.match(singleEndpointStabilityMigration, /v_max_endpoint<>18/)
+  assert.match(singleEndpointStabilityMigration, /v_max_judge<>4/)
+  assert.match(singleEndpointStabilityMigration, /v_max_wake<>1/)
+  assert.match(singleEndpointStabilityMigration, /v_max_cost>0\.200000/)
+  assert.match(singleEndpointStabilityMigration, /productionTrafficAuthorized',false/)
+  assert.match(singleEndpointStabilityMigration, /frontier_response_anchor_then_stable_on_policy_distillation/)
 })
 
 test('atomic evaluator claim prioritizes confirmed v2 Computer Science proof without bypassing any gate', () => {

@@ -1,7 +1,6 @@
 // saas/lib/ai/cos/cosFreshGrounding.ts
 import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
 import { classifyAuthoritativeSourceNeed, rankByAuthority } from './officialSourceAuthority.ts'
-import { requiresLiveTravelPlanningEvidence } from './cosFreshnessPolicy.ts'
 
 export type FreshEvidenceSource = SearchResult & { id: string }
 
@@ -460,14 +459,6 @@ export function freshEvidenceSearchQuery(input: string, now = new Date()): strin
 export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
   const primary = freshEvidenceSearchQuery(input, now)
   const raw = String(input || '').trim()
-  if (requiresLiveTravelPlanningEvidence(raw)) {
-    const trip = raw.replace(/\s+/g, ' ').slice(0, 170)
-    return [...new Set([
-      primary,
-      `${trip} official airport city transport train bus fares schedules`.slice(0, 260),
-      `${trip} official attractions museums ticket prices opening hours reservations`.slice(0, 260),
-    ])]
-  }
   if (isPersonOrOfficeEvaluation(raw)) {
     const topic = raw.replace(/[?!.]+$/g, '').trim()
     return [...new Set([

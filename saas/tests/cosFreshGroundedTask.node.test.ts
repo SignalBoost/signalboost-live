@@ -17,7 +17,7 @@ test('travel planning bypasses the single-claim freshness contract and goes dire
 })
 
 test('grounded interactive task completion is bounded, JSON-enforced and disables Qwen thinking', () => {
-  assert.match(route, /FRESH_GROUNDED_TASK_TIMEOUT_MS = 18_000/)
+  assert.match(route, /FRESH_GROUNDED_TASK_TIMEOUT_MS = 40_000/)
   assert.match(route, /jsonObject:true/)
   assert.match(route, /disableThinking:true/)
   assert.match(route, /timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS/)

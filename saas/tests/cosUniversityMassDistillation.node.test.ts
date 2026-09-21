@@ -161,7 +161,7 @@ test('mass distillation batches are bounded, deterministic and do not reuse assi
 })
 
 
-test('failure-derived material is concentrated into a minimum-sized hybrid remediation batch', () => {
+test('failure-derived material rides inside a full-sized hybrid batch instead of shrinking it', () => {
   const real = Array.from({ length: 118 }, (_, index) => ({
     contentHash: h(index + 70_000),
     materialHash: h(index + 80_000),
@@ -186,15 +186,17 @@ test('failure-derived material is concentrated into a minimum-sized hybrid remed
     license: 'synthetic-benchmark-fixture',
     confidence: 1,
   }))
+  // Production 2026-09-19 -> 2026-09-21: shrinking to a 20-item cohort whenever any failure row
+  // existed never released (every failed evaluation adds failure rows) and trained each LoRA on ~16
+  // examples. Failure rows now keep their reserved share inside a full batch.
   const prepared = buildMassDistillationBatches([...real, ...failure, ...synthetic])
-  assert.equal(prepared.length, 2)
-  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MIN_BATCH)
-  assert.equal(prepared[1].sourceCount, 108)
+  assert.equal(prepared.length, 1)
+  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MAX_BATCH)
 
   const first = new Set(prepared[0].sourceHashes)
-  assert.equal(real.filter(row => first.has(row.contentHash)).length, 10)
   assert.equal(failure.filter(row => first.has(row.contentHash)).length, 6)
   assert.equal(synthetic.filter(row => first.has(row.contentHash)).length, 4)
+  assert.equal(real.filter(row => first.has(row.contentHash)).length, 118)
   assert.deepEqual(buildMassDistillationBatches([...real, ...failure, ...synthetic]), prepared)
 })
 

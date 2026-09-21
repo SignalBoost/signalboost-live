@@ -47,6 +47,14 @@ const TERSE_SPORTS_STATE = /^\s*(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|n
 const OUTAGE_STATE = /\b(?:service|network|internet|cloud|website|site|api|platform)\s+(?:status|outage)|\b(?:outage|outages)\b/i
 const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live traffic|traffic conditions|road conditions)\b/i
 
+// Itinerary/recommendation requests often look like content generation but materially depend on
+// mutable external facts: airport/city transport, fares, schedules, opening hours, ticket prices,
+// closures, reservations, and attraction availability. Those facts must be live-grounded before
+// COS drafts the plan. This is multilingual and category-level; it does not encode any city,
+// attraction, operator, date, or answer.
+const TRAVEL_PLANNING_INTENT = /\b(?:itinerary|travel plan|trip plan|sightseeing plan|day plan|plan zwiedzania|plan wycieczk\p{L}*|zwiedzani\p{L}*|plan podr[oó]\p{L}*|plan de viaje|itinerario|roteiro|plano de viagem|маршрут|план поездк\p{L}*|план путешеств\p{L}*)\b/iu
+const TRAVEL_MUTABLE_DETAIL = /\b(?:airport|transport|public transport|train|bus|coach|metro|tram|ferry|fare|fares|ticket|tickets|price|prices|cost|costs|schedule|timetable|opening hours|open|closed|museum|attraction|reservation|booking|lotnisk\p{L}*|transport\p{L}*|poci[aą]g\p{L}*|autobus\p{L}*|metro|tramwaj\p{L}*|bilet\p{L}*|cen\p{L}*|koszt\p{L}*|godzin\p{L}* otwarcia|muze\p{L}*|atrakcj\p{L}*|rezerwacj\p{L}*|aeropuerto|transporte|tren|autob[uú]s|billete|precio|horario|museo|atracci[oó]n|reserva|aeroporto|comboio|trem|autocarro|[oô]nibus|bilhete|pre[cç]o|hor[aá]rio|museu|atra[cç][aã]o|reserva|аэропорт|транспорт|поезд|автобус|метро|трамва\p{L}*|билет\p{L}*|цен\p{L}*|расписан\p{L}*|музе\p{L}*|достопримечательност\p{L}*|бронирован\p{L}*)\b/iu
+
 // Whether a NONSTOP/DIRECT transport connection EXISTS is externally mutable: airlines and other
 // operators add, suspend, seasonally pause, and remove routes. These patterns keep route-existence
 // questions on the live-evidence path across EN/ES/PT/PL/RU instead of trusting model memory.
@@ -228,6 +236,12 @@ function isGovernedPublicGuidance(text: string): boolean {
   return GOVERNED_GUIDANCE_TOPIC.test(text) && GUIDANCE_REQUEST.test(text)
 }
 
+export function requiresLiveTravelPlanningEvidence(input: string): boolean {
+  const text = normalizedText(input)
+  if (!text) return false
+  return TRAVEL_PLANNING_INTENT.test(text) && TRAVEL_MUTABLE_DETAIL.test(text)
+}
+
 // True when the question asks whether a DIRECT/NONSTOP transport route currently exists and is not
 // already a price/schedule/status/date-specific lookup handled by the dedicated live rules.
 function isRouteExistenceQuestion(text: string): boolean {
@@ -286,6 +300,9 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
   if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
+  // Travel planning is not safely self-contained authoring when the requested plan depends on
+  // mutable transport/price/hours/availability facts. Preserve freshness before the authoring escape.
+  if (requiresLiveTravelPlanningEvidence(input)) return true
   if (isContentGenerationRequest(text) || isPoliteAuthoringForFreshness(input)) return false
 
   // A moral/civic/public-policy proposition is not itself a request for the current law. Route the

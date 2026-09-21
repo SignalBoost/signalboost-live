@@ -43,6 +43,8 @@ export interface McpOutboundClientOptions {
   maxTools?: number
   clientName?: string
   clientVersion?: string
+  /** Protocol version requested during initialize. Defaults to the Agent Gateway compatibility version. */
+  protocolVersion?: string
 }
 
 export interface McpOutboundClient {
@@ -114,6 +116,7 @@ export function createMcpOutboundClient(options: McpOutboundClientOptions): McpO
   const maxTools = positiveInteger(options.maxTools, 128, 'maxTools')
   const clientName = required(options.clientName ?? 'signalboost-provider-hub', 'clientName')
   const clientVersion = required(options.clientVersion ?? PROVIDER_HUB_MCP_OUTBOUND_CLIENT_VERSION, 'clientVersion')
+  const requestedProtocolVersion = required(options.protocolVersion ?? MCP_PROTOCOL_VERSION, 'protocolVersion')
   let nextId = 0
   let initialized = false
 
@@ -137,14 +140,14 @@ export function createMcpOutboundClient(options: McpOutboundClientOptions): McpO
 
   async function initialize() {
     const result = await request('initialize', {
-      protocolVersion: MCP_PROTOCOL_VERSION,
+      protocolVersion: requestedProtocolVersion,
       capabilities: {},
       clientInfo: { name: clientName, version: clientVersion },
     })
     if (!plain(result)) throw new Error('mcp_invalid_initialize_result')
-    const protocolVersion = required(result.protocolVersion, 'initialize.protocolVersion')
-    if (protocolVersion !== MCP_PROTOCOL_VERSION) {
-      throw new Error(`mcp_unsupported_protocol_version:${protocolVersion}`)
+    const negotiatedProtocolVersion = required(result.protocolVersion, 'initialize.protocolVersion')
+    if (negotiatedProtocolVersion !== requestedProtocolVersion) {
+      throw new Error(`mcp_unsupported_protocol_version:${negotiatedProtocolVersion}`)
     }
     const serverInfo = plain(result.serverInfo) ? result.serverInfo : null
     initialized = true
@@ -157,7 +160,7 @@ export function createMcpOutboundClient(options: McpOutboundClientOptions): McpO
       })
     }
     return Object.freeze({
-      protocolVersion,
+      protocolVersion: negotiatedProtocolVersion,
       ...(serverInfo && typeof serverInfo.name === 'string' ? { serverName: serverInfo.name.trim() } : {}),
       ...(serverInfo && typeof serverInfo.version === 'string' ? { serverVersion: serverInfo.version.trim() } : {}),
     })

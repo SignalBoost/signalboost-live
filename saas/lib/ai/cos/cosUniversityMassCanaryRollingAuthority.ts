@@ -25,6 +25,13 @@ export const MASS_CANARY_MAX_IDENTICAL_FAILURES = 4
 export const MASS_CANARY_ENDPOINT_REFRESH_FAILURES = 2
 export const MASS_CANARY_MAX_COST_USD = 0.2
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
+// Owner apprenticeship proof lane (2026-09-21): the first post-remediation Computer Science artifacts
+// must not sit behind the legacy canary backlog once they are ready to prove themselves. Prioritize only
+// the first two exact-artifact canary PASSES from the post-#2684 Builder cohort, then automatically return
+// to normal oldest-first scheduling. This changes ordering only: one-canary concurrency, 72/day, <= $0.20,
+// exact-artifact binding, evaluator gates, promotion rules and Production traffic authority are unchanged.
+export const MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER = '2026-09-21T01:55:00.000Z' as const
+export const MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE = 2
 const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 
 export type CanaryArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string }>
@@ -147,7 +154,27 @@ export function decideMassCanaryRollingApproval(input: {
 
   const valid = input.artifacts
     .filter(artifact => artifact.candidateId.startsWith('mass:') && HEX64.test(artifact.artifactHash) && artifact.subjectId)
-    .sort((a, b) => at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId))
+
+  const builderProofArtifact = (artifact: CanaryArtifact) =>
+    artifact.subjectId === 'Computer Science & Coding'
+      && at(artifact.createdAt) >= at(MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER)
+
+  const builderProofPasses = new Set(valid
+    .filter(builderProofArtifact)
+    .filter(artifact => forArtifact(input.events, artifact).some(event => claim(event) === 'local_distilled_runtime_canary_passed'))
+    .map(artifact => artifact.candidateId)).size
+  const builderProofNeeded = builderProofPasses < MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE
+
+  valid.sort((a, b) => {
+    // Bounded apprenticeship proof lane: only until two post-remediation Computer Science artifacts
+    // have a durable exact-artifact canary pass. Afterwards queue fairness returns to oldest-first.
+    if (builderProofNeeded) {
+      const aBuilder = builderProofArtifact(a)
+      const bBuilder = builderProofArtifact(b)
+      if (aBuilder !== bBuilder) return aBuilder ? -1 : 1
+    }
+    return at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId)
+  })
 
   // The live approval is the real global semaphore: only one canary endpoint may exist at a time, so no
   // second approval is issued until this one is consumed, expired or released. This stays queue-wide.

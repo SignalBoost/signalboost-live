@@ -13,6 +13,7 @@ import {
   MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES,
 } from './cosUniversityDistillationCurriculumPlan.ts'
 import {
+  FAILURE_DERIVED_REMEDIATION_PROFILE,
   HYBRID_DISTILLATION_PROFILE,
   HYBRID_FAILURE_DERIVED_TARGET,
   failedEvaluationRemediationGates,
@@ -115,7 +116,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
       if (!failure) continue
       // Bind remediation identity to the independently evaluated artifact + failed gate classes.
       // Re-running the same evidence is idempotent; a newly failed artifact produces fresh curriculum.
-      const remediationKey = `${failure.candidateId}:${failure.gates.join(',')}`
+      const remediationKey = `${FAILURE_DERIVED_REMEDIATION_PROFILE}:${failure.candidateId}:${failure.gates.join(',')}`
       const contentHash = failureDerivedSourceHash(target.subject, ordinal, remediationKey)
       const remediationPrinciples = failureDerivedRemediationPrinciples(failure.gates)
       const remediationVariant = failureDerivedPracticeVariant({
@@ -143,6 +144,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
           {
             origin: 'failure_derived',
             profile: HYBRID_DISTILLATION_PROFILE,
+            remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE,
             ordinal,
             remediationGates: failure.gates,
             remediationPrinciples,
@@ -154,6 +156,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
         license: 'synthetic-benchmark-fixture',
         evidence: [{
           profile: HYBRID_DISTILLATION_PROFILE,
+          remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE,
           origin: 'failure_derived',
           independentEvaluationFailure: true,
           remediationGates: failure.gates,

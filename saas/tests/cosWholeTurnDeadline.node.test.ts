@@ -1,3 +1,4 @@
+// saas/tests/cosWholeTurnDeadline.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
@@ -42,4 +43,12 @@ test('model calls and the durable worker are bound to the whole-turn deadline', 
   assert.match(route, /DURABLE_TURN_MODEL_DEADLINE_MS = 150_000/)
   assert.match(route, /DURABLE_TURN_WATCHDOG_MS = 172_000/)
   assert.match(route, /source: deadlineElapsed \? 'cos-durable-turn-deadline'/)
+})
+
+test('direct (non-durable) turns run under the same clock and always record the question', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-provenance-browser/route.ts'), 'utf8')
+  assert.match(route, /const syncWorker = runWithTurnDeadline\(\s*requestStartedAt \+ DURABLE_TURN_MODEL_DEADLINE_MS,/)
+  assert.match(route, /response = await Promise\.race\(\[syncWorker, syncWatchdog\]\)/)
+  assert.match(route, /source: 'cos-turn-deadline'/)
+  assert.match(route, /if \(successful \|\| \(deadlineElapsed && reply\)\)/)
 })

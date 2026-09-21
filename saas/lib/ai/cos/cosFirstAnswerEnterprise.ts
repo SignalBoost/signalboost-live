@@ -51,6 +51,7 @@ import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, SIGNALB
 import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
 import { correctCompoundingArithmetic } from '@/lib/ai/cos/compoundingArithmeticCheck'
+import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -481,7 +482,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     '- Refusing to create leaves the user with nothing, which is worse than an artifact that is merely not yet data-tuned. Reserve outright refusal for requests that are unsafe or genuinely impossible, never for thin evidence.',
     '- Never present ordinary judgement as if it were learned performance, and never invent weights, metrics, or heuristics to fill the gap. Say plainly which parts are judgement and which are evidence.',
     '',
-    `Reply in ${language}.`,
+    `Reply in ${reportLanguageName(language)}.`,
     'Return ONLY strict JSON, nothing before the opening brace and nothing after the closing brace: {"answer":"complete answer","confidence":0.0}.',
     'The 0.0 in that example is a FORMAT PLACEHOLDER, not a suggested value. Always replace it with your own genuine self-assessment between 0 and 1. For advisory or strategic questions with no single verifiable answer, confidence should reflect how well-reasoned and grounded the recommendation is given the stated facts, not certainty the advice will succeed — that can never be fully known. Reserve near-zero for genuinely baseless guesses, not for good, well-reasoned advice.',
   ].join('\n')

@@ -5,6 +5,14 @@
 **Public product:** iTMounts  
 **Status:** normative architecture correction; implementation is evidence-gated
 
+## Operational handoff
+
+For the current end-to-end graduate -> real company work -> verified outcome -> continuing-education runbook, use:
+
+- `docs/COS-UNIVERSITY-REAL-WORLD-APPRENTICESHIP-HANDOFF-2026-09-21.md`
+
+The handoff contains a dated Production checkpoint and must be re-verified before acting.
+
 ## Owner intent
 
 Distillation inside COS University is not complete when a student model merely becomes a trained artifact.

@@ -17,6 +17,8 @@ import {
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
+  MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
+  MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   decideExhaustedMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
@@ -190,18 +192,49 @@ type RollingOutcome = Readonly<{
 async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const artifacts = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
-    .eq('status', 'evaluation_pending')
-    .like('candidate_id', 'mass:%')
-    .order('created_at', { ascending: true })
-    .limit(500)
-  if (artifacts.error) throw artifacts.error
-  const rows: RollingArtifact[] = (artifacts.data || []).map((row: any) => ({
-    candidateId: clean(row.candidate_id, 240), subjectId: clean(row.subject_id, 240),
-    artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
-    frontierRecipe: row.intended_use?.trainingReceipt?.profile === 'cos_university_frontier_gkd_v1',
-  }))
+  // Keep normal queue work bounded to the oldest 500, but explicitly include the small confirmed-v2
+  // Computer Science proof cohort. Otherwise a growing legacy backlog can make the priority policy unreachable.
+  const [oldestArtifacts, builderV2Artifacts] = await Promise.all([
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+      .eq('status', 'evaluation_pending')
+      .like('candidate_id', 'mass:%')
+      .order('created_at', { ascending: true })
+      .limit(500),
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+      .eq('status', 'evaluation_pending')
+      .eq('subject_id', 'Computer Science & Coding')
+      .contains('intended_use', { trainingReceipt: {
+        optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
+        frontierResponseAnchorRequired: true,
+        frontierResponseAnchorEpochs: 1,
+      } })
+      .order('created_at', { ascending: true })
+      .limit(20),
+  ])
+  if (oldestArtifacts.error) throw oldestArtifacts.error
+  if (builderV2Artifacts.error) throw builderV2Artifacts.error
+  const artifactByCandidate = new Map<string, any>()
+  for (const row of [...(oldestArtifacts.data || []), ...(builderV2Artifacts.data || [])]) {
+    artifactByCandidate.set(String((row as any).candidate_id), row)
+  }
+  const artifactRows = [...artifactByCandidate.values()]
+  const rows: RollingArtifact[] = artifactRows.map((row: any) => {
+    const receipt = row?.intended_use?.trainingReceipt && typeof row.intended_use.trainingReceipt === 'object'
+      ? row.intended_use.trainingReceipt
+      : {}
+    return {
+      candidateId: clean(row.candidate_id, 240), subjectId: clean(row.subject_id, 240),
+      artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
+      frontierRecipe: receipt.profile === 'cos_university_frontier_gkd_v1',
+      builderV2: String(row.subject_id || '') === 'Computer Science & Coding'
+        && receipt.optimizer === MASS_EVALUATION_BUILDER_V2_OPTIMIZER
+        && receipt.frontierResponseAnchorRequired === true
+        && Number(receipt.frontierResponseAnchorEpochs) === 1
+        && Number(receipt.frontierResponseAnchorItems) > 0,
+    }
+  })
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
   // Scope evidence to the pending candidates being evaluated this tick. Supabase/PostgREST can cap
   // broad result sets below the requested limit; a global newest-events query can therefore evict
@@ -258,6 +291,43 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   }))
   const now = new Date()
 
+  // The Builder apprenticeship proof lane is defined by the durable v2 receipt, not the broad historical
+  // frontier profile. Old-recipe artifacts share that profile and already produced dozens of evaluation rows.
+  // Count only durable results from confirmed response-anchor v2 Computer Science artifacts.
+  let builderV2ProofCompletions = MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
+  try {
+    const builderArtifacts = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,intended_use')
+      .eq('subject_id', 'Computer Science & Coding')
+      .contains('intended_use', { trainingReceipt: {
+        optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
+        frontierResponseAnchorRequired: true,
+        frontierResponseAnchorEpochs: 1,
+      } })
+      .like('candidate_id', 'mass:%')
+      .limit(200)
+    if (!builderArtifacts.error) {
+      const builderIds = (builderArtifacts.data || [])
+        .filter((row: any) => Number(row?.intended_use?.trainingReceipt?.frontierResponseAnchorItems) > 0)
+        .map((row: any) => clean(row.candidate_id, 240))
+        .filter(Boolean)
+      if (builderIds.length) {
+        const builderResults = await db.from('cos_university_distilled_evaluation_runs')
+          .select('candidate_id')
+          .in('candidate_id', builderIds)
+          .limit(500)
+        if (!builderResults.error) {
+          builderV2ProofCompletions = new Set((builderResults.data || [])
+            .map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
+        }
+      } else {
+        builderV2ProofCompletions = 0
+      }
+    }
+  } catch {
+    builderV2ProofCompletions = MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
+  }
+
   // The current frontier recipe cannot improve itself until it receives independent measurements.
   // A start is not proof: Production 2026-09-20 launched four frontier reservations, but three ended in
   // RunPod readiness failures before any evaluation row existed. Count distinct durable evaluation results
@@ -306,6 +376,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     events: all,
     now,
     frontierProofCompletions,
+    builderV2ProofCompletions,
   })
   if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }
   const inserted = await db.from('cos_university_learning_assurance_events').insert({

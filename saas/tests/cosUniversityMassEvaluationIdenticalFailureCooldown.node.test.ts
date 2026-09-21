@@ -11,6 +11,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS,
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
   MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
@@ -87,9 +88,11 @@ test('the cooldown ladder grows with each further identical failure and is cappe
   assert.equal(identicalInfrastructureFailureCooldownMs(-3), 0)
 })
 
-test('below the threshold nothing waits at all', () => {
-  const decision = decide(failures(NOT_READY, MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES - 1), '2026-09-20T10:08:00Z')
-  assert.equal(decision.issue, true)
+test('below the identical-error threshold the fairness floor still yields the artifact briefly', () => {
+  const three = failures(NOT_READY, MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES - 1)
+  assert.equal(MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS, 10 * MINUTE)
+  assert.equal(decide(three, '2026-09-20T10:08:00Z').issue, false)
+  assert.equal(decide(three, '2026-09-20T10:17:00Z').issue, true)
 })
 
 test('four identical readiness failures hold the artifact, then release it when the cooldown elapses', () => {
@@ -117,7 +120,7 @@ test('a fifth identical failure makes the artifact wait longer, not the same', (
   assert.equal(decide(five, '2026-09-20T11:10:00Z').issue, true)
 })
 
-test('a different newest failure resets the run and retries immediately', () => {
+test('a different infrastructure failure resets the long identical ladder but not the fairness floor', () => {
   const mixed = [
     ...failures(NOT_READY, 6),
     ev('host_controller', {
@@ -126,7 +129,45 @@ test('a different newest failure resets the run and retries immediately', () => 
       error: 'mass_distilled_evaluation_judge_unavailable',
     }, '2026-09-20T10:08:00Z'),
   ]
-  assert.equal(decide(mixed, '2026-09-20T10:09:00Z').issue, true)
+  assert.equal(decide(mixed, '2026-09-20T10:09:00Z').issue, false)
+  assert.equal(decide(mixed, '2026-09-20T10:19:00Z').issue, true)
+})
+
+test('a cooling oldest artifact yields the evaluator slot to the next eligible artifact', () => {
+  const second = {
+    candidateId: 'mass:reasoning:8',
+    subjectId: 'Reasoning & Decision Science',
+    artifactHash: 'd52c01ef'.padEnd(64, 'd'),
+    createdAt: '2026-09-19T00:10:00Z',
+  }
+  const secondCanary: RollingEvent = {
+    candidateId: second.candidateId,
+    verifier: 'host_production_verifier',
+    observedAt: '2026-09-19T01:10:00Z',
+    expiresAt: null,
+    evidence: {
+      claim: 'production_canary_healthy',
+      artifactHash: second.artifactHash,
+      exactArtifact: true,
+      productionTrafficAuthorized: false,
+    },
+  }
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifact, second],
+    events: [canary, approval, ...failures(NOT_READY, 1), secondCanary],
+    now: new Date('2026-09-20T10:08:00Z'),
+  })
+  assert.equal(decision.issue, true)
+  if (!decision.issue) return
+  assert.equal(decision.artifact.candidateId, second.candidateId)
+})
+
+test('an expired bounded runtime authorization is infrastructure and never burns the substantive budget', () => {
+  const controlPlane = failures('bounded_runtime_evaluation_authorization_missing_or_expired', MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT)
+  // Past the short fairness floor, this artifact remains eligible. If these were counted as substantive,
+  // three failures would permanently dispose it instead.
+  assert.equal(decide(controlPlane, '2026-09-20T10:17:00Z').issue, true)
 })
 
 test('the substantive-failure budget is untouched: a cooled-down artifact that really failed stays out', () => {

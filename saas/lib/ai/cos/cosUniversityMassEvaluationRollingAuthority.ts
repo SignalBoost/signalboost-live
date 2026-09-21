@@ -35,6 +35,13 @@ export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
 // compute each time and learning nothing. Identical repeats stop; a different failure resets the count.
 export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
+// Production 2026-09-21: a single old artifact alternated among readiness, 502, timeout and
+// truncated-answer infrastructure failures. Because the error STRING changed, the identical-error ladder
+// reset and the same artifact could reclaim one of four evaluator slots seconds later while 240+ eligible
+// artifacts waited. Give every infrastructure failure a short fairness floor; the existing identical-error
+// ladder still adds the longer backoff for a truly repeating defect. This changes scheduling only: it does
+// not consume a substantive attempt, widen spend, change scores, or weaken any graduation gate.
+export const MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS = 10 * 60_000
 // The identical-failure stop above had no time bound: once four identical failures were recorded, the artifact
 // was skipped on every subsequent tick forever, with nothing in the system able to release it except a
 // hand-inserted reopen event. That is correct for a permanent defect and wrong for a transient one, and the
@@ -147,6 +154,7 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error.startsWith('mass_distilled_evaluation_runtime_wake_')
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
     || error === 'mass_distilled_evaluation_route_deadline_exceeded'
+    || error === 'bounded_runtime_evaluation_authorization_missing_or_expired'
     || /\bis not a function\b/.test(error)
 }
 
@@ -374,6 +382,16 @@ export function decideRollingMassEvaluationApproval(input: {
       .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
         && at(event.observedAt) >= infrastructureGenerationStart)
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+    // Fairness floor: any newest infrastructure/control-plane failure yields this artifact briefly so
+    // the scheduler can try another eligible artifact. Different infrastructure error strings do not erase
+    // the floor. Substantive model-quality failures do not enter this branch and retain their separate budget.
+    const newestFailure = recentFailures[0]
+    if (newestFailure && evaluatorInfrastructureFailure(newestFailure)) {
+      const newestFailureAt = at(newestFailure.observedAt)
+      if (!Number.isFinite(newestFailureAt)) continue
+      if (nowMs - newestFailureAt < MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS) continue
+    }
+
     const recentErrors = recentFailures.map(event => String(event.evidence?.error || '').trim().toLowerCase())
     const newest = recentErrors[0]
     if (newest) {

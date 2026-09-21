@@ -94,6 +94,8 @@ function durableTrainingReceipt(profileValue: unknown, recipeValue: unknown) {
     const value = number(key, min, max)
     return value != null && Number.isInteger(value) ? value : null
   }
+  const boolean = (key: string): boolean | null =>
+    typeof raw[key] === 'boolean' ? raw[key] as boolean : null
   const faculty = Array.isArray(raw.frontierFaculty)
     ? [...new Set(raw.frontierFaculty.map(value => clean(value, 80)).filter(Boolean))].slice(0, 32)
     : []
@@ -105,6 +107,11 @@ function durableTrainingReceipt(profileValue: unknown, recipeValue: unknown) {
     denseTeacherRevision: clean(raw.denseTeacherRevision, 40).toLowerCase() || null,
     onPolicyFraction: number('onPolicyFraction', 0, 1),
     offPolicyAnchorFraction: number('offPolicyAnchorFraction', 0, 1),
+    frontierResponseAnchorRequired: boolean('frontierResponseAnchorRequired'),
+    frontierResponseAnchorEpochs: number('frontierResponseAnchorEpochs', 0, 100),
+    frontierResponseAnchorItems: integer('frontierResponseAnchorItems', 0, 100_000),
+    frontierResponseAnchorTrainer: clean(raw.frontierResponseAnchorTrainer, 80) || null,
+    frontierResponseAnchorTrainableFp32TensorCount: integer('frontierResponseAnchorTrainableFp32TensorCount', 0, 1_000_000),
     beta: number('beta', 0, 1),
     temperature: number('temperature', 0.01, 4),
     maxNewTokens: integer('maxNewTokens', 1, 8192),

@@ -25,16 +25,29 @@ export const MASS_CANARY_MAX_IDENTICAL_FAILURES = 4
 export const MASS_CANARY_ENDPOINT_REFRESH_FAILURES = 2
 export const MASS_CANARY_MAX_COST_USD = 0.2
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
-// Owner apprenticeship proof lane (2026-09-21): the first post-remediation Computer Science artifacts
-// must not sit behind the legacy canary backlog once they are ready to prove themselves. Prioritize only
-// the first two exact-artifact canary PASSES from the post-#2684 Builder cohort, then automatically return
-// to normal oldest-first scheduling. This changes ordering only: one-canary concurrency, 72/day, <= $0.20,
-// exact-artifact binding, evaluator gates, promotion rules and Production traffic authority are unchanged.
+// Owner apprenticeship proof lane (2026-09-21): the first CONFIRMED response-anchor v2
+// Computer Science artifacts must not sit behind the legacy canary backlog once they are ready to prove
+// themselves. Two old-recipe post-remediation CS artifacts already consumed the original date-only quota,
+// leaving the first true v2 artifact behind 336 older uncanaried artifacts. Prioritize only the first two
+// exact-artifact canary PASSES whose durable training receipt proves the v2 response-anchor recipe, then
+// automatically return to normal oldest-first scheduling. This changes ordering only: one-canary
+// concurrency, 72/day, <= $0.20, exact-artifact binding, evaluator gates, promotion rules and Production
+// traffic authority are unchanged.
 export const MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER = '2026-09-21T01:55:00.000Z' as const
 export const MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE = 2
+export const MASS_CANARY_BUILDER_V2_OPTIMIZER = 'frontier_response_anchor_then_stable_on_policy_distillation' as const
 const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 
-export type CanaryArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string }>
+export type CanaryArtifact = Readonly<{
+  candidateId: string
+  subjectId: string
+  artifactHash: string
+  createdAt: string
+  trainingOptimizer?: string
+  frontierResponseAnchorRequired?: boolean
+  frontierResponseAnchorEpochs?: number
+  frontierResponseAnchorItems?: number
+}>
 export type CanaryEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 export type CanaryDecision =
   | Readonly<{ issue: true; artifact: CanaryArtifact; evidence: Record<string, unknown>; expiresAt: string }>
@@ -158,6 +171,10 @@ export function decideMassCanaryRollingApproval(input: {
   const builderProofArtifact = (artifact: CanaryArtifact) =>
     artifact.subjectId === 'Computer Science & Coding'
       && at(artifact.createdAt) >= at(MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER)
+      && artifact.trainingOptimizer === MASS_CANARY_BUILDER_V2_OPTIMIZER
+      && artifact.frontierResponseAnchorRequired === true
+      && artifact.frontierResponseAnchorEpochs === 1
+      && Number(artifact.frontierResponseAnchorItems) > 0
 
   const builderProofPasses = new Set(valid
     .filter(builderProofArtifact)

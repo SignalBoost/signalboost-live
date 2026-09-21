@@ -11,7 +11,7 @@ import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerifi
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
-import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import {
   classifyAuthoritativeVolatileFact,
@@ -416,16 +416,13 @@ export async function postCosPrimary(req:NextRequest){
       && semanticTaskIntent.confidence>=0.72,
   )
   const baselineRequiresFreshEvidence=(heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
-  const hardTravelFreshness=requiresLiveTravelPlanningEvidence(input)
   // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh,
   // trust whole-request semantic intent rather than forcing the user to know COS routing phrases.
-  // Mutable travel planning is explicitly not self-contained authoring: fares, schedules, hours,
-  // ticket prices, closures and availability must remain live-grounded.
-  if(!hardTravelFreshness&&!hasAttachments&&!isCosCodingObjective(input)&&semanticIntentIsSelfContainedContentGeneration(semanticTaskIntent)){
+  if(!hasAttachments&&!isCosCodingObjective(input)&&semanticIntentIsSelfContainedContentGeneration(semanticTaskIntent)){
     const semanticFast=await runFastAuthoring(input,language)
     if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic')
   }
-  const requiresFreshEvidence=baselineRequiresFreshEvidence&&(hardTravelFreshness||!semanticIntentSuppressesFreshness(semanticTaskIntent))
+  const requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness(semanticTaskIntent)
   if(baselineRequiresFreshEvidence&&!requiresFreshEvidence){
     logEscalation({event:'freshness_semantic_intent_suppressed',semantic_task_mode:semanticTaskIntent?.mode??null,semantic_task_confidence:semanticTaskIntent?.confidence??null,supplied_context_primary:semanticTaskIntent?.suppliedContextPrimary??null,external_facts_required:semanticTaskIntent?.externalFactsRequired??null,external_ai_invoked:false,local_model_invoked:true})
   }

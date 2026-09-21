@@ -18,6 +18,7 @@ import {
   FIGMA_MCP_PROFILE,
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
+  VERCEL_MCP_PROFILE,
   UNIVERSAL_MCP_PROFILES,
   createUniversalMcpRegistryEntries,
   universalMcpToolNames,
@@ -34,7 +35,7 @@ export interface UniversalMcpProviderReadiness {
   providerId: UniversalMcpProfileId
   displayName: string
   configured: boolean
-  reason: 'ready' | 'missing_credential' | 'missing_project_ref'
+  reason: 'ready' | 'missing_credential' | 'missing_project_ref' | 'missing_target'
   authentication: 'bearer' | 'anonymous'
   target: string
 }
@@ -98,6 +99,9 @@ function readinessFor(env: Environment, allowedRepos: readonly string[]): readon
   const sbToken = String(env.SUPABASE_ACCESS_TOKEN || '').trim()
   const sbRef = supabaseProjectRef(env)
   const context7Token = String(env.CONTEXT7_API_KEY || '').trim()
+  const vercelToken = String(env.VERCEL_MCP_OAUTH_ACCESS_TOKEN || '').trim()
+  const vercelTeam = String(env.VERCEL_MCP_TEAM_SLUG || '').trim()
+  const vercelProject = String(env.VERCEL_MCP_PROJECT_SLUG || '').trim()
   return Object.freeze([
     Object.freeze({
       providerId: 'github-mcp' as const,
@@ -130,6 +134,16 @@ function readinessFor(env: Environment, allowedRepos: readonly string[]): readon
       reason: String(env.FIGMA_MCP_OAUTH_ACCESS_TOKEN || '').trim() ? 'ready' as const : 'missing_credential' as const,
       authentication: 'bearer' as const,
       target: 'figma-account',
+    }),
+    Object.freeze({
+      providerId: 'vercel-mcp' as const,
+      displayName: VERCEL_MCP_PROFILE.displayName,
+      configured: Boolean(vercelToken && vercelTeam && vercelProject),
+      reason: !vercelToken ? 'missing_credential' as const
+        : !vercelTeam || !vercelProject ? 'missing_target' as const
+          : 'ready' as const,
+      authentication: 'bearer' as const,
+      target: vercelTeam && vercelProject ? `${vercelTeam}/${vercelProject}` : 'unresolved',
     }),
   ])
 }
@@ -185,6 +199,19 @@ function httpProfiles(env: Environment, ready: readonly UniversalMcpProviderRead
       endpoint: 'https://mcp.figma.com/mcp',
       protocolVersion: FIGMA_MCP_PROFILE.protocolVersion,
       authorization: () => `Bearer ${figmaToken}`,
+    }))
+  }
+
+  const vercelToken = String(env.VERCEL_MCP_OAUTH_ACCESS_TOKEN || '').trim()
+  const vercelTeam = String(env.VERCEL_MCP_TEAM_SLUG || '').trim()
+  const vercelProject = String(env.VERCEL_MCP_PROJECT_SLUG || '').trim()
+  if (vercelToken && vercelTeam && vercelProject) {
+    profiles.push(Object.freeze({
+      serverId: VERCEL_MCP_PROFILE.serverId,
+      transportRef: VERCEL_MCP_PROFILE.transportRef,
+      endpoint: `https://mcp.vercel.com/${encodeURIComponent(vercelTeam)}/${encodeURIComponent(vercelProject)}`,
+      protocolVersion: VERCEL_MCP_PROFILE.protocolVersion,
+      authorization: () => `Bearer ${vercelToken}`,
     }))
   }
 

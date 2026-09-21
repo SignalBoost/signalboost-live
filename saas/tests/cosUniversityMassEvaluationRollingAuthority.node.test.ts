@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
+  MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
@@ -54,6 +55,71 @@ test('frontier proof sampling is bounded and then returns to oldest-first order'
   assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
 })
 
+test('confirmed v2 Computer Science proof sampling outranks legacy work only until two durable results exist', () => {
+  assert.equal(MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE, 2)
+  const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
+  const builderV2 = {
+    ...artifactA,
+    candidateId: 'mass:builder-v2:1',
+    artifactHash: '6'.repeat(64),
+    createdAt: '2026-09-15T22:34:00Z',
+    frontierRecipe: true,
+    builderV2: true,
+  }
+  const builderCanary = ev(builderV2.candidateId, 'host_production_verifier', {
+    claim: 'production_canary_healthy',
+    artifactHash: builderV2.artifactHash,
+    exactArtifact: true,
+    productionTrafficAuthorized: false,
+  })
+
+  const proof = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, builderV2],
+    events: [canary(legacy as typeof artifactA), builderCanary],
+    now,
+    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+    builderV2ProofCompletions: 0,
+  })
+  assert.equal(proof.issue && proof.artifact.candidateId, builderV2.candidateId)
+
+  const normal = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, builderV2],
+    events: [canary(legacy as typeof artifactA), builderCanary],
+    now,
+    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+    builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
+  })
+  assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
+})
+
+test('v2 Builder evaluation priority never bypasses the 12-hour retention delay', () => {
+  const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
+  const freshBuilder = {
+    ...artifactA,
+    candidateId: 'mass:builder-v2:fresh',
+    artifactHash: '5'.repeat(64),
+    createdAt: '2026-09-16T10:00:00Z',
+    builderV2: true,
+  }
+  const freshCanary = ev(freshBuilder.candidateId, 'host_production_verifier', {
+    claim: 'production_canary_healthy',
+    artifactHash: freshBuilder.artifactHash,
+    exactArtifact: true,
+    productionTrafficAuthorized: false,
+  })
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, freshBuilder],
+    events: [canary(legacy as typeof artifactA), freshCanary],
+    now,
+    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+    builderV2ProofCompletions: 0,
+  })
+  assert.equal(decision.issue && decision.artifact.candidateId, legacy.candidateId)
+})
+
 test('an infrastructure-failed frontier start remains proof-prioritized until a real result exists', () => {
   const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
   const frontier = { ...artifactA, candidateId: 'mass:frontier:retry', artifactHash: '7'.repeat(64), createdAt: '2026-09-15T22:34:00Z', frontierRecipe: true }
@@ -83,13 +149,19 @@ test('an infrastructure-failed frontier start remains proof-prioritized until a 
   assert.equal(decision.issue && decision.artifact.candidateId, frontier.candidateId)
 })
 
-test('cron scans the full bounded pending population and measures frontier proof completions durably', () => {
+test('cron scans bounded legacy work, explicitly includes v2 CS, and measures both proof cohorts durably', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /\.select\('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use'\)/)
+  assert.match(route, /const \[oldestArtifacts, builderV2Artifacts\] = await Promise\.all/)
   assert.match(route, /\.limit\(500\)/)
-  assert.match(route, /frontierRecipe: row\.intended_use\?\.trainingReceipt\?\.profile === 'cos_university_frontier_gkd_v1'/)
+  assert.match(route, /\.eq\('subject_id', 'Computer Science & Coding'\)/)
+  assert.match(route, /optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER/)
+  assert.match(route, /frontierRecipe: receipt\.profile === 'cos_university_frontier_gkd_v1'/)
+  assert.match(route, /builderV2:/)
+  assert.match(route, /frontierResponseAnchorItems/)
   assert.match(route, /cos_university_distilled_evaluation_runs/)
+  assert.match(route, /builderV2ProofCompletions = new Set/)
   assert.match(route, /frontierProofCompletions = new Set/)
+  assert.match(route, /MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE/)
   assert.match(route, /MASS_EVALUATION_FRONTIER_PROOF_SAMPLE/)
 })
 

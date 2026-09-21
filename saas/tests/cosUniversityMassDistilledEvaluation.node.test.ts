@@ -12,6 +12,7 @@ const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisi
 const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 const claimMigration = readFileSync(new URL('../supabase/migrations/20260919030000_mass_distilled_evaluation_claim_18.sql', import.meta.url), 'utf8')
 const concurrencyMigration = readFileSync(new URL('../supabase/migrations/20260920211800_mass_distilled_evaluation_bounded_concurrency.sql', import.meta.url), 'utf8')
+const builderV2PriorityMigration = readFileSync(new URL('../supabase/migrations/20260921185000_mass_distilled_v2_cs_evaluation_priority.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
 const MASS_REVISION = Object.freeze({
@@ -79,6 +80,29 @@ test('mass evaluation uses bounded four-way concurrency without changing authori
   assert.match(concurrencyMigration, /productionTrafficAuthorized',false/)
   assert.match(concurrencyMigration, /revoke all on function public\.claim_next_mass_distilled_evaluation\(\) from public, anon, authenticated/)
   assert.match(concurrencyMigration, /grant execute on function public\.claim_next_mass_distilled_evaluation\(\) to service_role/)
+})
+
+test('atomic evaluator claim prioritizes confirmed v2 Computer Science proof without bypassing any gate', () => {
+  assert.match(builderV2PriorityMigration, /v_builder_v2_completions integer := 0/)
+  assert.match(builderV2PriorityMigration, /v_builder_v2_completions < 2/)
+  assert.match(builderV2PriorityMigration, /Computer Science & Coding/)
+  assert.match(builderV2PriorityMigration, /frontier_response_anchor_then_stable_on_policy_distillation/)
+  assert.match(builderV2PriorityMigration, /frontierResponseAnchorRequired/)
+  assert.match(builderV2PriorityMigration, /frontierResponseAnchorEpochs/)
+  assert.match(builderV2PriorityMigration, /frontierResponseAnchorItems/)
+  assert.match(builderV2PriorityMigration, /a\.created_at <= v_now - interval '12 hours'/)
+  assert.match(builderV2PriorityMigration, /v_active_reservations >= 4/)
+  assert.match(builderV2PriorityMigration, /evidence->>'claim'='production_canary_healthy'/)
+  assert.match(builderV2PriorityMigration, /evidence->>'exactArtifact'='true'/)
+  assert.match(builderV2PriorityMigration, /v_max_endpoint<>18/)
+  assert.match(builderV2PriorityMigration, /v_max_judge<>4/)
+  assert.match(builderV2PriorityMigration, /v_max_wake<>1/)
+  assert.match(builderV2PriorityMigration, /v_max_cost>0\.200000/)
+  assert.match(builderV2PriorityMigration, /productionTrafficAuthorized',false/)
+  assert.match(
+    builderV2PriorityMigration,
+    /case[\s\S]*v_builder_v2_completions < 2[\s\S]*frontier_response_anchor_then_stable_on_policy_distillation[\s\S]*then 0 else 1[\s\S]*v_frontier_completions < 4/i,
+  )
 })
 
 test('mass evaluator binds exact governed training revision, pinned holdout and dynamic canary model', () => {

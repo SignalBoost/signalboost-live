@@ -192,6 +192,13 @@ test('browser MCP live host rejects hidden tools, filesystem output, and off-ori
 
   assert.throws(() => assertBrowserMcpToolCallForTest({
     serverId: 'chrome-devtools-mcp',
+    toolName: 'new_page',
+    args: { url: 'https://itmounts.com/', background: true },
+    approvedOrigins: ['https://itmounts.com'],
+  }), /browser_mcp_background_navigation_rejected/)
+
+  assert.throws(() => assertBrowserMcpToolCallForTest({
+    serverId: 'chrome-devtools-mcp',
     toolName: 'take_screenshot',
     args: { pageId: 1, filePath: '/tmp/leak.png' },
     approvedOrigins: ['https://itmounts.com'],

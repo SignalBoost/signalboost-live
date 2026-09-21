@@ -86,7 +86,7 @@ test('COS chat i18n is natively generated and tracked across exactly five suppor
   const dock = read('../components/Concierge.tsx')
 
   assert.match(primary, /reportLanguageName\(language\)/)
-  assert.match(primary, /language:reportLanguageName\(language\)/)
+  assert.match(primary, /userId,language,privileged:isPrivileged/)
   assert.match(primary, /language==='pl'/)
   assert.match(primary, /language==='ru'/)
   assert.match(primary, /Nie mam rzeczywistego zapisu pochodzenia/)

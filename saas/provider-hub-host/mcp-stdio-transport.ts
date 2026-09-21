@@ -77,6 +77,7 @@ function safeEnvironment(extra?: Readonly<Record<string, string>>): NodeJS.Proce
     PATH: process.env.PATH || '',
     HOME: process.env.HOME || '',
     TMPDIR: process.env.TMPDIR || '/tmp',
+    NODE_ENV: process.env.NODE_ENV || 'production',
     CI: process.env.CI || '1',
     NO_COLOR: '1',
   }

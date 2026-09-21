@@ -13,11 +13,15 @@ test('a slipped answer marker no longer aborts the batch: parsed answers are kep
 test('slipped cases are retried solo only inside the approved call ceiling and never use calls reserved for later suites', () => {
   assert.match(source, /if\(!item\|\|input\.budget\.used\+1\+reserve>input\.budget\.max\)throw new Error\(first\.errors\[id\]\)/)
   assert.match(source, /input\.budget\.used\+=1;const solo=await raw\(\[item\]\)/)
-  assert.match(source, /const ENDPOINT_CALLS = 8/)
+  assert.match(source, /const ENDPOINT_CALLS = MASS_EVALUATION_ENDPOINT_CALLS/)
 })
 
-test('a case that fails alone keeps the same error name, with finish_reason appended', () => {
-  assert.match(source, /if\(solo\.missing\.length\)throw new Error\(solo\.errors\[id\]\)/)
+test('solo candidate output exhaustion becomes model-quality only after the bounded solo retry reproduces it', () => {
+  assert.match(source, /function candidateSoloOutputExhaustion\(error:string\)/)
+  assert.match(source, /finish=length:think=0:open=1:close=0:other=0:cap=1024/)
+  assert.match(source, /if\(input\.candidate&&candidateSoloOutputExhaustion\(failure\)\)throw new Error\(failure\.replace\('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_output_exhausted:'\)\)/)
+  // Baseline truncation and every non-exact shape keep the original fail-closed error.
+  assert.match(source, /throw new Error\(failure\)/)
   assert.match(source, /errors\[item\.id\]=`\$\{error instanceof Error\?error\.message:String\(error\)\}:\$\{answerFailureFingerprint\(text,item,finish,cap\)\}`/)
   assert.match(source, /throw new Error\(`mass_distilled_evaluation_answer_missing:\$\{item\.id\}`\)/)
 })

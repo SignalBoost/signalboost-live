@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260915100500_mass_distilled_runtime_canary_claim.sql', import.meta.url), 'utf8')
+const endpointRefreshMigration = readFileSync(new URL('../supabase/migrations/20260921154000_mass_distilled_canary_endpoint_refresh_claim.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
 test('mass-distilled runtime derives immutable v2 identity from the exact artifact hash', () => {
@@ -137,4 +138,22 @@ test('rolling canary evidence loading cannot truncate old pass evidence behind u
   assert.match(route, /\.contains\('evidence',\{profile\}\)/)
   assert.match(route, /\.range\(from,from\+ROLLING_EVENT_PAGE_SIZE-1\)/)
   assert.doesNotMatch(route, /\.order\('observed_at',\{ascending:false\}\)\.limit\(5000\)/)
+})
+
+
+test('endpoint-refresh approval can re-canary an exact artifact that passed an older canary', () => {
+  assert.match(endpointRefreshMigration, /create or replace function public\.claim_next_mass_distilled_runtime_canary\(\)/)
+  assert.match(endpointRefreshMigration, /jsonb_typeof\(v_evidence->'endpointRefresh'\)='boolean'/)
+  assert.match(endpointRefreshMigration, /\(v_evidence->>'endpointRefresh'\)::boolean=true/)
+  assert.match(endpointRefreshMigration, /and e\.observed_at >= v_control\.observed_at/)
+  assert.match(endpointRefreshMigration, /v_max_invocations <> 1/)
+  assert.match(endpointRefreshMigration, /v_max_cost <= 0 or v_max_cost > 0\.200000/)
+  assert.match(endpointRefreshMigration, /'productionTrafficAuthorized',false/)
+})
+
+test('historical canary pass still blocks ordinary duplicate approvals', () => {
+  const passGate = endpointRefreshMigration.match(/if exists \([\s\S]*?local_distilled_runtime_canary_passed[\s\S]*?then continue; end if;/)?.[0]
+  assert.ok(passGate)
+  assert.match(passGate, /and not \(/)
+  assert.match(passGate, /endpointRefresh/)
 })

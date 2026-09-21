@@ -1,0 +1,79 @@
+# .github/workflows/playwright-mcp-live-acceptance.yml
+#
+# Real reference-host acceptance for Playwright MCP through SignalBoost governance.
+
+name: Playwright MCP Live Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/playwright-mcp-live-acceptance.yml'
+      - 'saas/provider-hub-host/mcp-stdio-transport.ts'
+      - 'saas/provider-hub-host/mcp-outbound-client.ts'
+      - 'saas/provider-hub-host/mcp-connection-registry.ts'
+      - 'saas/provider-hub-host/browser-mcp-profiles.ts'
+      - 'saas/provider-hub-host/browser-mcp-stdio-host.ts'
+      - 'saas/scripts/browser-agent-host/run-playwright-mcp-acceptance.ts'
+      - 'saas/tests/portableBrowserAdapterCatalog.node.test.ts'
+  workflow_dispatch:
+    inputs:
+      probe_url:
+        description: 'Approved iTMounts URL for the governed reference acceptance'
+        required: false
+        default: 'https://itmounts.com/'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playwright-mcp-live-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-playwright-mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Use repository Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Install pinned Playwright MCP and browser
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          npm install --no-save @playwright/mcp@0.0.82 tsx@4 @playwright/test@^1.41.0
+          actual="$(npm ls @playwright/mcp --depth=0 --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).dependencies['@playwright/mcp'].version))")"
+          test "$actual" = "0.0.82" || { echo "::error::Expected @playwright/mcp 0.0.82, got $actual"; exit 1; }
+          npx playwright install --with-deps chromium
+          browser_path="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")"
+          test -x "$browser_path" || { echo "::error::Chromium executable not found at $browser_path"; exit 1; }
+          echo "BROWSER_MCP_PLAYWRIGHT_EXECUTABLE=$browser_path" >> "$GITHUB_ENV"
+
+      - name: Run governed live acceptance
+        working-directory: saas
+        env:
+          BROWSER_MCP_PROBE_URL: ${{ github.event.inputs.probe_url || 'https://itmounts.com/' }}
+          BROWSER_MCP_APPROVED_ORIGINS: 'https://itmounts.com,https://www.itmounts.com'
+          BROWSER_MCP_ACCEPTANCE_RESULT_PATH: ${{ github.workspace }}/playwright-mcp-acceptance.json
+        run: node --import tsx scripts/browser-agent-host/run-playwright-mcp-acceptance.ts
+
+      - name: Upload metadata-only acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-mcp-acceptance-${{ github.run_id }}
+          path: playwright-mcp-acceptance.json
+          retention-days: 30
+          if-no-files-found: warn

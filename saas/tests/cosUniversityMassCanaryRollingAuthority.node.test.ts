@@ -12,6 +12,7 @@ import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
+  MASS_CANARY_IN_FLIGHT_TTL_MS,
   MASS_CANARY_MAX_IDENTICAL_FAILURES,
   decideMassCanaryRollingApproval,
   type CanaryArtifact,
@@ -139,6 +140,30 @@ test('an armed approval anywhere blocks a second one', () => {
   const a=artifact(1); const b=artifact(2)
   const armed=event(a,MASS_CANARY_APPROVAL_CLAIM,'2026-09-17T16:50:00.000Z',{expiresAt:'2026-09-17T18:50:00.000Z'})
   assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a,b],events:[armed],now,enabled:true}),{issue:false,reason:'mass_canary_approval_already_armed'})
+})
+
+test('a paid canary invocation remains a queue-wide semaphore until terminal evidence arrives', () => {
+  const a=artifact(1); const b=artifact(2)
+  const started=event(a,'local_distilled_runtime_canary_invocation_started','2026-09-17T16:55:00.000Z')
+  assert.deepEqual(
+    decideMassCanaryRollingApproval({artifacts:[a,b],events:[started],now,enabled:true}),
+    {issue:false,reason:'mass_canary_invocation_already_in_flight'},
+  )
+
+  const passed=event(a,'local_distilled_runtime_canary_passed','2026-09-17T16:56:00.000Z')
+  const afterPass=decideMassCanaryRollingApproval({artifacts:[a,b],events:[started,passed],now,enabled:true})
+  assert.ok('artifact' in afterPass)
+  assert.equal(afterPass.artifact.candidateId,b.candidateId)
+})
+
+test('an orphaned invocation marker releases after the bounded in-flight TTL', () => {
+  assert.equal(MASS_CANARY_IN_FLIGHT_TTL_MS, 10 * 60 * 1000)
+  const a=artifact(1); const b=artifact(2)
+  const staleStart=event(a,'local_distilled_runtime_canary_invocation_started',
+    new Date(now.getTime()-MASS_CANARY_IN_FLIGHT_TTL_MS-1000).toISOString())
+  const decision=decideMassCanaryRollingApproval({artifacts:[a,b],events:[staleStart],now,enabled:true})
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId,a.candidateId)
 })
 
 test('the kill switch and the 24-hour cap stop issuance', () => {

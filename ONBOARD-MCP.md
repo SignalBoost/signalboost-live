@@ -104,4 +104,18 @@ The shared MCP certification framework now covers all three implemented Universa
 - Context7 certification requires the exact two governed documentation capabilities and a real library resolution call.
 - GitHub, Supabase, and Context7 produce the same metadata-only certification report shape.
 - A missing Supabase credential remains a hard failure for live acceptance; it is not converted into a skip.
-- Figma is the next provider. Its official remote endpoint is `https://mcp.figma.com/mcp`; Production enablement must remain fail-closed until host-owned Figma OAuth authorization is present and live certification passes.
+- Figma is implemented as a governed OAuth provider profile at `https://mcp.figma.com/mcp`; Production enablement remains fail-closed until host-owned Figma OAuth authorization is present and live certification passes.
+
+
+## Vercel MCP provider — 2026-09-21
+
+Vercel MCP is now implemented as the next Universal MCP provider, optimized for the Builder / deployment-diagnostics loop.
+
+- Official remote MCP: `https://mcp.vercel.com`.
+- Host configuration requires `VERCEL_MCP_OAUTH_ACCESS_TOKEN`, `VERCEL_MCP_TEAM_SLUG`, and `VERCEL_MCP_PROJECT_SLUG`.
+- The gateway uses Vercel's project-specific MCP URL, `https://mcp.vercel.com/<team>/<project>`, so project scope is owned by the host transport rather than caller arguments.
+- Caller-supplied `teamId` or `projectId` values are rejected when they disagree with the configured target and are stripped before transport.
+- The initial governed projection is diagnostics-first and read-only: documentation search, project metadata, deployment list/detail, build logs, runtime logs, and domain availability/price checks.
+- `buy_domain`, `deploy_to_vercel`, `use_vercel_cli`, protected-deployment sharing, and other mutating or broader account capabilities are intentionally absent from the first allowlist. They require a separate authority/risk review before exposure.
+- Live certification is optional until the host-owned Vercel OAuth credential and exact team/project target are configured. Once configured, the shared certification framework requires exact projection plus a real project-scoped read.
+- Do not describe Vercel MCP as Production-certified until the Universal MCP Live Acceptance workflow passes on the candidate revision with that OAuth/target configuration.

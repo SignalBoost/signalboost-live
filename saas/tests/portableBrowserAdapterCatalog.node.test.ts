@@ -13,6 +13,7 @@ import { createMcpOutboundClient } from '../provider-hub-host/mcp-outbound-clien
 import { createNodeMcpStdioTransportFactory } from '../provider-hub-host/mcp-stdio-transport.ts'
 import {
   assertBrowserMcpNavigationResultForTest,
+  assertBrowserMcpRawNavigationResultForTest,
   assertBrowserMcpToolCallForTest,
   liveBrowserMcpToolNames,
 } from '../provider-hub-host/browser-mcp-stdio-host.ts'
@@ -227,4 +228,64 @@ test('Chrome MCP post-navigation evidence rejects an off-origin redirect', () =>
       { id: 1, url: 'https://redirect.example/', selected: true },
     ],
   }), /browser_mcp_navigation_origin_rejected/)
+})
+
+
+test('browser MCP post-navigation verification accepts only the final reported approved URL', () => {
+  assert.doesNotThrow(() => assertBrowserMcpRawNavigationResultForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'new_page',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com', 'https://www.itmounts.com'],
+    rawResult: {
+      content: [{
+        type: 'text',
+        text: '## Pages\n0: about:blank\n1: attacker-title https://redirect.example/ (https://www.itmounts.com/) [selected]',
+      }],
+    },
+  }))
+
+  assert.throws(() => assertBrowserMcpRawNavigationResultForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'new_page',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com', 'https://www.itmounts.com'],
+    rawResult: {
+      content: [{ type: 'text', text: '## Pages\n1: iTMounts (https://redirect.example/) [selected]' }],
+    },
+  }), /browser_mcp_navigation_origin_rejected/)
+
+  assert.doesNotThrow(() => assertBrowserMcpRawNavigationResultForTest({
+    serverId: 'playwright-mcp',
+    toolName: 'browser_navigate',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com', 'https://www.itmounts.com'],
+    rawResult: {
+      content: [{
+        type: 'text',
+        text: '### Page state\n- Page URL: https://www.itmounts.com/\n- Page Title: iTMounts',
+      }],
+    },
+  }))
+
+  assert.throws(() => assertBrowserMcpRawNavigationResultForTest({
+    serverId: 'playwright-mcp',
+    toolName: 'browser_navigate',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com', 'https://www.itmounts.com'],
+    rawResult: {
+      content: [{
+        type: 'text',
+        text: '### Page state\n- Page URL: https://redirect.example/\n- Page Title: Redirect',
+      }],
+    },
+  }), /browser_mcp_navigation_origin_rejected/)
+
+  assert.throws(() => assertBrowserMcpRawNavigationResultForTest({
+    serverId: 'playwright-mcp',
+    toolName: 'browser_navigate',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com'],
+    rawResult: { content: [{ type: 'text', text: 'navigation completed without page evidence' }] },
+  }), /browser_mcp_navigation_evidence_missing/)
 })

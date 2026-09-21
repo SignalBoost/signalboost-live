@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 export const HYBRID_DISTILLATION_PROFILE = 'cos-university-hybrid-distillation-v1' as const
+export const FAILURE_DERIVED_REMEDIATION_PROFILE = 'cos-university-failure-derived-remediation-v2' as const
 export const HYBRID_REAL_SOURCE_TARGET = 0.50
 export const HYBRID_FAILURE_DERIVED_TARGET = 0.30
 export const HYBRID_TEACHER_SYNTHETIC_TARGET = 0.20

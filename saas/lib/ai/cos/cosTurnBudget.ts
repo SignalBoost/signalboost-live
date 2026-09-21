@@ -14,6 +14,15 @@
 // beats a killed request.
 //
 // Deterministic and dependency-free so it can be unit-tested without clocks or models.
+//
+// WHOLE-TURN DEADLINE (Sep 21 2026). startTurnBudget() used to start a fresh clock on every call,
+// and several stages (COS-first, semantic rescue, completion rescue, fresh-evidence synthesis) each
+// call the reasoner. The per-call budgets therefore stacked until the durable worker hit the 300 s
+// platform ceiling and was killed (History: worker_lost). The durable worker now opens ONE deadline
+// for the whole turn with runWithTurnDeadline(); every budget started inside it is clamped to that
+// deadline, and every model HTTP call (lib/ai/local-inference.ts) is clamped to the time left.
+
+import { AsyncLocalStorage } from 'node:async_hooks'
 
 /** Platform ceiling for the COS answer routes (`export const maxDuration = 300`). */
 const PLATFORM_CEILING_MS = 300_000
@@ -44,8 +53,28 @@ export function turnBudgetMs(): number {
   return Math.min(configured, PLATFORM_CEILING_MS - RESERVED_OVERHEAD_MS)
 }
 
+const turnDeadlineScope = new AsyncLocalStorage<{ deadlineAt: number }>()
+
+/**
+ * Run one whole COS turn under a single wall-clock deadline. Nested scopes can only tighten it.
+ * Everything awaited inside fn (reasoner phases, rescues, model HTTP calls) sees the same deadline.
+ */
+export function runWithTurnDeadline<T>(deadlineAt: number, fn: () => Promise<T>): Promise<T> {
+  const outer = turnDeadlineScope.getStore()
+  const effective = outer ? Math.min(outer.deadlineAt, deadlineAt) : deadlineAt
+  return turnDeadlineScope.run({ deadlineAt: effective }, fn)
+}
+
+/** Milliseconds left in the enclosing whole-turn deadline, or null when no turn deadline is open. */
+export function turnDeadlineRemainingMs(now = Date.now()): number | null {
+  const scope = turnDeadlineScope.getStore()
+  return scope ? Math.max(0, scope.deadlineAt - now) : null
+}
+
 export function startTurnBudget(now = Date.now()): TurnBudget {
-  return { startedAt: now, deadlineAt: now + turnBudgetMs() }
+  const own = now + turnBudgetMs()
+  const scope = turnDeadlineScope.getStore()
+  return { startedAt: now, deadlineAt: scope ? Math.min(own, scope.deadlineAt) : own }
 }
 
 export function remainingMs(budget: TurnBudget, now = Date.now()): number {

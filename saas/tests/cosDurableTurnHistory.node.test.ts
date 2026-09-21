@@ -27,7 +27,8 @@ test('read-only COS questions stay synchronous while non-replayable actions keep
   assert.match(route, /progress: runningReply/)
   assert.doesNotMatch(route, /status: 'running',[\s\S]{0,120}reply: runningReply/)
   assert.match(route, /\{ status: 202 \}/)
-  assert.match(route, /const workerResponse = await cosBrowserPost/)
+  assert.match(route, /runWithTurnDeadline\(\s*requestStartedAt \+ DURABLE_TURN_MODEL_DEADLINE_MS,\s*\(\) => cosBrowserPost\(downstreamRequest\(req, body\)\)/)
+  assert.match(route, /const workerResponse = await Promise\.race\(\[worker, watchdog\]\)/)
 })
 
 test('browser follows durable COS History by turn id with read-only GETs', () => {

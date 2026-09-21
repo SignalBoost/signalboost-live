@@ -12,6 +12,7 @@ import {
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance.ts'
 import { recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance.ts'
 import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durableCosTurn.ts'
+import { runWithTurnDeadline } from '@/lib/ai/cos/cosTurnBudget.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
 
@@ -23,6 +24,16 @@ const PROVENANCE_COOKIE = 'sb_answer_provenance'
 const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 const MAX_PROVENANCE_COOKIE_CHARS = 3600
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// One clock for the whole durable turn, measured from when this request started. Reasoning must
+// finish by the model deadline; the watchdog then writes an honest terminal History row. Both sit
+// inside the browser's 180 s History wait (agentProgressClient COS_TURN_FOREGROUND_WAIT_MS) and far
+// inside Vercel's 300 s maxDuration, so the page always receives the real outcome and the platform
+// can never kill the worker silently (worker_lost).
+const DURABLE_TURN_MODEL_DEADLINE_MS = 150_000
+const DURABLE_TURN_WATCHDOG_MS = 172_000
+const DURABLE_TURN_DEADLINE_REPLY = 'COS ran out of time on this turn before it produced a verified response, so nothing was sent in its place. The request was not replayed.'
+
+class DurableTurnWatchdogElapsed extends Error {}
 
 type BrowserMessage = {
   role?: unknown
@@ -165,6 +176,7 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const requestStartedAt = Date.now()
   // This route is an internal network boundary, not a second public assistant endpoint. The proxy
   // injects a server-only secret after applying spend/routing policy. A direct request fails closed.
   if (!trustedBoundaryRequest(req)) {
@@ -242,8 +254,20 @@ export async function POST(req: NextRequest): Promise<Response> {
 
         const workerUserId = access.userId
         after(async () => {
+          const watchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
           try {
-            const workerResponse = await cosBrowserPost(downstreamRequest(req, body))
+            const watchdog = new Promise<never>((_, reject) => {
+              watchdogTimer.handle = setTimeout(
+                () => reject(new DurableTurnWatchdogElapsed('cos_durable_turn_deadline')),
+                Math.max(1_000, requestStartedAt + DURABLE_TURN_WATCHDOG_MS - Date.now()),
+              )
+            })
+            const worker = runWithTurnDeadline(
+              requestStartedAt + DURABLE_TURN_MODEL_DEADLINE_MS,
+              () => cosBrowserPost(downstreamRequest(req, body)),
+            )
+            worker.catch(() => undefined)
+            const workerResponse = await Promise.race([worker, watchdog])
             const payload: any = await workerResponse.clone().json().catch(() => null)
             const reply = String(payload?.reply || payload?.error || '').trim()
             const succeeded = workerResponse.ok && payload?.ok !== false && Boolean(reply)
@@ -259,15 +283,21 @@ export async function POST(req: NextRequest): Promise<Response> {
               error: succeeded ? null : String(payload?.error || `http_${workerResponse.status}`),
             })
           } catch (error) {
+            const deadlineElapsed = error instanceof DurableTurnWatchdogElapsed
+            if (deadlineElapsed) {
+              console.error('[cos_durable_turn_deadline]', JSON.stringify({ turnId, elapsedMs: Date.now() - requestStartedAt }))
+            }
             await finishDurableCosTurn({
               turnId,
               historyMessageId,
               userId: workerUserId,
               status: 'failed',
-              reply: 'COS could not finish this durable turn. The request was not replayed.',
-              source: 'cos-durable-worker-failed',
+              reply: deadlineElapsed ? DURABLE_TURN_DEADLINE_REPLY : 'COS could not finish this durable turn. The request was not replayed.',
+              source: deadlineElapsed ? 'cos-durable-turn-deadline' : 'cos-durable-worker-failed',
               error: error instanceof Error ? error.message : 'cos_durable_worker_failed',
             }).catch(() => undefined)
+          } finally {
+            if (watchdogTimer.handle) clearTimeout(watchdogTimer.handle)
           }
         })
 

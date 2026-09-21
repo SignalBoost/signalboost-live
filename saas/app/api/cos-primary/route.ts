@@ -251,7 +251,7 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
   const evidence=sources.slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}${source.sourceDate?` (source date: ${source.sourceDate})`:''}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
   const result=await callCosReasoner({
     temperature:.2,
-    maxTokens:1000,
+    maxTokens:700,
     jsonObject:true,
     disableThinking:true,
     timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS,

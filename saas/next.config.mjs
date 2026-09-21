@@ -23,9 +23,17 @@ const PUBLIC_ROOT_EXPOSURE_HEADERS = [
   { key: 'Server', value: '' },
 ]
 
+const CI_BUILD_SKIP_NEXT_TYPECHECK = process.env.CI_NEXT_BUILD_SKIP_TYPECHECK === 'true'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   turbopack: {},
+  // GitHub's build job already depends on the dedicated tsc --noEmit gate. Next 16 runs its own
+  // isolated checker with a ~2 GB heap and currently OOMs on this repository even when NODE_OPTIONS
+  // is raised. Skip only that duplicate CI checker; Vercel/Production keeps normal Next typechecking.
+  typescript: {
+    ignoreBuildErrors: CI_BUILD_SKIP_NEXT_TYPECHECK,
+  },
   outputFileTracingRoot: path.join(process.cwd(), '..'),
   outputFileTracingIncludes: {
     '/api/concierge': ['../cos-core/brain.md'],

@@ -34,6 +34,27 @@ function boundedInt(value: unknown, fallback: number, min: number, max: number):
   return Math.max(min, Math.min(max, Math.floor(parsed)))
 }
 
+function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(min, Math.min(max, parsed))
+}
+
+function numericMap(value: unknown, min: number, max: number, integer = false): Readonly<Record<string, number>> {
+  let parsed: unknown
+  try { parsed = JSON.parse(String(value ?? '').trim() || '{}') } catch { return Object.freeze({}) }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return Object.freeze({})
+  const result: Record<string, number> = {}
+  for (const [rawKey, rawValue] of Object.entries(parsed as Record<string, unknown>)) {
+    const key = clean(rawKey, 80).toLowerCase()
+    if (!/^[a-z0-9][a-z0-9._-]{0,79}$/.test(key)) continue
+    const n = boundedNumber(rawValue, Number.NaN, min, max)
+    if (!Number.isFinite(n)) continue
+    result[key] = integer ? Math.floor(n) : n
+  }
+  return Object.freeze(result)
+}
+
 function hash(value: unknown): string {
   return createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex')
 }
@@ -75,7 +96,75 @@ export function massHostedTeacherStageConfig(env: Env = process.env) {
     maxOutputTokens: boundedInt(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS, DEFAULT_MAX_OUTPUT_TOKENS, 128, HARD_MAX_OUTPUT_TOKENS),
     parallelism: boundedInt(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM, DEFAULT_PARALLELISM, 1, HARD_MAX_PARALLELISM),
     minimumRows: MIN_TEACHER_ROWS,
+    // These are planning estimates, not billing claims. The router uses them to balance expected
+    // dollars across active faculty while preserving at least one governed route to each teacher.
+    providerEstimatedUnitCostUsd: numericMap(
+      env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_COST_USD_JSON,
+      0.000001,
+      100,
+    ),
+    // A provider may need more completion headroom to finish the same concise teaching answer.
+    // The global hard ceiling still wins, so this cannot expand the existing 512-token envelope.
+    providerMaxOutputTokens: numericMap(
+      env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_MAX_OUTPUT_TOKENS_JSON,
+      128,
+      HARD_MAX_OUTPUT_TOKENS,
+      true,
+    ),
   })
+}
+
+type MassHostedTeacherConfig = ReturnType<typeof massHostedTeacherStageConfig>
+
+function teacherTuningValue(
+  values: Readonly<Record<string, number>>,
+  teacher: UniversityTeacherDefinition,
+): number | null {
+  return values[teacher.id.toLowerCase()] ?? values[teacher.provider.toLowerCase()] ?? null
+}
+
+function teacherEstimatedCostUsd(config: MassHostedTeacherConfig, teacher: UniversityTeacherDefinition): number | null {
+  return teacherTuningValue(config.providerEstimatedUnitCostUsd, teacher)
+}
+
+function teacherOutputTokenLimit(config: MassHostedTeacherConfig, teacher: UniversityTeacherDefinition): number {
+  const configured = teacherTuningValue(config.providerMaxOutputTokens, teacher)
+  return configured == null
+    ? config.maxOutputTokens
+    : boundedInt(configured, config.maxOutputTokens, 128, HARD_MAX_OUTPUT_TOKENS)
+}
+
+function costBalancedPrimaryPlan(input: {
+  prompts: readonly Prompt[]
+  teachers: readonly UniversityTeacherDefinition[]
+  config: MassHostedTeacherConfig
+}): ReadonlyMap<string, UniversityTeacherDefinition> {
+  const knownCosts = input.teachers
+    .map(teacher => teacherEstimatedCostUsd(input.config, teacher))
+    .filter((value): value is number => value != null && value > 0)
+  // An unpriced provider is treated conservatively as the most expensive known provider. If none
+  // are priced, every provider has equal planning cost and the deterministic tie-break spreads work.
+  const fallbackCost = knownCosts.length ? Math.max(...knownCosts) : 1
+  const plannedSpend = new Map<string, number>()
+  const plan = new Map<string, UniversityTeacherDefinition>()
+
+  for (const prompt of input.prompts) {
+    const promptId = clean(prompt.id, 64).toLowerCase()
+    const ranked = [...input.teachers].sort((left, right) => {
+      const leftCost = teacherEstimatedCostUsd(input.config, left) ?? fallbackCost
+      const rightCost = teacherEstimatedCostUsd(input.config, right) ?? fallbackCost
+      const leftProjected = (plannedSpend.get(left.provider) || 0) + leftCost
+      const rightProjected = (plannedSpend.get(right.provider) || 0) + rightCost
+      if (leftProjected !== rightProjected) return leftProjected - rightProjected
+      return hash(`${promptId}\u0000${left.id}`).localeCompare(hash(`${promptId}\u0000${right.id}`))
+    })
+    const selected = ranked[0]
+    if (!selected) continue
+    const cost = teacherEstimatedCostUsd(input.config, selected) ?? fallbackCost
+    plannedSpend.set(selected.provider, (plannedSpend.get(selected.provider) || 0) + cost)
+    plan.set(promptId, selected)
+  }
+  return plan
 }
 
 export async function runMassHostedTeacherStage(input: {
@@ -123,6 +212,22 @@ export async function runMassHostedTeacherStage(input: {
   const missing = input.prompts.filter(prompt => !byPrompt.has(clean(prompt.id, 64).toLowerCase()))
   const failures: Array<{ promptId: string; teacherId: string; error: string }> = []
 
+  // Balance *expected dollars*, not call counts. Equal provider balances otherwise drain at radically
+  // different rates. A cost-balanced primary plan preserves faculty diversity while assigning fewer
+  // first-pass calls to expensive teachers. On a partial retry, the original primary is excluded when
+  // another provider exists, preventing a known failed/truncated paid attempt from being purchased
+  // again before rerouting.
+  const primaryPlan = costBalancedPrimaryPlan({ prompts: input.prompts, teachers, config })
+  const plannedProviderMix: Record<string, number> = {}
+  let plannedEstimatedCostUsd = 0
+  for (const teacher of primaryPlan.values()) {
+    plannedProviderMix[teacher.id] = (plannedProviderMix[teacher.id] || 0) + 1
+    plannedEstimatedCostUsd += teacherEstimatedCostUsd(config, teacher) || 0
+  }
+  const partialRetry = (existing.data || []).length > 0
+    && missing.length < input.prompts.length
+    && input.prompts.length <= config.maxCalls
+
   // The shared Dynamic Pipeline Router owns selection policy. This stage only supplies active,
   // authorized teacher pipelines and executes the returned order. Provider names are data, not
   // routing branches.
@@ -136,16 +241,22 @@ export async function runMassHostedTeacherStage(input: {
     activeLeases: 0,
     queueDepth: 0,
     recentFailureRate: 0,
+    estimatedUnitCostUsd: teacherEstimatedCostUsd(config, teacher),
     environments: Object.freeze(['production']),
     metadata: Object.freeze({ transport: teacher.transport }),
   }))
   const rankedByPrompt = new Map<string, readonly UniversityTeacherDefinition[]>()
   for (const prompt of missing) {
     const promptId = clean(prompt.id, 64).toLowerCase()
+    const preferred = primaryPlan.get(promptId)
+    const hasAlternative = Boolean(preferred && teachers.some(teacher => teacher.provider !== preferred.provider))
+    const excludePreviousPrimary = partialRetry && hasAlternative ? [preferred!.provider] : undefined
     const ranked = rankDynamicPipelineCandidates({
       workloadId: promptId,
       capabilityId: 'ai.teacher.generate',
       environment: 'production',
+      preferredProviderIds: excludePreviousPrimary || !preferred ? undefined : [preferred.provider],
+      excludedProviderIds: excludePreviousPrimary,
     }, routerCandidates)
     rankedByPrompt.set(promptId, Object.freeze(
       ranked.map(item => teacherByPipeline.get(item.candidate.pipelineId)).filter((item): item is UniversityTeacherDefinition => Boolean(item)),
@@ -195,10 +306,10 @@ export async function runMassHostedTeacherStage(input: {
                 'You are one governed teacher in the COS University mass-distillation faculty.',
                 'Use the supplied rights-cleared learning case only.',
                 'Return a rigorous final teaching response without hidden chain-of-thought, citations, private data, or claims of external access.',
-                'Keep the response complete and concise: finish the full teaching example in no more than 300 output tokens.',
+                'Keep the response complete and concise: use at most 180 words, finish every sentence and list, and never pad the answer to the output limit.',
               ].join(' '),
               prompt: String(prompt.prompt || '').slice(0, 3000),
-              maxOutputTokens: config.maxOutputTokens,
+              maxOutputTokens: teacherOutputTokenLimit(config, teacher),
               temperature: 0.2,
             },
           })
@@ -273,7 +384,9 @@ export async function runMassHostedTeacherStage(input: {
     minimumRows: MIN_TEACHER_ROWS,
     activeProviders: teachers.map(item => item.id),
     providerMix: Object.freeze(providerMix),
-    routingMode: 'dynamic-pipeline-router-v1' as const,
+    plannedProviderMix: Object.freeze(plannedProviderMix),
+    plannedEstimatedCostUsd: Number(plannedEstimatedCostUsd.toFixed(6)),
+    routingMode: 'dynamic-pipeline-router-v1-cost-balanced' as const,
     attemptedCalls,
     reroutedPrompts,
     failures: Object.freeze(failures),

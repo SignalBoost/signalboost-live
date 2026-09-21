@@ -69,14 +69,21 @@ test('evaluator quota repair only releases sibling mass-distilled worker reserva
 })
 
 
-test('canary and evaluator capacity reclamation never disable active graduate endpoints', () => {
-  assert.match(provisionLegacy, /activeGraduateRunpodEndpointIds/)
+test('capacity reclamation never disables active graduates or live canary/evaluator endpoints', () => {
+  assert.match(provisionLegacy, /protectedMassDistilledRunpodEndpointIds/)
   assert.match(provisionLegacy, /!protectedEndpointIds\.has\(clean\(endpoint\.id,160\)\.toLowerCase\(\)\)/)
-  assert.match(provisionV2, /activeGraduateRunpodEndpointIds/)
+  assert.match(provisionV2, /protectedMassDistilledRunpodEndpointIds/)
   assert.match(provisionV2, /!protectedEndpointIds\.has\(clean\(endpoint\.id, 160\)\.toLowerCase\(\)\)/)
   assert.match(graduateProtection, /cos_university_graduate_model_registry/)
   assert.match(graduateProtection, /\.eq\('status', 'active'\)/)
   assert.match(graduateProtection, /\.eq\('runtime_provider', 'runpod'\)/)
-  assert.match(graduateProtection, /\.api\.runpod\.ai/)
+  assert.match(graduateProtection, /mass_distilled_independent_evaluation_started/)
+  assert.match(graduateProtection, /mass_distilled_independent_evaluation_completed/)
+  assert.match(graduateProtection, /mass_distilled_independent_evaluation_failed/)
+  assert.match(graduateProtection, /local_distilled_runtime_canary_invocation_started/)
+  assert.match(graduateProtection, /local_distilled_runtime_canary_passed/)
+  assert.match(graduateProtection, /local_distilled_runtime_canary_failed/)
+  assert.match(graduateProtection, /EVALUATION_PROTECTION_TTL_MS = 12 \* 60 \* 1000/)
+  assert.match(graduateProtection, /CANARY_PROTECTION_TTL_MS = 10 \* 60 \* 1000/)
   assert.match(graduateProtection, /graduate_endpoint_protection_database_unavailable/)
 })

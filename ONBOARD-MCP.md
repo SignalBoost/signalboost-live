@@ -82,3 +82,15 @@ Acceptance:
 - `npm run test:mcp-gateway` is mandatory in the main test suite.
 - `.github/workflows/universal-mcp-live-acceptance.yml` performs real remote acceptance against Context7, the private SignalBoost GitHub repository, and the scoped Supabase project.
 - Supabase live acceptance deliberately fails when `SUPABASE_ACCESS_TOKEN` is unavailable; it never converts a missing credential into a skipped/green result.
+
+
+## MCP provider certification framework — 2026-09-21
+
+MCP onboarding now has a provider-neutral certification layer rather than relying on one-off acceptance logic for each integration.
+
+- `saas/provider-hub-host/mcp-certification.ts` defines the reusable fail-closed certification contract.
+- Certification requires provider readiness, an exact governed capability projection, and explicit positive/negative probes.
+- Certification evidence is metadata-only: probe arguments, remote results, credentials, and provider error bodies are never retained.
+- GitHub MCP is the first provider wired through this framework. Its live certification verifies the exact host-approved capability set, a real read of `SignalBoost/signalboost-live`, and rejection of an off-scope repository.
+- `npm run test:mcp-gateway` includes certification regression coverage.
+- `.github/workflows/universal-mcp-live-acceptance.yml` is the live evidence gate. Do not describe GitHub MCP as Production-certified until that workflow passes on the candidate revision.

@@ -1,5 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
+import { certifyMcpProvider } from '../../provider-hub-host/mcp-certification.ts'
 import { createUniversalMcpGateway } from '../../provider-hub-host/universal-mcp-gateway.ts'
+import { GITHUB_MCP_PROFILE } from '../../provider-hub-host/universal-mcp-profiles.ts'
 
 const checks: Array<{ name: string; passed: boolean; detail: string }> = []
 const add = (name: string, passed: boolean, detail: string) => checks.push({ name, passed, detail })
@@ -29,19 +31,27 @@ async function run() {
   })
   add('context7_real_lookup', resolved.ok, `mode=${resolved.mode || 'none'}`)
 
-  const github = await gateway.discover('github-mcp')
-  add(
-    'github_governed_projection',
-    github.some(item => item.capabilityId === 'mcp.github-mcp.contents.read') &&
-      !github.some(item => item.capabilityId.includes('delete_repository')),
-    `capabilities=${github.length}`,
-  )
-  const githubRead = await gateway.invoke({
-    serverId: 'github-mcp',
-    capabilityId: 'mcp.github-mcp.contents.read',
-    args: { owner: 'SignalBoost', repo: 'signalboost-live', path: 'ONBOARD.md', ref: 'main' },
+  const githubCertification = await certifyMcpProvider(gateway, {
+    providerId: 'github-mcp',
+    expectedCapabilities: GITHUB_MCP_PROFILE.tools.map(item => `mcp.github-mcp.${item.capabilityName}`),
+    probes: [
+      {
+        id: 'private_repo_read',
+        capabilityId: 'mcp.github-mcp.contents.read',
+        args: { owner: 'SignalBoost', repo: 'signalboost-live', path: 'ONBOARD.md', ref: 'main' },
+        expect: { ok: true },
+      },
+      {
+        id: 'cross_repo_scope_rejected',
+        capabilityId: 'mcp.github-mcp.contents.read',
+        args: { owner: 'other', repo: 'repo', path: 'README.md', ref: 'main' },
+        expect: { ok: false, errorIncludes: 'universal_mcp_github_repository_rejected' },
+      },
+    ],
   })
-  add('github_real_private_repo_read', githubRead.ok, `mode=${githubRead.mode || 'none'}`)
+  for (const item of githubCertification.checks) {
+    add(`github_certification_${item.id.replace(/[^a-z0-9_-]+/gi, '_')}`, item.passed, item.detail)
+  }
 
   const supabaseReady = gateway.readiness.find(item => item.providerId === 'supabase-mcp')
   add('supabase_management_credential_present', supabaseReady?.configured === true, supabaseReady?.reason || 'missing')
@@ -62,7 +72,7 @@ async function run() {
   }
 
   const evidence = {
-    schemaVersion: 'universal-mcp-live-acceptance-v1',
+    schemaVersion: 'universal-mcp-live-acceptance-v2',
     observedAt: new Date().toISOString(),
     providers: gateway.readiness.map(item => ({
       providerId: item.providerId,
@@ -70,13 +80,14 @@ async function run() {
       reason: item.reason,
       authentication: item.authentication,
     })),
+    certifications: [githubCertification],
     checks,
   }
   await mkdir('artifacts', { recursive: true })
   await writeFile('artifacts/universal-mcp-live-acceptance.json', JSON.stringify(evidence, null, 2) + '\n')
 
-  for (const check of checks) console.log(`${check.passed ? 'PASS' : 'FAIL'} ${check.name}: ${check.detail}`)
-  const failed = checks.filter(check => !check.passed)
+  for (const item of checks) console.log(`${item.passed ? 'PASS' : 'FAIL'} ${item.name}: ${item.detail}`)
+  const failed = checks.filter(item => !item.passed)
   if (failed.length) throw new Error(`universal_mcp_live_acceptance_failed:${failed.map(item => item.name).join(',')}`)
 }
 

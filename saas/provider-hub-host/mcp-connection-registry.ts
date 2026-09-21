@@ -60,6 +60,7 @@ export interface McpRegistryResolution {
   serverId: string
   transportRef: string
   adapter: ReturnType<typeof createMcpOutboundProviderHubAdapter>
+  close(): Promise<void>
 }
 
 const SECRET_KEY = /(?:secret|token|password|passwd|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|refresh[_-]?token|authorization|credential)/i
@@ -230,7 +231,13 @@ export function createMcpConnectionRegistryResolver(options: {
       },
     })
 
-    return Object.freeze({ assignmentId: assignment.assignmentId, serverId, transportRef: server.transportRef, adapter })
+    return Object.freeze({
+      assignmentId: assignment.assignmentId,
+      serverId,
+      transportRef: server.transportRef,
+      adapter,
+      close: () => client.close(),
+    })
   }
 
   async function listAssignments(input: { tenantId: string; environmentId: string; portableId: string }) {

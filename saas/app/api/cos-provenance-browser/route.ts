@@ -1,7 +1,7 @@
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosBrowserPost } from '@/app/api/cos-browser/route'
 import { getAccess } from '@/lib/auth/access'
-import { isProvenanceIntrospection } from '@/lib/ai/cos/cosOrchestration'
+import { isProvenanceIntrospection, requestsExternalAction } from '@/lib/ai/cos/cosOrchestration'
 import { ensureAnswerExecutionProvenance } from '@/lib/ai/cos/answerProvenance.ts'
 import { provenanceBoundarySecret } from '@/lib/ai/cos/provenanceBoundarySecret.ts'
 import {
@@ -13,6 +13,7 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance.ts'
 import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durableCosTurn.ts'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
+import { persistTurn } from '@/lib/ai/tools/conversationHistory.ts'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -207,17 +208,21 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
   }
 
-  // Signed-in ordinary turns use the same durable contract as Builder: persist a running History
-  // row, return 202 immediately, execute exactly once in after(), then update that same row.
-  // Fast edits are already removed by the proxy/direct fast lane before this point. Source-heavy
-  // coding requests stay on the existing Software Specialist/Builder lifecycle rather than nesting
-  // one durable job inside another.
+  // Durability is for requests whose POST must not be replayed. Ordinary read-only questions
+  // should return their actual answer on the original response path instead of turning every chat
+  // into a background job and making the browser poll History for minutes.
+  //
+  // Completed read-only turns are still persisted below before the response is returned, so History
+  // remains authoritative without exposing a running receipt as the user-visible answer.
   const conversationId = String(body?.context?.conversationId || body?.conversationId || '').trim()
   const attachments = Array.isArray(body?.attachments) ? body.attachments : []
-  const durableConversationTurn = Boolean(prompt)
+  const ordinaryConversationTurn = Boolean(prompt)
     && UUID.test(conversationId)
     && attachments.length === 0
     && !isConciergeBuilderObjective(prompt, { attachmentNames: [], attachmentMimeTypes: [] })
+  const externalActionRequested = Boolean(prompt) && requestsExternalAction(prompt)
+  const durableConversationTurn = ordinaryConversationTurn && externalActionRequested
+  const synchronousReadOnlyTurn = ordinaryConversationTurn && !externalActionRequested
 
   if (durableConversationTurn) {
     const access = await getAccess().catch(() => null)
@@ -291,5 +296,26 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const response = await cosBrowserPost(downstreamRequest(req, body))
-  return finalizeAnswer(response, req, body)
+  const delivered = await finalizeAnswer(response, req, body)
+
+  if (synchronousReadOnlyTurn) {
+    const access = await getAccess().catch(() => null)
+    const userId = access?.userId || null
+    if (userId) {
+      const payload: any = await delivered.clone().json().catch(() => null)
+      const reply = typeof payload?.reply === 'string' ? payload.reply.trim() : ''
+      const successful = delivered.ok && payload?.ok !== false && Boolean(reply)
+      if (successful) {
+        await persistTurn({
+          conversationId,
+          userId,
+          userMessage: prompt,
+          assistantReply: reply,
+          provenance: payload?.execution_provenance ?? null,
+        })
+      }
+    }
+  }
+
+  return delivered
 }

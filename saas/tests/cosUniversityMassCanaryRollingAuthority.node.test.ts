@@ -10,6 +10,7 @@ import {
   MASS_CANARY_COLD_START_FAILURE,
   MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
   MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+  MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
   MASS_CANARY_MAX_IDENTICAL_FAILURES,
   decideMassCanaryRollingApproval,
@@ -21,6 +22,16 @@ const now = new Date('2026-09-17T17:00:00.000Z')
 const h = (n: number) => n.toString(16).padStart(64, '0')
 const artifact = (n: number, createdAt = `2026-09-1${n % 7}T00:00:00.000Z`): CanaryArtifact =>
   ({ candidateId: `mass:${n}`, subjectId: 'computer_science', artifactHash: h(n), createdAt })
+const v2BuilderArtifact = (candidateId: string, hashId: number, createdAt: string): CanaryArtifact => ({
+  candidateId,
+  subjectId: 'Computer Science & Coding',
+  artifactHash: h(hashId),
+  createdAt,
+  trainingOptimizer: MASS_CANARY_BUILDER_V2_OPTIMIZER,
+  frontierResponseAnchorRequired: true,
+  frontierResponseAnchorEpochs: 1,
+  frontierResponseAnchorItems: 16,
+})
 const event = (a: CanaryArtifact, claim: string, observedAt: string, extra: Partial<CanaryEvent> = {}, evidence: Record<string, unknown> = {}): CanaryEvent =>
   ({ candidateId: a.candidateId, observedAt, expiresAt: null, verifier: 'host_controller', evidence: { profile: MASS_CANARY_PROFILE, claim, artifactHash: a.artifactHash, ...evidence }, ...extra })
 
@@ -32,25 +43,47 @@ test('issues exactly the claim-compatible approval for the oldest artifact witho
   assert.equal(decision.expiresAt, '2026-09-17T19:00:00.000Z')
 })
 
-test('bounded Builder apprenticeship proof lane prioritizes the first two post-remediation Computer Science canaries then restores oldest-first', () => {
+test('bounded Builder apprenticeship proof lane counts only confirmed response-anchor v2 Computer Science canaries', () => {
   assert.equal(MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE, 2)
   assert.equal(MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER, '2026-09-21T01:55:00.000Z')
-  const proofNow = new Date('2026-09-21T14:30:00.000Z')
+  assert.equal(MASS_CANARY_BUILDER_V2_OPTIMIZER, 'frontier_response_anchor_then_stable_on_policy_distillation')
+  const proofNow = new Date('2026-09-21T18:30:00.000Z')
   const legacy: CanaryArtifact = { candidateId:'mass:legacy', subjectId:'Mathematics', artifactHash:h(90), createdAt:'2026-09-20T00:00:00.000Z' }
-  const first: CanaryArtifact = { candidateId:'mass:builder-1', subjectId:'Computer Science & Coding', artifactHash:h(91), createdAt:'2026-09-21T02:14:25.056Z' }
-  const second: CanaryArtifact = { candidateId:'mass:builder-2', subjectId:'Computer Science & Coding', artifactHash:h(92), createdAt:'2026-09-21T02:31:24.295Z' }
+  const oldRecipeFirst: CanaryArtifact = { candidateId:'mass:old-builder-1', subjectId:'Computer Science & Coding', artifactHash:h(91), createdAt:'2026-09-21T02:14:25.056Z' }
+  const oldRecipeSecond: CanaryArtifact = { candidateId:'mass:old-builder-2', subjectId:'Computer Science & Coding', artifactHash:h(92), createdAt:'2026-09-21T02:31:24.295Z' }
+  const first = v2BuilderArtifact('mass:v2-builder-1', 93, '2026-09-21T17:20:26.126Z')
+  const second = v2BuilderArtifact('mass:v2-builder-2', 94, '2026-09-21T17:40:26.126Z')
+  const oldRecipePasses = [
+    event(oldRecipeFirst, 'local_distilled_runtime_canary_passed', '2026-09-21T14:57:06.858Z'),
+    event(oldRecipeSecond, 'local_distilled_runtime_canary_passed', '2026-09-21T15:00:56.087Z'),
+  ]
 
-  const firstDecision = decideMassCanaryRollingApproval({ artifacts:[legacy,second,first], events:[], now:proofNow, enabled:true })
+  const firstDecision = decideMassCanaryRollingApproval({
+    artifacts:[legacy,oldRecipeFirst,oldRecipeSecond,second,first],
+    events:oldRecipePasses,
+    now:proofNow,
+    enabled:true,
+  })
   assert.ok('artifact' in firstDecision)
   assert.equal(firstDecision.artifact.candidateId, first.candidateId)
 
-  const firstPassed = event(first, 'local_distilled_runtime_canary_passed', '2026-09-21T14:10:00.000Z')
-  const secondDecision = decideMassCanaryRollingApproval({ artifacts:[legacy,second,first], events:[firstPassed], now:proofNow, enabled:true })
+  const firstPassed = event(first, 'local_distilled_runtime_canary_passed', '2026-09-21T18:10:00.000Z')
+  const secondDecision = decideMassCanaryRollingApproval({
+    artifacts:[legacy,oldRecipeFirst,oldRecipeSecond,second,first],
+    events:[...oldRecipePasses,firstPassed],
+    now:proofNow,
+    enabled:true,
+  })
   assert.ok('artifact' in secondDecision)
   assert.equal(secondDecision.artifact.candidateId, second.candidateId)
 
-  const secondPassed = event(second, 'local_distilled_runtime_canary_passed', '2026-09-21T14:20:00.000Z')
-  const restored = decideMassCanaryRollingApproval({ artifacts:[legacy,second,first], events:[firstPassed,secondPassed], now:proofNow, enabled:true })
+  const secondPassed = event(second, 'local_distilled_runtime_canary_passed', '2026-09-21T18:20:00.000Z')
+  const restored = decideMassCanaryRollingApproval({
+    artifacts:[legacy,oldRecipeFirst,oldRecipeSecond,second,first],
+    events:[...oldRecipePasses,firstPassed,secondPassed],
+    now:proofNow,
+    enabled:true,
+  })
   assert.ok('artifact' in restored)
   assert.equal(restored.artifact.candidateId, legacy.candidateId)
 })
@@ -120,6 +153,10 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.match(route,/Include both canary and independent-evaluation events/)
   assert.doesNotMatch(route,/\.contains\('evidence',\{profile:MASS_CANARY_PROFILE\}\)/)
   assert.match(route,/db\.rpc\('claim_next_mass_distilled_runtime_canary'\)/)
+  assert.match(route,/created_at,intended_use/)
+  assert.match(route,/frontierResponseAnchorRequired:receipt\.frontierResponseAnchorRequired===true/)
+  assert.match(route,/frontierResponseAnchorEpochs:Number\(receipt\.frontierResponseAnchorEpochs\|\|0\)/)
+  assert.match(route,/frontierResponseAnchorItems:Number\(receipt\.frontierResponseAnchorItems\|\|0\)/)
   assert.doesNotMatch(route,/productionTrafficAuthorized:true|automaticPromotionAuthorized:true/)
 })
 

@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const provisionV2 = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisionV2.ts', import.meta.url), 'utf8')
+const provisionLegacy = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
+const graduateProtection = readFileSync(new URL('../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts', import.meta.url), 'utf8')
 const deployRoute = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 const evaluationRoute = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 
@@ -64,4 +66,17 @@ test('evaluator quota repair only releases sibling mass-distilled worker reserva
   assert.match(provisionV2, /workers: \{ min: 0, max: 0, idleTimeout \}/)
   assert.match(provisionV2, /await releaseOtherMassEndpointCapacity\(String\(endpoint\.id\)\)/)
   assert.doesNotMatch(provisionV2, /max: 2|min: 1/)
+})
+
+
+test('canary and evaluator capacity reclamation never disable active graduate endpoints', () => {
+  assert.match(provisionLegacy, /activeGraduateRunpodEndpointIds/)
+  assert.match(provisionLegacy, /!protectedEndpointIds\.has\(clean\(endpoint\.id,160\)\.toLowerCase\(\)\)/)
+  assert.match(provisionV2, /activeGraduateRunpodEndpointIds/)
+  assert.match(provisionV2, /!protectedEndpointIds\.has\(clean\(endpoint\.id, 160\)\.toLowerCase\(\)\)/)
+  assert.match(graduateProtection, /cos_university_graduate_model_registry/)
+  assert.match(graduateProtection, /\.eq\('status', 'active'\)/)
+  assert.match(graduateProtection, /\.eq\('runtime_provider', 'runpod'\)/)
+  assert.match(graduateProtection, /\.api\.runpod\.ai/)
+  assert.match(graduateProtection, /graduate_endpoint_protection_database_unavailable/)
 })

@@ -1,9 +1,9 @@
 // saas/tests/portableBrowserRemoteAdapters.node.test.ts
 //
-// Five adapters that were four-line stubs — create() returned `never` — now validate a
+// Seven governed remote/host adapters — create() returned `never` — now validate a
 // buyer's configuration and delegate the vendor call to a transport the buyer implements.
-// These tests hold the rules that make that safe, and they run against every rebuilt adapter
-// so a sixth cannot be added with a weaker posture.
+// These tests hold the rules that make that safe, including the credential-optional MCP hosts,
+// so another adapter cannot be added with a weaker posture.
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -13,6 +13,8 @@ import { createSauceLabsSessionFactory, SAUCE_LABS_ADAPTER_DEFINITION } from '..
 import { createLambdatestSessionFactory, LAMBDATEST_ADAPTER_DEFINITION } from '../lib/portable-browser/adapters/lambdatest-adapter.ts'
 import { createUipathSessionFactory, UIPATH_ADAPTER_DEFINITION } from '../lib/portable-browser/adapters/uipath-adapter.ts'
 import { createAutomationAnywhereSessionFactory, AUTOMATION_ANYWHERE_ADAPTER_DEFINITION } from '../lib/portable-browser/adapters/automation-anywhere-adapter.ts'
+import { createPlaywrightMcpSessionFactory, PLAYWRIGHT_MCP_ADAPTER_DEFINITION } from '../lib/portable-browser/adapters/playwright-mcp-adapter.ts'
+import { createChromeDevtoolsMcpSessionFactory, CHROME_DEVTOOLS_MCP_ADAPTER_DEFINITION } from '../lib/portable-browser/adapters/chrome-devtools-mcp-adapter.ts'
 import { describeRemoteAdapter } from '../lib/portable-browser/adapters/remote-adapter-kit.ts'
 
 const ORIGIN = 'http://localhost:3000'
@@ -29,6 +31,8 @@ const CONFIGS: Record<string, Record<string, string>> = {
   lambdatest: { hubEndpoint: 'https://hub.example.com' },
   uipath: { orchestratorUrl: 'https://orch.example.com', tenantName: 'acme', folderPath: '/Approved' },
   'automation-anywhere': { controlRoomUrl: 'https://cr.example.com', botId: 'bot-42' },
+  'playwright-mcp': { transportRef: 'host:mcp:playwright' },
+  'chrome-devtools-mcp': { transportRef: 'host:mcp:chrome-devtools' },
 }
 
 const FACTORIES: Record<string, (c: any) => any> = {
@@ -37,6 +41,8 @@ const FACTORIES: Record<string, (c: any) => any> = {
   lambdatest: createLambdatestSessionFactory,
   uipath: createUipathSessionFactory,
   'automation-anywhere': createAutomationAnywhereSessionFactory,
+  'playwright-mcp': createPlaywrightMcpSessionFactory,
+  'chrome-devtools-mcp': createChromeDevtoolsMcpSessionFactory,
 }
 
 const DEFINITIONS = [
@@ -45,6 +51,8 @@ const DEFINITIONS = [
   LAMBDATEST_ADAPTER_DEFINITION,
   UIPATH_ADAPTER_DEFINITION,
   AUTOMATION_ANYWHERE_ADAPTER_DEFINITION,
+  PLAYWRIGHT_MCP_ADAPTER_DEFINITION,
+  CHROME_DEVTOOLS_MCP_ADAPTER_DEFINITION,
 ]
 
 const build = (id: string, over: any = {}) =>
@@ -129,12 +137,23 @@ test('missing configuration names the exact key, per vendor', () => {
   assert.throws(() => build('uipath', { configuration: { orchestratorUrl: 'https://orch.example.com', tenantName: 'acme' } }), /uipath_folderPath_required/)
   assert.throws(() => build('sauce-labs', { configuration: { hubEndpoint: 'https://ondemand.example.com' } }), /sauce-labs_dataCentre_required/)
   assert.throws(() => build('automation-anywhere', { configuration: { controlRoomUrl: 'https://cr.example.com' } }), /automation-anywhere_botId_required/)
+  assert.throws(() => build('playwright-mcp', { configuration: {} }), /playwright-mcp_transportRef_required/)
+  assert.throws(() => build('chrome-devtools-mcp', { configuration: {} }), /chrome-devtools-mcp_transportRef_required/)
 })
 
 test('a missing broker or transport is refused at construction, not at launch', () => {
   assert.throws(() => build('lambdatest', { credentialBroker: undefined }), /lambdatest_credential_broker_required/)
   assert.throws(() => build('lambdatest', { transport: undefined }), /lambdatest_transport_required/)
   assert.throws(() => build('lambdatest', { approvedOrigins: [] }), /lambdatest_origin_required/)
+})
+
+test('credential-optional MCP adapters can open without a credential broker', async () => {
+  for (const id of ['playwright-mcp', 'chrome-devtools-mcp']) {
+    const calls: any[] = []
+    const opened = await build(id, { credentialBroker: undefined, transport: transport(calls) }).open(launch(id))
+    assert.ok(opened)
+    assert.equal(calls[0].credential, '')
+  }
 })
 
 test('a credential the vault cannot resolve stops the launch', async () => {
@@ -167,14 +186,14 @@ test('every definition declares its required ports — no more requiredPorts: []
     const status = describeRemoteAdapter(definition)
     assert.equal(status.status, 'buyer_configuration_required')
     assert.ok(status.requiredConfigurationKeys.length > 0, `${definition.adapterId} declares no configuration keys`)
-    assert.deepEqual(status.requiredPorts, ['credentialBroker', 'transport'])
-    assert.equal(status.credentialRequired, true)
+    assert.deepEqual(status.requiredPorts, definition.credentialOptional ? ['transport'] : ['credentialBroker', 'transport'])
+    assert.equal(status.credentialRequired, !definition.credentialOptional)
   }
   assert.equal(browserstackAdapterStatus.adapterId, 'browserstack')
 })
 
 test('each adapter declaration matches its catalog id exactly', () => {
   assert.deepEqual(DEFINITIONS.map((d) => d.adapterId).sort(), [
-    'automation-anywhere', 'browserstack', 'lambdatest', 'sauce-labs', 'uipath',
+    'automation-anywhere', 'browserstack', 'chrome-devtools-mcp', 'lambdatest', 'playwright-mcp', 'sauce-labs', 'uipath',
   ])
 })

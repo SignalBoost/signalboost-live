@@ -234,7 +234,7 @@ class NodeMcpStdioTransport implements McpOutboundTransport {
       }
       child.once('close', finish)
       setTimeout(() => {
-        if (!child.killed) child.kill('SIGKILL')
+        if (!settled) child.kill('SIGKILL')
         finish()
       }, 1_000).unref()
     })

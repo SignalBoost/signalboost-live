@@ -41,9 +41,18 @@ function assertion(name: string, passed: boolean, detail: string) {
 }
 
 function safeRuntimeDetail(result: { mode?: string; error?: string | null }): string {
-  const error = String(result.error || '')
-  const code = error.match(/browser_mcp_[a-z0-9_.:-]+/i)?.[0]
-  return code ? `mode=${result.mode || 'none'}; error=${code}` : `mode=${result.mode || 'none'}`
+  const rawError = String(result.error || '')
+  const code = rawError.match(/browser_mcp_[a-z0-9_.:-]+/i)?.[0]
+  const sanitized = rawError
+    .replace(/https?:\/\/\S+/gi, '<url>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180)
+  return code
+    ? `mode=${result.mode || 'none'}; error=${code}`
+    : sanitized
+      ? `mode=${result.mode || 'none'}; error=${sanitized}`
+      : `mode=${result.mode || 'none'}`
 }
 
 async function main() {

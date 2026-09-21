@@ -6,7 +6,7 @@
 // a deterministic training recipe that existing governed dispatch/evaluation paths may consume.
 
 export const COS_UNIVERSITY_FRONTIER_DISTILLATION_PROFILE =
-  'cos-university-frontier-adaptive-distillation-v1' as const
+  'cos-university-frontier-adaptive-distillation-v2' as const
 
 export type FrontierDistillationOptimizer =
   | 'gkd_on_policy'
@@ -23,6 +23,8 @@ export type FrontierDistillationPlan = Readonly<{
   frontierFaculty: readonly string[]
   onPolicyFraction: number
   offPolicyAnchorFraction: number
+  frontierResponseAnchorRequired: boolean
+  frontierResponseAnchorEpochs: number
   beta: number
   temperature: number
   maxNewTokens: number
@@ -68,9 +70,10 @@ function unique(values: readonly string[]): readonly string[] {
 /**
  * Build the default mass-distillation training plan.
  *
- * High on-policy GKD is the primary optimizer. A bounded off-policy fraction remains only as an
- * anchor so frontier-faculty examples can seed behavior the student does not yet visit by itself.
- * Independent University evaluation, not the planner, decides whether the resulting artifact wins.
+ * Stable on-policy GKD remains the primary optimizer. When verified frontier-faculty responses are
+ * present, a separate bounded SFT anchor pass runs before GKD so those expert responses directly seed
+ * behavior the student does not yet visit by itself. Independent University evaluation, not the
+ * planner or either teacher, decides whether the resulting artifact wins.
  */
 export function buildFrontierDistillationPlan(input: {
   studentModelId: string
@@ -98,17 +101,17 @@ export function buildFrontierDistillationPlan(input: {
     throw new Error('frontier_distillation_teacher_rights_invalid')
   }
 
-  // GKD literature and TRL both support mixing on-policy student generations with a smaller
-  // off-policy anchor fraction. Keep on-policy dominant; evaluation may later tune this empirically.
-  // Stable Production distillation is fully on-policy. The frontier faculty still provides
-  // curriculum/critique supervision, but the paid optimizer must not depend on the experimental
-  // mixed-rollout GKD surface. A future off-policy anchor can be reintroduced only after its own
-  // independently validated executor exists.
+  // TRL 1.10's stable DistillationTrainer is fully on-policy and ignores dataset response columns.
+  // Keep GKD itself fully on-policy. Frontier responses are consumed by a separate, explicit,
+  // one-epoch SFT anchor executor before GKD; this avoids pretending hosted API answers are dense
+  // token-level logits while still letting verified faculty outputs teach behavior.
   const onPolicyFraction = 1.0
   const beta = boundedFloat(env.COS_UNIVERSITY_GKD_BETA, 0.50, 0.00, 1.00)
   const temperature = boundedFloat(env.COS_UNIVERSITY_GKD_TEMPERATURE, 0.80, 0.10, 1.50)
   const maxNewTokens = boundedInt(env.COS_UNIVERSITY_GKD_MAX_NEW_TOKENS, 256, 64, 512)
   const frontierFaculty = unique(input.frontierFaculty || [])
+  const frontierResponseAnchorRequired = frontierFaculty.length > 0
+  const frontierResponseAnchorEpochs = frontierResponseAnchorRequired ? 1 : 0
 
   return Object.freeze({
     profile: COS_UNIVERSITY_FRONTIER_DISTILLATION_PROFILE,
@@ -123,6 +126,8 @@ export function buildFrontierDistillationPlan(input: {
     frontierFaculty,
     onPolicyFraction,
     offPolicyAnchorFraction: Number((1 - onPolicyFraction).toFixed(6)),
+    frontierResponseAnchorRequired,
+    frontierResponseAnchorEpochs,
     beta,
     temperature,
     maxNewTokens,
@@ -157,5 +162,7 @@ export function legacyBootstrapPlan(input: {
     optimizer: 'legacy_bootstrap_sft',
     onPolicyFraction: 0,
     offPolicyAnchorFraction: 1,
+    frontierResponseAnchorRequired: false,
+    frontierResponseAnchorEpochs: 0,
   })
 }

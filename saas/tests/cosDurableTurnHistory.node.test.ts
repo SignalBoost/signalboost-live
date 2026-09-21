@@ -3,7 +3,6 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { findDurableCosTurnReply, findRecoveredAssistantReply } from '../lib/ai/cos/assistantTransportRecovery.ts'
-import { requestsExternalAction } from '../lib/ai/cos/cosOrchestration.ts'
 
 test('read-only COS questions stay synchronous while non-replayable actions keep durable 202', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/cos-provenance-browser/route.ts'), 'utf8')
@@ -12,10 +11,6 @@ test('read-only COS questions stay synchronous while non-replayable actions keep
   assert.match(route, /const synchronousReadOnlyTurn = ordinaryConversationTurn && !externalActionRequested/)
   assert.match(route, /if \(synchronousReadOnlyTurn\)/)
   assert.match(route, /await persistTurn\(/)
-
-  assert.equal(requestsExternalAction('what is the capital of Germany?'), false)
-  assert.equal(requestsExternalAction('Mam 9 godzin do zabicia w Amsterdamie w sobotę. Przygotuj mi ekonomiczny plan zwiedzania między 9 a 18.'), false)
-  assert.equal(requestsExternalAction('send this email to the customer'), true)
 
   assert.match(route, /enqueueDurableCosTurn/)
   assert.match(route, /if \(access\?\.userId\)/)

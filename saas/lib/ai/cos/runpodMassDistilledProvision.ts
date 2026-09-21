@@ -1,6 +1,6 @@
 // Dynamic exact-artifact RunPod canary support for mass-distilled students.
 import { configuredRunpodApiKey } from './runpodConfig.ts'
-import { activeGraduateRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
+import { protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
 
 const REST_V1 = 'https://rest.runpod.io/v1'
 const CONTROL_API_V2 = 'https://api.runpod.io/v2'
@@ -165,7 +165,7 @@ function assertEndpointPolicy(endpoint:Endpoint,templateId:string){
 }
 
 async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEndpointName:string){
-  const protectedEndpointIds=await activeGraduateRunpodEndpointIds()
+  const protectedEndpointIds=await protectedRunpodEndpointIds()
   const retired=endpoints.filter(endpoint=>endpoint.name.startsWith('itmounts-mass-distilled-')
     && endpoint.name!==activeEndpointName
     && !protectedEndpointIds.has(clean(endpoint.id,160).toLowerCase())

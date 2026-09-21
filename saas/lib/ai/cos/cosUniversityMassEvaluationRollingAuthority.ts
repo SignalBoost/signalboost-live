@@ -29,6 +29,8 @@ export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
 export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
 export const MASS_EVALUATION_MAX_IN_FLIGHT = 4
 export const MASS_EVALUATION_FRONTIER_PROOF_SAMPLE = 4
+export const MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE = 2
+export const MASS_EVALUATION_BUILDER_V2_OPTIMIZER = 'frontier_response_anchor_then_stable_on_policy_distillation' as const
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
 // resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case
@@ -84,7 +86,14 @@ export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
 const REPAIRED_SUSPENSION_REASON = 'candidate_502_pending_runpod_worker_logs' as const
 
-export type RollingArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string; frontierRecipe?: boolean }>
+export type RollingArtifact = Readonly<{
+  candidateId: string
+  subjectId: string
+  artifactHash: string
+  createdAt: string
+  frontierRecipe?: boolean
+  builderV2?: boolean
+}>
 export type RollingEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 
 export type RollingDecision =
@@ -318,6 +327,7 @@ export function decideRollingMassEvaluationApproval(input: {
   events: readonly RollingEvent[]
   now: Date
   frontierProofCompletions?: number
+  builderV2ProofCompletions?: number
 }): RollingDecision {
   if (!input.enabled) return { issue: false, reason: 'rolling_mass_evaluation_authorization_disabled' }
   const nowMs = input.now.getTime()
@@ -331,11 +341,19 @@ export function decideRollingMassEvaluationApproval(input: {
 
   const proofCompletions = Math.max(0, Math.floor(Number(input.frontierProofCompletions ?? MASS_EVALUATION_FRONTIER_PROOF_SAMPLE)))
   const frontierProofNeeded = proofCompletions < MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
+  const builderV2Completions = Math.max(0, Math.floor(Number(input.builderV2ProofCompletions ?? MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE)))
+  const builderV2ProofNeeded = builderV2Completions < MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
   const ordered = [...input.artifacts].sort((a, b) => {
-    // Until four current-recipe artifacts have produced an actual independent evaluation result,
-    // keep frontier artifacts ahead of legacy backlog work. A prior start that ended in evaluator
-    // infrastructure failure is not proof and must remain retryable/preferred. This is only a bounded
-    // scheduling preference; once four durable frontier results exist, oldest-first resumes.
+    // Builder apprenticeship proof lane: until two confirmed response-anchor v2 Computer Science artifacts
+    // have durable independent evaluation results, keep those exact artifacts ahead of the legacy backlog.
+    // This changes scheduling only; the full 12-hour retention delay, exact canary, scoring, retry, spend,
+    // promotion and Production-traffic gates remain unchanged.
+    if (builderV2ProofNeeded) {
+      const aBuilder = a.builderV2 === true
+      const bBuilder = b.builderV2 === true
+      if (aBuilder !== bBuilder) return aBuilder ? -1 : 1
+    }
+    // Preserve the older bounded frontier proof lane for repositories where it is still incomplete.
     if (frontierProofNeeded) {
       const aProof = a.frontierRecipe === true
       const bProof = b.frontierRecipe === true

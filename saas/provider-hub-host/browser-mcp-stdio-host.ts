@@ -179,7 +179,7 @@ function toolTextLines(raw: unknown): readonly string[] {
   const lines: string[] = []
   for (const item of result.content) {
     if (!plain(item) || typeof item.text !== 'string') continue
-    lines.push(...item.text.split(/\\r?\\n/))
+    lines.push(...item.text.split(/\r?\n/))
   }
   return Object.freeze(lines)
 }
@@ -209,21 +209,21 @@ function chromeStructuredPages(raw: unknown): readonly ChromeStructuredPage[] {
   // page line per page. Parse only the final URL position, never URLs embedded in page titles.
   const pages: ChromeStructuredPage[] = []
   for (const line of toolTextLines(raw)) {
-    const row = line.match(/^\\s*(\\d+)\\s*:\\s*(.+?)\\s*$/)
+    const row = line.match(/^\s*(\d+)\s*:\s*(.+?)\s*$/)
     if (!row) continue
     const id = Number(row[1])
     let body = row[2].trim()
-    const selected = /\\s+\\[selected\\](?:\\s+isolatedContext=.*)?\\s*$/.test(body)
+    const selected = /\s+\[selected\](?:\s+isolatedContext=.*)?\s*$/.test(body)
     body = body
-      .replace(/\\s+\\[selected\\](?:\\s+isolatedContext=.*)?\\s*$/, '')
-      .replace(/\\s+isolatedContext=.*$/, '')
+      .replace(/\s+\[selected\](?:\s+isolatedContext=.*)?\s*$/, '')
+      .replace(/\s+isolatedContext=.*$/, '')
       .trim()
 
     let url = ''
-    if (/^https?:\\/\\/\\S+$/.test(body)) {
+    if (/^https?:\/\/\S+$/.test(body)) {
       url = body
     } else {
-      const titled = body.match(/\\((https?:\\/\\/[^()\\s]+)\\)\\s*$/)
+      const titled = body.match(/\((https?:\/\/[^()\s]+)\)\s*$/)
       if (titled) url = titled[1]
     }
     if (Number.isInteger(id) && url) pages.push({ id, url, selected })
@@ -233,7 +233,7 @@ function chromeStructuredPages(raw: unknown): readonly ChromeStructuredPage[] {
 
 function playwrightNavigationUrl(raw: unknown): string | null {
   for (const line of toolTextLines(raw)) {
-    const match = line.match(/^\\s*(?:-\\s*)?Page URL:\\s*(https?:\\/\\/\\S+)\\s*$/)
+    const match = line.match(/^\s*(?:-\s*)?Page URL:\s*(https?:\/\/\S+)\s*$/)
     if (match) return match[1]
   }
   return null

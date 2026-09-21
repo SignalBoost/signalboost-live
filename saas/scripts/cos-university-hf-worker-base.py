@@ -1,3 +1,4 @@
+# saas/scripts/cos-university-hf-worker-base.py
 #!/usr/bin/env python3
 """Governed iTMounts Hugging Face Jobs worker.
 
@@ -24,6 +25,9 @@ from typing import Any
 HF_REF = re.compile(r"^hf://datasets/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9._-]+))?#([A-Za-z0-9_.-]+)$")
 HEX64 = re.compile(r"^[a-f0-9]{64}$", re.I)
 HEX40 = re.compile(r"^[a-f0-9]{40}$", re.I)
+
+
+MASS_HOLDOUT_MAX_ITEMS = 6
 
 
 def clean(value: Any, limit: int = 4000) -> str:
@@ -397,7 +401,18 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
         raise RuntimeError("worker_dataset_too_small")
 
     ordered = sorted(by_hash.items(), key=lambda item: item[0])
-    holdout_count = max(1, min(len(ordered) // 5, 500))
+    # Mass-distillation holdouts are capped at MASS_HOLDOUT_MAX_ITEMS. The mass evaluator grades a
+    # holdout inside a fixed call ceiling behind a ~40s serverless gateway: the baseline in at most two
+    # requests (a 6-case holdout is 3+3) and the slower candidate one request per case. Larger
+    # holdouts push several cases into one baseline request, where Production showed answers late in a
+    # shared request degrading by position, which would bias the comparison toward the candidate.
+    # Capping the holdout rather than the batch lets a full 128-item batch train on ~122 examples.
+    # Single-artifact lanes keep the proportional split; their evaluator chunks larger holdouts.
+    proportional = len(ordered) // 5
+    if clean(envelope.get("candidateId"), 200).startswith("mass:"):
+        holdout_count = max(1, min(proportional, MASS_HOLDOUT_MAX_ITEMS))
+    else:
+        holdout_count = max(1, min(proportional, 500))
     holdout_pairs = ordered[:holdout_count]
     training_pairs = ordered[holdout_count:]
     if not training_pairs or not holdout_pairs:

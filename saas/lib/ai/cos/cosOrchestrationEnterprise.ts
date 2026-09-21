@@ -5,6 +5,7 @@ import { checkLocalInferenceHealth, localInferenceConfigFromEnv } from '@/lib/ai
 import { consumeAdvisoryDiagnosisResearchForAnswer } from './advisoryDiagnosisResearchTrace.ts'
 import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
 import { isContentGenerationRequest } from './contentGenerationIntent.ts'
+import { isExternalActionCommand } from './externalActionCommandIntent.ts'
 export { isProvenanceIntrospection }
 
 export function confidenceThreshold(): number { const value=Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD||'0.72'); return Number.isFinite(value)?Math.max(.5,Math.min(.98,value)):.72 }
@@ -22,24 +23,7 @@ export function requestsExternalAction(input:string):boolean{
   if(isProvenanceIntrospection(input))return false
   // AUTHORING IS NEVER EXECUTION: writing about a system is not a request to alter it.
   if(isContentGenerationRequest(input))return false
-  const executionVerb='(?:run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research|deploy|commit|merge|create|update|delete|send|publish|queue|launch|start|render|rendering|fix|repair|change|modify|invite|reset|archive|upload|empty|transfer|pay|purchase|book|reserve|cancel|approve|reject|call the tool|use (?:the )?tools?)'
-  const actionOpener=new RegExp(`^\\s*(?:(?:please|kindly)\\s+|i\\s+(?:need|want)\\s+you\\s+to\\s+)?${executionVerb}\\b`,'i')
-  const target=/\b(repo|repository|github|vercel|supabase|logs?|metrics?|status page|production|deployment|database|table|file|route|api|web|internet|youtube|publication|magazine|journal|provider|video|render(?:ing)?|campaign|prospect|email|message|customer|contact|recipient|user|account|password|storage|bucket|object|payment|invoice|subscription|order|ticket|calendar|event|meeting|domain|dns)\b/i
-  const diagnosticVerbThenQuestionWord=/\b(?:run|execute|perform|investigate|check|fetch|pull|read|scan|audit|search|look up|research)\s+(?:why|what|how|whether|if|when|where)\b/i
-  const diagnosticOpener=/^\s*(why|what|how|when|where|which|who|explain|describe|tell me|is|are|was|were|does|did|do|could|would|should)\b/i
-  const endsAsQuestion=/\?\s*$/
-  if(diagnosticVerbThenQuestionWord.test(input)||diagnosticOpener.test(input)||endsAsQuestion.test(input))return false
-
-  // A governed external action must look like an actual command in its own clause. The former
-  // whole-prompt bag-of-words check could combine scenario nouns with document-section language
-  // (for example "database" + "audit logging") and invent an execution request. Requiring an
-  // imperative opener also prevents noun phrases such as "covering audit logs" from being read as
-  // the command "audit logs". Real imperative commands still route to the executor.
-  const clauses=String(input||'')
-    .split(/(?:[.!?;]|\n+|—|--|\band then\b|\bthen\b)/iu)
-    .map(part=>part.trim())
-    .filter(Boolean)
-  return clauses.some(clause=>actionOpener.test(clause)&&target.test(clause))
+  return isExternalActionCommand(input)
 }
 
 type FunnelStage={retrieved:number;relevant:number;selected:number;injected:number;cited:number}

@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const provisionV2 = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisionV2.ts', import.meta.url), 'utf8')
 const provisionLegacy = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
-const graduateProtection = readFileSync(new URL('../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts', import.meta.url), 'utf8')
+const endpointProtection = readFileSync(new URL('../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts', import.meta.url), 'utf8')
 const deployRoute = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 const evaluationRoute = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 
@@ -69,14 +69,23 @@ test('evaluator quota repair only releases sibling mass-distilled worker reserva
 })
 
 
-test('canary and evaluator capacity reclamation never disable active graduate endpoints', () => {
-  assert.match(provisionLegacy, /activeGraduateRunpodEndpointIds/)
+test('capacity reclamation never disables active graduate or evaluator endpoints', () => {
+  assert.match(provisionLegacy, /protectedRunpodEndpointIds/)
   assert.match(provisionLegacy, /!protectedEndpointIds\.has\(clean\(endpoint\.id,160\)\.toLowerCase\(\)\)/)
-  assert.match(provisionV2, /activeGraduateRunpodEndpointIds/)
+  assert.match(provisionV2, /protectedRunpodEndpointIds/)
   assert.match(provisionV2, /!protectedEndpointIds\.has\(clean\(endpoint\.id, 160\)\.toLowerCase\(\)\)/)
-  assert.match(graduateProtection, /cos_university_graduate_model_registry/)
-  assert.match(graduateProtection, /\.eq\('status', 'active'\)/)
-  assert.match(graduateProtection, /\.eq\('runtime_provider', 'runpod'\)/)
-  assert.match(graduateProtection, /\.api\.runpod\.ai/)
-  assert.match(graduateProtection, /graduate_endpoint_protection_database_unavailable/)
+
+  assert.match(endpointProtection, /cos_university_graduate_model_registry/)
+  assert.match(endpointProtection, /\.eq\('status', 'active'\)/)
+  assert.match(endpointProtection, /\.eq\('runtime_provider', 'runpod'\)/)
+  assert.match(endpointProtection, /graduate_endpoint_protection_database_unavailable/)
+
+  assert.match(endpointProtection, /MASS_EVALUATION_PROFILE = 'cos_mass_distilled_independent_evaluation_runtime_v1'/)
+  assert.match(endpointProtection, /mass_distilled_independent_evaluation_started/)
+  assert.match(endpointProtection, /reservationOnly === true/)
+  assert.match(endpointProtection, /mass_distilled_independent_evaluation_completed/)
+  assert.match(endpointProtection, /mass_distilled_independent_evaluation_failed/)
+  assert.match(endpointProtection, /MASS_EVALUATION_ACTIVE_MS = 12 \* 60 \* 1000/)
+  assert.match(endpointProtection, /evaluation_endpoint_protection_database_unavailable/)
+  assert.match(endpointProtection, /new Set\(\[\.\.\.graduates, \.\.\.evaluations\]\)/)
 })

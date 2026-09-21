@@ -12,6 +12,7 @@ export interface McpRegisteredServer {
   serverId: string
   displayName: string
   transportRef: string
+  protocolVersion?: string
   enabled: boolean
   metadata?: Readonly<Record<string, string | number | boolean | null>>
 }
@@ -99,6 +100,7 @@ function normalizeServer(server: McpRegisteredServer): McpRegisteredServer {
     serverId: required(server.serverId, 'serverId'),
     displayName: required(server.displayName, 'server.displayName'),
     transportRef: required(server.transportRef, 'server.transportRef'),
+    protocolVersion: server.protocolVersion ? required(server.protocolVersion, 'server.protocolVersion') : undefined,
     enabled: server.enabled === true,
     metadata: server.metadata ? Object.freeze({ ...server.metadata }) : undefined,
   })
@@ -217,7 +219,14 @@ export function createMcpConnectionRegistryResolver(options: {
 
     const scope: McpOutboundScope = Object.freeze({ tenantId, environmentId, portableId, ...(input.actor ? { actor: input.actor } : {}) })
     const transport = options.transportFactory.create({ serverId, transportRef: server.transportRef, scope })
-    const client = createMcpOutboundClient({ serverId, scope, transport, timeoutMs: options.timeoutMs, maxTools: options.maxTools })
+    const client = createMcpOutboundClient({
+      serverId,
+      scope,
+      transport,
+      timeoutMs: options.timeoutMs,
+      maxTools: options.maxTools,
+      protocolVersion: server.protocolVersion,
+    })
     const byRemoteName = new Map(assignment.tools.map(tool => [tool.remoteToolName, tool] as const))
     const adapter = createMcpOutboundProviderHubAdapter({
       serverId,

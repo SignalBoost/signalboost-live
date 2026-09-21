@@ -17,6 +17,7 @@ import {
 } from '../../provider-hub-host/browser-mcp-profiles.ts'
 import {
   createBrowserMcpStdioTransportFactory,
+  isolatedBrowserMcpSandboxArgs,
   liveBrowserMcpToolNames,
 } from '../../provider-hub-host/browser-mcp-stdio-host.ts'
 
@@ -84,6 +85,7 @@ async function main() {
           '--no-install',
           profile.packageName,
           ...profile.recommendedArgs,
+          ...isolatedBrowserMcpSandboxArgs(profile.profileId),
           '--allowed-origins',
           origins.join(';'),
           '--block-service-workers',

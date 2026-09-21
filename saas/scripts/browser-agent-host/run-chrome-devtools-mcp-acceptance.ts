@@ -26,7 +26,10 @@ import {
   CHROME_DEVTOOLS_MCP_PROFILE,
   createBrowserMcpRegistryEntries,
 } from '../../provider-hub-host/browser-mcp-profiles.ts'
-import { createBrowserMcpStdioTransportFactory } from '../../provider-hub-host/browser-mcp-stdio-host.ts'
+import {
+  createBrowserMcpStdioTransportFactory,
+  isolatedBrowserMcpSandboxArgs,
+} from '../../provider-hub-host/browser-mcp-stdio-host.ts'
 
 const tenantId = 'signalboost-reference'
 const environmentId = 'production-reference'
@@ -137,6 +140,7 @@ async function main() {
           '--no-install',
           profile.packageName,
           ...profile.recommendedArgs,
+          ...isolatedBrowserMcpSandboxArgs(profile.profileId),
           ...(chromeExecutable ? [`--executable-path=${chromeExecutable}`] : []),
         ],
         cwd: process.cwd(),

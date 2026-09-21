@@ -15,6 +15,7 @@ import {
   assertBrowserMcpNavigationResultForTest,
   assertBrowserMcpRawNavigationResultForTest,
   assertBrowserMcpToolCallForTest,
+  isolatedBrowserMcpSandboxArgs,
   liveBrowserMcpToolNames,
 } from '../provider-hub-host/browser-mcp-stdio-host.ts'
 
@@ -169,6 +170,14 @@ test('stateful MCP stdio transport completes initialize notification before tool
     isError: false,
   })
   await client.close()
+})
+
+test('isolated browser MCP host uses explicit package-supported sandbox overrides', () => {
+  assert.deepEqual(isolatedBrowserMcpSandboxArgs('playwright-mcp'), ['--no-sandbox'])
+  assert.deepEqual(isolatedBrowserMcpSandboxArgs('chrome-devtools-mcp'), [
+    '--chrome-arg=--no-sandbox',
+    '--chrome-arg=--disable-setuid-sandbox',
+  ])
 })
 
 test('browser MCP live host rejects hidden tools, filesystem output, and off-origin navigation', () => {

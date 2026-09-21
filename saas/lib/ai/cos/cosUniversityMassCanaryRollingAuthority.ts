@@ -25,6 +25,7 @@ export const MASS_CANARY_MAX_IDENTICAL_FAILURES = 4
 export const MASS_CANARY_ENDPOINT_REFRESH_FAILURES = 2
 export const MASS_CANARY_MAX_COST_USD = 0.2
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
+export const MASS_CANARY_IN_FLIGHT_TTL_MS = 10 * 60 * 1000
 // Owner apprenticeship proof lane (2026-09-21): the first CONFIRMED response-anchor v2
 // Computer Science artifacts must not sit behind the legacy canary backlog once they are ready to prove
 // themselves. Two old-recipe post-remediation CS artifacts already consumed the original date-only quota,
@@ -150,6 +151,25 @@ function armedApproval(own: readonly CanaryEvent[], nowMs: number): boolean {
   })
 }
 
+/**
+ * Once the paid/model invocation has started, the approval is intentionally no longer "armed", but the
+ * canary still owns the single global runtime slot until a terminal pass/fail is durably recorded.
+ * Without this second semaphore window the next cron tick can approve the same artifact again while its
+ * first canary is still running, creating duplicate endpoints and duplicate spend. A bounded TTL prevents
+ * an orphaned invocation marker from freezing the queue forever after a process crash.
+ */
+function canaryInvocationInFlight(own: readonly CanaryEvent[], nowMs: number): boolean {
+  const starts = own
+    .filter(event => claim(event) === 'local_distilled_runtime_canary_invocation_started')
+    .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+  const latest = starts[0]
+  if (!latest) return false
+  const startedAt = at(latest.observedAt)
+  if (!Number.isFinite(startedAt) || nowMs - startedAt >= MASS_CANARY_IN_FLIGHT_TTL_MS) return false
+  return !own.some(event => at(event.observedAt) >= startedAt
+    && ['local_distilled_runtime_canary_passed', 'local_distilled_runtime_canary_failed'].includes(claim(event)))
+}
+
 export function decideMassCanaryRollingApproval(input: {
   artifacts: readonly CanaryArtifact[]
   events: readonly CanaryEvent[]
@@ -193,10 +213,13 @@ export function decideMassCanaryRollingApproval(input: {
     return at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId)
   })
 
-  // The live approval is the real global semaphore: only one canary endpoint may exist at a time, so no
-  // second approval is issued until this one is consumed, expired or released. This stays queue-wide.
+  // Queue-wide semaphore has two phases: an unconsumed approval, then the actual in-flight canary
+  // invocation. The second phase matters because the approval ceases to be armed as soon as invocation starts.
   if (valid.some(artifact => armedApproval(forArtifact(input.events, artifact), nowMs))) {
     return { issue: false, reason: 'mass_canary_approval_already_armed' }
+  }
+  if (valid.some(artifact => canaryInvocationInFlight(forArtifact(input.events, artifact), nowMs))) {
+    return { issue: false, reason: 'mass_canary_invocation_already_in_flight' }
   }
 
   // Awaiting independent evaluation is an ARTIFACT-LOCAL lifecycle condition and is excluded per

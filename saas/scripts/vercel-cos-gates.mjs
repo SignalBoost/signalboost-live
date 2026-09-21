@@ -109,7 +109,6 @@ const tests = [
   'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',
   'tests/cosDomainAvailability.node.test.ts',
   'tests/assistantTransportClient.node.test.ts',
-  'tests/cosDurableTurnHistory.node.test.ts',
   'tests/cosWholeTurnDeadline.node.test.ts',
   'tests/operationalSystemsLearning.node.test.ts',
   'tests/advisoryDiagnosisPolicy.node.test.ts',

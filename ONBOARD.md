@@ -93,6 +93,8 @@ Reliability invariant: prepared work must continuously fill available healthy tr
 
 Performance invariant: concurrency, faculty parallelism, prepared-buffer depth and training hardware are throughput controls, not learning-quality shortcuts. Scale them from measured queue depth, provider health, training yield and evaluator outcomes while preserving deterministic admission, idempotency, provenance and rollback.
 
+Hosted-faculty spend-efficiency invariant (2026-09-20/21): equal buyer balances do **not** imply equal call counts. The mass hosted-teacher stage must distribute first-pass work by bounded, configuration-driven **expected dollar cost per useful call** while preserving approved multi-provider diversity. Expensive teachers such as Claude may therefore receive fewer first-pass prompts than cheaper teachers. Provider-specific completion headroom may be raised only inside the existing global hard output ceiling when that reduces paid truncation waste. If a partial batch proves a prompt's first-pass provider failed or truncated and another approved provider exists, the retry must exclude that original primary before purchasing it again. Cost planning never changes curriculum rights, evaluator independence, promotion gates, provider authority, or the campaign spend ceiling.
+
 Production distillation runtime invariant (2026-09-20 hotfix):
 
 - Production frontier distillation uses TRL's **stable `DistillationTrainer`** on-policy path; experimental GKD trainer imports are not permitted in the paid mass-distillation lane unless separately validated and release-gated.

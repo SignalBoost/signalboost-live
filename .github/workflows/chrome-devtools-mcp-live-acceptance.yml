@@ -56,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save chrome-devtools-mcp@1.9.0 tsx@4 @playwright/test@^1.41.0
-          actual="$(node -p "require('chrome-devtools-mcp/package.json').version")"
+          actual="$(npm ls chrome-devtools-mcp --depth=0 --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).dependencies['chrome-devtools-mcp'].version))")"
           test "$actual" = "1.9.0" || { echo "::error::Expected chrome-devtools-mcp 1.9.0, got $actual"; exit 1; }
           npx playwright install --with-deps chromium
           chrome_path="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")"

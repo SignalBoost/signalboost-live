@@ -1,2 +1,2 @@
-base_sha=20f4f2cd07c5304409f2ecbe02440db00510e45a
-branch=docs/supabase-disk-io-runbook-20260920
+base_sha=401cde65e5b7f41d436a82bb1508679bcd4db20d
+branch=fix/university-evaluator-infra-retry-fairness-20260920

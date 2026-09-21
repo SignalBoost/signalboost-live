@@ -221,7 +221,7 @@ async function runCompletionFirstRescue(input:string,language:string):Promise<{r
       'Do not invent mutable current-world facts in this lane; current external facts must be handled by live retrieval before this rescue is reached.',
       'Do not bypass safety, authorization, privacy, or destructive-action boundaries. When a boundary genuinely prevents the requested action, explain the concrete limitation briefly and give the closest useful safe alternative.',
       'Do not ask a clarifying question unless no meaningful partial answer can be given without the missing fact.',
-      language ? 'Respond in the user language when appropriate: '+language+'.' : '',
+      language ? 'Respond in the user language when appropriate: '+reportLanguageName(language)+'.' : '',
     ].filter(Boolean).join(' '),
     prompt:input,
   }).catch(()=>null)
@@ -563,7 +563,7 @@ export async function postCosPrimary(req:NextRequest){
   if(conversationRecall) reasoningPrompt=`${conversationRecall}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
-    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language:reportLanguageName(language),privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
@@ -594,7 +594,7 @@ export async function postCosPrimary(req:NextRequest){
   // authoring: explanation, analysis, planning, and other low-risk tasks should still receive a
   // useful answer when the primary confidence gate declined to release one.
   if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)){
-    const completionRescue=await runCompletionFirstRescue(input,reportLanguageName(language))
+    const completionRescue=await runCompletionFirstRescue(input,language)
     if(completionRescue)return completionFirstResponse(startedAt,input,completionRescue,'cos-completion-first-rescue')
   }
 

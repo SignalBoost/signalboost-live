@@ -90,10 +90,16 @@ begin
     and a.subject_id='Computer Science & Coding'
     and a.intended_use #>> '{trainingReceipt,optimizer}'='frontier_response_anchor_then_stable_on_policy_distillation'
     and a.intended_use #>> '{trainingReceipt,frontierResponseAnchorRequired}'='true'
-    and jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorEpochs}')='number'
-    and (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorEpochs}')::numeric=1
-    and jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorItems}')='number'
-    and (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorItems}')::numeric>0;
+    and case
+      when jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorEpochs}')='number'
+      then (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorEpochs}')::numeric
+      else 0
+    end=1
+    and case
+      when jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorItems}')='number'
+      then (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorItems}')::numeric
+      else 0
+    end>0;
 
   select count(distinct r.candidate_id)::integer into v_frontier_completions
   from public.cos_university_distilled_evaluation_runs r
@@ -117,10 +123,16 @@ begin
           and a.subject_id='Computer Science & Coding'
           and a.intended_use #>> '{trainingReceipt,optimizer}'='frontier_response_anchor_then_stable_on_policy_distillation'
           and a.intended_use #>> '{trainingReceipt,frontierResponseAnchorRequired}'='true'
-          and jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorEpochs}')='number'
-          and (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorEpochs}')::numeric=1
-          and jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorItems}')='number'
-          and (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorItems}')::numeric>0
+          and case
+            when jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorEpochs}')='number'
+            then (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorEpochs}')::numeric
+            else 0
+          end=1
+          and case
+            when jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorItems}')='number'
+            then (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorItems}')::numeric
+            else 0
+          end>0
         then 0 else 1
       end,
       case

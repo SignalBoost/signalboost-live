@@ -8,7 +8,7 @@ import type {
 export const UNIVERSAL_MCP_PROFILE_VERSION = 'universal-mcp-profile-v1' as const
 export const UNIVERSAL_MCP_PROTOCOL_VERSION = '2025-11-25' as const
 
-export type UniversalMcpProfileId = 'github-mcp' | 'supabase-mcp' | 'context7-mcp'
+export type UniversalMcpProfileId = 'github-mcp' | 'supabase-mcp' | 'context7-mcp' | 'figma-mcp'
 
 export interface UniversalMcpToolPolicy {
   readonly remoteToolName: string
@@ -119,10 +119,37 @@ export const CONTEXT7_MCP_PROFILE: UniversalMcpServerProfile = Object.freeze({
   ]),
 })
 
+
+export const FIGMA_MCP_PROFILE: UniversalMcpServerProfile = Object.freeze({
+  profileId: 'figma-mcp',
+  serverId: 'figma-mcp',
+  displayName: 'Figma MCP',
+  transport: 'streamable-http',
+  transportRef: 'host:mcp:figma',
+  protocolVersion: UNIVERSAL_MCP_PROTOCOL_VERSION,
+  tools: Object.freeze([
+    read('whoami', 'identity.read', 'design.account.read'),
+    read('get_design_context', 'design_context.read', 'design.file.read'),
+    read('get_metadata', 'metadata.read', 'design.file.read'),
+    read('get_screenshot', 'screenshot.read', 'design.file.read'),
+    read('get_variable_defs', 'variables.read', 'design.file.read'),
+    read('get_code_connect_map', 'code_connect.read', 'design.code_connect.read'),
+    read('get_libraries', 'libraries.list', 'design.library.read'),
+    read('search_design_system', 'design_system.search', 'design.library.read'),
+    write('add_code_connect_map', 'code_connect.write', 'design.code_connect.write'),
+    write('create_new_file', 'file.create', 'design.file.write'),
+    write('generate_diagram', 'diagram.generate', 'design.file.write'),
+    write('generate_figma_design', 'design.generate', 'design.file.write'),
+    write('upload_assets', 'assets.upload', 'design.file.write'),
+    consequential('use_figma', 'canvas.mutate', 'design.canvas.mutate'),
+  ]),
+})
+
 export const UNIVERSAL_MCP_PROFILES: readonly UniversalMcpServerProfile[] = Object.freeze([
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
   CONTEXT7_MCP_PROFILE,
+  FIGMA_MCP_PROFILE,
 ])
 
 export function universalMcpToolNames(profile: UniversalMcpServerProfile): readonly string[] {

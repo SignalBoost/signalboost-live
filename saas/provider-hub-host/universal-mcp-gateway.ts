@@ -18,6 +18,7 @@ import {
   FIGMA_MCP_PROFILE,
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
+  VERCEL_MCP_PROFILE,
   UNIVERSAL_MCP_PROFILES,
   createUniversalMcpRegistryEntries,
   universalMcpToolNames,
@@ -34,7 +35,7 @@ export interface UniversalMcpProviderReadiness {
   providerId: UniversalMcpProfileId
   displayName: string
   configured: boolean
-  reason: 'ready' | 'missing_credential' | 'missing_project_ref'
+  reason: 'ready' | 'missing_credential' | 'missing_project_ref' | 'missing_target'
   authentication: 'bearer' | 'anonymous'
   target: string
 }
@@ -87,6 +88,14 @@ function githubRepos(env: Environment, override?: readonly string[]): readonly s
   return Object.freeze(normalized)
 }
 
+function vercelScope(env: Environment): Readonly<{ teamSlug: string; projectSlug: string }> | null {
+  const teamSlug = String(env.VERCEL_MCP_TEAM_SLUG || '').trim()
+  const projectSlug = String(env.VERCEL_MCP_PROJECT_SLUG || '').trim()
+  const slug = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i
+  if (!teamSlug || !projectSlug || !slug.test(teamSlug) || !slug.test(projectSlug)) return null
+  return Object.freeze({ teamSlug, projectSlug })
+}
+
 function profileFor(id: UniversalMcpProfileId): UniversalMcpServerProfile {
   const profile = UNIVERSAL_MCP_PROFILES.find(item => item.profileId === id)
   if (!profile) throw new Error(`universal_mcp_unknown_profile:${id}`)
@@ -98,6 +107,8 @@ function readinessFor(env: Environment, allowedRepos: readonly string[]): readon
   const sbToken = String(env.SUPABASE_ACCESS_TOKEN || '').trim()
   const sbRef = supabaseProjectRef(env)
   const context7Token = String(env.CONTEXT7_API_KEY || '').trim()
+  const vercelToken = String(env.VERCEL_MCP_OAUTH_ACCESS_TOKEN || '').trim()
+  const vercel = vercelScope(env)
   return Object.freeze([
     Object.freeze({
       providerId: 'github-mcp' as const,
@@ -130,6 +141,14 @@ function readinessFor(env: Environment, allowedRepos: readonly string[]): readon
       reason: String(env.FIGMA_MCP_OAUTH_ACCESS_TOKEN || '').trim() ? 'ready' as const : 'missing_credential' as const,
       authentication: 'bearer' as const,
       target: 'figma-account',
+    }),
+    Object.freeze({
+      providerId: 'vercel-mcp' as const,
+      displayName: VERCEL_MCP_PROFILE.displayName,
+      configured: Boolean(vercelToken && vercel),
+      reason: !vercelToken ? 'missing_credential' as const : !vercel ? 'missing_target' as const : 'ready' as const,
+      authentication: 'bearer' as const,
+      target: vercel ? `${vercel.teamSlug}/${vercel.projectSlug}` : 'unresolved',
     }),
   ])
 }
@@ -188,6 +207,19 @@ function httpProfiles(env: Environment, ready: readonly UniversalMcpProviderRead
     }))
   }
 
+  const vercelToken = String(env.VERCEL_MCP_OAUTH_ACCESS_TOKEN || '').trim()
+  const vercel = vercelScope(env)
+  const vercelReady = ready.find(item => item.providerId === 'vercel-mcp')?.configured === true
+  if (vercelReady && vercel) {
+    profiles.push(Object.freeze({
+      serverId: VERCEL_MCP_PROFILE.serverId,
+      transportRef: VERCEL_MCP_PROFILE.transportRef,
+      endpoint: `https://mcp.vercel.com/${encodeURIComponent(vercel.teamSlug)}/${encodeURIComponent(vercel.projectSlug)}`,
+      protocolVersion: VERCEL_MCP_PROFILE.protocolVersion,
+      authorization: () => `Bearer ${vercelToken}`,
+    }))
+  }
+
   return Object.freeze(profiles)
 }
 
@@ -232,9 +264,31 @@ function guardGithubArguments(
   return Object.freeze(mutable)
 }
 
+function guardVercelArguments(
+  toolName: string,
+  args: Record<string, unknown>,
+  scope: Readonly<{ teamSlug: string; projectSlug: string }> | null,
+): Readonly<Record<string, unknown>> {
+  if (!scope) throw new Error('universal_mcp_vercel_target_required')
+  const mutable = { ...args }
+  const suppliedTeam = typeof mutable.teamId === 'string' ? mutable.teamId.trim() : ''
+  const suppliedProject = typeof mutable.projectId === 'string' ? mutable.projectId.trim() : ''
+  if (suppliedTeam && suppliedTeam.toLowerCase() !== scope.teamSlug.toLowerCase()) {
+    throw new Error('universal_mcp_vercel_team_rejected')
+  }
+  if (suppliedProject && suppliedProject.toLowerCase() !== scope.projectSlug.toLowerCase()) {
+    throw new Error('universal_mcp_vercel_project_rejected')
+  }
+
+  delete mutable.teamId
+  delete mutable.projectId
+  return Object.freeze(mutable)
+}
+
 function guardedFactory(
   base: McpRegistryTransportFactory,
   allowedRepos: readonly string[],
+  vercel: Readonly<{ teamSlug: string; projectSlug: string }> | null,
 ): McpRegistryTransportFactory {
   return Object.freeze({
     create(input) {
@@ -250,7 +304,9 @@ function guardedFactory(
           const args = plain(params.arguments) ? params.arguments : {}
           const guardedArgs = profile.profileId === 'github-mcp'
             ? guardGithubArguments(name, { ...args }, allowedRepos)
-            : Object.freeze({ ...args })
+            : profile.profileId === 'vercel-mcp'
+              ? guardVercelArguments(name, { ...args }, vercel)
+              : Object.freeze({ ...args })
           return delegate.send({
             ...call,
             request: Object.freeze({
@@ -272,6 +328,7 @@ export function createUniversalMcpGateway(options: UniversalMcpGatewayOptions) {
   const portableId = required(options.portableId, 'portableId')
   const env: Environment = options.env ?? process.env
   const allowedRepos = githubRepos(env, options.allowedGitHubRepos)
+  const vercel = vercelScope(env)
   const readiness = readinessFor(env, allowedRepos)
   const enabledProfiles = readiness.filter(item => item.configured).map(item => item.providerId)
   const registry = createInMemoryMcpConnectionRegistry(createUniversalMcpRegistryEntries({
@@ -286,7 +343,7 @@ export function createUniversalMcpGateway(options: UniversalMcpGatewayOptions) {
   })
   const resolver = createMcpConnectionRegistryResolver({
     registry,
-    transportFactory: guardedFactory(http, allowedRepos),
+    transportFactory: guardedFactory(http, allowedRepos, vercel),
     timeoutMs: 30_000,
     maxTools: 128,
   })

@@ -18,6 +18,7 @@ import { playwrightDescriptor } from './playwright.ts'
 import { puppeteerDescriptor } from './puppeteer.ts'
 import { selenium_gridDescriptor } from './selenium-grid.ts'
 import { playwright_mcpDescriptor } from './playwright-mcp.ts'
+import { chrome_devtools_mcpDescriptor } from './chrome-devtools-mcp.ts'
 import { agent_browserDescriptor } from './agent-browser.ts'
 import { uipathDescriptor } from './uipath.ts'
 import { automation_anywhereDescriptor } from './automation-anywhere.ts'
@@ -47,6 +48,7 @@ export const allPortableBrowserAdapterDescriptors = Object.freeze([
   puppeteerDescriptor,
   selenium_gridDescriptor,
   playwright_mcpDescriptor,
+  chrome_devtools_mcpDescriptor,
   agent_browserDescriptor,
   uipathDescriptor,
   automation_anywhereDescriptor,

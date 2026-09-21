@@ -1,9 +1,9 @@
-// saas/lib/portable-browser/catalog/playwright-mcp.ts
+// saas/lib/portable-browser/catalog/chrome-devtools-mcp.ts
 import { freezePortableBrowserAdapterDescriptor } from '../browser-adapter-descriptor.ts'
 
-export const playwright_mcpDescriptor = freezePortableBrowserAdapterDescriptor({
-  adapterId: 'playwright-mcp',
-  displayName: 'Playwright MCP',
+export const chrome_devtools_mcpDescriptor = freezePortableBrowserAdapterDescriptor({
+  adapterId: 'chrome-devtools-mcp',
+  displayName: 'Chrome DevTools MCP',
   category: 'agent_loop',
   implementationStatus: 'host_adapter_required',
   runtimeLanguages: ['typescript', 'mcp'],
@@ -14,26 +14,21 @@ export const playwright_mcpDescriptor = freezePortableBrowserAdapterDescriptor({
     'accessibility_snapshot',
     'console_inspection',
     'network_inspection',
+    'performance_trace',
     'screenshot',
     'bounded_interaction',
   ],
-  authenticationModes: ['buyer_managed', 'opaque_grant'],
-  observabilityCapabilities: ['audit_events', 'console_messages', 'network_requests'],
+  authenticationModes: ['buyer_managed'],
+  observabilityCapabilities: ['audit_events', 'console_messages', 'network_requests', 'performance_traces'],
   humanControlCapabilities: [],
-  evidenceCapabilities: ['screenshots', 'accessibility_snapshots'],
+  evidenceCapabilities: ['screenshots', 'accessibility_snapshots', 'performance_traces'],
   complianceMetadataKeys: ['tenant_isolation', 'approved_origins', 'mcp_transport'],
   configurationFieldDefinitions: [
     {
       key: 'transportRef',
       type: 'string',
       required: true,
-      description: 'Host-owned logical transport reference for the stdio Playwright MCP process.',
-    },
-    {
-      key: 'credentialReference',
-      type: 'opaque_reference',
-      required: false,
-      description: 'Optional vault reference when the host-side MCP process requires authentication.',
+      description: 'Host-owned logical transport reference for the stdio Chrome DevTools MCP process.',
     },
     {
       key: 'approvedOrigins',

@@ -4,6 +4,11 @@ import assert from 'node:assert/strict'
 import { allPortableBrowserAdapterDescriptors } from '../lib/portable-browser/catalog/index.ts'
 import { checkPortableBrowserCompatibility } from '../lib/portable-browser/browser-compatibility.ts'
 import { freezePortableBrowserManifest } from '../lib/portable-browser/browser-portable-manifest.ts'
+import {
+  PLAYWRIGHT_MCP_PROFILE,
+  CHROME_DEVTOOLS_MCP_PROFILE,
+  createBrowserMcpRegistryEntries,
+} from '../provider-hub-host/browser-mcp-profiles.ts'
 
 const availableAdapters = new Set(['browserbase', 'browserless', 'steel', 'playwright'])
 
@@ -15,6 +20,8 @@ test('portable browser descriptors are frozen, serializable, and explicitly inac
     assert.equal(descriptor.implementationStatus, availableAdapters.has(descriptor.adapterId) ? 'available' : 'host_adapter_required'); assert.doesNotThrow(() => JSON.stringify(descriptor))
     assert.ok(descriptor.documentationReference); assert.ok(descriptor.supportedPortKinds.length)
   }
+  assert.ok(ids.has('playwright-mcp'))
+  assert.ok(ids.has('chrome-devtools-mcp'))
 })
 // Now that every vendor declares its required configuration, the compatibility checker's
 // `unresolvedConfigurationFields` rule finally does something: a host that has not supplied a
@@ -49,4 +56,47 @@ test('compatibility is capability based and fails closed', () => {
 
   // A missing PORT still fails closed regardless of configuration.
   assert.equal(checkPortableBrowserCompatibility(manifest,allPortableBrowserAdapterDescriptors.filter(x=>x.adapterId==='stagehand'),hostWithKeys(requiredKeysFor(['stagehand']))).compatible,false)
+})
+
+
+test('browser MCP profiles are pinned, stdio, and deny dangerous tools by default', () => {
+  assert.equal(PLAYWRIGHT_MCP_PROFILE.transport, 'stdio')
+  assert.equal(PLAYWRIGHT_MCP_PROFILE.packageName, '@playwright/mcp')
+  assert.equal(PLAYWRIGHT_MCP_PROFILE.packageVersion, '0.0.81')
+  assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.transport, 'stdio')
+  assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.packageName, 'chrome-devtools-mcp')
+  assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.packageVersion, '1.9.0')
+
+  const deniedByAbsence = new Set([
+    'browser_run_code_unsafe',
+    'browser_file_upload',
+    'upload_file',
+    'install_extension',
+    'uninstall_extension',
+    'install_pwa',
+    'execute_3p_developer_tool',
+    'execute_webmcp_tool',
+  ])
+
+  for (const profile of [PLAYWRIGHT_MCP_PROFILE, CHROME_DEVTOOLS_MCP_PROFILE]) {
+    assert.ok(profile.tools.length > 0)
+    assert.equal(profile.tools.some(tool => deniedByAbsence.has(tool.remoteToolName)), false)
+    for (const tool of profile.tools) {
+      if (tool.risk === 'read') assert.equal(tool.requiresApproval, false)
+      else assert.equal(tool.requiresApproval, true)
+    }
+  }
+
+  const entries = createBrowserMcpRegistryEntries({
+    tenantId: 'tenant-a',
+    environmentId: 'prod',
+    portableId: 'software-specialist',
+  })
+  assert.deepEqual(entries.servers.map(server => server.serverId).sort(), ['chrome-devtools-mcp', 'playwright-mcp'])
+  assert.equal(entries.assignments.every(assignment =>
+    assignment.tenantId === 'tenant-a' &&
+    assignment.environmentId === 'prod' &&
+    assignment.portableId === 'software-specialist' &&
+    assignment.tools.length > 0
+  ), true)
 })

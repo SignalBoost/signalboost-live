@@ -117,3 +117,17 @@ Vercel is the next Universal MCP provider after GitHub, Supabase, Context7, and 
 - `deploy_to_vercel`, `use_vercel_cli`, domain purchase, protected-link creation, and other mutation/consequential tools are intentionally absent pending separate authority review.
 - Live Vercel certification is conditional on the three host-owned Vercel secrets being present and requires exact governed capability projection plus a real project details probe.
 - Remote tool discovery never expands the host allowlist or project scope.
+
+
+## Browser MCP CI sandbox repair — 2026-09-21
+
+The governed browser MCP live host now carries an explicit isolated-runner sandbox launch policy.
+
+- The previous Playwright live acceptance reached Provider Hub successfully but Chromium terminated because its sandbox could not initialize on the Actions host.
+- The previous Chrome DevTools MCP live acceptance failed with the corresponding opaque `Target closed` launch failure.
+- `isolatedBrowserMcpSandboxArgs()` centralizes the package-supported overrides used only by the isolated browser host:
+  - Playwright MCP: `--no-sandbox`
+  - Chrome DevTools MCP: `--chrome-arg=--no-sandbox` and `--chrome-arg=--disable-setuid-sandbox`
+- This does **not** widen Provider Hub capability projection, approved origins, filesystem access, credentials, or Portable Connector Runtime authority.
+- Regression coverage pins the exact launch policy in `saas/tests/portableBrowserAdapterCatalog.node.test.ts`.
+- Playwright and Chrome DevTools MCP must each pass their real live acceptance workflow on the repair revision before they are described as functional.

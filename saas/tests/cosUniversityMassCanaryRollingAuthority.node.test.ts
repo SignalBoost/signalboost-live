@@ -8,6 +8,8 @@ import {
   MASS_CANARY_ROLLING_AUTHORIZATION_REF,
   MASS_CANARY_ROLLING_MAX_APPROVALS,
   MASS_CANARY_COLD_START_FAILURE,
+  MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
+  MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
   MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
   MASS_CANARY_MAX_IDENTICAL_FAILURES,
   decideMassCanaryRollingApproval,
@@ -28,6 +30,29 @@ test('issues exactly the claim-compatible approval for the oldest artifact witho
   assert.ok('artifact' in decision)
   assert.equal(decision.artifact.candidateId, 'mass:1')
   assert.equal(decision.expiresAt, '2026-09-17T19:00:00.000Z')
+})
+
+test('bounded Builder apprenticeship proof lane prioritizes the first two post-remediation Computer Science canaries then restores oldest-first', () => {
+  assert.equal(MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE, 2)
+  assert.equal(MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER, '2026-09-21T01:55:00.000Z')
+  const proofNow = new Date('2026-09-21T14:30:00.000Z')
+  const legacy: CanaryArtifact = { candidateId:'mass:legacy', subjectId:'Mathematics', artifactHash:h(90), createdAt:'2026-09-20T00:00:00.000Z' }
+  const first: CanaryArtifact = { candidateId:'mass:builder-1', subjectId:'Computer Science & Coding', artifactHash:h(91), createdAt:'2026-09-21T02:14:25.056Z' }
+  const second: CanaryArtifact = { candidateId:'mass:builder-2', subjectId:'Computer Science & Coding', artifactHash:h(92), createdAt:'2026-09-21T02:31:24.295Z' }
+
+  const firstDecision = decideMassCanaryRollingApproval({ artifacts:[legacy,second,first], events:[], now:proofNow, enabled:true })
+  assert.ok('artifact' in firstDecision)
+  assert.equal(firstDecision.artifact.candidateId, first.candidateId)
+
+  const firstPassed = event(first, 'local_distilled_runtime_canary_passed', '2026-09-21T14:10:00.000Z')
+  const secondDecision = decideMassCanaryRollingApproval({ artifacts:[legacy,second,first], events:[firstPassed], now:proofNow, enabled:true })
+  assert.ok('artifact' in secondDecision)
+  assert.equal(secondDecision.artifact.candidateId, second.candidateId)
+
+  const secondPassed = event(second, 'local_distilled_runtime_canary_passed', '2026-09-21T14:20:00.000Z')
+  const restored = decideMassCanaryRollingApproval({ artifacts:[legacy,second,first], events:[firstPassed,secondPassed], now:proofNow, enabled:true })
+  assert.ok('artifact' in restored)
+  assert.equal(restored.artifact.candidateId, legacy.candidateId)
 })
 
 test('passed canary keeps its endpoint through one transient independent-evaluation lifecycle failure', () => {

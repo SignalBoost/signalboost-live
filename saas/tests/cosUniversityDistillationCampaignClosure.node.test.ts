@@ -129,3 +129,18 @@ test('a campaign that ended as expired or cancelled no longer strands its unfini
   assert.match(cleanup, /productionTrafficAuthorized: false/)
   assert.doesNotMatch(cleanup, /dispatch_authorized:\s*true/)
 })
+
+
+test('terminal cleanup reconciles a live campaign whose runs are already complete', () => {
+  const cleanup = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationTerminalCleanup.ts', import.meta.url), 'utf8')
+  assert.match(cleanup, /\.in\('status', \['authorized', 'active'\]\)/)
+  assert.match(cleanup, /stages\.some\(stage => stage !== 'complete'\)/)
+  assert.match(cleanup, /liveUnsettledCampaigns\.has\(campaignId\)/)
+  assert.match(cleanup, /status: 'completed', completed_at: now, updated_at: now/)
+  assert.match(cleanup, /mass_distillation_completed_campaign_reconciled/)
+  assert.match(cleanup, /all_runs_complete_and_provider_jobs_settled/)
+  assert.match(cleanup, /reconciledCompletedCampaigns/)
+  assert.match(cleanup, /retryAuthorized: false/)
+  assert.match(cleanup, /dispatchAuthorized: false/)
+  assert.match(cleanup, /productionTrafficAuthorized: false/)
+})

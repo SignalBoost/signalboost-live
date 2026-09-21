@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
+import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
 
 export interface LocalModelCallArgs {
   prompt: string
@@ -257,9 +258,15 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   const controller = new AbortController()
   const baseTimeoutMs = interactiveUserResponse(args) ? interactiveModelTimeoutMs(args, config.timeoutMs) : config.timeoutMs
   const callerTimeoutMs = Number(args.timeoutMs)
-  const timeoutMs = Number.isFinite(callerTimeoutMs) && callerTimeoutMs > 0
+  const callerBoundTimeoutMs = Number.isFinite(callerTimeoutMs) && callerTimeoutMs > 0
     ? Math.max(250, Math.min(baseTimeoutMs, callerTimeoutMs))
     : baseTimeoutMs
+  // Inside a durable COS turn, no single model call (RunPod attempt, DeepInfra fallback, retry) may
+  // outlive the whole-turn deadline. Outside a turn this is a no-op.
+  const turnRemainingMs = turnDeadlineRemainingMs()
+  const timeoutMs = turnRemainingMs === null
+    ? callerBoundTimeoutMs
+    : Math.max(250, Math.min(callerBoundTimeoutMs, turnRemainingMs))
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
     inferenceStartedAt = Date.now()

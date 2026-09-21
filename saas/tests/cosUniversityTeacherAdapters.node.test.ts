@@ -228,3 +228,70 @@ test('a buyer-added OpenAI-compatible provider uses the same transport adapter w
   assert.equal(result.provider, 'buyer-cloud')
   assert.equal(result.text, 'buyer provider answer')
 })
+
+
+test('hosted teacher adapters reject provider-declared token-limit truncation', async () => {
+  const cases = [
+    {
+      id: 'openai',
+      env: {
+        OPENAI_API_KEY: 'sk_123456789012345678901234567890',
+        COS_UNIVERSITY_TEACHER_OPENAI_MODEL: 'gpt-5.6-luna',
+      },
+      payload: {
+        id: 'resp-truncated',
+        status: 'incomplete',
+        incomplete_details: { reason: 'max_output_tokens' },
+        output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'partial answer' }] }],
+        usage: { input_tokens: 10, output_tokens: 384 },
+      },
+    },
+    {
+      id: 'claude',
+      env: {
+        ANTHROPIC_API_KEY: 'sk-ant-123456789012345678901234567890',
+        COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL: 'claude-sonnet-4-6',
+      },
+      payload: {
+        content: [{ type: 'text', text: 'partial answer' }],
+        stop_reason: 'max_tokens',
+        usage: { input_tokens: 10, output_tokens: 384 },
+      },
+    },
+    {
+      id: 'grok',
+      env: {
+        XAI_API_KEY: 'xai_123456789012345678901234567890',
+        COS_UNIVERSITY_TEACHER_XAI_MODEL: 'grok-4.6',
+      },
+      payload: {
+        choices: [{ finish_reason: 'length', message: { content: 'partial answer' } }],
+        usage: { prompt_tokens: 10, completion_tokens: 384 },
+      },
+    },
+    {
+      id: 'gemini',
+      env: {
+        GEMINI_API_KEY: 'gai_123456789012345678901234567890',
+        COS_UNIVERSITY_TEACHER_GEMINI_MODEL: 'gemini-3.8-flash',
+      },
+      payload: {
+        candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: 'partial answer' }] } }],
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 380 },
+      },
+    },
+  ] as const
+
+  for (const item of cases) {
+    await assert.rejects(
+      generateWithUniversityTeacher({
+        teacher: byId(item.id),
+        env: item.env,
+        request: { system: 'Teach carefully.', prompt: 'Explain safely.', maxOutputTokens: 384 },
+        fetchImpl: async () => new Response(JSON.stringify(item.payload), { status: 200 }),
+      }),
+      /university_teacher_output_truncated/,
+      item.id,
+    )
+  }
+})

@@ -226,14 +226,16 @@ function massDistillationHybridOrigin(sourceKind: string): HybridDistillationOri
 function selectHybridDistillationChunk(rows: readonly NormalizedIdentity[]): NormalizedIdentity[] {
   if (rows.length < MASS_DISTILLATION_MIN_BATCH) return []
   const ordered = [...rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
-  const failureCount = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'failure_derived').length
-  // Remediation must not be diluted inside a large 128-item batch. When any independently-derived
-  // failure curriculum is available, package a minimum-sized corrective cohort first; once those
-  // rows are consumed, normal high-throughput batch sizing resumes.
-  const targetSize = Math.min(
-    failureCount > 0 ? MASS_DISTILLATION_MIN_BATCH : MASS_DISTILLATION_MAX_BATCH,
-    ordered.length,
-  )
+  // Failure-derived curriculum rides inside a full-sized batch; it does not shrink the batch.
+  // Production 2026-09-19 -> 2026-09-21: the previous rule packaged a minimum 20-item "corrective
+  // cohort" whenever ANY failure-derived row existed. Every failed evaluation produces failure-derived
+  // rows, so the rule never released: 170 of 457 batch runs in 48h were exactly 20 items, and no
+  // 128-item batch was built after 2026-09-19 20:08 UTC. A 20-item batch trains the LoRA on ~16
+  // examples and grades it on ~4 holdout cases; 47 evaluations in 12h then tied baseline on 176 of
+  // 188 holdout cases and quarantined, which generated more failure rows - a closed loop.
+  // Remediation is not diluted here: planHybridDistillationMix reserves failure-derived rows a fixed
+  // share (HYBRID_FAILURE_DERIVED_TARGET) of every batch and gives them any unused synthetic share.
+  const targetSize = Math.min(MASS_DISTILLATION_MAX_BATCH, ordered.length)
   const real = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'real_source')
   const failure = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'failure_derived')
   const synthetic = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'teacher_synthetic')

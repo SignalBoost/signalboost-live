@@ -37,6 +37,84 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
     runs: [] as unknown[],
   })
 
+  // Reconcile successful live parents too. Provider-stage completion is authoritative for the child,
+  // but an interrupted caller can miss the final parent update after the run reaches complete. Leaving
+  // that parent active consumes dynamic campaign capacity indefinitely even though there is no work left.
+  // Close only when every child is complete and every provider job is settled; this grants no retry,
+  // dispatch, spend, promotion or Production-traffic authority.
+  const liveCampaigns = await db.from('cos_university_mass_distillation_campaigns')
+    .select('id,status')
+    .in('status', ['authorized', 'active'])
+    .is('completed_at', null)
+    .order('updated_at', { ascending: true })
+    .limit(Math.max(1, Math.min(input.maxCampaigns ?? 20, 100)))
+  if (liveCampaigns.error) throw liveCampaigns.error
+
+  const liveCampaignIds = (liveCampaigns.data || []).map((row: any) => String(row.id || '')).filter(Boolean)
+  const liveRuns = liveCampaignIds.length ? await db.from('cos_university_mass_distillation_batch_runs')
+    .select('campaign_id,stage')
+    .in('campaign_id', liveCampaignIds)
+    .limit(500) : { data: [] as any[], error: null }
+  if (liveRuns.error) throw liveRuns.error
+
+  const liveUnsettledJobs = liveCampaignIds.length ? await db.from('cos_university_mass_distillation_provider_jobs')
+    .select('campaign_id')
+    .in('campaign_id', liveCampaignIds)
+    .is('settled_at', null)
+    .limit(500) : { data: [] as any[], error: null }
+  if (liveUnsettledJobs.error) throw liveUnsettledJobs.error
+
+  const liveStagesByCampaign = new Map<string, string[]>()
+  for (const row of liveRuns.data || []) {
+    const campaignId = String((row as any).campaign_id || '')
+    if (!campaignId) continue
+    const stages = liveStagesByCampaign.get(campaignId) || []
+    stages.push(String((row as any).stage || ''))
+    liveStagesByCampaign.set(campaignId, stages)
+  }
+  const liveUnsettledCampaigns = new Set((liveUnsettledJobs.data || []).map((row: any) => String(row.campaign_id || '')).filter(Boolean))
+  const reconciledCompletedCampaignIds: string[] = []
+
+  for (const campaignId of liveCampaignIds) {
+    const stages = liveStagesByCampaign.get(campaignId) || []
+    if (!stages.length || stages.some(stage => stage !== 'complete') || liveUnsettledCampaigns.has(campaignId)) continue
+    const now = new Date().toISOString()
+    const closed = await db.from('cos_university_mass_distillation_campaigns')
+      .update({ status: 'completed', completed_at: now, updated_at: now })
+      .eq('id', campaignId)
+      .in('status', ['authorized', 'active'])
+      .is('completed_at', null)
+      .select('id')
+      .maybeSingle()
+    if (closed.error) throw closed.error
+    if (!closed.data) continue
+
+    const evidence = {
+      profile: MASS_DISTILLATION_TERMINAL_CLEANUP_PROFILE,
+      claim: 'mass_distillation_completed_campaign_reconciled',
+      campaignId,
+      reason: 'all_runs_complete_and_provider_jobs_settled',
+      retryAuthorized: false,
+      dispatchAuthorized: false,
+      productionTrafficAuthorized: false,
+      authorityExpanded: false,
+    }
+    const evidenceHash = hash(evidence)
+    const eventKey = hash([MASS_DISTILLATION_TERMINAL_CLEANUP_PROFILE, 'completed-campaign-reconciled', campaignId])
+    const recorded = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: eventKey,
+      event_type: 'fine_tune',
+      subject_id: 'distillation_campaign',
+      candidate_id: `mass-campaign:${campaignId}`,
+      evidence_hash: evidenceHash,
+      evidence,
+      verifier: 'host_controller',
+      observed_at: now,
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (recorded.error) throw recorded.error
+    reconciledCompletedCampaignIds.push(campaignId)
+  }
+
   const campaigns = await db.from('cos_university_mass_distillation_campaigns')
     .select('id,status')
     .in('status', CLEANUP_CAMPAIGN_STATUSES)
@@ -255,8 +333,8 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
 
   return Object.freeze({
     ok: true as const,
-    skipped: terminalized.length === 0 && quarantinedBatches.length === 0 && completedCampaigns.length === 0,
-    reason: terminalized.length === 0 && quarantinedBatches.length === 0 && completedCampaigns.length === 0
+    skipped: reconciledCompletedCampaignIds.length === 0 && terminalized.length === 0 && quarantinedBatches.length === 0 && completedCampaigns.length === 0,
+    reason: reconciledCompletedCampaignIds.length === 0 && terminalized.length === 0 && quarantinedBatches.length === 0 && completedCampaigns.length === 0
       ? 'no_orphaned_nonterminal_terminal_campaign_run'
       : null,
     campaignsInspected: campaignIds.length,
@@ -266,6 +344,8 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
     batchQuarantines: Object.freeze(quarantinedBatches),
     completedCampaigns: completedCampaigns.length,
     completedCampaignIds: Object.freeze(completedCampaigns),
+    reconciledCompletedCampaigns: reconciledCompletedCampaignIds.length,
+    reconciledCompletedCampaignIds: Object.freeze(reconciledCompletedCampaignIds),
     retryAuthorized: false,
     dispatchAuthorized: false,
     productionTrafficAuthorized: false,

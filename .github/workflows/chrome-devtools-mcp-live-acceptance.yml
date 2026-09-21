@@ -1,0 +1,81 @@
+# .github/workflows/chrome-devtools-mcp-live-acceptance.yml
+#
+# Real reference-host acceptance for Chrome DevTools MCP.
+# This workflow launches an actual Chrome/Chromium process plus the pinned MCP server and routes
+# every operation through SignalBoost Provider Hub + Portable Connector Runtime governance.
+
+name: Chrome DevTools MCP Live Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/chrome-devtools-mcp-live-acceptance.yml'
+      - 'saas/provider-hub-host/mcp-stdio-transport.ts'
+      - 'saas/provider-hub-host/mcp-outbound-client.ts'
+      - 'saas/provider-hub-host/mcp-connection-registry.ts'
+      - 'saas/provider-hub-host/browser-mcp-profiles.ts'
+      - 'saas/provider-hub-host/browser-mcp-stdio-host.ts'
+      - 'saas/scripts/browser-agent-host/run-chrome-devtools-mcp-acceptance.ts'
+      - 'saas/tests/portableBrowserAdapterCatalog.node.test.ts'
+  workflow_dispatch:
+    inputs:
+      probe_url:
+        description: 'Approved iTMounts URL for the read-only reference acceptance'
+        required: false
+        default: 'https://itmounts.com/'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chrome-devtools-mcp-live-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-chrome-devtools-mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Use supported Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Install host-only acceptance dependencies
+        working-directory: saas
+        run: |
+          set -euo pipefail
+          npm install --no-save chrome-devtools-mcp@1.9.0 tsx@4 @playwright/test@^1.41.0
+          actual="$(node -p "require('chrome-devtools-mcp/package.json').version")"
+          test "$actual" = "1.9.0" || { echo "::error::Expected chrome-devtools-mcp 1.9.0, got $actual"; exit 1; }
+          npx playwright install --with-deps chromium
+          chrome_path="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")"
+          test -x "$chrome_path" || { echo "::error::Chromium executable not found at $chrome_path"; exit 1; }
+          echo "BROWSER_MCP_CHROME_EXECUTABLE=$chrome_path" >> "$GITHUB_ENV"
+
+      - name: Run governed live acceptance
+        working-directory: saas
+        env:
+          BROWSER_MCP_PROBE_URL: ${{ github.event.inputs.probe_url || 'https://itmounts.com/' }}
+          BROWSER_MCP_APPROVED_ORIGINS: 'https://itmounts.com,https://www.itmounts.com'
+          BROWSER_MCP_ACCEPTANCE_RESULT_PATH: ${{ github.workspace }}/browser-mcp-acceptance.json
+        run: node --import tsx scripts/browser-agent-host/run-chrome-devtools-mcp-acceptance.ts
+
+      - name: Upload metadata-only acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-devtools-mcp-acceptance-${{ github.run_id }}
+          path: browser-mcp-acceptance.json
+          retention-days: 30
+          if-no-files-found: warn

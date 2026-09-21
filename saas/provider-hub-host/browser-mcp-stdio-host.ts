@@ -156,6 +156,7 @@ function assertToolCall(
       if (type !== 'url') throw new Error(`browser_mcp_navigation_type_rejected:${type}`)
       assertUrlAllowed(call.args.url, approvedOrigins)
     } else if (call.name === 'new_page') {
+      if (call.args.background === true) throw new Error('browser_mcp_background_navigation_rejected')
       assertUrlAllowed(call.args.url, approvedOrigins)
     }
   } else if (profile.profileId === 'playwright-mcp' && call.name === 'browser_navigate') {
@@ -263,6 +264,12 @@ function assertNavigationResultAllowed(
   const call = callShape(request)
   if (!call) return
 
+  // Preserve an upstream tool error as an upstream tool error. Final-origin evidence is required
+  // only for a navigation the remote MCP server reports as successful; otherwise the adapter must
+  // surface the real remote failure instead of masking it as missing navigation evidence.
+  const result = toolResult(raw)
+  if (result?.isError === true) return
+
   if (profile.profileId === 'chrome-devtools-mcp' && ['navigate_page', 'new_page'].includes(call.name)) {
     const pages = chromeStructuredPages(raw)
     if (!pages.length) throw new Error('browser_mcp_navigation_evidence_missing')
@@ -278,6 +285,35 @@ function assertNavigationResultAllowed(
     if (!finalUrl) throw new Error('browser_mcp_navigation_evidence_missing')
     assertUrlAllowed(finalUrl, approvedOrigins)
   }
+}
+
+function navigationProofRequest(
+  profile: BrowserMcpServerProfile,
+  originalRequest: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> | null {
+  const call = callShape(originalRequest)
+  if (!call) return null
+
+  const proofTool = profile.profileId === 'chrome-devtools-mcp'
+    ? (['navigate_page', 'new_page'].includes(call.name) ? 'list_pages' : null)
+    : (call.name === 'browser_navigate' ? 'browser_snapshot' : null)
+  if (!proofTool) return null
+
+  const originalId = typeof originalRequest.id === 'string' || typeof originalRequest.id === 'number'
+    ? String(originalRequest.id)
+    : 'unknown'
+  return Object.freeze({
+    jsonrpc: '2.0',
+    id: `signalboost-origin-proof:${profile.profileId}:${originalId}`,
+    method: 'tools/call',
+    params: Object.freeze({ name: proofTool, arguments: Object.freeze({}) }),
+  })
+}
+
+function isMissingNavigationEvidence(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '')
+  return message === 'browser_mcp_navigation_evidence_missing' ||
+    message === 'browser_mcp_navigation_target_missing'
 }
 
 function filterToolsResponse(
@@ -365,8 +401,31 @@ export function createBrowserMcpStdioTransportFactory(options: BrowserMcpStdioHo
           try {
             assertNavigationResultAllowed(profile, call.request, raw, approvedOrigins)
           } catch (error) {
-            await delegate.close?.()
-            throw error
+            const proofRequest = isMissingNavigationEvidence(error)
+              ? navigationProofRequest(profile, call.request)
+              : null
+            if (!proofRequest) {
+              await delegate.close?.()
+              throw error
+            }
+
+            let proofRaw: unknown
+            try {
+              proofRaw = await delegate.send({ ...call, request: proofRequest })
+            } catch {
+              await delegate.close?.()
+              throw new Error('browser_mcp_navigation_proof_failed')
+            }
+            if (toolResult(proofRaw)?.isError === true) {
+              await delegate.close?.()
+              throw new Error('browser_mcp_navigation_proof_failed')
+            }
+            try {
+              assertNavigationResultAllowed(profile, call.request, proofRaw, approvedOrigins)
+            } catch (proofError) {
+              await delegate.close?.()
+              throw proofError
+            }
           }
           return filterToolsResponse(profile, call.request, raw)
         },

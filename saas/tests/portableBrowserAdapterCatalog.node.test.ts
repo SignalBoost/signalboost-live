@@ -192,6 +192,13 @@ test('browser MCP live host rejects hidden tools, filesystem output, and off-ori
 
   assert.throws(() => assertBrowserMcpToolCallForTest({
     serverId: 'chrome-devtools-mcp',
+    toolName: 'new_page',
+    args: { url: 'https://itmounts.com/', background: true },
+    approvedOrigins: ['https://itmounts.com'],
+  }), /browser_mcp_background_navigation_rejected/)
+
+  assert.throws(() => assertBrowserMcpToolCallForTest({
+    serverId: 'chrome-devtools-mcp',
     toolName: 'take_screenshot',
     args: { pageId: 1, filePath: '/tmp/leak.png' },
     approvedOrigins: ['https://itmounts.com'],
@@ -288,4 +295,29 @@ test('browser MCP post-navigation verification accepts only the final reported a
     approvedOrigins: ['https://itmounts.com'],
     rawResult: { content: [{ type: 'text', text: 'navigation completed without page evidence' }] },
   }), /browser_mcp_navigation_evidence_missing/)
+})
+
+
+test('browser MCP navigation guard preserves upstream tool failures for adapter error handling', () => {
+  assert.doesNotThrow(() => assertBrowserMcpRawNavigationResultForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'new_page',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com', 'https://www.itmounts.com'],
+    rawResult: {
+      isError: true,
+      content: [{ type: 'text', text: 'Unable to navigate to the requested page.' }],
+    },
+  }))
+
+  assert.doesNotThrow(() => assertBrowserMcpRawNavigationResultForTest({
+    serverId: 'playwright-mcp',
+    toolName: 'browser_navigate',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com', 'https://www.itmounts.com'],
+    rawResult: {
+      isError: true,
+      content: [{ type: 'text', text: 'Navigation failed.' }],
+    },
+  }))
 })

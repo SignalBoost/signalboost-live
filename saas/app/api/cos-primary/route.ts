@@ -55,6 +55,7 @@ import { getAccess } from '@/lib/auth/access'
 import { buildConversationRecallContext, detectConversationRecallIntent } from '@/lib/ai/cos/cosConversationRecall'
 import { searchPastConversations } from '@/lib/ai/tools/conversationHistory'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
+import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
@@ -557,7 +558,7 @@ export async function postCosPrimary(req:NextRequest){
   if(conversationRecall) reasoningPrompt=`${conversationRecall}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
-    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language:reportLanguageName(language),privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
@@ -588,7 +589,7 @@ export async function postCosPrimary(req:NextRequest){
   // authoring: explanation, analysis, planning, and other low-risk tasks should still receive a
   // useful answer when the primary confidence gate declined to release one.
   if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)){
-    const completionRescue=await runCompletionFirstRescue(input,language)
+    const completionRescue=await runCompletionFirstRescue(input,reportLanguageName(language))
     if(completionRescue)return completionFirstResponse(startedAt,input,completionRescue,'cos-completion-first-rescue')
   }
 

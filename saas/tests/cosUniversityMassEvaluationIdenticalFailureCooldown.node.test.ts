@@ -170,6 +170,24 @@ test('an expired bounded runtime authorization is infrastructure and never burns
   assert.equal(decide(controlPlane, '2026-09-20T10:17:00Z').issue, true)
 })
 
+test('solo candidate output exhaustion spends substantive attempts instead of cooling back into the queue', () => {
+  const exhausted = failures(
+    'mass_distilled_evaluation_candidate_output_exhausted:187f9db2cb691694:finish=length:think=0:open=1:close=0:other=0:cap=1024',
+    MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
+  )
+  assert.equal(decide(exhausted, '2026-09-20T10:08:00Z').issue, false)
+  assert.equal(decide(exhausted, '2026-09-22T10:08:00Z').issue, false)
+})
+
+test('legacy or baseline answer truncation remains infrastructure and gets the fairness cooldown', () => {
+  const transport = failures(
+    'mass_distilled_evaluation_answer_missing:187f9db2cb691694:finish=length:think=0:open=1:close=0:other=0:cap=1024',
+    1,
+  )
+  assert.equal(decide(transport, '2026-09-20T10:08:00Z').issue, false)
+  assert.equal(decide(transport, '2026-09-20T10:17:00Z').issue, true)
+})
+
 test('the substantive-failure budget is untouched: a cooled-down artifact that really failed stays out', () => {
   // Not an infrastructure failure, so these spend the artifact's real attempt budget. No amount of waiting
   // may bring it back - the cooldown must only ever govern infrastructure repeats.

@@ -104,6 +104,7 @@ export const CHROME_DEVTOOLS_MCP_PROFILE: BrowserMcpServerProfile = Object.freez
     '--performance-crux=false',
     '--javascript-evaluation=false',
     '--redact-network-headers=true',
+    '--experimental-structured-content=true',
     '--screenshot-format=jpeg',
     '--screenshot-quality=70',
     '--screenshot-max-width=1440',

@@ -250,6 +250,7 @@ export default function Home() {
       setTurns((current) => [...current, {
         request: displayContent,
         response: reply,
+        sourceLanguage: (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as ConciergeTranscriptTurn['sourceLanguage'],
         ...(result.suggestedFollowups.length === 2 ? { suggestedFollowups: result.suggestedFollowups } : {}),
         ...(result.builderWorkspaceId && result.builderFiles.length ? { builderWorkspaceId: result.builderWorkspaceId, builderFiles: result.builderFiles } : {}),
         ...(result.visualPreviewUrl ? { visualPreviewUrl: result.visualPreviewUrl } : {}),
@@ -344,7 +345,7 @@ export default function Home() {
                         ⧉ {copiedTarget === `a-${index}` ? copy.copied : copy.copyResponse}
                       </button>
                     </div>
-                    <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
+                    <div className="assistant-content" data-ai-content data-sb-source-language={turn.sourceLanguage}><AssistantMessage content={turn.response} /></div>
                     {turn.visualPreviewUrl ? (
                       <figure
                         aria-label={turn.request}

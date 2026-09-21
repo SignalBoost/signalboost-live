@@ -13,7 +13,7 @@ export type AgentProgressEvent = {
 const JOB_POLL_DELAY_MS = 1_500
 const JOB_POLL_ATTEMPTS = 180
 const COS_TURN_POLL_DELAY_MS = 1_500
-const COS_TURN_POLL_ATTEMPTS = 26
+const COS_TURN_FOREGROUND_WAIT_MS = 180_000
 const COS_HISTORY_READ_DEADLINE_MS = 2_000
 const PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS = 195_000
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
@@ -300,15 +300,22 @@ export async function postWithAgentProgress(args: {
     : ''
 
   if (turnId && data?.status === 'running' && conversationId) {
-    for (let attempt = 0; attempt < COS_TURN_POLL_ATTEMPTS; attempt += 1) {
+    const durablePollDeadlineMs = startedAt + COS_TURN_FOREGROUND_WAIT_MS
+    while (Date.now() < durablePollDeadlineMs) {
       report('running', 'COS accepted the turn durably — checking History for the completed response')
       try {
-        await wait(COS_TURN_POLL_DELAY_MS, args.signal)
+        const remainingBeforeWaitMs = durablePollDeadlineMs - Date.now()
+        if (remainingBeforeWaitMs <= 0) break
+        await wait(Math.min(COS_TURN_POLL_DELAY_MS, remainingBeforeWaitMs), args.signal)
+
+        const remainingBeforeReadMs = durablePollDeadlineMs - Date.now()
+        if (remainingBeforeReadMs <= 0) break
+        const historyReadBudgetMs = Math.max(1, Math.min(COS_HISTORY_READ_DEADLINE_MS, remainingBeforeReadMs))
         const history = await fetch(`/api/assistant/chats?id=${encodeURIComponent(conversationId)}`, {
           method: 'GET',
           credentials: 'include',
           cache: 'no-store',
-          signal: AbortSignal.any([args.signal, AbortSignal.timeout(COS_HISTORY_READ_DEADLINE_MS)]),
+          signal: AbortSignal.any([args.signal, AbortSignal.timeout(historyReadBudgetMs)]),
           headers: { accept: 'application/json' },
         })
         if (!history.ok) continue
@@ -336,8 +343,22 @@ export async function postWithAgentProgress(args: {
         // Read-only History polling never replays the accepted POST.
       }
     }
-    report('complete', 'COS is still finishing this durable turn in History; you can continue using the page')
-    return { ok: true, status: 202, data }
+
+    // The durable worker may still finish later, but a running transport receipt must never become
+    // the visible assistant answer. Return an explicit timeout envelope instead of the original 202.
+    report('complete', 'COS did not finish the durable turn inside the foreground response window')
+    return {
+      ok: false,
+      status: 504,
+      data: {
+        reply: transportFailureReply(requestBody),
+        source: 'cos-durable-history-deadline',
+        turnId,
+        status: 'running',
+        execution_allowed: false,
+        external_action_taken: false,
+      },
+    }
   }
 
   const jobId = typeof data?.jobId === 'string' ? data.jobId : ''

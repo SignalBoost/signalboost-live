@@ -36,7 +36,7 @@ test('production routing has a semantic authoring rescue and does not branch on 
 
 test('canonical COS fast authoring runs before auth, retrieval, and enterprise reasoning', () => {
   const eligible = primary.indexOf('const fastAuthoringEligible=')
-  const run = primary.indexOf('const fast=await runFastAuthoring(input)', eligible)
+  const run = primary.indexOf('const fast=await runFastAuthoring(input,language)', eligible)
   const auth = primary.indexOf('const access=await getAccess()', eligible)
   const enterprise = primary.indexOf('tryCOSFirstAnswer({prompt:reasoningPrompt', eligible)
 
@@ -49,6 +49,7 @@ test('canonical COS fast authoring runs before auth, retrieval, and enterprise r
   assert.match(primary, /FAST_AUTHORING_ATTEMPT_MS = 9_000/)
   assert.match(primary, /usageContext:\{feature:'cos_fast_authoring'/)
   assert.match(primary, /source='cos-fast-authoring'/)
+  assert.match(primary, /Respond in \$\{reportLanguageName\(language\)\}/)
   assert.match(primary, /startsWith\('cos-fast-authoring'\)/)
 })
 
@@ -79,7 +80,7 @@ test('completion-first routing semantically promotes natural research requests t
 test('ordinary low-confidence answers are completed instead of replaced by the generic refusal', () => {
   assert.match(primary, /completion_first_best_effort/)
   assert.match(primary, /source:'cos-local-best-effort'/)
-  assert.match(primary, /runCompletionFirstRescue\(input,language\)/)
+  assert.match(primary, /runCompletionFirstRescue\(input,reportLanguageName\(language\)\)/)
   assert.match(primary, /cos-completion-first-rescue/)
   assert.ok(primary.indexOf('completion_first_best_effort') < primary.indexOf('buildHonestRefusalReply({prompt:input'))
 })

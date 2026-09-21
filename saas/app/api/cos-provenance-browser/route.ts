@@ -266,11 +266,14 @@ export async function POST(req: NextRequest): Promise<Response> {
           }
         })
 
+        // A 202 receipt is transport state, never an assistant answer. Keep the human-readable
+        // progress text out of `reply` so any client that misses or abandons History polling cannot
+        // accidentally render the acceptance receipt as the completed COS response.
         const accepted = NextResponse.json({
           ok: true,
           turnId,
           status: 'running',
-          reply: runningReply,
+          progress: runningReply,
           source: 'cos-durable-turn-running',
           execution_allowed: false,
           external_action_taken: false,

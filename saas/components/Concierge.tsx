@@ -16,11 +16,13 @@ import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/age
 import VoiceInputButton from '@/components/VoiceInputButton'
 import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
 
+type SupportedLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string; error?: string }
 type Message = {
   role: 'user' | 'assistant'
   content: string
+  sourceLanguage?: SupportedLanguage
   feedbackPrompt?: string
   feedbackEligible?: boolean
   suggestedFollowups?: string[]
@@ -123,7 +125,7 @@ function ConciergeVideoMessage({ content }: { content: string }) {
 export default function Concierge() {
   const pathname = usePathname()
   const { lang, dict } = useI18n()
-  const activeLang = ['en', 'pt', 'es', 'pl', 'ru'].includes(lang) ? lang : 'en'
+  const activeLang = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as SupportedLanguage
 
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
@@ -269,6 +271,7 @@ export default function Concierge() {
   const assetNoticeMessage: Message | null = assetNotice
     ? {
         role: 'assistant',
+        sourceLanguage: activeLang,
         content: [
           `${t(dict, 'concierge.assetReady')}${assetNotice.title ? ` “${assetNotice.title}”` : ''}`,
           `[${t(dict, 'concierge.assetReadyCta')}](/dashboard/cosa?campaign=${encodeURIComponent(assetNotice.id)})`,
@@ -279,7 +282,7 @@ export default function Concierge() {
 
   const baseMessages: Message[] = messages.length
     ? messages
-    : [{ role: 'assistant' as const, content: contextualGreeting }]
+    : [{ role: 'assistant' as const, content: contextualGreeting, sourceLanguage: activeLang }]
   const visibleMessages = assetNoticeMessage ? [...baseMessages, assetNoticeMessage] : baseMessages
 
   function resetVisibleChat() {
@@ -393,6 +396,7 @@ export default function Concierge() {
         {
           role: 'assistant',
           content: reply,
+          sourceLanguage: activeLang,
           ...(feedbackEligible ? { feedbackPrompt: content, feedbackEligible: true } : {}),
           ...(suggestedFollowups.length === 2 ? { suggestedFollowups } : {}),
           ...(builderWorkspaceId && builderFiles.length ? { builderWorkspaceId, builderFiles } : {}),
@@ -403,7 +407,7 @@ export default function Concierge() {
       // Reset/unmount intentionally aborts the old request. Do not let its completion append an
       // error to a cleared chat or release loading state underneath a newer request.
       if (controller.signal.aborted && requestAbortRef.current !== controller) return
-      setMessages(prev => [...prev, { role: 'assistant', content: t(dict, 'concierge.connectionError') }])
+      setMessages(prev => [...prev, { role: 'assistant', content: t(dict, 'concierge.connectionError'), sourceLanguage: activeLang }])
     } finally {
       window.clearTimeout(deadline)
       if (requestAbortRef.current === controller) {
@@ -486,6 +490,8 @@ export default function Concierge() {
               return (
                 <div
                   key={`${message.role}-${index}`}
+                  data-ai-content={message.role === 'assistant' ? 'true' : undefined}
+                  data-sb-source-language={message.role === 'assistant' ? message.sourceLanguage : undefined}
                   className={message.role === 'user'
                     ? 'max-w-[88%] self-end whitespace-pre-wrap rounded-2xl rounded-br-md border border-blue-400/35 bg-blue-500/25 px-3.5 py-2.5 text-[13px] leading-6 text-white'
                     : 'max-w-[88%] self-start rounded-2xl rounded-bl-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}

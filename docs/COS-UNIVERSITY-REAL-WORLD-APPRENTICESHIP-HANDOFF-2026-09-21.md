@@ -173,7 +173,7 @@ frontierResponseAnchorEpochs = 1
 frontierResponseAnchorItems > 0
 ```
 
-Until two such v2 Computer Science artifacts have durable exact-artifact canary passes, they receive bounded priority over the legacy backlog. This remains scheduling only and does not bypass independent evaluation, one-canary concurrency, spend ceilings, exact-artifact binding, rollback, promotion or Production-traffic gates.
+Until two such v2 Computer Science artifacts have durable exact-artifact canary passes, they receive bounded priority over the legacy backlog. Production also proved that the priority cohort must be included in the database read itself: the first true v2 artifact sat behind roughly 336 older uncanaried artifacts while the issuer fetched only the oldest 200, so an in-memory priority sort could never see it. The issuer now combines the bounded oldest-first page with a separately bounded confirmed-v2 Computer Science proof query before applying policy. This remains scheduling only and does not bypass independent evaluation, one-canary concurrency, spend ceilings, exact-artifact binding, rollback, promotion or Production-traffic gates.
 
 ### Canary refresh / graduate runtime protection
 

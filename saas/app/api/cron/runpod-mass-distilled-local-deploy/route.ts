@@ -4,7 +4,13 @@ import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
-import { MASS_CANARY_PROFILE, decideMassCanaryRollingApproval, type CanaryEvent } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
+import {
+  MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
+  MASS_CANARY_BUILDER_V2_OPTIMIZER,
+  MASS_CANARY_PROFILE,
+  decideMassCanaryRollingApproval,
+  type CanaryEvent,
+} from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
 import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
 import { describeThrownValue } from '@/lib/ai/cos/describeThrownValue'
 import {
@@ -112,12 +118,36 @@ async function readRollingCanaryEvents(db:any,candidateIds:string[]){
 // Kill switch: COS_MASS_CANARY_ROLLING_AUTHORIZATION=false.
 async function issueRollingCanaryApproval(now:Date){
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
-  const artifacts=await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
-    .eq('status','evaluation_pending').like('candidate_id','mass:%')
-    .order('created_at',{ascending:true}).limit(200)
-  if(artifacts.error) throw artifacts.error
-  const candidateIds=(artifacts.data||[]).map((row:any)=>String(row.candidate_id))
+  // Keep normal queue fairness bounded to the oldest 200, but separately include the small
+  // response-anchor v2 Computer Science proof cohort. Applying v2 priority only AFTER an oldest-200
+  // query is ineffective once the backlog exceeds 200: Production had 336 older uncanaried artifacts
+  // ahead of the first true v2 Builder candidate.
+  const [oldestArtifacts,v2BuilderArtifacts]=await Promise.all([
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+      .eq('status','evaluation_pending').like('candidate_id','mass:%')
+      .order('created_at',{ascending:true}).limit(200),
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+      .eq('status','evaluation_pending')
+      .eq('subject_id','Computer Science & Coding')
+      .gte('created_at',MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER)
+      .contains('intended_use',{trainingReceipt:{
+        optimizer:MASS_CANARY_BUILDER_V2_OPTIMIZER,
+        frontierResponseAnchorRequired:true,
+        frontierResponseAnchorEpochs:1,
+      }})
+      .order('created_at',{ascending:true})
+      .limit(20),
+  ])
+  if(oldestArtifacts.error) throw oldestArtifacts.error
+  if(v2BuilderArtifacts.error) throw v2BuilderArtifacts.error
+  const artifactByCandidate=new Map<string,any>()
+  for(const row of [...(oldestArtifacts.data||[]),...(v2BuilderArtifacts.data||[])]){
+    artifactByCandidate.set(String((row as any).candidate_id),row)
+  }
+  const artifactRows=[...artifactByCandidate.values()]
+  const candidateIds=artifactRows.map((row:any)=>String(row.candidate_id))
   if(!candidateIds.length) return {issued:false,reason:'no_evaluation_pending_mass_artifacts'}
   // Read only the three policy-relevant evidence streams and page each stream completely.
   // The old global .limit(5000) mixed in teacher/training/provider history; as that history grew,
@@ -127,7 +157,7 @@ async function issueRollingCanaryApproval(now:Date){
   const decision=decideMassCanaryRollingApproval({
     enabled:process.env.COS_MASS_CANARY_ROLLING_AUTHORIZATION!=='false',
     now,
-    artifacts:(artifacts.data||[]).map((row:any)=>{
+    artifacts:artifactRows.map((row:any)=>{
       const receipt=row?.intended_use?.trainingReceipt && typeof row.intended_use.trainingReceipt==='object'
         ? row.intended_use.trainingReceipt
         : {}

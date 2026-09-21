@@ -9,6 +9,7 @@ import {
   FIGMA_MCP_PROFILE,
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
+  VERCEL_MCP_PROFILE,
 } from '../provider-hub-host/universal-mcp-profiles.ts'
 
 function rpc(id: unknown, result: unknown) {
@@ -34,7 +35,9 @@ function fakeMcpFetch(toolCalls: string[]): typeof fetch {
           ? SUPABASE_MCP_PROFILE.tools.map(item => item.remoteToolName)
           : host === 'mcp.figma.com'
             ? FIGMA_MCP_PROFILE.tools.map(item => item.remoteToolName)
-            : CONTEXT7_MCP_PROFILE.tools.map(item => item.remoteToolName)
+            : host === 'mcp.vercel.com'
+              ? VERCEL_MCP_PROFILE.tools.map(item => item.remoteToolName)
+              : CONTEXT7_MCP_PROFILE.tools.map(item => item.remoteToolName)
       return Response.json(rpc(body.id, {
         tools: names.map(name => ({ name, description: name, inputSchema: { type: 'object' } })),
       }))
@@ -66,6 +69,7 @@ test('gateway readiness is honest: Context7 works anonymously while credentialed
       ['supabase-mcp', false, 'missing_credential'],
       ['context7-mcp', true, 'ready'],
       ['figma-mcp', false, 'missing_credential'],
+      ['vercel-mcp', false, 'missing_credential'],
     ],
   )
 })
@@ -80,6 +84,9 @@ test('profiles classify mutations and consequential operations without trusting 
   assert.equal(FIGMA_MCP_PROFILE.tools.find(item => item.remoteToolName === 'get_design_context')?.risk, 'read')
   assert.equal(FIGMA_MCP_PROFILE.tools.find(item => item.remoteToolName === 'create_new_file')?.requiresApproval, true)
   assert.equal(FIGMA_MCP_PROFILE.tools.find(item => item.remoteToolName === 'use_figma')?.risk, 'consequential')
+  assert.equal(VERCEL_MCP_PROFILE.tools.every(item => item.risk === 'read' && !item.requiresApproval), true)
+  assert.equal(VERCEL_MCP_PROFILE.tools.some(item => item.remoteToolName === 'deploy_to_vercel'), false)
+  assert.equal(VERCEL_MCP_PROFILE.tools.some(item => item.remoteToolName === 'buy_domain'), false)
 })
 
 test('Context7 live shape is projected to exactly the two governed documentation capabilities', async () => {
@@ -266,4 +273,44 @@ test('Figma OAuth bearer enables only the governed Figma capability projection',
     visible.map(item => item.capabilityId).sort(),
     FIGMA_MCP_PROFILE.tools.map(item => `mcp.figma-mcp.${item.capabilityName}`).sort(),
   )
+})
+
+
+test('Vercel remains fail-closed without host-owned OAuth and exact project target', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {},
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  assert.deepEqual(await gateway.discover('vercel-mcp'), [])
+  const result = await gateway.invoke({
+    serverId: 'vercel-mcp',
+    capabilityId: 'mcp.vercel-mcp.project.read',
+    args: {},
+  })
+  assert.equal(result.mode, 'mcp_provider_not_configured')
+})
+
+test('Vercel OAuth plus exact team/project exposes only read-only diagnostics', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {
+      VERCEL_MCP_OAUTH_ACCESS_TOKEN: 'oauth-access-token',
+      VERCEL_MCP_TEAM_SLUG: 'signalboost',
+      VERCEL_MCP_PROJECT_SLUG: 'itmounts',
+    },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const visible = await gateway.discover('vercel-mcp')
+  assert.deepEqual(
+    visible.map(item => item.capabilityId).sort(),
+    VERCEL_MCP_PROFILE.tools.map(item => `mcp.vercel-mcp.${item.capabilityName}`).sort(),
+  )
+  assert.equal(visible.every(item => item.risk === 'read' && !item.requiresApproval), true)
 })

@@ -69,6 +69,14 @@ const env = {
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS: '20',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS: '384',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM: '8',
+  COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_COST_USD_JSON: JSON.stringify({
+    openai: 0.002,
+    claude: 0.008,
+    grok: 0.004,
+    'deepseek-api': 0.001,
+    gemini: 0.0017,
+  }),
+  COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_MAX_OUTPUT_TOKENS_JSON: JSON.stringify({ claude: 512 }),
 }
 
 test('mass hosted teacher stage is hard-bounded to the existing teacher ceiling envelope', () => {
@@ -78,6 +86,9 @@ test('mass hosted teacher stage is hard-bounded to the existing teacher ceiling 
   assert.equal(config.maxOutputTokens, 384)
   assert.equal(config.parallelism, 8)
   assert.equal(config.minimumRows, 20)
+  assert.equal(config.providerEstimatedUnitCostUsd.claude, 0.008)
+  assert.equal(config.providerEstimatedUnitCostUsd['deepseek-api'], 0.001)
+  assert.equal(config.providerMaxOutputTokens.claude, 512)
 })
 
 test('twenty prompts fan out across all active hosted teachers and persist exact rows', async () => {
@@ -87,6 +98,7 @@ test('twenty prompts fan out across all active hosted teachers and persist exact
     prompt: `Teaching prompt ${index + 1}`,
   }))
   let calls = 0
+  let anthropicMaxTokens: number | null = null
   const result = await runMassHostedTeacherStage({
     db,
     run: {
@@ -104,6 +116,7 @@ test('twenty prompts fan out across all active hosted teachers and persist exact
       const model = String(body.model)
       const text = `answer-${calls}-${model}`
       if (url.includes('anthropic.com')) {
+        anthropicMaxTokens = Number(body.max_tokens)
         return new Response(JSON.stringify({
           content: [{ type: 'text', text }],
           usage: { input_tokens: 10, output_tokens: 5 },
@@ -139,6 +152,17 @@ test('twenty prompts fan out across all active hosted teachers and persist exact
   assert.equal(calls, 20)
   assert.equal(db.rows.length, 20)
   assert.deepEqual(result.activeProviders, ['openai', 'claude', 'grok', 'deepseek-api', 'gemini'])
+  assert.deepEqual(result.plannedProviderMix, {
+    openai: 4,
+    claude: 1,
+    grok: 2,
+    'deepseek-api': 8,
+    gemini: 5,
+  })
+  assert.deepEqual(result.providerMix, result.plannedProviderMix)
+  assert.equal(result.plannedEstimatedCostUsd, 0.0405)
+  assert.equal(anthropicMaxTokens, 512)
+  assert.equal(result.routingMode, 'dynamic-pipeline-router-v1-cost-balanced')
   assert.equal(Object.values(result.providerMix).reduce((sum, value) => sum + value, 0), 20)
   assert.ok(Object.keys(result.providerMix).every(id => result.activeProviders.includes(id)))
   assert.match(String(result.datasetHash), /^[a-f0-9]{64}$/)
@@ -199,6 +223,14 @@ test('production config activates the bounded parallel teacher stage without emb
   assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS, '20')
   assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS, '384')
   assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM, '8')
+  assert.deepEqual(JSON.parse(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_COST_USD_JSON), {
+    openai: 0.002,
+    claude: 0.008,
+    grok: 0.004,
+    'deepseek-api': 0.001,
+    gemini: 0.0017,
+  })
+  assert.deepEqual(JSON.parse(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_MAX_OUTPUT_TOKENS_JSON), { claude: 512 })
   assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_OPENAI_MODEL, 'gpt-5.6-luna')
   assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL, 'claude-sonnet-4-6')
   assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_XAI_MODEL, 'grok-4.6')
@@ -305,15 +337,17 @@ test('missing teacher work reroutes to another available provider instead of wai
   const first = await runMassHostedTeacherStage({
     db, run, prompts, promptSetHash: '1'.repeat(64), env: retryEnv, fetchImpl,
   })
-  assert.equal(first.rows, 10)
+  assert.equal(first.rows, 16)
   assert.equal(first.completed, false)
   assert.deepEqual(first.activeProviders, ['openai', 'claude'])
-  assert.equal(first.providerMix.openai, 10)
+  assert.equal(first.providerMix.openai, 16)
+  assert.equal(first.providerMix.claude, undefined)
+  assert.equal(first.failures.length, 4)
   assert.ok(first.failures.every(item => item.teacherId === 'claude'))
 
-  // The next tick sees only the ten missing prompts. Its 20-call budget gives each missing prompt
-  // a second compatible route, so Claude failures immediately spill to OpenAI without waiting for
-  // Claude to recover.
+  // The next tick knows this is a partial retry. It excludes each missing prompt's original primary
+  // provider when another approved route exists, so a paid Claude failure is not purchased again
+  // before the prompt spills to the cheaper healthy provider.
   const second = await runMassHostedTeacherStage({
     db, run, prompts, promptSetHash: '1'.repeat(64), env: retryEnv, fetchImpl,
   })
@@ -321,10 +355,9 @@ test('missing teacher work reroutes to another available provider instead of wai
   assert.equal(second.completed, true)
   assert.equal(second.providerMix.openai, 20)
   assert.equal(second.providerMix.claude, undefined)
-  assert.equal(second.reroutedPrompts, 10)
-  assert.equal(second.attemptedCalls, 20)
-  assert.equal(second.failures.length, 10)
-  assert.ok(second.failures.every(item => item.teacherId === 'claude'))
+  assert.equal(second.reroutedPrompts, 0)
+  assert.equal(second.attemptedCalls, 4)
+  assert.equal(second.failures.length, 0)
 })
 
 
@@ -339,9 +372,13 @@ test('dataset preparation excludes rows without a supervised prompt-response pai
 })
 
 
-test('hosted teacher prompt requires a complete answer inside the existing token ceiling', () => {
+test('hosted teacher routing balances dollars and gives expensive teachers completion headroom without raising the hard ceiling', () => {
   const source = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts'), 'utf8')
-  assert.match(source, /finish the full teaching example in no more than 300 output tokens/)
+  assert.match(source, /use at most 180 words/)
+  assert.match(source, /costBalancedPrimaryPlan/)
+  assert.match(source, /estimatedUnitCostUsd: teacherEstimatedCostUsd/)
+  assert.match(source, /excludedProviderIds: excludePreviousPrimary/)
+  assert.doesNotMatch(source, /teacher\.id === ['"]claude['"]/)
   assert.match(source, /DEFAULT_MAX_OUTPUT_TOKENS = 384/)
   assert.match(source, /HARD_MAX_OUTPUT_TOKENS = 512/)
 })

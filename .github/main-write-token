@@ -1,2 +1,2 @@
-base_sha=f607e9e8b65ba8318f4292f448b15e0cbe897870
-branch=fix/cos-turn-deadline-and-action-classifier-20260921
+base_sha=40577bf44d5cb3837bd026a9f8e1307e9135c8e7
+branch=fix/cos-durable-gate-scope-20260921

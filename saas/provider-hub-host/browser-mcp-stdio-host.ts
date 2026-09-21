@@ -33,6 +33,21 @@ import {
 
 export const BROWSER_MCP_STDIO_HOST_VERSION = 'browser-mcp-stdio-host-v1' as const
 
+/**
+ * Browser sandbox overrides for an already-isolated CI/container host.
+ *
+ * These flags change only the Chromium process sandbox. They do not broaden Provider Hub tools,
+ * approved origins, filesystem access, credentials, or Portable Connector Runtime authority.
+ */
+export function isolatedBrowserMcpSandboxArgs(profileId: BrowserMcpProfileId): readonly string[] {
+  return profileId === 'playwright-mcp'
+    ? Object.freeze(['--no-sandbox'])
+    : Object.freeze([
+        '--chrome-arg=--no-sandbox',
+        '--chrome-arg=--disable-setuid-sandbox',
+      ])
+}
+
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]'])
 
 const LIVE_TOOL_ALLOWLIST: Readonly<Record<BrowserMcpProfileId, ReadonlySet<string>>> = Object.freeze({

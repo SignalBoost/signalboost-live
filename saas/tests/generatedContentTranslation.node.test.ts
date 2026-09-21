@@ -77,3 +77,23 @@ test('translated copies are cached per user without storing duplicate source doc
   assert.match(migration, /enable row level security/)
   assert.doesNotMatch(migration, /source_payload/)
 })
+
+
+test('COS chat i18n is natively generated and tracked across exactly five supported languages', () => {
+  const primary = read('../app/api/cos-primary/route.ts')
+  const homepage = read('../app/page.tsx')
+  const assistant = read('../app/dashboard/assistant/page.tsx')
+  const dock = read('../components/Concierge.tsx')
+
+  assert.match(primary, /reportLanguageName\(language\)/)
+  assert.match(primary, /language:reportLanguageName\(language\)/)
+
+  for (const source of [homepage, assistant, dock]) {
+    assert.match(source, /data-sb-source-language/)
+    assert.match(source, /data-ai-content/)
+  }
+
+  assert.match(homepage, /\['en', 'es', 'pt', 'pl', 'ru'\]/)
+  assert.match(assistant, /type Lang = 'en' \| 'es' \| 'pt' \| 'pl' \| 'ru'/)
+  assert.match(dock, /type SupportedLanguage = 'en' \| 'es' \| 'pt' \| 'pl' \| 'ru'/)
+})

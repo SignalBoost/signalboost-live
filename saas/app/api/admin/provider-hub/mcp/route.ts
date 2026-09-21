@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const PROVIDERS = new Set<UniversalMcpProfileId>(['github-mcp', 'supabase-mcp', 'context7-mcp'])
+const PROVIDERS = new Set<UniversalMcpProfileId>(['github-mcp', 'supabase-mcp', 'context7-mcp', 'figma-mcp'])
 
 function providerId(value: unknown): UniversalMcpProfileId | null {
   const id = String(value ?? '').trim() as UniversalMcpProfileId

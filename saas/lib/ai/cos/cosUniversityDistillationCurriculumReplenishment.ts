@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector, type ContinuousLearningPolicy } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
@@ -47,12 +48,20 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   now: Date
   maxSubjects: number
 }) {
+  // Remediation used to be selected by curriculum SHORTAGE: only subjects whose inventory was too thin to form
+  // a batch could receive failure-derived material, and the amount was capped by that shortfall. A subject with
+  // healthy supply therefore received nothing no matter how many of its artifacts failed their gates - the loop
+  // asked "is this subject short of material?" when the question is "did this subject's artifacts fail?".
+  //
+  // Production, current safety suite: 63 consecutive evaluations, every one pinned at 0.500 because the same two
+  // safety cases fail for every artifact, while the remediation principles that address exactly those behaviours
+  // existed and were never seeded for the subjects that were failing.
+  //
+  // Targets are now the subjects with verified failures, most-failing first, with shortfall only breaking ties.
+  // Volume stays bounded exactly as before: at most HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT seeds per subject per
+  // pass, at most maxSubjects subjects, and the content hash is derived from the failing candidate and its gate
+  // classes - so re-running produces nothing new and only a newly failed artifact creates new material.
   const since = new Date(input.now.getTime() - VERIFIED_FAILURE_LOOKBACK_DAYS * 86_400_000).toISOString()
-  const targets = [...input.supply]
-    .filter(subject => subject.shortfallToBatch > 0)
-    .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || a.subject.localeCompare(b.subject))
-    .slice(0, input.maxSubjects)
-  const targetTitles = new Set(targets.map(subject => subject.subject))
 
   const rows = await input.db.from('cos_university_distilled_evaluation_runs')
     .select('candidate_id,subject_id,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
@@ -66,7 +75,6 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   for (const row of (rows.data || []) as any[]) {
     const rawSubject = String(row.subject_id || '').trim()
     const subject = titleById.get(rawSubject as any) || rawSubject
-    if (!targetTitles.has(subject)) continue
     const gates = failedEvaluationRemediationGates({
       holdoutImproved: row.holdout_improved,
       safetyPassed: row.safety_passed,
@@ -81,14 +89,24 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
     failuresByTitle.set(subject, failures)
   }
 
+  // Select by failure, not by scarcity. A subject with no verified failure is never targeted, so this cannot
+  // manufacture curriculum for a subject that is doing fine.
+  const targets = [...input.supply]
+    .filter(subject => (failuresByTitle.get(subject.subject) || []).length > 0)
+    .sort((a, b) => (failuresByTitle.get(b.subject) || []).length - (failuresByTitle.get(a.subject) || []).length
+      || b.shortfallToBatch - a.shortfallToBatch
+      || a.subject.localeCompare(b.subject))
+    .slice(0, input.maxSubjects)
+
   let inserted = 0
   const bySubject: Array<{ subject: string; inserted: number }> = []
   for (const target of targets) {
     const verifiedFailures = failuresByTitle.get(target.subject) || []
+    // The per-subject ceiling still applies; the shortfall no longer caps it, because a subject with full
+    // inventory and failing artifacts needs remediation most, not least.
     const needed = Math.min(
       HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT,
       verifiedFailures.length,
-      Math.max(0, target.shortfallToBatch),
     )
     let subjectInserted = 0
     for (let ordinal = 0; ordinal < needed; ordinal += 1) {

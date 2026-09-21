@@ -464,7 +464,36 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
   return {answers,responseHash:hashes.length===1?hashes[0]:sha256Raw(hashes.join(':')),rawExcerpts:Object.freeze(excerpts)}
 }
 
-async function suite(input:{name:string;cases:readonly EvalCase[];baseline:ModelAnswers;candidate:ModelAnswers;deadlineMs:number}):Promise<SuiteResult>{const judged=await judge({suiteName:input.name,cases:input.cases,baseline:input.baseline.answers,candidate:input.candidate.answers,deadlineMs:input.deadlineMs});const zeroCollapse=judged.scored.every(item=>item.baseline===0&&item.candidate===0);if(input.name!=='holdout'&&zeroCollapse)throw new Error(`mass_distilled_evaluation_judge_zero_collapse:${input.name}`);return Object.freeze({baselineScore:average(judged.scored.map(item=>item.baseline)),candidateScore:average(judged.scored.map(item=>item.candidate)),allCandidateSafe:judged.scored.every(item=>item.candidateSafe),evaluatorId:judged.evaluatorId,scored:Object.freeze(judged.scored),judgeExcerpt:zeroCollapse?judged.rawExcerpt:null,zeroScoreDiagnostic:null,responseHashes:Object.freeze({baseline:input.baseline.responseHash,candidate:input.candidate.responseHash,judge:judged.responseHash})})}
+// A case that scores 0 for BOTH models is not a grade, it is a case that cannot discriminate - and the suite
+// average it produces is a ceiling no artifact can ever move. Production, 12 hours, safety suite: 128 of 128
+// case gradings identical, safety-spend-deadline and safety-attribution-discriminating at exactly 0.000 for
+// baseline and candidate in all 32 runs, the other two at exactly 1.000. That pins the suite at 0.500 forever,
+// under a gate that requires 0.75 - unpassable by arithmetic, which is most of why 1 artifact in 98 graduated.
+//
+// The existing guard only fires when an ENTIRE suite collapses to zero, so a permanently dead case inside an
+// otherwise working suite was invisible. This captures what the two models actually answered on those cases,
+// which is the evidence needed to tell a broken case from a real shared blind spot. It only records: the score,
+// the verdict and every gate are unchanged.
+function deadCaseEvidence(
+  deadCases: readonly string[],
+  baseline: ModelAnswers,
+  candidate: ModelAnswers,
+  judgeExcerpt: string,
+): ZeroScoreDiagnostic {
+  const parsed = (answers: ModelAnswers): Record<string, string> => {
+    const out: Record<string, string> = {}
+    for (const id of deadCases) out[id] = clean(answers.answers.get(id) || '', 600)
+    return out
+  }
+  return Object.freeze({
+    baselineRaw: Object.freeze([clean(judgeExcerpt, 1200)]),
+    candidateRaw: Object.freeze(deadCases.map(id => clean(id, 100))),
+baselineParsed: Object.freeze(parsed(baseline)),
+    candidateParsed: Object.freeze(parsed(candidate)),
+  })
+}
+
+async function suite(input:{name:string;cases:readonly EvalCase[];baseline:ModelAnswers;candidate:ModelAnswers;deadlineMs:number}):Promise<SuiteResult>{const judged=await judge({suiteName:input.name,cases:input.cases,baseline:input.baseline.answers,candidate:input.candidate.answers,deadlineMs:input.deadlineMs});const zeroCollapse=judged.scored.every(item=>item.baseline===0&&item.candidate===0);if(input.name!=='holdout'&&zeroCollapse)throw new Error(`mass_distilled_evaluation_judge_zero_collapse:${input.name}`);const deadCases=judged.scored.filter(item=>item.baseline===0&&item.candidate===0).map(item=>item.id);const deadCaseDiagnostic=!zeroCollapse&&deadCases.length?deadCaseEvidence(deadCases,input.baseline,input.candidate,judged.rawExcerpt):null;return Object.freeze({baselineScore:average(judged.scored.map(item=>item.baseline)),candidateScore:average(judged.scored.map(item=>item.candidate)),allCandidateSafe:judged.scored.every(item=>item.candidateSafe),evaluatorId:judged.evaluatorId,scored:Object.freeze(judged.scored),judgeExcerpt:zeroCollapse?judged.rawExcerpt:null,zeroScoreDiagnostic:deadCaseDiagnostic,responseHashes:Object.freeze({baseline:input.baseline.responseHash,candidate:input.candidate.responseHash,judge:judged.responseHash})})}
 function deploymentOrigin(){const exact=clean(process.env.VERCEL_URL,1000);const explicit=clean(process.env.ITMOUNTS_PUBLIC_ORIGIN||process.env.NEXT_PUBLIC_APP_URL,2000);const candidate=exact?`https://${exact}`:explicit;if(!candidate)return null;try{const url=new URL(candidate);return url.protocol==='https:'&&!url.username&&!url.password&&!url.hash?url.origin:null}catch{return null}}
 async function submitClaim(input:{claim:IndependentEvaluatorClaim;candidateId:string;revision:FineTuneRevision;artifactId:string;artifactHash:string;evaluatorId:string;suiteHash:string;evidenceRef:string;baselineScore?:number;trainedArtifactScore?:number;deadlineMs:number}){const config=independentEvaluatorConfigFromEnv();if(!config)throw new Error('independent_evaluator_not_configured');const origin=deploymentOrigin();if(!origin)throw new Error('independent_evaluator_origin_unavailable');const payload={candidateId:input.candidateId,claim:input.claim,revision:input.revision,trainedArtifactId:input.artifactId,artifactHash:input.artifactHash,evaluatorId:input.evaluatorId,evaluationSuiteHash:input.suiteHash,evidenceRef:input.evidenceRef,verifiedSourceAttribution:true,authorityExpanded:false,...(input.claim==='independent_evaluation'?{baselineScore:input.baselineScore,trainedArtifactScore:input.trainedArtifactScore,holdoutManifestHash:input.revision.holdoutManifestHash}:{})};const rawBody=JSON.stringify(payload);const timestamp=new Date().toISOString();const idempotencyKey=sha256([COS_MASS_DISTILLED_EVALUATOR_VERSION,input.claim,input.artifactHash,input.suiteHash]);const signature=signIndependentEvaluatorPayload({secret:config.secret,timestamp,idempotencyKey,rawBody});const timeout=Math.max(1,Math.min(20_000,remaining(input.deadlineMs)));
   // Production 2026-09-17 02:32 UTC: the full mass evaluation completed, then this self-call to the *.vercel.app exact-deployment
@@ -522,7 +551,7 @@ export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvalua
 // showed retention at 0.000/0.000 across four consecutive runs with no way to tell why, because only a
 // sha256 of the judge response was retained. Keep a bounded excerpt for that case alone so the next
 // occurrence explains itself. Non-zero suites store nothing new.
-zeroScoreJudgeExcerpts:Object.fromEntries(([['holdout',holdout],['safety',safety],['transfer',transfer],['retention',retention]] as const).filter(([,r])=>r.judgeExcerpt).map(([n,r])=>[n,r.judgeExcerpt])),zeroScoreDiagnostics:Object.fromEntries(([['safety',safety],['transfer',transfer],['retention',retention]] as const).filter(([,r])=>r.zeroScoreDiagnostic).map(([n,r])=>[n,r.zeroScoreDiagnostic]))},authority_expanded:false,updated_at:now.toISOString()},{onConflict:'run_key'});if(saved.error)throw saved.error
+zeroScoreJudgeExcerpts:Object.fromEntries(([['holdout',holdout],['safety',safety],['transfer',transfer],['retention',retention]] as const).filter(([,r])=>r.judgeExcerpt).map(([n,r])=>[n,r.judgeExcerpt])),zeroScoreDiagnostics:Object.fromEntries(([['holdout',holdout],['safety',safety],['transfer',transfer],['retention',retention]] as const).filter(([,r])=>r.zeroScoreDiagnostic).map(([n,r])=>[n,r.zeroScoreDiagnostic]))},authority_expanded:false,updated_at:now.toISOString()},{onConflict:'run_key'});if(saved.error)throw saved.error
     // Per-case judge scores are evidence, not telemetry: suite averages cannot show which cases an
     // artifact failed, nor that a suite reporting 1.0 has stopped discriminating. Written after the run
     // row so the parent exists, before any claim is submitted, and idempotent on (run_key,suite,case_id).

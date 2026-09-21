@@ -6,6 +6,7 @@ import type { PortableConnectorAuditEvent } from '../provider-hub-core/connector
 import { createUniversalMcpGateway } from '../provider-hub-host/universal-mcp-gateway.ts'
 import {
   CONTEXT7_MCP_PROFILE,
+  FIGMA_MCP_PROFILE,
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
 } from '../provider-hub-host/universal-mcp-profiles.ts'
@@ -31,7 +32,9 @@ function fakeMcpFetch(toolCalls: string[]): typeof fetch {
         ? GITHUB_MCP_PROFILE.tools.map(item => item.remoteToolName)
         : host === 'mcp.supabase.com'
           ? SUPABASE_MCP_PROFILE.tools.map(item => item.remoteToolName)
-          : CONTEXT7_MCP_PROFILE.tools.map(item => item.remoteToolName)
+          : host === 'mcp.figma.com'
+            ? FIGMA_MCP_PROFILE.tools.map(item => item.remoteToolName)
+            : CONTEXT7_MCP_PROFILE.tools.map(item => item.remoteToolName)
       return Response.json(rpc(body.id, {
         tools: names.map(name => ({ name, description: name, inputSchema: { type: 'object' } })),
       }))
@@ -62,6 +65,7 @@ test('gateway readiness is honest: Context7 works anonymously while credentialed
       ['github-mcp', false, 'missing_credential'],
       ['supabase-mcp', false, 'missing_credential'],
       ['context7-mcp', true, 'ready'],
+      ['figma-mcp', false, 'missing_credential'],
     ],
   )
 })
@@ -73,6 +77,9 @@ test('profiles classify mutations and consequential operations without trusting 
   assert.equal(SUPABASE_MCP_PROFILE.tools.find(item => item.remoteToolName === 'execute_sql')?.risk, 'consequential')
   assert.equal(SUPABASE_MCP_PROFILE.tools.find(item => item.remoteToolName === 'apply_migration')?.requiresApproval, true)
   assert.equal(CONTEXT7_MCP_PROFILE.tools.every(item => item.risk === 'read' && !item.requiresApproval), true)
+  assert.equal(FIGMA_MCP_PROFILE.tools.find(item => item.remoteToolName === 'get_design_context')?.risk, 'read')
+  assert.equal(FIGMA_MCP_PROFILE.tools.find(item => item.remoteToolName === 'create_new_file')?.requiresApproval, true)
+  assert.equal(FIGMA_MCP_PROFILE.tools.find(item => item.remoteToolName === 'use_figma')?.risk, 'consequential')
 })
 
 test('Context7 live shape is projected to exactly the two governed documentation capabilities', async () => {
@@ -223,4 +230,40 @@ test('durable MCP audit schema never persists tool arguments, results or credent
   for (const forbidden of ['tool_args ', 'tool_arguments ', 'arguments json', 'tool_result ', 'response_body ', 'credentials json', 'access_token ', 'api_key ', 'secret_value ']) {
     assert.equal(migration.toLowerCase().includes(forbidden), false, `audit migration must not persist ${forbidden.trim()}`)
   }
+})
+
+
+test('Figma remains fail-closed without a host-owned OAuth access token', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {},
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const visible = await gateway.discover('figma-mcp')
+  assert.deepEqual(visible, [])
+  const result = await gateway.invoke({
+    serverId: 'figma-mcp',
+    capabilityId: 'mcp.figma-mcp.identity.read',
+    args: {},
+  })
+  assert.equal(result.mode, 'mcp_provider_not_configured')
+})
+
+test('Figma OAuth bearer enables only the governed Figma capability projection', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: { FIGMA_MCP_OAUTH_ACCESS_TOKEN: 'oauth-access-token' },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const visible = await gateway.discover('figma-mcp')
+  assert.deepEqual(
+    visible.map(item => item.capabilityId).sort(),
+    FIGMA_MCP_PROFILE.tools.map(item => `mcp.figma-mcp.${item.capabilityName}`).sort(),
+  )
 })

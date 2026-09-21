@@ -94,3 +94,14 @@ MCP onboarding now has a provider-neutral certification layer rather than relyin
 - GitHub MCP is the first provider wired through this framework. Its live certification verifies the exact host-approved capability set, a real read of `SignalBoost/signalboost-live`, and rejection of an off-scope repository.
 - `npm run test:mcp-gateway` includes certification regression coverage.
 - `.github/workflows/universal-mcp-live-acceptance.yml` is the live evidence gate. Do not describe GitHub MCP as Production-certified until that workflow passes on the candidate revision.
+
+
+## Supabase + Context7 provider certification — 2026-09-21
+
+The shared MCP certification framework now covers all three implemented Universal MCP providers.
+
+- Supabase certification requires the management credential, exact governed capability projection, and a real project-scoped table read.
+- Context7 certification requires the exact two governed documentation capabilities and a real library resolution call.
+- GitHub, Supabase, and Context7 produce the same metadata-only certification report shape.
+- A missing Supabase credential remains a hard failure for live acceptance; it is not converted into a skip.
+- Figma is the next provider. Its official remote endpoint is `https://mcp.figma.com/mcp`; Production enablement must remain fail-closed until host-owned Figma OAuth authorization is present and live certification passes.

@@ -15,6 +15,7 @@ import {
 } from './mcp-streamable-http-transport.ts'
 import {
   CONTEXT7_MCP_PROFILE,
+  FIGMA_MCP_PROFILE,
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
   UNIVERSAL_MCP_PROFILES,
@@ -122,6 +123,14 @@ function readinessFor(env: Environment, allowedRepos: readonly string[]): readon
       authentication: context7Token ? 'bearer' as const : 'anonymous' as const,
       target: 'public-documentation',
     }),
+    Object.freeze({
+      providerId: 'figma-mcp' as const,
+      displayName: FIGMA_MCP_PROFILE.displayName,
+      configured: Boolean(String(env.FIGMA_MCP_OAUTH_ACCESS_TOKEN || '').trim()),
+      reason: String(env.FIGMA_MCP_OAUTH_ACCESS_TOKEN || '').trim() ? 'ready' as const : 'missing_credential' as const,
+      authentication: 'bearer' as const,
+      target: 'figma-account',
+    }),
   ])
 }
 
@@ -167,6 +176,17 @@ function httpProfiles(env: Environment, ready: readonly UniversalMcpProviderRead
     protocolVersion: CONTEXT7_MCP_PROFILE.protocolVersion,
     ...(ctxToken ? { authorization: () => `Bearer ${ctxToken}` } : {}),
   }))
+
+  const figmaToken = String(env.FIGMA_MCP_OAUTH_ACCESS_TOKEN || '').trim()
+  if (figmaToken) {
+    profiles.push(Object.freeze({
+      serverId: FIGMA_MCP_PROFILE.serverId,
+      transportRef: FIGMA_MCP_PROFILE.transportRef,
+      endpoint: 'https://mcp.figma.com/mcp',
+      protocolVersion: FIGMA_MCP_PROFILE.protocolVersion,
+      authorization: () => `Bearer ${figmaToken}`,
+    }))
+  }
 
   return Object.freeze(profiles)
 }

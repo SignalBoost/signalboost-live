@@ -1,7 +1,12 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { certifyMcpProvider } from '../../provider-hub-host/mcp-certification.ts'
 import { createUniversalMcpGateway } from '../../provider-hub-host/universal-mcp-gateway.ts'
-import { GITHUB_MCP_PROFILE } from '../../provider-hub-host/universal-mcp-profiles.ts'
+import {
+  CONTEXT7_MCP_PROFILE,
+  FIGMA_MCP_PROFILE,
+  GITHUB_MCP_PROFILE,
+  SUPABASE_MCP_PROFILE,
+} from '../../provider-hub-host/universal-mcp-profiles.ts'
 
 const checks: Array<{ name: string; passed: boolean; detail: string }> = []
 const add = (name: string, passed: boolean, detail: string) => checks.push({ name, passed, detail })
@@ -16,20 +21,19 @@ async function run() {
     audit: { async append() {} },
   })
 
-  const context7 = await gateway.discover('context7-mcp')
-  add(
-    'context7_exact_projection',
-    context7.length === 2 &&
-      context7.some(item => item.capabilityId === 'mcp.context7-mcp.library.resolve') &&
-      context7.some(item => item.capabilityId === 'mcp.context7-mcp.docs.query'),
-    `capabilities=${context7.length}`,
-  )
-  const resolved = await gateway.invoke({
-    serverId: 'context7-mcp',
-    capabilityId: 'mcp.context7-mcp.library.resolve',
-    args: { libraryName: 'next.js', query: 'App Router route handlers' },
+  const context7Certification = await certifyMcpProvider(gateway, {
+    providerId: 'context7-mcp',
+    expectedCapabilities: CONTEXT7_MCP_PROFILE.tools.map(item => `mcp.context7-mcp.${item.capabilityName}`),
+    probes: [{
+      id: 'real_library_lookup',
+      capabilityId: 'mcp.context7-mcp.library.resolve',
+      args: { libraryName: 'next.js', query: 'App Router route handlers' },
+      expect: { ok: true },
+    }],
   })
-  add('context7_real_lookup', resolved.ok, `mode=${resolved.mode || 'none'}`)
+  for (const item of context7Certification.checks) {
+    add(`context7_certification_${item.id.replace(/[^a-z0-9_-]+/gi, '_')}`, item.passed, item.detail)
+  }
 
   const githubCertification = await certifyMcpProvider(gateway, {
     providerId: 'github-mcp',
@@ -53,26 +57,41 @@ async function run() {
     add(`github_certification_${item.id.replace(/[^a-z0-9_-]+/gi, '_')}`, item.passed, item.detail)
   }
 
-  const supabaseReady = gateway.readiness.find(item => item.providerId === 'supabase-mcp')
-  add('supabase_management_credential_present', supabaseReady?.configured === true, supabaseReady?.reason || 'missing')
-  if (supabaseReady?.configured) {
-    const supabase = await gateway.discover('supabase-mcp')
-    add(
-      'supabase_governed_projection',
-      supabase.some(item => item.capabilityId === 'mcp.supabase-mcp.tables.list') &&
-        supabase.some(item => item.capabilityId === 'mcp.supabase-mcp.migration.apply'),
-      `capabilities=${supabase.length}`,
-    )
-    const tables = await gateway.invoke({
-      serverId: 'supabase-mcp',
+  const supabaseCertification = await certifyMcpProvider(gateway, {
+    providerId: 'supabase-mcp',
+    expectedCapabilities: SUPABASE_MCP_PROFILE.tools.map(item => `mcp.supabase-mcp.${item.capabilityName}`),
+    probes: [{
+      id: 'real_project_table_read',
       capabilityId: 'mcp.supabase-mcp.tables.list',
       args: { schemas: ['public'] },
-    })
-    add('supabase_real_project_read', tables.ok, `mode=${tables.mode || 'none'}`)
+      expect: { ok: true },
+    }],
+  })
+  for (const item of supabaseCertification.checks) {
+    add(`supabase_certification_${item.id.replace(/[^a-z0-9_-]+/gi, '_')}`, item.passed, item.detail)
+  }
+
+  const figmaReady = gateway.readiness.find(item => item.providerId === 'figma-mcp')?.configured === true
+  const figmaCertification = figmaReady
+    ? await certifyMcpProvider(gateway, {
+        providerId: 'figma-mcp',
+        expectedCapabilities: FIGMA_MCP_PROFILE.tools.map(item => `mcp.figma-mcp.${item.capabilityName}`),
+        probes: [{
+          id: 'authenticated_identity',
+          capabilityId: 'mcp.figma-mcp.identity.read',
+          args: {},
+          expect: { ok: true },
+        }],
+      })
+    : null
+  if (figmaCertification) {
+    for (const item of figmaCertification.checks) {
+      add(`figma_certification_${item.id.replace(/[^a-z0-9_-]+/gi, '_')}`, item.passed, item.detail)
+    }
   }
 
   const evidence = {
-    schemaVersion: 'universal-mcp-live-acceptance-v2',
+    schemaVersion: 'universal-mcp-live-acceptance-v3',
     observedAt: new Date().toISOString(),
     providers: gateway.readiness.map(item => ({
       providerId: item.providerId,
@@ -80,7 +99,7 @@ async function run() {
       reason: item.reason,
       authentication: item.authentication,
     })),
-    certifications: [githubCertification],
+    certifications: [githubCertification, supabaseCertification, context7Certification, ...(figmaCertification ? [figmaCertification] : [])],
     checks,
   }
   await mkdir('artifacts', { recursive: true })

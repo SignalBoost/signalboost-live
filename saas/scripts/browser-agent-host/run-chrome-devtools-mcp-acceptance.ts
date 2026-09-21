@@ -44,31 +44,60 @@ function originOf(value: string): string {
   return new URL(value).origin
 }
 
-function textParts(value: unknown, output: string[] = []): string[] {
-  if (!value || typeof value !== 'object') return output
-  if (Array.isArray(value)) {
-    value.forEach(item => textParts(item, output))
-    return output
-  }
-  const record = value as Record<string, unknown>
-  if (typeof record.text === 'string') output.push(record.text)
-  Object.values(record).forEach(item => textParts(item, output))
-  return output
+function plain(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function pagesFromResult(value: unknown): Array<{ pageId: number; url: string }> {
-  const text = textParts(value).join('\n')
-  const pages: Array<{ pageId: number; url: string }> = []
-  for (const line of text.split(/\r?\n/)) {
-    const match = line.match(/^\s*(\d+)\s*:\s*(https?:\/\/\S+)/)
-    if (!match) continue
-    pages.push({ pageId: Number(match[1]), url: match[2].replace(/[\],)]+$/, '') })
+function pagesFromResult(value: unknown): Array<{ pageId: number; url: string; selected: boolean }> {
+  if (plain(value) && plain(value.structuredContent) && Array.isArray(value.structuredContent.pages)) {
+    const structured = value.structuredContent.pages.flatMap(item => {
+      if (!plain(item)) return []
+      const pageId = typeof item.id === 'number'
+        ? item.id
+        : typeof item.pageId === 'number'
+          ? item.pageId
+          : NaN
+      const url = typeof item.url === 'string' ? item.url : ''
+      return Number.isInteger(pageId) && url
+        ? [{ pageId, url, selected: item.selected === true }]
+        : []
+    })
+    if (structured.length) return structured
+  }
+
+  // Compatibility fallback for older/non-structured responses. Current Chrome DevTools MCP may
+  // render a titled page as: "1: Page title (https://example.com/) [selected]".
+  const text: string[] = []
+  const collect = (input: unknown): void => {
+    if (!input || typeof input !== 'object') return
+    if (Array.isArray(input)) {
+      input.forEach(collect)
+      return
+    }
+    const record = input as Record<string, unknown>
+    if (typeof record.text === 'string') text.push(record.text)
+    Object.values(record).forEach(collect)
+  }
+  collect(value)
+
+  const pages: Array<{ pageId: number; url: string; selected: boolean }> = []
+  for (const line of text.join('\n').split(/\r?\n/)) {
+    const id = line.match(/^\s*(\d+)\s*:/)
+    const url = line.match(/https?:\/\/[^\s)\]]+/)
+    if (!id || !url) continue
+    pages.push({ pageId: Number(id[1]), url: url[0], selected: /\[selected\]/.test(line) })
   }
   return pages
 }
 
 function assertion(name: string, passed: boolean, detail: string) {
   return Object.freeze({ name, passed, detail })
+}
+
+function safeRuntimeDetail(result: { mode?: string; error?: string | null }): string {
+  const error = String(result.error || '')
+  const code = error.match(/browser_mcp_[a-z0-9_.:-]+/i)?.[0]
+  return code ? `mode=${result.mode || 'none'}; error=${code}` : `mode=${result.mode || 'none'}`
 }
 
 async function main() {
@@ -215,65 +244,79 @@ async function main() {
         },
       },
     })
-    checks.push(assertion('approved_itmounts_navigation', opened.ok, `mode=${opened.mode || 'none'}`))
+    checks.push(assertion('approved_itmounts_navigation', opened.ok, safeRuntimeDetail(opened)))
 
-    const listed = await runtime.invoke({
-      manifest,
-      invocation: {
-        tenantId,
-        environmentId,
-        portableId,
-        capabilityId: 'browser.chrome-devtools-mcp.pages.list',
-        args: {},
-      },
-    })
-    const pages = listed.ok ? pagesFromResult(listed.data) : []
-    const target = pages.find(page => {
-      try { return approvedOriginSet.has(originOf(page.url)) } catch { return false }
-    })
-    checks.push(assertion(
-      'itmounts_page_observed',
-      listed.ok && Boolean(target),
-      `page_count=${pages.length}; approved_page=${Boolean(target)}`,
-    ))
+    if (opened.ok) {
+      const listed = await runtime.invoke({
+        manifest,
+        invocation: {
+          tenantId,
+          environmentId,
+          portableId,
+          capabilityId: 'browser.chrome-devtools-mcp.pages.list',
+          args: {},
+        },
+      })
+      const pages = listed.ok ? pagesFromResult(listed.data) : []
+      const target = pages.find(page => {
+        try { return approvedOriginSet.has(originOf(page.url)) } catch { return false }
+      })
+      const observedOrigins = [...new Set(pages.flatMap(page => {
+        try { return [originOf(page.url)] } catch { return [] }
+      }))].sort()
+      checks.push(assertion(
+        'itmounts_page_observed',
+        listed.ok && Boolean(target),
+        `page_count=${pages.length}; approved_page=${Boolean(target)}; observed_origins=${observedOrigins.join(',') || 'none'}`,
+      ))
 
-    if (!target) throw new Error('Chrome DevTools MCP did not report an approved iTMounts page after navigation')
+      if (target) {
+        const snapshot = await runtime.invoke({
+          manifest,
+          invocation: {
+            tenantId,
+            environmentId,
+            portableId,
+            capabilityId: 'browser.chrome-devtools-mcp.snapshot',
+            args: { pageId: target.pageId, verbose: false },
+          },
+        })
+        checks.push(assertion('accessibility_snapshot_live', snapshot.ok, `mode=${snapshot.mode || 'none'}`))
 
-    const snapshot = await runtime.invoke({
-      manifest,
-      invocation: {
-        tenantId,
-        environmentId,
-        portableId,
-        capabilityId: 'browser.chrome-devtools-mcp.snapshot',
-        args: { pageId: target.pageId, verbose: false },
-      },
-    })
-    checks.push(assertion('accessibility_snapshot_live', snapshot.ok, `mode=${snapshot.mode || 'none'}`))
+        const consoleResult = await runtime.invoke({
+          manifest,
+          invocation: {
+            tenantId,
+            environmentId,
+            portableId,
+            capabilityId: 'browser.chrome-devtools-mcp.console.list',
+            args: { pageId: target.pageId, pageSize: 20 },
+          },
+        })
+        checks.push(assertion('console_diagnostics_live', consoleResult.ok, `mode=${consoleResult.mode || 'none'}`))
 
-    const consoleResult = await runtime.invoke({
-      manifest,
-      invocation: {
-        tenantId,
-        environmentId,
-        portableId,
-        capabilityId: 'browser.chrome-devtools-mcp.console.list',
-        args: { pageId: target.pageId, pageSize: 20 },
-      },
-    })
-    checks.push(assertion('console_diagnostics_live', consoleResult.ok, `mode=${consoleResult.mode || 'none'}`))
-
-    const networkResult = await runtime.invoke({
-      manifest,
-      invocation: {
-        tenantId,
-        environmentId,
-        portableId,
-        capabilityId: 'browser.chrome-devtools-mcp.network.list',
-        args: { pageId: target.pageId, pageSize: 20 },
-      },
-    })
-    checks.push(assertion('network_diagnostics_live', networkResult.ok, `mode=${networkResult.mode || 'none'}`))
+        const networkResult = await runtime.invoke({
+          manifest,
+          invocation: {
+            tenantId,
+            environmentId,
+            portableId,
+            capabilityId: 'browser.chrome-devtools-mcp.network.list',
+            args: { pageId: target.pageId, pageSize: 20 },
+          },
+        })
+        checks.push(assertion('network_diagnostics_live', networkResult.ok, `mode=${networkResult.mode || 'none'}`))
+      } else {
+        checks.push(assertion('accessibility_snapshot_live', false, 'skipped_no_approved_page'))
+        checks.push(assertion('console_diagnostics_live', false, 'skipped_no_approved_page'))
+        checks.push(assertion('network_diagnostics_live', false, 'skipped_no_approved_page'))
+      }
+    } else {
+      checks.push(assertion('itmounts_page_observed', false, 'skipped_navigation_failed'))
+      checks.push(assertion('accessibility_snapshot_live', false, 'skipped_navigation_failed'))
+      checks.push(assertion('console_diagnostics_live', false, 'skipped_navigation_failed'))
+      checks.push(assertion('network_diagnostics_live', false, 'skipped_navigation_failed'))
+    }
   } finally {
     await resolved.close()
   }

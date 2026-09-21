@@ -12,6 +12,7 @@ import {
 import { createMcpOutboundClient } from '../provider-hub-host/mcp-outbound-client.ts'
 import { createNodeMcpStdioTransportFactory } from '../provider-hub-host/mcp-stdio-transport.ts'
 import {
+  assertBrowserMcpNavigationResultForTest,
   assertBrowserMcpToolCallForTest,
   liveBrowserMcpToolNames,
 } from '../provider-hub-host/browser-mcp-stdio-host.ts'
@@ -72,6 +73,7 @@ test('browser MCP profiles are pinned, stdio, and deny dangerous tools by defaul
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.transport, 'stdio')
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.packageName, 'chrome-devtools-mcp')
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.packageVersion, '1.9.0')
+  assert.ok(CHROME_DEVTOOLS_MCP_PROFILE.recommendedArgs.includes('--experimental-structured-content=true'))
 
   const deniedByAbsence = new Set([
     'browser_run_code_unsafe',
@@ -200,4 +202,29 @@ test('browser MCP live host rejects hidden tools, filesystem output, and off-ori
     args: { pageId: 1, filePaths: ['/etc/passwd'], uid: '1_2' },
     approvedOrigins: ['https://itmounts.com'],
   }), /browser_mcp_tool_not_live_enabled/)
+})
+
+
+test('Chrome MCP post-navigation evidence rejects an off-origin redirect', () => {
+  assert.doesNotThrow(() => assertBrowserMcpNavigationResultForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'new_page',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com', 'https://www.itmounts.com'],
+    pages: [
+      { id: 0, url: 'about:blank' },
+      { id: 1, url: 'https://www.itmounts.com/', selected: true },
+    ],
+  }))
+
+  assert.throws(() => assertBrowserMcpNavigationResultForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'new_page',
+    args: { url: 'https://itmounts.com/' },
+    approvedOrigins: ['https://itmounts.com', 'https://www.itmounts.com'],
+    pages: [
+      { id: 0, url: 'about:blank' },
+      { id: 1, url: 'https://redirect.example/', selected: true },
+    ],
+  }), /browser_mcp_navigation_origin_rejected/)
 })

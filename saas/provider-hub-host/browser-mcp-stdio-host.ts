@@ -163,6 +163,64 @@ function assertToolCall(
   }
 }
 
+type ChromeStructuredPage = {
+  id: number
+  url: string
+  selected: boolean
+}
+
+function chromeStructuredPages(raw: unknown): readonly ChromeStructuredPage[] {
+  if (!plain(raw) || !plain(raw.result) || !plain(raw.result.structuredContent)) return Object.freeze([])
+  const value = raw.result.structuredContent.pages
+  if (!Array.isArray(value)) return Object.freeze([])
+  const pages: ChromeStructuredPage[] = []
+  for (const item of value) {
+    if (!plain(item)) continue
+    const id = typeof item.id === 'number'
+      ? item.id
+      : typeof item.pageId === 'number'
+        ? item.pageId
+        : NaN
+    const url = typeof item.url === 'string' ? item.url : ''
+    if (!Number.isInteger(id) || !url) continue
+    pages.push({ id, url, selected: item.selected === true })
+  }
+  return Object.freeze(pages)
+}
+
+function navigationTargetPageId(call: ReturnType<typeof callShape>, pages: readonly ChromeStructuredPage[]): number | null {
+  if (!call) return null
+  if (call.name === 'navigate_page') {
+    return typeof call.args.pageId === 'number' && Number.isInteger(call.args.pageId)
+      ? call.args.pageId
+      : null
+  }
+  if (call.name === 'new_page') {
+    const selected = pages.find(page => page.selected)
+    if (selected) return selected.id
+    return pages.length ? Math.max(...pages.map(page => page.id)) : null
+  }
+  return null
+}
+
+function assertNavigationResultAllowed(
+  profile: BrowserMcpServerProfile,
+  request: Readonly<Record<string, unknown>>,
+  raw: unknown,
+  approvedOrigins: ReadonlySet<string>,
+): void {
+  if (profile.profileId !== 'chrome-devtools-mcp') return
+  const call = callShape(request)
+  if (!call || !['navigate_page', 'new_page'].includes(call.name)) return
+
+  const pages = chromeStructuredPages(raw)
+  if (!pages.length) throw new Error('browser_mcp_navigation_evidence_missing')
+  const targetId = navigationTargetPageId(call, pages)
+  const target = targetId === null ? undefined : pages.find(page => page.id === targetId)
+  if (!target) throw new Error('browser_mcp_navigation_target_missing')
+  assertUrlAllowed(target.url, approvedOrigins)
+}
+
 function filterToolsResponse(
   profile: BrowserMcpServerProfile,
   request: Readonly<Record<string, unknown>>,
@@ -245,6 +303,12 @@ export function createBrowserMcpStdioTransportFactory(options: BrowserMcpStdioHo
         async send(call: McpOutboundTransportInput) {
           assertToolCall(profile, call.request, approvedOrigins)
           const raw = await delegate.send(call)
+          try {
+            assertNavigationResultAllowed(profile, call.request, raw, approvedOrigins)
+          } catch (error) {
+            await delegate.close?.()
+            throw error
+          }
           return filterToolsResponse(profile, call.request, raw)
         },
         async notify(call: McpOutboundTransportInput) {
@@ -278,5 +342,33 @@ export function assertBrowserMcpToolCallForTest(input: {
     id: 1,
     method: 'tools/call',
     params: { name: input.toolName, arguments: input.args },
+  }, approved)
+}
+
+
+export function assertBrowserMcpNavigationResultForTest(input: {
+  serverId: BrowserMcpProfileId
+  toolName: 'navigate_page' | 'new_page'
+  args: Readonly<Record<string, unknown>>
+  approvedOrigins: readonly string[]
+  pages: readonly Readonly<{ id: number; url: string; selected?: boolean }>[]
+}): void {
+  const profile = input.serverId === 'chrome-devtools-mcp'
+    ? CHROME_DEVTOOLS_MCP_PROFILE
+    : PLAYWRIGHT_MCP_PROFILE
+  const approved = new Set(input.approvedOrigins.map(normalizeApprovedOrigin))
+  assertNavigationResultAllowed(profile, {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: { name: input.toolName, arguments: input.args },
+  }, {
+    jsonrpc: '2.0',
+    id: 1,
+    result: {
+      structuredContent: {
+        pages: input.pages.map(page => ({ ...page, selected: page.selected === true })),
+      },
+    },
   }, approved)
 }

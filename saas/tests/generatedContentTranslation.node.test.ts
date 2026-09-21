@@ -81,12 +81,14 @@ test('translated copies are cached per user without storing duplicate source doc
 
 test('COS chat i18n is natively generated and tracked across exactly five supported languages', () => {
   const primary = read('../app/api/cos-primary/route.ts')
+  const enterprise = read('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
   const homepage = read('../app/page.tsx')
   const assistant = read('../app/dashboard/assistant/page.tsx')
   const dock = read('../components/Concierge.tsx')
 
   assert.match(primary, /reportLanguageName\(language\)/)
-  assert.match(primary, /language:reportLanguageName\(language\)/)
+  assert.match(primary, /tryCOSFirstAnswer\(\{prompt:reasoningPrompt,previousAssistant:precedingAssistant\|\|null,userId,language,privileged:isPrivileged/)
+  assert.match(enterprise, /Reply in \$\{reportLanguageName\(language\)\}/)
   assert.match(primary, /language==='pl'/)
   assert.match(primary, /language==='ru'/)
   assert.match(primary, /Nie mam rzeczywistego zapisu pochodzenia/)

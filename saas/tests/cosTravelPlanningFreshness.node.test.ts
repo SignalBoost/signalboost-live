@@ -13,17 +13,16 @@ test('mutable travel itineraries require live evidence even when phrased as cont
 })
 
 
-test('semantic content-generation intent cannot suppress hard travel freshness', () => {
+test('semantic intent cannot downgrade mutable travel planning to self-contained authoring', () => {
+  const semantic = readFileSync(new URL('../lib/ai/cos/cosSemanticTaskIntent.ts', import.meta.url), 'utf8')
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
-  const core = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerCore.ts', import.meta.url), 'utf8')
-  assert.match(route, /const hardTravelFreshness=requiresLiveTravelPlanningEvidence\(input\)/)
-  assert.match(route, /if\(!hardTravelFreshness&&!hasAttachments/)
-  assert.match(route, /baselineRequiresFreshEvidence&&\(hardTravelFreshness\|\|!semanticIntentSuppressesFreshness/)
-  assert.match(core, /const hardTravelFreshness = requiresLiveTravelPlanningEvidence\(input\.prompt\)/)
-  assert.match(core, /const suppressFreshnessForInterpretation = !hardTravelFreshness && semanticIntentSuppressesFreshness/)
+  assert.match(semantic, /if \(requiresLiveTravelPlanningEvidence\(input\)\)/)
+  assert.match(semantic, /mode: 'external_fact_verification'/)
+  assert.match(semantic, /externalFactsRequired: true/)
+  assert.match(route, /requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness\(semanticTaskIntent\)/)
 })
 
-test('completion rescue remains unavailable for hard fresh travel requests', () => {
+test('completion rescue remains unavailable for fresh travel requests', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.match(route, /if\(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective\(input\)\)/)
 })

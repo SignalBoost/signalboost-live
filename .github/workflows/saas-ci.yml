@@ -267,8 +267,10 @@ jobs:
     # Build can compile without real secrets; placeholders satisfy module-load client init.
     env:
       # Next 16 isolated build workers strip max-old-space-size from NODE_OPTIONS.
-      # max-heap-size propagates to the worker and prevents the default ~2 GB heap OOM.
-      NODE_OPTIONS: '--max-heap-size=4096'
+      # max-heap-size propagates to the worker. The repository now exceeds the old 4 GB
+      # total-heap override during Next's TypeScript phase, so align this isolated worker
+      # with the repo-wide 7 GB CI memory envelope rather than failing on V8 allocation.
+      NODE_OPTIONS: '--max-heap-size=7168'
       NEXT_TELEMETRY_DISABLED: '1'
       NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'

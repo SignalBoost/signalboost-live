@@ -13,7 +13,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { failureDerivedRemediationPrinciples, failedEvaluationRemediationGates } from '../lib/ai/cos/cosUniversityHybridDistillation.ts'
+import {
+  failureDerivedPracticeVariant,
+  failureDerivedRemediationPrinciples,
+  failedEvaluationRemediationGates,
+} from '../lib/ai/cos/cosUniversityHybridDistillation.ts'
 
 const FILE = readFileSync(
   new URL('../lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts', import.meta.url),
@@ -48,7 +52,9 @@ test('volume stays bounded: per-subject ceiling, subject count, and idempotent i
   assert.match(SOURCE, /\.slice\(0, input\.maxSubjects\)/)
   // Identity is the failing artifact plus its gate classes, so a re-run inserts nothing new and only a newly
   // failed artifact produces new material.
-  assert.match(SOURCE, /const remediationKey = `\$\{failure\.candidateId\}:\$\{failure\.gates\.join\(','\)\}`/)
+  assert.match(SOURCE, /FAILURE_DERIVED_REMEDIATION_PROFILE/)
+  assert.match(SOURCE, /const remediationKey = `\$\{FAILURE_DERIVED_REMEDIATION_PROFILE\}:\$\{failure\.candidateId\}:\$\{failure\.gates\.join\(','\)\}`/)
+  assert.match(SOURCE, /remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE/)
   assert.match(SOURCE, /ignoreDuplicates: true/)
 })
 
@@ -69,12 +75,41 @@ test('the seeded material teaches the behaviours the failing cases actually test
   assert.match(principles, /do not assert a cause before the evidence supports it/)
 })
 
+test('newly failed artifacts produce materially distinct safe remediation variants without copying candidate identity', () => {
+  const gates = ['holdout_improvement', 'safety', 'unseen_transfer', 'delayed_retention'] as const
+  const first = failureDerivedPracticeVariant({
+    subjectId: 'Computer Science & Coding',
+    candidateId: 'candidate-a',
+    ordinal: 0,
+    gates,
+  })
+  const second = failureDerivedPracticeVariant({
+    subjectId: 'Computer Science & Coding',
+    candidateId: 'candidate-b',
+    ordinal: 0,
+    gates,
+  })
+  assert.notDeepEqual(first, second)
+  const material = JSON.stringify([first, second])
+  assert.doesNotMatch(material, /candidate-a|candidate-b/)
+  assert.match(material, /verification|evidence|check|invariant|authority|constraint/i)
+})
+
+test('failure-derived rows persist the distinct practice variant in retained teaching material', () => {
+  assert.match(SOURCE, /const remediationVariant = failureDerivedPracticeVariant\(/)
+  assert.match(SOURCE, /Practice context: \$\{remediationVariant\.context\}/)
+  assert.match(SOURCE, /Verification mode: \$\{remediationVariant\.verificationMode\}/)
+  assert.match(SOURCE, /Difficulty twist: \$\{remediationVariant\.difficultyTwist\}/)
+  assert.match(SOURCE, /remediationVariant,/)
+})
+
 test('no hidden evaluation material reaches the curriculum', () => {
   // The seeds carry general principles only. Case ids, prompts, references and judge output must never be
   // written into training material, or the suite stops measuring anything.
   assert.match(SOURCE, /subject_level_remediation_general_principles_only_no_raw_chat_no_private_holdout_no_hidden_exam/)
   assert.match(SOURCE, /sourceDetailsCopied: false/)
   assert.doesNotMatch(SOURCE, /safety-spend-deadline|safety-attribution-discriminating/)
+  assert.doesNotMatch(SOURCE, /candidateId[^\n]*summary|sourceEvaluationCandidateId[^\n]*summary/)
   assert.match(SOURCE, /authorityExpanded: false/)
 })
 

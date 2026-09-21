@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 export const HYBRID_DISTILLATION_PROFILE = 'cos-university-hybrid-distillation-v1' as const
+export const FAILURE_DERIVED_REMEDIATION_PROFILE = 'cos-university-failure-derived-remediation-v2' as const
 export const HYBRID_REAL_SOURCE_TARGET = 0.50
 export const HYBRID_FAILURE_DERIVED_TARGET = 0.30
 export const HYBRID_TEACHER_SYNTHETIC_TARGET = 0.20
@@ -102,6 +103,76 @@ export function failureDerivedRemediationPrinciples(
   }
 
   return Object.freeze(principles)
+}
+
+
+export type FailureDerivedPracticeVariant = Readonly<{
+  context: string
+  verificationMode: string
+  difficultyTwist: string
+  remediationRequirements: readonly string[]
+}>
+
+export function failureDerivedPracticeVariant(input: {
+  subjectId: string
+  candidateId: string
+  ordinal: number
+  gates: readonly FailureDerivedRemediationGate[]
+}): FailureDerivedPracticeVariant {
+  const contexts = Object.freeze([
+    'code review for a small but consequential change',
+    'test-failure diagnosis after a refactor',
+    'deployment planning for a reversible software change',
+    'incident triage with multiple plausible technical causes',
+    'dependency upgrade with incomplete operational evidence',
+    'data-pipeline repair under explicit access constraints',
+    'rollback decision after a partially successful release',
+    'service-debugging task with noisy and incomplete telemetry',
+  ])
+  const verificationModes = Object.freeze([
+    'state assumptions and include one independent verification step',
+    'include a counterexample that would falsify the first diagnosis',
+    'separate observed facts from hypotheses before recommending action',
+    'identify the invariant that must survive changed names, numbers, or ordering',
+    'carry prior safety and authorization constraints into a later follow-up step',
+    'produce a minimal reproducible check before recommending a repair',
+    'compare two plausible explanations using discriminating evidence',
+    'finish with a concise, externally checkable success criterion',
+  ])
+  const difficultyTwists = Object.freeze([
+    'time pressure is present but does not change authority',
+    'some telemetry is missing and uncertainty must remain explicit',
+    'the surface wording changes while the governing rule stays the same',
+    'a later requirement competes with an earlier safety constraint',
+    'one observation supports several possible causes',
+    'a convenient shortcut would exceed the stated scope',
+    'the first plausible answer needs an explicit verification step',
+    'the task includes distracting details that should not change the core rule',
+  ])
+  const digest = hash([input.subjectId, input.candidateId, input.ordinal, [...input.gates].sort()])
+  const pick = (values: readonly string[], offset: number) =>
+    values[Number.parseInt(digest.slice(offset, offset + 8), 16) % values.length] || values[0]!
+
+  const remediationRequirements: string[] = []
+  if (input.gates.includes('holdout_improvement')) {
+    remediationRequirements.push('Solve the underlying problem rather than matching surface wording, and make the final answer independently checkable.')
+  }
+  if (input.gates.includes('safety')) {
+    remediationRequirements.push('Preserve explicit authority boundaries, keep causal claims proportional to evidence, and fully contain any credential exposure.')
+  }
+  if (input.gates.includes('unseen_transfer')) {
+    remediationRequirements.push('Generalize the governing principle to a changed scenario instead of memorizing names, values, or ordering.')
+  }
+  if (input.gates.includes('delayed_retention')) {
+    remediationRequirements.push('Preserve earlier safety, calibration, and subject constraints when a later task introduces competing details.')
+  }
+
+  return Object.freeze({
+    context: pick(contexts, 0),
+    verificationMode: pick(verificationModes, 8),
+    difficultyTwist: pick(difficultyTwists, 16),
+    remediationRequirements: Object.freeze(remediationRequirements),
+  })
 }
 
 export function teacherSyntheticSourceHash(subjectId: string, ordinal: number, generationKey?: string): string {

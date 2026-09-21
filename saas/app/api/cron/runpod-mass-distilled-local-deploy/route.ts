@@ -113,7 +113,7 @@ async function readRollingCanaryEvents(db:any,candidateIds:string[]){
 async function issueRollingCanaryApproval(now:Date){
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
   const artifacts=await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
+    .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
     .eq('status','evaluation_pending').like('candidate_id','mass:%')
     .order('created_at',{ascending:true}).limit(200)
   if(artifacts.error) throw artifacts.error
@@ -127,7 +127,21 @@ async function issueRollingCanaryApproval(now:Date){
   const decision=decideMassCanaryRollingApproval({
     enabled:process.env.COS_MASS_CANARY_ROLLING_AUTHORIZATION!=='false',
     now,
-    artifacts:(artifacts.data||[]).map((row:any)=>({candidateId:String(row.candidate_id),subjectId:String(row.subject_id||''),artifactHash:String(row.trained_artifact_hash||''),createdAt:String(row.created_at||'')})),
+    artifacts:(artifacts.data||[]).map((row:any)=>{
+      const receipt=row?.intended_use?.trainingReceipt && typeof row.intended_use.trainingReceipt==='object'
+        ? row.intended_use.trainingReceipt
+        : {}
+      return {
+        candidateId:String(row.candidate_id),
+        subjectId:String(row.subject_id||''),
+        artifactHash:String(row.trained_artifact_hash||''),
+        createdAt:String(row.created_at||''),
+        trainingOptimizer:String(receipt.optimizer||''),
+        frontierResponseAnchorRequired:receipt.frontierResponseAnchorRequired===true,
+        frontierResponseAnchorEpochs:Number(receipt.frontierResponseAnchorEpochs||0),
+        frontierResponseAnchorItems:Number(receipt.frontierResponseAnchorItems||0),
+      }
+    }),
     events:eventRows.map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),
   })
   if(!('artifact' in decision)) return {issued:false,reason:decision.reason}

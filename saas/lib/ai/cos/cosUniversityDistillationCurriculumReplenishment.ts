@@ -13,9 +13,11 @@ import {
   MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES,
 } from './cosUniversityDistillationCurriculumPlan.ts'
 import {
+  FAILURE_DERIVED_REMEDIATION_PROFILE,
   HYBRID_DISTILLATION_PROFILE,
   HYBRID_FAILURE_DERIVED_TARGET,
   failedEvaluationRemediationGates,
+  failureDerivedPracticeVariant,
   failureDerivedRemediationPrinciples,
   failureDerivedSourceHash,
   teacherSyntheticSourceHash,
@@ -114,9 +116,15 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
       if (!failure) continue
       // Bind remediation identity to the independently evaluated artifact + failed gate classes.
       // Re-running the same evidence is idempotent; a newly failed artifact produces fresh curriculum.
-      const remediationKey = `${failure.candidateId}:${failure.gates.join(',')}`
+      const remediationKey = `${FAILURE_DERIVED_REMEDIATION_PROFILE}:${failure.candidateId}:${failure.gates.join(',')}`
       const contentHash = failureDerivedSourceHash(target.subject, ordinal, remediationKey)
       const remediationPrinciples = failureDerivedRemediationPrinciples(failure.gates)
+      const remediationVariant = failureDerivedPracticeVariant({
+        subjectId: target.subject,
+        candidateId: failure.candidateId,
+        ordinal,
+        gates: failure.gates,
+      })
       const row = {
         content_hash: contentHash,
         source_kind: 'failure_derived_curriculum',
@@ -127,6 +135,8 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
         summary: [
           `Independent evaluation shows a remediation need in ${target.subject} for graduation gate classes: ${failure.gates.join(', ')}.`,
           'Generate a distinct self-contained expert teaching example that targets the relevant failure class while preserving correct, safe, transferable, and retainable behavior.',
+          `Practice context: ${remediationVariant.context}. Verification mode: ${remediationVariant.verificationMode}. Difficulty twist: ${remediationVariant.difficultyTwist}.`,
+          `Variant-specific remediation requirements: ${remediationVariant.remediationRequirements.join(' ')}`,
           `General remediation principles: ${remediationPrinciples.join(' ')}`,
           'Use those general principles without recreating any hidden evaluation case. Do not reproduce training examples, raw conversations, private holdouts, hidden exams, evaluator output, user data, or private evidence.',
         ].join(' '),
@@ -134,9 +144,11 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
           {
             origin: 'failure_derived',
             profile: HYBRID_DISTILLATION_PROFILE,
+            remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE,
             ordinal,
             remediationGates: failure.gates,
             remediationPrinciples,
+            remediationVariant,
           },
           { constraint: 'subject_level_remediation_general_principles_only_no_raw_chat_no_private_holdout_no_hidden_exam' },
         ],
@@ -144,6 +156,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
         license: 'synthetic-benchmark-fixture',
         evidence: [{
           profile: HYBRID_DISTILLATION_PROFILE,
+          remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE,
           origin: 'failure_derived',
           independentEvaluationFailure: true,
           remediationGates: failure.gates,

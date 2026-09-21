@@ -263,6 +263,12 @@ function assertNavigationResultAllowed(
   const call = callShape(request)
   if (!call) return
 
+  // Preserve an upstream tool error as an upstream tool error. Final-origin evidence is required
+  // only for a navigation the remote MCP server reports as successful; otherwise the adapter must
+  // surface the real remote failure instead of masking it as missing navigation evidence.
+  const result = toolResult(raw)
+  if (result?.isError === true) return
+
   if (profile.profileId === 'chrome-devtools-mcp' && ['navigate_page', 'new_page'].includes(call.name)) {
     const pages = chromeStructuredPages(raw)
     if (!pages.length) throw new Error('browser_mcp_navigation_evidence_missing')

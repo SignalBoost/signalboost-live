@@ -86,10 +86,12 @@ test('secret-like router metadata is rejected',()=>{
 })
 
 
-test('University distillation consumes the shared router instead of a private vendor modulo',()=>{
+test('University distillation consumes the shared router with cost-balanced provider data instead of a private vendor modulo',()=>{
   const source=readFileSync(new URL('../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts',import.meta.url),'utf8')
   assert.match(source,/rankDynamicPipelineCandidates/)
   assert.match(source,/capabilityId: 'ai\.teacher\.generate'/)
-  assert.match(source,/routingMode: 'dynamic-pipeline-router-v1'/)
+  assert.match(source,/estimatedUnitCostUsd: teacherEstimatedCostUsd/)
+  assert.match(source,/routingMode: 'dynamic-pipeline-router-v1-cost-balanced'/)
   assert.doesNotMatch(source,/teachers\[\(\(index as number\) \+ wave\) % teachers\.length\]/)
+  assert.doesNotMatch(source,/teacher\.id === ['"]claude['"]/)
 })

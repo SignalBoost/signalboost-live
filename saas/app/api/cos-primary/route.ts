@@ -240,6 +240,36 @@ function completionFirstResponse(startedAt:number,input:string,result:{reply:str
   return NextResponse.json({ok:true,reply:result.reply,source,confidence_score:result.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
 }
 
+// When live sources were retrieved but the strict single-claim evidence contract rejected the draft,
+// the request may be a TASK (plan, itinerary, comparison, recommendation) rather than one current
+// fact. COS reasons over the retrieved sources to complete the task, cites what the sources support,
+// and explicitly marks anything they do not support as unverified. The model decides whether the
+// request is a task or a bare fact claim; a bare fact claim still fails closed.
+async function runFreshGroundedTaskCompletion(input:string,language:string,sources:FreshEvidenceSource[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+  const evidence=sources.slice(0,8).map(source=>`[${source.id}] ${String(source.title||'').slice(0,200)} — ${String(source.url||'')}${source.sourceDate?` (source date: ${source.sourceDate})`:''}\n${String(source.snippet||'').slice(0,700)}`).join('\n\n')
+  const result=await callCosReasoner({
+    temperature:.3,
+    maxTokens:2600,
+    systemPrompt:[
+      'You are COS. Live web sources were retrieved this turn for the user request below.',
+      'First decide what the user wants. If the request is only to confirm one specific current fact (who holds a role, a single price, a single status) and the sources do not clearly support it, return {"answer":"","confidence":0}.',
+      'Otherwise the request is a task to complete (for example a plan, itinerary, schedule, comparison or recommendation). Complete it fully and usefully with sound reasoning.',
+      'Use the sources for specific mutable facts such as fares, routes, schedules, opening hours, ticket prices and availability, and cite them inline as [LIVE1], [LIVE2].',
+      'Any specific fact you state that the sources do not support must be clearly marked as unverified and to be checked before relying on it.',
+      'Never invent free services, discounts, businesses, venues, routes or prices. If you are not sure something exists, leave it out or say it must be checked.',
+      'Keep what the user asked for: respect their constraints (time window, budget, dates, preferences) and answer every part of the request.',
+      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+      language ? `Respond in the language the user wrote in; if unclear use ${reportLanguageName(language)}.` : 'Respond in the language the user wrote in.',
+    ].join(' '),
+    prompt:`USER REQUEST:\n${input.slice(0,8_000)}\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`,
+  }).catch(()=>null)
+  const parsed=result?.text?parseLocalResult(result.text):null
+  const reply=parsed?.answer?.trim()||''
+  if(!reply||hasUnsafePublicModelOutput(reply))return null
+  const resolved=resolveCosReasoner()
+  return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}
+}
+
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
 function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
 function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:typeof item.external_provider==='string'?item.external_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:typeof item.external_model==='string'?item.external_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
@@ -602,6 +632,19 @@ export async function postCosPrimary(req:NextRequest){
   const freshFailureCode: FreshEvidenceInternalFailureCode | null = freshHardFail
     ? (freshLocalFailureCode ?? 'local_synthesis_unparseable')
     : null
+  if(freshHardFail&&freshRetrievedAt&&freshSources.length&&!requestedAction){
+    const groundedTask=await runFreshGroundedTaskCompletion(lookupInput,language,freshSources)
+    if(groundedTask){
+      const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:groundedTask.reasonerLabel,confidence:groundedTask.confidence,accepted:true})
+      const executionProvenance=attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true})
+      ;Object.assign(executionProvenance as any,{policy:'fresh_live_data_grounded_task',assistant_text_used_for_resolution:false})
+      ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:groundedTask.reasonerLabel,grounded_at:freshRetrievedAt}
+      logEscalation({event:'fresh_grounded_task_completed',documents_acquired:freshSources.length,reasoner:groundedTask.reasonerLabel,strict_failure_code:freshFailureCode,external_ai_invoked:false,local_model_invoked:true})
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:groundedTask.reply,source:'local_cos_reasoning',confidence:groundedTask.confidence,provenance:freshTelemetryProvenance(true,groundedTask.reasonerLabel),externalAiInvoked:false})
+      await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
+      return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
+  }
   const reason=freshHardFail?{code:freshFailureCode!,detail:freshFailureCode === 'local_synthesis_failed'
     ? 'Authoritative live evidence was retrieved, but bounded local synthesis failed after transport retries.'
     : 'Authoritative live evidence was retrieved, but no completed synthesis satisfied the grounding contract.'}:escalationReason(cos,localError,requestedAction)

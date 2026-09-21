@@ -1,2 +1,2 @@
-base_sha=4a9652d0f9b3e69882005ba3e3da208f1d4813c9
-branch=fix/recent-supabase-coldstart-regression
+base_sha=20f4f2cd07c5304409f2ecbe02440db00510e45a
+branch=docs/supabase-disk-io-runbook-20260920

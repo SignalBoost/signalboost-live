@@ -109,14 +109,16 @@ test('replenishment keeps acquiring when every canonical subject was just consum
   assert.ok(gaps.every(gap => gap.evidence.includes('shortfall_to_batch=20')))
 })
 
-test('fallback curriculum receives the same empty-subject targets selected by the replenishment planner', () => {
+test('shortage fallback stays planner-scoped while failure remediation sees all failing supplied subjects', () => {
   const replenishment = source('../lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts')
-  assert.match(replenishment, /const plannedSubjects = \[\.\.\.new Set\(gaps\.map\(gap => gap\.subject\)\)\]/)
-  assert.match(replenishment, /const replenishmentSupply: MassDistillationSubjectSupply\[\] = plannedSubjects\.map/)
-  assert.match(replenishment, /shortfallToBatch: MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS/)
-  assert.match(replenishment, /installVerifiedFailureDerivedCurriculum\(\{ db, supply: replenishmentSupply/)
-  assert.match(replenishment, /installHostedTeacherCurriculum\(\{ db, supply: replenishmentSupply/)
-  assert.match(replenishment, /installTeacherSyntheticFallback\(\{ db, supply: replenishmentSupply/)
+  assert.ok(replenishment.includes('const plannedSubjects = [...new Set(gaps.map(gap => gap.subject))]'))
+  assert.ok(replenishment.includes('const replenishmentSupply: MassDistillationSubjectSupply[] = plannedSubjects.map'))
+  assert.ok(replenishment.includes('shortfallToBatch: MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS'))
+  assert.ok(replenishment.includes('for (const item of input.supply) remediationSupplyBySubject.set(item.subject, item)'))
+  assert.ok(replenishment.includes('for (const item of replenishmentSupply) remediationSupplyBySubject.set(item.subject, item)'))
+  assert.ok(replenishment.includes('installVerifiedFailureDerivedCurriculum({ db, supply: remediationSupply'))
+  assert.ok(replenishment.includes('installHostedTeacherCurriculum({ db, supply: replenishmentSupply'))
+  assert.ok(replenishment.includes('installTeacherSyntheticFallback({ db, supply: replenishmentSupply'))
   // Cost-bearing hosted calls remain separately fail-closed; this handoff does not grant budget.
   const hostedTeacher = source('../lib/ai/cos/cosUniversityHostedTeacherCurriculum.ts')
   assert.match(hostedTeacher, /COS_UNIVERSITY_TEACHER_HOSTED_MAX_CALLS_PER_CYCLE/)

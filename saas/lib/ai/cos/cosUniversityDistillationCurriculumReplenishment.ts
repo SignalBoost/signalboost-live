@@ -154,9 +154,13 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
       }
       const write = await input.db.from('cos_continuous_learning')
         .upsert(row, { onConflict: 'content_hash', ignoreDuplicates: true })
+        .select('content_hash')
       if (write.error) throw write.error
-      inserted += 1
-      subjectInserted += 1
+      const created = Array.isArray(write.data) && write.data.length > 0
+      if (created) {
+        inserted += 1
+        subjectInserted += 1
+      }
     }
     bySubject.push({ subject: target.subject, inserted: subjectInserted })
   }
@@ -236,8 +240,30 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
   const maxCandidatesPerCycle = Number.isSafeInteger(input.maxCandidatesPerCycle) && Number(input.maxCandidatesPerCycle) > 0
     ? Number(input.maxCandidatesPerCycle)
     : 40
+  const db = cosServiceDb()
+  if (!db) throw new Error('persistent_learning_store_unavailable')
+
   const gaps = buildMassDistillationReplenishmentGaps(input.supply, now, maxSubjects, queriesPerSubject)
-  if (!gaps.length) return Object.freeze({ ok: true, skipped: true, reason: 'no_targetable_subject_shortfall', targets: [], externalCostUsd: 0 })
+  if (!gaps.length) {
+    // Evaluation remediation is failure-driven, not inventory-driven. A subject can have a full curriculum
+    // buffer and still repeatedly fail a graduation gate; that failure must remain able to seed bounded,
+    // idempotent corrective curriculum even when OpenAlex/teacher replenishment has no shortage to fill.
+    const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: input.supply, now, maxSubjects })
+    const remediationTargets = failureDerived.bySubject.map(item => item.subject)
+    return Object.freeze({
+      ok: true,
+      skipped: failureDerived.inserted === 0,
+      reason: remediationTargets.length === 0
+        ? 'no_targetable_subject_shortfall'
+        : failureDerived.inserted > 0
+          ? 'verified_failure_remediation_installed'
+          : 'verified_failure_remediation_already_current',
+      targets: remediationTargets,
+      failureDerivedInserted: failureDerived.inserted,
+      failureDerivedBySubject: failureDerived.bySubject,
+      externalCostUsd: 0,
+    })
+  }
 
   // The planner deliberately rotates canonical subjects that have zero currently batchable items.
   // Those subjects do not exist in input.supply, so passing the raw supply to fallback installers
@@ -258,9 +284,16 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     }
   })
 
-  const db = cosServiceDb()
+  // Failure-derived remediation must consider every supplied subject with a verified failure, not only
+  // the subjects selected by the current shortage planner. Shortage remains the boundary for OpenAlex
+  // acquisition and teacher-synthetic fill, but never suppresses independently verified remediation.
+  const remediationSupplyBySubject = new Map<string, MassDistillationSubjectSupply>()
+  for (const item of input.supply) remediationSupplyBySubject.set(item.subject, item)
+  for (const item of replenishmentSupply) remediationSupplyBySubject.set(item.subject, item)
+  const remediationSupply = [...remediationSupplyBySubject.values()]
+
   const stores = createSupabaseCOSStores()
-  if (!db || !stores?.continuousLearning) throw new Error('persistent_learning_store_unavailable')
+  if (!stores?.continuousLearning) throw new Error('persistent_learning_store_unavailable')
 
   const key = slotKey(now)
   const claim = await db.from('cos_university_continuous_runs').insert({
@@ -300,7 +333,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     // Explicitly enabled hosted teachers then generate real multi-provider synthetic curriculum in
     // parallel. The zero-cost placeholder fallback remains last so unavailable hosted providers can
     // never stop curriculum growth.
-    const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: replenishmentSupply, now, maxSubjects })
+    const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: remediationSupply, now, maxSubjects })
     const hostedTeachers = await installHostedTeacherCurriculum({ db, supply: replenishmentSupply, now, maxSubjects })
     const synthetic = await installTeacherSyntheticFallback({ db, supply: replenishmentSupply, now, maxSubjects })
 

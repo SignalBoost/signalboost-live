@@ -77,3 +77,29 @@ test('no hidden evaluation material reaches the curriculum', () => {
   assert.doesNotMatch(SOURCE, /safety-spend-deadline|safety-attribution-discriminating/)
   assert.match(SOURCE, /authorityExpanded: false/)
 })
+
+
+test('outer replenishment does not suppress failure remediation when inventory has no shortage', () => {
+  const all = FILE
+  const gaps = all.indexOf('const gaps = buildMassDistillationReplenishmentGaps')
+  const failureOnly = all.indexOf('if (!gaps.length) {')
+  const install = all.indexOf('const failureDerived = await installVerifiedFailureDerivedCurriculum', failureOnly)
+  assert.ok(gaps >= 0 && failureOnly > gaps && install > failureOnly)
+  assert.match(all.slice(failureOnly, install + 240), /supply: input\.supply/)
+  assert.match(all.slice(failureOnly, install + 800), /verified_failure_remediation_installed/)
+  assert.match(all.slice(failureOnly, install + 900), /externalCostUsd: 0/)
+})
+
+test('shortage replenishment includes failing full-supply subjects in remediation', () => {
+  const all = FILE
+  assert.match(all, /const remediationSupplyBySubject = new Map<string, MassDistillationSubjectSupply>\(\)/)
+  assert.match(all, /for \(const item of input\.supply\) remediationSupplyBySubject\.set\(item\.subject, item\)/)
+  assert.match(all, /for \(const item of replenishmentSupply\) remediationSupplyBySubject\.set\(item\.subject, item\)/)
+  assert.match(all, /installVerifiedFailureDerivedCurriculum\(\{ db, supply: remediationSupply, now, maxSubjects \}\)/)
+})
+
+test('failure-derived insertion telemetry counts only rows actually created', () => {
+  assert.match(SOURCE, /\.upsert\(row, \{ onConflict: 'content_hash', ignoreDuplicates: true \}\)\s*\.select\('content_hash'\)/)
+  assert.match(SOURCE, /const created = Array\.isArray\(write\.data\) && write\.data\.length > 0/)
+  assert.match(SOURCE, /if \(created\) \{\s*inserted \+= 1\s*subjectInserted \+= 1/)
+})

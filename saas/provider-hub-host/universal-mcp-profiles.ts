@@ -8,7 +8,7 @@ import type {
 export const UNIVERSAL_MCP_PROFILE_VERSION = 'universal-mcp-profile-v1' as const
 export const UNIVERSAL_MCP_PROTOCOL_VERSION = '2025-11-25' as const
 
-export type UniversalMcpProfileId = 'github-mcp' | 'supabase-mcp' | 'context7-mcp' | 'figma-mcp'
+export type UniversalMcpProfileId = 'github-mcp' | 'supabase-mcp' | 'context7-mcp' | 'figma-mcp' | 'vercel-mcp'
 
 export interface UniversalMcpToolPolicy {
   readonly remoteToolName: string
@@ -145,11 +145,30 @@ export const FIGMA_MCP_PROFILE: UniversalMcpServerProfile = Object.freeze({
   ]),
 })
 
+export const VERCEL_MCP_PROFILE: UniversalMcpServerProfile = Object.freeze({
+  profileId: 'vercel-mcp',
+  serverId: 'vercel-mcp',
+  displayName: 'Vercel MCP',
+  transport: 'streamable-http',
+  transportRef: 'host:mcp:vercel',
+  protocolVersion: UNIVERSAL_MCP_PROTOCOL_VERSION,
+  tools: Object.freeze([
+    read('search_documentation', 'docs.search', 'deployment.docs.read'),
+    read('get_project', 'project.read', 'deployment.project.read'),
+    read('list_deployments', 'deployments.list', 'deployment.read'),
+    read('get_deployment', 'deployment.read', 'deployment.read'),
+    read('get_deployment_build_logs', 'build_logs.read', 'deployment.logs.read'),
+    read('get_runtime_logs', 'runtime_logs.read', 'deployment.logs.read'),
+    read('check_domain_availability_and_price', 'domain_availability.read', 'deployment.domains.read'),
+  ]),
+})
+
 export const UNIVERSAL_MCP_PROFILES: readonly UniversalMcpServerProfile[] = Object.freeze([
   GITHUB_MCP_PROFILE,
   SUPABASE_MCP_PROFILE,
   CONTEXT7_MCP_PROFILE,
   FIGMA_MCP_PROFILE,
+  VERCEL_MCP_PROFILE,
 ])
 
 export function universalMcpToolNames(profile: UniversalMcpServerProfile): readonly string[] {

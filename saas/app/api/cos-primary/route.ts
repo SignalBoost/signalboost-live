@@ -245,17 +245,17 @@ function completionFirstResponse(startedAt:number,input:string,result:{reply:str
 // fact. COS reasons over the retrieved sources to complete the task, cites what the sources support,
 // and explicitly marks anything they do not support as unverified. The model decides whether the
 // request is a task or a bare fact claim; a bare fact claim still fails closed.
-export const FRESH_GROUNDED_TASK_TIMEOUT_MS = 18_000
+export const FRESH_GROUNDED_TASK_TIMEOUT_MS = 40_000
 async function runFreshGroundedTaskCompletion(input:string,language:string,sources:FreshEvidenceSource[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const travelTask=requiresLiveTravelPlanningEvidence(input)
-  const evidence=sources.slice(0,8).map(source=>`[${source.id}] ${String(source.title||'').slice(0,200)} — ${String(source.url||'')}${source.sourceDate?` (source date: ${source.sourceDate})`:''}\n${String(source.snippet||'').slice(0,450)}`).join('\n\n')
+  const evidence=sources.slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}${source.sourceDate?` (source date: ${source.sourceDate})`:''}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
   const result=await callCosReasoner({
     temperature:.2,
-    maxTokens:1800,
+    maxTokens:1000,
     jsonObject:true,
     disableThinking:true,
     timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS,
-    allowConfiguredFallback:true,
+    allowConfiguredFallback:false,
     usageContext:{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'},
     systemPrompt:[
       'You are COS. Live web sources were retrieved this turn for the user request below. /no_think',

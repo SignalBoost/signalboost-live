@@ -109,18 +109,20 @@ test('replenishment keeps acquiring when every canonical subject was just consum
   assert.ok(gaps.every(gap => gap.evidence.includes('shortfall_to_batch=20')))
 })
 
-test('fallback curriculum receives the same empty-subject targets selected by the replenishment planner', () => {
+test('shortage fallback stays planner-scoped while failure remediation sees all failing supplied subjects', () => {
   const replenishment = source('../lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts')
-  assert.match(replenishment, /const plannedSubjects = \[\.\.\.new Set\(gaps\.map\(gap => gap\.subject\)\)\]/)
-  assert.match(replenishment, /const replenishmentSupply: MassDistillationSubjectSupply\[\] = plannedSubjects\.map/)
+  assert.match(replenishment, /const plannedSubjects = \\[\\.\\.\\.new Set\\(gaps\\.map\\(gap => gap\\.subject\\)\\)\\]/)
+  assert.match(replenishment, /const replenishmentSupply: MassDistillationSubjectSupply\\[\\] = plannedSubjects\\.map/)
   assert.match(replenishment, /shortfallToBatch: MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS/)
-  assert.match(replenishment, /installVerifiedFailureDerivedCurriculum\(\{ db, supply: replenishmentSupply/)
-  assert.match(replenishment, /installHostedTeacherCurriculum\(\{ db, supply: replenishmentSupply/)
-  assert.match(replenishment, /installTeacherSyntheticFallback\(\{ db, supply: replenishmentSupply/)
+  assert.match(replenishment, /for \\(const item of input\\.supply\\) remediationSupplyBySubject\\.set\\(item\\.subject, item\\)/)
+  assert.match(replenishment, /for \\(const item of replenishmentSupply\\) remediationSupplyBySubject\\.set\\(item\\.subject, item\\)/)
+  assert.match(replenishment, /installVerifiedFailureDerivedCurriculum\\(\\{ db, supply: remediationSupply/)
+  assert.match(replenishment, /installHostedTeacherCurriculum\\(\\{ db, supply: replenishmentSupply/)
+  assert.match(replenishment, /installTeacherSyntheticFallback\\(\\{ db, supply: replenishmentSupply/)
   // Cost-bearing hosted calls remain separately fail-closed; this handoff does not grant budget.
   const hostedTeacher = source('../lib/ai/cos/cosUniversityHostedTeacherCurriculum.ts')
   assert.match(hostedTeacher, /COS_UNIVERSITY_TEACHER_HOSTED_MAX_CALLS_PER_CYCLE/)
-  assert.match(hostedTeacher, /if \(maxCalls === 0\)/)
+  assert.match(hostedTeacher, /if \\(maxCalls === 0\\)/)
 })
 
 test('empty canonical subjects rotate between slots instead of always asking the same three', () => {

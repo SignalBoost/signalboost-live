@@ -102,6 +102,12 @@ After the resize, the database showed approximately:
 - 1 active query at essentially 0 seconds
 - no evidence of a long-running runaway query
 
+### Verify the application query bridge
+
+The operator-facing iTMounts **Tier 1 Providers -> Supabase Workspace -> SQL Editor** should also execute a harmless read query successfully. During this incident's recovery, the workspace SQL Engine returned a normal one-row result after the resize, confirming that the application-side Supabase query bridge was functional again.
+
+This is a supplemental health check only. A successful one-row query does not replace database-side resource checks, but it proves the application's provider integration can once again reach and read Production.
+
 ### Check cache/deadlocks
 
 ```sql

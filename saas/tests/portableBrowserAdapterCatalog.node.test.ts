@@ -9,6 +9,12 @@ import {
   CHROME_DEVTOOLS_MCP_PROFILE,
   createBrowserMcpRegistryEntries,
 } from '../provider-hub-host/browser-mcp-profiles.ts'
+import { createMcpOutboundClient } from '../provider-hub-host/mcp-outbound-client.ts'
+import { createNodeMcpStdioTransportFactory } from '../provider-hub-host/mcp-stdio-transport.ts'
+import {
+  assertBrowserMcpToolCallForTest,
+  liveBrowserMcpToolNames,
+} from '../provider-hub-host/browser-mcp-stdio-host.ts'
 
 const availableAdapters = new Set(['browserbase', 'browserless', 'steel', 'playwright'])
 
@@ -62,13 +68,14 @@ test('compatibility is capability based and fails closed', () => {
 test('browser MCP profiles are pinned, stdio, and deny dangerous tools by default', () => {
   assert.equal(PLAYWRIGHT_MCP_PROFILE.transport, 'stdio')
   assert.equal(PLAYWRIGHT_MCP_PROFILE.packageName, '@playwright/mcp')
-  assert.equal(PLAYWRIGHT_MCP_PROFILE.packageVersion, '0.0.81')
+  assert.equal(PLAYWRIGHT_MCP_PROFILE.packageVersion, '0.0.82')
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.transport, 'stdio')
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.packageName, 'chrome-devtools-mcp')
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.packageVersion, '1.9.0')
 
   const deniedByAbsence = new Set([
     'browser_run_code_unsafe',
+    'browser_evaluate',
     'browser_file_upload',
     'upload_file',
     'install_extension',
@@ -99,4 +106,98 @@ test('browser MCP profiles are pinned, stdio, and deny dangerous tools by defaul
     assignment.portableId === 'software-specialist' &&
     assignment.tools.length > 0
   ), true)
+})
+
+
+test('stateful MCP stdio transport completes initialize notification before tool discovery', async () => {
+  const mockServer = String.raw`
+    let buffer = ''
+    let initialized = false
+    process.stdin.setEncoding('utf8')
+    process.stdin.on('data', chunk => {
+      buffer += chunk
+      for (;;) {
+        const i = buffer.indexOf('\\n')
+        if (i < 0) break
+        const line = buffer.slice(0, i).trim()
+        buffer = buffer.slice(i + 1)
+        if (!line) continue
+        const req = JSON.parse(line)
+        if (req.method === 'notifications/initialized') {
+          initialized = true
+          continue
+        }
+        let result
+        if (req.method === 'initialize') {
+          result = { protocolVersion: req.params.protocolVersion, serverInfo: { name: 'mock-browser-mcp', version: '1.0.0' } }
+        } else if (req.method === 'tools/list') {
+          if (!initialized) {
+            process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, error: { code: -32000, message: 'not initialized' } }) + '\\n')
+            continue
+          }
+          result = { tools: [{ name: 'list_pages', description: 'safe', inputSchema: { type: 'object' } }] }
+        } else if (req.method === 'tools/call') {
+          result = { content: [{ type: 'text', text: 'ok' }], isError: false }
+        } else {
+          result = {}
+        }
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, result }) + '\\n')
+      }
+    })
+  `
+
+  const scope = { tenantId: 'tenant-a', environmentId: 'test', portableId: 'software-specialist' }
+  const factory = createNodeMcpStdioTransportFactory({
+    commandResolver: {
+      resolve() {
+        return { command: process.execPath, args: ['-e', mockServer] }
+      },
+    },
+  })
+  const transport = factory.create({ serverId: 'mock-browser', transportRef: 'mock:stdio', scope })
+  const client = createMcpOutboundClient({ serverId: 'mock-browser', scope, transport })
+
+  const initialized = await client.initialize()
+  assert.equal(initialized.serverName, 'mock-browser-mcp')
+  assert.equal(initialized.serverVersion, '1.0.0')
+  assert.deepEqual((await client.listTools()).map(tool => tool.name), ['list_pages'])
+  assert.deepEqual(await client.callTool('list_pages', {}), {
+    content: [{ type: 'text', text: 'ok' }],
+    isError: false,
+  })
+  await client.close()
+})
+
+test('browser MCP live host rejects hidden tools, filesystem output, and off-origin navigation', () => {
+  assert.equal(liveBrowserMcpToolNames('chrome-devtools-mcp').includes('upload_file'), false)
+  assert.equal(liveBrowserMcpToolNames('chrome-devtools-mcp').includes('evaluate_script'), false)
+  assert.equal(PLAYWRIGHT_MCP_PROFILE.tools.some(tool => tool.remoteToolName === 'browser_evaluate'), false)
+
+  assert.doesNotThrow(() => assertBrowserMcpToolCallForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'navigate_page',
+    args: { type: 'url', url: 'https://itmounts.com/dashboard', pageId: 1 },
+    approvedOrigins: ['https://itmounts.com'],
+  }))
+
+  assert.throws(() => assertBrowserMcpToolCallForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'navigate_page',
+    args: { type: 'url', url: 'https://example.com/', pageId: 1 },
+    approvedOrigins: ['https://itmounts.com'],
+  }), /browser_mcp_navigation_origin_rejected/)
+
+  assert.throws(() => assertBrowserMcpToolCallForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'take_screenshot',
+    args: { pageId: 1, filePath: '/tmp/leak.png' },
+    approvedOrigins: ['https://itmounts.com'],
+  }), /browser_mcp_host_write_argument_rejected/)
+
+  assert.throws(() => assertBrowserMcpToolCallForTest({
+    serverId: 'chrome-devtools-mcp',
+    toolName: 'upload_file',
+    args: { pageId: 1, filePaths: ['/etc/passwd'], uid: '1_2' },
+    approvedOrigins: ['https://itmounts.com'],
+  }), /browser_mcp_tool_not_live_enabled/)
 })

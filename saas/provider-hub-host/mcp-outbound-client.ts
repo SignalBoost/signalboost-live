@@ -9,17 +9,24 @@ export interface McpOutboundScope {
   actor?: { userId?: string; roles?: readonly string[] }
 }
 
+export interface McpOutboundTransportInput {
+  serverId: string
+  request: Readonly<Record<string, unknown>>
+  scope: McpOutboundScope
+  timeoutMs: number
+}
+
 export interface McpOutboundTransport {
   /**
-   * Host-owned transport. It owns endpoint selection, TLS, authentication, proxying and
-   * credential handling. The MCP client core receives none of those secrets.
+   * Host-owned transport. It owns endpoint/process selection, TLS/authentication where
+   * applicable, proxying and credential handling. The MCP client core receives none of those
+   * secrets.
    */
-  send(input: {
-    serverId: string
-    request: Readonly<Record<string, unknown>>
-    scope: McpOutboundScope
-    timeoutMs: number
-  }): Promise<unknown>
+  send(input: McpOutboundTransportInput): Promise<unknown>
+  /** Optional MCP notification channel, used for notifications/initialized on stateful transports. */
+  notify?(input: McpOutboundTransportInput): Promise<void>
+  /** Optional lifecycle hook for stateful transports such as stdio child processes. */
+  close?(): Promise<void>
 }
 
 export interface McpRemoteTool {
@@ -42,6 +49,7 @@ export interface McpOutboundClient {
   initialize(): Promise<{ protocolVersion: string; serverName?: string; serverVersion?: string }>
   listTools(): Promise<readonly McpRemoteTool[]>
   callTool(name: string, args: Readonly<Record<string, unknown>>): Promise<unknown>
+  close(): Promise<void>
 }
 
 type JsonRpcResponse = {
@@ -140,6 +148,14 @@ export function createMcpOutboundClient(options: McpOutboundClientOptions): McpO
     }
     const serverInfo = plain(result.serverInfo) ? result.serverInfo : null
     initialized = true
+    if (options.transport.notify) {
+      await options.transport.notify({
+        serverId,
+        scope,
+        timeoutMs,
+        request: Object.freeze({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+      })
+    }
     return Object.freeze({
       protocolVersion,
       ...(serverInfo && typeof serverInfo.name === 'string' ? { serverName: serverInfo.name.trim() } : {}),
@@ -171,6 +187,10 @@ export function createMcpOutboundClient(options: McpOutboundClientOptions): McpO
       const toolName = required(name, 'tool.name')
       if (!plain(args)) throw new Error('mcp_tool_arguments_must_be_object')
       return request('tools/call', { name: toolName, arguments: Object.freeze({ ...args }) })
+    },
+    async close() {
+      initialized = false
+      await options.transport.close?.()
     },
   })
 }

@@ -2,6 +2,7 @@
 // RunPod REST v2 compatibility repair for exact-artifact mass-distilled canaries.
 // v2 applies templateId as a one-time materialization; it does not retain a persistent template link.
 import { configuredRunpodApiKey } from './runpodConfig.ts'
+import { activeGraduateRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
 import {
   MASS_DISTILLED_CANARY_MAX_COST_USD,
   MASS_DISTILLED_MAX_CANARY_INVOCATIONS,
@@ -135,8 +136,10 @@ function runpodWorkerQuotaError(error: unknown) {
 
 async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+  const protectedEndpointIds = await activeGraduateRunpodEndpointIds()
   const retired = (listed.endpoints || []).filter(endpoint =>
     clean(endpoint.id, 160) !== activeEndpointId
+    && !protectedEndpointIds.has(clean(endpoint.id, 160).toLowerCase())
     && clean(endpoint.name, 240).startsWith('itmounts-mass-distilled-')
     && Number(endpoint.workers?.max ?? 0) > 0)
   for (const endpoint of retired) {

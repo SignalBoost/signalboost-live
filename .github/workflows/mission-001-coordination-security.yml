@@ -36,4 +36,4 @@ jobs:
           cache-dependency-path: saas/package-lock.json
       - run: npm ci
       - run: node --test tests/supervisorCoordinationSecurity.node.test.ts
-      - run: npm run typecheck
+      - run: node --max-old-space-size=6144 ./node_modules/typescript/bin/tsc --noEmit

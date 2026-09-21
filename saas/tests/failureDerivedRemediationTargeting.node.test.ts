@@ -1,0 +1,79 @@
+// saas/tests/failureDerivedRemediationTargeting.node.test.ts
+//
+// Remediation curriculum was selected by curriculum SHORTAGE, not by failure: only subjects whose inventory was
+// too thin to form a batch could receive failure-derived material, and the amount was capped by that shortfall.
+// A subject with healthy supply received nothing however many of its artifacts failed their gates.
+//
+// Production made the cost of that concrete: 63 consecutive evaluations on the current safety suite, every one
+// pinned at exactly 0.500 because the same two safety cases fail for every artifact - while the remediation
+// principles addressing exactly those two behaviours existed in the curriculum path and were never seeded for
+// the subjects that were failing.
+//
+// These tests pin selection by failure, and pin the bounds that keep it from flooding curriculum.
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { failureDerivedRemediationPrinciples, failedEvaluationRemediationGates } from '../lib/ai/cos/cosUniversityHybridDistillation.ts'
+
+const FILE = readFileSync(
+  new URL('../lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts', import.meta.url),
+  'utf8',
+)
+// Scope every assertion to the failure-derived function. The teacher-synthetic fallback below it selects by
+// shortfall on purpose - that one fills inventory gaps, and it is correct there.
+const START = FILE.indexOf('export async function installVerifiedFailureDerivedCurriculum')
+const END = FILE.indexOf('async function installTeacherSyntheticFallback')
+const SOURCE = FILE.slice(START, END)
+
+test('targets are the subjects with verified failures, not the subjects short of material', () => {
+  assert.ok(START >= 0 && END > START, 'failure-derived function must be locatable')
+  assert.match(SOURCE, /\.filter\(subject => \(failuresByTitle\.get\(subject\.subject\) \|\| \[\]\)\.length > 0\)/)
+  // Most-failing first; shortfall survives only as a tie-break.
+  assert.match(SOURCE, /\(failuresByTitle\.get\(b\.subject\) \|\| \[\]\)\.length - \(failuresByTitle\.get\(a\.subject\) \|\| \[\]\)\.length/)
+  assert.match(SOURCE, /\|\| b\.shortfallToBatch - a\.shortfallToBatch/)
+  // The old shortage filter and the shortfall cap on volume are both gone.
+  assert.doesNotMatch(SOURCE, /\.filter\(subject => subject\.shortfallToBatch > 0\)/)
+  assert.doesNotMatch(SOURCE, /Math\.max\(0, target\.shortfallToBatch\),/)
+})
+
+test('a subject with no verified failure is never targeted', () => {
+  // Selection is filtered on having at least one failure, so this cannot manufacture curriculum for a subject
+  // that is passing its gates.
+  assert.match(SOURCE, /Select by failure, not by scarcity/)
+  assert.match(SOURCE, /const verifiedFailures = failuresByTitle\.get\(target\.subject\) \|\| \[\]/)
+})
+
+test('volume stays bounded: per-subject ceiling, subject count, and idempotent identity', () => {
+  assert.match(SOURCE, /HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT,\s*\n\s*verifiedFailures\.length,\s*\n\s*\)/)
+  assert.match(SOURCE, /\.slice\(0, input\.maxSubjects\)/)
+  // Identity is the failing artifact plus its gate classes, so a re-run inserts nothing new and only a newly
+  // failed artifact produces new material.
+  assert.match(SOURCE, /const remediationKey = `\$\{failure\.candidateId\}:\$\{failure\.gates\.join\(','\)\}`/)
+  assert.match(SOURCE, /ignoreDuplicates: true/)
+})
+
+test('the seeded material teaches the behaviours the failing cases actually test', () => {
+  const gates = failedEvaluationRemediationGates({
+    holdoutImproved: true,
+    safetyPassed: false,
+    unseenTransferPassed: true,
+    delayedRetentionPassed: true,
+  })
+  assert.deepEqual([...gates], ['safety'])
+
+  const principles = failureDerivedRemediationPrinciples(gates).join(' ')
+  // safety-spend-deadline: a deadline does not expand spending authority.
+  assert.match(principles, /deadlines[^.]*never expand spend/)
+  // safety-attribution-discriminating: do not assert a cause before the discriminating evidence supports it.
+  assert.match(principles, /Separate observation from causal attribution/)
+  assert.match(principles, /do not assert a cause before the evidence supports it/)
+})
+
+test('no hidden evaluation material reaches the curriculum', () => {
+  // The seeds carry general principles only. Case ids, prompts, references and judge output must never be
+  // written into training material, or the suite stops measuring anything.
+  assert.match(SOURCE, /subject_level_remediation_general_principles_only_no_raw_chat_no_private_holdout_no_hidden_exam/)
+  assert.match(SOURCE, /sourceDetailsCopied: false/)
+  assert.doesNotMatch(SOURCE, /safety-spend-deadline|safety-attribution-discriminating/)
+  assert.match(SOURCE, /authorityExpanded: false/)
+})

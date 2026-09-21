@@ -6,7 +6,7 @@
 
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
-import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
+import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from './cosFreshnessPolicy.ts'
 import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
 import { extractSambaSchoolNames, isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
@@ -997,6 +997,7 @@ export async function tryCOSFirstAnswer(input: {
   // never override a high-confidence neural finding that the task is interpretation of supplied
   // language/context rather than verification of the outside world.
   const baselineRequiresFreshEvidence = requiresFreshExternalEvidence(input.prompt)
+  const hardTravelFreshness = requiresLiveTravelPlanningEvidence(input.prompt)
   const semanticTaskIntent = baselineRequiresFreshEvidence
     ? await classifyCosSemanticTaskIntent({
         input: input.prompt,
@@ -1004,7 +1005,7 @@ export async function tryCOSFirstAnswer(input: {
         previousAssistant: input.previousAssistant,
       })
     : null
-  const suppressFreshnessForInterpretation = semanticIntentSuppressesFreshness(semanticTaskIntent)
+  const suppressFreshnessForInterpretation = !hardTravelFreshness && semanticIntentSuppressesFreshness(semanticTaskIntent)
   if (suppressFreshnessForInterpretation) {
     console.info('[cos-core-contextual-freshness-suppressed]', JSON.stringify({
       at: new Date().toISOString(),

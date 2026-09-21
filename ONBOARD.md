@@ -48,6 +48,8 @@ For the current workload, **Small is the Production compute floor until live mea
 
 ## University graduate adoption loop invariant — 2026-09-20
 
+Builder apprenticeship scheduling invariant (2026-09-21): the first post-remediation `Computer Science & Coding` proof cohort must not wait behind the legacy exact-artifact canary backlog after the remediation generation is available. The canary scheduler may therefore prioritize exactly the first **two** Computer Science artifacts created at or after `2026-09-21T01:55:00Z` until both have durable exact-artifact canary passes. After those two passes, normal oldest-first canary scheduling resumes automatically. This is scheduling only: one-canary concurrency, the 72/24h approval ceiling, <= $0.20 per-canary authority, exact-artifact binding, independent evaluation, promotion, rollback and Production traffic gates remain unchanged. The purpose is to prove the real Builder apprenticeship loop promptly, not to bypass graduation.
+
 Training is not operationally complete when a distilled artifact merely exists. The canonical closed loop is:
 
 ```text

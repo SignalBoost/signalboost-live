@@ -169,23 +169,74 @@ type ChromeStructuredPage = {
   selected: boolean
 }
 
+function toolResult(raw: unknown): Record<string, unknown> | null {
+  return plain(raw) && plain(raw.result) ? raw.result : null
+}
+
+function toolTextLines(raw: unknown): readonly string[] {
+  const result = toolResult(raw)
+  if (!result || !Array.isArray(result.content)) return Object.freeze([])
+  const lines: string[] = []
+  for (const item of result.content) {
+    if (!plain(item) || typeof item.text !== 'string') continue
+    lines.push(...item.text.split(/\\r?\\n/))
+  }
+  return Object.freeze(lines)
+}
+
 function chromeStructuredPages(raw: unknown): readonly ChromeStructuredPage[] {
-  if (!plain(raw) || !plain(raw.result) || !plain(raw.result.structuredContent)) return Object.freeze([])
-  const value = raw.result.structuredContent.pages
-  if (!Array.isArray(value)) return Object.freeze([])
+  const result = toolResult(raw)
+  const structured = result && plain(result.structuredContent) ? result.structuredContent : null
+  const value = structured?.pages
+  if (Array.isArray(value)) {
+    const pages: ChromeStructuredPage[] = []
+    for (const item of value) {
+      if (!plain(item)) continue
+      const id = typeof item.id === 'number'
+        ? item.id
+        : typeof item.pageId === 'number'
+          ? item.pageId
+          : NaN
+      const url = typeof item.url === 'string' ? item.url : ''
+      if (!Number.isInteger(id) || !url) continue
+      pages.push({ id, url, selected: item.selected === true })
+    }
+    if (pages.length) return Object.freeze(pages)
+  }
+
+  // Chrome DevTools MCP 1.9.0 can omit structuredContent from the MCP result even when the
+  // experimental structured flag is enabled. Its standard text result still emits one host-owned
+  // page line per page. Parse only the final URL position, never URLs embedded in page titles.
   const pages: ChromeStructuredPage[] = []
-  for (const item of value) {
-    if (!plain(item)) continue
-    const id = typeof item.id === 'number'
-      ? item.id
-      : typeof item.pageId === 'number'
-        ? item.pageId
-        : NaN
-    const url = typeof item.url === 'string' ? item.url : ''
-    if (!Number.isInteger(id) || !url) continue
-    pages.push({ id, url, selected: item.selected === true })
+  for (const line of toolTextLines(raw)) {
+    const row = line.match(/^\\s*(\\d+)\\s*:\\s*(.+?)\\s*$/)
+    if (!row) continue
+    const id = Number(row[1])
+    let body = row[2].trim()
+    const selected = /\\s+\\[selected\\](?:\\s+isolatedContext=.*)?\\s*$/.test(body)
+    body = body
+      .replace(/\\s+\\[selected\\](?:\\s+isolatedContext=.*)?\\s*$/, '')
+      .replace(/\\s+isolatedContext=.*$/, '')
+      .trim()
+
+    let url = ''
+    if (/^https?:\\/\\/\\S+$/.test(body)) {
+      url = body
+    } else {
+      const titled = body.match(/\\((https?:\\/\\/[^()\\s]+)\\)\\s*$/)
+      if (titled) url = titled[1]
+    }
+    if (Number.isInteger(id) && url) pages.push({ id, url, selected })
   }
   return Object.freeze(pages)
+}
+
+function playwrightNavigationUrl(raw: unknown): string | null {
+  for (const line of toolTextLines(raw)) {
+    const match = line.match(/^\\s*(?:-\\s*)?Page URL:\\s*(https?:\\/\\/\\S+)\\s*$/)
+    if (match) return match[1]
+  }
+  return null
 }
 
 function navigationTargetPageId(call: ReturnType<typeof callShape>, pages: readonly ChromeStructuredPage[]): number | null {
@@ -209,16 +260,24 @@ function assertNavigationResultAllowed(
   raw: unknown,
   approvedOrigins: ReadonlySet<string>,
 ): void {
-  if (profile.profileId !== 'chrome-devtools-mcp') return
   const call = callShape(request)
-  if (!call || !['navigate_page', 'new_page'].includes(call.name)) return
+  if (!call) return
 
-  const pages = chromeStructuredPages(raw)
-  if (!pages.length) throw new Error('browser_mcp_navigation_evidence_missing')
-  const targetId = navigationTargetPageId(call, pages)
-  const target = targetId === null ? undefined : pages.find(page => page.id === targetId)
-  if (!target) throw new Error('browser_mcp_navigation_target_missing')
-  assertUrlAllowed(target.url, approvedOrigins)
+  if (profile.profileId === 'chrome-devtools-mcp' && ['navigate_page', 'new_page'].includes(call.name)) {
+    const pages = chromeStructuredPages(raw)
+    if (!pages.length) throw new Error('browser_mcp_navigation_evidence_missing')
+    const targetId = navigationTargetPageId(call, pages)
+    const target = targetId === null ? undefined : pages.find(page => page.id === targetId)
+    if (!target) throw new Error('browser_mcp_navigation_target_missing')
+    assertUrlAllowed(target.url, approvedOrigins)
+    return
+  }
+
+  if (profile.profileId === 'playwright-mcp' && call.name === 'browser_navigate') {
+    const finalUrl = playwrightNavigationUrl(raw)
+    if (!finalUrl) throw new Error('browser_mcp_navigation_evidence_missing')
+    assertUrlAllowed(finalUrl, approvedOrigins)
+  }
 }
 
 function filterToolsResponse(
@@ -370,5 +429,29 @@ export function assertBrowserMcpNavigationResultForTest(input: {
         pages: input.pages.map(page => ({ ...page, selected: page.selected === true })),
       },
     },
+  }, approved)
+}
+
+
+export function assertBrowserMcpRawNavigationResultForTest(input: {
+  serverId: BrowserMcpProfileId
+  toolName: 'navigate_page' | 'new_page' | 'browser_navigate'
+  args: Readonly<Record<string, unknown>>
+  approvedOrigins: readonly string[]
+  rawResult: Readonly<Record<string, unknown>>
+}): void {
+  const profile = input.serverId === 'chrome-devtools-mcp'
+    ? CHROME_DEVTOOLS_MCP_PROFILE
+    : PLAYWRIGHT_MCP_PROFILE
+  const approved = new Set(input.approvedOrigins.map(normalizeApprovedOrigin))
+  assertNavigationResultAllowed(profile, {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: { name: input.toolName, arguments: input.args },
+  }, {
+    jsonrpc: '2.0',
+    id: 1,
+    result: input.rawResult,
   }, approved)
 }

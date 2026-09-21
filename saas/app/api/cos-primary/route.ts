@@ -11,7 +11,7 @@ import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerifi
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
-import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import {
   classifyAuthoritativeVolatileFact,
@@ -245,15 +245,23 @@ function completionFirstResponse(startedAt:number,input:string,result:{reply:str
 // fact. COS reasons over the retrieved sources to complete the task, cites what the sources support,
 // and explicitly marks anything they do not support as unverified. The model decides whether the
 // request is a task or a bare fact claim; a bare fact claim still fails closed.
+export const FRESH_GROUNDED_TASK_TIMEOUT_MS = 18_000
 async function runFreshGroundedTaskCompletion(input:string,language:string,sources:FreshEvidenceSource[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
-  const evidence=sources.slice(0,8).map(source=>`[${source.id}] ${String(source.title||'').slice(0,200)} — ${String(source.url||'')}${source.sourceDate?` (source date: ${source.sourceDate})`:''}\n${String(source.snippet||'').slice(0,700)}`).join('\n\n')
+  const travelTask=requiresLiveTravelPlanningEvidence(input)
+  const evidence=sources.slice(0,8).map(source=>`[${source.id}] ${String(source.title||'').slice(0,200)} — ${String(source.url||'')}${source.sourceDate?` (source date: ${source.sourceDate})`:''}\n${String(source.snippet||'').slice(0,450)}`).join('\n\n')
   const result=await callCosReasoner({
-    temperature:.3,
-    maxTokens:2600,
+    temperature:.2,
+    maxTokens:1800,
+    jsonObject:true,
+    disableThinking:true,
+    timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS,
+    allowConfiguredFallback:true,
+    usageContext:{feature:'cos_interactive_answer',purpose:'fresh_grounded_task'},
     systemPrompt:[
-      'You are COS. Live web sources were retrieved this turn for the user request below.',
-      'First decide what the user wants. If the request is only to confirm one specific current fact (who holds a role, a single price, a single status) and the sources do not clearly support it, return {"answer":"","confidence":0}.',
-      'Otherwise the request is a task to complete (for example a plan, itinerary, schedule, comparison or recommendation). Complete it fully and usefully with sound reasoning.',
+      'You are COS. Live web sources were retrieved this turn for the user request below. /no_think',
+      travelTask
+        ? 'This request is already classified as a travel-planning task. Do not reclassify it as a bare fact lookup and do not return an empty answer merely because some details are unsupported. Produce the requested itinerary from the supported evidence and clearly mark only unsupported mutable specifics as needing verification.'
+        : 'First decide what the user wants. If the request is only to confirm one specific current fact (who holds a role, a single price, a single status) and the sources do not clearly support it, return {"answer":"","confidence":0}. Otherwise complete the requested task fully.',
       'Use the sources for specific mutable facts such as fares, routes, schedules, opening hours, ticket prices and availability, and cite them inline as [LIVE1], [LIVE2].',
       'Any specific fact you state that the sources do not support must be clearly marked as unverified and to be checked before relying on it.',
       'Never invent free services, discounts, businesses, venues, routes or prices. If you are not sure something exists, leave it out or say it must be checked.',
@@ -554,7 +562,27 @@ export async function postCosPrimary(req:NextRequest){
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-roster-unparsed',confidence_score:0,external_ai_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),execution_allowed:false,external_action_taken:false},{status:200})
     }
 
-    if(!requestedAction){
+    const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)
+    if(!requestedAction&&liveTravelTask){
+      freshLocalAttempted=true
+      freshLocalModel=localReasonerLabel()
+      const groundedTask=await runFreshGroundedTaskCompletion(lookupInput,language,freshSources)
+      if(groundedTask){
+        freshLocalModel=groundedTask.reasonerLabel
+        const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:groundedTask.reasonerLabel,confidence:groundedTask.confidence,accepted:true})
+        const executionProvenance=attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true})
+        ;Object.assign(executionProvenance as any,{policy:'fresh_live_data_grounded_task',assistant_text_used_for_resolution:false})
+        ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:groundedTask.reasonerLabel,grounded_at:freshRetrievedAt}
+        logEscalation({event:'fresh_grounded_task_completed',documents_acquired:freshSources.length,reasoner:groundedTask.reasonerLabel,strict_failure_code:null,external_ai_invoked:false,local_model_invoked:true})
+        const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:groundedTask.reply,source:'local_cos_reasoning',confidence:groundedTask.confidence,provenance:freshTelemetryProvenance(true,groundedTask.reasonerLabel),externalAiInvoked:false})
+        await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
+        return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+      }
+      freshLocalFailureCode='local_synthesis_failed'
+      logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true})
+    }
+
+    if(!requestedAction&&!liveTravelTask){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
       const localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})
@@ -632,7 +660,7 @@ export async function postCosPrimary(req:NextRequest){
   const freshFailureCode: FreshEvidenceInternalFailureCode | null = freshHardFail
     ? (freshLocalFailureCode ?? 'local_synthesis_unparseable')
     : null
-  if(freshHardFail&&freshRetrievedAt&&freshSources.length&&!requestedAction){
+  if(freshHardFail&&freshRetrievedAt&&freshSources.length&&!requestedAction&&!requiresLiveTravelPlanningEvidence(lookupInput)){
     const groundedTask=await runFreshGroundedTaskCompletion(lookupInput,language,freshSources)
     if(groundedTask){
       const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:groundedTask.reasonerLabel,confidence:groundedTask.confidence,accepted:true})

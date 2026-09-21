@@ -52,7 +52,9 @@ test('volume stays bounded: per-subject ceiling, subject count, and idempotent i
   assert.match(SOURCE, /\.slice\(0, input\.maxSubjects\)/)
   // Identity is the failing artifact plus its gate classes, so a re-run inserts nothing new and only a newly
   // failed artifact produces new material.
-  assert.match(SOURCE, /const remediationKey = `\$\{failure\.candidateId\}:\$\{failure\.gates\.join\(','\)\}`/)
+  assert.match(SOURCE, /FAILURE_DERIVED_REMEDIATION_PROFILE/)
+  assert.match(SOURCE, /const remediationKey = `\$\{FAILURE_DERIVED_REMEDIATION_PROFILE\}:\$\{failure\.candidateId\}:\$\{failure\.gates\.join\(','\)\}`/)
+  assert.match(SOURCE, /remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE/)
   assert.match(SOURCE, /ignoreDuplicates: true/)
 })
 

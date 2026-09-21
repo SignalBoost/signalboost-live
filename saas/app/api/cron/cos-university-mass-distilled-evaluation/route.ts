@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto'
 import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
 import { isTerminalHoldoutDataDefect } from '@/lib/ai/cos/cosUniversityMassEvaluationTerminalDefect'
+import { REQUIRED_EVALUATION_RUN_COLUMNS, isMissingColumnError, missingColumnsFromError } from '@/lib/ai/cos/cosUniversityEvaluationSchemaPreflight'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
@@ -370,6 +371,24 @@ async function claimNext(): Promise<MassEvaluationClaim | null> {
   })
 }
 
+// One bounded read, before any claim, wake or model call. The evaluator writes its verdict only at the END of
+// a run, so a column that exists in the code but not yet in the database turns a complete evaluation - wake,
+// inference, judge - into a lost run that also spends an artifact attempt and a rolling approval. Checking the
+// write surface first makes that mistake cost one cheap select instead. It happened on 2026-09-20 with
+// safety_baseline_score / safety_absolute_threshold_met and looked like model failure for hours.
+async function evaluationSchemaMissingColumns(): Promise<string[] | null> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const probe = await db.from('cos_university_distilled_evaluation_runs')
+    .select(REQUIRED_EVALUATION_RUN_COLUMNS.join(','))
+    .limit(1)
+  if (!probe.error) return null
+  // Only an unknown column means the migration is pending. Auth, network and timeouts are real failures and
+  // must keep their own error rather than being reported as a schema problem.
+  if (!isMissingColumnError(probe.error)) throw probe.error
+  return missingColumnsFromError(probe.error)
+}
+
 async function quarantineTerminalHoldoutDefect(claim: MassEvaluationClaim) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -435,6 +454,25 @@ export async function GET(req: NextRequest) {
     }
     if (!process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
+    }
+
+    const missingColumns = await evaluationSchemaMissingColumns()
+    if (missingColumns) {
+      await recordProduction(false, {
+        runnerInvoked: false,
+        blocked: 'evaluation_schema_migration_pending',
+        missingColumns,
+      }).catch(() => undefined)
+      console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({
+        ok: false,
+        error: 'evaluation_schema_migration_pending',
+        missingColumns,
+      }))
+      return NextResponse.json({
+        ok: false,
+        error: 'evaluation_schema_migration_pending',
+        missingColumns,
+      }, { status: 503 })
     }
 
     const account = await queryRunpodAccountStatus()

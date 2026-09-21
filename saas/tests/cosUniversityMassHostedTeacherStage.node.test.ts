@@ -337,3 +337,11 @@ test('dataset preparation excludes rows without a supervised prompt-response pai
   assert.match(worker, /user_marker = "<user>\\n"/)
   assert.match(worker, /assistant_marker = "\\n\\n<assistant>\\n"/)
 })
+
+
+test('hosted teacher prompt requires a complete answer inside the existing token ceiling', () => {
+  const source = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts'), 'utf8')
+  assert.match(source, /finish the full teaching example in no more than 300 output tokens/)
+  assert.match(source, /DEFAULT_MAX_OUTPUT_TOKENS = 384/)
+  assert.match(source, /HARD_MAX_OUTPUT_TOKENS = 512/)
+})

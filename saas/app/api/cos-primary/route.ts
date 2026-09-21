@@ -157,7 +157,7 @@ function fastAuthoringCognitiveMode(input:string):FastAuthoringCognitiveMode{
     : 'deterministic'
 }
 
-async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabel:string;cognitiveMode:FastAuthoringCognitiveMode}|null>{
+async function runFastAuthoring(input:string,language:string):Promise<{reply:string;reasonerLabel:string;cognitiveMode:FastAuthoringCognitiveMode}|null>{
   const config=localInferenceConfigFromEnv()
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
   const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
@@ -182,6 +182,7 @@ async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabe
         cognitiveMode==='creative'
           ? 'The user is asking for creative generation: explore original wording and varied ideas while respecting every supplied constraint.'
           : 'The task is precision-oriented: prefer faithful, controlled wording over novelty.',
+        `Respond in ${reportLanguageName(language)} unless the user explicitly requests a different target language.`,
         'If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
       ].join(' '),
       prompt:input,
@@ -253,11 +254,13 @@ function externalExecution(payload:any,trace:ProviderExecutionTrace,isPrivileged
 function embeddedExecutionProvenance(payload:any):Record<string,unknown>|null{const value=payload?.execution_provenance;return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null}
 function finiteNumber(value:unknown):number|null{const parsed=Number(value);return Number.isFinite(parsed)?parsed:null}
 function legacyContinuityFailure(payload:any):boolean{const text=JSON.stringify(payload??{}).toLowerCase();return text.includes('both reasoning providers are temporarily unavailable')||text.includes('continuity protection detected a primary failure')}
-function noPriorReply(language:string):string{return language==='es'?'No tengo un registro de procedencia real para la respuesta inmediatamente anterior. No voy a inventarlo.':language==='pt'?'Não tenho um registro de proveniência real para a resposta imediatamente anterior. Não vou inventá-lo.':"I don't have a real provenance record for the immediately preceding answer. I won't fabricate one."}
+function noPriorReply(language:string):string{const replies:Record<string,string>={en:"I don't have a real provenance record for the immediately preceding answer. I won't fabricate one.",es:'No tengo un registro de procedencia real para la respuesta inmediatamente anterior. No voy a inventarlo.',pt:'Não tenho um registro de proveniência real para a resposta imediatamente anterior. Não vou inventá-lo.',pl:'Nie mam rzeczywistego zapisu pochodzenia bezpośrednio poprzedniej odpowiedzi. Nie będę go wymyślać.',ru:'У меня нет реальной записи о происхождении непосредственно предыдущего ответа. Я не буду её выдумывать.'};return replies[language]||replies.en}
 function isRecordedProvenanceReport(text:string):boolean{return /(?:This is the real, recorded provenance|Recorded Influence Interpretation|LIVE SYSTEM STATE)/i.test(String(text||''))}
 function provenanceReportFollowupReply(language:string):string{
   if(language==='es')return 'La respuesta inmediatamente anterior ya es el informe de procedencia registrado de la respuesta anterior. Sus secciones “Primary Reasoner” y “Material Contributors” identifican la fuente; no es una nueva respuesta sustantiva que requiera otro registro de procedencia.'
   if(language==='pt')return 'A resposta imediatamente anterior já é o relatório de proveniência registrado da resposta anterior. As seções “Primary Reasoner” e “Material Contributors” identificam a fonte; ela não é uma nova resposta substantiva que exija outro registro de proveniência.'
+  if(language==='pl')return 'Bezpośrednio poprzednia odpowiedź jest już zapisanym raportem pochodzenia odpowiedzi wcześniejszej. Sekcje „Primary Reasoner” i „Material Contributors” wskazują źródło; nie jest to nowa odpowiedź merytoryczna wymagająca kolejnego raportu pochodzenia.'
+  if(language==='ru')return 'Непосредственно предыдущий ответ уже является сохранённым отчётом о происхождении ответа перед ним. Разделы “Primary Reasoner” и “Material Contributors” указывают источник; это не новый содержательный ответ, требующий отдельной записи о происхождении.'
   return 'The immediately preceding reply is already the recorded provenance report for the answer before it. Its “Primary Reasoner” and “Material Contributors” sections identify the source; it is not a new substantive answer that needs a second provenance record.'
 }
 function emitRequestTelemetry(args:{startedAt:number;input:string;reply?:string|null;source:CosLiveResponseSource;confidence?:number|null;provenance?:any;externalAiInvoked:boolean}){const p=args.provenance??null,observation=buildCosLiveTelemetry({responseSource:args.source,latencyMs:Math.max(0,Date.now()-args.startedAt),confidence:args.confidence??null,reasonerLabel:p?.reasonerLabel??p?.local_reasoning?.model??null,localModelInvoked:p?.localModelInvoked??p?.local_reasoning?.invoked??false,externalAiInvoked:args.externalAiInvoked,knowledgeFactsUsed:p?.knowledgeFactsUsed??p?.knowledge_graph?.evidence_count??0,learnedItemsUsed:p?.learnedItemsUsed??p?.learned_corpus?.evidence_count??0,userMemoriesUsed:p?.userMemoriesUsed??p?.user_memory?.evidence_count??0,similarityScore:p?.similarityScore,promptChars:args.input.length,replyChars:String(args.reply??'').length});emitCosLiveTelemetry(observation);return observation}
@@ -290,6 +293,8 @@ function excerptFreshPageBody(body:string,input:string):string{
 function partialOfficeHolderReply(reply:string,language:string):string{
   const suffix=language==='pt'?'Não foi possível verificar com segurança a lista histórica solicitada a partir das fontes recuperadas nesta resposta.':
     language==='es'?'No se pudo verificar con seguridad la lista histórica solicitada a partir de las fuentes recuperadas en esta respuesta.':
+    language==='pl'?'Nie udało się bezpiecznie zweryfikować żądanej listy historycznej na podstawie źródeł pobranych w tej odpowiedzi.':
+    language==='ru'?'Не удалось надёжно проверить запрошенный исторический список по источникам, полученным для этого ответа.':
     'I could not verify the requested historical list safely from the retrieved sources in this response.'
   return `${reply}\n\n${suffix}`
 }
@@ -336,7 +341,7 @@ export async function postCosPrimary(req:NextRequest){
     && isAuthoringObjectiveWithoutLiveLookup(input)
     && !isCosCodingObjective(input)
   if(fastAuthoringEligible){
-    const fast=await runFastAuthoring(input)
+    const fast=await runFastAuthoring(input,language)
     if(fast)return fastAuthoringResponse(startedAt,input,fast)
   }
 
@@ -414,7 +419,7 @@ export async function postCosPrimary(req:NextRequest){
   // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh,
   // trust whole-request semantic intent rather than forcing the user to know COS routing phrases.
   if(!hasAttachments&&!isCosCodingObjective(input)&&semanticIntentIsSelfContainedContentGeneration(semanticTaskIntent)){
-    const semanticFast=await runFastAuthoring(input)
+    const semanticFast=await runFastAuthoring(input,language)
     if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic')
   }
   const requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness(semanticTaskIntent)
@@ -580,7 +585,7 @@ export async function postCosPrimary(req:NextRequest){
   if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
     const rescueIntent=semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
-      const semanticFast=await runFastAuthoring(input)
+      const semanticFast=await runFastAuthoring(input,language)
       if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic-rescue')
     }
   }

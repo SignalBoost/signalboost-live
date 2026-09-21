@@ -41,3 +41,44 @@ A concrete host-owned stdio runtime is now implemented for browser MCP servers. 
 - `.github/workflows/chrome-devtools-mcp-live-acceptance.yml` launches the real pinned server and Chromium and probes only approved iTMounts origins through Provider Hub and Portable Connector Runtime.
 - Retained acceptance evidence is metadata-only: page text, console bodies, network headers, screenshots, prompts and credentials are not persisted.
 - The first live run on PR #2696 correctly exposed a brittle text parser after Chrome DevTools MCP changed titled page rendering. The repair uses `structuredContent.pages`; live acceptance must pass on the repair revision before the runtime is called accepted.
+
+
+## Universal MCP Gateway — GitHub, Supabase, Context7 — 2026-09-21
+
+The first non-browser production MCP provider set is implemented through the existing Phase 2/3 Provider Hub boundary. These are real remote MCP integrations, not catalog placeholders.
+
+Architecture:
+
+```text
+COS / authorized portable / owner console
+→ Universal MCP Gateway
+→ exact tenant + environment + portable assignment
+→ Portable Connector Runtime
+→ explicit host tool mapping
+→ host-owned Streamable HTTP transport
+→ GitHub / Supabase / Context7 remote MCP
+```
+
+Canonical implementation:
+- `saas/provider-hub-host/universal-mcp-profiles.ts` — exact deny-by-default tool and risk catalog.
+- `saas/provider-hub-host/mcp-streamable-http-transport.ts` — HTTPS-only remote transport with bounded responses, redirect rejection, session compatibility, and host-owned authentication.
+- `saas/provider-hub-host/universal-mcp-gateway.ts` — executable gateway, credential readiness, project/repository scoping, Portable Connector Runtime approval/audit integration.
+- `saas/provider-hub-host/mcp-gateway-audit.ts` + `provider_hub_mcp_audit` — durable metadata-only execution evidence; arguments, results and credentials are never persisted.
+- `/api/admin/provider-hub/mcp` — owner-authenticated discovery and invocation surface. Caller-supplied approval identity is rejected by construction; an explicit `approve: true` is converted into approval evidence owned by the authenticated owner identity.
+
+Provider contracts:
+- GitHub remote MCP: `https://api.githubcopilot.com/mcp/`. Only the exact configured tools are requested with `X-MCP-Tools`; lockdown mode is enabled as defense in depth. The host remains the authorization boundary. GitHub operations are additionally constrained to `MCP_GITHUB_ALLOWED_REPOS` (default for this deployment: `SignalBoost/signalboost-live`). Code search is automatically repository-qualified; cross-repository qualifiers are rejected.
+- Supabase remote MCP: `https://mcp.supabase.com/mcp`, project-scoped with `project_ref` and bounded feature groups. `SUPABASE_ACCESS_TOKEN` is the management credential; a database service-role key is not substituted for it. The project ref is read from `SUPABASE_MCP_PROJECT_REF` or derived from the configured Supabase URL. Missing credential/ref fails closed.
+- Context7 remote MCP: `https://mcp.context7.com/mcp`. Exact tools are `resolve-library-id` and `query-docs`; both are read-only. `CONTEXT7_API_KEY` is optional because anonymous service access is supported, with lower provider-side limits.
+
+Risk policy:
+- Read capabilities require no mutation approval.
+- GitHub branch/file/issue/PR writes require explicit approval.
+- GitHub merge/workflow triggers and Supabase raw SQL/migrations/Edge Function deployment are `consequential`: explicit approval plus a buyer/platform audit sink are mandatory.
+- Remote MCP annotations and descriptions never grant authority or lower a host classification.
+- Arbitrary registry discovery and arbitrary remote endpoints are not supported.
+
+Acceptance:
+- `npm run test:mcp-gateway` is mandatory in the main test suite.
+- `.github/workflows/universal-mcp-live-acceptance.yml` performs real remote acceptance against Context7, the private SignalBoost GitHub repository, and the scoped Supabase project.
+- Supabase live acceptance deliberately fails when `SUPABASE_ACCESS_TOKEN` is unavailable; it never converts a missing credential into a skipped/green result.

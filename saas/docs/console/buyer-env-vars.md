@@ -68,6 +68,18 @@ touch (see **Providers** below).
 | --- | --- | --- |
 | `SUPABASE_ACCESS_TOKEN` | For SQL Editor & project picker | Supabase Management API token used to list projects and run gated SQL. |
 
+## Universal MCP Gateway
+
+The remote MCP gateway is deny-by-default. Credentials stay server-side and are never stored in MCP registry metadata.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `GITHUB_MCP_TOKEN` | Optional override | Dedicated GitHub MCP bearer token. If unset, the gateway falls back to `GITHUB_TOKEN`, then `GITHUB_WRITE_TOKEN`. |
+| `MCP_GITHUB_ALLOWED_REPOS` | Recommended | Comma-separated exact `owner/repo` allowlist. This deployment defaults to `SignalBoost/signalboost-live`; buyer deployments should set their own explicit list. |
+| `SUPABASE_ACCESS_TOKEN` | For Supabase MCP | Supabase Management API token used by the official remote MCP server. A service-role database key is not a substitute. |
+| `SUPABASE_MCP_PROJECT_REF` | Optional | Exact Supabase project ref. If unset, the gateway derives it from `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_URL`. |
+| `CONTEXT7_API_KEY` | Optional | Context7 bearer token for higher provider limits. Context7 can operate anonymously when omitted. |
+
 ## Providers (set only what you use)
 
 Each provider's actions are inert until its key is present.

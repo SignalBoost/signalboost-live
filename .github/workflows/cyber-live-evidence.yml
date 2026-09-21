@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Keep non-PR runs independent, but collapse repeated events for the same PR to its newest revision.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   evidence:
     name: Collect live advisory evidence (not security clearance)

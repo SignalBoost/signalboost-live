@@ -4,8 +4,9 @@
 //
 // These profiles are authorization input, not trust in remote self-description. Only tools listed
 // here may be mapped into a portable/agent assignment. Read-only diagnostics stay read-only.
-// Browser interaction and JavaScript execution are mapped as writes and require the existing
-// Portable Connector Runtime approval gate. High-risk surfaces such as arbitrary Playwright code,
+// Browser interaction is mapped as write and requires the existing Portable Connector Runtime
+// approval gate. JavaScript evaluation is not exposed by the default governed profiles. High-risk
+// surfaces such as arbitrary Playwright code,
 // file upload, Chrome extension mutation, PWA installation, third-party developer tools, and
 // nested WebMCP execution are deliberately absent from the default profiles.
 //
@@ -66,9 +67,9 @@ export const PLAYWRIGHT_MCP_PROFILE: BrowserMcpServerProfile = Object.freeze({
   displayName: 'Playwright MCP',
   transport: 'stdio',
   packageName: '@playwright/mcp',
-  packageVersion: '0.0.81',
+  packageVersion: '0.0.82',
   transportRef: 'host:mcp:playwright',
-  recommendedArgs: Object.freeze(['--headless']),
+  recommendedArgs: Object.freeze(['--headless', '--isolated', '--browser', 'chrome']),
   tools: Object.freeze([
     readTool('browser_snapshot', 'snapshot'),
     readTool('browser_find', 'find'),
@@ -85,7 +86,6 @@ export const PLAYWRIGHT_MCP_PROFILE: BrowserMcpServerProfile = Object.freeze({
     writeTool('browser_select_option', 'select_option'),
     writeTool('browser_press_key', 'press_key'),
     writeTool('browser_handle_dialog', 'handle_dialog'),
-    writeTool('browser_evaluate', 'evaluate'),
   ]),
 })
 
@@ -98,10 +98,16 @@ export const CHROME_DEVTOOLS_MCP_PROFILE: BrowserMcpServerProfile = Object.freez
   packageVersion: '1.9.0',
   transportRef: 'host:mcp:chrome-devtools',
   recommendedArgs: Object.freeze([
-    '--headless',
+    '--headless=true',
+    '--isolated=true',
     '--no-usage-statistics',
-    '--no-performance-crux',
+    '--performance-crux=false',
     '--javascript-evaluation=false',
+    '--redact-network-headers=true',
+    '--screenshot-format=jpeg',
+    '--screenshot-quality=70',
+    '--screenshot-max-width=1440',
+    '--screenshot-max-height=1200',
   ]),
   tools: Object.freeze([
     readTool('list_pages', 'pages.list'),

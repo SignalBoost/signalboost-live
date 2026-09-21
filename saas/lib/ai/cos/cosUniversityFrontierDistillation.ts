@@ -6,7 +6,7 @@
 // a deterministic training recipe that existing governed dispatch/evaluation paths may consume.
 
 export const COS_UNIVERSITY_FRONTIER_DISTILLATION_PROFILE =
-  'cos-university-frontier-adaptive-distillation-v1' as const
+  'cos-university-frontier-adaptive-distillation-v2' as const
 
 export type FrontierDistillationOptimizer =
   | 'gkd_on_policy'

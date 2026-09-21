@@ -1,3 +1,4 @@
+// saas/app/api/cos-provenance-browser/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosBrowserPost } from '@/app/api/cos-browser/route'
 import { getAccess } from '@/lib/auth/access'
@@ -26,9 +27,10 @@ const MAX_PROVENANCE_COOKIE_CHARS = 3600
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 // One clock for the whole durable turn, measured from when this request started. Reasoning must
 // finish by the model deadline; the watchdog then writes an honest terminal History row. Both sit
-// inside the browser's 180 s History wait (agentProgressClient COS_TURN_FOREGROUND_WAIT_MS) and far
-// inside Vercel's 300 s maxDuration, so the page always receives the real outcome and the platform
-// can never kill the worker silently (worker_lost).
+// inside the browser's 180 s History wait (agentProgressClient COS_TURN_FOREGROUND_WAIT_MS), inside
+// the Concierge's 195 s direct-response wait (PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS) and far inside
+// Vercel's 300 s maxDuration. The same clock governs durable AND direct turns, so the page always
+// receives the real outcome and the platform can never kill the worker silently (worker_lost).
 const DURABLE_TURN_MODEL_DEADLINE_MS = 150_000
 const DURABLE_TURN_WATCHDOG_MS = 172_000
 const DURABLE_TURN_DEADLINE_REPLY = 'COS ran out of time on this turn before it produced a verified response, so nothing was sent in its place. The request was not replayed.'
@@ -325,7 +327,40 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
   }
 
-  const response = await cosBrowserPost(downstreamRequest(req, body))
+  // Direct (non-durable) turns run inside the same single whole-turn clock as durable ones. Without
+  // it, every stage started its own budget, the request outlived the browser's wait, and because this
+  // path saves History only after completion, the question vanished from History entirely.
+  const syncWatchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
+  let deadlineElapsed = false
+  let response!: Response
+  try {
+    const syncWatchdog = new Promise<never>((_, reject) => {
+      syncWatchdogTimer.handle = setTimeout(
+        () => reject(new DurableTurnWatchdogElapsed('cos_turn_deadline')),
+        Math.max(1_000, requestStartedAt + DURABLE_TURN_WATCHDOG_MS - Date.now()),
+      )
+    })
+    const syncWorker = runWithTurnDeadline(
+      requestStartedAt + DURABLE_TURN_MODEL_DEADLINE_MS,
+      () => cosBrowserPost(downstreamRequest(req, body)),
+    )
+    syncWorker.catch(() => undefined)
+    response = await Promise.race([syncWorker, syncWatchdog])
+  } catch (error) {
+    if (!(error instanceof DurableTurnWatchdogElapsed)) throw error
+    deadlineElapsed = true
+    console.error('[cos_turn_deadline]', JSON.stringify({ elapsedMs: Date.now() - requestStartedAt }))
+    response = NextResponse.json({
+      ok: false,
+      reply: DURABLE_TURN_DEADLINE_REPLY,
+      error: 'cos_turn_deadline',
+      source: 'cos-turn-deadline',
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 200 })
+  } finally {
+    if (syncWatchdogTimer.handle) clearTimeout(syncWatchdogTimer.handle)
+  }
   const delivered = await finalizeAnswer(response, req, body)
 
   if (synchronousReadOnlyTurn) {
@@ -335,7 +370,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       const payload: any = await delivered.clone().json().catch(() => null)
       const reply = typeof payload?.reply === 'string' ? payload.reply.trim() : ''
       const successful = delivered.ok && payload?.ok !== false && Boolean(reply)
-      if (successful) {
+      // A turn that ran out of time is still recorded, so History always holds the question.
+      if (successful || (deadlineElapsed && reply)) {
         await persistTurn({
           conversationId,
           userId,

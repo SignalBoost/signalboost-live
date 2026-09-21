@@ -390,7 +390,7 @@ export default function AssistantPage() {
         if (!(aborted && !hitDeadline)) {
           const recovered = await recoverCompletedTurn(conversationId, content, sentAtMs)
           if (recovered) {
-            setMessages([...next, { role: 'assistant', content: recovered }])
+            setMessages([...next, { role: 'assistant', content: recovered, sourceLanguage: l }])
             return
           }
         }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
 
 import type { PortableConnectorAuditEvent } from '../provider-hub-core/connector-runtime.ts'
 import { createUniversalMcpGateway } from '../provider-hub-host/universal-mcp-gateway.ts'
@@ -203,4 +204,23 @@ test('Supabase is project-scoped and unavailable without management access token
     args: {},
   })
   assert.equal(result.mode, 'mcp_provider_not_configured')
+})
+
+
+test('owner MCP route derives approval from authenticated owner and never accepts caller approval identity', async () => {
+  const source = await readFile(new URL('../app/api/admin/provider-hub/mcp/route.ts', import.meta.url), 'utf8')
+  assert.match(source, /requireOwner\(\)/)
+  assert.match(source, /body\.approve === true/)
+  assert.match(source, /approvedBy: guard\.ctx\.userId/)
+  assert.match(source, /owner-mcp:\$\{randomUUID\(\)\}/)
+  assert.doesNotMatch(source, /body\.approvalId|body\.approvedBy|body\.approvedAt/)
+})
+
+test('durable MCP audit schema never persists tool arguments, results or credentials', async () => {
+  const migration = await readFile(new URL('../supabase/migrations/20260921153000_provider_hub_mcp_audit.sql', import.meta.url), 'utf8')
+  assert.match(migration, /enable row level security/i)
+  assert.match(migration, /revoke all .* anon, authenticated/i)
+  for (const forbidden of ['tool_args ', 'tool_arguments ', 'arguments json', 'tool_result ', 'response_body ', 'credentials json', 'access_token ', 'api_key ', 'secret_value ']) {
+    assert.equal(migration.toLowerCase().includes(forbidden), false, `audit migration must not persist ${forbidden.trim()}`)
+  }
 })

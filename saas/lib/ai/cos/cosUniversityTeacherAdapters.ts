@@ -82,6 +82,23 @@ function providerErrorDetail(payload: any): string {
   return message ? `${type}:${message}` : type
 }
 
+function assertTeacherCompletion(input: {
+  provider: string
+  finishReason?: unknown
+  incomplete?: boolean
+}) {
+  const reason = clean(input.finishReason, 80).toLowerCase().replace(/[^a-z0-9._-]/g, '_')
+  const tokenLimited = input.incomplete === true
+    || reason === 'length'
+    || reason === 'max_tokens'
+    || reason === 'max_output_tokens'
+    || reason === 'max_tokens_reached'
+    || reason === 'max_output_tokens_reached'
+  if (tokenLimited) {
+    throw new Error(`university_teacher_output_truncated:${clean(input.provider, 40)}:${reason || 'token_limit'}`)
+  }
+}
+
 async function callOpenAiResponses(input: UniversityTeacherAdapterInput): Promise<TeacherGenerationResult> {
   const model = modelFor(input.teacher, input.env)
   const credential = credentialFor(input.teacher, input.env)
@@ -113,6 +130,11 @@ async function callOpenAiResponses(input: UniversityTeacherAdapterInput): Promis
         .join('\n')
       : '')
   if (!outputText) throw new Error('university_teacher_empty_response')
+  assertTeacherCompletion({
+    provider: input.teacher.provider,
+    finishReason: payload?.incomplete_details?.reason || payload?.status,
+    incomplete: payload?.status === 'incomplete',
+  })
   return Object.freeze({
     provider: input.teacher.provider,
     model,
@@ -152,6 +174,10 @@ async function callOpenAiCompatible(input: UniversityTeacherAdapterInput): Promi
   }
   const text = clean(payload?.choices?.[0]?.message?.content)
   if (!text) throw new Error('university_teacher_empty_response')
+  assertTeacherCompletion({
+    provider: input.teacher.provider,
+    finishReason: payload?.choices?.[0]?.finish_reason,
+  })
   return Object.freeze({
     provider: input.teacher.provider,
     model,
@@ -193,6 +219,10 @@ async function callGeminiGenerateContent(input: UniversityTeacherAdapterInput): 
       .join('\n')
     : '')
   if (!text) throw new Error('university_teacher_empty_response')
+  assertTeacherCompletion({
+    provider: input.teacher.provider,
+    finishReason: payload?.candidates?.[0]?.finishReason,
+  })
   return Object.freeze({
     provider: input.teacher.provider,
     model,
@@ -231,6 +261,10 @@ async function callAnthropic(input: UniversityTeacherAdapterInput): Promise<Teac
     ? payload.content.filter((item: any) => item?.type === 'text').map((item: any) => item.text).join('\n')
     : '')
   if (!text) throw new Error('university_teacher_empty_response')
+  assertTeacherCompletion({
+    provider: input.teacher.provider,
+    finishReason: payload?.stop_reason,
+  })
   return Object.freeze({
     provider: input.teacher.provider,
     model,

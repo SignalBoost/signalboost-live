@@ -195,6 +195,7 @@ export async function runMassHostedTeacherStage(input: {
                 'You are one governed teacher in the COS University mass-distillation faculty.',
                 'Use the supplied rights-cleared learning case only.',
                 'Return a rigorous final teaching response without hidden chain-of-thought, citations, private data, or claims of external access.',
+                'Keep the response complete and concise: finish the full teaching example in no more than 300 output tokens.',
               ].join(' '),
               prompt: String(prompt.prompt || '').slice(0, 3000),
               maxOutputTokens: config.maxOutputTokens,

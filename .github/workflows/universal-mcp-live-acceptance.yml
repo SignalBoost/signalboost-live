@@ -42,6 +42,9 @@ jobs:
       SUPABASE_MCP_PROJECT_REF: qpblefwtnbivuusxmabv
       CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
       FIGMA_MCP_OAUTH_ACCESS_TOKEN: ${{ secrets.FIGMA_MCP_OAUTH_ACCESS_TOKEN }}
+      VERCEL_MCP_OAUTH_ACCESS_TOKEN: ${{ secrets.VERCEL_MCP_OAUTH_ACCESS_TOKEN }}
+      VERCEL_MCP_TEAM_SLUG: ${{ vars.VERCEL_MCP_TEAM_SLUG }}
+      VERCEL_MCP_PROJECT_SLUG: ${{ vars.VERCEL_MCP_PROJECT_SLUG }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,7 +60,7 @@ jobs:
             echo "::error::SUPABASE_ACCESS_TOKEN repository secret is required for real Supabase MCP acceptance."
             exit 1
           fi
-      - name: Run real GitHub Supabase Context7 and optional Figma MCP acceptance
+      - name: Run real GitHub Supabase Context7 and optional Figma Vercel MCP acceptance
         working-directory: saas
         run: npx tsx scripts/mcp-gateway/run-universal-mcp-acceptance.ts
       - name: Upload metadata-only MCP evidence

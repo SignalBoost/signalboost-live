@@ -144,3 +144,13 @@ test('terminal cleanup reconciles a live campaign whose runs are already complet
   assert.match(cleanup, /dispatchAuthorized: false/)
   assert.match(cleanup, /productionTrafficAuthorized: false/)
 })
+
+
+test('successful live-parent reconciliation is reported even when no terminal parent campaigns exist', () => {
+  const cleanup = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationTerminalCleanup.ts', import.meta.url), 'utf8')
+  assert.match(cleanup, /if \(!campaignIds\.length\) return Object\.freeze\(\{[\s\S]*skipped: reconciledCompletedCampaignIds\.length === 0/)
+  assert.match(cleanup, /reason: reconciledCompletedCampaignIds\.length === 0 \? 'no_terminal_campaign' : null/)
+  assert.match(cleanup, /reconciledCompletedCampaigns: reconciledCompletedCampaignIds\.length/)
+  assert.match(cleanup, /reconciledCompletedCampaignIds: Object\.freeze\(reconciledCompletedCampaignIds\)/)
+  assert.match(cleanup, /productionTrafficAuthorized: false/)
+})

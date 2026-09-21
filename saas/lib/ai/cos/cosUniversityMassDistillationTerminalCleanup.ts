@@ -132,11 +132,21 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
   const failedCampaignIds = campaignIds.filter(id => campaignStatusById.get(id) === 'failed')
   if (!campaignIds.length) return Object.freeze({
     ok: true as const,
-    skipped: true as const,
-    reason: 'no_terminal_campaign',
-    campaignsInspected: 0,
+    skipped: reconciledCompletedCampaignIds.length === 0,
+    reason: reconciledCompletedCampaignIds.length === 0 ? 'no_terminal_campaign' : null,
+    campaignsInspected: liveCampaignIds.length,
     terminalizedRuns: 0,
     runs: [] as unknown[],
+    quarantinedBatches: 0,
+    batchQuarantines: Object.freeze([] as unknown[]),
+    completedCampaigns: 0,
+    completedCampaignIds: Object.freeze([] as string[]),
+    reconciledCompletedCampaigns: reconciledCompletedCampaignIds.length,
+    reconciledCompletedCampaignIds: Object.freeze(reconciledCompletedCampaignIds),
+    retryAuthorized: false,
+    dispatchAuthorized: false,
+    productionTrafficAuthorized: false,
+    authorityExpanded: false,
   })
 
   const pending = await db.from('cos_university_mass_distillation_batch_runs')

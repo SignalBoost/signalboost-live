@@ -1,0 +1,206 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import type { PortableConnectorAuditEvent } from '../provider-hub-core/connector-runtime.ts'
+import { createUniversalMcpGateway } from '../provider-hub-host/universal-mcp-gateway.ts'
+import {
+  CONTEXT7_MCP_PROFILE,
+  GITHUB_MCP_PROFILE,
+  SUPABASE_MCP_PROFILE,
+} from '../provider-hub-host/universal-mcp-profiles.ts'
+
+function rpc(id: unknown, result: unknown) {
+  return { jsonrpc: '2.0', id, result }
+}
+
+function fakeMcpFetch(toolCalls: string[]): typeof fetch {
+  return async (input, init = {}) => {
+    const body = JSON.parse(String(init.body || '{}'))
+    if (body.method === 'notifications/initialized') return new Response('', { status: 202 })
+    if (body.method === 'initialize') {
+      return Response.json(rpc(body.id, {
+        protocolVersion: '2025-11-25',
+        serverInfo: { name: new URL(String(input)).hostname, version: 'test' },
+        capabilities: { tools: {} },
+      }))
+    }
+    if (body.method === 'tools/list') {
+      const host = new URL(String(input)).hostname
+      const names = host === 'api.githubcopilot.com'
+        ? GITHUB_MCP_PROFILE.tools.map(item => item.remoteToolName)
+        : host === 'mcp.supabase.com'
+          ? SUPABASE_MCP_PROFILE.tools.map(item => item.remoteToolName)
+          : CONTEXT7_MCP_PROFILE.tools.map(item => item.remoteToolName)
+      return Response.json(rpc(body.id, {
+        tools: names.map(name => ({ name, description: name, inputSchema: { type: 'object' } })),
+      }))
+    }
+    if (body.method === 'tools/call') {
+      toolCalls.push(body.params.name)
+      return Response.json(rpc(body.id, {
+        content: [{ type: 'text', text: 'ok' }],
+        isError: false,
+      }))
+    }
+    throw new Error(`unexpected MCP method: ${body.method}`)
+  }
+}
+
+test('gateway readiness is honest: Context7 works anonymously while credentialed providers fail closed', () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {},
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  assert.deepEqual(
+    gateway.readiness.map(item => [item.providerId, item.configured, item.reason]),
+    [
+      ['github-mcp', false, 'missing_credential'],
+      ['supabase-mcp', false, 'missing_credential'],
+      ['context7-mcp', true, 'ready'],
+    ],
+  )
+})
+
+test('profiles classify mutations and consequential operations without trusting remote descriptions', () => {
+  assert.equal(GITHUB_MCP_PROFILE.tools.find(item => item.remoteToolName === 'get_file_contents')?.risk, 'read')
+  assert.equal(GITHUB_MCP_PROFILE.tools.find(item => item.remoteToolName === 'issue_write')?.requiresApproval, true)
+  assert.equal(GITHUB_MCP_PROFILE.tools.find(item => item.remoteToolName === 'merge_pull_request')?.risk, 'consequential')
+  assert.equal(SUPABASE_MCP_PROFILE.tools.find(item => item.remoteToolName === 'execute_sql')?.risk, 'consequential')
+  assert.equal(SUPABASE_MCP_PROFILE.tools.find(item => item.remoteToolName === 'apply_migration')?.requiresApproval, true)
+  assert.equal(CONTEXT7_MCP_PROFILE.tools.every(item => item.risk === 'read' && !item.requiresApproval), true)
+})
+
+test('Context7 live shape is projected to exactly the two governed documentation capabilities', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {},
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const visible = await gateway.discover('context7-mcp')
+  assert.deepEqual(
+    visible.map(item => item.capabilityId).sort(),
+    ['mcp.context7-mcp.docs.query', 'mcp.context7-mcp.library.resolve'],
+  )
+})
+
+test('GitHub writes require approval and repository scope is host-enforced', async () => {
+  const calls: string[] = []
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: { GITHUB_MCP_TOKEN: 'token' },
+    allowedGitHubRepos: ['SignalBoost/signalboost-live'],
+    fetcher: fakeMcpFetch(calls),
+    audit: { async append() {} },
+  })
+
+  const blocked = await gateway.invoke({
+    serverId: 'github-mcp',
+    capabilityId: 'mcp.github-mcp.issue.write',
+    args: { owner: 'SignalBoost', repo: 'signalboost-live', method: 'create', title: 'x' },
+  })
+  assert.equal(blocked.mode, 'approval_required')
+  assert.equal(calls.length, 0)
+
+  const offRepo = await gateway.invoke({
+    serverId: 'github-mcp',
+    capabilityId: 'mcp.github-mcp.contents.read',
+    args: { owner: 'other', repo: 'repo', path: 'README.md' },
+  })
+  assert.equal(offRepo.ok, false)
+  assert.match(offRepo.error || '', /universal_mcp_github_repository_rejected/)
+
+  const approved = await gateway.invoke({
+    serverId: 'github-mcp',
+    capabilityId: 'mcp.github-mcp.issue.write',
+    args: { owner: 'SignalBoost', repo: 'signalboost-live', method: 'create', title: 'x' },
+    approval: { approvalId: 'owner-1', approvedBy: 'owner', approvedAt: '2026-09-21T18:00:00.000Z' },
+  })
+  assert.equal(approved.ok, true)
+  assert.deepEqual(calls, ['issue_write'])
+})
+
+test('GitHub code search is forcibly repository-bounded and rejects cross-repo qualifiers', async () => {
+  const calls: string[] = []
+  const seenBodies: any[] = []
+  const base = fakeMcpFetch(calls)
+  const fetcher: typeof fetch = async (input, init = {}) => {
+    const body = JSON.parse(String(init.body || '{}'))
+    if (body.method === 'tools/call') seenBodies.push(body)
+    return base(input, init)
+  }
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: { GITHUB_MCP_TOKEN: 'token' },
+    allowedGitHubRepos: ['SignalBoost/signalboost-live'],
+    fetcher,
+    audit: { async append() {} },
+  })
+
+  const allowed = await gateway.invoke({
+    serverId: 'github-mcp',
+    capabilityId: 'mcp.github-mcp.code.search',
+    args: { query: 'createUniversalMcpGateway' },
+  })
+  assert.equal(allowed.ok, true)
+  assert.match(seenBodies[0]?.params?.arguments?.query || '', /repo:SignalBoost\/signalboost-live/)
+
+  const rejected = await gateway.invoke({
+    serverId: 'github-mcp',
+    capabilityId: 'mcp.github-mcp.code.search',
+    args: { query: 'password repo:other/repo' },
+  })
+  assert.equal(rejected.ok, false)
+  assert.match(rejected.error || '', /universal_mcp_github_repository_rejected/)
+})
+
+test('consequential GitHub execution is approved and produces durable-audit-shaped evidence', async () => {
+  const calls: string[] = []
+  const events: PortableConnectorAuditEvent[] = []
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: { GITHUB_MCP_TOKEN: 'token' },
+    allowedGitHubRepos: ['SignalBoost/signalboost-live'],
+    fetcher: fakeMcpFetch(calls),
+    audit: { async append(event) { events.push(event) } },
+  })
+  const result = await gateway.invoke({
+    serverId: 'github-mcp',
+    capabilityId: 'mcp.github-mcp.pull_request.merge',
+    args: { owner: 'SignalBoost', repo: 'signalboost-live', pullNumber: 42 },
+    approval: { approvalId: 'owner-merge', approvedBy: 'owner', approvedAt: '2026-09-21T18:00:00.000Z' },
+  })
+  assert.equal(result.ok, true)
+  assert.deepEqual(calls, ['merge_pull_request'])
+  assert.equal(events.at(-1)?.risk, 'consequential')
+  assert.equal(events.at(-1)?.approvalId, 'owner-merge')
+})
+
+test('Supabase is project-scoped and unavailable without management access token', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: { NEXT_PUBLIC_SUPABASE_URL: 'https://qpblefwtnbivuusxmabv.supabase.co' },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const result = await gateway.invoke({
+    serverId: 'supabase-mcp',
+    capabilityId: 'mcp.supabase-mcp.tables.list',
+    args: {},
+  })
+  assert.equal(result.mode, 'mcp_provider_not_configured')
+})

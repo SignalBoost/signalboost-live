@@ -26,3 +26,21 @@ Playwright MCP and Chrome DevTools MCP are now first-class governed browser-tool
 - Arbitrary Playwright code execution, file upload, Chrome extension/PWA mutation, third-party developer-tool execution and nested WebMCP execution are absent from the default allowlist.
 - Exact approved-origin enforcement remains a host/browser security boundary. An upstream server's own allow-origin setting is defense in depth, not authorization.
 - These profiles do not install npm packages, launch Chrome, store credentials, or make Production enablement claims. The host transport/process lifecycle and Production acceptance remain separate evidence-gated work.
+
+
+## Browser MCP live host — 2026-09-21
+
+The browser MCP workstream now includes a concrete **host-owned stdio transport** and a GitHub Actions reference host for live acceptance. Vercel remains intentionally unsuitable for the long-lived Chrome/stdin process; the existing GitHub Actions browser host is the reference execution environment.
+
+Current contracts:
+
+- `saas/provider-hub-host/mcp-stdio-transport.ts` owns one bounded child process per resolved MCP transport, sends `notifications/initialized`, correlates JSON-RPC responses, bounds stdout, drains untrusted stderr, and terminates the child on close.
+- `saas/provider-hub-host/browser-mcp-stdio-host.ts` is the browser security boundary. Registry metadata cannot choose arbitrary commands. Remote tool self-description is filtered again at runtime.
+- Chrome DevTools MCP is pinned to `chrome-devtools-mcp@1.9.0`; Playwright MCP is pinned to `@playwright/mcp@0.0.82`.
+- The live Chrome reference profile disables JavaScript evaluation, CrUX lookup, usage statistics and network-header disclosure; browser state is isolated per process.
+- The live reference allowlist exposes diagnostics plus bounded page creation/navigation only. Click/type/fill/upload/arbitrary evaluation and filesystem-writing arguments are not live-enabled.
+- Every explicit navigation URL is checked against the host's exact approved-origin set **before** the MCP request reaches Chrome. Playwright's upstream allowed-origin option remains defense in depth only.
+- Write-shaped navigation still requires Portable Connector Runtime approval evidence. Read-only diagnostic calls do not gain mutation authority.
+- `.github/workflows/chrome-devtools-mcp-live-acceptance.yml` launches the real pinned MCP package and Chromium on GitHub Actions, routes through Provider Hub/Portable Connector Runtime, and probes only approved iTMounts origins.
+- Retained acceptance evidence is metadata-only: no page body, console body, network headers, screenshots, prompts or credentials are stored.
+- A green implementation/Preview does not itself establish live acceptance. Claim live Chrome DevTools MCP acceptance only after the workflow has run successfully against the exact merged/reviewed revision.

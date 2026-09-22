@@ -22,7 +22,7 @@ test('Builder continuation auth still precedes all queue reads and execution', (
   const authIndex = route.indexOf("status: 401")
   const continuationIndex = route.indexOf('await listBuilderContinuations')
   const ownedIndex = route.indexOf('await queuedOwnedSelfHealingRepairs')
-  const runIndex = route.indexOf('await Promise.all(jobs.map(job => runBuilderJob')
+  const runIndex = route.indexOf('if (selected) await runBuilderJob')
   assert.ok(authIndex >= 0)
   assert.ok(authIndex < continuationIndex)
   assert.ok(continuationIndex < ownedIndex)
@@ -33,6 +33,15 @@ test('Builder continuation cron exposes a distinct owner Playwright CLI canary l
   assert.match(route, /builderPlaywrightCliCanary/)
   assert.match(route, /queuedOwnedRepair\('builderPlaywrightCliCanary', 'playwright-cli-canary'\)/)
   assert.match(route, /playwrightCliCanaryQueued:/)
+})
+
+test('explicit Playwright CLI production canary is not starved by Self-Healing backlog', () => {
+  const continuationIndex = route.indexOf('...continuations')
+  const canaryIndex = route.indexOf('...(playwrightCliCanary ? [playwrightCliCanary] : [])')
+  const repairsIndex = route.indexOf('...ownedRepairs', canaryIndex)
+  assert.ok(continuationIndex >= 0)
+  assert.ok(canaryIndex > continuationIndex)
+  assert.ok(repairsIndex > canaryIndex)
 })
 
 test('Builder continuation response exposes site and Audit pickup independently', () => {

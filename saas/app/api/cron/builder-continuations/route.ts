@@ -64,7 +64,10 @@ export async function GET(request: Request) {
     queuedOwnedRepair('builderPlaywrightCliCanary', 'playwright-cli-canary'),
   ])
   const unique = new Map<string, { id: string; userId: string }>()
-  for (const job of [...continuations, ...ownedRepairs, ...(playwrightCliCanary ? [playwrightCliCanary] : [])]) {
+  // Preserve paused Builder continuations first. A deliberately queued owner acceptance canary is
+  // next so a large Self-Healing backlog cannot starve explicit production proof indefinitely.
+  // The canary consumes at most one scheduler tick; no repair job is removed or reclassified.
+  for (const job of [...continuations, ...(playwrightCliCanary ? [playwrightCliCanary] : []), ...ownedRepairs]) {
     unique.set(job.id, { id: job.id, userId: job.userId })
   }
   const jobs = [...unique.values()]

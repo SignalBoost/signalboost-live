@@ -19,6 +19,9 @@ export const MASS_DISTILLATION_MAX_BATCH = 128
 export const MASS_DISTILLATION_MAX_BATCHES_PER_RUN = 20
 export const MASS_DISTILLATION_CORPUS_PAGE_SIZE = 1000
 export const MASS_DISTILLATION_CORPUS_MAX_ROWS = 5000
+// Failure-derived curriculum must remain visible even after fresher general learning pushes it outside
+// the normal bounded corpus window. This is an additive read-only rescue window, never extra dispatch authority.
+export const MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS = 1000
 const MASS_DISTILLATION_BATCH_WRITE_CHUNK = 100
 const MASS_DISTILLATION_EXISTING_BATCH_PAGE_SIZE = 1000
 
@@ -423,9 +426,21 @@ function stringArray(value: unknown): string[] {
 async function readMassDistillationCorpus(
   db: NonNullable<ReturnType<typeof CosServiceDbFactory>>,
   maxRows = MASS_DISTILLATION_CORPUS_MAX_ROWS,
+  assignedHashes: ReadonlySet<string> = new Set(),
 ) {
   const requestedRows = positiveSafeInteger(maxRows, MASS_DISTILLATION_CORPUS_MAX_ROWS)
   const rows: any[] = []
+  const seenHashes = new Set<string>()
+
+  const retain = (pageRows: readonly any[]) => {
+    for (const row of pageRows) {
+      const contentHash = clean(row?.content_hash, 64).toLowerCase()
+      if (!HEX64.test(contentHash) || seenHashes.has(contentHash)) continue
+      seenHashes.add(contentHash)
+      rows.push(row)
+    }
+  }
+
   for (let offset = 0; offset < requestedRows; offset += MASS_DISTILLATION_CORPUS_PAGE_SIZE) {
     const end = Math.min(offset + MASS_DISTILLATION_CORPUS_PAGE_SIZE, requestedRows) - 1
     const expectedPageSize = end - offset + 1
@@ -440,7 +455,28 @@ async function readMassDistillationCorpus(
       .range(offset, end)
     if (page.error) throw page.error
     const pageRows = page.data ?? []
-    rows.push(...pageRows)
+    retain(pageRows)
+    if (pageRows.length < expectedPageSize) break
+  }
+
+  // The newest-first window above can legitimately advance past corrective curriculum before enough
+  // same-subject material is available to package it. Read a second, tightly bounded remediation-only
+  // window so independently verified failures cannot be forgotten merely because general learning is busy.
+  // Assigned rows are skipped here because they already have a durable batch identity.
+  for (let offset = 0; offset < MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS; offset += MASS_DISTILLATION_CORPUS_PAGE_SIZE) {
+    const end = Math.min(offset + MASS_DISTILLATION_CORPUS_PAGE_SIZE, MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS) - 1
+    const expectedPageSize = end - offset + 1
+    const page = await db.from('cos_continuous_learning')
+      .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
+      .eq('source_kind', 'failure_derived_curriculum')
+      .gte('confidence', MASS_DISTILLATION_MIN_CONFIDENCE)
+      .or(EFFECTIVE_CORPUS_FILTER)
+      .order('created_at', { ascending: false })
+      .order('content_hash', { ascending: true })
+      .range(offset, end)
+    if (page.error) throw page.error
+    const pageRows = page.data ?? []
+    retain(pageRows.filter((row: any) => !assignedHashes.has(clean(row?.content_hash, 64).toLowerCase())))
     if (pageRows.length < expectedPageSize) break
   }
   return rows
@@ -492,7 +528,7 @@ export async function prepareUniversityMassDistillationCurriculum(
 
   const corpusScanRows = positiveSafeInteger(throughput.corpusScanRows, MASS_DISTILLATION_CORPUS_MAX_ROWS)
   const maxBatchesPerSweep = positiveSafeInteger(throughput.maxBatchesPerSweep, MASS_DISTILLATION_MAX_BATCHES_PER_RUN)
-  const corpusRows = await readMassDistillationCorpus(db, corpusScanRows)
+  const corpusRows = await readMassDistillationCorpus(db, corpusScanRows, assigned)
   const identities: RetainedDistillationIdentity[] = corpusRows.map((row: any) => ({
     contentHash: clean(row.content_hash, 64),
     materialHash: retainedMaterialHash({ sourceTitle: row.source_title, summary: row.summary, facts: row.facts }) || '',

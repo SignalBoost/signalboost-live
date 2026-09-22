@@ -17,6 +17,7 @@ create table if not exists public.cos_university_residency_enrollments (
   standing text not null default 'resident'
     check (standing in ('resident','senior_resident','residency_complete','remediation_required')),
   admission_evidence_hash text not null check (admission_evidence_hash ~ '^[a-f0-9]{64}$'),
+  gate_enforced boolean not null default false,
   authority_expanded boolean not null default false check (authority_expanded is false),
   admitted_at timestamptz not null default now(),
   completed_at timestamptz,
@@ -64,5 +65,7 @@ grant select, insert, update, delete on table public.cos_university_residency_co
 
 comment on table public.cos_university_residency_enrollments is
   'Formal COS University practical residency for trained student artifacts before final independent evaluation and graduation. Residency standing never expands authority.';
+comment on column public.cos_university_residency_enrollments.gate_enforced is
+  'Shadow by default. Set true only after the practical Residency runner is operational; then final canary/evaluation require Residency completion.';
 comment on table public.cos_university_residency_competency_evidence is
   'Exact-artifact supervised-practice evidence from the Residency harness. Hidden final-exam material is prohibited from this ledger; duplicate case fingerprints cannot manufacture competence.';

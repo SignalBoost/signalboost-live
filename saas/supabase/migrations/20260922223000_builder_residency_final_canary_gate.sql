@@ -1,6 +1,7 @@
 -- Forward gate: Builder / Computer Science exact-artifact canary is a post-Residency final proof.
--- A trained Builder artifact cannot be claimed until its formal Residency is complete, the controlling
--- approval is newer than Residency completion, and any historical pre-Residency canary pass is ignored.
+-- Once a Residency enrollment is explicitly enforced, a trained Builder artifact cannot be claimed until
+-- formal Residency is complete, the controlling approval is newer than completion, and any historical
+-- pre-Residency canary pass is ignored. Shadow enrollments do not block the existing pipeline.
 -- All existing one-invocation, <=$0.20, preflight, identity and no-Production-traffic limits remain unchanged.
 create or replace function public.claim_next_mass_distilled_runtime_canary()
 returns table (
@@ -94,13 +95,19 @@ begin
     if not found then continue; end if;
 
     v_residency_completed_at := null;
-    if pg_catalog.regexp_replace(pg_catalog.lower(coalesce(v_artifact.subject_id,'')), '[^a-z0-9]+', '_', 'g')
-      in ('computer_science','computer_science_coding') then
+    if exists (
+      select 1 from public.cos_university_residency_enrollments r
+      where r.candidate_id=v_artifact.candidate_id
+        and r.trained_artifact_hash=v_artifact.trained_artifact_hash
+        and r.program_id='builder-computer-science-v1'
+        and r.gate_enforced=true
+    ) then
       select max(r.completed_at) into v_residency_completed_at
       from public.cos_university_residency_enrollments r
       where r.candidate_id=v_artifact.candidate_id
         and r.trained_artifact_hash=v_artifact.trained_artifact_hash
         and r.program_id='builder-computer-science-v1'
+        and r.gate_enforced=true
         and r.standing='residency_complete'
         and r.completed_at is not null;
       if v_residency_completed_at is null then continue; end if;
@@ -217,17 +224,13 @@ $$;
 revoke all on function public.claim_next_mass_distilled_runtime_canary()
   from public, anon, authenticated;
 grant execute on function public.claim_next_mass_distilled_runtime_canary() to service_role;
-      and (
-        pg_catalog.regexp_replace(pg_catalog.lower(coalesce(a.subject_id,'')), '[^a-z0-9]+', '_', 'g')
-          not in ('computer_science','computer_science_coding')
-        or exists (
-          select 1 from public.cos_university_residency_enrollments r
-          where r.candidate_id=a.candidate_id
-            and r.trained_artifact_hash=a.trained_artifact_hash
-            and r.program_id='builder-computer-science-v1'
-            and r.standing='residency_complete'
-            and r.completed_at is not null
-        )
+      and not exists (
+        select 1 from public.cos_university_residency_enrollments r
+        where r.candidate_id=a.candidate_id
+          and r.trained_artifact_hash=a.trained_artifact_hash
+          and r.program_id='builder-computer-science-v1'
+          and r.gate_enforced=true
+          and (r.standing<>'residency_complete' or r.completed_at is null)
       )
     order by a.created_at asc, a.candidate_id asc
   loop

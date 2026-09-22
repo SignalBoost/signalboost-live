@@ -39,6 +39,21 @@ Trajectory evidence contains observable actions, observations, tool outcomes, ve
 
 University Residency is the educational use of this shared platform world. Residency may feed sanitized competency evidence into University, but it does not own the harness. The `evaluation_runtime` profile supplies a controlled execution environment only; hidden exam material, evaluator logic, graduation decisions, and the teaching/remediation boundary remain independently owned.
 
+### Builder Residency live-runner invariant — 2026-09-22
+
+Builder Residency now has a durable practical runner. Enrollment accepts only trained Computer Science artifacts in `evaluation_pending` with a real immutable Hub artifact reference `hf://models/<repo>@<40-char commit>`. The 64-character University `revision_key` remains evidence identity and must never be substituted for the Hub commit revision.
+
+The first live teaching families are candidate-specific local JavaScript diagnosis/recovery fixtures. They are **teaching material, not hidden final exams**. The exact student artifact is served on a scale-to-zero RunPod Residency lease; the lease is explicitly `supervised_practical_residency_runtime_not_final_canary` and must never create final-canary, evaluation, graduation, or Production-activation evidence.
+
+Fresh fixture seeding is host-owned setup. Once the student begins, workspace reads/writes/edits and Vercel Sandbox commands are native Platform Harness capabilities and every one crosses the Agent Gateway Governed Socket. The initial runner has no repository merge, Production deploy, raw SQL, migration, external write, or Production database mutation authority.
+
+Case outcomes are independently verified from recorded tool behavior plus exact expected sandbox output. A verified student failure becomes University remediation evidence. Infrastructure failure routes to Self-Healing. Authority boundaries route to Referee/Guardian. Ambiguous Harness failures remain Harness assurance. Only accepted Residency evidence may update competency standing.
+
+The final Residency gate remains **shadow/off** until the live case program covers enough competencies and has Production evidence that residents can satisfy it. Residency completion still precedes exact-artifact final canary and independent final examinations.
+
+See `docs/PLATFORM-HARNESS.md` and `saas/platform-harness/`.
+
+
 See `docs/PLATFORM-HARNESS.md` and `saas/platform-harness/`.
 
 ## COS University Residency invariant — 2026-09-22

@@ -10,6 +10,8 @@ import {
   MASS_CANARY_ROLLING_WINDOW_HOURS,
   MASS_CANARY_COLD_START_FAILURE,
   MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS,
+  MASS_CANARY_COLD_START_RESUME_COOLDOWN_MS,
+  MASS_CANARY_MAX_COLD_START_RESUMES_PER_RUNTIME,
   MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
   MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
@@ -286,6 +288,41 @@ test('cold-start timeouts do not spend an artifact\'s three substantive attempts
   ]
   const decision = decideMassCanaryRollingApproval({ artifacts: [a], events, now, enabled: true })
   assert.ok('artifact' in decision, `expected a retry, got ${JSON.stringify(decision)}`)
+})
+
+test('one exact cold-start timeout may resume the same endpoint/runtime after the short continuation cooldown', () => {
+  assert.equal(MASS_CANARY_COLD_START_RESUME_COOLDOWN_MS, 60_000)
+  assert.equal(MASS_CANARY_MAX_COLD_START_RESUMES_PER_RUNTIME, 1)
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const failedAt = new Date(now.getTime() - 2 * 60_000).toISOString()
+  const cold = event(a, 'local_distilled_runtime_canary_failed', failedAt, {}, {
+    error: MASS_CANARY_COLD_START_FAILURE,
+    endpointId: 'oqoteq4035elnb',
+    runtimeKey: '40461bb31f',
+  })
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a], events:[cold], now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.evidence.coldStartResume, true)
+  assert.equal(decision.evidence.coldStartResumeEndpointId, 'oqoteq4035elnb')
+  assert.equal(decision.evidence.coldStartResumeRuntimeKey, '40461bb31f')
+})
+
+test('a second cold-start timeout on the same runtime falls back to the long fairness cooldown', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const first = event(a, 'local_distilled_runtime_canary_failed', new Date(now.getTime() - 8 * 60_000).toISOString(), {}, {
+    error: MASS_CANARY_COLD_START_FAILURE,
+    endpointId: 'oqoteq4035elnb',
+    runtimeKey: '40461bb31f',
+  })
+  const second = event(a, 'local_distilled_runtime_canary_failed', new Date(now.getTime() - 2 * 60_000).toISOString(), {}, {
+    error: MASS_CANARY_COLD_START_FAILURE,
+    endpointId: 'oqoteq4035elnb',
+    runtimeKey: '40461bb31f',
+  })
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a,b], events:[first,second], now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId, b.candidateId)
 })
 
 test('cold-start failures yield briefly, then remain retryable instead of becoming a permanent identical-error stop', () => {

@@ -246,6 +246,28 @@ function artifactFromClaim(claim:AtomicClaim):{artifact:MassDistilledRuntimeArti
   return {artifact:Object.freeze({candidateId,subjectId,artifactId,artifactRevision:revision,artifactHash}),revisionKey}
 }
 
+async function approvedColdStartResume(input:{candidateId:string;artifactHash:string;approvalAt:string}){
+  const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
+  const result=await db.from('cos_university_learning_assurance_events')
+    .select('observed_at,evidence')
+    .eq('event_type','fine_tune')
+    .eq('candidate_id',input.candidateId)
+    .eq('verifier','host_controller')
+    .contains('evidence',{profile:PROFILE,claim:'local_distilled_runtime_deploy_approved',artifactHash:input.artifactHash})
+    .lte('observed_at',input.approvalAt)
+    .order('observed_at',{ascending:false})
+    .limit(1)
+  if(result.error) throw result.error
+  const evidence=(result.data?.[0] as any)?.evidence
+  if(!evidence||evidence.coldStartResume!==true) return null
+  const endpointId=clean(evidence.coldStartResumeEndpointId,120)
+  const runtimeKey=clean(evidence.coldStartResumeRuntimeKey,32).toLowerCase()
+  if(!/^[a-z0-9_-]{3,120}$/i.test(endpointId)||!/^[a-z0-9]{10}$/.test(runtimeKey)) {
+    throw new Error('mass_distilled_cold_start_resume_identity_invalid')
+  }
+  return Object.freeze({endpointId,runtimeKey})
+}
+
 export async function GET(req:NextRequest){
   const secret=process.env.CRON_SECRET
   if(!secret||req.headers.get('authorization')!==`Bearer ${secret}`) return NextResponse.json({ok:false,error:'Unauthorized'},{status:401})
@@ -265,17 +287,21 @@ export async function GET(req:NextRequest){
     const approvedCost=Number(claim.max_estimated_canary_cost_usd)
     const approvalAt=String(claim.approval_observed_at||'')
     const reservationEventKey=clean(claim.reservation_event_key,64)
-    const runtimeKey=hash(['mass-canary-runtime-v3',artifact.artifactHash,approvalAt]).slice(0,10)
+    const coldStartResume=await approvedColdStartResume({candidateId:artifact.candidateId,artifactHash:artifact.artifactHash,approvalAt})
+    const runtimeKey=coldStartResume?.runtimeKey || hash(['mass-canary-runtime-v3',artifact.artifactHash,approvalAt]).slice(0,10)
     const runtimeArtifact=Object.freeze({...artifact,runtimeKey})
     active=Object.freeze({artifact:runtimeArtifact,revisionKey,approvedCost,approvalAt,reservationEventKey,runtimeKey})
 
     // Provisioning is preflight. Provider/API/template drift here may be repaired and retried within
     // the same unexpired approval because no model request or paid endpoint wake has happened yet.
     const provisioned=await provisionMassDistilledRuntime(runtimeArtifact)
+    if(coldStartResume && provisioned.endpointId!==coldStartResume.endpointId) {
+      throw new Error('mass_distilled_cold_start_resume_endpoint_mismatch')
+    }
 
     // This durable marker is the exact boundary where the single canary invocation becomes consumed.
     // It is written before /ready, because the first endpoint request can wake paid compute.
-    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:INVOCATION_STARTED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:INVOCATION_STARTED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...(coldStartResume?{coldStartResume:true}:{}),providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
     providerInvocationStarted=true
 
     const canary=await canaryMassDistilledRuntime({endpointId:provisioned.endpointId,modelName:provisioned.modelName})

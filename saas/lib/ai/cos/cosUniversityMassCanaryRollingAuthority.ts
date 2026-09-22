@@ -21,6 +21,12 @@ export const MASS_CANARY_COLD_START_FAILURE = 'the operation was aborted due to 
 // Provider cold starts are infrastructure, not artifact quality. Yield a recently cold-start-failed
 // artifact briefly so another eligible artifact can use the single canary lane; then allow retry.
 export const MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS = 10 * 60_000
+// When a timed-out canary still has an exact provider endpoint, one short continuation may reuse that same
+// endpoint/runtime identity. This catches a worker that was still booting at the readiness deadline instead of
+// discarding warm progress and creating a fresh cold endpoint. A second timeout on the same runtime falls back
+// to the normal ten-minute fairness cooldown. Invocation and $0.20 ceilings remain unchanged per approval.
+export const MASS_CANARY_COLD_START_RESUME_COOLDOWN_MS = 60_000
+export const MASS_CANARY_MAX_COLD_START_RESUMES_PER_RUNTIME = 1
 export const MASS_CANARY_MAX_IDENTICAL_FAILURES = 4
 // A passed canary is not permanent proof that its exact endpoint still exists or can wake. One lifecycle failure can
 // be a normal cold start, but two consecutive lifecycle failures after the latest useful evaluation evidence mean the
@@ -295,13 +301,27 @@ export function decideMassCanaryRollingApproval(input: {
     const newestFailure = failureEvents[0]
     const newestFailureError = String(newestFailure?.evidence?.error || '').trim().toLowerCase()
 
-    // A cold-start timeout means RunPod never supplied a worker; the artifact was never exercised.
-    // Give another artifact a fairness window, then retry this one. Never turn repeated transient
-    // capacity misses into a permanent artifact stop.
+    // A cold-start timeout is infrastructure, not artifact quality. If the provider did create an exact
+    // endpoint/runtime, allow one short continuation on that SAME runtime so a still-booting worker is not
+    // thrown away. After one timeout on that runtime, return to the longer fairness cooldown.
+    const newestFailureEndpointId = String(newestFailure?.evidence?.endpointId || '').trim()
+    const newestFailureRuntimeKey = String(newestFailure?.evidence?.runtimeKey || '').trim().toLowerCase()
+    const resumableColdStart = newestFailureError === MASS_CANARY_COLD_START_FAILURE
+      && /^[a-z0-9_-]{3,120}$/i.test(newestFailureEndpointId)
+      && /^[a-z0-9]{10}$/.test(newestFailureRuntimeKey)
+    const coldStartResumeCount = resumableColdStart
+      ? failureEvents.filter(event =>
+          String(event.evidence?.error || '').trim().toLowerCase() === MASS_CANARY_COLD_START_FAILURE
+          && String(event.evidence?.runtimeKey || '').trim().toLowerCase() === newestFailureRuntimeKey).length
+      : 0
+    const coldStartResumeAllowed = resumableColdStart
+      && coldStartResumeCount <= MASS_CANARY_MAX_COLD_START_RESUMES_PER_RUNTIME
     if (newestFailureError === MASS_CANARY_COLD_START_FAILURE) {
       const newestFailureAt = at(newestFailure?.observedAt)
-      if (!Number.isFinite(newestFailureAt)
-        || nowMs - newestFailureAt < MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS) continue
+      const cooldown = coldStartResumeAllowed
+        ? MASS_CANARY_COLD_START_RESUME_COOLDOWN_MS
+        : MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS
+      if (!Number.isFinite(newestFailureAt) || nowMs - newestFailureAt < cooldown) continue
     }
 
     // Consecutive identical NON-cold-start failures are a stuck artifact, not a repairable retry.
@@ -331,6 +351,11 @@ export function decideMassCanaryRollingApproval(input: {
         automaticPromotionAuthorized: false,
         authorityExpanded: false,
         authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF,
+        ...(coldStartResumeAllowed ? {
+          coldStartResume: true,
+          coldStartResumeEndpointId: newestFailureEndpointId,
+          coldStartResumeRuntimeKey: newestFailureRuntimeKey,
+        } : {}),
         ...(replayProofNeeded && replayProofArtifact(artifact) ? { remediationReplayProofPriority: true } : {}),
         ...(refreshEndpoint ? { endpointRefresh: true, endpointRefreshReason: 'repeated_evaluation_endpoint_lifecycle_failure' } : {}),
       },

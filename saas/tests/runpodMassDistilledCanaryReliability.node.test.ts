@@ -7,7 +7,7 @@ const compatibility = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledPro
 const route = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260915233000_mass_distilled_canary_preflight_reliability.sql', import.meta.url), 'utf8')
 
-test('every approved canary receives an approval-scoped provider runtime identity', () => {
+test('normal approved canaries receive approval-scoped provider runtime identities', () => {
   assert.match(provision, /runtimeKey\?: string/)
   assert.match(provision, /itmounts-mass-distilled-\$\{suffix\}-\$\{runtimeKey\}-v3/)
   assert.match(compatibility, /itmounts-mass-distilled-\$\{suffix\}-\$\{runtimeKey\}-v3/)
@@ -58,4 +58,16 @@ test('compatibility layer can recover both legacy template and endpoint identity
   assert.match(compatibility, /mass_distilled_runtime_endpoint_template_rebind_failed/)
   assert.match(compatibility, /assertEndpointSafetyPolicy\(endpoint\)/)
   assert.match(compatibility, /materializedEndpointMatches/)
+})
+
+test('cold-start continuation reuses only the explicitly approved exact runtime identity', () => {
+  assert.match(route, /approvedColdStartResume/)
+  assert.match(route, /coldStartResume===true/)
+  assert.match(route, /coldStartResumeEndpointId/)
+  assert.match(route, /coldStartResumeRuntimeKey/)
+  assert.match(route, /coldStartResume\?\.runtimeKey \|\| hash\(\['mass-canary-runtime-v3'/)
+  assert.match(route, /provisioned\.endpointId!==coldStartResume\.endpointId/)
+  assert.match(route, /mass_distilled_cold_start_resume_endpoint_mismatch/)
+  assert.match(route, /maxCanaryInvocations:1/)
+  assert.match(route, /maxEstimatedCanaryCostUsd:approvedCost/)
 })

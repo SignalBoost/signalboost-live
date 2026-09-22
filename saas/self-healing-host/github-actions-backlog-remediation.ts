@@ -11,7 +11,11 @@ type WorkflowRun = {
   name?: string
   head_branch?: string | null
   head_sha?: string | null
+  status?: string | null
+  conclusion?: string | null
   created_at?: string | null
+  updated_at?: string | null
+  pull_requests?: unknown[]
 }
 
 type Pull = {
@@ -25,6 +29,7 @@ export type GitHubActionsBacklogRemediationResult = {
   scanned: number
   eligible: number
   cancelled: number
+  purged: number
   preserved: number
   raced: number
   errors: number
@@ -137,6 +142,7 @@ export async function runGitHubActionsBacklogRemediation(input: {
     scanned: 0,
     eligible: 0,
     cancelled: 0,
+    purged: 0,
     preserved: 0,
     raced: 0,
     errors: 0,
@@ -185,7 +191,7 @@ export async function runGitHubActionsBacklogRemediation(input: {
     return tip
   }
 
-  const candidates: Array<{ id: number; reason: string }> = []
+  const candidates: Array<{ id: number; reason: string; run: WorkflowRun }> = []
   let preserved = 0
 
   for (const run of runs as WorkflowRun[]) {
@@ -203,28 +209,28 @@ export async function runGitHubActionsBacklogRemediation(input: {
       continue
     }
     if (branch === 'main') {
-      candidates.push({ id, reason: 'stale_main_revision' })
+      candidates.push({ id, reason: 'stale_main_revision', run })
       continue
     }
 
     const openTip = openPrTips.get(branch)
     if (openTip) {
       if (openTip === sha) preserved += 1
-      else candidates.push({ id, reason: 'superseded_open_pr_revision' })
+      else candidates.push({ id, reason: 'superseded_open_pr_revision', run })
       continue
     }
 
     const tip = await getTip(branch)
     if (!tip) {
-      candidates.push({ id, reason: 'deleted_branch' })
+      candidates.push({ id, reason: 'deleted_branch', run })
       continue
     }
     if (tip !== sha) {
-      candidates.push({ id, reason: 'superseded_branch_revision' })
+      candidates.push({ id, reason: 'superseded_branch_revision', run })
       continue
     }
     if (isEphemeral(branch)) {
-      candidates.push({ id, reason: 'closed_or_unsubmitted_ephemeral_branch' })
+      candidates.push({ id, reason: 'closed_or_unsubmitted_ephemeral_branch', run })
       continue
     }
     preserved += 1
@@ -232,8 +238,22 @@ export async function runGitHubActionsBacklogRemediation(input: {
 
   const selected = candidates.slice(0, maxCancels)
   let cancelled = 0
+  let purged = 0
   let raced = 0
   let errors = 0
+
+  const ghostQueuedRun = (run: WorkflowRun): boolean => {
+    const created = createdAtMs(run)
+    const updated = Date.parse(String(run.updated_at || ''))
+    return String(run.status || '') === 'queued'
+      && run.conclusion == null
+      && Array.isArray(run.pull_requests)
+      && run.pull_requests.length === 0
+      && created > 0
+      && Number.isFinite(updated)
+      && nowMs - created >= 24 * 60 * 60_000
+      && Math.abs(updated - created) <= 60_000
+  }
 
   for (let offset = 0; offset < selected.length; offset += 8) {
     const batch = selected.slice(offset, offset + 8)
@@ -247,13 +267,30 @@ export async function runGitHubActionsBacklogRemediation(input: {
           await githubApi(token, `/repos/${repository}/actions/runs/${item.id}/force-cancel`, { method: 'POST' }, fetcher)
           return 'cancelled' as const
         } catch (forceError) {
-          if ((forceError as any)?.status === 409) return 'raced' as const
-          return 'error' as const
+          if ((forceError as any)?.status !== 409) return 'error' as const
+          if (!ghostQueuedRun(item.run)) return 'raced' as const
+          try {
+            const jobs = await githubApi(
+              token,
+              `/repos/${repository}/actions/runs/${item.id}/jobs?per_page=1`,
+              { method: 'GET' },
+              fetcher,
+            )
+            const totalJobs = Number(jobs?.total_count)
+            const listedJobs = Array.isArray(jobs?.jobs) ? jobs.jobs.length : -1
+            if (totalJobs !== 0 || listedJobs !== 0) return 'raced' as const
+            await githubApi(token, `/repos/${repository}/actions/runs/${item.id}`, { method: 'DELETE' }, fetcher)
+            return 'purged' as const
+          } catch (purgeError) {
+            if ((purgeError as any)?.status === 409) return 'raced' as const
+            return 'error' as const
+          }
         }
       }
     }))
     for (const result of results) {
       if (result === 'cancelled') cancelled += 1
+      else if (result === 'purged') purged += 1
       else if (result === 'raced') raced += 1
       else errors += 1
     }
@@ -265,6 +302,7 @@ export async function runGitHubActionsBacklogRemediation(input: {
     eligible: candidates.length,
     attempted: selected.length,
     cancelled,
+    purged,
     preserved,
     raced,
     errors,
@@ -277,6 +315,7 @@ export async function runGitHubActionsBacklogRemediation(input: {
     scanned: runs.length,
     eligible: candidates.length,
     cancelled,
+    purged,
     preserved,
     raced,
     errors,

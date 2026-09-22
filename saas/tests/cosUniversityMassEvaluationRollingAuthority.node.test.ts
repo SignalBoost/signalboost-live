@@ -32,8 +32,8 @@ test('rolling throughput ceiling matches the owner-approved backlog-drain budget
 })
 
 
-test('provider worker quota bounds evaluator admission at three active leases', () => {
-  assert.equal(MASS_EVALUATION_MAX_IN_FLIGHT, 3)
+test('provider worker quota reserves one worker of canary headroom by capping evaluator admission at two active leases', () => {
+  assert.equal(MASS_EVALUATION_MAX_IN_FLIGHT, 2)
   const full = decideRollingMassEvaluationApproval({
     enabled: true,
     artifacts: [artifactA],

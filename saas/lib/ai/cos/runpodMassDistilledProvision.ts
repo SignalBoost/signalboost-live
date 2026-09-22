@@ -187,6 +187,15 @@ function runpodWorkerQuotaError(error:unknown){
     .toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
 }
 
+function configuredServerlessWorkerQuota(){
+  const value=Number(process.env.RUNPOD_SERVERLESS_WORKER_QUOTA||'10')
+  return Number.isFinite(value)&&value>=1?Math.floor(value):10
+}
+
+function reservedServerlessWorkerSlots(endpoints:Endpoint[]){
+  return endpoints.reduce((total,endpoint)=>total+Math.max(0,Math.floor(Number(endpoint.workers?.max??0))),0)
+}
+
 async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEndpointName:string){
   const protectedEndpointIds=await protectedRunpodEndpointIds()
   const retired=endpoints.filter(endpoint=>endpoint.name.startsWith('itmounts-mass-distilled-')
@@ -223,16 +232,19 @@ async function createMassEndpointViaGraphQl(input:{name:string;templateId:string
     flashBootType:'FLASHBOOT',
   }})
   const created=data.saveEndpoint
-  const id=clean(created?.id,120)
-  if(!created||!id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
-  if(created.type!=='LB') throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
-  if(clean(created.templateId,200)!==input.templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
+  let observedId=clean(created?.id,120)
+  if(created?.type&&created.type!=='LB') throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
+  if(created?.templateId&&clean(created.templateId,200)!==input.templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
   for(let attempt=0;attempt<5;attempt+=1){
     const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
-    const endpoint=(listed.endpoints||[]).find(item=>clean(item.id,120)===id||clean(item.name,240)===input.name)
+    const endpoint=(listed.endpoints||[]).find(item=>(observedId&&clean(item.id,120)===observedId)||clean(item.name,240)===input.name)
     if(endpoint?.id) return endpoint
+    const official=await requestV1<RestEndpointIdentity[]>('/endpoints')
+    const identity=official.find(item=>clean(item.name,240)===input.name&&clean(item.id,120))
+    if(identity?.id) observedId=clean(identity.id,120)
     if(attempt<4) await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)))
   }
+  if(!observedId) throw new Error('mass_distilled_runtime_endpoint_id_missing')
   throw new Error('mass_distilled_runtime_endpoint_policy_unavailable')
 }
 
@@ -284,13 +296,23 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
     for(let attempt=0;attempt<4&&!endpoint;attempt+=1){
       const current=attempt===0?listed:await requestV2<{endpoints?:Endpoint[]}>('/serverless')
       await releaseRetiredMassEndpointCapacity(current.endpoints||[],ids.endpointName)
+      const refreshed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
+      endpoint=(refreshed.endpoints||[]).find(item=>item.name===ids.endpointName)
+      if(endpoint) break
+      const reserved=reservedServerlessWorkerSlots(refreshed.endpoints||[])
+      const quota=configuredServerlessWorkerQuota()
+      if(reserved>=quota){
+        quotaError=new Error(`mass_distilled_runtime_worker_quota_full:${reserved}/${quota}`)
+        if(attempt<3) await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)))
+        continue
+      }
       if(attempt>0) await new Promise(resolve=>setTimeout(resolve,1000*attempt))
       try{
         endpoint=await createMassEndpointViaGraphQl({name:ids.endpointName,templateId:template.id,pools})
         createdEndpoint=true
       }catch(error){
         if(!runpodWorkerQuotaError(error)) throw error
-        quotaError=error
+        quotaError=new Error('mass_distilled_runtime_worker_quota_full')
       }
     }
     if(!endpoint&&quotaError) throw quotaError

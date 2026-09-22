@@ -71,3 +71,21 @@ test('cold-start continuation reuses only the explicitly approved exact runtime 
   assert.match(route, /maxCanaryInvocations:1/)
   assert.match(route, /maxEstimatedCanaryCostUsd:approvedCost/)
 })
+
+
+test('RunPod load-balancer health stays initializing until internal vLLM is truly ready', () => {
+  assert.match(provision, /template-v4/)
+  assert.match(provision, /if not ready\.is_set\(\): return Response\(status_code=204\)/)
+  assert.match(provision, /return \{'status':'ready','modelReady':True,'model':MODEL\}/)
+  assert.match(provision, /HEALTH_CHECK_PATH:'\/ping'/)
+})
+
+test('canary observes RunPod control-plane ready workers instead of holding a custom readiness route open', () => {
+  assert.match(provision, /workers:\{idle:Number\(payload\?\.workers\?\.idle\|\|0\),ready:Number\(payload\?\.workers\?\.ready\|\|0\)/)
+  assert.match(provision, /const wake=await fetch\(\`\$\{root\}\/ping\`/)
+  assert.match(provision, /if\(health\.workers\.ready>0\)/)
+  const start = provision.indexOf('export async function canaryMassDistilledRuntime')
+  const end = provision.indexOf('export const MASS_DISTILLED_CANARY_MAX_COST_USD', start)
+  const body = provision.slice(start, end)
+  assert.doesNotMatch(body, /fetch\(\`\$\{root\}\/ready\`/)
+})

@@ -65,6 +65,16 @@ export type BuilderBrowserCliCapability = Readonly<{
   allowedOrigins: readonly string[]
 }>
 
+export type BuilderBrowserCliFailureCode =
+  | 'browser_missing_dependencies'
+  | 'browser_not_installed'
+  | 'browser_launch_failed'
+  | 'navigation_failed'
+  | 'network_policy_failed'
+  | 'config_invalid'
+  | 'sandbox_execution_failed'
+  | 'cli_exit_nonzero'
+
 export interface BuilderBrowserCliPort {
   capabilities(): Promise<BuilderBrowserCliCapability | null>
   invoke(input: {
@@ -80,6 +90,7 @@ export interface BuilderBrowserCliPort {
     stdout: string
     stderr: string
     timedOut: boolean
+    failureCode?: BuilderBrowserCliFailureCode
   }>>
   close(): Promise<void>
 }

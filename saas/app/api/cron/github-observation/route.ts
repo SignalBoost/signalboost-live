@@ -7,10 +7,11 @@ import type { GitHubCapability } from '@/lib/provider-framework/github'
 import { materializeGuardianRepositoryObservation } from '@/lib/security/github-guardian-observation'
 import { createGuardianSelfHealingHandoff, guardianReviewRequest } from '@/lib/security/github-guardian-self-healing'
 import { remediateNativeIncidents } from '@/self-healing-host/native-autonomous-loop'
+import { runGitHubActionsBacklogRemediation } from '@/self-healing-host/github-actions-backlog-remediation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
 const bounded = (name: string, fallback: number, max: number) => Math.min(Math.max(Number(process.env[name] || fallback), 1), max)
 const capability = (): GitHubCapability => {
@@ -182,10 +183,25 @@ export async function GET(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: { code: 'unauthorized_cron' } }, { status: 401 })
   }
+  const actionsBacklogPromise = runGitHubActionsBacklogRemediation().catch(error => ({
+    ok: false,
+    schemaVersion: 'github-actions-backlog-remediation-v1' as const,
+    mode: 'active' as const,
+    scanned: 0,
+    eligible: 0,
+    cancelled: 0,
+    preserved: 0,
+    raced: 0,
+    errors: 1,
+    detail: error instanceof Error ? error.message.slice(0, 240) : 'github actions backlog remediation failed',
+  }))
   const db = getAdminSupabase()
   let coordinationStore
   try { coordinationStore = createSupervisorCoordinationStore({ supabase: db, runtime: process.env.NODE_ENV as any }) }
-  catch { return NextResponse.json({ ok: false, outcome: 'deferred', error: { code: 'coordination_unavailable' } }, { status: 503 }) }
+  catch {
+    const actionsBacklog = await actionsBacklogPromise
+    return NextResponse.json({ ok: false, outcome: 'deferred', error: { code: 'coordination_unavailable' }, actionsBacklog }, { status: 503 })
+  }
 
   const started = Date.now()
   const maxConnections = bounded('GITHUB_OBSERVATION_MAX_CONNECTIONS', 3, 25)
@@ -236,13 +252,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const actionsBacklog = await actionsBacklogPromise
   return NextResponse.json({
     ok: true,
-    schemaVersion: 'github-observation-cron-v1',
-    readOnly: true,
-    repairAttempted: false,
-    providerMutations: false,
+    schemaVersion: 'github-observation-cron-v2',
+    readOnly: false,
+    repairAttempted: actionsBacklog.mode === 'active',
+    providerMutations: actionsBacklog.cancelled > 0,
     productionBrowserExecution: false,
+    actionsBacklog,
     summary,
   })
 }

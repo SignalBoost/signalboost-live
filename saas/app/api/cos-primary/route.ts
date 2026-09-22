@@ -245,6 +245,25 @@ function completionFirstResponse(startedAt:number,input:string,result:{reply:str
 // fact. COS reasons over the retrieved sources to complete the task, cites what the sources support,
 // and explicitly marks anything they do not support as unverified. The model decides whether the
 // request is a task or a bare fact claim; a bare fact claim still fails closed.
+function normalizeGroundedTaskText(value:string):string{
+  return String(value||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim()
+}
+function groundedTaskReplyIsSubstantive(input:string,reply:string,travelTask:boolean):boolean{
+  const normalizedInput=normalizeGroundedTaskText(input),normalizedReply=normalizeGroundedTaskText(reply)
+  if(!normalizedReply||normalizedReply===normalizedInput)return false
+  const inputTerms=new Set(normalizedInput.split(' ').filter(term=>term.length>=3))
+  const replyTerms=new Set(normalizedReply.split(' ').filter(term=>term.length>=3))
+  const overlap=inputTerms.size?[...inputTerms].filter(term=>replyTerms.has(term)).length/inputTerms.size:0
+  const nearEcho=normalizedReply.length<=Math.max(normalizedInput.length+100,Math.ceil(normalizedInput.length*1.4))&&overlap>=.75
+  if(nearEcho)return false
+  if(travelTask){
+    const liveCitations=(reply.match(/\[LIVE\d+\]/g)||[]).length
+    if(liveCitations<1)return false
+    if(reply.trim().length<Math.max(360,Math.ceil(input.trim().length*1.25)))return false
+  }
+  return true
+}
+
 export const FRESH_GROUNDED_TASK_TIMEOUT_MS = 40_000
 export const FRESH_GROUNDED_TASK_MAX_TOKENS = 2_000
 async function runFreshGroundedTaskCompletion(input:string,language:string,sources:FreshEvidenceSource[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
@@ -275,7 +294,10 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
   }).catch(()=>null)
   const parsed=result?.text?parseLocalResult(result.text):null
   const reply=parsed?.answer?.trim()||''
-  if(!reply||hasUnsafePublicModelOutput(reply))return null
+  if(!reply||hasUnsafePublicModelOutput(reply)||!groundedTaskReplyIsSubstantive(input,reply,travelTask)){
+    console.warn('[cos-fresh-grounded-task-rejected]',JSON.stringify({event:'non_substantive_grounded_task_draft',travelTask,inputChars:input.length,replyChars:reply.length}))
+    return null
+  }
   const resolved=resolveCosReasoner()
   return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}
 }
@@ -580,11 +602,10 @@ export async function postCosPrimary(req:NextRequest){
         await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
         return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
       }
-      freshLocalFailureCode='local_synthesis_failed'
-      logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,fallthrough:'travel_grounded_task_failed_closed'})
+      logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,fallthrough:'shared_local_synthesizer'})
     }
 
-    if(!requestedAction&&!liveTravelTask){
+    if(!requestedAction){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
       const localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})

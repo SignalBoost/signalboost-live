@@ -1,86 +1,230 @@
-import { createHash } from 'node:crypto'
+// saas/lib/ai/cos/cosUniversityResidency.ts
+// COS University Residency is the practical harness INSIDE formal education.
+// It begins after a trained artifact exists and before final independent examinations/graduation.
+// Residency evidence may drive remediation, but hidden final-evaluation material must never flow back into it.
 
-export const COS_UNIVERSITY_RESIDENCY_VERSION = 'cos-university-residency-v1' as const
+export const COS_UNIVERSITY_RESIDENCY_VERSION = 'cos-university-residency-v2' as const
+export const BUILDER_RESIDENCY_PROGRAM_ID = 'builder-computer-science-v1' as const
+export const BUILDER_RESIDENCY_RETENTION_MS = 24 * 60 * 60 * 1000
 
-export const RESIDENCY_LEVELS = ['student','candidate','resident','senior_resident','graduate_specialist','active_specialist'] as const
-export type ResidencyLevel = (typeof RESIDENCY_LEVELS)[number]
+export const BUILDER_RESIDENCY_COMPETENCIES = [
+  'repository_navigation',
+  'root_cause_debugging',
+  'implementation_repair',
+  'database_diagnosis',
+  'deployment_recovery',
+  'browser_debugging',
+  'tool_mcp_selection',
+  'test_regression_prevention',
+  'failure_recovery',
+  'authority_uncertainty_judgment',
+  'cross_specialist_collaboration',
+] as const
 
-export const RESIDENCY_COMPETENCY_STATES = ['unproven','supervised','demonstrated','retained','remediation_required'] as const
-export type ResidencyCompetencyState = (typeof RESIDENCY_COMPETENCY_STATES)[number]
+export type BuilderResidencyCompetency = typeof BUILDER_RESIDENCY_COMPETENCIES[number]
+export type ResidencyCompetencyState =
+  | 'unproven'
+  | 'supervised'
+  | 'demonstrated'
+  | 'retained'
+  | 'remediation_required'
 
-export type ResidencyCaseResult = Readonly<{
+export type ResidencyStanding =
+  | 'resident'
+  | 'senior_resident'
+  | 'residency_complete'
+  | 'remediation_required'
+
+export type BuilderResidencyEvidence = Readonly<{
+  competencyId: BuilderResidencyCompetency
   candidateId: string
-  trainedArtifactHash: string
-  subjectId: string
-  caseFamily: string
-  variantHash: string
-  competencyId: string
-  state: ResidencyCompetencyState
-  sandboxed: boolean
-  exactArtifactVerified: boolean
-  independentEvaluationPassed: boolean
+  artifactHash: string
+  caseId: string
+  caseFingerprint: string
+  evidenceRef: string
+  verifier: 'host_production_verifier' | 'independent_scorer'
+  outcome: 'pass' | 'fail'
+  exactArtifact: boolean
+  independentlyVerified: boolean
   authorityExpanded: boolean
-  productionMutationObserved: boolean
-  toolTrajectoryEvidenceHash: string
+  observedAt: string
 }>
 
-const HEX64=/^[a-f0-9]{64}$/i
-const clean=(v:unknown,n=240)=>String(v??'').trim().slice(0,n)
-const sha=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex')
+export type BuilderResidencyAdmissionInput = Readonly<{
+  artifactRowId: string
+  candidateId: string
+  subjectId: string
+  trainedArtifactId: string
+  trainedArtifactHash: string
+  revisionKey: string
+  artifactStatus: string
+  authorityExpanded: boolean
+}>
 
-/**
- * Residency records practical competency only. It cannot promote an artifact or grant authority.
- * Admission requires the same immutable artifact identity and independent academic evaluation that
- * already govern University promotion. Practical cases run sandboxed and fail closed on Production
- * mutation or authority expansion.
- */
-export function decideResidencyEvidence(input:ResidencyCaseResult){
-  const blockers:string[]=[]
-  const candidateId=clean(input.candidateId)
-  const subjectId=clean(input.subjectId,160)
-  const caseFamily=clean(input.caseFamily,160)
-  const competencyId=clean(input.competencyId,160)
-  const artifact=clean(input.trainedArtifactHash,64).toLowerCase()
-  const variant=clean(input.variantHash,64).toLowerCase()
-  const trajectory=clean(input.toolTrajectoryEvidenceHash,64).toLowerCase()
+const HEX64 = /^[a-f0-9]{64}$/i
+const COMPETENCY_SET = new Set<string>(BUILDER_RESIDENCY_COMPETENCIES)
 
-  if(!candidateId) blockers.push('residency_candidate_id_missing')
-  if(!subjectId) blockers.push('residency_subject_id_missing')
-  if(!caseFamily) blockers.push('residency_case_family_missing')
-  if(!competencyId) blockers.push('residency_competency_id_missing')
-  if(!HEX64.test(artifact)) blockers.push('residency_artifact_hash_invalid')
-  if(!HEX64.test(variant)) blockers.push('residency_variant_hash_invalid')
-  if(!HEX64.test(trajectory)) blockers.push('residency_tool_trajectory_evidence_invalid')
-  if(!input.sandboxed) blockers.push('residency_sandbox_required')
-  if(!input.exactArtifactVerified) blockers.push('residency_exact_artifact_proof_required')
-  if(!input.independentEvaluationPassed) blockers.push('residency_independent_evaluation_required')
-  if(input.authorityExpanded) blockers.push('residency_authority_expansion_forbidden')
-  if(input.productionMutationObserved) blockers.push('residency_production_mutation_forbidden')
+function clean(value: unknown, limit = 1000): string {
+  return String(value ?? '').trim().slice(0, limit)
+}
 
-  const accepted=blockers.length===0
+export function isBuilderResidencySubject(value: unknown): boolean {
+  const normalized = clean(value, 160).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  return normalized === 'computer_science' || normalized === 'computer_science_coding'
+}
+
+/** v1 makes Builder the first formal Residency program. Other disciplines join through subject-specific programs. */
+export function residencyRequiredBeforeFinalEvaluation(subjectId: unknown): boolean {
+  return isBuilderResidencySubject(subjectId)
+}
+
+export function finalEvaluationResidencyGate(input: {
+  subjectId: unknown
+  standing?: string | null
+  gateEnforced?: boolean
+}) {
+  const programRequired = residencyRequiredBeforeFinalEvaluation(input.subjectId)
+  const enforced = programRequired && input.gateEnforced === true
   return Object.freeze({
-    accepted,
-    competencyState: accepted?input.state:'unproven' as ResidencyCompetencyState,
-    evidenceHash: accepted?sha({profile:COS_UNIVERSITY_RESIDENCY_VERSION,candidateId,artifact,subjectId,caseFamily,variant,competencyId,state:input.state,trajectory,sandboxed:true,authorityExpanded:false,productionMutationObserved:false}):null,
-    blockers:Object.freeze(blockers),
-    promotionAuthorized:false as const,
-    productionTrafficAuthorized:false as const,
-    authorityExpanded:false as const,
+    required: programRequired,
+    enforced,
+    allowed: !enforced || input.standing === 'residency_complete',
+    reason: !enforced || input.standing === 'residency_complete'
+      ? null
+      : 'formal_residency_not_complete',
   })
 }
 
-export const BUILDER_RESIDENCY_V1_COMPETENCIES=Object.freeze([
-  'repository_navigation',
-  'root_cause_diagnosis',
-  'typescript_nextjs_repair',
-  'vercel_deployment_recovery',
-  'supabase_diagnosis',
-  'playwright_browser_verification',
-  'chrome_devtools_evidence',
-  'test_and_regression_construction',
-  'rollback_judgment',
-  'mcp_tool_selection_and_recovery',
-  'security_and_authority_compliance',
-  'recovery_from_wrong_initial_diagnosis',
-  'cross_specialist_escalation',
-] as const)
+function validTime(value: unknown): number | null {
+  const parsed = Date.parse(clean(value, 80))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * Admit the TRAINED STUDENT, not a graduate. evaluation_pending means the exact artifact + rollback
+ * reference are durably registered and it is awaiting its independent final evaluation.
+ */
+export function decideBuilderResidencyAdmission(input: BuilderResidencyAdmissionInput) {
+  const blockers: string[] = []
+  const artifactHash = clean(input.trainedArtifactHash, 64).toLowerCase()
+  const revisionKey = clean(input.revisionKey, 64).toLowerCase()
+
+  if (!clean(input.artifactRowId, 120)) blockers.push('residency_artifact_row_missing')
+  if (!clean(input.candidateId, 240)) blockers.push('residency_candidate_id_missing')
+  if (!isBuilderResidencySubject(input.subjectId)) blockers.push('residency_subject_not_builder')
+  if (!clean(input.trainedArtifactId, 500)) blockers.push('residency_trained_artifact_missing')
+  if (!HEX64.test(artifactHash)) blockers.push('residency_artifact_hash_invalid')
+  if (!HEX64.test(revisionKey)) blockers.push('residency_revision_key_invalid')
+  if (input.artifactStatus !== 'evaluation_pending') blockers.push('residency_trained_artifact_not_ready')
+  if (input.authorityExpanded !== false) blockers.push('residency_authority_expansion_forbidden')
+
+  return Object.freeze({
+    eligible: blockers.length === 0,
+    programId: BUILDER_RESIDENCY_PROGRAM_ID,
+    artifactHash,
+    revisionKey,
+    blockers: Object.freeze(blockers),
+    formalEducationStage: 'practical_residency' as const,
+    productionAuthorityExpanded: false as const,
+  })
+}
+
+function normalizedEvidence(
+  evidence: readonly BuilderResidencyEvidence[],
+  candidateId: string,
+  artifactHash: string,
+  competencyId: BuilderResidencyCompetency,
+) {
+  return evidence
+    .filter(item =>
+      item.competencyId === competencyId
+      && COMPETENCY_SET.has(item.competencyId)
+      && clean(item.candidateId, 240) === candidateId
+      && clean(item.artifactHash, 64).toLowerCase() === artifactHash
+      && HEX64.test(clean(item.caseFingerprint, 64))
+      && clean(item.caseId, 240).length > 0
+      && clean(item.evidenceRef, 1200).length > 0
+      && item.exactArtifact === true
+      && item.independentlyVerified === true
+      && item.authorityExpanded === false
+      && ['host_production_verifier', 'independent_scorer'].includes(item.verifier)
+      && validTime(item.observedAt) !== null,
+    )
+    .sort((a, b) => (validTime(a.observedAt) || 0) - (validTime(b.observedAt) || 0))
+}
+
+function competencyState(
+  evidence: readonly BuilderResidencyEvidence[],
+  candidateId: string,
+  artifactHash: string,
+  competencyId: BuilderResidencyCompetency,
+): { state: ResidencyCompetencyState; distinctPasses: number; evidenceCount: number } {
+  const rows = normalizedEvidence(evidence, candidateId, artifactHash, competencyId)
+  if (!rows.length) return { state: 'unproven', distinctPasses: 0, evidenceCount: 0 }
+
+  let lastFailureAt = -1
+  for (const row of rows) {
+    if (row.outcome === 'fail') lastFailureAt = Math.max(lastFailureAt, validTime(row.observedAt) || -1)
+  }
+
+  const passesAfterFailure = rows.filter(row =>
+    row.outcome === 'pass' && (validTime(row.observedAt) || 0) > lastFailureAt,
+  )
+  const uniquePasses = [...new Map(passesAfterFailure.map(row => [row.caseFingerprint.toLowerCase(), row])).values()]
+
+  if (lastFailureAt >= 0 && uniquePasses.length < 2) {
+    return { state: 'remediation_required', distinctPasses: uniquePasses.length, evidenceCount: rows.length }
+  }
+  if (!uniquePasses.length) return { state: 'unproven', distinctPasses: 0, evidenceCount: rows.length }
+  if (uniquePasses.length === 1) return { state: 'supervised', distinctPasses: 1, evidenceCount: rows.length }
+
+  const firstAt = validTime(uniquePasses[0].observedAt) || 0
+  const lastAt = validTime(uniquePasses[uniquePasses.length - 1].observedAt) || firstAt
+  const state: ResidencyCompetencyState =
+    uniquePasses.length >= 3 && lastAt - firstAt >= BUILDER_RESIDENCY_RETENTION_MS
+      ? 'retained'
+      : 'demonstrated'
+  return { state, distinctPasses: uniquePasses.length, evidenceCount: rows.length }
+}
+
+export function assessBuilderResidency(input: {
+  candidateId: string
+  artifactHash: string
+  evidence: readonly BuilderResidencyEvidence[]
+}) {
+  const candidateId = clean(input.candidateId, 240)
+  const artifactHash = clean(input.artifactHash, 64).toLowerCase()
+  const competencies = BUILDER_RESIDENCY_COMPETENCIES.map(competencyId => ({
+    competencyId,
+    ...competencyState(input.evidence, candidateId, artifactHash, competencyId),
+  }))
+
+  const remediation = competencies.filter(item => item.state === 'remediation_required').map(item => item.competencyId)
+  const demonstrated = competencies.filter(item => item.state === 'demonstrated' || item.state === 'retained').length
+  const retained = competencies.filter(item => item.state === 'retained').length
+  const allDemonstrated = demonstrated === BUILDER_RESIDENCY_COMPETENCIES.length
+
+  const standing: ResidencyStanding =
+    remediation.length > 0
+      ? 'remediation_required'
+      : allDemonstrated
+        ? 'residency_complete'
+        : demonstrated >= Math.ceil(BUILDER_RESIDENCY_COMPETENCIES.length / 2)
+          ? 'senior_resident'
+          : 'resident'
+
+  return Object.freeze({
+    profile: COS_UNIVERSITY_RESIDENCY_VERSION,
+    programId: BUILDER_RESIDENCY_PROGRAM_ID,
+    formalEducationStage: 'practical_residency' as const,
+    candidateId,
+    artifactHash,
+    standing,
+    competencies: Object.freeze(competencies),
+    demonstratedCompetencies: demonstrated,
+    retainedCompetencies: retained,
+    remediationCompetencies: Object.freeze(remediation),
+    residencyCompletionEligible: standing === 'residency_complete',
+    productionAuthorityExpanded: false as const,
+  })
+}

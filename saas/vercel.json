@@ -47,7 +47,9 @@
     "COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS": "384",
     "COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM": "8",
     "COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_COST_USD_JSON": "{\"openai\":0.002,\"claude\":0.008,\"grok\":0.004,\"deepseek-api\":0.001,\"gemini\":0.0017}",
-    "COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_MAX_OUTPUT_TOKENS_JSON": "{\"claude\":512}"
+    "COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_MAX_OUTPUT_TOKENS_JSON": "{\"claude\":512}",
+    "COS_UNIVERSITY_RESIDENCY_ENABLED": "true",
+    "COS_UNIVERSITY_RESIDENCY_FINAL_GATE_ENABLED": "false"
   },
   "routes": [
     {
@@ -227,6 +229,10 @@
     {
       "path": "/api/cron/cos-university-phd-progress",
       "schedule": "56 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-university-residency",
+      "schedule": "12,22,32,42,52 * * * *"
     },
     {
       "path": "/api/cron/cos-university-graduate-activation",

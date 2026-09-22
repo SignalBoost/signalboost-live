@@ -12,6 +12,7 @@ import {
   type CanaryEvent,
 } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
 import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
+import { BUILDER_RESIDENCY_PROGRAM_ID, isBuilderResidencySubject } from '@/lib/ai/cos/cosUniversityResidency'
 import { describeThrownValue } from '@/lib/ai/cos/describeThrownValue'
 import {
   MASS_DISTILLED_READY_TIMEOUT_MS,
@@ -114,6 +115,31 @@ async function readRollingCanaryEvents(db:any,candidateIds:string[]){
   return rows
 }
 
+async function builderResidencyCompletions(db:any,artifacts:any[]){
+  const builderArtifacts=artifacts.filter((row:any)=>isBuilderResidencySubject(row?.subject_id))
+  const candidateIds=[...new Set(builderArtifacts.map((row:any)=>clean(row?.candidate_id,240)).filter(Boolean))]
+  const gates=new Map<string,{enforced:boolean;completedAt:string|null}>()
+  if(!candidateIds.length) return gates
+  const result=await db.from('cos_university_residency_enrollments')
+    .select('candidate_id,trained_artifact_hash,standing,completed_at,gate_enforced')
+    .eq('program_id',BUILDER_RESIDENCY_PROGRAM_ID)
+    .in('candidate_id',candidateIds)
+    .limit(500)
+  if(result.error) throw result.error
+  for(const row of result.data||[]){
+    const candidateId=clean((row as any).candidate_id,240)
+    const artifactHash=clean((row as any).trained_artifact_hash,64).toLowerCase()
+    const completedAtRaw=clean((row as any).completed_at,80)
+    const completedAt=(row as any).standing==='residency_complete'&&Number.isFinite(Date.parse(completedAtRaw))
+      ? completedAtRaw
+      : null
+    if(candidateId&&HEX64.test(artifactHash)){
+      gates.set(candidateId+':'+artifactHash,{enforced:(row as any).gate_enforced===true,completedAt})
+    }
+  }
+  return gates
+}
+
 // Issues at most one bounded canary approval per tick before the unchanged atomic claim.
 // Kill switch: COS_MASS_CANARY_ROLLING_AUTHORIZATION=false.
 async function issueRollingCanaryApproval(now:Date){
@@ -168,7 +194,14 @@ async function issueRollingCanaryApproval(now:Date){
   for(const row of [...(oldestArtifacts.data||[]),...pendingBuilderArtifacts,...pendingReplayArtifacts]){
     artifactByCandidate.set(String((row as any).candidate_id),row)
   }
-  const artifactRows=[...artifactByCandidate.values()]
+  const unfilteredArtifactRows=[...artifactByCandidate.values()]
+  const residencyCompletions=await builderResidencyCompletions(db,unfilteredArtifactRows)
+  const artifactRows=unfilteredArtifactRows.filter((row:any)=>{
+    if(!isBuilderResidencySubject(row?.subject_id)) return true
+    const key=clean(row?.candidate_id,240)+':'+clean(row?.trained_artifact_hash,64).toLowerCase()
+    const gate=residencyCompletions.get(key)
+    return !gate?.enforced || Boolean(gate.completedAt)
+  })
   const proofCandidateIds=[
     ...confirmedBuilderArtifacts.map((row:any)=>String(row.candidate_id)),
     ...confirmedReplayArtifacts.map((row:any)=>String(row.candidate_id)),
@@ -180,7 +213,18 @@ async function issueRollingCanaryApproval(now:Date){
   // an older exact-artifact canary pass fell out of the window and the issuer re-approved the same
   // already-passed artifact. That approval was intentionally unclaimable and froze the queue.
   const eventRows=await readRollingCanaryEvents(db,candidateIds)
-  const passedCandidates=new Set(eventRows
+  // A Builder canary from before Residency completion is lab-era evidence, not the post-Residency
+  // exact-artifact final proof. Drop it from policy so a fresh canary is required after Residency.
+  const policyEventRows=eventRows.filter((row:any)=>{
+    if(String(row?.evidence?.claim||'')!=='local_distilled_runtime_canary_passed') return true
+    const candidateId=clean(row?.candidate_id,240)
+    const artifactHash=clean(row?.evidence?.artifactHash,64).toLowerCase()
+    const gate=residencyCompletions.get(candidateId+':'+artifactHash)
+    if(!gate?.enforced) return true
+    if(!gate.completedAt) return false
+    return Date.parse(String(row?.observed_at||''))>=Date.parse(gate.completedAt)
+  })
+  const passedCandidates=new Set(policyEventRows
     .filter((row:any)=>String(row?.evidence?.claim||'')==='local_distilled_runtime_canary_passed')
     .map((row:any)=>String(row.candidate_id)))
   const builderCandidateIds=new Set(confirmedBuilderArtifacts.map((row:any)=>String(row.candidate_id)))
@@ -209,7 +253,7 @@ async function issueRollingCanaryApproval(now:Date){
         failureDerivedReplayItems:Number(receipt.failureDerivedReplayItems||0),
       }
     }),
-    events:eventRows.map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),
+    events:policyEventRows.map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),
   })
   if(!('artifact' in decision)) return {issued:false,reason:decision.reason}
   const evidenceHash=hash(decision.evidence)

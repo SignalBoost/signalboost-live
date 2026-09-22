@@ -41,6 +41,18 @@ function eventSection(block, eventName) {
   return lines.slice(start, end).join('\n')
 }
 
+const allowedDualEventWorkflows = new Set([
+  // Governance/integrity needs both the proposed PR revision and the landed main revision.
+  'audit-remediation-regression.yml',
+  'main-write-discipline.yml',
+  'pipeline-integrity.yml',
+  // These workflows intentionally produce/deploy artifacts across PR and main lifecycle events.
+  'portable-package.yml',
+  'portable-release.yml',
+  'runpod-serverless-embedding.yml',
+  'social-outreach-package.yml',
+])
+
 const violations = []
 
 for (const file of files) {
@@ -53,10 +65,12 @@ for (const file of files) {
   const hasPullRequest = Boolean(pullRequest)
   const pushHasBranchFilter = /^\s{4}branches(?:-ignore)?:/m.test(push)
   const unrestrictedPush = hasPush && !pushHasBranchFilter
-  const allowedUnrestrictedPush = file === 'audit-remediation-regression.yml'
-
-  if (unrestrictedPush && !allowedUnrestrictedPush) {
+  if (unrestrictedPush) {
     violations.push(`${file}: unrestricted push trigger is forbidden; limit push to main/protected branches or use pull_request`)
+  }
+
+  if (hasPush && hasPullRequest && !allowedDualEventWorkflows.has(file)) {
+    violations.push(`${file}: validation workflows must not run on both push and pull_request; keep PR validation on pull_request and reserve push for approved governance/release lifecycles`)
   }
 
   if (unrestrictedPush && hasPullRequest) {

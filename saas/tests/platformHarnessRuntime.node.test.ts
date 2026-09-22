@@ -22,6 +22,7 @@ import {
   type HarnessAuthorityEnvelope,
   type HarnessManifest,
   type HarnessRunResult,
+  type HarnessWorkerContext,
 } from '../platform-harness/index.ts'
 
 const hash = (char: string) => char.repeat(64)
@@ -259,9 +260,7 @@ test('independent verifier routes competency vs infrastructure failure', async (
   const executor = createGovernedHarnessExecutor({ policy: gatewayPolicy, host })
   const capabilities = createProviderHubHarnessCapabilityResolver(discovery([githubRead]))
   const worker = {
-    async run(context: Parameters<typeof runHarnessWorker>[0]['worker'] extends infer W
-      ? W extends { run(context: infer C): Promise<void> } ? C : never
-      : never) {
+    async run(context: HarnessWorkerContext) {
       await context.execute({
         actionId: 'read-1',
         kind: 'read',

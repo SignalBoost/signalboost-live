@@ -747,7 +747,7 @@ export class BuilderToolLoop {
             stderr: result.stderr.slice(0, 16_000),
             timedOut: result.timedOut,
           }
-          if (!result.ok) throw new Error(`builder_browser_cli_failed:${result.exitCode}`)
+          if (!result.ok) throw new Error(`builder_browser_cli_failed:${result.failureCode || 'cli_exit_nonzero'}:${result.exitCode}`)
         }
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
           if (documentationPaths && !documentationPaths.includes(toolPath(action.input))) throw new Error('builder_documentation_scope_violation')

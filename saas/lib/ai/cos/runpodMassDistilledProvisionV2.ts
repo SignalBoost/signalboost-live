@@ -310,7 +310,8 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
     const message = error instanceof Error ? error.message : String(error)
     if (message !== 'mass_distilled_runtime_template_identity_mismatch'
       && message !== 'mass_distilled_runtime_endpoint_template_mismatch'
-      && message !== 'mass_distilled_runtime_endpoint_template_rebind_failed') throw error
+      && message !== 'mass_distilled_runtime_endpoint_template_rebind_failed'
+      && message !== 'mass_distilled_runtime_endpoint_gpu_pool_drift') throw error
 
     const recovered = await resolveExactEndpoint(input)
     const endpoint = recovered.endpoint

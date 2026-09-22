@@ -68,6 +68,7 @@ test('University telemetry hot-path migration matches the Production sort/filter
 
 
 test('University telemetry exposes read-only evaluator claim blockers without changing authority', () => {
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
   assert.match(route, /claimability = 'waiting_12h'/)
   assert.match(route, /claimability = 'missing_approval'/)
   assert.match(route, /claimability = 'approval_expired'/)

@@ -122,7 +122,7 @@ async function issueRollingCanaryApproval(now:Date){
   // response-anchor v2 Computer Science proof cohort. Applying v2 priority only AFTER an oldest-200
   // query is ineffective once the backlog exceeds 200: Production had 336 older uncanaried artifacts
   // ahead of the first true v2 Builder candidate.
-  const [oldestArtifacts,v2BuilderArtifacts]=await Promise.all([
+  const [oldestArtifacts,v2BuilderArtifacts,replayArtifacts]=await Promise.all([
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status','evaluation_pending').like('candidate_id','mass:%')
@@ -139,11 +139,25 @@ async function issueRollingCanaryApproval(now:Date){
       }})
       .order('created_at',{ascending:true})
       .limit(20),
+    // Replay proof must be visible even when the legacy oldest-200 window is full.
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+      .eq('status','evaluation_pending')
+      .contains('intended_use',{trainingReceipt:{failureDerivedReplayRequired:true}})
+      .order('created_at',{ascending:true})
+      .limit(50),
   ])
   if(oldestArtifacts.error) throw oldestArtifacts.error
   if(v2BuilderArtifacts.error) throw v2BuilderArtifacts.error
+  if(replayArtifacts.error) throw replayArtifacts.error
+  const confirmedReplayArtifacts=(replayArtifacts.data||[]).filter((row:any)=>{
+    const receipt=row?.intended_use?.trainingReceipt
+    return receipt&&typeof receipt==='object'
+      && receipt.failureDerivedReplayRequired===true
+      && Number(receipt.failureDerivedReplayItems||0)>0
+  })
   const artifactByCandidate=new Map<string,any>()
-  for(const row of [...(oldestArtifacts.data||[]),...(v2BuilderArtifacts.data||[])]){
+  for(const row of [...(oldestArtifacts.data||[]),...(v2BuilderArtifacts.data||[]),...confirmedReplayArtifacts]){
     artifactByCandidate.set(String((row as any).candidate_id),row)
   }
   const artifactRows=[...artifactByCandidate.values()]
@@ -170,6 +184,8 @@ async function issueRollingCanaryApproval(now:Date){
         frontierResponseAnchorRequired:receipt.frontierResponseAnchorRequired===true,
         frontierResponseAnchorEpochs:Number(receipt.frontierResponseAnchorEpochs||0),
         frontierResponseAnchorItems:Number(receipt.frontierResponseAnchorItems||0),
+        failureDerivedReplayRequired:receipt.failureDerivedReplayRequired===true,
+        failureDerivedReplayItems:Number(receipt.failureDerivedReplayItems||0),
       }
     }),
     events:eventRows.map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),

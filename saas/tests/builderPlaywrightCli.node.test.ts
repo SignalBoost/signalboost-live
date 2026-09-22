@@ -1,0 +1,185 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import type { BuilderBrowserCliPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
+import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
+import {
+  BUILDER_PLAYWRIGHT_CLI_VERSION,
+  createBuilderPlaywrightCliPort,
+} from '../lib/builder/playwright-cli-port.ts'
+import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
+
+function commandResult(exitCode = 0, stdout = '', stderr = '') {
+  return {
+    exitCode,
+    async stdout() { return stdout },
+    async stderr() { return stderr },
+  }
+}
+
+const idleRunner: BuilderRunnerPort = {
+  async run() {
+    assert.fail('Playwright CLI diagnostics must not execute through BuilderRunnerPort')
+  },
+}
+
+test('ordinary Builder never receives the owner Playwright CLI diagnostic lane', async () => {
+  let created = 0
+  const port = createBuilderPlaywrightCliPort({
+    ownerAuthorized: false,
+    createSandbox: (async () => {
+      created += 1
+      throw new Error('must not create')
+    }) as any,
+  })
+  assert.equal(await port.capabilities(), null)
+  assert.equal(created, 0)
+  await port.close()
+})
+
+test('Playwright CLI rejects off-origin navigation before sandbox creation', async () => {
+  let created = 0
+  const port = createBuilderPlaywrightCliPort({
+    ownerAuthorized: true,
+    env: { BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS: 'https://itmounts.com' },
+    createSandbox: (async () => {
+      created += 1
+      throw new Error('must not create')
+    }) as any,
+  })
+  await assert.rejects(
+    () => port.invoke({ action: 'open', url: 'https://example.com/' }),
+    /builder_browser_cli_origin_rejected/,
+  )
+  assert.equal(created, 0)
+})
+
+test('Playwright CLI bootstraps host-owned package before locking egress to approved hosts', async () => {
+  const steps: string[] = []
+  const commands: Array<{ cmd: string; args: string[] }> = []
+  const fake = {
+    async updateNetworkPolicy(policy: unknown) {
+      steps.push(`network:${JSON.stringify(policy)}`)
+    },
+    async runCommand(command: any) {
+      commands.push({ cmd: command.cmd, args: [...(command.args || [])] })
+      steps.push(`command:${command.cmd} ${(command.args || []).join(' ')}`)
+      if (command.cmd.endsWith('/playwright-cli') && command.args?.[0] === 'open') {
+        return commandResult(0, '### Page\n- Page URL: https://itmounts.com/\n- Page Title: iTMounts')
+      }
+      return commandResult()
+    },
+    async writeFiles(files: any[]) {
+      steps.push(`write:${files.map(file => file.path).join(',')}`)
+    },
+    async stop() {
+      steps.push('stop')
+    },
+  }
+  const port = createBuilderPlaywrightCliPort({
+    ownerAuthorized: true,
+    env: { BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS: 'https://itmounts.com' },
+    createSandbox: (async (options: any) => {
+      assert.equal(options.networkPolicy, 'deny-all')
+      assert.equal(options.persistent, false)
+      assert.equal(options.env.PLAYWRIGHT_MCP_WEBMCP, 'false')
+      return fake
+    }) as any,
+  })
+
+  const capabilities = await port.capabilities()
+  assert.deepEqual(capabilities?.allowedOrigins, ['https://itmounts.com'])
+  assert.ok(capabilities?.actions.includes('snapshot'))
+  assert.ok(!capabilities?.actions.includes('fill' as any))
+
+  const result = await port.invoke({ action: 'open', url: 'https://itmounts.com/' })
+  assert.equal(result.ok, true)
+  assert.match(result.stdout, /Page Title: iTMounts/)
+  assert.ok(commands.some(command => command.cmd === 'npm' && command.args.includes(`@playwright/cli@${BUILDER_PLAYWRIGHT_CLI_VERSION}`)))
+  assert.ok(commands.some(command => command.cmd.endsWith('/playwright-cli') && command.args.join(' ') === 'install-browser chromium'))
+  const lockdown = steps.findIndex(step => step === 'network:{"allow":["itmounts.com"]}')
+  const open = steps.findIndex(step => step.includes('playwright-cli open https://itmounts.com/'))
+  assert.ok(lockdown >= 0 && open > lockdown, JSON.stringify(steps))
+  assert.ok(!commands.some(command => command.cmd === 'sh' || command.cmd === 'bash'))
+
+  await port.close()
+  assert.equal(steps.at(-1), 'stop')
+})
+
+test('Builder can consume Playwright CLI evidence in the next reasoning round', async () => {
+  const prompts: string[] = []
+  const calls: string[] = []
+  const browser: BuilderBrowserCliPort = {
+    async capabilities() {
+      return { actions: ['open', 'snapshot', 'console', 'requests', 'close'], allowedOrigins: ['https://itmounts.com'] }
+    },
+    async invoke(input) {
+      calls.push(input.action)
+      return {
+        ok: true,
+        action: input.action,
+        exitCode: 0,
+        stdout: '### Page\n- Page URL: https://itmounts.com/\n- Page Title: iTMounts',
+        stderr: '',
+        timedOut: false,
+      }
+    },
+    async close() {},
+  }
+  const responses = [
+    JSON.stringify({ type: 'tool', toolId: 'browser_cli', input: { action: 'open', url: 'https://itmounts.com/' } }),
+    JSON.stringify({ type: 'answer', answer: 'The live page loaded successfully.' }),
+  ]
+  const result = await new BuilderToolLoop({
+    async generate(input) {
+      prompts.push(input.prompt)
+      return responses.shift() || null
+    },
+  }, new InMemoryBuilderWorkspace(), idleRunner, undefined, browser).run({
+    objective: 'Inspect the live iTMounts page and report whether it loads.',
+    workspaceId: 'owner:browser-cli',
+    maxRounds: 3,
+  })
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(calls, ['open'])
+  assert.match(prompts[0] || '', /PLAYWRIGHT CLI BROWSER DIAGNOSTICS/)
+  assert.match(prompts[1] || '', /Page Title: iTMounts/)
+})
+
+test('Builder checkpoint drops raw Playwright CLI evidence and stale browser refs', async () => {
+  let browserCalls = 0
+  const browser: BuilderBrowserCliPort = {
+    async capabilities() {
+      return { actions: ['snapshot'], allowedOrigins: ['https://itmounts.com'] }
+    },
+    async invoke() {
+      browserCalls += 1
+      return {
+        ok: true,
+        action: 'snapshot',
+        exitCode: 0,
+        stdout: 'PRIVATE_LIVE_PAGE_EVIDENCE ref=e42',
+        stderr: '',
+        timedOut: false,
+      }
+    },
+    async close() {},
+  }
+  const result = await new BuilderToolLoop({
+    async generate() {
+      return JSON.stringify({ type: 'tool', toolId: 'browser_cli', input: { action: 'snapshot' } })
+    },
+  }, new InMemoryBuilderWorkspace(), idleRunner, undefined, browser).run({
+    objective: 'Inspect the live page.',
+    workspaceId: 'owner:browser-cli-checkpoint',
+    maxRounds: 3,
+    shouldPause: () => browserCalls > 0,
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok || !result.checkpoint) assert.fail('checkpoint required')
+  assert.equal(result.trace.some(item => item.toolId === 'browser_cli' && item.ok), true)
+  assert.equal(result.checkpoint.trace.some(item => item.toolId === 'browser_cli'), false)
+  assert.equal(JSON.stringify(result.checkpoint).includes('PRIVATE_LIVE_PAGE_EVIDENCE'), false)
+})

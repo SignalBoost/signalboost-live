@@ -1,4 +1,4 @@
-export type BuilderToolId = 'list_files' | 'read_file' | 'search_files' | 'mcp_read' | 'write_file' | 'edit_file' | 'run' | 'model_control'
+export type BuilderToolId = 'list_files' | 'read_file' | 'search_files' | 'mcp_read' | 'browser_cli' | 'write_file' | 'edit_file' | 'run' | 'model_control'
 export type BuilderFailureClass = 'storage' | 'path' | 'runtime' | 'dependency' | 'test' | 'deployment' | 'unknown'
 
 export type BuilderFile = Readonly<{ path: string; content: string; updatedAt: number }>
@@ -56,6 +56,32 @@ export interface BuilderMcpReadPort {
     error?: string
     mode?: string
   }>>
+}
+
+export type BuilderBrowserCliAction = 'open' | 'goto' | 'snapshot' | 'find' | 'console' | 'requests' | 'close'
+
+export type BuilderBrowserCliCapability = Readonly<{
+  actions: readonly BuilderBrowserCliAction[]
+  allowedOrigins: readonly string[]
+}>
+
+export interface BuilderBrowserCliPort {
+  capabilities(): Promise<BuilderBrowserCliCapability | null>
+  invoke(input: {
+    action: BuilderBrowserCliAction
+    url?: string
+    query?: string
+    target?: string
+    level?: 'error' | 'warning' | 'info' | 'debug'
+  }): Promise<Readonly<{
+    ok: boolean
+    action: BuilderBrowserCliAction
+    exitCode: number
+    stdout: string
+    stderr: string
+    timedOut: boolean
+  }>>
+  close(): Promise<void>
 }
 
 export type BuilderToolTrace = Readonly<{

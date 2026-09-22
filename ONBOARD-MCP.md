@@ -41,6 +41,21 @@ Playwright MCP and Chrome DevTools MCP are now first-class governed browser-tool
 - These profiles do not install npm packages, launch Chrome, store credentials, or make Production enablement claims. The host transport/process lifecycle and Production acceptance remain separate evidence-gated work.
 
 
+## Builder Playwright CLI lane — 2026-09-21
+
+Builder now has a separate governed Playwright CLI diagnostic lane in addition to Playwright MCP and Chrome DevTools MCP.
+
+- Canonical host: `saas/lib/builder/playwright-cli-port.ts`.
+- The host pins `@playwright/cli@0.1.21`; this lane is optimized for short, token-efficient coding-agent browser loops while MCP remains the structured long-lived browser integration.
+- Only owner-authorized Builder jobs receive this lane initially.
+- The Builder model receives a structured host allowlist only: `open`, `goto`, `snapshot`, `find`, `console`, `requests`, and `close`.
+- Arbitrary Playwright code/eval, shell commands, form fill/type/click, uploads, downloads, extension attachment, persistent profiles, and off-origin navigation are not exposed.
+- The CLI package and Chromium are bootstrapped in an isolated Vercel Sandbox before any model-supplied action. Bootstrap may use network access only before model input reaches the browser lane; the sandbox firewall is then reduced to the exact approved target hosts.
+- Playwright's own allowed-origin setting is defense in depth only. The Vercel Sandbox egress firewall is the network security boundary and remains host-owned.
+- Browser CLI output is bounded turn-local diagnostic evidence. Raw page evidence and element refs are removed from durable Builder checkpoints so a resumed job must establish fresh browser state.
+- Default navigation origins are `https://itmounts.com` and `https://www.itmounts.com`; deployments may narrow or extend them only through host-owned `BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS`.
+- `tests/builderPlaywrightCli.node.test.ts` is mandatory in the Vercel gate and proves owner-only exposure, off-origin rejection before sandbox creation, bootstrap-before-lockdown ordering, shell non-exposure, Builder reasoning consumption, and checkpoint scrubbing.
+
 ## Browser MCP live host — 2026-09-21
 
 A concrete host-owned stdio runtime is now implemented for browser MCP servers. The reference execution environment is GitHub Actions because long-lived Chrome/stdin processes are not a Vercel serverless responsibility.

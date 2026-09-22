@@ -65,6 +65,7 @@ export interface McpRegistryResolution {
 }
 
 const SECRET_KEY = /(?:secret|token|password|passwd|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|refresh[_-]?token|authorization|credential)/i
+const SAFE_POLICY_METADATA_KEYS = new Set(['authorizationPolicy'])
 
 function required(value: unknown, name: string): string {
   const normalized = String(value ?? '').trim()
@@ -81,7 +82,9 @@ function validateSafeMetadata(value: unknown, path: string): void {
   if (value === undefined) return
   if (!plain(value)) throw new Error(`MCP registry ${path} must be a plain object`)
   for (const [key, item] of Object.entries(value)) {
-    if (SECRET_KEY.test(key)) throw new Error(`mcp_registry_secret_field_rejected:${path}.${key}`)
+    if (SECRET_KEY.test(key) && !SAFE_POLICY_METADATA_KEYS.has(key)) {
+      throw new Error(`mcp_registry_secret_field_rejected:${path}.${key}`)
+    }
     if (item !== null && !['string', 'number', 'boolean'].includes(typeof item)) {
       throw new Error(`MCP registry ${path}.${key} must be scalar`)
     }

@@ -212,6 +212,86 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
   }))
 }
 
+async function runBuilderPlaywrightCliCanary(job: BuilderJobRecord): Promise<void> {
+  if (job.ownerAuthorized !== true || job.metadata.builderPlaywrightCliCanary !== true) {
+    throw new Error('builder_playwright_cli_canary_not_authorized')
+  }
+
+  const browserCli = createBuilderPlaywrightCliPort({ ownerAuthorized: true })
+  const steps = [
+    { action: 'open' as const, url: 'https://itmounts.com/' },
+    { action: 'snapshot' as const },
+    { action: 'console' as const, level: 'info' as const },
+    { action: 'requests' as const },
+    { action: 'close' as const },
+  ]
+  const evidence: Array<{
+    action: string
+    ok: boolean
+    exitCode: number
+    timedOut: boolean
+    failureCode?: string
+  }> = []
+
+  try {
+    for (const input of steps) {
+      const observed = await browserCli.invoke(input)
+      evidence.push({
+        action: observed.action,
+        ok: observed.ok,
+        exitCode: observed.exitCode,
+        timedOut: observed.timedOut,
+        ...(observed.failureCode ? { failureCode: observed.failureCode } : {}),
+      })
+      if (!observed.ok) {
+        const error = `builder_playwright_cli_canary_failed:${observed.action}:${observed.failureCode || 'cli_exit_nonzero'}`
+        const reply = `Builder Playwright CLI Production canary failed at ${observed.action}.`
+        await finishBuilderJob({
+          jobId: job.id,
+          userId: job.userId,
+          claimGeneration: job.claimGeneration,
+          status: 'failed',
+          reply,
+          error,
+          result: {
+            schemaVersion: 'builder-playwright-cli-production-canary-v1',
+            jobId: job.id,
+            workspaceId: job.workspaceId,
+            status: 'failed',
+            error,
+            reply,
+            evidence,
+          },
+        })
+        return
+      }
+    }
+
+    const reply = 'PLAYWRIGHT_CLI_CANARY_COMPLETE'
+    await finishBuilderJob({
+      jobId: job.id,
+      userId: job.userId,
+      claimGeneration: job.claimGeneration,
+      status: 'succeeded',
+      reply,
+      result: {
+        schemaVersion: 'builder-playwright-cli-production-canary-v1',
+        jobId: job.id,
+        workspaceId: job.workspaceId,
+        status: 'succeeded',
+        reply,
+        evidence,
+      },
+    })
+  } finally {
+    await browserCli.close().catch(error => {
+      console.warn('[builder_playwright_cli_canary_close_failed]', {
+        message: error instanceof Error ? error.message : 'unknown',
+      })
+    })
+  }
+}
+
 /**
  * Execute one already-enqueued Builder job. The atomic claim makes duplicate invocations harmless;
  * the browser never replays POST and polling GET has no execution authority.
@@ -226,6 +306,13 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     if (job.claimGeneration === 1 && typeof job.metadata.approvedProposalFingerprint === 'string'
       && await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) !== job.metadata.approvedProposalFingerprint) {
       await terminalFailure(job, 'builder_proposal_source_changed')
+      return
+    }
+
+    // Production acceptance is a host-owned, owner-only lane. It must complete in one claim:
+    // browser state and browser_cli evidence are deliberately not persisted across Builder checkpoints.
+    if (job.ownerAuthorized === true && job.metadata.builderPlaywrightCliCanary === true) {
+      await runBuilderPlaywrightCliCanary(job)
       return
     }
 

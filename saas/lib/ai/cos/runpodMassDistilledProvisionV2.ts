@@ -44,6 +44,20 @@ const REQUEST_TIMEOUT_MS = 8_000
 // option for this exact-artifact runtime so long-form evaluator generation has deterministic VRAM headroom.
 const APPROVED_POOLS = ['AMPERE_24'] as const
 
+export async function massDistilledServerlessWorkerCapacity() {
+  const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+  const endpoints = listed.endpoints || []
+  const reservedWorkers = endpoints.reduce((total, endpoint) =>
+    total + Math.max(0, Math.floor(Number(endpoint.workers?.max ?? 0))), 0)
+  const configured = Number(process.env.RUNPOD_SERVERLESS_WORKER_QUOTA || '10')
+  const quota = Number.isFinite(configured) && configured >= 1 ? Math.floor(configured) : 10
+  return Object.freeze({
+    reservedWorkers,
+    quota,
+    availableWorkers: Math.max(0, quota - reservedWorkers),
+  })
+}
+
 type Template = { id?: string; name?: string; isServerless?: boolean }
 type Endpoint = {
   id?: string

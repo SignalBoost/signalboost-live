@@ -8,7 +8,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
-import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
+import { ensureMassDistilledEndpoint24Gb, massDistilledServerlessWorkerCapacity } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import { activeEvaluationRunpodEndpointIds } from '@/lib/ai/cos/cosUniversityGraduateEndpointProtection'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import { runpodServerlessRootUrl } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
@@ -326,6 +326,30 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   }))
   const now = new Date()
   const inFlightCount = (await activeEvaluationRunpodEndpointIds(now)).size
+
+  const remediationReplayCanaryPasses = new Set(rows
+    .filter(row => row.remediationReplay === true)
+    .filter(row => all.some(event => event.candidateId === row.candidateId
+      && event.verifier === 'host_production_verifier'
+      && event.evidence?.claim === 'production_canary_healthy'
+      && event.evidence?.exactArtifact === true
+      && String(event.evidence?.artifactHash || '').toLowerCase() === row.artifactHash.toLowerCase()))
+    .map(row => row.candidateId)).size
+
+  // While the first two replay-trained artifacts are still waiting for exact-artifact canary proof,
+  // never let the evaluator consume the account's last serverless worker reservation. Production
+  // 2026-09-22 hit 10/10 with one graduate and live evaluator leases, leaving the prioritized canary
+  // unable to provision. This is scheduling only: no endpoint is reclaimed here and no authority expands.
+  if (remediationReplayCanaryPasses < 2) {
+    const capacity = await massDistilledServerlessWorkerCapacity()
+    if (capacity.availableWorkers <= 1) {
+      return {
+        issued: false,
+        reason: 'replay_canary_runpod_headroom_reserved',
+        disposed: 0,
+      }
+    }
+  }
 
   // The Builder apprenticeship proof lane is defined by the durable v2 receipt, not the broad historical
   // frontier profile. Old-recipe artifacts share that profile and already produced dozens of evaluation rows.

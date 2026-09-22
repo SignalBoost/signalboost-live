@@ -135,6 +135,34 @@ test('first two post-GKD remediation replay artifacts get bounded canary proof p
   assert.equal(restored.artifact.candidateId, legacy.candidateId)
 })
 
+test('durable proof counts survive proof artifacts leaving the pending canary queue', () => {
+  const proofNow = new Date('2026-09-22T20:00:00.000Z')
+  const legacy = artifact(85, '2026-09-20T00:00:00.000Z')
+  const replay = replayArtifact('mass:replay-durable', 86, '2026-09-22T18:07:59.000Z')
+
+  const replayNeeded = decideMassCanaryRollingApproval({
+    artifacts:[legacy,replay],
+    events:[],
+    now:proofNow,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:0,
+  })
+  assert.ok('artifact' in replayNeeded)
+  assert.equal(replayNeeded.artifact.candidateId,replay.candidateId)
+
+  const cohortsDone = decideMassCanaryRollingApproval({
+    artifacts:[legacy,replay],
+    events:[],
+    now:proofNow,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  })
+  assert.ok('artifact' in cohortsDone)
+  assert.equal(cohortsDone.artifact.candidateId,legacy.candidateId)
+})
+
 test('passed canary keeps its endpoint through one transient independent-evaluation lifecycle failure', () => {
   const a = artifact(1, '2026-09-15T00:00:00.000Z'); const b = artifact(2, '2026-09-15T01:00:00.000Z')
   const passed = event(a, 'local_distilled_runtime_canary_passed', '2026-09-17T16:00:00.000Z')
@@ -239,6 +267,10 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.match(route,/failureDerivedReplayRequired:receipt\.failureDerivedReplayRequired===true/)
   assert.match(route,/failureDerivedReplayItems:Number\(receipt\.failureDerivedReplayItems\|\|0\)/)
   assert.match(route,/contains\('intended_use',\{trainingReceipt:\{failureDerivedReplayRequired:true\}\}\)/)
+  assert.match(route,/builderProofPasses=\[\.\.\.passedCandidates\]/)
+  assert.match(route,/remediationReplayProofPasses=\[\.\.\.passedCandidates\]/)
+  assert.match(route,/builderProofPasses,/)
+  assert.match(route,/remediationReplayProofPasses,/)
   assert.doesNotMatch(route,/productionTrafficAuthorized:true|automaticPromotionAuthorized:true/)
 })
 

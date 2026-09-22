@@ -291,7 +291,11 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
       language ? `Respond in the language the user wrote in; if unclear use ${reportLanguageName(language)}.` : 'Respond in the language the user wrote in.',
     ].join(' '),
     prompt:`USER REQUEST:\n${input.slice(0,8_000)}\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`,
-  }).catch(()=>null)
+  }).catch(error=>{
+    console.warn('[cos-fresh-grounded-task-error]',JSON.stringify({event:'reasoner_call_failed',travelTask,reason:error instanceof Error?error.message:String(error)}))
+    return null
+  })
+  if(!result?.text)console.warn('[cos-fresh-grounded-task-error]',JSON.stringify({event:'reasoner_returned_no_text',travelTask}))
   const parsed=result?.text?parseLocalResult(result.text):null
   const reply=parsed?.answer?.trim()||''
   if(!reply||hasUnsafePublicModelOutput(reply)||!groundedTaskReplyIsSubstantive(input,reply,travelTask)){
@@ -300,6 +304,53 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
   }
   const resolved=resolveCosReasoner()
   return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}
+}
+
+// TRAVEL-PLAN RESCUE (Sep 21 2026). A travel-planning request ("9 hours in Amsterdam, land at
+// Schiphol, cheap plan 9-18, transport, one paid attraction worth it") is routed to live evidence.
+// Both fresh lanes demand citation coverage that a full-day itinerary rarely gets from a handful of
+// web snippets, and the grounded-task lane needs a strict JSON envelope that a long non-English
+// plan can break. When both declined, the user got a failure message instead of a plan.
+// Owner doctrine (stated-assumption mode): complete the plan, use the live sources where they help,
+// and label every mutable specific (fares, hours, ticket prices) as something to check. Plain text
+// output, no JSON contract. Every decline is logged with its reason so no failure is silent.
+export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 60_000
+export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 3_000
+async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+  const evidence=(Array.isArray(sources)?sources:[]).slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
+  let result:Awaited<ReturnType<typeof callCosReasoner>>=null
+  try{
+    result=await callCosReasoner({
+      temperature:.3,
+      maxTokens:TRAVEL_PLAN_RESCUE_MAX_TOKENS,
+      disableThinking:true,
+      allowTruncatedText:true,
+      timeoutMs:TRAVEL_PLAN_RESCUE_TIMEOUT_MS,
+      allowConfiguredFallback:true,
+      usageContext:{feature:'cos_travel_plan_rescue',purpose:'travel_plan_rescue'},
+      systemPrompt:[
+        'You are COS. The user asked for a travel plan. Deliver the complete plan now. /no_think',
+        'Respect every constraint the user gave: arrival point, date, time window, budget, requested transport details, and whether to include a paid attraction.',
+        'Build the plan hour by hour with the transport between each stop.',
+        'Use the reference sources below where they help and cite them inline as their bracketed id. Where they do not cover a detail, use your best general knowledge and state it as an assumption.',
+        'Every fare, opening hour, ticket price or schedule must be marked as approximate and to be checked before the trip. Never present such a value as confirmed.',
+        'Never invent businesses, venues, routes or free services. If you are unsure something exists, leave it out.',
+        'Write only the plan for the user. No JSON, no preamble about sources or verification processes, no internal system language.',
+        language ? `Respond in the language the user wrote in; if unclear use ${reportLanguageName(language)}.` : 'Respond in the language the user wrote in.',
+      ].join(' '),
+      prompt:`USER REQUEST:\n${input.slice(0,8_000)}${evidence?`\n\nREFERENCE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}`,
+    })
+  }catch(error){
+    console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'reasoner_call_failed',reason:error instanceof Error?error.message:String(error)}))
+    return null
+  }
+  const reply=String(result?.text||'').replace(/<think>[\s\S]*?<\/think>/gi,'').trim()
+  if(!reply){console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'reasoner_returned_no_text'}));return null}
+  if(hasUnsafePublicModelOutput(reply)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'unsafe_public_output',replyChars:reply.length}));return null}
+  if(!groundedTaskReplyIsSubstantive(input,reply,false)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'echo_or_empty_draft',replyChars:reply.length}));return null}
+  if(reply.length<Math.max(360,Math.ceil(input.trim().length*1.25))){console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'draft_too_short',replyChars:reply.length}));return null}
+  const resolved=resolveCosReasoner()
+  return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:.5}
 }
 
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
@@ -386,7 +437,7 @@ export async function postCosPrimary(req:NextRequest){
   const fastEditAlreadyAttempted=req.headers.get('x-signalboost-fast-transform-attempted')==='1'
 
   // Fast text transforms remain the FIRST executable branch, but only for a verified edit intent.
-  // A miss is not terminal: the request falls through to the normal COS chain under the same turn.
+// A miss is not terminal: the request falls through to the normal COS chain under the same turn.
   if(!fastEditAlreadyAttempted&&isFastTextTransform(input,{previousAssistant:precedingAssistant})){
     const fast=await runFastTextTransform(input)
     if(fast){
@@ -695,6 +746,19 @@ export async function postCosPrimary(req:NextRequest){
       await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
       return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
+  }
+  if(freshHardFail&&!requestedAction&&requiresLiveTravelPlanningEvidence(lookupInput)){
+    const travelRescue=await runTravelPlanAssumptionRescue(lookupInput,language,freshSources)
+    if(travelRescue){
+      logEscalation({event:'travel_plan_rescue_completed',documents_acquired:freshSources.length,reasoner:travelRescue.reasonerLabel,strict_failure_code:freshFailureCode,external_ai_invoked:false,local_model_invoked:true})
+      const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:travelRescue.reasonerLabel,confidence:travelRescue.confidence,accepted:true})
+      const executionProvenance=freshRetrievedAt?attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true}):baseProvenance
+      ;Object.assign(executionProvenance as any,{policy:'travel_plan_stated_assumptions',assistant_text_used_for_resolution:false})
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:travelRescue.reply,source:'local_cos_reasoning',confidence:travelRescue.confidence,provenance:freshTelemetryProvenance(true,travelRescue.reasonerLabel),externalAiInvoked:false})
+      await writeCosPrimaryProvenance(userId,travelRescue.reply,executionProvenance,'cos-travel-plan-rescue',{prompt:lookupInput,answered:true,confidence:travelRescue.confidence,branch:'travel_plan_rescue'})
+      return NextResponse.json({ok:true,reply:travelRescue.reply,source:'cos-travel-plan-rescue',confidence_score:travelRescue.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:Boolean(freshSources.length),live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
+    logEscalation({event:'travel_plan_rescue_declined',documents_acquired:freshSources.length,strict_failure_code:freshFailureCode,external_ai_invoked:false,local_model_invoked:true})
   }
   const reason=freshHardFail?{code:freshFailureCode!,detail:freshFailureCode === 'local_synthesis_failed'
     ? 'Authoritative live evidence was retrieved, but bounded local synthesis failed after transport retries.'

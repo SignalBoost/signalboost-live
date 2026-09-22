@@ -59,3 +59,17 @@ test('compatibility layer can recover both legacy template and endpoint identity
   assert.match(compatibility, /assertEndpointSafetyPolicy\(endpoint\)/)
   assert.match(compatibility, /materializedEndpointMatches/)
 })
+
+
+test('slow exact-artifact readiness remains bounded preflight until the one model inference starts', () => {
+  assert.match(route, /waitForMassDistilledRuntimeReady\(\{endpointId:provisioned\.endpointId\}\)/)
+  assert.match(route, /reason:'runtime_warming'/)
+  assert.match(route, /providerComputeWakeStarted:true/)
+  assert.match(route, /retryableWithinApproval:true/)
+  const readyIndex = route.indexOf('waitForMassDistilledRuntimeReady({endpointId:provisioned.endpointId})')
+  const invocationIndex = route.indexOf('claim:INVOCATION_STARTED')
+  const inferenceIndex = route.indexOf('invokeMassDistilledRuntimeCanary({endpointId:provisioned.endpointId')
+  assert.ok(readyIndex >= 0)
+  assert.ok(invocationIndex > readyIndex)
+  assert.ok(inferenceIndex > invocationIndex)
+})

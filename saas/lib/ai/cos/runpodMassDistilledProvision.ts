@@ -21,6 +21,8 @@ const CANARY_TIMEOUT_MS = 35_000
 const MAX_GPU_PRICE_USD = 0.69
 const REQUEST_TIMEOUT_MS = 8_000
 const HEALTH_TIMEOUT_MS = 5_000
+const ENDPOINT_VISIBILITY_ATTEMPTS = 12
+const ENDPOINT_VISIBILITY_RETRY_MS = 2_000
 const APPROVED_POOLS = ['AMPERE_16', 'AMPERE_24'] as const
 
 export type MassDistilledRuntimeArtifact = Readonly<{
@@ -235,14 +237,14 @@ async function createMassEndpointViaGraphQl(input:{name:string;templateId:string
   let observedId=clean(created?.id,120)
   if(created?.type&&created.type!=='LB') throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
   if(created?.templateId&&clean(created.templateId,200)!==input.templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
-  for(let attempt=0;attempt<5;attempt+=1){
+  for(let attempt=0;attempt<ENDPOINT_VISIBILITY_ATTEMPTS;attempt+=1){
     const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
     const endpoint=(listed.endpoints||[]).find(item=>(observedId&&clean(item.id,120)===observedId)||clean(item.name,240)===input.name)
     if(endpoint?.id) return endpoint
     const official=await requestV1<RestEndpointIdentity[]>('/endpoints')
     const identity=official.find(item=>clean(item.name,240)===input.name&&clean(item.id,120))
     if(identity?.id) observedId=clean(identity.id,120)
-    if(attempt<4) await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)))
+    if(attempt<ENDPOINT_VISIBILITY_ATTEMPTS-1) await new Promise(resolve=>setTimeout(resolve,ENDPOINT_VISIBILITY_RETRY_MS))
   }
   if(!observedId) throw new Error('mass_distilled_runtime_endpoint_id_missing')
   throw new Error('mass_distilled_runtime_endpoint_policy_unavailable')
@@ -251,15 +253,16 @@ async function createMassEndpointViaGraphQl(input:{name:string;templateId:string
 async function recoverEndpointId(endpoint:Endpoint|undefined,endpointName:string):Promise<Endpoint|undefined>{
   if(endpoint?.id) return endpoint
   // RunPod's create response and v1 endpoint index can lag the v2 control plane briefly.
-  // Recover by the exact governed endpoint name, preferring v2, with a small bounded retry window.
-  for(let attempt=0;attempt<4;attempt+=1){
+  // Recover by the exact governed endpoint name, preferring v2, with the same bounded provider
+  // propagation window used after create. Never issue a second create while identity is settling.
+  for(let attempt=0;attempt<ENDPOINT_VISIBILITY_ATTEMPTS;attempt+=1){
     const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
     const v2=(listed.endpoints||[]).find(item=>clean(item.name,240)===endpointName&&clean(item.id,120))
     if(v2?.id) return v2
     const official=await requestV1<RestEndpointIdentity[]>('/endpoints')
     const v1=official.find(item=>clean(item.name,240)===endpointName&&clean(item.id,120))
     if(v1?.id) return {...(endpoint||{} as Endpoint),id:clean(v1.id,120),name:endpointName}
-    if(attempt<3) await new Promise(resolve=>setTimeout(resolve,750*(attempt+1)))
+    if(attempt<ENDPOINT_VISIBILITY_ATTEMPTS-1) await new Promise(resolve=>setTimeout(resolve,ENDPOINT_VISIBILITY_RETRY_MS))
   }
   return endpoint
 }

@@ -1,2 +1,2 @@
-base_sha=609efdad1fc2adedac31962105c2019760a4c039
-branch=fix/builder-playwright-cli-exact-browser-20260922
+base_sha=f8e0925f28928fdc8b26ca5322c3abe4d30bfeb5
+branch=fix/universal-mcp-nonsensitive-targets-20260922

@@ -78,12 +78,18 @@ export function residencyRequiredBeforeFinalEvaluation(subjectId: unknown): bool
   return isBuilderResidencySubject(subjectId)
 }
 
-export function finalEvaluationResidencyGate(input: { subjectId: unknown; standing?: string | null }) {
-  const required = residencyRequiredBeforeFinalEvaluation(input.subjectId)
+export function finalEvaluationResidencyGate(input: {
+  subjectId: unknown
+  standing?: string | null
+  gateEnforced?: boolean
+}) {
+  const programRequired = residencyRequiredBeforeFinalEvaluation(input.subjectId)
+  const enforced = programRequired && input.gateEnforced === true
   return Object.freeze({
-    required,
-    allowed: !required || input.standing === 'residency_complete',
-    reason: !required || input.standing === 'residency_complete'
+    required: programRequired,
+    enforced,
+    allowed: !enforced || input.standing === 'residency_complete',
+    reason: !enforced || input.standing === 'residency_complete'
       ? null
       : 'formal_residency_not_complete',
   })

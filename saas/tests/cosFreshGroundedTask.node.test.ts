@@ -7,10 +7,10 @@ import { join } from 'node:path'
 const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
 const localSynthesis = readFileSync(join(process.cwd(), 'lib/ai/cos/freshEvidenceLocalSynthesis.ts'), 'utf8')
 
-test('travel planning tries grounded task completion first, then retains shared fresh synthesis as recovery', () => {
+test('travel planning uses grounded task completion and does not fall through to the single-claim synthesizer', () => {
   const travelClassify = route.indexOf('const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)')
   const travelGrounded = route.indexOf('if(!requestedAction&&liveTravelTask)')
-  const sharedFresh = route.indexOf('if(!requestedAction){', travelGrounded)
+  const sharedFresh = route.indexOf('if(!requestedAction&&!liveTravelTask)', travelGrounded)
   assert.ok(travelClassify > 0)
   assert.ok(travelGrounded > travelClassify)
   assert.ok(sharedFresh > travelGrounded)
@@ -23,6 +23,7 @@ test('grounded interactive task completion is bounded, JSON-enforced and disable
   assert.match(route, /disableThinking:true/)
   assert.match(route, /timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS/)
   assert.match(route, /usageContext:\{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'\}/)
+  assert.match(route, /allowConfiguredFallback:true/)
   assert.match(route, /\/no_think/)
 })
 
@@ -40,20 +41,18 @@ test('travel failure does not invoke the grounded task synthesizer a second time
 })
 
 
-test('a grounded travel miss falls through to the shared live-evidence synthesizer before failure is recorded', () => {
+test('a grounded travel miss records local synthesis failure and skips the single-claim shared synthesizer', () => {
   const travelBlock = route.indexOf('if(!requestedAction&&liveTravelTask)')
   const groundedDeclined = route.indexOf("event:'fresh_grounded_task_declined'", travelBlock)
-  const sharedSynthesis = route.indexOf('if(!requestedAction){', groundedDeclined)
+  const travelFailure = route.indexOf("freshLocalFailureCode='local_synthesis_failed'", travelBlock)
+  const sharedSynthesis = route.indexOf('if(!requestedAction&&!liveTravelTask)', groundedDeclined)
   const localCall = route.indexOf('synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})', sharedSynthesis)
-  const localFailureWrite = route.indexOf('freshLocalFailureCode=localSynthesis.kind', localCall)
   assert.ok(travelBlock > 0)
-  assert.ok(groundedDeclined > travelBlock)
+  assert.ok(travelFailure > travelBlock && travelFailure < groundedDeclined)
   assert.ok(sharedSynthesis > groundedDeclined)
   assert.ok(localCall > sharedSynthesis)
-  assert.ok(localFailureWrite > localCall)
-  const between = route.slice(groundedDeclined, localCall)
-  assert.doesNotMatch(between, /freshLocalFailureCode='local_synthesis_failed'/)
-  assert.match(between, /fallthrough:'shared_local_synthesizer'/)
+  assert.match(route.slice(travelBlock, sharedSynthesis), /fallthrough:null/)
+  assert.doesNotMatch(route.slice(travelBlock, sharedSynthesis), /fallthrough:'shared_local_synthesizer'/)
 })
 
 test('once the fresh-evidence contract accepts a draft, review transport failures release that accepted draft', () => {

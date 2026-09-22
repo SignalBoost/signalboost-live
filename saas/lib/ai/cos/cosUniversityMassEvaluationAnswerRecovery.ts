@@ -34,6 +34,47 @@ export function recoverStoppedSoloMismatchedMarkerAnswer(text: string, caseId: s
 
 
 /**
+ * A solo retry has exactly one requested case. Production 2026-09-22 repeatedly returned finish=stop
+ * with the correct END marker, while the fingerprint reported open=0 and close=1. The existing
+ * missing-open recovery rejects any response containing "<<<ANSWER:", which means this shape carries
+ * one malformed/foreign opener rather than no opener at all. With one requested case, exactly one
+ * leading ANSWER-like opener and exactly one correct terminal closer are still unambiguous.
+ *
+ * Recover only that narrow wrapper shape. Thinking, truncation, multiple openers, extra END markers,
+ * embedded protocol markers, empty answers and trailing text remain fail-closed.
+ */
+export function recoverStoppedSoloForeignOpenCorrectCloseAnswer(text: string, caseId: string, finish: string): string | null {
+  if (finish !== 'stop' || /<\/?think>/i.test(text)) return null
+  const close = `<<<END:${caseId}>>>`
+  const closeAt = text.indexOf(close)
+  if (closeAt < 0 || text.indexOf(close, closeAt + close.length) >= 0) return null
+  const trailing = text.slice(closeAt + close.length).trim()
+  if (/<<<(?:ANSWER|END):/i.test(trailing)) return null
+
+  const beforeClose = text.slice(0, closeAt).trim()
+  if (!beforeClose.startsWith('<<<ANSWER:')) return null
+  if ((beforeClose.match(/<<<ANSWER:/g) || []).length !== 1 || /<<<END:/i.test(beforeClose)) return null
+
+  let answer = ''
+  const markerEnd = beforeClose.indexOf('>>>')
+  if (markerEnd >= 0) {
+    const opener = beforeClose.slice(0, markerEnd + 3)
+    if (!/^<<<ANSWER:[^>\r\n]{1,120}>>>$/i.test(opener)) return null
+    answer = beforeClose.slice(markerEnd + 3).trim()
+  } else {
+    const newlineAt = beforeClose.indexOf('\n')
+    if (newlineAt < 0) return null
+    const opener = beforeClose.slice(0, newlineAt).trim()
+    if (!/^<<<ANSWER:[^\r\n]{1,120}$/i.test(opener)) return null
+    answer = beforeClose.slice(newlineAt + 1).trim()
+  }
+
+  if (!answer || /<<<(?:ANSWER|END):/i.test(answer)) return null
+  return answer
+}
+
+
+/**
  * A solo retry has exactly one requested case. Production 2026-09-22 returned finish=stop with the
  * correct END marker, no ANSWER marker, no other marker and no thinking text. With one requested
  * case the non-empty body immediately before that sole correct closer is unambiguous. Truncated,
@@ -45,7 +86,9 @@ export function recoverStoppedSoloMissingOpenAnswer(text: string, caseId: string
   if (text.includes('<<<ANSWER:')) return null
   const closeAt = text.indexOf(close)
   if (closeAt < 0 || text.indexOf(close, closeAt + close.length) >= 0) return null
-  if (/<<<END:[^>\r\n]+>>>/.test(text.slice(0, closeAt)) || text.slice(closeAt + close.length).trim()) return null
+  const trailing = text.slice(closeAt + close.length).trim()
+  if (/<<<(?:ANSWER|END):/i.test(trailing)) return null
+  if (/<<<END:[^>\r\n]+>>>/.test(text.slice(0, closeAt))) return null
   const answer = text.slice(0, closeAt).trim()
   if (!answer || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(answer)) return null
   return answer

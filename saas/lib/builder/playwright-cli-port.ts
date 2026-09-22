@@ -151,7 +151,6 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
         PLAYWRIGHT_MCP_ALLOWED_ORIGINS: this.origins.join(';'),
         PLAYWRIGHT_MCP_ISOLATED: 'true',
         PLAYWRIGHT_MCP_HEADLESS: 'true',
-        PLAYWRIGHT_MCP_OUTPUT_MAX_SIZE: '1048576',
         PLAYWRIGHT_BROWSERS_PATH: BROWSER_CACHE,
       },
       tags: { surface: 'cos-builder-playwright-cli' },
@@ -169,11 +168,16 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
       if (install.exitCode !== 0) throw new Error(`builder_browser_cli_install_failed:${bounded(await install.stderr())}`)
 
       const browserDeps = await sandbox.runCommand({
-        cmd: 'node',
-        // Vercel Sandbox system-package changes must use the SDK-owned sudo boundary.
-        // Keep OS dependency installation separate from the unprivileged browser download.
-        args: [`${ROOT}/node_modules/playwright/cli.js`, 'install-deps', 'chromium'],
-        cwd: ROOT,
+        cmd: 'dnf',
+        // Vercel Sandbox uses an Amazon-Linux/RPM-family image. Playwright's install-deps
+        // path is apt-based on unsupported distros, so install the bounded Chromium runtime
+        // libraries explicitly through the SDK-owned sudo boundary.
+        args: [
+          'install', '-y',
+          'libXcomposite', 'libXdamage', 'libXrandr', 'libxkbcommon',
+          'pango', 'alsa-lib', 'atk', 'at-spi2-atk', 'cups-libs',
+          'libdrm', 'mesa-libgbm',
+        ],
         timeoutMs: BOOTSTRAP_TIMEOUT_MS,
         sudo: true,
       })
@@ -206,6 +210,16 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
       const browserExecutable = (await executableProbe.stdout()).trim()
       if (!browserExecutable) throw new Error('builder_browser_cli_browser_probe_failed:empty')
 
+      const runtimeProbe = await sandbox.runCommand({
+        cmd: browserExecutable,
+        args: ['--version'],
+        cwd: ROOT,
+        timeoutMs: COMMAND_TIMEOUT_MS,
+      })
+      if (runtimeProbe.exitCode !== 0) {
+        throw new Error(`builder_browser_cli_browser_deps_failed:${bounded(await runtimeProbe.stderr())}`)
+      }
+
       const config = JSON.stringify({
         browser: {
           browserName: 'chromium',
@@ -217,11 +231,9 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
           },
         },
         network: { allowedOrigins: this.origins },
-        saveSession: false,
         outputDir: `${ROOT}/artifacts`,
-        outputMaxSize: 1048576,
         console: { level: 'info' },
-        timeouts: { action: 5000, navigation: 30000, settle: 500 },
+        timeouts: { action: 5000, navigation: 30000 },
       })
       await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', '--', `${ROOT}/.playwright`], timeoutMs: COMMAND_TIMEOUT_MS })
       await sandbox.writeFiles([{ path: CLI_CONFIG, content: Buffer.from(config) }])

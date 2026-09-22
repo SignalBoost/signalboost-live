@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { classifyProviderFailure, openProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
 import {
   HUGGING_FACE_JOBS_API,
   huggingFaceJobsConfigFromEnv,
@@ -123,7 +124,7 @@ async function record(input: {
   if (inserted.error) throw inserted.error
 }
 
-/** Read-only diagnostics for terminal provider jobs already settled by the reconciler. */
+/** Diagnose settled provider failures and open the generic Self-Healing circuit before any later paid retry. */
 export async function diagnoseFailedMassDistillationHuggingFaceJobs(input: {
   maxJobs?: number
   fetchImpl?: FetchPort
@@ -147,19 +148,30 @@ export async function diagnoseFailedMassDistillationHuggingFaceJobs(input: {
     const jobId = clean((run as any).training_job_id || (run as any).preparation_job_id || (run as any).teacher_job_id, 240)
     if (!JOB_ID.test(jobId)) continue
     const candidateId = String((run as any).candidate_id || '')
-    if (!candidateId || await alreadyRecorded(candidateId, jobId)) continue
+    if (!candidateId) continue
     try {
+      const wasRecorded = await alreadyRecorded(candidateId, jobId)
       const logTail = await fetchHuggingFaceJobLogTail({ namespace, jobId, token: hf.token, limit: 40, fetchImpl: input.fetchImpl })
-      await record({
-        candidateId,
-        subjectId: String((run as any).subject_id || ''),
-        campaignId: String((run as any).campaign_id || ''),
-        batchKey: String((run as any).batch_key || ''),
-        runId: String((run as any).id || ''),
-        jobId,
-        logTail,
+      if (!wasRecorded) {
+        await record({
+          candidateId,
+          subjectId: String((run as any).subject_id || ''),
+          campaignId: String((run as any).campaign_id || ''),
+          batchKey: String((run as any).batch_key || ''),
+          runId: String((run as any).id || ''),
+          jobId,
+          logTail,
+        })
+      }
+      const classification = classifyProviderFailure(logTail)
+      const circuit = await openProviderCircuit({
+        db,
+        providerId: 'huggingface',
+        capability: 'model-training',
+        classification,
+        evidence: { candidateId, jobId, runId: String((run as any).id || ''), source: PROFILE },
       })
-      diagnostics.push({ runId: (run as any).id, jobId, logLines: logTail.length, recorded: true })
+      diagnostics.push({ runId: (run as any).id, jobId, logLines: logTail.length, recorded: !wasRecorded, classification, circuit })
     } catch (error) {
       diagnostics.push({
         runId: (run as any).id,
@@ -169,5 +181,5 @@ export async function diagnoseFailedMassDistillationHuggingFaceJobs(input: {
       })
     }
   }
-  return { ok: true as const, inspected: diagnostics.length, diagnostics, readOnly: true as const }
+  return { ok: true as const, inspected: diagnostics.length, diagnostics, providerMutation: false as const, circuitControlApplied: true as const }
 }

@@ -2,6 +2,7 @@
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { closeProviderCircuit, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
 import {
   classifyMassDistillationRights,
   MASS_DISTILLATION_MIN_CONFIDENCE,
@@ -1100,6 +1101,25 @@ export async function runMassDistillationCampaignConsumer(input: {
   const db = cosServiceDb()
   if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
 
+  // Self-Healing provider circuit is checked before claiming any paid stage. A deterministic
+  // provider failure (quota/storage/billing/auth/config/request) must never spend money merely
+  // to rediscover the same condition. This is provider/capability scoped, not a global halt.
+  const providerCircuit = await readProviderCircuit({ db, providerId: 'huggingface', capability: 'model-training' })
+  if (providerCircuit.open && !providerCircuit.costBearingRetryAllowed) {
+    return {
+      ok: false as const,
+      skipped: true as const,
+      reason: 'provider_circuit_open' as const,
+      providerId: 'huggingface' as const,
+      capability: 'model-training' as const,
+      failureClass: providerCircuit.failureClass,
+      circuitReason: providerCircuit.reason,
+      dispatched: 0,
+      externalCostUsd: 0,
+      authorityExpanded: false,
+    }
+  }
+
   const maxDispatches = Math.max(1, Math.min(5, Math.floor(input.maxDispatches ?? 3)))
   const campaigns = await db.from('cos_university_mass_distillation_campaigns')
     .select('id,status,max_total_cost_usd,committed_cost_usd,expires_at')
@@ -1358,6 +1378,15 @@ export async function recordMassDistillationWorkerEvidence(
         trainingMode: 'distillation', trainingReceipt,
       },
       verifier: 'training_executor',
+    })
+    // A signed callback carrying a durable uploaded artifact proves the provider's model-training
+    // write path recovered. Close only this provider/capability circuit; unrelated circuits remain.
+    await closeProviderCircuit({
+      db,
+      providerId: 'huggingface',
+      capability: 'model-training',
+      verification: { claim, candidateId, jobId, trainedArtifactId, artifactHash: trainedArtifactHash, evidenceRef },
+      now: new Date(now),
     })
     return { ok: true as const, campaignId: run.campaign_id, batchKey: run.batch_key, nextStage: 'trained_pending_rollback' as const }
   }

@@ -157,7 +157,7 @@ test('out-of-band Actions remediation force-cancels a proven stale run after nor
 test('out-of-band Actions remediation purges an old orphaned queued run after both cancel endpoints conflict', async () => {
   const calls: string[] = []
   const nowMs = Date.parse('2026-09-22T15:00:00.000Z')
-  const old = '2026-09-20T14:00:00.000Z'
+  const old = '2026-09-01T14:00:00.000Z'
 
   const fetcher: typeof fetch = async input => {
     const url = new URL(String(input))
@@ -219,4 +219,59 @@ test('out-of-band Actions remediation purges an old orphaned queued run after bo
   assert.ok(calls.includes('/repos/SignalBoost/signalboost-live/actions/runs/10/force-cancel'))
   assert.ok(calls.includes('/repos/SignalBoost/signalboost-live/actions/runs/10/jobs?per_page=1'))
   assert.ok(calls.includes('/repos/SignalBoost/signalboost-live/actions/runs/10'))
+})
+
+test('out-of-band Actions remediation retains sub-14-day provider ghosts without repeated cancellation traffic', async () => {
+  const calls: string[] = []
+  const nowMs = Date.parse('2026-09-22T15:00:00.000Z')
+  const old = '2026-09-15T10:25:49.000Z'
+
+  const fetcher: typeof fetch = async input => {
+    const url = new URL(String(input))
+    calls.push(`${url.pathname}${url.search}`)
+
+    if (url.pathname.endsWith('/git/ref/heads/main')) return json({ object: { sha: MAIN } })
+    if (url.pathname.endsWith('/actions/runs')) {
+      if (url.searchParams.get('status') === 'queued') {
+        return json({ workflow_runs: [
+          {
+            id: 11,
+            name: 'provider-retained-ghost',
+            head_branch: 'fix/provider-retained-ghost',
+            head_sha: OLD_PR,
+            status: 'queued',
+            conclusion: null,
+            created_at: old,
+            updated_at: old,
+            pull_requests: [],
+          },
+        ] })
+      }
+      return json({ workflow_runs: [] })
+    }
+    if (url.pathname.endsWith('/pulls')) return json([])
+    if (url.pathname.endsWith('/git/ref/heads/fix%2Fprovider-retained-ghost')) {
+      return json({ object: { sha: OLD_PR } })
+    }
+    throw new Error(`unexpected request: ${url.pathname}${url.search}`)
+  }
+
+  const result = await runGitHubActionsBacklogRemediation({
+    env: {
+      GITHUB_WRITE_TOKEN: 'test-token',
+      GITHUB_REPOSITORY: 'SignalBoost/signalboost-live',
+    },
+    fetcher,
+    nowMs,
+    minAgeMs: 10 * 60_000,
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.eligible, 0)
+  assert.equal(result.retainedGhosts, 1)
+  assert.equal(result.cancelled, 0)
+  assert.equal(result.purged, 0)
+  assert.equal(result.errors, 0)
+  assert.equal(calls.some(path => path.includes('/actions/runs/11/cancel')), false)
+  assert.equal(calls.some(path => path.includes('/actions/runs/11/force-cancel')), false)
 })

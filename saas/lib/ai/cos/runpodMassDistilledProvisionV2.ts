@@ -277,7 +277,9 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
 export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeArtifact) {
   try {
     const provisioned = await provisionLegacyMassDistilledRuntime(input)
-    const endpoint = await constrainEndpointToApprovedGpu(String(provisioned.endpointId))
+    const endpoint = await restoreRetiredEndpointCapacity(
+      await constrainEndpointToApprovedGpu(String(provisioned.endpointId)),
+    )
     return Object.freeze({
       ...provisioned,
       workersMin: Number(endpoint.workers?.min),

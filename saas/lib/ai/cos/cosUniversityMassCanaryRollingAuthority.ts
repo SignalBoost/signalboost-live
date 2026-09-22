@@ -188,14 +188,23 @@ export function decideMassCanaryRollingApproval(input: {
   if (!input.enabled) return { issue: false, reason: 'mass_canary_rolling_authorization_disabled' }
   const nowMs = input.now.getTime()
 
-  const issuedInWindow = input.events.filter(event => event.verifier === 'host_controller'
-    && claim(event) === MASS_CANARY_APPROVAL_CLAIM
-    && event.evidence?.authorizationRef === MASS_CANARY_ROLLING_AUTHORIZATION_REF
-    && at(event.observedAt) > nowMs - MASS_CANARY_ROLLING_WINDOW_HOURS * 3600_000).length
-  if (issuedInWindow >= MASS_CANARY_ROLLING_MAX_APPROVALS) return { issue: false, reason: 'mass_canary_rolling_window_exhausted' }
-
   const valid = input.artifacts
     .filter(artifact => artifact.candidateId.startsWith('mass:') && HEX64.test(artifact.artifactHash) && artifact.subjectId)
+
+  // Budget the rolling window by provider invocations that actually started, plus any currently
+  // armed approval that can still become one. Expired approvals that were never invoked consumed
+  // neither provider work nor canary spend and therefore must not create an artificial blackout.
+  // This preserves the same maximum potential spend: at most 18 started-or-still-reserved canaries
+  // per six hours, each already bounded to <= $0.20 by the approval contract.
+  const rollingWindowStart = nowMs - MASS_CANARY_ROLLING_WINDOW_HOURS * 3600_000
+  const invokedInWindow = input.events.filter(event => event.verifier === 'host_controller'
+    && claim(event) === 'local_distilled_runtime_canary_invocation_started'
+    && event.evidence?.profile === MASS_CANARY_PROFILE
+    && at(event.observedAt) > rollingWindowStart).length
+  const armedReservations = valid.filter(artifact => armedApproval(forArtifact(input.events, artifact), nowMs)).length
+  if (invokedInWindow + armedReservations >= MASS_CANARY_ROLLING_MAX_APPROVALS) {
+    return { issue: false, reason: 'mass_canary_rolling_window_exhausted' }
+  }
 
   const builderProofArtifact = (artifact: CanaryArtifact) =>
     artifact.subjectId === 'Computer Science & Coding'

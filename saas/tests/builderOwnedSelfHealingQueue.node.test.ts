@@ -29,6 +29,12 @@ test('Builder continuation auth still precedes all queue reads and execution', (
   assert.ok(ownedIndex < runIndex)
 })
 
+test('Builder continuation cron exposes a distinct owner Playwright CLI canary lane', () => {
+  assert.match(route, /builderPlaywrightCliCanary/)
+  assert.match(route, /queuedOwnedRepair\('builderPlaywrightCliCanary', 'playwright-cli-canary'\)/)
+  assert.match(route, /playwrightCliCanaryQueued:/)
+})
+
 test('Builder continuation response exposes site and Audit pickup independently', () => {
   assert.match(route, /ownedSiteRepairQueued:/)
   assert.match(route, /ownedAuditRepairQueued:/)

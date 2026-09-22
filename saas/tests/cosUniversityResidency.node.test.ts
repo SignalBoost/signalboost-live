@@ -4,39 +4,59 @@ import {
   BUILDER_RESIDENCY_COMPETENCIES,
   assessBuilderResidency,
   decideBuilderResidencyAdmission,
+  finalEvaluationResidencyGate,
   type BuilderResidencyEvidence,
 } from '../lib/ai/cos/cosUniversityResidency.ts'
 
 const HASH = 'a'.repeat(64)
-const HEALTH = 'b'.repeat(64)
-const ACTIVATION = 'c'.repeat(64)
+const REVISION = 'b'.repeat(64)
 
-test('Builder Residency admission requires an active exact graduate runtime and never expands authority', () => {
+test('Builder Residency admits a trained student before final evaluation and never expands authority', () => {
   const ok = decideBuilderResidencyAdmission({
-    registryId: 'registry-1',
+    artifactRowId: 'artifact-row-1',
     candidateId: 'mass:builder:1',
     subjectId: 'Computer Science & Coding',
+    trainedArtifactId: 'cadomos/itmounts-student-builder',
     trainedArtifactHash: HASH,
-    registryStatus: 'active',
-    runtimeHealthEvidenceHash: HEALTH,
-    activationEvidenceHash: ACTIVATION,
+    revisionKey: REVISION,
+    artifactStatus: 'evaluation_pending',
     authorityExpanded: false,
   })
   assert.equal(ok.eligible, true)
+  assert.equal(ok.formalEducationStage, 'practical_residency')
   assert.equal(ok.productionAuthorityExpanded, false)
 
   const blocked = decideBuilderResidencyAdmission({
-    registryId: 'registry-1',
+    artifactRowId: 'artifact-row-1',
     candidateId: 'mass:builder:1',
     subjectId: 'Computer Science & Coding',
+    trainedArtifactId: 'cadomos/itmounts-student-builder',
     trainedArtifactHash: HASH,
-    registryStatus: 'pending_runtime',
-    runtimeHealthEvidenceHash: HEALTH,
-    activationEvidenceHash: ACTIVATION,
+    revisionKey: REVISION,
+    artifactStatus: 'runtime_pending',
     authorityExpanded: false,
   })
   assert.equal(blocked.eligible, false)
-  assert.ok(blocked.blockers.includes('residency_runtime_not_active'))
+  assert.ok(blocked.blockers.includes('residency_trained_artifact_not_ready'))
+})
+
+test('Builder final evaluation is blocked until formal Residency completes', () => {
+  assert.deepEqual(finalEvaluationResidencyGate({
+    subjectId: 'Computer Science & Coding',
+    standing: 'senior_resident',
+  }), {
+    required: true,
+    allowed: false,
+    reason: 'formal_residency_not_complete',
+  })
+  assert.equal(finalEvaluationResidencyGate({
+    subjectId: 'Computer Science & Coding',
+    standing: 'residency_complete',
+  }).allowed, true)
+  assert.equal(finalEvaluationResidencyGate({
+    subjectId: 'Mathematics',
+    standing: null,
+  }).allowed, true)
 })
 
 function evidence(
@@ -104,7 +124,7 @@ test('duplicate cases do not manufacture competence', () => {
   assert.equal(assessment.competencies.find(x => x.competencyId === competency)?.state, 'supervised')
 })
 
-test('a verified failure requires remediation until two distinct newer passes exist', () => {
+test('a verified Residency failure requires remediation until two distinct newer passes exist', () => {
   const competency = 'failure_recovery'
   let assessment = assessBuilderResidency({
     candidateId: 'mass:builder:1',

@@ -1,2 +1,2 @@
-base_sha=57a1bf6bc2df59ea70f973864898d1916cb0084b
-branch=fix/builder-playwright-cli-sandbox-bootstrap-20260922
+base_sha=d0c51dad5d51a6fce9654b6886c807a7d7d7c514
+branch=fix/builder-playwright-cli-managed-image-20260922

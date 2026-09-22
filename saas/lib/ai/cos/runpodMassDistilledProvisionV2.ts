@@ -135,6 +135,21 @@ function runpodWorkerQuotaError(error: unknown) {
     .toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
 }
 
+async function withWorkerQuotaRecovery<T>(activeEndpointId: string, operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown = null
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      if (!runpodWorkerQuotaError(error)) throw error
+      lastError = error
+      await releaseOtherMassEndpointCapacity(activeEndpointId)
+      if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 750 * (attempt + 1)))
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('mass_distilled_runtime_worker_quota_full')
+}
+
 async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
   const protectedEndpointIds = await protectedRunpodEndpointIds()
@@ -186,13 +201,7 @@ async function constrainEndpointToApprovedGpu(endpointId: string, endpointName =
     method: 'PATCH',
     body: JSON.stringify({ gpu: { pools: [...APPROVED_POOLS], count: 1 } }),
   })
-  try {
-    endpoint = await patchGpu()
-  } catch (error) {
-    if (!runpodWorkerQuotaError(error)) throw error
-    await releaseOtherMassEndpointCapacity(String(endpoint.id))
-    endpoint = await patchGpu()
-  }
+  endpoint = await withWorkerQuotaRecovery(String(endpoint.id), patchGpu)
   if (!endpoint?.id) throw new Error('mass_distilled_runtime_gpu_pool_rebind_missing')
   assertEndpointSafetyPolicy(endpoint)
   return endpoint
@@ -214,14 +223,7 @@ async function restoreRetiredEndpointCapacity(endpoint: Endpoint) {
     method: 'PATCH',
     body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
   })
-  let restored: Endpoint
-  try {
-    restored = await restore()
-  } catch (error) {
-    if (!runpodWorkerQuotaError(error)) throw error
-    await releaseOtherMassEndpointCapacity(String(endpoint.id))
-    restored = await restore()
-  }
+  const restored = await withWorkerQuotaRecovery(String(endpoint.id), restore)
   if (!restored?.id) throw new Error('mass_distilled_runtime_capacity_restore_missing')
   if (Number(restored.workers?.max ?? Number.NaN) !== 1) throw new Error('mass_distilled_runtime_capacity_restore_rejected')
   assertEndpointSafetyPolicy(restored)

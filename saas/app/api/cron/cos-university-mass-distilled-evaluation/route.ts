@@ -528,7 +528,12 @@ export async function GET(req: NextRequest) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
 
-    const missingColumns = await evaluationSchemaMissingColumns()
+    let missingColumns: string[] | null
+    try {
+      missingColumns = await evaluationSchemaMissingColumns()
+    } catch (error) {
+      throw new Error(`mass_distilled_evaluation_schema_preflight_failed:${boundedErrorMessage(error)}`)
+    }
     if (missingColumns) {
       await recordProduction(false, {
         runnerInvoked: false,
@@ -547,7 +552,12 @@ export async function GET(req: NextRequest) {
       }, { status: 503 })
     }
 
-    const account = await queryRunpodAccountStatus()
+    let account: Awaited<ReturnType<typeof queryRunpodAccountStatus>>
+    try {
+      account = await queryRunpodAccountStatus()
+    } catch (error) {
+      throw new Error(`mass_distilled_evaluation_runpod_account_preflight_failed:${boundedErrorMessage(error)}`)
+    }
     if (account.clientBalance !== null && account.clientBalance < MIN_BALANCE_USD) {
       await recordProduction(false, {
         runnerInvoked: false,
@@ -557,7 +567,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'runpod_balance_guard', balance: account.clientBalance }, { status: 402 })
     }
 
-    const rolling = await ensureRollingMassEvaluationApproval()
+    let rolling: RollingOutcome
+    try {
+      rolling = await ensureRollingMassEvaluationApproval()
+    } catch (error) {
+      throw new Error(`mass_distilled_evaluation_rolling_preflight_failed:${boundedErrorMessage(error)}`)
+    }
     console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
     // A previous tick may already have issued a bounded approval that has not yet been atomically
     // claimed. Draining that approval does not mint new authority or expand spend: claimNext() re-validates

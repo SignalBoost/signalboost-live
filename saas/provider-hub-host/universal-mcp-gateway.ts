@@ -56,6 +56,7 @@ export interface UniversalMcpGatewayOptions {
   audit?: PortableConnectorAuditPort
   allowedGitHubRepos?: readonly string[]
   figmaAuthorization?: UniversalMcpFigmaAuthorization
+  toolAllowlistByProfile?: Readonly<Partial<Record<UniversalMcpProfileId, readonly string[]>>>
 }
 
 function required(value: unknown, name: string): string {
@@ -167,6 +168,7 @@ function httpProfiles(
   env: Environment,
   ready: readonly UniversalMcpProviderReadiness[],
   figmaAuthorization?: UniversalMcpFigmaAuthorization,
+  toolAllowlistByProfile?: Readonly<Partial<Record<UniversalMcpProfileId, readonly string[]>>>,
 ): readonly McpStreamableHttpProfile[] {
   const profiles: McpStreamableHttpProfile[] = []
   const gitToken = githubToken(env)
@@ -179,7 +181,7 @@ function httpProfiles(
       protocolVersion: GITHUB_MCP_PROFILE.protocolVersion,
       authorization: () => `Bearer ${gitToken}`,
       headers: Object.freeze({
-        'X-MCP-Tools': universalMcpToolNames(GITHUB_MCP_PROFILE).join(','),
+        'X-MCP-Tools': (toolAllowlistByProfile?.['github-mcp'] ?? universalMcpToolNames(GITHUB_MCP_PROFILE)).join(','),
         'X-MCP-Lockdown': 'true',
       }),
     }))
@@ -284,11 +286,12 @@ function guardGithubArguments(
 function guardedFactory(
   base: McpRegistryTransportFactory,
   allowedRepos: readonly string[],
+  toolAllowlistByProfile?: Readonly<Partial<Record<UniversalMcpProfileId, readonly string[]>>>,
 ): McpRegistryTransportFactory {
   return Object.freeze({
     create(input) {
       const profile = profileFor(input.serverId as UniversalMcpProfileId)
-      const allowedTools = new Set(universalMcpToolNames(profile))
+      const allowedTools = new Set(toolAllowlistByProfile?.[profile.profileId] ?? universalMcpToolNames(profile))
       const delegate = base.create(input)
       return Object.freeze({
         async send(call: McpOutboundTransportInput) {
@@ -328,14 +331,15 @@ export function createUniversalMcpGateway(options: UniversalMcpGatewayOptions) {
     environmentId,
     portableId,
     enabledProfiles,
+    toolAllowlistByProfile: options.toolAllowlistByProfile,
   }))
   const http = createMcpStreamableHttpTransportFactory({
-    profiles: httpProfiles(env, readiness, options.figmaAuthorization),
+    profiles: httpProfiles(env, readiness, options.figmaAuthorization, options.toolAllowlistByProfile),
     fetcher: options.fetcher,
   })
   const resolver = createMcpConnectionRegistryResolver({
     registry,
-    transportFactory: guardedFactory(http, allowedRepos),
+    transportFactory: guardedFactory(http, allowedRepos, options.toolAllowlistByProfile),
     timeoutMs: 30_000,
     maxTools: 128,
   })

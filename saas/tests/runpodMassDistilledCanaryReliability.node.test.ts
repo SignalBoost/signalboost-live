@@ -97,3 +97,15 @@ test('new mass canary endpoints pin the exact RunPod cached base-model revision'
   assert.match(provision, /modelReferences/)
   assert.match(provision, /mass_distilled_runtime_base_cache_binding_mismatch/)
 })
+
+
+test('new v4 templates recover delayed provider id visibility without duplicate creation', () => {
+  assert.match(provision, /async function recoverTemplateId\(template:Template\|undefined,templateName:string\)/)
+  assert.match(provision, /const exact=templates\.find\(item=>item\.name===templateName&&item\.isServerless!==false\)/)
+  assert.match(provision, /attempt<ENDPOINT_VISIBILITY_ATTEMPTS/)
+  assert.match(provision, /ENDPOINT_VISIBILITY_RETRY_MS/)
+  assert.match(provision, /template=await recoverTemplateId\(template,ids\.templateName\)/)
+  const provisionStart = provision.indexOf('export async function provisionMassDistilledRuntime')
+  const provisionBody = provision.slice(provisionStart)
+  assert.equal((provisionBody.match(/requestV1<Template>\('\/templates',\{method:'POST'/g) || []).length, 1)
+})

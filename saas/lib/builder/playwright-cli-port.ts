@@ -2,6 +2,7 @@ import { Sandbox } from '@vercel/sandbox'
 import type {
   BuilderBrowserCliAction,
   BuilderBrowserCliCapability,
+  BuilderBrowserCliFailureCode,
   BuilderBrowserCliPort,
 } from './contracts.ts'
 
@@ -28,6 +29,27 @@ type SandboxInstance = Awaited<ReturnType<typeof Sandbox.create>>
 
 function bounded(value: unknown): string {
   return String(value ?? '').slice(0, OUTPUT_LIMIT)
+}
+
+export function classifyBuilderPlaywrightCliFailure(value: unknown): BuilderBrowserCliFailureCode {
+  const message = String(value ?? '').toLowerCase()
+  if (/host system is missing dependencies|missing libraries|error while loading shared libraries|lib[a-z0-9_.+-]+\.so/.test(message)) {
+    return 'browser_missing_dependencies'
+  }
+  if (/executable doesn.?t exist|browser.+not installed|could not find.+(?:chrom|browser)|please run.+install/.test(message)) {
+    return 'browser_not_installed'
+  }
+  if (/failed to launch|browsertype\.launch|browser process|target page, context or browser has been closed/.test(message)) {
+    return 'browser_launch_failed'
+  }
+  if (/net::err_|navigation failed|page\.goto/.test(message)) return 'navigation_failed'
+  if (/origin.+(?:not allowed|rejected|blocked)|network.+(?:denied|blocked)|econnrefused|enotfound/.test(message)) {
+    return 'network_policy_failed'
+  }
+  if (/unknown (?:command|option)|unexpected argument|config.+(?:invalid|parse|json)|json.+(?:parse|invalid)/.test(message)) {
+    return 'config_invalid'
+  }
+  return 'cli_exit_nonzero'
 }
 
 function configuredOrigins(env: Environment): readonly string[] {
@@ -181,8 +203,8 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
   }) {
     if (!ACTIONS.includes(input.action)) throw new Error('builder_browser_cli_action_rejected')
     const args = commandArgs(input, this.origins)
-    const sandbox = await this.ready()
     try {
+      const sandbox = await this.ready()
       const result = await sandbox.runCommand({
         cmd: `${ROOT}/node_modules/.bin/playwright-cli`,
         args: [...args],
@@ -190,6 +212,9 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
         timeoutMs: COMMAND_TIMEOUT_MS,
       })
       const [stdout, stderr] = await Promise.all([result.stdout(), result.stderr()])
+      const failureCode = result.exitCode === 0
+        ? undefined
+        : classifyBuilderPlaywrightCliFailure(`${stderr}\n${stdout}`)
       const observed = {
         ok: result.exitCode === 0,
         action: input.action,
@@ -197,29 +222,38 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
         stdout: bounded(stdout),
         stderr: bounded(stderr),
         timedOut: false,
+        ...(failureCode ? { failureCode } : {}),
       } as const
       console.info('[builder_browser_cli_action]', {
         action: observed.action,
         ok: observed.ok,
         exitCode: observed.exitCode,
         timedOut: observed.timedOut,
+        ...(failureCode ? { failureCode } : {}),
       })
       return Object.freeze(observed)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'builder_browser_cli_execution_failed'
+      const timedOut = /timeout|timed out|SIGKILL/i.test(message)
+      const classified = classifyBuilderPlaywrightCliFailure(message)
+      const failureCode: BuilderBrowserCliFailureCode = timedOut
+        ? 'sandbox_execution_failed'
+        : classified === 'cli_exit_nonzero' ? 'sandbox_execution_failed' : classified
       const observed = {
         ok: false,
         action: input.action,
         exitCode: 124,
         stdout: '',
         stderr: bounded(message),
-        timedOut: /timeout|timed out|SIGKILL/i.test(message),
+        timedOut,
+        failureCode,
       } as const
       console.info('[builder_browser_cli_action]', {
         action: observed.action,
         ok: observed.ok,
         exitCode: observed.exitCode,
         timedOut: observed.timedOut,
+        failureCode: observed.failureCode,
       })
       return Object.freeze(observed)
     }

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
 
+// Budget-safety contract: the required audit workflow may push-run on main, not feature branches.
 const workflow = hydrateLocalizedSource(readFileSync(
   new URL('../../.github/workflows/audit-remediation-regression.yml', import.meta.url),
   'utf8',

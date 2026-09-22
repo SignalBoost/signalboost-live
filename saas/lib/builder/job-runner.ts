@@ -13,6 +13,7 @@ import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
 import { explainInitialBuilderRepair } from './explain-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
+import { createBuilderMcpReadPort } from './mcp-read-port.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
@@ -334,6 +335,12 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
     })
     const runner = new VercelSandboxBuilderRunner()
+    const mcp = createBuilderMcpReadPort({
+      tenantId: job.userId,
+      userId: job.userId,
+      environmentId: process.env.VERCEL_ENV || process.env.NODE_ENV || 'production',
+      ownerAuthorized: job.ownerAuthorized === true,
+    })
     const plan = debugPlan(job)
     const documentationPaths = !plan && isRepairObjective(job.objective)
       ? job.checkpoint ? job.checkpoint.documentationPaths ?? null : await classifyBuilderDocumentationIntent(ai, job.objective) : null
@@ -351,7 +358,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           ai,
           cognitiveSkills: cognitive.items,
         })
-      : await new BuilderToolLoop(ai, workspace, runner).run({
+      : await new BuilderToolLoop(ai, workspace, runner, mcp).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons,

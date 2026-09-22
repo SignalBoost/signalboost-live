@@ -1,4 +1,4 @@
-export type BuilderToolId = 'list_files' | 'read_file' | 'search_files' | 'write_file' | 'edit_file' | 'run' | 'model_control'
+export type BuilderToolId = 'list_files' | 'read_file' | 'search_files' | 'mcp_read' | 'write_file' | 'edit_file' | 'run' | 'model_control'
 export type BuilderFailureClass = 'storage' | 'path' | 'runtime' | 'dependency' | 'test' | 'deployment' | 'unknown'
 
 export type BuilderFile = Readonly<{ path: string; content: string; updatedAt: number }>
@@ -36,6 +36,26 @@ export interface BuilderRunnerPort {
 
 export interface BuilderAiPort {
   generate(input: { systemPrompt: string; prompt: string; maxTokens: number }): Promise<string | null>
+}
+
+export type BuilderMcpReadCapability = Readonly<{
+  providerId: string
+  capabilityId: string
+}>
+
+export interface BuilderMcpReadPort {
+  capabilities(): Promise<readonly BuilderMcpReadCapability[]>
+  invoke(input: {
+    providerId: string
+    capabilityId: string
+    args: Readonly<Record<string, unknown>>
+    traceId?: string
+  }): Promise<Readonly<{
+    ok: boolean
+    data?: unknown
+    error?: string
+    mode?: string
+  }>>
 }
 
 export type BuilderToolTrace = Readonly<{

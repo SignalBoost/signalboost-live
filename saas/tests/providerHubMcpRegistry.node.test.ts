@@ -110,6 +110,33 @@ test('registry rejects wildcard scope, duplicate mappings, unknown servers, and 
     servers: [{ serverId, displayName: 'CRM MCP', transportRef: 'buyer-host:crm', enabled: true, metadata: { apiKey: 'never-store-this' } as any }],
     assignments: [],
   }), /mcp_registry_secret_field_rejected/)
+
+  assert.throws(() => normalizeMcpConnectionRegistrySnapshot({
+    servers: [{ serverId, displayName: 'CRM MCP', transportRef: 'buyer-host:crm', enabled: true, metadata: { authorization: 'Bearer never-store-this' } as any }],
+    assignments: [],
+  }), /mcp_registry_secret_field_rejected/)
+
+  const safePolicy = normalizeMcpConnectionRegistrySnapshot({
+    servers: [{ serverId, displayName: 'CRM MCP', transportRef: 'buyer-host:crm', enabled: true }],
+    assignments: [{
+      assignmentId: 'policy-safe',
+      serverId,
+      tenantId,
+      environmentId,
+      portableId,
+      enabled: true,
+      tools: [{
+        remoteToolName: 'contacts.read',
+        capabilityId: 'crm.contacts.read',
+        providerId: 'crm-mcp',
+        connectionId: 'crm-primary',
+        risk: 'read',
+        requiresApproval: false,
+        metadata: { authorizationPolicy: 'provider_hub_host_enforced' },
+      }],
+    }],
+  })
+  assert.equal(safePolicy.assignments[0]?.tools[0]?.metadata?.authorizationPolicy, 'provider_hub_host_enforced')
 })
 
 test('consequential mappings cannot disable approval', () => {

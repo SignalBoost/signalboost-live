@@ -14,6 +14,19 @@ Direction: retain SignalBoost governance/Provider Hub as the authority layer; ge
 - Write/consequential capabilities remain subject to existing Portable Connector Runtime approval/audit gates and are never auto-authorized merely because an MCP server advertises them.
 
 
+## Builder Universal MCP read seam — 2026-09-21/22
+
+The durable Builder execution path now has a host-governed read-only Universal MCP seam rather than merely testing Universal MCP with `portableId=builder`.
+
+- `saas/lib/builder/mcp-read-port.ts` projects only capabilities whose host profile risk is `read`; GitHub writes/merge/actions, Supabase SQL/migrations/functions, Figma mutation, and every other write/consequential capability are absent from Builder's MCP tool loop.
+- Builder receives the exact configured capability catalog and may invoke it only through `mcp_read`; provider id and capability id must exactly match the host allowlist.
+- Context7 is safe for ordinary Builder sessions because it is public documentation. GitHub, Supabase, Figma, and Vercel currently use host-owned iTMounts credentials, so those reads are projected only into owner-authorized Builder jobs. Customer Builder sessions must never inherit iTMounts host credentials.
+- Figma screenshots and Supabase publishable-key retrieval are intentionally excluded from the Builder text-control seam.
+- MCP payloads are bounded turn-local evidence. Raw MCP result payloads are not persisted into Builder checkpoints; a resumed job must re-read current evidence through the governed port. Final public Builder traces retain only the existing sanitized metadata shape.
+- This seam does not grant repository writeback, database mutation, deployment authority, design mutation, browser interaction, or credential access. Platform Engineer and existing approval/audit boundaries remain authoritative for those actions.
+- Production acceptance still requires the exact Builder regression plus provider live certification. A configured profile or successful unit test is not runtime acceptance.
+
+
 ## Browser MCP tools — 2026-09-21
 
 Playwright MCP and Chrome DevTools MCP are now first-class governed browser-tool profiles for COS / Software Specialist / Builder-style portables.

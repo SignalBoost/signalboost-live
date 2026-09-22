@@ -8,12 +8,12 @@
 export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-17_mass_canary_without_manual_intervention' as const
 export const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1' as const
 export const MASS_CANARY_APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved' as const
-export const MASS_CANARY_ROLLING_WINDOW_HOURS = 24
-// 2026-09-17: 36 of 37 artifacts still need a canary, each taking 2-3 attempts because a cold RunPod worker often
-// misses the readiness window. At 24 approvals a day that is a multi-day drain of work that is already trained and
-// paid for. The ceiling is what bounds spend (<= $0.20 per canary), so it moves from 24 to 72: about $14.40/day
-// worst case, and one canary still runs at a time.
-export const MASS_CANARY_ROLLING_MAX_APPROVALS = 72
+// Smooth the same 72/day owner spend envelope across four 6-hour windows. A bursty 24-hour
+// counter allowed 98 historical approvals to leave the canary lane dark for ~16 hours even though
+// the one-canary semaphore and <= $0.20 per-canary ceiling were healthy. 18 per 6 hours preserves
+// the same nominal worst-case rate (72/day, <= $14.40/day) without a long post-burst blackout.
+export const MASS_CANARY_ROLLING_WINDOW_HOURS = 6
+export const MASS_CANARY_ROLLING_MAX_APPROVALS = 18
 export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // A cold-start timeout is the runtime never answering, not the artifact failing. It is retried without spending one
 // of the three substantive attempts, and the identical-repeat stop below still prevents an endless loop.

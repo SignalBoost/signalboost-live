@@ -882,15 +882,33 @@ export async function recoverMassDistillationCampaigns(input: {
   if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
   const maxCampaigns = Math.max(1, Math.min(10, Math.floor(input.maxCampaigns ?? 5)))
   const now = (input.now || new Date()).toISOString()
-  const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')
-    .select('id,campaign_id,batch_key,candidate_id,subject_id,updated_at,failure_reason')
-    .eq('stage', 'failed')
+  // Recover only failures that still belong to live, unexpired, unfinished campaign
+  // authority. Filtering campaigns first prevents a large historical failed-run backlog from
+  // consuming the page and hiding the exact campaigns that are currently occupying capacity.
+  const liveCampaigns = await db.from('cos_university_mass_distillation_campaigns')
+    .select('id')
+    .in('status', ['authorized', 'active', 'failed'])
+    .is('completed_at', null)
+    .gt('expires_at', now)
     .order('updated_at', { ascending: true })
-    .limit(maxCampaigns * 20)
-  if (failedRuns.error) throw failedRuns.error
+    .limit(100)
+  if (liveCampaigns.error) throw liveCampaigns.error
+  const liveCampaignIds = (liveCampaigns.data || []).map((row: any) => String(row.id)).filter(Boolean)
+
+  let failedRunRows: any[] = []
+  if (liveCampaignIds.length > 0) {
+    const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')
+      .select('id,campaign_id,batch_key,candidate_id,subject_id,updated_at,failure_reason')
+      .eq('stage', 'failed')
+      .in('campaign_id', liveCampaignIds)
+      .order('updated_at', { ascending: true })
+      .limit(maxCampaigns * 20)
+    if (failedRuns.error) throw failedRuns.error
+    failedRunRows = failedRuns.data || []
+  }
 
   const terminalized: Array<{ runId: string; campaignId: string; batchKey: string }> = []
-  for (const raw of (failedRuns.data || []) as any[]) {
+  for (const raw of failedRunRows as any[]) {
     const reason = clean(raw.failure_reason, 300)
     if (!terminalBatchFailure(reason)) continue
     const terminalizedAt = new Date().toISOString()
@@ -927,7 +945,7 @@ export async function recoverMassDistillationCampaigns(input: {
     terminalized.push({ runId: clean(raw.id, 80), campaignId: clean(raw.campaign_id, 80), batchKey })
   }
 
-  const retryableFailedRuns = (failedRuns.data || []).filter((row: any) =>
+  const retryableFailedRuns = failedRunRows.filter((row: any) =>
     !terminalBatchFailure(clean(row.failure_reason, 300))
   )
   const candidateIds = [...new Set(retryableFailedRuns.map((row: any) => String(row.campaign_id)))].filter(Boolean)

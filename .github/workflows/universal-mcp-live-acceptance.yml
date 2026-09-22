@@ -1,6 +1,7 @@
 name: Universal MCP Live Acceptance
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
     paths:

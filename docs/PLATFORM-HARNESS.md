@@ -158,3 +158,22 @@ trained immutable artifact
 
 Hidden final-exam material is forbidden from Residency. The independent verifier, not the resident
 worker, owns failure attribution between competency and infrastructure.
+
+
+## Builder Residency orchestration
+
+The Residency scheduler is bounded to one enrolled artifact/case per invocation. It selects remediation
+work first, otherwise the next unseen practical case, executes only through the shared Platform Harness,
+persists case/competency evidence, and then delegates educational-standing persistence to the canonical
+Residency assessment store.
+
+The scheduler never enables the final-evaluation Residency gate, grants Production traffic, or authorizes
+promotion.
+
+Current practical-case coverage is intentionally reported rather than hidden: the first catalog covers
+3 of the 13 Builder competencies. When those available cases are exhausted, the scheduler returns
+`waiting_for_residency_cases` with the missing competency list instead of manufacturing completion.
+The next Residency workstream is therefore to add distinct, rights-safe practical case families for the
+remaining competencies, especially Vercel recovery, Supabase diagnosis, Playwright verification,
+Chrome DevTools evidence, rollback judgment, MCP recovery, security/authority compliance, repository
+navigation, TypeScript/Next.js repair, and cross-specialist escalation.

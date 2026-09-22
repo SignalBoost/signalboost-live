@@ -62,6 +62,45 @@ test('Builder can consume a governed MCP read and use its result in the next rea
   assert.match(prompts[1] || '', /Route Handlers use the Web Request and Response APIs/)
 })
 
+test('Builder checkpoint drops raw MCP evidence and allows a resumed job to re-read it', async () => {
+  let mcpCalls = 0
+  const mcp: BuilderMcpReadPort = {
+    async capabilities() {
+      return [{ providerId: 'context7-mcp', capabilityId: 'mcp.context7-mcp.docs.query' }]
+    },
+    async invoke() {
+      mcpCalls += 1
+      return { ok: true, data: { privateTurnEvidence: 'DO_NOT_PERSIST_MCP_PAYLOAD' } }
+    },
+  }
+  const ai = {
+    async generate() {
+      return JSON.stringify({
+        type: 'tool',
+        toolId: 'mcp_read',
+        input: {
+          providerId: 'context7-mcp',
+          capabilityId: 'mcp.context7-mcp.docs.query',
+          args: { libraryId: '/vercel/next.js', query: 'route handlers' },
+        },
+      })
+    },
+  }
+
+  const result = await new BuilderToolLoop(ai, new InMemoryBuilderWorkspace(), idleRunner, mcp).run({
+    objective: 'Read current documentation.',
+    workspaceId: 'builder-mcp-checkpoint',
+    maxRounds: 3,
+    shouldPause: () => mcpCalls > 0,
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok || !result.checkpoint) assert.fail('checkpoint required')
+  assert.equal(result.trace.some(item => item.toolId === 'mcp_read' && item.ok), true)
+  assert.equal(result.checkpoint.trace.some(item => item.toolId === 'mcp_read'), false)
+  assert.equal(JSON.stringify(result.checkpoint).includes('DO_NOT_PERSIST_MCP_PAYLOAD'), false)
+})
+
 test('Builder MCP catalog contains reads only and excludes credential/binary-oriented reads', () => {
   for (const capability of BUILDER_MCP_READ_CATALOG) {
     const profile = UNIVERSAL_MCP_PROFILES.find(item => item.profileId === capability.providerId)

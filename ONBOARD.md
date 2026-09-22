@@ -25,7 +25,7 @@ iTMounts Platform
 
 Canonical profiles are: `residency`, `production`, `sandbox`, `self_healing`, `security_lab`, `replay`, and `evaluation_runtime`. They share one execution architecture. A profile may **reduce** capability, environment, budget, time, or learning behavior, but it may never create or widen authority.
 
-The executable manifest is the intersection of **requested work + profile constraints + an already-verified Referee/Guardian/host authority envelope**. Every executable action still passes through `agent-gateway/runGoverned()`; the harness cannot mint approval, route around a halt, widen Production scope, grant spend, promote a model, or convert task success into authority.
+The executable surface is the intersection of **requested work + profile constraints + an already-verified Referee/Guardian/host authority envelope + Provider Hub capabilities actually assigned and available for the exact tenant/environment/portable identity**. Every executable action still passes through `agent-gateway/runGoverned()`; the harness cannot mint approval, route around a halt, widen Production scope, grant spend, promote a model, or convert task success into authority.
 
 Ownership stays separated:
 
@@ -49,10 +49,11 @@ Canonical lifecycle:
 
 ```text
 curriculum -> frontier faculty / distillation -> immutable trained artifact
--> exact-artifact RunPod canary + rollback proof
--> independent holdout / safety / unseen-transfer / delayed-retention evaluation
 -> Residency (sandboxed supervised practical work)
--> durable competency evidence
+-> competency gaps / targeted remediation / retraining as needed
+-> Residency completion
+-> exact-artifact final canary + rollback proof
+-> independent holdout / safety / unseen-transfer / delayed-retention final evaluation
 -> graduate registry / separately governed activation
 -> verified Production outcomes
 -> continuing education / remediation / recertification
@@ -72,7 +73,7 @@ Residency also trains the **organization**. Cases may require a resident to reco
 
 Builder is the first implementation because practical outcomes are independently observable and it is the next high-value specialist lane. Initial cases should cover GitHub repository navigation/root-cause analysis, TypeScript/Next.js repair, Vercel deployment diagnosis/recovery, Supabase diagnosis, Playwright/browser verification, Chrome DevTools evidence, test/regression construction, rollback, MCP selection/recovery, security/authority boundaries, and recovery from an initially wrong diagnosis. The first release should start small (roughly 20-30 high-quality case families with hidden variants) and expand by measured competency gaps, not by raw volume.
 
-A qualifying Computer Science artifact still must clear the existing University gates. Residency does not shortcut Builder apprenticeship; it makes apprenticeship evidence practical, durable, and competency-specific. Production outcomes from an activated graduate may later become sanitized verified case inputs for continuing education.
+A qualifying Computer Science artifact enters Residency as a trained immutable student artifact before final canary/exams. Residency does not shortcut those gates; it supplies practical teaching and competency evidence before the unchanged final canary, independent examinations, graduation, and separately governed activation. Production outcomes from an activated graduate may later become sanitized verified case inputs for continuing education.
 
 ### University recovery/status handoff — 2026-09-22
 

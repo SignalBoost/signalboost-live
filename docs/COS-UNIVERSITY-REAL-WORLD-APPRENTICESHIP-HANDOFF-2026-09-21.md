@@ -1,5 +1,7 @@
 # COS University Real-World Apprenticeship Handoff
 
+> **2026-09-22 architecture correction:** the teaching/practice portion described here is now formal **Residency inside University education**, before final canary/evaluation/graduation. Post-graduation bounded company work remains valuable as continuing-education/recertification evidence, but it is no longer the primary Residency teaching stage. See `docs/COS-UNIVERSITY-RESIDENCY-2026-09-22.md` and the Residency invariant in `ONBOARD.md`.
+
 **Date:** September 21, 2026  
 **Repository:** `SignalBoost/signalboost-live`  
 **Public product:** iTMounts  

@@ -316,7 +316,7 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
 // output, no JSON contract. Every decline is logged with its reason so no failure is silent.
 export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 60_000
 export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 3_000
-async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const evidence=(Array.isArray(sources)?sources:[]).slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
   const languageLine=language ? `Write the plan in the language the traveller wrote in; if unclear use ${reportLanguageName(language)}.` : 'Write the plan in the language the traveller wrote in.'
   const rules=[
@@ -361,14 +361,16 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
         prompt:attempt.prompt,
       })
     }catch(error){
-      console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'reasoner_call_failed',reason:error instanceof Error?error.message:String(error)}))
+      const reason=error instanceof Error?error.message:String(error)
+      console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'reasoner_call_failed',reason}))
+      declines.push(`attempt ${index+1}: reasoner_call_failed (${reason.slice(0,160)})`)
       continue
     }
     const reply=String(result?.text||'').replace(/<think>[\s\S]*?<\/think>/gi,'').replace(/^\s*<think>[\s\S]*$/i,'').trim()
-    if(!reply){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'reasoner_returned_no_text'}));continue}
-    if(hasUnsafePublicModelOutput(reply)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'unsafe_public_output',replyChars:reply.length}));continue}
-    if(!groundedTaskReplyIsSubstantive(input,reply,false)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'echo_or_empty_draft',replyChars:reply.length}));continue}
-    if(reply.length<Math.max(360,Math.ceil(input.trim().length*1.25))){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'draft_too_short',replyChars:reply.length}));continue}
+    if(!reply){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'reasoner_returned_no_text'}));declines.push(`attempt ${index+1}: reasoner_returned_no_text (raw ${String(result?.text||'').length} chars)`);continue}
+    if(hasUnsafePublicModelOutput(reply)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'unsafe_public_output',replyChars:reply.length}));declines.push(`attempt ${index+1}: unsafe_public_output (${reply.length} chars)`);continue}
+    if(!groundedTaskReplyIsSubstantive(input,reply,false)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'echo_or_empty_draft',replyChars:reply.length}));declines.push(`attempt ${index+1}: echo_or_empty_draft (${reply.length} chars, starts: "${reply.slice(0,120).replace(/\s+/g,' ')}")`);continue}
+    if(reply.length<Math.max(360,Math.ceil(input.trim().length*1.25))){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'draft_too_short',replyChars:reply.length}));declines.push(`attempt ${index+1}: draft_too_short (${reply.length} chars, starts: "${reply.slice(0,120).replace(/\s+/g,' ')}")`);continue}
     const resolved=resolveCosReasoner()
     return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:.5}
   }
@@ -769,8 +771,14 @@ export async function postCosPrimary(req:NextRequest){
       return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
   }
-  if(freshHardFail&&!requestedAction&&requiresLiveTravelPlanningEvidence(lookupInput)){
-    const travelRescue=await runTravelPlanAssumptionRescue(lookupInput,language,freshSources)
+  // OWNER-ONLY DIAGNOSTIC (Sep 21 2026): the owner cannot read Vercel logs, so for privileged turns the
+  // travel-plan decision trail is appended to the failure reply he already sees. Never for public turns.
+  const travelRescueDeclines:string[]=[]
+  const travelTaskDetected=requiresLiveTravelPlanningEvidence(lookupInput)
+  let travelRescueReached=false
+  if(freshHardFail&&!requestedAction&&travelTaskDetected){
+    travelRescueReached=true
+    const travelRescue=await runTravelPlanAssumptionRescue(lookupInput,language,freshSources,travelRescueDeclines)
     if(travelRescue){
       logEscalation({event:'travel_plan_rescue_completed',documents_acquired:freshSources.length,reasoner:travelRescue.reasonerLabel,strict_failure_code:freshFailureCode,external_ai_invoked:false,local_model_invoked:true})
       const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:travelRescue.reasonerLabel,confidence:travelRescue.confidence,accepted:true})
@@ -796,7 +804,11 @@ export async function postCosPrimary(req:NextRequest){
     if(requiresFreshEvidence)Object.assign(executionProvenance as any,{policy:'fresh_live_data_local_first',assistant_text_used_for_resolution:false})
     const normativeEvidenceFallback=freshHardFail?buildNormativeFreshEvidenceFallback({input:lookupInput,sources:freshSources,language}):null
     const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback))
-    const reply=partialFreshOfficeHolderReply??normativeEvidenceFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language}))),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
+    const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})))
+    const ownerDiagnostic=isPrivileged&&requiresFreshEvidence&&!partialFreshOfficeHolderReply&&!normativeEvidenceFallback
+      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA||'unknown').slice(0,7)}\nstrict synthesis: ${freshFailureCode??'n/a'} · sources: ${freshSources.length}\ntravel task detected: ${travelTaskDetected} · external action: ${requestedAction} · travel-plan step reached: ${travelRescueReached}${travelRescueDeclines.length?`\n${travelRescueDeclines.join('\n')}`:''}`
+      : ''
+    const reply=baseFailureReply+ownerDiagnostic,liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
     const completionSource=normativeEvidenceFallback?'cos-fresh-normative-evidence-map':partialCompletion?'cos-fresh-partial-grounded':'failed_closed'
     await writeCosPrimaryProvenance(userId,reply,executionProvenance,completionSource,{prompt:requiresFreshEvidence?lookupInput:input,answered:partialCompletion,confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):0,branch:normativeEvidenceFallback?'fresh_normative_evidence_map':partialCompletion?'fresh_partial_grounded':'failed_closed'})
     return NextResponse.json({ok:partialCompletion,reply,error:partialCompletion?undefined:reply,source:completionSource,partial_completion:partialCompletion,cos_first_attempted:requiresFreshEvidence?freshLocalAttempted:(Boolean(cos)||Boolean(localError)),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,fresh_failure_class:freshFailureCode,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:requiresFreshEvidence,live_evidence_sources:requiresFreshEvidence?freshSources.map(source=>({id:source.id,title:source.title,url:source.url})):[],live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:partialCompletion||freshFailureCode!=='local_synthesis_failed'?200:503})

@@ -9,6 +9,8 @@ import type {
 export const BUILDER_PLAYWRIGHT_CLI_VERSION = '0.1.21' as const
 
 const ROOT = '/tmp/cos-builder-playwright-cli'
+const BROWSER_CACHE = `${ROOT}/pw-browsers`
+const CLI_CONFIG = `${ROOT}/.playwright/cli.config.json`
 const COMMAND_TIMEOUT_MS = 25_000
 const BOOTSTRAP_TIMEOUT_MS = 180_000
 const SANDBOX_TIMEOUT_MS = 220_000
@@ -150,6 +152,8 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
         PLAYWRIGHT_MCP_ISOLATED: 'true',
         PLAYWRIGHT_MCP_HEADLESS: 'true',
         PLAYWRIGHT_MCP_OUTPUT_MAX_SIZE: '1048576',
+        PLAYWRIGHT_MCP_CONFIG: CLI_CONFIG,
+        PLAYWRIGHT_BROWSERS_PATH: BROWSER_CACHE,
       },
       tags: { surface: 'cos-builder-playwright-cli' },
     })
@@ -167,8 +171,41 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
       })
       if (install.exitCode !== 0) throw new Error(`builder_browser_cli_install_failed:${bounded(await install.stderr())}`)
 
+      const browser = await sandbox.runCommand({
+        cmd: 'node',
+        // @playwright/cli@0.1.21 carries its own pinned Playwright build. Invoke that exact
+        // installer so the downloaded Chromium revision always matches the CLI runtime.
+        args: [`${ROOT}/node_modules/playwright/cli.js`, 'install', '--with-deps', 'chromium'],
+        cwd: ROOT,
+        timeoutMs: BOOTSTRAP_TIMEOUT_MS,
+      })
+      if (browser.exitCode !== 0) throw new Error(`builder_browser_cli_browser_install_failed:${bounded(await browser.stderr())}`)
+
+      const executableProbe = await sandbox.runCommand({
+        cmd: 'node',
+        args: [
+          '-e',
+          `const fs=require('node:fs');const {chromium}=require('${ROOT}/node_modules/playwright');const p=chromium.executablePath();if(!p||!fs.existsSync(p)){process.stderr.write('browser executable missing');process.exit(2)}process.stdout.write(p)`,
+        ],
+        cwd: ROOT,
+        timeoutMs: COMMAND_TIMEOUT_MS,
+      })
+      if (executableProbe.exitCode !== 0) {
+        throw new Error(`builder_browser_cli_browser_probe_failed:${bounded(await executableProbe.stderr())}`)
+      }
+      const browserExecutable = (await executableProbe.stdout()).trim()
+      if (!browserExecutable) throw new Error('builder_browser_cli_browser_probe_failed:empty')
+
       const config = JSON.stringify({
-        browser: { browserName: 'chromium', isolated: true, launchOptions: { headless: true, chromiumSandbox: false } },
+        browser: {
+          browserName: 'chromium',
+          isolated: true,
+          launchOptions: {
+            headless: true,
+            chromiumSandbox: false,
+            executablePath: browserExecutable,
+          },
+        },
         network: { allowedOrigins: this.origins },
         saveSession: false,
         outputDir: `${ROOT}/artifacts`,
@@ -177,19 +214,7 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
         timeouts: { action: 5000, navigation: 30000, settle: 500 },
       })
       await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', '--', `${ROOT}/.playwright`], timeoutMs: COMMAND_TIMEOUT_MS })
-      await sandbox.writeFiles([{ path: `${ROOT}/.playwright/cli.config.json`, content: Buffer.from(config) }])
-
-      const browser = await sandbox.runCommand({
-        cmd: `${ROOT}/node_modules/.bin/playwright-cli`,
-        // Vercel Sandbox SDK v3 uses an Ubuntu managed image. Playwright can download Chromium
-        // successfully while still reporting missing host libraries only at first launch. Install
-        // the pinned CLI's browser dependencies during the host-owned bootstrap, before the
-        // model can issue any browser action and before egress is reduced to approved origins.
-        args: ['install-browser', '--with-deps', 'chromium'],
-        cwd: ROOT,
-        timeoutMs: BOOTSTRAP_TIMEOUT_MS,
-      })
-      if (browser.exitCode !== 0) throw new Error(`builder_browser_cli_browser_install_failed:${bounded(await browser.stderr())}`)
+      await sandbox.writeFiles([{ path: CLI_CONFIG, content: Buffer.from(config) }])
     } finally {
       // No model-supplied browser action runs until the bootstrap network is closed to exact hosts.
       await sandbox.updateNetworkPolicy({ allow: [...allowedHosts(this.origins)] })

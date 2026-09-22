@@ -59,6 +59,7 @@ test('Playwright CLI rejects off-origin navigation before sandbox creation', asy
 test('Playwright CLI bootstraps host-owned package before locking egress to approved hosts', async () => {
   const steps: string[] = []
   const commands: Array<{ cmd: string; args: string[] }> = []
+  const written: string[] = []
   const fake = {
     async updateNetworkPolicy(policy: unknown) {
       steps.push(`network:${JSON.stringify(policy)}`)
@@ -66,6 +67,9 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
     async runCommand(command: any) {
       commands.push({ cmd: command.cmd, args: [...(command.args || [])] })
       steps.push(`command:${command.cmd} ${(command.args || []).join(' ')}`)
+      if (command.cmd === 'node' && command.args?.[0] === '-e') {
+        return commandResult(0, '/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome')
+      }
       if (command.cmd.endsWith('/playwright-cli') && command.args?.[0] === 'open') {
         return commandResult(0, '### Page\n- Page URL: https://itmounts.com/\n- Page Title: iTMounts')
       }
@@ -73,6 +77,7 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
     },
     async writeFiles(files: any[]) {
       steps.push(`write:${files.map(file => file.path).join(',')}`)
+      for (const file of files) written.push(Buffer.from(file.content).toString('utf8'))
     },
     async stop() {
       steps.push('stop')
@@ -85,6 +90,8 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
       assert.equal(options.networkPolicy, 'deny-all')
       assert.equal(options.persistent, false)
       assert.equal(options.env.PLAYWRIGHT_MCP_WEBMCP, 'false')
+      assert.equal(options.env.PLAYWRIGHT_MCP_CONFIG, '/tmp/cos-builder-playwright-cli/.playwright/cli.config.json')
+      assert.equal(options.env.PLAYWRIGHT_BROWSERS_PATH, '/tmp/cos-builder-playwright-cli/pw-browsers')
       return fake
     }) as any,
   })
@@ -98,8 +105,16 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
   assert.equal(result.ok, true)
   assert.match(result.stdout, /Page Title: iTMounts/)
   assert.ok(commands.some(command => command.cmd === 'npm' && command.args.includes(`@playwright/cli@${BUILDER_PLAYWRIGHT_CLI_VERSION}`)))
-  assert.ok(commands.some(command => command.cmd.endsWith('/playwright-cli') && command.args.join(' ') === 'install-browser --with-deps chromium'))
-  const dependencyBootstrap = steps.findIndex(step => step.includes('playwright-cli install-browser --with-deps chromium'))
+  assert.ok(commands.some(command =>
+    command.cmd === 'node'
+      && command.args.join(' ') === '/tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install --with-deps chromium'
+  ))
+  assert.ok(commands.some(command => command.cmd === 'node' && command.args[0] === '-e'))
+  assert.ok(written.some(value =>
+    value.includes('"browserName":"chromium"')
+      && value.includes('"executablePath":"/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome"')
+  ))
+  const dependencyBootstrap = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install --with-deps chromium'))
   const lockdown = steps.findIndex(step => step === 'network:{"allow":["itmounts.com"]}')
   const open = steps.findIndex(step => step.includes('playwright-cli open https://itmounts.com/'))
   assert.ok(dependencyBootstrap >= 0 && lockdown > dependencyBootstrap, JSON.stringify(steps))
@@ -146,6 +161,9 @@ test('nonzero CLI result reports a sanitized failure code without logging raw st
     const fake = {
       async updateNetworkPolicy() {},
       async runCommand(command: any) {
+        if (command.cmd === 'node' && command.args?.[0] === '-e') {
+          return commandResult(0, '/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome')
+        }
         if (command.cmd.endsWith('/playwright-cli') && command.args?.[0] === 'open') {
           return commandResult(1, '', 'Host system is missing dependencies to run browsers: SECRET_RAW_DETAIL')
         }

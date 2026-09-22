@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
+const provisionV2 = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisionV2.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260915100500_mass_distilled_runtime_canary_claim.sql', import.meta.url), 'utf8')
 const endpointRefreshMigration = readFileSync(new URL('../supabase/migrations/20260921154000_mass_distilled_canary_endpoint_refresh_claim.sql', import.meta.url), 'utf8')
@@ -49,8 +50,19 @@ test('mass-distilled provisioning releases only retired mass canary worker reser
   assert.match(provision, /endpoint\.name\.startsWith\('itmounts-mass-distilled-'\)/)
   assert.match(provision, /endpoint\.name!==activeEndpointName/)
   assert.match(provision, /JSON\.stringify\(\{workers:\{min:0,max:0/)
-  assert.match(provision, /await releaseRetiredMassEndpointCapacity\(listed\.endpoints\|\|\[\],ids\.endpointName\)/)
+  assert.match(provision, /await releaseRetiredMassEndpointCapacity\(current\.endpoints\|\|\[\],ids\.endpointName\)/)
   assert.doesNotMatch(provision, /releaseRetiredMassEndpointCapacity[\s\S]*method:'DELETE'/)
+})
+
+test('mass-distilled canary waits safely when account-wide RunPod worker quota is full', () => {
+  assert.match(provision, /configuredServerlessWorkerQuota/)
+  assert.match(provision, /reservedServerlessWorkerSlots/)
+  assert.match(provision, /mass_distilled_runtime_worker_quota_full/)
+  assert.match(provisionV2, /restoreRetiredEndpointCapacity\([\s\S]*constrainEndpointToApprovedGpu/)
+  assert.match(route, /quotaBlocked/)
+  assert.match(route, /runpod_worker_quota_full/)
+  assert.match(route, /retryableWithinApproval:true/)
+  assert.doesNotMatch(route, /runpod_worker_quota_full[\s\S]{0,300}status:500/)
 })
 
 test('mass-distilled provisioning recovers an omitted v2 endpoint id from the official REST endpoint list', () => {

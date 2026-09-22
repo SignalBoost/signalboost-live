@@ -37,6 +37,11 @@ export const MASS_CANARY_IN_FLIGHT_TTL_MS = 10 * 60 * 1000
 export const MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER = '2026-09-21T01:55:00.000Z' as const
 export const MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE = 2
 export const MASS_CANARY_BUILDER_V2_OPTIMIZER = 'frontier_response_anchor_then_stable_on_policy_distillation' as const
+// Production 2026-09-22: the first artifact whose durable training receipt proves the post-GKD
+// failure-derived replay exists, but the legacy canary backlog is hundreds deep and the older Builder
+// proof cohort is already complete. Prioritize only the first two replay-proven canary passes, then
+// automatically return to the existing Builder/frontier/oldest-first ordering. Scheduling only.
+export const MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE = 2
 const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 
 export type CanaryArtifact = Readonly<{
@@ -48,6 +53,8 @@ export type CanaryArtifact = Readonly<{
   frontierResponseAnchorRequired?: boolean
   frontierResponseAnchorEpochs?: number
   frontierResponseAnchorItems?: number
+  failureDerivedReplayRequired?: boolean
+  failureDerivedReplayItems?: number
 }>
 export type CanaryEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 export type CanaryDecision =
@@ -202,13 +209,28 @@ export function decideMassCanaryRollingApproval(input: {
     .map(artifact => artifact.candidateId)).size
   const builderProofNeeded = builderProofPasses < MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE
 
+  const replayProofArtifact = (artifact: CanaryArtifact) =>
+    artifact.failureDerivedReplayRequired === true
+      && Number(artifact.failureDerivedReplayItems) > 0
+  const replayProofPasses = new Set(valid
+    .filter(replayProofArtifact)
+    .filter(artifact => forArtifact(input.events, artifact).some(event => claim(event) === 'local_distilled_runtime_canary_passed'))
+    .map(artifact => artifact.candidateId)).size
+  const replayProofNeeded = replayProofPasses < MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE
+
   valid.sort((a, b) => {
-    // Bounded apprenticeship proof lane: only until two post-remediation Computer Science artifacts
-    // have a durable exact-artifact canary pass. Afterwards queue fairness returns to oldest-first.
+    // Preserve the established Builder apprenticeship priority whenever that cohort is unfinished.
     if (builderProofNeeded) {
       const aBuilder = builderProofArtifact(a)
       const bBuilder = builderProofArtifact(b)
       if (aBuilder !== bBuilder) return aBuilder ? -1 : 1
+    }
+    // Once Builder proof is satisfied, give the first two post-GKD remediation-replay artifacts a
+    // bounded proof lane ahead of the legacy backlog. The 18/6h canary cap and all other authority remain unchanged.
+    if (replayProofNeeded) {
+      const aReplay = replayProofArtifact(a)
+      const bReplay = replayProofArtifact(b)
+      if (aReplay !== bReplay) return aReplay ? -1 : 1
     }
     return at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId)
   })
@@ -279,6 +301,7 @@ export function decideMassCanaryRollingApproval(input: {
         automaticPromotionAuthorized: false,
         authorityExpanded: false,
         authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF,
+        ...(replayProofNeeded && replayProofArtifact(artifact) ? { remediationReplayProofPriority: true } : {}),
         ...(refreshEndpoint ? { endpointRefresh: true, endpointRefreshReason: 'repeated_evaluation_endpoint_lifecycle_failure' } : {}),
       },
     }

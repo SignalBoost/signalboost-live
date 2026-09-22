@@ -1,6 +1,6 @@
 // saas/lib/provider-framework/google-cloud.ts
 import { randomUUID } from 'node:crypto'
-import { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'\nimport { executeSupervisedProviderCall } from './supervised-executor.ts'\nimport { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
 
 export const GOOGLE_CLOUD_PROVIDER_ID = 'google-cloud' as const
 export const googleCloudCapabilities = ['google_cloud.connection.validate','google_cloud.projects.read','google_cloud.compute.instances.list','google_cloud.storage.buckets.list','google_cloud.cloud_run.services.list','google_cloud.functions.list','google_cloud.sql.instances.list','google_cloud.pubsub.topics.list','google_cloud.logging.entries.list','google_cloud.monitoring.alert_policies.list'] as const

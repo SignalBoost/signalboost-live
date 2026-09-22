@@ -283,7 +283,7 @@ function assertMaterializedEndpointIdentity(endpoint: Endpoint, input: MassDisti
 
 async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
   const ids = identity(input)
-  const templates = await requestV1<Template[]>('/templates')
+  const templates = await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')
   const template = templates.find(item => clean(item.name, 240) === ids.templateName && item.isServerless !== false)
   if (!template?.id) throw new Error('mass_distilled_runtime_template_id_missing')
 

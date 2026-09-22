@@ -176,7 +176,7 @@ async function recoverTemplateId(template:Template|undefined,templateName:string
   // Re-read only the exact governed name for the same bounded propagation window used by endpoints;
   // never create a second template while provider identity is settling.
   for(let attempt=0;attempt<ENDPOINT_VISIBILITY_ATTEMPTS;attempt+=1){
-    const templates=await requestV1<Template[]>('/templates')
+    const templates=await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')
     const exact=templates.find(item=>item.name===templateName&&item.isServerless!==false)
     if(exact?.id) return exact
     if(attempt<ENDPOINT_VISIBILITY_ATTEMPTS-1) await new Promise(resolve=>setTimeout(resolve,ENDPOINT_VISIBILITY_RETRY_MS))
@@ -309,7 +309,7 @@ async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string):Promi
 export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeArtifact){
   assertArtifact(input)
   const token=process.env.HF_TOKEN?.trim()||''; if(token.length<20) throw new Error('HF_TOKEN is not configured')
-  const ids=identity(input); const templates=await requestV1<Template[]>('/templates')
+  const ids=identity(input); const templates=await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')
   let template=templates.find(item=>item.name===ids.templateName&&item.isServerless!==false); let createdTemplate=false
   if(template&&!templateMatches(template,input,ids.modelName)) throw new Error('mass_distilled_runtime_template_identity_mismatch')
   if(!template){template=await requestV1<Template>('/templates',{method:'POST',body:JSON.stringify({name:ids.templateName,imageName:VLLM_IMAGE,category:'NVIDIA',containerDiskInGb:50,dockerEntrypoint:['bash','-lc'],dockerStartCmd:[startupCommand(input,ids.modelName)],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PUBLIC_PORT),PORT_HEALTH:String(PUBLIC_PORT),HEALTH_CHECK_PATH:'/ping'},isPublic:false,isServerless:true,ports:[`${PUBLIC_PORT}/http`],readme:'iTMounts exact mass-distilled Qwen3-4B + immutable LoRA canary runtime. Strict internal-vLLM readiness; scale-to-zero; no Production traffic.'})});createdTemplate=true}

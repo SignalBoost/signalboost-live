@@ -14,6 +14,7 @@ import {
   resolveHarnessManifest,
   type HarnessAuthorityEnvelope,
   type HarnessRunRequest,
+  resolveAvailableCapabilities,
 } from '../platform-harness/index.ts'
 
 const authority: HarnessAuthorityEnvelope = {
@@ -183,4 +184,18 @@ test('harness execution still goes through the existing Governed Socket', async 
   assert.equal(write.status, 'authority_boundary')
   assert.equal(write.gatewayOutcome?.verdict, 'halt_for_approval')
   assert.equal(performed, 1)
+})
+
+
+test('discovered capabilities never widen the resolved manifest', () => {
+  const decision = resolveHarnessManifest(request(), authority)
+  assert.equal(decision.allowed, true)
+  if (!decision.allowed) return
+  const resolved = resolveAvailableCapabilities(decision.manifest, [
+    { id: 'github.read', source: 'mcp', available: true },
+    { id: 'github.write', source: 'mcp', available: true },
+    { id: 'production.deploy', source: 'native', available: true },
+  ])
+  assert.deepEqual(resolved.executable.map(item => item.id), ['github.read', 'github.write'])
+  assert.deepEqual(resolved.discoveredButUnauthorized, ['production.deploy'])
 })

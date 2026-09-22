@@ -14,6 +14,7 @@ import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
 import { explainInitialBuilderRepair } from './explain-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
 import { createBuilderMcpReadPort } from './mcp-read-port.ts'
+import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
@@ -341,6 +342,9 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       environmentId: process.env.VERCEL_ENV || process.env.NODE_ENV || 'production',
       ownerAuthorized: job.ownerAuthorized === true,
     })
+    const browserCli = createBuilderPlaywrightCliPort({
+      ownerAuthorized: job.ownerAuthorized === true,
+    })
     const plan = debugPlan(job)
     const documentationPaths = !plan && isRepairObjective(job.objective)
       ? job.checkpoint ? job.checkpoint.documentationPaths ?? null : await classifyBuilderDocumentationIntent(ai, job.objective) : null
@@ -358,7 +362,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           ai,
           cognitiveSkills: cognitive.items,
         })
-      : await new BuilderToolLoop(ai, workspace, runner, mcp).run({
+      : await new BuilderToolLoop(ai, workspace, runner, mcp, browserCli).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons,
@@ -372,6 +376,9 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
           modelRoundTimeoutMs: 55_000,
         })
+    await browserCli.close().catch(error => {
+      console.warn('[builder_browser_cli_close_failed]', { message: error instanceof Error ? error.message : 'unknown' })
+    })
 
     lastTrace = result.trace
     const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)

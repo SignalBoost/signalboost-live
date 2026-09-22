@@ -76,5 +76,6 @@ test('University telemetry exposes read-only evaluator claim blockers without ch
   assert.match(route, /claimability = 'active_reservation'/)
   assert.match(route, /claimability = 'evaluator_failed'/)
   assert.match(route, /claimability = 'claimable'/)
+  assert.ok(route.indexOf("else if (!canary) claimability = 'missing_exact_canary'") < route.indexOf("else if (!approval) claimability = 'missing_approval'"), 'exact canary must be reported before the approval it gates')
   assert.doesNotMatch(route, /export async function POST/)
 })

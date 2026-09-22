@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE, signTrainingExecutorPayload, trainingExecutorConfigFromEnv, verifyTrainingExecutorPayload } from '@/lib/ai/cos/cosUniversityTrainingExecutor'
 import { buildHuggingFaceJobSpec, huggingFaceJobsConfigFromEnv, installHuggingFaceTrainingExecutorEnv, resolveHuggingFaceHardwareRate, resolveHuggingFaceNamespace, submitHuggingFaceJob } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
 import { installHfWorkerDeliveryEnv } from '@/lib/ai/cos/cosUniversityHfWorkerDelivery'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { readProviderCircuit } from '@/lib/supervisor/provider-circuit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -32,6 +34,30 @@ export async function POST(req: NextRequest) {
   let envelope: any = null
   try { envelope = JSON.parse(rawBody) } catch { envelope = null }
   if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope) || envelope.profile !== COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE || envelope.authorityExpanded !== false) return signedResponse({ body: { accepted: false, error: 'huggingface_training_payload_invalid' }, idempotencyKey, secret: executor.secret, status: 400 })
+
+  // Defense in depth: every cost-bearing HF submission checks the durable provider circuit.
+  // The workflow consumer already checks it before claiming work, but this executor is the final
+  // network boundary and must fail closed if another caller or a race reaches it after a circuit opens.
+  const db = cosServiceDb()
+  if (!db) return signedResponse({ body: { accepted: false, error: 'service_database_unavailable' }, idempotencyKey, secret: executor.secret, status: 503 })
+  const providerCircuit = await readProviderCircuit({ db, providerId: 'huggingface', capability: 'model-training' })
+  if (providerCircuit.open && !providerCircuit.costBearingRetryAllowed) {
+    return signedResponse({
+      body: {
+        accepted: false,
+        error: 'provider_circuit_open',
+        provider: 'huggingface',
+        capability: 'model-training',
+        failureClass: providerCircuit.failureClass,
+        circuitReason: providerCircuit.reason,
+        externalCostUsd: 0,
+        authorityExpanded: false,
+      },
+      idempotencyKey,
+      secret: executor.secret,
+      status: 503,
+    })
+  }
 
   try {
     const callbackUrl = new URL(String(envelope.callbackPath || ''), req.nextUrl.origin).toString()

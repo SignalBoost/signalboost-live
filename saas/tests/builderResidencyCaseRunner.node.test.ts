@@ -4,6 +4,7 @@ import {
   BUILDER_RESIDENCY_CASES,
   builderResidencyCaseByVariantHash,
   createBuilderResidencyHarnessExecutor,
+  admitBuilderResidency,
   runBuilderResidencyCase,
   type BuilderResidencyEvidenceStore,
   type BuilderResidencyExactArtifactExecutor,
@@ -246,4 +247,24 @@ test('Builder Residency live executor uses shared Harness and preserves exact ar
   assert.equal(out.outcome.status,'success')
   assert.equal(out.authorityExpanded,false)
   assert.equal(out.productionMutationObserved,false)
+})
+
+
+test('Builder Residency admission persists only eligible evaluation_pending exact artifact',async()=>{
+  const writes:any[]=[]
+  const db:any={from(table:string){return{upsert(value:any){writes.push({table,value});return{select(){return{async maybeSingle(){return{data:{id:'residency-1',standing:'resident'},error:null}}}}}},select(){return{eq(){return this},async maybeSingle(){return{data:null,error:null}}}}}}}
+  const out=await admitBuilderResidency({db,admission:{artifactRowId:'artifact-row-1',candidateId:base.candidateId,subjectId:'computer_science_coding',trainedArtifactId:base.artifactId,trainedArtifactHash:hash('a'),revisionKey:hash('b'),artifactStatus:'evaluation_pending',authorityExpanded:false},admissionEvidenceHash:hash('c')})
+  assert.equal(out.ok,true)
+  assert.equal(writes.length,1)
+  assert.equal(writes[0].table,'cos_university_residency_enrollments')
+  assert.equal(writes[0].value.authority_expanded,false)
+  assert.equal(writes[0].value.gate_enforced,false)
+})
+
+test('Builder Residency admission rejects non-pending artifact before database write',async()=>{
+  let writes=0
+  const db:any={from(){return{upsert(){writes+=1;throw new Error('must_not_write')}}}}
+  const out=await admitBuilderResidency({db,admission:{artifactRowId:'artifact-row-1',candidateId:base.candidateId,subjectId:'computer_science_coding',trainedArtifactId:base.artifactId,trainedArtifactHash:hash('a'),revisionKey:hash('b'),artifactStatus:'runtime_pending',authorityExpanded:false},admissionEvidenceHash:hash('c')})
+  assert.equal(out.ok,false)
+  assert.equal(writes,0)
 })

@@ -253,6 +253,17 @@ export async function GET(req: NextRequest) {
   }
 
   const actionsBacklog = await actionsBacklogPromise
+  console.info('[github-actions-backlog-remediation-result]', {
+    mode: actionsBacklog.mode,
+    ok: actionsBacklog.ok,
+    scanned: actionsBacklog.scanned,
+    eligible: actionsBacklog.eligible,
+    cancelled: actionsBacklog.cancelled,
+    preserved: actionsBacklog.preserved,
+    raced: actionsBacklog.raced,
+    errors: actionsBacklog.errors,
+    detail: 'detail' in actionsBacklog ? String(actionsBacklog.detail || '').split(':')[0] : undefined,
+  })
   return NextResponse.json({
     ok: true,
     schemaVersion: 'github-observation-cron-v2',

@@ -39,6 +39,11 @@ const XML_INPUT_KEYS = Object.freeze([
   'search',
   'replace',
   'command',
+  'action',
+  'url',
+  'query',
+  'target',
+  'level',
 ])
 
 export const BUILDER_TURN_TIMEOUT_ERROR = 'builder_turn_timeout'

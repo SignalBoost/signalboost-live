@@ -11,20 +11,13 @@ on:
       - 'saas/tests/cosBackupIntegrity.node.test.ts'
       - '.github/workflows/cos-governance.yml'
       - '.github/CODEOWNERS'
-  push:
-    branches: [main]
-    paths:
-      - 'cos-core/**'
-      - 'saas/app/api/concierge/route.ts'
-      - 'saas/app/api/support/route.ts'
-      - 'saas/lib/cos-backup/**'
-      - 'saas/scripts/check-cos-integrity.mjs'
-      - 'saas/tests/cosBackupIntegrity.node.test.ts'
-      - '.github/workflows/cos-governance.yml'
-
 permissions:
   contents: read
   pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integrity:

@@ -9,12 +9,12 @@ const workflow = hydrateLocalizedSource(readFileSync(
   'utf8',
 ))
 
-test('audit remediation required workflow supports its actual push event', () => {
+test('audit remediation required workflow limits push execution to main', () => {
   assert.match(workflow, /^\s{2}push:\s*$/m)
+  assert.match(workflow, /^\s{4}branches:\s*\[main\]\s*$/m)
   assert.match(workflow, /^\s{2}pull_request:\s*$/m)
   assert.match(workflow, /^\s{2}merge_group:\s*$/m)
   assert.doesNotMatch(workflow, /^\s+paths:\s*$/m)
-  assert.doesNotMatch(workflow, /^\s+branches:\s*/m)
 })
 
 test('the required job uses only contexts available before runner allocation', () => {

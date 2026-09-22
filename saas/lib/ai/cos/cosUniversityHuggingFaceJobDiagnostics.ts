@@ -164,13 +164,19 @@ export async function diagnoseFailedMassDistillationHuggingFaceJobs(input: {
         })
       }
       const classification = classifyProviderFailure(logTail)
-      const circuit = await openProviderCircuit({
-        db,
-        providerId: 'huggingface',
-        capability: 'model-training',
-        classification,
-        evidence: { candidateId, jobId, runId: String((run as any).id || ''), source: PROFILE },
-      })
+      // Provider failures are edge-triggered. Once a specific failed job has durable
+      // diagnostic evidence, re-reading that historical job must not mutate circuit
+      // state again. Otherwise a repaired provider can never complete a half-open
+      // recovery probe because the next cron tick re-opens the circuit from stale logs.
+      const circuit = wasRecorded
+        ? { opened: false as const, reason: 'historical_failure_already_recorded' as const }
+        : await openProviderCircuit({
+            db,
+            providerId: 'huggingface',
+            capability: 'model-training',
+            classification,
+            evidence: { candidateId, jobId, runId: String((run as any).id || ''), source: PROFILE },
+          })
       diagnostics.push({ runId: (run as any).id, jobId, logLines: logTail.length, recorded: !wasRecorded, classification, circuit })
     } catch (error) {
       diagnostics.push({

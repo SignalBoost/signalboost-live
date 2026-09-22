@@ -242,8 +242,14 @@ export async function runGitHubActionsBacklogRemediation(input: {
         await githubApi(token, `/repos/${repository}/actions/runs/${item.id}/cancel`, { method: 'POST' }, fetcher)
         return 'cancelled' as const
       } catch (error) {
-        if ((error as any)?.status === 409) return 'raced' as const
-        return 'error' as const
+        if ((error as any)?.status !== 409) return 'error' as const
+        try {
+          await githubApi(token, `/repos/${repository}/actions/runs/${item.id}/force-cancel`, { method: 'POST' }, fetcher)
+          return 'cancelled' as const
+        } catch (forceError) {
+          if ((forceError as any)?.status === 409) return 'raced' as const
+          return 'error' as const
+        }
       }
     }))
     for (const result of results) {

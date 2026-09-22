@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo="${GITHUB_REPOSITORY:-SignalBoost/signalboost-live}"
 owner="${repo%%/*}"
-protected_csv="${PROTECTED_RUN_IDS:-35666699786,35666699755}"
+protected_csv="${PROTECTED_RUN_IDS:-}"
 parallelism="${CANCEL_PARALLELISM:-10}"
 
 if ! command -v gh >/dev/null 2>&1; then
@@ -193,6 +193,13 @@ done < "$candidate_file"
 wait
 
 echo "Bulk cancellation pass complete."
+
+if [[ "${REDISPATCH_MCP_ACCEPTANCE:-true}" == "true" ]]; then
+  echo "Starting fresh MCP acceptance runs on current main..."
+  gh workflow run playwright-mcp-live-acceptance.yml --repo "$repo" --ref main
+  gh workflow run chrome-devtools-mcp-live-acceptance.yml --repo "$repo" --ref main
+  echo "Fresh Playwright and Chrome DevTools MCP acceptance runs dispatched."
+fi
 \t' read -r id name branch head_sha; do
   [[ -z "$id" ]] && continue
 

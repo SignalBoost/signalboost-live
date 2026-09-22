@@ -1,0 +1,38 @@
+name: Actions Backlog Self-Heal
+
+on:
+  push:
+    branches:
+      - main
+      - 'ops/actions-backlog-self-heal-*'
+    paths:
+      - '.github/workflows/actions-backlog-self-heal.yml'
+      - '.github/scripts/actions-backlog-self-heal.mjs'
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: actions-backlog-self-heal
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out cleanup logic
+        uses: actions/checkout@v4
+
+      - name: Validate cleanup script syntax
+        run: node --check .github/scripts/actions-backlog-self-heal.mjs
+
+      - name: Cancel obsolete queued and running workflows
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROTECTED_RUN_IDS: '35666699786,35666699755'
+        run: node .github/scripts/actions-backlog-self-heal.mjs

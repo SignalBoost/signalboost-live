@@ -17,8 +17,8 @@ permissions:
   contents: read
 
 concurrency:
-  # Keep non-PR runs independent, but collapse repeated events for the same PR to its newest revision.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  # Collapse repeated events for the same PR or branch/ref to the newest revision.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

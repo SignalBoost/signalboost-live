@@ -139,7 +139,7 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
     if (this.sandbox) return this.sandbox
 
     const sandbox = await this.createSandbox({
-      runtime: 'node24',
+      image: 'vercel/sandbox/node:24',
       timeout: SANDBOX_TIMEOUT_MS,
       resources: { vcpus: 1 },
       networkPolicy: 'deny-all',

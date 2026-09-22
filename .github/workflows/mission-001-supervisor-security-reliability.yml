@@ -8,17 +8,12 @@ on:
       - 'saas/tests/supervisorCoordinationSecurity.node.test.ts'
       - 'saas/tests/supervisorStartupReconciliation.node.test.ts'
       - '.github/workflows/mission-001-supervisor-security-reliability.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'saas/lib/supervisor/coordination/**'
-      - 'saas/supabase/migrations/**supervisor**'
-      - 'saas/tests/supervisorCoordinationSecurity.node.test.ts'
-      - 'saas/tests/supervisorStartupReconciliation.node.test.ts'
-      - '.github/workflows/mission-001-supervisor-security-reliability.yml'
-
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   security-reliability:

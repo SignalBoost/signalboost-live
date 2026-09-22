@@ -37,19 +37,19 @@ export async function GET(req: NextRequest) {
       })()
     : Promise.resolve()
   try {
-    const { response, invocationSucceeded, skipped } = await runCosUniversityMassDistillationWorkflow({
+    const { response, invocationSucceeded, transportSucceeded, skipped } = await runCosUniversityMassDistillationWorkflow({
       source: 'scheduled_cron',
     })
 
     await recordCosUniversityProductionPath({
       path: 'mass_distillation_campaign',
       invocationSucceeded,
-      evidence: { ...response, runnerInvoked: !skipped, skipped },
+      evidence: { ...response, transportSucceeded, runnerInvoked: !skipped, skipped },
     })
     console.info('[cos-university-mass-distillation]', JSON.stringify(response))
     await forensicCapture
     return NextResponse.json(response, {
-      status: invocationSucceeded ? 200 : 503,
+      status: transportSucceeded ? 200 : 503,
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     })
   } catch (error) {

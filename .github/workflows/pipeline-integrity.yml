@@ -38,5 +38,8 @@ jobs:
       - name: Verify Actions queue policy
         run: node scripts/verify-actions-queue-policy.mjs
 
+      - name: Reject exact duplicate test files
+        run: node scripts/verify-no-duplicate-tests.mjs
+
       - name: Verify route handler / page structure
         run: node scripts/verify-route-handlers.mjs

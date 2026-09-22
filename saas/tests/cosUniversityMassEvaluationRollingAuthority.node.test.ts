@@ -447,12 +447,18 @@ test('moving-head holdout revision failures are evaluator infrastructure and rel
 })
 
 
-test('rolling approval evidence is candidate-scoped and paginated so old exact canaries cannot fall out of a global row cap', () => {
+test('rolling approval evidence is candidate-scoped, chunked, and paginated so a large backlog cannot overflow PostgREST filters', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const candidateIds = rows\.map\(row => row\.candidateId\)/)
-  assert.match(route, /\.in\('candidate_id', candidateIds\)/)
+  assert.match(route, /ROLLING_CANDIDATE_FILTER_CHUNK_SIZE = 50/)
+  assert.match(route, /function candidateChunks\(values: readonly string\[\]\)/)
+  assert.match(route, /for \(const candidateChunk of candidateChunks\(candidateIds\)\)/)
+  assert.match(route, /\.in\('candidate_id', candidateChunk\)/)
+  assert.doesNotMatch(route, /\.in\('candidate_id', candidateIds\)/)
   assert.match(route, /\.range\(from, to\)/)
   assert.match(route, /ROLLING_EVENT_PAGE_SIZE = 1000/)
+  assert.match(route, /readEvaluationRunCandidateIds\(db, builderIds\)/)
+  assert.match(route, /readEvaluationRunCandidateIds\(db, frontierIds\)/)
   assert.match(route, /MASS_EVALUATION_ROLLING_AUTHORIZATION_REF/)
   assert.match(route, /authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF/)
   assert.match(route, /profile: 'cos_mass_distilled_independent_evaluation_runtime_v1'/)
@@ -514,7 +520,8 @@ test('mass evaluator evidence reads have a candidate-first fine_tune index', () 
   const migration = readFileSync(new URL('../supabase/migrations/20260920050000_mass_evaluation_candidate_evidence_index.sql', import.meta.url), 'utf8')
   assert.match(migration, /candidate_id, verifier, observed_at desc/i)
   assert.match(migration, /where event_type = 'fine_tune'/i)
-  assert.match(route, /\.in\('candidate_id', candidateIds\)/)
+  assert.match(route, /\.in\('candidate_id', candidateChunk\)/)
+  assert.match(route, /ROLLING_CANDIDATE_FILTER_CHUNK_SIZE = 50/)
   assert.match(route, /\.gte\('observed_at', new Date\(Date\.now\(\) - 30 \* 86_400_000\)\.toISOString\(\)\)/)
 })
 

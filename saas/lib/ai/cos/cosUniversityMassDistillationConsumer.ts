@@ -2,7 +2,7 @@
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { closeProviderCircuit, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
+import { closeProviderCircuit, consumeProviderCircuitRecoveryProbe, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
 import {
   classifyMassDistillationRights,
   MASS_DISTILLATION_MIN_CONFIDENCE,
@@ -1120,7 +1120,13 @@ export async function runMassDistillationCampaignConsumer(input: {
     }
   }
 
-  const maxDispatches = Math.max(1, Math.min(5, Math.floor(input.maxDispatches ?? 3)))
+  // A remediated open circuit may receive exactly one half-open paid verification attempt.
+  // The probe authorization is consumed atomically only after a claim exists, so an empty queue
+  // does not waste the one-shot recovery permission and a later cron cannot fan out more retries.
+  const recoveryProbeArmed = providerCircuit.open && providerCircuit.costBearingRetryAllowed === true
+  const maxDispatches = recoveryProbeArmed
+    ? 1
+    : Math.max(1, Math.min(5, Math.floor(input.maxDispatches ?? 3)))
   const campaigns = await db.from('cos_university_mass_distillation_campaigns')
     .select('id,status,max_total_cost_usd,committed_cost_usd,expires_at')
     .in('status', ['authorized', 'active'])
@@ -1162,6 +1168,29 @@ export async function runMassDistillationCampaignConsumer(input: {
       break
     }
     if (!campaign || !claim) break
+    if (recoveryProbeArmed) {
+      const probe = await consumeProviderCircuitRecoveryProbe({
+        db,
+        providerId: 'huggingface',
+        capability: 'model-training',
+        verification: {
+          source: 'mass_distillation_consumer',
+          campaignId: claim.campaign_id,
+          runId: claim.run_id,
+          candidateId: claim.candidate_id,
+        },
+        now: input.now || new Date(),
+      })
+      if (!probe.claimed) {
+        failures.push({
+          campaignId: claim.campaign_id,
+          runId: claim.run_id,
+          phase: 'claim',
+          error: 'provider_circuit_recovery_probe_not_available',
+        })
+        break
+      }
+    }
     touchedCampaignIds.add(campaign.id)
     try {
       dispatched.push(await dispatchClaim(claim, input.fetchImpl))

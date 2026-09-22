@@ -34,6 +34,7 @@ export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
 export const MASS_EVALUATION_MAX_IN_FLIGHT = 3
 export const MASS_EVALUATION_FRONTIER_PROOF_SAMPLE = 4
 export const MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE = 2
+export const MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE = 2
 export const MASS_EVALUATION_BUILDER_V2_OPTIMIZER = 'frontier_response_anchor_then_stable_on_policy_distillation' as const
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
@@ -97,6 +98,7 @@ export type RollingArtifact = Readonly<{
   createdAt: string
   frontierRecipe?: boolean
   builderV2?: boolean
+  remediationReplay?: boolean
 }>
 export type RollingEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 
@@ -332,6 +334,7 @@ export function decideRollingMassEvaluationApproval(input: {
   now: Date
   frontierProofCompletions?: number
   builderV2ProofCompletions?: number
+  remediationReplayProofCompletions?: number
   inFlightCount?: number
 }): RollingDecision {
   if (!input.enabled) return { issue: false, reason: 'rolling_mass_evaluation_authorization_disabled' }
@@ -350,6 +353,8 @@ export function decideRollingMassEvaluationApproval(input: {
   const frontierProofNeeded = proofCompletions < MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
   const builderV2Completions = Math.max(0, Math.floor(Number(input.builderV2ProofCompletions ?? MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE)))
   const builderV2ProofNeeded = builderV2Completions < MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
+  const replayCompletions = Math.max(0, Math.floor(Number(input.remediationReplayProofCompletions ?? MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE)))
+  const remediationReplayProofNeeded = replayCompletions < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
   const ordered = [...input.artifacts].sort((a, b) => {
     // Builder apprenticeship proof lane: until two confirmed response-anchor v2 Computer Science artifacts
     // have durable independent evaluation results, keep those exact artifacts ahead of the legacy backlog.
@@ -359,6 +364,14 @@ export function decideRollingMassEvaluationApproval(input: {
       const aBuilder = a.builderV2 === true
       const bBuilder = b.builderV2 === true
       if (aBuilder !== bBuilder) return aBuilder ? -1 : 1
+    }
+    // Once the established Builder sample is complete, prioritize only the first two artifacts whose
+    // durable receipt proves post-GKD failure-derived replay. This is scheduling only; the 12-hour
+    // retention delay below and every scoring/spend/promotion gate remain unchanged.
+    if (remediationReplayProofNeeded) {
+      const aReplay = a.remediationReplay === true
+      const bReplay = b.remediationReplay === true
+      if (aReplay !== bReplay) return aReplay ? -1 : 1
     }
     // Preserve the older bounded frontier proof lane for repositories where it is still incomplete.
     if (frontierProofNeeded) {
@@ -479,6 +492,7 @@ export function decideRollingMassEvaluationApproval(input: {
         infrastructureRepairRef: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF,
         infrastructureRepairAt: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT,
         priorFailedAttempts: failures,
+        ...(remediationReplayProofNeeded && artifact.remediationReplay === true ? { remediationReplayProofPriority: true } : {}),
         ...(repairedSuspension ? { resumeAfterSuspension: true, repairRef: MASS_EVALUATION_24GB_REPAIR_REF } : {}),
       },
     }

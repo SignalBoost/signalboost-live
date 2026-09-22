@@ -5,14 +5,15 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+const localSynthesis = readFileSync(join(process.cwd(), 'lib/ai/cos/freshEvidenceLocalSynthesis.ts'), 'utf8')
 
-test('travel planning bypasses the single-claim freshness contract and goes directly to grounded task completion', () => {
+test('travel planning tries grounded task completion first, then retains shared fresh synthesis as recovery', () => {
   const travelClassify = route.indexOf('const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)')
   const travelGrounded = route.indexOf('if(!requestedAction&&liveTravelTask)')
-  const strictFresh = route.indexOf('if(!requestedAction&&!liveTravelTask)')
+  const sharedFresh = route.indexOf('if(!requestedAction){', travelGrounded)
   assert.ok(travelClassify > 0)
   assert.ok(travelGrounded > travelClassify)
-  assert.ok(strictFresh > travelGrounded)
+  assert.ok(sharedFresh > travelGrounded)
   assert.match(route, /source:'cos-fresh-grounded-task'/)
 })
 
@@ -36,4 +37,35 @@ test('travel tasks are not reclassified as bare fact lookups, while generic grou
 test('travel failure does not invoke the grounded task synthesizer a second time later in the route', () => {
   assert.match(route, /if\(freshHardFail&&freshRetrievedAt&&freshSources\.length&&!requestedAction&&!requiresLiveTravelPlanningEvidence\(lookupInput\)\)/)
   assert.equal((route.match(/const groundedTask=await runFreshGroundedTaskCompletion\(lookupInput,language,freshSources\)/g) || []).length, 2)
+})
+
+
+test('a grounded travel miss falls through to the shared live-evidence synthesizer before failure is recorded', () => {
+  const travelBlock = route.indexOf('if(!requestedAction&&liveTravelTask)')
+  const groundedDeclined = route.indexOf("event:'fresh_grounded_task_declined'", travelBlock)
+  const sharedSynthesis = route.indexOf('if(!requestedAction){', groundedDeclined)
+  const localCall = route.indexOf('synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})', sharedSynthesis)
+  const localFailureWrite = route.indexOf('freshLocalFailureCode=localSynthesis.kind', localCall)
+  assert.ok(travelBlock > 0)
+  assert.ok(groundedDeclined > travelBlock)
+  assert.ok(sharedSynthesis > groundedDeclined)
+  assert.ok(localCall > sharedSynthesis)
+  assert.ok(localFailureWrite > localCall)
+  const between = route.slice(groundedDeclined, localCall)
+  assert.doesNotMatch(between, /freshLocalFailureCode='local_synthesis_failed'/)
+  assert.match(between, /fallthrough:'shared_local_synthesizer'/)
+})
+
+test('once the fresh-evidence contract accepts a draft, review transport failures release that accepted draft', () => {
+  assert.match(localSynthesis, /function acceptedOutcome\(accepted: AcceptedFreshEvidenceSynthesis\)/)
+  assert.match(localSynthesis, /accepted_draft_released_after_review_transport_failure/)
+  assert.match(localSynthesis, /reviewed\.kind === 'local_synthesis_failed'[\s\S]*return acceptedOutcome\(accepted\)/)
+  assert.match(localSynthesis, /revised\.ok === false[\s\S]*return acceptedOutcome\(accepted\)/)
+  assert.match(localSynthesis, /finalReview\.kind === 'local_synthesis_failed'[\s\S]*return acceptedOutcome\(repaired\)/)
+})
+
+test('structural or semantic review failures still fail closed', () => {
+  assert.match(localSynthesis, /reviewed\.kind === 'unparseable'\) return \{ kind: 'citation_grounding_rejected' \}/)
+  assert.match(localSynthesis, /finalReview\.kind === 'unparseable' \|\| !finalReview\.review\.faithful/)
+  assert.match(localSynthesis, /review_failed_quality_boundary/)
 })

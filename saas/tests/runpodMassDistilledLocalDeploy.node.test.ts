@@ -68,6 +68,13 @@ test('mass-distilled canary waits safely when account-wide RunPod worker quota i
   assert.doesNotMatch(route, /runpod_worker_quota_full[\s\S]{0,300}status:500/)
 })
 
+test('v2 compatibility accepts a warm endpoint already narrowed to the governed 24GB pool', () => {
+  assert.match(provisionV2, /message !== 'mass_distilled_runtime_endpoint_gpu_pool_drift'/)
+  assert.match(provisionV2, /const APPROVED_POOLS = \['AMPERE_24'\] as const/)
+  assert.match(provisionV2, /resolveExactEndpoint\(input\)/)
+  assert.match(provisionV2, /constrainEndpointToApprovedGpu/)
+})
+
 test('v2 compatibility recovery tolerates delayed endpoint visibility by exact governed name', () => {
   assert.match(provisionV2, /resolveEndpointControlPlane/)
   assert.match(provisionV2, /requestV1<RestEndpointIdentity\[\]>\('\/endpoints'\)/)

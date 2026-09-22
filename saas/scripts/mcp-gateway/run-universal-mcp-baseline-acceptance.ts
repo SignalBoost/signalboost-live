@@ -89,13 +89,13 @@ async function run() {
   )
 
   const evidence = {
-    schemaVersion: 'universal-mcp-baseline-live-acceptance-v1',
+    schemaVersion: 'universal-mcp-baseline-live-acceptance-v2',
     observedAt: new Date().toISOString(),
     scope: ['github-mcp', 'context7-mcp'],
-    excludedPendingProviders: {
-      'supabase-mcp': 'repository_credential_required',
+    excludedProviderStatus: {
+      'supabase-mcp': 'certified_via_vercel_preview',
       'figma-mcp': 'provider_client_approval_required',
-      'vercel-mcp': 'repository_credential_required',
+      'vercel-mcp': 'certified_via_vercel_preview',
     },
     certifications,
     checks,

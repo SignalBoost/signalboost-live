@@ -240,12 +240,46 @@ test('an orphaned invocation marker releases after the bounded in-flight TTL', (
   assert.equal(decision.artifact.candidateId,a.candidateId)
 })
 
-test('the kill switch and the smoothed 6-hour cap stop issuance', () => {
+test('the kill switch and the smoothed 6-hour cap stop issuance for approvals that actually invoked canaries', () => {
   const a=artifact(1)
   assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 6)
   assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a],events:[],now,enabled:false}),{issue:false,reason:'mass_canary_rolling_authorization_disabled'})
-  const others=Array.from({length:MASS_CANARY_ROLLING_MAX_APPROVALS},(_,i)=>{const o=artifact(100+i);return event(o,MASS_CANARY_APPROVAL_CLAIM,'2026-09-17T13:00:00.000Z',{expiresAt:'2026-09-17T15:00:00.000Z'},{authorizationRef:MASS_CANARY_ROLLING_AUTHORIZATION_REF})})
+  const others=Array.from({length:MASS_CANARY_ROLLING_MAX_APPROVALS},(_,i)=>{
+    const o=artifact(100+i)
+    const approvedAt=`2026-09-17T13:${String(i).padStart(2,'0')}:00.000Z`
+    return [
+      event(o,MASS_CANARY_APPROVAL_CLAIM,approvedAt,{expiresAt:'2026-09-17T15:00:00.000Z'},{authorizationRef:MASS_CANARY_ROLLING_AUTHORIZATION_REF}),
+      event(o,'local_distilled_runtime_canary_invocation_started',`2026-09-17T13:${String(i).padStart(2,'0')}:10.000Z`,{}, {authorizationObservedAt:approvedAt}),
+    ]
+  }).flat()
   assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a],events:others,now,enabled:true}),{issue:false,reason:'mass_canary_rolling_window_exhausted'})
+})
+
+test('expired uninvoked approvals do not consume the rolling canary spend window', () => {
+  const a=artifact(1)
+  const dead=Array.from({length:MASS_CANARY_ROLLING_MAX_APPROVALS},(_,i)=>{
+    const o=artifact(200+i)
+    return event(o,MASS_CANARY_APPROVAL_CLAIM,`2026-09-17T13:${String(i).padStart(2,'0')}:00.000Z`,
+      {expiresAt:'2026-09-17T15:00:00.000Z'},
+      {authorizationRef:MASS_CANARY_ROLLING_AUTHORIZATION_REF})
+  })
+  const decision=decideMassCanaryRollingApproval({artifacts:[a],events:dead,now,enabled:true})
+  assert.ok('artifact' in decision, `expected dead approvals to release spend window, got ${JSON.stringify(decision)}`)
+  assert.equal(decision.artifact.candidateId,a.candidateId)
+})
+
+test('an unexpired uninvoked approval still reserves the rolling spend window', () => {
+  const a=artifact(1)
+  const reservations=Array.from({length:MASS_CANARY_ROLLING_MAX_APPROVALS},(_,i)=>{
+    const o=artifact(300+i)
+    return event(o,MASS_CANARY_APPROVAL_CLAIM,`2026-09-17T16:${String(i).padStart(2,'0')}:00.000Z`,
+      {expiresAt:'2026-09-17T18:30:00.000Z'},
+      {authorizationRef:MASS_CANARY_ROLLING_AUTHORIZATION_REF})
+  })
+  assert.deepEqual(
+    decideMassCanaryRollingApproval({artifacts:[a],events:reservations,now,enabled:true}),
+    {issue:false,reason:'mass_canary_rolling_window_exhausted'},
+  )
 })
 
 test('cron reads evaluation events before issuing a new canary and preserves authority fences', () => {
@@ -300,11 +334,15 @@ test('the smoothed ceiling preserves the 72-per-day nominal spend envelope witho
   const a = artifact(1)
   const exhausted = Array.from({ length: MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) => {
     const other = artifact(100 + index)
-    return event(other, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T13:00:00.000Z', { expiresAt: '2026-09-17T15:00:00.000Z' }, { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF })
-  })
+    const approvedAt = `2026-09-17T13:${String(index).padStart(2,'0')}:00.000Z`
+    return [
+      event(other, MASS_CANARY_APPROVAL_CLAIM, approvedAt, { expiresAt: '2026-09-17T15:00:00.000Z' }, { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF }),
+      event(other, 'local_distilled_runtime_canary_invocation_started', `2026-09-17T13:${String(index).padStart(2,'0')}:10.000Z`, {}, { authorizationObservedAt: approvedAt }),
+    ]
+  }).flat()
   assert.deepEqual(decideMassCanaryRollingApproval({ artifacts: [a], events: exhausted, now, enabled: true }), { issue: false, reason: 'mass_canary_rolling_window_exhausted' })
 
-  const agedOut = exhausted.map(item => ({ ...item, observedAt: '2026-09-17T10:00:00.000Z' }))
+  const agedOut = exhausted.map(item => ({ ...item, observedAt: item.observedAt.replace('2026-09-17T13:', '2026-09-17T10:'), evidence: item.evidence?.authorizationObservedAt ? { ...item.evidence, authorizationObservedAt: String(item.evidence.authorizationObservedAt).replace('2026-09-17T13:', '2026-09-17T10:') } : item.evidence }))
   const resumed = decideMassCanaryRollingApproval({ artifacts: [a], events: agedOut, now, enabled: true })
   assert.ok('artifact' in resumed, `expected admission after the 6-hour window aged out, got ${JSON.stringify(resumed)}`)
   assert.equal(resumed.artifact.candidateId, a.candidateId)

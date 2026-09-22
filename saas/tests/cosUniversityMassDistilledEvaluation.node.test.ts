@@ -244,3 +244,20 @@ test('legacy hosted-teacher holdouts recover prompts only through exact durable 
   assert.match(runner, /reference: row\.text/)
   assert.doesNotMatch(runner, /productionTrafficAuthorized:\s*true/)
 })
+
+test('v2 Builder evaluator cohort avoids nested intended_use containment filters', () => {
+  assert.match(route, /function isBuilderV2Receipt\(intendedUse: unknown\)/)
+  assert.match(route, /const confirmedBuilderV2Artifacts = \(builderV2Artifacts\.data \|\| \[\]\)/)
+  assert.match(route, /\.filter\(\(row: any\) => isBuilderV2Receipt\(row\?\.intended_use\)\)/)
+  assert.doesNotMatch(
+    route,
+    /\.contains\('intended_use',\s*\{\s*trainingReceipt:\s*\{\s*optimizer:\s*MASS_EVALUATION_BUILDER_V2_OPTIMIZER/,
+  )
+})
+
+test('mass evaluation pre-claim failures retain their exact failing phase', () => {
+  assert.match(route, /mass_distilled_evaluation_schema_preflight_failed:/)
+  assert.match(route, /mass_distilled_evaluation_runpod_account_preflight_failed:/)
+  assert.match(route, /mass_distilled_evaluation_rolling_preflight_failed:/)
+})
+

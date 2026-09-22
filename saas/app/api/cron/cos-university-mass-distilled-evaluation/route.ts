@@ -41,6 +41,7 @@ const RUNTIME_WAKE_TIMEOUT_MS = 20_000
 const MIN_BALANCE_USD = 1
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
+const ROLLING_CANDIDATE_CHUNK_SIZE = 75
 const HEX64 = /^[a-f0-9]{64}$/i
 const ENDPOINT_ID = /^[A-Za-z0-9_-]{3,120}$/
 
@@ -249,38 +250,44 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   // canary lives. Scope every read to the candidates actually under consideration and page through them, so an
   // older canary can never fall out of the window and make a genuinely eligible artifact look unproven.
   const eventRows: any[] = []
-  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
-    const from = page * ROLLING_EVENT_PAGE_SIZE
-    const to = from + ROLLING_EVENT_PAGE_SIZE - 1
-    const result = await db.from('cos_university_learning_assurance_events')
-      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
-      .eq('event_type', 'fine_tune')
-      .in('candidate_id', candidateIds)
-      .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
-      .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
-      .order('observed_at', { ascending: false })
-      .range(from, to)
-    if (result.error) throw result.error
-    const batch = result.data || []
-    eventRows.push(...batch)
-    if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
-  }
   const reservationRows: any[] = []
-  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
-    const from = page * ROLLING_EVENT_PAGE_SIZE
-    const to = from + ROLLING_EVENT_PAGE_SIZE - 1
-    const result = await db.from('cos_university_learning_assurance_events')
-      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
-      .eq('event_type', 'fine_tune')
-      .in('candidate_id', candidateIds)
-      .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
-      .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
-      .order('observed_at', { ascending: false })
-      .range(from, to)
-    if (result.error) throw result.error
-    const batch = result.data || []
-    reservationRows.push(...batch)
-    if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+  // A 500-candidate PostgREST .in(...) filter is roughly 32 KB before URL encoding in Production.
+  // That exceeds safe request-line limits and was returning HTTP 400 before any evaluator claim could run.
+  // Preserve the exact candidate set and complete pagination, but split only the transport into bounded chunks.
+  for (let offset = 0; offset < candidateIds.length; offset += ROLLING_CANDIDATE_CHUNK_SIZE) {
+    const candidateChunk = candidateIds.slice(offset, offset + ROLLING_CANDIDATE_CHUNK_SIZE)
+    for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+      const from = page * ROLLING_EVENT_PAGE_SIZE
+      const to = from + ROLLING_EVENT_PAGE_SIZE - 1
+      const result = await db.from('cos_university_learning_assurance_events')
+        .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+        .eq('event_type', 'fine_tune')
+        .in('candidate_id', candidateChunk)
+        .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
+        .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+        .order('observed_at', { ascending: false })
+        .range(from, to)
+      if (result.error) throw new Error(`mass_distilled_evaluation_event_read_failed:${boundedErrorMessage(result.error)}`)
+      const batch = result.data || []
+      eventRows.push(...batch)
+      if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+    }
+    for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+      const from = page * ROLLING_EVENT_PAGE_SIZE
+      const to = from + ROLLING_EVENT_PAGE_SIZE - 1
+      const result = await db.from('cos_university_learning_assurance_events')
+        .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+        .eq('event_type', 'fine_tune')
+        .in('candidate_id', candidateChunk)
+        .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
+        .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+        .order('observed_at', { ascending: false })
+        .range(from, to)
+      if (result.error) throw new Error(`mass_distilled_evaluation_reservation_read_failed:${boundedErrorMessage(result.error)}`)
+      const batch = result.data || []
+      reservationRows.push(...batch)
+      if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+    }
   }
   const seenEventKeys = new Set<string>()
   const uniqueRows = [...eventRows, ...reservationRows].filter((row: any) => {
@@ -290,6 +297,8 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     seenEventKeys.add(key)
     return true
   })
+  uniqueRows.sort((left: any, right: any) =>
+    Date.parse(String(right?.observed_at || '')) - Date.parse(String(left?.observed_at || '')))
   const all: RollingEvent[] = uniqueRows.map((row: any) => ({
     candidateId: clean(row.candidate_id, 240), observedAt: String(row.observed_at || ''), expiresAt: row.expires_at ? String(row.expires_at) : null,
     verifier: clean(row.verifier, 80), evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,

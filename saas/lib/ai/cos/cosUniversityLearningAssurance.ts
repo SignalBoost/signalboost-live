@@ -85,6 +85,7 @@ export type LearningPathId =
   | 'registered_agent_cycle'
   | 'continuous_learning'
   | 'deliberate_practice'
+  | 'practical_residency'
   | 'independent_exams'
   | 'subject_a_range_evidence'
   | 'language_a_range_evidence'
@@ -110,6 +111,7 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   registered_agent_cycle: 'COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED',
   continuous_learning: 'COS_UNIVERSITY_CONTINUOUS_ENABLED',
   deliberate_practice: 'COS_UNIVERSITY_PRACTICE_ENABLED',
+  practical_residency: 'COS_UNIVERSITY_RESIDENCY_ENABLED',
   independent_exams: 'COS_UNIVERSITY_EXAMS_ENABLED',
   subject_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
   language_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',

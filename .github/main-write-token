@@ -1,2 +1,2 @@
-base_sha=cb30c1ab5ab877c9e23b9cd472973b358f5922eb
-branch=fix/smooth-mass-canary-admission-window-20260922
+base_sha=91e05fff93d87e2c5697520da453df83282862bf
+branch=fix/chunk-mass-evaluator-candidate-filters-20260922

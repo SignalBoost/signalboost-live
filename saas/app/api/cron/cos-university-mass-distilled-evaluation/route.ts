@@ -41,11 +41,35 @@ const RUNTIME_WAKE_TIMEOUT_MS = 20_000
 const MIN_BALANCE_USD = 1
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
+// Keep PostgREST `in(...)` filters well below proxy/request-line limits. Production reached
+// 548 pending mass artifacts; the oldest-500 candidate IDs alone were ~29KB before encoding.
+const ROLLING_CANDIDATE_FILTER_CHUNK_SIZE = 50
 const HEX64 = /^[a-f0-9]{64}$/i
 const ENDPOINT_ID = /^[A-Za-z0-9_-]{3,120}$/
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const clean = (value: unknown, max = 1000) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+
+function candidateChunks(values: readonly string[]): string[][] {
+  const chunks: string[][] = []
+  for (let offset = 0; offset < values.length; offset += ROLLING_CANDIDATE_FILTER_CHUNK_SIZE) {
+    chunks.push(values.slice(offset, offset + ROLLING_CANDIDATE_FILTER_CHUNK_SIZE))
+  }
+  return chunks
+}
+
+async function readEvaluationRunCandidateIds(db: any, candidateIds: readonly string[]): Promise<string[] | null> {
+  const rows: string[] = []
+  for (const candidateChunk of candidateChunks(candidateIds)) {
+    const result = await db.from('cos_university_distilled_evaluation_runs')
+      .select('candidate_id')
+      .in('candidate_id', candidateChunk)
+      .limit(1000)
+    if (result.error) return null
+    rows.push(...(result.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean))
+  }
+  return rows
+}
 
 function boundedErrorMessage(error: unknown): string {
   if (error instanceof Error) return clean(error.message, 500)
@@ -244,38 +268,42 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   // canary lives. Scope every read to the candidates actually under consideration and page through them, so an
   // older canary can never fall out of the window and make a genuinely eligible artifact look unproven.
   const eventRows: any[] = []
-  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
-    const from = page * ROLLING_EVENT_PAGE_SIZE
-    const to = from + ROLLING_EVENT_PAGE_SIZE - 1
-    const result = await db.from('cos_university_learning_assurance_events')
-      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
-      .eq('event_type', 'fine_tune')
-      .in('candidate_id', candidateIds)
-      .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
-      .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
-      .order('observed_at', { ascending: false })
-      .range(from, to)
-    if (result.error) throw result.error
-    const batch = result.data || []
-    eventRows.push(...batch)
-    if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+  for (const candidateChunk of candidateChunks(candidateIds)) {
+    for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+      const from = page * ROLLING_EVENT_PAGE_SIZE
+      const to = from + ROLLING_EVENT_PAGE_SIZE - 1
+      const result = await db.from('cos_university_learning_assurance_events')
+        .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+        .eq('event_type', 'fine_tune')
+        .in('candidate_id', candidateChunk)
+        .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
+        .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+        .order('observed_at', { ascending: false })
+        .range(from, to)
+      if (result.error) throw result.error
+      const batch = result.data || []
+      eventRows.push(...batch)
+      if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+    }
   }
   const reservationRows: any[] = []
-  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
-    const from = page * ROLLING_EVENT_PAGE_SIZE
-    const to = from + ROLLING_EVENT_PAGE_SIZE - 1
-    const result = await db.from('cos_university_learning_assurance_events')
-      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
-      .eq('event_type', 'fine_tune')
-      .in('candidate_id', candidateIds)
-      .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
-      .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
-      .order('observed_at', { ascending: false })
-      .range(from, to)
-    if (result.error) throw result.error
-    const batch = result.data || []
-    reservationRows.push(...batch)
-    if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+  for (const candidateChunk of candidateChunks(candidateIds)) {
+    for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+      const from = page * ROLLING_EVENT_PAGE_SIZE
+      const to = from + ROLLING_EVENT_PAGE_SIZE - 1
+      const result = await db.from('cos_university_learning_assurance_events')
+        .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+        .eq('event_type', 'fine_tune')
+        .in('candidate_id', candidateChunk)
+        .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
+        .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+        .order('observed_at', { ascending: false })
+        .range(from, to)
+      if (result.error) throw result.error
+      const batch = result.data || []
+      reservationRows.push(...batch)
+      if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+    }
   }
   const seenEventKeys = new Set<string>()
   const uniqueRows = [...eventRows, ...reservationRows].filter((row: any) => {
@@ -312,13 +340,9 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
         .map((row: any) => clean(row.candidate_id, 240))
         .filter(Boolean)
       if (builderIds.length) {
-        const builderResults = await db.from('cos_university_distilled_evaluation_runs')
-          .select('candidate_id')
-          .in('candidate_id', builderIds)
-          .limit(500)
-        if (!builderResults.error) {
-          builderV2ProofCompletions = new Set((builderResults.data || [])
-            .map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
+        const builderResultIds = await readEvaluationRunCandidateIds(db, builderIds)
+        if (builderResultIds) {
+          builderV2ProofCompletions = new Set(builderResultIds).size
         }
       } else {
         builderV2ProofCompletions = 0
@@ -344,11 +368,8 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     if (!frontierArtifacts.error) {
       const frontierIds = (frontierArtifacts.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)
       if (frontierIds.length) {
-        const frontierResults = await db.from('cos_university_distilled_evaluation_runs')
-          .select('candidate_id')
-          .in('candidate_id', frontierIds)
-          .limit(1000)
-        if (!frontierResults.error) frontierProofCompletions = new Set((frontierResults.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
+        const frontierResultIds = await readEvaluationRunCandidateIds(db, frontierIds)
+        if (frontierResultIds) frontierProofCompletions = new Set(frontierResultIds).size
       }
     }
   } catch {

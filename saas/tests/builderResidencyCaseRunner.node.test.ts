@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   BUILDER_RESIDENCY_CASES,
   builderResidencyCaseByVariantHash,
+  createBuilderResidencyHarnessExecutor,
   runBuilderResidencyCase,
   type BuilderResidencyEvidenceStore,
   type BuilderResidencyExactArtifactExecutor,
@@ -228,4 +229,21 @@ test('shared Harness evidence must persist before University competency evidence
   assert.equal(out.reason,'residency_harness_completion_failed')
   assert.equal(mem.competency.length,0)
   assert.equal(mem.finished[0].status,'rejected')
+})
+
+
+test('Builder Residency live executor uses shared Harness and preserves exact artifact binding',async()=>{
+  let workerCalls=0
+  const live=createBuilderResidencyHarnessExecutor({
+    capabilities:{async resolve(manifest){return{satisfied:true,missing:[],resolved:Object.fromEntries(manifest.capabilities.map(item=>[item.id,{id:item.id}]))} as any}},
+    executor:{async execute(_manifest,action){return{actionId:action.actionId,capabilityId:action.capabilityId,status:'executed'} as any}},
+    worker:{async run(context){workerCalls+=1;assert.equal(context.manifest.identity.artifact?.artifactHash,hash('a'));context.observe({summary:'exact artifact observed',evidenceRefs:['evidence://exact-artifact']})}},
+    verifier:{async verify(input){assert.equal(input.manifest.identity.artifact?.artifactHash,hash('a'));return{verified:true,verifierRef:'verifier://residency-live',evidenceRefs:['evidence://exact-artifact']}}},
+  })
+  const request=(await import('../platform-harness/adapters/builder.ts')).createBuilderResidencyHarnessRequest({...base,runId:'live-residency-1',objective:'practice',sandboxEnvironmentId:base.sandboxEnvironmentId})
+  const out=await live.run({request,authority,practiceCase:BUILDER_RESIDENCY_CASES[0]})
+  assert.equal(workerCalls,1)
+  assert.equal(out.outcome.status,'success')
+  assert.equal(out.authorityExpanded,false)
+  assert.equal(out.productionMutationObserved,false)
 })

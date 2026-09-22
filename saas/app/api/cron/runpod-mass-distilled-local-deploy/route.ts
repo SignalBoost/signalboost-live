@@ -128,8 +128,7 @@ async function issueRollingCanaryApproval(now:Date){
       .eq('status','evaluation_pending').like('candidate_id','mass:%')
       .order('created_at',{ascending:true}).limit(200),
     db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
-      .eq('status','evaluation_pending')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
       .eq('subject_id','Computer Science & Coding')
       .gte('created_at',MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER)
       .contains('intended_use',{trainingReceipt:{
@@ -141,8 +140,7 @@ async function issueRollingCanaryApproval(now:Date){
       .limit(20),
     // Replay proof must be visible even when the legacy oldest-200 window is full.
     db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
-      .eq('status','evaluation_pending')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
       .contains('intended_use',{trainingReceipt:{failureDerivedReplayRequired:true}})
       .order('created_at',{ascending:true})
       .limit(50),
@@ -150,27 +148,50 @@ async function issueRollingCanaryApproval(now:Date){
   if(oldestArtifacts.error) throw oldestArtifacts.error
   if(v2BuilderArtifacts.error) throw v2BuilderArtifacts.error
   if(replayArtifacts.error) throw replayArtifacts.error
+  const confirmedBuilderArtifacts=(v2BuilderArtifacts.data||[]).filter((row:any)=>{
+    const receipt=row?.intended_use?.trainingReceipt
+    return receipt&&typeof receipt==='object'
+      && receipt.optimizer===MASS_CANARY_BUILDER_V2_OPTIMIZER
+      && receipt.frontierResponseAnchorRequired===true
+      && Number(receipt.frontierResponseAnchorEpochs||0)===1
+      && Number(receipt.frontierResponseAnchorItems||0)>0
+  })
   const confirmedReplayArtifacts=(replayArtifacts.data||[]).filter((row:any)=>{
     const receipt=row?.intended_use?.trainingReceipt
     return receipt&&typeof receipt==='object'
       && receipt.failureDerivedReplayRequired===true
       && Number(receipt.failureDerivedReplayItems||0)>0
   })
+  const pendingBuilderArtifacts=confirmedBuilderArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
+  const pendingReplayArtifacts=confirmedReplayArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const artifactByCandidate=new Map<string,any>()
-  for(const row of [...(oldestArtifacts.data||[]),...(v2BuilderArtifacts.data||[]),...confirmedReplayArtifacts]){
+  for(const row of [...(oldestArtifacts.data||[]),...pendingBuilderArtifacts,...pendingReplayArtifacts]){
     artifactByCandidate.set(String((row as any).candidate_id),row)
   }
   const artifactRows=[...artifactByCandidate.values()]
-  const candidateIds=artifactRows.map((row:any)=>String(row.candidate_id))
-  if(!candidateIds.length) return {issued:false,reason:'no_evaluation_pending_mass_artifacts'}
+  const proofCandidateIds=[
+    ...confirmedBuilderArtifacts.map((row:any)=>String(row.candidate_id)),
+    ...confirmedReplayArtifacts.map((row:any)=>String(row.candidate_id)),
+  ]
+  const candidateIds=[...new Set([...artifactRows.map((row:any)=>String(row.candidate_id)),...proofCandidateIds])]
+  if(!artifactRows.length) return {issued:false,reason:'no_evaluation_pending_mass_artifacts'}
   // Read only the three policy-relevant evidence streams and page each stream completely.
   // The old global .limit(5000) mixed in teacher/training/provider history; as that history grew,
   // an older exact-artifact canary pass fell out of the window and the issuer re-approved the same
   // already-passed artifact. That approval was intentionally unclaimable and froze the queue.
   const eventRows=await readRollingCanaryEvents(db,candidateIds)
+  const passedCandidates=new Set(eventRows
+    .filter((row:any)=>String(row?.evidence?.claim||'')==='local_distilled_runtime_canary_passed')
+    .map((row:any)=>String(row.candidate_id)))
+  const builderCandidateIds=new Set(confirmedBuilderArtifacts.map((row:any)=>String(row.candidate_id)))
+  const replayCandidateIds=new Set(confirmedReplayArtifacts.map((row:any)=>String(row.candidate_id)))
+  const builderProofPasses=[...passedCandidates].filter(id=>builderCandidateIds.has(id)).length
+  const remediationReplayProofPasses=[...passedCandidates].filter(id=>replayCandidateIds.has(id)).length
   const decision=decideMassCanaryRollingApproval({
     enabled:process.env.COS_MASS_CANARY_ROLLING_AUTHORIZATION!=='false',
     now,
+    builderProofPasses,
+    remediationReplayProofPasses,
     artifacts:artifactRows.map((row:any)=>{
       const receipt=row?.intended_use?.trainingReceipt && typeof row.intended_use.trainingReceipt==='object'
         ? row.intended_use.trainingReceipt

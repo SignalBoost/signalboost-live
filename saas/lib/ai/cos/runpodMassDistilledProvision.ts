@@ -177,9 +177,18 @@ async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEnd
 
 async function recoverEndpointId(endpoint:Endpoint|undefined,endpointName:string):Promise<Endpoint|undefined>{
   if(endpoint?.id) return endpoint
-  const official=await requestV1<RestEndpointIdentity[]>('/endpoints')
-  const match=official.find(item=>clean(item.name,240)===endpointName&&clean(item.id,120))
-  return match?.id?{...(endpoint||{} as Endpoint),id:clean(match.id,120),name:endpointName}:endpoint
+  // RunPod's create response and v1 endpoint index can lag the v2 control plane briefly.
+  // Recover by the exact governed endpoint name, preferring v2, with a small bounded retry window.
+  for(let attempt=0;attempt<4;attempt+=1){
+    const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
+    const v2=(listed.endpoints||[]).find(item=>clean(item.name,240)===endpointName&&clean(item.id,120))
+    if(v2?.id) return v2
+    const official=await requestV1<RestEndpointIdentity[]>('/endpoints')
+    const v1=official.find(item=>clean(item.name,240)===endpointName&&clean(item.id,120))
+    if(v1?.id) return {...(endpoint||{} as Endpoint),id:clean(v1.id,120),name:endpointName}
+    if(attempt<3) await new Promise(resolve=>setTimeout(resolve,750*(attempt+1)))
+  }
+  return endpoint
 }
 
 async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string):Promise<Endpoint>{

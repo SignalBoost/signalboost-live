@@ -18,6 +18,9 @@ export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // A cold-start timeout is the runtime never answering, not the artifact failing. It is retried without spending one
 // of the three substantive attempts, and the identical-repeat stop below still prevents an endless loop.
 export const MASS_CANARY_COLD_START_FAILURE = 'the operation was aborted due to timeout' as const
+// Provider cold starts are infrastructure, not artifact quality. Yield a recently cold-start-failed
+// artifact briefly so another eligible artifact can use the single canary lane; then allow retry.
+export const MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS = 10 * 60_000
 export const MASS_CANARY_MAX_IDENTICAL_FAILURES = 4
 // A passed canary is not permanent proof that its exact endpoint still exists or can wake. One lifecycle failure can
 // be a normal cold start, but two consecutive lifecycle failures after the latest useful evaluation evidence mean the
@@ -286,12 +289,24 @@ export function decideMassCanaryRollingApproval(input: {
       : 0
     if (failures >= MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
-    // Consecutive identical failures are a stuck artifact, not a repairable retry; a different failure resets it.
-    const errors = own
+    const failureEvents = own
       .filter(event => claim(event) === 'local_distilled_runtime_canary_failed')
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
-      .map(event => String(event.evidence?.error || '').trim().toLowerCase())
-    if (errors.length) {
+    const newestFailure = failureEvents[0]
+    const newestFailureError = String(newestFailure?.evidence?.error || '').trim().toLowerCase()
+
+    // A cold-start timeout means RunPod never supplied a worker; the artifact was never exercised.
+    // Give another artifact a fairness window, then retry this one. Never turn repeated transient
+    // capacity misses into a permanent artifact stop.
+    if (newestFailureError === MASS_CANARY_COLD_START_FAILURE) {
+      const newestFailureAt = at(newestFailure?.observedAt)
+      if (!Number.isFinite(newestFailureAt)
+        || nowMs - newestFailureAt < MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS) continue
+    }
+
+    // Consecutive identical NON-cold-start failures are a stuck artifact, not a repairable retry.
+    const errors = failureEvents.map(event => String(event.evidence?.error || '').trim().toLowerCase())
+    if (errors.length && errors[0] !== MASS_CANARY_COLD_START_FAILURE) {
       let identical = 0
       for (const error of errors) {
         if (error !== errors[0]) break

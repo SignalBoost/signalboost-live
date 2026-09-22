@@ -13,19 +13,9 @@ on:
       - 'saas/tests/businessIntelligenceWikidataPopulation.node.test.ts'
       - 'saas/vercel.json'
       - '.github/workflows/business-intelligence-wikidata.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'saas/lib/business-intelligence-corpus/wikidata-public.ts'
-      - 'saas/lib/business-intelligence-corpus/wikidata-public-parser.ts'
-      - 'saas/lib/business-intelligence-corpus/wikidata-population.ts'
-      - 'saas/app/api/admin/business-intelligence-corpus/seed-wikidata/route.ts'
-      - 'saas/app/api/cron/business-intelligence-corpus-populate/route.ts'
-      - 'saas/supabase/migrations/20260816_business_intelligence_corpus_seed_state.sql'
-      - 'saas/tests/businessIntelligenceWikidata.node.test.ts'
-      - 'saas/tests/businessIntelligenceWikidataPopulation.node.test.ts'
-      - 'saas/vercel.json'
-      - '.github/workflows/business-intelligence-wikidata.yml'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { createUniversalMcpGateway } from '@/provider-hub-host/universal-mcp-gateway'
+import { universalMcpCertificationSummary } from '@/provider-hub-host/universal-mcp-certification-status'
 import type { UniversalMcpProfileId } from '@/provider-hub-host/universal-mcp-profiles'
 
 export const runtime = 'nodejs'
@@ -55,10 +56,12 @@ export async function GET() {
       return { ...item, capabilities: [], connection: safeError(error) }
     }
   }))
+  const certification = universalMcpCertificationSummary()
   return NextResponse.json({
     ok: true,
     schemaVersion: gateway.schemaVersion,
     providers,
+    certification,
   })
 }
 

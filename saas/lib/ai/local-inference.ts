@@ -31,8 +31,8 @@ export interface LocalModelCallArgs {
 }
 
 /**
- * Thrown when the provider reports finish_reason 'length'. The partial content is never returned:
- * a half-written control object or source file must not be mistaken for a finished answer.
+ * Thrown when the provider reports finish_reason 'length'. Partial content is discarded by default:
+ * only callers that explicitly opt into truncated-text salvage may receive it for dedicated parsing.
  */
 export const LOCAL_MODEL_OUTPUT_TRUNCATED = 'local_model_output_truncated'
 export interface LocalInferenceConfig {

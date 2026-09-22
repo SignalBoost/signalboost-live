@@ -140,6 +140,16 @@ begin
     and started_at < now() - interval '20 minutes'
     and attempt_count < 3;
 
+  update public.cos_university_residency_case_runs
+  set status = 'infrastructure_failure',
+      failure_route = 'self_healing',
+      failure_code = 'residency_stale_claim_retry_exhausted',
+      finished_at = now(),
+      updated_at = now()
+  where status in ('provisioning','running')
+    and started_at < now() - interval '20 minutes'
+    and attempt_count >= 3;
+
   -- One exact-artifact Residency case at a time keeps RunPod capacity bounded and avoids
   -- overlapping supervision on the same shared educational lane.
   if exists (

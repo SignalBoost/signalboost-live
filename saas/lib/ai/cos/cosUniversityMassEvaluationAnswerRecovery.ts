@@ -50,3 +50,16 @@ export function recoverStoppedSoloMissingOpenAnswer(text: string, caseId: string
   if (!answer || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(answer)) return null
   return answer
 }
+
+
+/**
+ * A solo retry may ignore the marker protocol entirely while still returning one complete answer.
+ * Recover only a normal stop with non-empty plain text, no thinking block and no protocol marker at all.
+ * Grouped requests, truncation and any marker-bearing ambiguity remain fail-closed.
+ */
+export function recoverStoppedSoloPlainAnswer(text: string, finish: string): string | null {
+  if (finish !== 'stop' || /<\/?think>/i.test(text)) return null
+  const answer = text.trim()
+  if (!answer || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(answer)) return null
+  return answer
+}

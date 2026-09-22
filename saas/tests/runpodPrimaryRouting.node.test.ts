@@ -117,14 +117,13 @@ test('admin probe reports configuration booleans without returning the RunPod ac
 })
 
 
-test('fresh grounded tasks use owned RunPod primary while keeping graduate attempts bounded', () => {
+test('fresh grounded tasks are interactive and bypass owned RunPod primary', () => {
   const inference = source('../lib/ai/local-inference.ts')
   const workers = source('../lib/ai/cos/cosReasoningWorkers.ts')
   const route = source('../app/api/cos-primary/route.ts')
   assert.match(route, /feature:'cos_fresh_grounded_task'/)
-  assert.doesNotMatch(inference, /feature === 'cos_fresh_grounded_task'/)
+  assert.match(inference, /feature === 'cos_fresh_grounded_task'/)
   assert.match(workers, /'cos_fresh_grounded_task'/)
   const eligible = inference.slice(inference.indexOf('function eligibleForRunpodPrimary'), inference.indexOf('async function callConfiguredModel'))
   assert.match(eligible, /if \(interactiveUserResponse\(args\)\) return false/)
-  assert.doesNotMatch(eligible, /cos_fresh_grounded_task/)
 })

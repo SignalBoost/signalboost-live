@@ -190,8 +190,9 @@ export async function GET(req: NextRequest) {
 
   const evidence = {
     enabled: true,
-    runnerInvoked: true,
-    status: errors.length ? 'completed_with_errors' : 'completed',
+    runnerInvoked: false,
+    caseExecuted: false,
+    status: errors.length ? 'enrollment_completed_with_errors' : 'enrollment_completed',
     eligible,
     enrolled,
     queued,

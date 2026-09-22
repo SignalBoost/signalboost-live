@@ -25,7 +25,7 @@ import {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300
+export const maxDuration = 450
 
 const PROFILE = 'cos_local_distilled_runtime_deploy_v1'
 const FINE_TUNE_PROFILE = 'cos_university_fine_tune_evidence_v1'

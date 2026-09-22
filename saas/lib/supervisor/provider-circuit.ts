@@ -118,6 +118,46 @@ export async function readProviderCircuit(input: { db: any; providerId: string; 
   }
 }
 
+export async function consumeProviderCircuitRecoveryProbe(input: {
+  db: any
+  providerId: string
+  capability: string
+  verification?: Record<string, unknown>
+  now?: Date
+}) {
+  const now = (input.now || new Date()).toISOString()
+  const providerId = String(input.providerId || '').trim().toLowerCase()
+  const capability = String(input.capability || '').trim().toLowerCase()
+  if (!providerId || !capability) throw new Error('provider_circuit_identity_invalid')
+  const result = await input.db.from('self_healing_provider_circuits').update({
+    cost_bearing_retry_allowed: false,
+    last_observed_at: now,
+    recovery_verification: {
+      profile: PROVIDER_CIRCUIT_PROFILE,
+      state: 'half_open_probe_claimed',
+      providerId,
+      capability,
+      ...(input.verification || {}),
+      claimedAt: now,
+    },
+  })
+    .eq('provider_id', providerId)
+    .eq('capability', capability)
+    .eq('state', 'open')
+    .eq('cost_bearing_retry_allowed', true)
+    .select('provider_id,capability,failure_class,reason')
+    .maybeSingle()
+  if (result.error) throw result.error
+  if (!result.data) return { claimed: false as const }
+  return {
+    claimed: true as const,
+    providerId,
+    capability,
+    failureClass: String(result.data.failure_class || 'unknown'),
+    reason: String(result.data.reason || 'provider_circuit_open'),
+  }
+}
+
 export async function closeProviderCircuit(input: {
   db: any
   providerId: string

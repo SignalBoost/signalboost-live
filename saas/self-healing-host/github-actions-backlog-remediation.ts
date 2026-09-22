@@ -30,6 +30,7 @@ export type GitHubActionsBacklogRemediationResult = {
   eligible: number
   cancelled: number
   purged: number
+  retainedGhosts: number
   preserved: number
   raced: number
   errors: number
@@ -143,6 +144,7 @@ export async function runGitHubActionsBacklogRemediation(input: {
     eligible: 0,
     cancelled: 0,
     purged: 0,
+    retainedGhosts: 0,
     preserved: 0,
     raced: 0,
     errors: 0,
@@ -193,6 +195,29 @@ export async function runGitHubActionsBacklogRemediation(input: {
 
   const candidates: Array<{ id: number; reason: string; run: WorkflowRun }> = []
   let preserved = 0
+  let retainedGhosts = 0
+
+  const ghostLikeQueuedRun = (run: WorkflowRun): boolean => {
+    const created = createdAtMs(run)
+    const updated = Date.parse(String(run.updated_at || ''))
+    return String(run.status || '') === 'queued'
+      && run.conclusion == null
+      && Array.isArray(run.pull_requests)
+      && run.pull_requests.length === 0
+      && created > 0
+      && Number.isFinite(updated)
+      && nowMs - created >= 24 * 60 * 60_000
+      && Math.abs(updated - created) <= 60_000
+  }
+
+  const queueCandidate = (id: number, reason: string, run: WorkflowRun) => {
+    const ageMs = nowMs - createdAtMs(run)
+    if (ghostLikeQueuedRun(run) && ageMs < 14 * 24 * 60 * 60_000) {
+      retainedGhosts += 1
+      return
+    }
+    candidates.push({ id, reason, run })
+  }
 
   for (const run of runs as WorkflowRun[]) {
     const id = Number(run.id)
@@ -209,28 +234,28 @@ export async function runGitHubActionsBacklogRemediation(input: {
       continue
     }
     if (branch === 'main') {
-      candidates.push({ id, reason: 'stale_main_revision', run })
+      queueCandidate(id, 'stale_main_revision', run)
       continue
     }
 
     const openTip = openPrTips.get(branch)
     if (openTip) {
       if (openTip === sha) preserved += 1
-      else candidates.push({ id, reason: 'superseded_open_pr_revision', run })
+      else queueCandidate(id, 'superseded_open_pr_revision', run)
       continue
     }
 
     const tip = await getTip(branch)
     if (!tip) {
-      candidates.push({ id, reason: 'deleted_branch', run })
+      queueCandidate(id, 'deleted_branch', run)
       continue
     }
     if (tip !== sha) {
-      candidates.push({ id, reason: 'superseded_branch_revision', run })
+      queueCandidate(id, 'superseded_branch_revision', run)
       continue
     }
     if (isEphemeral(branch)) {
-      candidates.push({ id, reason: 'closed_or_unsubmitted_ephemeral_branch', run })
+      queueCandidate(id, 'closed_or_unsubmitted_ephemeral_branch', run)
       continue
     }
     preserved += 1
@@ -242,18 +267,10 @@ export async function runGitHubActionsBacklogRemediation(input: {
   let raced = 0
   let errors = 0
 
-  const ghostQueuedRun = (run: WorkflowRun): boolean => {
-    const created = createdAtMs(run)
-    const updated = Date.parse(String(run.updated_at || ''))
-    return String(run.status || '') === 'queued'
-      && run.conclusion == null
-      && Array.isArray(run.pull_requests)
-      && run.pull_requests.length === 0
-      && created > 0
-      && Number.isFinite(updated)
-      && nowMs - created >= 24 * 60 * 60_000
-      && Math.abs(updated - created) <= 60_000
-  }
+  const ghostQueuedRun = (run: WorkflowRun): boolean => (
+    ghostLikeQueuedRun(run)
+    && nowMs - createdAtMs(run) >= 14 * 24 * 60 * 60_000
+  )
 
   for (let offset = 0; offset < selected.length; offset += 8) {
     const batch = selected.slice(offset, offset + 8)
@@ -303,6 +320,7 @@ export async function runGitHubActionsBacklogRemediation(input: {
     attempted: selected.length,
     cancelled,
     purged,
+    retainedGhosts,
     preserved,
     raced,
     errors,
@@ -316,6 +334,7 @@ export async function runGitHubActionsBacklogRemediation(input: {
     eligible: candidates.length,
     cancelled,
     purged,
+    retainedGhosts,
     preserved,
     raced,
     errors,

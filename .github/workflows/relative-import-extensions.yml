@@ -7,14 +7,6 @@ on:
       - 'saas/**/*.tsx'
       - 'saas/scripts/validate-relative-import-extensions.mjs'
       - '.github/workflows/relative-import-extensions.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'saas/**/*.ts'
-      - 'saas/**/*.tsx'
-      - 'saas/scripts/validate-relative-import-extensions.mjs'
-      - '.github/workflows/relative-import-extensions.yml'
-
 permissions:
   contents: read
 

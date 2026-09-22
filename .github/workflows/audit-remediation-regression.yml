@@ -1,10 +1,10 @@
 name: Audit Remediation Regression
 
 on:
-  # GitHub's enforced required-workflow runner invokes this workflow with `push`
-  # for protected branch commits. Keep all supported events unfiltered so the
-  # required job is present for audit branches, pull requests, and merge queues.
+  # Keep the protected main-branch push required by governance, but never
+  # duplicate PR validation on ordinary feature-branch pushes.
   push:
+    branches: [main]
   pull_request:
   merge_group:
   workflow_dispatch:

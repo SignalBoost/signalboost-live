@@ -14,21 +14,6 @@ on:
       - 'saas/tests/vercelExactRepairVerification.node.test.ts'
       - 'saas/tests/nativeSelfHealingAcceptance.node.test.ts'
       - '.github/workflows/cos-council-regression.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'saas/lib/ai/cos/**'
-      - 'saas/lib/autonomous-supervisor/**'
-      - 'saas/self-healing-host/**'
-      - 'saas/agent-gateway-host/**'
-      - 'saas/supabase/migrations/**'
-      - 'saas/tests/cosCouncil*.node.test.ts'
-      - 'saas/tests/selfHealingNativeMonitoringPolicy.node.test.ts'
-      - 'saas/tests/supervisorDiagnosticCacheKey.node.test.ts'
-      - 'saas/tests/vercelExactRepairVerification.node.test.ts'
-      - 'saas/tests/nativeSelfHealingAcceptance.node.test.ts'
-      - '.github/workflows/cos-council-regression.yml'
   workflow_dispatch:
 
 permissions:

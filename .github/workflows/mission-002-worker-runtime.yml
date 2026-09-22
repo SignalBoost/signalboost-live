@@ -2,10 +2,11 @@ name: Mission 002 Worker Runtime
 on:
   pull_request:
     paths: ['saas/lib/supervisor/missions/**','saas/tests/mission*','saas/supabase/migrations/**mission_002**','.github/workflows/mission-002-worker-runtime.yml']
-  push:
-    branches: [main]
-    paths: ['saas/lib/supervisor/missions/**','saas/tests/mission*','saas/supabase/migrations/**mission_002**','.github/workflows/mission-002-worker-runtime.yml']
 permissions: { contents: read }
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   mission-runtime:
     runs-on: ubuntu-latest

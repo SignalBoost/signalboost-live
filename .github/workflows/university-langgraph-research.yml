@@ -7,20 +7,16 @@ on:
       - 'saas/lib/cos-core/orchestration/index.ts'
       - 'saas/tests/cosUniversityLangGraphResearch.node.test.ts'
       - '.github/workflows/university-langgraph-research.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'saas/lib/cos-core/orchestration/university-research.ts'
-      - 'saas/lib/cos-core/orchestration/index.ts'
-      - 'saas/tests/cosUniversityLangGraphResearch.node.test.ts'
-      - '.github/workflows/university-langgraph-research.yml'
-
 permissions:
   contents: read
 
 defaults:
   run:
     working-directory: saas
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   research-graph:

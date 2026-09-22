@@ -11,19 +11,6 @@ on:
       - 'saas/scripts/validate-provider-runtime.mjs'
       - 'saas/package.json'
       - '.github/workflows/provider-framework-bootstrap.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'saas/lib/provider-framework/**'
-      - 'saas/tests/universalProviderFramework.node.test.ts'
-      - 'saas/tests/providerRegistryBootstrap.node.test.ts'
-      - 'saas/tests/githubProviderRuntime.node.test.ts'
-      - 'saas/tests/githubProductionPipeline.node.test.ts'
-      - 'saas/scripts/validate-provider-runtime.mjs'
-      - 'saas/package.json'
-      - '.github/workflows/provider-framework-bootstrap.yml'
-
 permissions:
   contents: read
 

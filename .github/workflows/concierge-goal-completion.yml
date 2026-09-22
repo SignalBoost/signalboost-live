@@ -13,26 +13,16 @@ on:
       - 'saas/tests/conciergeGoalCompletion.node.test.ts'
       - 'saas/tests/conciergeVisualIntent.node.test.ts'
       - '.github/workflows/concierge-goal-completion.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'saas/app/api/visuals/**'
-      - 'saas/lib/ai/cos/goalCompletion.ts'
-      - 'saas/lib/cos/aiPort.ts'
-      - 'saas/lib/visuals/freshGeneration.ts'
-      - 'saas/lib/visuals/intent.ts'
-      - 'saas/lib/visuals/personReferences.ts'
-      - 'saas/tests/conciergeFreshVisualGeneration.node.test.ts'
-      - 'saas/tests/conciergeGoalCompletion.node.test.ts'
-      - 'saas/tests/conciergeVisualIntent.node.test.ts'
-      - '.github/workflows/concierge-goal-completion.yml'
-
 permissions:
   contents: read
 
 defaults:
   run:
     working-directory: saas
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   goal-completion-contract:

@@ -9,16 +9,6 @@ on:
       - 'saas/package-lock.json'
       - 'scripts/dependency-integrity.mjs'
       - '.github/workflows/dependency-integrity.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - 'saas/package.json'
-      - 'saas/package-lock.json'
-      - 'scripts/dependency-integrity.mjs'
-      - '.github/workflows/dependency-integrity.yml'
-
 permissions:
   contents: read
 

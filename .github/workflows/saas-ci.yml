@@ -1,16 +1,12 @@
 # .github/workflows/saas-ci.yml
 name: SaaS CI
 
-# Runs on every push to main (the working branch) and on pull requests.
+# Runs on pull requests that change SaaS code. The expensive 18-job suite is
+# intentionally not repeated after merge; serialized PRs already validate the exact change.
 # The typecheck job alone catches the class of error that has reached production
 # before (e.g. a referenced-but-undefined function), without needing any secrets.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'saas/**'
-      - '.github/workflows/saas-ci.yml'
   pull_request:
     paths:
       - 'saas/**'

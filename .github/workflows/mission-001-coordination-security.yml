@@ -8,16 +8,12 @@ on:
       - 'saas/supabase/migrations/**'
       - 'saas/tests/supervisorCoordinationSecurity.node.test.ts'
       - '.github/workflows/mission-001-coordination-security.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'saas/lib/supervisor/**'
-      - 'saas/supabase/migrations/**'
-      - 'saas/tests/supervisorCoordinationSecurity.node.test.ts'
-      - '.github/workflows/mission-001-coordination-security.yml'
-
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   coordination-security:

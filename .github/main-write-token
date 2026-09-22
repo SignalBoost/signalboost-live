@@ -1,2 +1,2 @@
-base_sha=e88d276cc7cbb33d09c27787e8514d1ef28b26e1
-branch=test/universal-mcp-baseline-proof-v2-20260922
+base_sha=cb82bf40b05780a70582e7ec99b250599cd85b15
+branch=fix/mass-evaluator-json-filter-400-20260922-v2

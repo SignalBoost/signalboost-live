@@ -106,9 +106,10 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
   assert.match(result.stdout, /Page Title: iTMounts/)
   assert.ok(commands.some(command => command.cmd === 'npm' && command.args.includes(`@playwright/cli@${BUILDER_PLAYWRIGHT_CLI_VERSION}`)))
   assert.ok(commands.some(command =>
-    command.cmd === 'node'
+    command.cmd === 'dnf'
       && command.sudo === true
-      && command.args.join(' ') === '/tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install-deps chromium'
+      && command.args.includes('mesa-libgbm')
+      && command.args.includes('at-spi2-atk')
   ))
   assert.ok(commands.some(command =>
     command.cmd === 'node'
@@ -116,11 +117,15 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
       && command.args.join(' ') === '/tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install chromium'
   ))
   assert.ok(commands.some(command => command.cmd === 'node' && command.args[0] === '-e'))
+  assert.ok(commands.some(command => command.cmd.includes('/pw-browsers/') && command.args.join(' ') === '--version'))
   assert.ok(written.some(value =>
     value.includes('"browserName":"chromium"')
       && value.includes('"executablePath":"/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome"')
+      && !value.includes('"saveSession"')
+      && !value.includes('"outputMaxSize"')
+      && !value.includes('"settle"')
   ))
-  const dependencyBootstrap = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install-deps chromium'))
+  const dependencyBootstrap = steps.findIndex(step => step.includes('command:dnf install -y libXcomposite'))
   const browserDownload = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install chromium'))
   const lockdown = steps.findIndex(step => step === 'network:{"allow":["itmounts.com"]}')
   const open = steps.findIndex(step => step.includes('playwright-cli --config /tmp/cos-builder-playwright-cli/.playwright/cli.config.json open https://itmounts.com/'))
@@ -213,7 +218,7 @@ test('failed bootstrap destroys the half-initialized Sandbox and retries cleanly
     return {
       async updateNetworkPolicy() {},
       async runCommand(command: any) {
-        if (failDeps && command.cmd === 'node' && command.args?.includes('install-deps')) {
+        if (failDeps && command.cmd === 'dnf') {
           return commandResult(1, '', 'dependency install failed')
         }
         if (command.cmd === 'node' && command.args?.[0] === '-e') {

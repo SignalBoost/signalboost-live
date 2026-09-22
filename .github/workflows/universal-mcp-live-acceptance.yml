@@ -1,4 +1,5 @@
 name: Universal MCP Live Acceptance
+# Certification probe: all five providers remain fail-closed.
 
 on:
   workflow_dispatch:

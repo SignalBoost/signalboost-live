@@ -189,6 +189,16 @@ type RollingOutcome = Readonly<{
   disposed?: number
 }>
 
+function isBuilderV2Receipt(intendedUse: unknown): boolean {
+  if (!intendedUse || typeof intendedUse !== 'object' || Array.isArray(intendedUse)) return false
+  const receipt = (intendedUse as any).trainingReceipt
+  return Boolean(receipt && typeof receipt === 'object'
+    && receipt.optimizer === MASS_EVALUATION_BUILDER_V2_OPTIMIZER
+    && receipt.frontierResponseAnchorRequired === true
+    && Number(receipt.frontierResponseAnchorEpochs) === 1
+    && Number(receipt.frontierResponseAnchorItems) > 0)
+}
+
 async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -205,18 +215,16 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status', 'evaluation_pending')
       .eq('subject_id', 'Computer Science & Coding')
-      .contains('intended_use', { trainingReceipt: {
-        optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
-        frontierResponseAnchorRequired: true,
-        frontierResponseAnchorEpochs: 1,
-      } })
+      .like('candidate_id', 'mass:%')
       .order('created_at', { ascending: true })
-      .limit(20),
+      .limit(500),
   ])
   if (oldestArtifacts.error) throw oldestArtifacts.error
   if (builderV2Artifacts.error) throw builderV2Artifacts.error
+  const confirmedBuilderV2Artifacts = (builderV2Artifacts.data || [])
+    .filter((row: any) => isBuilderV2Receipt(row?.intended_use))
   const artifactByCandidate = new Map<string, any>()
-  for (const row of [...(oldestArtifacts.data || []), ...(builderV2Artifacts.data || [])]) {
+  for (const row of [...(oldestArtifacts.data || []), ...confirmedBuilderV2Artifacts]) {
     artifactByCandidate.set(String((row as any).candidate_id), row)
   }
   const artifactRows = [...artifactByCandidate.values()]
@@ -229,10 +237,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
       frontierRecipe: receipt.profile === 'cos_university_frontier_gkd_v1',
       builderV2: String(row.subject_id || '') === 'Computer Science & Coding'
-        && receipt.optimizer === MASS_EVALUATION_BUILDER_V2_OPTIMIZER
-        && receipt.frontierResponseAnchorRequired === true
-        && Number(receipt.frontierResponseAnchorEpochs) === 1
-        && Number(receipt.frontierResponseAnchorItems) > 0,
+        && isBuilderV2Receipt(row.intended_use),
     }
   })
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
@@ -297,18 +302,14 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   let builderV2ProofCompletions = MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
   try {
     const builderArtifacts = await db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,intended_use')
+      .select('candidate_id,intended_use,created_at')
       .eq('subject_id', 'Computer Science & Coding')
-      .contains('intended_use', { trainingReceipt: {
-        optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
-        frontierResponseAnchorRequired: true,
-        frontierResponseAnchorEpochs: 1,
-      } })
       .like('candidate_id', 'mass:%')
-      .limit(200)
+      .order('created_at', { ascending: false })
+      .limit(500)
     if (!builderArtifacts.error) {
       const builderIds = (builderArtifacts.data || [])
-        .filter((row: any) => Number(row?.intended_use?.trainingReceipt?.frontierResponseAnchorItems) > 0)
+        .filter((row: any) => isBuilderV2Receipt(row?.intended_use))
         .map((row: any) => clean(row.candidate_id, 240))
         .filter(Boolean)
       if (builderIds.length) {

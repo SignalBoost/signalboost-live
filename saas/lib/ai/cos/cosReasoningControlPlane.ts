@@ -18,6 +18,7 @@ export type CosReasoningRequest = {
   disableThinking?: boolean
   timeoutMs?: number
   allowConfiguredFallback?: boolean
+  allowTruncatedText?: boolean
   persistUsage?: boolean
   requestedRole?: CosReasoningWorkerRole
   allowExternalEscalation?: boolean

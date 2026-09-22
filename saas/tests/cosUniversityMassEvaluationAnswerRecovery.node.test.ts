@@ -2,6 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer } from '../lib/ai/cos/cosUniversityMassEvaluationAnswerRecovery.ts'
 
 const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
@@ -47,4 +48,26 @@ test('solo finish=stop plain text with no markers is recovered but only on the o
 test('solo finish=stop with one foreign or malformed opener and the correct terminal closer is recovered only on the solo path', () => {
   assert.match(source, /recoverStoppedSoloForeignOpenCorrectCloseAnswer/)
   assert.match(source, /cases\.length===1 \? recoverStoppedSoloForeignOpenCorrectCloseAnswer\(text,item\.id,finish\) : null/)
+})
+
+
+test('solo correct-close recovery accepts one foreign opener and ignores only non-protocol trailing text', () => {
+  const id='0ba8dfd777f3cd71'
+  assert.equal(
+    recoverStoppedSoloForeignOpenCorrectCloseAnswer(`<<<ANSWER:wrong-id>>>\nThe result is 16%.\n<<<END:${id}>>>\nDone.`,id,'stop'),
+    'The result is 16%.',
+  )
+  assert.equal(
+    recoverStoppedSoloForeignOpenCorrectCloseAnswer(`<<<ANSWER:wrong-id\nThe result is 16%.\n<<<END:${id}>>>`,id,'stop'),
+    'The result is 16%.',
+  )
+  assert.equal(recoverStoppedSoloForeignOpenCorrectCloseAnswer(`<<<ANSWER:a>>>\nA\n<<<ANSWER:b>>>\nB\n<<<END:${id}>>>`,id,'stop'),null)
+  assert.equal(recoverStoppedSoloForeignOpenCorrectCloseAnswer(`<<<ANSWER:wrong>>>\n<think>x</think> A\n<<<END:${id}>>>`,id,'stop'),null)
+  assert.equal(recoverStoppedSoloForeignOpenCorrectCloseAnswer(`<<<ANSWER:wrong>>>\nA\n<<<END:${id}>>>\n<<<END:other>>>`,id,'stop'),null)
+})
+
+test('solo missing-open recovery treats the correct closer as the answer boundary while rejecting trailing protocol blocks', () => {
+  const id='0ba8dfd777f3cd71'
+  assert.equal(recoverStoppedSoloMissingOpenAnswer(`The result is 16%.\n<<<END:${id}>>>\nDone.`,id,'stop'),'The result is 16%.')
+  assert.equal(recoverStoppedSoloMissingOpenAnswer(`The result is 16%.\n<<<END:${id}>>>\n<<<ANSWER:other>>>x`,id,'stop'),null)
 })

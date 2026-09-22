@@ -1,0 +1,188 @@
+import {
+  BUILDER_RESIDENCY_V1_COMPETENCIES,
+  assessBuilderResidency,
+  type ResidencyEvidenceForAssessment,
+  type ResidencyStanding,
+} from '../../lib/ai/cos/cosUniversityResidency.ts'
+import {
+  BUILDER_RESIDENCY_CASES,
+  type BuilderResidencyCase,
+} from '../cases/builder-residency.ts'
+import type {
+  BuilderResidencyEvidenceStore,
+  BuilderResidencyExactArtifactExecutor,
+} from './builder-case-runner.ts'
+import { runBuilderResidencyCase } from './builder-case-runner.ts'
+import type { HarnessAuthorityEnvelope } from '../core/types.ts'
+import type { HarnessEvidenceSink } from '../evidence/durable-evidence.ts'
+
+export interface BuilderResidencyEnrollment {
+  residencyId:string
+  candidateId:string
+  subjectId:string
+  tenantId:string
+  portableId:string
+  agentId:string
+  artifactId:string
+  artifactHash:string
+  artifactRevision?:string
+  sandboxEnvironmentId:string
+  standing:ResidencyStanding
+}
+
+export interface BuilderResidencyOrchestratorStore extends BuilderResidencyEvidenceStore {
+  nextEnrollment():Promise<BuilderResidencyEnrollment|null>
+  readEvidence(residencyId:string):Promise<readonly ResidencyEvidenceForAssessment[]>
+  refreshAssessment(residencyId:string):Promise<{
+    standing:ResidencyStanding
+    residencyComplete:boolean
+    demonstratedCompetencies:number
+    retainedCompetencies:number
+    remediationCompetencies:readonly string[]
+  }>
+}
+
+export interface BuilderResidencyCoverage {
+  totalCompetencies:number
+  coveredCompetencies:number
+  missingCompetencies:readonly string[]
+}
+
+export function assessBuilderResidencyCaseCoverage(
+  cases:readonly BuilderResidencyCase[]=BUILDER_RESIDENCY_CASES,
+):BuilderResidencyCoverage{
+  const covered=new Set(cases.map(item=>item.competencyId))
+  const missing=BUILDER_RESIDENCY_V1_COMPETENCIES.filter(item=>!covered.has(item))
+  return Object.freeze({
+    totalCompetencies:BUILDER_RESIDENCY_V1_COMPETENCIES.length,
+    coveredCompetencies:covered.size,
+    missingCompetencies:Object.freeze([...missing]),
+  })
+}
+
+function passedVariantKeys(evidence:readonly ResidencyEvidenceForAssessment[]):Set<string>{
+  return new Set(
+    evidence
+      .filter(item=>item.accepted&&item.outcome==='pass')
+      .map(item=>`${item.competencyId}:${item.variantHash}`),
+  )
+}
+
+export function selectNextBuilderResidencyCase(input:{
+  evidence:readonly ResidencyEvidenceForAssessment[]
+  cases?:readonly BuilderResidencyCase[]
+}):BuilderResidencyCase|null{
+  const cases=input.cases??BUILDER_RESIDENCY_CASES
+  const assessment=assessBuilderResidency(input.evidence)
+  const passed=passedVariantKeys(input.evidence)
+
+  const remediation=new Set(assessment.remediationCompetencies)
+  const remediationCase=cases.find(item=>
+    remediation.has(item.competencyId)&&
+    !passed.has(`${item.competencyId}:${item.variantHash}`),
+  )
+  if(remediationCase) return remediationCase
+
+  const stateByCompetency=new Map(
+    assessment.competencies.map(item=>[item.competencyId,item.state]),
+  )
+  return cases.find(item=>
+    !passed.has(`${item.competencyId}:${item.variantHash}`)&&
+    !['demonstrated','retained'].includes(String(stateByCompetency.get(item.competencyId))),
+  )??null
+}
+
+export async function runBuilderResidencyOrchestrator(input:{
+  store:BuilderResidencyOrchestratorStore
+  executor:BuilderResidencyExactArtifactExecutor
+  harnessEvidenceSink:HarnessEvidenceSink
+  authorityFor(enrollment:BuilderResidencyEnrollment):Promise<HarnessAuthorityEnvelope>
+  now?:()=>Date
+}){
+  const enrollment=await input.store.nextEnrollment()
+  const coverage=assessBuilderResidencyCaseCoverage()
+
+  if(!enrollment){
+    return Object.freeze({
+      ok:true,
+      state:'idle' as const,
+      coverage,
+      automaticFinalGateEnable:false as const,
+      promotionAuthorized:false as const,
+      productionTrafficAuthorized:false as const,
+    })
+  }
+
+  const beforeEvidence=await input.store.readEvidence(enrollment.residencyId)
+  const before=assessBuilderResidency(beforeEvidence)
+
+  if(before.residencyComplete){
+    await input.store.refreshAssessment(enrollment.residencyId)
+    return Object.freeze({
+      ok:true,
+      state:'already_complete' as const,
+      residencyId:enrollment.residencyId,
+      assessment:before,
+      coverage,
+      automaticFinalGateEnable:false as const,
+      promotionAuthorized:false as const,
+      productionTrafficAuthorized:false as const,
+    })
+  }
+
+  const practiceCase=selectNextBuilderResidencyCase({evidence:beforeEvidence})
+  if(!practiceCase){
+    await input.store.refreshAssessment(enrollment.residencyId)
+    return Object.freeze({
+      ok:false,
+      state:'waiting_for_residency_cases' as const,
+      residencyId:enrollment.residencyId,
+      assessment:before,
+      coverage,
+      automaticFinalGateEnable:false as const,
+      promotionAuthorized:false as const,
+      productionTrafficAuthorized:false as const,
+    })
+  }
+
+  const authority=await input.authorityFor(enrollment)
+  const execution=await runBuilderResidencyCase({
+    residencyId:enrollment.residencyId,
+    candidateId:enrollment.candidateId,
+    subjectId:enrollment.subjectId,
+    tenantId:enrollment.tenantId,
+    portableId:enrollment.portableId,
+    agentId:enrollment.agentId,
+    artifactId:enrollment.artifactId,
+    artifactHash:enrollment.artifactHash,
+    artifactRevision:enrollment.artifactRevision,
+    sandboxEnvironmentId:enrollment.sandboxEnvironmentId,
+    authority,
+    practiceCase,
+    executor:input.executor,
+    harnessEvidenceSink:input.harnessEvidenceSink,
+    store:input.store,
+    now:input.now,
+  })
+
+  const afterEvidence=await input.store.readEvidence(enrollment.residencyId)
+  const after=assessBuilderResidency(afterEvidence)
+  await input.store.refreshAssessment(enrollment.residencyId)
+
+  return Object.freeze({
+    ok:execution.ok,
+    state:execution.ok?'case_completed' as const:'case_not_completed' as const,
+    residencyId:enrollment.residencyId,
+    practiceCase:Object.freeze({
+      caseFamily:practiceCase.caseFamily,
+      competencyId:practiceCase.competencyId,
+      variantHash:practiceCase.variantHash,
+    }),
+    execution,
+    assessment:after,
+    coverage,
+    automaticFinalGateEnable:false as const,
+    promotionAuthorized:false as const,
+    productionTrafficAuthorized:false as const,
+  })
+}

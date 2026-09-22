@@ -94,7 +94,7 @@ begin
     if not found then continue; end if;
 
     v_residency_completed_at := null;
-    if pg_catalog.regexp_replace(pg_catalog.lower(pg_catalog.coalesce(v_artifact.subject_id,'')), '[^a-z0-9]+', '_', 'g')
+    if pg_catalog.regexp_replace(pg_catalog.lower(coalesce(v_artifact.subject_id,'')), '[^a-z0-9]+', '_', 'g')
       in ('computer_science','computer_science_coding') then
       select max(r.completed_at) into v_residency_completed_at
       from public.cos_university_residency_enrollments r
@@ -218,7 +218,7 @@ revoke all on function public.claim_next_mass_distilled_runtime_canary()
   from public, anon, authenticated;
 grant execute on function public.claim_next_mass_distilled_runtime_canary() to service_role;
       and (
-        pg_catalog.regexp_replace(pg_catalog.lower(pg_catalog.coalesce(a.subject_id,'')), '[^a-z0-9]+', '_', 'g')
+        pg_catalog.regexp_replace(pg_catalog.lower(coalesce(a.subject_id,'')), '[^a-z0-9]+', '_', 'g')
           not in ('computer_science','computer_science_coding')
         or exists (
           select 1 from public.cos_university_residency_enrollments r

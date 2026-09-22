@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type {
+  AgentRequest,
   ConsequenceClass,
   GatewayHost,
   GovernancePolicy,
@@ -144,7 +145,7 @@ test('harness execution still goes through the existing Governed Socket', async 
 
   let performed = 0
   const classifier = {
-    classify(agentRequest: { action: { kind: string } }): ConsequenceClass {
+    classify(agentRequest: AgentRequest): ConsequenceClass {
       return agentRequest.action.kind === 'write' ? 'external_effect' : 'reversible_internal'
     },
   }

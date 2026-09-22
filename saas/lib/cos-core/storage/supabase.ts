@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { embeddingModelName } from '@/lib/ai/cos/embeddingEndpoint'
 import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge/index.ts'
 import type { KnowledgeFact, KnowledgeFactMatch, SemanticKnowledgeStore } from '../layers/knowledge/persistent.ts'
@@ -7,15 +7,8 @@ import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/me
 import type { ContinuousLearningStore, LearningCandidate, LearningObservation, LearningStore, LearnedStrategy } from '../layers/learning/index.ts'
 import type { AIROIMetric, AIROIMetricsSink } from '../layers/optimization/index.ts'
 
-let singleton: SupabaseClient | null | undefined
-
-export function cosServiceDb(): SupabaseClient | null {
-  if (singleton !== undefined) return singleton
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  singleton = url && key ? createClient(url, key, { auth: { persistSession: false } }) : null
-  return singleton
-}
+import { cosServiceDb } from './service-db.ts'
+export { cosServiceDb } from './service-db.ts'
 
 export class SupabaseKnowledgeStore implements SemanticKnowledgeStore {
   constructor(private readonly db: SupabaseClient) {}

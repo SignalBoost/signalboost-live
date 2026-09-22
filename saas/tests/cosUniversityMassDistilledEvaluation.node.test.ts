@@ -209,9 +209,14 @@ test('system-prefixed holdout rows remain parseable instead of blocking the back
 })
 
 
-test('rolling evaluation evidence is scoped to the pending candidate set so API row caps cannot starve old canaries', () => {
+test('rolling evaluation evidence is scoped and transport-chunked so URL limits cannot starve the backlog', () => {
   assert.match(route, /const candidateIds = rows\.map\(row => row\.candidateId\)/)
-  assert.equal((route.match(/\.in\('candidate_id', candidateIds\)/g) || []).length, 2)
+  assert.match(route, /const ROLLING_CANDIDATE_CHUNK_SIZE = 75/)
+  assert.match(route, /candidateIds\.slice\(offset, offset \+ ROLLING_CANDIDATE_CHUNK_SIZE\)/)
+  assert.equal((route.match(/\.in\('candidate_id', candidateChunk\)/g) || []).length, 2)
+  assert.doesNotMatch(route, /\.in\('candidate_id', candidateIds\)/)
+  assert.match(route, /mass_distilled_evaluation_event_read_failed:/)
+  assert.match(route, /mass_distilled_evaluation_reservation_read_failed:/)
 })
 
 test('holdouts that can never be evaluated are terminally quarantined instead of retried', () => {
@@ -259,5 +264,10 @@ test('mass evaluation pre-claim failures retain their exact failing phase', () =
   assert.match(route, /mass_distilled_evaluation_schema_preflight_failed:/)
   assert.match(route, /mass_distilled_evaluation_runpod_account_preflight_failed:/)
   assert.match(route, /mass_distilled_evaluation_rolling_preflight_failed:/)
+})
+
+test('chunked evidence reads restore global newest-first event order before policy evaluation', () => {
+  assert.match(route, /uniqueRows\.sort\(\(left: any, right: any\) =>/)
+  assert.match(route, /Date\.parse\(String\(right\?\.observed_at \|\| ''\)\) - Date\.parse\(String\(left\?\.observed_at \|\| ''\)\)/)
 })
 

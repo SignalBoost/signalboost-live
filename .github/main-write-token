@@ -1,2 +1,2 @@
-base_sha=a7070ad43511582e9b10b8a3b79e7df228756a84
-branch=fix/saas-ci-scoped-fanout-20260922
+base_sha=416f394e008086cda23c9af5e2957179c81ab763
+branch=fix/migrate-provider-adapters-supervisor-20260922

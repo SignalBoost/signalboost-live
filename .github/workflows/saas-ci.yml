@@ -30,6 +30,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: Classify SaaS CI scope
+    runs-on: ubuntu-latest
+    outputs:
+      full_suite: ${{ steps.scope.outputs.full_suite }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        name: Detect whether the full suite is required
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          mapfile -t changed < <(git diff --name-only "$base" "$head")
+
+          full_suite=false
+          for path in "${changed[@]}"; do
+            case "$path" in
+              saas/lib/provider-framework/*|saas/tests/providerFramework*.node.test.ts|saas/tests/provider-framework*.node.test.ts|.github/main-write-token)
+                ;;
+              *)
+                full_suite=true
+                break
+                ;;
+            esac
+          done
+
+          echo "full_suite=$full_suite" >> "$GITHUB_OUTPUT"
+          printf 'Changed files:\n%s\n' "${changed[*]:-none}"
+          echo "Full suite required: $full_suite"
+
   typecheck:
     name: Typecheck (tsc --noEmit)
     runs-on: ubuntu-latest
@@ -44,6 +78,8 @@ jobs:
         run: node --max-old-space-size=7168 ./node_modules/typescript/bin/tsc --noEmit
 
   cos-fresh-routing:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS fresh-data routing policy
     runs-on: ubuntu-latest
     steps:
@@ -57,6 +93,8 @@ jobs:
         run: node --test tests/cosFreshnessPolicy.node.test.ts tests/cosFreshLiveRouting.node.test.ts tests/cosFreshGrounding.node.test.ts tests/cosStructuredLiveInfo.node.test.ts
 
   cos-embedding-transport:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS embedding transport compatibility
     runs-on: ubuntu-latest
     steps:
@@ -70,6 +108,8 @@ jobs:
         run: npx --yes tsx --test tests/localEmbeddings.node.test.ts tests/localEmbeddingsNativeFallback.node.test.ts
 
   cos-cache-provenance:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS cache provenance policy
     runs-on: ubuntu-latest
     steps:
@@ -83,6 +123,8 @@ jobs:
         run: npx --yes tsx --test tests/cosLiveSystemStateProvenance.node.test.ts tests/cosProvenanceFormat.node.test.ts
 
   cos-orchestration-action-classifier:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS orchestration action classifier
     runs-on: ubuntu-latest
     steps:
@@ -96,6 +138,8 @@ jobs:
         run: npx --yes tsx --test tests/cosOrchestrationActionClassifier.node.test.ts
 
   cos-definitional-answer-quality:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS definitional answer quality and canonical self-knowledge provenance
     runs-on: ubuntu-latest
     steps:
@@ -109,6 +153,8 @@ jobs:
         run: npx --yes tsx --test tests/cosDefinitionalAnswerQuality.node.test.ts
 
   provider-router-default-preference:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: Provider router default preference resolves to local
     runs-on: ubuntu-latest
     steps:
@@ -122,6 +168,8 @@ jobs:
         run: npx --yes tsx --test tests/providerRouterDefaultPreference.node.test.ts
 
   cos-quality-repair-audit:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS quality-repair audit persistence
     runs-on: ubuntu-latest
     steps:
@@ -135,6 +183,8 @@ jobs:
         run: npx --yes tsx --test tests/qualityRepairDecisionLogging.node.test.ts
 
   cos-core-learning-curriculum:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS core learning curriculum
     runs-on: ubuntu-latest
     steps:
@@ -173,6 +223,8 @@ jobs:
         run: npx --yes tsx --test tests/cosCurriculumCoverage.node.test.ts
 
   cos-university-programs:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS University time-bounded programs and admission
     runs-on: ubuntu-latest
     steps:
@@ -198,6 +250,8 @@ jobs:
           tests/cosUniversityLearningAssurance.node.test.ts
 
   cos-platform-self-knowledge:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS platform self-knowledge policy
     runs-on: ubuntu-latest
     steps:
@@ -211,6 +265,8 @@ jobs:
         run: npx --yes tsx --test tests/platformSelfKnowledge.node.test.ts
 
   cos-continuous-independence:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS continuous independence learning
     runs-on: ubuntu-latest
     steps:
@@ -224,6 +280,8 @@ jobs:
         run: npx --yes tsx --test tests/cosContinuousTurnLearning.node.test.ts tests/cosUserFeedbackLearning.node.test.ts tests/cosVerifiedProductionOutcome.node.test.ts tests/cosIndependenceMetrics.node.test.ts
 
   cos-capability-benchmark:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: COS capability benchmark contract
     runs-on: ubuntu-latest
     steps:
@@ -237,6 +295,8 @@ jobs:
         run: npx --yes tsx --test tests/cosCapabilityBenchmark.node.test.ts tests/cognitiveHeldOutCertification.node.test.ts
 
   concierge-visual-integrity:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: Concierge verified visual references
     runs-on: ubuntu-latest
     steps:
@@ -250,6 +310,8 @@ jobs:
         run: npx --yes tsx --test tests/conciergeVisuals.node.test.ts
 
   vercel-cos-gate:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: Vercel COS release gate
     runs-on: ubuntu-latest
     steps:
@@ -302,6 +364,8 @@ jobs:
         run: npm test
 
   issue-205-guards:
+    needs: scope
+    if: needs.scope.outputs.full_suite == 'true'
     name: Issue #205 enterprise guards
     runs-on: ubuntu-latest
     steps:

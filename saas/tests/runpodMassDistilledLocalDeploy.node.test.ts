@@ -192,3 +192,14 @@ test('historical canary pass still blocks ordinary duplicate approvals', () => {
   assert.match(passGate, /and not \(/)
   assert.match(passGate, /endpointRefresh/)
 })
+
+
+test('RunPod template discovery includes templates already bound to Serverless endpoints', () => {
+  const legacy = source('../lib/ai/cos/runpodMassDistilledProvision.ts')
+  const compat = source('../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
+  const required = "/templates?includeEndpointBoundTemplates=true"
+  assert.ok((legacy.match(/includeEndpointBoundTemplates=true/g) || []).length >= 2)
+  assert.ok((compat.match(/includeEndpointBoundTemplates=true/g) || []).length >= 1)
+  assert.match(legacy, new RegExp(required.replace(/[?]/g, '\\?')))
+  assert.match(compat, new RegExp(required.replace(/[?]/g, '\\?')))
+})

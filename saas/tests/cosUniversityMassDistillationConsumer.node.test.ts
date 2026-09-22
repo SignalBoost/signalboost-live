@@ -148,3 +148,15 @@ test('consumer accepts a positive bounded retry reserve but never more than the 
   assert.match(consumer, /expectedCeiling <= 0 \|\| expectedCeiling > maximumCeiling \+ 0\.000001/)
   assert.match(consumer, /boundedConfigForStage\(hf, claim\.stage, price\.hourlyCostUsd, expectedCeiling\)/)
 })
+
+
+test('live failed campaigns are selected before historical failed-run pagination', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  const liveCampaignAt = consumer.indexOf("const liveCampaigns = await db.from('cos_university_mass_distillation_campaigns')")
+  const failedRunsAt = consumer.indexOf("const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')", liveCampaignAt)
+  assert.ok(liveCampaignAt >= 0 && failedRunsAt > liveCampaignAt)
+  assert.match(consumer, /\.is\('completed_at', null\)/)
+  assert.match(consumer, /\.gt\('expires_at', now\)/)
+  assert.match(consumer, /\.in\('campaign_id', liveCampaignIds\)/)
+  assert.match(consumer, /failedRunRows = failedRuns\.data \|\| \[\]/)
+})

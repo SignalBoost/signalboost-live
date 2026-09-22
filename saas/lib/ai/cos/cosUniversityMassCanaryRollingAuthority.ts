@@ -177,6 +177,65 @@ function canaryInvocationInFlight(own: readonly CanaryEvent[], nowMs: number): b
     && ['local_distilled_runtime_canary_passed', 'local_distilled_runtime_canary_failed'].includes(claim(event)))
 }
 
+
+/**
+ * The rolling canary ceiling is a spend envelope, not an authorization-count envelope.
+ * An approval consumes that envelope only while it can still cause paid work (armed), or once
+ * its exact paid/model invocation has actually started. Expired/unclaimable approvals that
+ * never reached the invocation boundary must not darken the lane for the rest of the window.
+ *
+ * The invocation is bound back to its exact approval through authorizationObservedAt. If a
+ * legacy invocation lacks that binding, fail closed by associating it only with the approval
+ * interval that contains its observed_at timestamp.
+ */
+function canaryApprovalConsumesWindow(
+  approval: CanaryEvent,
+  events: readonly CanaryEvent[],
+  nowMs: number,
+): boolean {
+  const approvedAt = at(approval.observedAt)
+  if (!Number.isFinite(approvedAt)) return true
+  const artifactHash = String(approval.evidence?.artifactHash || '').trim().toLowerCase()
+  if (!HEX64.test(artifactHash)) return true
+
+  const own = events.filter(event => event.candidateId === approval.candidateId
+    && event.evidence?.profile === MASS_CANARY_PROFILE
+    && String(event.evidence?.artifactHash || '').trim().toLowerCase() === artifactHash)
+  const nextApprovalAt = own
+    .filter(event => event.verifier === 'host_controller'
+      && claim(event) === MASS_CANARY_APPROVAL_CLAIM
+      && at(event.observedAt) > approvedAt)
+    .map(event => at(event.observedAt))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)[0] ?? Number.POSITIVE_INFINITY
+
+  const exactInvocation = own.some(event => {
+    if (claim(event) !== 'local_distilled_runtime_canary_invocation_started') return false
+    const authorizationAt = at(String(event.evidence?.authorizationObservedAt || ''))
+    return Number.isFinite(authorizationAt) && authorizationAt === approvedAt
+  })
+  if (exactInvocation) return true
+
+  const legacyInvocation = own.some(event => {
+    if (claim(event) !== 'local_distilled_runtime_canary_invocation_started') return false
+    const authorizationAt = at(String(event.evidence?.authorizationObservedAt || ''))
+    if (Number.isFinite(authorizationAt)) return false
+    const observedAt = at(event.observedAt)
+    return Number.isFinite(observedAt) && observedAt >= approvedAt && observedAt < nextApprovalAt
+  })
+  if (legacyInvocation) return true
+
+  const preflightFailures = own.filter(event => {
+    if (claim(event) !== 'local_distilled_runtime_canary_preflight_failed') return false
+    const authorizationAt = at(String(event.evidence?.authorizationObservedAt || ''))
+    if (Number.isFinite(authorizationAt)) return authorizationAt === approvedAt
+    const observedAt = at(event.observedAt)
+    return Number.isFinite(observedAt) && observedAt >= approvedAt && observedAt < nextApprovalAt
+  }).length
+
+  return at(approval.expiresAt) > nowMs && preflightFailures < 3
+}
+
 export function decideMassCanaryRollingApproval(input: {
   artifacts: readonly CanaryArtifact[]
   events: readonly CanaryEvent[]
@@ -191,7 +250,8 @@ export function decideMassCanaryRollingApproval(input: {
   const issuedInWindow = input.events.filter(event => event.verifier === 'host_controller'
     && claim(event) === MASS_CANARY_APPROVAL_CLAIM
     && event.evidence?.authorizationRef === MASS_CANARY_ROLLING_AUTHORIZATION_REF
-    && at(event.observedAt) > nowMs - MASS_CANARY_ROLLING_WINDOW_HOURS * 3600_000).length
+    && at(event.observedAt) > nowMs - MASS_CANARY_ROLLING_WINDOW_HOURS * 3600_000
+    && canaryApprovalConsumesWindow(event, input.events, nowMs)).length
   if (issuedInWindow >= MASS_CANARY_ROLLING_MAX_APPROVALS) return { issue: false, reason: 'mass_canary_rolling_window_exhausted' }
 
   const valid = input.artifacts

@@ -251,9 +251,10 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
   const evidence=sources.slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}${source.sourceDate?` (source date: ${source.sourceDate})`:''}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
   const result=await callCosReasoner({
     temperature:.2,
-    maxTokens:700,
+    maxTokens:travelTask?2_000:700,
     jsonObject:true,
     disableThinking:true,
+    allowTruncatedText:travelTask,
     timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS,
     allowConfiguredFallback:true,
     usageContext:{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'},

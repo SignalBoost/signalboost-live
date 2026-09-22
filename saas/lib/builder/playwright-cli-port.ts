@@ -190,24 +190,38 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
         timeoutMs: COMMAND_TIMEOUT_MS,
       })
       const [stdout, stderr] = await Promise.all([result.stdout(), result.stderr()])
-      return Object.freeze({
+      const observed = {
         ok: result.exitCode === 0,
         action: input.action,
         exitCode: result.exitCode,
         stdout: bounded(stdout),
         stderr: bounded(stderr),
         timedOut: false,
+      } as const
+      console.info('[builder_browser_cli_action]', {
+        action: observed.action,
+        ok: observed.ok,
+        exitCode: observed.exitCode,
+        timedOut: observed.timedOut,
       })
+      return Object.freeze(observed)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'builder_browser_cli_execution_failed'
-      return Object.freeze({
+      const observed = {
         ok: false,
         action: input.action,
         exitCode: 124,
         stdout: '',
         stderr: bounded(message),
         timedOut: /timeout|timed out|SIGKILL/i.test(message),
+      } as const
+      console.info('[builder_browser_cli_action]', {
+        action: observed.action,
+        ok: observed.ok,
+        exitCode: observed.exitCode,
+        timedOut: observed.timedOut,
       })
+      return Object.freeze(observed)
     }
   }
 

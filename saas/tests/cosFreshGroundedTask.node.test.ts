@@ -7,13 +7,13 @@ import { join } from 'node:path'
 const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
 const localSynthesis = readFileSync(join(process.cwd(), 'lib/ai/cos/freshEvidenceLocalSynthesis.ts'), 'utf8')
 
-test('travel planning uses grounded task completion and never enters the single-claim fresh synthesizer', () => {
+test('travel planning tries grounded task completion first and retains shared synthesis recovery', () => {
   const travelClassify = route.indexOf('const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)')
   const travelGrounded = route.indexOf('if(!requestedAction&&liveTravelTask)')
-  const guardedSharedFresh = route.indexOf('if(!requestedAction&&!liveTravelTask){', travelGrounded)
+  const sharedFresh = route.indexOf('if(!requestedAction){', travelGrounded)
   assert.ok(travelClassify > 0)
   assert.ok(travelGrounded > travelClassify)
-  assert.ok(guardedSharedFresh > travelGrounded)
+  assert.ok(sharedFresh > travelGrounded)
   assert.match(route, /source:'cos-fresh-grounded-task'/)
 })
 
@@ -27,6 +27,14 @@ test('grounded interactive task completion is bounded, JSON-enforced and disable
   assert.match(route, /timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS/)
   assert.match(route, /usageContext:\{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'\}/)
   assert.match(route, /\/no_think/)
+})
+
+test('travel grounded drafts must be substantive and cannot simply echo the request', () => {
+  assert.match(route, /function groundedTaskReplyIsSubstantive/)
+  assert.match(route, /nearEcho=/)
+  assert.match(route, /liveCitations<1/)
+  assert.match(route, /non_substantive_grounded_task_draft/)
+  assert.match(route, /!groundedTaskReplyIsSubstantive\(input,reply,travelTask\)/)
 })
 
 test('travel tasks are not reclassified as bare fact lookups, while generic grounded tasks retain fail-closed fact handling', () => {
@@ -43,18 +51,18 @@ test('travel failure does not invoke the grounded task synthesizer a second time
 })
 
 
-test('a grounded travel miss fails closed without invoking the single-claim synthesizer', () => {
+test('a grounded travel miss falls through to shared fresh synthesis before failure is recorded', () => {
   const travelBlock = route.indexOf('if(!requestedAction&&liveTravelTask)')
   const groundedDeclined = route.indexOf("event:'fresh_grounded_task_declined'", travelBlock)
-  const guardedSharedSynthesis = route.indexOf('if(!requestedAction&&!liveTravelTask){', groundedDeclined)
-  const localCall = route.indexOf('synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})', guardedSharedSynthesis)
+  const sharedSynthesis = route.indexOf('if(!requestedAction){', groundedDeclined)
+  const localCall = route.indexOf('synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})', sharedSynthesis)
   assert.ok(travelBlock > 0)
   assert.ok(groundedDeclined > travelBlock)
-  assert.ok(guardedSharedSynthesis > groundedDeclined)
-  assert.ok(localCall > guardedSharedSynthesis)
-  const between = route.slice(travelBlock, guardedSharedSynthesis)
-  assert.match(between, /freshLocalFailureCode='local_synthesis_failed'/)
-  assert.match(between, /fallthrough:'travel_grounded_task_failed_closed'/)
+  assert.ok(sharedSynthesis > groundedDeclined)
+  assert.ok(localCall > sharedSynthesis)
+  const between = route.slice(travelBlock, localCall)
+  assert.doesNotMatch(between, /freshLocalFailureCode='local_synthesis_failed'/)
+  assert.match(between, /fallthrough:'shared_local_synthesizer'/)
 })
 
 test('once the fresh-evidence contract accepts a draft, review transport failures release that accepted draft', () => {

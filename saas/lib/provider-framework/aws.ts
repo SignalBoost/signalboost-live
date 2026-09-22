@@ -1,6 +1,6 @@
 // saas/lib/provider-framework/aws.ts
 import { randomUUID } from 'node:crypto'
-import { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'\nimport { executeSupervisedProviderCall } from './supervised-executor.ts'\nimport { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
 
 export const AWS_PROVIDER_ID = 'aws' as const
 export const awsCapabilities = ['aws.connection.validate','aws.account.read','aws.regions.list','aws.ec2.instances.list','aws.s3.buckets.list','aws.lambda.functions.list','aws.rds.instances.list','aws.cloudwatch.alarms.list','aws.iam.account_summary.read','aws.cloudtrail.trails.list'] as const

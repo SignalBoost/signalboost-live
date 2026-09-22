@@ -36,3 +36,9 @@ test('solo finish=stop with one correct closer and missing opener is recovered w
   assert.match(source, /recoverStoppedSoloMissingOpenAnswer/)
   assert.match(source, /cases\.length===1 \? recoverStoppedSoloMissingOpenAnswer\(text,item\.id,finish\) : null/)
 })
+
+
+test('solo finish=stop plain text with no markers is recovered but only on the one-case path', () => {
+  assert.match(source, /recoverStoppedSoloPlainAnswer/)
+  assert.match(source, /cases\.length===1 \? recoverStoppedSoloPlainAnswer\(text,finish\) : null/)
+})

@@ -87,6 +87,8 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
     ownerAuthorized: true,
     env: { BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS: 'https://itmounts.com' },
     createSandbox: (async (options: any) => {
+      assert.equal(options.image, 'vercel/sandbox/node:24')
+      assert.equal(options.runtime, undefined)
       assert.equal(options.networkPolicy, 'deny-all')
       assert.equal(options.persistent, false)
       assert.equal(options.env.PLAYWRIGHT_MCP_WEBMCP, 'false')
@@ -106,10 +108,9 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
   assert.match(result.stdout, /Page Title: iTMounts/)
   assert.ok(commands.some(command => command.cmd === 'npm' && command.args.includes(`@playwright/cli@${BUILDER_PLAYWRIGHT_CLI_VERSION}`)))
   assert.ok(commands.some(command =>
-    command.cmd === 'dnf'
+    command.cmd === 'node'
       && command.sudo === true
-      && command.args.includes('mesa-libgbm')
-      && command.args.includes('at-spi2-atk')
+      && command.args.join(' ') === '/tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install-deps chromium'
   ))
   assert.ok(commands.some(command =>
     command.cmd === 'node'
@@ -125,7 +126,7 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
       && !value.includes('"outputMaxSize"')
       && !value.includes('"settle"')
   ))
-  const dependencyBootstrap = steps.findIndex(step => step.includes('command:dnf install -y libXcomposite'))
+  const dependencyBootstrap = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install-deps chromium'))
   const browserDownload = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install chromium'))
   const lockdown = steps.findIndex(step => step === 'network:{"allow":["itmounts.com"]}')
   const open = steps.findIndex(step => step.includes('playwright-cli --config /tmp/cos-builder-playwright-cli/.playwright/cli.config.json open https://itmounts.com/'))
@@ -218,7 +219,7 @@ test('failed bootstrap destroys the half-initialized Sandbox and retries cleanly
     return {
       async updateNetworkPolicy() {},
       async runCommand(command: any) {
-        if (failDeps && command.cmd === 'dnf') {
+        if (failDeps && command.cmd === 'node' && command.args?.includes('install-deps')) {
           return commandResult(1, '', 'dependency install failed')
         }
         if (command.cmd === 'node' && command.args?.[0] === '-e') {

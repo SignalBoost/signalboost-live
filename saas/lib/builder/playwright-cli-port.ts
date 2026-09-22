@@ -139,7 +139,7 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
     if (this.sandbox) return this.sandbox
 
     const sandbox = await this.createSandbox({
-      runtime: 'node24',
+      image: 'vercel/sandbox/node:24',
       timeout: SANDBOX_TIMEOUT_MS,
       resources: { vcpus: 1 },
       networkPolicy: 'deny-all',
@@ -168,16 +168,11 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
       if (install.exitCode !== 0) throw new Error(`builder_browser_cli_install_failed:${bounded(await install.stderr())}`)
 
       const browserDeps = await sandbox.runCommand({
-        cmd: 'dnf',
-        // Vercel Sandbox uses an Amazon-Linux/RPM-family image. Playwright's install-deps
-        // path is apt-based on unsupported distros, so install the bounded Chromium runtime
-        // libraries explicitly through the SDK-owned sudo boundary.
-        args: [
-          'install', '-y',
-          'libXcomposite', 'libXdamage', 'libXrandr', 'libxkbcommon',
-          'pango', 'alsa-lib', 'atk', 'at-spi2-atk', 'cups-libs',
-          'libdrm', 'mesa-libgbm',
-        ],
+        cmd: 'node',
+        // The managed Vercel Sandbox image is Ubuntu-based, so Playwright's own pinned
+        // dependency installer is authoritative and runs only through the SDK sudo boundary.
+        args: [`${ROOT}/node_modules/playwright/cli.js`, 'install-deps', 'chromium'],
+        cwd: ROOT,
         timeoutMs: BOOTSTRAP_TIMEOUT_MS,
         sudo: true,
       })

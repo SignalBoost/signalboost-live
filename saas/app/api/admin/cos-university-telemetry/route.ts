@@ -267,6 +267,23 @@ export async function GET() {
       return acc
     }, {})
 
+    const artifactCandidates = (artifactsResult.data || []).map((row: any) => text(row.candidate_id, 240)).filter(Boolean)
+    const assuranceResult = artifactCandidates.length
+      ? await db.from('cos_university_learning_assurance_events')
+        .select('candidate_id,observed_at,expires_at,verifier,evidence')
+        .eq('event_type', 'fine_tune')
+        .in('candidate_id', artifactCandidates)
+        .order('observed_at', { ascending: false })
+        .limit(5000)
+      : { data: [], error: null } as any
+    if (assuranceResult.error) throw assuranceResult.error
+    const assuranceByCandidate = new Map<string, any[]>()
+    for (const row of assuranceResult.data || []) {
+      const candidateId = text(row.candidate_id, 240)
+      if (!assuranceByCandidate.has(candidateId)) assuranceByCandidate.set(candidateId, [])
+      assuranceByCandidate.get(candidateId)!.push(row)
+    }
+
     const latestEvaluationByArtifact = new Map<string, any>()
     for (const row of evaluationsResult.data || []) {
       const key = text(row.candidate_id, 240) + ':' + text(row.trained_artifact_hash, 80)
@@ -283,6 +300,43 @@ export async function GET() {
       const evaluation = latestEvaluationByArtifact.get(candidateId + ':' + artifactHash) || null
       const graduate = graduateByArtifact.get(candidateId + ':' + artifactHash) || null
       const createdAt = iso(artifact.created_at)
+      const events = assuranceByCandidate.get(candidateId) || []
+      const nowMs = Date.now()
+      const eligibleAtMs = createdAt ? Date.parse(createdAt) + 12 * 60 * 60 * 1000 : Number.POSITIVE_INFINITY
+      const approval = events.find((row: any) => row.verifier === 'host_controller'
+        && row.evidence?.profile === 'cos_distilled_independent_evaluation_authorization_v1'
+        && row.evidence?.artifactHash === artifactHash
+        && ['distilled_independent_evaluation_approved', 'distilled_independent_evaluation_suspended'].includes(row.evidence?.claim))
+      const canary = events.find((row: any) => row.verifier === 'host_production_verifier'
+        && row.evidence?.profile === 'cos_university_fine_tune_evidence_v1'
+        && row.evidence?.claim === 'production_canary_healthy'
+        && row.evidence?.artifactHash === artifactHash
+        && row.evidence?.trainedArtifactId === artifact.trained_artifact_id
+        && row.evidence?.revisionKey === artifact.revision_key
+        && row.evidence?.exactArtifact === true
+        && row.evidence?.internalVllmReady === true
+        && row.evidence?.productionTrafficAuthorized === false
+        && row.evidence?.authorityExpanded === false
+        && text(row.evidence?.endpointId, 120))
+      const started = events.find((row: any) => row.evidence?.profile === 'cos_mass_distilled_independent_evaluation_runtime_v1'
+        && row.evidence?.claim === 'mass_distilled_independent_evaluation_started'
+        && row.evidence?.artifactHash === artifactHash)
+      const terminal = events.find((row: any) => row.evidence?.profile === 'cos_mass_distilled_independent_evaluation_runtime_v1'
+        && ['mass_distilled_independent_evaluation_completed', 'mass_distilled_independent_evaluation_failed'].includes(row.evidence?.claim)
+        && row.evidence?.artifactHash === artifactHash
+        && (!started || Date.parse(String(row.observed_at || '')) >= Date.parse(String(started.observed_at || ''))))
+      const approvalExpiresMs = approval?.expires_at ? Date.parse(String(approval.expires_at)) : 0
+      let claimability = 'not_evaluation_pending'
+      if (artifact.status === 'evaluation_pending') {
+        if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
+        else if (!approval) claimability = 'missing_approval'
+        else if (approval.evidence?.claim !== 'distilled_independent_evaluation_approved') claimability = 'approval_suspended'
+        else if (!approvalExpiresMs || approvalExpiresMs <= nowMs) claimability = 'approval_expired'
+        else if (!canary) claimability = 'missing_exact_canary'
+        else if (started && !terminal && Date.parse(String(started.observed_at || '')) > nowMs - 12 * 60 * 1000) claimability = 'active_reservation'
+        else if (terminal?.evidence?.claim === 'mass_distilled_independent_evaluation_failed') claimability = 'evaluator_failed'
+        else claimability = 'claimable'
+      }
       const ageSeconds = createdAt ? Math.max(0, Math.floor((Date.now() - Date.parse(createdAt)) / 1000)) : null
       return {
         candidateId,
@@ -293,6 +347,7 @@ export async function GET() {
         revisionKey: text(artifact.revision_key, 240) || null,
         ageSeconds,
         retentionEligibleAt: createdAt ? new Date(Date.parse(createdAt) + 12 * 60 * 60 * 1000).toISOString() : null,
+        claimability,
         evaluation: evaluation ? {
           evaluatedAt: iso(evaluation.created_at),
           artifactAgeSeconds: n(evaluation.artifact_age_seconds),

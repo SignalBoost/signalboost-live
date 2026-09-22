@@ -1,6 +1,6 @@
 // saas/lib/provider-framework/cloudflare.ts
 import { randomUUID } from 'node:crypto'
-import { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'\nimport { executeSupervisedProviderCall } from './supervised-executor.ts'\nimport { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
 
 export const CLOUDFLARE_PROVIDER_ID = 'cloudflare' as const
 export const cloudflareCapabilities = ['cloudflare.connection.validate','cloudflare.accounts.list','cloudflare.zones.list','cloudflare.zone.read','cloudflare.dns.records.list','cloudflare.ssl.settings.read','cloudflare.rulesets.list','cloudflare.workers.scripts.list','cloudflare.pages.projects.list','cloudflare.analytics.read'] as const

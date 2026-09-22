@@ -13,10 +13,8 @@ import type {
   BuilderResidencyExactArtifactExecutor,
 } from './builder-case-runner.ts'
 import { runBuilderResidencyCase } from './builder-case-runner.ts'
-import type {
-  HarnessAuthorityEnvelope,
-  HarnessEvidenceSink,
-} from '../index.ts'
+import type { HarnessAuthorityEnvelope } from '../core/types.ts'
+import type { HarnessEvidenceSink } from '../evidence/durable-evidence.ts'
 
 export interface BuilderResidencyEnrollment {
   residencyId:string

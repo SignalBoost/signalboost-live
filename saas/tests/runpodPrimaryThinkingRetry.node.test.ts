@@ -34,6 +34,12 @@ test('a genuinely long answer cut at the limit keeps the unchanged truncation er
   })
 })
 
+test('opt-in truncation salvage returns non-empty partial text while the default still throws', async () => {
+  const partial = '{"answer":"A detailed layover itinerary draft with enough useful grounded content to salvage even though the provider hit its output limit before closing the JSON object and confidence field. The remaining stops can still be recovered from this partial answer without discarding the whole response.'
+  globalThis.fetch = (async () => reply(partial, 'length', 2000)) as typeof fetch
+  assert.equal(await callLocalModel({ prompt: 'plan my layover', maxTokens: 2000, allowTruncatedText: true }, runpodConfig), partial)
+})
+
 test('disableThinking and small-budget RunPod calls send reasoning_effort none', async () => {
   const bodies: any[] = []
   globalThis.fetch = (async (url, init) => { if (String(url).includes('/chat/completions')) bodies.push(JSON.parse(String(init?.body))); return reply('Lisbon.', 'stop', 3) }) as typeof fetch

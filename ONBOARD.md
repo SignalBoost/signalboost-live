@@ -4,28 +4,29 @@
 
 ## COS University Residency invariant — 2026-09-22
 
-The University includes a governed **Residency** stage: practical supervised work analogous to a medical residency. The harness is the infrastructure that runs realistic cases; Residency is the educational program. It applies to every specialist and eventually COS.
+The University includes a governed **Residency**: the practical supervised harness inside formal education, analogous to a medical residency. Residency is where trained students gain practical skill through realistic controlled work before their final canary/examinations and graduation. It applies to every specialist and eventually COS.
 
 Canonical lifecycle:
 
 ```text
 curriculum -> frontier faculty / distillation -> immutable trained artifact
--> exact-artifact RunPod canary + rollback proof
--> independent holdout / safety / unseen-transfer / delayed-retention evaluation
 -> Residency (sandboxed supervised practical work)
--> durable competency evidence
+-> competency gaps -> targeted remediation / retraining as needed
+-> durable Residency competency evidence
+-> exact-artifact final canary + rollback proof
+-> independent holdout / safety / unseen-transfer / delayed-retention final evaluation
 -> graduate registry / separately governed activation
 -> verified Production outcomes
 -> continuing education / remediation / recertification
 ```
 
-Residency **adds evidence; it never replaces or weakens an existing gate**. Exact-artifact identity, independent evaluator separation, delayed retention, rollback, Referee authority, spend ceilings, Production-traffic prohibition before promotion, and fail-closed behavior remain controlling. Residency cannot mint approvals, promote itself, widen authority, substitute an arbitrary endpoint/artifact, or convert task success into Production authorization. Referee/Guardian remain the authority boundary.
+Residency **teaches practical competence; it never replaces or weakens a final gate**. The Residency harness must bind practice to the intended immutable artifact, while the post-Residency exact-artifact canary, independent evaluator separation, delayed retention, rollback, Referee authority, spend ceilings, Production-traffic prohibition before promotion, and fail-closed behavior remain controlling. Residency cannot mint approvals, promote itself, widen authority, substitute an arbitrary artifact, or convert supervised task success into Production authorization. Referee/Guardian remain the authority boundary.
 
 Resident progression is competency-based, not task-count based: `student -> candidate -> resident -> senior_resident -> graduate_specialist -> active_specialist`. Repetition of an already-proven task does not manufacture a new competency. Evidence should distinguish at least `unproven`, `supervised`, `demonstrated`, `retained`, and `remediation_required`.
 
 A residency case exercises the **whole agent trajectory**, not only final prose: objective interpretation, plan, MCP/tool selection, bounded tool calls, observation grounding, diagnosis, correction after failed attempts, verification, rollback/escalation judgment, collaboration with other specialists, cost/latency awareness, and authority compliance. Cases should include unfamiliar variants and controlled failures. Residents operate in restricted manifests/sandboxes: e.g. branch but not merge, sandbox deploy but not Production deploy, synthetic/sanitized data rather than unrestricted Production data.
 
-Residency failures feed targeted remediation. The system records the failed competency/pattern, produces sanitized general practice material without copying private Production data, hidden exams, evaluator outputs, secrets, raw chats, or candidate identities, then sends that material through the existing governed curriculum/distillation path. A new immutable artifact must pass the unchanged canary and independent evaluation gates before Residency replays the original skill class using unseen variants. Residency success cannot hide a holdout, safety, transfer, retention, exact-canary, rollback, or served-identity failure.
+Residency failures feed targeted remediation. The system records the failed competency/pattern, produces sanitized general practice material without copying private Production data, hidden final exams, evaluator outputs, secrets, raw chats, or candidate identities, then sends that material through the existing governed curriculum/distillation path. A remediated immutable artifact re-enters Residency on fresh unseen practice variants. Only after Residency is complete does that artifact proceed to the unchanged final canary and independent evaluation gates. Residency success cannot hide a holdout, safety, transfer, retention, exact-canary, rollback, or served-identity failure.
 
 Residency also trains the **organization**. Cases may require a resident to recognize that another specialist is needed, delegate through governed MCP/capability boundaries, reconcile results, and escalate when evidence or authority is insufficient. COS Residency should eventually test delegation, monitoring, conflict reconciliation, and final accountable synthesis across specialists.
 
@@ -33,7 +34,10 @@ Residency also trains the **organization**. Cases may require a resident to reco
 
 Builder is the first implementation because practical outcomes are independently observable and it is the next high-value specialist lane. Initial cases should cover GitHub repository navigation/root-cause analysis, TypeScript/Next.js repair, Vercel deployment diagnosis/recovery, Supabase diagnosis, Playwright/browser verification, Chrome DevTools evidence, test/regression construction, rollback, MCP selection/recovery, security/authority boundaries, and recovery from an initially wrong diagnosis. The first release should start small (roughly 20-30 high-quality case families with hidden variants) and expand by measured competency gaps, not by raw volume.
 
-A qualifying Computer Science artifact still must clear the existing University gates. Residency does not shortcut Builder apprenticeship; it makes apprenticeship evidence practical, durable, and competency-specific. Production outcomes from an activated graduate may later become sanitized verified case inputs for continuing education.
+A qualifying Computer Science artifact still must clear the existing University final gates after Residency. Residency is the Builder practical-education harness itself: practical, durable, competency-specific supervised work before graduation. Production outcomes from an activated graduate may later become sanitized verified case inputs for continuing education.
+
+
+**Residency rollout safety:** the first implementation enrolls trained Builder artifacts and records practical competency in shadow mode while the controlled case runner is completed. Final-gate enforcement must remain off until residents have a working supervised path to satisfy the requirement. Once enforcement is deliberately enabled for an enrollment, pre-Residency canary evidence cannot satisfy the final proof; a fresh post-Residency canary and independent final evaluation are required.
 
 ### University recovery/status handoff — 2026-09-22
 
@@ -47,7 +51,7 @@ Recent recovery established the following engineering state and lessons:
 - Exact-artifact RunPod canary infrastructure remains the active infrastructure repair track. Repairs added endpoint recovery, bounded capacity recovery, safe AMPERE_24/GPU1/min0/max1/idle<=180 policy, rolling spend accounting based on real invocations/reservations, worker headroom, cold-start/readiness recovery, exact base revision caching, and bound-template lookup. Failures with `providerInvocationStarted:false` are control-plane/provisioning failures, not paid inference or model-quality results.
 - Safe RunPod template-identity diagnostics were added after Production continued to report `mass_distilled_runtime_template_id_missing`; use concrete provider response shape to repair identity rather than bypass exact binding or add speculative retries.
 - A containerized exact-artifact canary worker/gateway is the next controlled runtime direction. Its image/build path must remain exact-artifact bound and must not expand canary, spend, promotion, or Production authority.
-- Healthy distillation should not be disturbed while canary infrastructure and model quality are repaired in parallel. The near-term milestone is another legitimately improved graduate; the Computer Science graduate then enters the Builder Residency/apprenticeship path.
+- Healthy distillation should not be disturbed while canary infrastructure and model quality are repaired in parallel. The near-term milestone is a stronger Computer Science trained artifact entering Builder Residency; after practical competency is demonstrated, it proceeds to the final canary/evaluation/graduation sequence.
 
 
 ## Runtime provider priority invariant — 2026-09-19

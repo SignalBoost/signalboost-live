@@ -47,6 +47,22 @@ test('Builder normalizes the exact live DeepSeek XML and native tool-call envelo
   )
 })
 
+
+test('Builder normalizes governed MCP and Playwright CLI controls without widening the tool set', () => {
+  assert.deepEqual(
+    decodedControl('browser_cli {"action":"open","url":"https://itmounts.com/"}'),
+    { type: 'tool', toolId: 'browser_cli', input: { action: 'open', url: 'https://itmounts.com/' } },
+  )
+  assert.deepEqual(
+    decodedControl('<tool_calls> <browser_cli action="snapshot" /> </tool_calls>'),
+    { type: 'tool', toolId: 'browser_cli', input: { action: 'snapshot' } },
+  )
+  assert.deepEqual(
+    decodedControl('mcp_read {"providerId":"context7-mcp","capabilityId":"mcp.context7-mcp.docs.query","args":{}}'),
+    { type: 'tool', toolId: 'mcp_read', input: { providerId: 'context7-mcp', capabilityId: 'mcp.context7-mcp.docs.query', args: {} } },
+  )
+})
+
 test('DeepSeek control normalization never expands the Builder tool allowlist', () => {
   const unsupported = '<tool><toolId>delete_file</toolId><input><path>package.json</path></input></tool>'
   assert.equal(normalizeBuilderControlOutput(unsupported), unsupported)

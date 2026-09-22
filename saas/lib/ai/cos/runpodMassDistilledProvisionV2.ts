@@ -281,11 +281,14 @@ function assertMaterializedEndpointIdentity(endpoint: Endpoint, input: MassDisti
   }
 }
 
-async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
+async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact, recoveryFrom = '') {
   const ids = identity(input)
   const templates = await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')
   const template = templates.find(item => clean(item.name, 240) === ids.templateName && item.isServerless !== false)
-  if (!template?.id) throw new Error('mass_distilled_runtime_template_id_missing')
+  if (!template?.id) {
+    const exactKeys = Object.keys(template || {}).sort().join(',') || 'none'
+    throw new Error(`mass_distilled_runtime_template_id_missing:v2_exact_visible=${Boolean(template)};v2_exact_keys=${exactKeys};v2_list_count=${templates.length};recovery_from=${clean(recoveryFrom, 100)}`)
+  }
 
   let endpoint = await resolveEndpointControlPlane('', ids.endpointName)
   endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName)
@@ -327,7 +330,7 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
       && message !== 'mass_distilled_runtime_endpoint_template_rebind_failed'
       && message !== 'mass_distilled_runtime_endpoint_gpu_pool_drift') throw error
 
-    const recovered = await resolveExactEndpoint(input)
+    const recovered = await resolveExactEndpoint(input, message)
     const endpoint = recovered.endpoint
     assertMaterializedEndpointIdentity(endpoint, input, recovered.modelName)
     return Object.freeze({

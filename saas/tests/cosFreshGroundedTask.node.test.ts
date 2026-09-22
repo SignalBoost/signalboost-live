@@ -19,9 +19,12 @@ test('travel planning uses grounded task completion and never enters the single-
 
 test('grounded interactive task completion is bounded, JSON-enforced and disables Qwen thinking', () => {
   assert.match(route, /FRESH_GROUNDED_TASK_TIMEOUT_MS = 40_000/)
+  assert.match(route, /maxTokens:travelTask\?2_000:700/)
   assert.match(route, /jsonObject:true/)
   assert.match(route, /disableThinking:true/)
+  assert.match(route, /allowTruncatedText:travelTask/)
   assert.match(route, /timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS/)
+  assert.match(route, /allowConfiguredFallback:true/)
   assert.match(route, /usageContext:\{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'\}/)
   assert.match(route, /\/no_think/)
 })

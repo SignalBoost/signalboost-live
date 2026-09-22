@@ -1,6 +1,7 @@
 -- Forward gate: Builder / Computer Science independent evaluation is the FINAL examination after Residency.
--- A Builder artifact cannot be claimed until formal Residency is complete, the evaluation approval is newer
--- than Residency completion, and the exact-artifact canary itself occurred after Residency completion.
+-- Once Residency is explicitly enforced for an artifact, final evaluation cannot be claimed until Residency
+-- is complete, the evaluation approval is newer than completion, and the exact-artifact canary itself occurred
+-- after Residency completion. Shadow enrollments do not block the existing pipeline.
 -- Existing 12-hour retention, concurrency, spend, scoring, identity and no-Production-traffic gates remain unchanged.
 
 create or replace function public.claim_next_mass_distilled_evaluation()
@@ -147,13 +148,19 @@ begin
     if not found then continue; end if;
 
     v_residency_completed_at := null;
-    if pg_catalog.regexp_replace(pg_catalog.lower(coalesce(v_artifact.subject_id,'')), '[^a-z0-9]+', '_', 'g')
-      in ('computer_science','computer_science_coding') then
+    if exists (
+      select 1 from public.cos_university_residency_enrollments r
+      where r.candidate_id=v_artifact.candidate_id
+        and r.trained_artifact_hash=v_artifact.trained_artifact_hash
+        and r.program_id='builder-computer-science-v1'
+        and r.gate_enforced=true
+    ) then
       select max(r.completed_at) into v_residency_completed_at
       from public.cos_university_residency_enrollments r
       where r.candidate_id=v_artifact.candidate_id
         and r.trained_artifact_hash=v_artifact.trained_artifact_hash
         and r.program_id='builder-computer-science-v1'
+        and r.gate_enforced=true
         and r.standing='residency_complete'
         and r.completed_at is not null;
       if v_residency_completed_at is null then continue; end if;
@@ -301,17 +308,13 @@ revoke all on function public.claim_next_mass_distilled_evaluation()
 grant execute on function public.claim_next_mass_distilled_evaluation()
   to service_role;
 
-      and (
-        pg_catalog.regexp_replace(pg_catalog.lower(coalesce(a.subject_id,'')), '[^a-z0-9]+', '_', 'g')
-          not in ('computer_science','computer_science_coding')
-        or exists (
-          select 1 from public.cos_university_residency_enrollments r
-          where r.candidate_id=a.candidate_id
-            and r.trained_artifact_hash=a.trained_artifact_hash
-            and r.program_id='builder-computer-science-v1'
-            and r.standing='residency_complete'
-            and r.completed_at is not null
-        )
+      and not exists (
+        select 1 from public.cos_university_residency_enrollments r
+        where r.candidate_id=a.candidate_id
+          and r.trained_artifact_hash=a.trained_artifact_hash
+          and r.program_id='builder-computer-science-v1'
+          and r.gate_enforced=true
+          and (r.standing<>'residency_complete' or r.completed_at is null)
       )
     order by
       case

@@ -214,24 +214,29 @@ function isRemediationReplayReceipt(intendedUse: unknown): boolean {
 async function builderResidencyCompletions(db: any, artifacts: any[]) {
   const builderArtifacts = artifacts.filter((row: any) => isBuilderResidencySubject(row?.subject_id))
   const candidateIds = [...new Set(builderArtifacts.map((row: any) => clean(row?.candidate_id, 240)).filter(Boolean))]
-  const completions = new Map<string, string>()
-  if (!candidateIds.length) return completions
+  const gates = new Map<string, { enforced: boolean; completedAt: string | null }>()
+  if (!candidateIds.length) return gates
   const result = await db.from('cos_university_residency_enrollments')
-    .select('candidate_id,trained_artifact_hash,standing,completed_at')
+    .select('candidate_id,trained_artifact_hash,standing,completed_at,gate_enforced')
     .eq('program_id', BUILDER_RESIDENCY_PROGRAM_ID)
-    .eq('standing', 'residency_complete')
     .in('candidate_id', candidateIds)
     .limit(1000)
   if (result.error) throw new Error(`mass_distilled_evaluation_residency_read_failed:${boundedErrorMessage(result.error)}`)
   for (const row of result.data || []) {
     const candidateId = clean((row as any).candidate_id, 240)
     const artifactHash = clean((row as any).trained_artifact_hash, 64).toLowerCase()
-    const completedAt = clean((row as any).completed_at, 80)
-    if (candidateId && HEX64.test(artifactHash) && Number.isFinite(Date.parse(completedAt))) {
-      completions.set(candidateId + ':' + artifactHash, completedAt)
+    const completedAtRaw = clean((row as any).completed_at, 80)
+    const completedAt = (row as any).standing === 'residency_complete' && Number.isFinite(Date.parse(completedAtRaw))
+      ? completedAtRaw
+      : null
+    if (candidateId && HEX64.test(artifactHash)) {
+      gates.set(candidateId + ':' + artifactHash, {
+        enforced: (row as any).gate_enforced === true,
+        completedAt,
+      })
     }
   }
-  return completions
+  return gates
 }
 
 async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
@@ -277,7 +282,8 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const artifactRows = unfilteredArtifactRows.filter((row: any) => {
     if (!isBuilderResidencySubject(row?.subject_id)) return true
     const key = clean(row?.candidate_id, 240) + ':' + clean(row?.trained_artifact_hash, 64).toLowerCase()
-    return residencyCompletions.has(key)
+    const gate = residencyCompletions.get(key)
+    return !gate?.enforced || Boolean(gate.completedAt)
   })
   const rows: RollingArtifact[] = artifactRows.map((row: any) => {
     const receipt = row?.intended_use?.trainingReceipt && typeof row.intended_use.trainingReceipt === 'object'
@@ -357,8 +363,10 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     const artifact = artifactByCandidateForResidency.get(candidateId) as any
     if (!artifact || !isBuilderResidencySubject(artifact?.subject_id)) return true
     const artifactHash = clean(row?.evidence?.artifactHash, 64).toLowerCase()
-    const completedAt = residencyCompletions.get(candidateId + ':' + artifactHash)
-    return Boolean(completedAt) && Date.parse(String(row?.observed_at || '')) >= Date.parse(String(completedAt))
+    const gate = residencyCompletions.get(candidateId + ':' + artifactHash)
+    if (!gate?.enforced) return true
+    return Boolean(gate.completedAt)
+      && Date.parse(String(row?.observed_at || '')) >= Date.parse(String(gate.completedAt))
   })
   const all: RollingEvent[] = policyRows.map((row: any) => ({
     candidateId: clean(row.candidate_id, 240), observedAt: String(row.observed_at || ''), expiresAt: row.expires_at ? String(row.expires_at) : null,

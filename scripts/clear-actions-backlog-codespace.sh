@@ -97,5 +97,7 @@ if [[ "${REDISPATCH_MCP_ACCEPTANCE:-true}" == "true" ]]; then
     || echo "WARNING: could not dispatch Playwright MCP acceptance"
   gh workflow run chrome-devtools-mcp-live-acceptance.yml --repo "$repo" --ref main \
     || echo "WARNING: could not dispatch Chrome DevTools MCP acceptance"
+  gh workflow run universal-mcp-live-acceptance.yml --repo "$repo" --ref main \
+    || echo "WARNING: could not dispatch Universal MCP acceptance"
   echo "MCP acceptance dispatch step complete."
 fi

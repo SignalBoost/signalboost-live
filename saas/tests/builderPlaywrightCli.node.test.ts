@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 
 import type { BuilderBrowserCliPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
@@ -104,6 +105,18 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
 
   await port.close()
   assert.equal(steps.at(-1), 'stop')
+})
+
+test('Playwright CLI production telemetry is metadata-only', () => {
+  const source = readFileSync(new URL('../lib/builder/playwright-cli-port.ts', import.meta.url), 'utf8')
+  assert.match(source, /\[builder_browser_cli_action\]/)
+  assert.match(source, /action: observed\.action/)
+  assert.match(source, /ok: observed\.ok/)
+  assert.match(source, /exitCode: observed\.exitCode/)
+  assert.match(source, /timedOut: observed\.timedOut/)
+  assert.doesNotMatch(source, /console\.info\([^\n]*stdout/)
+  assert.doesNotMatch(source, /console\.info\([^\n]*stderr/)
+  assert.doesNotMatch(source, /console\.info\([^\n]*url/)
 })
 
 test('Builder can consume Playwright CLI evidence in the next reasoning round', async () => {

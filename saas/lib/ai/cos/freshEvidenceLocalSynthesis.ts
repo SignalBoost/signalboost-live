@@ -83,7 +83,13 @@ function errorText(error: unknown): string {
 }
 
 function acceptedOutcome(accepted: AcceptedFreshEvidenceSynthesis): FreshEvidenceLocalSynthesis {
-  return acceptedOutcome(accepted)
+  const reasoner = resolveCosReasoner()
+  return {
+    kind: 'accepted',
+    reply: accepted.reply,
+    reasonerLabel: reasoner.config?.label ?? `independent-local:${(process.env.LOCAL_AI_MODEL || 'local-model').trim()}`,
+  }
+}
 
 function logAcceptedDraftReleasedAfterReviewTransportFailure(stage: string, error: string): void {
   console.warn('[cos-fresh-review-release]', JSON.stringify({

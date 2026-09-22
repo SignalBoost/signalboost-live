@@ -1,3 +1,4 @@
+// Live proof trigger: 2026-09-22
 import { mkdir, writeFile } from 'node:fs/promises'
 import { certifyMcpProvider } from '../../provider-hub-host/mcp-certification.ts'
 import { createUniversalMcpGateway } from '../../provider-hub-host/universal-mcp-gateway.ts'
@@ -7,12 +8,17 @@ import {
 } from '../../provider-hub-host/universal-mcp-profiles.ts'
 
 async function run() {
+  const githubReadTools = GITHUB_MCP_PROFILE.tools
+    .filter(item => item.risk === 'read')
+    .map(item => item.remoteToolName)
+
   const gateway = createUniversalMcpGateway({
     tenantId: 'signalboost-live-baseline-acceptance',
     environmentId: 'github-actions',
     portableId: 'mcp-baseline-live-acceptance',
     actor: { userId: 'github-actions', roles: ['acceptance'] },
     allowedGitHubRepos: ['SignalBoost/signalboost-live'],
+    toolAllowlistByProfile: { 'github-mcp': githubReadTools },
     audit: { async append() {} },
   })
 
@@ -29,7 +35,7 @@ async function run() {
 
   const github = await certifyMcpProvider(gateway, {
     providerId: 'github-mcp',
-    expectedCapabilities: GITHUB_MCP_PROFILE.tools.map(item => `mcp.github-mcp.${item.capabilityName}`),
+    expectedCapabilities: GITHUB_MCP_PROFILE.tools.filter(item => item.risk === 'read').map(item => `mcp.github-mcp.${item.capabilityName}`),
     probes: [
       {
         id: 'private_repo_read',

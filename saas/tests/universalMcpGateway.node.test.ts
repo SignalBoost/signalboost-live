@@ -105,6 +105,43 @@ test('Context7 live shape is projected to exactly the two governed documentation
   )
 })
 
+test('GitHub tool allowlist narrows discovery without changing the canonical full profile', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: { GITHUB_MCP_TOKEN: 'token' },
+    allowedGitHubRepos: ['SignalBoost/signalboost-live'],
+    toolAllowlistByProfile: {
+      'github-mcp': ['get_me', 'get_file_contents'],
+    },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+
+  const visible = await gateway.discover('github-mcp')
+  assert.deepEqual(
+    visible.map(item => item.capabilityId).sort(),
+    ['mcp.github-mcp.contents.read', 'mcp.github-mcp.identity.read'],
+  )
+  assert.equal(GITHUB_MCP_PROFILE.tools.length, 22)
+})
+
+test('GitHub tool allowlist rejects unknown remote tool names fail-closed', () => {
+  assert.throws(() => createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: { GITHUB_MCP_TOKEN: 'token' },
+    allowedGitHubRepos: ['SignalBoost/signalboost-live'],
+    toolAllowlistByProfile: {
+      'github-mcp': ['not-a-real-github-tool'],
+    },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  }), /universal_mcp_unknown_tool_allowlist:github-mcp:not-a-real-github-tool/)
+})
+
 test('GitHub writes require approval and repository scope is host-enforced', async () => {
   const calls: string[] = []
   const gateway = createUniversalMcpGateway({

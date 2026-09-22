@@ -43,11 +43,15 @@ FRONTIER_TRAINING_PROFILE = "cos_university_frontier_gkd_v1"
 FRONTIER_GKD_MAX_LENGTH = 1024
 FRONTIER_GKD_LEARNING_RATE = 5e-5
 # Independent-evaluation remediation is first anchored with all verified faculty responses, then
-# replayed once after dense-teacher GKD so the later teacher pass cannot erase the corrected behavior.
-# The replay is deliberately tiny and bounded; it does not copy evaluator cases or expand training spend.
+# replayed after dense-teacher GKD so the later teacher pass cannot erase the corrected behavior.
+# Production 2026-09-22 receipts showed only 1-5 replay rows receiving one epoch at 2e-5 after three
+# GKD epochs at 5e-5; independently evaluated artifacts still reproduced the baseline's unsafe
+# authorization/attribution answers. Keep the replay tiny and isolated, but give those verified
+# corrective rows the same bounded epoch count and learning rate as the GKD pass so they can survive it.
+# Evaluator cases still never enter training and the existing training-stage spend/runtime ceiling is unchanged.
 FAILURE_DERIVED_REPLAY_MAX_ITEMS = 32
-FAILURE_DERIVED_REPLAY_EPOCHS = 1.0
-FAILURE_DERIVED_REPLAY_LEARNING_RATE = 2e-5
+FAILURE_DERIVED_REPLAY_EPOCHS = 3.0
+FAILURE_DERIVED_REPLAY_LEARNING_RATE = 5e-5
 FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION = 1
 
 BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"
@@ -940,7 +944,8 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     # remediation invariants. Production evidence showed a 30% remediation batch whose faculty answers
     # correctly taught authority/evidence boundaries, yet the final artifact still matched the unsafe
     # baseline after three GKD epochs. Replay only verified failure-derived TRAINING rows after GKD.
-    # Holdout rows remain untouched, evaluator cases never enter training, and the replay is one small SFT epoch.
+    # Holdout rows remain untouched, evaluator cases never enter training, and the replay remains a tiny
+    # failure-derived-only SFT pass within the existing training-stage runtime/spend boundary.
     if frontier_plan is not None and failure_derived_replay_training:
         gkd_model = trainer.model
         if hasattr(trainer, "teacher_model"):

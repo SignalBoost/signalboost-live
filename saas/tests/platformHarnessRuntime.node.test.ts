@@ -19,6 +19,7 @@ import {
   createSelfHealingHandoff,
   createReplayHarnessRequest,
   createEvaluationRuntimeHarnessRequest,
+  createHarnessEvidenceRecord,
   resolveHarnessManifest,
   runHarnessWorker,
   type HarnessAuthorityEnvelope,
@@ -442,4 +443,20 @@ test('Evaluation runtime is isolated from Production and learning feedback', () 
   const rejected=resolveHarnessManifest(productionReq,productionAuthority)
   assert.equal(rejected.allowed,false)
   if(!rejected.allowed) assert.ok(rejected.reasons.includes('profile_environment_forbidden'))
+})
+
+
+test('Durable Harness evidence is metadata-only and identity-bound', () => {
+  const decision=resolveHarnessManifest(request(),authority)
+  assert.equal(decision.allowed,true)
+  if(!decision.allowed) return
+  const result:HarnessRunResult={runId:decision.manifest.runId,profile:decision.manifest.profile,trajectory:[{runId:decision.manifest.runId,sequence:1,at:'2026-09-22T23:00:00Z',kind:'observation',summary:'secret-bearing human-readable summary must not be persisted',evidenceRefs:['evidence://safe/ref'],data:{credential:'must-not-persist'}}],outcome:{status:'success',verifierRef:'verifier://1',evidenceHash:'evidence://hash'},authorityExpanded:false,productionMutationObserved:false}
+  const record=createHarnessEvidenceRecord(decision.manifest,result)
+  assert.deepEqual(record.trajectoryEvidenceRefs,['evidence://safe/ref'])
+  const serialized=JSON.stringify(record)
+  assert.equal(serialized.includes('secret-bearing'),false)
+  assert.equal(serialized.includes('credential'),false)
+  assert.equal(serialized.includes(decision.manifest.objective),false)
+  assert.equal(record.authorityExpanded,false)
+  assert.throws(()=>createHarnessEvidenceRecord(decision.manifest,{...result,runId:'other-run'}),/harness_evidence_identity_mismatch/)
 })

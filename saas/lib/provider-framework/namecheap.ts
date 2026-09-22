@@ -1,6 +1,6 @@
 // saas/lib/provider-framework/namecheap.ts
 import { randomUUID } from 'node:crypto'
-import { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'\nimport { executeSupervisedProviderCall } from './supervised-executor.ts'\nimport { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
 
 export const NAMECHEAP_PROVIDER_ID = 'namecheap' as const
 export const namecheapCapabilities = ['namecheap.connection.validate','namecheap.domains.list','namecheap.domains.info.read','namecheap.domains.dns.hosts.read','namecheap.domains.dns.email_forwarding.read','namecheap.domains.nameservers.read','namecheap.ssl.certificates.list','namecheap.users.addresses.list','namecheap.account.balance.read','namecheap.whoisguard.status.read'] as const

@@ -58,19 +58,19 @@ test('Playwright CLI rejects off-origin navigation before sandbox creation', asy
 
 test('Playwright CLI bootstraps host-owned package before locking egress to approved hosts', async () => {
   const steps: string[] = []
-  const commands: Array<{ cmd: string; args: string[] }> = []
+  const commands: Array<{ cmd: string; args: string[]; sudo?: boolean }> = []
   const written: string[] = []
   const fake = {
     async updateNetworkPolicy(policy: unknown) {
       steps.push(`network:${JSON.stringify(policy)}`)
     },
     async runCommand(command: any) {
-      commands.push({ cmd: command.cmd, args: [...(command.args || [])] })
+      commands.push({ cmd: command.cmd, args: [...(command.args || [])], sudo: command.sudo })
       steps.push(`command:${command.cmd} ${(command.args || []).join(' ')}`)
       if (command.cmd === 'node' && command.args?.[0] === '-e') {
         return commandResult(0, '/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome')
       }
-      if (command.cmd.endsWith('/playwright-cli') && command.args?.[0] === 'open') {
+      if (command.cmd.endsWith('/playwright-cli') && command.args?.includes('open')) {
         return commandResult(0, '### Page\n- Page URL: https://itmounts.com/\n- Page Title: iTMounts')
       }
       return commandResult()
@@ -90,7 +90,7 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
       assert.equal(options.networkPolicy, 'deny-all')
       assert.equal(options.persistent, false)
       assert.equal(options.env.PLAYWRIGHT_MCP_WEBMCP, 'false')
-      assert.equal(options.env.PLAYWRIGHT_MCP_CONFIG, '/tmp/cos-builder-playwright-cli/.playwright/cli.config.json')
+      assert.equal(options.env.PLAYWRIGHT_MCP_CONFIG, undefined)
       assert.equal(options.env.PLAYWRIGHT_BROWSERS_PATH, '/tmp/cos-builder-playwright-cli/pw-browsers')
       return fake
     }) as any,
@@ -107,17 +107,25 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
   assert.ok(commands.some(command => command.cmd === 'npm' && command.args.includes(`@playwright/cli@${BUILDER_PLAYWRIGHT_CLI_VERSION}`)))
   assert.ok(commands.some(command =>
     command.cmd === 'node'
-      && command.args.join(' ') === '/tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install --with-deps chromium'
+      && command.sudo === true
+      && command.args.join(' ') === '/tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install-deps chromium'
+  ))
+  assert.ok(commands.some(command =>
+    command.cmd === 'node'
+      && command.sudo !== true
+      && command.args.join(' ') === '/tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install chromium'
   ))
   assert.ok(commands.some(command => command.cmd === 'node' && command.args[0] === '-e'))
   assert.ok(written.some(value =>
     value.includes('"browserName":"chromium"')
       && value.includes('"executablePath":"/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome"')
   ))
-  const dependencyBootstrap = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install --with-deps chromium'))
+  const dependencyBootstrap = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install-deps chromium'))
+  const browserDownload = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install chromium'))
   const lockdown = steps.findIndex(step => step === 'network:{"allow":["itmounts.com"]}')
-  const open = steps.findIndex(step => step.includes('playwright-cli open https://itmounts.com/'))
-  assert.ok(dependencyBootstrap >= 0 && lockdown > dependencyBootstrap, JSON.stringify(steps))
+  const open = steps.findIndex(step => step.includes('playwright-cli --config /tmp/cos-builder-playwright-cli/.playwright/cli.config.json open https://itmounts.com/'))
+  assert.ok(dependencyBootstrap >= 0 && browserDownload > dependencyBootstrap, JSON.stringify(steps))
+  assert.ok(lockdown > browserDownload, JSON.stringify(steps))
   assert.ok(lockdown >= 0 && open > lockdown, JSON.stringify(steps))
   assert.ok(!commands.some(command => command.cmd === 'sh' || command.cmd === 'bash'))
 
@@ -131,7 +139,15 @@ test('Playwright CLI failure classifier emits bounded machine codes only', () =>
     'browser_missing_dependencies',
   )
   assert.equal(
+    classifyBuilderPlaywrightCliFailure('builder_browser_cli_browser_deps_failed: apt failed'),
+    'browser_missing_dependencies',
+  )
+  assert.equal(
     classifyBuilderPlaywrightCliFailure("Executable doesn't exist at /tmp/chromium"),
+    'browser_not_installed',
+  )
+  assert.equal(
+    classifyBuilderPlaywrightCliFailure('builder_browser_cli_browser_probe_failed: missing'),
     'browser_not_installed',
   )
   assert.equal(
@@ -164,7 +180,7 @@ test('nonzero CLI result reports a sanitized failure code without logging raw st
         if (command.cmd === 'node' && command.args?.[0] === '-e') {
           return commandResult(0, '/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome')
         }
-        if (command.cmd.endsWith('/playwright-cli') && command.args?.[0] === 'open') {
+        if (command.cmd.endsWith('/playwright-cli') && command.args?.includes('open')) {
           return commandResult(1, '', 'Host system is missing dependencies to run browsers: SECRET_RAW_DETAIL')
         }
         return commandResult()
@@ -187,6 +203,51 @@ test('nonzero CLI result reports a sanitized failure code without logging raw st
   } finally {
     console.info = originalInfo
   }
+})
+
+test('failed bootstrap destroys the half-initialized Sandbox and retries cleanly', async () => {
+  let created = 0
+  let stopped = 0
+
+  function fake(failDeps: boolean) {
+    return {
+      async updateNetworkPolicy() {},
+      async runCommand(command: any) {
+        if (failDeps && command.cmd === 'node' && command.args?.includes('install-deps')) {
+          return commandResult(1, '', 'dependency install failed')
+        }
+        if (command.cmd === 'node' && command.args?.[0] === '-e') {
+          return commandResult(0, '/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome')
+        }
+        if (command.cmd.endsWith('/playwright-cli') && command.args?.includes('open')) {
+          return commandResult(0, '### Page\n- Page URL: https://itmounts.com/\n- Page Title: iTMounts')
+        }
+        return commandResult()
+      },
+      async writeFiles() {},
+      async stop() { stopped += 1 },
+    }
+  }
+
+  const port = createBuilderPlaywrightCliPort({
+    ownerAuthorized: true,
+    env: { BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS: 'https://itmounts.com' },
+    createSandbox: (async () => {
+      created += 1
+      return fake(created === 1)
+    }) as any,
+  })
+
+  const first = await port.invoke({ action: 'open', url: 'https://itmounts.com/' })
+  assert.equal(first.ok, false)
+  assert.equal(first.failureCode, 'browser_missing_dependencies')
+  assert.equal(stopped, 1)
+
+  const second = await port.invoke({ action: 'open', url: 'https://itmounts.com/' })
+  assert.equal(second.ok, true)
+  assert.equal(created, 2)
+  await port.close()
+  assert.equal(stopped, 2)
 })
 
 test('Playwright CLI production telemetry is metadata-only', () => {

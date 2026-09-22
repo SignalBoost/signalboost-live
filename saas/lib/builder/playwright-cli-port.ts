@@ -35,10 +35,10 @@ function bounded(value: unknown): string {
 
 export function classifyBuilderPlaywrightCliFailure(value: unknown): BuilderBrowserCliFailureCode {
   const message = String(value ?? '').toLowerCase()
-  if (/host system is missing dependencies|missing libraries|error while loading shared libraries|lib[a-z0-9_.+-]+\.so/.test(message)) {
+  if (/builder_browser_cli_browser_deps_failed|host system is missing dependencies|missing libraries|error while loading shared libraries|lib[a-z0-9_.+-]+\.so/.test(message)) {
     return 'browser_missing_dependencies'
   }
-  if (/executable doesn.?t exist|browser.+not installed|could not find.+(?:chrom|browser)|please run.+install/.test(message)) {
+  if (/builder_browser_cli_browser_(?:install|probe)_failed|executable doesn.?t exist|browser.+not installed|could not find.+(?:chrom|browser)|please run.+install/.test(message)) {
     return 'browser_not_installed'
   }
   if (/failed to launch|browsertype\.launch|browser process|target page, context or browser has been closed/.test(message)) {
@@ -152,13 +152,10 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
         PLAYWRIGHT_MCP_ISOLATED: 'true',
         PLAYWRIGHT_MCP_HEADLESS: 'true',
         PLAYWRIGHT_MCP_OUTPUT_MAX_SIZE: '1048576',
-        PLAYWRIGHT_MCP_CONFIG: CLI_CONFIG,
         PLAYWRIGHT_BROWSERS_PATH: BROWSER_CACHE,
       },
       tags: { surface: 'cos-builder-playwright-cli' },
     })
-    this.sandbox = sandbox
-
     try {
       await sandbox.updateNetworkPolicy('allow-all')
       const prepared = await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', '--', ROOT], timeoutMs: COMMAND_TIMEOUT_MS })
@@ -171,11 +168,24 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
       })
       if (install.exitCode !== 0) throw new Error(`builder_browser_cli_install_failed:${bounded(await install.stderr())}`)
 
+      const browserDeps = await sandbox.runCommand({
+        cmd: 'node',
+        // Vercel Sandbox system-package changes must use the SDK-owned sudo boundary.
+        // Keep OS dependency installation separate from the unprivileged browser download.
+        args: [`${ROOT}/node_modules/playwright/cli.js`, 'install-deps', 'chromium'],
+        cwd: ROOT,
+        timeoutMs: BOOTSTRAP_TIMEOUT_MS,
+        sudo: true,
+      })
+      if (browserDeps.exitCode !== 0) {
+        throw new Error(`builder_browser_cli_browser_deps_failed:${bounded(await browserDeps.stderr())}`)
+      }
+
       const browser = await sandbox.runCommand({
         cmd: 'node',
-        // @playwright/cli@0.1.21 carries its own pinned Playwright build. Invoke that exact
-        // installer so the downloaded Chromium revision always matches the CLI runtime.
-        args: [`${ROOT}/node_modules/playwright/cli.js`, 'install', '--with-deps', 'chromium'],
+        // Install the exact Chromium revision belonging to the Playwright build bundled by
+        // @playwright/cli. This remains unprivileged and lands in the host-owned browser cache.
+        args: [`${ROOT}/node_modules/playwright/cli.js`, 'install', 'chromium'],
         cwd: ROOT,
         timeoutMs: BOOTSTRAP_TIMEOUT_MS,
       })
@@ -215,12 +225,18 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
       })
       await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', '--', `${ROOT}/.playwright`], timeoutMs: COMMAND_TIMEOUT_MS })
       await sandbox.writeFiles([{ path: CLI_CONFIG, content: Buffer.from(config) }])
-    } finally {
-      // No model-supplied browser action runs until the bootstrap network is closed to exact hosts.
-      await sandbox.updateNetworkPolicy({ allow: [...allowedHosts(this.origins)] })
-    }
 
-    return sandbox
+      // No model-supplied browser action runs until bootstrap has fully succeeded and the
+      // network is reduced to the exact approved hosts.
+      await sandbox.updateNetworkPolicy({ allow: [...allowedHosts(this.origins)] })
+      this.sandbox = sandbox
+      return sandbox
+    } catch (error) {
+      // Never retain a half-initialized Sandbox. A later Builder round must start clean.
+      this.sandbox = null
+      await sandbox.stop().catch(() => undefined)
+      throw error
+    }
   }
 
   async invoke(input: {
@@ -236,7 +252,7 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
       const sandbox = await this.ready()
       const result = await sandbox.runCommand({
         cmd: `${ROOT}/node_modules/.bin/playwright-cli`,
-        args: [...args],
+        args: ['--config', CLI_CONFIG, ...args],
         cwd: ROOT,
         timeoutMs: COMMAND_TIMEOUT_MS,
       })

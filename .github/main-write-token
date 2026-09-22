@@ -1,2 +1,2 @@
-base_sha=f8e0925f28928fdc8b26ca5322c3abe4d30bfeb5
-branch=fix/universal-mcp-nonsensitive-targets-20260922
+base_sha=57a1bf6bc2df59ea70f973864898d1916cb0084b
+branch=fix/builder-playwright-cli-sandbox-bootstrap-20260922

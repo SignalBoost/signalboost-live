@@ -30,6 +30,8 @@ export interface HarnessIdentity {
   agentId: string
   role: string
   tenantId?: string
+  /** Provider Hub assignment subject; defaults to agentId when omitted. */
+  portableId?: string
   artifact?: {
     artifactId: string
     artifactHash?: string
@@ -50,10 +52,16 @@ export interface HarnessLimits {
   maxConcurrency?: number
 }
 
+export type HarnessCapabilityRisk = 'read' | 'write' | 'consequential'
+
 export interface HarnessCapabilityGrant {
   id: string
   environments: readonly HarnessEnvironmentClass[]
   mutating: boolean
+  /** Consequential authority must be explicit; mutating alone defaults to write. */
+  risk?: HarnessCapabilityRisk
+  scopes?: readonly string[]
+  preferredProviders?: readonly string[]
 }
 
 /**
@@ -125,6 +133,8 @@ export interface HarnessVerificationResult {
   verifierRef: string
   evidenceRefs: readonly string[]
   reason?: string
+  /** Independent verifier attribution; the worker under examination does not own this decision. */
+  failureAttribution?: 'infrastructure' | 'competency' | 'authority' | 'harness'
 }
 
 export interface HarnessOutcome {

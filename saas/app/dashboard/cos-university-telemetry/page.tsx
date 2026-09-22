@@ -44,6 +44,36 @@ type Run = {
   completedAt: string | null
 }
 
+type Artifact = {
+  candidateId: string
+  subject: string
+  status: string
+  artifactId: string | null
+  artifactHash: string | null
+  revisionKey: string | null
+  ageSeconds: number | null
+  retentionEligibleAt: string | null
+  evaluation: {
+    evaluatedAt: string | null
+    artifactAgeSeconds: number
+    baselineScore: number
+    artifactScore: number
+    holdoutImproved: boolean
+    safetyPassed: boolean
+    unseenTransferPassed: boolean
+    delayedRetentionPassed: boolean
+  } | null
+  graduate: {
+    status: string
+    runtimeProvider: string | null
+    runtimeModelId: string | null
+    promotedAt: string | null
+    activatedAt: string | null
+    updatedAt: string | null
+  } | null
+  updatedAt: string | null
+}
+
 type Telemetry = {
   ok?: boolean
   error?: string
@@ -60,6 +90,7 @@ type Telemetry = {
   }
   providers?: Provider[]
   runs?: Run[]
+  artifacts?: Artifact[]
 }
 
 const REFRESH_MS = 60_000
@@ -159,6 +190,7 @@ export default function CosUniversityTelemetryPage() {
   const summary = data?.summary || {}
   const providers = data?.providers || []
   const runs = data?.runs || []
+  const artifacts = data?.artifacts || []
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
@@ -264,6 +296,49 @@ export default function CosUniversityTelemetryPage() {
               {!runs.length ? (
                 <tr><td colSpan={8} className="py-6 text-center text-sm opacity-60">{copy.noRuns}</td></tr>
               ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <div className="mb-4">
+          <h2 className="font-semibold">{copy.artifactsTitle}</h2>
+          <p className="text-xs opacity-65">{copy.artifactsExplanation}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1200px] text-left text-sm">
+            <thead className="border-b text-xs uppercase opacity-60">
+              <tr>
+                <th className="pb-3 pr-4">{copy.subject}</th>
+                <th className="pb-3 pr-4">{copy.artifactStatus}</th>
+                <th className="pb-3 pr-4">{copy.retentionGate}</th>
+                <th className="pb-3 pr-4">{copy.holdout}</th>
+                <th className="pb-3 pr-4">{copy.safety}</th>
+                <th className="pb-3 pr-4">{copy.transfer}</th>
+                <th className="pb-3 pr-4">{copy.retention}</th>
+                <th className="pb-3 pr-4">{copy.graduation}</th>
+                <th className="pb-3">{copy.updated}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {artifacts.map(artifact => (
+                <tr key={artifact.candidateId + ':' + artifact.artifactHash} className="border-b border-white/10 align-top">
+                  <td className="py-3 pr-4">
+                    <div className="font-medium">{artifact.subject || copy.unknownSubject}</div>
+                    <div className="mt-1 font-mono text-[11px] opacity-50">{short(artifact.candidateId, 20)}</div>
+                  </td>
+                  <td className="py-3 pr-4"><span className="rounded-full border px-2 py-1 text-xs">{artifact.status || copy.unknownStage}</span></td>
+                  <td className="py-3 pr-4 text-xs">{when(artifact.retentionEligibleAt)}</td>
+                  <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.holdoutImproved ? copy.pass : copy.fail) : copy.pending}</td>
+                  <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.safetyPassed ? copy.pass : copy.fail) : copy.pending}</td>
+                  <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.unseenTransferPassed ? copy.pass : copy.fail) : copy.pending}</td>
+                  <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.delayedRetentionPassed ? copy.pass : copy.fail) : copy.pending}</td>
+                  <td className="py-3 pr-4 text-xs">{artifact.graduate?.status || copy.notGraduated}</td>
+                  <td className="py-3 text-xs opacity-65">{when(artifact.updatedAt)}</td>
+                </tr>
+              ))}
+              {!artifacts.length ? <tr><td colSpan={9} className="py-6 text-center text-sm opacity-60">{copy.noArtifacts}</td></tr> : null}
             </tbody>
           </table>
         </div>

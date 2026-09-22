@@ -166,6 +166,12 @@ export function universityProductionExecutionBlocker(path: LearningPathId, value
   if (evidence.error != null && evidence.error !== '') return 'runner_failed'
   if ('errors' in evidence && (!Array.isArray(evidence.errors) || evidence.errors.length !== 0)) return 'runner_failed'
 
+  if (path === 'practical_residency') {
+    return evidence.caseExecuted === true
+      ? null
+      : 'residency_case_execution_missing'
+  }
+
   const academic = ['independent_exams', 'subject_a_range_evidence', 'language_a_range_evidence', 'delayed_retention'].includes(path)
   if (academic) {
     const attempted = evidence.attempted

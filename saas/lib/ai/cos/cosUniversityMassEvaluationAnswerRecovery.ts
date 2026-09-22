@@ -47,7 +47,9 @@ export function recoverStoppedSoloForeignOpenCorrectCloseAnswer(text: string, ca
   if (finish !== 'stop' || /<\/?think>/i.test(text)) return null
   const close = `<<<END:${caseId}>>>`
   const closeAt = text.indexOf(close)
-  if (closeAt < 0 || text.indexOf(close, closeAt + close.length) >= 0 || text.slice(closeAt + close.length).trim()) return null
+  if (closeAt < 0 || text.indexOf(close, closeAt + close.length) >= 0) return null
+  const trailing = text.slice(closeAt + close.length).trim()
+  if (/<<<(?:ANSWER|END):/i.test(trailing)) return null
 
   const beforeClose = text.slice(0, closeAt).trim()
   if (!beforeClose.startsWith('<<<ANSWER:')) return null
@@ -84,7 +86,9 @@ export function recoverStoppedSoloMissingOpenAnswer(text: string, caseId: string
   if (text.includes('<<<ANSWER:')) return null
   const closeAt = text.indexOf(close)
   if (closeAt < 0 || text.indexOf(close, closeAt + close.length) >= 0) return null
-  if (/<<<END:[^>\r\n]+>>>/.test(text.slice(0, closeAt)) || text.slice(closeAt + close.length).trim()) return null
+  const trailing = text.slice(closeAt + close.length).trim()
+  if (/<<<(?:ANSWER|END):/i.test(trailing)) return null
+  if (/<<<END:[^>\r\n]+>>>/.test(text.slice(0, closeAt))) return null
   const answer = text.slice(0, closeAt).trim()
   if (!answer || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(answer)) return null
   return answer

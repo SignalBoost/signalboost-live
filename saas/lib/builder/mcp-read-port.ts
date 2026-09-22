@@ -96,7 +96,7 @@ export function createBuilderMcpReadPort(input: {
 
       return Object.freeze({
         ok: result.ok,
-        data: result.data,
+        data: 'data' in result ? result.data : undefined,
         error: result.error,
         mode: result.mode,
       })

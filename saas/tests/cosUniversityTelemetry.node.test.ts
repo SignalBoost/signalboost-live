@@ -65,3 +65,15 @@ test('University telemetry hot-path migration matches the Production sort/filter
   assert.match(migration, /cos_mass_provider_jobs_run_updated_desc_idx/)
   assert.match(migration, /cos_university_mass_distillation_provider_jobs \(run_id, updated_at desc\)/)
 })
+
+
+test('University telemetry exposes read-only evaluator claim blockers without changing authority', () => {
+  assert.match(route, /claimability = 'waiting_12h'/)
+  assert.match(route, /claimability = 'missing_approval'/)
+  assert.match(route, /claimability = 'approval_expired'/)
+  assert.match(route, /claimability = 'missing_exact_canary'/)
+  assert.match(route, /claimability = 'active_reservation'/)
+  assert.match(route, /claimability = 'evaluator_failed'/)
+  assert.match(route, /claimability = 'claimable'/)
+  assert.doesNotMatch(route, /export async function POST/)
+})

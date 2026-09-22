@@ -17,7 +17,8 @@ import {
   MASS_DISTILLED_READY_TIMEOUT_MS,
   MASS_DISTILLED_CANARY_TIMEOUT_MS,
   MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,
-  canaryMassDistilledRuntime,
+  waitForMassDistilledRuntimeReady,
+  invokeMassDistilledRuntimeCanary,
   massDistilledRuntimeHealth,
   provisionMassDistilledRuntime,
   type MassDistilledRuntimeArtifact,
@@ -273,12 +274,25 @@ export async function GET(req:NextRequest){
     // the same unexpired approval because no model request or paid endpoint wake has happened yet.
     const provisioned=await provisionMassDistilledRuntime(runtimeArtifact)
 
-    // This durable marker is the exact boundary where the single canary invocation becomes consumed.
-    // It is written before /ready, because the first endpoint request can wake paid compute.
+    // Runtime readiness is bounded warm-up preflight, not the single model inference. A /ready probe can
+    // wake paid compute, so the existing approval cost ceiling and max-three preflight attempts still bound
+    // spend. Keeping invocation unconsumed until internal vLLM is actually ready lets the same approval-scoped
+    // runtime finish a slow cold start instead of throwing away its progress and creating a fresh endpoint.
+    const ready=await waitForMassDistilledRuntimeReady({endpointId:provisioned.endpointId})
+    if(!ready.ok){
+      let healthAfter:unknown
+      try{healthAfter=await massDistilledRuntimeHealth(provisioned.endpointId)}
+      catch(error){healthAfter={ok:false,error:error instanceof Error?clean(error.message,300):'mass_distilled_health_read_failed'}}
+      await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PREFLIGHT_FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:ready.httpStatus,error:clean(ready.error,300),healthAfter,readyTimeoutMs:MASS_DISTILLED_READY_TIMEOUT_MS,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:false,providerComputeWakeStarted:true,retryableWithinApproval:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+      await laneStatus('skipped','runtime_warming',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,httpStatus:ready.httpStatus,error:clean(ready.error,300),retryableWithinApproval:true})
+      return NextResponse.json({ok:true,skipped:true,reason:'runtime_warming',candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,providerInvocationStarted:false,retryableWithinApproval:true})
+    }
+
+    // This durable marker is the exact boundary where the single MODEL inference becomes consumed.
     await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:INVOCATION_STARTED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
     providerInvocationStarted=true
 
-    const canary=await canaryMassDistilledRuntime({endpointId:provisioned.endpointId,modelName:provisioned.modelName})
+    const canary=await invokeMassDistilledRuntimeCanary({endpointId:provisioned.endpointId,modelName:provisioned.modelName})
     let healthAfter:unknown
     try{healthAfter=await massDistilledRuntimeHealth(provisioned.endpointId)}
     catch(error){healthAfter={ok:false,error:error instanceof Error?clean(error.message,300):'mass_distilled_health_read_failed'}}

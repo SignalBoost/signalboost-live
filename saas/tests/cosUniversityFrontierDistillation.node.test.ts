@@ -121,6 +121,29 @@ test('HF worker anchors verified responses, validates tokenizer compatibility fi
   assert.match(worker, /legacy_bootstrap_sft/)
 })
 
+test('verified failure-derived rows survive partition metadata and replay only after GKD', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  const baseWorker = source('../scripts/cos-university-hf-worker-base.py')
+  const worker = source('../scripts/cos-university-hf-worker.py')
+
+  assert.match(consumer, /source_title,subject,summary,facts,confidence,license,source_kind/)
+  assert.match(consumer, /source_kind, 80\) === 'failure_derived_curriculum'/)
+  assert.match(consumer, /failureDerived: failureDerivedPromptIds\.has\(promptId\)/)
+  assert.match(baseWorker, /"failure_derived": raw_row\.get\("failureDerived"\) is True/)
+
+  const trainingFunction = worker.slice(worker.indexOf('def train_student'), worker.indexOf('def main()'))
+  assert.match(trainingFunction, /failure_derived_replay_training/)
+  assert.match(trainingFunction, /row\.get\("failure_derived"\) is True/)
+  assert.match(worker, /FAILURE_DERIVED_REPLAY_MAX_ITEMS = 32/)
+  assert.match(worker, /FAILURE_DERIVED_REPLAY_EPOCHS = 1\.0/)
+  assert.match(worker, /FAILURE_DERIVED_REPLAY_LEARNING_RATE = 2e-5/)
+  const gkdTrain = trainingFunction.indexOf('trainer.train()')
+  const replayTrainer = trainingFunction.indexOf('replay_trainer = SFTTrainer(')
+  const replayTrain = trainingFunction.indexOf('replay_trainer.train()')
+  assert.ok(gkdTrain > 0 && replayTrainer > gkdTrain && replayTrain > replayTrainer)
+  assert.doesNotMatch(worker, /safety-spend-deadline|safety-attribution-discriminating/)
+})
+
 test('HF frontier runtime pins the stable TRL distillation API', () => {
   const jobs = source('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts')
   assert.match(jobs, /'transformers>=4\.56\.2,<6'/)
@@ -147,6 +170,10 @@ test('mass artifact evidence durably records the executed frontier training reci
   assert.match(consumer, /frontierResponseAnchorItems: integer\('frontierResponseAnchorItems', 0, 100_000\)/)
   assert.match(consumer, /frontierResponseAnchorTrainer: clean\(raw\.frontierResponseAnchorTrainer, 80\) \|\| null/)
   assert.match(consumer, /frontierResponseAnchorTrainableFp32TensorCount: integer\('frontierResponseAnchorTrainableFp32TensorCount', 0, 1_000_000\)/)
+  assert.match(consumer, /failureDerivedReplayRequired: boolean\('failureDerivedReplayRequired'\)/)
+  assert.match(consumer, /failureDerivedReplayItems: integer\('failureDerivedReplayItems', 0, 100_000\)/)
+  assert.match(consumer, /failureDerivedReplayEpochs: number\('failureDerivedReplayEpochs', 0, 10\)/)
+  assert.match(consumer, /failureDerivedReplayTrainer: clean\(raw\.failureDerivedReplayTrainer, 80\) \|\| null/)
   assert.match(consumer, /trainingReceipt = durableTrainingReceipt\(body\.trainingProfile, body\.trainingRecipe\)/)
   assert.match(consumer, /trainingMode: 'distillation', trainingReceipt/)
   assert.match(consumer, /\|\| !trainingReceipt\)/)

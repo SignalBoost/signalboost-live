@@ -396,6 +396,9 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
             "item_hash": digest,
             "prompt": prompt,
             "response": response,
+            # Provenance is metadata only: partition identity remains the immutable response-text hash.
+            # Only the host controller may set this exact boolean from persisted curriculum source_kind.
+            "failure_derived": raw_row.get("failureDerived") is True,
         })
     if len(by_hash) < 20:
         raise RuntimeError("worker_dataset_too_small")

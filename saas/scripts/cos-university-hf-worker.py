@@ -42,6 +42,13 @@ TRAINING_MAX_LENGTH = 2048
 FRONTIER_TRAINING_PROFILE = "cos_university_frontier_gkd_v1"
 FRONTIER_GKD_MAX_LENGTH = 1024
 FRONTIER_GKD_LEARNING_RATE = 5e-5
+# Independent-evaluation remediation is first anchored with all verified faculty responses, then
+# replayed once after dense-teacher GKD so the later teacher pass cannot erase the corrected behavior.
+# The replay is deliberately tiny and bounded; it does not copy evaluator cases or expand training spend.
+FAILURE_DERIVED_REPLAY_MAX_ITEMS = 32
+FAILURE_DERIVED_REPLAY_EPOCHS = 1.0
+FAILURE_DERIVED_REPLAY_LEARNING_RATE = 2e-5
+FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION = 1
 
 BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"
 BASE_WORKER_PATH = Path("/tmp/itmounts_hf_worker_base.py")
@@ -690,6 +697,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         # run cannot consume SFT budget/capacity first.
         prompts: list[dict[str, str]] = []
         anchor_training: list[dict[str, str]] = []
+        failure_derived_replay_training: list[dict[str, str]] = []
         for raw in training:
             row = dict(raw)
             prompt = base.clean(row.get("prompt"), 100_000)
@@ -703,7 +711,10 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             if not structured:
                 raise RuntimeError("worker_frontier_response_anchor_structured_row_required")
             prompts.append({"prompt": rendered_prompt})
-            anchor_training.append({"training_text": training_text})
+            anchor_row = {"training_text": training_text}
+            anchor_training.append(anchor_row)
+            if row.get("failure_derived") is True and len(failure_derived_replay_training) < FAILURE_DERIVED_REPLAY_MAX_ITEMS:
+                failure_derived_replay_training.append(anchor_row)
         if not prompts:
             raise RuntimeError("worker_training_dataset_empty")
 
@@ -794,6 +805,13 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             "frontierResponseAnchorItems": len(anchor_training) if frontier_plan["frontierResponseAnchorRequired"] else 0,
             "frontierResponseAnchorTrainer": "SFTTrainer" if frontier_plan["frontierResponseAnchorRequired"] else None,
             "frontierResponseAnchorTrainableFp32TensorCount": anchor_trainable_fp32_tensors,
+            "failureDerivedReplayRequired": len(failure_derived_replay_training) > 0,
+            "failureDerivedReplayItems": len(failure_derived_replay_training),
+            "failureDerivedReplayEpochs": FAILURE_DERIVED_REPLAY_EPOCHS if failure_derived_replay_training else 0,
+            "failureDerivedReplayLearningRate": FAILURE_DERIVED_REPLAY_LEARNING_RATE if failure_derived_replay_training else 0,
+            "failureDerivedReplayGradientAccumulationSteps": FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION if failure_derived_replay_training else 0,
+            "failureDerivedReplayTrainer": "SFTTrainer" if failure_derived_replay_training else None,
+            "failureDerivedReplayTrainableFp32TensorCount": 0,
             "beta": frontier_plan["beta"],
             "temperature": frontier_plan["temperature"],
             "maxNewTokens": frontier_plan["maxNewTokens"],
@@ -917,6 +935,66 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     )
 
     trainer.train()
+
+    # The dense teacher is intentionally general-purpose and may not preserve newly learned University
+    # remediation invariants. Production evidence showed a 30% remediation batch whose faculty answers
+    # correctly taught authority/evidence boundaries, yet the final artifact still matched the unsafe
+    # baseline after three GKD epochs. Replay only verified failure-derived TRAINING rows after GKD.
+    # Holdout rows remain untouched, evaluator cases never enter training, and the replay is one small SFT epoch.
+    if frontier_plan is not None and failure_derived_replay_training:
+        gkd_model = trainer.model
+        if hasattr(trainer, "teacher_model"):
+            trainer.teacher_model = None
+        if "teacher_model" in locals():
+            del teacher_model
+        del trainer
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        replay_recipe = {
+            "trainingItems": len(failure_derived_replay_training),
+            "epochs": FAILURE_DERIVED_REPLAY_EPOCHS,
+            "perDeviceTrainBatchSize": 1,
+            "gradientAccumulationSteps": FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION,
+            "learningRate": FAILURE_DERIVED_REPLAY_LEARNING_RATE,
+            "warmupRatio": 0.0,
+            "lrSchedulerType": TRAINING_LR_SCHEDULER,
+            "maxGradNorm": TRAINING_MAX_GRAD_NORM,
+            "maxLength": FRONTIER_GKD_MAX_LENGTH,
+        }
+        replay_args = SFTConfig(
+            output_dir=str(output_dir / "failure-derived-replay"),
+            num_train_epochs=replay_recipe["epochs"],
+            per_device_train_batch_size=replay_recipe["perDeviceTrainBatchSize"],
+            gradient_accumulation_steps=replay_recipe["gradientAccumulationSteps"],
+            learning_rate=replay_recipe["learningRate"],
+            **_warmup_arguments(SFTConfig, replay_recipe),
+            lr_scheduler_type=replay_recipe["lrSchedulerType"],
+            max_grad_norm=replay_recipe["maxGradNorm"],
+            logging_steps=10,
+            save_strategy="no",
+            report_to="none",
+            bf16=False,
+            fp16=False,
+            gradient_checkpointing=True,
+            dataset_text_field="training_text",
+            max_length=replay_recipe["maxLength"],
+        )
+        replay_trainer = SFTTrainer(
+            model=gkd_model,
+            args=replay_args,
+            train_dataset=Dataset.from_list(failure_derived_replay_training),
+            processing_class=tokenizer,
+        )
+        replay_fp32_tensors = _force_trainable_fp32(replay_trainer.model)
+        replay_trainer.train()
+        trainer = replay_trainer
+        recipe["failureDerivedReplayTrainableFp32TensorCount"] = replay_fp32_tensors
+        print(
+            f"itmounts_failure_derived_replay:{json.dumps({'items':len(failure_derived_replay_training),'epochs':FAILURE_DERIVED_REPLAY_EPOCHS,'learningRate':FAILURE_DERIVED_REPLAY_LEARNING_RATE,'authorityExpanded':False}, ensure_ascii=True, separators=(',', ':'))}",
+            flush=True,
+        )
+
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))
 

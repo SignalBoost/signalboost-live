@@ -113,6 +113,13 @@ function durableTrainingReceipt(profileValue: unknown, recipeValue: unknown) {
     frontierResponseAnchorItems: integer('frontierResponseAnchorItems', 0, 100_000),
     frontierResponseAnchorTrainer: clean(raw.frontierResponseAnchorTrainer, 80) || null,
     frontierResponseAnchorTrainableFp32TensorCount: integer('frontierResponseAnchorTrainableFp32TensorCount', 0, 1_000_000),
+    failureDerivedReplayRequired: boolean('failureDerivedReplayRequired'),
+    failureDerivedReplayItems: integer('failureDerivedReplayItems', 0, 100_000),
+    failureDerivedReplayEpochs: number('failureDerivedReplayEpochs', 0, 10),
+    failureDerivedReplayLearningRate: number('failureDerivedReplayLearningRate', 0, 1),
+    failureDerivedReplayGradientAccumulationSteps: integer('failureDerivedReplayGradientAccumulationSteps', 0, 100_000),
+    failureDerivedReplayTrainer: clean(raw.failureDerivedReplayTrainer, 80) || null,
+    failureDerivedReplayTrainableFp32TensorCount: integer('failureDerivedReplayTrainableFp32TensorCount', 0, 1_000_000),
     beta: number('beta', 0, 1),
     temperature: number('temperature', 0.01, 4),
     maxNewTokens: integer('maxNewTokens', 1, 8192),
@@ -342,7 +349,7 @@ export async function buildTeacherPrompts(subjectId: string, sourceHashes: reado
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const rows = await db.from('cos_continuous_learning')
-    .select('content_hash,source_title,subject,summary,facts,confidence,license')
+    .select('content_hash,source_title,subject,summary,facts,confidence,license,source_kind')
     .in('content_hash', [...sourceHashes])
     .limit(128)
   if (rows.error) throw rows.error
@@ -350,6 +357,7 @@ export async function buildTeacherPrompts(subjectId: string, sourceHashes: reado
   if (byHash.size !== sourceHashes.length) throw new Error('mass_distillation_rights_cleared_source_missing')
 
   const prompts: Array<Readonly<{ id: string; prompt: string }>> = []
+  const failureDerivedPromptIds: string[] = []
   const seenPromptBodies = new Set<string>()
   for (const contentHash of sourceHashes) {
     const row: any = byHash.get(contentHash)
@@ -371,12 +379,18 @@ export async function buildTeacherPrompts(subjectId: string, sourceHashes: reado
     if (seenPromptBodies.has(promptBodyHash)) continue
     seenPromptBodies.add(promptBodyHash)
     prompts.push(Object.freeze({ id: contentHash, prompt }))
+    if (clean(row.source_kind, 80) === 'failure_derived_curriculum') failureDerivedPromptIds.push(contentHash)
   }
   if (prompts.length < 20) {
     throw new Error(`mass_distillation_teacher_prompt_diversity_insufficient:${prompts.length}/${sourceHashes.length}`)
   }
   if (prompts.length > 128) throw new Error('mass_distillation_teacher_prompt_count_invalid')
-  return Object.freeze({ prompts: Object.freeze(prompts), promptSetHash: hash(prompts), distinctPrompts: prompts.length })
+  return Object.freeze({
+    prompts: Object.freeze(prompts),
+    promptSetHash: hash(prompts),
+    distinctPrompts: prompts.length,
+    failureDerivedPromptIds: Object.freeze(failureDerivedPromptIds),
+  })
 }
 
 function expectedStageAfterDispatch(stage: Stage) {
@@ -610,8 +624,10 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         throw new Error('mass_distillation_hosted_prompt_set_mismatch')
       }
       const promptById = new Map(promptSet.prompts.map(item => [clean(item.id, 64).toLowerCase(), item.prompt] as const))
+      const failureDerivedPromptIds = new Set(promptSet.failureDerivedPromptIds)
       const structured = rawHostedRows.map(row => {
-        const prompt = promptById.get(clean(row.promptId, 64).toLowerCase())
+        const promptId = clean(row.promptId, 64).toLowerCase()
+        const prompt = promptById.get(promptId)
         const response = clean(row.text, 50_000)
         if (!prompt || !response) throw new Error('mass_distillation_hosted_prompt_response_missing')
         return Object.freeze({
@@ -619,6 +635,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
           text: response,
           prompt,
           response,
+          failureDerived: failureDerivedPromptIds.has(promptId),
           messages: Object.freeze([
             Object.freeze({ role: 'user', content: prompt }),
             Object.freeze({ role: 'assistant', content: response }),

@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto'
 import type { HarnessAuthorityEnvelope, HarnessRunResult } from '../core/types.ts'
 import { resolveHarnessManifest } from '../core/policy.ts'
 import { createBuilderResidencyHarnessRequest } from '../adapters/builder.ts'
-import { adaptResidencyRunToUniversity } from '../adapters/university.ts'
-import { persistHarnessEvidence, type HarnessEvidenceSink } from '../evidence/durable-evidence.ts'
+import type { HarnessEvidenceSink } from '../evidence/durable-evidence.ts'
+import { completeHarnessRun } from '../runtime/completion.ts'
 import type { BuilderResidencyCase } from '../cases/builder-residency.ts'
 
 const hash=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -109,11 +109,21 @@ export async function runBuilderResidencyCase(input:{
     return Object.freeze({ok:false,reason:'residency_exact_artifact_executor_failed'})
   }
 
+  let completion
   try{
-    await persistHarnessEvidence({
+    completion=await completeHarnessRun({
       manifest:policy.manifest,
       result,
-      sink:input.harnessEvidenceSink,
+      evidenceSink:input.harnessEvidenceSink,
+      universityContext:{
+        candidateId:input.candidateId,
+        subjectId:input.subjectId,
+        caseFamily:input.practiceCase.caseFamily,
+        variantHash:input.practiceCase.variantHash,
+        competencyId:input.practiceCase.competencyId,
+        requestedState:'demonstrated',
+        finalExamMaterialUsed:false,
+      },
     })
   }catch{
     await input.store.finishCase({
@@ -121,23 +131,32 @@ export async function runBuilderResidencyCase(input:{
       status:'rejected',
       harnessOutcome:result.outcome.status,
       verifierRef:result.outcome.verifierRef,
-      failureCode:'residency_harness_evidence_persist_failed',
+      failureCode:'residency_harness_completion_failed',
     })
-    return Object.freeze({ok:false,reason:'residency_harness_evidence_persist_failed',result})
+    return Object.freeze({ok:false,reason:'residency_harness_completion_failed',result})
   }
 
   const trajectoryHash=hash(result.trajectory)
   const observedAt=now().toISOString()
-  const adapted=adaptResidencyRunToUniversity(policy.manifest,result,{
-    candidateId:input.candidateId,
-    subjectId:input.subjectId,
-    caseFamily:input.practiceCase.caseFamily,
-    variantHash:input.practiceCase.variantHash,
-    competencyId:input.practiceCase.competencyId,
-    requestedState:'demonstrated',
-    finalExamMaterialUsed:false,
-  })
 
+  if(completion.route.destination!=='university'){
+    await input.store.finishCase({
+      caseRunId:started.caseRunId,
+      status:'rejected',
+      harnessOutcome:result.outcome.status,
+      verifierRef:result.outcome.verifierRef,
+      trajectoryHash,
+      failureCode:result.outcome.failureCode??`residency_routed_${completion.route.destination}`,
+    })
+    return Object.freeze({
+      ok:false,
+      reason:`residency_routed_${completion.route.destination}`,
+      result,
+      route:completion.route,
+    })
+  }
+
+  const adapted=completion.route.decision
   if(!adapted.accepted||!adapted.evidenceHash){
     await input.store.finishCase({
       caseRunId:started.caseRunId,

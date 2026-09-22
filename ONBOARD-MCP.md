@@ -104,18 +104,19 @@ The shared MCP certification framework now covers all three implemented Universa
 - Context7 certification requires the exact two governed documentation capabilities and a real library resolution call.
 - GitHub, Supabase, and Context7 produce the same metadata-only certification report shape.
 - A missing Supabase credential remains a hard failure for live acceptance; it is not converted into a skip.
-- Figma is the next provider. Its official remote endpoint is `https://mcp.figma.com/mcp`; Production enablement must remain fail-closed until host-owned Figma OAuth authorization is present and live certification passes.
+- Figma is part of the required Universal MCP Production set. Its official remote endpoint is `https://mcp.figma.com/mcp`; Production enablement remains fail-closed until host-owned Figma OAuth authorization is present and live certification passes.
 
 
 ## Vercel provider certification — 2026-09-21
 
-Vercel is the next Universal MCP provider after GitHub, Supabase, Context7, and governed Figma onboarding.
+Vercel is part of the required Universal MCP Production set after GitHub, Supabase, Context7, and governed Figma onboarding.
 
 - Official remote server: `https://mcp.vercel.com`; iTMounts uses Vercel's project-specific endpoint form `https://mcp.vercel.com/<teamSlug>/<projectSlug>` so the remote server receives exact team/project context.
 - Production configuration requires host-owned `VERCEL_MCP_OAUTH_ACCESS_TOKEN`, `VERCEL_MCP_TEAM_SLUG`, and `VERCEL_MCP_PROJECT_SLUG`. Missing OAuth or target fails closed.
 - The initial allowlist is diagnostics-first and read-only: documentation search, project read, deployment listing/read, build logs, and runtime logs.
 - `deploy_to_vercel`, `use_vercel_cli`, domain purchase, protected-link creation, and other mutation/consequential tools are intentionally absent pending separate authority review.
-- Live Vercel certification is conditional on the three host-owned Vercel secrets being present and requires exact governed capability projection plus a real project details probe.
+- Live Vercel certification requires the three host-owned Vercel secrets and exact governed capability projection plus a real project-details probe. Missing Vercel configuration is a failed full-suite acceptance, not a skip.
+- Full Universal MCP acceptance requires GitHub, Supabase, Context7, Figma, and Vercel to certify on the same candidate revision; a green run may not omit Figma or Vercel.
 - Remote tool discovery never expands the host allowlist or project scope.
 
 

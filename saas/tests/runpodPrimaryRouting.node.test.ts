@@ -117,13 +117,20 @@ test('admin probe reports configuration booleans without returning the RunPod ac
 })
 
 
-test('fresh grounded tasks are interactive and bypass owned RunPod primary', () => {
+test('fresh grounded tasks prefer owned RunPod, cap that attempt, then retain configured fallback', () => {
   const inference = source('../lib/ai/local-inference.ts')
   const workers = source('../lib/ai/cos/cosReasoningWorkers.ts')
   const route = source('../app/api/cos-primary/route.ts')
   assert.match(route, /feature:'cos_fresh_grounded_task'/)
-  assert.match(inference, /feature === 'cos_fresh_grounded_task'/)
+  assert.match(route, /allowConfiguredFallback:true/)
   assert.match(workers, /'cos_fresh_grounded_task'/)
+  const interactive = inference.slice(inference.indexOf('function interactiveUserResponse'), inference.indexOf('function interactiveReasoningEffort'))
+  assert.doesNotMatch(interactive, /feature === 'cos_fresh_grounded_task'/)
+  assert.match(inference, /function freshGroundedTask/)
+  assert.match(inference, /FRESH_GROUNDED_RUNPOD_ATTEMPT_MS = 16_000/)
+  assert.match(inference, /const runpodArgs = freshGroundedTask\(args\)/)
+  assert.match(inference, /timeoutMs: Math\.min\(/)
+  assert.match(inference, /return callConfiguredModel\(args, ownedAttempted \? \{ \.\.\.config, fallbackFromOwned: true \} : config\)/)
   const eligible = inference.slice(inference.indexOf('function eligibleForRunpodPrimary'), inference.indexOf('async function callConfiguredModel'))
   assert.match(eligible, /if \(interactiveUserResponse\(args\)\) return false/)
 })

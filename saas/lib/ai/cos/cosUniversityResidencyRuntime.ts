@@ -37,10 +37,13 @@ export async function provisionResidencyArtifactRuntime(input: {
   artifactRevision: string
   artifactHash: string
 }): Promise<ResidencyArtifactRuntimeLease> {
+  // Reuse one scale-to-zero endpoint per exact student artifact. A case-specific key would
+  // manufacture an endpoint per teaching case and leak infrastructure rather than competence.
   const runtimeKey = sha256({
     purpose: 'practical_residency',
-    caseRunId: input.caseRunId,
     candidateId: input.candidateId,
+    artifactId: input.artifactId,
+    artifactRevision: input.artifactRevision,
     artifactHash: input.artifactHash,
   }).slice(0, 10)
 

@@ -49,8 +49,9 @@ jobs:
       CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
       FIGMA_MCP_OAUTH_ACCESS_TOKEN: ${{ secrets.FIGMA_MCP_OAUTH_ACCESS_TOKEN }}
       VERCEL_MCP_OAUTH_ACCESS_TOKEN: ${{ secrets.VERCEL_MCP_OAUTH_ACCESS_TOKEN }}
-      VERCEL_MCP_TEAM_SLUG: ${{ secrets.VERCEL_MCP_TEAM_SLUG }}
-      VERCEL_MCP_PROJECT_SLUG: ${{ secrets.VERCEL_MCP_PROJECT_SLUG }}
+      # Target identifiers are public routing context, not credentials.
+      VERCEL_MCP_TEAM_SLUG: luis-de-andrades-projects-b2fd8ade
+      VERCEL_MCP_PROJECT_SLUG: signalboost-live
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,7 +64,7 @@ jobs:
         shell: bash
         run: |
           missing=0
-          for name in SUPABASE_ACCESS_TOKEN FIGMA_MCP_OAUTH_ACCESS_TOKEN VERCEL_MCP_OAUTH_ACCESS_TOKEN VERCEL_MCP_TEAM_SLUG VERCEL_MCP_PROJECT_SLUG; do
+          for name in SUPABASE_ACCESS_TOKEN FIGMA_MCP_OAUTH_ACCESS_TOKEN VERCEL_MCP_OAUTH_ACCESS_TOKEN; do
             if [ -z "${!name}" ]; then
               echo "::error::${name} repository secret is required for full Universal MCP live acceptance."
               missing=1

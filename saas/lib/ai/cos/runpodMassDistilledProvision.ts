@@ -12,11 +12,13 @@ const BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 const ROUTING = 'LOAD_BALANCER' as const
 const PUBLIC_PORT = 8000
 const IDLE_TIMEOUT_SECONDS = 60
-// Production evidence showed the exact Qwen3-4B + LoRA worker still loading at 190 seconds while
-// RunPod reported one healthy running worker. Keep enough of the 300-second route budget for the
-// inference probe and evidence writes, but do not turn a slow cold start into a false terminal
-// artifact failure.
-const READY_TIMEOUT_MS = 235_000
+// Production 2026-09-22: two replay-trained exact artifacts reached a healthy RunPod worker but
+// internal vLLM was still loading at the old 235-second cutoff. The gateway itself permits up to
+// 300 seconds of internal bootstrap after the worker becomes routable, so the old route budget
+// could expire before the model's own bounded startup contract. Allow 380 seconds for readiness;
+// the cron route remains below the 8-minute database reservation lifetime, and worst-case GPU cost
+// still stays far below the unchanged $0.20 per-canary authorization.
+const READY_TIMEOUT_MS = 380_000
 const CANARY_TIMEOUT_MS = 35_000
 const MAX_GPU_PRICE_USD = 0.69
 const REQUEST_TIMEOUT_MS = 8_000

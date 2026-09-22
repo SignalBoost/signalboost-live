@@ -58,3 +58,13 @@ test('diagnostic helper is read-only and never cancels or re-arms jobs', () => {
   assert.match(source, /automaticRetryAuthorized:\s*false/)
   assert.doesNotMatch(source, /method:\s*['"]POST['"]|method:\s*['"]DELETE['"]|teacher_pending|runpod/i)
 })
+
+test('historical HF failures do not re-open a recovered provider circuit', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityHuggingFaceJobDiagnostics.ts'), 'utf8')
+  assert.match(source, /const circuit = wasRecorded/)
+  assert.match(source, /historical_failure_already_recorded/)
+  const gateAt = source.indexOf('const circuit = wasRecorded')
+  const openAt = source.indexOf('openProviderCircuit({', gateAt)
+  assert.ok(gateAt >= 0 && openAt > gateAt)
+})
+

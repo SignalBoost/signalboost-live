@@ -1,2 +1,2 @@
-base_sha=416f394e008086cda23c9af5e2957179c81ab763
-branch=test/universal-mcp-baseline-proof-20260922
+base_sha=3452650b702d63afa26030fbe39312e61a015e1f
+branch=fix/hf-diagnostics-edge-trigger-20260922-v2

@@ -27,7 +27,11 @@ export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
 // asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the per-evaluation cost ceiling,
 // but never the rolling cap, which is enforced here alone.
 export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
-export const MASS_EVALUATION_MAX_IN_FLIGHT = 4
+// Production 2026-09-22: RunPod's account-wide serverless worker quota is 10. Three concurrent exact-artifact
+// evaluations were admitted successfully; the fourth was rejected before wake because all legally reclaimable
+// worker reservations were exhausted. Keep three evaluator leases in flight so active evaluations and active
+// graduates remain protected instead of burning approvals against provider quota.
+export const MASS_EVALUATION_MAX_IN_FLIGHT = 3
 export const MASS_EVALUATION_FRONTIER_PROOF_SAMPLE = 4
 export const MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE = 2
 export const MASS_EVALUATION_BUILDER_V2_OPTIMIZER = 'frontier_response_anchor_then_stable_on_policy_distillation' as const
@@ -328,8 +332,11 @@ export function decideRollingMassEvaluationApproval(input: {
   now: Date
   frontierProofCompletions?: number
   builderV2ProofCompletions?: number
+  inFlightCount?: number
 }): RollingDecision {
   if (!input.enabled) return { issue: false, reason: 'rolling_mass_evaluation_authorization_disabled' }
+  const inFlightCount = Math.max(0, Math.floor(Number(input.inFlightCount ?? 0)))
+  if (inFlightCount >= MASS_EVALUATION_MAX_IN_FLIGHT) return { issue: false, reason: 'mass_evaluation_concurrency_full' }
   const nowMs = input.now.getTime()
 
   const rollingApprovalsInWindow = input.events.filter(event => event.verifier === 'host_controller'

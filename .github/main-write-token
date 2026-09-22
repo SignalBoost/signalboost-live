@@ -1,2 +1,2 @@
-base_sha=6157b6f2179dd188dfabdfc57d732ab346080bd4
-branch=fix/prioritize-builder-playwright-canary-20260922
+base_sha=47210206d0e657bcdc6b42ca2eb3923097a9777c
+branch=fix/builder-playwright-cli-runtime-diagnostic-20260922

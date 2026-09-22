@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { embeddingModelName } from '@/lib/ai/cos/embeddingEndpoint'
+import { embeddingModelName } from '../../ai/cos/embeddingEndpoint.ts'
 import type { CachedResponse, KnowledgeRecord } from '../layers/knowledge/index.ts'
 import type { KnowledgeFact, KnowledgeFactMatch, SemanticKnowledgeStore } from '../layers/knowledge/persistent.ts'
 import type { ContextSummaryStore, CompressedMemorySnapshot } from '../layers/memory/index.ts'

@@ -1,4 +1,5 @@
 name: Actions Backlog Self-Heal
+# A main-path touch intentionally triggers an immediate stale-run sweep after deployment.
 
 on:
   push:

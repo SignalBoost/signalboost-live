@@ -1,7 +1,8 @@
 // saas/lib/provider-framework/azure.ts
 import { randomUUID } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { executeSupervisedProviderCall } from './supervised-executor.ts'\nimport { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
+import { executeSupervisedProviderCall } from './supervised-executor.ts'
+import { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
 
 export const AZURE_PROVIDER_ID = 'azure' as const
 export const azureCapabilities = ['azure.connection.validate','azure.subscriptions.list','azure.resource_groups.list','azure.resources.list','azure.compute.virtual_machines.list','azure.web.sites.list','azure.storage.accounts.list','azure.database.servers.list','azure.monitor.activity_logs.read','azure.advisor.recommendations.list'] as const

@@ -7,7 +7,6 @@
 // asks COS to verify the external world.
 
 import { callCosReasoner } from './cosReasoner.ts'
-import { requiresLiveTravelPlanningEvidence } from './cosFreshnessPolicy.ts'
 
 export type CosSemanticTaskMode =
   | 'contextual_interpretation'
@@ -91,19 +90,6 @@ export async function classifyCosSemanticTaskIntent(args: {
 }): Promise<CosSemanticTaskIntent | null> {
   const input = String(args.input || '').trim()
   if (!input) return null
-
-  // Mutable travel planning cannot be treated as self-contained authoring. Airport/city transport,
-  // fares, schedules, opening hours, ticket prices, closures, reservations and attraction
-  // availability require live verification before synthesis. Resolve this deterministically before
-  // the semantic model can accidentally suppress freshness.
-  if (requiresLiveTravelPlanningEvidence(input)) {
-    return {
-      mode: 'external_fact_verification',
-      confidence: 1,
-      suppliedContextPrimary: false,
-      externalFactsRequired: true,
-    }
-  }
 
   const priorUser = String(args.previousUserContext || '').trim().slice(0, 4_000)
   const priorAssistant = String(args.previousAssistant || '').trim().slice(0, 4_000)

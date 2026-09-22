@@ -89,3 +89,11 @@ test('canary observes RunPod control-plane ready workers instead of holding a cu
   const body = provision.slice(start, end)
   assert.doesNotMatch(body, /fetch\(\`\$\{root\}\/ready\`/)
 })
+
+
+test('new mass canary endpoints pin the exact RunPod cached base-model revision', () => {
+  assert.match(provision, /const BASE_MODEL_REFERENCE = `https:\/\/huggingface\.co\/\$\{BASE_MODEL_ID\}:\$\{BASE_MODEL_REVISION\}`/)
+  assert.match(provision, /modelReferences:\[BASE_MODEL_REFERENCE\]/)
+  assert.match(provision, /modelReferences/)
+  assert.match(provision, /mass_distilled_runtime_base_cache_binding_mismatch/)
+})

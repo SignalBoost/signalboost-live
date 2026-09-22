@@ -19,12 +19,28 @@ type Connection = {
   updatedAt: string
 }
 
+type UniversalMcpCertification = {
+  schemaVersion: string
+  requiredProviders: number
+  certifiedProviders: number
+  productionReady: boolean
+  blocker: string
+  providers: readonly {
+    providerId: string
+    state: 'certified' | 'blocked_external'
+    observedAt: string
+    evidence: string
+    blocker?: string
+  }[]
+}
+
 type StatusSurface = {
   schemaVersion: string
   mode: 'self_service' | 'enterprise_admin'
   connection: Connection | null
   allowedActions: readonly string[]
   notices: readonly string[]
+  universalMcp?: UniversalMcpCertification
 }
 
 type Locale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
@@ -50,6 +66,12 @@ type LocalizedCopy = {
   fields: string
   actions: string
   notices: string
+  mcpSection: string
+  mcpSummary: string
+  mcpProductionReady: string
+  mcpCertified: string
+  mcpBlockedExternal: string
+  mcpBlocker: string
   actionLabels: Readonly<Record<string, string>>
   noticeLabels: Readonly<Record<string, string>>
 }
@@ -57,11 +79,11 @@ type LocalizedCopy = {
 const LOCALIZED_LOAD_ERROR = '__localized_provider_hub_load_error__'
 
 const copy: Readonly<Record<Locale, LocalizedCopy>> = {
-  en: { title: uiText('generatedUi.u_07b67c8736945565'), notice: uiText('generatedUi.u_383a465862841858'), unavailable: uiText('generatedUi.u_7eb5af92e49c32f0'), loadError: uiText('generatedUi.u_5fa89a526ec863a3'), loading: uiText('generatedUi.u_b5b53daefa35c15a'), section: uiText('generatedUi.u_1c1485d517272df7'), none: uiText('generatedUi.u_139742d725395c50'), state: uiText('generatedUi.u_900c7badbeb25811'), auth: uiText('generatedUi.u_66880d2d8216260d'), configured: uiText('generatedUi.u_1c81633afddc3ed2'), yes: uiText('generatedUi.u_85a39ab345d672ff'), no: uiText('generatedUi.u_1ea442a134b2a184'), tenant: uiText('generatedUi.u_e23969d284c3424c'), environment: uiText('generatedUi.u_9e471951a1b4106e'), id: "Connection ID", updated: uiText('generatedUi.u_3a5ecca188c0579c'), noMetadata: uiText('generatedUi.u_4a9b9c613c6bcd72'), fields: uiText('generatedUi.u_115350042fdc6de7'), actions: uiText('generatedUi.u_6a70c39bf17c1353'), notices: uiText('generatedUi.u_00a05fce19732187'), actionLabels: { view: uiText('generatedUi.u_dcc839a4015c4b7d'), manual_setup: uiText('generatedUi.u_2831546121359362') }, noticeLabels: { 'No provider connection is configured.': uiText('generatedUi.u_90c0c34d801fdd9c') } },
-  es: { title: 'Tus conexiones de proveedores', notice: 'Este panel es de solo lectura. Nunca revela, copia, descifra ni devuelve credenciales de proveedores.', unavailable: 'Estado no disponible', loadError: 'No se pudo cargar el estado de Provider Hub.', loading: 'Cargando el estado de la conexión…', section: 'Estado de conexión del proveedor', none: 'Ningún proveedor configurado', state: 'Estado de la conexión', auth: 'Autenticación', configured: 'Credenciales configuradas', yes: 'Sí', no: 'No', tenant: 'Inquilino', environment: 'Entorno', id: 'ID de conexión', updated: 'Actualizado', noMetadata: 'No hay metadatos de conexión disponibles para este ámbito autenticado.', fields: 'Campos configurados', actions: 'Acciones disponibles', notices: 'Avisos', actionLabels: { view: 'Ver', manual_setup: 'Configuración manual' }, noticeLabels: { 'No provider connection is configured.': 'No hay ninguna conexión de proveedor configurada.' } },
-  pt: { title: 'Suas conexões de provedores', notice: 'Este painel é somente leitura. Ele nunca revela, copia, descriptografa ou retorna credenciais de provedores.', unavailable: 'Status indisponível', loadError: 'Não foi possível carregar o status do Provider Hub.', loading: 'Carregando o status da conexão…', section: 'Status da conexão do provedor', none: 'Nenhum provedor configurado', state: 'Status da conexão', auth: 'Autenticação', configured: 'Credenciais configuradas', yes: 'Sim', no: 'Não', tenant: 'Locatário', environment: 'Ambiente', id: 'ID da conexão', updated: 'Atualizado', noMetadata: 'Nenhum metadado de conexão está disponível para este escopo autenticado.', fields: 'Campos configurados', actions: 'Ações disponíveis', notices: 'Avisos', actionLabels: { view: 'Ver', manual_setup: 'Configuração manual' }, noticeLabels: { 'No provider connection is configured.': 'Nenhuma conexão de provedor está configurada.' } },
-  pl: { title: 'Twoje połączenia z dostawcami', notice: 'Ten panel jest tylko do odczytu. Nigdy nie ujawnia, nie kopiuje, nie odszyfrowuje ani nie zwraca danych uwierzytelniających dostawcy.', unavailable: 'Status niedostępny', loadError: 'Nie można załadować statusu Provider Hub.', loading: 'Ładowanie statusu połączenia…', section: 'Status połączenia z dostawcą', none: 'Brak skonfigurowanego dostawcy', state: 'Stan połączenia', auth: 'Uwierzytelnianie', configured: 'Dane uwierzytelniające skonfigurowane', yes: 'Tak', no: 'Nie', tenant: 'Dzierżawca', environment: 'Środowisko', id: 'Identyfikator połączenia', updated: 'Zaktualizowano', noMetadata: 'Brak metadanych połączenia dla tego uwierzytelnionego zakresu.', fields: 'Skonfigurowane pola', actions: 'Dostępne działania', notices: 'Powiadomienia', actionLabels: { view: 'Wyświetl', manual_setup: 'Konfiguracja ręczna' }, noticeLabels: { 'No provider connection is configured.': 'Nie skonfigurowano połączenia z dostawcą.' } },
-  ru: { title: 'Ваши подключения к провайдерам', notice: 'Эта панель доступна только для чтения. Она никогда не раскрывает, не копирует, не расшифровывает и не возвращает учетные данные провайдера.', unavailable: 'Статус недоступен', loadError: 'Не удалось загрузить статус Provider Hub.', loading: 'Загрузка статуса подключения…', section: 'Статус подключения провайдера', none: 'Провайдер не настроен', state: 'Состояние подключения', auth: 'Аутентификация', configured: 'Учетные данные настроены', yes: 'Да', no: 'Нет', tenant: 'Арендатор', environment: 'Среда', id: 'Идентификатор подключения', updated: 'Обновлено', noMetadata: 'Для этой аутентифицированной области нет метаданных подключения.', fields: 'Настроенные поля', actions: 'Доступные действия', notices: 'Уведомления', actionLabels: { view: 'Просмотреть', manual_setup: 'Ручная настройка' }, noticeLabels: { 'No provider connection is configured.': 'Подключение к провайдеру не настроено.' } },
+  en: { title: uiText('generatedUi.u_07b67c8736945565'), notice: uiText('generatedUi.u_383a465862841858'), unavailable: uiText('generatedUi.u_7eb5af92e49c32f0'), loadError: uiText('generatedUi.u_5fa89a526ec863a3'), loading: uiText('generatedUi.u_b5b53daefa35c15a'), section: uiText('generatedUi.u_1c1485d517272df7'), none: uiText('generatedUi.u_139742d725395c50'), state: uiText('generatedUi.u_900c7badbeb25811'), auth: uiText('generatedUi.u_66880d2d8216260d'), configured: uiText('generatedUi.u_1c81633afddc3ed2'), yes: uiText('generatedUi.u_85a39ab345d672ff'), no: uiText('generatedUi.u_1ea442a134b2a184'), tenant: uiText('generatedUi.u_e23969d284c3424c'), environment: uiText('generatedUi.u_9e471951a1b4106e'), id: "Connection ID", updated: uiText('generatedUi.u_3a5ecca188c0579c'), noMetadata: uiText('generatedUi.u_4a9b9c613c6bcd72'), fields: uiText('generatedUi.u_115350042fdc6de7'), actions: uiText('generatedUi.u_6a70c39bf17c1353'), notices: uiText('generatedUi.u_00a05fce19732187'), mcpSection: 'Universal MCP certification', mcpSummary: 'Certified providers', mcpProductionReady: 'Production ready', mcpCertified: 'Certified', mcpBlockedExternal: 'Externally blocked', mcpBlocker: 'Blocker', actionLabels: { view: uiText('generatedUi.u_dcc839a4015c4b7d'), manual_setup: uiText('generatedUi.u_2831546121359362') }, noticeLabels: { 'No provider connection is configured.': uiText('generatedUi.u_90c0c34d801fdd9c') } },
+  es: { title: 'Tus conexiones de proveedores', notice: 'Este panel es de solo lectura. Nunca revela, copia, descifra ni devuelve credenciales de proveedores.', unavailable: 'Estado no disponible', loadError: 'No se pudo cargar el estado de Provider Hub.', loading: 'Cargando el estado de la conexión…', section: 'Estado de conexión del proveedor', none: 'Ningún proveedor configurado', state: 'Estado de la conexión', auth: 'Autenticación', configured: 'Credenciales configuradas', yes: 'Sí', no: 'No', tenant: 'Inquilino', environment: 'Entorno', id: 'ID de conexión', updated: 'Actualizado', noMetadata: 'No hay metadatos de conexión disponibles para este ámbito autenticado.', fields: 'Campos configurados', actions: 'Acciones disponibles', notices: 'Avisos', mcpSection: 'Certificación Universal MCP', mcpSummary: 'Proveedores certificados', mcpProductionReady: 'Listo para producción', mcpCertified: 'Certificado', mcpBlockedExternal: 'Bloqueado externamente', mcpBlocker: 'Bloqueo', actionLabels: { view: 'Ver', manual_setup: 'Configuración manual' }, noticeLabels: { 'No provider connection is configured.': 'No hay ninguna conexión de proveedor configurada.' } },
+  pt: { title: 'Suas conexões de provedores', notice: 'Este painel é somente leitura. Ele nunca revela, copia, descriptografa ou retorna credenciais de provedores.', unavailable: 'Status indisponível', loadError: 'Não foi possível carregar o status do Provider Hub.', loading: 'Carregando o status da conexão…', section: 'Status da conexão do provedor', none: 'Nenhum provedor configurado', state: 'Status da conexão', auth: 'Autenticação', configured: 'Credenciais configuradas', yes: 'Sim', no: 'Não', tenant: 'Locatário', environment: 'Ambiente', id: 'ID da conexão', updated: 'Atualizado', noMetadata: 'Nenhum metadado de conexão está disponível para este escopo autenticado.', fields: 'Campos configurados', actions: 'Ações disponíveis', notices: 'Avisos', mcpSection: 'Certificação Universal MCP', mcpSummary: 'Provedores certificados', mcpProductionReady: 'Pronto para produção', mcpCertified: 'Certificado', mcpBlockedExternal: 'Bloqueado externamente', mcpBlocker: 'Bloqueio', actionLabels: { view: 'Ver', manual_setup: 'Configuração manual' }, noticeLabels: { 'No provider connection is configured.': 'Nenhuma conexão de provedor está configurada.' } },
+  pl: { title: 'Twoje połączenia z dostawcami', notice: 'Ten panel jest tylko do odczytu. Nigdy nie ujawnia, nie kopiuje, nie odszyfrowuje ani nie zwraca danych uwierzytelniających dostawcy.', unavailable: 'Status niedostępny', loadError: 'Nie można załadować statusu Provider Hub.', loading: 'Ładowanie statusu połączenia…', section: 'Status połączenia z dostawcą', none: 'Brak skonfigurowanego dostawcy', state: 'Stan połączenia', auth: 'Uwierzytelnianie', configured: 'Dane uwierzytelniające skonfigurowane', yes: 'Tak', no: 'Nie', tenant: 'Dzierżawca', environment: 'Środowisko', id: 'Identyfikator połączenia', updated: 'Zaktualizowano', noMetadata: 'Brak metadanych połączenia dla tego uwierzytelnionego zakresu.', fields: 'Skonfigurowane pola', actions: 'Dostępne działania', notices: 'Powiadomienia', mcpSection: 'Certyfikacja Universal MCP', mcpSummary: 'Certyfikowani dostawcy', mcpProductionReady: 'Gotowe do produkcji', mcpCertified: 'Certyfikowany', mcpBlockedExternal: 'Zablokowany zewnętrznie', mcpBlocker: 'Blokada', actionLabels: { view: 'Wyświetl', manual_setup: 'Konfiguracja ręczna' }, noticeLabels: { 'No provider connection is configured.': 'Nie skonfigurowano połączenia z dostawcą.' } },
+  ru: { title: 'Ваши подключения к провайдерам', notice: 'Эта панель доступна только для чтения. Она никогда не раскрывает, не копирует, не расшифровывает и не возвращает учетные данные провайдера.', unavailable: 'Статус недоступен', loadError: 'Не удалось загрузить статус Provider Hub.', loading: 'Загрузка статуса подключения…', section: 'Статус подключения провайдера', none: 'Провайдер не настроен', state: 'Состояние подключения', auth: 'Аутентификация', configured: 'Учетные данные настроены', yes: 'Да', no: 'Нет', tenant: 'Арендатор', environment: 'Среда', id: 'Идентификатор подключения', updated: 'Обновлено', noMetadata: 'Для этой аутентифицированной области нет метаданных подключения.', fields: 'Настроенные поля', actions: 'Доступные действия', notices: 'Уведомления', mcpSection: 'Сертификация Universal MCP', mcpSummary: 'Сертифицированные провайдеры', mcpProductionReady: 'Готово к Production', mcpCertified: 'Сертифицирован', mcpBlockedExternal: 'Внешняя блокировка', mcpBlocker: 'Блокировка', actionLabels: { view: 'Просмотреть', manual_setup: 'Ручная настройка' }, noticeLabels: { 'No provider connection is configured.': 'Подключение к провайдеру не настроено.' } },
 }
 
 function normalizeLocale(value: string): Locale {
@@ -111,6 +133,18 @@ export default function ProviderHubStatusDashboard({ endpoint, title }: { endpoi
         </div>
         {surface.connection && Object.keys(surface.connection.authentication.maskedFields).length > 0 ? <div style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 20 }}><h2 style={{ marginTop: 0 }}>{text.fields}</h2><ul>{Object.entries(surface.connection.authentication.maskedFields).map(([name, status]) => <li key={name}>{name}: {status}</li>)}</ul></div> : null}
         <div style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 20 }}><h2 style={{ marginTop: 0 }}>{text.actions}</h2><ul>{surface.allowedActions.map(action => <li key={action}>{actionLabel(action)}</li>)}</ul>{surface.notices.length > 0 ? <><h3>{text.notices}</h3><ul>{surface.notices.map(notice => <li key={notice}>{noticeLabel(notice)}</li>)}</ul></> : null}</div>
+        {surface.universalMcp ? <div style={{ border: '1px solid #d1d5db', borderRadius: 12, padding: 20 }}>
+          <h2 style={{ marginTop: 0 }}>{text.mcpSection}</h2>
+          <p>{text.mcpSummary}: {surface.universalMcp.certifiedProviders}/{surface.universalMcp.requiredProviders}</p>
+          <p>{text.mcpProductionReady}: {surface.universalMcp.productionReady ? text.yes : text.no}</p>
+          <ul>
+            {surface.universalMcp.providers.map(provider => <li key={provider.providerId}>
+              <strong>{provider.providerId}</strong>: {provider.state === 'certified' ? text.mcpCertified : text.mcpBlockedExternal}
+              {' · '}{new Date(provider.observedAt).toLocaleString(locale)}
+              {provider.blocker ? <> · {text.mcpBlocker}: {humanize(provider.blocker)}</> : null}
+            </li>)}
+          </ul>
+        </div> : null}
       </section> : null}
     </main>
   )

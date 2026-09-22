@@ -19,11 +19,11 @@ permissions:
 
 concurrency:
   group: actions-backlog-self-heal
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   cleanup:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 15
     steps:
       - name: Check out cleanup logic

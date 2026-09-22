@@ -9,18 +9,12 @@ on:
       - 'saas/lib/ai/cos/textTransformationInput.ts'
       - 'saas/tests/cosTextTransformationQuality.node.test.ts'
       - '.github/workflows/cos-text-transformation-quality.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'saas/lib/ai/cos/directTextTransformation.ts'
-      - 'saas/lib/ai/cos/communicationNeuralReasoning.ts'
-      - 'saas/lib/ai/cos/textTransformationQuality.ts'
-      - 'saas/lib/ai/cos/textTransformationInput.ts'
-      - 'saas/tests/cosTextTransformationQuality.node.test.ts'
-      - '.github/workflows/cos-text-transformation-quality.yml'
-
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   writing-quality:

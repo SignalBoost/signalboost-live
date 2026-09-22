@@ -1,5 +1,5 @@
 import type { BuilderMcpReadCapability, BuilderMcpReadPort } from './contracts.ts'
-import { createUniversalMcpGateway } from '../../provider-hub-host/universal-mcp-gateway.ts'
+import { createUniversalMcpGateway, type UniversalMcpFigmaAuthorization } from '../../provider-hub-host/universal-mcp-gateway.ts'
 import {
   UNIVERSAL_MCP_PROFILES,
   type UniversalMcpProfileId,
@@ -48,6 +48,7 @@ export function createBuilderMcpReadPort(input: {
   environmentId: string
   ownerAuthorized: boolean
   env?: Environment
+  figmaAuthorization?: UniversalMcpFigmaAuthorization
 }): BuilderMcpReadPort {
   const gateway = createUniversalMcpGateway({
     tenantId: input.tenantId,
@@ -58,6 +59,7 @@ export function createBuilderMcpReadPort(input: {
       roles: input.ownerAuthorized ? ['owner'] : [],
     },
     env: input.env,
+    figmaAuthorization: input.figmaAuthorization,
   })
   const catalog = allowedCatalog(input.ownerAuthorized)
   const configured = new Set(

@@ -1,2 +1,2 @@
-base_sha=a7070ad43511582e9b10b8a3b79e7df228756a84
-branch=fix/saas-ci-scoped-fanout-20260922
+base_sha=20bfc33117269673e32b5a612657b3d90e273425
+branch=fix/figma-mcp-oauth-architecture-20260922

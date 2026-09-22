@@ -35,8 +35,10 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_MCP_PROJECT_REF: qpblefwtnbivuusxmabv
       CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
-      FIGMA_MCP_OAUTH_ACCESS_TOKEN: ${{ secrets.FIGMA_MCP_OAUTH_ACCESS_TOKEN }}
       VERCEL_MCP_OAUTH_ACCESS_TOKEN: ${{ secrets.VERCEL_MCP_OAUTH_ACCESS_TOKEN }}
+      # Figma intentionally has no static token secret: its remote MCP requires per-user OAuth
+      # and currently accepts only clients in Figma's MCP Catalog. iTMounts remains fail-closed
+      # until provider client approval and a host-owned OAuth connection are available.
       # Target identifiers are public routing context, not credentials.
       VERCEL_MCP_TEAM_SLUG: luis-de-andrades-projects-b2fd8ade
       VERCEL_MCP_PROJECT_SLUG: signalboost-live
@@ -52,7 +54,7 @@ jobs:
         shell: bash
         run: |
           missing=0
-          for name in SUPABASE_ACCESS_TOKEN FIGMA_MCP_OAUTH_ACCESS_TOKEN VERCEL_MCP_OAUTH_ACCESS_TOKEN; do
+          for name in SUPABASE_ACCESS_TOKEN VERCEL_MCP_OAUTH_ACCESS_TOKEN; do
             if [ -z "${!name}" ]; then
               echo "::error::${name} repository secret is required for full Universal MCP live acceptance."
               missing=1

@@ -12,7 +12,7 @@ export interface McpStreamableHttpProfile {
   readonly transportRef: string
   readonly endpoint: string
   readonly protocolVersion: string
-  readonly authorization?: (scope: McpOutboundScope) => string | null
+  readonly authorization?: (scope: McpOutboundScope) => string | null | Promise<string | null>
   readonly headers?: Readonly<Record<string, string>>
   readonly maxResponseBytes?: number
 }
@@ -112,7 +112,7 @@ export function createMcpStreamableHttpTransportFactory(input: {
       let sessionId: string | null = null
       let closed = false
 
-      const headers = (): Record<string, string> => {
+      const headers = async (): Promise<Record<string, string>> => {
         const resolved: Record<string, string> = {
           Accept: 'application/json, text/event-stream',
           'Content-Type': 'application/json',
@@ -120,7 +120,8 @@ export function createMcpStreamableHttpTransportFactory(input: {
           ...profile.headers,
         }
         if (sessionId) resolved['Mcp-Session-Id'] = sessionId
-        const authorization = profile.authorization?.(scope)
+        const authorization = await profile.authorization?.(scope)
+        if (profile.authorization && !authorization) throw new Error('mcp_http_authorization_required')
         if (authorization) resolved.Authorization = required(authorization, 'authorization')
         return resolved
       }
@@ -139,7 +140,7 @@ export function createMcpStreamableHttpTransportFactory(input: {
         try {
           const response = await fetcher(profile.endpoint, {
             method: 'POST',
-            headers: headers(),
+            headers: await headers(),
             body: JSON.stringify(call.request),
             redirect: 'error',
             cache: 'no-store',
@@ -171,7 +172,7 @@ export function createMcpStreamableHttpTransportFactory(input: {
           try {
             await fetcher(profile.endpoint, {
               method: 'DELETE',
-              headers: headers(),
+              headers: await headers(),
               redirect: 'error',
               cache: 'no-store',
             })

@@ -68,7 +68,7 @@ test('gateway readiness is honest: Context7 works anonymously while credentialed
       ['github-mcp', false, 'missing_credential'],
       ['supabase-mcp', false, 'missing_credential'],
       ['context7-mcp', true, 'ready'],
-      ['figma-mcp', false, 'missing_credential'],
+      ['figma-mcp', false, 'provider_client_approval_required'],
       ['vercel-mcp', false, 'missing_credential'],
     ],
   )
@@ -240,7 +240,13 @@ test('durable MCP audit schema never persists tool arguments, results or credent
 })
 
 
-test('Figma remains fail-closed without a host-owned OAuth access token', async () => {
+test('Universal MCP live acceptance never requests a static Figma access-token secret', async () => {
+  const workflow = await readFile(new URL('../../.github/workflows/universal-mcp-live-acceptance.yml', import.meta.url), 'utf8')
+  assert.doesNotMatch(workflow, /FIGMA_MCP_OAUTH_ACCESS_TOKEN/)
+  assert.match(workflow, /Figma intentionally has no static token secret/)
+})
+
+test('Figma remains fail-closed until the custom MCP client is approved and connected', async () => {
   const gateway = createUniversalMcpGateway({
     tenantId: 'tenant-a',
     environmentId: 'test',
@@ -259,12 +265,32 @@ test('Figma remains fail-closed without a host-owned OAuth access token', async 
   assert.equal(result.mode, 'mcp_provider_not_configured')
 })
 
-test('Figma OAuth bearer enables only the governed Figma capability projection', async () => {
+test('legacy static Figma token environment variables do not enable the provider', async () => {
   const gateway = createUniversalMcpGateway({
     tenantId: 'tenant-a',
     environmentId: 'test',
     portableId: 'builder',
-    env: { FIGMA_MCP_OAUTH_ACCESS_TOKEN: 'oauth-access-token' },
+    env: { FIGMA_MCP_OAUTH_ACCESS_TOKEN: 'legacy-static-token-must-be-ignored' },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const figma = gateway.readiness.find(item => item.providerId === 'figma-mcp')
+  assert.equal(figma?.configured, false)
+  assert.equal(figma?.reason, 'provider_client_approval_required')
+  assert.deepEqual(await gateway.discover('figma-mcp'), [])
+})
+
+test('approved host-owned Figma authorization exposes only the governed capability projection', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {},
+    figmaAuthorization: {
+      clientApproved: true,
+      connected: true,
+      async getAccessToken() { return 'oauth-access-token' },
+    },
     fetcher: fakeMcpFetch([]),
     audit: { async append() {} },
   })
@@ -275,6 +301,25 @@ test('Figma OAuth bearer enables only the governed Figma capability projection',
   )
 })
 
+test('approved Figma client without a user connection remains fail-closed', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {},
+    figmaAuthorization: {
+      clientApproved: true,
+      connected: false,
+      async getAccessToken() { return null },
+    },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const figma = gateway.readiness.find(item => item.providerId === 'figma-mcp')
+  assert.equal(figma?.configured, false)
+  assert.equal(figma?.reason, 'authorization_required')
+  assert.deepEqual(await gateway.discover('figma-mcp'), [])
+})
 
 test('Vercel remains fail-closed without host-owned OAuth and exact project target', async () => {
   const gateway = createUniversalMcpGateway({

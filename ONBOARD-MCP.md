@@ -135,7 +135,7 @@ The shared MCP certification framework now covers all three implemented Universa
 - Context7 certification requires the exact two governed documentation capabilities and a real library resolution call.
 - GitHub, Supabase, and Context7 produce the same metadata-only certification report shape.
 - A missing Supabase credential remains a hard failure for live acceptance; it is not converted into a skip.
-- Figma is part of the required Universal MCP Production set. Its official remote endpoint is `https://mcp.figma.com/mcp`; Production enablement remains fail-closed until host-owned Figma OAuth authorization is present and live certification passes.
+- Figma is part of the required Universal MCP Production set. Its official remote endpoint is `https://mcp.figma.com/mcp`. As of 2026-09-22, Figma documents that only clients in the Figma MCP Catalog can connect; a new custom MCP client must obtain provider approval first. iTMounts therefore reports `provider_client_approval_required` and stays fail-closed. A legacy/static `FIGMA_MCP_OAUTH_ACCESS_TOKEN` must not enable the provider. The HTTP transport accepts an async host-owned authorization resolver so, after Figma approves iTMounts, the authenticated user's OAuth connection can be resolved/refreshed from the server-side encrypted vault rather than copied into Vercel or GitHub secrets.
 
 
 ## Vercel provider certification — 2026-09-21

@@ -8,7 +8,7 @@ import {
   createMcpConnectionRegistryResolver,
   type McpRegistryTransportFactory,
 } from './mcp-connection-registry.ts'
-import type { McpOutboundTransportInput } from './mcp-outbound-client.ts'
+import type { McpOutboundScope, McpOutboundTransportInput } from './mcp-outbound-client.ts'
 import {
   createMcpStreamableHttpTransportFactory,
   type McpStreamableHttpProfile,
@@ -35,9 +35,15 @@ export interface UniversalMcpProviderReadiness {
   providerId: UniversalMcpProfileId
   displayName: string
   configured: boolean
-  reason: 'ready' | 'missing_credential' | 'missing_project_ref' | 'missing_target'
+  reason: 'ready' | 'missing_credential' | 'missing_project_ref' | 'missing_target' | 'provider_client_approval_required' | 'authorization_required'
   authentication: 'bearer' | 'anonymous'
   target: string
+}
+
+export interface UniversalMcpFigmaAuthorization {
+  readonly clientApproved: boolean
+  readonly connected: boolean
+  readonly getAccessToken: (scope: McpOutboundScope) => Promise<string | null>
 }
 
 export interface UniversalMcpGatewayOptions {
@@ -49,6 +55,7 @@ export interface UniversalMcpGatewayOptions {
   fetcher?: typeof fetch
   audit?: PortableConnectorAuditPort
   allowedGitHubRepos?: readonly string[]
+  figmaAuthorization?: UniversalMcpFigmaAuthorization
 }
 
 function required(value: unknown, name: string): string {
@@ -94,7 +101,11 @@ function profileFor(id: UniversalMcpProfileId): UniversalMcpServerProfile {
   return profile
 }
 
-function readinessFor(env: Environment, allowedRepos: readonly string[]): readonly UniversalMcpProviderReadiness[] {
+function readinessFor(
+  env: Environment,
+  allowedRepos: readonly string[],
+  figmaAuthorization?: UniversalMcpFigmaAuthorization,
+): readonly UniversalMcpProviderReadiness[] {
   const gitToken = githubToken(env)
   const sbToken = String(env.SUPABASE_ACCESS_TOKEN || '').trim()
   const sbRef = supabaseProjectRef(env)
@@ -130,8 +141,12 @@ function readinessFor(env: Environment, allowedRepos: readonly string[]): readon
     Object.freeze({
       providerId: 'figma-mcp' as const,
       displayName: FIGMA_MCP_PROFILE.displayName,
-      configured: Boolean(String(env.FIGMA_MCP_OAUTH_ACCESS_TOKEN || '').trim()),
-      reason: String(env.FIGMA_MCP_OAUTH_ACCESS_TOKEN || '').trim() ? 'ready' as const : 'missing_credential' as const,
+      configured: figmaAuthorization?.clientApproved === true && figmaAuthorization.connected === true,
+      reason: figmaAuthorization?.clientApproved !== true
+        ? 'provider_client_approval_required' as const
+        : figmaAuthorization?.connected !== true
+          ? 'authorization_required' as const
+          : 'ready' as const,
       authentication: 'bearer' as const,
       target: 'figma-account',
     }),
@@ -148,7 +163,11 @@ function readinessFor(env: Environment, allowedRepos: readonly string[]): readon
   ])
 }
 
-function httpProfiles(env: Environment, ready: readonly UniversalMcpProviderReadiness[]): readonly McpStreamableHttpProfile[] {
+function httpProfiles(
+  env: Environment,
+  ready: readonly UniversalMcpProviderReadiness[],
+  figmaAuthorization?: UniversalMcpFigmaAuthorization,
+): readonly McpStreamableHttpProfile[] {
   const profiles: McpStreamableHttpProfile[] = []
   const gitToken = githubToken(env)
   const gitReady = ready.find(item => item.providerId === 'github-mcp')?.configured === true
@@ -191,14 +210,17 @@ function httpProfiles(env: Environment, ready: readonly UniversalMcpProviderRead
     ...(ctxToken ? { authorization: () => `Bearer ${ctxToken}` } : {}),
   }))
 
-  const figmaToken = String(env.FIGMA_MCP_OAUTH_ACCESS_TOKEN || '').trim()
-  if (figmaToken) {
+  const figmaReady = ready.find(item => item.providerId === 'figma-mcp')?.configured === true
+  if (figmaReady && figmaAuthorization) {
     profiles.push(Object.freeze({
       serverId: FIGMA_MCP_PROFILE.serverId,
       transportRef: FIGMA_MCP_PROFILE.transportRef,
       endpoint: 'https://mcp.figma.com/mcp',
       protocolVersion: FIGMA_MCP_PROFILE.protocolVersion,
-      authorization: () => `Bearer ${figmaToken}`,
+      authorization: async scope => {
+        const token = String(await figmaAuthorization.getAccessToken(scope) || '').trim()
+        return token ? `Bearer ${token}` : null
+      },
     }))
   }
 
@@ -299,7 +321,7 @@ export function createUniversalMcpGateway(options: UniversalMcpGatewayOptions) {
   const portableId = required(options.portableId, 'portableId')
   const env: Environment = options.env ?? process.env
   const allowedRepos = githubRepos(env, options.allowedGitHubRepos)
-  const readiness = readinessFor(env, allowedRepos)
+  const readiness = readinessFor(env, allowedRepos, options.figmaAuthorization)
   const enabledProfiles = readiness.filter(item => item.configured).map(item => item.providerId)
   const registry = createInMemoryMcpConnectionRegistry(createUniversalMcpRegistryEntries({
     tenantId,
@@ -308,7 +330,7 @@ export function createUniversalMcpGateway(options: UniversalMcpGatewayOptions) {
     enabledProfiles,
   }))
   const http = createMcpStreamableHttpTransportFactory({
-    profiles: httpProfiles(env, readiness),
+    profiles: httpProfiles(env, readiness, options.figmaAuthorization),
     fetcher: options.fetcher,
   })
   const resolver = createMcpConnectionRegistryResolver({

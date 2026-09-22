@@ -240,6 +240,12 @@ test('durable MCP audit schema never persists tool arguments, results or credent
 })
 
 
+test('Universal MCP live acceptance never requests a static Figma access-token secret', async () => {
+  const workflow = await readFile(new URL('../../.github/workflows/universal-mcp-live-acceptance.yml', import.meta.url), 'utf8')
+  assert.doesNotMatch(workflow, /FIGMA_MCP_OAUTH_ACCESS_TOKEN/)
+  assert.match(workflow, /Figma intentionally has no static token secret/)
+})
+
 test('Figma remains fail-closed until the custom MCP client is approved and connected', async () => {
   const gateway = createUniversalMcpGateway({
     tenantId: 'tenant-a',

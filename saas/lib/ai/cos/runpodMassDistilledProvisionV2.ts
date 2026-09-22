@@ -56,6 +56,7 @@ type Endpoint = {
   workers?: { min?: number; max?: number; idleTimeout?: number }
   gpu?: { pools?: string[]; count?: number }
 }
+type RestEndpointIdentity = { id?: string; name?: string }
 
 const clean = (value: unknown, max = 1000) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 
@@ -153,10 +154,29 @@ async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
   return retired.length
 }
 
-async function constrainEndpointToApprovedGpu(endpointId: string) {
-  const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
-  let endpoint = (listed.endpoints || []).find(item => clean(item.id, 160) === endpointId)
-  if (!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
+async function resolveEndpointControlPlane(endpointId: string, endpointName = ''): Promise<Endpoint> {
+  let observedId = clean(endpointId, 160)
+  const observedName = clean(endpointName, 240)
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+    const endpoint = (listed.endpoints || []).find(item =>
+      (observedId && clean(item.id, 160) === observedId)
+      || (observedName && clean(item.name, 240) === observedName))
+    if (endpoint?.id) return endpoint
+
+    if (observedName) {
+      const official = await requestV1<RestEndpointIdentity[]>('/endpoints')
+      const identity = official.find(item =>
+        clean(item.name, 240) === observedName && clean(item.id, 160))
+      if (identity?.id) observedId = clean(identity.id, 160)
+    }
+    if (attempt < 4) await new Promise(resolve => setTimeout(resolve, 750 * (attempt + 1)))
+  }
+  throw new Error('mass_distilled_runtime_endpoint_id_missing')
+}
+
+async function constrainEndpointToApprovedGpu(endpointId: string, endpointName = '') {
+  let endpoint = await resolveEndpointControlPlane(endpointId, endpointName)
   assertNonGpuEndpointSafetyPolicy(endpoint)
   const currentPools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
   if (!currentPools.includes(APPROVED_POOLS[0])) throw new Error('mass_distilled_runtime_24gb_pool_unavailable')
@@ -251,10 +271,8 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
   const template = templates.find(item => clean(item.name, 240) === ids.templateName && item.isServerless !== false)
   if (!template?.id) throw new Error('mass_distilled_runtime_template_id_missing')
 
-  const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
-  let endpoint = (listed.endpoints || []).find(item => clean(item.name, 240) === ids.endpointName)
-  if (!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
-  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id))
+  let endpoint = await resolveEndpointControlPlane('', ids.endpointName)
+  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName)
 
   if (materializedEndpointMatches(endpoint, input, ids.modelName)) {
     return Object.freeze({ endpoint, ...ids, reboundTemplate: false })
@@ -265,7 +283,7 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
     body: JSON.stringify({ templateId: template.id }),
   })
   if (!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_template_rebind_missing')
-  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id))
+  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName)
   assertMaterializedEndpointIdentity(endpoint, input, ids.modelName)
   return Object.freeze({ endpoint, ...ids, reboundTemplate: true })
 }
@@ -278,7 +296,7 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
   try {
     const provisioned = await provisionLegacyMassDistilledRuntime(input)
     const endpoint = await restoreRetiredEndpointCapacity(
-      await constrainEndpointToApprovedGpu(String(provisioned.endpointId)),
+      await constrainEndpointToApprovedGpu(String(provisioned.endpointId), String(provisioned.endpointName || '')),
     )
     return Object.freeze({
       ...provisioned,

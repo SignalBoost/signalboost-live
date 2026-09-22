@@ -65,6 +65,15 @@ test('mass-distilled canary waits safely when account-wide RunPod worker quota i
   assert.doesNotMatch(route, /runpod_worker_quota_full[\s\S]{0,300}status:500/)
 })
 
+test('v2 compatibility recovery tolerates delayed endpoint visibility by exact governed name', () => {
+  assert.match(provisionV2, /resolveEndpointControlPlane/)
+  assert.match(provisionV2, /requestV1<RestEndpointIdentity\[\]>\('\/endpoints'\)/)
+  assert.match(provisionV2, /clean\(item\.name, 240\) === observedName/)
+  assert.match(provisionV2, /for \(let attempt = 0; attempt < 5; attempt \+= 1\)/)
+  assert.match(provisionV2, /constrainEndpointToApprovedGpu\(String\(provisioned\.endpointId\), String\(provisioned\.endpointName \|\| ''\)\)/)
+  assert.match(provisionV2, /resolveEndpointControlPlane\('', ids\.endpointName\)/)
+})
+
 test('mass-distilled provisioning recovers an omitted v2 endpoint id from the official REST endpoint list', () => {
   assert.match(provision, /requestV1<RestEndpointIdentity\[\]>\('\/endpoints'\)/)
   assert.match(provision, /clean\(item\.name,240\)===endpointName/)

@@ -44,18 +44,27 @@ test('Builder final evaluation is blocked until formal Residency completes', () 
   assert.deepEqual(finalEvaluationResidencyGate({
     subjectId: 'Computer Science & Coding',
     standing: 'senior_resident',
+    gateEnforced: true,
   }), {
     required: true,
+    enforced: true,
     allowed: false,
     reason: 'formal_residency_not_complete',
   })
   assert.equal(finalEvaluationResidencyGate({
     subjectId: 'Computer Science & Coding',
     standing: 'residency_complete',
+    gateEnforced: true,
   }).allowed, true)
   assert.equal(finalEvaluationResidencyGate({
     subjectId: 'Mathematics',
     standing: null,
+    gateEnforced: true,
+  }).allowed, true)
+  assert.equal(finalEvaluationResidencyGate({
+    subjectId: 'Computer Science & Coding',
+    standing: 'resident',
+    gateEnforced: false,
   }).allowed, true)
 })
 

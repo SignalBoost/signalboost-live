@@ -7,13 +7,13 @@ import { join } from 'node:path'
 const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
 const localSynthesis = readFileSync(join(process.cwd(), 'lib/ai/cos/freshEvidenceLocalSynthesis.ts'), 'utf8')
 
-test('travel planning bypasses the single-claim freshness contract and goes directly to grounded task completion', () => {
+test('travel planning tries grounded task completion first, then retains shared fresh synthesis as recovery', () => {
   const travelClassify = route.indexOf('const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)')
   const travelGrounded = route.indexOf('if(!requestedAction&&liveTravelTask)')
-  const strictFresh = route.indexOf('if(!requestedAction&&!liveTravelTask)')
+  const sharedFresh = route.indexOf('if(!requestedAction){', travelGrounded)
   assert.ok(travelClassify > 0)
   assert.ok(travelGrounded > travelClassify)
-  assert.ok(strictFresh > travelGrounded)
+  assert.ok(sharedFresh > travelGrounded)
   assert.match(route, /source:'cos-fresh-grounded-task'/)
 })
 

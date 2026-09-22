@@ -42,3 +42,9 @@ test('solo finish=stop plain text with no markers is recovered but only on the o
   assert.match(source, /recoverStoppedSoloPlainAnswer/)
   assert.match(source, /cases\.length===1 \? recoverStoppedSoloPlainAnswer\(text,finish\) : null/)
 })
+
+
+test('solo finish=stop with one foreign or malformed opener and the correct terminal closer is recovered only on the solo path', () => {
+  assert.match(source, /recoverStoppedSoloForeignOpenCorrectCloseAnswer/)
+  assert.match(source, /cases\.length===1 \? recoverStoppedSoloForeignOpenCorrectCloseAnswer\(text,item\.id,finish\) : null/)
+})

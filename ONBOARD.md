@@ -2,6 +2,54 @@
 
 # iTMounts Engineering Blueprint
 
+## COS University Residency invariant — 2026-09-22
+
+The University includes a governed **Residency** stage: practical supervised work analogous to a medical residency. The harness is the infrastructure that runs realistic cases; Residency is the educational program. It applies to every specialist and eventually COS.
+
+Canonical lifecycle:
+
+```text
+curriculum -> frontier faculty / distillation -> immutable trained artifact
+-> exact-artifact RunPod canary + rollback proof
+-> independent holdout / safety / unseen-transfer / delayed-retention evaluation
+-> Residency (sandboxed supervised practical work)
+-> durable competency evidence
+-> graduate registry / separately governed activation
+-> verified Production outcomes
+-> continuing education / remediation / recertification
+```
+
+Residency **adds evidence; it never replaces or weakens an existing gate**. Exact-artifact identity, independent evaluator separation, delayed retention, rollback, Referee authority, spend ceilings, Production-traffic prohibition before promotion, and fail-closed behavior remain controlling. Residency cannot mint approvals, promote itself, widen authority, substitute an arbitrary endpoint/artifact, or convert task success into Production authorization. Referee/Guardian remain the authority boundary.
+
+Resident progression is competency-based, not task-count based: `student -> candidate -> resident -> senior_resident -> graduate_specialist -> active_specialist`. Repetition of an already-proven task does not manufacture a new competency. Evidence should distinguish at least `unproven`, `supervised`, `demonstrated`, `retained`, and `remediation_required`.
+
+A residency case exercises the **whole agent trajectory**, not only final prose: objective interpretation, plan, MCP/tool selection, bounded tool calls, observation grounding, diagnosis, correction after failed attempts, verification, rollback/escalation judgment, collaboration with other specialists, cost/latency awareness, and authority compliance. Cases should include unfamiliar variants and controlled failures. Residents operate in restricted manifests/sandboxes: e.g. branch but not merge, sandbox deploy but not Production deploy, synthetic/sanitized data rather than unrestricted Production data.
+
+Residency failures feed targeted remediation. The system records the failed competency/pattern, produces sanitized general practice material without copying private Production data, hidden exams, evaluator outputs, secrets, raw chats, or candidate identities, then sends that material through the existing governed curriculum/distillation path. A new immutable artifact must pass the unchanged canary and independent evaluation gates before Residency replays the original skill class using unseen variants. Residency success cannot hide a holdout, safety, transfer, retention, exact-canary, rollback, or served-identity failure.
+
+Residency also trains the **organization**. Cases may require a resident to recognize that another specialist is needed, delegate through governed MCP/capability boundaries, reconcile results, and escalate when evidence or authority is insufficient. COS Residency should eventually test delegation, monitoring, conflict reconciliation, and final accountable synthesis across specialists.
+
+### First Residency program: Computer Science / Builder
+
+Builder is the first implementation because practical outcomes are independently observable and it is the next high-value specialist lane. Initial cases should cover GitHub repository navigation/root-cause analysis, TypeScript/Next.js repair, Vercel deployment diagnosis/recovery, Supabase diagnosis, Playwright/browser verification, Chrome DevTools evidence, test/regression construction, rollback, MCP selection/recovery, security/authority boundaries, and recovery from an initially wrong diagnosis. The first release should start small (roughly 20-30 high-quality case families with hidden variants) and expand by measured competency gaps, not by raw volume.
+
+A qualifying Computer Science artifact still must clear the existing University gates. Residency does not shortcut Builder apprenticeship; it makes apprenticeship evidence practical, durable, and competency-specific. Production outcomes from an activated graduate may later become sanitized verified case inputs for continuing education.
+
+### University recovery/status handoff — 2026-09-22
+
+Recent recovery established the following engineering state and lessons:
+
+- Mass distillation is a continuously replenished governed pipeline; curriculum normalization/packaging, multi-provider faculty, HF training, artifact registration, provider circuits, bounded retry and Self-Healing progress recovery were repaired without weakening curriculum/evaluation rules.
+- Hugging Face training failures were traced to private repository storage exhaustion after successful training; storage was upgraded and successful callbacks again register immutable artifacts as `evaluation_pending`. Training completion never means graduation.
+- Self-Healing gained provider failure classification/circuit breaking and a universal supervised-provider contract so deterministic billing/capacity/auth/config failures do not create paid retry storms while transient failures remain bounded.
+- The independent mass evaluator is operational and preserves unchanged holdout, safety, unseen-transfer and delayed-retention gates. Recent quarantines are model-quality evidence, not evaluator failure.
+- Failure-derived remediation was strengthened, including a bounded frontier response-anchor followed by stable on-policy distillation and a three-epoch remediation replay where governed by the current recipe. Evaluator thresholds must never be lowered to make a model pass.
+- Exact-artifact RunPod canary infrastructure remains the active infrastructure repair track. Repairs added endpoint recovery, bounded capacity recovery, safe AMPERE_24/GPU1/min0/max1/idle<=180 policy, rolling spend accounting based on real invocations/reservations, worker headroom, cold-start/readiness recovery, exact base revision caching, and bound-template lookup. Failures with `providerInvocationStarted:false` are control-plane/provisioning failures, not paid inference or model-quality results.
+- Safe RunPod template-identity diagnostics were added after Production continued to report `mass_distilled_runtime_template_id_missing`; use concrete provider response shape to repair identity rather than bypass exact binding or add speculative retries.
+- A containerized exact-artifact canary worker/gateway is the next controlled runtime direction. Its image/build path must remain exact-artifact bound and must not expand canary, spend, promotion, or Production authority.
+- Healthy distillation should not be disturbed while canary infrastructure and model quality are repaired in parallel. The near-term milestone is another legitimately improved graduate; the Computer Science graduate then enters the Builder Residency/apprenticeship path.
+
+
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

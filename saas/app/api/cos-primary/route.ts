@@ -255,7 +255,7 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
     jsonObject:true,
     disableThinking:true,
     timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS,
-    allowConfiguredFallback:false,
+    allowConfiguredFallback:true,
     usageContext:{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'},
     systemPrompt:[
       'You are COS. Live web sources were retrieved this turn for the user request below. /no_think',
@@ -578,10 +578,11 @@ export async function postCosPrimary(req:NextRequest){
         await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
         return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
       }
-      logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,fallthrough:'shared_local_synthesizer'})
+      freshLocalFailureCode='local_synthesis_failed'
+      logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,fallthrough:null})
     }
 
-    if(!requestedAction){
+    if(!requestedAction&&!liveTravelTask){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
       const localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})

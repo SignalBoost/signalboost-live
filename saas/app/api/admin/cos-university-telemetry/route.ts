@@ -329,10 +329,13 @@ export async function GET() {
       let claimability = 'not_evaluation_pending'
       if (artifact.status === 'evaluation_pending') {
         if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
+        // Rolling authority deliberately refuses to mint an evaluation approval until the exact-artifact
+        // Production canary exists. Report that upstream prerequisite first; otherwise every canary-less
+        // artifact is misleadingly labelled "missing approval" even though approval issuance is correctly blocked.
+        else if (!canary) claimability = 'missing_exact_canary'
         else if (!approval) claimability = 'missing_approval'
         else if (approval.evidence?.claim !== 'distilled_independent_evaluation_approved') claimability = 'approval_suspended'
         else if (!approvalExpiresMs || approvalExpiresMs <= nowMs) claimability = 'approval_expired'
-        else if (!canary) claimability = 'missing_exact_canary'
         else if (started && !terminal && Date.parse(String(started.observed_at || '')) > nowMs - 12 * 60 * 1000) claimability = 'active_reservation'
         else if (terminal?.evidence?.claim === 'mass_distilled_independent_evaluation_failed') claimability = 'evaluator_failed'
         else claimability = 'claimable'

@@ -2,6 +2,45 @@
 
 # iTMounts Engineering Blueprint
 
+## iTMounts Platform Harness invariant — 2026-09-22
+
+The **Platform Harness** is a first-class iTMounts platform layer shared by COS, specialists, Builder, University Residency, Self-Healing, security exercises, replay, sandbox work, Production work, and independent evaluation runtime. It is not subordinate to University and it is not a replacement governance engine.
+
+Canonical architecture:
+
+```text
+iTMounts Platform
+-> Platform Harness
+-> exact identity + trusted authority + controlled environment
+-> HarnessRun
+-> COS / specialist
+-> capability resolver
+-> Agent Gateway Governed Socket
+-> controlled execution
+-> observable trajectory
+-> independent outcome verification
+-> strict failure routing
+-> durable evidence
+```
+
+Canonical profiles are: `residency`, `production`, `sandbox`, `self_healing`, `security_lab`, `replay`, and `evaluation_runtime`. They share one execution architecture. A profile may **reduce** capability, environment, budget, time, or learning behavior, but it may never create or widen authority.
+
+The executable manifest is the intersection of **requested work + profile constraints + an already-verified Referee/Guardian/host authority envelope**. Every executable action still passes through `agent-gateway/runGoverned()`; the harness cannot mint approval, route around a halt, widen Production scope, grant spend, promote a model, or convert task success into authority.
+
+Ownership stays separated:
+
+- infrastructure/environment/provider/tool failure -> **Self-Healing**;
+- observable agent competency failure with infrastructure available -> **University remediation**;
+- authority/approval boundary -> **Referee/Guardian**;
+- independently verified success -> **durable evidence**;
+- ambiguous attribution -> **Harness assurance/operator review**, never automatic blame or repair.
+
+Trajectory evidence contains observable actions, observations, tool outcomes, verification, cost/latency/failure references, rollback and escalation evidence. **Private chain-of-thought, scratchpads, hidden reasoning, and internal monologue must never be persisted.**
+
+University Residency is the educational use of this shared platform world. Residency may feed sanitized competency evidence into University, but it does not own the harness. The `evaluation_runtime` profile supplies a controlled execution environment only; hidden exam material, evaluator logic, graduation decisions, and the teaching/remediation boundary remain independently owned.
+
+See `docs/PLATFORM-HARNESS.md` and `saas/platform-harness/`.
+
 ## COS University Residency invariant — 2026-09-22
 
 The University includes a governed **Residency** stage: practical supervised work analogous to a medical residency. The harness is the infrastructure that runs realistic cases; Residency is the educational program. It applies to every specialist and eventually COS.

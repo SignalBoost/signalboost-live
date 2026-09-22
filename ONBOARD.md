@@ -2,38 +2,75 @@
 
 # iTMounts Engineering Blueprint
 
-## COS University Residency invariant — 2026-09-22
+## COS University Residency / practical-education harness invariant — 2026-09-22
 
-The University includes a governed **Residency** stage: practical supervised work analogous to a medical residency. The harness is the infrastructure that runs realistic cases; Residency is the educational program. It applies to every specialist and eventually COS.
+**Residency is the practical harness inside formal University education. It is not a post-graduation gate and it is not a separate evaluator.** Every specialist, and eventually COS, receives both academic/theoretical education and supervised practical education before graduation.
 
-Canonical lifecycle:
+Canonical educational lifecycle:
 
 ```text
-curriculum -> frontier faculty / distillation -> immutable trained artifact
+governed curriculum
+-> classroom / frontier faculty / distillation
+-> immutable trained artifact
+-> Residency harness: supervised practical cases in restricted sandboxes
+-> competency evidence + targeted remediation / retraining
+-> Residency replay with unseen variants
 -> exact-artifact RunPod canary + rollback proof
--> independent holdout / safety / unseen-transfer / delayed-retention evaluation
--> Residency (sandboxed supervised practical work)
--> durable competency evidence
--> graduate registry / separately governed activation
--> verified Production outcomes
+-> independent final examinations: holdout / safety / unseen-transfer / delayed-retention
+-> graduation / graduate registry
+-> separately governed activation
+-> verified Production practice
 -> continuing education / remediation / recertification
 ```
 
-Residency **adds evidence; it never replaces or weakens an existing gate**. Exact-artifact identity, independent evaluator separation, delayed retention, rollback, Referee authority, spend ceilings, Production-traffic prohibition before promotion, and fail-closed behavior remain controlling. Residency cannot mint approvals, promote itself, widen authority, substitute an arbitrary endpoint/artifact, or convert task success into Production authorization. Referee/Guardian remain the authority boundary.
+The distinction is mandatory: **Residency teaches; the independent evaluator examines.** Residency may expose weaknesses, coach through realistic practice, create sanitized failure-derived curriculum, and trigger another governed training cycle. It must never reveal/reconstruct hidden examination material or train against evaluator outputs. Final examination remains independent and unchanged.
 
-Resident progression is competency-based, not task-count based: `student -> candidate -> resident -> senior_resident -> graduate_specialist -> active_specialist`. Repetition of an already-proven task does not manufacture a new competency. Evidence should distinguish at least `unproven`, `supervised`, `demonstrated`, `retained`, and `remediation_required`.
+The Residency harness exercises the **whole agent trajectory**, not only final prose: objective interpretation, planning, MCP/tool selection, bounded tool calls, observation grounding, diagnosis, correction after failed attempts, verification, rollback/escalation judgment, collaboration with other specialists, cost/latency awareness, and authority compliance. Cases deliberately include unfamiliar variants, incomplete evidence and controlled failures so practical skill develops through supervised experience.
 
-A residency case exercises the **whole agent trajectory**, not only final prose: objective interpretation, plan, MCP/tool selection, bounded tool calls, observation grounding, diagnosis, correction after failed attempts, verification, rollback/escalation judgment, collaboration with other specialists, cost/latency awareness, and authority compliance. Cases should include unfamiliar variants and controlled failures. Residents operate in restricted manifests/sandboxes: e.g. branch but not merge, sandbox deploy but not Production deploy, synthetic/sanitized data rather than unrestricted Production data.
+Residency is competency-based, not task-count based. Practical evidence uses states such as `unproven`, `supervised`, `demonstrated`, `retained`, and `remediation_required`. Repetition of an already-mastered exercise does not manufacture a new competency. Residency should preferentially assign cases that close demonstrated competency gaps.
 
-Residency failures feed targeted remediation. The system records the failed competency/pattern, produces sanitized general practice material without copying private Production data, hidden exams, evaluator outputs, secrets, raw chats, or candidate identities, then sends that material through the existing governed curriculum/distillation path. A new immutable artifact must pass the unchanged canary and independent evaluation gates before Residency replays the original skill class using unseen variants. Residency success cannot hide a holdout, safety, transfer, retention, exact-canary, rollback, or served-identity failure.
+Residents work only under restricted manifests/sandboxes appropriate to education: e.g. create a branch but not merge it, deploy a sandbox but not Production, use synthetic/sanitized records rather than unrestricted Production data. **Residency adds education and evidence; it never grants operational authority.** Referee/Guardian remain the authority boundary. Residency cannot mint approvals, promote itself, widen authority, substitute an arbitrary artifact/endpoint, authorize Production traffic, or convert successful practice into operational permission.
 
-Residency also trains the **organization**. Cases may require a resident to recognize that another specialist is needed, delegate through governed MCP/capability boundaries, reconcile results, and escalate when evidence or authority is insufficient. COS Residency should eventually test delegation, monitoring, conflict reconciliation, and final accountable synthesis across specialists.
+A Residency failure creates a learning loop:
 
-### First Residency program: Computer Science / Builder
+```text
+practical failure
+-> classify failed competency/pattern
+-> generate sanitized targeted practice/curriculum
+-> governed distillation/retraining
+-> new immutable artifact
+-> supervised Residency on unseen variants
+-> independent final examinations
+```
 
-Builder is the first implementation because practical outcomes are independently observable and it is the next high-value specialist lane. Initial cases should cover GitHub repository navigation/root-cause analysis, TypeScript/Next.js repair, Vercel deployment diagnosis/recovery, Supabase diagnosis, Playwright/browser verification, Chrome DevTools evidence, test/regression construction, rollback, MCP selection/recovery, security/authority boundaries, and recovery from an initially wrong diagnosis. The first release should start small (roughly 20-30 high-quality case families with hidden variants) and expand by measured competency gaps, not by raw volume.
+The remediation generator must not copy private Production data, raw chats, secrets, hidden exams, evaluator output, or candidate identities into retained curriculum. Residency success cannot hide or waive a later holdout, safety, transfer, retention, exact-canary, rollback, served-identity, runtime-health or authority failure.
 
-A qualifying Computer Science artifact still must clear the existing University gates. Residency does not shortcut Builder apprenticeship; it makes apprenticeship evidence practical, durable, and competency-specific. Production outcomes from an activated graduate may later become sanitized verified case inputs for continuing education.
+Residency also educates the **organization**, not only individual agents. Cases may require a resident to recognize that another specialist is needed, delegate through governed MCP/capability boundaries, reconcile results and escalate when evidence or authority is insufficient. COS Residency should eventually exercise executive delegation, monitoring, conflict reconciliation and accountable synthesis across multiple specialists.
+
+### First practical Residency harness: Computer Science / Builder
+
+Builder is the first implementation because practical outcomes are objectively observable and Computer Science is the next high-value specialist lane. Initial case families cover GitHub repository navigation/root-cause analysis, TypeScript/Next.js repair, Vercel deployment diagnosis/recovery, Supabase diagnosis, Playwright/browser verification, Chrome DevTools evidence, test/regression construction, rollback judgment, MCP selection/recovery, security/authority compliance, recovery from an initially wrong diagnosis, and cross-specialist escalation.
+
+Start with roughly 20-30 high-quality case families with hidden/unseen variants and expand from measured competency gaps rather than raw volume. The harness should preserve full tool-trajectory evidence so the University can distinguish a lucky final answer from correct professional practice.
+
+For Builder the educational loop is:
+
+```text
+Computer Science curriculum
+-> distillation/training
+-> Builder Residency harness
+-> GitHub/Vercel/Supabase/Playwright/Chrome DevTools practical work
+-> failure-derived remediation and retraining as needed
+-> Residency replay on unseen cases
+-> exact-artifact canary + rollback
+-> independent final examinations
+-> Computer Science graduation
+-> separately governed Builder activation/apprenticeship
+```
+
+The same Residency harness contract generalizes to every discipline with profession-specific case libraries: Security gets controlled security labs; CRM gets customer/workflow simulations; Research gets evidence/research assignments; Finance gets controlled financial cases; other specialists receive equivalent practical curricula; COS ultimately receives a cross-specialist executive Residency.
+
+Production outcomes from an activated graduate may later become sanitized, verified inputs for continuing education, but Production itself is not the resident's unrestricted training sandbox.
 
 ### University recovery/status handoff — 2026-09-22
 

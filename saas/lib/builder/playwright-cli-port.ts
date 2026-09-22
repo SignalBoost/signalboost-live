@@ -10,7 +10,7 @@ export const BUILDER_PLAYWRIGHT_CLI_VERSION = '0.1.21' as const
 
 const ROOT = '/tmp/cos-builder-playwright-cli'
 const COMMAND_TIMEOUT_MS = 25_000
-const BOOTSTRAP_TIMEOUT_MS = 120_000
+const BOOTSTRAP_TIMEOUT_MS = 180_000
 const SANDBOX_TIMEOUT_MS = 220_000
 const OUTPUT_LIMIT = 16_000
 const DEFAULT_ORIGINS = Object.freeze(['https://itmounts.com', 'https://www.itmounts.com'])
@@ -181,7 +181,11 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
 
       const browser = await sandbox.runCommand({
         cmd: `${ROOT}/node_modules/.bin/playwright-cli`,
-        args: ['install-browser', 'chromium'],
+        // Vercel Sandbox SDK v3 uses an Ubuntu managed image. Playwright can download Chromium
+        // successfully while still reporting missing host libraries only at first launch. Install
+        // the pinned CLI's browser dependencies during the host-owned bootstrap, before the
+        // model can issue any browser action and before egress is reduced to approved origins.
+        args: ['install-browser', '--with-deps', 'chromium'],
         cwd: ROOT,
         timeoutMs: BOOTSTRAP_TIMEOUT_MS,
       })

@@ -144,7 +144,7 @@ function readinessFor(
       configured: figmaAuthorization?.clientApproved === true && figmaAuthorization.connected === true,
       reason: figmaAuthorization?.clientApproved !== true
         ? 'provider_client_approval_required' as const
-        : figmaAuthorization.connected !== true
+        : figmaAuthorization?.connected !== true
           ? 'authorization_required' as const
           : 'ready' as const,
       authentication: 'bearer' as const,

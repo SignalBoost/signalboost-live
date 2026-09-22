@@ -1,2 +1,2 @@
-base_sha=3452650b702d63afa26030fbe39312e61a015e1f
-branch=fix/hf-diagnostics-edge-trigger-20260922-v2
+base_sha=aa433e9fb1324033d1b0c7bb18b09a06552a7536
+branch=fix/out-of-band-actions-backlog-self-heal-20260922

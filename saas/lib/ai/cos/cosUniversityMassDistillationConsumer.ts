@@ -2,7 +2,7 @@
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
+import { closeProviderCircuit, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
 import {
   classifyMassDistillationRights,
   MASS_DISTILLATION_MIN_CONFIDENCE,
@@ -1378,6 +1378,15 @@ export async function recordMassDistillationWorkerEvidence(
         trainingMode: 'distillation', trainingReceipt,
       },
       verifier: 'training_executor',
+    })
+    // A signed callback carrying a durable uploaded artifact proves the provider's model-training
+    // write path recovered. Close only this provider/capability circuit; unrelated circuits remain.
+    await closeProviderCircuit({
+      db,
+      providerId: 'huggingface',
+      capability: 'model-training',
+      verification: { claim, candidateId, jobId, trainedArtifactId, artifactHash: trainedArtifactHash, evidenceRef },
+      now: new Date(now),
     })
     return { ok: true as const, campaignId: run.campaign_id, batchKey: run.batch_key, nextStage: 'trained_pending_rollback' as const }
   }

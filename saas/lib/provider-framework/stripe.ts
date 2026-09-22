@@ -1,6 +1,6 @@
 // saas/lib/provider-framework/stripe.ts
 import { randomUUID } from 'node:crypto'
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosServiceDb } from '../cos-core/storage/supabase.ts'
 import { executeSupervisedProviderCall } from './supervised-executor.ts'
 import { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
 

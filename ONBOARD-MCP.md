@@ -151,6 +151,26 @@ Vercel is part of the required Universal MCP Production set after GitHub, Supaba
 - Remote tool discovery never expands the host allowlist or project scope.
 
 
+## Universal MCP Production certification status — 2026-09-22
+
+The Universal MCP required provider set is currently **4/5 certified; not Production-complete**.
+
+- GitHub MCP — certified by the mandatory Vercel Preview postbuild live baseline, including governed read-capability projection, a real private `SignalBoost/signalboost-live` read, and cross-repository rejection. Evidence commit: `7737a2160fbf67f00ba21483945ba7679f20c1cd`.
+- Context7 MCP — certified in the same live Preview baseline with exact two-tool projection and a real Next.js library resolution call. Evidence commit: `7737a2160fbf67f00ba21483945ba7679f20c1cd`.
+- Supabase MCP — certified by an isolated mandatory Vercel Preview postbuild with exact governed projection and a real project-scoped `public` table-list probe. Evidence commit: `45d857c4da787dd158d8664d0ad7ca2a68dd152d`.
+- Vercel MCP — certified by an isolated mandatory Vercel Preview postbuild with exact governed projection and a real project-details probe. Evidence commit: `bf9f69aea1ad97a9d02034f508e7ab7e1aa779cb`.
+- Figma MCP — **externally blocked**, not failed. The iTMounts custom MCP client registration was submitted to Figma on 2026-09-22. Until Figma approves the client and the host-owned per-user OAuth connection is Production-ready, the provider remains fail-closed as `provider_client_approval_required`.
+
+Canonical dated certification metadata lives in `saas/provider-hub-host/universal-mcp-certification-status.ts` and is exposed only on the owner/admin Provider Hub status surface. It is certification evidence, not live credential-health telemetry.
+
+The full five-provider GitHub Actions acceptance job has a server-side job guard and allocates no runner unless both repository variables are explicitly true:
+
+- `FIGMA_MCP_CLIENT_APPROVED=true`
+- `FIGMA_MCP_USER_OAUTH_READY=true`
+
+Do not flip either variable merely because the registration form was submitted. Full Universal MCP Production acceptance still requires all five providers on one candidate revision; 4/5 must never be relabeled green.
+
+
 ## Browser MCP CI sandbox repair — 2026-09-21
 
 The governed browser MCP live host now carries an explicit isolated-runner sandbox launch policy.

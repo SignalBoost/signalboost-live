@@ -87,6 +87,8 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
     ownerAuthorized: true,
     env: { BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS: 'https://itmounts.com' },
     createSandbox: (async (options: any) => {
+      assert.equal(options.image, 'vercel/sandbox/node:24')
+      assert.equal(options.runtime, undefined)
       assert.equal(options.networkPolicy, 'deny-all')
       assert.equal(options.persistent, false)
       assert.equal(options.env.PLAYWRIGHT_MCP_WEBMCP, 'false')

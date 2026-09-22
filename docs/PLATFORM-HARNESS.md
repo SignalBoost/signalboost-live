@@ -111,7 +111,7 @@ behavior, never the underlying authority source.
 
 ## Non-negotiable invariants
 
-1. `requested work ∩ profile ∩ trusted authority` is the maximum executable manifest.
+1. `requested work ∩ profile ∩ trusted authority ∩ Provider Hub assigned/available capability supply` is the maximum executable surface.
 2. A profile may reduce authority but can never widen it.
 3. Every executable action still passes through `agent-gateway/runGoverned()`.
 4. Infrastructure failure is routed to Self-Healing, not scored as model incompetence.
@@ -120,3 +120,42 @@ behavior, never the underlying authority source.
 7. Verified success produces durable evidence; task success by assertion is insufficient.
 8. Trajectory evidence records observable actions/results, never private chain-of-thought.
 9. Evaluation runtime remains isolated from Residency teaching/remediation material.
+
+## Runtime composition
+
+The shared runtime controller now composes the architecture rather than only describing it:
+
+```text
+HarnessRun request
+-> profile + trusted authority intersection
+-> Provider Hub discovery for exact tenant/environment/portable assignment
+-> Governed Socket execution
+-> observable trajectory journal
+-> independent outcome verifier
+-> strict failure owner
+```
+
+Provider Hub discovery is mandatory for tool execution. Authority alone does not make an MCP/native
+capability available, and discovery alone does not grant authority. Consequential capabilities require
+an explicit consequential authority ceiling; a generic mutating/write grant is insufficient.
+
+The first concrete educational consumer is Builder Residency. Its default capability request includes
+governed GitHub read/branch/edit/PR creation plus Vercel, Supabase, Playwright and Chrome DevTools
+diagnostics. It deliberately excludes merge, Production deployment, raw SQL, migrations, edge-function
+deployment, and similar consequential actions.
+
+Residency sequencing is formal education:
+
+```text
+trained immutable artifact
+-> supervised sandbox Residency
+-> competency evidence / remediation / retraining
+-> Residency completion
+-> exact-artifact final canary + rollback proof
+-> independent final examinations
+-> graduation
+-> separately governed Production practice
+```
+
+Residency teaching material must never contain hidden final-exam material. The independent verifier,
+not the resident worker, owns failure attribution between infrastructure and competency.

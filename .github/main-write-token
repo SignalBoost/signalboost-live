@@ -1,2 +1,2 @@
-base_sha=8fad4674f3b92270113a4c7c2d903db042eadd6f
-branch=fix/audit-main-only-trigger-test-20260922
+base_sha=458bf87a9d4f002638eb9477cb2658c086b03be0
+branch=fix/provider-framework-enforce-supervision-20260922

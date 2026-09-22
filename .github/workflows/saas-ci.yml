@@ -6,11 +6,6 @@ name: SaaS CI
 # before (e.g. a referenced-but-undefined function), without needing any secrets.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'saas/**'
-      - '.github/workflows/saas-ci.yml'
   pull_request:
     paths:
       - 'saas/**'

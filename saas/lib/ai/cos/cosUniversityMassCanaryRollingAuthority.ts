@@ -182,6 +182,8 @@ export function decideMassCanaryRollingApproval(input: {
   events: readonly CanaryEvent[]
   now: Date
   enabled: boolean
+  builderProofPasses?: number
+  remediationReplayProofPasses?: number
 }): CanaryDecision {
   if (!input.enabled) return { issue: false, reason: 'mass_canary_rolling_authorization_disabled' }
   const nowMs = input.now.getTime()
@@ -203,19 +205,23 @@ export function decideMassCanaryRollingApproval(input: {
       && artifact.frontierResponseAnchorEpochs === 1
       && Number(artifact.frontierResponseAnchorItems) > 0
 
-  const builderProofPasses = new Set(valid
-    .filter(builderProofArtifact)
-    .filter(artifact => forArtifact(input.events, artifact).some(event => claim(event) === 'local_distilled_runtime_canary_passed'))
-    .map(artifact => artifact.candidateId)).size
+  const builderProofPasses = Number.isFinite(Number(input.builderProofPasses))
+    ? Math.max(0, Math.floor(Number(input.builderProofPasses)))
+    : new Set(valid
+      .filter(builderProofArtifact)
+      .filter(artifact => forArtifact(input.events, artifact).some(event => claim(event) === 'local_distilled_runtime_canary_passed'))
+      .map(artifact => artifact.candidateId)).size
   const builderProofNeeded = builderProofPasses < MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE
 
   const replayProofArtifact = (artifact: CanaryArtifact) =>
     artifact.failureDerivedReplayRequired === true
       && Number(artifact.failureDerivedReplayItems) > 0
-  const replayProofPasses = new Set(valid
-    .filter(replayProofArtifact)
-    .filter(artifact => forArtifact(input.events, artifact).some(event => claim(event) === 'local_distilled_runtime_canary_passed'))
-    .map(artifact => artifact.candidateId)).size
+  const replayProofPasses = Number.isFinite(Number(input.remediationReplayProofPasses))
+    ? Math.max(0, Math.floor(Number(input.remediationReplayProofPasses)))
+    : new Set(valid
+      .filter(replayProofArtifact)
+      .filter(artifact => forArtifact(input.events, artifact).some(event => claim(event) === 'local_distilled_runtime_canary_passed'))
+      .map(artifact => artifact.candidateId)).size
   const replayProofNeeded = replayProofPasses < MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE
 
   valid.sort((a, b) => {

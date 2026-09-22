@@ -1,2 +1,2 @@
-base_sha=459a8bba53afe08c0e97b225c8dd5dce8ea790b5
-branch=fix/actions-budget-fanout-20260922
+base_sha=8fad4674f3b92270113a4c7c2d903db042eadd6f
+branch=fix/audit-main-only-trigger-test-20260922

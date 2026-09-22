@@ -11,7 +11,7 @@ import { runGitHubActionsBacklogRemediation } from '@/self-healing-host/github-a
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
 const bounded = (name: string, fallback: number, max: number) => Math.min(Math.max(Number(process.env[name] || fallback), 1), max)
 const capability = (): GitHubCapability => {

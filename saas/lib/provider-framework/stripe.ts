@@ -1,6 +1,6 @@
 // saas/lib/provider-framework/stripe.ts
 import { randomUUID } from 'node:crypto'
-import { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'\nimport { executeSupervisedProviderCall } from './supervised-executor.ts'\nimport { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
 
 export const STRIPE_PROVIDER_ID = 'stripe' as const
 export const stripeCapabilities = ['stripe.connection.validate','stripe.account.read','stripe.balance.read','stripe.charges.list','stripe.payment_intents.list','stripe.refunds.list','stripe.disputes.list','stripe.subscriptions.list','stripe.invoices.list','stripe.events.list'] as const

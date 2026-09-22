@@ -17,6 +17,7 @@ on:
       - 'ONBOARD-A2A.md'
       - 'docs/HANDOFF-A2A-AGENT-FABRIC-*.md'
       - '.github/workflows/a2a-agent-fabric.yml'
+permissions:
   contents: read
 
 concurrency:

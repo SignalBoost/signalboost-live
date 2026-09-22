@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
 
 import { runGitHubActionsBacklogRemediation } from '../self-healing-host/github-actions-backlog-remediation.ts'
 
@@ -82,4 +83,19 @@ test('out-of-band Actions remediation fails closed when the backend write creden
   assert.equal(result.mode, 'missing_credential')
   assert.equal(contacted, false)
   assert.equal(result.cancelled, 0)
+})
+
+test('GitHub backlog remediation is hosted by the five-minute GitHub cron, not the broad monitor', async () => {
+  const githubRoute = await readFile(new URL('../app/api/cron/github-observation/route.ts', import.meta.url), 'utf8')
+  const nativeRoute = await readFile(new URL('../app/api/cron/native-proactive-monitoring/route.ts', import.meta.url), 'utf8')
+  const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'))
+
+  assert.match(githubRoute, /runGitHubActionsBacklogRemediation/)
+  assert.match(githubRoute, /actionsBacklogPromise/)
+  assert.match(githubRoute, /coordination_unavailable[\s\S]*actionsBacklog/)
+  assert.doesNotMatch(nativeRoute, /runGitHubActionsBacklogRemediation/)
+  assert.deepEqual(
+    vercel.crons.find((item: { path: string }) => item.path === '/api/cron/github-observation'),
+    { path: '/api/cron/github-observation', schedule: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *' },
+  )
 })

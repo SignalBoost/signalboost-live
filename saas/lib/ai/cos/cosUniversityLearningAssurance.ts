@@ -85,6 +85,7 @@ export type LearningPathId =
   | 'registered_agent_cycle'
   | 'continuous_learning'
   | 'deliberate_practice'
+  | 'practical_residency'
   | 'independent_exams'
   | 'subject_a_range_evidence'
   | 'language_a_range_evidence'
@@ -110,6 +111,7 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   registered_agent_cycle: 'COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED',
   continuous_learning: 'COS_UNIVERSITY_CONTINUOUS_ENABLED',
   deliberate_practice: 'COS_UNIVERSITY_PRACTICE_ENABLED',
+  practical_residency: 'COS_UNIVERSITY_RESIDENCY_ENABLED',
   independent_exams: 'COS_UNIVERSITY_EXAMS_ENABLED',
   subject_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
   language_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
@@ -163,6 +165,12 @@ export function universityProductionExecutionBlocker(path: LearningPathId, value
   if (['blocked', 'skipped', 'not_due', 'nothing_due', 'deferred', 'not_claimed'].includes(String(evidence.status))) return 'runner_did_no_work'
   if (evidence.error != null && evidence.error !== '') return 'runner_failed'
   if ('errors' in evidence && (!Array.isArray(evidence.errors) || evidence.errors.length !== 0)) return 'runner_failed'
+
+  if (path === 'practical_residency') {
+    return evidence.caseExecuted === true
+      ? null
+      : 'residency_case_execution_missing'
+  }
 
   const academic = ['independent_exams', 'subject_a_range_evidence', 'language_a_range_evidence', 'delayed_retention'].includes(path)
   if (academic) {

@@ -314,7 +314,15 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
   if(template&&!templateMatches(template,input,ids.modelName)) throw new Error('mass_distilled_runtime_template_identity_mismatch')
   if(!template){template=await requestV1<Template>('/templates',{method:'POST',body:JSON.stringify({name:ids.templateName,imageName:VLLM_IMAGE,category:'NVIDIA',containerDiskInGb:50,dockerEntrypoint:['bash','-lc'],dockerStartCmd:[startupCommand(input,ids.modelName)],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PUBLIC_PORT),PORT_HEALTH:String(PUBLIC_PORT),HEALTH_CHECK_PATH:'/ping'},isPublic:false,isServerless:true,ports:[`${PUBLIC_PORT}/http`],readme:'iTMounts exact mass-distilled Qwen3-4B + immutable LoRA canary runtime. Strict internal-vLLM readiness; scale-to-zero; no Production traffic.'})});createdTemplate=true}
   template=await recoverTemplateId(template,ids.templateName)
-  if(!template?.id) throw new Error('mass_distilled_runtime_template_id_missing')
+  if(!template?.id){
+    // Provider-shape diagnostic only: field names and exact-name visibility, never values/secrets.
+    // Production has acknowledged template creates that remain id-less through the bounded v1 lookup.
+    const observed=await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')
+    const exact=observed.find(item=>item.name===ids.templateName&&item.isServerless!==false)
+    const createKeys=Object.keys(template||{}).sort().join(',')||'none'
+    const exactKeys=Object.keys(exact||{}).sort().join(',')||'none'
+    throw new Error(`mass_distilled_runtime_template_id_missing:create_keys=${createKeys};exact_visible=${Boolean(exact)};exact_keys=${exactKeys};list_count=${observed.length}`)
+  }
   const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless'); let endpoint=(listed.endpoints||[]).find(item=>item.name===ids.endpointName); let createdEndpoint=false; let reboundTemplate=false
   if(!endpoint){
     // RunPod counts maxWorkers even for scale-to-zero endpoints. Exact-artifact canaries are

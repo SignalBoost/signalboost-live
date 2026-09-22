@@ -52,6 +52,11 @@ test('a durable preflight failure releases the short reservation lease immediate
   assert.match(migration, /interval '8 minutes'/)
 })
 
+test('compatibility layer uses the same v4 template identity as the creator', () => {
+  assert.match(provision, /templateName:`itmounts-mass-distilled-\$\{suffix\}-\$\{runtimeKey\}-template-v4`/)
+  assert.match(compatibility, /templateName: `itmounts-mass-distilled-\$\{suffix\}-\$\{runtimeKey\}-template-v4`/)
+})
+
 test('compatibility layer can recover both legacy template and endpoint identity drift', () => {
   assert.match(compatibility, /mass_distilled_runtime_template_identity_mismatch/)
   assert.match(compatibility, /mass_distilled_runtime_endpoint_template_mismatch/)

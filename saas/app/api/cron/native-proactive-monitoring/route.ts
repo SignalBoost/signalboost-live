@@ -10,7 +10,6 @@ import { platformHealthNativeMonitoringCollector } from '@/self-healing-host/pla
 import { ownedSiteOptimizationMonitoringCollector } from '@/self-healing-host/owned-site-optimization-monitoring'
 import { ownedSiteCybersecurityMonitoringCollector } from '@/self-healing-host/owned-site-cybersecurity-monitoring'
 import { verifyPendingExactVercelRepairOutcomes } from '@/self-healing-host/vercel-deployment-outcome-verifier'
-import { runGitHubActionsBacklogRemediation } from '@/self-healing-host/github-actions-backlog-remediation'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
 import { PUBLIC_BRAND } from '@/lib/public-brand'
@@ -57,28 +56,14 @@ function livePlatformHealthCollector(db: any) {
 
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  const actionsBacklogPromise = runGitHubActionsBacklogRemediation().catch(error => ({
-    ok: false,
-    schemaVersion: 'github-actions-backlog-remediation-v1' as const,
-    mode: 'active' as const,
-    scanned: 0,
-    eligible: 0,
-    cancelled: 0,
-    preserved: 0,
-    raced: 0,
-    errors: 1,
-    detail: error instanceof Error ? error.message.slice(0, 240) : 'github actions backlog remediation failed',
-  }))
   const db = getAdminSupabase(); const store = new SupabaseNativeProbeStore(db)
   try {
     await store.verifySchema()
   } catch (error) {
-    const actionsBacklog = await actionsBacklogPromise
     return NextResponse.json({
       ok: false,
       error: 'native_probe_store_unavailable',
       detail: error instanceof Error ? error.message.slice(0,220) : 'native probe schema unavailable',
-      actionsBacklog,
     }, { status: 503 })
   }
 
@@ -91,8 +76,7 @@ export async function GET(req: NextRequest) {
 
   const apiUrls = parseApiUrls(); const certificateTargets = parseTlsTargets(apiUrls)
   if (!apiUrls.length || !certificateTargets.length) {
-    const actionsBacklog = await actionsBacklogPromise
-    return NextResponse.json({ ok: false, error: 'native_probe_targets_unavailable', priorRepairVerification, actionsBacklog }, { status: 503 })
+    return NextResponse.json({ ok: false, error: 'native_probe_targets_unavailable', priorRepairVerification }, { status: 503 })
   }
   const quotaBytes = storageQuotaBytes()
   const baseUrl = productionBaseUrl()
@@ -130,7 +114,6 @@ export async function GET(req: NextRequest) {
   const preventive = [configurationIncident, confidenceIncident].filter(Boolean) as typeof result.incidents
   const incidents = [...result.incidents, ...preventive]
   const remediation = incidents.length ? await remediateNativeIncidents(incidents, { maxIncidents: 4 }) : []
-  const actionsBacklog = await actionsBacklogPromise
   const status = result.collectorErrors.length === collectors.length ? 503 : 200
   return NextResponse.json({
     ok: status === 200,
@@ -139,7 +122,7 @@ export async function GET(req: NextRequest) {
     limits: { apiTargets: apiUrls.length, tlsTargets: certificateTargets.length, maxDurationSeconds: maxDuration, storageQuotaConfigured: quotaBytes != null, apiTargetCap: apiTargetCap() },
     collectorsRun: result.collectorsRun, signalsObserved: result.signalsObserved, incidents,
     configurationInvestigationClaimed: Boolean(configurationIncident), confidenceInvestigationClaimed: Boolean(confidenceIncident),
-    priorRepairVerification, actionsBacklog, remediation, collectorErrors: result.collectorErrors,
+    priorRepairVerification, remediation, collectorErrors: result.collectorErrors,
   }, { status })
 }
 export async function POST(req: NextRequest) { return GET(req) }

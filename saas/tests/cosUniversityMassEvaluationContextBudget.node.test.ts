@@ -113,7 +113,7 @@ test('the runner stays inside the approved endpoint-call ceiling and reserves ca
   assert.match(source, /reserveCallsAfter:0/)
   // 2 holdout + 6 fixed (three suites x two models)
   assert.equal((source.match(/await answersFor\(/g) || []).length, 8)
-  assert.equal((source.match(/await suite\(\{name:'(holdout|safety|transfer|retention)'/g) || []).length, 4)
+  assert.equal((source.match(/suite\(\{name:'(holdout|safety|transfer|retention)'/g) || []).length, 4)
   assert.match(source, /endpointCalls:budget\.used/)
 })
 

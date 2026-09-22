@@ -31,3 +31,22 @@ export function recoverStoppedSoloMismatchedMarkerAnswer(text: string, caseId: s
   if (!answer || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(answer)) return null
   return answer
 }
+
+
+/**
+ * A solo retry has exactly one requested case. Production 2026-09-22 returned finish=stop with the
+ * correct END marker, no ANSWER marker, no other marker and no thinking text. With one requested
+ * case the non-empty body immediately before that sole correct closer is unambiguous. Truncated,
+ * thinking, empty, extra-marker and trailing-text responses remain fail-closed.
+ */
+export function recoverStoppedSoloMissingOpenAnswer(text: string, caseId: string, finish: string): string | null {
+  if (finish !== 'stop' || /<\/?think>/i.test(text)) return null
+  const close = `<<<END:${caseId}>>>`
+  if (text.includes('<<<ANSWER:')) return null
+  const closeAt = text.indexOf(close)
+  if (closeAt < 0 || text.indexOf(close, closeAt + close.length) >= 0) return null
+  if (/<<<END:[^>\r\n]+>>>/.test(text.slice(0, closeAt)) || text.slice(closeAt + close.length).trim()) return null
+  const answer = text.slice(0, closeAt).trim()
+  if (!answer || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(answer)) return null
+  return answer
+}

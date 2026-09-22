@@ -17,6 +17,7 @@ import {
   createGovernedHarnessExecutor,
   createProviderHubHarnessCapabilityResolver,
   createSelfHealingHandoff,
+  createReplayHarnessRequest,
   resolveHarnessManifest,
   runHarnessWorker,
   type HarnessAuthorityEnvelope,
@@ -413,4 +414,15 @@ test('Builder Residency excludes consequential Production authority', () => {
   })
   assert.equal(builder.profile, 'residency')
   assert.equal(builder.environment.class, 'sandbox')
+})
+
+
+test('Replay profile cannot acquire mutating authority', () => {
+  const replayRequest=createReplayHarnessRequest({runId:'replay-1',objective:'replay observable failure evidence',tenantId:'tenant-1',portableId:'builder',agentId:'builder-replay',environmentId:'sandbox-1',fixtureHash:hash('d'),capabilities:['mcp.github-mcp.contents.read']})
+  const readDecision=resolveHarnessManifest(replayRequest,authority)
+  assert.equal(readDecision.allowed,true)
+  const writeRequest={...replayRequest,requestedCapabilities:['mcp.github-mcp.contents.write']}
+  const writeDecision=resolveHarnessManifest(writeRequest,authority)
+  assert.equal(writeDecision.allowed,false)
+  if(!writeDecision.allowed) assert.ok(writeDecision.reasons.includes('profile_mutation_forbidden:mcp.github-mcp.contents.write'))
 })

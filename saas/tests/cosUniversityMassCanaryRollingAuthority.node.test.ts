@@ -9,6 +9,7 @@ import {
   MASS_CANARY_ROLLING_MAX_APPROVALS,
   MASS_CANARY_ROLLING_WINDOW_HOURS,
   MASS_CANARY_COLD_START_FAILURE,
+  MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS,
   MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
   MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
@@ -285,6 +286,22 @@ test('cold-start timeouts do not spend an artifact\'s three substantive attempts
   ]
   const decision = decideMassCanaryRollingApproval({ artifacts: [a], events, now, enabled: true })
   assert.ok('artifact' in decision, `expected a retry, got ${JSON.stringify(decision)}`)
+})
+
+test('cold-start failures yield briefly, then remain retryable instead of becoming a permanent identical-error stop', () => {
+  assert.equal(MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS, 10 * 60_000)
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const recent = event(a, 'local_distilled_runtime_canary_failed', '2026-09-17T16:55:00.000Z', {}, { error: MASS_CANARY_COLD_START_FAILURE })
+  const yielded = decideMassCanaryRollingApproval({ artifacts:[a,b], events:[recent], now, enabled:true })
+  assert.ok('artifact' in yielded)
+  assert.equal(yielded.artifact.candidateId, b.candidateId)
+
+  const oldColdStarts = ['16:10','16:20','16:30','16:40'].map(time =>
+    event(a, 'local_distilled_runtime_canary_failed', `2026-09-17T${time}:00.000Z`, {}, { error: MASS_CANARY_COLD_START_FAILURE }))
+  const retry = decideMassCanaryRollingApproval({ artifacts:[a,b], events:oldColdStarts, now, enabled:true })
+  assert.ok('artifact' in retry)
+  assert.equal(retry.artifact.candidateId, a.candidateId)
 })
 
 test('the same canary failure repeating stops that artifact instead of looping', () => {

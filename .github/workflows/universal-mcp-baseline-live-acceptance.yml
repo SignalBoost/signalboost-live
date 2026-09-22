@@ -1,0 +1,41 @@
+name: Universal MCP Baseline Live Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/universal-mcp-baseline-live-acceptance.yml'
+      - 'saas/scripts/mcp-gateway/run-universal-mcp-baseline-acceptance.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITHUB_MCP_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install TypeScript runner
+        working-directory: saas
+        run: npm install --no-save --ignore-scripts tsx@4.20.6
+      - name: Certify GitHub and Context7 MCP live
+        working-directory: saas
+        run: npx tsx scripts/mcp-gateway/run-universal-mcp-baseline-acceptance.ts
+      - name: Upload metadata-only MCP evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-mcp-baseline-live-acceptance
+          path: saas/artifacts/universal-mcp-baseline-live-acceptance.json
+          if-no-files-found: warn

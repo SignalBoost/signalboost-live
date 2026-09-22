@@ -18,3 +18,5 @@ export * from './google-cloud.ts'
 export * from './namecheap.ts'
 export * from './hosted-providers.ts'
 export * from './provider-registry-bootstrap.ts'
+
+export * from './supervisor-contract.ts'

@@ -9,6 +9,7 @@ import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
+import { activeEvaluationRunpodEndpointIds } from '@/lib/ai/cos/cosUniversityGraduateEndpointProtection'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import { runpodServerlessRootUrl } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
 import {
@@ -304,6 +305,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     verifier: clean(row.verifier, 80), evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
   }))
   const now = new Date()
+  const inFlightCount = (await activeEvaluationRunpodEndpointIds(now)).size
 
   // The Builder apprenticeship proof lane is defined by the durable v2 receipt, not the broad historical
   // frontier profile. Old-recipe artifacts share that profile and already produced dozens of evaluation rows.
@@ -387,6 +389,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     now,
     frontierProofCompletions,
     builderV2ProofCompletions,
+    inFlightCount,
   })
   if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }
   const inserted = await db.from('cos_university_learning_assurance_events').insert({

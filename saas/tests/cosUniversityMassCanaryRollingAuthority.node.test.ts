@@ -138,6 +138,39 @@ test('first two post-GKD remediation replay artifacts get bounded canary proof p
   assert.equal(restored.artifact.candidateId, legacy.candidateId)
 })
 
+test('replay proof lane proves a replay-trained Computer Science artifact before non-CS replay peers', () => {
+  const proofNow = new Date('2026-09-22T20:00:00.000Z')
+  const legacy = artifact(87, '2026-09-20T00:00:00.000Z')
+  const olderLaw = replayArtifact('mass:replay-law', 88, '2026-09-22T18:07:59.000Z')
+  const newerComputerScience: CanaryArtifact = {
+    ...replayArtifact('mass:replay-cs', 89, '2026-09-22T18:19:57.000Z'),
+    subjectId:'Computer Science & Coding',
+  }
+
+  const first = decideMassCanaryRollingApproval({
+    artifacts:[legacy,olderLaw,newerComputerScience],
+    events:[],
+    now:proofNow,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:0,
+  })
+  assert.ok('artifact' in first)
+  assert.equal(first.artifact.candidateId,newerComputerScience.candidateId)
+
+  const csPassed = event(newerComputerScience,'local_distilled_runtime_canary_passed','2026-09-22T18:40:00.000Z')
+  const second = decideMassCanaryRollingApproval({
+    artifacts:[legacy,olderLaw,newerComputerScience],
+    events:[csPassed],
+    now:proofNow,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:1,
+  })
+  assert.ok('artifact' in second)
+  assert.equal(second.artifact.candidateId,olderLaw.candidateId)
+})
+
 test('durable proof counts survive proof artifacts leaving the pending canary queue', () => {
   const proofNow = new Date('2026-09-22T20:00:00.000Z')
   const legacy = artifact(85, '2026-09-20T00:00:00.000Z')

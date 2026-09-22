@@ -255,6 +255,14 @@ export function decideMassCanaryRollingApproval(input: {
       const aReplay = replayProofArtifact(a)
       const bReplay = replayProofArtifact(b)
       if (aReplay !== bReplay) return aReplay ? -1 : 1
+      // Builder apprenticeship still needs a qualifying Computer Science graduate. Once replay
+      // remediation exists, prove one replay-trained CS artifact before spending the bounded
+      // two-artifact proof cohort entirely on other subjects. Ordering only; all gates remain.
+      if (aReplay && bReplay) {
+        const aComputerScience = a.subjectId === 'Computer Science & Coding'
+        const bComputerScience = b.subjectId === 'Computer Science & Coding'
+        if (aComputerScience !== bComputerScience) return aComputerScience ? -1 : 1
+      }
     }
     return at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId)
   })

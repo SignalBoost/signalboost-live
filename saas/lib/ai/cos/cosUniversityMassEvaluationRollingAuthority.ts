@@ -27,11 +27,12 @@ export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
 // asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the per-evaluation cost ceiling,
 // but never the rolling cap, which is enforced here alone.
 export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
-// Production 2026-09-22: RunPod's account-wide serverless worker quota is 10. Three concurrent exact-artifact
-// evaluations were admitted successfully; the fourth was rejected before wake because all legally reclaimable
-// worker reservations were exhausted. Keep three evaluator leases in flight so active evaluations and active
-// graduates remain protected instead of burning approvals against provider quota.
-export const MASS_EVALUATION_MAX_IN_FLIGHT = 3
+// Production 2026-09-22: RunPod's account-wide serverless worker quota is 10. With three live evaluators,
+// one active graduate and other account serverless reservations, the exact-artifact canary lane reached 10/10
+// before provider invocation. Reserve one worker of headroom by admitting at most two evaluators concurrently.
+// This keeps evaluation throughput above the observed training arrival rate while allowing the canary lane to
+// make progress without reclaiming an active graduate, an active evaluator, or unrelated workloads.
+export const MASS_EVALUATION_MAX_IN_FLIGHT = 2
 export const MASS_EVALUATION_FRONTIER_PROOF_SAMPLE = 4
 export const MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE = 2
 export const MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE = 2

@@ -18,6 +18,7 @@ import {
   createProviderHubHarnessCapabilityResolver,
   createSelfHealingHandoff,
   createReplayHarnessRequest,
+  createEvaluationRuntimeHarnessRequest,
   resolveHarnessManifest,
   runHarnessWorker,
   type HarnessAuthorityEnvelope,
@@ -425,4 +426,20 @@ test('Replay profile cannot acquire mutating authority', () => {
   const writeDecision=resolveHarnessManifest(writeRequest,authority)
   assert.equal(writeDecision.allowed,false)
   if(!writeDecision.allowed) assert.ok(writeDecision.reasons.includes('profile_mutation_forbidden:mcp.github-mcp.contents.write'))
+})
+
+
+test('Evaluation runtime is isolated from Production and learning feedback', () => {
+  const req=createEvaluationRuntimeHarnessRequest({runId:'evaluation-1',objective:'execute independent hidden examination',tenantId:'tenant-1',portableId:'candidate',agentId:'candidate-1',artifactId:'artifact-1',artifactHash:hash('e'),environmentId:'evaluation-sandbox-1',fixtureHash:hash('f'),capabilities:['mcp.github-mcp.contents.read']})
+  const decision=resolveHarnessManifest(req,authority)
+  assert.equal(decision.allowed,true)
+  if(!decision.allowed) return
+  assert.equal(decision.manifest.profile,'evaluation_runtime')
+  assert.equal(decision.manifest.environment.class,'sandbox')
+  assert.equal(decision.manifest.learningFeedbackAllowed,false)
+  const productionReq={...req,environment:{environmentId:'production-1',class:'production' as const}}
+  const productionAuthority={...authority,environments:['sandbox','production'] as const,capabilities:authority.capabilities.map(item=>({...item,environments:['sandbox','production'] as const}))}
+  const rejected=resolveHarnessManifest(productionReq,productionAuthority)
+  assert.equal(rejected.allowed,false)
+  if(!rejected.allowed) assert.ok(rejected.reasons.includes('profile_environment_forbidden'))
 })

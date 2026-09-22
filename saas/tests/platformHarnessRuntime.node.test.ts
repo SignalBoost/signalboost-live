@@ -21,6 +21,7 @@ import {
   createEvaluationRuntimeHarnessRequest,
   createHarnessEvidenceRecord,
   completeHarnessRun,
+  createSupervisorAuditHarnessEvidenceSink,
   resolveHarnessManifest,
   runHarnessWorker,
   type HarnessAuthorityEnvelope,
@@ -482,4 +483,18 @@ test('Harness completion does not route when durable evidence persistence fails'
   if(!decision.allowed) return
   const result:HarnessRunResult={runId:decision.manifest.runId,profile:decision.manifest.profile,trajectory:[],outcome:{status:'authority_halt',failureCode:'scope_denied'},authorityExpanded:false,productionMutationObserved:false}
   await assert.rejects(()=>completeHarnessRun({manifest:decision.manifest,result,evidenceSink:{async append(){throw new Error('evidence_sink_unavailable')}}}),/evidence_sink_unavailable/)
+})
+
+
+test('Supervisor audit Harness sink persists only sanitized evidence record', async () => {
+  const writes:Array<{table:string;value:any}>=[]
+  const sink=createSupervisorAuditHarnessEvidenceSink({from(table:string){return{async insert(value:unknown){writes.push({table,value});return{error:null}}}}})
+  await sink.append({runId:'run-1',profile:'sandbox',environmentClass:'sandbox',agentId:'agent-1',artifactId:'artifact-1',artifactHash:hash('a'),authorityManifestRef:'referee://manifest-1',outcomeStatus:'success',verifierRef:'verifier://1',evidenceHash:'evidence://hash',authorityExpanded:false,productionMutationObserved:false,trajectoryEvidenceRefs:['evidence://safe/ref']})
+  assert.equal(writes.length,1)
+  assert.equal(writes[0]?.table,'supervisor_audit_events')
+  const serialized=JSON.stringify(writes[0]?.value)
+  assert.equal(serialized.includes('platform_harness_run_completed'),true)
+  assert.equal(serialized.includes('evidence://safe/ref'),true)
+  assert.equal(serialized.includes('objective'),false)
+  assert.equal(serialized.includes('credential'),false)
 })

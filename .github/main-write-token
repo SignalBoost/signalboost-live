@@ -1,2 +1,2 @@
-base_sha=d57f66c7bb6f23481c226d8b41b443dd66fbb83b
-branch=fix/mass-evaluator-candidate-query-chunking-20260922
+base_sha=19f800e02f315f059663605b9503f1307a1555a6
+branch=fix/universal-mcp-baseline-read-permissions-20260922

@@ -334,20 +334,28 @@ export async function massDistilledRuntimeHealth(endpointId:string){
   return Object.freeze({ok:response.ok,httpStatus:response.status,jobs:{inProgress:Number(payload?.jobs?.inProgress||0),inQueue:Number(payload?.jobs?.inQueue||0),failed:Number(payload?.jobs?.failed||0),completed:Number(payload?.jobs?.completed||0)},workers:{idle:Number(payload?.workers?.idle||0),running:Number(payload?.workers?.running||0)},error:response.ok?null:(safeError(raw)||`HTTP ${response.status}`)})
 }
 
-export async function canaryMassDistilledRuntime(input:{endpointId:string;modelName:string}){
+export async function waitForMassDistilledRuntimeReady(input:{endpointId:string}){
   const key=configuredRunpodApiKey(); if(!key) throw new Error('RUNPOD_API_KEY is not configured')
   const root=`https://${input.endpointId}.api.runpod.ai`; const deadline=Date.now()+READY_TIMEOUT_MS; let lastStatus:number|null=null; let lastError:string|null=null
   while(Date.now()<deadline){
     try{
       const response=await fetch(`${root}/ready`,{headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(Math.min(120000,Math.max(1000,deadline-Date.now())))})
       lastStatus=response.status; const raw=await response.text()
-      if(response.status===200){let payload:any={};try{payload=raw?JSON.parse(raw):{}}catch{};if(payload?.ready===true) break}
+      if(response.status===200){
+        let payload:any={};try{payload=raw?JSON.parse(raw):{}}catch{}
+        if(payload?.ready===true) return {ok:true,httpStatus:response.status,error:null}
+      }
       const detail=safeError(raw); if(detail) lastError=detail
-      if(response.status===503&&detail?.includes('distilled_bootstrap_failed')) return {ok:false,httpStatus:response.status,text:null,error:detail}
+      if(response.status===503&&detail?.includes('distilled_bootstrap_failed')) return {ok:false,httpStatus:response.status,error:detail}
     }catch(error){lastError=error instanceof Error?clean(error.message):'mass_distilled_ready_failed'}
     if(Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,Math.min(3000,Math.max(0,deadline-Date.now()))))
   }
-  if(lastStatus!==200) return {ok:false,httpStatus:lastStatus,text:null,error:lastError||'mass_distilled_internal_vllm_not_ready'}
+  return {ok:false,httpStatus:lastStatus,error:lastError||'mass_distilled_internal_vllm_not_ready'}
+}
+
+export async function invokeMassDistilledRuntimeCanary(input:{endpointId:string;modelName:string}){
+  const key=configuredRunpodApiKey(); if(!key) throw new Error('RUNPOD_API_KEY is not configured')
+  const root=`https://${input.endpointId}.api.runpod.ai`
   try{
     const response=await fetch(`${root}/v1/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.modelName,max_tokens:64,temperature:0,chat_template_kwargs:{enable_thinking:false},messages:[{role:'system',content:'Return one concise sentence. Do not reveal hidden reasoning.'},{role:'user',content:'State the operational principle: evidence should be separated from inference.'}]}),signal:AbortSignal.timeout(CANARY_TIMEOUT_MS)})
     const raw=await response.text(); if(!response.ok) return {ok:false,httpStatus:response.status,text:null,error:safeError(raw)||`HTTP ${response.status}`}
@@ -355,6 +363,12 @@ export async function canaryMassDistilledRuntime(input:{endpointId:string;modelN
     const text=clean(payload?.choices?.[0]?.message?.content,2000)
     return text?{ok:true,httpStatus:response.status,text,error:null}:{ok:false,httpStatus:response.status,text:null,error:'mass_distilled_canary_empty'}
   }catch(error){return {ok:false,httpStatus:null,text:null,error:error instanceof Error?clean(error.message):'mass_distilled_canary_failed'}}
+}
+
+export async function canaryMassDistilledRuntime(input:{endpointId:string;modelName:string}){
+  const ready=await waitForMassDistilledRuntimeReady({endpointId:input.endpointId})
+  if(!ready.ok) return {ok:false,httpStatus:ready.httpStatus,text:null,error:ready.error}
+  return invokeMassDistilledRuntimeCanary(input)
 }
 
 export const MASS_DISTILLED_CANARY_MAX_COST_USD=0.2

@@ -106,6 +106,8 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
   const result = await port.invoke({ action: 'open', url: 'https://itmounts.com/' })
   assert.equal(result.ok, true)
   assert.match(result.stdout, /Page Title: iTMounts/)
+  const snapshot = await port.invoke({ action: 'snapshot' })
+  assert.equal(snapshot.ok, true)
   assert.ok(commands.some(command => command.cmd === 'npm' && command.args.includes(`@playwright/cli@${BUILDER_PLAYWRIGHT_CLI_VERSION}`)))
   assert.ok(commands.some(command =>
     command.cmd === 'node'
@@ -129,10 +131,13 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
   const dependencyBootstrap = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install-deps chromium'))
   const browserDownload = steps.findIndex(step => step.includes('node /tmp/cos-builder-playwright-cli/node_modules/playwright/cli.js install chromium'))
   const lockdown = steps.findIndex(step => step === 'network:{"allow":["itmounts.com"]}')
-  const open = steps.findIndex(step => step.includes('playwright-cli --config /tmp/cos-builder-playwright-cli/.playwright/cli.config.json open https://itmounts.com/'))
+  const open = steps.findIndex(step => step.includes('playwright-cli open https://itmounts.com/'))
+  const snapshotCommand = steps.findIndex(step => step.includes('playwright-cli snapshot'))
   assert.ok(dependencyBootstrap >= 0 && browserDownload > dependencyBootstrap, JSON.stringify(steps))
   assert.ok(lockdown > browserDownload, JSON.stringify(steps))
   assert.ok(lockdown >= 0 && open > lockdown, JSON.stringify(steps))
+  assert.ok(snapshotCommand > open, JSON.stringify(steps))
+  assert.ok(!commands.some(command => command.cmd.endsWith('/playwright-cli') && command.args.includes('--config')))
   assert.ok(!commands.some(command => command.cmd === 'sh' || command.cmd === 'bash'))
 
   await port.close()

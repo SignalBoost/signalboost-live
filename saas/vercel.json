@@ -320,7 +320,7 @@
     },
     {
       "path": "/api/cron/cos-university-residency",
-      "schedule": "7,27,47 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/cos-university-residency-run",

@@ -300,9 +300,8 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
   if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
-  // Travel planning is not safely self-contained authoring when the requested plan depends on
-  // mutable transport/price/hours/availability facts. Preserve freshness before the authoring escape.
-  if (requiresLiveTravelPlanningEvidence(input)) return true
+  // Travel plans are no longer deterministically forced into the strict fresh-fact verifier.
+  // Let normal completion-first/semantic intent routing decide whether live facts are required.
   if (isContentGenerationRequest(text) || isPoliteAuthoringForFreshness(input)) return false
 
   // A moral/civic/public-policy proposition is not itself a request for the current law. Route the

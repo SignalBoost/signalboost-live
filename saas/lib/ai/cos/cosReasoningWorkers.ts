@@ -79,6 +79,7 @@ function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistR
     ...(request.disableThinking === undefined ? {} : { disableThinking: request.disableThinking }),
     ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
     ...(request.allowConfiguredFallback === undefined ? {} : { allowConfiguredFallback: request.allowConfiguredFallback }),
+    ...(request.allowTruncatedText === undefined ? {} : { allowTruncatedText: request.allowTruncatedText }),
     ...(request.persistUsage === undefined ? {} : { persistUsage: request.persistUsage }),
   }
 }

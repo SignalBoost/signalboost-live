@@ -680,6 +680,8 @@ export async function GET(req: NextRequest) {
     // now ends the same way instead of circling on the retry ladder. Availability failures and reader
     // ceilings are deliberately excluded and stay retryable - see the predicate for why.
     const terminalDataDefect = isTerminalHoldoutDataDefect(message)
+    const workerQuotaDeferred = Boolean(claim)
+      && message.toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
     if (claim) {
       if (terminalDataDefect) {
         await quarantineTerminalHoldoutDefect(claim).catch(() => undefined)
@@ -697,9 +699,24 @@ export async function GET(req: NextRequest) {
     await recordProduction(false, {
       runnerInvoked: Boolean(claim),
       error: clean(message, 500),
+      ...(workerQuotaDeferred ? { infrastructureDeferred: true, reason: 'runpod_worker_quota_full' } : {}),
       ...(frames.length ? { errorFrames: frames } : {}),
       ...(claim ? { candidateId: claim.candidateId, artifactHash: claim.artifactHash } : {}),
     }).catch(() => undefined)
+    if (workerQuotaDeferred) {
+      console.info('[cos-mass-distilled-independent-evaluation]', JSON.stringify({
+        ok: true,
+        skipped: true,
+        reason: 'runpod_worker_quota_full',
+        retryable: true,
+      }))
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: 'runpod_worker_quota_full',
+        retryable: true,
+      }, { status: 200 })
+    }
     console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: clean(message, 500) }))
     if (claim && terminalDataDefect) {
       return NextResponse.json({

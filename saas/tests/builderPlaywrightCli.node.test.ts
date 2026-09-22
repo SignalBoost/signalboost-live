@@ -6,6 +6,7 @@ import type { BuilderBrowserCliPort, BuilderRunnerPort } from '../lib/builder/co
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import {
   BUILDER_PLAYWRIGHT_CLI_VERSION,
+  classifyBuilderPlaywrightCliFailure,
   createBuilderPlaywrightCliPort,
 } from '../lib/builder/playwright-cli-port.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
@@ -107,6 +108,67 @@ test('Playwright CLI bootstraps host-owned package before locking egress to appr
   assert.equal(steps.at(-1), 'stop')
 })
 
+test('Playwright CLI failure classifier emits bounded machine codes only', () => {
+  assert.equal(
+    classifyBuilderPlaywrightCliFailure('Host system is missing dependencies to run browsers'),
+    'browser_missing_dependencies',
+  )
+  assert.equal(
+    classifyBuilderPlaywrightCliFailure("Executable doesn't exist at /tmp/chromium"),
+    'browser_not_installed',
+  )
+  assert.equal(
+    classifyBuilderPlaywrightCliFailure('browserType.launch: Failed to launch browser process'),
+    'browser_launch_failed',
+  )
+  assert.equal(
+    classifyBuilderPlaywrightCliFailure('page.goto: net::ERR_NAME_NOT_RESOLVED'),
+    'navigation_failed',
+  )
+  assert.equal(
+    classifyBuilderPlaywrightCliFailure('Origin request was blocked by network policy'),
+    'network_policy_failed',
+  )
+  assert.equal(
+    classifyBuilderPlaywrightCliFailure('error: unknown option --bad'),
+    'config_invalid',
+  )
+  assert.equal(classifyBuilderPlaywrightCliFailure('unclassified failure'), 'cli_exit_nonzero')
+})
+
+test('nonzero CLI result reports a sanitized failure code without logging raw stderr', async () => {
+  const originalInfo = console.info
+  const events: unknown[][] = []
+  console.info = (...args: unknown[]) => { events.push(args) }
+  try {
+    const fake = {
+      async updateNetworkPolicy() {},
+      async runCommand(command: any) {
+        if (command.cmd.endsWith('/playwright-cli') && command.args?.[0] === 'open') {
+          return commandResult(1, '', 'Host system is missing dependencies to run browsers: SECRET_RAW_DETAIL')
+        }
+        return commandResult()
+      },
+      async writeFiles() {},
+      async stop() {},
+    }
+    const port = createBuilderPlaywrightCliPort({
+      ownerAuthorized: true,
+      env: { BUILDER_PLAYWRIGHT_CLI_ALLOWED_ORIGINS: 'https://itmounts.com' },
+      createSandbox: (async () => fake) as any,
+    })
+    const result = await port.invoke({ action: 'open', url: 'https://itmounts.com/' })
+    assert.equal(result.ok, false)
+    assert.equal(result.failureCode, 'browser_missing_dependencies')
+    const encoded = JSON.stringify(events)
+    assert.match(encoded, /browser_missing_dependencies/)
+    assert.doesNotMatch(encoded, /SECRET_RAW_DETAIL/)
+    await port.close()
+  } finally {
+    console.info = originalInfo
+  }
+})
+
 test('Playwright CLI production telemetry is metadata-only', () => {
   const source = readFileSync(new URL('../lib/builder/playwright-cli-port.ts', import.meta.url), 'utf8')
   assert.match(source, /\[builder_browser_cli_action\]/)
@@ -114,6 +176,7 @@ test('Playwright CLI production telemetry is metadata-only', () => {
   assert.match(source, /ok: observed\.ok/)
   assert.match(source, /exitCode: observed\.exitCode/)
   assert.match(source, /timedOut: observed\.timedOut/)
+  assert.match(source, /failureCode/)
   assert.doesNotMatch(source, /console\.info\([^\n]*stdout/)
   assert.doesNotMatch(source, /console\.info\([^\n]*stderr/)
   assert.doesNotMatch(source, /console\.info\([^\n]*url/)

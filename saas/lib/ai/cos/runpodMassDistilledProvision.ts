@@ -93,7 +93,7 @@ function identity(input:MassDistilledRuntimeArtifact){
   const suffix=input.artifactHash.slice(0,12).toLowerCase()
   const runtimeKey=clean(input.runtimeKey,32).toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,10)
   if(runtimeKey){
-    return {templateName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,endpointName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,modelName:`itmounts-mass-distilled-${suffix}-${runtimeKey}`}
+    return {templateName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-template-v4`,endpointName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,modelName:`itmounts-mass-distilled-${suffix}-${runtimeKey}`}
   }
   // Backward-compatible identity for historical callers. New approved canaries always provide runtimeKey.
   return {templateName:`itmounts-mass-distilled-${suffix}-v2`,endpointName:`itmounts-mass-distilled-${suffix}-v2`,modelName:`itmounts-mass-distilled-${suffix}`}
@@ -131,7 +131,10 @@ async def bootstrap():
 @app.on_event('startup')
 async def start(): asyncio.create_task(bootstrap())
 @app.get('/ping')
-async def ping(): return {'status':'accepting_requests','modelReady':ready.is_set()}
+async def ping():
+    if bootstrap_error: raise HTTPException(status_code=503,detail=f'distilled_bootstrap_failed:{bootstrap_error}')
+    if not ready.is_set(): return Response(status_code=204)
+    return {'status':'ready','modelReady':True,'model':MODEL}
 @app.get('/ready')
 async def is_ready():
     if bootstrap_error: raise HTTPException(status_code=503,detail=f'distilled_bootstrap_failed:{bootstrap_error}')
@@ -333,23 +336,47 @@ export async function massDistilledRuntimeHealth(endpointId:string){
   const key=configuredRunpodApiKey(); if(!key) throw new Error('RUNPOD_API_KEY is not configured')
   const response=await fetch(`${SERVERLESS_API}/${endpointId}/health`,{headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(HEALTH_TIMEOUT_MS)})
   const raw=await response.text(); let payload:any={}; try{payload=JSON.parse(raw)}catch{}
-  return Object.freeze({ok:response.ok,httpStatus:response.status,jobs:{inProgress:Number(payload?.jobs?.inProgress||0),inQueue:Number(payload?.jobs?.inQueue||0),failed:Number(payload?.jobs?.failed||0),completed:Number(payload?.jobs?.completed||0)},workers:{idle:Number(payload?.workers?.idle||0),running:Number(payload?.workers?.running||0)},error:response.ok?null:(safeError(raw)||`HTTP ${response.status}`)})
+  return Object.freeze({ok:response.ok,httpStatus:response.status,jobs:{inProgress:Number(payload?.jobs?.inProgress||0),inQueue:Number(payload?.jobs?.inQueue||0),failed:Number(payload?.jobs?.failed||0),completed:Number(payload?.jobs?.completed||0)},workers:{idle:Number(payload?.workers?.idle||0),ready:Number(payload?.workers?.ready||0),running:Number(payload?.workers?.running||0),initializing:Number(payload?.workers?.initializing||0)},error:response.ok?null:(safeError(raw)||`HTTP ${response.status}`)})
 }
 
 export async function canaryMassDistilledRuntime(input:{endpointId:string;modelName:string}){
   const key=configuredRunpodApiKey(); if(!key) throw new Error('RUNPOD_API_KEY is not configured')
-  const root=`https://${input.endpointId}.api.runpod.ai`; const deadline=Date.now()+READY_TIMEOUT_MS; let lastStatus:number|null=null; let lastError:string|null=null
-  while(Date.now()<deadline){
+  const root=`https://${input.endpointId}.api.runpod.ai`
+  const deadline=Date.now()+READY_TIMEOUT_MS
+  let lastStatus:number|null=null
+  let lastError:string|null=null
+  let readyObserved=false
+
+  // A single direct LB request wakes scale-to-zero compute. RunPod does not route custom paths until
+  // the worker's configured /ping health check returns 200, so do not hold a /ready request open for
+  // the provider's ~2 minute "no worker available" gateway timeout. The gateway itself returns 204
+  // from /ping while vLLM is booting, which keeps the worker initializing rather than prematurely routable.
+  try{
+    const wake=await fetch(`${root}/ping`,{
+      headers:{Authorization:`Bearer ${key}`},
+      signal:AbortSignal.timeout(Math.min(20_000,Math.max(1000,deadline-Date.now()))),
+    })
+    lastStatus=wake.status
+    if(wake.status===401||wake.status===403) return {ok:false,httpStatus:wake.status,text:null,error:`mass_distilled_runtime_wake_http_${wake.status}`}
+    if(wake.status===200) readyObserved=true
+  }catch{
+    // The wake request is expected to miss/timeout while a scale-to-zero LB has no healthy worker.
+    // Readiness is authoritatively observed below through RunPod's endpoint health control plane.
+  }
+
+  while(!readyObserved&&Date.now()<deadline){
     try{
-      const response=await fetch(`${root}/ready`,{headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(Math.min(120000,Math.max(1000,deadline-Date.now())))})
-      lastStatus=response.status; const raw=await response.text()
-      if(response.status===200){let payload:any={};try{payload=raw?JSON.parse(raw):{}}catch{};if(payload?.ready===true) break}
-      const detail=safeError(raw); if(detail) lastError=detail
-      if(response.status===503&&detail?.includes('distilled_bootstrap_failed')) return {ok:false,httpStatus:response.status,text:null,error:detail}
-    }catch(error){lastError=error instanceof Error?clean(error.message):'mass_distilled_ready_failed'}
+      const health=await massDistilledRuntimeHealth(input.endpointId)
+      lastStatus=health.httpStatus
+      if(!health.ok&&health.error) lastError=health.error
+      if(health.workers.ready>0){readyObserved=true;break}
+    }catch(error){
+      lastError=error instanceof Error?clean(error.message):'mass_distilled_health_probe_failed'
+    }
     if(Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,Math.min(3000,Math.max(0,deadline-Date.now()))))
   }
-  if(lastStatus!==200) return {ok:false,httpStatus:lastStatus,text:null,error:lastError||'mass_distilled_internal_vllm_not_ready'}
+  if(!readyObserved) return {ok:false,httpStatus:lastStatus,text:null,error:lastError||'mass_distilled_runtime_worker_not_ready'}
+
   try{
     const response=await fetch(`${root}/v1/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.modelName,max_tokens:64,temperature:0,chat_template_kwargs:{enable_thinking:false},messages:[{role:'system',content:'Return one concise sentence. Do not reveal hidden reasoning.'},{role:'user',content:'State the operational principle: evidence should be separated from inference.'}]}),signal:AbortSignal.timeout(CANARY_TIMEOUT_MS)})
     const raw=await response.text(); if(!response.ok) return {ok:false,httpStatus:response.status,text:null,error:safeError(raw)||`HTTP ${response.status}`}

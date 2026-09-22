@@ -1,6 +1,6 @@
 // saas/lib/provider-framework/supabase.ts
 import { randomUUID } from 'node:crypto'
-import { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'\nimport { executeSupervisedProviderCall } from './supervised-executor.ts'\nimport { UNIVERSAL_PROVIDER_SCHEMA_VERSION, type UniversalProviderCapability, type UniversalProviderHealth, type UniversalProviderMetadata, type UniversalProviderSdk } from './types.ts'
 
 export const SUPABASE_PROVIDER_ID = 'supabase' as const
 export const supabaseCapabilities = [

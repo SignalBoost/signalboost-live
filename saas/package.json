@@ -68,7 +68,8 @@
     "translate:i18n-generated-ui": "node scripts/translate-generated-ui-locales.mjs --write",
     "translate:i18n-generated-ui-public": "node scripts/translate-generated-ui-locales-public.mjs --write",
     "repair:i18n-generated-ui": "node scripts/repair-generated-ui-token-mismatches.mjs",
-    "test:cos-langgraph": "node --test tests/cosLangGraph.node.test.ts"
+    "test:cos-langgraph": "node --test tests/cosLangGraph.node.test.ts",
+    "test:platform-harness": "node --test tests/platformHarness.node.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",

@@ -1,2 +1,2 @@
-base_sha=da795d8113a48fa3a71c33f9cb8d6800c28313f0
-branch=fix/actions-backlog-ghost-retention-20260922
+base_sha=e88d276cc7cbb33d09c27787e8514d1ef28b26e1
+branch=fix/mass-evaluator-json-filter-400-20260922

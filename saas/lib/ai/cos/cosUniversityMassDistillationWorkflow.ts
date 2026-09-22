@@ -112,6 +112,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
 }): Promise<{
   response: Record<string, unknown>
   invocationSucceeded: boolean
+  transportSucceeded: boolean
   skipped: boolean
 }> {
   const now = input.now || new Date()
@@ -276,8 +277,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   const capacityRecoverySkipped = 'skipped' in capacityRecovery && capacityRecovery.skipped === true
   const skipped = consumerSkipped && reconciliationSkipped && diagnosticsSkipped
     && stalledDispatchRecoverySkipped && recoverySkipped && capacityRecoverySkipped
-  const invocationSucceeded = result.ok === true
-    && reconciliation.ok === true
+  const supportingStepsSucceeded = reconciliation.ok === true
     && diagnostics.ok === true
     && stalledDispatchRecovery.ok === true
     && recovery.ok === true
@@ -290,6 +290,19 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
     && capacityRecovery.ok === true
     && postRecoveryAuthorization.ok === true
     && postRecoveryConsumer.ok === true
+  const invocationSucceeded = result.ok === true && supportingStepsSucceeded
+  // A provider-stage miss remains failed evidence, but when the consumer explicitly schedules a bounded
+  // retry and every surrounding control/recovery step is healthy, the cron transport itself is healthy.
+  // This prevents Vercel from treating self-healing progress as an outage while preserving the failed
+  // stage in the durable Production receipt. Hard failures, blocked retries, or any unhealthy supporting
+  // step remain transport failures.
+  const retryScheduled = result.ok !== true
+    && result.degraded === true
+    && result.automaticRetryAuthorized === true
+    && result.automaticPromotionAuthorized === false
+    && result.runpodMutationAuthorized === false
+    && result.semantics === 'failed_stages_scheduled_for_bounded_retry_while_other_campaign_work_continues'
+  const transportSucceeded = invocationSucceeded || (retryScheduled && supportingStepsSucceeded)
 
   return {
     response: {
@@ -318,9 +331,12 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       rollingAuthorization,
       slowMaintenanceDue,
       workflowSource: input.source,
+      retryScheduled,
+      transportSucceeded,
       workflowSemantics: 'detect_repair_evict_inert_capacity_same_tick_reauthorize_dispatch_fill_available_dynamic_capacity_dispatch_any_compatible_lane_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
     },
     invocationSucceeded,
+    transportSucceeded,
     skipped,
   }
 }
@@ -331,6 +347,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
 }): Promise<{
   response: Record<string, unknown>
   invocationSucceeded: boolean
+  transportSucceeded: boolean
   skipped: boolean
 }> {
   let lease: Awaited<ReturnType<typeof claimUniversityMassDistillationWorkflowLease>>
@@ -353,6 +370,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
         workflowLease: { acquired: false, failClosed: true },
       },
       invocationSucceeded: false,
+      transportSucceeded: false,
       skipped: false,
     }
   }
@@ -374,6 +392,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
         authorityExpanded: false,
       },
       invocationSucceeded: true,
+      transportSucceeded: true,
       skipped: true,
     }
   }

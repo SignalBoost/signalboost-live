@@ -110,6 +110,23 @@ test('mass campaign has a signed callback and a bounded scheduled consumer', () 
 })
 
 
+test('bounded retry degradation remains failed evidence without becoming a cron transport outage', () => {
+  const cron = source('../app/api/cron/cos-university-mass-distillation/route.ts')
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  assert.match(workflow, /const supportingStepsSucceeded = reconciliation\.ok === true/)
+  assert.match(workflow, /const retryScheduled = result\.ok !== true/)
+  assert.match(workflow, /result\.degraded === true/)
+  assert.match(workflow, /result\.automaticRetryAuthorized === true/)
+  assert.match(workflow, /result\.automaticPromotionAuthorized === false/)
+  assert.match(workflow, /result\.runpodMutationAuthorized === false/)
+  assert.match(workflow, /failed_stages_scheduled_for_bounded_retry_while_other_campaign_work_continues/)
+  assert.match(workflow, /const transportSucceeded = invocationSucceeded \|\| \(retryScheduled && supportingStepsSucceeded\)/)
+  assert.match(cron, /response, invocationSucceeded, transportSucceeded, skipped/)
+  assert.match(cron, /invocationSucceeded,/)
+  assert.match(cron, /status: transportSucceeded \? 200 : 503/)
+  assert.doesNotMatch(cron, /status: invocationSucceeded \? 200 : 503/)
+})
+
 test('recovery terminalizes pre-existing semantic failures and frees their prepared batches', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   assert.match(consumer, /terminalizedSemanticFailures/)

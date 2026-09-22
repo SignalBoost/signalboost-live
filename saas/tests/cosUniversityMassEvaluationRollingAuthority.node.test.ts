@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import {
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
   MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
+  MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   MASS_EVALUATION_MAX_IN_FLIGHT,
@@ -117,6 +118,64 @@ test('confirmed v2 Computer Science proof sampling outranks legacy work only unt
   assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
 })
 
+test('post-GKD remediation replay proof sampling is bounded and never bypasses the 12-hour delay', () => {
+  assert.equal(MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE, 2)
+  const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
+  const replay = {
+    ...artifactA,
+    candidateId: 'mass:replay-proof:1',
+    artifactHash: '4'.repeat(64),
+    createdAt: '2026-09-15T22:34:00Z',
+    remediationReplay: true,
+  }
+  const replayCanary = ev(replay.candidateId, 'host_production_verifier', {
+    claim: 'production_canary_healthy',
+    artifactHash: replay.artifactHash,
+    exactArtifact: true,
+    productionTrafficAuthorized: false,
+  })
+  const proof = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, replay],
+    events: [canary(legacy as typeof artifactA), replayCanary],
+    now,
+    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+    builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
+    remediationReplayProofCompletions: 0,
+  })
+  assert.equal(proof.issue && proof.artifact.candidateId, replay.candidateId)
+  if (proof.issue) assert.equal(proof.evidence.remediationReplayProofPriority, true)
+
+  const normal = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, replay],
+    events: [canary(legacy as typeof artifactA), replayCanary],
+    now,
+    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+    builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
+    remediationReplayProofCompletions: MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  })
+  assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
+
+  const freshReplay = { ...replay, candidateId: 'mass:replay-proof:fresh', artifactHash: '3'.repeat(64), createdAt: '2026-09-16T10:00:00Z' }
+  const freshCanary = ev(freshReplay.candidateId, 'host_production_verifier', {
+    claim: 'production_canary_healthy',
+    artifactHash: freshReplay.artifactHash,
+    exactArtifact: true,
+    productionTrafficAuthorized: false,
+  })
+  const retained = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, freshReplay],
+    events: [canary(legacy as typeof artifactA), freshCanary],
+    now,
+    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+    builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
+    remediationReplayProofCompletions: 0,
+  })
+  assert.equal(retained.issue && retained.artifact.candidateId, legacy.candidateId)
+})
+
 test('v2 Builder evaluation priority never bypasses the 12-hour retention delay', () => {
   const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
   const freshBuilder = {
@@ -172,19 +231,24 @@ test('an infrastructure-failed frontier start remains proof-prioritized until a 
   assert.equal(decision.issue && decision.artifact.candidateId, frontier.candidateId)
 })
 
-test('cron scans bounded legacy work, explicitly includes v2 CS, and measures both proof cohorts durably', () => {
+test('cron scans bounded legacy work and explicitly includes both Builder v2 and remediation replay proof cohorts', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /const \[oldestArtifacts, builderV2Artifacts\] = await Promise\.all/)
+  assert.match(route, /const \[oldestArtifacts, builderV2Artifacts, replayArtifacts\] = await Promise\.all/)
   assert.match(route, /\.limit\(500\)/)
   assert.match(route, /\.eq\('subject_id', 'Computer Science & Coding'\)/)
   assert.match(route, /optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER/)
   assert.match(route, /frontierRecipe: receipt\.profile === 'cos_university_frontier_gkd_v1'/)
   assert.match(route, /builderV2:/)
+  assert.match(route, /remediationReplay: isRemediationReplayReceipt/)
+  assert.match(route, /failureDerivedReplayRequired/)
+  assert.match(route, /failureDerivedReplayItems/)
   assert.match(route, /frontierResponseAnchorItems/)
   assert.match(route, /cos_university_distilled_evaluation_runs/)
   assert.match(route, /builderV2ProofCompletions = new Set/)
+  assert.match(route, /remediationReplayProofCompletions = new Set/)
   assert.match(route, /frontierProofCompletions = new Set/)
   assert.match(route, /MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE/)
+  assert.match(route, /MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE/)
   assert.match(route, /MASS_EVALUATION_FRONTIER_PROOF_SAMPLE/)
 })
 

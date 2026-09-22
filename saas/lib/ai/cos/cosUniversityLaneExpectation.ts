@@ -97,6 +97,7 @@ const OPERATIONAL_IDLE_OK_PATHS: ReadonlySet<string> = new Set([
   'mass_distillation_campaign',
   'mass_distillation_supervision',
   'graduate_runtime_activation',
+  'practical_residency',
 ])
 
 export function cosUniversityLaneExpectation(

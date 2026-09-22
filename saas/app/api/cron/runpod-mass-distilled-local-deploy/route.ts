@@ -118,24 +118,26 @@ async function readRollingCanaryEvents(db:any,candidateIds:string[]){
 async function builderResidencyCompletions(db:any,artifacts:any[]){
   const builderArtifacts=artifacts.filter((row:any)=>isBuilderResidencySubject(row?.subject_id))
   const candidateIds=[...new Set(builderArtifacts.map((row:any)=>clean(row?.candidate_id,240)).filter(Boolean))]
-  const completions=new Map<string,string>()
-  if(!candidateIds.length) return completions
+  const gates=new Map<string,{enforced:boolean;completedAt:string|null}>()
+  if(!candidateIds.length) return gates
   const result=await db.from('cos_university_residency_enrollments')
-    .select('candidate_id,trained_artifact_hash,standing,completed_at')
+    .select('candidate_id,trained_artifact_hash,standing,completed_at,gate_enforced')
     .eq('program_id',BUILDER_RESIDENCY_PROGRAM_ID)
-    .eq('standing','residency_complete')
     .in('candidate_id',candidateIds)
     .limit(500)
   if(result.error) throw result.error
   for(const row of result.data||[]){
     const candidateId=clean((row as any).candidate_id,240)
     const artifactHash=clean((row as any).trained_artifact_hash,64).toLowerCase()
-    const completedAt=clean((row as any).completed_at,80)
-    if(candidateId&&HEX64.test(artifactHash)&&Number.isFinite(Date.parse(completedAt))){
-      completions.set(candidateId+':'+artifactHash,completedAt)
+    const completedAtRaw=clean((row as any).completed_at,80)
+    const completedAt=(row as any).standing==='residency_complete'&&Number.isFinite(Date.parse(completedAtRaw))
+      ? completedAtRaw
+      : null
+    if(candidateId&&HEX64.test(artifactHash)){
+      gates.set(candidateId+':'+artifactHash,{enforced:(row as any).gate_enforced===true,completedAt})
     }
   }
-  return completions
+  return gates
 }
 
 // Issues at most one bounded canary approval per tick before the unchanged atomic claim.
@@ -197,7 +199,8 @@ async function issueRollingCanaryApproval(now:Date){
   const artifactRows=unfilteredArtifactRows.filter((row:any)=>{
     if(!isBuilderResidencySubject(row?.subject_id)) return true
     const key=clean(row?.candidate_id,240)+':'+clean(row?.trained_artifact_hash,64).toLowerCase()
-    return residencyCompletions.has(key)
+    const gate=residencyCompletions.get(key)
+    return !gate?.enforced || Boolean(gate.completedAt)
   })
   const proofCandidateIds=[
     ...confirmedBuilderArtifacts.map((row:any)=>String(row.candidate_id)),
@@ -216,9 +219,10 @@ async function issueRollingCanaryApproval(now:Date){
     if(String(row?.evidence?.claim||'')!=='local_distilled_runtime_canary_passed') return true
     const candidateId=clean(row?.candidate_id,240)
     const artifactHash=clean(row?.evidence?.artifactHash,64).toLowerCase()
-    const completedAt=residencyCompletions.get(candidateId+':'+artifactHash)
-    if(!completedAt) return !isBuilderResidencySubject(artifactByCandidate.get(candidateId)?.subject_id)
-    return Date.parse(String(row?.observed_at||''))>=Date.parse(completedAt)
+    const gate=residencyCompletions.get(candidateId+':'+artifactHash)
+    if(!gate?.enforced) return true
+    if(!gate.completedAt) return false
+    return Date.parse(String(row?.observed_at||''))>=Date.parse(gate.completedAt)
   })
   const passedCandidates=new Set(policyEventRows
     .filter((row:any)=>String(row?.evidence?.claim||'')==='local_distilled_runtime_canary_passed')

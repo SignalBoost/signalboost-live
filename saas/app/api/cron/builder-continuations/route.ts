@@ -9,11 +9,11 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type OwnedRepairKind = 'site' | 'audit' | 'university'
+type OwnedRepairKind = 'site' | 'audit' | 'university' | 'playwright-cli-canary'
 type QueuedOwnedRepair = { id: string; userId: string; kind: OwnedRepairKind; createdAt: string }
 
 async function queuedOwnedRepair(
-  metadataKey: 'selfHealingOwnedSite' | 'selfHealingOwnedAudit' | 'selfHealingUniversityDistillation',
+  metadataKey: 'selfHealingOwnedSite' | 'selfHealingOwnedAudit' | 'selfHealingUniversityDistillation' | 'builderPlaywrightCliCanary',
   kind: OwnedRepairKind,
 ): Promise<QueuedOwnedRepair | null> {
   const db = getAdminSupabase()
@@ -59,9 +59,14 @@ export async function GET(request: Request) {
     retryFailedOwnedAuditEngineRepair(admin),
     retryFailedUniversityDistillationRepair(admin),
   ])
-  const ownedRepairs = await queuedOwnedSelfHealingRepairs()
+  const [ownedRepairs, playwrightCliCanary] = await Promise.all([
+    queuedOwnedSelfHealingRepairs(),
+    queuedOwnedRepair('builderPlaywrightCliCanary', 'playwright-cli-canary'),
+  ])
   const unique = new Map<string, { id: string; userId: string }>()
-  for (const job of [...continuations, ...ownedRepairs]) unique.set(job.id, { id: job.id, userId: job.userId })
+  for (const job of [...continuations, ...ownedRepairs, ...(playwrightCliCanary ? [playwrightCliCanary] : [])]) {
+    unique.set(job.id, { id: job.id, userId: job.userId })
+  }
   const jobs = [...unique.values()]
 
   // A single RunPod reasoner serves Builder. Running several continuations in Promise.all overloaded
@@ -78,6 +83,7 @@ export async function GET(request: Request) {
     ownedSiteRepairQueued: ownedRepairs.some(job => job.kind === 'site'),
     ownedAuditRepairQueued: ownedRepairs.some(job => job.kind === 'audit'),
     universityDistillationRepairQueued: ownedRepairs.some(job => job.kind === 'university'),
+    playwrightCliCanaryQueued: playwrightCliCanary !== null,
     ownedAuditRepairRetried: auditRetry.retried,
     ownedAuditRepairRetryAttempt: auditRetry.attempt,
     universityDistillationRepairRetried: universityRetry.retried,

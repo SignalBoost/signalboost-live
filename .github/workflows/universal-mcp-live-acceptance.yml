@@ -28,6 +28,10 @@ concurrency:
 
 jobs:
   live-universal-mcp:
+    # Do not allocate a paid Actions runner while the required Figma custom client
+    # is externally blocked. Flip both repository variables only after Figma approval
+    # and the host-owned per-user OAuth connection are Production-ready.
+    if: ${{ vars.FIGMA_MCP_CLIENT_APPROVED == 'true' && vars.FIGMA_MCP_USER_OAUTH_READY == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

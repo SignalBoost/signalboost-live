@@ -10,6 +10,9 @@ export type ResidencyLevel = (typeof RESIDENCY_LEVELS)[number]
 export const RESIDENCY_COMPETENCY_STATES = ['unproven','supervised','demonstrated','retained','remediation_required'] as const
 export type ResidencyCompetencyState = (typeof RESIDENCY_COMPETENCY_STATES)[number]
 
+export const RESIDENCY_STANDINGS = ['resident','senior_resident','residency_complete','remediation_required'] as const
+export type ResidencyStanding = (typeof RESIDENCY_STANDINGS)[number]
+
 export const BUILDER_RESIDENCY_V1_COMPETENCIES = Object.freeze([
   'repository_navigation',
   'root_cause_diagnosis',
@@ -194,9 +197,10 @@ export function assessBuilderResidency(evidence:readonly ResidencyEvidenceForAss
   const demonstrated=competencies.filter(row=>row.state==='demonstrated'||row.state==='retained').length
   const retained=competencies.filter(row=>row.state==='retained').length
   const complete=demonstrated===BUILDER_RESIDENCY_V1_COMPETENCIES.length
-  const standing:ResidencyLevel=complete?'graduate_specialist'
-    :demonstrated>=Math.ceil(BUILDER_RESIDENCY_V1_COMPETENCIES.length/2)?'senior_resident'
-      :'resident'
+  const standing:ResidencyStanding=remediation.length>0?'remediation_required'
+    :complete?'residency_complete'
+      :demonstrated>=Math.ceil(BUILDER_RESIDENCY_V1_COMPETENCIES.length/2)?'senior_resident'
+        :'resident'
 
   return Object.freeze({
     profile:COS_UNIVERSITY_RESIDENCY_VERSION,

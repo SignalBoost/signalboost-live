@@ -38,6 +38,8 @@ type Copy = Readonly<{
   artifactsExplanation: string
   artifactStatus: string
   retentionGate: string
+  claimability: string
+  claimabilityStates: Readonly<Record<string, string>>
   holdout: string
   safety: string
   transfer: string
@@ -88,6 +90,8 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     artifactsExplanation: 'Read-only artifact lifecycle evidence. This view does not authorize evaluation, graduation, activation, or Production traffic.',
     artifactStatus: 'Artifact status',
     retentionGate: '12h eligible at',
+    claimability: 'Evaluator state',
+    claimabilityStates: { waiting_12h:'Waiting 12h', missing_approval:'Missing approval', approval_suspended:'Approval suspended', approval_expired:'Approval expired', missing_exact_canary:'Missing exact canary', active_reservation:'Evaluation running', evaluator_failed:'Evaluator failed', claimable:'Claimable', not_evaluation_pending:'Not pending' },
     holdout: 'Holdout',
     safety: 'Safety',
     transfer: 'Transfer',
@@ -136,6 +140,8 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     artifactsExplanation: 'Evidencia de solo lectura del ciclo de vida del artefacto. Esta vista no autoriza evaluación, graduación, activación ni tráfico de Producción.',
     artifactStatus: 'Estado del artefacto',
     retentionGate: 'Elegible 12 h',
+    claimability: 'Estado del evaluador',
+    claimabilityStates: { waiting_12h:'Esperando 12 h', missing_approval:'Falta aprobación', approval_suspended:'Aprobación suspendida', approval_expired:'Aprobación vencida', missing_exact_canary:'Falta canary exacto', active_reservation:'Evaluación en curso', evaluator_failed:'Evaluador falló', claimable:'Reclamable', not_evaluation_pending:'No pendiente' },
     holdout: 'Holdout',
     safety: 'Seguridad',
     transfer: 'Transferencia',
@@ -184,6 +190,8 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     artifactsExplanation: 'Evidência somente leitura do ciclo de vida do artefato. Esta tela não autoriza avaliação, graduação, ativação ou tráfego de Produção.',
     artifactStatus: 'Status do artefato',
     retentionGate: 'Elegível em 12 h',
+    claimability: 'Estado do avaliador',
+    claimabilityStates: { waiting_12h:'Aguardando 12 h', missing_approval:'Falta aprovação', approval_suspended:'Aprovação suspensa', approval_expired:'Aprovação expirada', missing_exact_canary:'Falta canário exato', active_reservation:'Avaliação em execução', evaluator_failed:'Avaliador falhou', claimable:'Elegível para claim', not_evaluation_pending:'Não pendente' },
     holdout: 'Holdout',
     safety: 'Segurança',
     transfer: 'Transferência',
@@ -232,6 +240,8 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     artifactsExplanation: 'Dowody cyklu życia artefaktu tylko do odczytu. Ten widok nie autoryzuje oceny, ukończenia, aktywacji ani ruchu Produkcyjnego.',
     artifactStatus: 'Status artefaktu',
     retentionGate: 'Kwalifikacja po 12 h',
+    claimability: 'Stan ewaluatora',
+    claimabilityStates: { waiting_12h:'Oczekiwanie 12 h', missing_approval:'Brak zatwierdzenia', approval_suspended:'Zatwierdzenie wstrzymane', approval_expired:'Zatwierdzenie wygasło', missing_exact_canary:'Brak dokładnego canary', active_reservation:'Ocena w toku', evaluator_failed:'Błąd ewaluatora', claimable:'Gotowy do claim', not_evaluation_pending:'Nie oczekuje' },
     holdout: 'Holdout',
     safety: 'Bezpieczeństwo',
     transfer: 'Transfer',
@@ -280,6 +290,8 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     artifactsExplanation: 'Данные жизненного цикла артефакта только для чтения. Этот экран не разрешает оценку, выпуск, активацию или производственный трафик.',
     artifactStatus: 'Статус артефакта',
     retentionGate: 'Допуск через 12 ч',
+    claimability: 'Состояние оценщика',
+    claimabilityStates: { waiting_12h:'Ожидание 12 ч', missing_approval:'Нет разрешения', approval_suspended:'Разрешение приостановлено', approval_expired:'Разрешение истекло', missing_exact_canary:'Нет точного canary', active_reservation:'Оценка выполняется', evaluator_failed:'Ошибка оценщика', claimable:'Готов к claim', not_evaluation_pending:'Не ожидает' },
     holdout: 'Holdout',
     safety: 'Безопасность',
     transfer: 'Перенос',

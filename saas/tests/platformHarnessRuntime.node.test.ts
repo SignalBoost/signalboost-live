@@ -20,6 +20,7 @@ import {
   createReplayHarnessRequest,
   createEvaluationRuntimeHarnessRequest,
   createHarnessEvidenceRecord,
+  completeHarnessRun,
   resolveHarnessManifest,
   runHarnessWorker,
   type HarnessAuthorityEnvelope,
@@ -459,4 +460,26 @@ test('Durable Harness evidence is metadata-only and identity-bound', () => {
   assert.equal(serialized.includes(decision.manifest.objective),false)
   assert.equal(record.authorityExpanded,false)
   assert.throws(()=>createHarnessEvidenceRecord(decision.manifest,{...result,runId:'other-run'}),/harness_evidence_identity_mismatch/)
+})
+
+
+test('Harness completion persists evidence before routing infrastructure failure', async () => {
+  const decision=resolveHarnessManifest(request(),authority)
+  assert.equal(decision.allowed,true)
+  if(!decision.allowed) return
+  const order:string[]=[]
+  const result:HarnessRunResult={runId:decision.manifest.runId,profile:decision.manifest.profile,trajectory:[{runId:decision.manifest.runId,sequence:1,at:'2026-09-22T23:30:00Z',kind:'failure',summary:'provider unavailable',evidenceRefs:['evidence://provider-down']}],outcome:{status:'infrastructure_failure',failureCode:'provider_unavailable'},authorityExpanded:false,productionMutationObserved:false}
+  const completed=await completeHarnessRun({manifest:decision.manifest,result,evidenceSink:{async append(record){order.push('persist');assert.equal(record.outcomeStatus,'infrastructure_failure')}}})
+  order.push('route')
+  assert.deepEqual(order,['persist','route'])
+  assert.equal(completed.route.destination,'self_healing')
+  assert.equal(completed.evidence.authorityExpanded,false)
+})
+
+test('Harness completion does not route when durable evidence persistence fails', async () => {
+  const decision=resolveHarnessManifest(request(),authority)
+  assert.equal(decision.allowed,true)
+  if(!decision.allowed) return
+  const result:HarnessRunResult={runId:decision.manifest.runId,profile:decision.manifest.profile,trajectory:[],outcome:{status:'authority_halt',failureCode:'scope_denied'},authorityExpanded:false,productionMutationObserved:false}
+  await assert.rejects(()=>completeHarnessRun({manifest:decision.manifest,result,evidenceSink:{async append(){throw new Error('evidence_sink_unavailable')}}}),/evidence_sink_unavailable/)
 })

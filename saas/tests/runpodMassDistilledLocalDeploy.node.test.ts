@@ -78,6 +78,10 @@ test('mass-distilled provisioning recovers an omitted v2 endpoint id from the of
   assert.match(provision, /requestV1<RestEndpointIdentity\[\]>\('\/endpoints'\)/)
   assert.match(provision, /clean\(item\.name,240\)===endpointName/)
   assert.match(provision, /endpoint=await recoverEndpointId\(endpoint,ids\.endpointName\)/)
+  assert.match(provision, /ENDPOINT_VISIBILITY_ATTEMPTS = 12/)
+  assert.match(provision, /ENDPOINT_VISIBILITY_RETRY_MS = 2_000/)
+  assert.equal((provision.match(/attempt<ENDPOINT_VISIBILITY_ATTEMPTS/g) || []).length, 2)
+  assert.match(provision, /Never issue a second create while identity is settling/)
 })
 
 test('204 is never treated as inference-ready for mass artifacts', () => {

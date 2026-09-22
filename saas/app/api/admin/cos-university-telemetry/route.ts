@@ -12,6 +12,9 @@ const RUNS = 'cos_university_mass_distillation_batch_runs'
 const CAMPAIGNS = 'cos_university_mass_distillation_campaigns'
 const TEACHERS = 'cos_university_mass_hosted_teacher_rows'
 const PROVIDER_JOBS = 'cos_university_mass_distillation_provider_jobs'
+const ARTIFACTS = 'cos_local_distillation_artifacts'
+const EVALUATIONS = 'cos_university_distilled_evaluation_runs'
+const GRADUATES = 'cos_university_graduate_model_registry'
 const WINDOW_HOURS = 24
 
 function n(value: unknown): number {
@@ -71,7 +74,7 @@ export async function GET() {
     const db = getAdminSupabase()
     const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString()
 
-    const [runsResult, campaignsResult] = await Promise.all([
+    const [runsResult, campaignsResult, artifactsResult, evaluationsResult, graduatesResult] = await Promise.all([
       db.from(RUNS)
         .select('id,campaign_id,subject_id,stage,failure_reason,teacher_model_id,teacher_source_ref,teacher_output_hashes,preparation_job_id,preparation_job_url,training_job_id,training_job_url,trained_artifact_id,created_at,updated_at,completed_at')
         .order('updated_at', { ascending: false })
@@ -80,9 +83,24 @@ export async function GET() {
         .select('id,status,batch_count,max_total_cost_usd,committed_cost_usd,authorized_at,expires_at,completed_at,created_at,updated_at')
         .order('updated_at', { ascending: false })
         .limit(12),
+      db.from(ARTIFACTS)
+        .select('candidate_id,subject_id,status,trained_artifact_id,trained_artifact_hash,revision_key,created_at,updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(100),
+      db.from(EVALUATIONS)
+        .select('candidate_id,trained_artifact_hash,artifact_age_seconds,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      db.from(GRADUATES)
+        .select('candidate_id,trained_artifact_hash,status,runtime_provider,runtime_model_id,promoted_at,activated_at,updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(100),
     ])
     if (runsResult.error) throw runsResult.error
     if (campaignsResult.error) throw campaignsResult.error
+    if (artifactsResult.error) throw artifactsResult.error
+    if (evaluationsResult.error) throw evaluationsResult.error
+    if (graduatesResult.error) throw graduatesResult.error
 
     const runs = runsResult.data || []
     const runIds = runs.map((row: any) => text(row.id, 80)).filter(Boolean)
@@ -249,6 +267,54 @@ export async function GET() {
       return acc
     }, {})
 
+    const latestEvaluationByArtifact = new Map<string, any>()
+    for (const row of evaluationsResult.data || []) {
+      const key = text(row.candidate_id, 240) + ':' + text(row.trained_artifact_hash, 80)
+      if (!latestEvaluationByArtifact.has(key)) latestEvaluationByArtifact.set(key, row)
+    }
+    const graduateByArtifact = new Map<string, any>()
+    for (const row of graduatesResult.data || []) {
+      const key = text(row.candidate_id, 240) + ':' + text(row.trained_artifact_hash, 80)
+      if (!graduateByArtifact.has(key)) graduateByArtifact.set(key, row)
+    }
+    const artifacts = (artifactsResult.data || []).map((artifact: any) => {
+      const candidateId = text(artifact.candidate_id, 240)
+      const artifactHash = text(artifact.trained_artifact_hash, 80)
+      const evaluation = latestEvaluationByArtifact.get(candidateId + ':' + artifactHash) || null
+      const graduate = graduateByArtifact.get(candidateId + ':' + artifactHash) || null
+      const createdAt = iso(artifact.created_at)
+      const ageSeconds = createdAt ? Math.max(0, Math.floor((Date.now() - Date.parse(createdAt)) / 1000)) : null
+      return {
+        candidateId,
+        subject: text(artifact.subject_id, 240),
+        status: text(artifact.status, 80),
+        artifactId: text(artifact.trained_artifact_id, 240) || null,
+        artifactHash: artifactHash || null,
+        revisionKey: text(artifact.revision_key, 240) || null,
+        ageSeconds,
+        retentionEligibleAt: createdAt ? new Date(Date.parse(createdAt) + 12 * 60 * 60 * 1000).toISOString() : null,
+        evaluation: evaluation ? {
+          evaluatedAt: iso(evaluation.created_at),
+          artifactAgeSeconds: n(evaluation.artifact_age_seconds),
+          baselineScore: n(evaluation.baseline_score),
+          artifactScore: n(evaluation.trained_artifact_score),
+          holdoutImproved: evaluation.holdout_improved === true,
+          safetyPassed: evaluation.safety_passed === true,
+          unseenTransferPassed: evaluation.unseen_transfer_passed === true,
+          delayedRetentionPassed: evaluation.delayed_retention_passed === true,
+        } : null,
+        graduate: graduate ? {
+          status: text(graduate.status, 80),
+          runtimeProvider: text(graduate.runtime_provider, 120) || null,
+          runtimeModelId: text(graduate.runtime_model_id, 240) || null,
+          promotedAt: iso(graduate.promoted_at),
+          activatedAt: iso(graduate.activated_at),
+          updatedAt: iso(graduate.updated_at),
+        } : null,
+        updatedAt: iso(artifact.updated_at),
+      }
+    })
+
     const hfObservedCostUsd24h = recentJobs.reduce(
       (total: number, job: any) => total + n(job.observed_cost_usd),
       0,
@@ -269,6 +335,7 @@ export async function GET() {
       providers: Array.from(providers.values())
         .sort((a, b) => b.calls - a.calls || a.id.localeCompare(b.id)),
       runs: recentRuns,
+      artifacts,
       campaigns: (campaignsResult.data || []).map((campaign: any) => ({
         id: text(campaign.id, 80),
         status: text(campaign.status, 80),

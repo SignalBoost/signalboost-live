@@ -7,6 +7,7 @@ import {
   MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+  MASS_EVALUATION_MAX_IN_FLIGHT,
   MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
   MASS_EVALUATION_REOPEN_CLAIM,
   MASS_EVALUATION_ROLLING_MAX_APPROVALS,
@@ -29,6 +30,28 @@ test('rolling throughput ceiling matches the owner-approved backlog-drain budget
   // This test pins throughput authority; the per-evaluation claim test below pins the $0.20 boundary itself.
 })
 
+
+test('provider worker quota bounds evaluator admission at three active leases', () => {
+  assert.equal(MASS_EVALUATION_MAX_IN_FLIGHT, 3)
+  const full = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA)],
+    now,
+    inFlightCount: MASS_EVALUATION_MAX_IN_FLIGHT,
+  })
+  assert.equal(full.issue, false)
+  assert.equal(!full.issue && full.reason, 'mass_evaluation_concurrency_full')
+
+  const available = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA)],
+    now,
+    inFlightCount: MASS_EVALUATION_MAX_IN_FLIGHT - 1,
+  })
+  assert.equal(available.issue, true)
+})
 
 test('frontier proof sampling is bounded and then returns to oldest-first order', () => {
   assert.equal(MASS_EVALUATION_FRONTIER_PROOF_SAMPLE, 4)

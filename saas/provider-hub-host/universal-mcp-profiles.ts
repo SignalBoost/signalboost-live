@@ -174,8 +174,25 @@ export function universalMcpToolNames(profile: UniversalMcpServerProfile): reado
   return Object.freeze(profile.tools.map(item => item.remoteToolName).sort())
 }
 
-function mappingsFor(profile: UniversalMcpServerProfile, connectionId: string): readonly McpRegisteredToolMapping[] {
-  return Object.freeze(profile.tools.map(item => Object.freeze({
+function selectedTools(
+  profile: UniversalMcpServerProfile,
+  allowlist?: readonly string[],
+): readonly UniversalMcpToolPolicy[] {
+  if (!allowlist) return profile.tools
+  const allowed = new Set(allowlist.map(value => String(value || '').trim()).filter(Boolean))
+  const known = new Set(profile.tools.map(item => item.remoteToolName))
+  for (const name of allowed) {
+    if (!known.has(name)) throw new Error(`universal_mcp_unknown_tool_allowlist:${profile.profileId}:${name}`)
+  }
+  return Object.freeze(profile.tools.filter(item => allowed.has(item.remoteToolName)))
+}
+
+function mappingsFor(
+  profile: UniversalMcpServerProfile,
+  connectionId: string,
+  allowlist?: readonly string[],
+): readonly McpRegisteredToolMapping[] {
+  return Object.freeze(selectedTools(profile, allowlist).map(item => Object.freeze({
     remoteToolName: item.remoteToolName,
     capabilityId: `mcp.${profile.profileId}.${item.capabilityName}`,
     providerId: profile.serverId,
@@ -196,6 +213,7 @@ export function createUniversalMcpRegistryEntries(input: {
   environmentId: string
   portableId: string
   enabledProfiles: readonly UniversalMcpProfileId[]
+  toolAllowlistByProfile?: Readonly<Partial<Record<UniversalMcpProfileId, readonly string[]>>>
 }): {
   readonly servers: readonly McpRegisteredServer[]
   readonly assignments: readonly McpPortableServerAssignment[]
@@ -221,7 +239,11 @@ export function createUniversalMcpRegistryEntries(input: {
       environmentId: input.environmentId,
       portableId: input.portableId,
       enabled: true,
-      tools: mappingsFor(profile, `${profile.serverId}:${input.environmentId}`),
+      tools: mappingsFor(
+        profile,
+        `${profile.serverId}:${input.environmentId}`,
+        input.toolAllowlistByProfile?.[profile.profileId],
+      ),
     }))),
   })
 }

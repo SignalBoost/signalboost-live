@@ -12,6 +12,7 @@ import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
   MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
+  MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
   MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
   MASS_CANARY_IN_FLIGHT_TTL_MS,
   MASS_CANARY_MAX_IDENTICAL_FAILURES,
@@ -33,6 +34,14 @@ const v2BuilderArtifact = (candidateId: string, hashId: number, createdAt: strin
   frontierResponseAnchorRequired: true,
   frontierResponseAnchorEpochs: 1,
   frontierResponseAnchorItems: 16,
+})
+const replayArtifact = (candidateId: string, hashId: number, createdAt: string): CanaryArtifact => ({
+  candidateId,
+  subjectId: 'Law, Regulation & Governance',
+  artifactHash: h(hashId),
+  createdAt,
+  failureDerivedReplayRequired: true,
+  failureDerivedReplayItems: 3,
 })
 const event = (a: CanaryArtifact, claim: string, observedAt: string, extra: Partial<CanaryEvent> = {}, evidence: Record<string, unknown> = {}): CanaryEvent =>
   ({ candidateId: a.candidateId, observedAt, expiresAt: null, verifier: 'host_controller', evidence: { profile: MASS_CANARY_PROFILE, claim, artifactHash: a.artifactHash, ...evidence }, ...extra })
@@ -88,6 +97,70 @@ test('bounded Builder apprenticeship proof lane counts only confirmed response-a
   })
   assert.ok('artifact' in restored)
   assert.equal(restored.artifact.candidateId, legacy.candidateId)
+})
+
+test('first two post-GKD remediation replay artifacts get bounded canary proof priority after Builder proof is complete', () => {
+  assert.equal(MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE, 2)
+  const proofNow = new Date('2026-09-22T20:00:00.000Z')
+  const legacy = artifact(80, '2026-09-20T00:00:00.000Z')
+  const builderOne = v2BuilderArtifact('mass:builder-done-1', 81, '2026-09-21T17:00:00.000Z')
+  const builderTwo = v2BuilderArtifact('mass:builder-done-2', 82, '2026-09-21T17:10:00.000Z')
+  const replayOne = replayArtifact('mass:replay-1', 83, '2026-09-22T18:07:59.000Z')
+  const replayTwo = replayArtifact('mass:replay-2', 84, '2026-09-22T18:20:00.000Z')
+  const builderDone = [
+    event(builderOne, 'local_distilled_runtime_canary_passed', '2026-09-21T18:00:00.000Z'),
+    event(builderTwo, 'local_distilled_runtime_canary_passed', '2026-09-21T18:10:00.000Z'),
+  ]
+
+  const first = decideMassCanaryRollingApproval({
+    artifacts:[legacy,builderOne,builderTwo,replayTwo,replayOne], events:builderDone, now:proofNow, enabled:true,
+  })
+  assert.ok('artifact' in first)
+  assert.equal(first.artifact.candidateId, replayOne.candidateId)
+  assert.equal(first.evidence.remediationReplayProofPriority, true)
+
+  const firstPassed = event(replayOne, 'local_distilled_runtime_canary_passed', '2026-09-22T18:30:00.000Z')
+  const second = decideMassCanaryRollingApproval({
+    artifacts:[legacy,builderOne,builderTwo,replayTwo,replayOne], events:[...builderDone,firstPassed], now:proofNow, enabled:true,
+  })
+  assert.ok('artifact' in second)
+  assert.equal(second.artifact.candidateId, replayTwo.candidateId)
+
+  const secondPassed = event(replayTwo, 'local_distilled_runtime_canary_passed', '2026-09-22T18:40:00.000Z')
+  const restored = decideMassCanaryRollingApproval({
+    artifacts:[legacy,builderOne,builderTwo,replayTwo,replayOne],
+    events:[...builderDone,firstPassed,secondPassed], now:proofNow, enabled:true,
+  })
+  assert.ok('artifact' in restored)
+  assert.equal(restored.artifact.candidateId, legacy.candidateId)
+})
+
+test('durable proof counts survive proof artifacts leaving the pending canary queue', () => {
+  const proofNow = new Date('2026-09-22T20:00:00.000Z')
+  const legacy = artifact(85, '2026-09-20T00:00:00.000Z')
+  const replay = replayArtifact('mass:replay-durable', 86, '2026-09-22T18:07:59.000Z')
+
+  const replayNeeded = decideMassCanaryRollingApproval({
+    artifacts:[legacy,replay],
+    events:[],
+    now:proofNow,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:0,
+  })
+  assert.ok('artifact' in replayNeeded)
+  assert.equal(replayNeeded.artifact.candidateId,replay.candidateId)
+
+  const cohortsDone = decideMassCanaryRollingApproval({
+    artifacts:[legacy,replay],
+    events:[],
+    now:proofNow,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  })
+  assert.ok('artifact' in cohortsDone)
+  assert.equal(cohortsDone.artifact.candidateId,legacy.candidateId)
 })
 
 test('passed canary keeps its endpoint through one transient independent-evaluation lifecycle failure', () => {
@@ -181,7 +254,7 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.doesNotMatch(route,/\.contains\('evidence',\{profile:MASS_CANARY_PROFILE\}\)/)
   assert.match(route,/db\.rpc\('claim_next_mass_distilled_runtime_canary'\)/)
   assert.match(route,/created_at,intended_use/)
-  assert.match(route,/oldestArtifacts,v2BuilderArtifacts/)
+  assert.match(route,/oldestArtifacts,v2BuilderArtifacts,replayArtifacts/)
   assert.match(route,/\.limit\(200\)/)
   assert.match(route,/\.eq\('subject_id','Computer Science & Coding'\)/)
   assert.match(route,/\.gte\('created_at',MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER\)/)
@@ -191,6 +264,13 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.match(route,/frontierResponseAnchorRequired:receipt\.frontierResponseAnchorRequired===true/)
   assert.match(route,/frontierResponseAnchorEpochs:Number\(receipt\.frontierResponseAnchorEpochs\|\|0\)/)
   assert.match(route,/frontierResponseAnchorItems:Number\(receipt\.frontierResponseAnchorItems\|\|0\)/)
+  assert.match(route,/failureDerivedReplayRequired:receipt\.failureDerivedReplayRequired===true/)
+  assert.match(route,/failureDerivedReplayItems:Number\(receipt\.failureDerivedReplayItems\|\|0\)/)
+  assert.match(route,/contains\('intended_use',\{trainingReceipt:\{failureDerivedReplayRequired:true\}\}\)/)
+  assert.match(route,/builderProofPasses=\[\.\.\.passedCandidates\]/)
+  assert.match(route,/remediationReplayProofPasses=\[\.\.\.passedCandidates\]/)
+  assert.match(route,/builderProofPasses,/)
+  assert.match(route,/remediationReplayProofPasses,/)
   assert.doesNotMatch(route,/productionTrafficAuthorized:true|automaticPromotionAuthorized:true/)
 })
 

@@ -1,2 +1,2 @@
-base_sha=cb82bf40b05780a70582e7ec99b250599cd85b15
-branch=fix/mass-evaluator-json-filter-400-20260922-v2
+base_sha=d57f66c7bb6f23481c226d8b41b443dd66fbb83b
+branch=fix/mass-evaluator-candidate-query-chunking-20260922

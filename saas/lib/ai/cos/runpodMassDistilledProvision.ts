@@ -4,6 +4,7 @@ import { protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProte
 
 const REST_V1 = 'https://rest.runpod.io/v1'
 const CONTROL_API_V2 = 'https://api.runpod.io/v2'
+const GRAPHQL_API = 'https://api.runpod.io/graphql'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const BASE_MODEL_ID = 'Qwen/Qwen3-4B'
@@ -61,6 +62,23 @@ async function requestV2<T>(path:string,init:RequestInit={}):Promise<T>{
   const response=await fetch(`${CONTROL_API_V2}${path}`,{...init,headers:{Authorization:`Bearer ${key}`,...(init.body?{'Content-Type':'application/json'}:{}),...(init.headers||{})},signal:AbortSignal.timeout(REQUEST_TIMEOUT_MS)})
   const raw=await response.text(); if(!response.ok) throw new Error(`RunPod REST v2 ${String(init.method||'GET').toUpperCase()} ${path} HTTP ${response.status}${safeError(raw)?`: ${safeError(raw)}`:''}`)
   return raw?JSON.parse(raw) as T:{} as T
+}
+
+async function requestGraphQl<T>(query:string,variables:Record<string,unknown>):Promise<T>{
+  const key=configuredRunpodApiKey(); if(!key) throw new Error('RUNPOD_API_KEY is not configured')
+  const response=await fetch(`${GRAPHQL_API}?api_key=${encodeURIComponent(key)}`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','User-Agent':'Mozilla/5.0 (compatible; SignalBoost/1.0)'},
+    body:JSON.stringify({query,variables}),
+    signal:AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+  const raw=await response.text()
+  if(!response.ok) throw new Error(`RunPod GraphQL HTTP ${response.status}${safeError(raw)?`: ${safeError(raw)}`:''}`)
+  let payload:{data?:T;errors?:Array<{message?:unknown}>}={}
+  try{payload=raw?JSON.parse(raw):{}}catch{throw new Error('RunPod GraphQL response was not valid JSON')}
+  if(payload.errors?.length) throw new Error(`RunPod GraphQL error: ${clean(payload.errors[0]?.message,300)||'unknown error'}`)
+  if(!payload.data) throw new Error('RunPod GraphQL response carried no data')
+  return payload.data
 }
 
 function assertArtifact(input:MassDistilledRuntimeArtifact){
@@ -180,6 +198,44 @@ async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEnd
   }
 }
 
+async function createMassEndpointViaGraphQl(input:{name:string;templateId:string;pools:string[]}):Promise<Endpoint>{
+  const data=await requestGraphQl<{saveEndpoint?:{id?:string;name?:string;type?:'QB'|'LB';templateId?:string}}>(`
+    mutation SaveMassDistilledEndpoint($input: EndpointInput!) {
+      saveEndpoint(input: $input) {
+        id
+        name
+        type
+        templateId
+      }
+    }
+  `,{input:{
+    name:input.name,
+    type:'LB',
+    templateId:input.templateId,
+    gpuIds:input.pools.join(','),
+    gpuCount:1,
+    workersMin:0,
+    workersMax:1,
+    idleTimeout:IDLE_TIMEOUT_SECONDS,
+    scalerType:'REQUEST_COUNT',
+    scalerValue:1,
+    executionTimeoutMs:300000,
+    flashBootType:'FLASHBOOT',
+  }})
+  const created=data.saveEndpoint
+  const id=clean(created?.id,120)
+  if(!created||!id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
+  if(created.type!=='LB') throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
+  if(clean(created.templateId,200)!==input.templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
+  for(let attempt=0;attempt<5;attempt+=1){
+    const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
+    const endpoint=(listed.endpoints||[]).find(item=>clean(item.id,120)===id||clean(item.name,240)===input.name)
+    if(endpoint?.id) return endpoint
+    if(attempt<4) await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)))
+  }
+  throw new Error('mass_distilled_runtime_endpoint_policy_unavailable')
+}
+
 async function recoverEndpointId(endpoint:Endpoint|undefined,endpointName:string):Promise<Endpoint|undefined>{
   if(endpoint?.id) return endpoint
   // RunPod's create response and v1 endpoint index can lag the v2 control plane briefly.
@@ -224,14 +280,15 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
     // consistent after PATCH max=0, so retry only this exact quota rejection with a fresh protected
     // endpoint snapshot and a bounded settle delay.
     const pools=await gpuPools()
-    const createEndpoint=()=>requestV2<Endpoint>('/serverless',{method:'POST',body:JSON.stringify({name:ids.endpointName,type:ROUTING,templateId:template.id,gpu:{pools,count:1},workers:{min:0,max:1,idleTimeout:IDLE_TIMEOUT_SECONDS},scaling:{type:'REQUEST_COUNT',requestCount:1},timeout:300000,flashboot:'FLASHBOOT'})})
     let quotaError:unknown=null
     for(let attempt=0;attempt<4&&!endpoint;attempt+=1){
       const current=attempt===0?listed:await requestV2<{endpoints?:Endpoint[]}>('/serverless')
       await releaseRetiredMassEndpointCapacity(current.endpoints||[],ids.endpointName)
       if(attempt>0) await new Promise(resolve=>setTimeout(resolve,1000*attempt))
-      try{endpoint=await createEndpoint();createdEndpoint=true}
-      catch(error){
+      try{
+        endpoint=await createMassEndpointViaGraphQl({name:ids.endpointName,templateId:template.id,pools})
+        createdEndpoint=true
+      }catch(error){
         if(!runpodWorkerQuotaError(error)) throw error
         quotaError=error
       }

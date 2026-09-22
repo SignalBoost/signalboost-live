@@ -82,6 +82,24 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function acceptedOutcome(accepted: AcceptedFreshEvidenceSynthesis): FreshEvidenceLocalSynthesis {
+  const reasoner = resolveCosReasoner()
+  return {
+    kind: 'accepted',
+    reply: accepted.reply,
+    reasonerLabel: reasoner.config?.label ?? `independent-local:${(process.env.LOCAL_AI_MODEL || 'local-model').trim()}`,
+  }
+}
+
+function logAcceptedDraftReleasedAfterReviewTransportFailure(stage: string, error: string): void {
+  console.warn('[cos-fresh-review-release]', JSON.stringify({
+    at: new Date().toISOString(),
+    event: 'accepted_draft_released_after_review_transport_failure',
+    stage,
+    error,
+  }))
+}
+
 async function boundedLocalCompletion(args: {
   prompt: string
   systemPrompt: string
@@ -428,7 +446,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
 
   if (multiScopeReviewRequired) {
     const reviewed = await reviewScopeFaithfulness({ ...args, semanticPlan, answer: accepted.answer })
-    if (reviewed.kind === 'local_synthesis_failed') return reviewed
+    if (reviewed.kind === 'local_synthesis_failed') {
+      logAcceptedDraftReleasedAfterReviewTransportFailure('faithfulness_review', reviewed.error)
+      return acceptedOutcome(accepted)
+    }
     if (reviewed.kind === 'unparseable') return { kind: 'citation_grounding_rejected' }
     faithfulnessReview = reviewed.review
     console.info('[cos-fresh-scope-faithfulness-review]', JSON.stringify({
@@ -473,7 +494,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
       maxTokens: REVISION_MAX_TOKENS,
       phase: 'neural_review',
     })
-    if (revised.ok === false) return { kind: 'local_synthesis_failed', error: revised.error }
+    if (revised.ok === false) {
+      logAcceptedDraftReleasedAfterReviewTransportFailure('neural_review', revised.error)
+      return acceptedOutcome(accepted)
+    }
     if (!revised.text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
     const repaired = acceptFreshEvidenceSynthesis({
@@ -514,7 +538,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
 
     if (multiScopeReviewRequired) {
       const finalReview = await reviewScopeFaithfulness({ ...args, semanticPlan, answer: repaired.answer })
-      if (finalReview.kind === 'local_synthesis_failed') return finalReview
+      if (finalReview.kind === 'local_synthesis_failed') {
+        logAcceptedDraftReleasedAfterReviewTransportFailure('final_faithfulness_review', finalReview.error)
+        return acceptedOutcome(repaired)
+      }
       if (finalReview.kind === 'unparseable' || !finalReview.review.faithful) {
         console.warn('[cos-fresh-neural-synthesis-review]', JSON.stringify({
           at: new Date().toISOString(),

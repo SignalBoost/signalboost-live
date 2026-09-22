@@ -9,6 +9,7 @@ const SERVERLESS_API = 'https://api.runpod.ai/v2'
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 const BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
+const BASE_MODEL_REFERENCE = `https://huggingface.co/${BASE_MODEL_ID}:${BASE_MODEL_REVISION}`
 const ROUTING = 'LOAD_BALANCER' as const
 const PUBLIC_PORT = 8000
 const IDLE_TIMEOUT_SECONDS = 60
@@ -215,13 +216,14 @@ async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEnd
 }
 
 async function createMassEndpointViaGraphQl(input:{name:string;templateId:string;pools:string[]}):Promise<Endpoint>{
-  const data=await requestGraphQl<{saveEndpoint?:{id?:string;name?:string;type?:'QB'|'LB';templateId?:string}}>(`
+  const data=await requestGraphQl<{saveEndpoint?:{id?:string;name?:string;type?:'QB'|'LB';templateId?:string;modelReferences?:string[]}}>(`
     mutation SaveMassDistilledEndpoint($input: EndpointInput!) {
       saveEndpoint(input: $input) {
         id
         name
         type
         templateId
+        modelReferences
       }
     }
   `,{input:{
@@ -237,11 +239,17 @@ async function createMassEndpointViaGraphQl(input:{name:string;templateId:string
     scalerValue:1,
     executionTimeoutMs:300000,
     flashBootType:'FLASHBOOT',
+    // Match the proven distilled endpoint path: RunPod caches this immutable public base revision
+    // outside the worker lifecycle, while the private exact LoRA remains downloaded by the worker.
+    // This reduces cold-start download time without changing artifact identity or authority.
+    modelReferences:[BASE_MODEL_REFERENCE],
   }})
   const created=data.saveEndpoint
   let observedId=clean(created?.id,120)
   if(created?.type&&created.type!=='LB') throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
   if(created?.templateId&&clean(created.templateId,200)!==input.templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
+  const modelReferences=Array.isArray(created?.modelReferences)?created.modelReferences.map(item=>clean(item,500)):[]
+  if(modelReferences.length!==1||modelReferences[0]!==BASE_MODEL_REFERENCE) throw new Error('mass_distilled_runtime_base_cache_binding_mismatch')
   for(let attempt=0;attempt<ENDPOINT_VISIBILITY_ATTEMPTS;attempt+=1){
     const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
     const endpoint=(listed.endpoints||[]).find(item=>(observedId&&clean(item.id,120)===observedId)||clean(item.name,240)===input.name)

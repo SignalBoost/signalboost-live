@@ -1460,3 +1460,100 @@ Public identity is a two-layer contract:
 4. Malformed or ambiguous semantic verdicts fail closed into normal routing.
 
 This prevents phrasing gaps from sending “What is this platform called?” into name generation while preserving deep-learning interpretation rather than expanding a permanent regex list.
+
+
+---
+
+# iTMounts Platform Harness — canonical architecture (2026-09-22)
+
+The canonical architecture is **Platform Harness design 1 + profile design 2**. The Harness is a first-class iTMounts platform layer; it is not subordinate to COS University. University Residency is one educational profile of the same controlled operating world used by governed specialists elsewhere on the platform.
+
+```text
+                         iTMounts PLATFORM
+                                |
+                                v
+                     PLATFORM HARNESS LAYER
+                                |
+                +---------------+----------------+
+                |               |                |
+             Identity        Authority        Environment
+          agent/artifact   Referee/Guardian   sandbox/prod
+                |               |                |
+                +---------------+----------------+
+                                v
+                           HarnessRun
+                  objective + manifest + limits
+                                |
+                                v
+                         COS / Specialist
+                                |
+                                v
+                      Capability Resolver
+                         /      |       \
+                       MCP   Native APIs  Agents
+                                |
+                                v
+                         GOVERNED SOCKET
+                                |
+                       controlled execution
+                                |
+                 observe -> reason -> act -> recover
+                                |
+                                v
+                       TRAJECTORY JOURNAL
+                                |
+                       OUTCOME VERIFIER
+                                |
+                         FAILURE ROUTER
+                    /           |            \
+             Self-Healing   University   Referee/Guardian
+            infrastructure  competency      authority
+                    \           |            /
+                     +----------+-----------+
+                                v
+                         DURABLE EVIDENCE
+```
+
+The same Harness core supports these profiles; profiles change authority, environment, limits and purpose, not the underlying execution/evidence architecture:
+
+```text
+Platform Harness
+|- residency
+|- production
+|- sandbox
+|- self_healing
+|- security_lab
+|- replay
+\- evaluation_runtime
+```
+
+Core invariants:
+
+- one Harness engine, multiple profiles;
+- exact agent/artifact identity is bound before execution where an immutable artifact exists;
+- capability discovery never grants authority;
+- Provider Hub/MCP and native capabilities are resolved through existing governed capability boundaries rather than duplicated;
+- agent-gateway/Governed Socket remains the execution authority boundary; Referee/Guardian remain authority owners;
+- every run has an explicit manifest covering profile, scope, capabilities, environment, budget/limits and rollback/escalation behavior;
+- complete observable trajectory evidence records tool calls/results, costs, failures and verification evidence without persisting hidden chain-of-thought;
+- outcomes are independently verified from observable state rather than agent self-report;
+- infrastructure failure routes to Self-Healing, competency failure routes to University remediation, and authority violations/requests route to Referee/Guardian;
+- Harness defects are classified separately so they are not charged to agent competency or underlying infrastructure;
+- successful verified work produces durable outcome evidence and, where appropriate, competency evidence;
+- Residency teaches; the independent University evaluator examines; the Harness only supplies the controlled execution/evidence environment and cannot approve graduation;
+- no Harness profile may widen credentials, spend, production traffic, promotion, endpoint substitution or other authority beyond its signed/governed manifest.
+
+Residency integration is therefore:
+
+```text
+University assignment
+  -> HarnessRun(profile=residency)
+  -> restricted real platform capabilities in a controlled environment
+  -> trajectory + independently verified outcome
+  -> University competency/remediation evidence
+  -> exact-artifact canary/rollback proof
+  -> independent final examinations
+  -> existing governed graduation/activation path
+```
+
+Existing Residency enrollment, competency, remediation and retention concepts remain University-owned. Execution machinery belongs in the shared Platform Harness and University consumes it through an adapter. Do not create a parallel University-only tool/runtime harness.

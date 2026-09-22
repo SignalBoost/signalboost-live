@@ -161,6 +161,9 @@ test('nonzero CLI result reports a sanitized failure code without logging raw st
     const fake = {
       async updateNetworkPolicy() {},
       async runCommand(command: any) {
+        if (command.cmd === 'node' && command.args?.[0] === '-e') {
+          return commandResult(0, '/tmp/cos-builder-playwright-cli/pw-browsers/chromium-1234/chrome-linux/chrome')
+        }
         if (command.cmd.endsWith('/playwright-cli') && command.args?.[0] === 'open') {
           return commandResult(1, '', 'Host system is missing dependencies to run browsers: SECRET_RAW_DETAIL')
         }

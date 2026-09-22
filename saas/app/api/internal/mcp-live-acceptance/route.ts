@@ -87,6 +87,13 @@ export async function GET() {
   return NextResponse.json({
     ok: failed.length === 0,
     schemaVersion: 'universal-mcp-preview-live-acceptance-v1',
+    providers: gateway.readiness.map(item => ({
+      providerId: item.providerId,
+      configured: item.configured,
+      reason: item.reason,
+      authentication: item.authentication,
+      target: item.target,
+    })),
     checks,
   }, { status: failed.length === 0 ? 200 : 503 })
 }

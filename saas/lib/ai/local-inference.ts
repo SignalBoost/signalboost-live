@@ -24,13 +24,15 @@ export interface LocalModelCallArgs {
   timeoutMs?: number
   /** Disable configured-model fallback after an owned-primary failure for latency-critical calls. */
   allowConfiguredFallback?: boolean
+  /** Return non-empty text on finish_reason=length so a caller with a dedicated salvage parser can recover it. */
+  allowTruncatedText?: boolean
   /** Skip durable usage persistence when the caller must avoid a database dependency. */
   persistUsage?: boolean
 }
 
 /**
- * Thrown when the provider reports finish_reason 'length'. The partial content is never returned:
- * a half-written control object or source file must not be mistaken for a finished answer.
+ * Thrown when the provider reports finish_reason 'length'. Partial content is discarded by default:
+ * only callers that explicitly opt into truncated-text salvage may receive it for dedicated parsing.
  */
 export const LOCAL_MODEL_OUTPUT_TRUNCATED = 'local_model_output_truncated'
 export interface LocalInferenceConfig {
@@ -392,6 +394,15 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   }
 
   if (finishReason === 'length') {
+    if (args.allowTruncatedText === true && text?.trim()) {
+      console.warn('[cos-local-inference-truncated-released]', JSON.stringify({
+        feature: args.usageContext?.feature || 'unattributed_local_inference',
+        requestedMaxTokens,
+        completionTokens,
+        contentLength: text.length,
+      }))
+      return text
+    }
     const error = new Error(LOCAL_MODEL_OUTPUT_TRUNCATED) as Error & { emptyContent?: boolean }
     error.emptyContent = !text
     throw error

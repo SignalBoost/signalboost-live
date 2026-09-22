@@ -19,8 +19,9 @@ permissions:
   contents: read
 
 concurrency:
-  # Collapse repeated events for the same PR or branch/ref to the newest revision.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Push and pull_request events for the same branch share one lane. This preserves
+  # GitHub's required-workflow push event while preventing duplicate expensive runs.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:

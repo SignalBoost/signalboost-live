@@ -20,3 +20,5 @@ export * from './hosted-providers.ts'
 export * from './provider-registry-bootstrap.ts'
 
 export * from './supervisor-contract.ts'
+
+export * from './supervised-executor.ts'

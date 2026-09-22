@@ -255,3 +255,9 @@ test('v2 Builder evaluator cohort avoids nested intended_use containment filters
   )
 })
 
+test('mass evaluation pre-claim failures retain their exact failing phase', () => {
+  assert.match(route, /mass_distilled_evaluation_schema_preflight_failed:/)
+  assert.match(route, /mass_distilled_evaluation_runpod_account_preflight_failed:/)
+  assert.match(route, /mass_distilled_evaluation_rolling_preflight_failed:/)
+})
+

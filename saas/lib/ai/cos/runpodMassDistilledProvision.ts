@@ -164,6 +164,11 @@ function assertEndpointPolicy(endpoint:Endpoint,templateId:string){
   if(clean(endpoint.templateId,200)!==templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
 }
 
+function runpodWorkerQuotaError(error:unknown){
+  return (error instanceof Error?error.message:String(error))
+    .toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
+}
+
 async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEndpointName:string){
   const protectedEndpointIds=await protectedRunpodEndpointIds()
   const retired=endpoints.filter(endpoint=>endpoint.name.startsWith('itmounts-mass-distilled-')
@@ -215,9 +220,23 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
   if(!endpoint){
     // RunPod counts maxWorkers even for scale-to-zero endpoints. Exact-artifact canaries are
     // sequential, so older mass-distilled endpoints must release their reserved capacity without
-    // deleting provider resources or touching unrelated workloads.
-    await releaseRetiredMassEndpointCapacity(listed.endpoints||[],ids.endpointName)
-    endpoint=await requestV2<Endpoint>('/serverless',{method:'POST',body:JSON.stringify({name:ids.endpointName,type:ROUTING,templateId:template.id,gpu:{pools:await gpuPools(),count:1},workers:{min:0,max:1,idleTimeout:IDLE_TIMEOUT_SECONDS},scaling:{type:'REQUEST_COUNT',requestCount:1},timeout:300000,flashboot:'FLASHBOOT'})});createdEndpoint=true
+    // deleting provider resources or touching unrelated workloads. The quota counter is eventually
+    // consistent after PATCH max=0, so retry only this exact quota rejection with a fresh protected
+    // endpoint snapshot and a bounded settle delay.
+    const pools=await gpuPools()
+    const createEndpoint=()=>requestV2<Endpoint>('/serverless',{method:'POST',body:JSON.stringify({name:ids.endpointName,type:ROUTING,templateId:template.id,gpu:{pools,count:1},workers:{min:0,max:1,idleTimeout:IDLE_TIMEOUT_SECONDS},scaling:{type:'REQUEST_COUNT',requestCount:1},timeout:300000,flashboot:'FLASHBOOT'})})
+    let quotaError:unknown=null
+    for(let attempt=0;attempt<4&&!endpoint;attempt+=1){
+      const current=attempt===0?listed:await requestV2<{endpoints?:Endpoint[]}>('/serverless')
+      await releaseRetiredMassEndpointCapacity(current.endpoints||[],ids.endpointName)
+      if(attempt>0) await new Promise(resolve=>setTimeout(resolve,1000*attempt))
+      try{endpoint=await createEndpoint();createdEndpoint=true}
+      catch(error){
+        if(!runpodWorkerQuotaError(error)) throw error
+        quotaError=error
+      }
+    }
+    if(!endpoint&&quotaError) throw quotaError
   }
   else {const previousTemplateId=clean(endpoint.templateId,200); endpoint=await rebindEndpointTemplate(endpoint,template.id); reboundTemplate=previousTemplateId!==template.id}
   endpoint=await recoverEndpointId(endpoint,ids.endpointName)

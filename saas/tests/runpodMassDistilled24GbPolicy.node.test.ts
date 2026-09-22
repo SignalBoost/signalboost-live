@@ -89,3 +89,16 @@ test('capacity reclamation never disables active graduate or evaluator endpoints
   assert.match(endpointProtection, /evaluation_endpoint_protection_database_unavailable/)
   assert.match(endpointProtection, /new Set\(\[\.\.\.graduates, \.\.\.evaluations\]\)/)
 })
+
+
+test('evaluator waits for RunPod quota settlement and defers cleanly when protected capacity remains full', () => {
+  assert.match(provisionV2, /async function withWorkerQuotaRecovery/)
+  assert.match(provisionV2, /for \(let attempt = 0; attempt < 4; attempt \+= 1\)/)
+  assert.match(provisionV2, /750 \* \(attempt \+ 1\)/)
+  assert.match(provisionV2, /withWorkerQuotaRecovery\(String\(endpoint\.id\), patchGpu\)/)
+  assert.match(provisionV2, /withWorkerQuotaRecovery\(String\(endpoint\.id\), restore\)/)
+  assert.match(evaluationRoute, /workerQuotaDeferred/)
+  assert.match(evaluationRoute, /reason: 'runpod_worker_quota_full'/)
+  assert.match(evaluationRoute, /retryable: true/)
+  assert.match(evaluationRoute, /\{ status: 200 \}/)
+})

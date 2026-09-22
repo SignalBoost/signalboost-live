@@ -44,3 +44,17 @@ test('successful durable artifact callback closes only the recovered provider ca
   assert.match(source, /closeProviderCircuit\(\{[\s\S]*providerId: 'huggingface'[\s\S]*capability: 'model-training'/)
   assert.match(source, /claim === 'trained_artifact_registered'/)
 })
+
+
+test('half-open provider recovery is one-shot and consumed before paid dispatch', () => {
+  const circuitSource = fs.readFileSync(path.join(ROOT, 'lib/supervisor/provider-circuit.ts'), 'utf8')
+  const consumerSource = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityMassDistillationConsumer.ts'), 'utf8')
+  assert.match(circuitSource, /consumeProviderCircuitRecoveryProbe/)
+  assert.match(circuitSource, /cost_bearing_retry_allowed: false/)
+  assert.match(circuitSource, /\.eq\('cost_bearing_retry_allowed', true\)/)
+  assert.match(consumerSource, /const recoveryProbeArmed = providerCircuit\.open && providerCircuit\.costBearingRetryAllowed === true/)
+  assert.match(consumerSource, /const maxDispatches = recoveryProbeArmed[\s\S]*\? 1/)
+  const consumeAt = consumerSource.indexOf('consumeProviderCircuitRecoveryProbe({')
+  const dispatchAt = consumerSource.indexOf('dispatchClaim(claim, input.fetchImpl)')
+  assert.ok(consumeAt >= 0 && dispatchAt > consumeAt)
+})

@@ -12,6 +12,8 @@ import {
   MASS_DISTILLED_REQUEST_TIMEOUT_MS,
   MASS_DISTILLED_HEALTH_TIMEOUT_MS,
   canaryMassDistilledRuntime,
+  waitForMassDistilledRuntimeReady,
+  invokeMassDistilledRuntimeCanary,
   massDistilledRuntimeHealth,
   provisionMassDistilledRuntime as provisionLegacyMassDistilledRuntime,
   type MassDistilledRuntimeArtifact,
@@ -26,6 +28,8 @@ export {
   MASS_DISTILLED_REQUEST_TIMEOUT_MS,
   MASS_DISTILLED_HEALTH_TIMEOUT_MS,
   canaryMassDistilledRuntime,
+  waitForMassDistilledRuntimeReady,
+  invokeMassDistilledRuntimeCanary,
   massDistilledRuntimeHealth,
 }
 export type { MassDistilledRuntimeArtifact }

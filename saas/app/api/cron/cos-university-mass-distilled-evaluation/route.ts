@@ -20,6 +20,7 @@ import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
   MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
   MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
+  MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   decideExhaustedMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
@@ -201,12 +202,20 @@ function isBuilderV2Receipt(intendedUse: unknown): boolean {
     && Number(receipt.frontierResponseAnchorItems) > 0)
 }
 
+function isRemediationReplayReceipt(intendedUse: unknown): boolean {
+  if (!intendedUse || typeof intendedUse !== 'object' || Array.isArray(intendedUse)) return false
+  const receipt = (intendedUse as any).trainingReceipt
+  return Boolean(receipt && typeof receipt === 'object'
+    && receipt.failureDerivedReplayRequired === true
+    && Number(receipt.failureDerivedReplayItems) > 0)
+}
+
 async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   // Keep normal queue work bounded to the oldest 500, but explicitly include the small confirmed-v2
   // Computer Science proof cohort. Otherwise a growing legacy backlog can make the priority policy unreachable.
-  const [oldestArtifacts, builderV2Artifacts] = await Promise.all([
+  const [oldestArtifacts, builderV2Artifacts, replayArtifacts] = await Promise.all([
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status', 'evaluation_pending')
@@ -220,13 +229,23 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       .like('candidate_id', 'mass:%')
       .order('created_at', { ascending: true })
       .limit(500),
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+      .eq('status', 'evaluation_pending')
+      .like('candidate_id', 'mass:%')
+      .contains('intended_use', { trainingReceipt: { failureDerivedReplayRequired: true } })
+      .order('created_at', { ascending: true })
+      .limit(100),
   ])
   if (oldestArtifacts.error) throw oldestArtifacts.error
   if (builderV2Artifacts.error) throw builderV2Artifacts.error
+  if (replayArtifacts.error) throw replayArtifacts.error
   const confirmedBuilderV2Artifacts = (builderV2Artifacts.data || [])
     .filter((row: any) => isBuilderV2Receipt(row?.intended_use))
+  const confirmedReplayArtifacts = (replayArtifacts.data || [])
+    .filter((row: any) => isRemediationReplayReceipt(row?.intended_use))
   const artifactByCandidate = new Map<string, any>()
-  for (const row of [...(oldestArtifacts.data || []), ...confirmedBuilderV2Artifacts]) {
+  for (const row of [...(oldestArtifacts.data || []), ...confirmedBuilderV2Artifacts, ...confirmedReplayArtifacts]) {
     artifactByCandidate.set(String((row as any).candidate_id), row)
   }
   const artifactRows = [...artifactByCandidate.values()]
@@ -240,6 +259,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       frontierRecipe: receipt.profile === 'cos_university_frontier_gkd_v1',
       builderV2: String(row.subject_id || '') === 'Computer Science & Coding'
         && isBuilderV2Receipt(row.intended_use),
+      remediationReplay: isRemediationReplayReceipt(row.intended_use),
     }
   })
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
@@ -340,6 +360,38 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     builderV2ProofCompletions = MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
   }
 
+  // The post-GKD remediation replay repair also needs a bounded proof cohort. Count durable
+  // independent evaluation rows from replay-proven artifacts across all statuses; once two exist,
+  // scheduling automatically returns to the pre-existing Builder/frontier/oldest-first order.
+  let remediationReplayProofCompletions = MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
+  try {
+    const replayProofArtifacts = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,intended_use')
+      .contains('intended_use', { trainingReceipt: { failureDerivedReplayRequired: true } })
+      .like('candidate_id', 'mass:%')
+      .limit(500)
+    if (!replayProofArtifacts.error) {
+      const replayIds = (replayProofArtifacts.data || [])
+        .filter((row: any) => isRemediationReplayReceipt(row?.intended_use))
+        .map((row: any) => clean(row.candidate_id, 240))
+        .filter(Boolean)
+      if (replayIds.length) {
+        const replayResults = await db.from('cos_university_distilled_evaluation_runs')
+          .select('candidate_id')
+          .in('candidate_id', replayIds)
+          .limit(500)
+        if (!replayResults.error) {
+          remediationReplayProofCompletions = new Set((replayResults.data || [])
+            .map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
+        }
+      } else {
+        remediationReplayProofCompletions = 0
+      }
+    }
+  } catch {
+    remediationReplayProofCompletions = MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
+  }
+
   // The current frontier recipe cannot improve itself until it receives independent measurements.
   // A start is not proof: Production 2026-09-20 launched four frontier reservations, but three ended in
   // RunPod readiness failures before any evaluation row existed. Count distinct durable evaluation results
@@ -389,6 +441,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     now,
     frontierProofCompletions,
     builderV2ProofCompletions,
+    remediationReplayProofCompletions,
     inFlightCount,
   })
   if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }

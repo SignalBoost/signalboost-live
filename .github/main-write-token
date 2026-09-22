@@ -1,2 +1,2 @@
-base_sha=9b364be0e7984e008f46bf1feb2a0956e84458e0
-branch=test/universal-mcp-baseline-live-20260922
+base_sha=e36b46de9409a2cd439dd4be88f98aea73c00986
+branch=fix/provider-import-newlines-production-20260922

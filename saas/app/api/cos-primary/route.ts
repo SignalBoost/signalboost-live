@@ -318,39 +318,61 @@ export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 60_000
 export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 3_000
 async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const evidence=(Array.isArray(sources)?sources:[]).slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
-  let result:Awaited<ReturnType<typeof callCosReasoner>>=null
-  try{
-    result=await callCosReasoner({
+  const languageLine=language ? `Write the plan in the language the traveller wrote in; if unclear use ${reportLanguageName(language)}.` : 'Write the plan in the language the traveller wrote in.'
+  const rules=[
+    'Respect every constraint the traveller gave: arrival point, date, time window, budget, requested transport details, and whether to include a paid attraction.',
+    'Build the plan hour by hour with the transport between each stop.',
+    'Use the reference sources where they help and cite them inline by their bracketed id. Where they do not cover a detail, use your best general knowledge and state it as an assumption.',
+    'Every fare, opening hour, ticket price or schedule must be marked as approximate and to be checked before the trip. Never present such a value as confirmed.',
+    'Never invent businesses, venues, routes or free services. If you are unsure something exists, leave it out.',
+    'Write only the plan. No JSON, no preamble about sources or verification, no internal system language.',
+    languageLine,
+  ]
+  // Two framings. The first addresses the request directly. The second exists because this reasoner
+  // has echoed a travel request back instead of answering it (observed Sep 21 2026 on this exact
+  // Amsterdam prompt): it presents the request as a quoted brief and demands the itinerary starts
+  // with the first time slot, so restating the request is not a plausible completion.
+  const attempts=[
+    {
       temperature:.3,
-      maxTokens:TRAVEL_PLAN_RESCUE_MAX_TOKENS,
-      disableThinking:true,
-      allowTruncatedText:true,
-      timeoutMs:TRAVEL_PLAN_RESCUE_TIMEOUT_MS,
-      allowConfiguredFallback:true,
-      usageContext:{feature:'cos_travel_plan_rescue',purpose:'travel_plan_rescue'},
-      systemPrompt:[
-        'You are COS. The user asked for a travel plan. Deliver the complete plan now. /no_think',
-        'Respect every constraint the user gave: arrival point, date, time window, budget, requested transport details, and whether to include a paid attraction.',
-        'Build the plan hour by hour with the transport between each stop.',
-        'Use the reference sources below where they help and cite them inline as their bracketed id. Where they do not cover a detail, use your best general knowledge and state it as an assumption.',
-        'Every fare, opening hour, ticket price or schedule must be marked as approximate and to be checked before the trip. Never present such a value as confirmed.',
-        'Never invent businesses, venues, routes or free services. If you are unsure something exists, leave it out.',
-        'Write only the plan for the user. No JSON, no preamble about sources or verification processes, no internal system language.',
-        language ? `Respond in the language the user wrote in; if unclear use ${reportLanguageName(language)}.` : 'Respond in the language the user wrote in.',
-      ].join(' '),
+      systemPrompt:['You are COS. The user asked for a travel plan. Deliver the complete plan now. /no_think',...rules].join(' '),
       prompt:`USER REQUEST:\n${input.slice(0,8_000)}${evidence?`\n\nREFERENCE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}`,
-    })
-  }catch(error){
-    console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'reasoner_call_failed',reason:error instanceof Error?error.message:String(error)}))
-    return null
+    },
+    {
+      temperature:.6,
+      systemPrompt:['You are an experienced local travel planner. A traveller sent the brief below. Do NOT restate, correct or translate the brief. Your output must begin directly with the first time slot of the itinerary (for example "09:00") and continue slot by slot to the end of the time window, then a short cost summary. /no_think',...rules].join(' '),
+      prompt:`TRAVELLER BRIEF (do not repeat it):\n"""\n${input.slice(0,8_000)}\n"""${evidence?`\n\nREFERENCE SOURCES:\n${evidence}`:''}\n\nITINERARY:`,
+    },
+  ]
+  for(let index=0;index<attempts.length;index+=1){
+    const attempt=attempts[index]
+    const tag={attempt:index+1,of:attempts.length}
+    let result:Awaited<ReturnType<typeof callCosReasoner>>=null
+    try{
+      result=await callCosReasoner({
+        temperature:attempt.temperature,
+        maxTokens:TRAVEL_PLAN_RESCUE_MAX_TOKENS,
+        disableThinking:true,
+        allowTruncatedText:true,
+        timeoutMs:TRAVEL_PLAN_RESCUE_TIMEOUT_MS,
+        allowConfiguredFallback:true,
+        usageContext:{feature:'cos_travel_plan_rescue',purpose:'travel_plan_rescue'},
+        systemPrompt:attempt.systemPrompt,
+        prompt:attempt.prompt,
+      })
+    }catch(error){
+      console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'reasoner_call_failed',reason:error instanceof Error?error.message:String(error)}))
+      continue
+    }
+    const reply=String(result?.text||'').replace(/<think>[\s\S]*?<\/think>/gi,'').replace(/^\s*<think>[\s\S]*$/i,'').trim()
+    if(!reply){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'reasoner_returned_no_text'}));continue}
+    if(hasUnsafePublicModelOutput(reply)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'unsafe_public_output',replyChars:reply.length}));continue}
+    if(!groundedTaskReplyIsSubstantive(input,reply,false)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'echo_or_empty_draft',replyChars:reply.length}));continue}
+    if(reply.length<Math.max(360,Math.ceil(input.trim().length*1.25))){console.warn('[cos-travel-plan-rescue]',JSON.stringify({...tag,event:'draft_too_short',replyChars:reply.length}));continue}
+    const resolved=resolveCosReasoner()
+    return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:.5}
   }
-  const reply=String(result?.text||'').replace(/<think>[\s\S]*?<\/think>/gi,'').trim()
-  if(!reply){console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'reasoner_returned_no_text'}));return null}
-  if(hasUnsafePublicModelOutput(reply)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'unsafe_public_output',replyChars:reply.length}));return null}
-  if(!groundedTaskReplyIsSubstantive(input,reply,false)){console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'echo_or_empty_draft',replyChars:reply.length}));return null}
-  if(reply.length<Math.max(360,Math.ceil(input.trim().length*1.25))){console.warn('[cos-travel-plan-rescue]',JSON.stringify({event:'draft_too_short',replyChars:reply.length}));return null}
-  const resolved=resolveCosReasoner()
-  return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:.5}
+  return null
 }
 
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}

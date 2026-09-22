@@ -124,7 +124,7 @@ test('fresh grounded tasks prefer owned RunPod, cap that attempt, then retain co
   assert.match(route, /feature:'cos_fresh_grounded_task'/)
   assert.match(route, /allowConfiguredFallback:true/)
   assert.match(workers, /'cos_fresh_grounded_task'/)
-  const interactive = inference.slice(inference.indexOf('function interactiveUserResponse'), inference.indexOf('function interactiveReasoningEffort'))
+  const interactive = inference.slice(inference.indexOf('function interactiveUserResponse'), inference.indexOf('function freshGroundedTask'))
   assert.doesNotMatch(interactive, /feature === 'cos_fresh_grounded_task'/)
   assert.match(inference, /function freshGroundedTask/)
   assert.match(inference, /FRESH_GROUNDED_RUNPOD_ATTEMPT_MS = 16_000/)

@@ -271,12 +271,72 @@ test('Builder Residency admission rejects non-pending artifact before database w
 })
 
 
-test('Residency assessment persists remediation standing from durable competency failure only',async()=>{
-  const updates:any[]=[]
-  const db:any={from(table:string){if(table==='cos_university_residency_competency_evidence')return{select(){return{eq(){return{async order(){return{data:[{competency_id:'root_cause_diagnosis',variant_hash:hash('d'),outcome:'fail',observed_at:'2026-09-22T20:00:00Z'}],error:null}}}}}}};return{update(value:any){updates.push(value);return{eq(){return{select(){return{async maybeSingle(){return{data:{id:'residency-1',standing:value.standing,gate_enforced:false},error:null}}}}}}}}}}
-  const out=await refreshBuilderResidencyAssessment({db,residencyId:'residency-1',now:()=>new Date('2026-09-22T21:00:00Z')})
-  assert.equal(out.standing,'remediation_required')
-  assert.equal(updates[0].remediation_required_at,'2026-09-22T21:00:00.000Z')
-  assert.equal(out.promotionAuthorized,false)
-  assert.equal(out.productionTrafficAuthorized,false)
+test('Residency assessment persists remediation standing from durable competency failure only', async () => {
+  const updates: any[] = []
+  const db: any = {
+    from(table: string) {
+      if (table === 'cos_university_residency_competency_evidence') {
+        return {
+          select() {
+            return {
+              eq() {
+                return {
+                  async order() {
+                    return {
+                      data: [{
+                        competency_id: 'root_cause_diagnosis',
+                        variant_hash: hash('d'),
+                        outcome: 'fail',
+                        observed_at: '2026-09-22T20:00:00Z',
+                      }],
+                      error: null,
+                    }
+                  },
+                }
+              },
+            }
+          },
+        }
+      }
+      if (table === 'cos_university_residency_enrollments') {
+        return {
+          update(value: any) {
+            updates.push(value)
+            return {
+              eq() {
+                return {
+                  select() {
+                    return {
+                      async maybeSingle() {
+                        return {
+                          data: {
+                            id: 'residency-1',
+                            standing: value.standing,
+                            gate_enforced: false,
+                          },
+                          error: null,
+                        }
+                      },
+                    }
+                  },
+                }
+              },
+            }
+          },
+        }
+      }
+      throw new Error(`unexpected_table:${table}`)
+    },
+  }
+
+  const out = await refreshBuilderResidencyAssessment({
+    db,
+    residencyId: 'residency-1',
+    now: () => new Date('2026-09-22T21:00:00Z'),
+  })
+
+  assert.equal(out.standing, 'remediation_required')
+  assert.equal(updates[0].remediation_required_at, '2026-09-22T21:00:00.000Z')
+  assert.equal(out.promotionAuthorized, false)
+  assert.equal(out.productionTrafficAuthorized, false)
 })

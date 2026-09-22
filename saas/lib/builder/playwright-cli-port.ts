@@ -259,7 +259,7 @@ export class VercelSandboxPlaywrightCliPort implements BuilderBrowserCliPort {
       const sandbox = await this.ready()
       const result = await sandbox.runCommand({
         cmd: `${ROOT}/node_modules/.bin/playwright-cli`,
-        args: ['--config', CLI_CONFIG, ...args],
+        args: [...args],
         cwd: ROOT,
         timeoutMs: COMMAND_TIMEOUT_MS,
       })

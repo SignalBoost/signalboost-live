@@ -113,6 +113,7 @@ function interactiveUserResponse(args: LocalModelCallArgs): boolean {
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   return feature === 'cos_interactive_answer'
     || feature === 'cos_interactive_authoring'
+    || feature === 'cos_fresh_grounded_task'
     || feature === 'direct_text_transformation'
 }
 

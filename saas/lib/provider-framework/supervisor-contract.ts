@@ -1,5 +1,5 @@
 import type { UniversalProviderCapability } from './types.ts'
-import { classifyProviderFailure, openProviderCircuit, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
+import { classifyProviderFailure, openProviderCircuit, readProviderCircuit } from '../supervisor/provider-circuit.ts'
 
 export const PROVIDER_SUPERVISOR_CONTRACT_VERSION = 'universal-provider-supervisor-contract-v1' as const
 

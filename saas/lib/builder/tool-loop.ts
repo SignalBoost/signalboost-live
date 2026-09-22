@@ -123,6 +123,12 @@ function validToolInput(toolId: BuilderToolId, input: Record<string, unknown>): 
   if (toolId === 'mcp_read') return typeof input.providerId === 'string' && input.providerId.trim().length > 0
     && typeof input.capabilityId === 'string' && input.capabilityId.trim().length > 0
     && (input.args === undefined || isRecord(input.args))
+  if (toolId === 'browser_cli') return typeof input.action === 'string'
+    && ['open', 'goto', 'snapshot', 'find', 'console', 'requests', 'close'].includes(input.action)
+    && (input.url === undefined || typeof input.url === 'string')
+    && (input.query === undefined || typeof input.query === 'string')
+    && (input.target === undefined || typeof input.target === 'string')
+    && (input.level === undefined || ['error', 'warning', 'info', 'debug'].includes(String(input.level)))
   if (toolId === 'write_file') return Boolean(toolPath(input)) && hasToolContent(input)
     && (input.mode === undefined || input.mode === 'replace' || (input.mode === 'append' && Number.isSafeInteger(input.offset) && typeof input.final === 'boolean'))
   if (toolId === 'edit_file') {

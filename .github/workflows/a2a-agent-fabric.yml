@@ -17,27 +17,11 @@ on:
       - 'ONBOARD-A2A.md'
       - 'docs/HANDOFF-A2A-AGENT-FABRIC-*.md'
       - '.github/workflows/a2a-agent-fabric.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'saas/a2a-core/**'
-      - 'saas/a2a-host/**'
-      - 'saas/app/api/a2a/**'
-      - 'saas/app/api/cos-specialist/**'
-      - 'saas/app/api/cron/specialist-mesh-production-acceptance/**'
-      - 'saas/app/api/cron/specialist-mesh-write-production-acceptance/**'
-      - 'saas/app/api/cron/specialist-mesh-university-coverage/**'
-      - 'saas/tests/a2a*.node.test.ts'
-      - 'saas/tests/specialistMesh*.node.test.ts'
-      - 'saas/supabase/migrations/**specialist_mesh**'
-      - 'saas/vercel.json'
-      - 'ONBOARD-A2A.md'
-      - 'docs/HANDOFF-A2A-AGENT-FABRIC-PHASE*-2026-08-31.md'
-      - 'docs/HANDOFF-A2A-AGENT-FABRIC-*.md'
-      - '.github/workflows/a2a-agent-fabric.yml'
-
-permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   regression:

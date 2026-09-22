@@ -69,7 +69,7 @@ test('background shared text inference prefers RunPod and treats LOCAL_AI DeepIn
   const health = inference.indexOf('export async function checkLocalInferenceHealth', publicEntry)
   const routing = inference.slice(publicEntry, health)
   const resolveRunpod = routing.indexOf("import('./cos/runpodPrimaryInference.ts')")
-  const callRunpod = routing.indexOf('callConfiguredModel(args, runpodConfig)')
+  const callRunpod = routing.indexOf('callConfiguredModel(runpodArgs, runpodConfig)')
   const fallback = routing.lastIndexOf('callConfiguredModel(args, ownedAttempted')
   assert.ok(resolveRunpod >= 0 && callRunpod > resolveRunpod && fallback > callRunpod)
   assert.match(inference, /protectedIndependentEvaluation/)

@@ -1,9 +1,9 @@
 // saas/lib/ai/cos/cosUniversityResidency.ts
-// Formal COS University Residency: practical competency evidence between academic qualification
-// and broader specialist standing. Residency never grants operational authority; Referee/governance
-// remains the only authority boundary.
+// COS University Residency is the practical harness INSIDE formal education.
+// It begins after a trained artifact exists and before final independent examinations/graduation.
+// Residency evidence may drive remediation, but hidden final-evaluation material must never flow back into it.
 
-export const COS_UNIVERSITY_RESIDENCY_VERSION = 'cos-university-residency-v1' as const
+export const COS_UNIVERSITY_RESIDENCY_VERSION = 'cos-university-residency-v2' as const
 export const BUILDER_RESIDENCY_PROGRAM_ID = 'builder-computer-science-v1' as const
 export const BUILDER_RESIDENCY_RETENTION_MS = 24 * 60 * 60 * 1000
 
@@ -51,13 +51,13 @@ export type BuilderResidencyEvidence = Readonly<{
 }>
 
 export type BuilderResidencyAdmissionInput = Readonly<{
-  registryId: string
+  artifactRowId: string
   candidateId: string
   subjectId: string
+  trainedArtifactId: string
   trainedArtifactHash: string
-  registryStatus: string
-  runtimeHealthEvidenceHash: string | null
-  activationEvidenceHash: string | null
+  revisionKey: string
+  artifactStatus: string
   authorityExpanded: boolean
 }>
 
@@ -68,9 +68,25 @@ function clean(value: unknown, limit = 1000): string {
   return String(value ?? '').trim().slice(0, limit)
 }
 
-function subjectIsComputerScience(value: unknown): boolean {
+export function isBuilderResidencySubject(value: unknown): boolean {
   const normalized = clean(value, 160).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
   return normalized === 'computer_science' || normalized === 'computer_science_coding'
+}
+
+/** v1 makes Builder the first formal Residency program. Other disciplines join through subject-specific programs. */
+export function residencyRequiredBeforeFinalEvaluation(subjectId: unknown): boolean {
+  return isBuilderResidencySubject(subjectId)
+}
+
+export function finalEvaluationResidencyGate(input: { subjectId: unknown; standing?: string | null }) {
+  const required = residencyRequiredBeforeFinalEvaluation(input.subjectId)
+  return Object.freeze({
+    required,
+    allowed: !required || input.standing === 'residency_complete',
+    reason: !required || input.standing === 'residency_complete'
+      ? null
+      : 'formal_residency_not_complete',
+  })
 }
 
 function validTime(value: unknown): number | null {
@@ -78,24 +94,31 @@ function validTime(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+/**
+ * Admit the TRAINED STUDENT, not a graduate. evaluation_pending means the exact artifact + rollback
+ * reference are durably registered and it is awaiting its independent final evaluation.
+ */
 export function decideBuilderResidencyAdmission(input: BuilderResidencyAdmissionInput) {
   const blockers: string[] = []
   const artifactHash = clean(input.trainedArtifactHash, 64).toLowerCase()
+  const revisionKey = clean(input.revisionKey, 64).toLowerCase()
 
-  if (!clean(input.registryId, 120)) blockers.push('residency_registry_id_missing')
+  if (!clean(input.artifactRowId, 120)) blockers.push('residency_artifact_row_missing')
   if (!clean(input.candidateId, 240)) blockers.push('residency_candidate_id_missing')
-  if (!subjectIsComputerScience(input.subjectId)) blockers.push('residency_subject_not_builder')
+  if (!isBuilderResidencySubject(input.subjectId)) blockers.push('residency_subject_not_builder')
+  if (!clean(input.trainedArtifactId, 500)) blockers.push('residency_trained_artifact_missing')
   if (!HEX64.test(artifactHash)) blockers.push('residency_artifact_hash_invalid')
-  if (input.registryStatus !== 'active') blockers.push('residency_runtime_not_active')
-  if (!HEX64.test(clean(input.runtimeHealthEvidenceHash, 64))) blockers.push('residency_runtime_health_evidence_missing')
-  if (!HEX64.test(clean(input.activationEvidenceHash, 64))) blockers.push('residency_activation_evidence_missing')
+  if (!HEX64.test(revisionKey)) blockers.push('residency_revision_key_invalid')
+  if (input.artifactStatus !== 'evaluation_pending') blockers.push('residency_trained_artifact_not_ready')
   if (input.authorityExpanded !== false) blockers.push('residency_authority_expansion_forbidden')
 
   return Object.freeze({
     eligible: blockers.length === 0,
     programId: BUILDER_RESIDENCY_PROGRAM_ID,
     artifactHash,
+    revisionKey,
     blockers: Object.freeze(blockers),
+    formalEducationStage: 'practical_residency' as const,
     productionAuthorityExpanded: false as const,
   })
 }
@@ -187,6 +210,7 @@ export function assessBuilderResidency(input: {
   return Object.freeze({
     profile: COS_UNIVERSITY_RESIDENCY_VERSION,
     programId: BUILDER_RESIDENCY_PROGRAM_ID,
+    formalEducationStage: 'practical_residency' as const,
     candidateId,
     artifactHash,
     standing,

@@ -1,5 +1,5 @@
 name: Universal MCP Baseline Live Acceptance
-# Live proof trigger: 2026-09-22 v2
+# Live proof trigger: 2026-09-22 v3
 
 on:
   pull_request:
@@ -11,6 +11,9 @@ on:
 
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
+  actions: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

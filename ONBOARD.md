@@ -1412,3 +1412,10 @@ Public identity is a two-layer contract:
 4. Malformed or ambiguous semantic verdicts fail closed into normal routing.
 
 This prevents phrasing gaps from sending “What is this platform called?” into name generation while preserving deep-learning interpretation rather than expanding a permanent regex list.
+
+
+## Residency formal-education invariant (2026-09-22)
+
+Residency is the practical harness **inside formal COS University education**, not a post-graduation apprenticeship gate. The intended sequence is: curriculum/classroom/distillation -> trained student artifact -> supervised practical Residency -> remediation/retraining as needed -> exact-artifact final canary -> independent final examination -> graduation -> governed practice.
+
+Residency teaches; independent evaluation examines; Referee/governance authorizes. Residency may generate targeted remediation from its own supervised failures, but hidden final-exam prompts, rubrics, evaluator outputs, private holdouts, or final-exam answers must never be copied into Residency cases or retained training material. For the first Builder / Computer Science program, final-gate enforcement is shadowed until the practical case runner is operational. Once an enrollment is explicitly marked `gate_enforced=true`, only `residency_complete` may proceed to a **fresh post-Residency** exact-artifact canary and independent final evaluation; older pre-Residency canary evidence does not satisfy that final proof. Residency standing never expands operational authority.

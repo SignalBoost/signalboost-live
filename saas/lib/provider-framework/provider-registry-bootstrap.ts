@@ -8,7 +8,7 @@
 // credentials, no mutations. This is the piece that turns the framework from
 // test-only into a live production registry.
 //
-// To onboard a new provider: add its SDK singleton to PROVIDERS below.
+// To onboard a new provider: add its SDK singleton to PROVIDERS below.\n// Any provider that performs network execution MUST route that execution through\n// executeSupervisedProviderCall. CI enforces this for registered network adapters so\n// Self-Healing circuit preflight/failure containment cannot be an optional convention.
 
 import { UniversalProviderRegistry } from './registry.ts'
 import type { UniversalProviderSdk } from './types.ts'

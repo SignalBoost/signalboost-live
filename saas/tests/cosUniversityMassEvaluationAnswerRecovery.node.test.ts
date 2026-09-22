@@ -30,3 +30,9 @@ test('retry responses are folded into the answer hash and the complete-answer ch
   assert.match(source, /return \{answers:recovered,responseHash:sha256Raw\(parts\.join\(':'\)\)\}/)
   assert.match(source, /if\(answers\.size!==input\.cases\.length\)throw new Error/)
 })
+
+
+test('solo finish=stop with one correct closer and missing opener is recovered without weakening other malformed shapes', () => {
+  assert.match(source, /recoverStoppedSoloMissingOpenAnswer/)
+  assert.match(source, /cases\.length===1 \? recoverStoppedSoloMissingOpenAnswer\(text,item\.id,finish\) : null/)
+})

@@ -1,2 +1,2 @@
-base_sha=ba9580f367dce938eb0dafbb56c6d4e2eb605f27
-branch=fix/cos-fresh-synthesis-fallthrough-v3-20260921
+base_sha=8fa89a0ff2b6e4c212e40b33caf90e7dcac84c87
+branch=feat/builder-universal-mcp-read-tools-20260921

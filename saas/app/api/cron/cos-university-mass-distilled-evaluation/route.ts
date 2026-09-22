@@ -189,6 +189,16 @@ type RollingOutcome = Readonly<{
   disposed?: number
 }>
 
+function isBuilderV2Receipt(intendedUse: unknown): boolean {
+  if (!intendedUse || typeof intendedUse !== 'object' || Array.isArray(intendedUse)) return false
+  const receipt = (intendedUse as any).trainingReceipt
+  return Boolean(receipt && typeof receipt === 'object'
+    && receipt.optimizer === MASS_EVALUATION_BUILDER_V2_OPTIMIZER
+    && receipt.frontierResponseAnchorRequired === true
+    && Number(receipt.frontierResponseAnchorEpochs) === 1
+    && Number(receipt.frontierResponseAnchorItems) > 0)
+}
+
 async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -205,18 +215,16 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status', 'evaluation_pending')
       .eq('subject_id', 'Computer Science & Coding')
-      .contains('intended_use', { trainingReceipt: {
-        optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
-        frontierResponseAnchorRequired: true,
-        frontierResponseAnchorEpochs: 1,
-      } })
+      .like('candidate_id', 'mass:%')
       .order('created_at', { ascending: true })
-      .limit(20),
+      .limit(500),
   ])
   if (oldestArtifacts.error) throw oldestArtifacts.error
   if (builderV2Artifacts.error) throw builderV2Artifacts.error
+  const confirmedBuilderV2Artifacts = (builderV2Artifacts.data || [])
+    .filter((row: any) => isBuilderV2Receipt(row?.intended_use))
   const artifactByCandidate = new Map<string, any>()
-  for (const row of [...(oldestArtifacts.data || []), ...(builderV2Artifacts.data || [])]) {
+  for (const row of [...(oldestArtifacts.data || []), ...confirmedBuilderV2Artifacts]) {
     artifactByCandidate.set(String((row as any).candidate_id), row)
   }
   const artifactRows = [...artifactByCandidate.values()]
@@ -229,10 +237,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
       frontierRecipe: receipt.profile === 'cos_university_frontier_gkd_v1',
       builderV2: String(row.subject_id || '') === 'Computer Science & Coding'
-        && receipt.optimizer === MASS_EVALUATION_BUILDER_V2_OPTIMIZER
-        && receipt.frontierResponseAnchorRequired === true
-        && Number(receipt.frontierResponseAnchorEpochs) === 1
-        && Number(receipt.frontierResponseAnchorItems) > 0,
+        && isBuilderV2Receipt(row.intended_use),
     }
   })
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
@@ -297,18 +302,14 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   let builderV2ProofCompletions = MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
   try {
     const builderArtifacts = await db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,intended_use')
+      .select('candidate_id,intended_use,created_at')
       .eq('subject_id', 'Computer Science & Coding')
-      .contains('intended_use', { trainingReceipt: {
-        optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
-        frontierResponseAnchorRequired: true,
-        frontierResponseAnchorEpochs: 1,
-      } })
       .like('candidate_id', 'mass:%')
-      .limit(200)
+      .order('created_at', { ascending: false })
+      .limit(500)
     if (!builderArtifacts.error) {
       const builderIds = (builderArtifacts.data || [])
-        .filter((row: any) => Number(row?.intended_use?.trainingReceipt?.frontierResponseAnchorItems) > 0)
+        .filter((row: any) => isBuilderV2Receipt(row?.intended_use))
         .map((row: any) => clean(row.candidate_id, 240))
         .filter(Boolean)
       if (builderIds.length) {
@@ -527,7 +528,12 @@ export async function GET(req: NextRequest) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
 
-    const missingColumns = await evaluationSchemaMissingColumns()
+    let missingColumns: string[] | null
+    try {
+      missingColumns = await evaluationSchemaMissingColumns()
+    } catch (error) {
+      throw new Error(`mass_distilled_evaluation_schema_preflight_failed:${boundedErrorMessage(error)}`)
+    }
     if (missingColumns) {
       await recordProduction(false, {
         runnerInvoked: false,
@@ -546,7 +552,12 @@ export async function GET(req: NextRequest) {
       }, { status: 503 })
     }
 
-    const account = await queryRunpodAccountStatus()
+    let account: Awaited<ReturnType<typeof queryRunpodAccountStatus>>
+    try {
+      account = await queryRunpodAccountStatus()
+    } catch (error) {
+      throw new Error(`mass_distilled_evaluation_runpod_account_preflight_failed:${boundedErrorMessage(error)}`)
+    }
     if (account.clientBalance !== null && account.clientBalance < MIN_BALANCE_USD) {
       await recordProduction(false, {
         runnerInvoked: false,
@@ -556,7 +567,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'runpod_balance_guard', balance: account.clientBalance }, { status: 402 })
     }
 
-    const rolling = await ensureRollingMassEvaluationApproval()
+    let rolling: RollingOutcome
+    try {
+      rolling = await ensureRollingMassEvaluationApproval()
+    } catch (error) {
+      throw new Error(`mass_distilled_evaluation_rolling_preflight_failed:${boundedErrorMessage(error)}`)
+    }
     console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
     // A previous tick may already have issued a bounded approval that has not yet been atomically
     // claimed. Draining that approval does not mint new authority or expand spend: claimNext() re-validates

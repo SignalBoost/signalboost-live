@@ -1,2 +1,2 @@
-base_sha=654ed21ed740f6bae2cb753ed22936cac92a40d4
-branch=fix/actions-backlog-remediation-observability-20260922
+base_sha=cb30c1ab5ab877c9e23b9cd472973b358f5922eb
+branch=fix/smooth-mass-canary-admission-window-20260922

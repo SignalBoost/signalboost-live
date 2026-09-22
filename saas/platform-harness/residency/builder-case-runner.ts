@@ -80,7 +80,7 @@ export async function runBuilderResidencyCase(input:{
     sandboxEnvironmentId:input.sandboxEnvironmentId,
   })
   const policy=resolveHarnessManifest(request,input.authority)
-  if(!policy.allowed) return Object.freeze({ok:false,reason:'residency_manifest_rejected',blockers:policy.reasons})
+  if(policy.allowed===false) return Object.freeze({ok:false,reason:'residency_manifest_rejected',blockers:policy.reasons})
 
   const started=await input.store.startCase({
     residencyId:input.residencyId,

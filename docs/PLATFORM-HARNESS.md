@@ -158,3 +158,36 @@ trained immutable artifact
 
 Hidden final-exam material is forbidden from Residency. The independent verifier, not the resident
 worker, owns failure attribution between competency and infrastructure.
+
+## Live Builder Residency
+
+The first real Residency execution lane uses the same Platform Harness rather than a parallel Builder
+engine.
+
+```text
+trained immutable Computer Science artifact
+-> durable Residency enrollment
+-> candidate-specific teaching case queue
+-> exact artifact RunPod Residency lease
+-> exact served-identity proof
+-> fresh isolated Builder workspace
+-> student chooses action
+-> native Builder capability
+-> Governed Socket
+-> ephemeral Vercel Sandbox
+-> host verifier
+-> competency evidence / remediation / infrastructure route
+```
+
+The Hub commit revision and University revision key are separate identities. The serving lease requires
+the actual 40-character immutable Hub commit from the artifact evidence reference; the 64-character
+University revision key is never used as a substitute.
+
+The initial teaching cases exercise root-cause repair and observe-failure/recovery. They deliberately
+avoid Production repositories and external writes. Every student workspace mutation and sandbox
+command is a reversible native Harness capability. The student cannot call the workspace or runner
+directly.
+
+Runtime readiness is educational infrastructure evidence only. It is never submitted as the final
+exact-artifact canary. Hidden final-exam material is not used. The final Residency gate remains off
+until practical coverage and successful live evidence make enforcement safe.

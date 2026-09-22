@@ -262,6 +262,15 @@ export async function GET(req:NextRequest){
     if(active&&!providerInvocationStarted){
       await record({candidateId:active.artifact.candidateId,subjectId:active.artifact.subjectId,artifactHash:active.artifact.artifactHash,claim:PREFLIGHT_FAILED,evidence:{error:clean(message,300),attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:active.approvedCost,authorizationObservedAt:active.approvalAt,reservationEventKey:active.reservationEventKey,runtimeKey:active.runtimeKey,providerInvocationStarted:false,retryableWithinApproval:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}}).catch(recordError=>console.error('[runpod-mass-distilled-local-deploy-preflight-record]',JSON.stringify({ok:false,error:clean(recordError instanceof Error?recordError.message:String(recordError),300)})))
     }
+    const quotaBlocked=!providerInvocationStarted&&(
+      message.startsWith('mass_distilled_runtime_worker_quota_full')
+      || message.toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
+    )
+    if(quotaBlocked){
+      await laneStatus('skipped','runpod_worker_quota_full',{candidateId:active?.artifact.candidateId,retryableWithinApproval:true})
+      console.info('[runpod-mass-distilled-local-deploy]',JSON.stringify({ok:true,skipped:true,reason:'runpod_worker_quota_full',claim:active?RESERVED:null,providerInvocationStarted:false}))
+      return NextResponse.json({ok:true,skipped:true,reason:'runpod_worker_quota_full',providerInvocationStarted:false})
+    }
     await laneStatus('failed','lane_error',{error:clean(message,300),providerInvocationStarted,candidateId:active?.artifact.candidateId})
     console.error('[runpod-mass-distilled-local-deploy]',JSON.stringify({ok:false,error:clean(message,300),claim:active?RESERVED:null,providerInvocationStarted}))
     return NextResponse.json({ok:false,error:clean(message,300),providerInvocationStarted},{status:500})

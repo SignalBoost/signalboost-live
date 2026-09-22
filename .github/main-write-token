@@ -1,2 +1,2 @@
-base_sha=47210206d0e657bcdc6b42ca2eb3923097a9777c
-branch=fix/builder-playwright-cli-runtime-diagnostic-20260922
+base_sha=d354aa4d1aa4e364fdcc5a88749b9a7b78d16155
+branch=fix/builder-playwright-cli-browser-deps-20260922

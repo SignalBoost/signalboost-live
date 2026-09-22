@@ -115,9 +115,14 @@ function interactiveUserResponse(args: LocalModelCallArgs): boolean {
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   return feature === 'cos_interactive_answer'
     || feature === 'cos_interactive_authoring'
-    || feature === 'cos_fresh_grounded_task'
     || feature === 'direct_text_transformation'
 }
+
+function freshGroundedTask(args: LocalModelCallArgs): boolean {
+  return String(args.usageContext?.feature || '').trim().toLowerCase() === 'cos_fresh_grounded_task'
+}
+
+const FRESH_GROUNDED_RUNPOD_ATTEMPT_MS = 16_000
 
 function interactiveReasoningEffort(args: LocalModelCallArgs): 'none' | 'low' | 'medium' | 'high' {
   if (directTextTransformation(args) || interactiveAuthoring(args)) return 'none'
@@ -427,7 +432,18 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       const runpodConfig = await primary.resolveReadyRunpodPrimaryConfig('reasoner')
       if (runpodConfig) {
         try {
-          const text = await callConfiguredModel(args, runpodConfig)
+          const runpodArgs = freshGroundedTask(args)
+            ? {
+                ...args,
+                timeoutMs: Math.min(
+                  FRESH_GROUNDED_RUNPOD_ATTEMPT_MS,
+                  Number.isFinite(Number(args.timeoutMs)) && Number(args.timeoutMs) > 0
+                    ? Number(args.timeoutMs)
+                    : FRESH_GROUNDED_RUNPOD_ATTEMPT_MS,
+                ),
+              }
+            : args
+          const text = await callConfiguredModel(runpodArgs, runpodConfig)
           if (text?.trim()) return text
         } catch (error) {
           if (!isEmptyThinkingTruncation(error) || args.disableThinking === true || runpodSmallBudgetThinkingOff(args, 'runpod')) throw error
@@ -435,7 +451,10 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
             feature: args.usageContext?.feature || 'unattributed_local_inference',
             reason: 'empty_hidden_reasoning_exhausted_token_budget',
           }))
-          const text = await callConfiguredModel({ ...args, disableThinking: true }, runpodConfig)
+          const retryArgs = freshGroundedTask(args)
+            ? { ...args, disableThinking: true, timeoutMs: FRESH_GROUNDED_RUNPOD_ATTEMPT_MS }
+            : { ...args, disableThinking: true }
+          const text = await callConfiguredModel(retryArgs, runpodConfig)
           if (text?.trim()) return text
         }
       }

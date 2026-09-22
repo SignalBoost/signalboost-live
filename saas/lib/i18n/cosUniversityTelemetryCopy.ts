@@ -34,6 +34,20 @@ type Copy = Readonly<{
   footer: string
   unknownSubject: string
   unknownStage: string
+  artifactsTitle: string
+  artifactsExplanation: string
+  artifactStatus: string
+  retentionGate: string
+  holdout: string
+  safety: string
+  transfer: string
+  retention: string
+  graduation: string
+  pass: string
+  fail: string
+  pending: string
+  notGraduated: string
+  noArtifacts: string
 }>
 
 export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguage, Copy> = {
@@ -70,6 +84,20 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     footer: 'This surface is read-only. It does not authorize spend, retrigger jobs, change providers, or promote artifacts.',
     unknownSubject: 'Unknown subject',
     unknownStage: 'Unknown',
+    artifactsTitle: 'Evaluation & graduation',
+    artifactsExplanation: 'Read-only artifact lifecycle evidence. This view does not authorize evaluation, graduation, activation, or Production traffic.',
+    artifactStatus: 'Artifact status',
+    retentionGate: '12h eligible at',
+    holdout: 'Holdout',
+    safety: 'Safety',
+    transfer: 'Transfer',
+    retention: 'Retention',
+    graduation: 'Graduation',
+    pass: 'PASS',
+    fail: 'FAIL',
+    pending: 'Pending',
+    notGraduated: 'Not graduated',
+    noArtifacts: 'No distilled artifacts found.',
   },
   es: {
     title: 'COS University — Telemetría de destilación',
@@ -104,6 +132,20 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     footer: 'Esta vista es de solo lectura. No autoriza gasto, reintentos de trabajos, cambios de proveedor ni promoción de artefactos.',
     unknownSubject: 'Materia desconocida',
     unknownStage: 'Desconocida',
+    artifactsTitle: 'Evaluación y graduación',
+    artifactsExplanation: 'Evidencia de solo lectura del ciclo de vida del artefacto. Esta vista no autoriza evaluación, graduación, activación ni tráfico de Producción.',
+    artifactStatus: 'Estado del artefacto',
+    retentionGate: 'Elegible 12 h',
+    holdout: 'Holdout',
+    safety: 'Seguridad',
+    transfer: 'Transferencia',
+    retention: 'Retención',
+    graduation: 'Graduación',
+    pass: 'APROBADO',
+    fail: 'FALLÓ',
+    pending: 'Pendiente',
+    notGraduated: 'No graduado',
+    noArtifacts: 'No se encontraron artefactos destilados.',
   },
   pt: {
     title: 'COS University — Telemetria de destilação',
@@ -138,6 +180,20 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     footer: 'Esta tela é somente leitura. Ela não autoriza gastos, reexecução de jobs, troca de provedores ou promoção de artefatos.',
     unknownSubject: 'Assunto desconhecido',
     unknownStage: 'Desconhecida',
+    artifactsTitle: 'Avaliação e graduação',
+    artifactsExplanation: 'Evidência somente leitura do ciclo de vida do artefato. Esta tela não autoriza avaliação, graduação, ativação ou tráfego de Produção.',
+    artifactStatus: 'Status do artefato',
+    retentionGate: 'Elegível em 12 h',
+    holdout: 'Holdout',
+    safety: 'Segurança',
+    transfer: 'Transferência',
+    retention: 'Retenção',
+    graduation: 'Graduação',
+    pass: 'APROVADO',
+    fail: 'FALHOU',
+    pending: 'Pendente',
+    notGraduated: 'Não graduado',
+    noArtifacts: 'Nenhum artefato destilado encontrado.',
   },
   pl: {
     title: 'COS University — Telemetria destylacji',
@@ -172,6 +228,20 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     footer: 'Ten widok jest tylko do odczytu. Nie autoryzuje wydatków, ponawiania zadań, zmian dostawców ani promocji artefaktów.',
     unknownSubject: 'Nieznany temat',
     unknownStage: 'Nieznany',
+    artifactsTitle: 'Ocena i ukończenie',
+    artifactsExplanation: 'Dowody cyklu życia artefaktu tylko do odczytu. Ten widok nie autoryzuje oceny, ukończenia, aktywacji ani ruchu Produkcyjnego.',
+    artifactStatus: 'Status artefaktu',
+    retentionGate: 'Kwalifikacja po 12 h',
+    holdout: 'Holdout',
+    safety: 'Bezpieczeństwo',
+    transfer: 'Transfer',
+    retention: 'Retencja',
+    graduation: 'Ukończenie',
+    pass: 'ZALICZONE',
+    fail: 'NIEZALICZONE',
+    pending: 'Oczekuje',
+    notGraduated: 'Nieukończony',
+    noArtifacts: 'Nie znaleziono artefaktów destylowanych.',
   },
   ru: {
     title: 'COS University — Телеметрия дистилляции',
@@ -206,5 +276,19 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     footer: 'Этот экран только для чтения. Он не разрешает расходы, перезапуск задач, смену провайдеров или продвижение артефактов.',
     unknownSubject: 'Неизвестный предмет',
     unknownStage: 'Неизвестен',
+    artifactsTitle: 'Оценка и выпуск',
+    artifactsExplanation: 'Данные жизненного цикла артефакта только для чтения. Этот экран не разрешает оценку, выпуск, активацию или производственный трафик.',
+    artifactStatus: 'Статус артефакта',
+    retentionGate: 'Допуск через 12 ч',
+    holdout: 'Holdout',
+    safety: 'Безопасность',
+    transfer: 'Перенос',
+    retention: 'Удержание',
+    graduation: 'Выпуск',
+    pass: 'ПРОЙДЕНО',
+    fail: 'НЕ ПРОЙДЕНО',
+    pending: 'Ожидает',
+    notGraduated: 'Не выпущен',
+    noArtifacts: 'Дистиллированные артефакты не найдены.',
   },
 }

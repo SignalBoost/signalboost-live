@@ -498,3 +498,20 @@ test('Supervisor audit Harness sink persists only sanitized evidence record', as
   assert.equal(serialized.includes('objective'),false)
   assert.equal(serialized.includes('credential'),false)
 })
+
+
+test('Harness preserves independently verified infrastructure cause for Self-Healing', async () => {
+  const decision=resolveHarnessManifest(request(),authority)
+  assert.equal(decision.allowed,true)
+  if(!decision.allowed) return
+  const result=await runHarnessWorker({
+    manifest:decision.manifest,
+    capabilities:{async resolve(){return {satisfied:true,resolved:{},missing:[]}}},
+    executor:{async execute(){throw new Error('unexpected_execute')}},
+    worker:{async run(){}},
+    verifier:{async verify(){return {verified:false,verifierRef:'host://independent',evidenceRefs:[],reason:'runpod_endpoint_cold_start_timeout',failureAttribution:'infrastructure'}}},
+  })
+  assert.equal(result.outcome.status,'infrastructure_failure')
+  assert.equal(result.outcome.failureCode,'runpod_endpoint_cold_start_timeout')
+  assert.equal(result.outcome.verifierRef,'host://independent')
+})

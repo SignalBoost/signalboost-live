@@ -3,7 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationIntent.ts'
-import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
+import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 
 test('the live Dwight edit shape is transformation work, never fresh web lookup', () => {
   const prompt = 'edit Dwight, thank you for let me know and for your ocncern - if you are thinking about cancelling it because of me, do not worry. At the end of the day, this is at the moment a one-person post. If I do not do it, you will have to do it. We do what we have to do and whatever is needed to support the mission.'
@@ -48,4 +48,19 @@ test('the public Concierge browser ingress routes explicit artifacts before norm
   const primary = browser.indexOf('cosPrimaryPost(routedRequest)')
   assert.ok(artifact >= 0)
   assert.ok(primary > artifact)
+})
+
+
+test('known mutable travel plans skip the agent-decision model and route straight to live evidence', () => {
+  const prompt = 'Mam 9 godzin do zabicia w Amsterdamie. Ląduję na Schiphol. Przygotuj ekonomiczny plan zwiedzania 9-18, podaj transport i jedną płatną atrakcję.'
+  assert.equal(requiresLiveTravelPlanningEvidence(prompt), true)
+  const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
+  const deterministic = browser.indexOf('const deterministicTravelPlan = requiresLiveTravelPlanningEvidence(prompt)')
+  const seededDecision = browser.indexOf("reason: 'host_travel_freshness_guard'", deterministic)
+  const modelDecision = browser.indexOf('agentDecision = await decideCosAgentTurn({', deterministic)
+  assert.ok(deterministic >= 0)
+  assert.ok(seededDecision > deterministic)
+  assert.ok(modelDecision > seededDecision)
+  assert.match(browser, /if \(!deterministicTravelPlan && !operationalEvidence/)
+  assert.match(browser, /capabilities: \['live_web'\]/)
 })

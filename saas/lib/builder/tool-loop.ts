@@ -72,14 +72,21 @@ const safeJson = (value: unknown, maximum = 18_000) => {
   }
 }
 
-async function within<T>(work: Promise<T>, timeoutMs?: number): Promise<T> {
+async function within<T>(
+  work: Promise<T>,
+  timeoutMs?: number,
+  onTimeout?: () => void,
+): Promise<T> {
   if (!timeoutMs || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return work
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
       work,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('builder_model_round_timeout')), timeoutMs)
+        timer = setTimeout(() => {
+          reject(new Error('builder_model_round_timeout'))
+          onTimeout?.()
+        }, timeoutMs)
       }),
     ])
   } finally {
@@ -92,7 +99,17 @@ async function generateWithRetry(ai: BuilderAiPort, input: Parameters<BuilderAiP
   let request = input
   for (let modelAttempt = 1; modelAttempt <= MAX_MODEL_ROUND_ATTEMPTS; modelAttempt += 1) {
     try {
-      return await within(ai.generate(request), timeoutMs)
+      const controller = timeoutMs && Number.isFinite(timeoutMs) && timeoutMs > 0
+        ? new AbortController()
+        : null
+      const attempt = controller
+        ? { ...request, signal: controller.signal }
+        : request
+      return await within(
+        ai.generate(attempt),
+        timeoutMs,
+        () => controller?.abort('builder_model_round_timeout'),
+      )
     } catch (error) {
       lastError = error
       if (modelAttempt === MAX_MODEL_ROUND_ATTEMPTS) throw error

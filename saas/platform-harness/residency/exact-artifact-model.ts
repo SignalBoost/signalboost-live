@@ -31,6 +31,8 @@ const REVISION=/^[a-f0-9]{40}$/
 const READY_TIMEOUT_MS=360_000
 const READY_POLL_MS=3_000
 const WAKE_TIMEOUT_MS=20_000
+const MAX_WAKE_ATTEMPTS=3
+const EMPTY_HEALTH_POLLS_BEFORE_WAKE_RETRY=3
 const APPLICATION_READY_TIMEOUT_MS=15_000
 
 type ResidencyRuntimeArtifact=Readonly<{
@@ -182,27 +184,41 @@ export function createRunpodBuilderResidencyModelPort(input:{
 
       const root=`https://${endpointId}.api.runpod.ai`
       const deadline=Date.now()+readyTimeoutMs
-      try{
-        const wake=await call(`${root}/ping`,{
-          headers:{Authorization:`Bearer ${input.apiKey}`},
-          signal:AbortSignal.timeout(Math.min(WAKE_TIMEOUT_MS,readyTimeoutMs)),
-        })
-        if(wake.status===401||wake.status===403){
-          throw new Error(`residency_exact_artifact_runtime_wake_http_${wake.status}`)
+      let wakeAttempts=0
+      const wakeRuntime=async()=>{
+        wakeAttempts+=1
+        try{
+          const remaining=Math.max(1,deadline-Date.now())
+          const wake=await call(`${root}/ping`,{
+            headers:{Authorization:`Bearer ${input.apiKey}`},
+            signal:AbortSignal.timeout(Math.min(WAKE_TIMEOUT_MS,remaining)),
+          })
+          if(wake.status===401||wake.status===403){
+            throw new Error(`residency_exact_artifact_runtime_wake_http_${wake.status}`)
+          }
+        }catch(error){
+          if(error instanceof Error&&/^residency_exact_artifact_runtime_wake_http_/.test(error.message)){
+            throw error
+          }
+          // A scale-to-zero LB may reject or time out the first request before a worker is assigned.
+          // The bounded retry below is allowed only while the provider still reports no worker at all.
         }
-      }catch(error){
-        if(error instanceof Error&&/^residency_exact_artifact_runtime_wake_http_/.test(error.message)){
-          throw error
-        }
-        // A cold scale-to-zero LB commonly times out while RunPod starts a worker.
-        // Readiness is authoritatively observed through the provider health plane below.
       }
+      await wakeRuntime()
 
       let lastHealthError=''
+      let emptyHealthPolls=0
       while(Date.now()<deadline){
         try{
           const state=await health(endpointId)
-          if(state.ok&&state.workers.ready>0){
+          const ready=Math.max(0,Number(state.workers?.ready??0))
+          const running=Math.max(0,Number(state.workers?.running??0))
+          const initializing=Math.max(0,Number(state.workers?.initializing??0))
+          const idle=Math.max(0,Number(state.workers?.idle??0))
+          if(state.ok){
+            lastHealthError=`provider_workers_ready_${ready}_running_${running}_initializing_${initializing}_idle_${idle}_wake_attempts_${wakeAttempts}`
+          }
+          if(state.ok&&ready>0){
             try{
               const remaining=Math.max(1,deadline-Date.now())
               const application=await call(`${root}/ready`,{
@@ -259,6 +275,20 @@ export function createRunpodBuilderResidencyModelPort(input:{
             }
           }
           if(!state.ok&&state.error) lastHealthError=String(state.error).slice(0,240)
+
+          if(state.ok&&ready===0&&running===0&&initializing===0&&idle===0){
+            emptyHealthPolls+=1
+            if(
+              emptyHealthPolls>=EMPTY_HEALTH_POLLS_BEFORE_WAKE_RETRY&&
+              wakeAttempts<MAX_WAKE_ATTEMPTS&&
+              Date.now()<deadline
+            ){
+              await wakeRuntime()
+              emptyHealthPolls=0
+            }
+          }else{
+            emptyHealthPolls=0
+          }
         }catch(error){
           lastHealthError=error instanceof Error
             ?error.message.slice(0,240)

@@ -135,6 +135,70 @@ test('Residency runtime preparation fails closed on artifact-registry identity d
   )
 })
 
+test('Residency retries a missed scale-to-zero wake only while RunPod reports zero workers',async()=>{
+  const {db}=artifactDb()
+  let pingCalls=0
+  let healthCalls=0
+  const port=createRunpodBuilderResidencyModelPort({
+    db,
+    apiKey:'secret',
+    readyTimeoutMs:1000,
+    provisionImpl:async()=>({
+      endpointId:'ep_residency_123',
+      endpointName:'residency-endpoint',
+      templateName:'residency-template',
+      modelName:'itmounts-resident-model',
+      baseUrl:'https://ep_residency_123.api.runpod.ai/v1',
+      createdTemplate:false,
+      createdEndpoint:false,
+      reboundTemplate:false,
+      workersMin:0,
+      workersMax:1,
+      idleTimeout:720,
+    }),
+    healthImpl:async()=>{
+      healthCalls+=1
+      if(pingCalls<2){
+        return {
+          ok:true,
+          httpStatus:200,
+          jobs:{inProgress:0,inQueue:0,failed:0,completed:0},
+          workers:{idle:0,ready:0,running:0,initializing:0},
+          error:null,
+        }
+      }
+      return {
+        ok:true,
+        httpStatus:200,
+        jobs:{inProgress:0,inQueue:0,failed:0,completed:0},
+        workers:{idle:1,ready:1,running:0,initializing:0},
+        error:null,
+      }
+    },
+    sleepImpl:async()=>{},
+    fetchImpl:async(url:any)=>{
+      const value=String(url)
+      if(value.endsWith('/ping')){
+        pingCalls+=1
+        if(pingCalls===1) throw new DOMException('timeout','TimeoutError')
+        return new Response(JSON.stringify({status:'ready'}),{status:200})
+      }
+      if(value.endsWith('/ready')){
+        return new Response(JSON.stringify({
+          ready:true,
+          model:'itmounts-resident-model',
+        }),{status:200})
+      }
+      throw new Error('unexpected_fetch')
+    },
+  })
+
+  const prepared=await port.prepare!(identity)
+  assert.equal(prepared.exactArtifact,true)
+  assert.equal(pingCalls,2)
+  assert.ok(healthCalls>=4)
+})
+
 test('Residency runtime preparation classifies unavailable provider readiness as infrastructure',async()=>{
   const {db}=artifactDb()
   let healthCalls=0

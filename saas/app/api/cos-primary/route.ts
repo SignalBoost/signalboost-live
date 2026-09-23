@@ -61,6 +61,7 @@ import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/f
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
+import { retrieveCreativeMemory, formatCreativeMemoryForReasoner } from '@/lib/ai/cos/creativeMemory'
 import {
   isProvenanceIntrospection,
   requestsExternalAction,
@@ -317,6 +318,10 @@ export const TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 28_000
 export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 1_400
 export const TRAVEL_PLAN_RETRY_MAX_TOKENS = 900
 async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+  const creative=await retrieveCreativeMemory(input,{privileged:true,limit:2}).catch(()=>({retrieved:0,relevant:0,selected:[],mode:'unavailable' as const}))
+  const creativeGuidance=creative.selected.length
+    ? formatCreativeMemoryForReasoner(creative.selected).join('\n')
+    : ''
   const evidence=(Array.isArray(sources)?sources:[]).slice(0,6).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,360)}`).join('\n\n')
   const languageLine=language ? `Write the plan in the language the traveller wrote in; if unclear use ${reportLanguageName(language)}.` : 'Write the plan in the language the traveller wrote in.'
   const rules=[
@@ -335,7 +340,7 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
       maxTokens:TRAVEL_PLAN_RESCUE_MAX_TOKENS,
       purpose:'travel_plan_grounded',
       systemPrompt:['You are a fast, practical local travel planner. Deliver a complete but concise itinerary now. Prefer useful specifics over long explanation. /no_think',...rules].join(' '),
-      prompt:`TRAVELLER REQUEST:\n${input.slice(0,8_000)}${evidence?`\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}\n\nITINERARY:`,
+      prompt:`TRAVELLER REQUEST:\n${input.slice(0,8_000)}${creativeGuidance?`\n\nCREATIVE MEMORY — HOW TO SOLVE/PRESENT, NEVER FACTUAL EVIDENCE:\n${creativeGuidance}`:''}${evidence?`\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}\n\nITINERARY:`,
     },
     {
       temperature:.35,
@@ -343,7 +348,7 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
       maxTokens:TRAVEL_PLAN_RETRY_MAX_TOKENS,
       purpose:'travel_plan_grounded_retry',
       systemPrompt:['Complete the travel brief directly and concisely. Start with the first time slot, not a restatement. Cover transport, budget, and one worthwhile paid attraction if supported. /no_think',...rules].join(' '),
-      prompt:`BRIEF:\n${input.slice(0,8_000)}${evidence?`\n\nLIVE SOURCES:\n${evidence}`:''}\n\nPLAN:`,
+      prompt:`BRIEF:\n${input.slice(0,8_000)}${creativeGuidance?`\n\nCREATIVE MEMORY — HOW TO SOLVE/PRESENT, NEVER FACTUAL EVIDENCE:\n${creativeGuidance}`:''}${evidence?`\n\nLIVE SOURCES:\n${evidence}`:''}\n\nPLAN:`,
     },
   ]
   const started=Date.now()

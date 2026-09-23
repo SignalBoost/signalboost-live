@@ -70,3 +70,61 @@ test('travel authority gate refuses one-dimensional evidence for a request that 
   ]] as any, 8, polishAmsterdam)
   assert.equal(freshEvidenceMeetsAuthority(polishAmsterdam, transportOnly), false)
 })
+
+
+test('travel source ranking prefers destination-local, user-language, and English sources over unrelated languages', () => {
+  const groups = [[
+    {
+      title: 'Collegamenti da e per l’aeroporto di Amsterdam, come arrivare in centro',
+      url: 'https://aeroporto.net/amsterdam',
+      snippet: 'Informazioni su trasporto, biglietti e collegamenti con il centro.',
+    },
+    {
+      title: 'Transport w Amsterdamie',
+      url: 'https://amsterdam.info.pl/transport',
+      snippet: 'Lotnisko, pociąg, bilety i transport publiczny w Amsterdamie.',
+    },
+    {
+      title: 'Reizen met GVB',
+      url: 'https://www.gvb.nl/reizen',
+      snippet: 'Openbaar vervoer, tram en metro in Amsterdam.',
+    },
+    {
+      title: 'Visit Amsterdam museums',
+      url: 'https://www.iamsterdam.nl/en/see-and-do/museums-and-galleries',
+      snippet: 'Official visitor information about museums, attractions and tickets.',
+    },
+    {
+      title: 'Rijksmuseum visitor information',
+      url: 'https://www.rijksmuseum.nl/en/visit',
+      snippet: 'Museum tickets, opening hours and visitor information.',
+    },
+  ]]
+
+  const sources = prepareFreshEvidenceAcrossQueries(groups as any, 4, polishAmsterdam)
+  const urls = sources.map(source => source.url)
+
+  assert.equal(urls[0], 'https://www.gvb.nl/reizen')
+  assert.ok(urls.includes('https://amsterdam.info.pl/transport'))
+  assert.ok(urls.some(url => url.includes('iamsterdam.nl') || url.includes('rijksmuseum.nl')))
+  assert.ok(!urls.includes('https://aeroporto.net/amsterdam'))
+})
+
+test('travel source ranking may use an unrelated language only when preferred-language/local evidence cannot cover a requested dimension', () => {
+  const groups = [[
+    {
+      title: 'Amsterdam airport train',
+      url: 'https://example.com/amsterdam-airport-train',
+      snippet: 'Airport train and public transport tickets to the city centre.',
+    },
+    {
+      title: 'Musei ad Amsterdam',
+      url: 'https://example.it/amsterdam-musei',
+      snippet: 'Museo, biglietti, orari e attrazioni ad Amsterdam.',
+    },
+  ]]
+
+  const sources = prepareFreshEvidenceAcrossQueries(groups as any, 4, polishAmsterdam)
+  assert.ok(sources.some(source => source.url === 'https://example.it/amsterdam-musei'))
+  assert.equal(freshEvidenceMeetsAuthority(polishAmsterdam, sources), true)
+})

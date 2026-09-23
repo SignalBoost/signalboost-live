@@ -1332,6 +1332,67 @@ They run for real queued knowledge gaps rather than indiscriminate daily mining.
 training rights are not inferred from the presence of an embedding; its material remains
 non-training by default unless a separate rights classification establishes eligibility.
 
+## Concurrent Working COS + University distillation invariant — 2026-09-23
+
+COS is allowed to **work and attend University at the same time**. Formal University education remains the long-horizon qualification path for COS and every specialist, but the live platform must not freeze COS intelligence while exams, Residency, delayed retention, canaries, and graduation are still in progress.
+
+There is one shared knowledge-acquisition supply chain, not a duplicate COS-only crawler:
+
+```text
+approved free/open sources + paid frontier faculty + verified internal outcomes
+-> provenance + rights + quality + deduplication + subject normalization
+-> durable model-neutral educational assets / internal embeddings
+-> shared knowledge fabric
+   -> Working COS direct-distillation lane
+   -> University curriculum for COS and all relevant specialists
+```
+
+Open-source acquisition is therefore **shared once, consumed many times**. OpenAlex, Semantic Scholar/S2ORC, approved Hugging Face open datasets, Wikimedia/Wikipedia, and future approved corpora must not be fetched, embedded, or stored separately for COS and specialists merely because they have different learning paths. One accepted source item may support multiple curricula when subject relevance and rights permit.
+
+The Working COS lane is real model training/distillation, not merely RAG. It may create a new versioned COS candidate from already accepted model-neutral educational assets while COS continues through the full University program. It must never mutate the currently served COS weights in place. Canonical progression is:
+
+```text
+current COS artifact
+-> exact configured COS base/runtime identity
+-> bounded direct distillation using sealed portable assets
+-> new immutable Working-COS candidate
+-> fast independent improvement + regression + safety checks
+-> exact served-identity canary + rollback proof
+-> bounded Production activation
+```
+
+The previous COS artifact remains the rollback target. Direct Working-COS activation is **not** University graduation, does not award academic standing, does not bypass Residency/retention/transfer requirements, and does not widen authority. COS may truthfully be an active Production worker while still a University student.
+
+The University lane continues independently from the same durable assets:
+
+```text
+curriculum
+-> distillation/training
+-> independent exams
+-> Residency
+-> transfer + delayed retention
+-> exact-artifact canary + rollback
+-> graduation
+-> separately governed activation
+```
+
+Model portability remains controlling. The expensive asset is the retained education: source material, teacher prompt/response pairs, provenance, rights, remediation material, evaluation cases, verified outcomes, and internal embeddings. LoRAs, adapters, checkpoints, and serving-model artifacts are reproducible model-specific derivatives. Replacing the underlying LLM may require recompilation/retraining, but must not require repurchasing the same education when rights and compatibility allow reuse.
+
+Cost waterfall for shared University/Working-COS acquisition:
+
+```text
+free/open rights-cleared material first
+-> local/open-model transformation where sufficient
+-> paid frontier faculty selectively where quality or difficulty justifies cost
+-> independent evaluation unchanged
+```
+
+Frontier-provider spend is therefore an optimization layer, not the permanent store of University intelligence. SMB deployments may primarily consume shared graduates, retrieval, and bounded personalization; enterprise deployments may additionally fund private/customer-specific distillation with their own approved provider/compute budgets. Commercial packaging never changes tenant isolation, training rights, evaluator independence, or authority gates.
+
+University telemetry must expose open-source acquisition separately from paid frontier faculty. The `openSources` lane reports configured/implemented sources and observed retained material without pretending that a configured source produced data when it did not. Open-source counts are acquisition evidence only; they do not imply training, mastery, evaluation, or graduation.
+
+Implementation status at introduction: `saas/lib/ai/cos/cosWorkingDistillation.ts` defines the fail-closed Working-COS candidate contract and exact-base-model binding. Automatic training dispatch and Production activation remain disabled until the dedicated fast evaluator, rollback proof, exact served-identity canary, and bounded activation path are implemented and independently tested.
+
 ## University distillation asset portability invariant — 2026-09-23
 
 Distillation spend must create a durable iTMounts-controlled educational asset, not only a model-

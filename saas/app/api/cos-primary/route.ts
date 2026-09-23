@@ -310,9 +310,11 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
 // Do not stack the 40s grounded JSON lane, shared synthesis, and two 60s rescue calls. Once live
 // sources are available, give one bounded direct planner profile two short attempts inside a single
 // 16-second model budget. This profile bypasses RunPod wake/readiness through local-inference.ts.
-export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 8_000
-export const TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 16_000
-export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 2_200
+export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 16_000
+export const TRAVEL_PLAN_RETRY_TIMEOUT_MS = 10_000
+export const TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 28_000
+export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 1_400
+export const TRAVEL_PLAN_RETRY_MAX_TOKENS = 900
 async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const evidence=(Array.isArray(sources)?sources:[]).slice(0,6).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,360)}`).join('\n\n')
   const languageLine=language ? `Write the plan in the language the traveller wrote in; if unclear use ${reportLanguageName(language)}.` : 'Write the plan in the language the traveller wrote in.'
@@ -328,12 +330,18 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
   const attempts=[
     {
       temperature:.25,
-      systemPrompt:['You are a fast, practical local travel planner. Deliver the complete itinerary now. /no_think',...rules].join(' '),
+      timeoutMs:TRAVEL_PLAN_RESCUE_TIMEOUT_MS,
+      maxTokens:TRAVEL_PLAN_RESCUE_MAX_TOKENS,
+      purpose:'travel_plan_grounded',
+      systemPrompt:['You are a fast, practical local travel planner. Deliver a complete but concise itinerary now. Prefer useful specifics over long explanation. /no_think',...rules].join(' '),
       prompt:`TRAVELLER REQUEST:\n${input.slice(0,8_000)}${evidence?`\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}\n\nITINERARY:`,
     },
     {
-      temperature:.45,
-      systemPrompt:['Complete the travel brief directly. Start with the first time slot, not a restatement. /no_think',...rules].join(' '),
+      temperature:.35,
+      timeoutMs:TRAVEL_PLAN_RETRY_TIMEOUT_MS,
+      maxTokens:TRAVEL_PLAN_RETRY_MAX_TOKENS,
+      purpose:'travel_plan_grounded_retry',
+      systemPrompt:['Complete the travel brief directly and concisely. Start with the first time slot, not a restatement. Cover transport, budget, and one worthwhile paid attraction if supported. /no_think',...rules].join(' '),
       prompt:`BRIEF:\n${input.slice(0,8_000)}${evidence?`\n\nLIVE SOURCES:\n${evidence}`:''}\n\nPLAN:`,
     },
   ]
@@ -346,13 +354,13 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
     try{
       const turn=await callLocalModelTurn({
         temperature:attempt.temperature,
-        maxTokens:TRAVEL_PLAN_RESCUE_MAX_TOKENS,
+        maxTokens:attempt.maxTokens,
         disableThinking:true,
         allowTruncatedText:true,
-        timeoutMs:Math.min(TRAVEL_PLAN_RESCUE_TIMEOUT_MS,remaining),
+        timeoutMs:Math.min(attempt.timeoutMs,remaining),
         allowConfiguredFallback:false,
         persistUsage:false,
-        usageContext:{feature:'cos_interactive_travel_plan',purpose:'travel_plan_grounded'},
+        usageContext:{feature:'cos_interactive_travel_plan',purpose:attempt.purpose},
         systemPrompt:attempt.systemPrompt,
         prompt:attempt.prompt,
       })
@@ -369,6 +377,37 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
     }
   }
   return null
+}
+
+function buildTravelPlanEvidenceBackstop(input:string,language:string,sources:any[]):{reply:string;confidence:number}{
+  const sourceList=(Array.isArray(sources)?sources:[]).slice(0,6)
+  const transport=sourceList.find(source=>/\b(train|rail|metro|tram|bus|airport|station|transport|kolej|poci[aą]g|autobus)\b/i.test(`${source?.title||''} ${source?.snippet||''}`))
+  const attraction=sourceList.find(source=>/\b(museum|museo|museum|muzeum|gallery|attraction|ticket|admission|rijksmuseum|anne frank|van gogh)\b/i.test(`${source?.title||''} ${source?.snippet||''}`))
+  const transportTitle=String(transport?.title||'live public-transport source').slice(0,160)
+  const attractionTitle=String(attraction?.title||'a major paid attraction supported by the live results').slice(0,160)
+  const sourceRefs=sourceList.slice(0,3).map((source,index)=>`[LIVE${index+1}] ${String(source?.title||'Live source').slice(0,160)}`).join('; ')
+  if(language==='pl')return{confidence:.45,reply:[
+    'Plan awaryjny — COS pobrał aktualne źródła, ale model planujący nie zdążył zakończyć pełnej syntezy w limicie. Zamiast odsyłać Cię do ponowienia, daję użyteczny plan oparty na bezpiecznych założeniach.',
+    '09:00–10:15 — przylot i przejazd z lotniska do centrum. Wybierz bezpośredni transport publiczny wskazany w aktualnym źródle: '+transportTitle+'.',
+    '10:15–12:15 — historyczne centrum i główne kanały pieszo; to najtańsza część dnia i nie wymaga biletu.',
+    '12:15–13:00 — niedrogi lunch poza najbardziej turystycznymi ulicami.',
+    '13:00–15:00 — dalsze zwiedzanie pieszo: dzielnica historyczna / targ / park, zależnie od tego, co jest najbliżej na trasie.',
+    '15:00–16:30 — jedna płatna atrakcja: '+attractionTitle+'. Przed wejściem sprawdź w aktualnym źródle cenę, godzinę wejścia i dostępność.',
+    '16:30–17:15 — powrót w stronę głównego węzła komunikacyjnego; korzystaj z tramwaju/metra tylko wtedy, gdy realnie skraca drogę.',
+    '17:15–18:00 — powrót na lotnisko z zapasem czasu.',
+    sourceRefs?'Aktualne źródła pobrane przez COS: '+sourceRefs+'.':'',
+  ].filter(Boolean).join('\n\n')}
+  return{confidence:.45,reply:[
+    'Fallback plan — COS retrieved current sources, but the planner did not finish full synthesis inside the interactive deadline. Rather than asking you to retry, here is a usable plan based on conservative assumptions.',
+    '09:00–10:15 — arrival and airport-to-center transfer. Use the direct public-transport option shown by the current source: '+transportTitle+'.',
+    '10:15–12:15 — historic center and main walkable sights on foot.',
+    '12:15–13:00 — inexpensive lunch away from the most tourist-heavy streets.',
+    '13:00–15:00 — continue on foot through a historic district, market, or park on the natural route.',
+    '15:00–16:30 — one paid attraction: '+attractionTitle+'. Verify the current ticket price, timed entry, and availability in the live source before entering.',
+    '16:30–17:15 — head back toward the main transport hub; use local transit only where it meaningfully saves time.',
+    '17:15–18:00 — return to the airport with margin.',
+    sourceRefs?'Current sources retrieved by COS: '+sourceRefs+'.':'',
+  ].filter(Boolean).join('\n\n')}
 }
 
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}

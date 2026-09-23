@@ -25,6 +25,18 @@ export interface HarnessOutcomeVerifier {
   verify(manifest: HarnessManifest): Promise<HarnessVerificationResult>
 }
 
+function diagnosticFailureCode(
+  verification: HarnessVerificationResult,
+  fallback: string,
+): string {
+  const raw=String(verification.reason??'').trim()
+  if(!raw) return fallback
+  return raw
+    .replace(/\b(bearer|token|secret|api[_-]?key)\b\s*[:=]?\s*[^,;\s]+/gi,'$1=[redacted]')
+    .replace(/\s+/g,' ')
+    .slice(0,500)
+}
+
 /**
  * Deterministic plan runner retained for simple callers.
  * Execution failures without independent attribution remain harness failures.
@@ -160,7 +172,7 @@ export async function runHarness(input: {
       verifierRef: verification.verifierRef,
       ...(classification.status === 'success'
         ? {}
-        : { failureCode: classification.reason }),
+        : { failureCode: diagnosticFailureCode(verification,classification.reason) }),
     },
     authorityExpanded: false,
     productionMutationObserved,
@@ -469,7 +481,7 @@ export async function runHarnessWorker(input: {
       verifierRef: verification.verifierRef,
       ...(classification.status === 'success'
         ? {}
-        : { failureCode: classification.reason }),
+        : { failureCode: diagnosticFailureCode(verification,classification.reason) }),
     },
     authorityExpanded: false,
     productionMutationObserved,

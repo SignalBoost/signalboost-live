@@ -215,3 +215,13 @@ test('idle scheduler never changes authority or final gate state',async()=>{
   assert.equal(out.promotionAuthorized,false)
   assert.equal(out.productionTrafficAuthorized,false)
 })
+
+
+test('Builder Residency practical catalog covers every v1 competency without claiming final evaluation',()=>{
+  const coverage=assessBuilderResidencyCaseCoverage()
+  assert.equal(coverage.totalCompetencies,13)
+  assert.equal(coverage.coveredCompetencies,13)
+  assert.deepEqual(coverage.missingCompetencies,[])
+  assert.equal(new Set(BUILDER_RESIDENCY_CASES.map(item=>item.competencyId)).size,13)
+  assert.equal(new Set(BUILDER_RESIDENCY_CASES.map(item=>item.variantHash)).size,BUILDER_RESIDENCY_CASES.length)
+})

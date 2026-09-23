@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  createHuggingFaceGithubCc0Search,
   createHuggingFaceNistCybersecuritySearch,
   HUGGING_FACE_OPEN_DATASETS,
 } from '../lib/cos-core/layers/learning/huggingFaceOpenData.ts'
@@ -100,5 +101,70 @@ test('HF NIST CC0 material is admitted by the existing mass-distillation rights 
   assert.equal(
     classifyMassDistillationRights('Hugging Face public dataset with unknown training rights'),
     null,
+  )
+})
+
+
+test('GitHub CC0 source retains code provenance and requires canonical internal embedding', async () => {
+  let requested = ''
+  const fetcher = (async (url: string | URL | Request) => {
+    requested = String(url)
+    return fakeResponse({
+      rows: [{
+        row_idx: 9,
+        row: {
+          text: 'export async function createClient() { return new SupabaseClient() }',
+          meta: {
+            repo_name: 'example/cc0-app',
+            repo_language: 'TypeScript',
+            file_name: 'src/client.ts',
+            mime_type: 'text/typescript',
+          },
+        },
+      }],
+    })
+  }) as typeof fetch
+
+  const search = createHuggingFaceGithubCc0Search(fetcher)
+  const rows = await search('typescript supabase client', 4)
+
+  assert.match(requested, /KoalaAI%2FGitHub-CC0/)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].title, 'example/cc0-app / src/client.ts')
+  assert.match(rows[0].uri, /^hf:\/\/datasets\/KoalaAI\/GitHub-CC0#train:9$/)
+  assert.match(String(rows[0].license), /^cc0 /)
+  assert.ok(rows[0].evidence?.includes('huggingface_dataset:KoalaAI/GitHub-CC0'))
+  assert.ok(rows[0].evidence?.includes('huggingface_dataset_license:cc0-1.0'))
+  assert.ok(rows[0].evidence?.includes('external_vector_imported:false'))
+  assert.ok(rows[0].evidence?.includes('canonical_embedding_required:true'))
+  assert.ok(rows[0].evidence?.includes('repo_language:TypeScript'))
+})
+
+test('GitHub CC0 source is exposed by the shared learning factory only for software-relevant gaps', async () => {
+  const adapters = createLiveLearningAdapters({
+    COS_LIVE_SOURCES_ENABLED: 'true',
+    COS_HF_OPEN_DATASETS_ENABLED: 'true',
+  })
+  const adapter = adapters.find(item => item.id === 'hf_github_cc0')
+  assert.ok(adapter)
+
+  const unrelated = await adapter!.acquire({
+    id: 'gap-unrelated-code',
+    subject: 'European art history',
+    question: 'How did impressionism change nineteenth century painting?',
+    portableIds: [],
+    expectedReuse: 1,
+    expectedAvoidedCostUsd: 0,
+    urgency: 1,
+    evidence: [],
+  })
+  assert.deepEqual(unrelated, [])
+
+  assert.equal(HUGGING_FACE_OPEN_DATASETS.githubCc0.dataset, 'KoalaAI/GitHub-CC0')
+  assert.equal(HUGGING_FACE_OPEN_DATASETS.githubCc0.license, 'cc0-1.0')
+  assert.equal(HUGGING_FACE_OPEN_DATASETS.githubCc0.vectorDimensions, null)
+  assert.equal(
+    classifyMassDistillationRights('cc0 public-domain GitHub-CC0 software corpus'),
+    'cc0',
   )
 })

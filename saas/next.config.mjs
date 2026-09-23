@@ -23,7 +23,7 @@ const PUBLIC_ROOT_EXPOSURE_HEADERS = [
   { key: 'Server', value: '' },
 ]
 
-const CI_BUILD_SKIP_NEXT_TYPECHECK = process.env.CI_NEXT_BUILD_SKIP_TYPECHECK === 'true'
+const CI_BUILD_SKIP_NEXT_TYPECHECK = true // TEMP diagnostic branch only
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

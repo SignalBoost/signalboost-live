@@ -51,16 +51,17 @@ test('the public Concierge browser ingress routes explicit artifacts before norm
 })
 
 
-test('known mutable travel plans skip the agent-decision model and route straight to live evidence', () => {
-  const prompt = 'Mam 9 godzin do zabicia w Amsterdamie. Ląduję na Schiphol. Przygotuj ekonomiczny plan zwiedzania 9-18, podaj transport i jedną płatną atrakcję.'
+test('mutable travel plans remain model-first and use freshness only as a post-model backstop', () => {
+  const prompt = 'Plan a low-cost future Amsterdam layover with airport transport, opening hours, prices, and one paid attraction.'
   assert.equal(requiresLiveTravelPlanningEvidence(prompt), true)
   const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
-  const deterministic = browser.indexOf('const deterministicTravelPlan = requiresLiveTravelPlanningEvidence(prompt)')
-  const seededDecision = browser.indexOf("reason: 'host_travel_freshness_guard'", deterministic)
-  const modelDecision = browser.indexOf('agentDecision = await decideCosAgentTurn({', deterministic)
-  assert.ok(deterministic >= 0)
-  assert.ok(seededDecision > deterministic)
-  assert.ok(modelDecision > seededDecision)
-  assert.match(browser, /if \(!deterministicTravelPlan && !operationalEvidence/)
+  const modelDecision = browser.indexOf('agentDecision = await decideCosAgentTurn({')
+  const freshnessGuard = browser.indexOf("agentDecision?.mode === 'answer' && (requiresFreshExternalEvidence(prompt) || requiresLiveTravelPlanningEvidence(prompt))", modelDecision)
+  const orchestrate = browser.indexOf("if (agentDecision?.mode === 'orchestrate')", freshnessGuard)
+  assert.ok(modelDecision >= 0)
+  assert.ok(freshnessGuard > modelDecision)
+  assert.ok(orchestrate > freshnessGuard)
+  assert.doesNotMatch(browser, /const deterministicTravelPlan = requiresLiveTravelPlanningEvidence\(prompt\)/)
+  assert.match(browser, /reason: 'host_freshness_guard'/)
   assert.match(browser, /capabilities: \['live_web'\]/)
 })

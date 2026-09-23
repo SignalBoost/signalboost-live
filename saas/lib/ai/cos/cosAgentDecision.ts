@@ -14,6 +14,8 @@ export const COS_AGENT_CAPABILITIES = [
   'live_web',
   'conversation_history',
   'internal_context',
+  'semantic_memory',
+  'creative_memory',
   'platform_runtime',
   'repository_read',
   'software_specialist',
@@ -50,6 +52,8 @@ const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   live_web: 'Retrieve current or mutable public-world information before answering.',
   conversation_history: 'Retrieve this signed-in user\'s past conversation context when it is materially required.',
   internal_context: 'Retrieve private organization/project context available to the authenticated owner.',
+  semantic_memory: 'Retrieve meaning-similar durable knowledge, documents, learned material, enterprise/user context, and other authorized semantic memory. This is context retrieval, not permission and not a substitute for live facts.',
+  creative_memory: 'Retrieve validated successful approaches, structures, styles, useful elements, and failure lessons that may improve how the task is solved or presented. Creative Memory is never factual evidence.',
   platform_runtime: 'Read current host-verified COS/iTMounts runtime and model configuration for the authenticated owner.',
   repository_read: 'Inspect the authorized repository or codebase before answering.',
   software_specialist: 'Hand off real debugging, implementation, testing, or deployment work to the governed Software Specialist.',
@@ -156,6 +160,8 @@ export async function decideCosAgentTurn(input: {
       'A function call is a capability request, NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy.',
       'Do not call tools merely because a topic is sophisticated. A conceptual software question that stable knowledge can answer needs no tool.',
       'Current/future travel details such as transport, fares, opening hours, prices, availability, schedules, weather, or other mutable facts require live_web.',
+      'Request semantic_memory when meaning-similar durable internal context would materially improve the answer beyond stable model knowledge.',
+      'Request creative_memory when a planning, writing, ideation, recommendation, transformation, or problem-solving task would materially benefit from validated prior approaches or successful answer patterns. Creative Memory guides HOW to solve/present; never use it as factual evidence.',
       'When answering directly, return ONLY strict JSON: {"mode":"answer","answer":"complete user-facing answer","confidence":0.0,"capabilities":[],"reason":"self_contained"}.',
       input.surface === 'concierge'
         ? 'This is public Concierge. Only the public-safe tools supplied by the host exist for this turn; never imply access to private owner capabilities.'

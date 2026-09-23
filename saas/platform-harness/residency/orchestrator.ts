@@ -97,6 +97,7 @@ export async function runBuilderResidencyOrchestrator(input:{
   executor:BuilderResidencyExactArtifactExecutor
   harnessEvidenceSink:HarnessEvidenceSink
   authorityFor(enrollment:BuilderResidencyEnrollment):Promise<HarnessAuthorityEnvelope>
+  requestedCapabilities?:readonly string[]
   now?:()=>Date
 }){
   const enrollment=await input.store.nextEnrollment()
@@ -159,6 +160,7 @@ export async function runBuilderResidencyOrchestrator(input:{
     sandboxEnvironmentId:enrollment.sandboxEnvironmentId,
     authority,
     practiceCase,
+    requestedCapabilities:input.requestedCapabilities,
     executor:input.executor,
     harnessEvidenceSink:input.harnessEvidenceSink,
     store:input.store,

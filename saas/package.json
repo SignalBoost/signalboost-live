@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "prebuild": "node -e \"process.exit(0)\"",
+    "prebuild": "mkdir -p public && (npx tsc --noEmit > public/tsc-debug.txt 2>&1 || true)",
     "build": "next build",
     "start": "next start",
     "dev": "next dev",

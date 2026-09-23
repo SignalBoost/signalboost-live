@@ -158,7 +158,7 @@ if (!/UI_LOCALES\s*=\s*\['en', 'es', 'pt', 'pl', 'ru'\]/.test(generatedUtils)) {
 
 const hardcodedMap = readText('lib/i18n/hardcoded-ui-copy.ts')
 for (const lang of ['es', 'pt', 'pl', 'ru']) {
-  if (!new RegExp(`^  ${lang}: \\\{`, 'm').test(hardcodedMap)) fail(`hardcoded UI safety net missing ${lang}`)
+  if (!hardcodedMap.includes(`  ${lang}: {`)) fail(`hardcoded UI safety net missing ${lang}`)
 }
 
 const baseline = readJson('scripts/i18n-hardcoded-baseline.json')

@@ -104,8 +104,6 @@ Failure invariant: a simple answerable owner/general question must not end in `h
 
 Response-delivery invariant: once a latency-sensitive owner/general question has a valid answer, optional provenance/history persistence must not hold the HTTP response open. Those writes run in the post-response lifecycle; persistence failures are telemetry/continuity failures, not permission to discard or delay an already-valid answer.
 
-Travel-planning invariant: live travel requests use a bounded travel-specific path. After one grounded travel completion attempt, they must not enter the generic multi-phase fresh-evidence synthesis/review pipeline; one short stated-assumption travel rescue may run, then the turn must return. Completed read-only answers persist conversation History after response delivery, never in the foreground.
-
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

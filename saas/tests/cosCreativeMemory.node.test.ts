@@ -51,3 +51,19 @@ test('initial approved patterns improve travel, transform continuity and proacti
   assert.match(migration, /Bind the immediately preceding assistant answer as the source artifact/)
   assert.match(migration, /Finish the requested task first/)
 })
+
+
+test('Creative Memory RPC is service-role only', () => {
+  const privileges = readFileSync(join(ROOT, 'supabase/migrations/20260923193500_cos_creative_memory_privileges.sql'), 'utf8')
+  assert.match(privileges, /revoke all on table public\.cos_creative_memory from public, anon, authenticated/i)
+  assert.match(privileges, /grant select, insert, update, delete on table public\.cos_creative_memory to service_role/i)
+  assert.match(privileges, /revoke all on function public\.cos_match_creative_memory[\s\S]*from public, anon, authenticated/i)
+  assert.match(privileges, /grant execute on function public\.cos_match_creative_memory[\s\S]*to service_role/i)
+})
+
+test('Creative Memory embeddings are maintained by the canonical knowledge lifecycle', () => {
+  const cron = readFileSync(join(ROOT, 'app/api/cron/cos-knowledge-promotion/route.ts'), 'utf8')
+  const manual = readFileSync(join(ROOT, 'app/api/admin/cos-knowledge-promotion/trigger/route.ts'), 'utf8')
+  const reembed = readFileSync(join(ROOT, 'app/api/admin/cos-learning/reembed-current-space/route.ts'), 'utf8')
+  for (const source of [cron, manual, reembed]) assert.match(source, /backfillCreativeMemoryEmbeddings/)
+})

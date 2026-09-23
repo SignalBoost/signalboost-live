@@ -33,6 +33,12 @@ export function createSupabaseBuilderResidencyEvidenceStore(
         completed_at:new Date().toISOString(),
       }).eq('id',input.caseRunId)
       if(error) throw error
+      // Rotate scheduling after every attempt, including infrastructure rejection,
+      // so one cold/broken resident cannot starve the rest of the cohort.
+      const residency=await db.from('cos_university_residency_case_runs').select('residency_id').eq('id',input.caseRunId).single()
+      if(residency.error) throw residency.error
+      const rotated=await db.from('cos_university_residency_enrollments').update({updated_at:new Date().toISOString()}).eq('id',String(residency.data.residency_id))
+      if(rotated.error) throw rotated.error
     },
     async recordCompetency(input){
       const {error}=await db.from('cos_university_residency_competency_evidence').insert({

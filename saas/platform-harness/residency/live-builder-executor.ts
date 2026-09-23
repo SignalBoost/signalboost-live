@@ -21,12 +21,20 @@ import { VercelSandboxBuilderRunner } from '../../lib/builder/vercel-sandbox-run
 import type {
   HarnessAuthorityEnvelope,
   HarnessManifest,
+  HarnessRunResult,
   HarnessVerificationResult,
 } from '../core/types.ts'
 import { resolveHarnessManifest } from '../core/policy.ts'
-import type { HarnessCapabilityResolverPort } from '../capabilities/resolver.ts'
+import type {
+  HarnessCapabilityResolverPort,
+  ProviderHubHarnessResolution,
+} from '../capabilities/resolver.ts'
 import { createGovernedHarnessExecutor } from '../runtime/governed-executor.ts'
-import { runHarnessWorker, type HarnessWorkerContext } from '../runtime/runner.ts'
+import {
+  runHarnessWorker,
+  type HarnessWorkerContext,
+  type HarnessWorkerPort,
+} from '../runtime/runner.ts'
 import type { HarnessTrajectoryVerifier } from '../verification/outcome-verifier.ts'
 import type { BuilderResidencyExactArtifactExecutor } from './builder-case-runner.ts'
 import {
@@ -56,7 +64,7 @@ const KIND_BY_CAP:Record<NativeCapability,string>={
 }
 
 export function createBuilderResidencyNativeAuthority():HarnessAuthorityEnvelope{
-  return Object.freeze({
+  const authority:HarnessAuthorityEnvelope={
     manifestRef:'host://platform-harness/builder-residency-native-v1',
     verified:true,
     verifiedBy:'host',
@@ -75,12 +83,13 @@ export function createBuilderResidencyNativeAuthority():HarnessAuthorityEnvelope
       deadlineMs:240_000,
       maxConcurrency:1,
     }),
-  })
+  }
+  return Object.freeze(authority)
 }
 
 function nativeCapabilityResolver(bound:HarnessManifest):HarnessCapabilityResolverPort{
-  return Object.freeze({
-    async resolve(manifest){
+  const resolver:HarnessCapabilityResolverPort={
+    async resolve(manifest):Promise<ProviderHubHarnessResolution>{
       const tenantId=String(manifest.identity.tenantId||'').trim()
       const portableId=String(manifest.identity.portableId||manifest.identity.agentId).trim()
       if(
@@ -127,7 +136,8 @@ function nativeCapabilityResolver(bound:HarnessManifest):HarnessCapabilityResolv
         ...(missing.length?{reason:'residency_native_capability_unavailable'}:{}),
       })
     },
-  })
+  }
+  return Object.freeze(resolver)
 }
 
 function asObject(value:unknown):Record<string,unknown>{
@@ -236,7 +246,7 @@ class GovernedResidencyRunner implements BuilderRunnerPort{
 
 function residencyGovernancePolicy():GovernancePolicy{
   const valid=new Set<NativeCapability>(BUILDER_RESIDENCY_NATIVE_CAPABILITIES)
-  return Object.freeze({
+  const policy:GovernancePolicy={
     classifier:{
       classify(request:AgentRequest):ConsequenceClass{
         const target=request.action.target as NativeCapability
@@ -253,7 +263,8 @@ function residencyGovernancePolicy():GovernancePolicy{
       })),
     ),
     environment:'sandbox',
-  })
+  }
+  return Object.freeze(policy)
 }
 
 async function allFiles(
@@ -276,7 +287,7 @@ function nativeGatewayHost(input:{
   workspaceId:string
   markInfrastructureFailure:(code:string)=>void
 }):GatewayHost{
-  return Object.freeze({
+  const host:GatewayHost={
     execution:{
       async perform(request){
         const params=asObject(request.action.params)
@@ -348,7 +359,8 @@ function nativeGatewayHost(input:{
         }
       },
     },
-  })
+  }
+  return Object.freeze(host)
 }
 
 function evidenceRef(input:{
@@ -382,7 +394,7 @@ function exactArtifactBuilderAi(input:{
   }
   markInfrastructureFailure:(code:string)=>void
 }):BuilderAiPort{
-  return Object.freeze({
+  const ai:BuilderAiPort={
     async generate(request){
       try{
         const out=await input.modelPort.complete({
@@ -403,7 +415,8 @@ function exactArtifactBuilderAi(input:{
         throw error
       }
     },
-  })
+  }
+  return Object.freeze(ai)
 }
 
 /**
@@ -418,8 +431,8 @@ export function createLiveBuilderResidencyExecutor(input:{
   sandboxRunner?:BuilderRunnerPort
   modelPortFactory?:()=>BuilderResidencyModelPort
 }):BuilderResidencyExactArtifactExecutor{
-  return Object.freeze({
-    async run(call){
+  const residencyExecutor:BuilderResidencyExactArtifactExecutor={
+    async run(call):Promise<HarnessRunResult>{
       const decision=resolveHarnessManifest(call.request,call.authority)
       if(decision.allowed===false){
         throw new Error('residency_execution_manifest_rejected')
@@ -502,7 +515,7 @@ export function createLiveBuilderResidencyExecutor(input:{
         markInfrastructureFailure,
       })
 
-      const worker={
+      const worker:HarnessWorkerPort={
         async run(context:HarnessWorkerContext){
           const governedWorkspace=
             new GovernedResidencyWorkspace(context,workspaceId)
@@ -550,7 +563,7 @@ export function createLiveBuilderResidencyExecutor(input:{
                 'host://builder-residency-independent-proof-v1',
               evidenceRefs:Object.freeze([]),
               reason:infrastructureFailure,
-              failureAttribution:'infrastructure',
+              failureAttribution:'infrastructure' as const,
             })
           }
           try{
@@ -591,7 +604,7 @@ export function createLiveBuilderResidencyExecutor(input:{
               reason:error instanceof Error
                 ?error.message
                 :'residency_independent_verifier_failed',
-              failureAttribution:'infrastructure',
+              failureAttribution:'infrastructure' as const,
             })
           }
         },
@@ -605,5 +618,6 @@ export function createLiveBuilderResidencyExecutor(input:{
         verifier,
       })
     },
-  })
+  }
+  return Object.freeze(residencyExecutor)
 }

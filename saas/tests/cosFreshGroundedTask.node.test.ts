@@ -64,7 +64,7 @@ test('a grounded travel miss bypasses generic fresh synthesis and reaches one bo
   assert.ok(travelRescue > sharedSynthesisGate)
   assert.match(route, /TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 22_000/)
   const rescueBlock = route.slice(route.indexOf('async function runTravelPlanAssumptionRescue'), route.indexOf('function previousAssistantText'))
-  const attemptsBlock = rescueBlock.slice(rescueBlock.indexOf('const attempts=['), rescueBlock.indexOf('for(const attempt of attempts)'))
+  const attemptsBlock = rescueBlock.slice(rescueBlock.indexOf('const attempts=['), rescueBlock.indexOf('for(let index=0;index<attempts.length;index+=1)'))
   assert.equal((attemptsBlock.match(/temperature:/g) || []).length, 1)
 })
 

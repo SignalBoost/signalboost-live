@@ -168,22 +168,34 @@ export function createRunpodBuilderResidencyModelPort(input:{
         // Readiness is authoritatively observed through the provider health plane below.
       }
 
+      let lastHealthError=''
       while(Date.now()<deadline){
-        const state=await health(endpointId)
-        if(state.ok&&state.workers.ready>0){
-          const result=Object.freeze({
-            endpointId,
-            modelId,
-            baseUrl,
-            artifactRevision:artifact.artifactRevision,
-            exactArtifact:true as const,
-          })
-          prepared=result
-          return result
+        try{
+          const state=await health(endpointId)
+          if(state.ok&&state.workers.ready>0){
+            const result=Object.freeze({
+              endpointId,
+              modelId,
+              baseUrl,
+              artifactRevision:artifact.artifactRevision,
+              exactArtifact:true as const,
+            })
+            prepared=result
+            return result
+          }
+          if(!state.ok&&state.error) lastHealthError=String(state.error).slice(0,240)
+        }catch(error){
+          lastHealthError=error instanceof Error
+            ?error.message.slice(0,240)
+            :'residency_exact_artifact_health_probe_failed'
         }
         await sleep(Math.min(READY_POLL_MS,Math.max(1,deadline-Date.now())))
       }
-      throw new Error('residency_exact_artifact_runtime_not_ready')
+      throw new Error(
+        lastHealthError
+          ?`residency_exact_artifact_runtime_not_ready:${lastHealthError}`
+          :'residency_exact_artifact_runtime_not_ready',
+      )
     })()
     try{return await preparing}
     finally{preparing=null}

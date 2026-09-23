@@ -106,6 +106,8 @@ Response-delivery invariant: once a latency-sensitive owner/general question has
 
 Model-first agent invariant: after host authentication and hard security/surface boundaries, an ordinary user request reaches the primary COS model before optional capability routing. The model must either return a complete answer or request the minimum capability plan needed to finish. Capability requests are intent, not authority: Referee/host policy, public-delivery scope, owner authentication, action permission, and tool authorization remain deterministic and cannot be expanded by model output. Current platform/runtime facts remain host-verified. When the model has already requested live_web or conversation_history, COS must use that plan instead of paying for a redundant semantic classifier.
 
+Native tool-call implementation: interactive COS uses the OpenAI-compatible `tools` / `tool_choice=auto` / `tool_calls` protocol for its first answer-or-capability decision. Direct model answers are released immediately only when host release policy does not require fresh evidence. If a mutable/current-world request is mistakenly answered from model memory, the host converts that same decision into `live_web` orchestration after the model turn; this guard can require more evidence but never grant authority or substitute a deterministic semantic answer.
+
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

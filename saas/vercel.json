@@ -319,7 +319,7 @@
     },
     {
       "path": "/api/cron/cos-university-residency",
-      "schedule": "12,22,32,42,52 * * * *"
+      "schedule": "2,12,22,32,42,52 * * * *"
     }
   ]
 }

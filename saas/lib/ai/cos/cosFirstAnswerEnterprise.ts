@@ -88,7 +88,7 @@ export type COSProvenance = {
   enterpriseMemoriesCited?:number
   userMemoriesCited?:number
   cognitiveSkillsCited?:number
-  canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
+  canonicalSelfKnowledgeUsed?:{semanticMemoryDefinition:boolean; creativeMemoryDefinition:boolean; enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
   // Facts the user stated inline in the prompt. Provenance previously accounted only for
   // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
   // its lone contributor — implying the facts came from nowhere (2026-08-23).
@@ -222,11 +222,13 @@ function cacheHitProvenance(
     enterpriseMemoriesUsed:number
     userMemoriesUsed:number
     cognitiveSkillsUsed:number
+    creativeMemoriesUsed:number
     enterpriseMemoryStatus:string
     enterpriseMemoryOrganizationId:string|null
     internalSystemsConsulted:string[]
     evidenceFunnel:COSEvidenceFunnel
     cognitiveSkillFunnel:EvidenceFunnelStage
+    creativeMemoryFunnel:EvidenceFunnelStage
   },
   responseSource:'semantic_cache'|'semantic_similarity',
   similarityScore?:number,
@@ -1015,7 +1017,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     cognitiveSkillsCited:cited.sk,
     evidenceFunnel:executionFunnel(context, true, cited, enterpriseCited),
     cognitiveSkillFunnel:executionSkillFunnel(context, true, cited.sk),
-    ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ ...canonicalSelfKnowledgeUsed, used:undefined } } : {}),
+    ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ semanticMemoryDefinition:canonicalSelfKnowledgeUsed.semanticMemoryDefinition, creativeMemoryDefinition:canonicalSelfKnowledgeUsed.creativeMemoryDefinition, enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
   }
   const groundedCount = citedKnowledgeEvidenceCount({ kg:cited.kg, cl:cited.cl, oem:enterpriseCited })
   const ceiling = groundedEvidenceCeiling(groundedCount, input.prompt)
@@ -1065,7 +1067,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       evidenceFunnel:citedProvenance.evidenceFunnel,
       cognitiveSkillFunnel:citedProvenance.cognitiveSkillFunnel,
       creativeMemoryFunnel:citedProvenance.creativeMemoryFunnel,
-      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ ...canonicalSelfKnowledgeUsed, used:undefined } } : {}),
+      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ semanticMemoryDefinition:canonicalSelfKnowledgeUsed.semanticMemoryDefinition, creativeMemoryDefinition:canonicalSelfKnowledgeUsed.creativeMemoryDefinition, enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
     },
   }
   const cacheWriteBudgetMs = Number(process.env.COS_CACHE_WRITE_BUDGET_MS ?? '8000')

@@ -12,6 +12,7 @@ import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
 import { extractSambaSchoolNames, isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
 import { buildHonestRefusalReply } from './honestRefusalReply.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
+import { currentPlatformModelTopology } from './platformIdentityContext.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
 import {
   FRESH_SEARCH_RESULT_BUDGET,
@@ -88,14 +89,32 @@ function isPlatformStackQuestion(prompt: unknown): boolean {
 }
 
 function ownerPlatformStackReply(language?: string | null): string {
-  const model = process.env.LOCAL_AI_MODEL || 'Qwen/Qwen3.6-35B-A3B'
-  const embed = process.env.LOCAL_AI_EMBEDDING_MODEL || 'BAAI/bge-base-en-v1.5'
-  const host = process.env.LOCAL_AI_MANAGED_PROVIDER || 'deepinfra'
+  const topology = currentPlatformModelTopology()
+  const value = (configured: string | null, variable: string) => configured || `NOT CONFIGURED (${variable})`
+  const primaryProvider = value(topology.primaryComputeProvider, 'RUNPOD_API_KEY + RUNPOD_PRIMARY_POD_ID/RUNPOD_POD_ID')
+  const primaryModel = value(topology.preferredPrimaryReasonerModel, 'RUNPOD_PRIMARY_MODEL')
+  const fallbackProvider = value(topology.managedProvider, 'LOCAL_AI_MANAGED_PROVIDER')
+  const fallbackModel = value(topology.fallbackReasonerModel, 'LOCAL_AI_MODEL')
+  const builderPrimary = value(topology.builderPrimaryModel, 'RUNPOD_PRIMARY_BUILDER_MODEL or RUNPOD_PRIMARY_MODEL')
+  const builderFallback = value(topology.builderCodingModel, 'DEEPINFRA_BUILDER_MODEL')
+  const embedding = value(topology.embeddingModel, 'LOCAL_AI_EMBEDDING_MODEL')
   const code = String(language ?? 'en').slice(0, 2).toLowerCase()
-  if (code === 'pt') {
-    return `Canal do owner: o reasoner do COS nesta plataforma é ${model}, via ${host}. Embeddings: ${embed}. Isso vem da configuração de Production, não de uma busca na web.`
-  }
-  return `Owner channel: this platform's COS reasoner is ${model}, via ${host}. Embeddings: ${embed}. That is Production configuration, not a live web lookup.`
+
+  const facts = [
+    `Primary COS compute: ${primaryProvider}`,
+    `Primary reasoning model: ${primaryModel}`,
+    `Managed fallback: ${fallbackProvider} / ${fallbackModel}`,
+    `Builder primary model: ${builderPrimary}`,
+    `Builder fallback model: ${builderFallback}`,
+    `Embedding model: ${embedding}`,
+  ]
+  const note = 'These values come directly from the current runtime configuration. Hardware and context-window details are not asserted unless separately configured.'
+
+  if (code === 'pt') return ['Canal do proprietário — configuração atual:', ...facts, note].join('\n')
+  if (code === 'es') return ['Canal del propietario — configuración actual:', ...facts, note].join('\n')
+  if (code === 'pl') return ['Kanał właściciela — bieżąca konfiguracja:', ...facts, note].join('\n')
+  if (code === 'ru') return ['Канал владельца — текущая конфигурация:', ...facts, note].join('\n')
+  return ['Owner channel — current runtime configuration:', ...facts, note].join('\n')
 }
 
 function confidenceThreshold(): number {

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { isSimpleKnowledgeQuestion } from '../lib/ai/cos/simpleKnowledgeIntent.ts'
 
 function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -133,4 +134,38 @@ test('fresh grounded tasks prefer owned RunPod, cap that attempt, then retain co
   assert.match(inference, /return callConfiguredModel\(args, ownedAttempted \? \{ \.\.\.config, fallbackFromOwned: true \} : config\)/)
   const eligible = inference.slice(inference.indexOf('function eligibleForRunpodPrimary'), inference.indexOf('async function callConfiguredModel'))
   assert.match(eligible, /if \(interactiveUserResponse\(args\)\) return false/)
+})
+
+
+test('short stable knowledge questions use the fail-fast direct model lane', () => {
+  assert.equal(isSimpleKnowledgeQuestion('What is the capital of Portugal?'), true)
+  assert.equal(isSimpleKnowledgeQuestion('Who wrote Hamlet?'), true)
+  assert.equal(isSimpleKnowledgeQuestion('When did World War II end?'), true)
+
+  // Anything volatile, contextual, action-bearing, platform-specific, or analytical stays on COS.
+  assert.equal(isSimpleKnowledgeQuestion('Who is the current president of Portugal?'), false)
+  assert.equal(isSimpleKnowledgeQuestion('What is the weather in Lisbon today?'), false)
+  assert.equal(isSimpleKnowledgeQuestion('What is my current plan?'), false)
+  assert.equal(isSimpleKnowledgeQuestion('What is your model?'), false)
+  assert.equal(isSimpleKnowledgeQuestion('Why did the Roman Empire fall?'), false)
+
+  const route = source('../app/api/cos-browser/route.ts')
+  const inference = source('../lib/ai/local-inference.ts')
+  const fast = source('../lib/ai/cos/simpleKnowledgeFastPath.ts')
+
+  const classifier = route.indexOf('isSimpleKnowledgeQuestion(prompt)')
+  const ordinaryAccess = route.indexOf('const access = await getAccess().catch(() => null)')
+  assert.ok(classifier >= 0 && ordinaryAccess > classifier, 'simple facts must short-circuit before ordinary auth/orchestration')
+
+  assert.match(route, /source: 'cos-simple-knowledge-fast'/)
+  assert.match(route, /latency_profile: 'under-10s-simple-knowledge'/)
+  assert.match(fast, /SIMPLE_KNOWLEDGE_FAST_TIMEOUT_MS = 7_000/)
+  assert.match(fast, /maxTokens: 180/)
+  assert.match(fast, /disableThinking: true/)
+  assert.match(fast, /persistUsage: false/)
+  assert.match(fast, /allowConfiguredFallback: false/)
+  assert.match(inference, /feature === 'cos_simple_knowledge'/)
+  assert.match(inference, /COS_SIMPLE_KNOWLEDGE_TIMEOUT_MS/)
+  assert.match(inference, /COS_SIMPLE_KNOWLEDGE_MODEL/)
+  assert.match(inference, /deepseek-ai\/DeepSeek-V4-Flash/)
 })

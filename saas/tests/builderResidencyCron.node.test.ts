@@ -47,3 +47,17 @@ test('Vercel schedules bounded Residency separately from final exams', async () 
   assert.equal(item.schedule, '12,22,32,42,52 * * * *')
   assert.equal(vercel.env.COS_UNIVERSITY_RESIDENCY_ENABLED, 'true')
 })
+
+
+test('Residency cron auto-admits a bounded Builder cohort before practical execution', async () => {
+  const source = await readFile(routeUrl, 'utf8')
+  assert.match(source, /admitNextBuilderResidency/)
+  assert.match(source, /activeLimit:\s*4/)
+  assert.match(source, /runBuilderResidencyOrchestrator/)
+  assert.ok(
+    source.indexOf('admitNextBuilderResidency') <
+    source.lastIndexOf('runBuilderResidencyOrchestrator'),
+  )
+  assert.match(source, /promotionAuthorized:\s*false/)
+  assert.match(source, /productionTrafficAuthorized:\s*false/)
+})

@@ -192,3 +192,18 @@ the Residency enrollment's `completed_at`.
 
 This gate is scoped to Computer Science & Coding. Other subjects keep their existing evaluation flow.
 The change does not grant promotion, graduation, Production traffic, or wider authority.
+
+
+## Automatic Residency admission
+
+The Residency cron is also the bounded admission controller for trained Builder artifacts. On each tick it
+may admit at most one unenrolled `evaluation_pending` **Computer Science & Coding** artifact, and only while
+fewer than four enrollments are actively `resident`, `senior_resident`, or
+`remediation_required`.
+
+Admission is exact-artifact/idempotent: candidate, artifact-row identity, trained artifact hash, revision,
+program version, and host-generated admission evidence are persisted under the existing unique enrollment
+constraints. Admission never grants final evaluation, promotion, Production traffic, or authority.
+
+This prevents the final-evaluation Residency gate from becoming a dead queue: protected Builder artifacts
+must have a bounded automatic path from `evaluation_pending` into practical Residency.

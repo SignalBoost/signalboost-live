@@ -6,6 +6,7 @@ import {
   createLiveBuilderResidencyExecutor,
 } from '@/platform-harness/residency/live-builder-executor'
 import { runBuilderResidencyOrchestrator } from '@/platform-harness/residency/orchestrator'
+import { admitNextBuilderResidency } from '@/platform-harness/residency/admission-store'
 import { createSupabaseBuilderResidencyOrchestratorStore } from '@/platform-harness/residency/orchestrator-store'
 import { createSupervisorAuditHarnessEvidenceSink } from '@/platform-harness/evidence/supervisor-audit-sink'
 
@@ -30,7 +31,7 @@ function enabled(): boolean {
   return process.env.COS_UNIVERSITY_RESIDENCY_ENABLED === 'true'
 }
 
-function publicResult(result: any) {
+function publicResult(result: any, admission?: any) {
   return {
     ok: result.ok,
     state: result.state,
@@ -45,6 +46,18 @@ function publicResult(result: any) {
       remediationCompetencies: result.assessment.remediationCompetencies,
     } : {}),
     ...(result.practiceCase ? { practiceCase: result.practiceCase } : {}),
+    ...(admission ? {
+      admission: {
+        ok: admission.ok,
+        admitted: admission.admitted === true,
+        ...(admission.residencyId ? { residencyId: admission.residencyId } : {}),
+        ...(admission.reason ? { reason: admission.reason } : {}),
+        activeResidents: admission.activeResidents,
+        activeLimit: admission.activeLimit,
+        promotionAuthorized: false,
+        productionTrafficAuthorized: false,
+      },
+    } : {}),
   }
 }
 
@@ -90,6 +103,11 @@ export async function GET(req: Request) {
     createSupervisorAuditHarnessEvidenceSink(db as any)
 
   try {
+    // Admission is bounded separately from practical execution. At most one new
+    // exact artifact is admitted per tick, and no more than four residents may
+    // remain active concurrently.
+    const admission = await admitNextBuilderResidency({ db, activeLimit: 4 })
+
     const result = await runBuilderResidencyOrchestrator({
       store,
       executor,
@@ -98,7 +116,7 @@ export async function GET(req: Request) {
       requestedCapabilities: BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
     })
 
-    return NextResponse.json(publicResult(result), {
+    return NextResponse.json(publicResult(result, admission), {
       status: result.ok || result.state === 'waiting_for_residency_cases'
         ? 200
         : 503,

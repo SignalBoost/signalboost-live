@@ -37,6 +37,8 @@ Ownership stays separated:
 
 Trajectory evidence contains observable actions, observations, tool outcomes, verification, cost/latency/failure references, rollback and escalation evidence. **Private chain-of-thought, scratchpads, hidden reasoning, and internal monologue must never be persisted.**
 
+Residency admission invariant: trained `evaluation_pending` Computer Science artifacts must have a bounded automatic enrollment path into practical Residency. The cron may admit at most one new artifact per tick and keeps at most four active residents; admission is exact-artifact/idempotent and never authorizes final exams, promotion, Production traffic, or wider authority.
+
 University Residency is the educational use of this shared platform world. Residency may feed sanitized competency evidence into University, but it does not own the harness. The `evaluation_runtime` profile supplies a controlled execution environment only; hidden exam material, evaluator logic, graduation decisions, and the teaching/remediation boundary remain independently owned.
 
 See `docs/PLATFORM-HARNESS.md` and `saas/platform-harness/`.

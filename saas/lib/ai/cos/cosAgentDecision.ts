@@ -177,11 +177,11 @@ export async function decideCosAgentTurn(input: {
   })
 
   if (nativeTurn?.toolCalls.length) {
-    const capabilities: CosAgentCapability[] = Array.from(
-      new Set<CosAgentCapability>(
+    const capabilities = Array.from(
+      new Set(
         nativeTurn.toolCalls
           .map(call => String(call.function.name || '').trim())
-          .filter(isCosAgentCapability),
+          .filter((name): name is CosAgentCapability => isCosAgentCapability(name)),
       ),
     )
     if (capabilities.length) {

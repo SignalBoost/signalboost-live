@@ -22,6 +22,7 @@ export const DEFAULT_LEARNING_SOURCE_CAPS = {
   openalex: 6,
   openalex_semantic: 3,
   semantic_scholar: 3,
+  hf_nist_cc0: 3,
   europe_pmc: 4,
   open_library: 1,
   gdelt: 2,

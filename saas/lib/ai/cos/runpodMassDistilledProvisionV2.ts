@@ -341,7 +341,12 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
     if (message !== 'mass_distilled_runtime_template_identity_mismatch'
       && message !== 'mass_distilled_runtime_endpoint_template_mismatch'
       && message !== 'mass_distilled_runtime_endpoint_template_rebind_failed'
-      && message !== 'mass_distilled_runtime_endpoint_gpu_pool_drift') throw error
+      && message !== 'mass_distilled_runtime_endpoint_gpu_pool_drift'
+      // Residency may deliberately request a longer bounded idle window than the
+      // legacy creator accepts. V2 has already validated the request against the
+      // 720s Residency ceiling, so recover the pre-existing exact endpoint rather
+      // than letting the legacy 300s caller ceiling abort the Residency run.
+      && message !== 'mass_distilled_runtime_idle_timeout_invalid') throw error
 
     const recovered = await resolveExactEndpoint(input, message)
     const endpoint = recovered.endpoint

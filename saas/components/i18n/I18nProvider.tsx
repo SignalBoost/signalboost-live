@@ -13,6 +13,7 @@ import englishCopy from '@/locales/en.json'
 import { loadLanguage, type Dict, type DictValue } from '@/lib/i18n/loadLanguage'
 import { applyHardcodedUiCopy } from '@/lib/i18n/hardcoded-ui-copy'
 import { setRuntimeDictionary } from '@/lib/i18n/uiText'
+import { normalizeSupportedLanguage, type SupportedLanguage } from '@/lib/i18n/supportedLanguages'
 
 type I18nContextType = {
   lang: string
@@ -24,15 +25,7 @@ type I18nContextType = {
 const I18nContext =
   createContext<I18nContextType | null>(null)
 
-const SUPPORTED_LANGS = [
-  'en',
-  'pt',
-  'es',
-  'pl',
-  'ru',
-] as const
-
-type SupportedLang = (typeof SUPPORTED_LANGS)[number]
+type SupportedLang = SupportedLanguage
 type TranslatableAttr = 'placeholder' | 'aria-label' | 'title'
 
 const ORIGINAL_TEXT = new WeakMap<Node, string>()
@@ -40,15 +33,8 @@ const LAST_TRANSLATED_TEXT = new WeakMap<Node, string>()
 const ORIGINAL_ATTRS = new WeakMap<Element, Partial<Record<TranslatableAttr, string>>>()
 const LAST_TRANSLATED_ATTRS = new WeakMap<Element, Partial<Record<TranslatableAttr, string>>>()
 
-function normalizeLang(value: string | null) {
-  if (!value) return 'en'
-
-  const lower = value.toLowerCase()
-  const match = SUPPORTED_LANGS.find((supportedLang) =>
-    lower.startsWith(supportedLang)
-  )
-
-  return match ?? 'en'
+function normalizeLang(value: string | null): SupportedLang {
+  return normalizeSupportedLanguage(value)
 }
 
 function persistLanguage(lang: string) {

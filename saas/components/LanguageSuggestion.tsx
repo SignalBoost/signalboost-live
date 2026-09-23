@@ -4,16 +4,10 @@ import { useEffect, useRef } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import GeneratedContentLocalizer from '@/components/i18n/GeneratedContentLocalizer'
 import AssistantHistoryLayoutPatch from '@/components/AssistantHistoryLayoutPatch'
+import { normalizeSupportedLanguage } from '@/lib/i18n/supportedLanguages'
 
-const SUPPORTED_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru'] as const
-
-type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
-
-function normalizeLanguage(value: string | null | undefined): SupportedLanguage {
-  const short = String(value || 'en').slice(0, 2).toLowerCase()
-  return SUPPORTED_LANGUAGES.includes(short as SupportedLanguage)
-    ? short as SupportedLanguage
-    : 'en'
+function normalizeLanguage(value: string | null | undefined) {
+  return normalizeSupportedLanguage(value)
 }
 
 function AutoLanguageInitializer() {

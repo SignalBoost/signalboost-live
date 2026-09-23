@@ -23,6 +23,7 @@ import {
   type FreshEvidenceSource,
 } from './cosFreshGroundingBase.ts'
 import { requiresLiveTravelPlanningEvidence } from './cosFreshnessPolicy.ts'
+import { resolveResponseLanguage, type SupportedResponseLanguage } from '@/lib/i18n/responseLanguage'
 
 const EVALUATIVE_RANKING = /\b(?:best|greatest|top|worst|worse|most\s+successful|least\s+successful|rank(?:ing|ings|ed)?|overrated|underrated|melhor|maior|pior|mais\s+bem[- ]?sucedid[oa]|mejor|peor|m[aá]s\s+exitos[oa]|najlepsz\w*|najgorsz\w*|ranking\w*|лучший|лучшая|лучшие|худший|худшая|рейтинг\w*)\b/iu
 const OFFICE_OR_EXECUTIVE_ROLE = /\b(?:president|vice\s+president|prime\s+minister|premier|chancellor|governor|mayor|secretary\s+of\s+state|attorney\s+general|speaker|minister|monarch|king|queen|pope|chief\s+executive\s+officer|ceo|chief\s+financial\s+officer|cfo|chief\s+information\s+officer|cio|chief\s+technology\s+officer|cto|chair(?:man|woman)?)\b/i
@@ -51,6 +52,93 @@ function asksTravelAttractions(input: string): boolean {
 
 function travelSearchSeed(input: string): string {
   return String(input || '').replace(/\s+/g, ' ').trim().slice(0, 150)
+}
+
+
+const TRAVEL_SOURCE_LANGUAGE_MARKERS: Record<SupportedResponseLanguage, RegExp> = {
+  pl: /\b(?:lotnisko|poci[aą]g|autobus|tramwaj|bilet|bilety|zwiedzanie|atrakcja|muzeum|godziny\s+otwarcia|cena|centrum|podr[oó][żz])\b/iu,
+  en: /\b(?:airport|train|bus|tram|ticket|tickets|attraction|museum|opening\s+hours|public\s+transport|city\s+centre|city\s+center|visitor|tourism|travel)\b/iu,
+  es: /\b(?:aeropuerto|tren|autob[uú]s|billete|entradas?|atracci[oó]n|museo|horario|transporte\s+p[uú]blico|centro|turismo|viaje)\b/iu,
+  pt: /\b(?:aeroporto|comboio|trem|autocarro|[oô]nibus|bilhete|ingresso|atra[cç][aã]o|museu|hor[aá]rio|transporte\s+p[uú]blico|centro|turismo|viagem)\b/iu,
+  ru: /\b(?:аэропорт|поезд|автобус|метро|трамвай|билет|достопримечательность|музей|часы\s+работы|общественный\s+транспорт|центр|туризм|путешествие)\b/iu,
+}
+
+const TRAVEL_OTHER_LANGUAGE_MARKERS = /\b(?:collegamenti|arrivare|biglietti|orari|trasporto|aeroporto|museo|tourisme|billets|a[eé]roport|verkehr|fahrkarten|flughafen|sehensw[uü]rdigkeiten)\b/iu
+
+const TRAVEL_USER_COUNTRY_TLDS: Record<SupportedResponseLanguage, readonly string[]> = {
+  pl: ['pl'],
+  en: ['uk', 'us', 'ca', 'au', 'nz', 'ie'],
+  es: ['es', 'mx', 'ar', 'cl', 'co', 'pe'],
+  pt: ['pt', 'br'],
+  ru: ['ru'],
+}
+
+function travelSourceCountryCode(result: Pick<SearchResult, 'url'>): string | null {
+  const host = freshEvidenceHost(result.url)
+  const tld = host.split('.').pop() || ''
+  return /^[a-z]{2}$/.test(tld) ? tld : null
+}
+
+function travelSourceLanguage(result: Pick<SearchResult, 'title' | 'snippet'>): SupportedResponseLanguage | 'other' | 'unknown' {
+  const text = `${result.title || ''} ${result.snippet || ''}`
+  for (const language of ['pl', 'en', 'es', 'pt', 'ru'] as const) {
+    if (TRAVEL_SOURCE_LANGUAGE_MARKERS[language].test(text)) return language
+  }
+  if (TRAVEL_OTHER_LANGUAGE_MARKERS.test(text)) return 'other'
+  return 'unknown'
+}
+
+function inferredDestinationCountryCodes(results: SearchResult[], userLanguage: SupportedResponseLanguage): Set<string> {
+  const userCountryCodes = new Set(TRAVEL_USER_COUNTRY_TLDS[userLanguage])
+  const counts = new Map<string, number>()
+  for (const result of results) {
+    const code = travelSourceCountryCode(result)
+    if (!code || userCountryCodes.has(code)) continue
+    counts.set(code, (counts.get(code) || 0) + 1)
+  }
+  const strongest = Math.max(0, ...counts.values())
+  if (strongest < 2) return new Set()
+  return new Set([...counts.entries()].filter(([, count]) => count === strongest).map(([code]) => code))
+}
+
+function rankTravelEvidence(results: SearchResult[], query: string): SearchResult[] {
+  const userLanguage = resolveResponseLanguage(query)
+  const localCodes = inferredDestinationCountryCodes(results, userLanguage)
+  const userCountryCodes = new Set(TRAVEL_USER_COUNTRY_TLDS[userLanguage])
+
+  const scored = results.map((result, index) => {
+    const sourceLanguage = travelSourceLanguage(result)
+    const countryCode = travelSourceCountryCode(result)
+    const destinationLocal = Boolean(countryCode && localCodes.has(countryCode))
+    const userCountry = Boolean(countryCode && userCountryCodes.has(countryCode))
+    const userLanguageMatch = sourceLanguage === userLanguage
+    const english = sourceLanguage === 'en'
+    const preferred = destinationLocal || userCountry || userLanguageMatch || english
+    const preferenceScore = destinationLocal ? 400
+      : userCountry || userLanguageMatch ? 300
+      : english ? 200
+      : sourceLanguage === 'unknown' ? 50
+      : 0
+    return { result, index, preferred, preferenceScore }
+  })
+
+  const ordered = scored
+    .sort((a, b) => b.preferenceScore - a.preferenceScore || a.index - b.index)
+    .map(item => item.result)
+
+  const preferred = scored.filter(item => item.preferred).map(item => item.result)
+  if (preferred.length < 2) return ordered
+
+  const pool = [...preferred]
+  const ensureDimension = (pattern: RegExp) => {
+    if (pool.some(source => pattern.test(travelEvidenceText(source)))) return
+    const fallback = ordered.find(source => !pool.includes(source) && pattern.test(travelEvidenceText(source)))
+    if (fallback) pool.push(fallback)
+  }
+  if (asksTravelTransport(query)) ensureDimension(TRAVEL_TRANSPORT_SIGNAL)
+  if (asksTravelAttractions(query)) ensureDimension(TRAVEL_ATTRACTION_SIGNAL)
+
+  return [...new Set([...pool, ...ordered])]
 }
 
 /** True only for an evaluative question about a public office/executive role. */
@@ -116,8 +204,9 @@ export function prepareFreshEvidenceAcrossQueries(
   if (!requiresLiveTravelPlanningEvidence(query)) {
     return basePrepareFreshEvidenceAcrossQueries(resultGroups, totalBudget, query)
   }
-  const relevantGroups = resultGroups.map(results => results.filter(travelEvidenceRelevant))
-  return basePrepareFreshEvidenceAcrossQueries(relevantGroups, totalBudget, query)
+  const relevant = resultGroups.flatMap(results => results.filter(travelEvidenceRelevant))
+  const ranked = rankTravelEvidence(relevant, query)
+  return basePrepareFreshEvidenceAcrossQueries([ranked], totalBudget, query)
 }
 
 export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {

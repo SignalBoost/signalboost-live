@@ -1258,6 +1258,19 @@ Repair contract:
 - legacy repository/service/domain identifiers may remain internal but cannot override public product identity;
 - the reported logo-then-company-name exchange is a mandatory regression.
 
+## Semantic + Creative Memory invariant — 2026-09-23
+
+COS uses two distinct inference-time memory concepts and does not wait for University graduation to benefit from either:
+
+- **Semantic Memory** is meaning-based retrieval across authorized durable knowledge/context using the active embedding model and pgvector/vector similarity. It may retrieve Knowledge Graph facts, learned documents, Enterprise Memory, user memory and other authorized records even when wording differs. Embeddings are indexes, not truth; volatile current-world claims still require live evidence.
+- **Creative Memory** is durable, validated memory of successful approaches, structures, styles, useful elements, constraints and outcome-backed patterns. It guides **how** COS solves or presents a task; it is never factual evidence for **what is true**.
+- Creative Memory uses the same active embedding-model identity as existing semantic stores. Equal vector dimensions do not make incompatible embedding spaces interchangeable.
+- Raw model output can never approve itself into Creative Memory. Unvalidated or low-quality candidates are quarantined; only approved records are retrieved.
+- Creative Memory is audience-scoped. Public Concierge may retrieve only `public` patterns; authenticated owner COS may retrieve `public` plus `owner` patterns.
+- `[CM#]` labels are internal reasoning scaffolding only. They must never be treated as factual citations or exposed to users.
+- Creative Memory participates in answer cache identity/provenance so a reply generated under one creative context is not silently replayed as though no creative guidance was used.
+- Initial approved patterns cover complete short-budget city itineraries, conversational transformation continuity, and proactive completion. University may later consume only explicitly `training_eligible` records; COS inference does not wait for that lifecycle.
+
 ## Vector Intelligence / external semantic research invariant — 2026-09-23
 
 iTMounts already has an internal vector-database layer: Supabase PostgreSQL + pgvector stores and

@@ -401,6 +401,12 @@ function provenanceReportFollowupReply(language:string):string{
   return 'The immediately preceding reply is already the recorded provenance report for the answer before it. Its “Primary Reasoner” and “Material Contributors” sections identify the source; it is not a new substantive answer that needs a second provenance record.'
 }
 function emitRequestTelemetry(args:{startedAt:number;input:string;reply?:string|null;source:CosLiveResponseSource;confidence?:number|null;provenance?:any;externalAiInvoked:boolean}){const p=args.provenance??null,observation=buildCosLiveTelemetry({responseSource:args.source,latencyMs:Math.max(0,Date.now()-args.startedAt),confidence:args.confidence??null,reasonerLabel:p?.reasonerLabel??p?.local_reasoning?.model??null,localModelInvoked:p?.localModelInvoked??p?.local_reasoning?.invoked??false,externalAiInvoked:args.externalAiInvoked,knowledgeFactsUsed:p?.knowledgeFactsUsed??p?.knowledge_graph?.evidence_count??0,learnedItemsUsed:p?.learnedItemsUsed??p?.learned_corpus?.evidence_count??0,userMemoriesUsed:p?.userMemoriesUsed??p?.user_memory?.evidence_count??0,similarityScore:p?.similarityScore,promptChars:args.input.length,replyChars:String(args.reply??'').length});emitCosLiveTelemetry(observation);return observation}
+function persistCosPrimaryProvenanceAfterResponse(userId:string|null,reply:string,provenance:unknown,source:string,turn?:Parameters<typeof writeCosPrimaryProvenance>[4]){
+  after(async()=>{
+    try{await writeCosPrimaryProvenance(userId,reply,provenance,source,turn)}
+    catch(error){console.warn('[cos-primary-provenance] post-response persistence failed:',error instanceof Error?error.message:String(error))}
+  })
+}
 function asksForHistoricalRoster(input:string):boolean{return /\b(?:former|past|previous|last)\b/i.test(input)&&/\b(?:list|secretar(?:y|ies)|office holder|history)\b/i.test(input)}
 function sameFreshSourceUrl(left:string,right:string):boolean{
   try{
@@ -493,7 +499,7 @@ export async function postCosPrimary(req:NextRequest){
       const executionProvenance=authoritativeProvenance(selfKnowledgeCos,{invoked:false})
       const source:CosLiveResponseSource=selfKnowledgeCos.provenance.responseSource as CosLiveResponseSource
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:selfKnowledgeCos.reply,source,confidence:selfKnowledgeCos.confidence,provenance:selfKnowledgeCos.provenance,externalAiInvoked:false})
-      await writeCosPrimaryProvenance(userId,selfKnowledgeCos.reply,executionProvenance,'cos-owner-self-knowledge',{prompt:input,answered:true,confidence:selfKnowledgeCos.confidence,branch:'owner_self_knowledge'})
+      persistCosPrimaryProvenanceAfterResponse(userId,selfKnowledgeCos.reply,executionProvenance,'cos-owner-self-knowledge',{prompt:input,answered:true,confidence:selfKnowledgeCos.confidence,branch:'owner_self_knowledge'})
       return NextResponse.json({reply:selfKnowledgeCos.reply,source:'cos-owner-self-knowledge',confidence_score:selfKnowledgeCos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:selfKnowledgeCos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:selfKnowledgeCos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
   }
@@ -738,7 +744,7 @@ export async function postCosPrimary(req:NextRequest){
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
     try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
-  if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
+  if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   // A low confidence score is learning/calibration telemetry, not permission to throw away a
   // useful guarded answer. For ordinary non-live, non-action tasks, release the best-effort answer
@@ -748,7 +754,7 @@ export async function postCosPrimary(req:NextRequest){
     const executionProvenance=authoritativeProvenance(cos,{invoked:false})
     ;(executionProvenance as any).completion_first={released_best_effort:true,confidence:cos.confidence,threshold:confidenceThreshold()}
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'local_cos_reasoning',confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false})
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-local-best-effort',{prompt:input,answered:true,confidence:cos.confidence,branch:'completion_first_best_effort'})
+    persistCosPrimaryProvenanceAfterResponse(userId,reply,executionProvenance,'cos-local-best-effort',{prompt:input,answered:true,confidence:cos.confidence,branch:'completion_first_best_effort'})
     return NextResponse.json({ok:true,reply,source:'cos-local-best-effort',confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
   }
 

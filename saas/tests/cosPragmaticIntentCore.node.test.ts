@@ -64,3 +64,21 @@ test('semantic intent calls are low-latency interactive classification, not 120-
   assert.match(semanticIntent, /timeoutMs: 8_000/)
   assert.match(semanticIntent, /jsonObject: true/)
 })
+
+
+test('ordinary COS questions return before non-critical provenance persistence', () => {
+  assert.match(route, /function persistCosPrimaryProvenanceAfterResponse/)
+  assert.match(route, /after\(async\(\)=>\{/)
+
+  const ownerFastPath = route.indexOf('if(access?.isOwner&&isPlatformSelfKnowledgePrompt(input))')
+  const ownerReturn = route.indexOf("source:'cos-owner-self-knowledge'", ownerFastPath)
+  const ownerBlock = route.slice(ownerFastPath, ownerReturn)
+  assert.match(ownerBlock, /persistCosPrimaryProvenanceAfterResponse/)
+  assert.doesNotMatch(ownerBlock, /await writeCosPrimaryProvenance/)
+
+  const ordinaryHandled = route.indexOf('if(cos?.handled)')
+  const bestEffort = route.indexOf("source:'cos-local-best-effort'", ordinaryHandled)
+  const ordinaryBlock = route.slice(ordinaryHandled, bestEffort)
+  assert.match(ordinaryBlock, /persistCosPrimaryProvenanceAfterResponse/)
+  assert.doesNotMatch(ordinaryBlock, /await writeCosPrimaryProvenance/)
+})

@@ -102,6 +102,8 @@ The semantic task-intent model is a disambiguator for freshness/context boundari
 
 Failure invariant: a simple answerable owner/general question must not end in `honestRefusalReply` merely because a routing/classification model timed out. Deterministic host facts release deterministically; ordinary model reasoning remains bounded and completion-first.
 
+Response-delivery invariant: once a latency-sensitive owner/general question has a valid answer, optional provenance/history persistence must not hold the HTTP response open. Those writes run in the post-response lifecycle; persistence failures are telemetry/continuity failures, not permission to discard or delay an already-valid answer.
+
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

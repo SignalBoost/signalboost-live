@@ -205,6 +205,7 @@ const tests = [
   'tests/normativeFreshEvidenceFallback.node.test.ts',
   'tests/cosNeuralEvidenceReasoning.node.test.ts',
   'tests/cosPragmaticIntentCore.node.test.ts',
+  'tests/cosModelFirstAgentLoop.node.test.ts',
   'tests/cosContextualInterpretationIsolation.node.test.ts',
   'tests/cosOperatingCharter.node.test.ts',
   'tests/publicRecordedProvenance.node.test.ts',

@@ -13,6 +13,7 @@ export interface BuilderResidencyExactArtifactExecutor {
     request:ReturnType<typeof createBuilderResidencyHarnessRequest>
     authority:HarnessAuthorityEnvelope
     practiceCase:BuilderResidencyCase
+    candidateId?:string
   }):Promise<HarnessRunResult>
 }
 
@@ -100,6 +101,7 @@ export async function runBuilderResidencyCase(input:{
       request,
       authority:input.authority,
       practiceCase:input.practiceCase,
+      candidateId:input.candidateId,
     })
   }catch{
     await input.store.finishCase({

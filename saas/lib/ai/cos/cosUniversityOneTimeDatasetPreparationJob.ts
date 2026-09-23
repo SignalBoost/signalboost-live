@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readDistillationAssetsBySourceRef } from './cosUniversityDistillationAssetVault.ts'
+import { tryReadDistillationAssetsBySourceRef } from './cosUniversityDistillationAssetVault.ts'
 import {
   COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE,
   trainingExecutorConfigFromEnv,
@@ -153,7 +153,7 @@ export async function dispatchApprovedOneTimeDatasetPreparation(input: {
     throw new Error('one_time_dataset_preparation_immutable_source_required')
   }
   const datasetHash = controlledFineTuneDatasetHash(plan)
-  const vaulted = await readDistillationAssetsBySourceRef(source)
+  const vaulted = await tryReadDistillationAssetsBySourceRef(source)
 
   installHuggingFaceTrainingExecutorEnv()
   const executor = trainingExecutorConfigFromEnv()
@@ -187,7 +187,7 @@ export async function dispatchApprovedOneTimeDatasetPreparation(input: {
     subjectId: plan.subject_id,
     baseModel: approval.baseModel,
     datasetHash,
-    candidate: { ...descriptor, teacherRows: vaulted.rows },
+    candidate: vaulted ? { ...descriptor, teacherRows: vaulted.rows } : descriptor,
     callbackPath: '/api/internal/cos/university-training-executor/evidence',
     authorityExpanded: false,
   }

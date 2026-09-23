@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "prebuild": "npm run validate:strip-safe && npm run validate:i18n-platform",
+    "prebuild": "npm run validate:strip-safe && mkdir -p public && (node scripts/check-hardcoded-copy.mjs --list > public/i18n-hardcoded-report.txt 2>&1 || true) && (node scripts/migrate-page-copy-to-locales.mjs > public/i18n-migration-report.txt 2>&1 || true) && node scripts/check-generated-ui-locale-completeness.mjs && node scripts/check-five-language-platform.mjs",
     "build": "next build",
     "start": "next start",
     "dev": "next dev",

@@ -12,7 +12,7 @@ import { createSupervisorAuditHarnessEvidenceSink } from '@/platform-harness/evi
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 300
+export const maxDuration = 600
 
 const RESIDENCY_TENANT = 'itmounts-university'
 const RESIDENCY_PORTABLE = 'builder-residency'

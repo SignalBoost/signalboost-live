@@ -8,6 +8,7 @@ import type {
 } from '../../agent-gateway/types.ts'
 import { BuilderToolLoop } from '../../lib/builder/tool-loop.ts'
 import type {
+  BuilderAiPort,
   BuilderFile,
   BuilderRunResult,
   BuilderRunnerPort,
@@ -274,6 +275,8 @@ function evidenceRef(input:{
 export function createLiveBuilderResidencyExecutor(input:{
   db:SupabaseClient
   sandboxRunner?:BuilderRunnerPort
+  resolveServingIdentity?:typeof resolveBuilderResidencyServingIdentity
+  aiFactory?:(identity:Awaited<ReturnType<typeof resolveBuilderResidencyServingIdentity>>,markInfrastructureFailure:(code:string)=>void)=>BuilderAiPort
 }):BuilderResidencyExactArtifactExecutor{
   return Object.freeze({
     async run(call){
@@ -289,7 +292,7 @@ export function createLiveBuilderResidencyExecutor(input:{
 
       const candidateId=String(call.candidateId||'').trim()
       if(!candidateId) throw new Error('residency_runtime_candidate_binding_missing')
-      const serving=await resolveBuilderResidencyServingIdentity({
+      const serving=await (input.resolveServingIdentity??resolveBuilderResidencyServingIdentity)({
         db:input.db,
         candidateId,
         artifactHash:artifact.artifactHash,
@@ -316,10 +319,12 @@ export function createLiveBuilderResidencyExecutor(input:{
         host:gatewayHost,
       })
       const capabilities=nativeCapabilityResolver(manifest)
-      const ai=createExactArtifactResidencyBuilderAi({
-        identity:serving,
-        onInfrastructureFailure:markInfrastructureFailure,
-      })
+      const ai=input.aiFactory
+        ?input.aiFactory(serving,markInfrastructureFailure)
+        :createExactArtifactResidencyBuilderAi({
+          identity:serving,
+          onInfrastructureFailure:markInfrastructureFailure,
+        })
 
       const worker={
         async run(context:HarnessWorkerContext){

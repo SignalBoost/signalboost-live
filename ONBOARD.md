@@ -52,7 +52,7 @@ curriculum -> frontier faculty / distillation -> immutable trained artifact
 -> Residency (sandboxed supervised practical work)
 -> competency gaps / targeted remediation / retraining as needed
 -> Residency completion
--> exact-artifact final canary + rollback proof
+-> fresh post-Residency exact-artifact final canary + rollback proof
 -> independent holdout / safety / unseen-transfer / delayed-retention final evaluation
 -> graduate registry / separately governed activation
 -> verified Production outcomes

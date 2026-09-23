@@ -288,3 +288,12 @@ export async function readDistillationAssetsBySourceRef(sourceRefInput: unknown,
   })
 }
 
+export async function tryReadDistillationAssetsBySourceRef(sourceRef: unknown, dbOverride?: any) {
+  try {
+    return await readDistillationAssetsBySourceRef(sourceRef, dbOverride)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'distillation_asset_set_missing') return null
+    throw error
+  }
+}
+

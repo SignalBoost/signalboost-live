@@ -216,6 +216,9 @@ test('owner and internal routes preserve confirmation, signed callback, live pri
   assert.match(worker, /enable_thinking=False/)
   assert.match(worker, /strip_hidden_reasoning/)
   assert.match(worker, /private=True/)
+  assert.match(worker, /"teacherRows": \[/)
+  assert.match(worker, /"prompt": row\["prompt"\]/)
+  assert.match(worker, /"response": row\["response"\]/)
 })
 
 test('no teacher dataset operation enables dispatch or auto-starts model training', () => {

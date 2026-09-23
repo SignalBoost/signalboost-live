@@ -558,13 +558,22 @@ export async function postCosPrimary(req:NextRequest){
   if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source,{prompt:input,answered:true,confidence:deterministic.confidence,branch:'deterministic'});return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   const requestedAction=requestsExternalAction(input)
+  const agentCapabilities=new Set(
+    String(req.headers.get('x-signalboost-agent-capabilities')||'')
+      .split(',')
+      .map(value=>value.trim())
+      .filter(Boolean),
+  )
+  const modelPlannedFreshEvidence=agentCapabilities.has('live_web')
+  const modelPlannedConversationRecall=agentCapabilities.has('conversation_history')
   // A question about an earlier conversation with this user is answered from their own history, never from the public web.
-  const conversationRecallRequested=Boolean(userId)&&detectConversationRecallIntent(input)
+  const conversationRecallRequested=Boolean(userId)&&(modelPlannedConversationRecall||detectConversationRecallIntent(input))
   const heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested
-  // Semantic intent is a disambiguator, not a toll booth in front of every answer. Run it only
-  // when freshness already needs adjudication or bounded conversation context is materially in play.
-  // Ordinary timeless/general questions proceed directly to COS without a pre-answer model call.
+  // A model capability plan is the semantic decision for this turn. Do not charge a second model
+  // classifier when the first model already requested live evidence. The semantic classifier remains
+  // a compatibility fallback for legacy/no-plan turns where heuristic freshness needs adjudication.
   const semanticTaskIntentNeeded=!requestedAction
+    && !modelPlannedFreshEvidence
     && (heuristicRequiresFreshEvidence || freshConversationContext.contextUsed)
   const semanticTaskIntent=semanticTaskIntentNeeded
     ? await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
@@ -575,7 +584,7 @@ export async function postCosPrimary(req:NextRequest){
       && semanticTaskIntent.externalFactsRequired
       && semanticTaskIntent.confidence>=0.72,
   )
-  const baselineRequiresFreshEvidence=(heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
+  const baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
   // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh,
   // trust whole-request semantic intent rather than forcing the user to know COS routing phrases.
   if(!hasAttachments&&!isCosCodingObjective(input)&&semanticIntentIsSelfContainedContentGeneration(semanticTaskIntent)){
@@ -583,6 +592,16 @@ export async function postCosPrimary(req:NextRequest){
     if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic')
   }
   const requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness(semanticTaskIntent)
+  if(agentCapabilities.size){
+    console.info('[cos-agent-plan-applied]',JSON.stringify({
+      at:new Date().toISOString(),
+      capabilities:[...agentCapabilities],
+      liveWeb:modelPlannedFreshEvidence,
+      conversationHistory:modelPlannedConversationRecall,
+      requiresFreshEvidence,
+      requestedAction,
+    }))
+  }
   if(baselineRequiresFreshEvidence&&!requiresFreshEvidence){
     logEscalation({event:'freshness_semantic_intent_suppressed',semantic_task_mode:semanticTaskIntent?.mode??null,semantic_task_confidence:semanticTaskIntent?.confidence??null,supplied_context_primary:semanticTaskIntent?.suppliedContextPrimary??null,external_facts_required:semanticTaskIntent?.externalFactsRequired??null,external_ai_invoked:false,local_model_invoked:true})
   }

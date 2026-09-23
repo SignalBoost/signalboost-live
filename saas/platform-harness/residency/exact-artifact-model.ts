@@ -1,6 +1,5 @@
+import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { provisionMassDistilledRuntime, canaryMassDistilledRuntime } from '../../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
-
 export interface BuilderResidencyModelIdentity {
   candidateId:string
   artifactId:string
@@ -8,7 +7,16 @@ export interface BuilderResidencyModelIdentity {
   revisionKey:string
 }
 
+export interface BuilderResidencyPreparedRuntime {
+  endpointId:string
+  modelId:string
+  baseUrl:string
+  artifactRevision:string
+  exactArtifact:true
+}
+
 export interface BuilderResidencyModelPort {
+  prepare?(identity:BuilderResidencyModelIdentity):Promise<BuilderResidencyPreparedRuntime>
   complete(input:{identity:BuilderResidencyModelIdentity;system:string;user:string;maxTokens?:number}):Promise<{
     text:string
     endpointId:string
@@ -18,49 +26,216 @@ export interface BuilderResidencyModelPort {
 }
 
 const HASH=/^[a-f0-9]{64}$/
+const REVISION=/^[a-f0-9]{40}$/
+const READY_TIMEOUT_MS=360_000
+const READY_POLL_MS=3_000
+const WAKE_TIMEOUT_MS=20_000
+
+type ResidencyRuntimeArtifact=Readonly<{
+  candidateId:string
+  subjectId:string
+  artifactId:string
+  artifactRevision:string
+  artifactHash:string
+  runtimeKey?:string
+}>
+
+type ResidencyProvisionedRuntime=Readonly<{
+  endpointId:string
+  modelName:string
+  baseUrl:string
+  [key:string]:unknown
+}>
+
+type ResidencyRuntimeHealth=Readonly<{
+  ok:boolean
+  workers:{ready:number;[key:string]:unknown}
+  error?:string|null
+  [key:string]:unknown
+}>
+
+type ResidencyProvision=(artifact:ResidencyRuntimeArtifact)=>Promise<ResidencyProvisionedRuntime>
+type ResidencyHealth=(endpointId:string)=>Promise<ResidencyRuntimeHealth>
+
+type ArtifactRow=Readonly<{
+  candidate_id:string
+  subject_id:string
+  trained_artifact_id:string
+  trained_artifact_hash:string
+  revision_key:string
+  evidence_ref:string
+  status:string
+  authority_expanded:boolean
+}>
+
+function runtimeKey(identity:BuilderResidencyModelIdentity):string{
+  return createHash('sha256')
+    .update(JSON.stringify([
+      'builder-residency-runtime-v1',
+      identity.candidateId,
+      identity.artifactHash.toLowerCase(),
+    ]))
+    .digest('hex')
+    .slice(0,10)
+}
+
+function artifactRevision(evidenceRef:unknown):string{
+  const match=/^hf:\/\/models\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@([a-f0-9]{40})$/i
+    .exec(String(evidenceRef??'').trim())
+  return match?.[1]?.toLowerCase()??''
+}
+
+async function resolveResidencyArtifact(
+  db:SupabaseClient,
+  identity:BuilderResidencyModelIdentity,
+):Promise<ResidencyRuntimeArtifact>{
+  const candidateId=String(identity.candidateId||'').trim()
+  const artifactId=String(identity.artifactId||'').trim()
+  const artifactHash=String(identity.artifactHash||'').trim().toLowerCase()
+  const revisionKey=String(identity.revisionKey||'').trim().toLowerCase()
+  if(!candidateId.startsWith('mass:')||!artifactId||!HASH.test(artifactHash)||!HASH.test(revisionKey)){
+    throw new Error('residency_exact_artifact_identity_invalid')
+  }
+
+  const result=await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,evidence_ref,status,authority_expanded')
+    .eq('candidate_id',candidateId)
+    .eq('trained_artifact_hash',artifactHash)
+    .maybeSingle()
+  if(result.error) throw result.error
+  const row=result.data as ArtifactRow|null
+  if(!row) throw new Error('residency_exact_artifact_registry_missing')
+  if(
+    String(row.trained_artifact_id)!==artifactId||
+    String(row.revision_key).toLowerCase()!==revisionKey||
+    String(row.status)!=='evaluation_pending'||
+    row.authority_expanded===true
+  ){
+    throw new Error('residency_exact_artifact_registry_mismatch')
+  }
+
+  const revision=artifactRevision(row.evidence_ref)
+  if(!REVISION.test(revision)) throw new Error('residency_exact_artifact_hf_revision_missing')
+
+  return Object.freeze({
+    candidateId,
+    subjectId:String(row.subject_id||'').trim(),
+    artifactId,
+    artifactRevision:revision,
+    artifactHash,
+    runtimeKey:runtimeKey(identity),
+  })
+}
+
+async function defaultSleep(ms:number){await new Promise(resolve=>setTimeout(resolve,ms))}
 
 export function createRunpodBuilderResidencyModelPort(input:{
   db:SupabaseClient
   apiKey:string
   fetchImpl?:typeof fetch
   timeoutMs?:number
+  readyTimeoutMs?:number
+  provisionImpl?:ResidencyProvision
+  healthImpl?:ResidencyHealth
+  sleepImpl?:(ms:number)=>Promise<void>
 }):BuilderResidencyModelPort{
   const call=input.fetchImpl??fetch
   const timeoutMs=Math.max(1,Math.min(input.timeoutMs??120_000,180_000))
-  return Object.freeze({
-    async complete(request){
-      const candidateId=String(request.identity.candidateId||'').trim()
-      const artifactId=String(request.identity.artifactId||'').trim()
-      const artifactHash=String(request.identity.artifactHash||'').trim().toLowerCase()
-      const revisionKey=String(request.identity.revisionKey||'').trim().toLowerCase()
-      if(!candidateId||!artifactId||!HASH.test(artifactHash)||!HASH.test(revisionKey)) throw new Error('residency_exact_artifact_identity_invalid')
+  const readyTimeoutMs=Math.max(1,Math.min(input.readyTimeoutMs??READY_TIMEOUT_MS,420_000))
+  const provision:ResidencyProvision=input.provisionImpl??(async artifact=>{
+    const runtime=await import('../../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
+    return runtime.provisionMassDistilledRuntime(artifact)
+  })
+  const health:ResidencyHealth=input.healthImpl??(async endpointId=>{
+    const runtime=await import('../../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
+    return runtime.massDistilledRuntimeHealth(endpointId)
+  })
+  const sleep=input.sleepImpl??defaultSleep
+  let preparedKey=''
+  let prepared:BuilderResidencyPreparedRuntime|null=null
+  let preparing:Promise<BuilderResidencyPreparedRuntime>|null=null
+
+  const prepare=async(identity:BuilderResidencyModelIdentity):Promise<BuilderResidencyPreparedRuntime>=>{
+    const key=[
+      identity.candidateId,
+      identity.artifactId,
+      identity.artifactHash.toLowerCase(),
+      identity.revisionKey.toLowerCase(),
+    ].join(':')
+    if(prepared&&preparedKey===key) return prepared
+    if(preparing&&preparedKey===key) return preparing
+    preparedKey=key
+    preparing=(async()=>{
       if(!input.apiKey.trim()) throw new Error('residency_runpod_key_missing')
-
-      // Residency precedes the final Production canary. Bind directly to the immutable
-      // trained artifact in an isolated scale-to-zero/max-1 RunPod runtime instead of
-      // requiring later-stage canary evidence (which would make the lifecycle circular).
-      const provisioned=await provisionMassDistilledRuntime({
-        candidateId,
-        subjectId:'computer_science_coding',
-        artifactId,
-        artifactRevision:revisionKey,
-        artifactHash,
-        runtimeKey:'residency',
-      })
-      const endpointId=String(provisioned.endpointId||'').trim().toLowerCase()
+      const artifact=await resolveResidencyArtifact(input.db,identity)
+      const provisioned=await provision(artifact)
+      const endpointId=String(provisioned.endpointId||'').trim()
       const modelId=String(provisioned.modelName||'').trim()
-      if(!endpointId||!modelId) throw new Error('residency_exact_artifact_runtime_binding_missing')
+      const baseUrl=String(provisioned.baseUrl||'').trim()
+      if(!endpointId||!modelId||!baseUrl){
+        throw new Error('residency_exact_artifact_runtime_identity_missing')
+      }
 
-      // Infrastructure-only prewarm/readiness. This does not write final-canary evidence
-      // and therefore cannot satisfy or weaken any later graduation gate.
-      const prewarm=await canaryMassDistilledRuntime({endpointId,modelName:modelId})
-      if(!prewarm.ok) throw new Error(`residency_exact_artifact_runtime_not_ready:${prewarm.error||prewarm.httpStatus||'unknown'}`)
+      const root=`https://${endpointId}.api.runpod.ai`
+      const deadline=Date.now()+readyTimeoutMs
+      try{
+        const wake=await call(`${root}/ping`,{
+          headers:{Authorization:`Bearer ${input.apiKey}`},
+          signal:AbortSignal.timeout(Math.min(WAKE_TIMEOUT_MS,readyTimeoutMs)),
+        })
+        if(wake.status===401||wake.status===403){
+          throw new Error(`residency_exact_artifact_runtime_wake_http_${wake.status}`)
+        }
+      }catch(error){
+        if(error instanceof Error&&/^residency_exact_artifact_runtime_wake_http_/.test(error.message)){
+          throw error
+        }
+        // A cold scale-to-zero LB commonly times out while RunPod starts a worker.
+        // Readiness is authoritatively observed through the provider health plane below.
+      }
 
-      const response=await call(`https://${endpointId}.api.runpod.ai/v1/chat/completions`,{
+      let lastHealthError=''
+      while(Date.now()<deadline){
+        try{
+          const state=await health(endpointId)
+          if(state.ok&&state.workers.ready>0){
+            const result=Object.freeze({
+              endpointId,
+              modelId,
+              baseUrl,
+              artifactRevision:artifact.artifactRevision,
+              exactArtifact:true as const,
+            })
+            prepared=result
+            return result
+          }
+          if(!state.ok&&state.error) lastHealthError=String(state.error).slice(0,240)
+        }catch(error){
+          lastHealthError=error instanceof Error
+            ?error.message.slice(0,240)
+            :'residency_exact_artifact_health_probe_failed'
+        }
+        await sleep(Math.min(READY_POLL_MS,Math.max(1,deadline-Date.now())))
+      }
+      throw new Error(
+        lastHealthError
+          ?`residency_exact_artifact_runtime_not_ready:${lastHealthError}`
+          :'residency_exact_artifact_runtime_not_ready',
+      )
+    })()
+    try{return await preparing}
+    finally{preparing=null}
+  }
+
+  return Object.freeze({
+    prepare,
+    async complete(request){
+      const runtime=await prepare(request.identity)
+      const response=await call(`${runtime.baseUrl}/chat/completions`,{
         method:'POST',
         headers:{Authorization:`Bearer ${input.apiKey}`,'Content-Type':'application/json'},
         body:JSON.stringify({
-          model:modelId,
+          model:runtime.modelId,
           temperature:0,
           max_tokens:Math.max(1,Math.min(request.maxTokens??2048,4096)),
           chat_template_kwargs:{enable_thinking:false},
@@ -77,7 +252,12 @@ export function createRunpodBuilderResidencyModelPort(input:{
       try{parsed=JSON.parse(raw)}catch{throw new Error('residency_exact_artifact_inference_invalid_json')}
       const text=String(parsed?.choices?.[0]?.message?.content||'').trim()
       if(!text) throw new Error('residency_exact_artifact_inference_empty')
-      return Object.freeze({text,endpointId,modelId,exactArtifact:true as const})
+      return Object.freeze({
+        text,
+        endpointId:runtime.endpointId,
+        modelId:runtime.modelId,
+        exactArtifact:true as const,
+      })
     },
   })
 }

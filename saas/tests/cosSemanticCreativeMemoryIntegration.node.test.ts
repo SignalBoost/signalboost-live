@@ -66,3 +66,17 @@ test('travel planner receives Creative Memory guidance before live-evidence synt
   assert.match(block, /retrieveCreativeMemory/)
   assert.match(block, /CREATIVE MEMORY — HOW TO SOLVE\/PRESENT, NEVER FACTUAL EVIDENCE/)
 })
+
+
+test('deterministic travel backstop still applies Creative Memory and records it', () => {
+  const start = primary.indexOf('async function buildTravelPlanEvidenceBackstop')
+  const end = primary.indexOf('function previousAssistantText', start)
+  const block = primary.slice(start, end)
+  assert.match(block, /retrieveCreativeMemory\(input,\{privileged,limit:3\}\)/)
+  assert.match(block, /proactiveCompletion/)
+  assert.match(block, /Jeśli zostanie Ci dodatkowe 30–60 minut/)
+  assert.match(block, /Najtańszy wariant/)
+  assert.match(primary, /const backstop=await buildTravelPlanEvidenceBackstop\(lookupInput,language,freshSources,isPrivileged\)/)
+  assert.match(primary, /creative_memory:\{used:backstop\.creativeMemory\.selected>0/)
+  assert.match(primary, /semantics:'non_factual_guidance'/)
+})

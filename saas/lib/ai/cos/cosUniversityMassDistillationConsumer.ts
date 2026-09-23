@@ -1,6 +1,7 @@
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
+import { persistDistillationAssetVault } from './cosUniversityDistillationAssetVault.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { closeProviderCircuit, consumeProviderCircuitRecoveryProbe, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
 import {
@@ -1332,6 +1333,20 @@ export async function recordMassDistillationWorkerEvidence(
       throw new Error('mass_distillation_teacher_callback_provenance_mismatch')
     }
     const datasetHash = manifestHash(outputHashes)
+    const vaulted = await persistDistillationAssetVault({
+      candidateId,
+      runId: run.id,
+      batchKey: run.batch_key,
+      subjectId: run.subject_id,
+      promptSetHash,
+      sourceRef,
+      trainingRights: 'open_license',
+      expectedItemHashes: outputHashes,
+      defaultTeacherProvider: 'huggingface',
+      defaultTeacherModelId: run.teacher_model_id,
+      defaultTeacherModelRevision: run.teacher_model_revision,
+      rows: Array.isArray(body.teacherRows) ? body.teacherRows as any[] : [],
+    }, db)
     const updated = await db.from('cos_university_mass_distillation_batch_runs').update({
       teacher_job_id: jobId,
       teacher_source_ref: sourceRef,
@@ -1346,10 +1361,27 @@ export async function recordMassDistillationWorkerEvidence(
     if (updated.error) throw updated.error
     await recordAssurance({
       candidateId, subjectId: run.subject_id, claim,
-      evidence: { campaignId: run.campaign_id, batchKey: run.batch_key, jobId, sourceRef, datasetHash, promptSetHash, outputCount: outputHashes.length },
+      evidence: {
+        campaignId: run.campaign_id,
+        batchKey: run.batch_key,
+        jobId,
+        sourceRef,
+        datasetHash,
+        promptSetHash,
+        outputCount: outputHashes.length,
+        assetSetKey: vaulted.assetSetKey,
+        portableManifestHash: vaulted.portableManifestHash,
+      },
       verifier: 'training_executor',
     })
-    return { ok: true as const, campaignId: run.campaign_id, batchKey: run.batch_key, nextStage: 'preparation_pending' as const }
+    return {
+      ok: true as const,
+      campaignId: run.campaign_id,
+      batchKey: run.batch_key,
+      assetSetKey: vaulted.assetSetKey,
+      portableManifestHash: vaulted.portableManifestHash,
+      nextStage: 'preparation_pending' as const,
+    }
   }
 
   if (claim === 'partition_manifests_registered') {

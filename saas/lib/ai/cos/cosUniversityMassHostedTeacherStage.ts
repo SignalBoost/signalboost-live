@@ -184,7 +184,8 @@ export async function runMassHostedTeacherStage(input: {
     return Object.freeze({
       ok: true, skipped: true, reason: 'mass_hosted_teacher_disabled', completed: false,
       rows: 0, minimumRows: MIN_TEACHER_ROWS, activeProviders: [], providerMix: Object.freeze({}),
-      failures: Object.freeze([]), outputHashes: Object.freeze([]), datasetHash: null, config,
+      failures: Object.freeze([]), outputHashes: Object.freeze([]), datasetHash: null,
+      assetSetKey: null, portableManifestHash: null, config,
       authorityExpanded: false, silentFallbackAllowed: false,
     })
   }
@@ -192,7 +193,8 @@ export async function runMassHostedTeacherStage(input: {
     return Object.freeze({
       ok: true, skipped: true, reason: 'no_active_hosted_teacher_provider', completed: false,
       rows: 0, minimumRows: MIN_TEACHER_ROWS, activeProviders: [], providerMix: Object.freeze({}),
-      failures: Object.freeze([]), outputHashes: Object.freeze([]), datasetHash: null, config,
+      failures: Object.freeze([]), outputHashes: Object.freeze([]), datasetHash: null,
+      assetSetKey: null, portableManifestHash: null, config,
       authorityExpanded: false, silentFallbackAllowed: false,
     })
   }

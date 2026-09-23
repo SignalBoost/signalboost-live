@@ -1,2 +1,2 @@
-base_sha=47cc0553dba669537ab4183a3ca0b05e64eecd44
-branch=fix/builder-residency-catalog-hole-20260922
+base_sha=e5f7ecc2e9c7ef0fdd1f5dcf43f096f1c6a8c414
+branch=feat/residency-exact-artifact-model-port-20260922

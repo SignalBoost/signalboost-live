@@ -80,3 +80,13 @@ test('structural or semantic review failures still fail closed', () => {
   assert.match(localSynthesis, /finalReview\.kind === 'unparseable' \|\| !finalReview\.review\.faithful/)
   assert.match(localSynthesis, /review_failed_quality_boundary/)
 })
+
+
+test('successful travel answers return before provenance persistence', () => {
+  const travelStart = route.indexOf('const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)')
+  const travelEnd = route.indexOf("event:'travel_plan_rescue_declined'", travelStart)
+  const travelPath = route.slice(travelStart, travelEnd)
+  assert.match(travelPath, /persistCosPrimaryProvenanceAfterResponse/)
+  assert.doesNotMatch(travelPath, /await writeCosPrimaryProvenance/)
+  assert.match(travelPath, /fallthrough:'travel_plan_rescue'/)
+})

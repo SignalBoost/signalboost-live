@@ -314,7 +314,7 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
 // Owner doctrine (stated-assumption mode): complete the plan, use the live sources where they help,
 // and label every mutable specific (fares, hours, ticket prices) as something to check. Plain text
 // output, no JSON contract. Every decline is logged with its reason so no failure is silent.
-export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 60_000
+export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 22_000
 export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 3_000
 async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const evidence=(Array.isArray(sources)?sources:[]).slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
@@ -334,13 +334,8 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
   // with the first time slot, so restating the request is not a plausible completion.
   const attempts=[
     {
-      temperature:.3,
-      systemPrompt:['You are COS. The user asked for a travel plan. Deliver the complete plan now. /no_think',...rules].join(' '),
-      prompt:`USER REQUEST:\n${input.slice(0,8_000)}${evidence?`\n\nREFERENCE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}`,
-    },
-    {
-      temperature:.6,
-      systemPrompt:['You are an experienced local travel planner. A traveller sent the brief below. Do NOT restate, correct or translate the brief. Your output must begin directly with the first time slot of the itinerary (for example "09:00") and continue slot by slot to the end of the time window, then a short cost summary. /no_think',...rules].join(' '),
+      temperature:.45,
+      systemPrompt:['You are an experienced local travel planner. A traveller sent the brief below. Do NOT restate, correct or translate the brief. Deliver the complete plan now. Begin directly with the first time slot of the itinerary (for example "09:00"), continue slot by slot to the end of the requested window, then give a short cost summary. /no_think',...rules].join(' '),
       prompt:`TRAVELLER BRIEF (do not repeat it):\n"""\n${input.slice(0,8_000)}\n"""${evidence?`\n\nREFERENCE SOURCES:\n${evidence}`:''}\n\nITINERARY:`,
     },
   ]
@@ -697,13 +692,13 @@ export async function postCosPrimary(req:NextRequest){
         ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:groundedTask.reasonerLabel,grounded_at:freshRetrievedAt}
         logEscalation({event:'fresh_grounded_task_completed',documents_acquired:freshSources.length,reasoner:groundedTask.reasonerLabel,strict_failure_code:null,external_ai_invoked:false,local_model_invoked:true})
         const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:groundedTask.reply,source:'local_cos_reasoning',confidence:groundedTask.confidence,provenance:freshTelemetryProvenance(true,groundedTask.reasonerLabel),externalAiInvoked:false})
-        await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
+        persistCosPrimaryProvenanceAfterResponse(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
         return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
       }
-      logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,fallthrough:'shared_local_synthesizer'})
+      logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,fallthrough:'travel_plan_rescue'})
     }
 
-    if(!requestedAction){
+    if(!requestedAction&&!liveTravelTask){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
       const localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})
@@ -790,7 +785,7 @@ export async function postCosPrimary(req:NextRequest){
       ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:groundedTask.reasonerLabel,grounded_at:freshRetrievedAt}
       logEscalation({event:'fresh_grounded_task_completed',documents_acquired:freshSources.length,reasoner:groundedTask.reasonerLabel,strict_failure_code:freshFailureCode,external_ai_invoked:false,local_model_invoked:true})
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:groundedTask.reply,source:'local_cos_reasoning',confidence:groundedTask.confidence,provenance:freshTelemetryProvenance(true,groundedTask.reasonerLabel),externalAiInvoked:false})
-      await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
+      persistCosPrimaryProvenanceAfterResponse(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
       return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
   }
@@ -808,7 +803,7 @@ export async function postCosPrimary(req:NextRequest){
       const executionProvenance=freshRetrievedAt?attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true}):baseProvenance
       ;Object.assign(executionProvenance as any,{policy:'travel_plan_stated_assumptions',assistant_text_used_for_resolution:false})
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:travelRescue.reply,source:'local_cos_reasoning',confidence:travelRescue.confidence,provenance:freshTelemetryProvenance(true,travelRescue.reasonerLabel),externalAiInvoked:false})
-      await writeCosPrimaryProvenance(userId,travelRescue.reply,executionProvenance,'cos-travel-plan-rescue',{prompt:lookupInput,answered:true,confidence:travelRescue.confidence,branch:'travel_plan_rescue'})
+      persistCosPrimaryProvenanceAfterResponse(userId,travelRescue.reply,executionProvenance,'cos-travel-plan-rescue',{prompt:lookupInput,answered:true,confidence:travelRescue.confidence,branch:'travel_plan_rescue'})
       return NextResponse.json({ok:true,reply:travelRescue.reply,source:'cos-travel-plan-rescue',confidence_score:travelRescue.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:Boolean(freshSources.length),live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
     logEscalation({event:'travel_plan_rescue_declined',documents_acquired:freshSources.length,strict_failure_code:freshFailureCode,external_ai_invoked:false,local_model_invoked:true})

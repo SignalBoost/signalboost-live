@@ -372,12 +372,14 @@ export async function POST(req: NextRequest): Promise<Response> {
       const successful = delivered.ok && payload?.ok !== false && Boolean(reply)
       // A turn that ran out of time is still recorded, so History always holds the question.
       if (successful || (deadlineElapsed && reply)) {
-        await persistTurn({
-          conversationId,
-          userId,
-          userMessage: prompt,
-          assistantReply: reply,
-          provenance: payload?.execution_provenance ?? null,
+        after(async () => {
+          await persistTurn({
+            conversationId,
+            userId,
+            userMessage: prompt,
+            assistantReply: reply,
+            provenance: payload?.execution_provenance ?? null,
+          })
         })
       }
     }

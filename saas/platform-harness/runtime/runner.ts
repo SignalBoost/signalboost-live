@@ -160,7 +160,10 @@ export async function runHarness(input: {
       verifierRef: verification.verifierRef,
       ...(classification.status === 'success'
         ? {}
-        : { failureCode: classification.reason }),
+        : { failureCode:
+            classification.status === 'infrastructure_failure' && verification.reason
+              ? verification.reason
+              : classification.reason }),
     },
     authorityExpanded: false,
     productionMutationObserved,

@@ -1,2 +1,2 @@
-base_sha=34d647d974e53ad001fef155f9282e43da999cbc
-branch=fix/residency-bounded-wake-retry-20260923
+base_sha=93c41cdcfc89caf1fc411e23569cbcc19f59a4d6
+branch=fix/residency-readiness-evidence-cleanup-20260923

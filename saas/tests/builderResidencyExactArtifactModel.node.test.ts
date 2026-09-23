@@ -234,7 +234,7 @@ test('Residency runtime preparation classifies unavailable provider readiness as
   })
   await assert.rejects(
     ()=>port.prepare!(identity),
-    /residency_exact_artifact_runtime_not_ready/,
+    /residency_exact_artifact_runtime_not_ready:provider_workers_ready_0_running_0_initializing_1_idle_0_wake_attempts_1/,
   )
   assert.ok(healthCalls>=1)
 })

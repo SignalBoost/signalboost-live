@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { isSimpleKnowledgeQuestion } from '../lib/ai/cos/simpleKnowledgeIntent.ts'
 
 function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -70,8 +69,8 @@ test('background shared text inference prefers RunPod and treats LOCAL_AI DeepIn
   const health = inference.indexOf('export async function checkLocalInferenceHealth', publicEntry)
   const routing = inference.slice(publicEntry, health)
   const resolveRunpod = routing.indexOf("import('./cos/runpodPrimaryInference.ts')")
-  const callRunpod = routing.indexOf('callConfiguredModel(runpodArgs, runpodConfig)')
-  const fallback = routing.lastIndexOf('callConfiguredModel(args, ownedAttempted')
+  const callRunpod = routing.indexOf('callConfiguredModelTurn(runpodArgs, runpodConfig)')
+  const fallback = routing.lastIndexOf('callConfiguredModelTurn(args, ownedAttempted')
   assert.ok(resolveRunpod >= 0 && callRunpod > resolveRunpod && fallback > callRunpod)
   assert.match(inference, /protectedIndependentEvaluation/)
   assert.match(inference, /independent_assessment/)
@@ -131,41 +130,30 @@ test('fresh grounded tasks prefer owned RunPod, cap that attempt, then retain co
   assert.match(inference, /FRESH_GROUNDED_RUNPOD_ATTEMPT_MS = 16_000/)
   assert.match(inference, /const runpodArgs = freshGroundedTask\(args\)/)
   assert.match(inference, /timeoutMs: Math\.min\(/)
-  assert.match(inference, /return callConfiguredModel\(args, ownedAttempted \? \{ \.\.\.config, fallbackFromOwned: true \} : config\)/)
+  assert.match(inference, /return callConfiguredModelTurn\(args, ownedAttempted \? \{ \.\.\.config, fallbackFromOwned: true \} : config\)/)
   const eligible = inference.slice(inference.indexOf('function eligibleForRunpodPrimary'), inference.indexOf('async function callConfiguredModel'))
   assert.match(eligible, /if \(interactiveUserResponse\(args\)\) return false/)
 })
 
 
-test('short stable knowledge questions use the fail-fast direct model lane', () => {
-  assert.equal(isSimpleKnowledgeQuestion('What is the capital of Portugal?'), true)
-  assert.equal(isSimpleKnowledgeQuestion('Who wrote Hamlet?'), true)
-  assert.equal(isSimpleKnowledgeQuestion('When did World War II end?'), true)
-
-  // Anything volatile, contextual, action-bearing, platform-specific, or analytical stays on COS.
-  assert.equal(isSimpleKnowledgeQuestion('Who is the current president of Portugal?'), false)
-  assert.equal(isSimpleKnowledgeQuestion('What is the weather in Lisbon today?'), false)
-  assert.equal(isSimpleKnowledgeQuestion('What is my current plan?'), false)
-  assert.equal(isSimpleKnowledgeQuestion('What is your model?'), false)
-  assert.equal(isSimpleKnowledgeQuestion('Why did the Roman Empire fall?'), false)
-
+test('ordinary knowledge questions are model-first rather than regex-classified at browser ingress', () => {
   const route = source('../app/api/cos-browser/route.ts')
+  const decision = source('../lib/ai/cos/cosAgentDecision.ts')
   const inference = source('../lib/ai/local-inference.ts')
-  const fast = source('../lib/ai/cos/simpleKnowledgeFastPath.ts')
 
-  const classifier = route.indexOf('isSimpleKnowledgeQuestion(prompt)')
-  const ordinaryAccess = route.indexOf('const access = await getAccess().catch(() => null)')
-  assert.ok(classifier >= 0 && ordinaryAccess > classifier, 'simple facts must short-circuit before ordinary auth/orchestration')
+  assert.doesNotMatch(route, /isSimpleKnowledgeQuestion\(prompt\)/)
+  assert.doesNotMatch(route, /answerSimpleKnowledgeQuestion\(prompt\)/)
+  assert.match(route, /await decideCosAgentTurn\(\{/)
+  assert.match(route, /agentDecision\?\.mode === 'answer'/)
+  assert.match(route, /agentDecision\?\.mode === 'orchestrate'/)
 
-  assert.match(route, /source: 'cos-simple-knowledge-fast'/)
-  assert.match(route, /latency_profile: 'under-10s-simple-knowledge'/)
-  assert.match(fast, /SIMPLE_KNOWLEDGE_FAST_TIMEOUT_MS = 7_000/)
-  assert.match(fast, /maxTokens: 180/)
-  assert.match(fast, /disableThinking: true/)
-  assert.match(fast, /persistUsage: false/)
-  assert.match(fast, /allowConfiguredFallback: false/)
-  assert.match(inference, /feature === 'cos_simple_knowledge'/)
-  assert.match(inference, /COS_SIMPLE_KNOWLEDGE_TIMEOUT_MS/)
-  assert.match(inference, /COS_SIMPLE_KNOWLEDGE_MODEL/)
-  assert.match(inference, /deepseek-ai\/DeepSeek-V4-Flash/)
+  assert.match(decision, /feature: 'cos_interactive_answer'/)
+  assert.match(decision, /purpose: 'agent_native_tool_choice'/)
+  assert.match(decision, /purpose: 'agent_answer_or_capability_plan_compat'/)
+  assert.match(decision, /toolChoice: 'auto'/)
+  assert.match(decision, /disableThinking: true/)
+  assert.match(decision, /allowConfiguredFallback: false/)
+  assert.match(decision, /persistUsage: false/)
+  assert.match(decision, /COS_AGENT_DECISION_TIMEOUT_MS \|\| '10000'/)
+  assert.match(inference, /feature === 'cos_interactive_answer'/)
 })

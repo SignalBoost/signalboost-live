@@ -14,7 +14,10 @@ test('Full Assistant live page uses observable progress and the canonical COS br
   assert.match(progressClient, /'x-signalboost-surface': args\.target/)
 })
 
-test('Assistant is COS: ordinary owner turns do not enter a separate Concierge brain or pre-answer visual classifier', () => {
+test('Assistant is COS: ordinary owner turns let the model answer or request capabilities before orchestration', () => {
+  assert.match(browserRoute, /decideCosAgentTurn\(\{/)
+  assert.match(browserRoute, /agentDecision\?\.mode === 'answer'/)
+  assert.match(browserRoute, /agentDecision\?\.mode === 'orchestrate'/)
   assert.match(browserRoute, /const executeCosRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
   assert.match(browserRoute, /withPublicDeliveryScope\(\(\) => executeCosRequest\(\)\)/)
   assert.doesNotMatch(browserRoute, /publicConciergePost/)
@@ -23,7 +26,7 @@ test('Assistant is COS: ordinary owner turns do not enter a separate Concierge b
 
 test('Full Assistant passive operational logs are diagnosis-only until explicit repair intent', () => {
   assert.match(browserRoute, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
-  assert.match(browserRoute, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
+  assert.match(browserRoute, /const shouldConsultSoftwareSpecialist = hasSourceAttachment \|\| explicitOperationalRepair/)
   assert.match(browserRoute, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
   assert.match(browserRoute, /if \(operationalEvidence && !hasSourceAttachment\)/)
   assert.match(browserRoute, /await diagnoseOperationalLog\(\{/)

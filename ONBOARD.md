@@ -1389,6 +1389,14 @@ free/open rights-cleared material first
 
 Frontier-provider spend is therefore an optimization layer, not the permanent store of University intelligence. SMB deployments may primarily consume shared graduates, retrieval, and bounded personalization; enterprise deployments may additionally fund private/customer-specific distillation with their own approved provider/compute budgets. Commercial packaging never changes tenant isolation, training rights, evaluator independence, or authority gates.
 
+University open-source provider status as of 2026-09-23:
+
+- **OpenAlex:** implemented and already observed retaining Production scientific material through the governed learning lane. Its external 1,024-dimensional semantic space remains discovery-only; accepted text is re-embedded internally.
+- **Wikipedia / Wikimedia:** implemented through the existing governed reference adapter and already observed retaining Production material under CC BY-SA provenance. It improves retrieval/current general knowledge but is not admitted to mass model distillation by the current public-domain/CC0 training-rights policy.
+- **Semantic Scholar / S2ORC:** SPECTER2 discovery adapter implemented. It remains truthful as implemented-but-unobserved until retained Production material appears.
+- **Hugging Face open datasets:** the first active allowlisted source is `ethanolivertroy/nist-cybersecurity-training`, explicitly CC0/public-domain, with 1,536-dimensional source embeddings. It is queried only for cybersecurity/NIST-relevant gaps. The source embedding is fingerprinted for provenance and never mixed into the canonical iTMounts pgvector space; accepted text is re-embedded with the active internal embedding model. Its CC0 material may enter University mass-distillation packaging only after the ordinary relevance, confidence, deduplication, subject-normalization, and rights gates pass.
+- Hugging Face datasets without clear commercial training rights may be used only as discovery/RAG sources when permitted; their availability never implies training eligibility.
+
 University telemetry must expose open-source acquisition separately from paid frontier faculty. The `openSources` lane reports configured/implemented sources and observed retained material without pretending that a configured source produced data when it did not. Open-source counts are acquisition evidence only; they do not imply training, mastery, evaluation, or graduation.
 
 Implementation status at introduction: `saas/lib/ai/cos/cosWorkingDistillation.ts` defines the fail-closed Working-COS candidate contract and exact-base-model binding. Automatic training dispatch and Production activation remain disabled until the dedicated fast evaluator, rollback proof, exact served-identity canary, and bounded activation path are implemented and independently tested.

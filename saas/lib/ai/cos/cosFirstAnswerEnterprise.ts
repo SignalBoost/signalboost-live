@@ -77,18 +77,18 @@ export type COSProvenance = {
   enterpriseMemoriesUsed:number
   userMemoriesUsed:number
   cognitiveSkillsUsed:number
-  creativeMemoriesUsed:number
+  creativeMemoriesUsed?:number
   enterpriseMemoryStatus:string
   enterpriseMemoryOrganizationId:string|null
   evidenceFunnel:COSEvidenceFunnel
   cognitiveSkillFunnel:EvidenceFunnelStage
-  creativeMemoryFunnel:EvidenceFunnelStage
+  creativeMemoryFunnel?:EvidenceFunnelStage
   knowledgeFactsCited?:number
   learnedItemsCited?:number
   enterpriseMemoriesCited?:number
   userMemoriesCited?:number
   cognitiveSkillsCited?:number
-  canonicalSelfKnowledgeUsed?:{semanticMemoryDefinition:boolean; creativeMemoryDefinition:boolean; enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
+  canonicalSelfKnowledgeUsed?:{semanticMemoryDefinition?:boolean; creativeMemoryDefinition?:boolean; enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
   // Facts the user stated inline in the prompt. Provenance previously accounted only for
   // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
   // its lone contributor — implying the facts came from nowhere (2026-08-23).
@@ -110,7 +110,7 @@ type CachedAnswerOrigin = {
   enterpriseMemoriesUsed:number
   userMemoriesUsed:number
   cognitiveSkillsUsed:number
-  creativeMemoriesUsed:number
+  creativeMemoriesUsed?:number
   knowledgeFactsCited:number
   learnedItemsCited:number
   enterpriseMemoriesCited:number
@@ -1099,7 +1099,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult, language='en'):string {
   const p = result.provenance
-  const evidence = `${p.knowledgeFactsUsed} knowledge facts, ${p.learnedItemsUsed} learned items, ${p.enterpriseMemoriesUsed} enterprise memories, ${p.creativeMemoriesUsed} creative patterns, ${p.cognitiveSkillsUsed} validated skills, ${p.userMemoriesUsed} saved memories`
+  const evidence = `${p.knowledgeFactsUsed} knowledge facts, ${p.learnedItemsUsed} learned items, ${p.enterpriseMemoriesUsed} enterprise memories, ${p.creativeMemoriesUsed ?? 0} creative patterns, ${p.cognitiveSkillsUsed} validated skills, ${p.userMemoriesUsed} saved memories`
   const source = p.responseSource === 'semantic_cache' ? 'exact-match cache' : p.responseSource === 'semantic_similarity' ? `semantic match, similarity ${(p.similarityScore ?? 0).toFixed(2)}` : p.reasonerLabel
   if (language === 'pt') return result.handled ? `Fluxo: COS consultou primeiro seu conhecimento, corpus, memória empresarial, habilidades validadas e memória do usuário (${evidence}) → respondeu via ${source} com confiança ${result.confidence.toFixed(2)}. Nenhuma IA externa foi chamada.` : `Fluxo: COS consultou primeiro sua memória interna (${evidence}) → não atingiu confiança suficiente → IA externa é apenas o último recurso.`
   if (language === 'es') return result.handled ? `Flujo: COS consultó primero su conocimiento, corpus, memoria empresarial, habilidades validadas y memoria del usuario (${evidence}) → respondió vía ${source} con confianza ${result.confidence.toFixed(2)}. No se llamó IA externa.` : `Flujo: COS consultó primero su memoria interna (${evidence}) → no alcanzó confianza suficiente → la IA externa es solo el último recurso.`

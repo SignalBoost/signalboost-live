@@ -333,7 +333,7 @@ export const PLATFORM_COPY: Record<string, FlatCopy> = {
     'pricing_v2.errorGeneric': 'Algo salió mal.',
     'pricing_v2.errorNetwork': 'No se pudo iniciar el checkout. Contacta a support@signalboostapp.com',
   },
-pl: {
+  pl: {
     'pricing_v2.command.feature1': 'Wszystko z planu Growth',
     'pricing_v2.command.feature2': 'Nieograniczone lub rozszerzone strony i zaawansowane procesy optymalizacji',
     'pricing_v2.command.feature3': 'Zaawansowane procesy wideo, większa pula wykorzystania i priorytetowa ścieżka renderowania',

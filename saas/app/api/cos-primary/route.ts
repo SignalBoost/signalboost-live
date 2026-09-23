@@ -57,6 +57,7 @@ import { searchPastConversations } from '@/lib/ai/tools/conversationHistory'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
+import { retrieveCreativeMemory, formatCreativeMemoryForReasoner } from '@/lib/ai/cos/creativeMemory'
 import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
@@ -316,8 +317,10 @@ export const TRAVEL_PLAN_RETRY_TIMEOUT_MS = 10_000
 export const TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 28_000
 export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 1_400
 export const TRAVEL_PLAN_RETRY_MAX_TOKENS = 900
-async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[],privileged=false):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const evidence=(Array.isArray(sources)?sources:[]).slice(0,6).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,360)}`).join('\n\n')
+  const creativeResult=await retrieveCreativeMemory(input,{privileged,limit:2}).catch(()=>({retrieved:0,relevant:0,selected:[],mode:'unavailable' as const}))
+  const creative=formatCreativeMemoryForReasoner(creativeResult.selected).join('\n')
   const languageLine=language ? `Write the plan in the language the traveller wrote in; if unclear use ${reportLanguageName(language)}.` : 'Write the plan in the language the traveller wrote in.'
   const rules=[
     'Respect every constraint the traveller gave: arrival point, date, time window, budget, requested transport details, and paid-attraction preference.',
@@ -335,7 +338,7 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
       maxTokens:TRAVEL_PLAN_RESCUE_MAX_TOKENS,
       purpose:'travel_plan_grounded',
       systemPrompt:['You are a fast, practical local travel planner. Deliver a complete but concise itinerary now. Prefer useful specifics over long explanation. /no_think',...rules].join(' '),
-      prompt:`TRAVELLER REQUEST:\n${input.slice(0,8_000)}${evidence?`\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}\n\nITINERARY:`,
+      prompt:`TRAVELLER REQUEST:\n${input.slice(0,8_000)}${creative?`\n\nCREATIVE MEMORY — VALIDATED APPROACH PATTERNS, NOT FACTS:\n${creative}`:''}${evidence?`\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}\n\nITINERARY:`,
     },
     {
       temperature:.35,
@@ -343,7 +346,7 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
       maxTokens:TRAVEL_PLAN_RETRY_MAX_TOKENS,
       purpose:'travel_plan_grounded_retry',
       systemPrompt:['Complete the travel brief directly and concisely. Start with the first time slot, not a restatement. Cover transport, budget, and one worthwhile paid attraction if supported. /no_think',...rules].join(' '),
-      prompt:`BRIEF:\n${input.slice(0,8_000)}${evidence?`\n\nLIVE SOURCES:\n${evidence}`:''}\n\nPLAN:`,
+      prompt:`BRIEF:\n${input.slice(0,8_000)}${creative?`\n\nCREATIVE MEMORY — VALIDATED APPROACH PATTERNS, NOT FACTS:\n${creative}`:''}${evidence?`\n\nLIVE SOURCES:\n${evidence}`:''}\n\nPLAN:`,
     },
   ]
   const started=Date.now()
@@ -741,7 +744,7 @@ export async function postCosPrimary(req:NextRequest){
     if(!requestedAction&&liveTravelTask){
       freshLocalAttempted=true
       const travelDeclines:string[]=[]
-      const travelPlan=await runTravelPlanAssumptionRescue(lookupInput,language,freshSources,travelDeclines)
+      const travelPlan=await runTravelPlanAssumptionRescue(lookupInput,language,freshSources,travelDeclines,isPrivileged)
       if(travelPlan){
         freshLocalModel=travelPlan.reasonerLabel
         const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:travelPlan.reasonerLabel,confidence:travelPlan.confidence,accepted:true})

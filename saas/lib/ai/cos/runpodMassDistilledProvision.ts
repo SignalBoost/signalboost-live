@@ -168,7 +168,7 @@ async def proxy(req,path):
         kwargs['enable_thinking']=False
         payload['chat_template_kwargs']=kwargs
         body=json.dumps(payload).encode('utf-8')
-    async with httpx.AsyncClient(timeout=60.0) as client: r=await client.request(req.method,f'http://127.0.0.1:{INTERNAL}{path}',content=body,headers={'content-type':'application/json'})
+    async with httpx.AsyncClient(timeout=120.0) as client: r=await client.request(req.method,f'http://127.0.0.1:{INTERNAL}{path}',content=body,headers={'content-type':'application/json'})
     return Response(content=r.content,status_code=r.status_code,media_type=r.headers.get('content-type','application/json'))
 @app.post('/v1/chat/completions')
 async def chat(req:Request): return await proxy(req,'/v1/chat/completions')

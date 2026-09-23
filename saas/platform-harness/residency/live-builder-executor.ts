@@ -50,8 +50,8 @@ type NativeCapability=(typeof BUILDER_RESIDENCY_NATIVE_CAPABILITIES)[number]
  * BuilderToolLoop owns one bounded retry on builder_model_round_timeout; equal
  * deadlines let AbortSignal win the race and bypass that retry.
  */
-export const BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS=60_000
-export const BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS=70_000
+export const BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS=90_000
+export const BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS=110_000
 const READ_CAPS=new Set<NativeCapability>([
   'native.builder-residency.files.list',
   'native.builder-residency.file.read',

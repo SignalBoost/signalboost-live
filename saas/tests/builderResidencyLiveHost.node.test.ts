@@ -62,8 +62,9 @@ function scriptedModelPort():BuilderResidencyModelPort{
 }
 
 
-test('live Residency keeps provider abort outside Builder model-round timeout',()=>{
-  assert.ok(BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS>0)
+test('live Residency keeps nested exact-model timeouts ordered inside the Harness deadline',()=>{
+  assert.equal(BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS,90_000)
+  assert.equal(BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS,110_000)
   assert.ok(BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS>BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS)
   assert.ok(BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS<240_000)
 })

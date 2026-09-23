@@ -54,10 +54,11 @@ test('evaluation restores the one worker a retired endpoint is allowed, before i
   assert.doesNotMatch(provisionV2, /max: [2-9]|min: [1-9]/)
   assert.match(provisionV2, /const IDLE_TIMEOUT_SECONDS = 180/)
   assert.match(provisionV2, /if \(maxWorkers >= 1 && idleTimeout === idleTimeoutSeconds\) return endpoint/)
-  assert.match(provisionV2, /export const MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS = 300/)
+  assert.match(provisionV2, /export const MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS = 720/)
   assert.match(provisionV2, /if \(input\.idleTimeoutSeconds === undefined\) return IDLE_TIMEOUT_SECONDS/)
-  assert.ok((300 / 3600) * 0.69 < 0.2, '300s Residency warm retry stays below the existing $0.20 canary cost ceiling at the approved GPU price cap')
+  assert.ok((720 / 3600) * 0.69 < 0.2, '720s Residency warm retry bridges the 10-minute cron while staying below the existing $0.20 canary cost ceiling at the approved GPU price cap')
   assert.ok((180 / 3600) * 0.69 < 0.2, '180s at the approved $0.69\/hr ceiling stays below wake authority')
+  assert.match(provisionLegacy, /httpx\.AsyncClient\(timeout=120\.0\)/)
 })
 
 

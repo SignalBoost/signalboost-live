@@ -82,6 +82,7 @@ test('Residency provisions the exact trained artifact without requiring prior ca
     fetchImpl:async(url:any,init:any)=>{
       calls.push({url:String(url),init})
       if(String(url).endsWith('/ping')) return new Response('',{status:200})
+      if(String(url).endsWith('/ready')) return new Response(JSON.stringify({ready:true,model:'itmounts-resident-model'}),{status:200})
       return new Response(JSON.stringify({
         choices:[{message:{content:'bounded answer'}}],
       }),{status:200})
@@ -107,9 +108,10 @@ test('Residency provisions the exact trained artifact without requiring prior ca
   assert.equal(provisions[0].artifactHash,identity.artifactHash)
   assert.equal(provisions[0].artifactRevision,r40('c'))
   assert.match(provisions[0].runtimeKey,/^[a-f0-9]{10}$/)
-  assert.equal(provisions[0].idleTimeoutSeconds,300)
+  assert.equal(provisions[0].idleTimeoutSeconds,720)
   assert.deepEqual([...new Set(reads)],['cos_local_distillation_artifacts'])
   assert.equal(calls.filter(item=>item.url.endsWith('/ping')).length,1)
+  assert.equal(calls.filter(item=>item.url.endsWith('/ready')).length,1)
   const chat=calls.find(item=>item.url.endsWith('/v1/chat/completions'))
   assert.ok(chat)
   const body=JSON.parse(chat.init.body)
@@ -171,4 +173,101 @@ test('Residency runtime preparation classifies unavailable provider readiness as
     /residency_exact_artifact_runtime_not_ready/,
   )
   assert.ok(healthCalls>=1)
+})
+
+
+test('Residency waits for exact application model readiness after provider worker readiness', async () => {
+  const {db}=artifactDb()
+  let readyCalls=0
+  let healthCalls=0
+  const port=createRunpodBuilderResidencyModelPort({
+    db,
+    apiKey:'secret',
+    readyTimeoutMs:1000,
+    provisionImpl:async()=>({
+      endpointId:'ep_residency_123',
+      endpointName:'residency-endpoint',
+      templateName:'residency-template',
+      modelName:'itmounts-resident-model',
+      baseUrl:'https://ep_residency_123.api.runpod.ai/v1',
+      createdTemplate:false,
+      createdEndpoint:false,
+      reboundTemplate:false,
+      workersMin:0,
+      workersMax:1,
+      idleTimeout:720,
+    }),
+    healthImpl:async()=>{
+      healthCalls+=1
+      return {
+        ok:true,
+        httpStatus:200,
+        jobs:{inProgress:0,inQueue:0,failed:0,completed:0},
+        workers:{idle:0,ready:1,running:1,initializing:0},
+        error:null,
+      }
+    },
+    sleepImpl:async()=>{},
+    fetchImpl:async(url:any)=>{
+      const value=String(url)
+      if(value.endsWith('/ping')) return new Response('',{status:200})
+      if(value.endsWith('/ready')){
+        readyCalls+=1
+        if(readyCalls===1) return new Response('',{status:204})
+        return new Response(JSON.stringify({
+          ready:true,
+          model:'itmounts-resident-model',
+        }),{status:200})
+      }
+      throw new Error('unexpected_fetch')
+    },
+  })
+
+  const prepared=await port.prepare!(identity)
+  assert.equal(prepared.exactArtifact,true)
+  assert.ok(healthCalls>=2)
+  assert.equal(readyCalls,2)
+})
+
+test('Residency rejects application readiness for a different model identity', async () => {
+  const {db}=artifactDb()
+  const port=createRunpodBuilderResidencyModelPort({
+    db,
+    apiKey:'secret',
+    readyTimeoutMs:25,
+    provisionImpl:async()=>({
+      endpointId:'ep_residency_123',
+      endpointName:'residency-endpoint',
+      templateName:'residency-template',
+      modelName:'itmounts-resident-model',
+      baseUrl:'https://ep_residency_123.api.runpod.ai/v1',
+      createdTemplate:false,
+      createdEndpoint:false,
+      reboundTemplate:false,
+      workersMin:0,
+      workersMax:1,
+      idleTimeout:720,
+    }),
+    healthImpl:async()=>({
+      ok:true,
+      httpStatus:200,
+      jobs:{inProgress:0,inQueue:0,failed:0,completed:0},
+      workers:{idle:0,ready:1,running:1,initializing:0},
+      error:null,
+    }),
+    sleepImpl:async()=>{},
+    fetchImpl:async(url:any)=>{
+      if(String(url).endsWith('/ping')) return new Response('',{status:200})
+      if(String(url).endsWith('/ready')) return new Response(JSON.stringify({
+        ready:true,
+        model:'wrong-model',
+      }),{status:200})
+      throw new Error('unexpected_fetch')
+    },
+  })
+
+  await assert.rejects(
+    ()=>port.prepare!(identity),
+    /residency_exact_artifact_runtime_not_ready:residency_exact_artifact_application_model_not_ready/,
+  )
 })

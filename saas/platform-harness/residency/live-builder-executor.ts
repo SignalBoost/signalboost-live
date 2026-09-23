@@ -44,6 +44,14 @@ export const BUILDER_RESIDENCY_NATIVE_CAPABILITIES=Object.freeze([
 ] as const)
 
 type NativeCapability=(typeof BUILDER_RESIDENCY_NATIVE_CAPABILITIES)[number]
+
+/**
+ * Keep Builder's model-round deadline strictly inside the provider abort deadline.
+ * BuilderToolLoop owns one bounded retry on builder_model_round_timeout; equal
+ * deadlines let AbortSignal win the race and bypass that retry.
+ */
+export const BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS=60_000
+export const BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS=70_000
 const READ_CAPS=new Set<NativeCapability>([
   'native.builder-residency.files.list',
   'native.builder-residency.file.read',
@@ -486,7 +494,7 @@ export function createLiveBuilderResidencyExecutor(input:{
         :createRunpodBuilderResidencyModelPort({
           db:input.db,
           apiKey:apiKey!,
-          timeoutMs:35_000,
+          timeoutMs:BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS,
           readyTimeoutMs:360_000,
         })
 
@@ -551,7 +559,7 @@ export function createLiveBuilderResidencyExecutor(input:{
             objective:call.practiceCase.objective,
             workspaceId,
             maxRounds:16,
-            modelRoundTimeoutMs:35_000,
+            modelRoundTimeoutMs:BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS,
             deadlineAtMs:
               Date.now()+Math.max(60_000,deadline-20_000),
             minimumStepMs:25_000,

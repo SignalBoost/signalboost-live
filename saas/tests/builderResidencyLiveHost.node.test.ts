@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   BUILDER_RESIDENCY_CASES,
+  BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS,
   BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
+  BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS,
   createBuilderResidencyHarnessRequest,
   createBuilderResidencyNativeAuthority,
   createLiveBuilderResidencyExecutor,
@@ -58,6 +60,13 @@ function scriptedModelPort():BuilderResidencyModelPort{
     },
   })
 }
+
+
+test('live Residency keeps provider abort outside Builder model-round timeout',()=>{
+  assert.ok(BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS>0)
+  assert.ok(BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS>BUILDER_RESIDENCY_MODEL_ROUND_TIMEOUT_MS)
+  assert.ok(BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS<240_000)
+})
 
 test('live Residency routes model-controlled edits and commands through Governed Socket',async()=>{
   const practiceCase=BUILDER_RESIDENCY_CASES.find(

@@ -185,7 +185,7 @@ export interface HarnessWorkerPort {
 /**
  * Shared live-worker runner for COS/Specialists/Builder.
  *
- * Provider Hub discovery is mandatory before the worker receives capabilities.
+ * Capability resolution is mandatory before the worker receives capabilities. The resolver may be Provider Hub, native host capabilities, or a bounded composition of both.
  * The worker cannot widen its manifest, and failure attribution belongs to the
  * independent trajectory verifier.
  */
@@ -218,8 +218,8 @@ export async function runHarnessWorker(input: {
   } catch {
     journal.append({
       kind: 'failure',
-      summary: 'Provider Hub capability discovery failed.',
-      data: { code: 'harness_provider_hub_discovery_failed' },
+      summary: 'Harness capability resolution failed.',
+      data: { code: 'harness_capability_resolution_failed' },
     })
     return {
       runId: input.manifest.runId,
@@ -227,7 +227,7 @@ export async function runHarnessWorker(input: {
       trajectory: journal.snapshot(),
       outcome: {
         status: 'harness_failure',
-        failureCode: 'harness_provider_hub_discovery_failed',
+        failureCode: 'harness_capability_resolution_failed',
       },
       authorityExpanded: false,
       productionMutationObserved: false,
@@ -237,7 +237,7 @@ export async function runHarnessWorker(input: {
   if (!resolution.satisfied) {
     journal.append({
       kind: 'failure',
-      summary: 'Required Provider Hub capability assignment is unavailable.',
+      summary: 'Required Harness capability is unavailable for this exact run.',
       data: {
         code: resolution.reason ?? 'harness_capability_unavailable',
         missing: [...resolution.missing],
@@ -258,7 +258,7 @@ export async function runHarnessWorker(input: {
 
   journal.append({
     kind: 'capability_resolved',
-    summary: 'Provider Hub resolved all Harness capabilities for the exact assignment.',
+    summary: 'Harness capability resolver bound all capabilities for the exact assignment.',
     data: { capabilityIds: Object.keys(resolution.resolved).sort() },
   })
 

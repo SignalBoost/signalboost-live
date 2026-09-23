@@ -51,6 +51,8 @@ export function createBuilderResidencyHarnessRequest(input: {
   sandboxEnvironmentId: string
   fixtureHash?: string
   limits?: HarnessLimits
+  /** Host-selected capability subset. Omit to use the broader governed Builder Residency catalog. */
+  requestedCapabilities?: readonly string[]
 }): HarnessRunRequest {
   return Object.freeze({
     runId: input.runId,
@@ -72,7 +74,7 @@ export function createBuilderResidencyHarnessRequest(input: {
       class: 'sandbox',
       ...(input.fixtureHash ? { fixtureHash: input.fixtureHash } : {}),
     }),
-    requestedCapabilities: BUILDER_RESIDENCY_CAPABILITIES,
+    requestedCapabilities: Object.freeze([...(input.requestedCapabilities ?? BUILDER_RESIDENCY_CAPABILITIES)]),
     requestedLimits: Object.freeze({
       maxToolCalls: 120,
       deadlineMs: 20 * 60_000,

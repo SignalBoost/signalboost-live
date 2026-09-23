@@ -127,7 +127,7 @@ test('browser repository repair is owned only by the shared Software Specialist 
   assert.match(browser, /const deployment = \{[\s\S]*commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA[\s\S]*branch: process\.env\.VERCEL_GIT_COMMIT_REF/)
   assert.match(browser, /tryCosSoftwareSpecialist/)
   assert.match(browser, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
-  assert.match(browser, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
+  assert.match(browser, /const shouldConsultSoftwareSpecialist = hasSourceAttachment \|\| explicitOperationalRepair/)
   assert.match(browser, /surface: 'assistant'/)
   assert.match(browser, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
   assert.match(browser, /surface: 'concierge', allowRepositoryRepair: false/)

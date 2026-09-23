@@ -16,6 +16,8 @@ export interface HarnessSelfHealingHandoff {
   authorityManifestRef: string
   failureCode: string
   evidenceRefs: readonly string[]
+  repairClass?: 'runpod_exact_artifact_runtime_recovery'
+  retryable?: boolean
 }
 
 function evidenceRefs(result: HarnessRunResult): readonly string[] {
@@ -36,5 +38,8 @@ export function createSelfHealingHandoff(
     authorityManifestRef: manifest.authorityManifestRef,
     failureCode: result.outcome.failureCode ?? 'harness_infrastructure_failure',
     evidenceRefs: evidenceRefs(result),
+    ...(/^residency_exact_artifact_runtime_not_ready(?::|$)/.test(result.outcome.failureCode??'') || /operation was aborted due to timeout/i.test(result.outcome.failureCode??'')
+      ? { repairClass:'runpod_exact_artifact_runtime_recovery' as const, retryable:true }
+      : {}),
   })
 }

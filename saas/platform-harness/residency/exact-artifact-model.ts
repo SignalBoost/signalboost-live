@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS } from '../../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
 export interface BuilderResidencyModelIdentity {
   candidateId:string
   artifactId:string
@@ -38,6 +39,7 @@ type ResidencyRuntimeArtifact=Readonly<{
   artifactRevision:string
   artifactHash:string
   runtimeKey?:string
+  idleTimeoutSeconds?:number
 }>
 
 type ResidencyProvisionedRuntime=Readonly<{
@@ -124,6 +126,7 @@ async function resolveResidencyArtifact(
     artifactRevision:revision,
     artifactHash,
     runtimeKey:runtimeKey(identity),
+    idleTimeoutSeconds:MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS,
   })
 }
 

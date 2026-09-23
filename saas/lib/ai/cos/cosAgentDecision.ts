@@ -7,7 +7,7 @@
 // or request the minimum capabilities required to finish. A capability request is intent, NEVER
 // authority: Referee/host policy still decides what may execute.
 
-import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
+import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv, type LocalModelToolDefinition } from '../local-inference.ts'
 import { extractBalancedJsonObject } from './reasonerOutput.ts'
 
 export const COS_AGENT_CAPABILITIES = [
@@ -41,6 +41,38 @@ export type CosAgentDecision =
     }>
 
 const CAPABILITY_SET = new Set<string>(COS_AGENT_CAPABILITIES)
+
+const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
+  live_web: 'Retrieve current or mutable public-world information before answering.',
+  conversation_history: 'Retrieve this signed-in user\'s past conversation context when it is materially required.',
+  internal_context: 'Retrieve private organization/project context available to the authenticated owner.',
+  platform_runtime: 'Read current host-verified COS/iTMounts runtime and model configuration for the authenticated owner.',
+  repository_read: 'Inspect the authorized repository or codebase before answering.',
+  software_specialist: 'Hand off real debugging, implementation, testing, or deployment work to the governed Software Specialist.',
+  external_action: 'Request an authorized action in an external system; host policy decides whether execution is allowed.',
+}
+
+function toolCatalog(input: { surface: 'assistant' | 'concierge'; ownerAuthenticated: boolean }): readonly LocalModelToolDefinition[] {
+  const allowed: readonly CosAgentCapability[] = input.surface === 'concierge'
+    ? ['live_web']
+    : input.ownerAuthenticated
+      ? COS_AGENT_CAPABILITIES
+      : ['live_web']
+  return Object.freeze(allowed.map(name => Object.freeze({
+    type: 'function' as const,
+    function: Object.freeze({
+      name,
+      description: CAPABILITY_DESCRIPTIONS[name],
+      parameters: Object.freeze({ type: 'object', properties: Object.freeze({}), additionalProperties: false }),
+    }),
+  })))
+}
+
+function turnReasonerLabel(turn: { provider: string; model: string }): string {
+  return turn.provider === 'runpod' || turn.provider === 'self_hosted'
+    ? `independent-local:${turn.model}`
+    : `managed-open-model:${turn.provider}:${turn.model}`
+}
 
 function confidence(value: unknown): number {
   const numeric = Number(value)
@@ -102,8 +134,69 @@ export async function decideCosAgentTurn(input: {
     ? Math.max(4_000, Math.min(15_000, Math.floor(configuredTimeout)))
     : 10_000
 
+  const tools = toolCatalog({ surface: input.surface, ownerAuthenticated: input.ownerAuthenticated })
+  const nativeTurn = await callLocalModelTurn({
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_native_tool_choice' },
+    temperature: 0.1,
+    maxTokens: 1_800,
+    disableThinking: true,
+    timeoutMs,
+    allowConfiguredFallback: false,
+    persistUsage: false,
+    tools,
+    toolChoice: 'auto',
+    systemPrompt: [
+      'You are the first-turn reasoning brain inside the COS agent runtime.',
+      'Answer the user completely now when stable model knowledge and supplied context are sufficient.',
+      'If information or action outside the model is materially required, call only the minimum function tools needed and do not answer yet.',
+      'A function call is a capability request, NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy.',
+      'Do not call tools merely because a topic is sophisticated. A conceptual software question that stable knowledge can answer needs no tool.',
+      'Current/future travel details such as transport, fares, opening hours, prices, availability, schedules, weather, or other mutable facts require live_web.',
+      'When answering directly, return ONLY strict JSON: {"mode":"answer","answer":"complete user-facing answer","confidence":0.0,"capabilities":[],"reason":"self_contained"}.',
+      input.surface === 'concierge'
+        ? 'This is public Concierge. Only the public-safe tools supplied by the host exist for this turn; never imply access to private owner capabilities.'
+        : input.ownerAuthenticated
+          ? 'This is the authenticated owner Assistant. You may request only tools actually supplied by the host; host authorization remains final.'
+          : 'This is Assistant without verified owner authority. Only the tools supplied by the host are available.',
+      input.language ? `Write a direct answer in the user language hint: ${input.language}.` : '',
+    ].filter(Boolean).join(' '),
+    prompt: [
+      input.previousAssistant?.trim()
+        ? `PRECEDING ASSISTANT TURN (conversation context only):\\n${input.previousAssistant.trim().slice(0, 5_000)}`
+        : '',
+      `CURRENT USER REQUEST:\\n${prompt}`,
+      'Answer directly or request the minimum tool capability now.',
+    ].filter(Boolean).join('\\n\\n'),
+  }, { ...config, timeoutMs }).catch(error => {
+    console.warn('[cos-agent-native-tools] unavailable', error instanceof Error ? error.message : String(error))
+    return null
+  })
+
+  if (nativeTurn?.toolCalls.length) {
+    const capabilities = [...new Set(nativeTurn.toolCalls
+      .map(call => String(call.function.name || '').trim())
+      .filter((name): name is CosAgentCapability => CAPABILITY_SET.has(name)))]
+    if (capabilities.length) {
+      return {
+        mode: 'orchestrate',
+        answer: '',
+        confidence: 1,
+        capabilities,
+        reason: 'native_tool_request',
+        reasonerLabel: turnReasonerLabel(nativeTurn),
+      }
+    }
+  }
+
+  if (nativeTurn?.content?.trim()) {
+    const direct = parseCosAgentDecision(nativeTurn.content, turnReasonerLabel(nativeTurn))
+    if (direct?.mode === 'answer') return direct
+  }
+
+  // Compatibility fallback for OpenAI-compatible endpoints that do not implement native tools.
+  // This is still one answer-or-plan model turn, never a classifier followed by another answer call.
   const raw = await callLocalModel({
-    usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_answer_or_capability_plan' },
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_answer_or_capability_plan_compat' },
     temperature: 0.1,
     maxTokens: 1_800,
     disableThinking: true,
@@ -119,34 +212,19 @@ export async function decideCosAgentTurn(input: {
       '{"mode":"orchestrate","answer":"","confidence":0.0,"capabilities":["live_web"],"reason":"brief reason"}',
       'Prefer mode=answer when the request is reliably answerable from the request itself, conversation context supplied here, and stable model knowledge. Do not request capabilities merely to improve wording or because the topic sounds sophisticated.',
       'Use mode=orchestrate whenever correctness materially depends on information or action unavailable inside the model.',
-      'Available capability names and meanings:',
-      '- live_web: mutable outside-world facts such as current/future schedules, transport, prices, opening hours, availability, weather, news, office holders, releases, or explicit research/verification.',
-      '- conversation_history: earlier user conversations or decisions are materially required.',
-      '- internal_context: private user/organization/project knowledge not present in this request is materially required.',
-      '- platform_runtime: current COS/iTMounts/SignalBoost runtime, model, provider, configuration, or host facts are required.',
-      '- repository_read: inspecting the real repository/codebase is required.',
-      '- software_specialist: real debugging, repair, implementation, testing, or deployment work is required.',
-      '- external_action: the user asks to change an outside system, for example send, publish, deploy, modify, delete, purchase, book, or cancel.',
-      'A conceptual coding/software question that stable knowledge can answer is mode=answer. Do not request software_specialist merely because software is mentioned.',
-      'Travel planning involving a current/future date plus transport, fares, opening hours, prices, availability, or other mutable details requires live_web.',
+      `Allowed capabilities for this turn: ${tools.map(tool => tool.function.name).join(', ')}.`,
       'A capability request is NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy before executing anything.',
-      'Never claim a capability was used or an external action occurred unless a later host/tool result establishes that.',
-      input.surface === 'concierge'
-        ? 'This is public Concierge. Never request or disclose owner-private platform_runtime, repository_read, internal_context, software repair authority, or external_action authority. If such private capability would be required, answer only what is safely answerable without it.'
-        : input.ownerAuthenticated
-          ? 'This is the authenticated owner Assistant. You may request owner capabilities, but host authorization remains final.'
-          : 'This is Assistant without verified owner authority. You may identify a capability need, but privileged capabilities may be denied.',
       input.language ? `Write a direct answer in the user language hint: ${input.language}.` : '',
     ].filter(Boolean).join(' '),
     prompt: [
       input.previousAssistant?.trim()
-        ? `PRECEDING ASSISTANT TURN (conversation context only):\n${input.previousAssistant.trim().slice(0, 5_000)}`
+        ? `PRECEDING ASSISTANT TURN (conversation context only):\\n${input.previousAssistant.trim().slice(0, 5_000)}`
         : '',
-      `CURRENT USER REQUEST:\n${prompt}`,
+      `CURRENT USER REQUEST:\\n${prompt}`,
       'Choose ANSWER or ORCHESTRATE now.',
-    ].filter(Boolean).join('\n\n'),
+    ].filter(Boolean).join('\\n\\n'),
   }, { ...config, timeoutMs }).catch(error => {
-    console.warn('[cos-agent-decision] unavailable', error instanceof Error ? error.message : String(error))
+    console.warn('[cos-agent-decision] compatibility fallback unavailable', error instanceof Error ? error.message : String(error))
     return null
   })
 

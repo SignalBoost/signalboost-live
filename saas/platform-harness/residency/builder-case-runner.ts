@@ -61,6 +61,7 @@ export async function runBuilderResidencyCase(input:{
   sandboxEnvironmentId:string
   authority:HarnessAuthorityEnvelope
   practiceCase:BuilderResidencyCase
+  requestedCapabilities?:readonly string[]
   executor:BuilderResidencyExactArtifactExecutor
   harnessEvidenceSink:HarnessEvidenceSink
   store:BuilderResidencyEvidenceStore
@@ -78,6 +79,7 @@ export async function runBuilderResidencyCase(input:{
     artifactHash:input.artifactHash,
     artifactRevision:input.artifactRevision,
     sandboxEnvironmentId:input.sandboxEnvironmentId,
+    requestedCapabilities:input.requestedCapabilities,
   })
   const policy=resolveHarnessManifest(request,input.authority)
   if(policy.allowed===false) return Object.freeze({ok:false,reason:'residency_manifest_rejected',blockers:policy.reasons})

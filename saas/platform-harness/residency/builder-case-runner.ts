@@ -69,7 +69,10 @@ export async function runBuilderResidencyCase(input:{
   now?:()=>Date
 }){
   const now=input.now??(()=>new Date())
-  // Every infrastructure retry is a distinct auditable attempt. Competency evidence remains\n  // unique by residency+competency+variant and is written only after pedagogical acceptance.\n  const attemptId=now().getTime().toString(36)\n  const runId=`residency:${input.residencyId}:${input.practiceCase.variantHash.slice(0,16)}:${attemptId}`
+  // Every infrastructure retry is a distinct auditable attempt. Competency evidence remains
+  // unique by residency+competency+variant and is written only after pedagogical acceptance.
+  const attemptId=now().getTime().toString(36)
+  const runId=`residency:${input.residencyId}:${input.practiceCase.variantHash.slice(0,16)}:${attemptId}`
   const request=createBuilderResidencyHarnessRequest({
     runId,
     objective:input.practiceCase.objective,

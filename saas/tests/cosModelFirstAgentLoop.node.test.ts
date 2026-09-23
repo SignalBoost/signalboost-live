@@ -73,3 +73,21 @@ test('current platform runtime facts stay host-verified rather than model-guesse
   assert.match(browser, /!isPlatformSelfKnowledgePrompt\(prompt\)/)
   assert.match(primary, /if\(access\?\.isOwner&&isPlatformSelfKnowledgePrompt\(input\)\)/)
 })
+
+
+test('first semantic decision prefers native function tools and keeps JSON planning only as compatibility fallback', () => {
+  assert.match(decision, /callLocalModelTurn/)
+  assert.match(decision, /toolChoice: 'auto'/)
+  assert.match(decision, /purpose: 'agent_native_tool_choice'/)
+  assert.match(decision, /nativeTurn\?\.toolCalls\.length/)
+  assert.match(decision, /reason: 'native_tool_request'/)
+  assert.match(decision, /Compatibility fallback for OpenAI-compatible endpoints that do not implement native tools/)
+  const nativeAt = decision.indexOf('callLocalModelTurn({')
+  const compatAt = decision.indexOf("purpose: 'agent_answer_or_capability_plan_compat'", nativeAt)
+  assert.ok(nativeAt > 0 && compatAt > nativeAt)
+})
+
+test('public Concierge receives only the public-safe live_web native capability', () => {
+  assert.match(decision, /input\.surface === 'concierge'\s*\? \['live_web'\]/)
+  assert.match(decision, /input\.ownerAuthenticated\s*\? COS_AGENT_CAPABILITIES/)
+})

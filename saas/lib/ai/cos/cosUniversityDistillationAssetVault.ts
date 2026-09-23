@@ -238,3 +238,53 @@ export async function persistDistillationAssetVault(
     semantics: 'durable_itmounts_model_neutral_distillation_asset_copy' as const,
   })
 }
+
+export async function readDistillationAssetsBySourceRef(sourceRefInput: unknown, dbOverride?: any) {
+  const sourceRef = textValue(sourceRefInput, 2000)
+  if (!sourceRef) throw new Error('distillation_asset_source_ref_missing')
+  const db = dbOverride || cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+
+  const setResult = await db.from('cos_university_distillation_asset_sets')
+    .select('asset_set_key,source_dataset_hash,portable_manifest_hash,source_item_hashes,portable_content_hashes,item_count')
+    .eq('source_ref', sourceRef)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (setResult.error) throw setResult.error
+  const set: any = setResult.data
+  if (!set) throw new Error('distillation_asset_set_missing')
+
+  const rowResult = await db.from('cos_university_distillation_assets')
+    .select('prompt_id,prompt_text,response_text,training_text,source_item_hash,portable_content_hash,teacher_provider,teacher_model_id,teacher_model_revision')
+    .eq('asset_set_key', set.asset_set_key)
+    .order('prompt_id', { ascending: true })
+    .limit(5000)
+  if (rowResult.error) throw rowResult.error
+  const rows = rowResult.data || []
+  if (rows.length !== Number(set.item_count)) throw new Error('distillation_asset_set_incomplete')
+
+  const sourceHashes = rows.map((row: any) => textValue(row.source_item_hash, 64).toLowerCase()).sort()
+  const portableHashes = rows.map((row: any) => textValue(row.portable_content_hash, 64).toLowerCase()).sort()
+  if (manifestHash(sourceHashes) !== textValue(set.source_dataset_hash, 64).toLowerCase()
+    || manifestHash(portableHashes) !== textValue(set.portable_manifest_hash, 64).toLowerCase()) {
+    throw new Error('distillation_asset_set_manifest_mismatch')
+  }
+
+  return Object.freeze({
+    assetSetKey: textValue(set.asset_set_key, 64).toLowerCase(),
+    sourceDatasetHash: textValue(set.source_dataset_hash, 64).toLowerCase(),
+    portableManifestHash: textValue(set.portable_manifest_hash, 64).toLowerCase(),
+    rows: Object.freeze(rows.map((row: any) => Object.freeze({
+      promptId: textValue(row.prompt_id, 160),
+      prompt: textValue(row.prompt_text, 100_000),
+      response: textValue(row.response_text, 100_000),
+      text: textValue(row.training_text, 250_000),
+      itemHash: textValue(row.source_item_hash, 64).toLowerCase(),
+      teacherProvider: textValue(row.teacher_provider, 80).toLowerCase(),
+      teacherModelId: textValue(row.teacher_model_id, 240),
+      teacherModelRevision: textValue(row.teacher_model_revision, 120).toLowerCase() || null,
+    }))),
+  })
+}
+

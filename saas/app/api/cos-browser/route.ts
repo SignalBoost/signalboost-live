@@ -33,6 +33,7 @@ import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { answerSimpleKnowledgeQuestion, isSimpleKnowledgeQuestion } from '@/lib/ai/cos/simpleKnowledgeFastPath'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -154,31 +155,61 @@ export async function POST(req: NextRequest) {
   const ingressStartedAt = Date.now()
   let semanticIdentityInvoked = false
   let semanticVisualInvoked = false
+  const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
+  const hasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
+
+  // Stable one-line facts do not need COS orchestration. Keep this ahead of auth, semantic
+  // classifiers, memory, retrieval, specialists and tools so a public user is not forced to spend
+  // the response budget on machinery that cannot improve "What is the capital of Portugal?".
+  // A positive classification owns the turn: provider failure returns quickly rather than silently
+  // falling through into the long agent path and violating the interactive latency contract.
+  if (!hasAttachments && isSimpleKnowledgeQuestion(prompt)) {
+    const answer = await answerSimpleKnowledgeQuestion(prompt)
+    if (!answer) {
+      return NextResponse.json({
+        ok: false,
+        error: 'simple_knowledge_fast_path_unavailable',
+        reply: 'I could not complete that quick factual answer within the fast-response budget. Please try again.',
+        source: 'cos-simple-knowledge-fast',
+        local_model_invoked: true,
+        execution_allowed: false,
+        external_action_taken: false,
+      }, { status: 503, headers: { 'Retry-After': '1' } })
+    }
+    const response = NextResponse.json({
+      ok: true,
+      reply: answer,
+      source: 'cos-simple-knowledge-fast',
+      local_model_invoked: true,
+      execution_allowed: false,
+      external_action_taken: false,
+      latency_profile: 'under-10s-simple-knowledge',
+    })
+    return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
+  }
 
   // Explicit text transformations are fully scoped by the user's command and supplied source.
   // They require no identity/visual/software classification and no privileged authority. Execute
   // the bounded editor immediately on BOTH Concierge and Assistant so the homepage cannot spend
   // ~30 seconds on unrelated semantic classifiers before the edit model call.
   const directTextTransformation = detectDirectTextTransformation(prompt)
-  const directTextHasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
+  const directTextHasAttachments = hasAttachments
   if (directTextTransformation && !directTextHasAttachments) {
     // There is one editor capability, inside canonical COS. Browser ingress must never run a
     // competing editor and fail the turn before COS gets a chance to use its proven fast lane.
     const directAccess = await getAccess().catch(() => null)
     const directAuditUserId = directAccess?.userId ?? null
-    const directSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
     const executeDirect = () => cosPrimaryPost(req)
-    const response = directAccess?.isOwner && directSurface === 'assistant'
+    const response = directAccess?.isOwner && browserSurface === 'assistant'
       ? await executeDirect()
       : await withPublicAuditIdentity(directAuditUserId, () => withPublicDeliveryScope(() => executeDirect()))
-    return directSurface === 'concierge'
+    return browserSurface === 'concierge'
       ? publicConciergePresentation(response)
       : response
   }
 
   const access = await getAccess().catch(() => null)
   const auditUserId = access?.userId ?? null
-  const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
   const routingContext = builderRoutingContextFromBody(body)
 

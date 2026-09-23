@@ -700,20 +700,26 @@ export async function postCosPrimary(req:NextRequest){
     const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)
     if(!requestedAction&&liveTravelTask){
       freshLocalAttempted=true
-      freshLocalModel=localReasonerLabel()
-      const groundedTask=await runFreshGroundedTaskCompletion(lookupInput,language,freshSources)
-      if(groundedTask){
-        freshLocalModel=groundedTask.reasonerLabel
-        const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:groundedTask.reasonerLabel,confidence:groundedTask.confidence,accepted:true})
+      const travelDeclines:string[]=[]
+      const travelPlan=await runTravelPlanAssumptionRescue(lookupInput,language,freshSources,travelDeclines)
+      if(travelPlan){
+        freshLocalModel=travelPlan.reasonerLabel
+        const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:travelPlan.reasonerLabel,confidence:travelPlan.confidence,accepted:true})
         const executionProvenance=attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true})
-        ;Object.assign(executionProvenance as any,{policy:'fresh_live_data_grounded_task',assistant_text_used_for_resolution:false})
-        ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:groundedTask.reasonerLabel,grounded_at:freshRetrievedAt}
-        logEscalation({event:'fresh_grounded_task_completed',documents_acquired:freshSources.length,reasoner:groundedTask.reasonerLabel,strict_failure_code:null,external_ai_invoked:false,local_model_invoked:true})
-        const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:groundedTask.reply,source:'local_cos_reasoning',confidence:groundedTask.confidence,provenance:freshTelemetryProvenance(true,groundedTask.reasonerLabel),externalAiInvoked:false})
-        await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
-        return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+        ;Object.assign(executionProvenance as any,{policy:'travel_plan_fast_grounded',assistant_text_used_for_resolution:false})
+        ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:travelPlan.reasonerLabel,grounded_at:freshRetrievedAt}
+        logEscalation({event:'travel_plan_fast_completed',documents_acquired:freshSources.length,reasoner:travelPlan.reasonerLabel,external_ai_invoked:false,local_model_invoked:true})
+        const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:travelPlan.reply,source:'local_cos_reasoning',confidence:travelPlan.confidence,provenance:freshTelemetryProvenance(true,travelPlan.reasonerLabel),externalAiInvoked:false})
+        await writeCosPrimaryProvenance(userId,travelPlan.reply,executionProvenance,'cos-travel-plan-fast-grounded',{prompt:lookupInput,answered:true,confidence:travelPlan.confidence,branch:'travel_plan_fast_grounded'})
+        return NextResponse.json({ok:true,reply:travelPlan.reply,source:'cos-travel-plan-fast-grounded',confidence_score:travelPlan.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
       }
-      logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,fallthrough:'shared_local_synthesizer'})
+      const reply=language==='pl'
+        ? 'Nie udało mi się ukończyć planu podróży w szybkim limicie odpowiedzi. Nie potrzebuję od Ciebie dodatkowych informacji — spróbuj ponownie, a użyję tych samych podanych założeń.'
+        : 'I could not complete the travel plan within the fast-response budget. I do not need any additional input from you—retry and I will use the same constraints you already provided.'
+      logEscalation({event:'travel_plan_fast_declined',documents_acquired:freshSources.length,declines:travelDeclines,external_ai_invoked:false,local_model_invoked:true})
+      const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:'Fast grounded travel synthesis did not complete inside the bounded interactive budget.',synthesisAccepted:false})
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-travel-plan-fast-unavailable',{prompt:lookupInput,answered:false,confidence:0,branch:'travel_plan_fast_unavailable'})
+      return NextResponse.json({ok:false,reply,error:reply,source:'cos-travel-plan-fast-unavailable',confidence_score:0,external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),execution_allowed:false,external_action_taken:false},{status:503})
     }
 
     if(!requestedAction){

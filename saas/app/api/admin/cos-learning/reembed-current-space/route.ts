@@ -3,6 +3,7 @@ import { requireOwner } from '@/lib/auth/access'
 import { embeddingModelName } from '@/lib/ai/cos/embeddingEndpoint'
 import { backfillKnowledgeFactEmbeddings } from '@/lib/ai/cos/knowledgeFactSemantic'
 import { backfillLearnedCorpusEmbeddings, getLearnedCorpusEmbeddingStats } from '@/lib/ai/cos/learnedCorpusSemantic'
+import { backfillCreativeMemoryEmbeddings } from '@/lib/ai/cos/creativeMemory'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,14 +35,18 @@ export async function GET() {
   let corpusEmbedded = 0
   let corpusFailed = 0
   let corpusRemaining: number | null = null
+  let creativeAttempted = 0
+  let creativeEmbedded = 0
+  let creativeFailed = 0
   let rounds = 0
   const errors: string[] = []
 
   try {
     for (let index = 0; index < MAX_ROUNDS; index += 1) {
-      const [facts, corpus] = await Promise.all([
+      const [facts, corpus, creative] = await Promise.all([
         backfillKnowledgeFactEmbeddings(BATCH_SIZE),
         backfillLearnedCorpusEmbeddings(BATCH_SIZE),
+        backfillCreativeMemoryEmbeddings(BATCH_SIZE),
       ])
       rounds += 1
       factAttempted += facts.attempted
@@ -52,24 +57,28 @@ export async function GET() {
       corpusEmbedded += corpus.embedded
       corpusFailed += corpus.failed
       corpusRemaining = corpus.remaining
+      creativeAttempted += creative.attempted
+      creativeEmbedded += creative.embedded
+      creativeFailed += creative.failed
       if (facts.error) errors.push(`facts:${facts.error}`)
       if (corpus.error) errors.push(`corpus:${corpus.error}`)
 
-      if (facts.remaining === 0 && corpus.remaining === 0) break
-      if (facts.attempted === 0 && corpus.attempted === 0) break
-      if (facts.embedded === 0 && corpus.embedded === 0) break
+      if (facts.remaining === 0 && corpus.remaining === 0 && creative.attempted === 0) break
+      if (facts.attempted === 0 && corpus.attempted === 0 && creative.attempted === 0) break
+      if (facts.embedded === 0 && corpus.embedded === 0 && creative.embedded === 0) break
     }
 
     const corpusStats = await getLearnedCorpusEmbeddingStats()
     corpusRemaining = corpusStats.pending
     const completed = factRemaining === 0 && corpusRemaining === 0
-    const ok = completed && factFailed === 0 && corpusFailed === 0
+    const ok = completed && factFailed === 0 && corpusFailed === 0 && creativeFailed === 0
 
     return NextResponse.json({
       ok,
       completed,
       embeddingModel: model,
       facts: { attempted: factAttempted, embedded: factEmbedded, failed: factFailed, remaining: factRemaining },
+      creativeMemory: { attempted: creativeAttempted, embedded: creativeEmbedded, failed: creativeFailed },
       corpus: {
         attempted: corpusAttempted,
         embedded: corpusEmbedded,
@@ -92,6 +101,7 @@ export async function GET() {
       embeddingModel: model,
       facts: { attempted: factAttempted, embedded: factEmbedded, failed: factFailed, remaining: factRemaining },
       corpus: { attempted: corpusAttempted, embedded: corpusEmbedded, failed: corpusFailed, remaining: corpusRemaining },
+      creativeMemory: { attempted: creativeAttempted, embedded: creativeEmbedded, failed: creativeFailed },
       rounds,
       durationMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : String(error),

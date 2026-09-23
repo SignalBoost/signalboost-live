@@ -177,3 +177,18 @@ The next Residency workstream is therefore to add distinct, rights-safe practica
 remaining competencies, especially Vercel recovery, Supabase diagnosis, Playwright verification,
 Chrome DevTools evidence, rollback judgment, MCP recovery, security/authority compliance, repository
 navigation, TypeScript/Next.js repair, and cross-specialist escalation.
+
+
+## Residency final-evaluation handoff
+
+For Builder / Computer Science artifacts, `evaluation_pending` means the artifact is trained and eligible
+for practical Residency, not yet eligible for final evaluation. The database claim boundary now requires
+the exact candidate + artifact hash to have a durable `residency_complete` enrollment before either the
+final runtime-canary or independent-evaluation lane may claim it.
+
+A canary that passed before Residency completion is educationally stale for graduation purposes. The
+final evaluator therefore requires a fresh exact-artifact canary whose evidence timestamp is at or after
+the Residency enrollment's `completed_at`.
+
+This gate is scoped to Computer Science & Coding. Other subjects keep their existing evaluation flow.
+The change does not grant promotion, graduation, Production traffic, or wider authority.

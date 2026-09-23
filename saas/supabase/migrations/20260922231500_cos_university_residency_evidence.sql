@@ -48,8 +48,7 @@ create table if not exists public.cos_university_residency_case_runs (
   completed_at timestamptz,
   metadata jsonb not null default '{}'::jsonb check (jsonb_typeof(metadata) = 'object'),
   created_at timestamptz not null default now(),
-  unique (residency_id, run_id),
-  unique (residency_id, competency_id, variant_hash)
+  unique (residency_id, run_id)
 );
 
 create table if not exists public.cos_university_residency_competency_evidence (

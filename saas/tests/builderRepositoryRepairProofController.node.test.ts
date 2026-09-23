@@ -85,7 +85,7 @@ test('repository proof selection preserves the exact build and narrows explicit 
   assert.equal(repositoryRepairProofCommand({
     pathHints: [],
     failedCommand: 'node scripts/vercel-cos-gates.mjs && npm run prebuild && next build',
-  }), 'node scripts/vercel-cos-gates.mjs && npm run prebuild && next build')
+  }), 'node scripts/vercel-cos-gates.mjs && npm run prebuild && npm exec -- next build')
 
   assert.equal(repositoryRepairProofCommand({
     pathHints: ['saas/tests/builderToolLoop.node.test.ts'],

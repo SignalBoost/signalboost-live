@@ -28,10 +28,10 @@
 /** `[CL1]`, `[CL 12]`, `[LIVE3]`, and en-dash ranges such as `[CL1–CL6]`. */
 // Every marker family minted into COS prompts, verified against the codebase rather than guessed:
 // CL (learned corpus), LIVE (live search), KG (knowledge graph), EM / OEM (enterprise and
-// organization memory), UM (user memory), SK (cognitive skills), MEMBER (org member records).
+// organization memory), UM (user memory), SK (cognitive skills), CM (creative memory), MEMBER (org member records).
 // OEM was missing from the first version of this guard and leaked to a user on 2026-08-22 —
 // keep this list in sync with the prompt builders; a family absent here is a family that leaks.
-const MARKER_FAMILY = '(?:OEM|MEMBER|LIVE|CL|KG|EM|UM|SK)'
+const MARKER_FAMILY = '(?:OEM|MEMBER|LIVE|CL|KG|EM|UM|SK|CM)'
 const EVIDENCE_MARKER = new RegExp(`\\[\\s*${MARKER_FAMILY}\\s*\\d+(?:\\s*[–—-]\\s*${MARKER_FAMILY}?\\s*\\d+)?\\s*\\]`, 'gi')
 
 /** Sentences that talk ABOUT the prompt's evidence block rather than answering the question. */

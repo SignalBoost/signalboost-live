@@ -42,6 +42,10 @@ export type CosAgentDecision =
 
 const CAPABILITY_SET = new Set<string>(COS_AGENT_CAPABILITIES)
 
+function isCosAgentCapability(value: string): value is CosAgentCapability {
+  return CAPABILITY_SET.has(value)
+}
+
 const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   live_web: 'Retrieve current or mutable public-world information before answering.',
   conversation_history: 'Retrieve this signed-in user\'s past conversation context when it is materially required.',
@@ -175,7 +179,7 @@ export async function decideCosAgentTurn(input: {
   if (nativeTurn?.toolCalls.length) {
     const capabilities = [...new Set(nativeTurn.toolCalls
       .map(call => String(call.function.name || '').trim())
-      .filter((name): name is CosAgentCapability => CAPABILITY_SET.has(name)))]
+      .filter(isCosAgentCapability))]
     if (capabilities.length) {
       return {
         mode: 'orchestrate',

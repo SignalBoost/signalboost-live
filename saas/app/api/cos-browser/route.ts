@@ -34,6 +34,7 @@ import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationa
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
+import { isPlatformSelfKnowledgePrompt } from '@/lib/ai/cos/cosFreshnessPolicy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -403,7 +404,7 @@ export async function POST(req: NextRequest) {
   // request before optional capability routing. It either answers directly or asks the COS host for
   // the minimum capabilities it needs. Capability requests never grant authority; the host still
   // enforces owner/public boundaries before executing anything.
-  const agentDecision = !operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair
+  const agentDecision = !operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt)
     ? await decideCosAgentTurn({
         prompt,
         previousAssistant: priorAnswer || null,

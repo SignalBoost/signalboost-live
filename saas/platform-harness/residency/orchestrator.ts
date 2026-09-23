@@ -98,6 +98,12 @@ export async function runBuilderResidencyOrchestrator(input:{
   harnessEvidenceSink:HarnessEvidenceSink
   authorityFor(enrollment:BuilderResidencyEnrollment):Promise<HarnessAuthorityEnvelope>
   requestedCapabilities?:readonly string[]
+  repairInfrastructure?:(input:{
+    runId:string
+    candidateId:string
+    artifactHash:string
+    failureCode:string
+  })=>Promise<unknown>
   now?:()=>Date
 }){
   const enrollment=await input.store.nextEnrollment()
@@ -167,6 +173,37 @@ export async function runBuilderResidencyOrchestrator(input:{
     now:input.now,
   })
 
+  let selfHealing:unknown=null
+  if(!execution.ok&&input.repairInfrastructure){
+    const executionObject=execution as {
+      result?:{
+        runId?:string
+        outcome?:{status?:string;failureCode?:string}
+      }
+    }
+    const result=executionObject.result
+    const failureCode=String(result?.outcome?.failureCode??'').trim()
+    if(result?.outcome?.status==='infrastructure_failure'&&failureCode){
+      try{
+        selfHealing=await input.repairInfrastructure({
+          runId:String(result.runId||'').trim()||`residency:${enrollment.residencyId}`,
+          candidateId:enrollment.candidateId,
+          artifactHash:enrollment.artifactHash,
+          failureCode,
+        })
+      }catch(error){
+        selfHealing=Object.freeze({
+          attempted:true,
+          completed:false,
+          failureCode,
+          message:error instanceof Error?error.message:'residency_self_healing_actuation_failed',
+          authorityExpanded:false,
+          productionTrafficAuthorized:false,
+        })
+      }
+    }
+  }
+
   const afterEvidence=await input.store.readEvidence(enrollment.residencyId)
   const after=assessBuilderResidency(afterEvidence)
   await input.store.refreshAssessment(enrollment.residencyId)
@@ -181,6 +218,7 @@ export async function runBuilderResidencyOrchestrator(input:{
       variantHash:practiceCase.variantHash,
     }),
     execution,
+    ...(selfHealing?{selfHealing}:{}),
     assessment:after,
     coverage,
     automaticFinalGateEnable:false as const,

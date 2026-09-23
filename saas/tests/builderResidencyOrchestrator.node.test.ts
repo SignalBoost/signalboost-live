@@ -130,13 +130,11 @@ function successfulResult(runId:string):HarnessRunResult{
 
 const sink:HarnessEvidenceSink={async append(){}}
 
-test('coverage reports the real practical curriculum gap',()=>{
+test('coverage reports the complete Builder Residency v1 practical catalog',()=>{
   const coverage=assessBuilderResidencyCaseCoverage()
   assert.equal(coverage.totalCompetencies,13)
-  assert.equal(coverage.coveredCompetencies,3)
-  assert.equal(coverage.missingCompetencies.length,10)
-  assert.ok(coverage.missingCompetencies.includes('vercel_deployment_recovery'))
-  assert.ok(coverage.missingCompetencies.includes('chrome_devtools_evidence'))
+  assert.equal(coverage.coveredCompetencies,13)
+  assert.deepEqual(coverage.missingCompetencies,[])
 })
 
 test('case selection prioritizes remediation before untouched competency',()=>{
@@ -224,4 +222,82 @@ test('Builder Residency practical catalog covers every v1 competency without cla
   assert.deepEqual(coverage.missingCompetencies,[])
   assert.equal(new Set(BUILDER_RESIDENCY_CASES.map(item=>item.competencyId)).size,13)
   assert.equal(new Set(BUILDER_RESIDENCY_CASES.map(item=>item.variantHash)).size,BUILDER_RESIDENCY_CASES.length)
+})
+
+
+test('scheduler hands infrastructure failure to Self-Healing without creating competency evidence',async()=>{
+  const mem=memoryStore()
+  const repairs:any[]=[]
+  const executor:BuilderResidencyExactArtifactExecutor={
+    async run(input){
+      return {
+        runId:input.request.runId,
+        profile:'residency',
+        trajectory:[],
+        outcome:{
+          status:'infrastructure_failure',
+          verifierRef:'host://builder-residency-independent-proof-v1',
+          failureCode:'residency_exact_artifact_runtime_not_ready:network',
+        },
+        authorityExpanded:false,
+        productionMutationObserved:false,
+      }
+    },
+  }
+  const out=await runBuilderResidencyOrchestrator({
+    store:mem.store,
+    executor,
+    harnessEvidenceSink:sink,
+    authorityFor:async()=>authority,
+    repairInfrastructure:async input=>{
+      repairs.push(input)
+      return {
+        attempted:true,
+        completed:true,
+        failureCode:input.failureCode,
+        authorityExpanded:false,
+        productionTrafficAuthorized:false,
+      }
+    },
+    now:()=>new Date('2026-09-23T12:30:00Z'),
+  })
+
+  assert.equal(out.ok,false)
+  assert.equal(out.state,'case_not_completed')
+  assert.equal(repairs.length,1)
+  assert.equal(repairs[0].failureCode,'residency_exact_artifact_runtime_not_ready:network')
+  assert.equal(mem.competency.length,0)
+  assert.equal((out as any).selfHealing.completed,true)
+})
+
+test('scheduler does not invoke infrastructure repair for competency failure',async()=>{
+  const mem=memoryStore()
+  let repairs=0
+  const executor:BuilderResidencyExactArtifactExecutor={
+    async run(input){
+      return {
+        runId:input.request.runId,
+        profile:'residency',
+        trajectory:[],
+        outcome:{
+          status:'agent_failure',
+          verifierRef:'host://builder-residency-independent-proof-v1',
+          failureCode:'wrong_diagnosis',
+        },
+        authorityExpanded:false,
+        productionMutationObserved:false,
+      }
+    },
+  }
+  await runBuilderResidencyOrchestrator({
+    store:mem.store,
+    executor,
+    harnessEvidenceSink:sink,
+    authorityFor:async()=>authority,
+    repairInfrastructure:async()=>{
+      repairs+=1
+      return {}
+    },
+  })
+  assert.equal(repairs,0)
 })

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 
-import { callLocalModel, checkLocalInferenceHealth, localInferenceConfigFromEnv } from '../lib/ai/local-inference.ts'
+import { callLocalModel, callLocalModelTurn, checkLocalInferenceHealth, localInferenceConfigFromEnv } from '../lib/ai/local-inference.ts'
 
 const originalEnv = { ...process.env }
 const originalFetch = globalThis.fetch
@@ -257,4 +257,67 @@ test('health check verifies the configured served model', async () => {
   globalThis.fetch = (async () => new Response(JSON.stringify({ data: [{ id: 'signalboost-local-brain' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch
   const health = await checkLocalInferenceHealth({ baseUrl: 'http://127.0.0.1:8000/v1', model: 'signalboost-local-brain', timeoutMs: 5000 })
   assert.deepEqual(health, { ok: true, model: 'signalboost-local-brain' })
+})
+
+
+test('native tool calling sends OpenAI-compatible tools and accepts a tool-only assistant turn', async () => {
+  let observedBody: any = null
+  globalThis.fetch = (async (_input, init) => {
+    observedBody = JSON.parse(String(init?.body))
+    return Response.json({
+      choices: [{
+        finish_reason: 'tool_calls',
+        message: {
+          content: null,
+          tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'web_search', arguments: '{"query":"Amsterdam train fare"}' } }],
+        },
+      }],
+      usage: { prompt_tokens: 25, completion_tokens: 8, total_tokens: 33 },
+    })
+  }) as typeof fetch
+
+  const tools = [{ type: 'function' as const, function: {
+    name: 'web_search',
+    description: 'Search current public information.',
+    parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'], additionalProperties: false },
+  }}]
+  const result = await callLocalModelTurn({
+    prompt: 'Plan my Amsterdam layover.',
+    tools,
+    toolChoice: 'auto',
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_first_turn' },
+  }, { baseUrl: 'http://localhost/v1', model: 'qwen3:30b', timeoutMs: 5000 })
+
+  assert.equal(result?.content, null)
+  assert.equal(result?.finishReason, 'tool_calls')
+  assert.equal(result?.toolCalls.length, 1)
+  assert.equal(result?.toolCalls[0].function.name, 'web_search')
+  assert.equal(observedBody.tool_choice, 'auto')
+  assert.deepEqual(observedBody.tools, tools)
+  assert.equal(observedBody.response_format, undefined)
+})
+
+test('native tool loop preserves assistant tool calls and host tool results on the next model turn', async () => {
+  let observedBody: any = null
+  globalThis.fetch = (async (_input, init) => {
+    observedBody = JSON.parse(String(init?.body))
+    return Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'Take the train to Amsterdam Centraal.' } }] })
+  }) as typeof fetch
+
+  const call = { id: 'call_1', type: 'function' as const, function: { name: 'web_search', arguments: '{"query":"Schiphol train"}' } }
+  const result = await callLocalModelTurn({
+    prompt: 'Plan my Amsterdam layover.',
+    tools: [{ type: 'function', function: { name: 'web_search', parameters: { type: 'object' } } }],
+    messages: [
+      { role: 'user', content: 'Plan my Amsterdam layover.' },
+      { role: 'assistant', content: null, tool_calls: [call] },
+      { role: 'tool', tool_call_id: 'call_1', content: '{"ok":true,"results":[{"title":"NS","url":"https://www.ns.nl"}]}' },
+    ],
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_tool_result' },
+  }, { baseUrl: 'http://localhost/v1', model: 'qwen3:30b', timeoutMs: 5000 })
+
+  assert.equal(result?.content, 'Take the train to Amsterdam Centraal.')
+  assert.equal(observedBody.messages[2].role, 'assistant')
+  assert.equal(observedBody.messages[3].role, 'tool')
+  assert.equal(observedBody.messages[3].tool_call_id, 'call_1')
 })

@@ -179,7 +179,7 @@
     },
     {
       "path": "/api/cron/cos-knowledge-promotion",
-      "schedule": "15 7 * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/cos-learning-indexer",

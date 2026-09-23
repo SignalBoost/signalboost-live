@@ -23,7 +23,8 @@ export type SignalBoostRepositoryRepairTarget = Readonly<{
 
 const CLONE_LINE = /Cloning\s+(?:https?:\/\/)?github\.com\/SignalBoost\/signalboost-live(?:\.git)?\s*\(Branch:\s*([^,\r\n]+),\s*Commit:\s*([0-9a-f]{7,40})\)/i
 const SAFE_BRANCH = /^(?![-/])(?!.*(?:\.\.|\/\/))[A-Za-z0-9._/-]{1,180}$/
-const SOURCE_PATH = /(?:\.\/([A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+)|(saas\/[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+))(?::\d+(?::\d+)?)?/g
+const SOURCE_PATH = /(?:\.\/([A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+)|(saas\/[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+))(?:(?::\d+(?::\d+)?)|(?:\(\d+,\d+\)))?/g
+const PROJECT_ROOT_DIAGNOSTIC_PATH = /\b((?:app|lib|tests|test|scripts|components|hooks|types|locales|supabase)\/[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+)(?:(?::\d+(?::\d+)?)|(?:\(\d+,\d+\)))/g
 const TEST_PATH = /\b((?:tests|test)\/[A-Za-z0-9_@.+/-]+\.test\.(?:ts|tsx|js|mjs|cjs|mts|cts))(?::\d+(?::\d+)?)?/gi
 const MAX_FAILURE_EVIDENCE = 40
 const EXPLICIT_PLATFORM_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\b|(?:^|[\n.!?]\s*)(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\s+(?:is\s+|keeps?\s+)?(?:broken|failing|not\s+working)\b/i
@@ -83,6 +84,18 @@ function sourcePaths(input: string): readonly string[] {
     // Keep test paths only when the final failing-test section identifies them explicitly.
     if (/^saas\/(?:tests|test)\//i.test(normalized) && !failingTests.has(normalized)) continue
     paths.push(normalized)
+  }
+  // Next/TypeScript may report project-root diagnostics without "./" or "saas/" and use
+  // file(line,column), e.g. lib/ai/cos/cosAgentDecision.ts(184,9). Those are real repair
+  // targets in the mounted saas workspace and must not fall through to package-file defaults.
+  for (const line of normalizedLogLines(input)) {
+    for (const match of line.matchAll(PROJECT_ROOT_DIAGNOSTIC_PATH)) {
+      const path = match[1]
+      if (!path) continue
+      const normalized = `saas/${path}`
+      if (/^saas\/(?:tests|test)\//i.test(normalized) && !failingTests.has(normalized)) continue
+      paths.push(normalized)
+    }
   }
   return unique(paths, 32)
 }

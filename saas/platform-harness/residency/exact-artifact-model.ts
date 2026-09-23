@@ -1,11 +1,5 @@
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import {
-  massDistilledRuntimeHealth,
-  provisionMassDistilledRuntime,
-  type MassDistilledRuntimeArtifact,
-} from '../../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
-
 export interface BuilderResidencyModelIdentity {
   candidateId:string
   artifactId:string
@@ -36,6 +30,32 @@ const REVISION=/^[a-f0-9]{40}$/
 const READY_TIMEOUT_MS=360_000
 const READY_POLL_MS=3_000
 const WAKE_TIMEOUT_MS=20_000
+
+type ResidencyRuntimeArtifact=Readonly<{
+  candidateId:string
+  subjectId:string
+  artifactId:string
+  artifactRevision:string
+  artifactHash:string
+  runtimeKey?:string
+}>
+
+type ResidencyProvisionedRuntime=Readonly<{
+  endpointId:string
+  modelName:string
+  baseUrl:string
+  [key:string]:unknown
+}>
+
+type ResidencyRuntimeHealth=Readonly<{
+  ok:boolean
+  workers:{ready:number;[key:string]:unknown}
+  error?:string|null
+  [key:string]:unknown
+}>
+
+type ResidencyProvision=(artifact:ResidencyRuntimeArtifact)=>Promise<ResidencyProvisionedRuntime>
+type ResidencyHealth=(endpointId:string)=>Promise<ResidencyRuntimeHealth>
 
 type ArtifactRow=Readonly<{
   candidate_id:string
@@ -68,7 +88,7 @@ function artifactRevision(evidenceRef:unknown):string{
 async function resolveResidencyArtifact(
   db:SupabaseClient,
   identity:BuilderResidencyModelIdentity,
-):Promise<MassDistilledRuntimeArtifact>{
+):Promise<ResidencyRuntimeArtifact>{
   const candidateId=String(identity.candidateId||'').trim()
   const artifactId=String(identity.artifactId||'').trim()
   const artifactHash=String(identity.artifactHash||'').trim().toLowerCase()
@@ -115,15 +135,21 @@ export function createRunpodBuilderResidencyModelPort(input:{
   fetchImpl?:typeof fetch
   timeoutMs?:number
   readyTimeoutMs?:number
-  provisionImpl?:typeof provisionMassDistilledRuntime
-  healthImpl?:typeof massDistilledRuntimeHealth
+  provisionImpl?:ResidencyProvision
+  healthImpl?:ResidencyHealth
   sleepImpl?:(ms:number)=>Promise<void>
 }):BuilderResidencyModelPort{
   const call=input.fetchImpl??fetch
   const timeoutMs=Math.max(1,Math.min(input.timeoutMs??120_000,180_000))
   const readyTimeoutMs=Math.max(1,Math.min(input.readyTimeoutMs??READY_TIMEOUT_MS,420_000))
-  const provision=input.provisionImpl??provisionMassDistilledRuntime
-  const health=input.healthImpl??massDistilledRuntimeHealth
+  const provision:ResidencyProvision=input.provisionImpl??(async artifact=>{
+    const runtime=await import('../../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
+    return runtime.provisionMassDistilledRuntime(artifact)
+  })
+  const health:ResidencyHealth=input.healthImpl??(async endpointId=>{
+    const runtime=await import('../../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
+    return runtime.massDistilledRuntimeHealth(endpointId)
+  })
   const sleep=input.sleepImpl??defaultSleep
   let preparedKey=''
   let prepared:BuilderResidencyPreparedRuntime|null=null

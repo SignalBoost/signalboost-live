@@ -22,7 +22,7 @@ test('24GB narrowing remains provider preflight before the paid canary invocatio
   assert.ok(provisionIndex >= 0)
   assert.ok(invocationIndex > provisionIndex)
   assert.match(provisionV2, /const provisioned = await provisionLegacyMassDistilledRuntime\(input\)/)
-  assert.match(provisionV2, /await constrainEndpointToApprovedGpu\(String\(provisioned\.endpointId\)\)/)
+  assert.match(provisionV2, /await constrainEndpointToApprovedGpu\(String\(provisioned\.endpointId\), String\(provisioned\.endpointName \|\| ''\), idleTimeoutSeconds\)/)
 })
 
 test('independent evaluator reasserts 24GB endpoint policy before readiness or inference', () => {
@@ -44,16 +44,19 @@ test('evaluation restores the one worker a retired endpoint is allowed, before i
   const provisionV2 = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisionV2.ts', import.meta.url), 'utf8')
   // Production 2026-09-17 19:04 and 19:14 UTC: mass:481a6760 passed its canary at 17:27, a later canary retired its
   // endpoint to max 0 workers, and evaluation then failed with runtime_not_ready:network.
-  assert.match(provisionV2, /async function restoreRetiredEndpointCapacity\(endpoint: Endpoint\)/)
-  assert.match(provisionV2, /if \(Number\(endpoint\.workers\?\.max \?\? Number\.NaN\) >= 1\) return endpoint/)
-  assert.match(provisionV2, /body: JSON\.stringify\(\{ workers: \{ min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \} \}\)/)
+  assert.match(provisionV2, /async function restoreRetiredEndpointCapacity\(endpoint: Endpoint, idleTimeoutSeconds = IDLE_TIMEOUT_SECONDS\)/)
+  assert.match(provisionV2, /if \(maxWorkers >= 1 && idleTimeout === idleTimeoutSeconds\) return endpoint/)
+  assert.match(provisionV2, /body: JSON\.stringify\(\{ workers: \{ min: 0, max: 1, idleTimeout: idleTimeoutSeconds \} \}\)/)
   assert.match(provisionV2, /mass_distilled_runtime_capacity_restore_rejected/)
   assert.match(provisionV2, /const endpoint = await restoreRetiredEndpointCapacity\(await constrainEndpointToApprovedGpu/)
   // The evaluator keeps scale-to-zero and one worker max, but normalizes idle to 180s so a worker that finishes
   // cold bootstrap just after one 2-minute cron cycle remains available for the next bounded retry.
   assert.doesNotMatch(provisionV2, /max: [2-9]|min: [1-9]/)
   assert.match(provisionV2, /const IDLE_TIMEOUT_SECONDS = 180/)
-  assert.match(provisionV2, /if \(maxWorkers >= 1 && idleTimeout === IDLE_TIMEOUT_SECONDS\) return endpoint/)
+  assert.match(provisionV2, /if \(maxWorkers >= 1 && idleTimeout === idleTimeoutSeconds\) return endpoint/)
+  assert.match(provisionV2, /export const MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS = 300/)
+  assert.match(provisionV2, /if \(input\.idleTimeoutSeconds === undefined\) return IDLE_TIMEOUT_SECONDS/)
+  assert.ok((300 / 3600) * 0.69 < 0.2, '300s Residency warm retry stays below the existing $0.20 canary cost ceiling at the approved GPU price cap')
   assert.ok((180 / 3600) * 0.69 < 0.2, '180s at the approved $0.69\/hr ceiling stays below wake authority')
 })
 

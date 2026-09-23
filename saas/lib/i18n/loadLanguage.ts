@@ -24,6 +24,7 @@ import supervisorSocLocales from './supervisorSocLocales.json'
 import homepageLocales from './homepageLocales.json'
 import { HOMEPAGE_UI_LOCALES } from './homepageUiLocales.ts'
 import { mergeDict, mergePageLocales } from './pageLocales.ts'
+import { normalizeSupportedLanguage } from './supportedLanguages.ts'
 
 export type DictValue = string | string[] | Dict
 export type Dict = { [key: string]: DictValue }
@@ -91,26 +92,27 @@ function mergeWithEnglishFallback(english: Dict, localized: Dict): Dict {
 }
 
 export async function loadLanguage(lang: string): Promise<Dict> {
+  const safeLang = normalizeSupportedLanguage(lang)
   const english = mergePageLocales(await dictionaries.en(), 'en')
   const enConsole = loadConsole('en')
   const enAudit = mergeDict(loadAudit('en'), loadAuditCenter('en'))
   const enMarketingSales = loadMarketingSales('en')
   const enSupervisorSoc = loadSupervisorSoc('en')
   const enHomepage = loadHomepage('en')
-  if (lang === 'en' || !dictionaries[lang]) {
+  if (safeLang === 'en') {
     return { ...english, console: enConsole, audit: enAudit, onboarding: loadOnboarding('en'), marketingSales: enMarketingSales, homepage: enHomepage, ...enSupervisorSoc, __lang: 'en' }
   }
 
   try {
-    const localized = mergePageLocales(await dictionaries[lang](), lang)
+    const localized = mergePageLocales(await dictionaries[safeLang](), safeLang)
     const merged = mergeDict(mergeWithEnglishFallback(english, localized), localized)
-    merged.console = mergeWithEnglishFallback(enConsole, loadConsole(lang))
-    merged.audit = mergeWithEnglishFallback(enAudit, mergeDict(loadAudit(lang), loadAuditCenter(lang)))
-    merged.onboarding = mergeWithEnglishFallback(loadOnboarding('en'), loadOnboarding(lang))
-    merged.marketingSales = mergeWithEnglishFallback(enMarketingSales, loadMarketingSales(lang))
-    merged.homepage = mergeWithEnglishFallback(enHomepage, loadHomepage(lang))
-    Object.assign(merged, mergeWithEnglishFallback(enSupervisorSoc, loadSupervisorSoc(lang)))
-    merged.__lang = lang
+    merged.console = mergeWithEnglishFallback(enConsole, loadConsole(safeLang))
+    merged.audit = mergeWithEnglishFallback(enAudit, mergeDict(loadAudit(safeLang), loadAuditCenter(lang)))
+    merged.onboarding = mergeWithEnglishFallback(loadOnboarding('en'), loadOnboarding(safeLang))
+    merged.marketingSales = mergeWithEnglishFallback(enMarketingSales, loadMarketingSales(safeLang))
+    merged.homepage = mergeWithEnglishFallback(enHomepage, loadHomepage(safeLang))
+    Object.assign(merged, mergeWithEnglishFallback(enSupervisorSoc, loadSupervisorSoc(safeLang)))
+    merged.__lang = safeLang
     return merged
   } catch {
     return { ...english, console: enConsole, audit: enAudit, onboarding: loadOnboarding('en'), marketingSales: enMarketingSales, homepage: enHomepage, ...enSupervisorSoc, __lang: 'en' }

@@ -287,25 +287,12 @@ export function createLiveBuilderResidencyExecutor(input:{
         throw new Error('residency_live_native_capability_boundary_required')
       }
 
+      const candidateId=String(call.candidateId||'').trim()
+      if(!candidateId) throw new Error('residency_runtime_candidate_binding_missing')
       const serving=await resolveBuilderResidencyServingIdentity({
         db:input.db,
-        candidateId:String(call.request.identity.agentId?call.request.identity.agentId:''),
+        candidateId,
         artifactHash:artifact.artifactHash,
-      }).catch(async()=>{
-        // Enrollment candidate id is encoded by the case runner in the run scope rather than agentId.
-        // Resolve it from the technical canary using the exact artifact and any matching resident row.
-        const enrollment=await input.db.from('cos_university_residency_enrollments')
-          .select('candidate_id')
-          .eq('trained_artifact_hash',artifact.artifactHash)
-          .eq('trained_artifact_id',artifact.artifactId)
-          .limit(1)
-          .maybeSingle()
-        if(enrollment.error||!enrollment.data?.candidate_id) throw new Error('residency_runtime_candidate_binding_missing')
-        return resolveBuilderResidencyServingIdentity({
-          db:input.db,
-          candidateId:String(enrollment.data.candidate_id),
-          artifactHash:artifact.artifactHash,
-        })
       })
 
       const workspace=new InMemoryBuilderWorkspace()

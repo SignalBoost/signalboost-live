@@ -5,12 +5,12 @@ import { datasetLearningConnector,libraryLearningConnector,newsLearningConnector
 import { createWikipediaSearch } from './referenceClients.ts'
 import { crossrefScientificSearch,europePmcScientificSearch,openAlexScientificSearch,openLibrarySearch } from './publicClients.ts'
 import { createSemanticScholarScientificSearch,openAlexSemanticScientificSearch } from './semanticResearch.ts'
-import { createHuggingFaceNistCybersecuritySearch } from './huggingFaceOpenData.ts'
+import { createHuggingFaceGithubCc0Search, createHuggingFaceNistCybersecuritySearch } from './huggingFaceOpenData.ts'
 import { createGdeltNewsSearch,createYouTubeMetadataSearch,createYouTubeTranscriptSearch } from './mediaClients.ts'
 import { BUILTIN_OFFICIAL_TECH_FEEDS,createFeedSearch,parseFeedList } from './feedClients.ts'
 import { createWebTrainingResearchSearch,webTrainingMinimumCredibility } from './webTrainingDataLayer.ts'
 
-export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_HF_OPEN_DATASETS_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;COS_WEB_TRAINING_ENABLED?:string;COS_WEB_TRAINING_USE_BRAVE?:string;COS_WEB_TRAINING_MIN_CREDIBILITY?:string;BRAVE_SEARCH_API_KEY?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;SEMANTIC_SCHOLAR_API_KEY?:string;COS_LEARNING_CAP_YOUTUBE?:string;COS_LEARNING_CAP_HF_NIST?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string;COS_LEARNING_SOURCE_MIN_INTERVAL_MS?:string;LOCAL_AI_BASE_URL?:string;LOCAL_AI_API_KEY?:string }
+export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_HF_OPEN_DATASETS_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;COS_WEB_TRAINING_ENABLED?:string;COS_WEB_TRAINING_USE_BRAVE?:string;COS_WEB_TRAINING_MIN_CREDIBILITY?:string;BRAVE_SEARCH_API_KEY?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;SEMANTIC_SCHOLAR_API_KEY?:string;COS_LEARNING_CAP_YOUTUBE?:string;COS_LEARNING_CAP_HF_NIST?:string;COS_LEARNING_CAP_HF_GITHUB_CC0?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string;COS_LEARNING_SOURCE_MIN_INTERVAL_MS?:string;LOCAL_AI_BASE_URL?:string;LOCAL_AI_API_KEY?:string }
 // THIS IS WHY THE CORPUS BARELY GREW. Every live adapter was wrapped so that it returns NOTHING for
 // a 'daily-mining-' gap — live sources only ever served real queued knowledge gaps. Combined with an
 // empty gap queue (33 of 33 resolved on 2026-08-21), that meant the daily cycle acquired nothing at
@@ -34,7 +34,7 @@ function sourceIntervalMs(adapter:ContinuousLearningSourceAdapter,env:LiveLearni
   if(String(env.COS_LEARNING_SOURCE_MIN_INTERVAL_MS??'').trim()&&Number.isFinite(configured))return Math.max(0,Math.min(5000,Math.round(configured)))
   const id=adapter.id??adapter.kind
   if(id.startsWith('youtube_')||id==='gdelt'||id==='credible_web')return 750
-  if(id==='openalex_semantic'||id==='semantic_scholar'||id==='hf_nist_cc0')return 1000
+  if(id==='openalex_semantic'||id==='semantic_scholar'||id==='hf_nist_cc0'||id==='hf_github_cc0')return 1000
   if(id==='crossref')return 250
   return 0
 }
@@ -70,6 +70,7 @@ export function guardLearningSourceAdapter(adapter:ContinuousLearningSourceAdapt
 function transcriptLanguages(value?:string):string[]{const parsed=String(value||'en').split(',').map(item=>item.trim()).filter(Boolean);return parsed.length?parsed.slice(0,8):['en']}
 
 const NIST_CYBERSECURITY_GAP = /\b(cyber(?:security)?|security controls?|zero trust|nist|fips|risk management|incident response|identity access|cryptograph|post-quantum|privacy framework|supply chain risk)\b/i
+const SOFTWARE_ENGINEERING_GAP = /\b(code|coding|programming|software|typescript|javascript|python|java|golang|rust|react|next\.?js|node\.?js|api|database|sql|supabase|vercel|debug(?:ging)?|test(?:ing)?|devops|git|github|repository|architecture|algorithm|data structure)\b/i
 function subjectScopedLearningAdapter(adapter:ContinuousLearningSourceAdapter,pattern:RegExp):ContinuousLearningSourceAdapter{
   return{kind:adapter.kind,id:adapter.id,async acquire(gap){return pattern.test(`${gap.subject} ${gap.question}`)?adapter.acquire(gap):[]}}
 }
@@ -120,9 +121,12 @@ export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.e
   // fetch, so its cost per result is several times the others'. YouTube defaults to eight because
   // search.list charges per request, not per returned candidate; this raises useful yield while the
   // serialized/circuit-broken request cadence stays unchanged.
-  const cap={ crossref:learningSourceCap(env.COS_LEARNING_CAP_CROSSREF,DEFAULT_LEARNING_SOURCE_CAPS.crossref), openalex:learningSourceCap(env.COS_LEARNING_CAP_OPENALEX,DEFAULT_LEARNING_SOURCE_CAPS.openalex), openalexSemantic:learningSourceCap(env.COS_LEARNING_CAP_OPENALEX_SEMANTIC,DEFAULT_LEARNING_SOURCE_CAPS.openalex_semantic), semanticScholar:learningSourceCap(env.COS_LEARNING_CAP_SEMANTIC_SCHOLAR,DEFAULT_LEARNING_SOURCE_CAPS.semantic_scholar), hfNist:learningSourceCap(env.COS_LEARNING_CAP_HF_NIST,DEFAULT_LEARNING_SOURCE_CAPS.hf_nist_cc0), europePmc:learningSourceCap(env.COS_LEARNING_CAP_EUROPE_PMC,DEFAULT_LEARNING_SOURCE_CAPS.europe_pmc), openLibrary:learningSourceCap(env.COS_LEARNING_CAP_OPEN_LIBRARY,DEFAULT_LEARNING_SOURCE_CAPS.open_library), gdelt:learningSourceCap(env.COS_LEARNING_CAP_GDELT,DEFAULT_LEARNING_SOURCE_CAPS.gdelt), officialDocs:learningSourceCap(env.COS_LEARNING_CAP_OFFICIAL_DOCS,DEFAULT_LEARNING_SOURCE_CAPS.official_docs), reference:learningSourceCap(env.COS_LEARNING_CAP_REFERENCE,DEFAULT_LEARNING_SOURCE_CAPS.reference), youtube:learningSourceCap(env.COS_LEARNING_CAP_YOUTUBE,DEFAULT_LEARNING_SOURCE_CAPS.youtube) }
+  const cap={ crossref:learningSourceCap(env.COS_LEARNING_CAP_CROSSREF,DEFAULT_LEARNING_SOURCE_CAPS.crossref), openalex:learningSourceCap(env.COS_LEARNING_CAP_OPENALEX,DEFAULT_LEARNING_SOURCE_CAPS.openalex), openalexSemantic:learningSourceCap(env.COS_LEARNING_CAP_OPENALEX_SEMANTIC,DEFAULT_LEARNING_SOURCE_CAPS.openalex_semantic), semanticScholar:learningSourceCap(env.COS_LEARNING_CAP_SEMANTIC_SCHOLAR,DEFAULT_LEARNING_SOURCE_CAPS.semantic_scholar), hfNist:learningSourceCap(env.COS_LEARNING_CAP_HF_NIST,DEFAULT_LEARNING_SOURCE_CAPS.hf_nist_cc0), hfGithubCc0:learningSourceCap(env.COS_LEARNING_CAP_HF_GITHUB_CC0,DEFAULT_LEARNING_SOURCE_CAPS.hf_github_cc0), europePmc:learningSourceCap(env.COS_LEARNING_CAP_EUROPE_PMC,DEFAULT_LEARNING_SOURCE_CAPS.europe_pmc), openLibrary:learningSourceCap(env.COS_LEARNING_CAP_OPEN_LIBRARY,DEFAULT_LEARNING_SOURCE_CAPS.open_library), gdelt:learningSourceCap(env.COS_LEARNING_CAP_GDELT,DEFAULT_LEARNING_SOURCE_CAPS.gdelt), officialDocs:learningSourceCap(env.COS_LEARNING_CAP_OFFICIAL_DOCS,DEFAULT_LEARNING_SOURCE_CAPS.official_docs), reference:learningSourceCap(env.COS_LEARNING_CAP_REFERENCE,DEFAULT_LEARNING_SOURCE_CAPS.reference), youtube:learningSourceCap(env.COS_LEARNING_CAP_YOUTUBE,DEFAULT_LEARNING_SOURCE_CAPS.youtube) }
   const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,cap.crossref,'crossref'),scientificLearningConnector(openAlexScientificSearch,cap.openalex,'openalex'),scientificLearningConnector(openAlexSemanticScientificSearch,cap.openalexSemantic,'openalex_semantic'),scientificLearningConnector(createSemanticScholarScientificSearch({apiKey:env.SEMANTIC_SCHOLAR_API_KEY}),cap.semanticScholar,'semantic_scholar'),scientificLearningConnector(europePmcScientificSearch,cap.europePmc,'europe_pmc'),libraryLearningConnector(openLibrarySearch,cap.openLibrary,'open_library'),newsLearningConnector(createGdeltNewsSearch(),cap.gdelt,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds,fetch,{fullText:true}),cap.officialDocs,'official_docs'),referenceLearningConnector(createWikipediaSearch(),cap.reference,'reference')]
-  if(env.COS_HF_OPEN_DATASETS_ENABLED!=='false')adapters.push(subjectScopedLearningAdapter(datasetLearningConnector(createHuggingFaceNistCybersecuritySearch(),cap.hfNist,'hf_nist_cc0'),NIST_CYBERSECURITY_GAP))
+  if(env.COS_HF_OPEN_DATASETS_ENABLED!=='false'){
+    adapters.push(subjectScopedLearningAdapter(datasetLearningConnector(createHuggingFaceNistCybersecuritySearch(),cap.hfNist,'hf_nist_cc0'),NIST_CYBERSECURITY_GAP))
+    adapters.push(subjectScopedLearningAdapter(datasetLearningConnector(createHuggingFaceGithubCc0Search(),cap.hfGithubCc0,'hf_github_cc0'),SOFTWARE_ENGINEERING_GAP))
+  }
 
   if(env.COS_WEB_TRAINING_ENABLED!=='false'){
     adapters.push(new SearchLearningConnector('approved_public_web',createWebTrainingResearchSearch({

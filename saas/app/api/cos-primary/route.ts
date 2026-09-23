@@ -56,6 +56,7 @@ import { buildConversationRecallContext, detectConversationRecallIntent } from '
 import { searchPastConversations } from '@/lib/ai/tools/conversationHistory'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
+import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
@@ -411,7 +412,7 @@ function buildTravelPlanEvidenceBackstop(input:string,language:string,sources:an
 }
 
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
-function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
+function languageFrom(body:any,input=''):string{return resolveResponseLanguage(input,body?.context?.language)}
 function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:typeof item.external_provider==='string'?item.external_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:typeof item.external_model==='string'?item.external_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
 function normalizeProvider(value:string|null):string|null{return value==='claude'?'anthropic':value}
 function externalExecution(payload:any,trace:ProviderExecutionTrace,isPrivileged:boolean):{provider:string|null;model:string|null;invoked:boolean;source:'provider'|'cache'|null}{
@@ -494,7 +495,7 @@ function markFreshLocalReasoning(provenance:any,args:{invoked:boolean;model?:str
 function freshTelemetryProvenance(invoked:boolean,reasonerLabel:string|null){return{localModelInvoked:invoked,reasonerLabel}}
 
 export async function postCosPrimary(req:NextRequest){
-  const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body)
+  const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body,input)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const precedingAssistant=previousAssistantText(body)
   const fastEditAlreadyAttempted=req.headers.get('x-signalboost-fast-transform-attempted')==='1'

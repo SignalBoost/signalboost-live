@@ -21,8 +21,8 @@ const WINDOW_HOURS = 24
 const OPEN_SOURCE_CATALOG = Object.freeze([
   { id: 'openalex', name: 'OpenAlex', integration: 'implemented', vectorSpace: 'openalex_gte_large_en_v1', mode: 'remote_semantic_index' },
   { id: 'semantic_scholar', name: 'Semantic Scholar / S2ORC', integration: 'implemented', vectorSpace: 'semantic_scholar_specter2_proximity_v2', mode: 'precomputed_document_vector' },
-  { id: 'huggingface_open_datasets', name: 'Hugging Face open datasets', integration: 'candidate', vectorSpace: null, mode: 'open_dataset_corpus' },
-  { id: 'wikimedia', name: 'Wikipedia / Wikimedia', integration: 'candidate', vectorSpace: null, mode: 'open_reference_corpus' },
+  { id: 'huggingface_open_datasets', name: 'Hugging Face open datasets', integration: 'implemented', vectorSpace: 'nist_cybersecurity_training_1536', mode: 'preembedded_cc0_dataset_search' },
+  { id: 'wikimedia', name: 'Wikipedia / Wikimedia', integration: 'implemented', vectorSpace: null, mode: 'open_reference_corpus' },
 ] as const)
 
 function n(value: unknown): number {
@@ -85,6 +85,8 @@ function openSourceId(row: any): string | null {
     || haystack.includes('semantic scholar')
     || haystack.includes('semanticscholar.org')) return 'semantic_scholar'
   if (haystack.includes('huggingface.co/datasets')
+    || haystack.includes('hf://datasets/')
+    || haystack.includes('huggingface_dataset:')
     || haystack.includes('hugging face open dataset')
     || haystack.includes('huggingface dataset')) return 'huggingface_open_datasets'
   if (haystack.includes('wikipedia.org')

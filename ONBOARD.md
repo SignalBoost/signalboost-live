@@ -106,6 +106,8 @@ Response-delivery invariant: once a latency-sensitive owner/general question has
 
 Travel-planning invariant: live travel requests use a bounded travel-specific path. After one grounded travel completion attempt, they must not enter the generic multi-phase fresh-evidence synthesis/review pipeline; one short stated-assumption travel rescue may run, then the turn must return. Completed read-only answers persist conversation History after response delivery, never in the foreground.
 
+Model-first agent invariant: for ordinary read-only conversation turns, the primary COS model sees the request before optional capability routing and must return either a complete answer or the minimum capability plan needed to finish. A capability request is never authority: host authentication, Referee/Guardian policy, public-delivery scope, action classification, and tool permission checks remain deterministic and cannot be expanded by model output. Current host/runtime facts stay host-verified. When the model already requests live_web, COS must not pay for a second semantic freshness classifier before retrieval.
+
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

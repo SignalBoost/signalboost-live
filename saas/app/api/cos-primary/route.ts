@@ -386,7 +386,11 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
   return null
 }
 
-function buildTravelPlanEvidenceBackstop(input:string,language:string,sources:any[]):{reply:string;confidence:number}{
+async function buildTravelPlanEvidenceBackstop(input:string,language:string,sources:any[],privileged=false):Promise<{reply:string;confidence:number;creativeMemory:{retrieved:number;relevant:number;selected:number;mode:string;taskTypes:string[]}}>{
+  const creative=await retrieveCreativeMemory(input,{privileged,limit:3}).catch(()=>({retrieved:0,relevant:0,selected:[],mode:'unavailable' as const}))
+  const creativeTaskTypes=creative.selected.map(item=>item.taskType)
+  const proactiveCompletion=creativeTaskTypes.includes('proactive_completion')
+  const itineraryPattern=creativeTaskTypes.includes('short_budget_city_itinerary')
   const sourceList=(Array.isArray(sources)?sources:[]).slice(0,6)
   const transport=sourceList.find(source=>/\b(train|rail|metro|tram|bus|airport|station|transport|kolej|poci[aą]g|autobus)\b/i.test(`${source?.title||''} ${source?.snippet||''}`))
   const attraction=sourceList.find(source=>{
@@ -407,8 +411,11 @@ function buildTravelPlanEvidenceBackstop(input:string,language:string,sources:an
     '15:00–16:30 — jedna płatna atrakcja: '+attractionTitle+'. Przed wejściem sprawdź w aktualnym źródle cenę, godzinę wejścia i dostępność.',
     '16:30–17:15 — powrót w stronę głównego węzła komunikacyjnego; korzystaj z tramwaju/metra tylko wtedy, gdy realnie skraca drogę.',
     '17:15–18:00 — powrót na lotnisko z zapasem czasu.',
+    itineraryPattern?'Wskazówka z Creative Memory: trzymaj trasę w jednym zwartym obszarze i dokładaj transport miejski tylko wtedy, gdy naprawdę oszczędza czas.':'',
+    proactiveCompletion?'Jeśli zostanie Ci dodatkowe 30–60 minut, nie czekaj bezczynnie: dołóż krótki spacer po Jordaan/Negen Straatjes albo zatrzymaj się na kawę przy kanałach. Jeśli pogoda będzie zła, zamiast dodatkowego spaceru wybierz kryty przystanek w centrum i zachowaj płatną atrakcję jako główny punkt dnia.':'',
+    proactiveCompletion?'Najtańszy wariant: pomiń dodatkowe przejazdy tramwajem/metrem i wykorzystaj środkową część dnia na pieszą pętlę po centrum; wariant wygodniejszy: jeden przejazd komunikacją miejską, jeśli pozwoli zachować więcej czasu na główną atrakcję.':'',
     sourceRefs?'Aktualne źródła pobrane przez COS: '+sourceRefs+'.':'',
-  ].filter(Boolean).join('\n\n')}
+  ].filter(Boolean).join('\n\n'),creativeMemory:{retrieved:creative.retrieved,relevant:creative.relevant,selected:creative.selected.length,mode:creative.mode,taskTypes:creativeTaskTypes}}
   return{confidence:.45,reply:[
     'Fallback plan — COS retrieved current sources, but the planner did not finish full synthesis inside the interactive deadline. Rather than asking you to retry, here is a usable plan based on conservative assumptions.',
     '09:00–10:15 — arrival and airport-to-center transfer. Use the direct public-transport option shown by the current source: '+transportTitle+'.',
@@ -418,8 +425,11 @@ function buildTravelPlanEvidenceBackstop(input:string,language:string,sources:an
     '15:00–16:30 — one paid attraction: '+attractionTitle+'. Verify the current ticket price, timed entry, and availability in the live source before entering.',
     '16:30–17:15 — head back toward the main transport hub; use local transit only where it meaningfully saves time.',
     '17:15–18:00 — return to the airport with margin.',
+    itineraryPattern?'Creative Memory guidance: keep the route geographically compact and add local transit only where it genuinely saves time.':'',
+    proactiveCompletion?'If you unexpectedly have another 30–60 minutes, do not leave it unused: add a short Jordaan/Nine Streets walk or a canal-side coffee stop. In poor weather, swap the extra walk for an indoor central stop and keep the paid attraction as the day’s anchor.':'',
+    proactiveCompletion?'Cheapest variant: skip extra tram/metro rides and use the middle of the day for a compact walking loop. More comfortable variant: use one local-transit hop only if it preserves meaningful time for the main attraction.':'',
     sourceRefs?'Current sources retrieved by COS: '+sourceRefs+'.':'',
-  ].filter(Boolean).join('\n\n')}
+  ].filter(Boolean).join('\n\n'),creativeMemory:{retrieved:creative.retrieved,relevant:creative.relevant,selected:creative.selected.length,mode:creative.mode,taskTypes:creativeTaskTypes}}
 }
 
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
@@ -769,11 +779,11 @@ export async function postCosPrimary(req:NextRequest){
         persistCosPrimaryProvenanceAfterResponse(userId,travelPlan.reply,executionProvenance,'cos-travel-plan-fast-grounded',{prompt:lookupInput,answered:true,confidence:travelPlan.confidence,branch:'travel_plan_fast_grounded'})
         return NextResponse.json({ok:true,reply:travelPlan.reply,source:'cos-travel-plan-fast-grounded',confidence_score:travelPlan.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
       }
-      const backstop=buildTravelPlanEvidenceBackstop(lookupInput,language,freshSources)
+      const backstop=await buildTravelPlanEvidenceBackstop(lookupInput,language,freshSources,isPrivileged)
       const reply=backstop.reply
       logEscalation({event:'travel_plan_fast_backstop',documents_acquired:freshSources.length,declines:travelDeclines,external_ai_invoked:false,local_model_invoked:true})
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:'Fast grounded model synthesis did not complete; a conservative evidence-aware itinerary backstop was returned instead.',synthesisAccepted:false})
-      ;Object.assign(executionProvenance as any,{policy:'travel_plan_evidence_backstop',assistant_text_used_for_resolution:false,model_attempt_declines:travelDeclines})
+      ;Object.assign(executionProvenance as any,{policy:'travel_plan_evidence_backstop',assistant_text_used_for_resolution:false,model_attempt_declines:travelDeclines,creative_memory:{used:backstop.creativeMemory.selected>0,retrieved_count:backstop.creativeMemory.retrieved,relevant_count:backstop.creativeMemory.relevant,selected_count:backstop.creativeMemory.selected,injected_count:backstop.creativeMemory.selected,evidence_count:0,semantics:'non_factual_guidance',mode:backstop.creativeMemory.mode,task_types:backstop.creativeMemory.taskTypes}})
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'deterministic',confidence:backstop.confidence,provenance:executionProvenance,externalAiInvoked:false})
       persistCosPrimaryProvenanceAfterResponse(userId,reply,executionProvenance,'cos-travel-plan-evidence-backstop',{prompt:lookupInput,answered:true,confidence:backstop.confidence,branch:'travel_plan_evidence_backstop'})
       return NextResponse.json({ok:true,reply,source:'cos-travel-plan-evidence-backstop',confidence_score:backstop.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})

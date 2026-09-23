@@ -111,11 +111,16 @@ function interactiveAuthoring(args: LocalModelCallArgs): boolean {
   return String(args.usageContext?.feature || '').trim().toLowerCase() === 'cos_interactive_authoring'
 }
 
+function simpleKnowledgeResponse(args: LocalModelCallArgs): boolean {
+  return String(args.usageContext?.feature || '').trim().toLowerCase() === 'cos_simple_knowledge'
+}
+
 function interactiveUserResponse(args: LocalModelCallArgs): boolean {
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   return feature === 'cos_interactive_answer'
     || feature === 'cos_interactive_authoring'
     || feature === 'direct_text_transformation'
+    || feature === 'cos_simple_knowledge'
 }
 
 function freshGroundedTask(args: LocalModelCallArgs): boolean {
@@ -145,12 +150,15 @@ function isEmptyThinkingTruncation(error: unknown): boolean {
 function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: number): number {
   const directEdit = directTextTransformation(args)
   const authoring = interactiveAuthoring(args)
+  const simpleKnowledge = simpleKnowledgeResponse(args)
   const variable = directEdit
     ? 'COS_DIRECT_TEXT_TIMEOUT_MS'
     : authoring
       ? 'COS_INTERACTIVE_AUTHORING_TIMEOUT_MS'
-      : 'COS_INTERACTIVE_MODEL_TIMEOUT_MS'
-  const fallback = directEdit ? 12000 : authoring ? 15000 : 20000
+      : simpleKnowledge
+        ? 'COS_SIMPLE_KNOWLEDGE_TIMEOUT_MS'
+        : 'COS_INTERACTIVE_MODEL_TIMEOUT_MS'
+  const fallback = directEdit ? 12000 : authoring ? 15000 : simpleKnowledge ? 7000 : 20000
   const configured = Number(process.env[variable] || String(fallback))
   const bounded = Number.isFinite(configured) ? Math.max(3000, Math.min(60000, configured)) : fallback
   return Math.min(configTimeoutMs, bounded)
@@ -163,6 +171,9 @@ function modelForRequest(args: LocalModelCallArgs, config: LocalInferenceConfig,
   }
   if (interactiveAuthoring(args)) {
     return (process.env.COS_INTERACTIVE_AUTHORING_MODEL || 'zai-org/GLM-5.3-Flash').trim() || config.model
+  }
+  if (simpleKnowledgeResponse(args)) {
+    return (process.env.COS_SIMPLE_KNOWLEDGE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash').trim() || config.model
   }
   return config.model
 }

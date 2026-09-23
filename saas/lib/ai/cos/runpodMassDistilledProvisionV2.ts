@@ -348,3 +348,61 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
     })
   }
 }
+
+
+/**
+ * Self-Healing control-plane reconciliation for an already-created exact-artifact runtime.
+ *
+ * This function never creates a template or endpoint and never sends a model request. It may only
+ * restore the existing endpoint's approved GPU pool, exact template binding, scale-to-zero/max-1
+ * worker envelope, and idle timeout. Missing exact provider resources fail closed so a separate
+ * authority decision is required before creation.
+ */
+export async function reconcileExistingMassDistilledRuntime(input: MassDistilledRuntimeArtifact) {
+  const candidateId = clean(input.candidateId, 300)
+  const artifactId = clean(input.artifactId, 500)
+  const artifactRevision = clean(input.artifactRevision, 40).toLowerCase()
+  const artifactHash = clean(input.artifactHash, 64).toLowerCase()
+  if (
+    !candidateId.startsWith('mass:')
+    || !artifactId
+    || !/^[a-f0-9]{40}$/.test(artifactRevision)
+    || !/^[a-f0-9]{64}$/.test(artifactHash)
+  ) {
+    throw new Error('mass_distilled_runtime_artifact_invalid')
+  }
+
+  const recovered = await resolveExactEndpoint({
+    ...input,
+    candidateId,
+    artifactId,
+    artifactRevision,
+    artifactHash,
+  }, 'self_healing_existing_only')
+  const endpoint = await restoreRetiredEndpointCapacity(recovered.endpoint)
+  assertMaterializedEndpointIdentity(endpoint, {
+    ...input,
+    candidateId,
+    artifactId,
+    artifactRevision,
+    artifactHash,
+  }, recovered.modelName)
+
+  return Object.freeze({
+    templateName: recovered.templateName,
+    endpointName: recovered.endpointName,
+    modelName: recovered.modelName,
+    endpointId: String(endpoint.id),
+    createdTemplate: false as const,
+    createdEndpoint: false as const,
+    reboundTemplate: recovered.reboundTemplate,
+    workersMin: Number(endpoint.workers?.min),
+    workersMax: Number(endpoint.workers?.max),
+    idleTimeout: Number(endpoint.workers?.idleTimeout),
+    baseUrl: `https://${endpoint.id}.api.runpod.ai/v1`,
+    computeWakeAuthorized: false as const,
+    modelInvocationAuthorized: false as const,
+    productionTrafficAuthorized: false as const,
+    authorityExpanded: false as const,
+  })
+}

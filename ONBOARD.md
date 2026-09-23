@@ -1258,6 +1258,78 @@ Repair contract:
 - legacy repository/service/domain identifiers may remain internal but cannot override public product identity;
 - the reported logo-then-company-name exchange is a mandatory regression.
 
+## Vector Intelligence / external semantic research invariant — 2026-09-23
+
+iTMounts already has an internal vector-database layer: Supabase PostgreSQL + pgvector stores and
+retrieves platform embeddings for learned corpus, knowledge facts, semantic records, and other
+governed memory/retrieval paths. Do **not** add a second vector database merely because an external
+research provider exposes embeddings. The internal pgvector layer remains the durable platform
+retrieval substrate until measured scale/latency evidence justifies another architecture.
+
+External scientific semantic indexes are a **discovery accelerator**, not iTMounts memory and not a
+governance authority. Research Radar / University acquisition may query providers that have already
+embedded the scientific literature, then retrieve the underlying title/abstract/full text or other
+permitted source material for ordinary provenance, rights, relevance, quality, freshness, and
+learning-admission checks.
+
+Initial external semantic spaces:
+
+```text
+OpenAlex semantic search
+  external space: openalex_gte_large_en_v1
+  dimensions: 1024
+  role: provider-hosted semantic discovery; source vector is not imported
+
+Semantic Scholar SPECTER2
+  external space: semantic_scholar_specter2_proximity_v2
+  dimensions: 768
+  role: precomputed scientific-paper vector discovery/provenance
+```
+
+**Vector spaces must never be mixed merely because their dimensions match.** Provider/model identity,
+vector-space version, dimensions, source identity, and provenance remain explicit. OpenAlex,
+SPECTER2, the active iTMounts embedding model, a future code-specialized embedder, and any other
+embedding space are independent coordinate systems unless an explicit tested migration establishes
+compatibility.
+
+Canonical research flow:
+
+```text
+University/COS/Builder/specialist knowledge gap
+-> bounded external semantic discovery
+-> candidate papers/material
+-> source authority + provenance + rights + freshness + deduplication
+-> retrieve permitted human-readable source material
+-> normal iTMounts learning/admission gates
+-> retain only useful material
+-> create an iTMounts-native embedding in the active internal vector space when durable retrieval is warranted
+-> RAG/study/practice/distillation only under their existing independent gates
+```
+
+External vectors may be fingerprinted as provenance/evidence, but they do not become an internal
+retrieval vector by default. The model reasons over retrieved text/structured evidence; an embedding
+is a semantic locator, not a substitute for the underlying evidence. Valuable material should be
+re-embedded internally so provider replacement does not erase durable iTMounts retrieval.
+
+Research acquisition must be selective rather than an attempt to copy the scientific Internet.
+Prefer semantic discovery against provider-maintained indexes, bounded result sets, source-quality
+classification, DOI/persistent identity, deduplication, and rights-aware retention. Copyrighted or
+rights-unclear material may remain live/reference/RAG evidence when permitted but must not silently
+become distillation/training material. Open/public-domain/appropriately licensed material still
+passes the existing University source, confidence, provenance, deduplication, curriculum, and
+training-rights gates.
+
+Current-world facts remain subject to the Freshness / evidence rules. A newly indexed paper,
+preprint, magazine article, or vendor publication is candidate evidence; retrieval or embedding does
+not make its claims true, current, peer reviewed, independently replicated, learned, or mastered.
+
+Initial implementation starts inside the existing governed learning-source architecture rather than
+creating a parallel crawler: OpenAlex semantic discovery and Semantic Scholar SPECTER2-backed
+discovery feed the same bounded source circuit breakers and ordinary COS University admission path.
+They run for real queued knowledge gaps rather than indiscriminate daily mining. Semantic Scholar
+training rights are not inferred from the presence of an embedding; its material remains
+non-training by default unless a separate rights classification establishes eligibility.
+
 ## University distillation asset portability invariant — 2026-09-23
 
 Distillation spend must create a durable iTMounts-controlled educational asset, not only a model-

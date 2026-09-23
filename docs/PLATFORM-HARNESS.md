@@ -207,3 +207,27 @@ constraints. Admission never grants final evaluation, promotion, Production traf
 
 This prevents the final-evaluation Residency gate from becoming a dead queue: protected Builder artifacts
 must have a bounded automatic path from `evaluation_pending` into practical Residency.
+
+
+## Residency infrastructure Self-Healing
+
+A Builder Residency infrastructure failure is no longer alert-only. When the independent Harness verifier
+attributes a failure to infrastructure and emits a recognized exact-runtime failure code, the Residency
+orchestrator hands the exact candidate + artifact hash to a registered Self-Healing action.
+
+The repair action is deliberately narrower than normal provisioning:
+
+```text
+Residency infrastructure failure
+-> sanitized exact failure code
+-> pre-authorized recovery-code whitelist
+-> Agent Gateway Governed Socket
+-> exact artifact re-read from Supabase
+-> existing RunPod endpoint/template reconciliation only
+-> next scheduled Residency case owns compute wake/readiness
+```
+
+Self-Healing may restore only the already-existing exact runtime's approved template binding, AMPERE_24
+GPU pool, min=0/max=1 worker envelope, and idle timeout. It may not create a template or endpoint, wake
+GPU compute, invoke a model, promote an artifact, authorize Production traffic, or broaden authority.
+Authentication, credential, registry-identity, and unknown failures are excluded from automatic repair.

@@ -108,6 +108,8 @@ Model-first agent invariant: after host authentication and hard security/surface
 
 Native tool-call implementation: interactive COS uses the OpenAI-compatible `tools` / `tool_choice=auto` / `tool_calls` protocol for its first answer-or-capability decision. Direct model answers are released immediately only when host release policy does not require fresh evidence. If a mutable/current-world request is mistakenly answered from model memory, the host converts that same decision into `live_web` orchestration after the model turn; this guard can require more evidence but never grant authority or substitute a deterministic semantic answer.
 
+Travel completion invariant: a complete travel-planning request remains model-first, then uses live evidence and a bounded grounded planner. The interactive travel lane uses one primary fast-model attempt plus one shorter alternate-model retry; it must not return a retry/clarification dead end solely because model transport missed the budget. If both bounded model attempts fail after authoritative live evidence was acquired, COS returns a conservative evidence-aware itinerary backstop. Successful travel answers and backstops persist provenance after response delivery, never in the foreground.
+
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

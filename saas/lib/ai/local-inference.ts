@@ -207,7 +207,7 @@ function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: nu
         : travelPlan
           ? 'COS_INTERACTIVE_TRAVEL_TIMEOUT_MS'
           : 'COS_INTERACTIVE_MODEL_TIMEOUT_MS'
-  const fallback = directEdit ? 12000 : authoring ? 15000 : simpleKnowledge ? 7000 : travelPlan ? 8000 : 20000
+  const fallback = directEdit ? 12000 : authoring ? 15000 : simpleKnowledge ? 7000 : travelPlan ? 18000 : 20000
   const configured = Number(process.env[variable] || String(fallback))
   const bounded = Number.isFinite(configured) ? Math.max(3000, Math.min(60000, configured)) : fallback
   return Math.min(configTimeoutMs, bounded)
@@ -225,7 +225,11 @@ function modelForRequest(args: LocalModelCallArgs, config: LocalInferenceConfig,
     return (process.env.COS_SIMPLE_KNOWLEDGE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash').trim() || config.model
   }
   if (interactiveTravelPlan(args)) {
-    return (process.env.COS_INTERACTIVE_TRAVEL_MODEL || 'deepseek-ai/DeepSeek-V4-Flash').trim() || config.model
+    const retry = String(args.usageContext?.purpose || '').trim().toLowerCase() === 'travel_plan_grounded_retry'
+    const selected = retry
+      ? process.env.COS_INTERACTIVE_TRAVEL_RETRY_MODEL || 'zai-org/GLM-5.3-Flash'
+      : process.env.COS_INTERACTIVE_TRAVEL_MODEL || 'deepseek-ai/DeepSeek-V4-Flash'
+    return selected.trim() || config.model
   }
   return config.model
 }

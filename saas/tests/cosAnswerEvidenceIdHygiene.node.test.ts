@@ -24,7 +24,7 @@ test('the verbatim production leak is detected and the scaffolding sentence remo
 test('every internal marker family is stripped, including OEM and MEMBER and ranges', () => {
   const answer = 'Point one [CL1]. Point two [LIVE2]. Org data [OEM1] and [MEMBER2]. Range [CL1–CL6] and spaced [ CL 12 ].'
   const cleaned = stripInternalEvidenceIds(answer)
-  assert.doesNotMatch(cleaned, /\[\s*(?:OEM|MEMBER|CL|LIVE|KG|EM|UM|SK)\s*\d/i)
+  assert.doesNotMatch(cleaned, /\[\s*(?:OEM|MEMBER|CL|LIVE|KG|EM|UM|SK|CM)\s*\d/i)
   assert.match(cleaned, /Point one\./)
   assert.match(cleaned, /Point two\./)
 })
@@ -95,4 +95,14 @@ test('cached replies are cleaned on replay, not only at generation time', () => 
   const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
   assert.match(source, /reply:stripInternalEvidenceIds\(payload\.reply\)/)
   assert.match(source, /reply:stripInternalEvidenceIds\(cached\.reply\)/)
+})
+
+
+test('Creative Memory markers are internal scaffolding, not factual citations', () => {
+  const answer = 'Use a walking cluster [CM1] and keep one paid anchor [CM2].'
+  assert.equal(leaksInternalEvidenceIds(answer), true)
+  const cleaned = stripInternalEvidenceIds(answer)
+  assert.doesNotMatch(cleaned, /\[CM/)
+  assert.match(cleaned, /walking cluster/)
+  assert.match(cleaned, /paid anchor/)
 })

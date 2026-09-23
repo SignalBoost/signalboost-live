@@ -37,6 +37,7 @@ import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
 import { domainCompatibleContext, rankContextCandidates, relevanceTerms } from '@/lib/ai/cos/contextRelevance'
 import { countPendingLearnedCorpusEmbeddings, queryNearestLearnedCorpus } from '@/lib/ai/cos/learnedCorpusSemantic'
+import { retrieveCreativeMemory, formatCreativeMemoryForReasoner } from '@/lib/ai/cos/creativeMemory'
 import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
 import { executiveDecisionUnsupportedClaims, promptAppearsDiagnostic } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult, citedEvidence, citedIndexedValues } from '@/lib/ai/cos/reasonerOutput'
@@ -47,7 +48,7 @@ import { resolveCosEnterpriseMemoryScope } from '@/lib/ai/cos/cosEnterpriseMemor
 import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
-import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, SIGNALBOOST_COMPANY_IDENTITY_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
+import { SEMANTIC_MEMORY_DEFINITION, CREATIVE_MEMORY_DEFINITION, ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, SIGNALBOOST_COMPANY_IDENTITY_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
 import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
 import { correctCompoundingArithmetic } from '@/lib/ai/cos/compoundingArithmeticCheck'
@@ -76,10 +77,12 @@ export type COSProvenance = {
   enterpriseMemoriesUsed:number
   userMemoriesUsed:number
   cognitiveSkillsUsed:number
+  creativeMemoriesUsed:number
   enterpriseMemoryStatus:string
   enterpriseMemoryOrganizationId:string|null
   evidenceFunnel:COSEvidenceFunnel
   cognitiveSkillFunnel:EvidenceFunnelStage
+  creativeMemoryFunnel:EvidenceFunnelStage
   knowledgeFactsCited?:number
   learnedItemsCited?:number
   enterpriseMemoriesCited?:number
@@ -93,9 +96,10 @@ export type COSProvenance = {
   cacheOrigin?:{
     storedAt:string|null
     policyVersion:string|null
-    retrievedThisTurn:{facts:number;learned:number;enterprise:number;memories:number;skills?:number}
+    retrievedThisTurn:{facts:number;learned:number;enterprise:number;memories:number;skills?:number;creative?:number}
     originEvidenceFunnel?:COSEvidenceFunnel|null
     originCognitiveSkillFunnel?:EvidenceFunnelStage|null
+    originCreativeMemoryFunnel?:EvidenceFunnelStage|null
   }
 }
 
@@ -107,6 +111,7 @@ type CachedAnswerOrigin = {
   enterpriseMemoriesUsed:number
   userMemoriesUsed:number
   cognitiveSkillsUsed:number
+  creativeMemoriesUsed:number
   knowledgeFactsCited:number
   learnedItemsCited:number
   enterpriseMemoriesCited:number
@@ -114,7 +119,8 @@ type CachedAnswerOrigin = {
   cognitiveSkillsCited:number
   evidenceFunnel?:COSEvidenceFunnel
   cognitiveSkillFunnel?:EvidenceFunnelStage
-  canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
+  creativeMemoryFunnel?:EvidenceFunnelStage
+  canonicalSelfKnowledgeUsed?:{semanticMemoryDefinition:boolean; creativeMemoryDefinition:boolean; enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
   // Facts the user stated inline in the prompt. Provenance previously accounted only for
   // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
   // its lone contributor — implying the facts came from nowhere (2026-08-23).
@@ -139,6 +145,8 @@ type InternalContext = {
   memories:string[]
   skills:string[]
   skillIds:string[]
+  creativeMemories:string[]
+  creativeMemory:RetrievalCounts
   enterpriseMemoryStatus:string
   enterpriseMemoryOrganizationId:string|null
   funnel:{
@@ -235,10 +243,12 @@ function cacheHitProvenance(
     enterpriseMemoriesUsed:origin?.enterpriseMemoriesUsed ?? 0,
     userMemoriesUsed:origin?.userMemoriesUsed ?? 0,
     cognitiveSkillsUsed:origin?.cognitiveSkillsUsed ?? 0,
+    creativeMemoriesUsed:origin?.creativeMemoriesUsed ?? 0,
     enterpriseMemoryStatus:base.enterpriseMemoryStatus,
     enterpriseMemoryOrganizationId:base.enterpriseMemoryOrganizationId,
     evidenceFunnel:base.evidenceFunnel,
     cognitiveSkillFunnel:base.cognitiveSkillFunnel,
+    creativeMemoryFunnel:origin?.creativeMemoryFunnel ?? base.creativeMemoryFunnel,
     knowledgeFactsCited:origin?.knowledgeFactsCited ?? 0,
     learnedItemsCited:origin?.learnedItemsCited ?? 0,
     enterpriseMemoriesCited:origin?.enterpriseMemoriesCited ?? 0,
@@ -253,9 +263,11 @@ function cacheHitProvenance(
         enterprise:base.evidenceFunnel.enterpriseMemory.retrieved,
         memories:base.evidenceFunnel.userMemory.retrieved,
         skills:base.cognitiveSkillFunnel.retrieved,
+        creative:base.creativeMemoryFunnel.retrieved,
       },
       originEvidenceFunnel:origin?.evidenceFunnel ?? null,
       originCognitiveSkillFunnel:origin?.cognitiveSkillFunnel ?? null,
+      originCreativeMemoryFunnel:origin?.creativeMemoryFunnel ?? null,
     },
     ...(similarityScore === undefined ? {} : { similarityScore }),
   }
@@ -399,6 +411,8 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
     chiefOfStaffSkillForOwner(options?.privileged === true),
     "Reason from the user's input, your own model knowledge, and any supplied internal evidence.",
+    `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_MEMORY_DEFINITION}`,
+    `AUTHORITATIVE COS DEFINITIONS: ${CREATIVE_MEMORY_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${ENTERPRISE_MEMORY_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_ANSWER_CACHE_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`,
@@ -433,8 +447,8 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     '- Naming a monitoring product is not naming a mechanism. For every cause, state the mechanism and then the observable that would show it.',
     '',
     'CITING INTERNAL EVIDENCE:',
-    '- [KG#] = Knowledge Graph fact; [CL#] = learned-corpus evidence; [OEM#] = organization-scoped Enterprise Memory; [EM#] = saved per-user memory; [SK#] = validated procedural skill. Cite a label inline only when it genuinely informed the answer.',
-    '- [OEM#], [KG#], and [CL#] may ground factual claims. [EM#] is user context, not independent factual corroboration. [SK#] is HOW-to-reason guidance, not factual corroboration.',
+    '- [KG#] = Knowledge Graph fact; [CL#] = learned-corpus evidence; [OEM#] = organization-scoped Enterprise Memory; [EM#] = saved per-user memory; [SK#] = validated procedural skill; [CM#] = Creative Memory pattern. Cite a factual label inline only when it genuinely informed the answer.',
+    '- [OEM#], [KG#], and [CL#] may ground factual claims. [EM#] is user context, not independent factual corroboration. [SK#] is HOW-to-reason guidance. [CM#] is validated creative/strategic guidance: adapt its approach, never treat it as a fact, never copy old wording, and never cite [CM#] to the user.',
     '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge. Selected full-content [CL#] evidence is mandatory: make it materially support a claim and cite it, or state that it does not answer the question; never silently ignore it.',
     '- NEVER cite an item that did not change what you wrote. Related-but-not-supporting evidence must remain uncited. An honest answer with zero factual citations is correct when supplied factual evidence was not useful.',
     '',
@@ -591,6 +605,8 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
   const memories:string[] = []
   const skills:string[] = []
   const skillIds:string[] = []
+  const creativeMemories:string[] = []
+  let creativeMemory:RetrievalCounts = emptyRetrieval()
   const terms = queryTerms(prompt)
   const db = cosServiceDb()
   const funnel = {
@@ -605,9 +621,10 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
 
   if (db) {
     systems.push('Knowledge Graph', 'Continuous Learning Corpus')
-    const [semanticResult, semanticLearnedResult] = await Promise.allSettled([
+    const [semanticResult, semanticLearnedResult, creativeResult] = await Promise.allSettled([
       semanticKnowledgeFacts(prompt, db),
       semanticLearnedCorpus(prompt),
+      retrieveCreativeMemory(prompt, { privileged, limit:4 }),
     ])
 
     const semanticRows = semanticResult.status === 'fulfilled' ? semanticResult.value : null
@@ -676,6 +693,14 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         }
       }
     }
+
+    const creative = creativeResult.status === 'fulfilled' ? creativeResult.value : null
+    if (creative) {
+      creativeMemory = { retrieved:creative.retrieved, relevant:creative.relevant, selected:creative.selected.length }
+      if (creative.retrieved > 0) systems.push('Creative Memory')
+      if (creative.mode === 'vector' && creative.retrieved > 0) systems.push('Creative Memory semantic retrieval')
+      creativeMemories.push(...formatCreativeMemoryForReasoner(creative.selected))
+    }
   }
 
   const scopeResolution = await resolveCosEnterpriseMemoryScope({ privileged }).catch(() => ({ scope:null, status:'lookup_failed' as const }))
@@ -736,6 +761,7 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
 
   return {
     systems:[...new Set(systems)], facts, learned, enterpriseMemories, memories, skills, skillIds,
+    creativeMemories, creativeMemory,
     enterpriseMemoryStatus, enterpriseMemoryOrganizationId, funnel,
   }
 }
@@ -751,9 +777,12 @@ function executionFunnel(context:InternalContext, injected:boolean, cited={kg:0,
 function executionSkillFunnel(context:InternalContext, injected:boolean, cited=0):EvidenceFunnelStage {
   return stage(context.funnel.cognitiveSkills, injected, cited)
 }
-function contextFingerprint(context:{facts:string[];learned:string[];enterpriseMemories:string[];memories:string[];skills:string[]}):string {
+function executionCreativeMemoryFunnel(context:InternalContext, injected:boolean):EvidenceFunnelStage {
+  return stage(context.creativeMemory, injected, 0)
+}
+function contextFingerprint(context:{facts:string[];learned:string[];enterpriseMemories:string[];memories:string[];skills:string[];creativeMemories:string[]}):string {
   return createHash('sha256').update(JSON.stringify({
-    facts:context.facts, learned:context.learned, enterpriseMemories:context.enterpriseMemories, memories:context.memories, skills:context.skills,
+    facts:context.facts, learned:context.learned, enterpriseMemories:context.enterpriseMemories, memories:context.memories, skills:context.skills, creativeMemories:context.creativeMemories,
   })).digest('hex')
 }
 async function readCachedAnswer(key:string):Promise<CachedCosAnswer|null> {
@@ -802,12 +831,14 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     enterpriseMemoriesUsed:context.enterpriseMemories.length,
     userMemoriesUsed:context.memories.length,
     cognitiveSkillsUsed:context.skills.length,
+    creativeMemoriesUsed:context.creativeMemories.length,
     enterpriseMemoryStatus:context.enterpriseMemoryStatus,
     enterpriseMemoryOrganizationId:context.enterpriseMemoryOrganizationId,
     evidenceFunnel:executionFunnel(context, false),
     cognitiveSkillFunnel:executionSkillFunnel(context, false),
+    creativeMemoryFunnel:executionCreativeMemoryFunnel(context, false),
   }
-  const contextWindow = [...context.facts, ...context.learned, ...context.enterpriseMemories, ...context.skills].join('\n')
+  const contextWindow = [...context.facts, ...context.learned, ...context.enterpriseMemories, ...context.skills, ...context.creativeMemories].join('\n')
   const scopedMemorySelected = context.enterpriseMemories.length > 0 || context.memories.length > 0
   const policyVersion = answerPolicyVersion()
   const cacheTaskId = cosCacheTaskId('cos-first-answer', policyVersion)
@@ -865,6 +896,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     context.enterpriseMemories.length ? `ORGANIZATION ENTERPRISE MEMORY:\n${context.enterpriseMemories.join('\n')}` : '',
     context.memories.length ? `SAVED USER MEMORY:\n${context.memories.join('\n')}` : '',
     context.skills.length ? `VALIDATED COGNITIVE PROCEDURAL SKILLS (HOW-TO GUIDANCE, NOT FACTUAL EVIDENCE):\n${context.skills.join('\n')}` : '',
+    context.creativeMemories.length ? `CREATIVE MEMORY — VALIDATED APPROACH PATTERNS (HOW TO SOLVE/PRESENT, NEVER FACTUAL EVIDENCE):\n${context.creativeMemories.join('\n')}` : '',
   ].filter(Boolean).join('\n\n')
 
   // Captured outside the .catch() so the failure path below can distinguish a RunPod capacity
@@ -898,6 +930,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     reasonerLabel:reasoned?.reasoner.label ?? resolved.config.label,
     evidenceFunnel:executionFunnel(context, true),
     cognitiveSkillFunnel:executionSkillFunnel(context, true),
+    creativeMemoryFunnel:executionCreativeMemoryFunnel(context, true),
   }
   if (!reasoned?.text) {
     // The one case this exists for: RunPod had no free GPU to start the pod. Everything else keeps
@@ -982,7 +1015,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     cognitiveSkillsCited:cited.sk,
     evidenceFunnel:executionFunnel(context, true, cited, enterpriseCited),
     cognitiveSkillFunnel:executionSkillFunnel(context, true, cited.sk),
-    ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
+    ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ ...canonicalSelfKnowledgeUsed, used:undefined } } : {}),
   }
   const groundedCount = citedKnowledgeEvidenceCount({ kg:cited.kg, cl:cited.cl, oem:enterpriseCited })
   const ceiling = groundedEvidenceCeiling(groundedCount, input.prompt)
@@ -1023,6 +1056,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       enterpriseMemoriesUsed:context.enterpriseMemories.length,
       userMemoriesUsed:context.memories.length,
       cognitiveSkillsUsed:context.skills.length,
+      creativeMemoriesUsed:context.creativeMemories.length,
       knowledgeFactsCited:cited.kg,
       learnedItemsCited:cited.cl,
       enterpriseMemoriesCited:enterpriseCited,
@@ -1030,7 +1064,8 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       cognitiveSkillsCited:cited.sk,
       evidenceFunnel:citedProvenance.evidenceFunnel,
       cognitiveSkillFunnel:citedProvenance.cognitiveSkillFunnel,
-      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
+      creativeMemoryFunnel:citedProvenance.creativeMemoryFunnel,
+      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ ...canonicalSelfKnowledgeUsed, used:undefined } } : {}),
     },
   }
   const cacheWriteBudgetMs = Number(process.env.COS_CACHE_WRITE_BUDGET_MS ?? '8000')
@@ -1057,7 +1092,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult, language='en'):string {
   const p = result.provenance
-  const evidence = `${p.knowledgeFactsUsed} knowledge facts, ${p.learnedItemsUsed} learned items, ${p.enterpriseMemoriesUsed} enterprise memories, ${p.cognitiveSkillsUsed} validated skills, ${p.userMemoriesUsed} saved memories`
+  const evidence = `${p.knowledgeFactsUsed} knowledge facts, ${p.learnedItemsUsed} learned items, ${p.enterpriseMemoriesUsed} enterprise memories, ${p.cognitiveSkillsUsed} validated skills, ${p.creativeMemoriesUsed} creative patterns, ${p.userMemoriesUsed} saved memories`
   const source = p.responseSource === 'semantic_cache' ? 'exact-match cache' : p.responseSource === 'semantic_similarity' ? `semantic match, similarity ${(p.similarityScore ?? 0).toFixed(2)}` : p.reasonerLabel
   if (language === 'pt') return result.handled ? `Fluxo: COS consultou primeiro seu conhecimento, corpus, memória empresarial, habilidades validadas e memória do usuário (${evidence}) → respondeu via ${source} com confiança ${result.confidence.toFixed(2)}. Nenhuma IA externa foi chamada.` : `Fluxo: COS consultou primeiro sua memória interna (${evidence}) → não atingiu confiança suficiente → IA externa é apenas o último recurso.`
   if (language === 'es') return result.handled ? `Flujo: COS consultó primero su conocimiento, corpus, memoria empresarial, habilidades validadas y memoria del usuario (${evidence}) → respondió vía ${source} con confianza ${result.confidence.toFixed(2)}. No se llamó IA externa.` : `Flujo: COS consultó primero su memoria interna (${evidence}) → no alcanzó confianza suficiente → la IA externa es solo el último recurso.`

@@ -13,6 +13,14 @@ export const HUGGING_FACE_OPEN_DATASETS = Object.freeze({
     vectorDimensions: 1536,
     mode: 'preembedded_cc0_dataset_search',
   }),
+  githubCc0: Object.freeze({
+    dataset: 'KoalaAI/GitHub-CC0',
+    config: 'default',
+    split: 'train',
+    license: 'cc0-1.0',
+    vectorDimensions: null,
+    mode: 'cc0_code_corpus_search',
+  }),
 } as const)
 
 const DATASET_SERVER = 'https://datasets-server.huggingface.co'
@@ -113,6 +121,65 @@ export function createHuggingFaceNistCybersecuritySearch(fetcher: FetchLike = fe
           `external_vector_sha256:${vectorSha}`,
           'external_vector_imported:false',
           metadata.type ? `dataset_material_type:${clean(metadata.type, 120)}` : '',
+        ].filter(Boolean),
+      }
+    }).filter((item: LearningConnectorResult | null): item is LearningConnectorResult => Boolean(item?.uri && item.text))
+  }
+}
+
+
+/**
+ * Free CC0/public-domain software corpus from GitHub repositories selected for CC0 content.
+ *
+ * This dataset does not provide a compatible external embedding column. The original text is
+ * discovered through Hugging Face Dataset Viewer search, retained only after the ordinary learning
+ * gates pass, and then embedded by iTMounts using the active canonical embedding model. Repository,
+ * language, filename and MIME provenance stay attached to the retained learning item.
+ */
+export function createHuggingFaceGithubCc0Search(fetcher: FetchLike = fetch): LearningConnectorSearch {
+  return async (query, limit) => {
+    const q = queryText(query)
+    if (!q) return []
+    const source = HUGGING_FACE_OPEN_DATASETS.githubCc0
+    const params = new URLSearchParams({
+      dataset: source.dataset,
+      config: source.config,
+      split: source.split,
+      query: q,
+      offset: '0',
+      length: String(Math.min(Math.max(1, limit), 10)),
+    })
+    const json = await getJson(`${DATASET_SERVER}/search?${params.toString()}`, fetcher)
+    return (json?.rows ?? []).map((entry: any): LearningConnectorResult | null => {
+      const row = entry?.row ?? {}
+      const body = clean(row?.text, 40_000)
+      if (!body) return null
+
+      const meta = metadataRecord(row?.meta)
+      const repoName = clean(meta.repo_name, 500)
+      const language = clean(meta.repo_language, 120)
+      const fileName = clean(meta.file_name, 500)
+      const mimeType = clean(meta.mime_type, 160)
+      const rowIndex = Number.isFinite(Number(entry?.row_idx)) ? Math.max(0, Math.floor(Number(entry.row_idx))) : null
+      const uri = rowIndex === null
+        ? `hf://datasets/${source.dataset}#${source.split}`
+        : `hf://datasets/${source.dataset}#${source.split}:${rowIndex}`
+      const title = [repoName, fileName].filter(Boolean).join(' / ') || 'GitHub CC0 software material'
+
+      return {
+        uri,
+        title,
+        text: body,
+        license: 'cc0 public-domain GitHub-CC0 software corpus',
+        evidence: [
+          `huggingface_dataset:${source.dataset}`,
+          `huggingface_dataset_license:${source.license}`,
+          'external_vector_imported:false',
+          'canonical_embedding_required:true',
+          repoName ? `github_repo:${repoName}` : '',
+          language ? `repo_language:${language}` : '',
+          fileName ? `repo_file:${fileName}` : '',
+          mimeType ? `repo_mime:${mimeType}` : '',
         ].filter(Boolean),
       }
     }).filter((item: LearningConnectorResult | null): item is LearningConnectorResult => Boolean(item?.uri && item.text))

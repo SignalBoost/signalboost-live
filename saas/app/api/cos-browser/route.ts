@@ -405,22 +405,12 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId))
   }
 
-  // MODEL-FIRST AGENT LOOP for genuinely semantic routing. A mutable travel itinerary is a known
-  // host-owned dependency: it always needs live evidence. Do not spend a model call rediscovering
-  // that fact before retrieval; route it straight to live_web and reserve the model budget for the
-  // final grounded itinerary.
-  const deterministicTravelPlan = requiresLiveTravelPlanningEvidence(prompt)
-  let agentDecision: CosAgentDecision | null = deterministicTravelPlan
-    ? {
-        mode: 'orchestrate',
-        answer: '',
-        confidence: 1,
-        capabilities: ['live_web'],
-        reason: 'host_travel_freshness_guard',
-        reasonerLabel: 'host-policy',
-      }
-    : null
-  if (!deterministicTravelPlan && !operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt)) {
+  // MODEL-FIRST AGENT LOOP: after hard host/security/surface special cases, the primary model sees
+  // every ordinary request before optional capability routing. It either answers now or requests the
+  // minimum native capability needed. The model never grants itself authority. Mutable travel still
+  // has a host freshness backstop below, but that guard runs only after the model's first decision.
+  let agentDecision: CosAgentDecision | null = null
+  if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt)) {
     agentDecision = await decideCosAgentTurn({
       prompt,
       previousAssistant: priorAnswer || null,

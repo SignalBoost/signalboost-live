@@ -2,7 +2,7 @@
 import { cosServiceDb, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import { persistKnowledgeFactWithEmbedding } from '@/lib/ai/cos/knowledgeFactSemantic'
 import type { KnowledgeFact } from '@/lib/cos-core/layers/knowledge/persistent'
-import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
+import { SEMANTIC_MEMORY_DEFINITION, CREATIVE_MEMORY_DEFINITION, ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
 
 const SOURCE_VERSION = 'platform-self-knowledge:v3'
 
@@ -29,6 +29,26 @@ export type PlatformSelfKnowledgeSeedResult = {
  */
 export function platformSelfKnowledgeFacts(updatedAt = new Date()): KnowledgeFact[] {
   return [
+    {
+      id: 'cos-platform-self-knowledge-semantic-memory-v1',
+      taskId: 'support',
+      subject: 'SignalBoost COS Semantic Memory',
+      predicate: 'authoritative_definition',
+      object: SEMANTIC_MEMORY_DEFINITION,
+      confidence: 1,
+      source: `${SOURCE_VERSION}:saas/lib/ai/cos/cosFirstAnswerEnterprise.ts;saas/lib/ai/cos/localEmbeddings.ts;saas/lib/ai/cos/learnedCorpusSemantic.ts;saas/lib/cos-core/storage/supabase.ts`,
+      updatedAt,
+    },
+    {
+      id: 'cos-platform-self-knowledge-creative-memory-v1',
+      taskId: 'support',
+      subject: 'SignalBoost COS Creative Memory',
+      predicate: 'authoritative_definition',
+      object: CREATIVE_MEMORY_DEFINITION,
+      confidence: 1,
+      source: `${SOURCE_VERSION}:saas/lib/ai/cos/creativeMemory.ts;saas/supabase/migrations/20260923193000_cos_creative_memory.sql;saas/lib/ai/cos/cosFirstAnswerEnterprise.ts`,
+      updatedAt,
+    },
     {
       id: 'cos-platform-self-knowledge-enterprise-memory-v1',
       taskId: 'support',

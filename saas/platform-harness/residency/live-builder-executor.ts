@@ -525,15 +525,18 @@ export function createLiveBuilderResidencyExecutor(input:{
               Date.now()+Math.max(60_000,deadline-20_000),
             minimumStepMs:25_000,
           })
+          const observationData:Record<string,unknown>={
+            builderOutcome:result.ok?'completed':'incomplete',
+            traceSteps:result.trace.length,
+          }
+          if(!result.ok){
+            observationData.failureCode=result.error
+          }
           context.observe({
             summary:result.ok
               ?'Resident Builder completed the practical work loop.'
               :'Resident Builder stopped before proving practical completion.',
-            data:{
-              builderOutcome:result.ok?'completed':'incomplete',
-              traceSteps:result.trace.length,
-              ...(result.ok?{}:{failureCode:result.error}),
-            },
+            data:observationData,
           })
         },
       }

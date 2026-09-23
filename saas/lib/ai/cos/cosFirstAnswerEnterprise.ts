@@ -448,7 +448,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     'CITING INTERNAL EVIDENCE:',
     '- [KG#] = Knowledge Graph fact; [CL#] = learned-corpus evidence; [OEM#] = organization-scoped Enterprise Memory; [EM#] = saved per-user memory; [SK#] = validated procedural skill. Cite a label inline only when it genuinely informed the answer.',
     '- [OEM#], [KG#], and [CL#] may ground factual claims. [EM#] is user context, not independent factual corroboration. [SK#] is HOW-to-reason guidance, not factual corroboration.',
-    '- [CM#] is validated creative/strategic guidance about HOW to solve or present a task. It is never factual evidence, never raises factual grounding confidence, and must never be cited to the user as proof of a real-world claim.'
+    '- [CM#] is validated creative/strategic guidance about HOW to solve or present a task. It is never factual evidence, never raises factual grounding confidence, and must never be cited to the user as proof of a real-world claim.',
     '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge. Selected full-content [CL#] evidence is mandatory: make it materially support a claim and cite it, or state that it does not answer the question; never silently ignore it.',
     '- NEVER cite an item that did not change what you wrote. Related-but-not-supporting evidence must remain uncited. An honest answer with zero factual citations is correct when supplied factual evidence was not useful.',
     '',

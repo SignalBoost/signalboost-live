@@ -12,6 +12,7 @@ import {
   type HarnessRunResult,
 } from '../platform-harness/index.ts'
 import type { ResidencyEvidenceForAssessment, ResidencyStanding } from '../lib/ai/cos/cosUniversityResidency.ts'
+import { selectBuilderResidencyEnrollmentForTick } from '../platform-harness/residency/orchestrator-store.ts'
 
 const h=(char:string)=>char.repeat(64)
 
@@ -129,6 +130,39 @@ function successfulResult(runId:string):HarnessRunResult{
 }
 
 const sink:HarnessEvidenceSink={async append(){}}
+
+
+test('Residency scheduling retries one recent infrastructure failure then rotates for fairness',()=>{
+  const enrollments=[
+    {id:'resident-a'},
+    {id:'resident-b'},
+    {id:'resident-c'},
+  ]
+  const oneFailure=selectBuilderResidencyEnrollmentForTick({
+    enrollments,
+    recentCases:[
+      {residency_id:'resident-b',harness_outcome:'infrastructure_failure',completed_at:'2026-09-23T15:08:00Z'},
+    ],
+  })
+  assert.equal(oneFailure?.id,'resident-b')
+
+  const secondFailure=selectBuilderResidencyEnrollmentForTick({
+    enrollments,
+    recentCases:[
+      {residency_id:'resident-b',harness_outcome:'infrastructure_failure',completed_at:'2026-09-23T15:18:00Z'},
+      {residency_id:'resident-b',harness_outcome:'infrastructure_failure',completed_at:'2026-09-23T15:08:00Z'},
+    ],
+  })
+  assert.equal(secondFailure?.id,'resident-a')
+
+  const competencyResult=selectBuilderResidencyEnrollmentForTick({
+    enrollments,
+    recentCases:[
+      {residency_id:'resident-b',harness_outcome:'success',completed_at:'2026-09-23T15:18:00Z'},
+    ],
+  })
+  assert.equal(competencyResult?.id,'resident-a')
+})
 
 test('coverage reports the complete Builder Residency v1 practical catalog',()=>{
   const coverage=assessBuilderResidencyCaseCoverage()

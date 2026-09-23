@@ -59,11 +59,11 @@ const TRAVEL_SOURCE_LANGUAGE_MARKERS: Record<SupportedResponseLanguage, RegExp> 
   pl: /\b(?:lotnisko|poci[aą]g|autobus|tramwaj|bilet|bilety|zwiedzanie|atrakcja|muzeum|godziny\s+otwarcia|cena|centrum|podr[oó][żz])\b/iu,
   en: /\b(?:airport|train|bus|tram|ticket|tickets|attraction|museum|opening\s+hours|public\s+transport|city\s+centre|city\s+center|visitor|tourism|travel)\b/iu,
   es: /\b(?:aeropuerto|tren|autob[uú]s|billete|entradas?|atracci[oó]n|museo|horario|transporte\s+p[uú]blico|centro|turismo|viaje)\b/iu,
-  pt: /\b(?:aeroporto|comboio|trem|autocarro|[oô]nibus|bilhete|ingresso|atra[cç][aã]o|museu|hor[aá]rio|transporte\s+p[uú]blico|centro|turismo|viagem)\b/iu,
+  pt: /\b(?:comboio|trem|autocarro|[oô]nibus|bilhete|ingresso|atra[cç][aã]o|museu|hor[aá]rio|transporte\s+p[uú]blico|viagem)\b/iu,
   ru: /\b(?:аэропорт|поезд|автобус|метро|трамвай|билет|достопримечательность|музей|часы\s+работы|общественный\s+транспорт|центр|туризм|путешествие)\b/iu,
 }
 
-const TRAVEL_OTHER_LANGUAGE_MARKERS = /\b(?:collegamenti|arrivare|biglietti|orari|trasporto|aeroporto|museo|tourisme|billets|a[eé]roport|verkehr|fahrkarten|flughafen|sehensw[uü]rdigkeiten)\b/iu
+const TRAVEL_OTHER_LANGUAGE_MARKERS = /\b(?:collegamenti|arrivare|biglietti|orari|trasporto|aeroporto|museo|come|tourisme|billets|a[eé]roport|verkehr|fahrkarten|flughafen|sehensw[uü]rdigkeiten)\b/iu
 
 const TRAVEL_USER_COUNTRY_TLDS: Record<SupportedResponseLanguage, readonly string[]> = {
   pl: ['pl'],
@@ -122,11 +122,9 @@ function rankTravelEvidence(results: SearchResult[], query: string): SearchResul
     return { result, index, preferred, preferenceScore }
   })
 
-  const ordered = scored
-    .sort((a, b) => b.preferenceScore - a.preferenceScore || a.index - b.index)
-    .map(item => item.result)
-
-  const preferred = scored.filter(item => item.preferred).map(item => item.result)
+  const sorted = scored.slice().sort((a, b) => b.preferenceScore - a.preferenceScore || a.index - b.index)
+  const ordered = sorted.map(item => item.result)
+  const preferred = sorted.filter(item => item.preferred).map(item => item.result)
   if (preferred.length < 2) return ordered
 
   const pool = [...preferred]

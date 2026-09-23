@@ -49,3 +49,18 @@ test('the Production failure phrase can only come from a freshness path that con
   assert.ok(guardedFreshCall >= 0)
   assert.match(core, /return learnFromTurn\(input, await tryFreshCurrentFact\(input\)\)/)
 })
+
+test('ordinary answerable turns do not pay a semantic-classifier round trip', () => {
+  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& \(heuristicRequiresFreshEvidence \|\| freshConversationContext\.contextUsed\)/)
+  const ownerFastPath = route.indexOf('if(access?.isOwner&&isPlatformSelfKnowledgePrompt(input))')
+  const semanticGate = route.indexOf('const semanticTaskIntentNeeded=')
+  assert.ok(ownerFastPath >= 0)
+  assert.ok(semanticGate > ownerFastPath, 'owner self-knowledge must release before semantic routing')
+})
+
+test('semantic intent calls are low-latency interactive classification, not 120-second reasoning', () => {
+  assert.match(semanticIntent, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'semantic_task_intent' \}/)
+  assert.match(semanticIntent, /disableThinking: true/)
+  assert.match(semanticIntent, /timeoutMs: 8_000/)
+  assert.match(semanticIntent, /jsonObject: true/)
+})

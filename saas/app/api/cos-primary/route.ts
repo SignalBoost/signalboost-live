@@ -11,7 +11,7 @@ import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerifi
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
-import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import {
   classifyAuthoritativeVolatileFact,
@@ -483,6 +483,21 @@ export async function postCosPrimary(req:NextRequest){
   }
 
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
+
+  // OWNER SELF-KNOWLEDGE FAST PATH: authorization is host-verified before this branch and the
+  // current user message is classified before conversation augmentation or any neural router.
+  // Public Concierge cannot enter because public delivery resolves to guest access in getAccess().
+  if(access?.isOwner&&isPlatformSelfKnowledgePrompt(input)){
+    const selfKnowledgeCos=await tryCOSFirstAnswer({prompt:input,previousAssistant:precedingAssistant||null,userId,language,privileged:true,disableCache:true})
+    if(selfKnowledgeCos.handled){
+      const executionProvenance=authoritativeProvenance(selfKnowledgeCos,{invoked:false})
+      const source:CosLiveResponseSource=selfKnowledgeCos.provenance.responseSource as CosLiveResponseSource
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:selfKnowledgeCos.reply,source,confidence:selfKnowledgeCos.confidence,provenance:selfKnowledgeCos.provenance,externalAiInvoked:false})
+      await writeCosPrimaryProvenance(userId,selfKnowledgeCos.reply,executionProvenance,'cos-owner-self-knowledge',{prompt:input,answered:true,confidence:selfKnowledgeCos.confidence,branch:'owner_self_knowledge'})
+      return NextResponse.json({reply:selfKnowledgeCos.reply,source:'cos-owner-self-knowledge',confidence_score:selfKnowledgeCos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:selfKnowledgeCos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:selfKnowledgeCos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
+  }
+
   const freshConversationContext=resolveFreshConversationContext(body, input)
   const lookupInput=freshConversationContext.lookupInput
 
@@ -540,10 +555,12 @@ export async function postCosPrimary(req:NextRequest){
   // A question about an earlier conversation with this user is answered from their own history, never from the public web.
   const conversationRecallRequested=Boolean(userId)&&detectConversationRecallIntent(input)
   const heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested
-  // Completion-first routing: natural human phrasing is not an API contract. Classify every
-  // ordinary non-action task semantically so research/current-fact requests cannot miss live
-  // retrieval merely because their wording did not match a freshness regex.
-  const semanticTaskIntent=!requestedAction
+  // Semantic intent is a disambiguator, not a toll booth in front of every answer. Run it only
+  // when freshness already needs adjudication or bounded conversation context is materially in play.
+  // Ordinary timeless/general questions proceed directly to COS without a pre-answer model call.
+  const semanticTaskIntentNeeded=!requestedAction
+    && (heuristicRequiresFreshEvidence || freshConversationContext.contextUsed)
+  const semanticTaskIntent=semanticTaskIntentNeeded
     ? await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     : null
   const semanticRequiresFreshEvidence=Boolean(

@@ -8,21 +8,21 @@ const core = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerCore.ts', import.
 const enterprise = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
 const topology = readFileSync(new URL('../lib/ai/cos/platformIdentityContext.ts', import.meta.url), 'utf8')
 
-test('authenticated owner self-knowledge is decided and answered by neural semantic reasoning', () => {
-  assert.match(shared, /async function tryOwnerNeuralSelfKnowledge/)
-  assert.match(shared, /callCosReasoner\(\{/)
-  assert.match(shared, /ownerPlatformIdentityContext\(\)/)
-  assert.match(shared, /Use neural semantic reasoning over the complete request/)
-  assert.match(shared, /Do not use keyword rules, regex intent matching, canned replies, or answer templates/)
-  assert.match(shared, /Distinguish the general COS reasoner from Builder\/Platform Engineer coding specialization/)
+test('authenticated owner self-knowledge uses verified deterministic runtime facts before neural fallback', () => {
+  assert.match(shared, /const ownerSelfKnowledge = input\.privileged === true/)
+  assert.match(shared, /const deterministicSelfKnowledge = await tryCoreCOSFirstAnswer\(input\)/)
+  assert.match(shared, /deterministicSelfKnowledge\.handled && coreReleasedCannedOwnerSelfKnowledge/)
+  assert.match(shared, /tryOwnerNeuralSelfKnowledge\(input, \{ compatibilitySignal: true \}\)/)
+  const deterministic = shared.indexOf('const deterministicSelfKnowledge = await tryCoreCOSFirstAnswer(input)')
+  const fallback = shared.indexOf('tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true })')
+  assert.ok(deterministic >= 0)
+  assert.ok(fallback > deterministic, 'neural self-knowledge may only run after deterministic runtime facts fail')
 })
 
-test('the active owner entrypoint does not define or release a canned model/spec answer', () => {
-  assert.doesNotMatch(shared, /function ownerPlatformStackReply/)
-  assert.doesNotMatch(shared, /selfKnowledgeDeterministic:\s*true/)
-  assert.match(shared, /coreReleasedCannedOwnerSelfKnowledge/)
-  assert.match(shared, /selfKnowledgeDeterministicBlocked:\s*true/)
-  assert.match(shared, /The deterministic compatibility answer was blocked rather than released/)
+test('owner self-knowledge no longer blocks a valid deterministic runtime answer', () => {
+  assert.doesNotMatch(shared, /selfKnowledgeDeterministicBlocked/)
+  assert.doesNotMatch(shared, /deterministic compatibility answer was blocked rather than released/i)
+  assert.match(shared, /return deterministicSelfKnowledge/)
 })
 
 test('trusted runtime context reports RunPod primary separately from DeepInfra fallback', () => {
@@ -51,12 +51,10 @@ test('public disclosure remains a deterministic safety boundary, separate from o
   assert.doesNotMatch(enterprise, /publicImplementationDisclosureReply/)
 })
 
-test('both legacy owner hardcode paths are identifiable so the active entrypoint can block them', () => {
+test('owner runtime topology remains host-owned and public disclosure stays separate', () => {
   assert.match(core, /selfKnowledgeDeterministic:\s*true/)
   assert.match(core, /function ownerPlatformStackReply/)
+  assert.match(core, /currentPlatformModelTopology\(\)/)
+  assert.doesNotMatch(core, /LOCAL_AI_MODEL \|\| 'Qwen\//)
   assert.match(enterprise, /PLATFORM TECHNICAL SPECIFICATION \(owner-only\):/)
-  const neuralAttempt = shared.indexOf('tryOwnerNeuralSelfKnowledge(input)')
-  const coreAttempt = shared.indexOf('tryCoreCOSFirstAnswer(input)')
-  assert.ok(neuralAttempt >= 0, 'neural owner self-knowledge attempt must exist')
-  assert.ok(coreAttempt > neuralAttempt, 'neural semantic reasoning must run before compatibility core')
 })

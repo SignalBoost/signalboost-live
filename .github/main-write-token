@@ -1,2 +1,2 @@
-base_sha=ed5b468dd7f6f7baeb316a341703fdb6f88109c8
-branch=fix/residency-loop-result-narrowing-20260922
+base_sha=228650d3df853b0a78d912fb35103519217de018
+branch=fix/residency-loop-result-typeguard-20260922

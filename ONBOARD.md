@@ -27,6 +27,8 @@ Canonical profiles are: `residency`, `production`, `sandbox`, `self_healing`, `s
 
 The executable surface is the intersection of **requested work + profile constraints + an already-verified Referee/Guardian/host authority envelope + Provider Hub capabilities actually assigned and available for the exact tenant/environment/portable identity**. Every executable action still passes through `agent-gateway/runGoverned()`; the harness cannot mint approval, route around a halt, widen Production scope, grant spend, promote a model, or convert task success into authority.
 
+Residency infrastructure recovery invariant: independently attributed, recognized exact-runtime faults may enter a registered Self-Healing action through the Governed Socket. The action may reconcile only already-existing exact RunPod resources to the approved template/GPU/scale-to-zero envelope. It may not create provider resources, wake compute, invoke a model, promote an artifact, authorize Production traffic, or repair auth/identity failures automatically.
+
 Ownership stays separated:
 
 - infrastructure/environment/provider/tool failure -> **Self-Healing**;

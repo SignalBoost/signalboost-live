@@ -21,7 +21,7 @@ const WINDOW_HOURS = 24
 const OPEN_SOURCE_CATALOG = Object.freeze([
   { id: 'openalex', name: 'OpenAlex', integration: 'implemented', vectorSpace: 'openalex_gte_large_en_v1', mode: 'remote_semantic_index' },
   { id: 'semantic_scholar', name: 'Semantic Scholar / S2ORC', integration: 'implemented', vectorSpace: 'semantic_scholar_specter2_proximity_v2', mode: 'precomputed_document_vector' },
-  { id: 'huggingface_open_datasets', name: 'Hugging Face open datasets', integration: 'implemented', vectorSpace: 'nist_cybersecurity_training_1536', mode: 'preembedded_cc0_dataset_search' },
+  { id: 'huggingface_open_datasets', name: 'Hugging Face open datasets', integration: 'implemented', vectorSpace: null, mode: 'allowlisted_cc0_corpora_source_vectors_plus_internal_reembedding' },
   { id: 'wikimedia', name: 'Wikipedia / Wikimedia', integration: 'implemented', vectorSpace: null, mode: 'open_reference_corpus' },
 ] as const)
 

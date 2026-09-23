@@ -207,3 +207,20 @@ constraints. Admission never grants final evaluation, promotion, Production traf
 
 This prevents the final-evaluation Residency gate from becoming a dead queue: protected Builder artifacts
 must have a bounded automatic path from `evaluation_pending` into practical Residency.
+
+
+## Residency exact-artifact runtime
+
+Residency executes **before** the final exact-artifact canary. Its model binding therefore may not depend
+on prior canary evidence. The Residency host resolves the exact immutable trained artifact from
+`cos_local_distillation_artifacts`, validates candidate/artifact hash/revision/status/authority state,
+parses the immutable Hugging Face model revision, and provisions an isolated scale-to-zero RunPod
+runtime using a Residency-specific runtime key.
+
+Runtime provisioning/readiness is infrastructure evidence only. It does **not** write
+`production_canary_healthy`, does not satisfy the post-Residency final-canary gate, and does not authorize
+Production traffic or promotion.
+
+A provider/sandbox/runtime failure before practical execution is routed to Self-Healing and creates no
+competency verdict. The same unseen case variant may be attempted again after infrastructure recovery;
+only durable competency evidence remains unique per residency + competency + variant.

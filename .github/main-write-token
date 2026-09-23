@@ -1,2 +1,2 @@
-base_sha=c99d814fabace16716b8f15d362e08291efa7802
-branch=fix/residency-cancel-timeout-selfheal-20260923
+base_sha=8c610f8b43ae1ba8d269d6426b619a2970dc0f3c
+branch=feat/working-cos-open-source-telemetry-20260923

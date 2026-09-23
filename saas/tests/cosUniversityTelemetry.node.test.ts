@@ -52,6 +52,30 @@ test('University telemetry seeds active hosted teachers before live rows so new 
 })
 
 
+test('University telemetry exposes a separate open-source acquisition lane with truthful observed counts', () => {
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
+  const page = source('app/dashboard/cos-university-telemetry/page.tsx')
+  const copy = source('lib/i18n/cosUniversityTelemetryCopy.ts')
+  const semanticResearch = source('lib/cos-core/layers/learning/semanticResearch.ts')
+
+  assert.match(route, /OPEN_SOURCE_CATALOG/)
+  assert.match(route, /openalex_gte_large_en_v1/)
+  assert.match(route, /semantic_scholar_specter2_proximity_v2/)
+  assert.match(route, /Hugging Face open datasets/)
+  assert.match(route, /Wikipedia \/ Wikimedia/)
+  assert.match(route, /items24h/)
+  assert.match(route, /embedded24h/)
+  assert.match(route, /status: source\.items24h > 0 \? 'observed' : source\.integration/)
+  assert.match(route, /sourceAccessCostUsd24h:\s*0/)
+  assert.match(page, /copy\.openSourcesTitle/)
+  assert.match(page, /copy\.openSourceStates/)
+  assert.match(page, /summary\.openSourceItems24h/)
+  assert.match(copy, /Shared acquisition for Working COS and University/)
+  assert.match(semanticResearch, /openalex_gte_large_en_v1/)
+  assert.match(semanticResearch, /semantic_scholar_specter2_proximity_v2/)
+})
+
+
 test('University telemetry hot-path migration matches the Production sort/filter patterns', () => {
   const migration = source('supabase/migrations/20260920064000_university_telemetry_backpressure_indexes.sql')
   assert.match(migration, /cos_mass_runs_updated_desc_idx/)

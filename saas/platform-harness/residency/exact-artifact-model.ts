@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { servedCandidateModelFromCanary, type CanaryEventRow } from '../../lib/ai/cos/cosUniversityMassEvaluationServedModel.ts'
+import { provisionMassDistilledRuntime, canaryMassDistilledRuntime } from '../../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
 
 export interface BuilderResidencyModelIdentity {
   candidateId:string
@@ -17,7 +17,6 @@ export interface BuilderResidencyModelPort {
   }>
 }
 
-const ENDPOINT=/^[a-z0-9_-]{3,120}$/
 const HASH=/^[a-f0-9]{64}$/
 
 export function createRunpodBuilderResidencyModelPort(input:{
@@ -37,29 +36,25 @@ export function createRunpodBuilderResidencyModelPort(input:{
       if(!candidateId||!artifactId||!HASH.test(artifactHash)||!HASH.test(revisionKey)) throw new Error('residency_exact_artifact_identity_invalid')
       if(!input.apiKey.trim()) throw new Error('residency_runpod_key_missing')
 
-      const events=await input.db.from('cos_university_learning_assurance_events')
-        .select('verifier,evidence,observed_at')
-        .eq('event_type','fine_tune')
-        .eq('candidate_id',candidateId)
-        .eq('verifier','host_controller')
-        .contains('evidence',{claim:'local_distilled_runtime_canary_passed',exactArtifact:true})
-        .order('observed_at',{ascending:false})
-        .limit(100)
-      if(events.error) throw events.error
+      // Residency precedes the final Production canary. Bind directly to the immutable
+      // trained artifact in an isolated scale-to-zero/max-1 RunPod runtime instead of
+      // requiring later-stage canary evidence (which would make the lifecycle circular).
+      const provisioned=await provisionMassDistilledRuntime({
+        candidateId,
+        subjectId:'computer_science_coding',
+        artifactId,
+        artifactRevision:revisionKey,
+        artifactHash,
+        runtimeKey:'residency',
+      })
+      const endpointId=String(provisioned.endpointId||'').trim().toLowerCase()
+      const modelId=String(provisioned.modelName||'').trim()
+      if(!endpointId||!modelId) throw new Error('residency_exact_artifact_runtime_binding_missing')
 
-      const rows=(events.data??[]) as CanaryEventRow[]
-      let endpointId=''; let modelId=''
-      for(const row of rows){
-        const evidence=(row as any).evidence??{}
-        const endpoint=String(evidence.endpointId||'').trim().toLowerCase()
-        if(!ENDPOINT.test(endpoint)) continue
-        if(String(evidence.candidateId||'')!==candidateId) continue
-        if(String(evidence.artifactHash||'').toLowerCase()!==artifactHash) continue
-        if(evidence.trainedArtifactId&&String(evidence.trainedArtifactId)!==artifactId) continue
-        if(evidence.revisionKey&&String(evidence.revisionKey).toLowerCase()!==revisionKey) continue
-        try{modelId=servedCandidateModelFromCanary(rows,{candidateId,artifactHash,endpointId:endpoint});endpointId=endpoint;break}catch{}
-      }
-      if(!endpointId||!modelId) throw new Error('residency_exact_canary_serving_identity_missing')
+      // Infrastructure-only prewarm/readiness. This does not write final-canary evidence
+      // and therefore cannot satisfy or weaken any later graduation gate.
+      const prewarm=await canaryMassDistilledRuntime({endpointId,modelName:modelId})
+      if(!prewarm.ok) throw new Error(`residency_exact_artifact_runtime_not_ready:${prewarm.error||prewarm.httpStatus||'unknown'}`)
 
       const response=await call(`https://${endpointId}.api.runpod.ai/v1/chat/completions`,{
         method:'POST',

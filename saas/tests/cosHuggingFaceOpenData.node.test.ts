@@ -5,6 +5,7 @@ import {
   HUGGING_FACE_OPEN_DATASETS,
 } from '../lib/cos-core/layers/learning/huggingFaceOpenData.ts'
 import { createLiveLearningAdapters } from '../lib/cos-core/layers/learning/liveSources.ts'
+import { classifyMassDistillationRights } from '../lib/ai/cos/cosUniversityMassDistillation.ts'
 
 function fakeResponse(body: unknown, status = 200) {
   return {
@@ -89,4 +90,15 @@ test('shared live-learning factory includes HF NIST only when enabled and keeps 
     evidence: [],
   })
   assert.deepEqual(unrelated, [])
+})
+
+test('HF NIST CC0 material is admitted by the existing mass-distillation rights classifier', () => {
+  assert.equal(
+    classifyMassDistillationRights('cc0 public-domain NIST cybersecurity training dataset; source publications are public domain'),
+    'cc0',
+  )
+  assert.equal(
+    classifyMassDistillationRights('Hugging Face public dataset with unknown training rights'),
+    null,
+  )
 })

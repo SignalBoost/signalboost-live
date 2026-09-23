@@ -9,6 +9,7 @@ import { runBuilderResidencyOrchestrator } from '@/platform-harness/residency/or
 import { admitNextBuilderResidency } from '@/platform-harness/residency/admission-store'
 import { createSupabaseBuilderResidencyOrchestratorStore } from '@/platform-harness/residency/orchestrator-store'
 import { createSupervisorAuditHarnessEvidenceSink } from '@/platform-harness/evidence/supervisor-audit-sink'
+import { actuateBuilderResidencyRuntimeRecovery } from '@/self-healing-host/builder-residency-runtime-recovery'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -46,6 +47,16 @@ function publicResult(result: any, admission?: any) {
       remediationCompetencies: result.assessment.remediationCompetencies,
     } : {}),
     ...(result.practiceCase ? { practiceCase: result.practiceCase } : {}),
+    ...(result.selfHealing ? {
+      selfHealing: {
+        attempted: result.selfHealing.attempted === true,
+        completed: result.selfHealing.completed === true,
+        failureCode: result.selfHealing.failureCode,
+        message: result.selfHealing.message,
+        authorityExpanded: false,
+        productionTrafficAuthorized: false,
+      },
+    } : {}),
     ...(admission ? {
       admission: {
         ok: admission.ok,
@@ -114,6 +125,7 @@ export async function GET(req: Request) {
       harnessEvidenceSink,
       authorityFor: async () => createBuilderResidencyNativeAuthority(),
       requestedCapabilities: BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
+      repairInfrastructure: actuateBuilderResidencyRuntimeRecovery,
     })
 
     return NextResponse.json(publicResult(result, admission), {

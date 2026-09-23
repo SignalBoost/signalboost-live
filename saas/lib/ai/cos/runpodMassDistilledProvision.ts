@@ -36,6 +36,8 @@ export type MassDistilledRuntimeArtifact = Readonly<{
   artifactHash: string
   /** Host-derived approval-scoped key. It isolates a fresh provider runtime after a preflight failure. */
   runtimeKey?: string
+  /** Optional bounded idle window for a caller that needs one warm retry. Defaults to the canary policy. */
+  idleTimeoutSeconds?: number
 }>
 
 type Template = { id:string; name:string; imageName?:string; isServerless?:boolean; dockerEntrypoint?:string[]; dockerStartCmd?:string[]; ports?:string[] }
@@ -86,8 +88,20 @@ async function requestGraphQl<T>(query:string,variables:Record<string,unknown>):
   return payload.data
 }
 
+const MAX_CALLER_IDLE_TIMEOUT_SECONDS = 300
+
+function artifactIdleTimeoutSeconds(input:MassDistilledRuntimeArtifact){
+  if(input.idleTimeoutSeconds===undefined) return IDLE_TIMEOUT_SECONDS
+  const value=Number(input.idleTimeoutSeconds)
+  if(!Number.isInteger(value)||value<IDLE_TIMEOUT_SECONDS||value>MAX_CALLER_IDLE_TIMEOUT_SECONDS){
+    throw new Error('mass_distilled_runtime_idle_timeout_invalid')
+  }
+  return value
+}
+
 function assertArtifact(input:MassDistilledRuntimeArtifact){
   if(!input.candidateId.startsWith('mass:')||!input.artifactId||!HEX40.test(input.artifactRevision)||!HEX64.test(input.artifactHash)) throw new Error('mass_distilled_runtime_artifact_invalid')
+  artifactIdleTimeoutSeconds(input)
 }
 
 function identity(input:MassDistilledRuntimeArtifact){
@@ -191,16 +205,16 @@ async function gpuPools():Promise<string[]>{
   return [...APPROVED_POOLS]
 }
 
-function assertEndpointSafetyPolicy(endpoint:Endpoint){
+function assertEndpointSafetyPolicy(endpoint:Endpoint,idleTimeoutSeconds=IDLE_TIMEOUT_SECONDS){
   if(endpoint.type!==ROUTING) throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
-  if(Number(endpoint.workers?.min??Number.NaN)!==0||Number(endpoint.workers?.max??Number.NaN)>1||Number(endpoint.workers?.idleTimeout??Number.NaN)>IDLE_TIMEOUT_SECONDS) throw new Error('mass_distilled_runtime_endpoint_worker_policy_drift')
+  if(Number(endpoint.workers?.min??Number.NaN)!==0||Number(endpoint.workers?.max??Number.NaN)>1||Number(endpoint.workers?.idleTimeout??Number.NaN)>idleTimeoutSeconds) throw new Error('mass_distilled_runtime_endpoint_worker_policy_drift')
   if(Number(endpoint.gpu?.count??Number.NaN)!==1) throw new Error('mass_distilled_runtime_endpoint_gpu_count_drift')
   const pools=(endpoint.gpu?.pools||[]).map(pool=>clean(pool,80))
   if(pools.length!==APPROVED_POOLS.length||!APPROVED_POOLS.every(pool=>pools.includes(pool))) throw new Error('mass_distilled_runtime_endpoint_gpu_pool_drift')
 }
 
-function assertEndpointPolicy(endpoint:Endpoint,templateId:string){
-  assertEndpointSafetyPolicy(endpoint)
+function assertEndpointPolicy(endpoint:Endpoint,templateId:string,idleTimeoutSeconds=IDLE_TIMEOUT_SECONDS){
+  assertEndpointSafetyPolicy(endpoint,idleTimeoutSeconds)
   if(clean(endpoint.templateId,200)!==templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
 }
 
@@ -229,7 +243,7 @@ async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEnd
   }
 }
 
-async function createMassEndpointViaGraphQl(input:{name:string;templateId:string;pools:string[]}):Promise<Endpoint>{
+async function createMassEndpointViaGraphQl(input:{name:string;templateId:string;pools:string[];idleTimeoutSeconds:number}):Promise<Endpoint>{
   const data=await requestGraphQl<{saveEndpoint?:{id?:string;name?:string;type?:'QB'|'LB';templateId?:string;modelReferences?:string[]}}>(`
     mutation SaveMassDistilledEndpoint($input: EndpointInput!) {
       saveEndpoint(input: $input) {
@@ -248,7 +262,7 @@ async function createMassEndpointViaGraphQl(input:{name:string;templateId:string
     gpuCount:1,
     workersMin:0,
     workersMax:1,
-    idleTimeout:IDLE_TIMEOUT_SECONDS,
+    idleTimeout:input.idleTimeoutSeconds,
     scalerType:'REQUEST_COUNT',
     scalerValue:1,
     executionTimeoutMs:300000,
@@ -294,20 +308,21 @@ async function recoverEndpointId(endpoint:Endpoint|undefined,endpointName:string
   return endpoint
 }
 
-async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string):Promise<Endpoint>{
-  assertEndpointSafetyPolicy(endpoint)
+async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string,idleTimeoutSeconds=IDLE_TIMEOUT_SECONDS):Promise<Endpoint>{
+  assertEndpointSafetyPolicy(endpoint,idleTimeoutSeconds)
   if(clean(endpoint.templateId,200)===templateId) return endpoint
   await requestV1<unknown>(`/endpoints/${encodeURIComponent(endpoint.id)}`,{method:'PATCH',body:JSON.stringify({templateId})})
   const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
   const refreshed=(listed.endpoints||[]).find(item=>item.id===endpoint.id&&item.name===endpoint.name)
   if(!refreshed) throw new Error('mass_distilled_runtime_endpoint_template_rebind_missing')
   if(clean(refreshed.templateId,200)!==templateId) throw new Error('mass_distilled_runtime_endpoint_template_rebind_failed')
-  assertEndpointPolicy(refreshed,templateId)
+  assertEndpointPolicy(refreshed,templateId,idleTimeoutSeconds)
   return refreshed
 }
 
 export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeArtifact){
   assertArtifact(input)
+  const idleTimeoutSeconds=artifactIdleTimeoutSeconds(input)
   const token=process.env.HF_TOKEN?.trim()||''; if(token.length<20) throw new Error('HF_TOKEN is not configured')
   const ids=identity(input); const templates=await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')
   let template=templates.find(item=>item.name===ids.templateName&&item.isServerless!==false); let createdTemplate=false
@@ -347,7 +362,7 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
       }
       if(attempt>0) await new Promise(resolve=>setTimeout(resolve,1000*attempt))
       try{
-        endpoint=await createMassEndpointViaGraphQl({name:ids.endpointName,templateId:template.id,pools})
+        endpoint=await createMassEndpointViaGraphQl({name:ids.endpointName,templateId:template.id,pools,idleTimeoutSeconds})
         createdEndpoint=true
       }catch(error){
         if(!runpodWorkerQuotaError(error)) throw error
@@ -356,10 +371,10 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
     }
     if(!endpoint&&quotaError) throw quotaError
   }
-  else {const previousTemplateId=clean(endpoint.templateId,200); endpoint=await rebindEndpointTemplate(endpoint,template.id); reboundTemplate=previousTemplateId!==template.id}
+  else {const previousTemplateId=clean(endpoint.templateId,200); endpoint=await rebindEndpointTemplate(endpoint,template.id,idleTimeoutSeconds); reboundTemplate=previousTemplateId!==template.id}
   endpoint=await recoverEndpointId(endpoint,ids.endpointName)
   if(!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
-  assertEndpointPolicy(endpoint,template.id)
+  assertEndpointPolicy(endpoint,template.id,idleTimeoutSeconds)
   return Object.freeze({...ids,endpointId:endpoint.id,createdTemplate,createdEndpoint,reboundTemplate,workersMin:Number(endpoint.workers?.min),workersMax:Number(endpoint.workers?.max),idleTimeout:Number(endpoint.workers?.idleTimeout),baseUrl:`https://${endpoint.id}.api.runpod.ai/v1`})
 }
 

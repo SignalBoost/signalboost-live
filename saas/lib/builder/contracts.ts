@@ -35,7 +35,7 @@ export interface BuilderRunnerPort {
 }
 
 export interface BuilderAiPort {
-  generate(input: { systemPrompt: string; prompt: string; maxTokens: number }): Promise<string | null>
+  generate(input: { systemPrompt: string; prompt: string; maxTokens: number; signal?: AbortSignal }): Promise<string | null>
 }
 
 export type BuilderMcpReadCapability = Readonly<{

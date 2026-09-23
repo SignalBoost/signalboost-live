@@ -18,7 +18,7 @@ export interface BuilderResidencyPreparedRuntime {
 
 export interface BuilderResidencyModelPort {
   prepare?(identity:BuilderResidencyModelIdentity):Promise<BuilderResidencyPreparedRuntime>
-  complete(input:{identity:BuilderResidencyModelIdentity;system:string;user:string;maxTokens?:number}):Promise<{
+  complete(input:{identity:BuilderResidencyModelIdentity;system:string;user:string;maxTokens?:number;signal?:AbortSignal}):Promise<{
     text:string
     endpointId:string
     modelId:string
@@ -293,7 +293,9 @@ export function createRunpodBuilderResidencyModelPort(input:{
             {role:'user',content:request.user},
           ],
         }),
-        signal:AbortSignal.timeout(timeoutMs),
+        signal:request.signal
+          ?AbortSignal.any([request.signal,AbortSignal.timeout(timeoutMs)])
+          :AbortSignal.timeout(timeoutMs),
       })
       const raw=await response.text()
       if(!response.ok) throw new Error(`residency_exact_artifact_inference_http_${response.status}`)

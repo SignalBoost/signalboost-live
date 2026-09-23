@@ -59,6 +59,32 @@ test('an absent deadline preserves the previous unbounded-clock behaviour', asyn
   assert.equal(result.ok, true)
 })
 
+test('model-round timeout aborts abandoned provider work before retrying', async () => {
+  let calls = 0
+  let aborts = 0
+  const ai: BuilderAiPort = {
+    generate: async ({ signal }) => {
+      calls += 1
+      assert.ok(signal, 'bounded Builder model calls must receive an AbortSignal')
+      return await new Promise<string | null>(() => {
+        signal.addEventListener('abort', () => { aborts += 1 }, { once: true })
+      })
+    },
+  }
+  const loop = new BuilderToolLoop(ai, workspaceStub(), runnerStub)
+  const result = await loop.run({
+    objective: 'Inspect the workspace.',
+    workspaceId: 'ws',
+    maxRounds: 1,
+    modelRoundTimeoutMs: 5,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.error, 'builder_model_round_timeout')
+  assert.equal(calls, 2, 'the bounded retry still runs once')
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.equal(aborts, 2, 'each abandoned provider attempt is cancelled')
+})
+
 test('the durable job passes its own deadline down and no longer caps rounds at a low constant', () => {
   assert.match(jobRunner, /maxRounds: 96/)
   assert.match(jobRunner, /deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS/)

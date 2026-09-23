@@ -399,12 +399,16 @@ function exactArtifactBuilderAi(input:{
           system:request.systemPrompt,
           user:request.prompt,
           maxTokens:request.maxTokens,
+          signal:request.signal,
         })
         if(out.exactArtifact!==true||!out.text.trim()){
           throw new Error('residency_exact_artifact_response_invalid')
         }
         return out.text
       }catch(error){
+        if(request.signal?.aborted){
+          throw new Error('builder_model_round_timeout')
+        }
         const code=error instanceof Error
           ?error.message
           :'residency_exact_artifact_inference_failed'
@@ -564,6 +568,9 @@ export function createLiveBuilderResidencyExecutor(input:{
               Date.now()+Math.max(60_000,deadline-20_000),
             minimumStepMs:25_000,
           })
+          if(!result.ok&&result.error==='builder_model_round_timeout'){
+            markInfrastructureFailure('residency_exact_artifact_inference_timeout')
+          }
           const observationData:Record<string,unknown>={
             builderOutcome:result.ok?'completed':'incomplete',
             traceSteps:result.trace.length,

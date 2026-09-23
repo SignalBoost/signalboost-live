@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosServiceDb } from '../../cos-core/storage/service-db.ts'
 
 export const COS_UNIVERSITY_DISTILLATION_ASSET_VAULT_PROFILE =
   'cos-university-distillation-asset-vault-v1' as const

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { autoPromoteLearnedKnowledge } from '@/lib/ai/cos/autoPromoteLearning'
 import { backfillKnowledgeFactEmbeddings } from '@/lib/ai/cos/knowledgeFactSemantic'
 import { backfillLearnedCorpusEmbeddings } from '@/lib/ai/cos/learnedCorpusSemantic'
+import { backfillCreativeMemoryEmbeddings } from '@/lib/ai/cos/creativeMemory'
 import { seedPlatformSelfKnowledge } from '@/lib/ai/cos/platformSelfKnowledge'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -35,7 +36,8 @@ export async function GET(req: NextRequest) {
   const platformSelfKnowledge = await seedPlatformSelfKnowledge()
   const semanticBackfill = await backfillKnowledgeFactEmbeddings(4)
   const corpusBackfill = await backfillLearnedCorpusEmbeddings(4)
+  const creativeMemoryBackfill = await backfillCreativeMemoryEmbeddings(4)
   const promotion = await autoPromoteLearnedKnowledge(5, deadlineMs)
-  const ok = platformSelfKnowledge.failed === 0 && promotion.status !== 'error' && semanticBackfill.status !== 'error' && corpusBackfill.status !== 'error'
-  return NextResponse.json({ ok, platformSelfKnowledge, semanticBackfill, corpusBackfill, promotion }, { status: ok ? 200 : 500 })
+  const ok = platformSelfKnowledge.failed === 0 && promotion.status !== 'error' && semanticBackfill.status !== 'error' && corpusBackfill.status !== 'error' && creativeMemoryBackfill.failed === 0
+  return NextResponse.json({ ok, platformSelfKnowledge, semanticBackfill, corpusBackfill, creativeMemoryBackfill, promotion }, { status: ok ? 200 : 500 })
 }

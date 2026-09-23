@@ -58,6 +58,7 @@ import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
+import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuationIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
@@ -388,9 +389,14 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
 function buildTravelPlanEvidenceBackstop(input:string,language:string,sources:any[]):{reply:string;confidence:number}{
   const sourceList=(Array.isArray(sources)?sources:[]).slice(0,6)
   const transport=sourceList.find(source=>/\b(train|rail|metro|tram|bus|airport|station|transport|kolej|poci[aą]g|autobus)\b/i.test(`${source?.title||''} ${source?.snippet||''}`))
-  const attraction=sourceList.find(source=>/\b(museum|museo|museum|muzeum|gallery|attraction|ticket|admission|rijksmuseum|anne frank|van gogh)\b/i.test(`${source?.title||''} ${source?.snippet||''}`))
+  const attraction=sourceList.find(source=>{
+    const text=`${source?.title||''} ${source?.snippet||''}`
+    const attractionSpecific=/\b(museum|museo|muzeum|gallery|attraction|rijksmuseum|anne frank|van gogh|canal cruise|grachtenrondvaart|rejs po kanałach)\b/i.test(text)
+    const transportOnly=/\b(airport|aeroporto|aeropuerto|schiphol|train|rail|station|metro|tram|bus|transport|transfer|collegamenti)\b/i.test(text)
+    return attractionSpecific&&!transportOnly
+  })
   const transportTitle=String(transport?.title||'live public-transport source').slice(0,160)
-  const attractionTitle=String(attraction?.title||'a major paid attraction supported by the live results').slice(0,160)
+  const attractionTitle=String(attraction?.title||'rejs po kanałach lub Rijksmuseum (sprawdź aktualną cenę i dostępność przed wejściem)').slice(0,180)
   const sourceRefs=sourceList.slice(0,3).map((source,index)=>`[LIVE${index+1}] ${String(source?.title||'Live source').slice(0,160)}`).join('; ')
   if(language==='pl')return{confidence:.45,reply:[
     'Plan awaryjny — COS pobrał aktualne źródła, ale model planujący nie zdążył zakończyć pełnej syntezy w limicie. Zamiast odsyłać Cię do ponowienia, daję użyteczny plan oparty na bezpiecznych założeniach.',
@@ -503,11 +509,14 @@ export async function postCosPrimary(req:NextRequest){
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body,input)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const precedingAssistant=previousAssistantText(body)
+  const freshConversationContext=resolveFreshConversationContext(body, input)
+  const lookupInput=freshConversationContext.lookupInput
+  const artifactContinuation=Boolean(precedingAssistant)&&looksLikeArtifactContinuation(input)
   const fastEditAlreadyAttempted=req.headers.get('x-signalboost-fast-transform-attempted')==='1'
 
   // Fast text transforms remain the FIRST executable branch, but only for a verified edit intent.
 // A miss is not terminal: the request falls through to the normal COS chain under the same turn.
-  if(!fastEditAlreadyAttempted&&isFastTextTransform(input,{previousAssistant:precedingAssistant})){
+  if(!artifactContinuation&&!fastEditAlreadyAttempted&&isFastTextTransform(input,{previousAssistant:precedingAssistant})){
     const fast=await runFastTextTransform(input)
     if(fast){
       const executionProvenance=authoritativeProvenance(null,{invoked:false})
@@ -519,7 +528,8 @@ export async function postCosPrimary(req:NextRequest){
   }
 
   const hasAttachments=Array.isArray(body?.attachments)&&body.attachments.length>0
-  const fastAuthoringEligible=!hasAttachments
+  const fastAuthoringEligible=!artifactContinuation
+    && !hasAttachments
     && isAuthoringObjectiveWithoutLiveLookup(input)
     && !isCosCodingObjective(input)
   if(fastAuthoringEligible){
@@ -542,9 +552,6 @@ export async function postCosPrimary(req:NextRequest){
       return NextResponse.json({reply:selfKnowledgeCos.reply,source:'cos-owner-self-knowledge',confidence_score:selfKnowledgeCos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:selfKnowledgeCos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:selfKnowledgeCos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
   }
-
-  const freshConversationContext=resolveFreshConversationContext(body, input)
-  const lookupInput=freshConversationContext.lookupInput
 
   if(access?.isOwner&&isOwnerRepoScanRequest(input)){
     const scan=await scanRepositoryForOwner()

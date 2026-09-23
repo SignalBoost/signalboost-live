@@ -351,7 +351,7 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
         allowTruncatedText:true,
         timeoutMs:Math.min(TRAVEL_PLAN_RESCUE_TIMEOUT_MS,remaining),
         allowConfiguredFallback:false,
-        persistUsage:true,
+        persistUsage:false,
         usageContext:{feature:'cos_interactive_travel_plan',purpose:'travel_plan_grounded'},
         systemPrompt:attempt.systemPrompt,
         prompt:attempt.prompt,

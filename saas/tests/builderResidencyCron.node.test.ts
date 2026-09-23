@@ -44,7 +44,7 @@ test('Vercel schedules bounded Residency separately from final exams', async () 
       entry.path === '/api/cron/cos-university-residency',
   )
   assert.ok(item)
-  assert.equal(item.schedule, '12,22,32,42,52 * * * *')
+  assert.equal(item.schedule, '2,12,22,32,42,52 * * * *')
   assert.equal(vercel.env.COS_UNIVERSITY_RESIDENCY_ENABLED, 'true')
 })
 

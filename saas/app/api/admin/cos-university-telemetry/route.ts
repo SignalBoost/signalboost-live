@@ -15,7 +15,15 @@ const PROVIDER_JOBS = 'cos_university_mass_distillation_provider_jobs'
 const ARTIFACTS = 'cos_local_distillation_artifacts'
 const EVALUATIONS = 'cos_university_distilled_evaluation_runs'
 const GRADUATES = 'cos_university_graduate_model_registry'
+const LEARNING = 'cos_continuous_learning'
 const WINDOW_HOURS = 24
+
+const OPEN_SOURCE_CATALOG = Object.freeze([
+  { id: 'openalex', name: 'OpenAlex', integration: 'implemented', vectorSpace: 'openalex_gte_large_en_v1', mode: 'remote_semantic_index' },
+  { id: 'semantic_scholar', name: 'Semantic Scholar / S2ORC', integration: 'implemented', vectorSpace: 'semantic_scholar_specter2_proximity_v2', mode: 'precomputed_document_vector' },
+  { id: 'huggingface_open_datasets', name: 'Hugging Face open datasets', integration: 'candidate', vectorSpace: null, mode: 'open_dataset_corpus' },
+  { id: 'wikimedia', name: 'Wikipedia / Wikimedia', integration: 'candidate', vectorSpace: null, mode: 'open_reference_corpus' },
+] as const)
 
 function n(value: unknown): number {
   const parsed = Number(value)
@@ -61,6 +69,30 @@ function stageBucket(stage: unknown): 'complete' | 'failed' | 'in_flight' {
   return 'in_flight'
 }
 
+function openSourceId(row: any): string | null {
+  const evidence = Array.isArray(row?.evidence)
+    ? row.evidence.map((value: unknown) => text(value, 1000)).join(' ')
+    : text(row?.evidence, 3000)
+  const haystack = [
+    text(row?.source_kind, 120),
+    text(row?.source_uri, 1200),
+    text(row?.license, 1200),
+    evidence,
+  ].join(' ').toLowerCase()
+
+  if (haystack.includes('openalex_gte_large_en_v1') || haystack.includes('openalex')) return 'openalex'
+  if (haystack.includes('semantic_scholar_specter2_proximity_v2')
+    || haystack.includes('semantic scholar')
+    || haystack.includes('semanticscholar.org')) return 'semantic_scholar'
+  if (haystack.includes('huggingface.co/datasets')
+    || haystack.includes('hugging face open dataset')
+    || haystack.includes('huggingface dataset')) return 'huggingface_open_datasets'
+  if (haystack.includes('wikipedia.org')
+    || haystack.includes('wikimedia.org')
+    || haystack.includes('wikipedia / wikimedia')) return 'wikimedia'
+  return null
+}
+
 export async function GET() {
   const guard = await requireOwner()
   if (!guard.ok) {
@@ -74,7 +106,7 @@ export async function GET() {
     const db = getAdminSupabase()
     const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString()
 
-    const [runsResult, campaignsResult, artifactsResult, evaluationsResult, graduatesResult] = await Promise.all([
+    const [runsResult, campaignsResult, artifactsResult, evaluationsResult, graduatesResult, openLearningResult] = await Promise.all([
       db.from(RUNS)
         .select('id,campaign_id,subject_id,stage,failure_reason,teacher_model_id,teacher_source_ref,teacher_output_hashes,preparation_job_id,preparation_job_url,training_job_id,training_job_url,trained_artifact_id,created_at,updated_at,completed_at')
         .order('updated_at', { ascending: false })
@@ -95,12 +127,35 @@ export async function GET() {
         .select('candidate_id,trained_artifact_hash,status,runtime_provider,runtime_model_id,promoted_at,activated_at,updated_at')
         .order('updated_at', { ascending: false })
         .limit(100),
+      db.from(LEARNING)
+        .select('content_hash,source_kind,source_uri,license,evidence,embedding_model,observed_at')
+        .gte('observed_at', since)
+        .order('observed_at', { ascending: false })
+        .limit(5000),
     ])
     if (runsResult.error) throw runsResult.error
     if (campaignsResult.error) throw campaignsResult.error
     if (artifactsResult.error) throw artifactsResult.error
     if (evaluationsResult.error) throw evaluationsResult.error
     if (graduatesResult.error) throw graduatesResult.error
+    if (openLearningResult.error) throw openLearningResult.error
+
+    const openSources = new Map(OPEN_SOURCE_CATALOG.map(source => [source.id, {
+      ...source,
+      items24h: 0,
+      embedded24h: 0,
+      latestAt: null as string | null,
+    }]))
+    for (const row of openLearningResult.data || []) {
+      const id = openSourceId(row)
+      if (!id) continue
+      const current = openSources.get(id)
+      if (!current) continue
+      current.items24h += 1
+      if (text(row.embedding_model, 240)) current.embedded24h += 1
+      const at = iso(row.observed_at)
+      if (at && (!current.latestAt || at > current.latestAt)) current.latestAt = at
+    }
 
     const runs = runsResult.data || []
     const runIds = runs.map((row: any) => text(row.id, 80)).filter(Boolean)
@@ -389,7 +444,13 @@ export async function GET() {
         failedRuns24h: buckets.failed || 0,
         inFlightRuns24h: buckets.in_flight || 0,
         hfObservedCostUsd24h: Number(hfObservedCostUsd24h.toFixed(6)),
+        openSourceItems24h: Array.from(openSources.values()).reduce((total, source) => total + source.items24h, 0),
       },
+      openSources: Array.from(openSources.values()).map(source => ({
+        ...source,
+        status: source.items24h > 0 ? 'observed' : source.integration,
+        sourceAccessCostUsd24h: 0,
+      })),
       providers: Array.from(providers.values())
         .sort((a, b) => b.calls - a.calls || a.id.localeCompare(b.id)),
       runs: recentRuns,

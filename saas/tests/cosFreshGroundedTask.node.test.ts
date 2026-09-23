@@ -5,64 +5,57 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+const inference = readFileSync(join(process.cwd(), 'lib/ai/local-inference.ts'), 'utf8')
 const localSynthesis = readFileSync(join(process.cwd(), 'lib/ai/cos/freshEvidenceLocalSynthesis.ts'), 'utf8')
 
-test('travel planning tries grounded task completion first and retains shared synthesis recovery', () => {
+test('travel planning uses one bounded grounded lane and cannot fall through to stacked synthesis', () => {
   const travelClassify = route.indexOf('const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)')
-  const travelGrounded = route.indexOf('if(!requestedAction&&liveTravelTask)')
-  const sharedFresh = route.indexOf('if(!requestedAction){', travelGrounded)
+  const travelBlock = route.indexOf('if(!requestedAction&&liveTravelTask)', travelClassify)
+  const sharedFresh = route.indexOf('if(!requestedAction){', travelBlock)
   assert.ok(travelClassify > 0)
-  assert.ok(travelGrounded > travelClassify)
-  assert.ok(sharedFresh > travelGrounded)
-  assert.match(route, /source:'cos-fresh-grounded-task'/)
+  assert.ok(travelBlock > travelClassify)
+  assert.ok(sharedFresh > travelBlock)
+  const travelSlice = route.slice(travelBlock, sharedFresh)
+  assert.match(travelSlice, /runTravelPlanAssumptionRescue/)
+  assert.match(travelSlice, /source:'cos-travel-plan-fast-grounded'/)
+  assert.match(travelSlice, /source:'cos-travel-plan-fast-unavailable'/)
+  assert.doesNotMatch(travelSlice, /runFreshGroundedTaskCompletion/)
+  assert.doesNotMatch(travelSlice, /synthesizeFreshEvidenceLocally/)
+  assert.doesNotMatch(travelSlice, /buildHonestRefusalReply/)
 })
 
-test('grounded interactive task completion is bounded, JSON-enforced and disables Qwen thinking', () => {
-  assert.match(route, /FRESH_GROUNDED_TASK_TIMEOUT_MS = 40_000/)
-  assert.match(route, /FRESH_GROUNDED_TASK_MAX_TOKENS = 2_000/)
-  assert.match(route, /maxTokens:FRESH_GROUNDED_TASK_MAX_TOKENS/)
-  assert.match(route, /jsonObject:true/)
-  assert.match(route, /disableThinking:true/)
-  assert.match(route, /allowTruncatedText:travelTask/)
-  assert.match(route, /timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS/)
-  assert.match(route, /usageContext:\{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'\}/)
-  assert.match(route, /\/no_think/)
+test('fast travel planning has one shared 16-second model budget with short attempts', () => {
+  assert.match(route, /TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 8_000/)
+  assert.match(route, /TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 16_000/)
+  assert.match(route, /TRAVEL_PLAN_RESCUE_MAX_TOKENS = 2_200/)
+  assert.match(route, /feature:'cos_interactive_travel_plan'/)
+  assert.match(route, /purpose:'travel_plan_grounded'/)
+  assert.match(route, /timeoutMs:Math\.min\(TRAVEL_PLAN_RESCUE_TIMEOUT_MS,remaining\)/)
+  assert.match(route, /Do not ask the traveller to narrow an already complete itinerary request/)
 })
 
-test('travel grounded drafts must be substantive and cannot simply echo the request', () => {
+test('travel interactive profile bypasses RunPod readiness and uses the fast managed model profile', () => {
+  assert.match(inference, /feature === 'cos_interactive_travel_plan'/)
+  assert.match(inference, /COS_INTERACTIVE_TRAVEL_TIMEOUT_MS/)
+  assert.match(inference, /COS_INTERACTIVE_TRAVEL_MODEL/)
+  assert.match(inference, /deepseek-ai\/DeepSeek-V4-Flash/)
+  const eligible = inference.slice(inference.indexOf('function eligibleForRunpodPrimary'), inference.indexOf('async function callConfiguredModel'))
+  assert.match(eligible, /if \(interactiveUserResponse\(args\)\) return false/)
+})
+
+test('travel drafts must be substantive and cannot simply echo the request', () => {
   assert.match(route, /function groundedTaskReplyIsSubstantive/)
   assert.match(route, /nearEcho=/)
-  assert.match(route, /liveCitations<1/)
-  assert.match(route, /non_substantive_grounded_task_draft/)
-  assert.match(route, /!groundedTaskReplyIsSubstantive\(input,reply,travelTask\)/)
+  assert.match(route, /!groundedTaskReplyIsSubstantive\(input,reply,false\)/)
+  assert.match(route, /draft_too_short/)
 })
 
-test('travel tasks are not reclassified as bare fact lookups, while generic grounded tasks retain fail-closed fact handling', () => {
-  assert.match(route, /This request is already classified as a travel-planning task/)
-  assert.match(route, /do not return an empty answer merely because some details are unsupported/)
-  assert.match(route, /If the request is only to confirm one specific current fact[\s\S]*return \{"answer":"","confidence":0\}/)
-  assert.match(route, /must be clearly marked as unverified/)
-  assert.match(route, /Never invent free services, discounts, businesses, venues, routes or prices/)
-})
-
-test('travel failure does not invoke the grounded task synthesizer a second time later in the route', () => {
+test('generic fresh grounded tasks keep their strict JSON path for non-travel requests', () => {
+  assert.match(route, /FRESH_GROUNDED_TASK_TIMEOUT_MS = 40_000/)
+  assert.match(route, /FRESH_GROUNDED_TASK_MAX_TOKENS = 2_000/)
+  assert.match(route, /jsonObject:true/)
+  assert.match(route, /usageContext:\{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'\}/)
   assert.match(route, /if\(freshHardFail&&freshRetrievedAt&&freshSources\.length&&!requestedAction&&!requiresLiveTravelPlanningEvidence\(lookupInput\)\)/)
-  assert.equal((route.match(/const groundedTask=await runFreshGroundedTaskCompletion\(lookupInput,language,freshSources\)/g) || []).length, 2)
-})
-
-
-test('a grounded travel miss falls through to shared fresh synthesis before failure is recorded', () => {
-  const travelBlock = route.indexOf('if(!requestedAction&&liveTravelTask)')
-  const groundedDeclined = route.indexOf("event:'fresh_grounded_task_declined'", travelBlock)
-  const sharedSynthesis = route.indexOf('if(!requestedAction){', groundedDeclined)
-  const localCall = route.indexOf('synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})', sharedSynthesis)
-  assert.ok(travelBlock > 0)
-  assert.ok(groundedDeclined > travelBlock)
-  assert.ok(sharedSynthesis > groundedDeclined)
-  assert.ok(localCall > sharedSynthesis)
-  const between = route.slice(travelBlock, localCall)
-  assert.doesNotMatch(between, /freshLocalFailureCode='local_synthesis_failed'/)
-  assert.match(between, /fallthrough:'shared_local_synthesizer'/)
 })
 
 test('once the fresh-evidence contract accepts a draft, review transport failures release that accepted draft', () => {

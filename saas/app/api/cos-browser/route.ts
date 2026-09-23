@@ -34,7 +34,7 @@ import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationa
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
-import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { publicDisclosureViolations } from '@/lib/ai/cos/publicDisclosureGate'
 import { hasUnsafePublicModelOutput } from '@/lib/ai/cos/publicPromptSecurity'
 
@@ -422,7 +422,7 @@ export async function POST(req: NextRequest) {
   // The model gets first semantic choice. Host policy may still require MORE evidence before release.
   // This is a release guard, not a pre-model router: when the model misses a mutable/current-world
   // dependency, force the same turn into live_web orchestration rather than releasing stale memory.
-  if (agentDecision?.mode === 'answer' && requiresFreshExternalEvidence(prompt)) {
+  if (agentDecision?.mode === 'answer' && (requiresFreshExternalEvidence(prompt) || requiresLiveTravelPlanningEvidence(prompt))) {
     console.info('[cos-agent-decision]', JSON.stringify({
       at: new Date().toISOString(),
       mode: 'orchestrate',

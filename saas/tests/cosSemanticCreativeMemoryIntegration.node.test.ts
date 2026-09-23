@@ -80,3 +80,12 @@ test('deterministic travel backstop still applies Creative Memory and records it
   assert.match(primary, /creative_memory:\{used:backstop\.creativeMemory\.selected>0/)
   assert.match(primary, /semantics:'non_factual_guidance'/)
 })
+
+
+test('deterministic travel backstop does not expose internal timeout status', () => {
+  const start = primary.indexOf('async function buildTravelPlanEvidenceBackstop')
+  const end = primary.indexOf('function previousAssistantText', start)
+  const block = primary.slice(start, end)
+  assert.doesNotMatch(block, /Plan awaryjny — COS pobrał/)
+  assert.doesNotMatch(block, /Fallback plan — COS retrieved current sources/)
+})

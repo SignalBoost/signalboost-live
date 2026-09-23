@@ -403,7 +403,6 @@ async function buildTravelPlanEvidenceBackstop(input:string,language:string,sour
   const attractionTitle=String(attraction?.title||'rejs po kanałach lub Rijksmuseum (sprawdź aktualną cenę i dostępność przed wejściem)').slice(0,180)
   const sourceRefs=sourceList.slice(0,3).map((source,index)=>`[LIVE${index+1}] ${String(source?.title||'Live source').slice(0,160)}`).join('; ')
   if(language==='pl')return{confidence:.45,reply:[
-    'Plan awaryjny — COS pobrał aktualne źródła, ale model planujący nie zdążył zakończyć pełnej syntezy w limicie. Zamiast odsyłać Cię do ponowienia, daję użyteczny plan oparty na bezpiecznych założeniach.',
     '09:00–10:15 — przylot i przejazd z lotniska do centrum. Wybierz bezpośredni transport publiczny wskazany w aktualnym źródle: '+transportTitle+'.',
     '10:15–12:15 — historyczne centrum i główne kanały pieszo; to najtańsza część dnia i nie wymaga biletu.',
     '12:15–13:00 — niedrogi lunch poza najbardziej turystycznymi ulicami.',
@@ -417,7 +416,6 @@ async function buildTravelPlanEvidenceBackstop(input:string,language:string,sour
     sourceRefs?'Aktualne źródła pobrane przez COS: '+sourceRefs+'.':'',
   ].filter(Boolean).join('\n\n'),creativeMemory:{retrieved:creative.retrieved,relevant:creative.relevant,selected:creative.selected.length,mode:creative.mode,taskTypes:creativeTaskTypes}}
   return{confidence:.45,reply:[
-    'Fallback plan — COS retrieved current sources, but the planner did not finish full synthesis inside the interactive deadline. Rather than asking you to retry, here is a usable plan based on conservative assumptions.',
     '09:00–10:15 — arrival and airport-to-center transfer. Use the direct public-transport option shown by the current source: '+transportTitle+'.',
     '10:15–12:15 — historic center and main walkable sights on foot.',
     '12:15–13:00 — inexpensive lunch away from the most tourist-heavy streets.',

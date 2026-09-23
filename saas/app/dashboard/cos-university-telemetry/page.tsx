@@ -18,6 +18,19 @@ type Provider = {
   latestAt: string | null
 }
 
+type OpenSource = {
+  id: string
+  name: string
+  integration: 'implemented' | 'candidate'
+  status: 'observed' | 'implemented' | 'candidate'
+  vectorSpace: string | null
+  mode: string
+  items24h: number
+  embedded24h: number
+  latestAt: string | null
+  sourceAccessCostUsd24h: number
+}
+
 type Job = {
   jobId: string
   jobUrl: string | null
@@ -88,7 +101,9 @@ type Telemetry = {
     failedRuns24h?: number
     inFlightRuns24h?: number
     hfObservedCostUsd24h?: number
+    openSourceItems24h?: number
   }
+  openSources?: OpenSource[]
   providers?: Provider[]
   runs?: Run[]
   artifacts?: Artifact[]
@@ -190,6 +205,7 @@ export default function CosUniversityTelemetryPage() {
 
   const summary = data?.summary || {}
   const providers = data?.providers || []
+  const openSources = data?.openSources || []
   const runs = data?.runs || []
   const artifacts = data?.artifacts || []
 
@@ -220,8 +236,9 @@ export default function CosUniversityTelemetryPage() {
         <div className="rounded-lg border border-red-500/40 p-4 text-sm text-red-300">{error}</div>
       ) : null}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <Card label={copy.teacherOutputs24h} value={String(summary.teacherOutputs24h ?? '—')} />
+        <Card label={copy.openSourceItems24h} value={String(summary.openSourceItems24h ?? '—')} />
         <Card label={copy.completedRuns24h} value={String(summary.completedRuns24h ?? '—')} />
         <Card label={copy.inFlight24h} value={String(summary.inFlightRuns24h ?? '—')} />
         <Card label={copy.failedRuns24h} value={String(summary.failedRuns24h ?? '—')} />
@@ -249,6 +266,36 @@ export default function CosUniversityTelemetryPage() {
               <div className="mt-3 text-[11px] opacity-55">{copy.latest} {when(provider.latestAt)}</div>
             </div>
           )) : <p className="text-sm opacity-65">{copy.noTeacherCalls}</p>}
+        </div>
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <div className="mb-4">
+          <h2 className="font-semibold">{copy.openSourcesTitle}</h2>
+          <p className="text-xs opacity-65">{copy.openSourcesExplanation}</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {openSources.length ? openSources.map(source => (
+            <div key={source.id} className="rounded-lg border p-4">
+              <div className="text-sm font-semibold">{source.name}</div>
+              <div className="mt-1 text-xs opacity-65">{source.vectorSpace || source.mode}</div>
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                <span className="rounded-full border px-2 py-1">{copy.openSourceStates[source.status] || source.status}</span>
+                <span className="opacity-55">{copy.sourceAccessCost}: {money(source.sourceAccessCostUsd24h)}</span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="opacity-60">{copy.acquiredItems}</span><br />
+                  <strong className="text-xl tabular-nums">{source.items24h.toLocaleString()}</strong>
+                </div>
+                <div>
+                  <span className="opacity-60">{copy.embeddedItems}</span><br />
+                  <strong className="text-xl tabular-nums">{source.embedded24h.toLocaleString()}</strong>
+                </div>
+              </div>
+              <div className="mt-3 text-[11px] opacity-55">{copy.latest} {when(source.latestAt)}</div>
+            </div>
+          )) : <p className="text-sm opacity-65">{copy.noOpenSources}</p>}
         </div>
       </section>
 

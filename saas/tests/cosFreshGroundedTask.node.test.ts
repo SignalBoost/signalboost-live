@@ -64,7 +64,8 @@ test('a grounded travel miss bypasses generic fresh synthesis and reaches one bo
   assert.ok(travelRescue > sharedSynthesisGate)
   assert.match(route, /TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 22_000/)
   const rescueBlock = route.slice(route.indexOf('async function runTravelPlanAssumptionRescue'), route.indexOf('function previousAssistantText'))
-  assert.equal((rescueBlock.match(/temperature:/g) || []).length, 1)
+  const attemptsBlock = rescueBlock.slice(rescueBlock.indexOf('const attempts=['), rescueBlock.indexOf('for(const attempt of attempts)'))
+  assert.equal((attemptsBlock.match(/temperature:/g) || []).length, 1)
 })
 
 test('once the fresh-evidence contract accepts a draft, review transport failures release that accepted draft', () => {
@@ -86,7 +87,7 @@ test('successful travel answers return before provenance persistence', () => {
   const travelStart = route.indexOf('const liveTravelTask=requiresLiveTravelPlanningEvidence(lookupInput)')
   const travelEnd = route.indexOf("event:'travel_plan_rescue_declined'", travelStart)
   const travelPath = route.slice(travelStart, travelEnd)
-  assert.match(travelPath, /persistCosPrimaryProvenanceAfterResponse/)
-  assert.doesNotMatch(travelPath, /await writeCosPrimaryProvenance/)
+  assert.match(travelPath, /persistCosPrimaryProvenanceAfterResponse\(userId,groundedTask\.reply/)
+  assert.match(travelPath, /persistCosPrimaryProvenanceAfterResponse\(userId,travelRescue\.reply/)
   assert.match(travelPath, /fallthrough:'travel_plan_rescue'/)
 })

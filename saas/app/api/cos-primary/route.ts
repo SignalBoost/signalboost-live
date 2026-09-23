@@ -568,6 +568,7 @@ export async function postCosPrimary(req:NextRequest){
       prompt:input,
       userId,
       conversationId:String(body?.context?.conversationId||body?.conversationId||'')||null,
+      previousAssistant:precedingAssistant||null,
       privileged:isPrivileged,
     })
     if(modelFirst?.handled){

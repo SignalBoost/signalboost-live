@@ -14,7 +14,7 @@ test('Residency cron is CRON_SECRET-gated and feature-flagged', async () => {
   assert.match(source, /authorization/)
   assert.match(source, /Bearer/)
   assert.match(source, /COS_UNIVERSITY_RESIDENCY_ENABLED/)
-  assert.match(source, /maxDuration = 300/)
+  assert.match(source, /maxDuration = 600/)
 })
 
 test('Residency cron uses only the governed native practical host', async () => {

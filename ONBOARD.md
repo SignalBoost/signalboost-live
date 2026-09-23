@@ -1644,3 +1644,6 @@ Public identity is a two-layer contract:
 4. Malformed or ambiguous semantic verdicts fail closed into normal routing.
 
 This prevents phrasing gaps from sending “What is this platform called?” into name generation while preserving deep-learning interpretation rather than expanding a permanent regex list.
+
+
+Five-language i18n invariant: the platform's canonical user-facing languages are English (`en`), Spanish (`es`), Portuguese (`pt`), Polish (`pl`), and Russian (`ru`). COS, Concierge, deterministic fallbacks, specialists, generated content, and other AI-delivered responses must use the same language contract as the UI. By default, the language actually used in the current user prompt outranks the UI/session locale; an explicit user instruction to answer in another supported language outranks both. Short or ambiguous follow-ups may fall back to the active UI/session locale. Do not maintain a separate language-routing system for AI responses.

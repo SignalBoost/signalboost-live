@@ -37,6 +37,7 @@ import { decideCosAgentTurn, type CosAgentDecision } from '@/lib/ai/cos/cosAgent
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { publicDisclosureViolations } from '@/lib/ai/cos/publicDisclosureGate'
 import { hasUnsafePublicModelOutput } from '@/lib/ai/cos/publicPromptSecurity'
+import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -174,9 +175,7 @@ export async function POST(req: NextRequest) {
   const immediatePreviousMessage = latestUserIndex > 0 ? messages[latestUserIndex - 1] : null
   const assistantMessages = messages.filter((message: any) => message?.role === 'assistant' && typeof message?.content === 'string')
   const priorAnswer = typeof assistantMessages.at(-1)?.content === 'string' ? assistantMessages.at(-1).content : ''
-  const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
-    ? String(body.context.language).toLowerCase()
-    : 'en'
+  const language = resolveResponseLanguage(prompt, body?.context?.language)
   const ingressStartedAt = Date.now()
   let semanticIdentityInvoked = false
   let semanticVisualInvoked = false

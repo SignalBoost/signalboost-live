@@ -466,7 +466,16 @@ export function createLiveBuilderResidencyExecutor(input:{
       const runner=input.sandboxRunner??new VercelSandboxBuilderRunner()
       let infrastructureFailure:string|null=null
       const markInfrastructureFailure=(code:string)=>{
-        infrastructureFailure=infrastructureFailure??code
+        const specific=String(code??'').trim()
+        if(!specific) return
+        // Never let the generic routing bucket overwrite the provider/runtime cause.
+        if(specific==='environment_provider_or_tool_infrastructure_failed'){
+          infrastructureFailure=infrastructureFailure??specific
+          return
+        }
+        if(!infrastructureFailure||infrastructureFailure==='environment_provider_or_tool_infrastructure_failed'){
+          infrastructureFailure=specific
+        }
       }
       const apiKey=configuredRunpodApiKey()
       if(!input.modelPortFactory&&!apiKey){

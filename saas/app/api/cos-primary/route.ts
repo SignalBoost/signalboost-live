@@ -600,6 +600,8 @@ export async function postCosPrimary(req:NextRequest){
   )
   const modelPlannedFreshEvidence=agentCapabilities.has('live_web')
   const modelPlannedConversationRecall=agentCapabilities.has('conversation_history')
+  const modelPlannedSemanticMemory=agentCapabilities.has('semantic_memory')
+  const modelPlannedCreativeMemory=agentCapabilities.has('creative_memory')
   // A question about an earlier conversation with this user is answered from their own history, never from the public web.
   const conversationRecallRequested=Boolean(userId)&&(modelPlannedConversationRecall||detectConversationRecallIntent(input))
   const heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested
@@ -632,6 +634,8 @@ export async function postCosPrimary(req:NextRequest){
       capabilities:[...agentCapabilities],
       liveWeb:modelPlannedFreshEvidence,
       conversationHistory:modelPlannedConversationRecall,
+      semanticMemory:modelPlannedSemanticMemory,
+      creativeMemory:modelPlannedCreativeMemory,
       requiresFreshEvidence,
       requestedAction,
     }))
@@ -802,7 +806,7 @@ export async function postCosPrimary(req:NextRequest){
   if(conversationRecall) reasoningPrompt=`${conversationRecall}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
-    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest||modelPlannedSemanticMemory||modelPlannedCreativeMemory})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 

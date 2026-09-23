@@ -1072,7 +1072,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       evidenceFunnel:citedProvenance.evidenceFunnel,
       cognitiveSkillFunnel:citedProvenance.cognitiveSkillFunnel,
       creativeMemoryFunnel:citedProvenance.creativeMemoryFunnel,
-      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
+      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ semanticMemoryDefinition:canonicalSelfKnowledgeUsed.semanticMemoryDefinition, creativeMemoryDefinition:canonicalSelfKnowledgeUsed.creativeMemoryDefinition, enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
     },
   }
   const cacheWriteBudgetMs = Number(process.env.COS_CACHE_WRITE_BUDGET_MS ?? '8000')

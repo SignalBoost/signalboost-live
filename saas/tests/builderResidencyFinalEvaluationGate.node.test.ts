@@ -46,7 +46,8 @@ test('Residency final gate is scoped to Computer Science and preserves other sub
 
   const scopedBypass = /a\.subject_id <> 'Computer Science & Coding'\s+or exists/
   assert.match(sql, scopedBypass)
-  assert.doesNotMatch(sql, /productionTrafficAuthorized'\)::boolean\s*<>\s*false/)
+  assert.match(sql, /productionTrafficAuthorized'\)::boolean\s*<>\s*false/)
+  assert.match(sql, /authorityExpanded'\)::boolean\s*<>\s*false/)
   assert.match(sql, /productionTrafficAuthorized',false/)
   assert.match(sql, /authorityExpanded',false/)
 })

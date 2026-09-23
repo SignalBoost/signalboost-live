@@ -1503,6 +1503,10 @@ Success means:
 
 **iTMounts is the public product. COS is the brain. Concierge is the public face. Specialists are expert workers.**
 
+## COS model-first agent loop invariant — 2026-09-23
+
+COS follows a model-first agent pattern: after host authentication/Referee scope is established, the primary reasoner is the first semantic decision-maker for ordinary turns. The inference seam supports OpenAI-compatible native function tools (`tools`, `tool_choice`, assistant `tool_calls`, and host `tool` results) without changing existing text-only callers. A model tool request is a capability request, never authority: the host may expose only capabilities already allowed for the exact user/surface/environment, and every write/consequential action remains subject to existing Referee/Guardian/Agent Gateway governance. Simple questions should complete in the first model turn; tool-dependent questions may enter a bounded model → tool → model loop. Private chain-of-thought is never persisted; only observable tool requests/results and execution metadata may enter trajectory evidence.
+
 
 ## Semantic identity routing — 2026-09-09
 

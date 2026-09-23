@@ -107,6 +107,7 @@ test('Residency provisions the exact trained artifact without requiring prior ca
   assert.equal(provisions[0].artifactHash,identity.artifactHash)
   assert.equal(provisions[0].artifactRevision,r40('c'))
   assert.match(provisions[0].runtimeKey,/^[a-f0-9]{10}$/)
+  assert.equal(provisions[0].idleTimeoutSeconds,300)
   assert.deepEqual([...new Set(reads)],['cos_local_distillation_artifacts'])
   assert.equal(calls.filter(item=>item.url.endsWith('/ping')).length,1)
   const chat=calls.find(item=>item.url.endsWith('/v1/chat/completions'))

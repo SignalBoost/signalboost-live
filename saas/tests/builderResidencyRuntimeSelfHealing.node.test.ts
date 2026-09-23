@@ -112,6 +112,7 @@ test('recovery re-reads exact artifact identity and reconciles existing provider
   assert.equal(calls[0].artifactRevision,r('c'))
   assert.equal(calls[0].artifactHash,h('a'))
   assert.match(calls[0].runtimeKey,/^[a-f0-9]{10}$/)
+  assert.equal(calls[0].idleTimeoutSeconds,300)
   assert.equal(out.endpointId,'endpoint-1')
   assert.equal(out.computeWakeAuthorized,false)
   assert.equal(out.modelInvocationAuthorized,false)

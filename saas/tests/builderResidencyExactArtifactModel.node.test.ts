@@ -138,7 +138,7 @@ test('Residency runtime preparation classifies unavailable provider readiness as
   const port=createRunpodBuilderResidencyModelPort({
     db,
     apiKey:'secret',
-    readyTimeoutMs:2,
+    readyTimeoutMs:50,
     provisionImpl:async()=>({
       endpointId:'ep_residency_123',
       endpointName:'residency-endpoint',

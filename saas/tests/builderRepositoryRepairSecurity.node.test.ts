@@ -178,3 +178,27 @@ test('durable job runner revalidates owner authority and exact failed revision b
   const finish = runner.indexOf('finishBuilderJob({', execute)
   assert.ok(platform >= 0 && owner > platform && exact > owner && fallback > exact && execute > fallback && finish > execute)
 })
+
+test('Platform Engineer receives governed Playwright diagnostics without minting owner authority', () => {
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(repair, /ownerAuthorized: boolean/)
+  assert.match(repair, /if \(input\.ownerAuthorized !== true\)/)
+  assert.match(repair, /createBuilderPlaywrightCliPort\(\{ ownerAuthorized: input\.ownerAuthorized \}\)/)
+  assert.match(repair, /new BuilderToolLoop\([\s\S]*undefined,[\s\S]*browserCli,[\s\S]*\)\.run\(/)
+  assert.match(repair, /builder_repository_browser_cli_close_failed/)
+  assert.match(runner, /ownerAuthorized: job\.ownerAuthorized === true/)
+})
+
+test('Platform Engineer public evidence preserves bounded Playwright observations', () => {
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  const start = repair.indexOf("if (toolId === 'browser_cli')")
+  const end = repair.indexOf("if (toolId !== 'run')", start)
+  const block = repair.slice(start, end)
+  assert.ok(start >= 0 && end > start)
+  assert.match(block, /stdout\.slice\(0, 16_000\)/)
+  assert.match(block, /stderr\.slice\(0, 16_000\)/)
+  assert.match(block, /failureCode/)
+  assert.doesNotMatch(block, /input\.url/)
+})
+

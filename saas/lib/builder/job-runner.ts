@@ -344,6 +344,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       }
       const execution = await executeSignalBoostRepositoryRepair({
         userId: job.userId,
+        ownerAuthorized: job.ownerAuthorized === true,
         rawObjective: job.objective,
         workspaceId: job.workspaceId,
         target,

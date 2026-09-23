@@ -297,6 +297,10 @@ function diagnose(value: unknown, knownPaths: readonly string[] = []): { failure
   if (/supabase|postgres|database|constraint|pgrst|duplicate key|relation .* does not exist/.test(message)) return { failureClass: 'storage', remediation: 'Inspect the exact database error and the storage contract before retrying.' }
   if (/cannot find package|no module named|unable to resolve|npm err|dependency|lockfile/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   if (/cannot find module\s+['"](?![./])[^'"]+['"]/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
+  if (/command not found|executable not found/.test(message)) return {
+    failureClass: 'runtime',
+    remediation: 'The shell cannot resolve a bare executable. Use the project package script or npm exec -- <binary> so the pinned local dependency is resolved; do not treat this as a missing source path.',
+  }
   if (/invalid_path|not found|no such file|module_not_found|cannot find module|enoent|path/.test(message)) {
     // A generic "go list the files" nudge is not enough: the model has already listed them and still
     // invents a directory prefix. Name the real paths so the next command cannot be a guess.

@@ -4,6 +4,7 @@ import { builderPendingWriteEvidence } from './evidence-events.ts'
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
+import { createBuilderPlaywrightCliPort } from './playwright-cli-port.ts'
 import { createRepositoryRepairProofController, repositoryRepairProofCommand } from './repository-repair-proof-controller.ts'
 import { normalizeBuilderSandboxCommand } from './project-context.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
@@ -38,6 +39,18 @@ const BUILDER_RESULT_TEXT_PATH = 'builder-result.txt'
 function publicTrace(trace: readonly BuilderToolTrace[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
     const base = { round, toolId, ok, ...(error ? { error } : {}), ...(failureClass ? { failureClass } : {}), ...(remediation ? { remediation } : {}) }
+    if (toolId === 'browser_cli') {
+      const result = output && typeof output === 'object' ? output as Record<string, unknown> : {}
+      return {
+        ...base,
+        action: typeof input.action === 'string' ? input.action.slice(0, 80) : '',
+        ...(typeof result.exitCode === 'number' ? { exitCode: result.exitCode } : {}),
+        ...(typeof result.stdout === 'string' ? { stdout: result.stdout.slice(0, 16_000) } : {}),
+        ...(typeof result.stderr === 'string' ? { stderr: result.stderr.slice(0, 16_000) } : {}),
+        ...(typeof result.timedOut === 'boolean' ? { timedOut: result.timedOut } : {}),
+        ...(typeof result.failureCode === 'string' ? { failureCode: result.failureCode.slice(0, 120) } : {}),
+      }
+    }
     if (toolId !== 'run') return { ...base, ...builderPendingWriteEvidence(output), ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}) }
     const result = output && typeof output === 'object' ? output as Record<string, unknown> : {}
     return {
@@ -117,6 +130,7 @@ function isBroadRepositoryTestCommand(command: string): boolean {
 
 export async function executeSignalBoostRepositoryRepair(input: {
   userId: string
+  ownerAuthorized: boolean
   rawObjective: string
   workspaceId: string
   deadlineAtMs?: number
@@ -127,6 +141,21 @@ export async function executeSignalBoostRepositoryRepair(input: {
    */
   snapshotPort?: StateSnapshotPort | null
 }): Promise<SignalBoostRepositoryRepairExecution | null> {
+  if (input.ownerAuthorized !== true) {
+    return Object.freeze({
+      status: 403,
+      payload: {
+        error: 'builder_repository_repair_owner_required',
+        source: 'cos-platform-engineer',
+        workspaceId: input.workspaceId,
+        execution_allowed: false,
+        repository_write_allowed: false,
+        repository_write_taken: false,
+        merge_allowed: false,
+        deployment_allowed: false,
+      },
+    })
+  }
   const parsed = input.target ?? parseSignalBoostRepositoryRepairTarget(input.rawObjective)
   if (!parsed) return null
   const target = await resolveSignalBoostRepositoryCommit(parsed)
@@ -157,6 +186,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
   }
 
   let session: VercelRepositoryRepairSession | null = null
+  const browserCli = createBuilderPlaywrightCliPort({ ownerAuthorized: input.ownerAuthorized })
   try {
     session = await VercelRepositoryRepairSession.create(target, { deadlineAtMs })
     const aiDeadlineAtMs = deadlineAtMs - REPOSITORY_RESULT_RESERVE_MS
@@ -204,6 +234,8 @@ export async function executeSignalBoostRepositoryRepair(input: {
       proofController.ai,
       proofController.workspace,
       proofController.runner,
+      undefined,
+      browserCli,
     ).run({
       objective,
       workspaceId: input.workspaceId,
@@ -376,6 +408,13 @@ export async function executeSignalBoostRepositoryRepair(input: {
       },
     })
   } finally {
-    await session?.close()
+    await Promise.all([
+      session?.close(),
+      browserCli.close().catch(error => {
+        console.warn('[builder_repository_browser_cli_close_failed]', {
+          message: error instanceof Error ? error.message : 'unknown',
+        })
+      }),
+    ])
   }
 }

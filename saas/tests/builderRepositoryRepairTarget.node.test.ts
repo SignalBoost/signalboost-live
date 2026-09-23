@@ -82,6 +82,21 @@ test('normalizes Vercel project-root source paths into the mounted saas reposito
   assert.match(objective, /Path hints: lib\/builder\/repository-repair\.ts/)
 })
 
+test('captures bare TypeScript file(line,column) diagnostics from Vercel output', () => {
+  const log = [
+    '12:49:45.327 Cloning github.com/SignalBoost/signalboost-live (Branch: main, Commit: bd7577a)',
+    '12:50:08.086 Running TypeScript ...',
+    "12:50:34.024 lib/ai/cos/cosAgentDecision.ts(184,9): error TS2322: Type 'unknown[]' is not assignable to type 'CosAgentCapability[]'.",
+    '12:50:34.171 Failed to type check.',
+    '12:50:34.214 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+  ].join('\n')
+  const target = parseSignalBoostRepositoryRepairTarget(log)
+  assert.ok(target)
+  assert.ok(target.pathHints.includes('saas/lib/ai/cos/cosAgentDecision.ts'))
+  const objective = signalBoostRepositoryRepairObjective(target)
+  assert.match(objective, /Path hints: lib\/ai\/cos\/cosAgentDecision\.ts/)
+})
+
 test('noisy Vercel output targets the actual failing test instead of passing test warnings', () => {
   const target = parseSignalBoostRepositoryRepairTarget(noisyNodeTestFailureLog)
   assert.ok(target)

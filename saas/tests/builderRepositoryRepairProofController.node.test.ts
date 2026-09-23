@@ -4,7 +4,7 @@ import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { createRepositoryRepairProofController, repositoryRepairProofCommand } from '../lib/builder/repository-repair-proof-controller.ts'
 import { formatBuilderOperatorRepairReply } from '../lib/builder/operator-narration.ts'
-import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
+import type { BuilderAiPort, BuilderBrowserCliPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
 
 class ScriptedAi implements BuilderAiPort {
   calls = 0
@@ -85,7 +85,7 @@ test('repository proof selection preserves the exact build and narrows explicit 
   assert.equal(repositoryRepairProofCommand({
     pathHints: [],
     failedCommand: 'node scripts/vercel-cos-gates.mjs && npm run prebuild && next build',
-  }), 'node scripts/vercel-cos-gates.mjs && npm run prebuild && next build')
+  }), 'node scripts/vercel-cos-gates.mjs && npm run prebuild && npm exec -- next build')
 
   assert.equal(repositoryRepairProofCommand({
     pathHints: ['saas/tests/builderToolLoop.node.test.ts'],
@@ -125,3 +125,64 @@ test('operator narration never calls a failed diagnostic command a reproduced de
   })
   assert.match(realProof, /reproduced the reported failure/i)
 })
+
+test('Playwright evidence cannot replace repository fail-before-edit-pass-after proof', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('browser-proof', 'app.js', 'module.exports = "broken"')
+  const proofCommand = 'node --test tests/app.test.js'
+  let runs = 0
+  const runner: BuilderRunnerPort = {
+    async run(input) {
+      runs += 1
+      const app = input.files.find(file => file.path === 'app.js')
+      return app?.content.includes('fixed')
+        ? { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
+        : { exitCode: 1, stdout: '', stderr: 'AssertionError: expected fixed', timedOut: false }
+    },
+  }
+  const browserCalls: string[] = []
+  const browser: BuilderBrowserCliPort = {
+    async capabilities() {
+      return { actions: ['snapshot'], allowedOrigins: ['https://itmounts.com'] }
+    },
+    async invoke(input) {
+      browserCalls.push(input.action)
+      return {
+        ok: true,
+        action: input.action,
+        exitCode: 0,
+        stdout: '### Page\n- Page URL: https://itmounts.com/\n- Page Title: iTMounts',
+        stderr: '',
+        timedOut: false,
+      }
+    },
+    async close() {},
+  }
+  const model = new ScriptedAi([
+    '{"type":"tool","toolId":"browser_cli","input":{"action":"snapshot"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"broken","replace":"fixed"}}',
+  ])
+  const controlled = createRepositoryRepairProofController({ ai: model, workspace, runner, proofCommand })
+  const result = await new BuilderToolLoop(
+    controlled.ai,
+    controlled.workspace,
+    controlled.runner,
+    undefined,
+    browser,
+  ).run({
+    objective: 'fix broken app and inspect browser evidence',
+    workspaceId: 'browser-proof',
+    maxRounds: 8,
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(runs, 2)
+  assert.deepEqual(browserCalls, ['snapshot'])
+  assert.deepEqual(result.trace.map(item => [item.toolId, item.ok]), [
+    ['run', false],
+    ['browser_cli', true],
+    ['edit_file', true],
+    ['run', true],
+  ])
+})
+

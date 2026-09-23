@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { persistDistillationAssetVault } from './cosUniversityDistillationAssetVault.ts'
 import { createDynamicPipelineCandidate, rankDynamicPipelineCandidates } from '../../dynamic-pipeline-router/index.ts'
 import {
   universityTeacherPoolStatus,
@@ -365,6 +366,36 @@ export async function runMassHostedTeacherStage(input: {
   const providerMix: Record<string, number> = {}
   for (const row of rows) providerMix[row.teacher_id] = (providerMix[row.teacher_id] || 0) + 1
 
+  const datasetHash = rows.length >= MIN_TEACHER_ROWS
+    ? hash({ items: rows.map(row => clean(row.response_hash, 64).toLowerCase()).sort() })
+    : null
+  const vaulted = datasetHash
+    ? await persistDistillationAssetVault({
+        candidateId: input.run.candidate_id,
+        runId: input.run.id,
+        batchKey: input.run.batch_key,
+        subjectId: input.run.subject_id,
+        promptSetHash: input.promptSetHash,
+        sourceRef: `itmounts://cos-university/mass-hosted-teacher/${input.run.id}`,
+        trainingRights: 'governed_hosted_teacher_output',
+        expectedItemHashes: rows.map(row => clean(row.response_hash, 64).toLowerCase()),
+        rows: rows.map(row => {
+          const promptId = clean(row.prompt_id, 64).toLowerCase()
+          const prompt = input.prompts.find(item => clean(item.id, 64).toLowerCase() === promptId)?.prompt || ''
+          const response = clean(row.response_text, 50_000)
+          return {
+            promptId,
+            prompt,
+            response,
+            text: response,
+            itemHash: clean(row.response_hash, 64).toLowerCase(),
+            teacherProvider: row.provider,
+            teacherModelId: row.model,
+          }
+        }),
+      }, input.db)
+    : null
+
   if (failures.length > 0) {
     console.error('[cos-university-mass-hosted-teacher-failures]', JSON.stringify({
       runId: String(input.run.id || ''),
@@ -391,7 +422,9 @@ export async function runMassHostedTeacherStage(input: {
     reroutedPrompts,
     failures: Object.freeze(failures),
     outputHashes: Object.freeze(rows.map(row => clean(row.response_hash, 64).toLowerCase())),
-    datasetHash: rows.length >= MIN_TEACHER_ROWS ? hash({ items: rows.map(row => clean(row.response_hash, 64).toLowerCase()).sort() }) : null,
+    datasetHash,
+    assetSetKey: vaulted?.assetSetKey || null,
+    portableManifestHash: vaulted?.portableManifestHash || null,
     config,
     authorityExpanded: false,
     silentFallbackAllowed: false,

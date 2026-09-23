@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cosUniversityDistillationTeacherDataset.ts
 import { createHash } from 'node:crypto'
+import { persistDistillationAssetVault } from './cosUniversityDistillationAssetVault.ts'
 import {
   COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE,
   requireExplicitTrainingDispatchConfirmation,
@@ -478,6 +479,19 @@ export async function recordCosUniversityDistillationTeacherDatasetEvidence(
   const validated = validateTeacherDatasetCallbackBinding(body, evidence)
   if (!validated.eligible) throw new Error(validated.blockers[0])
 
+  const vaulted = await persistDistillationAssetVault({
+    candidateId,
+    subjectId: dispatched.subjectId,
+    promptSetHash: validated.promptSetHash,
+    sourceRef: validated.sourceRef,
+    trainingRights: 'open_license',
+    expectedItemHashes: validated.itemHashes,
+    defaultTeacherProvider: 'huggingface',
+    defaultTeacherModelId: validated.teacherModelId,
+    defaultTeacherModelRevision: validated.teacherModelRevision,
+    rows: Array.isArray(body?.teacherRows) ? body.teacherRows : [],
+  })
+
   const provenanceRefs = [
     `hf://models/${evidence.teacherModelId}@${evidence.teacherModelRevision}`,
     `hf://models/${evidence.studentModelId}@${evidence.studentModelRevision}`,
@@ -516,6 +530,9 @@ export async function recordCosUniversityDistillationTeacherDatasetEvidence(
       trainingRights: 'open_license',
       studentControlledByBuyer: true,
       containsPrivateProductionData: false,
+      assetSetKey: vaulted.assetSetKey,
+      portableManifestHash: vaulted.portableManifestHash,
+      assetItemCount: vaulted.itemCount,
     },
     verifier: 'training_executor',
   })
@@ -525,6 +542,8 @@ export async function recordCosUniversityDistillationTeacherDatasetEvidence(
     trainingCandidateId: registered.trainingCandidateId,
     sourceRef: validated.sourceRef,
     teacherOutputItemCount: validated.itemHashes.length,
+    assetSetKey: vaulted.assetSetKey,
+    portableManifestHash: vaulted.portableManifestHash,
     autoExecuteTraining: false,
   })
 }

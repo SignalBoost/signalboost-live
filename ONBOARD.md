@@ -1256,6 +1256,31 @@ Repair contract:
 - legacy repository/service/domain identifiers may remain internal but cannot override public product identity;
 - the reported logo-then-company-name exchange is a mandatory regression.
 
+## University distillation asset portability invariant — 2026-09-23
+
+Distillation spend must create a durable iTMounts-controlled educational asset, not only a model-
+specific weight artifact or an external-provider dataset reference. Every supervised teacher example
+accepted for training must be persisted in the append-only University distillation asset vault before
+the pipeline may advance from teacher generation to dataset preparation.
+
+The vault preserves the exact prompt, final teacher response, exact source training text/hash, prompt-
+set identity, source reference, rights classification, subject/candidate/run provenance, teacher
+provider/model identity, and a separate **portable content identity** computed from prompt + response.
+Teacher provider/model and student/base-model identity are provenance, not part of the portable
+content identity. Changing Qwen, DeepSeek, a hosted teacher, or a future student model therefore does
+not erase the reusable University material that prior spend produced.
+
+External provider datasets may remain immutable mirrors/evidence, but they must not be the sole copy
+of accepted distillation material. Dataset preparation consumes the sealed iTMounts vault copy when
+one exists, while the original provider reference and hashes remain evidence. A completed asset-set
+seal exists only after all expected rows have been durably stored; missing/tampered rows fail closed.
+
+Technical custody does not override third-party licenses or provider terms. Training-rights/provenance
+remain explicit and must continue to satisfy their governing policy. Hidden chain-of-thought,
+scratchpads, and private Production data are never made part of the portable asset. Model artifacts
+remain separately identity-bound outputs; the durable University material is the reusable source
+from which compatible future model artifacts can be trained and evaluated.
+
 # Runtime inference / provider source of truth
 
 The model/provider is replaceable compute. **COS is the learner.**

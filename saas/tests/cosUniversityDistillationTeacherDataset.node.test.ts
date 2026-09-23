@@ -1,6 +1,7 @@
 // saas/tests/cosUniversityDistillationTeacherDataset.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
 import {
   buildDistillationTeacherPromptSet,
@@ -9,6 +10,7 @@ import {
   DEFAULT_DISTILLATION_TEACHER_MODEL,
   validateTeacherDatasetCallbackBinding,
 } from '../lib/ai/cos/cosUniversityDistillationTeacherDataset.ts'
+import { buildDistillationAssetVaultRecords } from '../lib/ai/cos/cosUniversityDistillationAssetVault.ts'
 import {
   buildHuggingFaceJobSpec,
   huggingFaceJobsConfigFromEnv,
@@ -216,6 +218,9 @@ test('owner and internal routes preserve confirmation, signed callback, live pri
   assert.match(worker, /enable_thinking=False/)
   assert.match(worker, /strip_hidden_reasoning/)
   assert.match(worker, /private=True/)
+  assert.match(worker, /"teacherRows": \[/)
+  assert.match(worker, /"prompt": row\["prompt"\]/)
+  assert.match(worker, /"response": row\["response"\]/)
 })
 
 test('no teacher dataset operation enables dispatch or auto-starts model training', () => {
@@ -226,3 +231,60 @@ test('no teacher dataset operation enables dispatch or auto-starts model trainin
   assert.match(module, /autoExecuteTraining:\s*false/)
   assert.doesNotMatch(owner, /confirmDispatch:\s*true/)
 })
+
+test('distillation asset identity preserves reusable knowledge across model/provider changes', () => {
+  const prompt = 'Explain why a durable training dataset improves model portability.'
+  const response = 'It preserves the reusable supervised example independently of the model that consumes it.'
+  const trainingText = `<user>\n${prompt}\n\n<assistant>\n${response}`
+  const itemHash = createHash('sha256').update(trainingText).digest('hex')
+  const promptSetHash = createHash('sha256').update('portable-prompt-set').digest('hex')
+  const common = {
+    candidateId: 'study-plan:00000000-0000-4000-8000-000000000001',
+    subjectId: 'reasoning_decision_science',
+    promptSetHash,
+    trainingRights: 'governed_training_use',
+    expectedItemHashes: [itemHash],
+  }
+  const first = buildDistillationAssetVaultRecords({
+    ...common,
+    sourceRef: 'itmounts://teacher/openai',
+    rows: [{ promptId: 'case-1', prompt, response, text: trainingText, itemHash, provider: 'openai', model: 'teacher-a' }],
+  })
+  const second = buildDistillationAssetVaultRecords({
+    ...common,
+    sourceRef: 'itmounts://teacher/anthropic',
+    rows: [{ promptId: 'case-1', prompt, response, text: trainingText, itemHash, provider: 'anthropic', model: 'teacher-b' }],
+  })
+  assert.equal(first.assetRows[0].portable_content_hash, second.assetRows[0].portable_content_hash)
+  assert.equal(first.portableManifestHash, second.portableManifestHash)
+  assert.notEqual(first.assetSetKey, second.assetSetKey)
+  assert.equal(first.assetRows[0].model_neutral, true)
+})
+
+test('distillation asset vault rejects tampered training text and hidden reasoning', () => {
+  const prompt = 'Give the answer.'
+  const response = 'Final answer.'
+  const trainingText = `<user>\n${prompt}\n\n<assistant>\n${response}`
+  const itemHash = createHash('sha256').update(trainingText).digest('hex')
+  const promptSetHash = createHash('sha256').update('prompt-set').digest('hex')
+  const common = {
+    candidateId: 'study-plan:00000000-0000-4000-8000-000000000001',
+    promptSetHash,
+    sourceRef: 'itmounts://teacher/test',
+    trainingRights: 'governed_training_use',
+    expectedItemHashes: [itemHash],
+  }
+  assert.throws(() => buildDistillationAssetVaultRecords({
+    ...common,
+    rows: [{ promptId: 'case-1', prompt, response, text: trainingText + ' tampered', itemHash, provider: 'test', model: 'teacher' }],
+  }), /distillation_asset_item_hash_mismatch/)
+  const hidden = '<think>private scratch</think> Final answer.'
+  const hiddenText = `<user>\n${prompt}\n\n<assistant>\n${hidden}`
+  const hiddenHash = createHash('sha256').update(hiddenText).digest('hex')
+  assert.throws(() => buildDistillationAssetVaultRecords({
+    ...common,
+    expectedItemHashes: [hiddenHash],
+    rows: [{ promptId: 'case-1', prompt, response: hidden, text: hiddenText, itemHash: hiddenHash, provider: 'test', model: 'teacher' }],
+  }), /distillation_asset_hidden_reasoning_forbidden/)
+})
+

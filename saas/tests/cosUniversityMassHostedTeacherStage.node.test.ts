@@ -9,9 +9,31 @@ import {
 
 function memoryDb() {
   const rows: any[] = []
+  const assets: any[] = []
+  const assetSets: any[] = []
   return {
     rows,
+    assets,
+    assetSets,
     from(table: string) {
+      if (table === 'cos_university_distillation_assets') {
+        return {
+          async upsert(batch: any[]) {
+            for (const row of batch) {
+              if (!assets.some(item => item.asset_key === row.asset_key)) assets.push(row)
+            }
+            return { error: null }
+          },
+        }
+      }
+      if (table === 'cos_university_distillation_asset_sets') {
+        return {
+          async upsert(row: any) {
+            if (!assetSets.some(item => item.asset_set_key === row.asset_set_key)) assetSets.push(row)
+            return { error: null }
+          },
+        }
+      }
       assert.equal(table, 'cos_university_mass_hosted_teacher_rows')
       return {
         select() {
@@ -151,6 +173,10 @@ test('twenty prompts fan out across all active hosted teachers and persist exact
   assert.equal(result.rows, 20)
   assert.equal(calls, 20)
   assert.equal(db.rows.length, 20)
+  assert.equal(db.assets.length, 20)
+  assert.equal(db.assetSets.length, 1)
+  assert.match(String(result.assetSetKey), /^[a-f0-9]{64}$/)
+  assert.match(String(result.portableManifestHash), /^[a-f0-9]{64}$/)
   assert.deepEqual(result.activeProviders, ['openai', 'claude', 'grok', 'deepseek-api', 'gemini'])
   assert.deepEqual(result.plannedProviderMix, {
     openai: 4,

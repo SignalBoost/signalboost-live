@@ -1,6 +1,7 @@
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
+import { persistDistillationAssetVault, tryReadDistillationAssetsBySourceRef } from './cosUniversityDistillationAssetVault.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { closeProviderCircuit, consumeProviderCircuitRecoveryProbe, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
 import {
@@ -535,6 +536,8 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
           sourceRef: hostedSourceRef,
           datasetHash: hosted.datasetHash,
           promptSetHash: promptSet.promptSetHash,
+          assetSetKey: hosted.assetSetKey,
+          portableManifestHash: hosted.portableManifestHash,
           outputCount: hosted.outputHashes.length,
           providerMix: hosted.providerMix,
           activeProviders: hosted.activeProviders,
@@ -567,6 +570,8 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         reroutedPrompts: hosted.reroutedPrompts,
         outputCount: hosted.outputHashes.length,
         datasetHash: hosted.datasetHash,
+        assetSetKey: hosted.assetSetKey,
+        portableManifestHash: hosted.portableManifestHash,
         maxEstimatedCostUsd: expectedCeiling,
         reservedCostCeilingUsd: expectedCeiling,
         nextStage: 'preparation_pending',
@@ -614,6 +619,10 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       ? await readMassHostedTeacherRows({ db: cosServiceDb(), runId: run.id, promptSetHash: clean(run.prompt_set_hash, 64).toLowerCase() })
       : []
     if (hostedSource && rawHostedRows.length < 20) throw new Error(`mass_distillation_hosted_teacher_rows_missing:${rawHostedRows.length}`)
+    const vaultedTeacherRows = hostedSource ? null : await tryReadDistillationAssetsBySourceRef(teacherSourceRef, cosServiceDb())
+    if (vaultedTeacherRows && vaultedTeacherRows.sourceDatasetHash !== clean(run.dataset_hash, 64).toLowerCase()) {
+      throw new Error('mass_distillation_vault_dataset_hash_mismatch')
+    }
     let hostedRows: readonly any[] = rawHostedRows
     if (hostedSource) {
       // Rebuild the deterministic rights-cleared prompt set and attach it to each persisted hosted
@@ -652,7 +661,11 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       subjectId: run.subject_id,
       baseModel: run.student_model_id,
       datasetHash: run.dataset_hash,
-      candidate: hostedSource ? { source: teacherSourceRef, teacherRows: hostedRows } : { source: teacherSourceRef },
+      candidate: hostedSource
+        ? { source: teacherSourceRef, teacherRows: hostedRows }
+        : vaultedTeacherRows
+          ? { source: teacherSourceRef, teacherRows: vaultedTeacherRows.rows }
+          : { source: teacherSourceRef },
       callbackPath: MASS_DISTILLATION_CALLBACK_PATH,
       authorityExpanded: false,
     }
@@ -1332,6 +1345,20 @@ export async function recordMassDistillationWorkerEvidence(
       throw new Error('mass_distillation_teacher_callback_provenance_mismatch')
     }
     const datasetHash = manifestHash(outputHashes)
+    const vaulted = await persistDistillationAssetVault({
+      candidateId,
+      runId: run.id,
+      batchKey: run.batch_key,
+      subjectId: run.subject_id,
+      promptSetHash,
+      sourceRef,
+      trainingRights: 'open_license',
+      expectedItemHashes: outputHashes,
+      defaultTeacherProvider: 'huggingface',
+      defaultTeacherModelId: run.teacher_model_id,
+      defaultTeacherModelRevision: run.teacher_model_revision,
+      rows: Array.isArray(body.teacherRows) ? body.teacherRows as any[] : [],
+    }, db)
     const updated = await db.from('cos_university_mass_distillation_batch_runs').update({
       teacher_job_id: jobId,
       teacher_source_ref: sourceRef,
@@ -1346,10 +1373,27 @@ export async function recordMassDistillationWorkerEvidence(
     if (updated.error) throw updated.error
     await recordAssurance({
       candidateId, subjectId: run.subject_id, claim,
-      evidence: { campaignId: run.campaign_id, batchKey: run.batch_key, jobId, sourceRef, datasetHash, promptSetHash, outputCount: outputHashes.length },
+      evidence: {
+        campaignId: run.campaign_id,
+        batchKey: run.batch_key,
+        jobId,
+        sourceRef,
+        datasetHash,
+        promptSetHash,
+        outputCount: outputHashes.length,
+        assetSetKey: vaulted.assetSetKey,
+        portableManifestHash: vaulted.portableManifestHash,
+      },
       verifier: 'training_executor',
     })
-    return { ok: true as const, campaignId: run.campaign_id, batchKey: run.batch_key, nextStage: 'preparation_pending' as const }
+    return {
+      ok: true as const,
+      campaignId: run.campaign_id,
+      batchKey: run.batch_key,
+      assetSetKey: vaulted.assetSetKey,
+      portableManifestHash: vaulted.portableManifestHash,
+      nextStage: 'preparation_pending' as const,
+    }
   }
 
   if (claim === 'partition_manifests_registered') {

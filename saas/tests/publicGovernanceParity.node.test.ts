@@ -61,10 +61,12 @@ test('public identity disclosure intercept still precedes every public reasoner 
   assert.ok(intercept < firstCall, 'public self-identity must never reach the model')
 })
 
-test('owner self-knowledge neural reasoning is gated to actual self-knowledge before compatibility core', () => {
-  const guard = ENTRYPOINT.indexOf('!isPlatformSelfKnowledgePrompt(input.prompt)')
-  const neural = ENTRYPOINT.indexOf('tryOwnerNeuralSelfKnowledge(input)')
-  const core = ENTRYPOINT.indexOf('tryCoreCOSFirstAnswer(input)')
+test('owner self-knowledge releases deterministic runtime facts before bounded neural fallback', () => {
+  const guard = ENTRYPOINT.indexOf('const ownerSelfKnowledge = input.privileged === true')
+  const core = ENTRYPOINT.indexOf('const deterministicSelfKnowledge = await tryCoreCOSFirstAnswer(input)')
+  const release = ENTRYPOINT.indexOf('return deterministicSelfKnowledge', core)
+  const neuralFallback = ENTRYPOINT.indexOf('tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true })')
   assert.ok(guard > 0)
-  assert.ok(neural > guard && core > neural)
+  assert.ok(core > guard)
+  assert.ok(release > core && release < neuralFallback, 'verified runtime facts must release before neural fallback')
 })

@@ -303,12 +303,24 @@ test('independent verifier routes competency vs infrastructure failure', async (
           verified: false,
           verifierRef: 'verifier://infrastructure',
           evidenceRefs: ['evidence://infra-failure'],
+          reason: 'residency_exact_artifact_runtime_not_ready:network',
           failureAttribution: 'infrastructure',
         }
       },
     },
   })
   assert.equal(infrastructure.outcome.status, 'infrastructure_failure')
+  assert.equal(
+    infrastructure.outcome.failureCode,
+    'residency_exact_artifact_runtime_not_ready:network',
+  )
+  assert.equal(
+    createSelfHealingHandoff(
+      { ...policy.manifest, runId: 'harness-runtime-test-2' },
+      infrastructure,
+    )?.failureCode,
+    'residency_exact_artifact_runtime_not_ready:network',
+  )
 })
 
 test('University adapter accepts practical Residency evidence before final examinations', () => {
@@ -460,6 +472,18 @@ test('Durable Harness evidence is metadata-only and identity-bound', () => {
   assert.equal(serialized.includes('credential'),false)
   assert.equal(serialized.includes(decision.manifest.objective),false)
   assert.equal(record.authorityExpanded,false)
+  const failedRecord=createHarnessEvidenceRecord(decision.manifest,{
+    ...result,
+    outcome:{
+      status:'infrastructure_failure',
+      verifierRef:'verifier://infra',
+      failureCode:'residency_exact_artifact_runtime_not_ready:network',
+    },
+  })
+  assert.equal(
+    failedRecord.failureCode,
+    'residency_exact_artifact_runtime_not_ready:network',
+  )
   assert.throws(()=>createHarnessEvidenceRecord(decision.manifest,{...result,runId:'other-run'}),/harness_evidence_identity_mismatch/)
 })
 
@@ -489,12 +513,56 @@ test('Harness completion does not route when durable evidence persistence fails'
 test('Supervisor audit Harness sink persists only sanitized evidence record', async () => {
   const writes:Array<{table:string;value:any}>=[]
   const sink=createSupervisorAuditHarnessEvidenceSink({from(table:string){return{async insert(value:unknown){writes.push({table,value});return{error:null}}}}})
-  await sink.append({runId:'run-1',profile:'sandbox',environmentClass:'sandbox',agentId:'agent-1',artifactId:'artifact-1',artifactHash:hash('a'),authorityManifestRef:'referee://manifest-1',outcomeStatus:'success',verifierRef:'verifier://1',evidenceHash:'evidence://hash',authorityExpanded:false,productionMutationObserved:false,trajectoryEvidenceRefs:['evidence://safe/ref']})
+  await sink.append({runId:'run-1',profile:'sandbox',environmentClass:'sandbox',agentId:'agent-1',artifactId:'artifact-1',artifactHash:hash('a'),authorityManifestRef:'referee://manifest-1',outcomeStatus:'infrastructure_failure',verifierRef:'verifier://1',evidenceHash:'evidence://hash',failureCode:'residency_exact_artifact_runtime_not_ready:network',authorityExpanded:false,productionMutationObserved:false,trajectoryEvidenceRefs:['evidence://safe/ref']})
   assert.equal(writes.length,1)
   assert.equal(writes[0]?.table,'supervisor_audit_events')
   const serialized=JSON.stringify(writes[0]?.value)
   assert.equal(serialized.includes('platform_harness_run_completed'),true)
   assert.equal(serialized.includes('evidence://safe/ref'),true)
+  assert.equal(serialized.includes('residency_exact_artifact_runtime_not_ready:network'),true)
   assert.equal(serialized.includes('objective'),false)
   assert.equal(serialized.includes('credential'),false)
+})
+
+
+test('Harness failure diagnostics redact credential-shaped verifier text', async () => {
+  const policy=resolveHarnessManifest(request(),authority)
+  assert.equal(policy.allowed,true)
+  if(!policy.allowed) return
+
+  const gatewayPolicy:GovernancePolicy={
+    classifier:{classify:()=> 'reversible_internal' as const},
+    allowlist:[{
+      actionKind:'read',
+      target:'mcp.github-mcp.contents.read',
+      rollback:'no-op',
+    }],
+  }
+  const host:GatewayHost={
+    execution:{async perform(){return{ok:true,result:{ok:true}}}},
+  }
+
+  const result=await runHarnessWorker({
+    manifest:policy.manifest,
+    capabilities:createProviderHubHarnessCapabilityResolver(discovery([githubRead])),
+    executor:createGovernedHarnessExecutor({policy:gatewayPolicy,host}),
+    worker:{async run(){}},
+    verifier:{
+      async verify(){
+        return{
+          verified:false,
+          verifierRef:'verifier://infra-redaction',
+          evidenceRefs:[],
+          reason:'runtime_not_ready api_key=supersecret token=abc123 network',
+          failureAttribution:'infrastructure',
+        }
+      },
+    },
+  })
+
+  assert.equal(result.outcome.status,'infrastructure_failure')
+  assert.equal(result.outcome.failureCode?.includes('supersecret'),false)
+  assert.equal(result.outcome.failureCode?.includes('abc123'),false)
+  assert.match(result.outcome.failureCode??'',/api_key=\[redacted\]/)
+  assert.match(result.outcome.failureCode??'',/token=\[redacted\]/)
 })

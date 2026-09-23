@@ -31,6 +31,7 @@ const REVISION=/^[a-f0-9]{40}$/
 const READY_TIMEOUT_MS=360_000
 const READY_POLL_MS=3_000
 const WAKE_TIMEOUT_MS=20_000
+const APPLICATION_READY_TIMEOUT_MS=15_000
 
 type ResidencyRuntimeArtifact=Readonly<{
   candidateId:string
@@ -202,15 +203,60 @@ export function createRunpodBuilderResidencyModelPort(input:{
         try{
           const state=await health(endpointId)
           if(state.ok&&state.workers.ready>0){
-            const result=Object.freeze({
-              endpointId,
-              modelId,
-              baseUrl,
-              artifactRevision:artifact.artifactRevision,
-              exactArtifact:true as const,
-            })
-            prepared=result
-            return result
+            try{
+              const remaining=Math.max(1,deadline-Date.now())
+              const application=await call(`${root}/ready`,{
+                headers:{Authorization:`Bearer ${input.apiKey}`},
+                signal:AbortSignal.timeout(
+                  Math.min(APPLICATION_READY_TIMEOUT_MS,remaining),
+                ),
+              })
+              if(application.status===401||application.status===403){
+                throw new Error(
+                  `residency_exact_artifact_runtime_ready_http_${application.status}`,
+                )
+              }
+              if(application.status===200){
+                const raw=await application.text()
+                let parsed:any
+                try{parsed=JSON.parse(raw)}catch{
+                  throw new Error(
+                    'residency_exact_artifact_runtime_ready_invalid_json',
+                  )
+                }
+                if(
+                  parsed?.ready===true&&
+                  String(parsed?.model||'').trim()===modelId
+                ){
+                  const result=Object.freeze({
+                    endpointId,
+                    modelId,
+                    baseUrl,
+                    artifactRevision:artifact.artifactRevision,
+                    exactArtifact:true as const,
+                  })
+                  prepared=result
+                  return result
+                }
+                lastHealthError=
+                  'residency_exact_artifact_application_model_not_ready'
+              }else if(application.status!==204&&application.status!==503){
+                lastHealthError=
+                  `residency_exact_artifact_runtime_ready_http_${application.status}`
+              }
+            }catch(error){
+              const message=error instanceof Error
+                ?error.message
+                :'residency_exact_artifact_application_ready_probe_failed'
+              if(
+                /^residency_exact_artifact_runtime_ready_http_(?:401|403)$/.test(
+                  message,
+                )
+              ){
+                throw error
+              }
+              lastHealthError=message.slice(0,240)
+            }
           }
           if(!state.ok&&state.error) lastHealthError=String(state.error).slice(0,240)
         }catch(error){

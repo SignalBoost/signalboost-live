@@ -1281,6 +1281,33 @@ scratchpads, and private Production data are never made part of the portable ass
 remain separately identity-bound outputs; the durable University material is the reusable source
 from which compatible future model artifacts can be trained and evaluated.
 
+### Operational protection status — 2026-09-23
+
+**New/current distillation is protected by the platform asset-custody path.** After the Distillation
+Asset Vault deployment, accepted teacher material must be durably copied and sealed inside iTMounts
+before the pipeline may advance into dataset preparation. This applies to hosted-teacher material and
+to new Hugging Face teacher-dataset callbacks. Missing rows, count mismatches, manifest mismatches,
+tampered training text, or missing provenance fail closed rather than allowing a hashes-only record to
+stand in for the actual reusable educational material.
+
+Historical pre-vault material has a deliberately different status. Multi-provider hosted-teacher rows
+already retained in local Supabase remain durable platform data, but some older Hugging Face runs may
+still rely on immutable external dataset references and hashes without a complete row-for-row copy in
+the Distillation Asset Vault. Those runs remain usable for legacy compatibility, but they must **not**
+be described as having the same vault custody as new/current distillation until backfilled.
+
+Historical backfill must copy only exact retrievable prompt/response/training rows whose hashes,
+provenance, and training-rights classification can be verified. Missing historical teacher material
+must never be fabricated, reconstructed from trained weights, or inferred from model behavior merely
+to make the vault appear complete.
+
+Vault custody protects technical possession, integrity, reconstructability, and model portability; it
+does **not** override a provider's license, contract, or terms, and it does not manufacture broader IP
+rights than the platform is otherwise entitled to exercise. A future student model may consume
+compatible vaulted material only through the normal University training/evaluation path. Model-specific
+LoRAs, adapters, checkpoints, tokenizer formatting, and other compiled artifacts remain separate from
+the portable University source material and may still need retraining when the model family changes.
+
 # Runtime inference / provider source of truth
 
 The model/provider is replaceable compute. **COS is the learner.**

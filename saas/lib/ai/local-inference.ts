@@ -2,6 +2,41 @@ import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
 
+export type LocalModelToolDefinition = Readonly<{
+  type: 'function'
+  function: Readonly<{
+    name: string
+    description?: string
+    parameters: Readonly<Record<string, unknown>>
+  }>
+}>
+
+export type LocalModelToolCall = Readonly<{
+  id: string
+  type: 'function'
+  function: Readonly<{ name: string; arguments: string }>
+}>
+
+export type LocalModelChatMessage = Readonly<{
+  role: 'user' | 'assistant' | 'tool'
+  content?: string | null
+  tool_call_id?: string
+  tool_calls?: readonly LocalModelToolCall[]
+}>
+
+export type LocalModelToolChoice = 'auto' | 'none' | Readonly<{
+  type: 'function'
+  function: Readonly<{ name: string }>
+}>
+
+export type LocalModelTurnResult = Readonly<{
+  content: string | null
+  toolCalls: readonly LocalModelToolCall[]
+  finishReason: string | null
+  provider: string
+  model: string
+}>
+
 export interface LocalModelCallArgs {
   prompt: string
   systemPrompt?: string
@@ -28,6 +63,12 @@ export interface LocalModelCallArgs {
   allowTruncatedText?: boolean
   /** Skip durable usage persistence when the caller must avoid a database dependency. */
   persistUsage?: boolean
+  /** OpenAI-compatible function tools exposed to the model. Host policy still owns authorization. */
+  tools?: readonly LocalModelToolDefinition[]
+  /** Let the model choose zero or more tools, suppress tools, or force one exact function. */
+  toolChoice?: LocalModelToolChoice
+  /** Prior non-system messages for a multi-step model/tool loop. The host-owned system prompt is prepended. */
+  messages?: readonly LocalModelChatMessage[]
 }
 
 /**
@@ -256,7 +297,7 @@ function eligibleForRunpodPrimary(args: LocalModelCallArgs, config: LocalInferen
   return true
 }
 
-async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<string | null> {
+async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
   const startedAt = Date.now()
   const requestId = randomUUID()
   const provider = providerFor(config)
@@ -273,6 +314,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   let cachedPromptTokens: number | null = null
   let providerEstimatedCostUsd: number | null = null
   let text: string | null = null
+  let toolCalls: readonly LocalModelToolCall[] = Object.freeze([])
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
   const baseTimeoutMs = interactiveUserResponse(args) ? interactiveModelTimeoutMs(args, config.timeoutMs) : config.timeoutMs
@@ -292,7 +334,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     // Independent University scoring needs a compact verdict rather than model scratch work.
     // Preserve the evaluator's one-call, strict-JSON contract even when the general reasoner is
     // configured for deeper reasoning or prose-oriented repetition penalties.
-    const enforceJsonObject = strictJsonObjectRequested(args)
+    const enforceJsonObject = strictJsonObjectRequested(args) && !(args.tools?.length)
     const independentEvaluation = protectedIndependentEvaluation(args)
     const thinkingOff = args.disableThinking === true || runpodSmallBudgetThinkingOff(args, provider)
     const reasoningEffort = thinkingOff
@@ -333,9 +375,10 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
         ...(enforceJsonObject ? { response_format: { type: 'json_object' } } : {}),
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         ...(qwenThinkingOff ? { think: false, chat_template_kwargs: { enable_thinking: false } } : {}),
+        ...(args.tools?.length ? { tools: args.tools, tool_choice: args.toolChoice ?? 'auto' } : {}),
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: args.prompt },
+          ...(args.messages?.length ? args.messages : [{ role: 'user' as const, content: args.prompt }]),
         ],
       }),
     })
@@ -345,7 +388,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
       console.error('localInference: HTTP error', response.status, errorText)
     } else {
       const data = await response.json() as {
-        choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
+        choices?: Array<{ message?: { content?: string | null; tool_calls?: Array<{ id?: string; type?: string; function?: { name?: string; arguments?: string } }> }; finish_reason?: string }>
         usage?: {
           prompt_tokens?: number
           completion_tokens?: number
@@ -361,8 +404,17 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
       totalTokens = nonNegativeNumber(data.usage?.total_tokens)
       cachedPromptTokens = nonNegativeNumber(data.usage?.prompt_tokens_details?.cached_tokens)
       providerEstimatedCostUsd = nonNegativeNumber(data.usage?.estimated_cost)
-      const content = data.choices?.[0]?.message?.content
-      if (finishReason && finishReason !== 'stop') {
+      const message = data.choices?.[0]?.message
+      const content = message?.content
+      toolCalls = Object.freeze((message?.tool_calls ?? []).flatMap(call => {
+        const id = String(call?.id || '').trim()
+        const name = String(call?.function?.name || '').trim()
+        const argumentsText = typeof call?.function?.arguments === 'string' ? call.function.arguments : ''
+        return id && name
+          ? [Object.freeze({ id, type: 'function' as const, function: Object.freeze({ name, arguments: argumentsText }) })]
+          : []
+      }))
+      if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
         console.warn('[cos-local-inference-incomplete]', {
           model,
           finishReason,
@@ -371,7 +423,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
           contentLength: typeof content === 'string' ? content.length : 0,
         })
       }
-      if (typeof content !== 'string' || content.length === 0) errorText = 'Local inference returned an empty response'
+      if ((typeof content !== 'string' || content.length === 0) && toolCalls.length === 0) errorText = 'Local inference returned an empty response'
       text = typeof content === 'string' && content.length > 0 ? content : null
     }
   } catch (error) {
@@ -417,13 +469,18 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
         completionTokens,
         contentLength: text.length,
       }))
-      return text
+      return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
     }
     const error = new Error(LOCAL_MODEL_OUTPUT_TRUNCATED) as Error & { emptyContent?: boolean }
     error.emptyContent = !text
     throw error
   }
-  return text
+  if (errorText !== null || (text === null && toolCalls.length === 0)) return null
+  return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
+}
+
+async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<string | null> {
+  return (await callConfiguredModelTurn(args, config))?.content ?? null
 }
 
 /**
@@ -432,8 +489,8 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
  * the configured LOCAL_AI/DeepInfra transport only as a bounded fallback. Independent University
  * evaluation is intentionally excluded so the learner cannot silently change its evaluator runtime.
  */
-export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
-  if (!eligibleForRunpodPrimary(args, config)) return callConfiguredModel(args, config)
+export async function callLocalModelTurn(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<LocalModelTurnResult | null> {
+  if (!eligibleForRunpodPrimary(args, config)) return callConfiguredModelTurn(args, config)
 
   let ownedAttempted = false
   try {
@@ -454,8 +511,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
                 ),
               }
             : args
-          const text = await callConfiguredModel(runpodArgs, runpodConfig)
-          if (text?.trim()) return text
+          const turn = await callConfiguredModelTurn(runpodArgs, runpodConfig)
+          if (turn && (turn.content?.trim() || turn.toolCalls.length)) return turn
         } catch (error) {
           if (!isEmptyThinkingTruncation(error) || args.disableThinking === true || runpodSmallBudgetThinkingOff(args, 'runpod')) throw error
           console.warn('[runpod-primary-thinking-retry]', JSON.stringify({
@@ -465,8 +522,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
           const retryArgs = freshGroundedTask(args)
             ? { ...args, disableThinking: true, timeoutMs: FRESH_GROUNDED_RUNPOD_ATTEMPT_MS }
             : { ...args, disableThinking: true }
-          const text = await callConfiguredModel(retryArgs, runpodConfig)
-          if (text?.trim()) return text
+          const turn = await callConfiguredModelTurn(retryArgs, runpodConfig)
+          if (turn && (turn.content?.trim() || turn.toolCalls.length)) return turn
         }
       }
     }
@@ -478,7 +535,11 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   }
 
   if (args.allowConfiguredFallback === false && ownedAttempted) return null
-  return callConfiguredModel(args, ownedAttempted ? { ...config, fallbackFromOwned: true } : config)
+  return callConfiguredModelTurn(args, ownedAttempted ? { ...config, fallbackFromOwned: true } : config)
+}
+
+export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
+  return (await callLocalModelTurn(args, config))?.content ?? null
 }
 
 export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {

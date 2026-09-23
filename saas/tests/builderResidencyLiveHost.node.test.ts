@@ -162,3 +162,44 @@ test('live Residency fails closed when exact artifact revision is absent',async(
     /residency_exact_artifact_identity_missing/,
   )
 })
+
+
+test('live Residency classifies exact-artifact prewarm failure as infrastructure without grading the resident',async()=>{
+  const practiceCase=BUILDER_RESIDENCY_CASES[0]
+  const request=createBuilderResidencyHarnessRequest({
+    runId:'residency-live-test-prewarm-failure',
+    objective:practiceCase.objective,
+    tenantId:'itmounts-university',
+    portableId:'builder-residency',
+    agentId:'builder-resident',
+    artifactId:'artifact-1',
+    artifactHash:H,
+    artifactRevision:R,
+    sandboxEnvironmentId:'builder-residency-sandbox-v1',
+    requestedCapabilities:BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
+  })
+  let completeCalls=0
+  const modelPort:BuilderResidencyModelPort={
+    async prepare(){throw new Error('residency_exact_artifact_runtime_not_ready')},
+    async complete(){
+      completeCalls+=1
+      throw new Error('must_not_generate_when_prewarm_failed')
+    },
+  }
+  const executor=createLiveBuilderResidencyExecutor({
+    db:{} as any,
+    sandboxRunner:new FixtureRunner(),
+    modelPortFactory:()=>modelPort,
+  })
+  const result=await executor.run({
+    request,
+    authority:createBuilderResidencyNativeAuthority(),
+    practiceCase,
+    candidateId:'candidate-1',
+  })
+  assert.equal(result.outcome.status,'infrastructure_failure')
+  assert.equal(result.outcome.failureCode,'environment_provider_or_tool_infrastructure_failed')
+  assert.equal(completeCalls,0)
+  assert.equal(result.authorityExpanded,false)
+  assert.equal(result.productionMutationObserved,false)
+})

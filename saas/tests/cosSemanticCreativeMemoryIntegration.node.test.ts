@@ -89,3 +89,14 @@ test('deterministic travel backstop does not expose internal timeout status', ()
   assert.doesNotMatch(block, /Plan awaryjny — COS pobrał/)
   assert.doesNotMatch(block, /Fallback plan — COS retrieved current sources/)
 })
+
+
+test('travel fallback does not expose Creative Memory implementation labels', () => {
+  const start = primary.indexOf('async function buildTravelPlanEvidenceBackstop')
+  const end = primary.indexOf('function previousAssistantText', start)
+  const block = primary.slice(start, end)
+  assert.doesNotMatch(block, /Wskazówka z Creative Memory/)
+  assert.doesNotMatch(block, /Creative Memory guidance:/)
+  assert.match(block, /Trzymaj trasę w jednym zwartym obszarze/)
+  assert.match(block, /Keep the route geographically compact/)
+})

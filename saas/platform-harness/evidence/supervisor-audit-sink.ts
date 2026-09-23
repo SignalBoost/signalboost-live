@@ -24,6 +24,7 @@ export function createSupervisorAuditHarnessEvidenceSink(db:AuditDb):HarnessEvid
           outcomeStatus:record.outcomeStatus,
           ...(record.verifierRef?{verifierRef:record.verifierRef}:{}),
           ...(record.evidenceHash?{evidenceHash:record.evidenceHash}:{}),
+          ...(record.failureCode?{failureCode:record.failureCode}:{}),
           authorityExpanded:false,
           productionMutationObserved:record.productionMutationObserved,
           trajectoryEvidenceRefs:[...record.trajectoryEvidenceRefs],

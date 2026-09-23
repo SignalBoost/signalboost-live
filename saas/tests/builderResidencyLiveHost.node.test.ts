@@ -198,7 +198,7 @@ test('live Residency classifies exact-artifact prewarm failure as infrastructure
     candidateId:'candidate-1',
   })
   assert.equal(result.outcome.status,'infrastructure_failure')
-  assert.equal(result.outcome.failureCode,'environment_provider_or_tool_infrastructure_failed')
+  assert.equal(result.outcome.failureCode,'residency_exact_artifact_runtime_not_ready')
   assert.equal(completeCalls,0)
   assert.equal(result.authorityExpanded,false)
   assert.equal(result.productionMutationObserved,false)

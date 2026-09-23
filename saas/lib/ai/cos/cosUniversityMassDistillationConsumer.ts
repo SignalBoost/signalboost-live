@@ -1,7 +1,7 @@
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
-import { persistDistillationAssetVault, readDistillationAssetsBySourceRef } from './cosUniversityDistillationAssetVault.ts'
+import { persistDistillationAssetVault, tryReadDistillationAssetsBySourceRef } from './cosUniversityDistillationAssetVault.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { closeProviderCircuit, consumeProviderCircuitRecoveryProbe, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
 import {
@@ -619,7 +619,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       ? await readMassHostedTeacherRows({ db: cosServiceDb(), runId: run.id, promptSetHash: clean(run.prompt_set_hash, 64).toLowerCase() })
       : []
     if (hostedSource && rawHostedRows.length < 20) throw new Error(`mass_distillation_hosted_teacher_rows_missing:${rawHostedRows.length}`)
-    const vaultedTeacherRows = hostedSource ? null : await readDistillationAssetsBySourceRef(teacherSourceRef, cosServiceDb())
+    const vaultedTeacherRows = hostedSource ? null : await tryReadDistillationAssetsBySourceRef(teacherSourceRef, cosServiceDb())
     if (vaultedTeacherRows && vaultedTeacherRows.sourceDatasetHash !== clean(run.dataset_hash, 64).toLowerCase()) {
       throw new Error('mass_distillation_vault_dataset_hash_mismatch')
     }
@@ -663,7 +663,9 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       datasetHash: run.dataset_hash,
       candidate: hostedSource
         ? { source: teacherSourceRef, teacherRows: hostedRows }
-        : { source: teacherSourceRef, teacherRows: vaultedTeacherRows?.rows || [] },
+        : vaultedTeacherRows
+          ? { source: teacherSourceRef, teacherRows: vaultedTeacherRows.rows }
+          : { source: teacherSourceRef },
       callbackPath: MASS_DISTILLATION_CALLBACK_PATH,
       authorityExpanded: false,
     }

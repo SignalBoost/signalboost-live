@@ -325,7 +325,10 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact, recover
 export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeArtifact) {
   const idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input)
   try {
-    const provisioned = await provisionLegacyMassDistilledRuntime(input)
+    const legacySafeInput: MassDistilledRuntimeArtifact = input.idleTimeoutSeconds !== undefined && Number(input.idleTimeoutSeconds) > 300
+      ? Object.freeze({ ...input, idleTimeoutSeconds: 300 })
+      : input
+    const provisioned = await provisionLegacyMassDistilledRuntime(legacySafeInput)
     const endpoint = await restoreRetiredEndpointCapacity(
       await constrainEndpointToApprovedGpu(String(provisioned.endpointId), String(provisioned.endpointName || ''), idleTimeoutSeconds),
       idleTimeoutSeconds,

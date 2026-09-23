@@ -318,8 +318,8 @@ export const TRAVEL_PLAN_RETRY_TIMEOUT_MS = 10_000
 export const TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 28_000
 export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 1_400
 export const TRAVEL_PLAN_RETRY_MAX_TOKENS = 900
-async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
-  const creative=await retrieveCreativeMemory(input,{privileged:true,limit:2}).catch(()=>({retrieved:0,relevant:0,selected:[],mode:'unavailable' as const}))
+async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[],privileged=false):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+  const creative=await retrieveCreativeMemory(input,{privileged,limit:2}).catch(()=>({retrieved:0,relevant:0,selected:[],mode:'unavailable' as const}))
   const creativeGuidance=creative.selected.length
     ? formatCreativeMemoryForReasoner(creative.selected).join('\n')
     : ''
@@ -757,7 +757,7 @@ export async function postCosPrimary(req:NextRequest){
     if(!requestedAction&&liveTravelTask){
       freshLocalAttempted=true
       const travelDeclines:string[]=[]
-      const travelPlan=await runTravelPlanAssumptionRescue(lookupInput,language,freshSources,travelDeclines)
+      const travelPlan=await runTravelPlanAssumptionRescue(lookupInput,language,freshSources,travelDeclines,isPrivileged)
       if(travelPlan){
         freshLocalModel=travelPlan.reasonerLabel
         const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:travelPlan.reasonerLabel,confidence:travelPlan.confidence,accepted:true})

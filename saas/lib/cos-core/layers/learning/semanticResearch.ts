@@ -1,4 +1,5 @@
 // saas/lib/cos-core/layers/learning/semanticResearch.ts
+import { createHash } from 'node:crypto'
 import type { LearningConnectorResult, LearningConnectorSearch } from './connectors.ts'
 import { abstractFromInvertedIndex, openAlexAbstractIsSubstantive } from './openAlexAbstract.ts'
 
@@ -48,6 +49,13 @@ function boundedScore(value: unknown): string | null {
   return Math.max(-1, Math.min(1, numeric)).toFixed(6)
 }
 
+function vectorDigest(value: unknown, dimensions: number): string | null {
+  if (!Array.isArray(value) || value.length !== dimensions) return null
+  const vector = value.map(Number)
+  if (vector.some(item => !Number.isFinite(item))) return null
+  return createHash('sha256').update(JSON.stringify(vector)).digest('hex')
+}
+
 function doiUri(value: unknown): string {
   const raw = clean(value, 400)
   if (!raw) return ''
@@ -95,3 +103,61 @@ export function createOpenAlexSemanticScientificSearch(fetcher: FetchLike = fetc
 }
 
 export const openAlexSemanticScientificSearch = createOpenAlexSemanticScientificSearch()
+
+
+/**
+ * Semantic Scholar exposes precomputed SPECTER2 proximity vectors for scientific papers. iTMounts
+ * validates and fingerprints the source vector for provenance, but does not mix it into the
+ * platform's internal embedding space. Retained text can be embedded again with the active iTMounts
+ * embedding model after the ordinary learning-admission gates accept it.
+ */
+export function createSemanticScholarScientificSearch(options: {
+  fetcher?: FetchLike
+  apiKey?: string
+} = {}): LearningConnectorSearch {
+  const fetcher = options.fetcher ?? fetch
+  const apiKey = String(options.apiKey ?? '').trim()
+  return async (query, limit) => {
+    const q = semanticQuery(query)
+    if (!q) return []
+    const space = EXTERNAL_SEMANTIC_VECTOR_SPACES.semantic_scholar_specter2
+    const params = new URLSearchParams({
+      query: q,
+      limit: String(Math.min(Math.max(1, limit), 10)),
+      fields: 'title,url,abstract,year,citationCount,externalIds,embedding.specter_v2',
+    })
+    const json = await getJson(
+      `https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`,
+      fetcher,
+      apiKey ? { 'x-api-key': apiKey } : {},
+    )
+    return (json?.data ?? []).map((item: any): LearningConnectorResult | null => {
+      const digest = vectorDigest(item?.embedding?.vector, space.dimensions)
+      if (!digest) return null
+      const title = clean(item?.title, 1_000)
+      const abstract = clean(item?.abstract, 40_000)
+      const year = Number.isFinite(Number(item?.year)) ? String(item.year) : ''
+      const citations = Number.isFinite(Number(item?.citationCount)) ? String(item.citationCount) : ''
+      const text = clean([
+        title,
+        abstract,
+        year ? `Published: ${year}.` : '',
+        citations ? `Citations: ${citations}.` : '',
+      ].filter(Boolean).join(' '))
+      const uri = clean(item?.url, 800)
+        || doiUri(item?.externalIds?.DOI)
+        || (item?.paperId ? `https://www.semanticscholar.org/paper/${encodeURIComponent(String(item.paperId))}` : '')
+      return {
+        uri,
+        title,
+        text,
+        license: 'Semantic Scholar metadata/abstract with SPECTER2 discovery vector; training rights not asserted',
+        evidence: [
+          `external_semantic_index:${space.vectorSpace}`,
+          `external_vector_dimensions:${space.dimensions}`,
+          `external_vector_sha256:${digest}`,
+        ],
+      }
+    }).filter((item: LearningConnectorResult | null): item is LearningConnectorResult => Boolean(item?.uri && item.text))
+  }
+}

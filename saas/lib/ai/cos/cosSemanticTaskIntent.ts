@@ -95,8 +95,12 @@ export async function classifyCosSemanticTaskIntent(args: {
   const priorAssistant = String(args.previousAssistant || '').trim().slice(0, 4_000)
 
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'semantic_task_intent' },
     temperature: 0,
     maxTokens: 360,
+    disableThinking: true,
+    timeoutMs: 8_000,
+    jsonObject: true,
     systemPrompt: [
       'You are the COS semantic task-intent judge. Classify what help the user is actually asking for before any evidence workflow is selected.',
       'Use neural semantic understanding of the whole request and conversation context. Do not classify by keywords, regex patterns, named entities, dates, or isolated topical words.',

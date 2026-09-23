@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { DEFAULT_LEARNING_SOURCE_CAPS, learningSourceCap } from '../lib/cos-core/layers/learning/learningSourceCaps.ts'
+import { EXTERNAL_SEMANTIC_VECTOR_SPACES } from '../lib/cos-core/layers/learning/semanticResearch.ts'
 
 const liveSources = fs.readFileSync(
   path.join(process.cwd(), 'lib/cos-core/layers/learning/liveSources.ts'), 'utf8')
@@ -41,4 +42,10 @@ test('the adapter list reads its caps from this table rather than inline numbers
   }
   assert.ok(!/scientificLearningConnector\([a-zA-Z]+,\s*\d/.test(liveSources), 'a scholarly cap is still inline')
   assert.ok(!/officialDocsLearningConnector\([^,]+,\s*\d/.test(liveSources), 'the feed cap is still inline')
+})
+
+
+test('external scientific vector spaces remain separate', () => {
+  assert.equal(EXTERNAL_SEMANTIC_VECTOR_SPACES.openalex_gte_large_en.dimensions, 1024)
+  assert.equal(EXTERNAL_SEMANTIC_VECTOR_SPACES.semantic_scholar_specter2.dimensions, 768)
 })

@@ -6,6 +6,7 @@ import { isExplicitBuilderEvidenceRequest } from '@/lib/builder/execution-eviden
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
+import { runModelFirstCosAgent } from '@/lib/ai/cos/modelFirstAgent'
 import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
@@ -558,6 +559,91 @@ export async function postCosPrimary(req:NextRequest){
   if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source,{prompt:input,answered:true,confidence:deterministic.confidence,branch:'deterministic'});return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   const requestedAction=requestsExternalAction(input)
+  // MODEL-FIRST AGENT: for ordinary read-only turns the primary model sees the user's request
+  // before optional freshness/context classifiers. It either answers directly or emits native
+  // function calls for the minimum read-only capabilities it needs. Host policy still validates
+  // freshness/source authority and retains all action/security boundaries.
+  if(!requestedAction&&!hasAttachments&&!isCosCodingObjective(input)){
+    const modelFirst=await runModelFirstCosAgent({
+      prompt:input,
+      userId,
+      conversationId:String(body?.context?.conversationId||body?.conversationId||'')||null,
+      privileged:isPrivileged,
+    })
+    if(modelFirst?.handled){
+      const agentFreshRequired=requiresFreshExternalEvidence(input)
+      const agentSources:FreshEvidenceSource[]=modelFirst.liveSources.map((source,index)=>({
+        id:`LIVE${index+1}`,
+        title:source.title,
+        url:source.url,
+        snippet:source.snippet,
+        sourceDate:source.sourceDate,
+        authorityTier:source.authorityTier,
+      }))
+      const modelUsedLiveWeb=modelFirst.toolTrace.some(item=>item.name==='web_search')
+      const liveAuthoritySatisfied=!agentFreshRequired||(
+        modelUsedLiveWeb
+        && agentSources.length>0
+        && freshEvidenceMeetsQuestionAuthority(input,agentSources)
+        && securityScenarioEvidenceIsSpecific(input,agentSources)
+      )
+      if(liveAuthoritySatisfied){
+        let executionProvenance=authoritativeProvenance(null,{invoked:false})
+        ;(executionProvenance as any).local_reasoning={invoked:true,model:modelFirst.reasonerLabel,confidence:modelFirst.confidence,threshold:confidenceThreshold()}
+        ;(executionProvenance as any).model_first_agent={
+          native_tool_calling:true,
+          tool_calls:modelFirst.toolTrace,
+          conversation_history_used:modelFirst.usedConversationHistory,
+          runtime_configuration_used:modelFirst.usedRuntimeConfiguration,
+        }
+        if(agentSources.length){
+          executionProvenance=attachFreshEvidenceProvenance(executionProvenance,{
+            sources:agentSources,
+            retrievedAt:new Date().toISOString(),
+            error:null,
+            synthesisAccepted:true,
+          })
+        }
+        const liveTelemetry=emitRequestTelemetry({
+          startedAt,
+          input,
+          reply:modelFirst.reply,
+          source:'local_cos_reasoning',
+          confidence:modelFirst.confidence,
+          provenance:executionProvenance,
+          externalAiInvoked:false,
+        })
+        persistCosPrimaryProvenanceAfterResponse(userId,modelFirst.reply,executionProvenance,'cos-model-first-agent',{
+          prompt:input,
+          answered:true,
+          confidence:modelFirst.confidence,
+          branch:'model_first_agent',
+        })
+        return NextResponse.json({
+          ok:true,
+          reply:modelFirst.reply,
+          source:'cos-model-first-agent',
+          confidence_score:modelFirst.confidence,
+          confidence_threshold:confidenceThreshold(),
+          external_ai_invoked:false,
+          external_fallback_invoked:false,
+          local_model_invoked:true,
+          execution_provenance:executionProvenance,
+          live_evidence_retrieved_this_turn:agentSources.length>0,
+          live_evidence_sources:agentSources.map(source=>({id:source.id,title:source.title,url:source.url})),
+          agent_tool_trace:modelFirst.toolTrace,
+          live_telemetry:liveTelemetry,
+          execution_allowed:false,
+          external_action_taken:false,
+        })
+      }
+      console.info('[cos-model-first-agent] host grounding gate declined direct release',JSON.stringify({
+        freshRequired:agentFreshRequired,
+        modelUsedLiveWeb,
+        sources:agentSources.length,
+      }))
+    }
+  }
   const agentCapabilities=new Set(
     String(req.headers.get('x-signalboost-agent-capabilities')||'')
       .split(',')

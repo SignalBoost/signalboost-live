@@ -1,7 +1,8 @@
 // saas/lib/ai/cos/cosFirstAnswer.ts
 // Thin shared entrypoint. The established COS routing pipeline lives in cosFirstAnswerCore.ts.
-// Authenticated owner self-knowledge is handled here by neural semantic reasoning over trusted
-// runtime topology facts; no canned owner model/spec answer is released from this entrypoint.
+// Authenticated owner self-knowledge is answered from host-verified runtime topology before any
+// neural call. Neural reasoning remains only a bounded compatibility fallback when the deterministic
+// runtime path cannot produce a usable result. Public delivery never receives owner runtime facts.
 
 import { generateCosCreativeImage } from '@/lib/cos/creative-image'
 import { isCosCreativeImageRequest } from './creativeImageIntent.ts'
@@ -352,8 +353,12 @@ async function tryOwnerNeuralSelfKnowledge(
   const runtimeContext = ownerPlatformIdentityContext()
   const previousAssistant = String(input.previousAssistant ?? '').trim().slice(0, 8_000)
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'owner_self_knowledge_fallback' },
     temperature: 0,
     maxTokens: 1400,
+    disableThinking: true,
+    timeoutMs: 8_000,
+    jsonObject: true,
     systemPrompt: [
       "You are COS's authenticated owner-channel semantic self-knowledge reasoner.",
       'Use neural semantic reasoning over the complete request and relevant conversation context. Do not use keyword rules, regex intent matching, canned replies, or answer templates.',
@@ -608,11 +613,10 @@ function shouldRetryMalformedPublicCoreResult(result: COSFirstAnswerResult): boo
  * Explicit owner image-generation requests execute through the approved visual runtime before text
  * reasoning. Public Concierge visual requests remain on their separate metered delivery path.
  * Contextual interpretation is isolated before the mature retrieval pipeline so supplied language
- * cannot be contaminated by unrelated learned/internal evidence. Owner model/spec questions are
- * then decided and answered by the configured neural COS reasoner using trusted runtime topology
- * context. The old deterministic core remains temporarily behind this compatibility entrypoint for
- * the rest of the mature routing pipeline, but any canned owner self-knowledge result is blocked
- * from release and gets one neural semantic re-evaluation. Non-English handled answers receive one
+ * cannot be contaminated by unrelated learned/internal evidence. Authenticated owner model/spec
+ * questions are answered first by the deterministic core from current runtime configuration; this
+ * avoids paying model latency to discover facts the host already knows and keeps public disclosure
+ * unchanged. Neural self-knowledge is only a bounded compatibility fallback. Non-English handled answers receive one
  * bounded native-language review that may correct wording and restore only explicitly protected
  * user literals. English retains the fast path unless an explicit literal is missing. If model
  * review still omits a literal the user explicitly required, the host restores only that exact
@@ -633,29 +637,24 @@ export async function tryCOSFirstAnswer(input: COSFirstAnswerInput): Promise<COS
   const contextualInterpretation = await tryNeuralContextualInterpretation(input)
   if (contextualInterpretation) return reviewNativeLanguageQuality(input, contextualInterpretation)
 
-  const neuralSelfKnowledge = await tryOwnerNeuralSelfKnowledge(input)
-  if (neuralSelfKnowledge) return reviewNativeLanguageQuality(input, neuralSelfKnowledge)
+  const ownerSelfKnowledge = input.privileged === true
+    && !isPublicDeliveryScope()
+    && isPlatformSelfKnowledgePrompt(input.prompt)
+  if (ownerSelfKnowledge) {
+    const deterministicSelfKnowledge = await tryCoreCOSFirstAnswer(input)
+    if (deterministicSelfKnowledge.handled && coreReleasedCannedOwnerSelfKnowledge(deterministicSelfKnowledge)) {
+      return deterministicSelfKnowledge
+    }
+
+    const neuralFallback = await tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true })
+    if (neuralFallback) return reviewNativeLanguageQuality(input, neuralFallback)
+    return deterministicSelfKnowledge
+  }
 
   let coreResult = await tryCoreCOSFirstAnswer(input)
   if (shouldRetryMalformedPublicCoreResult(coreResult)) {
     coreResult = await tryCoreCOSFirstAnswer({ ...input, disableCache: true })
   }
 
-  if (input.privileged !== true || isPublicDeliveryScope() || !coreReleasedCannedOwnerSelfKnowledge(coreResult)) {
-    return reviewNativeLanguageQuality(input, coreResult)
-  }
-
-  const neuralRetry = await tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true })
-  if (neuralRetry) return reviewNativeLanguageQuality(input, neuralRetry)
-
-  return {
-    handled: false,
-    confidence: 0,
-    reason: 'Owner platform self-knowledge was identified, but neural semantic synthesis was unavailable. The deterministic compatibility answer was blocked rather than released.',
-    provenance: {
-      ...(coreResult.provenance as unknown as Record<string, unknown>),
-      responseSource: 'external_fallback_required',
-      selfKnowledgeDeterministicBlocked: true,
-    } as any,
-  }
+  return reviewNativeLanguageQuality(input, coreResult)
 }

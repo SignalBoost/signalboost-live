@@ -30,6 +30,8 @@ export function getLearningReadiness(
   const sources = [
     { name: 'Crossref', available: liveSourcesEnabled, requiresKey: false },
     { name: 'OpenAlex', available: liveSourcesEnabled, requiresKey: false },
+    { name: 'OpenAlex semantic index', available: liveSourcesEnabled, requiresKey: false },
+    { name: 'Semantic Scholar SPECTER2', available: liveSourcesEnabled, requiresKey: false },
     { name: 'Europe PMC', available: liveSourcesEnabled, requiresKey: false },
     { name: 'Open Library', available: liveSourcesEnabled, requiresKey: false },
     { name: 'GDELT', available: liveSourcesEnabled, requiresKey: false },

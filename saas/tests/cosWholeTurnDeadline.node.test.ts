@@ -52,3 +52,13 @@ test('direct (non-durable) turns run under the same clock and always record the 
   assert.match(route, /source: 'cos-turn-deadline'/)
   assert.match(route, /if \(successful \|\| \(deadlineElapsed && reply\)\)/)
 })
+
+
+test('completed read-only browser answers persist History after response delivery', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cos-provenance-browser/route.ts'), 'utf8')
+  const syncSection = route.slice(route.indexOf('if (synchronousReadOnlyTurn)'), route.indexOf('return delivered'))
+  assert.match(syncSection, /after\(async \(\) => \{/)
+  assert.match(syncSection, /await persistTurn\(/)
+  const beforeAfter = syncSection.slice(0, syncSection.indexOf('after(async () => {'))
+  assert.doesNotMatch(beforeAfter, /await persistTurn\(/)
+})

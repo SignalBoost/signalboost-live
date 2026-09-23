@@ -314,7 +314,7 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
 // Owner doctrine (stated-assumption mode): complete the plan, use the live sources where they help,
 // and label every mutable specific (fares, hours, ticket prices) as something to check. Plain text
 // output, no JSON contract. Every decline is logged with its reason so no failure is silent.
-export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 60_000
+export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 22_000
 export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 3_000
 async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const evidence=(Array.isArray(sources)?sources:[]).slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
@@ -334,13 +334,8 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
   // with the first time slot, so restating the request is not a plausible completion.
   const attempts=[
     {
-      temperature:.3,
-      systemPrompt:['You are COS. The user asked for a travel plan. Deliver the complete plan now. /no_think',...rules].join(' '),
-      prompt:`USER REQUEST:\n${input.slice(0,8_000)}${evidence?`\n\nREFERENCE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}`,
-    },
-    {
-      temperature:.6,
-      systemPrompt:['You are an experienced local travel planner. A traveller sent the brief below. Do NOT restate, correct or translate the brief. Your output must begin directly with the first time slot of the itinerary (for example "09:00") and continue slot by slot to the end of the time window, then a short cost summary. /no_think',...rules].join(' '),
+      temperature:.45,
+      systemPrompt:['You are an experienced local travel planner. A traveller sent the brief below. Do NOT restate, correct or translate the brief. Deliver the complete plan now. Begin directly with the first time slot of the itinerary (for example "09:00"), continue slot by slot to the end of the requested window, then give a short cost summary. /no_think',...rules].join(' '),
       prompt:`TRAVELLER BRIEF (do not repeat it):\n"""\n${input.slice(0,8_000)}\n"""${evidence?`\n\nREFERENCE SOURCES:\n${evidence}`:''}\n\nITINERARY:`,
     },
   ]
@@ -703,7 +698,7 @@ export async function postCosPrimary(req:NextRequest){
       logEscalation({event:'fresh_grounded_task_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,fallthrough:'shared_local_synthesizer'})
     }
 
-    if(!requestedAction){
+    if(!requestedAction&&!liveTravelTask){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
       const localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})

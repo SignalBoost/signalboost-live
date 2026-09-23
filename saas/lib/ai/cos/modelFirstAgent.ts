@@ -10,7 +10,7 @@ import { parseLocalResult } from './reasonerOutput.ts'
 import { createBuiltInCosCognitiveTools } from './autonomy/builtInTools.ts'
 import { searchPastConversations, formatHistoryForAI } from '@/lib/ai/tools/conversationHistory'
 import { ownerPlatformIdentityContext } from './platformIdentityContext.ts'
-import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
+import { getExternalInfo, formatExternalInfoForAI, type SearchResult } from '@/lib/ai/tools/getExternalInfo'
 
 const MAX_NATIVE_TOOL_CALLS = 3
 const FIRST_MODEL_TIMEOUT_MS = 12_000
@@ -152,13 +152,16 @@ async function executeTool(args: {
   const tool = args.registry.get(toolId)
   if (!tool || tool.risk !== 'read_only') return { ok: false, content: `tool_not_read_only:${toolId}` }
 
-  const result = await tool.execute(input)
-  if (toolId === 'web.search' && result.ok) {
+  if (toolId === 'web.search') {
     const query = String(input.query || '').trim()
-    const { getExternalInfo } = await import('@/lib/ai/tools/getExternalInfo')
-    const raw = query ? await getExternalInfo(query, 8, { bypassCache: true }) : null
-    if (raw?.ok) args.liveSources.push(...raw.results)
+    if (!query) return { ok: false, content: 'query_required' }
+    const raw = await getExternalInfo(query, 8, { bypassCache: true })
+    if (!raw.ok) return { ok: false, content: raw.error || 'web_search_failed' }
+    args.liveSources.push(...raw.results)
+    return { ok: true, content: formatExternalInfoForAI(query, raw.results) }
   }
+
+  const result = await tool.execute(input)
   return result.ok
     ? { ok: true, content: typeof result.output === 'string' ? result.output : JSON.stringify(result.output ?? null) }
     : { ok: false, content: result.error || `tool_failed:${toolId}` }

@@ -33,6 +33,7 @@ import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { decideCosAgentTurn, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -73,6 +74,25 @@ async function publicConciergePresentation(response: Response): Promise<NextResp
   // `orchestrator: cos` is internal execution telemetry. The public mouth may expose the selected
   // specialist and durable job status, but it does not disclose the private reasoning layer.
   if (payload.orchestrator === 'cos') delete payload.orchestrator
+  if (payload.agent_decision) delete payload.agent_decision
+  return NextResponse.json(payload, { status: response.status, headers })
+}
+
+async function withAgentDecisionMetadata(response: Response, decision: CosAgentDecision | null): Promise<NextResponse> {
+  if (!decision) return response instanceof NextResponse ? response : new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers: response.headers })
+  const headers = new Headers(response.headers)
+  headers.delete('content-length')
+  let payload: any
+  try { payload = await response.clone().json() } catch {
+    return new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers })
+  }
+  if (!payload || typeof payload !== 'object') return NextResponse.json(payload, { status: response.status, headers })
+  payload.agent_decision = {
+    mode: decision.mode,
+    capabilities: decision.capabilities,
+    confidence: decision.confidence,
+    reasoner: decision.reasonerLabel,
+  }
   return NextResponse.json(payload, { status: response.status, headers })
 }
 
@@ -261,7 +281,7 @@ export async function POST(req: NextRequest) {
   // COS decides that software work belongs to the Software Specialist. From that point onward the
   // Software Specialist owns Builder/Platform Engineer lifecycle. Repository authority follows the
   // authenticated owner identity, never the mouth that carried the request.
-  const shouldConsultSoftwareSpecialist = !operationalEvidence || hasSourceAttachment || explicitOperationalRepair
+  const shouldConsultSoftwareSpecialist = hasSourceAttachment || explicitOperationalRepair
   const ownerRepositoryRepairAllowed = authenticatedOwner
     && ownerSoftwareAuthority.allowRepositoryRepair
     && (!operationalEvidence || explicitOperationalRepair)
@@ -326,9 +346,10 @@ export async function POST(req: NextRequest) {
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')
-  const routedRequest = attachedOperationalEvidence
-    ? new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify({ ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }) })
-    : req
+  const routedBody = attachedOperationalEvidence
+    ? { ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }
+    : body
+  let routedRequest = new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify(routedBody) })
 
   if (!operationalEvidence) {
     if (isConciergeArtifactObjective(prompt)) {
@@ -378,6 +399,87 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId))
   }
 
+  // MODEL-FIRST AGENT LOOP: for ordinary read-only conversation turns, the primary model sees the
+  // request before optional capability routing. It either answers directly or asks the COS host for
+  // the minimum capabilities it needs. Capability requests never grant authority; the host still
+  // enforces owner/public boundaries before executing anything.
+  const agentDecision = !operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair
+    ? await decideCosAgentTurn({
+        prompt,
+        previousAssistant: priorAnswer || null,
+        surface: browserSurface,
+        ownerAuthenticated: authenticatedOwner,
+        language,
+      })
+    : null
+
+  if (agentDecision?.mode === 'answer') {
+    console.info('[cos-agent-decision]', JSON.stringify({
+      at: new Date().toISOString(),
+      mode: 'answer',
+      capabilities: [],
+      confidence: agentDecision.confidence,
+      reasoner: agentDecision.reasonerLabel,
+      decisionMs: Math.max(0, Date.now() - ingressStartedAt),
+    }))
+    const direct = await withAgentDecisionMetadata(NextResponse.json({
+      ok: true,
+      reply: agentDecision.answer,
+      source: 'cos-model-direct',
+      confidence_score: agentDecision.confidence,
+      external_ai_invoked: false,
+      external_fallback_invoked: false,
+      local_model_invoked: true,
+      execution_allowed: false,
+      external_action_taken: false,
+    }), agentDecision)
+    const decorated = await withSuggestedFollowups(direct, prompt, auditUserId)
+    return browserSurface === 'concierge' ? publicConciergePresentation(decorated) : decorated
+  }
+
+  if (agentDecision?.mode === 'orchestrate') {
+    console.info('[cos-agent-decision]', JSON.stringify({
+      at: new Date().toISOString(),
+      mode: 'orchestrate',
+      capabilities: agentDecision.capabilities,
+      confidence: agentDecision.confidence,
+      reason: agentDecision.reason,
+      reasoner: agentDecision.reasonerLabel,
+      decisionMs: Math.max(0, Date.now() - ingressStartedAt),
+    }))
+
+    if (agentDecision.capabilities.includes('software_specialist') || agentDecision.capabilities.includes('repository_read')) {
+      const specialist = authenticatedOwner
+        ? await tryCosSoftwareSpecialist({
+            body,
+            objective: prompt,
+            surface: browserSurface,
+            allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair,
+            signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
+            deployment,
+          })
+        : browserSurface === 'assistant'
+          ? await tryCosSoftwareSpecialist({
+              body,
+              objective: prompt,
+              surface: 'assistant',
+              allowRepositoryRepair: false,
+              signalBoostDeploymentContext: false,
+              deployment,
+            })
+          : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: prompt, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
+      if (specialist) {
+        const annotated = await withAgentDecisionMetadata(specialist, agentDecision)
+        return browserSurface === 'concierge' ? publicConciergePresentation(annotated) : annotated
+      }
+    }
+
+    routedHeaders.set('x-signalboost-agent-mode', 'orchestrate')
+    routedHeaders.set('x-signalboost-agent-capabilities', agentDecision.capabilities.join(','))
+    routedHeaders.set('x-signalboost-agent-confidence', String(agentDecision.confidence))
+    routedRequest = new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify(routedBody) })
+  }
+
   // ANSWERABILITY FIRST: ordinary questions reach COS before optional semantic routers. The
   // routers above are admitted only when the request is identity/visual-shaped. This timestamp
   // makes it visible whether time was spent understanding/routing or actually answering.
@@ -395,9 +497,10 @@ export async function POST(req: NextRequest) {
   // Both surfaces execute the same COS reasoning endpoint. Public scope changes authority,
   // memory/tool visibility, disclosure, and presentation — never which brain answers.
   const executeCosRequest = () => cosPrimaryPost(routedRequest)
-  const response = access?.isOwner && browserSurface === 'assistant'
+  let response = access?.isOwner && browserSurface === 'assistant'
     ? await executeCosRequest()
     : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => executeCosRequest()))
+  response = await withAgentDecisionMetadata(response, agentDecision)
 
   try {
     const outcome: any = await response.clone().json()

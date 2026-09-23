@@ -271,10 +271,10 @@ export function createRunpodBuilderResidencyModelPort(input:{
               ){
                 throw error
               }
-              lastHealthError=message.slice(0,240)
+              lastHealthError=`application_ready_probe:${message}`.slice(0,240)
             }
           }
-          if(!state.ok&&state.error) lastHealthError=String(state.error).slice(0,240)
+          if(!state.ok&&state.error) lastHealthError=`provider_health:${String(state.error)}`.slice(0,240)
 
           if(state.ok&&ready===0&&running===0&&initializing===0&&idle===0){
             emptyHealthPolls+=1
@@ -290,9 +290,10 @@ export function createRunpodBuilderResidencyModelPort(input:{
             emptyHealthPolls=0
           }
         }catch(error){
-          lastHealthError=error instanceof Error
-            ?error.message.slice(0,240)
+          const message=error instanceof Error
+            ?error.message
             :'residency_exact_artifact_health_probe_failed'
+          lastHealthError=`provider_health_probe:${message}`.slice(0,240)
         }
         await sleep(Math.min(READY_POLL_MS,Math.max(1,deadline-Date.now())))
       }

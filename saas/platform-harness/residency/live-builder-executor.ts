@@ -153,10 +153,15 @@ function actionResult<T>(
 
 class GovernedResidencyWorkspace implements BuilderWorkspacePort{
   private sequence=0
+  private readonly context:HarnessWorkerContext
+  private readonly workspaceId:string
   constructor(
-    private readonly context:HarnessWorkerContext,
-    private readonly workspaceId:string,
-  ){}
+    context:HarnessWorkerContext,
+    workspaceId:string,
+  ){
+    this.context=context
+    this.workspaceId=workspaceId
+  }
   private async invoke<T>(
     capabilityId:NativeCapability,
     params:Record<string,unknown>,
@@ -202,10 +207,15 @@ class GovernedResidencyWorkspace implements BuilderWorkspacePort{
 
 class GovernedResidencyRunner implements BuilderRunnerPort{
   private sequence=0
+  private readonly context:HarnessWorkerContext
+  private readonly workspaceId:string
   constructor(
-    private readonly context:HarnessWorkerContext,
-    private readonly workspaceId:string,
-  ){}
+    context:HarnessWorkerContext,
+    workspaceId:string,
+  ){
+    this.context=context
+    this.workspaceId=workspaceId
+  }
   async run(input:{
     workspaceId:string
     command:string

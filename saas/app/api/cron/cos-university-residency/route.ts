@@ -30,7 +30,7 @@ function enabled(): boolean {
   return process.env.COS_UNIVERSITY_RESIDENCY_ENABLED === 'true'
 }
 
-function publicResult(result: Awaited<ReturnType<typeof runBuilderResidencyOrchestrator>>) {
+function publicResult(result: any) {
   return {
     ok: result.ok,
     state: result.state,

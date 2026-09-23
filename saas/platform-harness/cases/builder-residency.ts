@@ -82,7 +82,6 @@ export const BUILDER_RESIDENCY_CASES=Object.freeze([
     ]),
     provingCommand:'node slug.test.js',
   }),
-,
   makeCase({
     caseFamily:'repository_navigation_dependency_trace',
     competencyId:'repository_navigation',

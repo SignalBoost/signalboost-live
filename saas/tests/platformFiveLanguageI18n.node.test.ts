@@ -48,10 +48,13 @@ test('five-language platform build gate covers all major locale stores', () => {
   ]) assert.ok(gate.includes(fragment), `missing gate coverage for ${fragment}`)
 })
 
-test('prebuild blocks deployment on i18n regressions', () => {
+test('prebuild blocks deployment on production i18n regressions without running source migration', () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
-  assert.match(pkg.scripts['validate:i18n-platform'], /validate:i18n-copy/)
+  assert.match(pkg.scripts['validate:i18n-platform'], /check-hardcoded-copy\.mjs/)
+  assert.match(pkg.scripts['validate:i18n-platform'], /check-generated-ui-locale-completeness\.mjs/)
   assert.match(pkg.scripts['validate:i18n-platform'], /check-five-language-platform\.mjs/)
+  assert.doesNotMatch(pkg.scripts['validate:i18n-platform'], /migrate-page-copy-to-locales/)
+  assert.match(pkg.scripts['audit:i18n-migration'], /migrate-page-copy-to-locales\.mjs/)
   assert.match(pkg.scripts.prebuild, /validate:i18n-platform/)
 })
 

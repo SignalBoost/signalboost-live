@@ -529,7 +529,7 @@ export function createLiveBuilderResidencyExecutor(input:{
             builderOutcome:result.ok?'completed':'incomplete',
             traceSteps:result.trace.length,
           }
-          if(!result.ok){
+          if('error' in result){
             observationData.failureCode=result.error
           }
           context.observe({

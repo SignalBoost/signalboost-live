@@ -140,12 +140,28 @@ export async function GET() {
     if (graduatesResult.error) throw graduatesResult.error
     if (openLearningResult.error) throw openLearningResult.error
 
-    const openSources = new Map(OPEN_SOURCE_CATALOG.map(source => [source.id, {
-      ...source,
-      items24h: 0,
-      embedded24h: 0,
-      latestAt: null as string | null,
-    }]))
+    const openSources = new Map<string, {
+      id: string
+      name: string
+      integration: 'implemented' | 'candidate'
+      vectorSpace: string | null
+      mode: string
+      items24h: number
+      embedded24h: number
+      latestAt: string | null
+    }>()
+    for (const source of OPEN_SOURCE_CATALOG) {
+      openSources.set(source.id, {
+        id: source.id,
+        name: source.name,
+        integration: source.integration,
+        vectorSpace: source.vectorSpace,
+        mode: source.mode,
+        items24h: 0,
+        embedded24h: 0,
+        latestAt: null,
+      })
+    }
     for (const row of openLearningResult.data || []) {
       const id = openSourceId(row)
       if (!id) continue

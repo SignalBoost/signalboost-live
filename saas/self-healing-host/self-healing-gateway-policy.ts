@@ -3,6 +3,10 @@ import { createConsequenceClassifier } from '@/agent-gateway/classifier'
 import { GATEWAY_ALLOWLIST } from '@/agent-gateway-host/gateway-policy'
 import { OBSERVATION_POLICY_RECONCILE_ALLOWLIST_ENTRY, OBSERVATION_POLICY_RECONCILE_TARGET } from '@/agent-gateway-host/observation-policy-recovery'
 import { UNIVERSITY_DISTILLATION_RECOVERY_ALLOWLIST_ENTRY } from '@/agent-gateway-host/university-distillation-recovery'
+import {
+  BUILDER_RESIDENCY_RUNTIME_RECOVERY_ALLOWLIST_ENTRY,
+  BUILDER_RESIDENCY_RUNTIME_RECOVERY_TARGET,
+} from '@/agent-gateway-host/builder-residency-runtime-recovery'
 import { UNIVERSITY_DISTILLATION_RECOVERY_TARGET } from './university-distillation-monitoring.ts'
 
 export const SELF_HEALING_GATEWAY_POLICY: GovernancePolicy = Object.freeze({
@@ -18,11 +22,17 @@ export const SELF_HEALING_GATEWAY_POLICY: GovernancePolicy = Object.freeze({
         consequenceClass: 'reversible_internal',
         targets: [UNIVERSITY_DISTILLATION_RECOVERY_TARGET],
       },
+      {
+        id: 'signalboost.self_healing.reversible.builder_residency_runtime_reconcile',
+        consequenceClass: 'reversible_internal',
+        targets: [BUILDER_RESIDENCY_RUNTIME_RECOVERY_TARGET],
+      },
     ],
   }),
   allowlist: Object.freeze([
     ...GATEWAY_ALLOWLIST,
     OBSERVATION_POLICY_RECONCILE_ALLOWLIST_ENTRY,
     UNIVERSITY_DISTILLATION_RECOVERY_ALLOWLIST_ENTRY,
+    BUILDER_RESIDENCY_RUNTIME_RECOVERY_ALLOWLIST_ENTRY,
   ]),
 })

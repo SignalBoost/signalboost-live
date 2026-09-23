@@ -36,7 +36,7 @@ const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 const ROUTING = 'LOAD_BALANCER' as const
 const PUBLIC_PORT = 8000
-const IDLE_TIMEOUT_SECONDS = 180
+const IDLE_TIMEOUT_SECONDS = MASS_DISTILLED_IDLE_TIMEOUT_SECONDS
 export const MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS = 720
 const REQUEST_TIMEOUT_MS = 8_000
 // Production mass-evaluation evidence on 2026-09-17 showed the exact LoRA candidate repeatedly

@@ -478,7 +478,26 @@ export function createLiveBuilderResidencyExecutor(input:{
           db:input.db,
           apiKey:apiKey!,
           timeoutMs:35_000,
+          readyTimeoutMs:360_000,
         })
+
+      const modelIdentity={
+        candidateId,
+        artifactId:artifact.artifactId,
+        artifactHash:artifact.artifactHash,
+        revisionKey,
+      }
+      if(modelPort.prepare){
+        try{
+          await modelPort.prepare(modelIdentity)
+        }catch(error){
+          markInfrastructureFailure(
+            error instanceof Error
+              ?error.message
+              :'residency_exact_artifact_runtime_prepare_failed',
+          )
+        }
+      }
 
       const gatewayHost=nativeGatewayHost({
         manifest,
@@ -494,17 +513,19 @@ export function createLiveBuilderResidencyExecutor(input:{
       const capabilities=nativeCapabilityResolver(manifest)
       const ai=exactArtifactBuilderAi({
         modelPort,
-        identity:{
-          candidateId,
-          artifactId:artifact.artifactId,
-          artifactHash:artifact.artifactHash,
-          revisionKey,
-        },
+        identity:modelIdentity,
         markInfrastructureFailure,
       })
 
       const worker={
         async run(context:HarnessWorkerContext){
+          if(infrastructureFailure){
+            context.observe({
+              summary:'Residency exact-artifact runtime was unavailable before practical execution.',
+              data:{failureCode:infrastructureFailure},
+            })
+            return
+          }
           const governedWorkspace=
             new GovernedResidencyWorkspace(context,workspaceId)
           const governedRunner=

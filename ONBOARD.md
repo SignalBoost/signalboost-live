@@ -104,6 +104,8 @@ Failure invariant: a simple answerable owner/general question must not end in `h
 
 Response-delivery invariant: once a latency-sensitive owner/general question has a valid answer, optional provenance/history persistence must not hold the HTTP response open. Those writes run in the post-response lifecycle; persistence failures are telemetry/continuity failures, not permission to discard or delay an already-valid answer.
 
+Model-first agent invariant: after host authentication and hard security/surface boundaries, an ordinary user request reaches the primary COS model before optional capability routing. The model must either return a complete answer or request the minimum capability plan needed to finish. Capability requests are intent, not authority: Referee/host policy, public-delivery scope, owner authentication, action permission, and tool authorization remain deterministic and cannot be expanded by model output. Current platform/runtime facts remain host-verified. When the model has already requested live_web or conversation_history, COS must use that plan instead of paying for a redundant semantic classifier.
+
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

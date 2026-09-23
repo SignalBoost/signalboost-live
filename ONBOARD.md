@@ -94,6 +94,14 @@ Recent recovery established the following engineering state and lessons:
 - Healthy distillation should not be disturbed while canary infrastructure and model quality are repaired in parallel. The near-term milestone is another legitimately improved graduate; the Computer Science graduate then enters the Builder Residency/apprenticeship path.
 
 
+## Interactive answerability / owner self-knowledge invariant — 2026-09-23
+
+Authenticated owner self-knowledge (for example model/provider/runtime/spec questions) is a host-owned configuration query, not a reasoning problem. After server-side owner authentication, the current raw user message must be answered from verified runtime topology **before** conversation augmentation, semantic-intent classification, RunPod wake, or Qwen/DeepInfra inference. Public Concierge never inherits this disclosure path.
+
+The semantic task-intent model is a disambiguator for freshness/context boundaries, not a mandatory pre-answer stage. Ordinary timeless/general questions proceed directly to COS. When semantic classification is needed, it uses the latency-sensitive interactive profile with thinking disabled, strict JSON, and an 8-second hard call bound; it must never inherit the generic 120-second `LOCAL_AI_TIMEOUT_MS`.
+
+Failure invariant: a simple answerable owner/general question must not end in `honestRefusalReply` merely because a routing/classification model timed out. Deterministic host facts release deterministically; ordinary model reasoning remains bounded and completion-first.
+
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

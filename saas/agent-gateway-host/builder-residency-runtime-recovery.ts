@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { AgentRequest, AllowlistEntry } from '../agent-gateway/index.ts'
 import type { ChainAttempt, ChainExecutor } from './execution-chain.ts'
 import {
+  MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS,
   massDistilledRuntimeHealth,
   reconcileExistingMassDistilledRuntime,
   type MassDistilledRuntimeArtifact,
@@ -137,6 +138,7 @@ export async function recoverBuilderResidencyRuntime(input:{
     artifactRevision,
     artifactHash,
     runtimeKey:residencyRuntimeKey(candidateId,artifactHash),
+    idleTimeoutSeconds:MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS,
   })
   const reconcile=input.reconcile??reconcileExistingMassDistilledRuntime
   const repaired=await reconcile(artifact)

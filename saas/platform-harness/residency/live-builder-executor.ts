@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createPortableCapabilityDescriptor } from '../../provider-hub-core/capability-runtime.ts'

@@ -58,9 +58,11 @@ import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
+import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuationIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
+import { retrieveCreativeMemory, formatCreativeMemoryForReasoner } from '@/lib/ai/cos/creativeMemory'
 import {
   isProvenanceIntrospection,
   requestsExternalAction,
@@ -317,6 +319,10 @@ export const TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 28_000
 export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 1_400
 export const TRAVEL_PLAN_RETRY_MAX_TOKENS = 900
 async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+  const creative=await retrieveCreativeMemory(input,{privileged:true,limit:2}).catch(()=>({retrieved:0,relevant:0,selected:[],mode:'unavailable' as const}))
+  const creativeGuidance=creative.selected.length
+    ? formatCreativeMemoryForReasoner(creative.selected).join('\n')
+    : ''
   const evidence=(Array.isArray(sources)?sources:[]).slice(0,6).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}\n${String(source.snippet||'').slice(0,360)}`).join('\n\n')
   const languageLine=language ? `Write the plan in the language the traveller wrote in; if unclear use ${reportLanguageName(language)}.` : 'Write the plan in the language the traveller wrote in.'
   const rules=[
@@ -335,7 +341,7 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
       maxTokens:TRAVEL_PLAN_RESCUE_MAX_TOKENS,
       purpose:'travel_plan_grounded',
       systemPrompt:['You are a fast, practical local travel planner. Deliver a complete but concise itinerary now. Prefer useful specifics over long explanation. /no_think',...rules].join(' '),
-      prompt:`TRAVELLER REQUEST:\n${input.slice(0,8_000)}${evidence?`\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}\n\nITINERARY:`,
+      prompt:`TRAVELLER REQUEST:\n${input.slice(0,8_000)}${creativeGuidance?`\n\nCREATIVE MEMORY — HOW TO SOLVE/PRESENT, NEVER FACTUAL EVIDENCE:\n${creativeGuidance}`:''}${evidence?`\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`:''}\n\nITINERARY:`,
     },
     {
       temperature:.35,
@@ -343,7 +349,7 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
       maxTokens:TRAVEL_PLAN_RETRY_MAX_TOKENS,
       purpose:'travel_plan_grounded_retry',
       systemPrompt:['Complete the travel brief directly and concisely. Start with the first time slot, not a restatement. Cover transport, budget, and one worthwhile paid attraction if supported. /no_think',...rules].join(' '),
-      prompt:`BRIEF:\n${input.slice(0,8_000)}${evidence?`\n\nLIVE SOURCES:\n${evidence}`:''}\n\nPLAN:`,
+      prompt:`BRIEF:\n${input.slice(0,8_000)}${creativeGuidance?`\n\nCREATIVE MEMORY — HOW TO SOLVE/PRESENT, NEVER FACTUAL EVIDENCE:\n${creativeGuidance}`:''}${evidence?`\n\nLIVE SOURCES:\n${evidence}`:''}\n\nPLAN:`,
     },
   ]
   const started=Date.now()
@@ -383,9 +389,14 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
 function buildTravelPlanEvidenceBackstop(input:string,language:string,sources:any[]):{reply:string;confidence:number}{
   const sourceList=(Array.isArray(sources)?sources:[]).slice(0,6)
   const transport=sourceList.find(source=>/\b(train|rail|metro|tram|bus|airport|station|transport|kolej|poci[aą]g|autobus)\b/i.test(`${source?.title||''} ${source?.snippet||''}`))
-  const attraction=sourceList.find(source=>/\b(museum|museo|museum|muzeum|gallery|attraction|ticket|admission|rijksmuseum|anne frank|van gogh)\b/i.test(`${source?.title||''} ${source?.snippet||''}`))
+  const attraction=sourceList.find(source=>{
+    const text=`${source?.title||''} ${source?.snippet||''}`
+    const attractionSpecific=/\b(museum|museo|muzeum|gallery|attraction|rijksmuseum|anne frank|van gogh|canal cruise|grachtenrondvaart|rejs po kanałach)\b/i.test(text)
+    const transportOnly=/\b(airport|aeroporto|aeropuerto|schiphol|train|rail|station|metro|tram|bus|transport|transfer|collegamenti)\b/i.test(text)
+    return attractionSpecific&&!transportOnly
+  })
   const transportTitle=String(transport?.title||'live public-transport source').slice(0,160)
-  const attractionTitle=String(attraction?.title||'a major paid attraction supported by the live results').slice(0,160)
+  const attractionTitle=String(attraction?.title||'rejs po kanałach lub Rijksmuseum (sprawdź aktualną cenę i dostępność przed wejściem)').slice(0,180)
   const sourceRefs=sourceList.slice(0,3).map((source,index)=>`[LIVE${index+1}] ${String(source?.title||'Live source').slice(0,160)}`).join('; ')
   if(language==='pl')return{confidence:.45,reply:[
     'Plan awaryjny — COS pobrał aktualne źródła, ale model planujący nie zdążył zakończyć pełnej syntezy w limicie. Zamiast odsyłać Cię do ponowienia, daję użyteczny plan oparty na bezpiecznych założeniach.',
@@ -498,11 +509,14 @@ export async function postCosPrimary(req:NextRequest){
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body,input)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const precedingAssistant=previousAssistantText(body)
+  const freshConversationContext=resolveFreshConversationContext(body, input)
+  const lookupInput=freshConversationContext.lookupInput
+  const artifactContinuation=Boolean(precedingAssistant)&&looksLikeArtifactContinuation(input)
   const fastEditAlreadyAttempted=req.headers.get('x-signalboost-fast-transform-attempted')==='1'
 
   // Fast text transforms remain the FIRST executable branch, but only for a verified edit intent.
 // A miss is not terminal: the request falls through to the normal COS chain under the same turn.
-  if(!fastEditAlreadyAttempted&&isFastTextTransform(input,{previousAssistant:precedingAssistant})){
+  if(!artifactContinuation&&!fastEditAlreadyAttempted&&isFastTextTransform(input,{previousAssistant:precedingAssistant})){
     const fast=await runFastTextTransform(input)
     if(fast){
       const executionProvenance=authoritativeProvenance(null,{invoked:false})
@@ -514,7 +528,8 @@ export async function postCosPrimary(req:NextRequest){
   }
 
   const hasAttachments=Array.isArray(body?.attachments)&&body.attachments.length>0
-  const fastAuthoringEligible=!hasAttachments
+  const fastAuthoringEligible=!artifactContinuation
+    && !hasAttachments
     && isAuthoringObjectiveWithoutLiveLookup(input)
     && !isCosCodingObjective(input)
   if(fastAuthoringEligible){
@@ -537,9 +552,6 @@ export async function postCosPrimary(req:NextRequest){
       return NextResponse.json({reply:selfKnowledgeCos.reply,source:'cos-owner-self-knowledge',confidence_score:selfKnowledgeCos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:selfKnowledgeCos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:selfKnowledgeCos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
   }
-
-  const freshConversationContext=resolveFreshConversationContext(body, input)
-  const lookupInput=freshConversationContext.lookupInput
 
   if(access?.isOwner&&isOwnerRepoScanRequest(input)){
     const scan=await scanRepositoryForOwner()
@@ -600,6 +612,8 @@ export async function postCosPrimary(req:NextRequest){
   )
   const modelPlannedFreshEvidence=agentCapabilities.has('live_web')
   const modelPlannedConversationRecall=agentCapabilities.has('conversation_history')
+  const modelPlannedSemanticMemory=agentCapabilities.has('semantic_memory')
+  const modelPlannedCreativeMemory=agentCapabilities.has('creative_memory')
   // A question about an earlier conversation with this user is answered from their own history, never from the public web.
   const conversationRecallRequested=Boolean(userId)&&(modelPlannedConversationRecall||detectConversationRecallIntent(input))
   const heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested
@@ -632,6 +646,8 @@ export async function postCosPrimary(req:NextRequest){
       capabilities:[...agentCapabilities],
       liveWeb:modelPlannedFreshEvidence,
       conversationHistory:modelPlannedConversationRecall,
+      semanticMemory:modelPlannedSemanticMemory,
+      creativeMemory:modelPlannedCreativeMemory,
       requiresFreshEvidence,
       requestedAction,
     }))
@@ -802,7 +818,7 @@ export async function postCosPrimary(req:NextRequest){
   if(conversationRecall) reasoningPrompt=`${conversationRecall}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
   if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
-    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest||modelPlannedSemanticMemory||modelPlannedCreativeMemory})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 

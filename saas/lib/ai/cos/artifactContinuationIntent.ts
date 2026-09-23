@@ -19,7 +19,7 @@ const TITLE_FOLLOWUP = new RegExp(
   'iu',
 )
 
-const DIRECT_EDIT_CONTINUATION = /^\s*(?:(?:can|could|would)\s+you\s+|please\s+)?(?:rewrite|rephrase|shorten|tighten|polish|proofread|edit|translate)\b/iu
+const DIRECT_EDIT_CONTINUATION = /^\s*(?:(?:can|could|would)\s+you\s+|please\s+|proszę\s+|por\s+favor\s+|пожалуйста\s+)?(?:rewrite|rephrase|shorten|tighten|polish|proofread|edit|translate|przet[lł]umacz|przeredaguj|zredaguj|skr[oó][ćc]|popraw|edytuj|traduc(?:e|ir)|reescrib(?:e|ir)|acort(?:a|ar)|revis(?:a|ar)|traduz(?:a|ir)|reescrev(?:a|er)|encurt(?:e|ar)|revis(?:e|ar)|переведи|перепиши|сократи|исправь|отредактируй)\b/iu
 const STYLE_EDIT_CONTINUATION = /^\s*(?:(?:can|could|would)\s+you\s+|please\s+)?(?:make|change)\s+(?:it|this|that|the\s+(?:e-?mail|message|draft|letter|memo|text|reply|response))\s+(?:more|less)\s+(?:formal|professional|friendly|direct|concise|diplomatic|firm|warm|polite|casual|clear|clearer)\b/iu
 const STRUCTURAL_EDIT_CONTINUATION = new RegExp(
   `^\\s*(?:(?:can|could|would)\\s+you\\s+|please\\s+)?(?:add|remove|include|exclude|change|use|keep|turn|convert)\\b.{0,80}\\b${ARTIFACT_PART}\\b`,
@@ -31,7 +31,7 @@ const ARTIFACT_DERIVATION = new RegExp(
   'iu',
 )
 
-const LEADING_ARTIFACT_COMMAND = /^\s*(?:(?:can|could|would)\s+you\s+|please\s+)?(?:rewrite|rephrase|shorten|tighten|polish|proofread|edit|translate|make|change|add|remove|include|exclude|use|keep|turn|convert)\b/iu
+const LEADING_ARTIFACT_COMMAND = /^\s*(?:(?:can|could|would)\s+you\s+|please\s+|proszę\s+|por\s+favor\s+|пожалуйста\s+)?(?:rewrite|rephrase|shorten|tighten|polish|proofread|edit|translate|make|change|add|remove|include|exclude|use|keep|turn|convert|przet[lł]umacz|przeredaguj|zredaguj|skr[oó][ćc]|popraw|edytuj|traduc(?:e|ir)|reescrib(?:e|ir)|acort(?:a|ar)|traduz(?:a|ir)|reescrev(?:a|er)|encurt(?:e|ar)|переведи|перепиши|сократи|исправь|отредактируй)\b/iu
 const LOOKUP_START = /^\s*(?:what|which|show|give|tell(?:\s+me)?|find|is|are)\b/iu
 const TEMPORAL_HEADING_LOOKUP = /\b(?:current|latest|today(?:'s)?|tonight|live|breaking|news)\b.{0,80}\b(?:headline|title|caption)\b|\b(?:headline|title|caption)\b.{0,80}\b(?:current|latest|today(?:'s)?|tonight|live|breaking|news)\b/iu
 const EXPLICIT_FACT_VERIFICATION = /\b(?:verify|fact[- ]?check|research|look\s+up|check\s+(?:whether|if)|confirm\s+(?:whether|if)|cite\s+(?:a\s+)?source|current\s+(?:rule|law|requirement|status)|latest\s+(?:rule|law|requirement|status)|today(?:'s)?\s+(?:rule|law|requirement|status))\b/iu

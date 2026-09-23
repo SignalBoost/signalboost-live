@@ -4,6 +4,12 @@
  * Keep these definitions dependency-free so prompts, verified self-knowledge, and regression tests
  * cannot drift into treating an embedding index as the memory or a cache as durable knowledge.
  */
+export const SEMANTIC_MEMORY_DEFINITION =
+  'Semantic Memory is meaning-based retrieval across durable COS knowledge and context. It uses embeddings/vector similarity to find relevant facts, documents, learned material, enterprise memory, user memory, and other authorized records even when wording differs. Embeddings are retrieval indexes, not truth; current-world facts still require live evidence when freshness policy says so.'
+
+export const CREATIVE_MEMORY_DEFINITION =
+  'Creative Memory is durable, validated memory of successful approaches, structures, styles, useful elements, constraints, and outcome-backed patterns. It guides how COS solves or presents a task; it is not factual evidence and must never be used to prove that a real-world claim is true. Raw model output cannot approve itself into Creative Memory.'
+
 export const ENTERPRISE_MEMORY_DEFINITION =
   'Enterprise Memory is durable organization-scoped operational knowledge retrieved only inside an authorized organization context. It stores reusable enterprise facts, decisions, history, and intelligence; it is not an answer cache.'
 
@@ -22,14 +28,25 @@ export const MEMORY_LAYER_COMPARISON_GUARDRAIL =
 
 
 /** Detect when the recorded answer materially used a canonical COS definition. */
+const SEMANTIC_MEMORY_FINGERPRINT = /meaning-based retrieval across durable COS knowledge and context/i
+const CREATIVE_MEMORY_FINGERPRINT = /durable, validated memory of successful approaches/i
 const ENTERPRISE_MEMORY_FINGERPRINT = /durable organization-scoped operational knowledge/i
 const SEMANTIC_CACHE_FINGERPRINT = /policy-versioned, age-bounded reuse/i
 const SIGNALBOOST_COMPANY_IDENTITY_FINGERPRINT = /privately owned U\.S\. AI platform/i
-export type CanonicalSelfKnowledgeContribution = { enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean; used:boolean }
+export type CanonicalSelfKnowledgeContribution = { semanticMemoryDefinition:boolean; creativeMemoryDefinition:boolean; enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean; used:boolean }
 export function canonicalSelfKnowledgeContribution(answer:string):CanonicalSelfKnowledgeContribution {
   const text=String(answer ?? '')
+  const semanticMemoryDefinition=SEMANTIC_MEMORY_FINGERPRINT.test(text)
+  const creativeMemoryDefinition=CREATIVE_MEMORY_FINGERPRINT.test(text)
   const enterpriseMemoryDefinition=ENTERPRISE_MEMORY_FINGERPRINT.test(text)
   const semanticCacheDefinition=SEMANTIC_CACHE_FINGERPRINT.test(text)
   const companyIdentityDefinition=SIGNALBOOST_COMPANY_IDENTITY_FINGERPRINT.test(text)
-  return { enterpriseMemoryDefinition, semanticCacheDefinition, companyIdentityDefinition, used:enterpriseMemoryDefinition || semanticCacheDefinition || companyIdentityDefinition }
+  return {
+    semanticMemoryDefinition,
+    creativeMemoryDefinition,
+    enterpriseMemoryDefinition,
+    semanticCacheDefinition,
+    companyIdentityDefinition,
+    used:semanticMemoryDefinition || creativeMemoryDefinition || enterpriseMemoryDefinition || semanticCacheDefinition || companyIdentityDefinition,
+  }
 }

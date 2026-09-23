@@ -1,10 +1,9 @@
-export type SupportedResponseLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+import { normalizeSupportedLanguage, type SupportedLanguage } from './supportedLanguages.ts'
 
-const SUPPORTED = new Set<SupportedResponseLanguage>(['en', 'es', 'pt', 'pl', 'ru'])
+export type SupportedResponseLanguage = SupportedLanguage
 
 function normalizedContextLanguage(value: unknown): SupportedResponseLanguage {
-  const normalized = String(value || '').trim().toLowerCase().slice(0, 2) as SupportedResponseLanguage
-  return SUPPORTED.has(normalized) ? normalized : 'en'
+  return normalizeSupportedLanguage(value)
 }
 
 function explicitLanguageOverride(prompt: string): SupportedResponseLanguage | null {

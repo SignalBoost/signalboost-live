@@ -107,7 +107,7 @@ export async function loadLanguage(lang: string): Promise<Dict> {
     const localized = mergePageLocales(await dictionaries[safeLang](), safeLang)
     const merged = mergeDict(mergeWithEnglishFallback(english, localized), localized)
     merged.console = mergeWithEnglishFallback(enConsole, loadConsole(safeLang))
-    merged.audit = mergeWithEnglishFallback(enAudit, mergeDict(loadAudit(safeLang), loadAuditCenter(lang)))
+    merged.audit = mergeWithEnglishFallback(enAudit, mergeDict(loadAudit(safeLang), loadAuditCenter(safeLang)))
     merged.onboarding = mergeWithEnglishFallback(loadOnboarding('en'), loadOnboarding(safeLang))
     merged.marketingSales = mergeWithEnglishFallback(enMarketingSales, loadMarketingSales(safeLang))
     merged.homepage = mergeWithEnglishFallback(enHomepage, loadHomepage(safeLang))

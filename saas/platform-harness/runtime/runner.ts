@@ -363,17 +363,21 @@ export async function runHarnessWorker(input: {
         })
       },
     })
-  } catch {
+  } catch (error) {
+    const code=diagnosticFailureCode(
+      { verified:false, verifierRef:'harness://worker', evidenceRefs:[], reason:error instanceof Error?error.message:'harness_worker_failed' },
+      'harness_worker_failed',
+    )
     journal.append({
       kind: 'failure',
       summary: 'Harness worker terminated unexpectedly.',
-      data: { code: 'harness_worker_failed' },
+      data: { code },
     })
     return {
       runId: input.manifest.runId,
       profile: input.manifest.profile,
       trajectory: journal.snapshot(),
-      outcome: { status: 'harness_failure', failureCode: 'harness_worker_failed' },
+      outcome: { status: 'harness_failure', failureCode: code },
       authorityExpanded: false,
       productionMutationObserved,
     }

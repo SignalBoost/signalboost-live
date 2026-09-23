@@ -19,9 +19,12 @@ test('owner provenance introspection bypasses the public browser interceptor', (
   assert.match(source, /!access\?\.isOwner && isProvenanceIntrospection\(prompt\)/)
 })
 
-test('COS has a deterministic privileged platform-stack response', () => {
-  const source = read('lib/ai/cos/cosFirstAnswer.ts')
-  assert.match(source, /function ownerPlatformStackReply/)
-  assert.match(source, /process\.env\.LOCAL_AI_MODEL \|\| 'Qwen\/Qwen3\.6-35B-A3B'/)
-  assert.match(source, /isPublicDeliveryScope\(\)\s*\? publicImplementationDisclosureReply\(input\.language\)\s*:\s*ownerPlatformStackReply\(input\.language\)/)
+test('COS has a deterministic privileged platform-stack response from current runtime topology', () => {
+  const shared = read('lib/ai/cos/cosFirstAnswer.ts')
+  const core = read('lib/ai/cos/cosFirstAnswerCore.ts')
+  assert.match(shared, /const deterministicSelfKnowledge = await tryCoreCOSFirstAnswer\(input\)/)
+  assert.match(core, /function ownerPlatformStackReply/)
+  assert.match(core, /currentPlatformModelTopology\(\)/)
+  assert.doesNotMatch(core, /LOCAL_AI_MODEL \|\| 'Qwen\//)
+  assert.match(core, /selfKnowledgeDeterministic:\s*true/)
 })

@@ -340,6 +340,16 @@ def generate_teacher_dataset(envelope: dict[str, Any]) -> None:
         "jobId": job_id,
         "sourceRef": source_ref,
         "teacherOutputItemHashes": item_hashes,
+        "teacherRows": [
+            {
+                "promptId": row["prompt_id"],
+                "prompt": row["prompt"],
+                "response": row["response"],
+                "text": row["text"],
+                "itemHash": row["item_hash"],
+            }
+            for row in rows
+        ],
         "promptSetHash": prompt_set_hash,
         "teacherModelId": teacher_id,
         "teacherModelRevision": teacher_revision,

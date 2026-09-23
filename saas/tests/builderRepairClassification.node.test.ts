@@ -141,3 +141,19 @@ test('reference and explicitly preserved documents are not writable documentatio
   assert.equal(await classifyBuilderDocumentationIntent({ async generate() { return '{"documentationOnly":true,"writePaths":["README.md","docs/guide.md"]}' } }, objective), null)
   assert.equal(await classifyBuilderDocumentationIntent({ async generate() { return '{"documentationOnly":true}' } }, objective), null)
 })
+
+test('bare package executable failures are runtime failures, not missing source paths', async () => {
+  const { BuilderToolLoop } = await import('../lib/builder/tool-loop.ts')
+  const { InMemoryBuilderWorkspace } = await import('../lib/builder/workspace.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('runtime-command', 'package.json', '{"scripts":{"build":"next build"}}')
+  const result = await new BuilderToolLoop(
+    { async generate() { return '{"type":"tool","toolId":"run","input":{"command":"next build"}}' } },
+    workspace,
+    { async run() { return { exitCode: 127, stdout: '', stderr: 'sh: line 1: next: command not found', timedOut: false } } },
+  ).run({ objective: 'Fix the failing TypeScript build.', workspaceId: 'runtime-command', maxRounds: 1 })
+  assert.equal(result.ok, false)
+  assert.equal(result.trace[0]?.failureClass, 'runtime')
+  assert.match(String(result.trace[0]?.remediation || ''), /npm exec/)
+})
+

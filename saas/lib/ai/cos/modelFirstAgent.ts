@@ -171,14 +171,19 @@ export async function runModelFirstCosAgent(args: {
   prompt: string
   userId: string | null
   conversationId?: string | null
+  previousAssistant?: string | null
   privileged: boolean
 }): Promise<ModelFirstAgentResult> {
   const prompt = String(args.prompt || '').trim()
   if (!prompt) return null
 
   const { registry, definitions, nativeToToolId } = toolDefinitions({ privileged: args.privileged, userId: args.userId })
+  const previousAssistant = String(args.previousAssistant || '').trim().slice(0, 6_000)
+  const firstPrompt = previousAssistant
+    ? `PRECEDING ASSISTANT TURN (conversation context only; not independent evidence):\n${previousAssistant}\n\nCURRENT USER REQUEST:\n${prompt}`
+    : prompt
   const first = await callLocalModelTurn({
-    prompt,
+    prompt: firstPrompt,
     systemPrompt: systemPrompt(args.privileged),
     tools: definitions,
     toolChoice: 'auto',

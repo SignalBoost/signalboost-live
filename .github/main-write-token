@@ -1,2 +1,2 @@
-base_sha=38fbabfb962b0f1773a12e168e6ca650687383fc
-branch=fix/residency-node-strip-types-20260922
+base_sha=ed5b468dd7f6f7baeb316a341703fdb6f88109c8
+branch=fix/residency-loop-result-narrowing-20260922

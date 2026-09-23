@@ -108,6 +108,8 @@ Model-first agent invariant: after host authentication and hard security/surface
 
 Native tool-call implementation: interactive COS uses the OpenAI-compatible `tools` / `tool_choice=auto` / `tool_calls` protocol for its first answer-or-capability decision. Direct model answers are released immediately only when host release policy does not require fresh evidence. If a mutable/current-world request is mistakenly answered from model memory, the host converts that same decision into `live_web` orchestration after the model turn; this guard can require more evidence but never grant authority or substitute a deterministic semantic answer.
 
+Model-first means model-first: semantic categories such as travel planning may have deterministic host release requirements, but they must not bypass the primary model's first answer-or-capability decision. Host classifiers may enforce freshness, authority, safety, or capability availability only after that decision. Latency is controlled by bounded model/tool budgets and fast grounded completion, not by moving semantic understanding back into pre-model routing.
+
 ## Runtime provider priority invariant — 2026-09-19
 
 The canonical iTMounts text-compute order is:

@@ -37,7 +37,7 @@ const BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 const ROUTING = 'LOAD_BALANCER' as const
 const PUBLIC_PORT = 8000
 const IDLE_TIMEOUT_SECONDS = 180
-export const MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS = 300
+export const MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS = 720
 const REQUEST_TIMEOUT_MS = 8_000
 // Production mass-evaluation evidence on 2026-09-17 showed the exact LoRA candidate repeatedly
 // returning HTTP 502 after ~40s while the same endpoint passed the short exact-artifact canary and

@@ -14,6 +14,14 @@ type Copy = Readonly<{
   inFlight24h: string
   failedRuns24h: string
   hfObservedCost24h: string
+  openSourceItems24h: string
+  openSourcesTitle: string
+  openSourcesExplanation: string
+  acquiredItems: string
+  embeddedItems: string
+  sourceAccessCost: string
+  openSourceStates: Readonly<Record<string, string>>
+  noOpenSources: string
   providersTitle: string
   providersExplanation: string
   teacherCalls: string
@@ -66,6 +74,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     inFlight24h: 'In flight · 24h',
     failedRuns24h: 'Failed runs · 24h',
     hfObservedCost24h: 'HF observed cost · 24h',
+    openSourceItems24h: 'Open-source items · 24h',
+    openSourcesTitle: 'Open sources',
+    openSourcesExplanation: 'Shared acquisition for Working COS and University. Counts reflect retained Production material, not mastery or graduation.',
+    acquiredItems: 'Retained · 24h',
+    embeddedItems: 'Embedded · 24h',
+    sourceAccessCost: 'Source access',
+    openSourceStates: { observed: 'Observed', implemented: 'Implemented · no retained items in 24h', candidate: 'Candidate connector' },
+    noOpenSources: 'No open-source providers configured.',
     providersTitle: 'Frontier teacher providers · last 24h',
     providersExplanation: 'Calls and tokens are durable API telemetry. Provider account charges are not inferred here.',
     teacherCalls: 'teacher calls',
@@ -116,6 +132,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     inFlight24h: 'En curso · 24 h',
     failedRuns24h: 'Ejecuciones fallidas · 24 h',
     hfObservedCost24h: 'Costo observado de HF · 24 h',
+    openSourceItems24h: 'Elementos open source · 24 h',
+    openSourcesTitle: 'Fuentes abiertas',
+    openSourcesExplanation: 'Adquisición compartida para Working COS y University. Los conteos reflejan material retenido en Producción, no dominio ni graduación.',
+    acquiredItems: 'Retenidos · 24 h',
+    embeddedItems: 'Embebidos · 24 h',
+    sourceAccessCost: 'Acceso a la fuente',
+    openSourceStates: { observed: 'Observado', implemented: 'Implementado · sin material retenido en 24 h', candidate: 'Conector candidato' },
+    noOpenSources: 'No hay proveedores de fuentes abiertas configurados.',
     providersTitle: 'Proveedores docentes frontier · últimas 24 h',
     providersExplanation: 'Las llamadas y los tokens son telemetría duradera de API. Aquí no se infieren cargos de las cuentas de los proveedores.',
     teacherCalls: 'llamadas docentes',
@@ -166,6 +190,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     inFlight24h: 'Em andamento · 24 h',
     failedRuns24h: 'Execuções com falha · 24 h',
     hfObservedCost24h: 'Custo observado do HF · 24 h',
+    openSourceItems24h: 'Itens open source · 24 h',
+    openSourcesTitle: 'Fontes abertas',
+    openSourcesExplanation: 'Aquisição compartilhada para Working COS e University. As contagens refletem material retido em Produção, não domínio ou graduação.',
+    acquiredItems: 'Retidos · 24 h',
+    embeddedItems: 'Embeddings · 24 h',
+    sourceAccessCost: 'Acesso à fonte',
+    openSourceStates: { observed: 'Observado', implemented: 'Implementado · sem material retido em 24 h', candidate: 'Conector candidato' },
+    noOpenSources: 'Nenhum provedor de fonte aberta configurado.',
     providersTitle: 'Provedores professores frontier · últimas 24 h',
     providersExplanation: 'Chamadas e tokens são telemetria persistente de API. Os custos das contas dos provedores não são inferidos aqui.',
     teacherCalls: 'chamadas de professor',
@@ -216,6 +248,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     inFlight24h: 'W toku · 24 h',
     failedRuns24h: 'Nieudane przebiegi · 24 h',
     hfObservedCost24h: 'Zaobserwowany koszt HF · 24 h',
+    openSourceItems24h: 'Elementy open source · 24 h',
+    openSourcesTitle: 'Otwarte źródła',
+    openSourcesExplanation: 'Wspólne pozyskiwanie dla Working COS i University. Liczniki pokazują materiał zachowany w Produkcji, a nie opanowanie wiedzy ani ukończenie programu.',
+    acquiredItems: 'Zachowane · 24 h',
+    embeddedItems: 'Osadzone · 24 h',
+    sourceAccessCost: 'Dostęp do źródła',
+    openSourceStates: { observed: 'Zaobserwowane', implemented: 'Wdrożone · brak zachowanego materiału w 24 h', candidate: 'Kandydat na konektor' },
+    noOpenSources: 'Brak skonfigurowanych dostawców otwartych źródeł.',
     providersTitle: 'Dostawcy nauczycieli frontier · ostatnie 24 h',
     providersExplanation: 'Wywołania i tokeny są trwałą telemetrią API. Opłaty kont dostawców nie są tutaj szacowane.',
     teacherCalls: 'wywołania nauczyciela',
@@ -266,6 +306,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     inFlight24h: 'В работе · 24 ч',
     failedRuns24h: 'Неудачные запуски · 24 ч',
     hfObservedCost24h: 'Наблюдаемая стоимость HF · 24 ч',
+    openSourceItems24h: 'Материалы open source · 24 ч',
+    openSourcesTitle: 'Открытые источники',
+    openSourcesExplanation: 'Общий поток получения материалов для Working COS и University. Счётчики показывают сохранённые материалы Продакшена, а не освоение или выпуск.',
+    acquiredItems: 'Сохранено · 24 ч',
+    embeddedItems: 'Векторизовано · 24 ч',
+    sourceAccessCost: 'Доступ к источнику',
+    openSourceStates: { observed: 'Наблюдается', implemented: 'Реализовано · нет сохранённых материалов за 24 ч', candidate: 'Кандидат-коннектор' },
+    noOpenSources: 'Провайдеры открытых источников не настроены.',
     providersTitle: 'Провайдеры frontier-учителей · последние 24 ч',
     providersExplanation: 'Вызовы и токены — сохранённая API-телеметрия. Списания со счетов провайдеров здесь не рассчитываются.',
     teacherCalls: 'вызовы учителя',

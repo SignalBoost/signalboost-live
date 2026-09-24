@@ -384,7 +384,7 @@ test('the same canary failure repeating stops that artifact instead of looping',
 })
 
 test('the hourly ceiling preserves the 72-per-day nominal spend envelope without a long blackout', () => {
-  assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 6)
+  assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 1)
   assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 3)
   assert.equal((24 / MASS_CANARY_ROLLING_WINDOW_HOURS) * MASS_CANARY_ROLLING_MAX_APPROVALS, 72)
   const a = artifact(1)

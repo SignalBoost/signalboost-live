@@ -26,3 +26,20 @@ test('HF open datasets receive bounded rotating exact-source daily acquisition',
   assert.match(caps, /hf_github_cc0:\s*4/)
   assert.match(caps, /hf_arxiv_cc0:\s*3/)
 })
+
+
+test('Semantic Scholar and Wikimedia receive exact-source rotating continuity objectives before generic gaps', () => {
+  const daily = readFileSync(join(process.cwd(), 'lib/cos/dailyAutonomousLearning.ts'), 'utf8')
+
+  assert.match(daily, /const SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES = Object\.freeze\(\[/)
+  assert.match(daily, /const WIKIMEDIA_CONTINUOUS_TOPICS = Object\.freeze\(\[/)
+  assert.match(daily, /function utcLearningHour\(now: Date\): number/)
+  assert.match(daily, /export function openSourceContinuityCurriculum\(now: Date = new Date\(\)\): KnowledgeGap\[\]/)
+
+  assert.match(daily, /id: 'curriculum:semantic-scholar-continuous'[\s\S]*?sourceKinds: \['scientific_journal'\][\s\S]*?allowedAdapterIds: \['semantic_scholar'\]/)
+  assert.ok(daily.includes('curriculum:wikimedia-continuous-'))
+  assert.match(daily, /sourceKinds: \['approved_public_web'\][\s\S]*?allowedAdapterIds: \['reference'\]/)
+  assert.match(daily, /const openSourceContinuity = openSourceContinuityCurriculum\(\)/)
+  assert.match(daily, /const gaps = \[\.\.\.openSourceContinuity, miningGap\(input\.miningSummary\), \.\.\.autonomousGaps, \.\.\.generalCurriculum\]/)
+  assert.match(daily, /openSourceContinuityQueries:/)
+})

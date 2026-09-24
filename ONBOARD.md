@@ -28,6 +28,42 @@ Canonical profiles are: `residency`, `production`, `sandbox`, `self_healing`, `s
 The executable surface is the intersection of **requested work + profile constraints + an already-verified Referee/Guardian/host authority envelope + Provider Hub capabilities actually assigned and available for the exact tenant/environment/portable identity**. Every executable action still passes through `agent-gateway/runGoverned()`; the harness cannot mint approval, route around a halt, widen Production scope, grant spend, promote a model, or convert task success into authority.
 
 Residency infrastructure recovery invariant: independently attributed, recognized exact-runtime faults may enter a registered Self-Healing action through the Governed Socket. The action may reconcile only already-existing exact RunPod resources to the approved template/GPU/scale-to-zero envelope. It may not create provider resources, wake compute, invoke a model, promote an artifact, authorize Production traffic, or repair auth/identity failures automatically.
+### Platform Harness full-enforcement target — 2026-09-23
+
+The Platform Harness is not considered complete merely because the contracts, profiles, Governed Socket adapter, trajectory journal, verifier, and failure routers exist. The completion target is **one mandatory execution envelope for COS and every specialist across interactive, delegated, scheduled, sandbox, Self-Healing, evaluation, and Production work**.
+
+The target runtime invariant is:
+
+```text
+request / scheduled objective / delegated objective
+-> HarnessRun identity + context binding
+-> trusted authority envelope
+-> profile + environment constraints
+-> Provider Hub capability intersection
+-> hard runtime limits
+-> governed execution
+-> observable trajectory
+-> independent verification
+-> rollback/recovery when required
+-> strict owner routing
+-> durable evidence
+```
+
+The full-enforcement requirements are:
+
+1. **Universal ingress.** Every COS or specialist execution receives a HarnessRun. A simple no-tool answer may use a zero-capability/lightweight manifest, but no model, specialist, delegate, background worker, MCP, native API, browser/runtime, repository action, provider call, or Production mutation may create a parallel ungoverned execution path.
+2. **Context is bound, not authoritative.** Conversation state, retrieved memory, vector/knowledge results, evidence, University knowledge, and task context may inform reasoning, but context can never grant capability or authority. Execution identity, artifact identity/revision where applicable, tenant, environment, and material context/evidence references must remain attributable to the run.
+3. **Real hard limits.** `maxToolCalls`, `deadlineMs`, `maxCostUsd`, and `maxConcurrency` are runtime controls, not metadata. The Harness must refuse new work when a ceiling is reached, account for provider/tool spend where measurable, bound concurrent calls/delegations, and propagate cancellation/deadlines into adapters that support abort signals. Unknown/unmetered paid cost must fail closed whenever a hard spend ceiling requires exact accounting.
+4. **Recursive delegation.** A COS-to-specialist or specialist-to-specialist delegation creates a child HarnessRun bound to the parent run and may only reduce the parent authority, budget, deadline, environment, and capability surface. Delegation can never launder or widen authority.
+5. **Consequential-action contract.** Consequential capabilities require explicit consequential authority plus an executable rollback or compensating-action contract where rollback is technically possible. The Harness records precondition evidence, action evidence, postcondition verification, rollback availability, rollback attempt/result when invoked, and escalation when safe rollback is impossible.
+6. **No success by assertion.** Model text, tool exit alone, HTTP 2xx alone, or a worker self-report cannot establish success. The independent verifier owns success/failure attribution from observable evidence. Verification failure cannot be converted into success by retrying through another provider or route outside the same authority envelope.
+7. **Strict recovery ownership.** Infrastructure failures route to Self-Healing; competency failures route to University/remediation where educational semantics apply; authority boundaries route to Referee/Guardian; Harness defects route to Harness assurance. Recovery executes only through a newly authorized/bounded HarnessRun or an already-authorized child run and must be reverified.
+8. **Production parity.** The same core Harness architecture applies in Production. Production is not a privileged bypass profile. Production may have broader separately granted authority, but all capability discovery, limits, governed execution, evidence, verification, and failure routing remain active.
+9. **Durable audit without hidden reasoning.** Persist run identity, authority reference, environment/profile, capability/tool observations, cost/latency/limit evidence, verification, rollback/recovery, routing, and outcome evidence. Never persist private chain-of-thought, hidden scratchpads, credentials, raw secrets, or unnecessary user content.
+10. **Fail-closed continuity.** If capability discovery, authority verification, budget accounting required for a hard ceiling, verifier availability, durable evidence persistence for a consequential action, or required rollback preconditions fail, the Harness stops rather than silently falling back to an ungoverned path.
+
+Platform-wide acceptance is not complete until Production evidence demonstrates the shared Harness on COS and representative specialists across read-only, write, consequential, delegated, failure/recovery, rollback, deadline, concurrency, and cost-ceiling cases. Unit tests or a Residency-only integration are necessary but not sufficient evidence for the platform-wide completion claim.
+
 
 Ownership stays separated:
 

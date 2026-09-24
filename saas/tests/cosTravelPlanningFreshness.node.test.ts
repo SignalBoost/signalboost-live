@@ -17,7 +17,7 @@ test('semantic intent may classify travel naturally instead of a deterministic f
   const semantic = readFileSync(new URL('../lib/ai/cos/cosSemanticTaskIntent.ts', import.meta.url), 'utf8')
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(semantic, /if \(requiresLiveTravelPlanningEvidence\(input\)\)/)
-  assert.match(route, /heuristicRequiresFreshEvidence\|\|requiresLiveTravelPlanningEvidence\(input\)\|\|freshConversationContext\.contextUsed/)
+  assert.match(route, /heuristicRequiresFreshEvidence\s*\|\|\s*requiresLiveTravelPlanningEvidence\(input\)\s*\|\|\s*freshConversationContext\.contextUsed/)
   assert.match(route, /requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness\(semanticTaskIntent\)/)
 })
 

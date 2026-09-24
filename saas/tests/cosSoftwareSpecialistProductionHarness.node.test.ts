@@ -1,3 +1,4 @@
+// saas/tests/cosSoftwareSpecialistProductionHarness.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -55,7 +56,7 @@ test('public Software Specialist export cannot bypass the Production Harness', (
   assert.doesNotMatch(source, /export async function tryCosSoftwareSpecialistLegacy\(/)
   assert.match(source, /export async function tryCosSoftwareSpecialist\(/)
   assert.match(source, /runCosSoftwareSpecialistProductionHarness\(\{/)
-  assert.match(source, /execute: \(\) => tryCosSoftwareSpecialistLegacy\(input\)/)
+  assert.match(source, /execute: signal => tryCosSoftwareSpecialistLegacy\(input, signal\)/)
   const exported = source.slice(source.indexOf('export async function tryCosSoftwareSpecialist('))
   assert.match(exported, /if \(!specialistRelevant\) return null/)
   assert.ok(

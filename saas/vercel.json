@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build",
+  "buildCommand": "node scripts/vercel-cos-gates.mjs",
   "env": {
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
     "COS_LIVE_SOURCES_ENABLED": "true",

@@ -125,6 +125,71 @@ test('live Residency routes model-controlled edits and commands through Governed
   assert.ok(runner.calls>=3)
 })
 
+
+test('live Residency serializes batched seed-file reads inside maxConcurrency one',async()=>{
+  const practiceCase=BUILDER_RESIDENCY_CASES.find(
+    item=>item.competencyId==='test_and_regression_construction',
+  )
+  assert.ok(practiceCase)
+  assert.ok(practiceCase.seedFiles.length>1)
+
+  const request=createBuilderResidencyHarnessRequest({
+    runId:'residency-live-test-multi-file',
+    objective:practiceCase.objective,
+    tenantId:'itmounts-university',
+    portableId:'builder-residency',
+    agentId:'builder-resident',
+    artifactId:'artifact-1',
+    artifactHash:H,
+    artifactRevision:R,
+    sandboxEnvironmentId:'builder-residency-sandbox-v1',
+    requestedCapabilities:BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
+    limits:{deadlineMs:180_000,maxToolCalls:60,maxConcurrency:1},
+  })
+  const replies=[
+    '{"type":"tool","toolId":"edit_file","input":{"path":"slug.js","search":"return value.toLowerCase().replace(\\' \\', \\'-\\')","replace":"return value.toLowerCase().replace(/[^a-z0-9]+/g, \\'-\\').replace(/^-|-$/g, \\'\\')"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node slug.test.js"}}',
+    '{"type":"answer","answer":"Repaired normalization and verified the regression."}',
+  ]
+  const modelPort:BuilderResidencyModelPort={
+    async complete(){
+      return Object.freeze({
+        text:replies.shift()??'{"type":"answer","answer":"done"}',
+        endpointId:'ep_multi',
+        modelId:'itmounts-mass-distilled-multi',
+        exactArtifact:true as const,
+      })
+    },
+  }
+  const runner:BuilderRunnerPort={
+    async run(input){
+      const source=input.files.find(file=>file.path==='slug.js')?.content??''
+      const fixed=source.includes("replace(/[^a-z0-9]+/g, '-')")
+      return {
+        exitCode:fixed?0:1,
+        stdout:fixed?'ok\n':'',
+        stderr:fixed?'':'not fixed',
+        timedOut:false,
+        executedCommand:input.command,
+      }
+    },
+  }
+  const executor=createLiveBuilderResidencyExecutor({
+    db:{} as any,
+    sandboxRunner:runner,
+    modelPortFactory:()=>modelPort,
+  })
+  const result=await executor.run({
+    request,
+    authority:createBuilderResidencyNativeAuthority(),
+    practiceCase,
+    candidateId:'candidate-multi',
+  })
+
+  assert.notEqual(result.outcome.failureCode,'harness_concurrency_limit_exceeded')
+  assert.equal(result.outcome.status,'success')
+})
+
 test('live Residency native authority is sandbox-only and non-consequential',()=>{
   const authority=createBuilderResidencyNativeAuthority()
   assert.deepEqual(authority.environments,['sandbox'])

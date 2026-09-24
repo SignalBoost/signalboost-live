@@ -249,20 +249,61 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     artifactByCandidate.set(String((row as any).candidate_id), row)
   }
   const artifactRows = [...artifactByCandidate.values()]
-  const rows: RollingArtifact[] = artifactRows.map((row: any) => {
+
+  // The atomic database claim enforces Builder Residency before Computer Science can enter final
+  // evaluation. The rolling authorizer must use the SAME eligibility set; otherwise it can spend every
+  // tick repeatedly approving an artifact the claim will deterministically refuse, starving older eligible
+  // subjects behind it. Keep the gate exact to candidate + artifact hash and carry the Residency completion
+  // timestamp forward so only a post-Residency exact canary can arm evaluation.
+  const builderRows = artifactRows.filter((row: any) =>
+    String(row?.subject_id || '') === 'Computer Science & Coding')
+  const residencyCompletedAt = new Map<string, string>()
+  const builderCandidateIds = [...new Set(builderRows
+    .map((row: any) => clean(row?.candidate_id, 240))
+    .filter(Boolean))]
+  for (let offset = 0; offset < builderCandidateIds.length; offset += ROLLING_CANDIDATE_CHUNK_SIZE) {
+    const candidateChunk = builderCandidateIds.slice(offset, offset + ROLLING_CANDIDATE_CHUNK_SIZE)
+    const result = await db.from('cos_university_residency_enrollments')
+      .select('candidate_id,trained_artifact_hash,completed_at')
+      .in('candidate_id', candidateChunk)
+      .eq('standing', 'residency_complete')
+      .eq('authority_expanded', false)
+      .not('completed_at', 'is', null)
+    if (result.error) throw new Error(`mass_distilled_evaluation_residency_read_failed:${boundedErrorMessage(result.error)}`)
+    for (const row of result.data || []) {
+      const candidateId = clean((row as any).candidate_id, 240)
+      const artifactHash = clean((row as any).trained_artifact_hash, 64).toLowerCase()
+      const completedAt = String((row as any).completed_at || '')
+      if (!candidateId || !HEX64.test(artifactHash) || !Number.isFinite(Date.parse(completedAt))) continue
+      const key = `${candidateId}:${artifactHash}`
+      const prior = residencyCompletedAt.get(key)
+      if (!prior || Date.parse(completedAt) > Date.parse(prior)) residencyCompletedAt.set(key, completedAt)
+    }
+  }
+
+  const finalGateArtifactRows = artifactRows.filter((row: any) => {
+    if (String(row?.subject_id || '') !== 'Computer Science & Coding') return true
+    const candidateId = clean(row?.candidate_id, 240)
+    const artifactHash = clean(row?.trained_artifact_hash, 64).toLowerCase()
+    return residencyCompletedAt.has(`${candidateId}:${artifactHash}`)
+  })
+  const rows: RollingArtifact[] = finalGateArtifactRows.map((row: any) => {
     const receipt = row?.intended_use?.trainingReceipt && typeof row.intended_use.trainingReceipt === 'object'
       ? row.intended_use.trainingReceipt
       : {}
+    const candidateId = clean(row.candidate_id, 240)
+    const artifactHash = clean(row.trained_artifact_hash, 64).toLowerCase()
+    const isBuilder = String(row.subject_id || '') === 'Computer Science & Coding'
     return {
-      candidateId: clean(row.candidate_id, 240), subjectId: clean(row.subject_id, 240),
-      artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
+      candidateId, subjectId: clean(row.subject_id, 240),
+      artifactHash, createdAt: String(row.created_at || ''),
       frontierRecipe: receipt.profile === 'cos_university_frontier_gkd_v1',
-      builderV2: String(row.subject_id || '') === 'Computer Science & Coding'
-        && isBuilderV2Receipt(row.intended_use),
+      builderV2: isBuilder && isBuilderV2Receipt(row.intended_use),
       remediationReplay: isRemediationReplayReceipt(row.intended_use),
+      ...(isBuilder ? { minimumCanaryObservedAt: residencyCompletedAt.get(`${candidateId}:${artifactHash}`) } : {}),
     }
   })
-  if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
+  if (!rows.length) return { issued: false, reason: 'no_mass_artifact_final_gate_eligible' }
   // Scope evidence to the pending candidates being evaluated this tick. Supabase/PostgREST can cap
   // broad result sets below the requested limit; a global newest-events query can therefore evict
   // older exact-canary evidence and make eligible artifacts appear permanently ineligible.
@@ -327,20 +368,23 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const now = new Date()
   const inFlightCount = (await activeEvaluationRunpodEndpointIds(now)).size
 
-  const remediationReplayCanaryPasses = new Set(rows
-    .filter(row => row.remediationReplay === true)
-    .filter(row => all.some(event => event.candidateId === row.candidateId
-      && event.verifier === 'host_production_verifier'
-      && event.evidence?.claim === 'production_canary_healthy'
-      && event.evidence?.exactArtifact === true
-      && String(event.evidence?.artifactHash || '').toLowerCase() === row.artifactHash.toLowerCase()))
+  const remediationReplayRows = rows.filter(row => row.remediationReplay === true)
+  const remediationReplayCanaryPasses = new Set(remediationReplayRows
+    .filter(row => {
+      const minimumCanaryAt = Date.parse(String(row.minimumCanaryObservedAt || ''))
+      return all.some(event => event.candidateId === row.candidateId
+        && event.verifier === 'host_production_verifier'
+        && event.evidence?.claim === 'production_canary_healthy'
+        && event.evidence?.exactArtifact === true
+        && String(event.evidence?.artifactHash || '').toLowerCase() === row.artifactHash.toLowerCase()
+        && (!Number.isFinite(minimumCanaryAt) || Date.parse(event.observedAt) >= minimumCanaryAt))
+    })
     .map(row => row.candidateId)).size
 
-  // While the first two replay-trained artifacts are still waiting for exact-artifact canary proof,
-  // never let the evaluator consume the account's last serverless worker reservation. Production
-  // 2026-09-22 hit 10/10 with one graduate and live evaluator leases, leaving the prioritized canary
-  // unable to provision. This is scheduling only: no endpoint is reclaimed here and no authority expands.
-  if (remediationReplayCanaryPasses < 2) {
+  // Reserve canary headroom only when a replay artifact has actually crossed every prerequisite that
+  // precedes canarying. A pre-Residency Builder artifact cannot consume the canary lane, so reserving a
+  // RunPod worker for it would block unrelated eligible evaluations forever.
+  if (remediationReplayRows.length > 0 && remediationReplayCanaryPasses < 2) {
     const capacity = await massDistilledServerlessWorkerCapacity()
     if (capacity.availableWorkers <= 1) {
       return {

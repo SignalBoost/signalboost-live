@@ -162,6 +162,7 @@ function actionResult<T>(
 
 class GovernedResidencyWorkspace implements BuilderWorkspacePort{
   private sequence=0
+  private serial:Promise<void>=Promise.resolve()
   private readonly context:HarnessWorkerContext
   private readonly workspaceId:string
   constructor(
@@ -171,17 +172,26 @@ class GovernedResidencyWorkspace implements BuilderWorkspacePort{
     this.context=context
     this.workspaceId=workspaceId
   }
-  private async invoke<T>(
+  private invoke<T>(
     capabilityId:NativeCapability,
     params:Record<string,unknown>,
   ):Promise<T>{
-    const result=await this.context.execute({
-      actionId:`workspace-${++this.sequence}`,
-      kind:KIND_BY_CAP[capabilityId],
-      capabilityId,
-      params:{workspaceId:this.workspaceId,...params},
+    // BuilderToolLoop intentionally batches initial file reads with Promise.all. Residency keeps a
+    // maxConcurrency=1 authority envelope, so forwarding those reads directly makes the Harness reject
+    // its own second read as harness_concurrency_limit_exceeded. Serialize only this governed workspace
+    // adapter: callers may batch reads, but the authority boundary still observes one action at a time.
+    const actionId=`workspace-${++this.sequence}`
+    const run=this.serial.then(async()=>{
+      const result=await this.context.execute({
+        actionId,
+        kind:KIND_BY_CAP[capabilityId],
+        capabilityId,
+        params:{workspaceId:this.workspaceId,...params},
+      })
+      return actionResult<T>(result)
     })
-    return actionResult<T>(result)
+    this.serial=run.then(()=>undefined,()=>undefined)
+    return run
   }
   listFiles(_workspaceId:string){
     return this.invoke<readonly Pick<BuilderFile,'path'|'updatedAt'>[]>(

@@ -100,6 +100,8 @@ export type RollingArtifact = Readonly<{
   frontierRecipe?: boolean
   builderV2?: boolean
   remediationReplay?: boolean
+  /** Earliest exact-canary timestamp accepted by the atomic claim (post-Residency for Builder artifacts). */
+  minimumCanaryObservedAt?: string
 }>
 export type RollingEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 
@@ -399,10 +401,12 @@ export function decideRollingMassEvaluationApproval(input: {
 
     if (history.hasVerdict) continue
 
+    const minimumCanaryAt = at(artifact.minimumCanaryObservedAt)
     const canary = mine.some(event => event.verifier === 'host_production_verifier'
       && event.evidence?.claim === 'production_canary_healthy'
       && event.evidence?.exactArtifact === true
-      && event.evidence?.productionTrafficAuthorized === false)
+      && event.evidence?.productionTrafficAuthorized === false
+      && (!Number.isFinite(minimumCanaryAt) || at(event.observedAt) >= minimumCanaryAt))
     if (!canary) continue
 
     // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.

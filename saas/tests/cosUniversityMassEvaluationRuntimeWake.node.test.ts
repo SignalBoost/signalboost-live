@@ -22,7 +22,7 @@ test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-bal
 })
 
 test('runtime wake is bounded and hands cold-start readiness back to the evaluator', () => {
-  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 150_000/)
+  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 260_000/)
   assert.match(route, /name !== 'TimeoutError' && name !== 'AbortError'/)
   assert.match(route, /wakeRequestTimedOut: true/)
   assert.match(route, /responseObserved: false/)

@@ -141,6 +141,58 @@ test('GitHub CC0 source retains code provenance and requires canonical internal 
   assert.ok(rows[0].evidence?.includes('repo_language:TypeScript'))
 })
 
+
+test('GitHub CC0 rejects unrelated fallback-like HTML even when it comes from the CC0 corpus', async () => {
+  const fetcher = (async () => fakeResponse({
+    rows: [{
+      row_idx: 5329,
+      row: {
+        text: 'Reducing greenhouse gas emissions requires community action and climate planning.',
+        meta: {
+          repo_name: 'Chicago/climatechangeisreal',
+          repo_language: 'HTML',
+          file_name: 'reducing-greenhouse-gas-emissions_.html',
+          mime_type: 'text/html',
+        },
+      },
+    }],
+  })) as typeof fetch
+
+  const rows = await createHuggingFaceGithubCc0Search(fetcher)('computer science coding algorithms', 4)
+  assert.deepEqual(rows, [])
+})
+
+test('GitHub CC0 relaxes a long University query into a compact software search', async () => {
+  const requested: string[] = []
+  const fetcher = (async (url: string | URL | Request) => {
+    requested.push(String(url))
+    if (requested.length === 1) return fakeResponse({ rows: [] }, 200)
+    return fakeResponse({
+      rows: [{
+        row_idx: 88,
+        row: {
+          text: 'export function binarySearch(values: number[], target: number) { return values.indexOf(target) }',
+          meta: {
+            repo_name: 'example/algorithms',
+            repo_language: 'TypeScript',
+            file_name: 'src/search.ts',
+            mime_type: 'text/typescript',
+          },
+        },
+      }],
+    })
+  }) as typeof fetch
+
+  const rows = await createHuggingFaceGithubCc0Search(fetcher)(
+    'Computer Science & Coding algorithms empirical findings systematic review measurement validation',
+    4,
+  )
+  assert.equal(rows.length, 1)
+  assert.equal(requested.length, 2)
+  assert.match(requested[1], /\/search\?/)
+  assert.ok(rows[0].evidence?.includes('huggingface_access_mode:search_relaxed'))
+})
+
 test('GitHub CC0 source is exposed by the shared learning factory only for software-relevant gaps', async () => {
   const adapters = createLiveLearningAdapters({
     COS_LIVE_SOURCES_ENABLED: 'true',
@@ -195,7 +247,7 @@ test('HF dataset search failure falls back to one bounded deterministic row slic
   assert.ok(rows[0].evidence?.includes('huggingface_access_mode:rows_fallback'))
 })
 
-test('HF dataset HTTP-200 empty search falls back to bounded row access', async () => {
+test('HF dataset HTTP-200 empty search relaxes the BM25 query before any row fallback', async () => {
   const requested: string[] = []
   const fetcher = (async (url: string | URL | Request) => {
     requested.push(String(url))
@@ -216,8 +268,8 @@ test('HF dataset HTTP-200 empty search falls back to bounded row access', async 
   assert.equal(rows.length, 1)
   assert.equal(requested.length, 2)
   assert.match(requested[0], /\/search\?/)
-  assert.match(requested[1], /\/rows\?/)
-  assert.ok(rows[0].evidence?.includes('huggingface_access_mode:rows_fallback'))
+  assert.match(requested[1], /\/search\?/)
+  assert.ok(rows[0].evidence?.includes('huggingface_access_mode:search_relaxed'))
 })
 
 test('HF dataset search abort falls back instead of opening the source circuit immediately', async () => {

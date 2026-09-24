@@ -42,6 +42,9 @@ type WorkingCos = {
   automaticTrainingAuthorized: boolean
   productionTrafficAuthorized: boolean
   nextGate: string
+  runtimeBindingEligible?: boolean
+  runtimeBindingBlockers?: string[]
+  runtimeBindingSource?: string | null
 }
 
 type Job = {
@@ -136,6 +139,10 @@ function when(value: string | null | undefined): string {
   return Number.isNaN(date.getTime())
     ? value
     : date.toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
+}
+
+function gateLabel(value: string | null | undefined): string {
+  return String(value || '—').replaceAll('_', ' ')
 }
 
 function short(value: string | null | undefined, length = 12): string {
@@ -269,7 +276,7 @@ export default function CosUniversityTelemetryPage() {
           <Card label={copy.workingCosBundleReady} value={workingCos ? (workingCos.bundleReady ? copy.pass : copy.pending) : '—'} />
           <Card label={copy.workingCosSubjects} value={workingCos ? String(workingCos.subjectCount) : '—'} />
           <Card label={copy.workingCosItems} value={workingCos ? String(workingCos.itemCount) : '—'} />
-          <Card label={copy.workingCosNextGate} value={workingCos?.nextGate || '—'} />
+          <Card label={copy.workingCosNextGate} value={gateLabel(workingCos?.nextGate)} />
         </div>
         {workingCos?.subjectIds?.length ? (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -439,9 +446,9 @@ export default function CosUniversityTelemetryPage() {
 
 function Card({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border p-4">
+    <div className="min-w-0 rounded-lg border p-4">
       <div className="text-xs opacity-60">{label}</div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-2 text-2xl font-semibold tabular-nums" style={{ overflowWrap: 'anywhere' }}>{value}</div>
     </div>
   )
 }

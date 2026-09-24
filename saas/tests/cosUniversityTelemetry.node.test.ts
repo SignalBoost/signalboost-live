@@ -117,10 +117,32 @@ test('University telemetry exposes read-only Working COS balanced bundle readine
   assert.match(route, /workingCos:\s*\{/)
   assert.match(route, /automaticTrainingAuthorized:\s*false/)
   assert.match(route, /productionTrafficAuthorized:\s*false/)
-  assert.match(route, /exact_runtime_identity_rollback_and_training_dispatch/)
+  assert.match(route, /queryWorkingCosRuntimeIdentity/)
+  assert.match(route, /workingCosRuntimeBindingFromEnv/)
+  assert.match(route, /workingCosRuntimeBinding\?\.eligible/)
+  assert.match(route, /workingCosRuntimeBinding\.nextGate/)
+  assert.match(route, /'runtime_binding'/)
   assert.match(page, /copy\.workingCosTitle/)
   assert.match(page, /workingCos\.subjectCount/)
   assert.match(page, /workingCos\.itemCount/)
   assert.match(page, /workingCos\.subjectIds/)
   assert.match(copy, /Working COS · direct distillation readiness/)
+})
+
+
+test('University telemetry 24-hour summaries are not derived from capped display rows', () => {
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
+  assert.match(route, /select\('id', \{ count: 'exact', head: true \}\)/)
+  assert.match(route, /const totalRuns24h = n\(totalRunCountResult\.count\)/)
+  assert.match(route, /const inFlightRuns24h = Math\.max\(0, totalRuns24h - completedRuns24h - failedRuns24h\)/)
+  assert.match(route, /collectPages<any>/)
+  assert.match(route, /\.range\(from, to\)/)
+  assert.doesNotMatch(route, /completedRuns24h:\s*buckets\./)
+})
+
+test('University telemetry wraps and humanizes long Working COS gate labels', () => {
+  const page = source('app/dashboard/cos-university-telemetry/page.tsx')
+  assert.match(page, /function gateLabel/)
+  assert.match(page, /replaceAll\('_', ' '\)/)
+  assert.match(page, /overflowWrap:\s*'anywhere'/)
 })

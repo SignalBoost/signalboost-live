@@ -31,15 +31,40 @@ export function residencyRunpodEndpointName(candidateId: unknown, artifactHash: 
   return `itmounts-mass-distilled-${artifact.slice(0, 12)}-${runtimeKey}-v3`
 }
 
-export async function activeResidencyRunpodEndpointNames(): Promise<ReadonlySet<string>> {
+const RESIDENCY_ENDPOINT_LEASE_MS = 15 * 60_000
+
+export async function activeResidencyRunpodEndpointNames(now = new Date()): Promise<ReadonlySet<string>> {
   const db = cosServiceDb()
   if (!db) throw new Error('residency_endpoint_protection_database_unavailable')
+
+  // Protect only Residency cases that are actually executing. Standing enrollment alone is not a
+  // compute lease: keeping every resident at maxWorkers=1 permanently consumes the account-wide
+  // RunPod worker quota and can starve evaluation/canary lanes indefinitely.
+  //
+  // startCase() writes status='started' before exact-artifact provisioning/execution, so this lease
+  // exists before any worker must be protected. The bounded 15-minute window also releases a stale
+  // lease after a crashed Vercel invocation without weakening Residency evidence or promotion gates.
+  const since = new Date(now.getTime() - RESIDENCY_ENDPOINT_LEASE_MS).toISOString()
+  const activeCases = await db.from('cos_university_residency_case_runs')
+    .select('residency_id,created_at')
+    .eq('status', 'started')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(32)
+  if (activeCases.error) throw activeCases.error
+
+  const residencyIds = [...new Set((activeCases.data || [])
+    .map(row => String((row as { residency_id?: unknown }).residency_id || '').trim())
+    .filter(Boolean))]
+  if (!residencyIds.length) return new Set<string>()
+
   const rows = await db.from('cos_university_residency_enrollments')
-    .select('candidate_id,trained_artifact_hash')
-    .in('standing', ['resident', 'senior_resident', 'remediation_required'])
+    .select('id,candidate_id,trained_artifact_hash,authority_expanded')
+    .in('id', residencyIds)
     .eq('authority_expanded', false)
     .limit(32)
   if (rows.error) throw rows.error
+
   const names = new Set<string>()
   for (const row of rows.data || []) {
     const name = residencyRunpodEndpointName(

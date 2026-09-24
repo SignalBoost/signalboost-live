@@ -28,7 +28,7 @@ test('drops oldest history before shrinking the current user turn', () => {
       { role: 'user', content: current },
     ],
   })
-  assert.equal(plan.messages.at(-1)?.content, current)
+  assert.equal(plan.messages[plan.messages.length - 1]?.content, current)
   assert.ok(plan.droppedMessages >= 1)
   assert.ok(plan.estimatedPromptTokens + plan.maxOutputTokens <= 4_096)
 })
@@ -63,4 +63,21 @@ test('fails closed if even the minimum completion cannot fit', () => {
 test('token estimator is conservative and deterministic', () => {
   assert.equal(estimateContextTokens('abcdef'), 2)
   assert.equal(estimateContextTokens('abcdef'), 2)
+})
+
+
+test('does not leave orphan tool results when compacting history', () => {
+  const plan = planContextWindow({
+    model: 'qwen',
+    contextWindowTokens: 2_048,
+    systemPrompt: 'system',
+    requestedOutputTokens: 512,
+    messages: [
+      { role: 'assistant', content: 'calling tool', tool_calls: [{ id: '1' }] },
+      { role: 'tool', content: 'x'.repeat(8_000), tool_call_id: '1' },
+      { role: 'user', content: 'newest request' },
+    ],
+  })
+  assert.equal(plan.messages.some(message => message.role === 'tool'), false)
+  assert.equal(plan.messages[plan.messages.length - 1]?.content, 'newest request')
 })

@@ -15,14 +15,39 @@ test('uses the runtime-keyed name the passing canary proved, not the bare hash n
   assert.equal(servedCandidateModelFromCanary([passed({})], input), 'itmounts-mass-distilled-7f23dde56e39-a1b2c3d4e5')
 })
 
-test('picks the newest proof for this endpoint and ignores other endpoints, artifacts and failed canaries', () => {
+test('picks the newest valid proof for this endpoint and ignores unrelated endpoint failures', () => {
   const events = [
     passed({ model: 'itmounts-mass-distilled-7f23dde56e39-old0000000' }, '2026-09-15T12:00:00Z'),
     passed({ model: 'itmounts-mass-distilled-7f23dde56e39-new0000000' }, '2026-09-16T12:00:00Z'),
     passed({ model: 'itmounts-mass-distilled-7f23dde56e39-otherendpt', endpointId: 'zzzz' }, '2026-09-17T00:00:00Z'),
-    passed({ model: 'itmounts-mass-distilled-7f23dde56e39-failed0000', claim: 'local_distilled_runtime_canary_failed' }, '2026-09-17T00:00:00Z'),
+    passed({ model: 'itmounts-mass-distilled-7f23dde56e39-failed0000', claim: 'local_distilled_runtime_canary_failed', endpointId: 'zzzz' }, '2026-09-17T00:00:00Z'),
   ]
   assert.equal(servedCandidateModelFromCanary(events, input), 'itmounts-mass-distilled-7f23dde56e39-new0000000')
+})
+
+test('fails closed when a newer canary failure invalidates the previously proven endpoint', () => {
+  const events = [
+    passed({ model: 'itmounts-mass-distilled-7f23dde56e39-good000000' }, '2026-09-16T12:00:00Z'),
+    passed({
+      model: 'itmounts-mass-distilled-7f23dde56e39-good000000',
+      claim: 'local_distilled_runtime_canary_failed',
+      exactArtifact: false,
+      error: 'mass_distilled_runtime_worker_not_ready',
+    }, '2026-09-16T13:00:00Z'),
+  ]
+  assert.throws(() => servedCandidateModelFromCanary(events, input), /served_model_unproven/)
+})
+
+test('an older failed canary does not invalidate a newer passing proof', () => {
+  const events = [
+    passed({
+      model: 'itmounts-mass-distilled-7f23dde56e39-oldfail0000',
+      claim: 'local_distilled_runtime_canary_failed',
+      exactArtifact: false,
+    }, '2026-09-16T11:00:00Z'),
+    passed({ model: 'itmounts-mass-distilled-7f23dde56e39-good000000' }, '2026-09-16T12:00:00Z'),
+  ]
+  assert.equal(servedCandidateModelFromCanary(events, input), 'itmounts-mass-distilled-7f23dde56e39-good000000')
 })
 
 test('fails closed without exact proof: no canary, wrong verifier, foreign model name, or not exactArtifact', () => {

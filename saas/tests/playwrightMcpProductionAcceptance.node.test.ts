@@ -5,6 +5,7 @@ import test from 'node:test'
 const host = readFileSync(new URL('../provider-hub-host/playwright-mcp-sandbox-acceptance.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/playwright-mcp-live-acceptance/route.ts', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
+const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
 
 test('Production Playwright MCP acceptance uses the exact pinned package and real Chromium', () => {
   assert.match(host, /@playwright\/mcp@0\.0\.82/)
@@ -34,4 +35,5 @@ test('Production Playwright MCP route is production-only and CRON_SECRET gated',
   assert.match(route, /Bearer/)
   assert.match(route, /playwright_mcp_production_acceptance/)
   assert.match(vercel, /\/api\/cron\/playwright-mcp-live-acceptance/)
+  assert.match(gate, /playwrightMcpProductionAcceptance\.node\.test\.ts/)
 })

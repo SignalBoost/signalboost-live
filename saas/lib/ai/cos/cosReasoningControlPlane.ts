@@ -1,6 +1,6 @@
 import type { LocalInferenceUsageContext } from '@/lib/ai/localInferenceUsage'
 
-export type CosReasoningWorkerRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher'
+export type CosReasoningWorkerRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher' | 'context_engineer'
 export type CosReasoningWorkerKind = 'cos-open-model' | 'cos-deterministic' | 'external-closed-model'
 
 export type CosReasoningRequest = {

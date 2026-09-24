@@ -65,6 +65,17 @@ The full-enforcement requirements are:
 Platform-wide acceptance is not complete until Production evidence demonstrates the shared Harness on COS and representative specialists across read-only, write, consequential, delegated, failure/recovery, rollback, deadline, concurrency, and cost-ceiling cases. Unit tests or a Residency-only integration are necessary but not sufficient evidence for the platform-wide completion claim.
 
 
+### Deployment-bound Platform Harness Production acceptance — 2026-09-24
+
+The canonical live acceptance implementation is `saas/platform-harness/acceptance/production-canary.ts`, executed only in the Production Vercel environment by `/api/cron/platform-harness-production-acceptance`. It is idempotent per exact `VERCEL_GIT_COMMIT_SHA` plus deployment fingerprint and persists sanitized case evidence to the immutable supervisor audit trail.
+
+The acceptance canary uses only `platform_harness_acceptance_scratch`, a service-role-only table containing bounded synthetic markers and no customer/business data. It exercises the same Production Harness, Governed Socket, capability resolution, hard limits, verifier, compensation, routing, and durable-evidence boundaries as live agents.
+
+Required live matrix: COS read-only verified success; specialist reversible Production write; consequential precondition plus forced independent-verification failure plus completed compensation; narrowed recursive child HarnessRun; absolute deadline cancellation; concurrency ceiling; hard cost ceiling fail-closed; infrastructure attribution to Self-Healing; competency attribution to University remediation; authority boundary to Referee/Guardian; and verification/Harness failure to Harness assurance.
+
+A green build or unit test is not final acceptance. The Platform Harness may be called platform-wide Production-complete only after the exact Production deployment has a persisted `platform_harness_production_acceptance_completed` event covering the required matrix.
+
+
 Ownership stays separated:
 
 - infrastructure/environment/provider/tool failure -> **Self-Healing**;

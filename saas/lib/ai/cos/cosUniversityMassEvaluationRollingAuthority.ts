@@ -6,6 +6,7 @@
 // the scorer or promotion, and it never re-rolls an artifact that already has a verdict.
 
 import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationContextBudget.ts'
+import { isCurrentMassRemediationReplayProofGeneration } from './cosUniversityRemediationReplayProofGeneration.ts'
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
@@ -387,8 +388,8 @@ export function decideRollingMassEvaluationApproval(input: {
     // durable receipt proves post-GKD failure-derived replay. This is scheduling only; the 12-hour
     // retention delay below and every scoring/spend/promotion gate remain unchanged.
     if (remediationReplayProofNeeded) {
-      const aReplay = a.remediationReplay === true
-      const bReplay = b.remediationReplay === true
+      const aReplay = a.remediationReplay === true && isCurrentMassRemediationReplayProofGeneration(a.createdAt)
+      const bReplay = b.remediationReplay === true && isCurrentMassRemediationReplayProofGeneration(b.createdAt)
       if (aReplay !== bReplay) return aReplay ? -1 : 1
     }
     // Preserve the older bounded frontier proof lane for repositories where it is still incomplete.
@@ -522,7 +523,7 @@ export function decideRollingMassEvaluationApproval(input: {
         infrastructureRepairRef: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF,
         infrastructureRepairAt: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT,
         priorFailedAttempts: failures,
-        ...(remediationReplayProofNeeded && artifact.remediationReplay === true ? { remediationReplayProofPriority: true } : {}),
+        ...(remediationReplayProofNeeded && artifact.remediationReplay === true && isCurrentMassRemediationReplayProofGeneration(artifact.createdAt) ? { remediationReplayProofPriority: true } : {}),
         ...(repairedSuspension ? { resumeAfterSuspension: true, repairRef: MASS_EVALUATION_24GB_REPAIR_REF } : {}),
       },
     }

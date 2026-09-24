@@ -18,6 +18,7 @@ import {
   type RollingEvent,
 } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
 import { MASS_EVALUATION_ENDPOINT_CALLS } from '../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
+import { MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER } from '../lib/ai/cos/cosUniversityRemediationReplayProofGeneration.ts'
 
 const now = new Date('2026-09-16T16:50:00Z')
 const hashA = '7f23dde5'.padEnd(64, 'a')
@@ -120,14 +121,16 @@ test('confirmed v2 Computer Science proof sampling outranks legacy work only unt
   assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
 })
 
-test('post-GKD remediation replay proof sampling is bounded and never bypasses the 12-hour delay', () => {
+test('post-GKD remediation replay proof sampling is generation-bound and never bypasses the 12-hour delay', () => {
   assert.equal(MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE, 2)
+  assert.equal(MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER, '2026-09-24T13:40:00.000Z')
+  const proofNow = new Date('2026-09-25T03:30:00.000Z')
   const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
   const replay = {
     ...artifactA,
     candidateId: 'mass:replay-proof:1',
     artifactHash: '4'.repeat(64),
-    createdAt: '2026-09-15T22:34:00Z',
+    createdAt: '2026-09-24T14:03:46.000Z',
     remediationReplay: true,
   }
   const replayCanary = ev(replay.candidateId, 'host_production_verifier', {
@@ -140,7 +143,7 @@ test('post-GKD remediation replay proof sampling is bounded and never bypasses t
     enabled: true,
     artifacts: [legacy, replay],
     events: [canary(legacy as typeof artifactA), replayCanary],
-    now,
+    now: proofNow,
     frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
     builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
     remediationReplayProofCompletions: 0,
@@ -152,14 +155,27 @@ test('post-GKD remediation replay proof sampling is bounded and never bypasses t
     enabled: true,
     artifacts: [legacy, replay],
     events: [canary(legacy as typeof artifactA), replayCanary],
-    now,
+    now: proofNow,
     frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
     builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
     remediationReplayProofCompletions: MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE,
   })
   assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
 
-  const freshReplay = { ...replay, candidateId: 'mass:replay-proof:fresh', artifactHash: '3'.repeat(64), createdAt: '2026-09-16T10:00:00Z' }
+  const oldReplay = { ...replay, candidateId: 'mass:replay-proof:old-generation', artifactHash: '2'.repeat(64), createdAt: '2026-09-22T18:07:59.000Z' }
+  const oldCanary = ev(oldReplay.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: oldReplay.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
+  const oldGenerationIgnored = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, oldReplay],
+    events: [canary(legacy as typeof artifactA), oldCanary],
+    now: proofNow,
+    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+    builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
+    remediationReplayProofCompletions: 0,
+  })
+  assert.equal(oldGenerationIgnored.issue && oldGenerationIgnored.artifact.candidateId, legacy.candidateId)
+
+  const freshReplay = { ...replay, candidateId: 'mass:replay-proof:fresh', artifactHash: '3'.repeat(64), createdAt: '2026-09-24T20:00:00Z' }
   const freshCanary = ev(freshReplay.candidateId, 'host_production_verifier', {
     claim: 'production_canary_healthy',
     artifactHash: freshReplay.artifactHash,
@@ -170,7 +186,7 @@ test('post-GKD remediation replay proof sampling is bounded and never bypasses t
     enabled: true,
     artifacts: [legacy, freshReplay],
     events: [canary(legacy as typeof artifactA), freshCanary],
-    now,
+    now: proofNow,
     frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
     builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
     remediationReplayProofCompletions: 0,
@@ -244,6 +260,8 @@ test('cron scans bounded legacy work and explicitly includes both Builder v2 and
   assert.match(route, /remediationReplay: isRemediationReplayReceipt/)
   assert.match(route, /failureDerivedReplayRequired/)
   assert.match(route, /failureDerivedReplayItems/)
+  assert.match(route, /MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER/)
+  assert.match(route, /\.gte\('created_at', MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER\)/)
   assert.match(route, /frontierResponseAnchorItems/)
   assert.match(route, /cos_university_distilled_evaluation_runs/)
   assert.match(route, /builderV2ProofCompletions = new Set/)

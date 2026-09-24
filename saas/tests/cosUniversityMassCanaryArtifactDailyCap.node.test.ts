@@ -21,7 +21,7 @@ const stuck: CanaryArtifact = {
   candidateId: 'mass:stuck',
   subjectId: 'Law, Regulation & Governance',
   artifactHash: h(1),
-  createdAt: '2026-09-24T10:00:00.000Z',
+  createdAt: '2026-09-24T14:00:00.000Z',
   failureDerivedReplayRequired: true,
   failureDerivedReplayItems: 3,
 }

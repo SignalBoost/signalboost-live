@@ -5,6 +5,8 @@
 // whether to issue ONE canary approval in exactly the shape claim_next_mass_distilled_runtime_canary accepts
 // (1 invocation, <= $0.20). It never touches the claim, the canary, the evaluator, promotion or Production traffic.
 
+import { isCurrentMassRemediationReplayProofGeneration } from './cosUniversityRemediationReplayProofGeneration.ts'
+
 export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-17_mass_canary_without_manual_intervention' as const
 export const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1' as const
 export const MASS_CANARY_APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved' as const
@@ -247,7 +249,8 @@ export function decideMassCanaryRollingApproval(input: {
   const builderProofNeeded = builderProofPasses < MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE
 
   const replayProofArtifact = (artifact: CanaryArtifact) =>
-    artifact.failureDerivedReplayRequired === true
+    isCurrentMassRemediationReplayProofGeneration(artifact.createdAt)
+      && artifact.failureDerivedReplayRequired === true
       && Number(artifact.failureDerivedReplayItems) > 0
   const replayProofPasses = Number.isFinite(Number(input.remediationReplayProofPasses))
     ? Math.max(0, Math.floor(Number(input.remediationReplayProofPasses)))

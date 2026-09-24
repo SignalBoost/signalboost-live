@@ -12,6 +12,10 @@ import {
   type CanaryEvent,
 } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
 import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
+import {
+  MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER,
+  isCurrentMassRemediationReplayProofGeneration,
+} from '@/lib/ai/cos/cosUniversityRemediationReplayProofGeneration'
 import { describeThrownValue } from '@/lib/ai/cos/describeThrownValue'
 import {
   MASS_DISTILLED_READY_TIMEOUT_MS,
@@ -142,6 +146,7 @@ async function issueRollingCanaryApproval(now:Date){
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
       .contains('intended_use',{trainingReceipt:{failureDerivedReplayRequired:true}})
+      .gte('created_at',MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER)
       .order('created_at',{ascending:true})
       .limit(50),
   ])
@@ -158,7 +163,8 @@ async function issueRollingCanaryApproval(now:Date){
   })
   const confirmedReplayArtifacts=(replayArtifacts.data||[]).filter((row:any)=>{
     const receipt=row?.intended_use?.trainingReceipt
-    return receipt&&typeof receipt==='object'
+    return isCurrentMassRemediationReplayProofGeneration(row?.created_at)
+      && receipt&&typeof receipt==='object'
       && receipt.failureDerivedReplayRequired===true
       && Number(receipt.failureDerivedReplayItems||0)>0
   })

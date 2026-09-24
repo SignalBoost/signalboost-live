@@ -1,2 +1,2 @@
-base_sha=fe3dd3d792a9d9e64822c2c21d125eb29d29b40e
-branch=fix/evaluator-latest-canary-state-v2-20260924
+base_sha=e18bd4423825e983df324c7f20f63849fd478d5a
+branch=fix/runpod-ada-canary-serialization-20260924

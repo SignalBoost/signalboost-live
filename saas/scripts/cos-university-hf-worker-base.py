@@ -369,7 +369,34 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
     token = os.environ["HF_TOKEN"]
     max_items = max(20, min(20_000, int(os.environ.get("ITMOUNTS_HF_MAX_DATASET_ITEMS", "5000"))))
     embedded_rows = candidate.get("teacherRows") if isinstance(candidate.get("teacherRows"), list) else None
-    if embedded_rows is not None:
+    working_cos_rows = candidate.get("workingCosRows") if isinstance(candidate.get("workingCosRows"), list) else None
+    if embedded_rows is not None and working_cos_rows is not None:
+        raise RuntimeError("worker_embedded_source_ambiguous")
+    if working_cos_rows is not None:
+        if len(working_cos_rows) < 20 or len(working_cos_rows) > 384:
+            raise RuntimeError("worker_working_cos_rows_invalid")
+        source = working_cos_rows[:max_items]
+        training_seen = 0
+        holdout_seen = 0
+        for raw_row in source:
+            if not isinstance(raw_row, dict):
+                raise RuntimeError("worker_working_cos_row_invalid")
+            text = row_text(raw_row)
+            declared_hash = clean(raw_row.get("itemHash"), 64).lower()
+            partition = clean(raw_row.get("partition"), 20)
+            if (not text or not HEX64.match(declared_hash) or sha256(text) != declared_hash
+                    or partition not in ("train", "holdout")
+                    or not HEX64.match(clean(raw_row.get("assetSetKey"), 64).lower())
+                    or not HEX64.match(clean(raw_row.get("portableContentHash"), 64).lower())
+                    or not clean(raw_row.get("subjectId"), 240)):
+                raise RuntimeError("worker_working_cos_row_binding_invalid")
+            if partition == "train":
+                training_seen += 1
+            else:
+                holdout_seen += 1
+        if training_seen < 8 or holdout_seen < 2:
+            raise RuntimeError("worker_working_cos_partition_too_small")
+    elif embedded_rows is not None:
         if len(embedded_rows) < 20 or len(embedded_rows) > 128:
             raise RuntimeError("worker_embedded_teacher_rows_invalid")
         source = embedded_rows[:max_items]
@@ -409,25 +436,43 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
             # Provenance is metadata only: partition identity remains the immutable response-text hash.
             # Only the host controller may set this exact boolean from persisted curriculum source_kind.
             "failure_derived": raw_row.get("failureDerived") is True,
+            "working_cos_partition": clean(raw_row.get("partition"), 20) if working_cos_rows is not None else "",
+            "working_cos_subject": clean(raw_row.get("subjectId"), 240) if working_cos_rows is not None else "",
+            "working_cos_asset_set_key": clean(raw_row.get("assetSetKey"), 64).lower() if working_cos_rows is not None else "",
+            "working_cos_portable_content_hash": clean(raw_row.get("portableContentHash"), 64).lower() if working_cos_rows is not None else "",
         })
     if len(by_hash) < 20:
         raise RuntimeError("worker_dataset_too_small")
 
     ordered = sorted(by_hash.items(), key=lambda item: item[0])
-    # Mass-distillation holdouts are capped at MASS_HOLDOUT_MAX_ITEMS. The mass evaluator grades a
-    # holdout inside a fixed call ceiling behind a ~40s serverless gateway: the baseline in at most two
-    # requests (a 6-case holdout is 3+3) and the slower candidate one request per case. Larger
-    # holdouts push several cases into one baseline request, where Production showed answers late in a
-    # shared request degrading by position, which would bias the comparison toward the candidate.
-    # Capping the holdout rather than the batch lets a full 128-item batch train on ~122 examples.
-    # Single-artifact lanes keep the proportional split; their evaluator chunks larger holdouts.
-    proportional = len(ordered) // 5
-    if clean(envelope.get("candidateId"), 200).startswith("mass:"):
-        holdout_count = max(1, min(proportional, MASS_HOLDOUT_MAX_ITEMS))
+    if working_cos_rows is not None:
+        training_pairs = [item for item in ordered if item[1].get("working_cos_partition") == "train"]
+        holdout_pairs = [item for item in ordered if item[1].get("working_cos_partition") == "holdout"]
+        expected_training_manifest = clean(envelope.get("expectedTrainingManifestHash"), 64).lower()
+        expected_holdout_manifest = clean(envelope.get("expectedHoldoutManifestHash"), 64).lower()
+        if (not HEX64.match(expected_training_manifest)
+                or not HEX64.match(expected_holdout_manifest)
+                or expected_training_manifest == expected_holdout_manifest):
+            raise RuntimeError("worker_working_cos_expected_manifest_invalid")
+        if manifest_hash([digest for digest, _ in training_pairs]) != expected_training_manifest:
+            raise RuntimeError("worker_working_cos_training_manifest_mismatch")
+        if manifest_hash([digest for digest, _ in holdout_pairs]) != expected_holdout_manifest:
+            raise RuntimeError("worker_working_cos_holdout_manifest_mismatch")
     else:
-        holdout_count = max(1, min(proportional, 500))
-    holdout_pairs = ordered[:holdout_count]
-    training_pairs = ordered[holdout_count:]
+        # Mass-distillation holdouts are capped at MASS_HOLDOUT_MAX_ITEMS. The mass evaluator grades a
+        # holdout inside a fixed call ceiling behind a ~40s serverless gateway: the baseline in at most two
+        # requests (a 6-case holdout is 3+3) and the slower candidate one request per case. Larger
+        # holdouts push several cases into one baseline request, where Production showed answers late in a
+        # shared request degrading by position, which would bias the comparison toward the candidate.
+        # Capping the holdout rather than the batch lets a full 128-item batch train on ~122 examples.
+        # Single-artifact lanes keep the proportional split; their evaluator chunks larger holdouts.
+        proportional = len(ordered) // 5
+        if clean(envelope.get("candidateId"), 200).startswith("mass:"):
+            holdout_count = max(1, min(proportional, MASS_HOLDOUT_MAX_ITEMS))
+        else:
+            holdout_count = max(1, min(proportional, 500))
+        holdout_pairs = ordered[:holdout_count]
+        training_pairs = ordered[holdout_count:]
     if not training_pairs or not holdout_pairs:
         raise RuntimeError("worker_partition_invalid")
 

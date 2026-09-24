@@ -19,11 +19,15 @@ const failures = (error: string) => Array.from({ length: MASS_EVALUATION_MAX_FAI
   ev('host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hash, error }, `2026-09-17T0${i + 1}:00:00Z`))
 const started = ev('host_controller', { claim: 'mass_distilled_independent_evaluation_started', artifactHash: hash }, '2026-09-17T00:21:00Z')
 
-test('evaluator observes RunPod readiness through the control plane, never the cold custom /ready route', () => {
+test('evaluator uses control-plane worker existence plus worker-local model readiness', () => {
   const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
   assert.match(source, /massDistilledRuntimeHealth\(endpointId\)/)
-  assert.match(source, /health\.workers\.ready>0/)
+  assert.match(source, /health\.workers\.ready>0\|\|health\.workers\.running>0/)
+  assert.match(source, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
+  assert.match(source, /payload\?\.modelReady===true/)
+  assert.match(source, /gatewayStatus==='ready'\|\|gatewayStatus==='accepting_requests'/)
   assert.doesNotMatch(source, /fetch\(\`\$\{root\}\/ready\`/)
+  assert.doesNotMatch(source, /\/v1\/chat\/completions.*modelReady/s)
 })
 
 test('runtime and RunPod transport failures do not exhaust the artifact retry budget', () => {

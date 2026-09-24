@@ -1,4 +1,4 @@
-import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
+import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 // saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {

@@ -131,7 +131,7 @@ export function buildMassDistillationReplenishmentGaps(
           `shortfall_to_batch=${supplySubject.shortfallToBatch}`,
           `query_variant=${queryIndex + 1}/${queryCount}`,
         ],
-        sourceKinds: ['scientific_journal'],
+        sourceKinds: ['scientific_journal', 'public_dataset'],
         curriculumAligned: true,
       })
     }

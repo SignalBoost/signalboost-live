@@ -163,3 +163,16 @@ The governed browser MCP live host now carries an explicit isolated-runner sandb
 - This does **not** widen Provider Hub capability projection, approved origins, filesystem access, credentials, or Portable Connector Runtime authority.
 - Regression coverage pins the exact launch policy in `saas/tests/portableBrowserAdapterCatalog.node.test.ts`.
 - Playwright and Chrome DevTools MCP must each pass their real live acceptance workflow on the repair revision before they are described as functional.
+
+
+## Playwright MCP Production certificate — 2026-09-24
+
+The governed Playwright MCP runtime has a separate Production certificate path in addition to GitHub Actions live acceptance.
+
+- `saas/provider-hub-host/playwright-mcp-sandbox-acceptance.ts` launches the exact pinned `@playwright/mcp@0.0.82` and real Chromium inside an ephemeral Vercel Sandbox.
+- The certificate proves exact Provider Hub projection, approval/origin enforcement, MCP initialization/discovery, approved iTMounts navigation, accessibility snapshot, console diagnostics, network diagnostics, and screenshot execution.
+- `/api/cron/playwright-mcp-live-acceptance` is Production-only and `CRON_SECRET` protected. It retains only bounded metadata; page bodies, console bodies, network headers, screenshots, and credentials are not persisted.
+- The Sandbox starts deny-all, opens only for bootstrap, then narrows egress to the approved iTMounts hosts before live browser execution and is always destroyed afterward.
+- `tests/playwrightMcpProductionAcceptance.node.test.ts` is mandatory in `vercel-cos-gates.mjs`. A green build without that regression is not sufficient evidence.
+- The Production certificate is scheduled twice hourly for bounded assurance. Do not increase cadence merely to obtain faster evidence.
+- Playwright MCP may be called Production-certified only after an exact deployed revision records every required certificate check as passed. Generic portable-browser catalog entries remain production-disabled by default and do not independently grant browser authority.

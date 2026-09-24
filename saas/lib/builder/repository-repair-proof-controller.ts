@@ -14,7 +14,7 @@ function normalizedProofCommand(value: unknown): string | null {
   // Vercel can report a shell command ending in bare "next build". Inside the isolated
   // repository sandbox local package binaries are not globally on PATH, even after npm ci.
   // Preserve the recorded build semantics while resolving Next through the pinned package.
-  return command.replace(/(^|&&|\\|\\||;)\\s*next\\s+build\\b/gi, (_match, prefix) => `${prefix} npm exec -- next build`)
+  return command.replace(/(^|&&|\|\||;)\s*next\s+build\b/gi, (_match, prefix) => `${prefix} npm exec -- next build`)
 }
 
 /**

@@ -16,7 +16,7 @@ const enterpriseReasoner = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnt
 test('live COS primary route passes preceding assistant context into ordinary reasoning', () => {
   assert.match(
     primaryRoute,
-    /tryCOSFirstAnswer\(\{prompt:reasoningPrompt,previousAssistant:precedingAssistant\|\|null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest\}\)/,
+    /tryCOSFirstAnswer\(\{prompt:reasoningPrompt,previousAssistant:precedingAssistant\|\|null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest\|\|modelPlannedSemanticMemory\|\|modelPlannedCreativeMemory\}\)/,
   )
 })
 

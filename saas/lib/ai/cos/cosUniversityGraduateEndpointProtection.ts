@@ -1,5 +1,5 @@
 // saas/lib/ai/cos/cosUniversityGraduateEndpointProtection.ts
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosServiceDb } from '../../cos-core/storage/service-db.ts'
 
 const ENDPOINT_ID = /^[a-z0-9_-]{3,120}$/i
 

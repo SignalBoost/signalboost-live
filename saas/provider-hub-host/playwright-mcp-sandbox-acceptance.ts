@@ -53,7 +53,7 @@ function runtimeScript(browserExecutable: string): string {
   return String.raw`
 const { spawn } = require('node:child_process')
 
-const ROOT = ${JSON.stringify(ROOT)}
+const RUNTIME_ROOT = ${JSON.stringify(ROOT)}
 const outputDir = ${JSON.stringify(OUTPUT_DIR)}
 const browserExecutable = ${JSON.stringify(browserExecutable)}
 const approvedOrigins = new Set(${origins})
@@ -138,7 +138,7 @@ async function main() {
     '--executable-path',
     browserExecutable,
   ], {
-    cwd: ROOT,
+    cwd: RUNTIME_ROOT,
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: {

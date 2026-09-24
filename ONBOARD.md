@@ -1414,6 +1414,18 @@ Implementation progress on 2026-09-23:
 
 Next gate after this slice: bind the balanced bundle to an **observed exact trainable COS base-model revision**, create immutable train/holdout manifests for the Working-COS candidate, register rollback evidence, and only then permit bounded training dispatch. The fast independent comparison/canary/activation gate remains separate from University graduation.
 
+Working-COS runtime-binding implementation — 2026-09-23:
+
+- Current Production runtime evidence from the authenticated RunPod primary probe shows the configured pod serving `qwen3:30b` successfully. This is an observed runtime fact, not a source-code/default-model assumption.
+- A model alias is insufficient for training identity. `saas/lib/ai/cos/cosWorkingRuntimeBinding.ts` now reads the exact immutable Ollama digest from the same authenticated RunPod gateway `/api/tags` endpoint used by the live COS runtime.
+- The normal RunPod primary probe now reports `inferenceDigest`, full non-secret model metadata, and a fail-closed `workingCosRuntimeBinding`. Digest-observation failure does not declare ordinary inference unhealthy and does not trigger model mutation.
+- The current public Ollama `qwen3:30b` tag is the 30.5B Qwen3 MoE Q4_K_M artifact and shares its digest with the `qwen3:30b-a3b-thinking-2507-q4_K_M` tag. Therefore the intended trainable lineage for this observed alias is `Qwen/Qwen3-30B-A3B-Thinking-2507`, not the older original `Qwen/Qwen3-30B-A3B`.
+- The trainable lineage is pinned to Hugging Face revision `144afc2f379b542fdd4e85a1fcd5e1f79112d95d`. The exact live Ollama 64-hex digest is still independently observed at runtime and must equal the declared binding before a Working-COS training candidate can become eligible.
+- Runtime binding requires all of: healthy runtime, exact pod identity, configured/observed model-name equality, valid observed Ollama digest, separately declared matching runtime digest, explicit trainable base model ID, and immutable 40-hex base revision.
+- Even a valid runtime binding grants no training, current-runtime mutation, Production traffic, promotion, or University graduation. It creates only an immutable baseline/rollback identity and moves the next gate to balanced-bundle train/holdout materialization plus bounded training dispatch.
+- Operator/runtime declarations are `COS_WORKING_DISTILLATION_RUNTIME_DIGEST`, `COS_WORKING_DISTILLATION_BASE_MODEL_ID`, and `COS_WORKING_DISTILLATION_BASE_MODEL_REVISION`. The first must never be guessed from a short public registry prefix.
+
+
 
 ## University distillation asset portability invariant — 2026-09-23
 

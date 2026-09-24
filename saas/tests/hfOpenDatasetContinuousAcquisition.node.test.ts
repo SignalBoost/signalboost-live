@@ -43,3 +43,21 @@ test('Semantic Scholar and Wikimedia receive exact-source rotating continuity ob
   assert.match(daily, /const gaps = \[\.\.\.openSourceContinuity, miningGap\(input\.miningSummary\), \.\.\.autonomousGaps, \.\.\.generalCurriculum\]/)
   assert.match(daily, /openSourceContinuityQueries:/)
 })
+
+
+test('Semantic Scholar and Wikimedia continuity has a dedicated bounded 15-minute cron', () => {
+  const continuity = readFileSync(join(process.cwd(), 'lib/cos/openSourceContinuityLearning.ts'), 'utf8')
+  const route = readFileSync(join(process.cwd(), 'app/api/cron/cos-open-source-continuity/route.ts'), 'utf8')
+  const vercel = readFileSync(join(process.cwd(), 'vercel.json'), 'utf8')
+
+  assert.match(continuity, /openSourceContinuityCurriculum/)
+  assert.match(continuity, /allowedAdapterIds\?\.includes\('semantic_scholar'\)/)
+  assert.match(continuity, /allowedAdapterIds\?\.includes\('reference'\)/)
+  assert.match(continuity, /maxCandidatesPerCycle: 12/)
+  assert.match(continuity, /maxExternalCostUsdPerCycle: 0/)
+  assert.match(continuity, /\[cos-open-source-continuity\]/)
+  assert.match(route, /runOpenSourceContinuityLearning/)
+  assert.match(route, /CRON_SECRET/)
+  assert.match(vercel, /"path": "\/api\/cron\/cos-open-source-continuity"/)
+  assert.match(vercel, /"schedule": "\*\/15 \* \* \* \*"/)
+})

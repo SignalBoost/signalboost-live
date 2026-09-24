@@ -1,2 +1,2 @@
-base_sha=7c3aaf866abf968387ed009a090bcb4001e49fc9
-branch=fix/university-residency-evaluator-deadlock-v2-20260924
+base_sha=910fa27fb1adec6102ba65e8327741f31b698eda
+branch=fix/require-vercel-preview-before-main-20260924

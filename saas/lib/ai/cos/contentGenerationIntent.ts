@@ -25,16 +25,16 @@ import { looksLikeArtifactContinuation } from './artifactContinuationIntent.ts'
 
 const AUTHORING_VERB = [
   // English
-  'write', 'draft', 'create', 'generate', 'design', 'produce',
+  'write', 'draft', 'create', 'generate', 'design', 'produce', 'prepare',
   'edit', 'rewrite', 'proofread', 'polish', 'rephrase', 'shorten', 'tighten', 'summarize', 'summarise', 'translate',
   // Spanish
-  'escribe', 'redacta', 'crea', 'edita', 'reescribe', 'revisa', 'corrige', 'resume', 'traduce',
+  'escribe', 'redacta', 'crea', 'prepara', 'edita', 'reescribe', 'revisa', 'corrige', 'resume', 'traduce',
   // Portuguese
-  'escreva', 'redija', 'crie', 'edite', 'reescreva', 'revise', 'corrija', 'resuma', 'traduza',
+  'escreva', 'redija', 'crie', 'prepare', 'edite', 'reescreva', 'revise', 'corrija', 'resuma', 'traduza',
   // Polish
-  'napisz', 'stw[oó]rz', 'zaprojektuj', 'edytuj', 'przeredaguj', 'zredaguj', 'popraw', 'skr[oó][ćc]', 'stre[sś][ćc]', 'przet[lł]umacz',
+  'napisz', 'stw[oó]rz', 'zaprojektuj', 'przygotuj', 'edytuj', 'przeredaguj', 'zredaguj', 'popraw', 'skr[oó][ćc]', 'stre[sś][ćc]', 'przet[lł]umacz',
   // Russian
-  'напиши', 'создай', 'сгенерируй', 'отредактируй', 'перепиши', 'исправь', 'улучши', 'сократи', 'резюмируй', 'переведи',
+  'напиши', 'создай', 'сгенерируй', 'подготовь', 'отредактируй', 'перепиши', 'исправь', 'улучши', 'сократи', 'резюмируй', 'переведи',
 ].join('|')
 
 /** Matches an authoring/transformation verb at the start of the string. */

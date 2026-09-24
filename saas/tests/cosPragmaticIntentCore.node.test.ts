@@ -10,7 +10,7 @@ test('route-level neural interpretation suppression remains before live freshnes
   const heuristic = route.indexOf('heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested')
   const semantic = route.indexOf('? await classifyCosSemanticTaskIntent')
   const semanticFresh = route.indexOf('semanticRequiresFreshEvidence=Boolean(')
-  const baseline = route.indexOf('baselineRequiresFreshEvidence=(heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
+  const baseline = route.indexOf('baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
   const finalGate = route.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
   const liveSearch = route.indexOf('freshEvidenceSearchQueries(lookupInput)')
 
@@ -51,7 +51,7 @@ test('the Production failure phrase can only come from a freshness path that con
 })
 
 test('ordinary answerable turns do not pay a semantic-classifier round trip', () => {
-  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& \(heuristicRequiresFreshEvidence \|\| freshConversationContext\.contextUsed\)/)
+  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& !modelPlannedFreshEvidence\s*&& \(heuristicRequiresFreshEvidence \|\| requiresLiveTravelPlanningEvidence\(input\) \|\| freshConversationContext\.contextUsed\)/)
   const ownerFastPath = route.indexOf('if(access?.isOwner&&isPlatformSelfKnowledgePrompt(input))')
   const semanticGate = route.indexOf('const semanticTaskIntentNeeded=')
   assert.ok(ownerFastPath >= 0)

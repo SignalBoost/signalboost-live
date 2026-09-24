@@ -300,11 +300,9 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
   if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
-  // Travel itineraries with mutable details (airport transport, fares, schedules, paid attractions)
-  // require live evidence even though they are also content-generation requests. This guard must run
-  // before the generic authoring exclusion or multilingual itinerary prompts can be misrouted into
-  // ordinary completion and eventually fall back to an unnecessary clarification request.
-  if (requiresLiveTravelPlanningEvidence(input)) return true
+  // Travel planning is detected separately so the route can ask the semantic planner whether live
+  // evidence is required. Do not force the strict fact-verification contract here: itineraries are
+  // synthesis tasks that may need live facts without becoming strict fact-verification requests.
   if (isContentGenerationRequest(text) || isPoliteAuthoringForFreshness(input)) return false
 
   // A moral/civic/public-policy proposition is not itself a request for the current law. Route the

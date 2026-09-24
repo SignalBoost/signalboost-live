@@ -11,7 +11,7 @@
 
 export * from './cosFreshGroundingBase.ts'
 
-import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
+import type { SearchResult } from '../tools/getExternalInfo.ts'
 import {
   FRESH_SELECTED_EVIDENCE_BUDGET,
   freshEvidenceGroundingBlock as baseFreshEvidenceGroundingBlock,
@@ -23,7 +23,7 @@ import {
   type FreshEvidenceSource,
 } from './cosFreshGroundingBase.ts'
 import { requiresLiveTravelPlanningEvidence } from './cosFreshnessPolicy.ts'
-import { resolveResponseLanguage, type SupportedResponseLanguage } from '@/lib/i18n/responseLanguage'
+import { resolveResponseLanguage, type SupportedResponseLanguage } from '../../i18n/responseLanguage.ts'
 
 const EVALUATIVE_RANKING = /\b(?:best|greatest|top|worst|worse|most\s+successful|least\s+successful|rank(?:ing|ings|ed)?|overrated|underrated|melhor|maior|pior|mais\s+bem[- ]?sucedid[oa]|mejor|peor|m[aá]s\s+exitos[oa]|najlepsz\w*|najgorsz\w*|ranking\w*|лучший|лучшая|лучшие|худший|худшая|рейтинг\w*)\b/iu
 const OFFICE_OR_EXECUTIVE_ROLE = /\b(?:president|vice\s+president|prime\s+minister|premier|chancellor|governor|mayor|secretary\s+of\s+state|attorney\s+general|speaker|minister|monarch|king|queen|pope|chief\s+executive\s+officer|ceo|chief\s+financial\s+officer|cfo|chief\s+information\s+officer|cio|chief\s+technology\s+officer|cto|chair(?:man|woman)?)\b/i

@@ -331,7 +331,7 @@
     },
     {
       "path": "/api/cron/platform-harness-production-acceptance",
-      "schedule": "11,26,41,56 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/builder-playwright-cli-live-acceptance",

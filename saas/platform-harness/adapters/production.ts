@@ -95,7 +95,7 @@ export async function runProductionHarnessEnvelope(input: {
   }
 
   const decision = resolveHarnessManifest(input.request, input.authority)
-  if (!decision.allowed) {
+  if (decision.allowed === false) {
     return Object.freeze({
       accepted: false,
       reasons: Object.freeze([...decision.reasons]),

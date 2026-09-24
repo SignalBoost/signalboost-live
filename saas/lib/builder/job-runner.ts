@@ -24,6 +24,8 @@ import { retrieveValidatedCognitiveSkills, type CognitiveSkillContextResult } fr
 import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
 import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
+import { runBuilderJobProductionHarness } from './job-harness.ts'
+import { harnessDeadlineRemainingMs } from '../../platform-harness/runtime/execution-context.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -296,12 +298,26 @@ async function runBuilderPlaywrightCliCanary(job: BuilderJobRecord): Promise<voi
  * Execute one already-enqueued Builder job. The atomic claim makes duplicate invocations harmless;
  * the browser never replays POST and polling GET has no execution authority.
  */
-export async function runBuilderJob(jobId: string, userId: string): Promise<void> {
+async function runBuilderJobLegacy(
+  jobId: string,
+  userId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) throw new Error('builder_harness_deadline_exceeded')
   let job: BuilderJobRecord | null = null
   let lastTrace: readonly BuilderToolTrace[] = []
   try {
     job = await claimBuilderJob(jobId, userId)
     if (!job) return
+    if (signal?.aborted) {
+      await terminalFailure(job, 'builder_harness_deadline_exceeded')
+      return
+    }
+
+    const harnessRemaining = harnessDeadlineRemainingMs()
+    const harnessDeadlineAtMs = harnessRemaining === null
+      ? Date.now() + BUILDER_JOB_BUDGET_MS
+      : Date.now() + Math.max(0, harnessRemaining)
 
     if (job.claimGeneration === 1 && typeof job.metadata.approvedProposalFingerprint === 'string'
       && await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) !== job.metadata.approvedProposalFingerprint) {
@@ -342,15 +358,20 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         await terminalFailure(job, 'builder_repository_repair_target_unavailable')
         return
       }
+      if (signal?.aborted) {
+        await terminalFailure(job, 'builder_harness_deadline_exceeded')
+        return
+      }
+      const repositoryDeadlineAtMs = selfHealingCapacityJob(job)
+        ? Math.min(harnessDeadlineAtMs, Date.now() + SELF_HEALING_REPOSITORY_BUDGET_MS)
+        : harnessDeadlineAtMs
       const execution = await executeSignalBoostRepositoryRepair({
         userId: job.userId,
         ownerAuthorized: job.ownerAuthorized === true,
         rawObjective: job.objective,
         workspaceId: job.workspaceId,
         target,
-        ...(selfHealingCapacityJob(job)
-          ? { deadlineAtMs: Date.now() + SELF_HEALING_REPOSITORY_BUDGET_MS }
-          : {}),
+        deadlineAtMs: repositoryDeadlineAtMs,
         // Null when Vercel credentials are absent, which auto-merge refuses on.
         snapshotPort: builderAutoMergeSnapshotPort(),
       })
@@ -419,7 +440,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     })
 
     const sliceStartedAtMs = Date.now()
-    const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS
+    const deadlineAtMs = Math.min(Date.now() + BUILDER_JOB_BUDGET_MS, harnessDeadlineAtMs)
     const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), {
       deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
     })
@@ -440,6 +461,10 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       console.warn('[builder_project_lesson_read_failed]', { jobId })
       return []
     })
+    if (signal?.aborted) {
+      await terminalFailure(job, 'builder_harness_deadline_exceeded')
+      return
+    }
     const result = plan
       ? await runDebugFileJob({
           objective: job.objective,
@@ -459,7 +484,8 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           checkpoint: job.checkpoint,
           documentationPaths,
           // Leave room for a slow model round, then a bounded sandbox command and persistence.
-          shouldPause: (beforeTool = false) => Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000),
+          shouldPause: (beforeTool = false) => signal?.aborted === true
+            || Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000),
           maxRounds: 96,
           deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
           modelRoundTimeoutMs: 55_000,
@@ -576,5 +602,24 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         })
       })
     }
+  }
+}
+
+/**
+ * Mandatory Platform Harness ingress for every durable Builder execution slice, including
+ * interactive queue dispatch, cron continuation, certification, Self-Healing and repository repair.
+ */
+export async function runBuilderJob(jobId: string, userId: string): Promise<void> {
+  const harness = await runBuilderJobProductionHarness({
+    jobId,
+    userId,
+    execute: signal => runBuilderJobLegacy(jobId, userId, signal),
+  })
+  if (!harness.ok) {
+    console.error('[builder_job_harness_blocked]', {
+      jobId,
+      harnessRunId: harness.runId,
+      code: harness.code || 'builder_job_harness_not_verified',
+    })
   }
 }

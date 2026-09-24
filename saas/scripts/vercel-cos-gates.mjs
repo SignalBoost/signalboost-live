@@ -9,6 +9,7 @@ const tests = [
   'tests/cosHarnessIngress.node.test.ts',
   'tests/cosSoftwareSpecialistProductionHarness.node.test.ts',
   'tests/cosA2ASpecialistHarnessIngress.node.test.ts',
+  'tests/builderResidencyLiveHost.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

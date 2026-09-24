@@ -262,10 +262,10 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     .map((row: any) => clean(row?.candidate_id, 240))
     .filter(Boolean))]
   for (let offset = 0; offset < builderCandidateIds.length; offset += ROLLING_CANDIDATE_CHUNK_SIZE) {
-    const candidateChunk = builderCandidateIds.slice(offset, offset + ROLLING_CANDIDATE_CHUNK_SIZE)
+    const residencyCandidateChunk = builderCandidateIds.slice(offset, offset + ROLLING_CANDIDATE_CHUNK_SIZE)
     const result = await db.from('cos_university_residency_enrollments')
       .select('candidate_id,trained_artifact_hash,completed_at')
-      .in('candidate_id', candidateChunk)
+      .in('candidate_id', residencyCandidateChunk)
       .eq('standing', 'residency_complete')
       .eq('authority_expanded', false)
       .not('completed_at', 'is', null)

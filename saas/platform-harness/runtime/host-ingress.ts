@@ -6,10 +6,8 @@
 // so downstream provider/tool adapters inherit the run identity, deadline and cancellation signal.
 
 import { randomUUID } from 'node:crypto'
-import {
-  createProductionHarnessRequest,
-  resolveHarnessManifest,
-} from '../index.ts'
+import { createProductionHarnessRequest } from '../adapters/production.ts'
+import { resolveHarnessManifest } from '../core/policy.ts'
 import {
   currentHarnessExecutionContext,
   withHarnessExecutionContext,

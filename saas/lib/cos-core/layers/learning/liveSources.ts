@@ -39,8 +39,19 @@ function sourceIntervalMs(adapter:ContinuousLearningSourceAdapter,env:LiveLearni
   return 0
 }
 
-export function sourceCallBudget(adapter:ContinuousLearningSourceAdapter):number{
+function configuredSourceCallBudget(adapterId:string,env:LiveLearningEnvironment):number|null{
+  const key=`COS_LEARNING_SOURCE_CALL_BUDGET_${adapterId.toUpperCase().replace(/[^A-Z0-9]+/g,'_')}`
+  const raw=String(env[key]??'').trim()
+  if(!raw)return null
+  const parsed=Math.floor(Number(raw))
+  if(!Number.isFinite(parsed)||parsed<0)return null
+  return Math.min(64,parsed)
+}
+
+export function sourceCallBudget(adapter:ContinuousLearningSourceAdapter,env:LiveLearningEnvironment=process.env):number{
   const id=adapter.id??adapter.kind
+  const configured=configuredSourceCallBudget(id,env)
+  if(configured!==null)return configured
   if(id==='semantic_scholar'||id==='openalex_semantic'||id==='hf_nist_cc0'||id==='hf_github_cc0'||id==='hf_arxiv_cc0')return 1
   if(id==='openalex'||id==='europe_pmc')return 2
   return Number.POSITIVE_INFINITY
@@ -156,5 +167,5 @@ export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.e
     }
   }
   const limit=failureLimit(env)
-  return adapters.map(gapScopeFor).map(adapter=>guardLearningSourceAdapter(adapter,limit,sourceIntervalMs(adapter,env),sourceCallBudget(adapter)))
+  return adapters.map(gapScopeFor).map(adapter=>guardLearningSourceAdapter(adapter,limit,sourceIntervalMs(adapter,env),sourceCallBudget(adapter,env)))
 }

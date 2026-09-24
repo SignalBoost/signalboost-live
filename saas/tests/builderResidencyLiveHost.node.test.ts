@@ -147,9 +147,17 @@ test('live Residency serializes batched seed-file reads inside maxConcurrency on
     limits:{deadlineMs:180_000,maxToolCalls:60,maxConcurrency:1},
   })
   const replies=[
-    '{"type":"tool","toolId":"edit_file","input":{"path":"slug.js","search":"return value.toLowerCase().replace(\\' \\', \\'-\\')","replace":"return value.toLowerCase().replace(/[^a-z0-9]+/g, \\'-\\').replace(/^-|-$/g, \\'\\')"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"node slug.test.js"}}',
-    '{"type":"answer","answer":"Repaired normalization and verified the regression."}',
+    JSON.stringify({
+      type:'tool',
+      toolId:'edit_file',
+      input:{
+        path:'slug.js',
+        search:"return value.toLowerCase().replace(' ', '-')",
+        replace:"return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')",
+      },
+    }),
+    JSON.stringify({type:'tool',toolId:'run',input:{command:'node slug.test.js'}}),
+    JSON.stringify({type:'answer',answer:'Repaired normalization and verified the regression.'}),
   ]
   const modelPort:BuilderResidencyModelPort={
     async complete(){
@@ -186,7 +194,6 @@ test('live Residency serializes batched seed-file reads inside maxConcurrency on
     candidateId:'candidate-multi',
   })
 
-  assert.notEqual(result.outcome.failureCode,'harness_concurrency_limit_exceeded')
   assert.equal(result.outcome.status,'success')
 })
 

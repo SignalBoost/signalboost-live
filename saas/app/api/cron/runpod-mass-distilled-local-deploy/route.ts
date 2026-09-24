@@ -8,6 +8,7 @@ import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_PROFILE,
+  MASS_CANARY_ROLLING_WINDOW_HOURS,
   decideMassCanaryRollingApproval,
   type CanaryEvent,
 } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
@@ -112,6 +113,30 @@ async function readRollingCanaryEvents(db:any,candidateIds:string[]){
     }
   }
   return rows
+}
+
+// The rolling hourly spend cap counts EVERY canary invocation in the window, not only invocations of the
+// artifacts still queued. readRollingCanaryEvents is scoped to the currently eligible candidates, so a canary
+// whose artifact then passed (and left evaluation_pending) or fell outside the oldest-200 window disappeared
+// from the count. Production on 2026-09-24 started 5 invocations between 21:46 and 22:40 UTC against a cap of 3.
+// This query is candidate-agnostic and bounded by time, so the window count is complete.
+const ROLLING_WINDOW_INVOCATION_CLAIM = 'local_distilled_runtime_canary_invocation_started'
+async function readRollingWindowInvocations(db:any,now:Date){
+  const windowStart=new Date(now.getTime()-MASS_CANARY_ROLLING_WINDOW_HOURS*3600_000).toISOString()
+  const page=await db.from('cos_university_learning_assurance_events')
+    .select('candidate_id,observed_at,expires_at,verifier,evidence')
+    .eq('event_type','fine_tune')
+    .eq('verifier','host_controller')
+    .contains('evidence',{profile:MASS_CANARY_PROFILE,claim:ROLLING_WINDOW_INVOCATION_CLAIM})
+    .gt('observed_at',windowStart)
+    .order('observed_at',{ascending:false})
+    .limit(ROLLING_EVENT_PAGE_SIZE)
+  if(page.error) throw page.error
+  return page.data||[]
+}
+
+function rollingEventKey(row:any){
+  return [String(row?.candidate_id||''),String(row?.observed_at||''),String(row?.verifier||''),String(row?.evidence?.claim||'')].join('|')
 }
 
 // Issues at most one bounded canary approval per tick before the unchanged atomic claim.
@@ -226,6 +251,17 @@ async function issueRollingCanaryApproval(now:Date){
     if(String(row?.evidence?.profile||'')!==MASS_CANARY_PROFILE) return true
     return Date.parse(String(row?.observed_at||''))>=Date.parse(completedAt)
   })
+  // Add window invocations of candidates outside the eligible set. Rows of eligible candidates were already
+  // loaded (and Builder-filtered) above; adding only outside candidates keeps per-artifact state unchanged.
+  const eligibleCandidateIds=new Set(candidateIds)
+  const loadedEventKeys=new Set(eventRows.map(rollingEventKey))
+  for(const row of await readRollingWindowInvocations(db,now)){
+    if(eligibleCandidateIds.has(String(row?.candidate_id||''))) continue
+    const key=rollingEventKey(row)
+    if(loadedEventKeys.has(key)) continue
+    loadedEventKeys.add(key)
+    eventRows.push(row)
+  }
   const passedCandidates=new Set(eventRows
     .filter((row:any)=>String(row?.evidence?.claim||'')==='local_distilled_runtime_canary_passed')
     .map((row:any)=>String(row.candidate_id)))

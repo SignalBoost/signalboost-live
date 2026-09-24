@@ -49,19 +49,22 @@ for (const abs of files) {
   const rel = relative(root, abs).replaceAll('\\', '/')
   if (rel.includes('/tests/') || rel.endsWith('.test.ts')) continue
   const source = readFileSync(abs, 'utf8')
+  const executableSource = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
 
   const importsProviderRouter = /from ['"][^'"]*providerRouter(?:\.ts)?['"]/.test(source)
   if (importsProviderRouter && !providerImportAllowlist.has(rel)) {
     failures.push(`${rel}: raw providerRouter import outside canonical gateway/adapters`)
   }
 
-  const invokesGoverned = /\brunGoverned\s*\(/.test(source)
+  const invokesGoverned = /\brunGoverned\s*\(/.test(executableSource)
   if (invokesGoverned && !rel.startsWith('agent-gateway/')) {
     const harnessBound = /withHostProductionHarnessIngress|createGovernedHarnessExecutor/.test(source)
     if (!harnessBound) failures.push(`${rel}: runGoverned() without Platform Harness ingress`)
   }
 
-  const invokesRawModel = /\bcallLocalModel(?:Turn)?\s*\(/.test(source)
+  const invokesRawModel = /\bcallLocalModel(?:Turn)?\s*\(/.test(executableSource)
   if (invokesRawModel && !directModelExecutionAllowlist.has(rel)) {
     const harnessBound = /withHostProductionHarnessIngress|withCosHarnessIngress|createGovernedHarnessExecutor/.test(source)
     if (!harnessBound) {

@@ -282,7 +282,7 @@ test('the kill switch and the hourly paid-invocation cap stop issuance', () => {
   assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a],events:[],now,enabled:false}),{issue:false,reason:'mass_canary_rolling_authorization_disabled'})
   const starts=Array.from({length:MASS_CANARY_ROLLING_MAX_APPROVALS},(_,i)=>{
     const o=artifact(100+i)
-    return event(o,'local_distilled_runtime_canary_invocation_started','2026-09-17T13:00:00.000Z')
+    return event(o,'local_distilled_runtime_canary_invocation_started','2026-09-17T16:30:00.000Z')
   })
   assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a],events:starts,now,enabled:true}),{issue:false,reason:'mass_canary_rolling_window_exhausted'})
 })
@@ -390,7 +390,7 @@ test('the hourly ceiling preserves the 72-per-day nominal spend envelope without
   const a = artifact(1)
   const exhausted = Array.from({ length:MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) => {
     const other = artifact(100 + index)
-    return event(other, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T13:00:00.000Z')
+    return event(other, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T16:30:00.000Z')
   })
   assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a], events:exhausted, now, enabled:true }),
     { issue:false, reason:'mass_canary_rolling_window_exhausted' })
@@ -414,7 +414,7 @@ test('expired unused approvals do not consume spend capacity while a live armed 
 
   const starts = Array.from({ length:MASS_CANARY_ROLLING_MAX_APPROVALS - 1 }, (_, index) => {
     const other = artifact(300 + index)
-    return event(other, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T13:00:00.000Z')
+    return event(other, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T16:30:00.000Z')
   })
   const armedArtifact = artifact(999)
   const armed = event(armedArtifact, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T16:50:00.000Z',

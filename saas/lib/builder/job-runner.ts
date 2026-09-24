@@ -1,4 +1,4 @@
-import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
+import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
 import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
 import { builderPendingWriteEvidence } from './evidence-events.ts'

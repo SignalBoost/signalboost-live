@@ -31,7 +31,7 @@ import { getCurrentUser } from '@/lib/auth/permission-middleware'
 import { runGoverned } from '@/agent-gateway/index.ts'
 import type { AgentRequest } from '@/agent-gateway/index.ts'
 import { createSignalBoostGatewayHost, GATEWAY_POLICY } from '@/agent-gateway-host/signalboost-host.ts'
-import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
+import { withHostProductionHarnessIngress } from '../../../../platform-harness/runtime/host-ingress.ts'
 import {
   RETRY_DEPLOYMENT_KIND,
   RETRY_DEPLOYMENT_TARGET,

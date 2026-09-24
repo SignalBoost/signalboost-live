@@ -32,7 +32,8 @@ export const HUGGING_FACE_OPEN_DATASETS = Object.freeze({
 } as const)
 
 const DATASET_SERVER = 'https://datasets-server.huggingface.co'
-const REQUEST_TIMEOUT_MS = 12_000
+const SEARCH_REQUEST_TIMEOUT_MS = 6_000
+const ROWS_REQUEST_TIMEOUT_MS = 10_000
 
 function clean(value: unknown, limit = 60_000): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit)
@@ -65,9 +66,13 @@ function vectorDigest(value: unknown, dimensions: number): string | null {
 
 type DatasetAccessResult = Readonly<{ rows: any[]; mode: 'search' | 'rows_fallback' }>
 
-async function getJsonResponse(url: string, fetcher: FetchLike): Promise<{ ok: boolean; status: number; body: any }> {
+async function getJsonResponse(
+  url: string,
+  fetcher: FetchLike,
+  timeoutMs: number,
+): Promise<{ ok: boolean; status: number; body: any }> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetcher(url, {
       headers: {
@@ -79,11 +84,16 @@ async function getJsonResponse(url: string, fetcher: FetchLike): Promise<{ ok: b
     let body: any = {}
     try { body = await response.json() } catch {}
     return { ok: response.ok, status: response.status, body }
+  } catch (error) {
+    // Dataset Viewer search is best-effort. A timeout/network abort must remain observable but it must
+    // not prevent the bounded /rows fallback from running, otherwise one slow search endpoint opens the
+    // source circuit even though the dataset itself is still readable.
+    const timedOut = controller.signal.aborted || (error instanceof Error && error.name === 'AbortError')
+    return { ok: false, status: timedOut ? 408 : 0, body: {} }
   } finally {
     clearTimeout(timer)
   }
 }
-
 function deterministicOffset(dataset: string, query: string): number {
   const digest = createHash('sha256').update(`${dataset}\n${query}`).digest('hex')
   return Number.parseInt(digest.slice(0, 8), 16) % 50_000
@@ -105,20 +115,34 @@ async function readDatasetRows(source: { dataset: string; config: string; split:
     offset: '0',
     length,
   })
-  const searched = await getJsonResponse(`${DATASET_SERVER}/search?${searchParams.toString()}`, fetcher)
-  if (searched.ok) return { rows: Array.isArray(searched.body?.rows) ? searched.body.rows : [], mode: 'search' }
+  const searched = await getJsonResponse(`${DATASET_SERVER}/search?${searchParams.toString()}`, fetcher, SEARCH_REQUEST_TIMEOUT_MS)
+  const searchedRows = Array.isArray(searched.body?.rows) ? searched.body.rows : []
+  if (searched.ok && searchedRows.length > 0) return { rows: searchedRows, mode: 'search' }
 
+  // Search can return HTTP 200 with zero rows when a Dataset Viewer search index is absent or stale.
+  // Treat that like an unavailable search service and fall back to bounded row access.
+  const primaryOffset = deterministicOffset(source.dataset, query) % 10_000
   const rowParams = new URLSearchParams({
     dataset: source.dataset,
     config: source.config,
     split: source.split,
-    offset: String(deterministicOffset(source.dataset, query)),
+    offset: String(primaryOffset),
     length,
   })
-  const fallback = await getJsonResponse(`${DATASET_SERVER}/rows?${rowParams.toString()}`, fetcher)
-  if (fallback.ok) return { rows: Array.isArray(fallback.body?.rows) ? fallback.body.rows : [], mode: 'rows_fallback' }
+  let fallback = await getJsonResponse(`${DATASET_SERVER}/rows?${rowParams.toString()}`, fetcher, ROWS_REQUEST_TIMEOUT_MS)
+  let fallbackRows = Array.isArray(fallback.body?.rows) ? fallback.body.rows : []
 
-  throw new Error(`COS Hugging Face open-data source failed: dataset=${source.dataset}:search=${searched.status}:rows=${fallback.status}`)
+  // One bounded zero-offset retry prevents an out-of-range deterministic slice from masquerading as
+  // an empty dataset. This does not widen admission, rights, relevance, or per-cycle provider authority.
+  if (fallback.ok && fallbackRows.length === 0 && primaryOffset !== 0) {
+    rowParams.set('offset', '0')
+    fallback = await getJsonResponse(`${DATASET_SERVER}/rows?${rowParams.toString()}`, fetcher, ROWS_REQUEST_TIMEOUT_MS)
+    fallbackRows = Array.isArray(fallback.body?.rows) ? fallback.body.rows : []
+  }
+  if (fallback.ok) return { rows: fallbackRows, mode: 'rows_fallback' }
+
+  const searchState = searched.ok ? '200-empty' : String(searched.status)
+  throw new Error(`COS Hugging Face open-data source failed: dataset=${source.dataset}:search=${searchState}:rows=${fallback.status}`)
 }
 
 /**

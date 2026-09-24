@@ -106,7 +106,7 @@ function defaultEvidenceSink(): HarnessEvidenceSink | null {
 export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
   objective: string
   tenantId: string
-  execute: () => Promise<T>
+  execute: (signal?: AbortSignal) => Promise<T>
   evidenceSink?: HarnessEvidenceSink
   runId?: string
   parentManifest?: HarnessManifest
@@ -151,7 +151,7 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
   let invoked = false
   const host: GatewayHost = Object.freeze({
     execution: Object.freeze({
-      async perform(agentRequest) {
+      async perform(agentRequest, control) {
         if (
           agentRequest.action.kind !== 'delegate'
           || agentRequest.action.target !== COS_SOFTWARE_SPECIALIST_DELEGATION_CAPABILITY
@@ -159,8 +159,14 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
         ) {
           return { ok: false, error: 'harness_software_specialist_host_scope_rejected' }
         }
+        if (control?.signal?.aborted) {
+          return { ok: false, error: 'harness_software_specialist_delegation_aborted' }
+        }
         try {
-          value = await input.execute()
+          value = await input.execute(control?.signal)
+          if (control?.signal?.aborted) {
+            return { ok: false, error: 'harness_software_specialist_delegation_aborted' }
+          }
           invoked = true
           return { ok: true, result: { delegated: true } }
         } catch (error) {

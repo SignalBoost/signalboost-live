@@ -64,6 +64,14 @@ The full-enforcement requirements are:
 
 Platform-wide acceptance is not complete until Production evidence demonstrates the shared Harness on COS and representative specialists across read-only, write, consequential, delegated, failure/recovery, rollback, deadline, concurrency, and cost-ceiling cases. Unit tests or a Residency-only integration are necessary but not sufficient evidence for the platform-wide completion claim.
 
+Production acceptance implementation — 2026-09-24:
+- `/api/cron/platform-harness-production-acceptance` is the deployment-bound proof runner for the full-enforcement target. It is Production-only, CRON-secret protected, exact-commit/deployment bound, and idempotent per deployment.
+- The runner uses the canonical `runProductionHarnessEnvelope()`, the real Agent Gateway Governed Socket via `createGovernedHarnessExecutor()`, and the existing immutable supervisor Harness evidence sink. It does not create a second execution or governance path.
+- The acceptance matrix covers a real Production read; a real reversible Production write; an explicitly consequential internal write with precondition evidence, forced independent-verification failure and executable compensation; a narrowed recursive child HarnessRun; wall-clock deadline abort; concurrency ceiling; and hard cost-ceiling fail-closed behavior.
+- Real mutation proof is restricted to `platform_harness_acceptance_scratch`, a service-role-only table containing no customer or business data. The consequential case must leave no scratch row after compensation. The ordinary write row may remain as harmless deployment evidence.
+- Each individual case persists the normal `platform_harness_run_completed` record. The suite then persists one `platform_harness_production_acceptance_completed` summary bound to `VERCEL_GIT_COMMIT_SHA` and a hashed deployment URL. The summary explicitly records `customerDataTouched=false`, `hiddenReasoningPersisted=false`, and `authorityExpanded=false`.
+- **Completion rule:** code/unit/Preview green is still not enough. The Platform Harness full-enforcement claim becomes Production-accepted only after the summary event exists for the exact Production deployment and all required matrix cases have the expected outcomes.
+
 
 Ownership stays separated:
 

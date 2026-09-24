@@ -69,7 +69,7 @@ export const PLAYWRIGHT_MCP_PROFILE: BrowserMcpServerProfile = Object.freeze({
   packageName: '@playwright/mcp',
   packageVersion: '0.0.82',
   transportRef: 'host:mcp:playwright',
-  recommendedArgs: Object.freeze(['--headless', '--isolated', '--browser', 'chrome']),
+  recommendedArgs: Object.freeze(['--headless', '--isolated', '--browser', 'chrome', '--no-webmcp']),
   tools: Object.freeze([
     readTool('browser_snapshot', 'snapshot'),
     readTool('browser_find', 'find'),

@@ -4,6 +4,9 @@ import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { universityTeacherPoolStatus } from '@/lib/ai/cos/cosUniversityTeacherPool'
 import { selectWorkingCosBalancedBundleFromVault } from '@/lib/ai/cos/cosWorkingDistillationBundle'
+import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
+import { runpodPrimaryConfig, runpodPrimaryEnabled, runpodPrimaryModel } from '@/lib/ai/cos/runpodPrimaryInference'
+import { queryWorkingCosRuntimeIdentity, workingCosRuntimeBindingFromEnv } from '@/lib/ai/cos/cosWorkingRuntimeBinding'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +21,21 @@ const EVALUATIONS = 'cos_university_distilled_evaluation_runs'
 const GRADUATES = 'cos_university_graduate_model_registry'
 const LEARNING = 'cos_continuous_learning'
 const WINDOW_HOURS = 24
+const TELEMETRY_PAGE_SIZE = 1000
+const MAX_TELEMETRY_PAGES = 100
+
+async function collectPages<T>(load: (from: number, to: number) => any): Promise<T[]> {
+  const rows: T[] = []
+  for (let page = 0; page < MAX_TELEMETRY_PAGES; page += 1) {
+    const from = page * TELEMETRY_PAGE_SIZE
+    const result = await load(from, from + TELEMETRY_PAGE_SIZE - 1)
+    if (result.error) throw result.error
+    const batch = (result.data || []) as T[]
+    rows.push(...batch)
+    if (batch.length < TELEMETRY_PAGE_SIZE) return rows
+  }
+  throw new Error('university_telemetry_window_exceeds_safe_pagination_limit')
+}
 
 const OPEN_SOURCE_CATALOG = Object.freeze([
   { id: 'openalex', name: 'OpenAlex', integration: 'implemented', vectorSpace: 'openalex_gte_large_en_v1', mode: 'remote_semantic_index' },
@@ -109,11 +127,33 @@ export async function GET() {
     const db = getAdminSupabase()
     const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString()
 
-    const [runsResult, campaignsResult, artifactsResult, evaluationsResult, graduatesResult, openLearningResult, workingCosBundle] = await Promise.all([
+    const [
+      runsResult,
+      totalRunCountResult,
+      completedRunCountResult,
+      failedRunCountResult,
+      campaignsResult,
+      artifactsResult,
+      evaluationsResult,
+      graduatesResult,
+      openLearningRows,
+      workingCosBundle,
+    ] = await Promise.all([
       db.from(RUNS)
         .select('id,campaign_id,subject_id,stage,failure_reason,teacher_model_id,teacher_source_ref,teacher_output_hashes,preparation_job_id,preparation_job_url,training_job_id,training_job_url,trained_artifact_id,created_at,updated_at,completed_at')
         .order('updated_at', { ascending: false })
         .limit(40),
+      db.from(RUNS)
+        .select('id', { count: 'exact', head: true })
+        .gte('updated_at', since),
+      db.from(RUNS)
+        .select('id', { count: 'exact', head: true })
+        .gte('updated_at', since)
+        .eq('stage', 'complete'),
+      db.from(RUNS)
+        .select('id', { count: 'exact', head: true })
+        .gte('updated_at', since)
+        .eq('stage', 'failed'),
       db.from(CAMPAIGNS)
         .select('id,status,batch_count,max_total_cost_usd,committed_cost_usd,authorized_at,expires_at,completed_at,created_at,updated_at')
         .order('updated_at', { ascending: false })
@@ -130,19 +170,25 @@ export async function GET() {
         .select('candidate_id,trained_artifact_hash,status,runtime_provider,runtime_model_id,promoted_at,activated_at,updated_at')
         .order('updated_at', { ascending: false })
         .limit(100),
-      db.from(LEARNING)
+      collectPages<any>((from, to) => db.from(LEARNING)
         .select('content_hash,source_kind,source_uri,license,evidence,embedding_model,observed_at')
         .gte('observed_at', since)
         .order('observed_at', { ascending: false })
-        .limit(5000),
+        .range(from, to)),
       selectWorkingCosBalancedBundleFromVault({}, db),
     ])
-    if (runsResult.error) throw runsResult.error
-    if (campaignsResult.error) throw campaignsResult.error
-    if (artifactsResult.error) throw artifactsResult.error
-    if (evaluationsResult.error) throw evaluationsResult.error
-    if (graduatesResult.error) throw graduatesResult.error
-    if (openLearningResult.error) throw openLearningResult.error
+    for (const result of [
+      runsResult,
+      totalRunCountResult,
+      completedRunCountResult,
+      failedRunCountResult,
+      campaignsResult,
+      artifactsResult,
+      evaluationsResult,
+      graduatesResult,
+    ]) {
+      if (result.error) throw result.error
+    }
 
     const openSources = new Map<string, {
       id: string
@@ -166,7 +212,7 @@ export async function GET() {
         latestAt: null,
       })
     }
-    for (const row of openLearningResult.data || []) {
+    for (const row of openLearningRows) {
       const id = openSourceId(row)
       if (!id) continue
       const current = openSources.get(id)
@@ -180,7 +226,7 @@ export async function GET() {
     const runs = runsResult.data || []
     const runIds = runs.map((row: any) => text(row.id, 80)).filter(Boolean)
 
-    const [runTeachersResult, recentTeachersResult, runJobsResult, recentJobsResult] = await Promise.all([
+    const [runTeachersResult, runJobsResult, recentTeachers, recentJobs] = await Promise.all([
       runIds.length
         ? db.from(TEACHERS)
           .select('run_id,teacher_id,provider,model,input_tokens,output_tokens,created_at')
@@ -188,11 +234,6 @@ export async function GET() {
           .order('created_at', { ascending: false })
           .limit(1500)
         : Promise.resolve({ data: [], error: null } as any),
-      db.from(TEACHERS)
-        .select('run_id,teacher_id,provider,model,input_tokens,output_tokens,created_at')
-        .gte('created_at', since)
-        .order('created_at', { ascending: false })
-        .limit(5000),
       runIds.length
         ? db.from(PROVIDER_JOBS)
           .select('run_id,operation,job_id,job_url,provider_stage,observed_cost_usd,reserved_cost_usd,hourly_cost_usd,failure_reason,dispatched_at,settled_at,updated_at')
@@ -200,20 +241,23 @@ export async function GET() {
           .order('updated_at', { ascending: false })
           .limit(1000)
         : Promise.resolve({ data: [], error: null } as any),
-      db.from(PROVIDER_JOBS)
+      collectPages<any>((from, to) => db.from(TEACHERS)
+        .select('run_id,teacher_id,provider,model,input_tokens,output_tokens,created_at')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .range(from, to)),
+      collectPages<any>((from, to) => db.from(PROVIDER_JOBS)
         .select('run_id,operation,provider_stage,observed_cost_usd,reserved_cost_usd,dispatched_at,settled_at')
         .gte('dispatched_at', since)
         .order('dispatched_at', { ascending: false })
-        .limit(3000),
+        .range(from, to)),
     ])
-    for (const result of [runTeachersResult, recentTeachersResult, runJobsResult, recentJobsResult]) {
+    for (const result of [runTeachersResult, runJobsResult]) {
       if (result.error) throw result.error
     }
 
     const runTeachers = runTeachersResult.data || []
-    const recentTeachers = recentTeachersResult.data || []
     const runJobs = runJobsResult.data || []
-    const recentJobs = recentJobsResult.data || []
 
     const providers = new Map<string, {
       id: string
@@ -332,15 +376,10 @@ export async function GET() {
       }
     })
 
-    const recentRunRows = runs.filter((row: any) => {
-      const at = Date.parse(text(row.updated_at, 80))
-      return Number.isFinite(at) && at >= Date.parse(since)
-    })
-    const buckets = recentRunRows.reduce((acc: Record<string, number>, row: any) => {
-      const bucket = stageBucket(row.stage)
-      acc[bucket] = (acc[bucket] || 0) + 1
-      return acc
-    }, {})
+    const totalRuns24h = n(totalRunCountResult.count)
+    const completedRuns24h = n(completedRunCountResult.count)
+    const failedRuns24h = n(failedRunCountResult.count)
+    const inFlightRuns24h = Math.max(0, totalRuns24h - completedRuns24h - failedRuns24h)
 
     const artifactCandidates = (artifactsResult.data || []).map((row: any) => text(row.candidate_id, 240)).filter(Boolean)
     const assuranceResult = artifactCandidates.length
@@ -448,6 +487,27 @@ export async function GET() {
       }
     })
 
+    let workingCosRuntimeBinding: ReturnType<typeof workingCosRuntimeBindingFromEnv> | null = null
+    if (workingCosBundle.eligible && runpodPrimaryEnabled()) {
+      const podId = configuredRunpodPodId()
+      if (podId) {
+        try {
+          const configuredModel = runpodPrimaryModel('reasoner')
+          const runtimeIdentity = await queryWorkingCosRuntimeIdentity(
+            runpodPrimaryConfig('reasoner', podId),
+          )
+          workingCosRuntimeBinding = workingCosRuntimeBindingFromEnv(
+            runtimeIdentity,
+            podId,
+            configuredModel,
+          )
+        } catch {
+          // Telemetry remains read-only and must not turn a transient runtime probe into a 500.
+          workingCosRuntimeBinding = null
+        }
+      }
+    }
+
     const hfObservedCostUsd24h = recentJobs.reduce(
       (total: number, job: any) => total + n(job.observed_cost_usd),
       0,
@@ -460,9 +520,9 @@ export async function GET() {
       windowHours: WINDOW_HOURS,
       summary: {
         teacherOutputs24h: recentTeachers.length,
-        completedRuns24h: buckets.complete || 0,
-        failedRuns24h: buckets.failed || 0,
-        inFlightRuns24h: buckets.in_flight || 0,
+        completedRuns24h,
+        failedRuns24h,
+        inFlightRuns24h,
         hfObservedCostUsd24h: Number(hfObservedCostUsd24h.toFixed(6)),
         openSourceItems24h: Array.from(openSources.values()).reduce((total, source) => total + source.items24h, 0),
       },
@@ -478,12 +538,22 @@ export async function GET() {
         itemCount: workingCosBundle.itemCount,
         subjectCount: workingCosBundle.subjectCount,
         subjectIds: workingCosBundle.subjectIds,
-        blockers: workingCosBundle.blockers,
+        blockers: [
+          ...workingCosBundle.blockers,
+          ...(workingCosBundle.eligible && !workingCosRuntimeBinding?.eligible
+            ? ['runtime_binding']
+            : []),
+        ],
+        runtimeBindingEligible: workingCosRuntimeBinding?.eligible === true,
+        runtimeBindingBlockers: workingCosRuntimeBinding?.blockers || [],
+        runtimeBindingSource: workingCosRuntimeBinding?.bindingSource || null,
         automaticTrainingAuthorized: false,
         productionTrafficAuthorized: false,
-        nextGate: workingCosBundle.eligible
-          ? 'exact_runtime_identity_rollback_and_training_dispatch'
-          : 'balanced_bundle_supply',
+        nextGate: !workingCosBundle.eligible
+          ? 'balanced_bundle_supply'
+          : workingCosRuntimeBinding?.eligible
+            ? workingCosRuntimeBinding.nextGate
+            : 'runtime_binding',
       },
       providers: Array.from(providers.values())
         .sort((a, b) => b.calls - a.calls || a.id.localeCompare(b.id)),

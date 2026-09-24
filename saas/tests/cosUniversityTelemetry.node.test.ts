@@ -106,3 +106,21 @@ test('University telemetry exposes read-only evaluator claim blockers without ch
   assert.ok(route.indexOf("else if (!canary) claimability = 'missing_exact_canary'") < route.indexOf("else if (!approval) claimability = 'missing_approval'"), 'exact canary must be reported before the approval it gates')
   assert.doesNotMatch(route, /export async function POST/)
 })
+
+
+test('University telemetry exposes read-only Working COS balanced bundle readiness', () => {
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
+  const page = source('app/dashboard/cos-university-telemetry/page.tsx')
+  const copy = source('lib/i18n/cosUniversityTelemetryCopy.ts')
+
+  assert.match(route, /selectWorkingCosBalancedBundleFromVault/)
+  assert.match(route, /workingCos:\s*\{/)
+  assert.match(route, /automaticTrainingAuthorized:\s*false/)
+  assert.match(route, /productionTrafficAuthorized:\s*false/)
+  assert.match(route, /exact_runtime_identity_rollback_and_training_dispatch/)
+  assert.match(page, /copy\.workingCosTitle/)
+  assert.match(page, /workingCos\.subjectCount/)
+  assert.match(page, /workingCos\.itemCount/)
+  assert.match(page, /workingCos\.subjectIds/)
+  assert.match(copy, /Working COS · direct distillation readiness/)
+})

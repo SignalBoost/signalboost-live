@@ -39,7 +39,7 @@ const FAILED = 'mass_distilled_independent_evaluation_failed'
 const EXHAUSTED = 'mass_distilled_evaluation_attempts_exhausted'
 const ROUTE_BUDGET_MS = 570_000
 const ROUTE_RESERVE_MS = 25_000
-const RUNTIME_WAKE_TIMEOUT_MS = 150_000
+const RUNTIME_WAKE_TIMEOUT_MS = 260_000
 const MIN_BALANCE_USD = 1
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
@@ -78,9 +78,10 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
   const remainingMs = deadlineMs - Date.now() - ROUTE_RESERVE_MS
   if (remainingMs <= 0) throw new Error('mass_distilled_evaluation_route_deadline_exceeded')
   const timeoutMs = Math.max(1, Math.min(RUNTIME_WAKE_TIMEOUT_MS, remainingMs))
-  // /ping is only a scale-from-zero trigger. Keep the request alive through the bounded cold-start window:
-  // aborting it after 20s can cancel the only scale trigger before RunPod attaches a worker, while /health
-  // still returns HTTP 200 with workers.ready=0. The evaluator remains bounded by the absolute route deadline.
+  // /ping is the single approved scale-from-zero trigger. Production readiness telemetry has observed
+  // successful exact-artifact cold starts as late as ~249.5s; a 150s abort can therefore cancel a healthy
+  // startup and leave /health returning HTTP 200 with workers.ready=0. Keep that one wake request alive
+  // through the measured cold-start tail while preserving the absolute route deadline and reserve.
   try {
     const response = await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`, {
       headers: { Authorization: `Bearer ${key}` },

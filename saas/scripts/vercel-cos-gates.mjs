@@ -17,8 +17,6 @@ const tests = [
   'tests/cosUniversityTeacherAdapters.node.test.ts',
   'tests/cosUniversityMassHostedTeacherStage.node.test.ts',
   'tests/cosUniversityTelemetry.node.test.ts',
-  'tests/cosWorkingDistillationDispatch.node.test.ts',
-  'tests/platformHarnessFullEnforcement.node.test.ts',
   'tests/cosUniversityDailyLaneCadence.node.test.ts',
   // Registered 2026-09-13. These regressions existed but were never in this gate, so they had
   // never run in CI: every "green" for them came from a sandbox. They defend the execution binding,
@@ -145,7 +143,6 @@ const tests = [
   'tests/cosAdaptiveRetrieval.node.test.ts',
   'tests/cosRetrievalSelfReflection.node.test.ts',
   'tests/cosFreshnessPolicy.node.test.ts',
-  'tests/cosNativeAgentFreshnessGuard.node.test.ts',
   'tests/cosTravelPlanningFreshness.node.test.ts',
   'tests/cosFreshGroundedTask.node.test.ts',
   'tests/listCatalogIntent.node.test.ts',

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
+import {
+  currentHarnessExecutionContext,
+  harnessDeadlineRemainingMs,
+} from '../../platform-harness/runtime/execution-context.ts'
 
 export type LocalModelToolDefinition = Readonly<{
   type: 'function'
@@ -332,17 +336,25 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   let toolCalls: readonly LocalModelToolCall[] = Object.freeze([])
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
+  const harnessContext = currentHarnessExecutionContext()
+  const abortFromHarness = () => controller.abort()
+  if (harnessContext?.signal.aborted) controller.abort()
+  else harnessContext?.signal.addEventListener('abort', abortFromHarness, { once: true })
+
   const baseTimeoutMs = interactiveUserResponse(args) ? interactiveModelTimeoutMs(args, config.timeoutMs) : config.timeoutMs
   const callerTimeoutMs = Number(args.timeoutMs)
   const callerBoundTimeoutMs = Number.isFinite(callerTimeoutMs) && callerTimeoutMs > 0
     ? Math.max(250, Math.min(baseTimeoutMs, callerTimeoutMs))
     : baseTimeoutMs
-  // Inside a durable COS turn, no single model call (RunPod attempt, DeepInfra fallback, retry) may
-  // outlive the whole-turn deadline. Outside a turn this is a no-op.
-  const turnRemainingMs = turnDeadlineRemainingMs()
-  const timeoutMs = turnRemainingMs === null
+  // COS's whole-turn budget and the outer Platform Harness are independent ceilings. A model call
+  // receives the strictest remaining bound and the Harness AbortSignal, so RunPod/DeepInfra/fallback
+  // transport cannot continue on a fresh provider clock after its owning HarnessRun expires.
+  const remainingBounds = [turnDeadlineRemainingMs(), harnessDeadlineRemainingMs()]
+    .filter((value): value is number => value !== null)
+  const outerRemainingMs = remainingBounds.length ? Math.min(...remainingBounds) : null
+  const timeoutMs = outerRemainingMs === null
     ? callerBoundTimeoutMs
-    : Math.max(250, Math.min(callerBoundTimeoutMs, turnRemainingMs))
+    : Math.max(1, Math.min(callerBoundTimeoutMs, outerRemainingMs))
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
     inferenceStartedAt = Date.now()
@@ -447,6 +459,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     text = null
   } finally {
     clearTimeout(timeout)
+    harnessContext?.signal.removeEventListener('abort', abortFromHarness)
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300
@@ -460,7 +473,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
       promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
     })
-    if (args.persistUsage !== false && shouldPersistUsage(provider, config)) {
+    if (args.persistUsage !== false && !harnessContext?.signal.aborted && shouldPersistUsage(provider, config)) {
       await recordLocalInferenceUsage({
         requestId, provider, model, context: usageContext,
         routeOwner,

@@ -195,6 +195,58 @@ test('HF dataset search failure falls back to one bounded deterministic row slic
   assert.ok(rows[0].evidence?.includes('huggingface_access_mode:rows_fallback'))
 })
 
+test('HF dataset HTTP-200 empty search falls back to bounded row access', async () => {
+  const requested: string[] = []
+  const fetcher = (async (url: string | URL | Request) => {
+    requested.push(String(url))
+    if (requested.length === 1) return fakeResponse({ rows: [] }, 200)
+    return fakeResponse({
+      rows: [{
+        row_idx: 45,
+        row: {
+          text: 'NIST access control guidance for identity and zero trust systems.',
+          embedding: Array.from({ length: 1536 }, (_, i) => i / 1536),
+          metadata: JSON.stringify({ source: 'NIST access control', type: 'section' }),
+        },
+      }],
+    })
+  }) as typeof fetch
+
+  const rows = await createHuggingFaceNistCybersecuritySearch(fetcher)('identity access control', 3)
+  assert.equal(rows.length, 1)
+  assert.equal(requested.length, 2)
+  assert.match(requested[0], /\/search\?/)
+  assert.match(requested[1], /\/rows\?/)
+  assert.ok(rows[0].evidence?.includes('huggingface_access_mode:rows_fallback'))
+})
+
+test('HF dataset search abort falls back instead of opening the source circuit immediately', async () => {
+  const requested: string[] = []
+  const fetcher = (async (url: string | URL | Request) => {
+    requested.push(String(url))
+    if (requested.length === 1) {
+      const aborted = new Error('aborted')
+      aborted.name = 'AbortError'
+      throw aborted
+    }
+    return fakeResponse({
+      rows: [{
+        row_idx: 46,
+        row: {
+          text: 'NIST incident response and cybersecurity risk management guidance.',
+          embedding: Array.from({ length: 1536 }, (_, i) => i / 1536),
+          metadata: JSON.stringify({ source: 'NIST resilience', type: 'section' }),
+        },
+      }],
+    })
+  }) as typeof fetch
+
+  const rows = await createHuggingFaceNistCybersecuritySearch(fetcher)('cybersecurity incident response', 3)
+  assert.equal(rows.length, 1)
+  assert.equal(requested.length, 2)
+  assert.ok(rows[0].evidence?.includes('huggingface_access_mode:rows_fallback'))
+})
+
 test('HF arXiv metadata source is searchable research discovery but does not assert paper training rights', async () => {
   let requested = ''
   const fetcher = (async (url: string | URL | Request) => {

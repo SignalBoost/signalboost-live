@@ -64,7 +64,7 @@ function vectorDigest(value: unknown, dimensions: number): string | null {
   return createHash('sha256').update(JSON.stringify(vector)).digest('hex')
 }
 
-type DatasetAccessResult = Readonly<{ rows: any[]; mode: 'search' | 'rows_fallback' | 'first_rows_fallback' }>
+type DatasetAccessResult = Readonly<{ rows: any[]; mode: 'search' | 'search_relaxed' | 'rows_fallback' | 'first_rows_fallback' }>
 
 async function getJsonResponse(
   url: string,
@@ -106,6 +106,45 @@ function deterministicOffset(dataset: string, query: string): number {
   return Number.parseInt(digest.slice(0, 8), 16) % 50_000
 }
 
+const QUERY_STOP_WORDS = new Set(['within','findings','methods','evidence','systematic','review','comparative','analysis','applications','limitations','measurement','validation','rigorous','reusable','strengthen','computer','science','coding'])
+
+function compactQueryTerms(query: string, preferred: readonly string[], fallback: string): string[] {
+  const normalized = clean(query, 600).toLowerCase()
+  const chosen = preferred.filter(term => normalized.includes(term)).slice(0, 3)
+  const lexical = normalized.split(/[^a-z0-9+#.-]+/).map(term => term.trim()).filter(term => term.length >= 3 && !QUERY_STOP_WORDS.has(term))
+  const lexicalCompact = [...new Set(lexical)].slice(0, 3).join(' ')
+  return [...new Set([chosen.join(' '), lexicalCompact, fallback].map(value => value.trim()).filter(value => value && value !== normalized))].slice(0, 2)
+}
+
+function relaxedQueriesForDataset(dataset: string, query: string): string[] {
+  if (dataset === HUGGING_FACE_OPEN_DATASETS.githubCc0.dataset) {
+    return compactQueryTerms(query, [
+      'typescript','javascript','python','react','next.js','node.js','api','database','sql','supabase',
+      'vercel','debugging','testing','devops','git','github','algorithm','data structure','architecture',
+      'software','programming','code',
+    ], 'software code')
+  }
+  if (dataset === HUGGING_FACE_OPEN_DATASETS.nistCybersecurity.dataset) {
+    return compactQueryTerms(query, [
+      'zero trust','incident response','risk management','access control','identity','cryptography',
+      'post-quantum','privacy','supply chain','cybersecurity','security','nist',
+    ], 'cybersecurity security')
+  }
+  return compactQueryTerms(query, ['machine learning','artificial intelligence','retrieval','embedding','database','statistics','physics','quantum','economics'], 'research')
+}
+
+function githubSoftwareLike(row: any): boolean {
+  const meta = metadataRecord(row?.meta)
+  const language = clean(meta.repo_language, 120).toLowerCase()
+  const fileName = clean(meta.file_name, 500).toLowerCase()
+  const mimeType = clean(meta.mime_type, 160).toLowerCase()
+  const body = clean(row?.text, 4000)
+  if (/\b(typescript|javascript|python|java|go|golang|rust|c\+\+|c#|ruby|php|swift|kotlin|scala|shell|sql)\b/.test(language)) return true
+  if (/\.(ts|tsx|js|jsx|mjs|cjs|py|java|go|rs|sql|cs|cpp|cc|c|h|hpp|rb|php|swift|kt|kts|scala|sh|bash|zsh|yaml|yml|json|toml)$/i.test(fileName)) return true
+  if (/\b(text\/(javascript|typescript|x-python)|application\/(javascript|json)|text\/x-(python|java|c|c\+\+))\b/i.test(mimeType)) return true
+  return /\b(import\s+.+from|export\s+(async\s+)?(function|const|class)|async\s+function|function\s+\w+\s*\(|class\s+\w+|interface\s+\w+|def\s+\w+\s*\(|SELECT\s+.+FROM|CREATE\s+TABLE|package\s+\w+|public\s+static\s+|fn\s+\w+\s*\()/i.test(body)
+}
+
 /**
  * Dataset Viewer search is not guaranteed for every Hub dataset even when the Hub page advertises a
  * Viewer. Search can be disabled or temporarily fail while ordinary bounded row access still works.
@@ -114,20 +153,36 @@ function deterministicOffset(dataset: string, query: string): number {
  */
 async function readDatasetRows(source: { dataset: string; config: string; split: string }, query: string, limit: number, fetcher: FetchLike): Promise<DatasetAccessResult> {
   const length = String(Math.min(Math.max(1, limit), 10))
-  const searchParams = new URLSearchParams({
-    dataset: source.dataset,
-    config: source.config,
-    split: source.split,
-    query,
-    offset: '0',
-    length,
-  })
-  const searched = await getJsonResponse(`${DATASET_SERVER}/search?${searchParams.toString()}`, fetcher, SEARCH_REQUEST_TIMEOUT_MS)
+  const search = async (candidateQuery: string) => {
+    const searchParams = new URLSearchParams({
+      dataset: source.dataset,
+      config: source.config,
+      split: source.split,
+      query: candidateQuery,
+      offset: '0',
+      length,
+    })
+    return getJsonResponse(`${DATASET_SERVER}/search?${searchParams.toString()}`, fetcher, SEARCH_REQUEST_TIMEOUT_MS)
+  }
+
+  const searched = await search(query)
   const searchedRows = Array.isArray(searched.body?.rows) ? searched.body.rows : []
   if (searched.ok && searchedRows.length > 0) return { rows: searchedRows, mode: 'search' }
 
-  // Search can return HTTP 200 with zero rows when a Dataset Viewer search index is absent or stale.
-  // Treat that like an unavailable search service and fall back to bounded row access.
+  // A healthy BM25 endpoint returning no rows usually means the University query is too specific,
+  // not that the dataset is empty. Relax only the query, never the rights/admission gates.
+  if (searched.ok) {
+    for (const relaxedQuery of relaxedQueriesForDataset(source.dataset, query)) {
+      const relaxed = await search(relaxedQuery)
+      const relaxedRows = Array.isArray(relaxed.body?.rows) ? relaxed.body.rows : []
+      if (relaxed.ok && relaxedRows.length > 0) return { rows: relaxedRows, mode: 'search_relaxed' }
+      if (!relaxed.ok) break
+    }
+  }
+
+  // Only use arbitrary bounded row access when search transport itself is unavailable. A successful
+  // search with no matching rows must not degrade into unrelated corpus samples.
+  if (searched.ok) return { rows: [], mode: 'search_relaxed' }
   const primaryOffset = deterministicOffset(source.dataset, query) % 10_000
   const rowParams = new URLSearchParams({
     dataset: source.dataset,
@@ -237,7 +292,7 @@ export function createHuggingFaceGithubCc0Search(fetcher: FetchLike = fetch): Le
     return accessed.rows.map((entry: any): LearningConnectorResult | null => {
       const row = entry?.row ?? {}
       const body = clean(row?.text, 40_000)
-      if (!body) return null
+      if (!body || !githubSoftwareLike(row)) return null
 
       const meta = metadataRecord(row?.meta)
       const repoName = clean(meta.repo_name, 500)

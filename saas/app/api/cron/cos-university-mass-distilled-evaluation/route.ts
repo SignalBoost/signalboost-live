@@ -16,6 +16,7 @@ import {
   runMassDistilledArtifactEvaluation,
   type MassEvaluationClaim,
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
+import { isStrengthenedFailureDerivedReplayReceipt } from '@/lib/ai/cos/cosUniversityFailureDerivedReplayReceipt'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
   MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
@@ -203,11 +204,7 @@ function isBuilderV2Receipt(intendedUse: unknown): boolean {
 }
 
 function isRemediationReplayReceipt(intendedUse: unknown): boolean {
-  if (!intendedUse || typeof intendedUse !== 'object' || Array.isArray(intendedUse)) return false
-  const receipt = (intendedUse as any).trainingReceipt
-  return Boolean(receipt && typeof receipt === 'object'
-    && receipt.failureDerivedReplayRequired === true
-    && Number(receipt.failureDerivedReplayItems) > 0)
+  return isStrengthenedFailureDerivedReplayReceipt(intendedUse)
 }
 
 async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {

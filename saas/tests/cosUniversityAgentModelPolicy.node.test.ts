@@ -176,7 +176,7 @@ test('host practice entry points use the service-only request-scoped configurati
 
 test('every declared domain subject belongs to a registered role', () => {
   const registered = new Set([
-    'software_engineering', 'cybersecurity', 'quantitative_data_science',
+    'software_engineering', 'context_engineering', 'cybersecurity', 'quantitative_data_science',
     'enterprise_operations_governance', 'scientific_physical_systems', 'aerospace_nuclear_safety',
     'molecular_biomedical_sciences', 'neuroscience_biophysics', 'actuarial_insurance_risk',
     'quantum_theoretical_physics',

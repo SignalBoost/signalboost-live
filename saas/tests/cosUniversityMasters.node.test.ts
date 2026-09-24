@@ -20,9 +20,9 @@ import type { CosUniversitySubjectId } from '../lib/ai/cos/cosUniversity.ts'
 
 const NOW = new Date('2026-10-01T00:00:00Z')
 
-test('ten Master’s tracks expose four canonical curriculum modules each', () => {
-  assert.equal(COS_UNIVERSITY_MASTERS_TRACKS.length, 10)
-  assert.equal(Object.keys(COS_UNIVERSITY_MASTERS_PROGRAMS).length, 10)
+test('eleven Master’s tracks expose four canonical curriculum modules each', () => {
+  assert.equal(COS_UNIVERSITY_MASTERS_TRACKS.length, 11)
+  assert.equal(Object.keys(COS_UNIVERSITY_MASTERS_PROGRAMS).length, 11)
   const moduleKeys = new Set<string>()
   for (const track of COS_UNIVERSITY_MASTERS_TRACKS) {
     assert.equal(track.curriculumModules.length, 4)
@@ -35,7 +35,7 @@ test('ten Master’s tracks expose four canonical curriculum modules each', () =
       moduleKeys.add(module.key)
     }
   }
-  assert.equal(moduleKeys.size, 40)
+  assert.equal(moduleKeys.size, 44)
 })
 
 test('advanced professional curricula preserve the common foundation and require practical proof', () => {

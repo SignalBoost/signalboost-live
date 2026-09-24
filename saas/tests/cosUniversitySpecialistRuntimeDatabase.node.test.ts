@@ -9,7 +9,10 @@ import {
 } from '../lib/ai/cos/cosUniversitySpecialistRuntimes.ts'
 
 const read = (relative: string) => fs.readFileSync(path.resolve(import.meta.dirname, '..', relative), 'utf8')
-const binding = read('supabase/migrations/20260913201500_university_specialist_runtime_binding.sql')
+const binding = [
+  read('supabase/migrations/20260913201500_university_specialist_runtime_binding.sql'),
+  read('supabase/migrations/20260924155000_context_engineer_specialist.sql'),
+].join('\n')
 const practice = read('supabase/migrations/20260913201600_university_specialist_practice_binding.sql')
 
 test('database role-to-runtime mapping is exactly the application mapping', () => {

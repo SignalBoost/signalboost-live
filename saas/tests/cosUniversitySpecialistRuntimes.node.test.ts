@@ -12,8 +12,10 @@ import {
 } from '../lib/ai/cos/cosUniversitySpecialistRuntimes.ts'
 
 const capstone = fs.readFileSync(path.join(process.cwd(), 'lib/ai/cos/cosUniversityAgentCapstone.ts'), 'utf8')
-const registry = fs.readFileSync(
-  path.join(process.cwd(), 'supabase/migrations/20260910133222_cos_university_agent_registry.sql'), 'utf8')
+const registry = [
+  'supabase/migrations/20260910133222_cos_university_agent_registry.sql',
+  'supabase/migrations/20260924155000_context_engineer_specialist.sql',
+].map(file => fs.readFileSync(path.join(process.cwd(), file), 'utf8')).join('\n')
 
 test('software keeps its exact historical runtime, because written evidence depends on it', () => {
   assert.equal(SOFTWARE_SPECIALIST_RUNTIME, 'university_software_specialist_v1')

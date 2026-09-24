@@ -10,7 +10,7 @@ test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-bal
   // /ping, /ready and POST /v1/chat/completions. The wake uses a path the runtime actually serves.
   assert.match(route, /runpodServerlessRootUrl\(endpointId\)\}\/ping`/)
   assert.doesNotMatch(route, /\/models`/)
-  assert.match(route, /!== 'accepting_requests'/)
+  assert.match(route, /\['accepting_requests', 'ready'\]\.includes/)
   // The wake result reads only fields /ping actually returns.
   assert.match(route, /modelReady: payload\?\.modelReady === true/)
   assert.doesNotMatch(route, /payload\.data\.length/)
@@ -22,7 +22,7 @@ test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-bal
 })
 
 test('runtime wake is bounded and hands cold-start readiness back to the evaluator', () => {
-  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 20_000/)
+  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 150_000/)
   assert.match(route, /name !== 'TimeoutError' && name !== 'AbortError'/)
   assert.match(route, /wakeRequestTimedOut: true/)
   assert.match(route, /responseObserved: false/)

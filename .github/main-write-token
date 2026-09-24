@@ -1,2 +1,2 @@
-base_sha=f6008220894d50f0c481f96ec50c86ea96a6fc38
-branch=fix/evaluator-backlog-drain-20260924-v3
+base_sha=ff157018f0867f06d535c01161be38e8224c17ea
+branch=fix/harness-node-resolvable-ingress-imports-20260924

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 const route = fs.readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+const evaluator = fs.readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
 test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-balancer path', () => {
   // Production 2026-09-17 19:32 UTC: GET /v1/models returned 404 because the exact-artifact gateway serves only
@@ -50,10 +51,10 @@ test('an evaluator defect records its own throw site, without leaking provider o
 
 
 test('readiness retriggers ping while control-plane worker count is zero', () => {
-  const start = route.indexOf('async function waitReady(endpointId:string,deadlineMs:number)')
-  const end = route.indexOf('\nfunction batchPrompt', start)
+  const start = evaluator.indexOf('async function waitReady(endpointId:string,deadlineMs:number)')
+  const end = evaluator.indexOf('\nfunction batchPrompt', start)
   assert.ok(start >= 0 && end > start)
-  const body = route.slice(start, end)
+  const body = evaluator.slice(start, end)
   assert.match(body, /massDistilledRuntimeHealth\(endpointId\)/)
   assert.match(body, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
   assert.doesNotMatch(body, /health\.workers\.ready>0\|\|health\.workers\.running>0/)

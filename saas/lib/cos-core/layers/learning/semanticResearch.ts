@@ -86,6 +86,62 @@ async function getSemanticScholarJson(
   throw new Error(`COS semantic research source failed: 429; provider=semantic_scholar; apiKeyConfigured=${apiKeyConfigured}`)
 }
 
+const S2ORC_HF_DATASET = 'sentence-transformers/s2orc'
+const S2ORC_HF_CONFIG = 'title-abstract-pair'
+const S2ORC_HF_SPLIT = 'train'
+
+async function searchS2orcMirror(
+  query: string,
+  limit: number,
+  fetcher: FetchLike,
+): Promise<LearningConnectorResult[]> {
+  const params = new URLSearchParams({
+    dataset: S2ORC_HF_DATASET,
+    config: S2ORC_HF_CONFIG,
+    split: S2ORC_HF_SPLIT,
+    query,
+    offset: '0',
+    length: String(Math.min(Math.max(1, limit), 10)),
+  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10_000)
+  try {
+    const response = await fetcher(`https://datasets-server.huggingface.co/search?${params.toString()}`, {
+      headers: { accept: 'application/json', 'user-agent': 'iTMounts-COS/1.0' },
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw new Error(`COS S2ORC mirror fallback failed: ${response.status}`)
+    }
+    const json = await response.json()
+    return (Array.isArray(json?.rows) ? json.rows : []).map((entry: any): LearningConnectorResult | null => {
+      const row = entry?.row ?? {}
+      const title = clean(row?.title, 1_000)
+      const abstract = clean(row?.abstract, 40_000)
+      if (!title || !abstract) return null
+      const rowIndex = Number.isFinite(Number(entry?.row_idx)) ? Math.max(0, Math.floor(Number(entry.row_idx))) : null
+      const uri = rowIndex === null
+        ? `hf://datasets/${S2ORC_HF_DATASET}#${S2ORC_HF_CONFIG}/${S2ORC_HF_SPLIT}`
+        : `hf://datasets/${S2ORC_HF_DATASET}#${S2ORC_HF_CONFIG}/${S2ORC_HF_SPLIT}:${rowIndex}`
+      return {
+        uri,
+        title,
+        text: clean([title, abstract].join(' '), 40_000),
+        license: 'S2ORC corpus mirror (ODC-By 1.0); underlying paper rights not asserted; retained for governed retrieval/internal re-embedding',
+        evidence: [
+          'semantic_scholar_s2orc_mirror_v1',
+          `huggingface_dataset:${S2ORC_HF_DATASET}`,
+          's2orc_license:ODC-By-1.0',
+          'semantic_scholar_graph_fallback:rate_limited',
+          'internal_reembedding_required',
+        ],
+      }
+    }).filter((item: LearningConnectorResult | null): item is LearningConnectorResult => Boolean(item?.uri && item.text))
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function boundedScore(value: unknown): string | null {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return null
@@ -169,11 +225,28 @@ export function createSemanticScholarScientificSearch(options: {
       limit: String(Math.min(Math.max(1, limit), 10)),
       fields: 'title,url,abstract,year,citationCount,externalIds,embedding.specter_v2',
     })
-    const json = await getSemanticScholarJson(
-      `https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`,
-      fetcher,
-      apiKey ? { 'x-api-key': apiKey } : {},
-    )
+    let json: any
+    try {
+      json = await getSemanticScholarJson(
+        `https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`,
+        fetcher,
+        apiKey ? { 'x-api-key': apiKey } : {},
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      // Anonymous Semantic Scholar traffic uses a shared throttled pool. When that pool remains at
+      // 429 after bounded retries, fall back to an explicitly identified S2ORC mirror instead of
+      // leaving the combined "Semantic Scholar / S2ORC" lane dead. Authenticated failures remain
+      // visible because a configured key has its own rate contract and should not be silently masked.
+      if (!apiKey && /failed: 429/.test(message)) {
+        console.warn('cosLearning: Semantic Scholar anonymous pool exhausted; using S2ORC mirror fallback', {
+          dataset: S2ORC_HF_DATASET,
+          config: S2ORC_HF_CONFIG,
+        })
+        return searchS2orcMirror(q, limit, fetcher)
+      }
+      throw error
+    }
     return (json?.data ?? []).map((item: any): LearningConnectorResult | null => {
       const digest = vectorDigest(item?.embedding?.vector, space.dimensions)
       const title = clean(item?.title, 1_000)

@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/runpodMassDistilledProvision.ts
 // Dynamic exact-artifact RunPod canary support for mass-distilled students.
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { activeResidencyRunpodEndpointNames, protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
@@ -20,7 +21,16 @@ const IDLE_TIMEOUT_SECONDS = 60
 // the cron route remains below the 8-minute database reservation lifetime, and worst-case GPU cost
 // still stays far below the unchanged $0.20 per-canary authorization.
 const READY_TIMEOUT_MS = 380_000
-const CANARY_TIMEOUT_MS = 35_000
+// Production 2026-09-24: 10 of 20 canaries failed with "The operation was aborted due to timeout" and no
+// HTTP status. Every one was the canary request itself, aborted after RunPod reported the worker ready:
+// a routable worker is not yet a loaded vLLM, and the gateway holds the first request while the exact
+// artifact finishes bootstrapping. A fixed 35s request window therefore failed healthy artifacts and
+// burned half of the 18-per-6h canary budget. Readiness and the request now share ONE budget: the request
+// gets whatever the readiness phase did not use, capped at 150s and never below the old 35s floor. The
+// worst-case end time (380s + 35s = 415s) and the $0.20 per-canary authorization are unchanged.
+const CANARY_TIMEOUT_MS = 150_000
+const CANARY_MIN_TIMEOUT_MS = 35_000
+const READY_AND_CANARY_BUDGET_MS = READY_TIMEOUT_MS + CANARY_MIN_TIMEOUT_MS
 const MAX_GPU_PRICE_USD = 0.69
 const REQUEST_TIMEOUT_MS = 8_000
 const HEALTH_TIMEOUT_MS = 5_000
@@ -390,10 +400,17 @@ export async function massDistilledRuntimeHealth(endpointId:string){
   return Object.freeze({ok:response.ok,httpStatus:response.status,jobs:{inProgress:Number(payload?.jobs?.inProgress||0),inQueue:Number(payload?.jobs?.inQueue||0),failed:Number(payload?.jobs?.failed||0),completed:Number(payload?.jobs?.completed||0)},workers:{idle:Number(payload?.workers?.idle||0),ready:Number(payload?.workers?.ready||0),running:Number(payload?.workers?.running||0),initializing:Number(payload?.workers?.initializing||0)},error:response.ok?null:(safeError(raw)||`HTTP ${response.status}`)})
 }
 
+/** First-request window after readiness: the unused shared budget, capped at 150s, never below 35s. */
+export function massDistilledCanaryRequestTimeoutMs(readinessElapsedMs:number):number{
+  const elapsed=Number.isFinite(readinessElapsedMs)?Math.max(0,readinessElapsedMs):READY_TIMEOUT_MS
+  return Math.max(CANARY_MIN_TIMEOUT_MS,Math.min(CANARY_TIMEOUT_MS,READY_AND_CANARY_BUDGET_MS-elapsed))
+}
+
 export async function canaryMassDistilledRuntime(input:{endpointId:string;modelName:string}){
   const key=configuredRunpodApiKey(); if(!key) throw new Error('RUNPOD_API_KEY is not configured')
   const root=`https://${input.endpointId}.api.runpod.ai`
-  const deadline=Date.now()+READY_TIMEOUT_MS
+  const startedAt=Date.now()
+  const deadline=startedAt+READY_TIMEOUT_MS
   let lastStatus:number|null=null
   let lastError:string|null=null
   let readyObserved=false
@@ -428,8 +445,9 @@ export async function canaryMassDistilledRuntime(input:{endpointId:string;modelN
   }
   if(!readyObserved) return {ok:false,httpStatus:lastStatus,text:null,error:lastError||'mass_distilled_runtime_worker_not_ready'}
 
+  const canaryTimeoutMs=massDistilledCanaryRequestTimeoutMs(Date.now()-startedAt)
   try{
-    const response=await fetch(`${root}/v1/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.modelName,max_tokens:64,temperature:0,chat_template_kwargs:{enable_thinking:false},messages:[{role:'system',content:'Return one concise sentence. Do not reveal hidden reasoning.'},{role:'user',content:'State the operational principle: evidence should be separated from inference.'}]}),signal:AbortSignal.timeout(CANARY_TIMEOUT_MS)})
+    const response=await fetch(`${root}/v1/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.modelName,max_tokens:64,temperature:0,chat_template_kwargs:{enable_thinking:false},messages:[{role:'system',content:'Return one concise sentence. Do not reveal hidden reasoning.'},{role:'user',content:'State the operational principle: evidence should be separated from inference.'}]}),signal:AbortSignal.timeout(canaryTimeoutMs)})
     const raw=await response.text(); if(!response.ok) return {ok:false,httpStatus:response.status,text:null,error:safeError(raw)||`HTTP ${response.status}`}
     let payload:any={}; try{payload=JSON.parse(raw)}catch{}
     const text=clean(payload?.choices?.[0]?.message?.content,2000)

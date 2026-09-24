@@ -333,12 +333,21 @@ export function decideMassCanaryRollingApproval(input: {
     // thrown away. After one timeout on that runtime, return to the longer fairness cooldown.
     const newestFailureEndpointId = String(newestFailure?.evidence?.endpointId || '').trim()
     const newestFailureRuntimeKey = String(newestFailure?.evidence?.runtimeKey || '').trim().toLowerCase()
-    const resumableColdStart = newestFailureError === MASS_CANARY_COLD_START_FAILURE
+    // Production 2026-09-24 19:31-19:55 UTC: three consecutive canaries ended in no-worker failures while RunPod
+    // still reported a worker INITIALIZING on the exact endpoint. Discarding that endpoint and creating a fresh one
+    // restarts the whole cold boot (image + model load) every time, so the boot can never finish inside one
+    // attempt. A no-worker failure whose recorded provider health still shows an initializing worker is therefore
+    // resumable on the same endpoint, exactly like a request timeout. A no-worker failure with no worker at all
+    // (no GPU allocated) keeps the old behaviour: yield, cool down, and derive a fresh runtime later.
+    const newestFailureWorkerInitializing = Number(
+      (newestFailure?.evidence as any)?.healthAfter?.workers?.initializing ?? 0) > 0
+    const resumableColdStart = (newestFailureError === MASS_CANARY_COLD_START_FAILURE
+        || (newestFailureError === MASS_CANARY_NO_WORKER_FAILURE && newestFailureWorkerInitializing))
       && /^[a-z0-9_-]{3,120}$/i.test(newestFailureEndpointId)
       && /^[a-z0-9]{10}$/.test(newestFailureRuntimeKey)
     const coldStartResumeCount = resumableColdStart
       ? failureEvents.filter(event =>
-          String(event.evidence?.error || '').trim().toLowerCase() === MASS_CANARY_COLD_START_FAILURE
+          canaryInfrastructureFailure(event.evidence?.error)
           && String(event.evidence?.runtimeKey || '').trim().toLowerCase() === newestFailureRuntimeKey).length
       : 0
     const coldStartResumeAllowed = resumableColdStart
@@ -349,7 +358,7 @@ export function decideMassCanaryRollingApproval(input: {
       // failure proves RunPod never allocated compute, so never pin the next attempt to that dead
       // endpoint: yield it for the normal fairness cooldown and let a later approval derive a fresh
       // runtime identity.
-      const cooldown = newestFailureError === MASS_CANARY_COLD_START_FAILURE && coldStartResumeAllowed
+      const cooldown = coldStartResumeAllowed
         ? MASS_CANARY_COLD_START_RESUME_COOLDOWN_MS
         : MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS
       if (!Number.isFinite(newestFailureAt) || nowMs - newestFailureAt < cooldown) continue

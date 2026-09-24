@@ -1,2 +1,2 @@
-base_sha=c98253d0beca3f8226cc71a8b1b937137d9ae83d
-branch=fix/cos-freshness-guard-test-20260923-2330
+base_sha=84df43d5331ede82bf96a04bd1379828897f520f
+branch=fix/working-cos-readiness-cadence-20260923

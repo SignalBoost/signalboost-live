@@ -7,15 +7,14 @@ import {
 } from '../lib/ai/cos/cosWorkingDistillationBundle.ts'
 import { buildWorkingCosDistillationPlanFromBundle } from '../lib/ai/cos/cosWorkingDistillation.ts'
 
-function hex(char: string, n: number): string {
-  return char.repeat(n)
+function hexId(value: number): string {
+  return Math.max(0, value).toString(16).padStart(64, '0')
 }
 
 function row(subjectId: string, index: number, rights = 'governed_hosted_teacher_output') {
-  const char = ((index % 6) + 10).toString(16)
   return {
-    assetSetKey: hex(char, 64),
-    portableManifestHash: hex(((index + 1) % 6 + 10).toString(16), 64),
+    assetSetKey: hexId(index + 1),
+    portableManifestHash: hexId(index + 1001),
     subjectId,
     itemCount: 20 + (index % 5),
     trainingRights: rights,

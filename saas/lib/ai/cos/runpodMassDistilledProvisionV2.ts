@@ -115,8 +115,8 @@ function identity(input: MassDistilledRuntimeArtifact) {
   const runtimeKey = clean(input.runtimeKey, 32).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10)
   if (runtimeKey) {
     return {
-      templateName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-template-v4`,
-      endpointName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,
+      templateName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-template-v5`,
+      endpointName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-v4`,
       modelName: `itmounts-mass-distilled-${suffix}-${runtimeKey}`,
     }
   }

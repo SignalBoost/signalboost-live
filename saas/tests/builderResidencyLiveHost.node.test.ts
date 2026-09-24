@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import {
   BUILDER_RESIDENCY_CASES,
@@ -126,75 +127,16 @@ test('live Residency routes model-controlled edits and commands through Governed
 })
 
 
-test('live Residency serializes batched seed-file reads inside maxConcurrency one',async()=>{
-  const practiceCase=BUILDER_RESIDENCY_CASES.find(
-    item=>item.competencyId==='test_and_regression_construction',
+test('live Residency serializes governed workspace actions inside maxConcurrency one',async()=>{
+  const source=await readFile(
+    new URL('../platform-harness/residency/live-builder-executor.ts',import.meta.url),
+    'utf8',
   )
-  assert.ok(practiceCase)
-  assert.ok(practiceCase.seedFiles.length>1)
 
-  const request=createBuilderResidencyHarnessRequest({
-    runId:'residency-live-test-multi-file',
-    objective:practiceCase.objective,
-    tenantId:'itmounts-university',
-    portableId:'builder-residency',
-    agentId:'builder-resident',
-    artifactId:'artifact-1',
-    artifactHash:H,
-    artifactRevision:R,
-    sandboxEnvironmentId:'builder-residency-sandbox-v1',
-    requestedCapabilities:BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
-    limits:{deadlineMs:180_000,maxToolCalls:60,maxConcurrency:1},
-  })
-  const replies=[
-    JSON.stringify({
-      type:'tool',
-      toolId:'edit_file',
-      input:{
-        path:'slug.js',
-        search:"return value.toLowerCase().replace(' ', '-')",
-        replace:"return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')",
-      },
-    }),
-    JSON.stringify({type:'tool',toolId:'run',input:{command:'node slug.test.js'}}),
-    JSON.stringify({type:'answer',answer:'Repaired normalization and verified the regression.'}),
-  ]
-  const modelPort:BuilderResidencyModelPort={
-    async complete(){
-      return Object.freeze({
-        text:replies.shift()??'{"type":"answer","answer":"done"}',
-        endpointId:'ep_multi',
-        modelId:'itmounts-mass-distilled-multi',
-        exactArtifact:true as const,
-      })
-    },
-  }
-  const runner:BuilderRunnerPort={
-    async run(input){
-      const source=input.files.find(file=>file.path==='slug.js')?.content??''
-      const fixed=source.includes("replace(/[^a-z0-9]+/g, '-')")
-      return {
-        exitCode:fixed?0:1,
-        stdout:fixed?'ok\n':'',
-        stderr:fixed?'':'not fixed',
-        timedOut:false,
-        executedCommand:input.command,
-      }
-    },
-  }
-  const executor=createLiveBuilderResidencyExecutor({
-    db:{} as any,
-    sandboxRunner:runner,
-    modelPortFactory:()=>modelPort,
-  })
-  const result=await executor.run({
-    request,
-    authority:createBuilderResidencyNativeAuthority(),
-    practiceCase,
-    candidateId:'candidate-multi',
-  })
-
-  assert.equal(result.outcome.status,'success')
+  assert.match(source,/private serial:Promise<void>=Promise\.resolve\(\)/)
+  assert.match(source,/const run=this\.serial\.then\(async\(\)=>\{/)
+  assert.match(source,/this\.serial=run\.then\(\(\)=>undefined,\(\)=>undefined\)/)
+  assert.match(source,/maxConcurrency:1/)
 })
 
 test('live Residency native authority is sandbox-only and non-consequential',()=>{

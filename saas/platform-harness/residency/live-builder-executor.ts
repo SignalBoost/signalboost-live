@@ -620,7 +620,7 @@ export function createLiveBuilderResidencyExecutor(input:{
                 'host://builder-residency-independent-proof-v1',
               evidenceRefs:Object.freeze([]),
               reason:infrastructureFailure,
-              failureAttribution:'infrastructure',
+              failureAttribution:'infrastructure' as const,
             })
           }
           try{
@@ -661,7 +661,7 @@ export function createLiveBuilderResidencyExecutor(input:{
               reason:error instanceof Error
                 ?error.message
                 :'residency_independent_verifier_failed',
-              failureAttribution:'infrastructure',
+              failureAttribution:'infrastructure' as const,
             })
           }
         },

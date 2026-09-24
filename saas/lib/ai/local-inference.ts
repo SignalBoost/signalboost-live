@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
+import { planContextWindow } from './context-window-manager.ts'
 import {
   currentHarnessExecutionContext,
   harnessDeadlineRemainingMs,
@@ -93,6 +94,8 @@ export interface LocalInferenceConfig {
   graduateArtifactId?: string
   graduateArtifactHash?: string
   fallbackFromOwned?: boolean
+  /** Physical serving-window override for this exact deployed model/runtime. */
+  contextWindowTokens?: number
 }
 
 export interface LocalInferenceTelemetry {
@@ -389,13 +392,38 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       ? `${baseSystemPrompt} Output exactly the requested JSON schema. Do not add explanations, rationale, analysis, prose, repeated inputs, or extra keys.`
       : baseSystemPrompt
     const systemPrompt = qwenThinkingOff ? `${governedSystemPrompt} /no_think` : governedSystemPrompt
+    const rawMessages: readonly LocalModelChatMessage[] = args.messages?.length
+      ? args.messages
+      : [{ role: 'user' as const, content: args.prompt }]
+    const contextPlan = planContextWindow({
+      model,
+      provider,
+      contextWindowTokens: config.contextWindowTokens,
+      systemPrompt,
+      messages: rawMessages,
+      requestedOutputTokens: requestedMaxTokens,
+      minimumOutputTokens: Math.min(256, requestedMaxTokens),
+    })
+    if (contextPlan.compacted) {
+      console.info('[context-window-plan]', JSON.stringify({
+        feature: usageContext.feature,
+        provider,
+        model,
+        contextWindowTokens: contextPlan.contextWindowTokens,
+        estimatedPromptTokens: contextPlan.estimatedPromptTokens,
+        requestedMaxTokens,
+        effectiveMaxTokens: contextPlan.maxOutputTokens,
+        droppedMessages: contextPlan.droppedMessages,
+        truncatedCharacters: contextPlan.truncatedCharacters,
+      }))
+    }
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
       signal: controller.signal,
       body: JSON.stringify({
         model,
-        max_tokens: requestedMaxTokens,
+        max_tokens: contextPlan.maxOutputTokens,
         temperature: args.temperature ?? 0.2,
         frequency_penalty: frequencyPenalty,
         presence_penalty: presencePenalty,
@@ -405,7 +433,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
         ...(args.tools?.length ? { tools: args.tools, tool_choice: args.toolChoice ?? 'auto' } : {}),
         messages: [
           { role: 'system', content: systemPrompt },
-          ...(args.messages?.length ? args.messages : [{ role: 'user' as const, content: args.prompt }]),
+          ...contextPlan.messages,
         ],
       }),
     })

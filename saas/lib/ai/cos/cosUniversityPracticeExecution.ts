@@ -1,7 +1,7 @@
 // saas/lib/ai/cos/cosUniversityPracticeExecution.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
-import { withEvaluationRuntimeHarness } from '@/platform-harness/adapters/evaluation-runtime'
+import { withEvaluationRuntimeHarness } from '../../../platform-harness/adapters/evaluation-runtime.ts'
 import { universityPracticeModelFromEnv } from './cosUniversityAgentModelPolicy.ts'
 import { currentUniversityPracticeModelOverride } from './cosUniversityPracticeModelContext.ts'
 import {

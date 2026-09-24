@@ -2,9 +2,10 @@ import type {
   HarnessAuthorityEnvelope,
   HarnessEnvironmentClass,
   HarnessLimits,
+  HarnessManifest,
   HarnessRunRequest,
 } from '../core/types.ts'
-import { resolveHarnessManifest } from '../core/policy.ts'
+import { resolveChildHarnessManifest, resolveHarnessManifest } from '../core/policy.ts'
 import type { HarnessCapabilityResolverPort } from '../capabilities/resolver.ts'
 import type { GovernedHarnessExecutor } from '../runtime/governed-executor.ts'
 import { runHarnessWorker, type HarnessWorkerPort } from '../runtime/runner.ts'
@@ -32,6 +33,10 @@ export function createProductionHarnessRequest(input: {
     artifactHash?: string
     revision?: string
   }
+  parent?: {
+    runId: string
+    authorityManifestRef: string
+  }
 }): HarnessRunRequest {
   return Object.freeze({
     runId: input.runId,
@@ -51,6 +56,9 @@ export function createProductionHarnessRequest(input: {
       class: input.environmentClass ?? 'production',
     }),
     requestedCapabilities: Object.freeze([...(input.requestedCapabilities ?? [])]),
+    ...(input.parent
+      ? { parent: Object.freeze({ ...input.parent }) }
+      : {}),
     ...(input.limits
       ? { requestedLimits: Object.freeze({ ...input.limits }) }
       : {}),
@@ -83,6 +91,7 @@ export async function runProductionHarnessEnvelope(input: {
   verifier: HarnessTrajectoryVerifier
   evidenceSink: HarnessEvidenceSink
   costBudget?: HarnessCostBudgetPort
+  parentManifest?: HarnessManifest
 }): Promise<ProductionHarnessEnvelopeResult> {
   if (
     input.request.profile !== 'production' ||
@@ -94,7 +103,9 @@ export async function runProductionHarnessEnvelope(input: {
     })
   }
 
-  const decision = resolveHarnessManifest(input.request, input.authority)
+  const decision = input.parentManifest
+    ? resolveChildHarnessManifest(input.request, input.authority, input.parentManifest)
+    : resolveHarnessManifest(input.request, input.authority)
   if (decision.allowed === false) {
     return Object.freeze({
       accepted: false,

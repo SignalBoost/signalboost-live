@@ -389,7 +389,10 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   // RunPod worker for it would block unrelated eligible evaluations forever.
   if (remediationReplayRows.length > 0 && remediationReplayCanaryPasses < 2) {
     const capacity = await massDistilledServerlessWorkerCapacity()
-    if (capacity.availableWorkers <= 1) {
+    // Never let canary headroom reservation deadlock the evaluator itself. Reserve the final
+    // available worker only while an evaluation is already active; with zero evaluators in flight,
+    // allow one bounded evaluation to proceed so backlog drain cannot fall permanently to zero.
+    if (capacity.availableWorkers <= 1 && inFlightCount > 0) {
       return {
         issued: false,
         reason: 'replay_canary_runpod_headroom_reserved',

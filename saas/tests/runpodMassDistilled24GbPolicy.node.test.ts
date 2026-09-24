@@ -9,20 +9,21 @@ const endpointProtection = readFileSync(new URL('../lib/ai/cos/cosUniversityGrad
 const deployRoute = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 const evaluationRoute = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 
-test('mass-distilled evaluator runtime narrows provider preflight to AMPERE_24 only', () => {
+test('mass-distilled evaluator runtime stays narrowed to AMPERE_24 only', () => {
   assert.match(provisionV2, /const APPROVED_POOLS = \['AMPERE_24'\] as const/)
-  assert.doesNotMatch(provisionV2, /APPROVED_POOLS = \['AMPERE_16', 'AMPERE_24'\] as const/)
-  assert.match(provisionV2, /constrainEndpointToApprovedGpu/)
-  assert.match(provisionV2, /body: JSON\.stringify\(\{ gpu: \{ pools: \[\.\.\.APPROVED_POOLS\], count: 1 \} \}\)/)
+  assert.match(provisionV2, /const CANARY_APPROVED_POOLS = \['AMPERE_24', 'AMPERE_16'\] as const/)
+  assert.match(provisionV2, /export async function ensureMassDistilledEndpoint24Gb/)
+  assert.match(provisionV2, /provisionMassDistilledRuntimeWithPools\(input, APPROVED_POOLS\)/)
 })
 
-test('24GB narrowing remains provider preflight before the paid canary invocation marker', () => {
-  const provisionIndex = deployRoute.indexOf('provisionMassDistilledRuntime(runtimeArtifact)')
+test('short canary gets 24-to-16GB availability fallback before the paid invocation marker', () => {
+  const provisionIndex = deployRoute.indexOf('provisionMassDistilledCanaryRuntime(runtimeArtifact)')
   const invocationIndex = deployRoute.indexOf('claim:INVOCATION_STARTED')
   assert.ok(provisionIndex >= 0)
   assert.ok(invocationIndex > provisionIndex)
-  assert.match(provisionV2, /const provisioned = await provisionLegacyMassDistilledRuntime\(input\)/)
-  assert.match(provisionV2, /await constrainEndpointToApprovedGpu\(String\(provisioned\.endpointId\), String\(provisioned\.endpointName \|\| ''\), idleTimeoutSeconds\)/)
+  assert.match(provisionV2, /export async function provisionMassDistilledCanaryRuntime/)
+  assert.match(provisionV2, /provisionMassDistilledRuntimeWithPools\(input, CANARY_APPROVED_POOLS\)/)
+  assert.match(provisionV2, /gpu: \{ pools: \[\.\.\.approvedPools\], count: 1 \}/)
 })
 
 test('independent evaluator reasserts 24GB endpoint policy before readiness or inference', () => {

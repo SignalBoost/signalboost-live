@@ -19,7 +19,7 @@ import {
   MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,
   canaryMassDistilledRuntime,
   massDistilledRuntimeHealth,
-  provisionMassDistilledRuntime,
+  provisionMassDistilledCanaryRuntime,
   type MassDistilledRuntimeArtifact,
 } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 
@@ -338,7 +338,7 @@ export async function GET(req:NextRequest){
 
     // Provisioning is preflight. Provider/API/template drift here may be repaired and retried within
     // the same unexpired approval because no model request or paid endpoint wake has happened yet.
-    const provisioned=await provisionMassDistilledRuntime(runtimeArtifact)
+    const provisioned=await provisionMassDistilledCanaryRuntime(runtimeArtifact)
     if(coldStartResume && provisioned.endpointId!==coldStartResume.endpointId) {
       throw new Error('mass_distilled_cold_start_resume_endpoint_mismatch')
     }

@@ -6,7 +6,7 @@ import {
   estimateContextTokens,
   planContextWindow,
   resolveContextWindowTokens,
-} from '../lib/ai/context-window-manager'
+} from '../lib/ai/context-window-manager.ts'
 
 test('uses the RunPod serving-window default and supports deployment overrides', () => {
   assert.equal(resolveContextWindowTokens({ model: 'qwen3:30b', provider: 'runpod', env: {} }), RUNPOD_CONTEXT_WINDOW_TOKENS)

@@ -28,10 +28,20 @@ export function normalizeHarnessVerification(
       failureAttribution: 'harness',
     })
   }
+  const evidenceRefs = Object.freeze([...new Set(result.evidenceRefs ?? [])].filter(Boolean))
+  if (result.verified === true && evidenceRefs.length === 0) {
+    return Object.freeze({
+      verified: false,
+      verifierRef,
+      evidenceRefs,
+      reason: 'harness_verifier_evidence_required',
+      failureAttribution: 'harness' as const,
+    })
+  }
   return Object.freeze({
     verified: result.verified === true,
     verifierRef,
-    evidenceRefs: Object.freeze([...new Set(result.evidenceRefs ?? [])]),
+    evidenceRefs,
     ...(result.reason ? { reason: String(result.reason).slice(0, 1000) } : {}),
     ...(result.failureAttribution
       ? { failureAttribution: result.failureAttribution }

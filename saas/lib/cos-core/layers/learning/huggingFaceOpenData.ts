@@ -21,6 +21,14 @@ export const HUGGING_FACE_OPEN_DATASETS = Object.freeze({
     vectorDimensions: null,
     mode: 'cc0_code_corpus_search',
   }),
+  arxivMetadata: Object.freeze({
+    dataset: 'librarian-bots/arxiv-metadata-snapshot',
+    config: 'default',
+    split: 'train',
+    license: 'cc0-1.0',
+    vectorDimensions: null,
+    mode: 'searchable_cc0_research_metadata',
+  }),
 } as const)
 
 const DATASET_SERVER = 'https://datasets-server.huggingface.co'
@@ -55,7 +63,9 @@ function vectorDigest(value: unknown, dimensions: number): string | null {
   return createHash('sha256').update(JSON.stringify(vector)).digest('hex')
 }
 
-async function getJson(url: string, fetcher: FetchLike): Promise<any> {
+type DatasetAccessResult = Readonly<{ rows: any[]; mode: 'search' | 'rows_fallback' }>
+
+async function getJsonResponse(url: string, fetcher: FetchLike): Promise<{ ok: boolean; status: number; body: any }> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
@@ -66,11 +76,49 @@ async function getJson(url: string, fetcher: FetchLike): Promise<any> {
       },
       signal: controller.signal,
     })
-    if (!response.ok) throw new Error(`COS Hugging Face open-data source failed: ${response.status}`)
-    return await response.json()
+    let body: any = {}
+    try { body = await response.json() } catch {}
+    return { ok: response.ok, status: response.status, body }
   } finally {
     clearTimeout(timer)
   }
+}
+
+function deterministicOffset(dataset: string, query: string): number {
+  const digest = createHash('sha256').update(`${dataset}\n${query}`).digest('hex')
+  return Number.parseInt(digest.slice(0, 8), 16) % 50_000
+}
+
+/**
+ * Dataset Viewer search is not guaranteed for every Hub dataset even when the Hub page advertises a
+ * Viewer. Search can be disabled or temporarily fail while ordinary bounded row access still works.
+ * Try semantic-ish BM25 search first, then one deterministic small row slice. If both are unavailable,
+ * fail closed so source health remains visible to the learning circuit/cooldown layer.
+ */
+async function readDatasetRows(source: { dataset: string; config: string; split: string }, query: string, limit: number, fetcher: FetchLike): Promise<DatasetAccessResult> {
+  const length = String(Math.min(Math.max(1, limit), 10))
+  const searchParams = new URLSearchParams({
+    dataset: source.dataset,
+    config: source.config,
+    split: source.split,
+    query,
+    offset: '0',
+    length,
+  })
+  const searched = await getJsonResponse(`${DATASET_SERVER}/search?${searchParams.toString()}`, fetcher)
+  if (searched.ok) return { rows: Array.isArray(searched.body?.rows) ? searched.body.rows : [], mode: 'search' }
+
+  const rowParams = new URLSearchParams({
+    dataset: source.dataset,
+    config: source.config,
+    split: source.split,
+    offset: String(deterministicOffset(source.dataset, query)),
+    length,
+  })
+  const fallback = await getJsonResponse(`${DATASET_SERVER}/rows?${rowParams.toString()}`, fetcher)
+  if (fallback.ok) return { rows: Array.isArray(fallback.body?.rows) ? fallback.body.rows : [], mode: 'rows_fallback' }
+
+  throw new Error(`COS Hugging Face open-data source failed: dataset=${source.dataset}:search=${searched.status}:rows=${fallback.status}`)
 }
 
 /**
@@ -86,16 +134,8 @@ export function createHuggingFaceNistCybersecuritySearch(fetcher: FetchLike = fe
     const q = queryText(query)
     if (!q) return []
     const source = HUGGING_FACE_OPEN_DATASETS.nistCybersecurity
-    const params = new URLSearchParams({
-      dataset: source.dataset,
-      config: source.config,
-      split: source.split,
-      query: q,
-      offset: '0',
-      length: String(Math.min(Math.max(1, limit), 10)),
-    })
-    const json = await getJson(`${DATASET_SERVER}/search?${params.toString()}`, fetcher)
-    return (json?.rows ?? []).map((entry: any): LearningConnectorResult | null => {
+    const accessed = await readDatasetRows(source, q, limit, fetcher)
+    return accessed.rows.map((entry: any): LearningConnectorResult | null => {
       const row = entry?.row ?? {}
       const text = clean(row?.text, 40_000)
       if (!text) return null
@@ -120,6 +160,7 @@ export function createHuggingFaceNistCybersecuritySearch(fetcher: FetchLike = fe
           `external_vector_dimensions:${source.vectorDimensions}`,
           `external_vector_sha256:${vectorSha}`,
           'external_vector_imported:false',
+          `huggingface_access_mode:${accessed.mode}`,
           metadata.type ? `dataset_material_type:${clean(metadata.type, 120)}` : '',
         ].filter(Boolean),
       }
@@ -141,16 +182,8 @@ export function createHuggingFaceGithubCc0Search(fetcher: FetchLike = fetch): Le
     const q = queryText(query)
     if (!q) return []
     const source = HUGGING_FACE_OPEN_DATASETS.githubCc0
-    const params = new URLSearchParams({
-      dataset: source.dataset,
-      config: source.config,
-      split: source.split,
-      query: q,
-      offset: '0',
-      length: String(Math.min(Math.max(1, limit), 10)),
-    })
-    const json = await getJson(`${DATASET_SERVER}/search?${params.toString()}`, fetcher)
-    return (json?.rows ?? []).map((entry: any): LearningConnectorResult | null => {
+    const accessed = await readDatasetRows(source, q, limit, fetcher)
+    return accessed.rows.map((entry: any): LearningConnectorResult | null => {
       const row = entry?.row ?? {}
       const body = clean(row?.text, 40_000)
       if (!body) return null
@@ -176,10 +209,65 @@ export function createHuggingFaceGithubCc0Search(fetcher: FetchLike = fetch): Le
           `huggingface_dataset_license:${source.license}`,
           'external_vector_imported:false',
           'canonical_embedding_required:true',
+          `huggingface_access_mode:${accessed.mode}`,
           repoName ? `github_repo:${repoName}` : '',
           language ? `repo_language:${language}` : '',
           fileName ? `repo_file:${fileName}` : '',
           mimeType ? `repo_mime:${mimeType}` : '',
+        ].filter(Boolean),
+      }
+    }).filter((item: LearningConnectorResult | null): item is LearningConnectorResult => Boolean(item?.uri && item.text))
+  }
+}
+
+
+/**
+ * CC0 arXiv metadata mirror maintained on Hugging Face. This is a research-discovery source, not a
+ * declaration that the underlying paper text is CC0 or training-eligible. The retained title and
+ * abstract stay available for governed RAG/learning, and accepted material is embedded internally.
+ */
+export function createHuggingFaceArxivMetadataSearch(fetcher: FetchLike = fetch): LearningConnectorSearch {
+  return async (query, limit) => {
+    const q = queryText(query)
+    if (!q) return []
+    const source = HUGGING_FACE_OPEN_DATASETS.arxivMetadata
+    const accessed = await readDatasetRows(source, q, limit, fetcher)
+    return accessed.rows.map((entry: any): LearningConnectorResult | null => {
+      const row = entry?.row ?? {}
+      const title = clean(row?.title, 1000)
+      const abstract = clean(row?.abstract, 40_000)
+      if (!title || !abstract) return null
+      const arxivId = clean(row?.id, 120)
+      const categories = clean(row?.categories, 500)
+      const updated = clean(row?.update_date, 80)
+      const doi = clean(row?.doi, 300)
+      const rowIndex = Number.isFinite(Number(entry?.row_idx)) ? Math.max(0, Math.floor(Number(entry.row_idx))) : null
+      const uri = rowIndex === null
+        ? `hf://datasets/${source.dataset}#${source.split}`
+        : `hf://datasets/${source.dataset}#${source.split}:${rowIndex}`
+      const text = clean([
+        title,
+        abstract,
+        categories ? `arXiv categories: ${categories}.` : '',
+        updated ? `Metadata updated: ${updated}.` : '',
+      ].filter(Boolean).join(' '), 40_000)
+
+      return {
+        uri,
+        title,
+        text,
+        // Deliberately does not start with "cc0": mass-distillation training rights for underlying
+        // papers are not inferred from the metadata mirror's catalog license.
+        license: 'research metadata mirror; catalog metadata is CC0; underlying paper training rights not asserted',
+        evidence: [
+          `huggingface_dataset:${source.dataset}`,
+          `huggingface_dataset_license:${source.license}`,
+          `huggingface_access_mode:${accessed.mode}`,
+          'external_vector_imported:false',
+          'canonical_embedding_required:true',
+          arxivId ? `arxiv_id:${arxivId}` : '',
+          doi ? `doi:${doi}` : '',
+          categories ? `arxiv_categories:${categories}` : '',
         ].filter(Boolean),
       }
     }).filter((item: LearningConnectorResult | null): item is LearningConnectorResult => Boolean(item?.uri && item.text))

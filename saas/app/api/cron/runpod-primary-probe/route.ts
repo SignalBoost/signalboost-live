@@ -4,6 +4,7 @@ import { configuredRunpodApiKey, configuredRunpodPodId } from '@/lib/ai/cos/runp
 import { runpodOrphanGuardEnabled } from '@/lib/ai/cos/runpodLifecycle'
 import { runpodPrimaryConfig, runpodPrimaryEnabled, runpodPrimaryModel } from '@/lib/ai/cos/runpodPrimaryInference'
 import { configurePodStartupContract, queryPodRuntimeConfig } from '@/lib/hub/runpodTelemetry'
+import { queryWorkingCosRuntimeIdentity, workingCosRuntimeBindingFromEnv, type WorkingCosRuntimeIdentity } from '@/lib/ai/cos/cosWorkingRuntimeBinding'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -89,6 +90,17 @@ export async function GET(req: NextRequest) {
     let inferenceReady = false
     let inferenceModel: string | null = null
     let inferenceError: string | null = runpodPrimaryEnabled() ? null : 'runpod_primary_disabled'
+    let runtimeIdentity: WorkingCosRuntimeIdentity = Object.freeze({
+      ready: false,
+      model: null,
+      digest: null,
+      modifiedAt: null,
+      size: null,
+      family: null,
+      parameterSize: null,
+      quantizationLevel: null,
+    })
+    let runtimeIdentityError: string | null = null
     if (configuredPodId && runpodPrimaryEnabled()) {
       try {
         const inferenceConfig = runpodPrimaryConfig('reasoner', configuredPodId)
@@ -96,6 +108,13 @@ export async function GET(req: NextRequest) {
         inferenceReady = health.ok
         inferenceModel = health.model
         inferenceError = health.ok ? null : (health.error || 'runpod_primary_model_unavailable')
+        if (health.ok) {
+          try {
+            runtimeIdentity = await queryWorkingCosRuntimeIdentity(inferenceConfig)
+          } catch (error) {
+            runtimeIdentityError = error instanceof Error ? error.message : String(error)
+          }
+        }
       } catch (error) {
         inferenceError = error instanceof Error ? error.message : String(error)
       }
@@ -170,6 +189,15 @@ export async function GET(req: NextRequest) {
       configuredPodFound: Boolean(configuredPodId && pods.some(pod => pod.id === configuredPodId)),
       inferenceReady,
       inferenceModel,
+      inferenceDigest: runtimeIdentity.digest,
+      inferenceIdentityReady: runtimeIdentity.ready,
+      inferenceIdentityError: runtimeIdentityError,
+      inferenceIdentity: runtimeIdentity,
+      workingCosRuntimeBinding: workingCosRuntimeBindingFromEnv(
+        runtimeIdentity,
+        configuredPodId,
+        runpodPrimaryModel('reasoner'),
+      ),
       inferenceError,
       repairAttempted,
       repairStarted,
@@ -193,6 +221,10 @@ export async function GET(req: NextRequest) {
       configuredPodId: configuredPodId || null,
       inferenceReady: false,
       inferenceModel: null,
+      inferenceDigest: null,
+      inferenceIdentityReady: false,
+      inferenceIdentityError: 'runpod_probe_failed',
+      workingCosRuntimeBinding: null,
       inferenceError: 'runpod_probe_failed',
       repairAttempted: false,
       repairStarted: false,

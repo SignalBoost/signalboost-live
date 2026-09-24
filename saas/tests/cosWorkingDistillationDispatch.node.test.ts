@@ -61,6 +61,8 @@ test('Working COS preparation binds deterministic manifests before provider exec
   assert.match(dispatch,/workingCosRows: context\.materialization\.rows/)
   assert.match(dataset,/COS_WORKING_DISPATCH_SUBJECTS = 8/)
   assert.match(dataset,/COS_WORKING_DISPATCH_MAX_ITEMS = 224/)
+  assert.match(dispatch,/registered\.registered === false/)
+  assert.match(dispatch,/COS_WORKING_DISPATCH_MAX_ITEMS/)
   assert.match(jobs,/embeddedWorkingCosRowsValid/)
   assert.match(worker,/worker_working_cos_training_manifest_mismatch/)
   assert.match(worker,/worker_working_cos_holdout_manifest_mismatch/)

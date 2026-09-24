@@ -1,2 +1,2 @@
-base_sha=15208c16a4a0021a2bef4ec010a8b3442311f107
-branch=fix/deepinfra-harness-spend-guard-20260924
+base_sha=fe3dd3d792a9d9e64822c2c21d125eb29d29b40e
+branch=fix/evaluator-latest-canary-state-v2-20260924

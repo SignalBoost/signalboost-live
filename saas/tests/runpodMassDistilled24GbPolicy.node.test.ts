@@ -85,7 +85,8 @@ test('capacity reclamation never disables active graduate, evaluator, or Residen
 
   assert.match(endpointProtection, /cos_university_residency_enrollments/)
   assert.match(endpointProtection, /\['resident', 'senior_resident', 'remediation_required'\]/)
-  assert.match(endpointProtection, /builder-residency-runtime-v1/)
+  assert.match(endpointProtection, /BUILDER_RESIDENCY_RUNTIME_IDENTITY_VERSION = 'builder-residency-runtime-v2'/)
+  assert.doesNotMatch(endpointProtection, /builder-residency-runtime-v1/)
   assert.match(endpointProtection, /residency_endpoint_protection_database_unavailable/)
   assert.match(endpointProtection, /cos_university_graduate_model_registry/)
   assert.match(endpointProtection, /\.eq\('status', 'active'\)/)

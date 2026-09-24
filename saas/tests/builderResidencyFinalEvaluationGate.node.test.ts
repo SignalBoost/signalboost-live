@@ -74,15 +74,22 @@ test('rolling evaluation authorization excludes Builder artifacts before Residen
   )
 })
 
-test('replay canary headroom cannot block unrelated evaluation before Builder Residency is complete', async () => {
+test('replay canary headroom cannot block unrelated evaluation after durable replay proof completes', async () => {
   const route = await readFile(
     new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url),
     'utf8',
   )
 
+  const durableProof = route.indexOf('let remediationReplayProofCompletions')
+  const headroom = route.indexOf("reason: 'replay_canary_runpod_headroom_reserved'")
+  assert.ok(durableProof >= 0 && headroom > durableProof)
   assert.match(route, /const remediationReplayRows = rows\.filter/)
   assert.match(
     route,
-    /if \(remediationReplayRows\.length > 0 && remediationReplayCanaryPasses < 2\)/,
+    /remediationReplayProofCompletions < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE/,
+  )
+  assert.match(
+    route,
+    /remediationReplayCanaryPasses < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE/,
   )
 })

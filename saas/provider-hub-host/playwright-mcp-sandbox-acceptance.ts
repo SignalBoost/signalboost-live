@@ -35,7 +35,7 @@ export type PlaywrightMcpProductionAcceptance = Readonly<{
     networkHeadersStored: false
     screenshotsStored: false
     credentialsStored: false
-    sandboxDestroyed: true
+    sandboxDestroyed: boolean
   }>
 }>
 
@@ -296,6 +296,7 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
   }))
 
   let sandbox: Awaited<ReturnType<typeof Sandbox.create>> | null = null
+  let sandboxDestroyed = false
   try {
     sandbox = await Sandbox.create({
       image: 'vercel/sandbox/node:24',
@@ -409,7 +410,21 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
       detail: bounded(error instanceof Error ? error.message : 'unknown_error'),
     }))
   } finally {
-    await sandbox?.stop().catch(() => undefined)
+    if (!sandbox) {
+      sandboxDestroyed = true
+    } else {
+      try {
+        await sandbox.stop()
+        sandboxDestroyed = true
+      } catch {
+        sandboxDestroyed = false
+      }
+    }
+    checks.push(Object.freeze({
+      name: 'sandbox_destroyed',
+      passed: sandboxDestroyed,
+      detail: `destroyed=${sandboxDestroyed}`,
+    }))
   }
 
   const required = new Set([
@@ -427,6 +442,7 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
     'console_diagnostics_live',
     'network_diagnostics_live',
     'screenshot_live',
+    'sandbox_destroyed',
   ])
   const ok = checks.every(check => check.passed) && [...required].every(name => checks.some(check => check.name === name && check.passed))
 
@@ -443,7 +459,7 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
       networkHeadersStored: false,
       screenshotsStored: false,
       credentialsStored: false,
-      sandboxDestroyed: true,
+      sandboxDestroyed,
     }),
   })
 }

@@ -339,7 +339,7 @@
     },
     {
       "path": "/api/cron/playwright-mcp-live-acceptance",
-      "schedule": "7,37 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }

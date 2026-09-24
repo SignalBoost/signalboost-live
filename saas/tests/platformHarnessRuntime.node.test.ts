@@ -291,6 +291,12 @@ test('independent verifier routes competency vs infrastructure failure', async (
     },
   })
   assert.equal(competency.outcome.status, 'agent_failure')
+  const competencyCompletion = await completeHarnessRun({
+    manifest: policy.manifest,
+    result: competency,
+    evidenceSink: { async append() {} },
+  })
+  assert.equal(competencyCompletion.route.destination, 'university_remediation')
 
   const infrastructure = await runHarnessWorker({
     manifest: { ...policy.manifest, runId: 'harness-runtime-test-2' },

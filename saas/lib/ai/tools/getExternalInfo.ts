@@ -121,7 +121,7 @@ function defaultSearchPort(): WebSearchPort {
     async search(query: string, count: number): Promise<SearchResult[]> {
       const governed = await searchThroughGovernedWebKnowledge({ query, count })
       if (governed.handled) {
-        if (!governed.ok) throw new Error(governed.error)
+        if (governed.ok === false) throw new Error(governed.error)
         if (!governed.results.length) throw new Error('Governed Web Knowledge returned no usable pages.')
         return governed.results.map(row => ({
           title: row.title,

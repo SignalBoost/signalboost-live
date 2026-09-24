@@ -3,7 +3,7 @@ import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector, type ContinuousLearningPolicy } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { MASS_DISTILLATION_MAX_BATCH, type MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
+import { MASS_DISTILLATION_MAX_BATCH, type MassDistillationSubjectSupply } from './cosUniversityMassDistillation'
 import { installHostedTeacherCurriculum } from './cosUniversityHostedTeacherCurriculum.ts'
 import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import {

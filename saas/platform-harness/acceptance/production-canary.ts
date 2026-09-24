@@ -109,9 +109,16 @@ function gatewayPolicy():GovernancePolicy {
     'harness.acceptance.deadline',
     'harness.acceptance.concurrency',
     'harness.acceptance.cost',
+    'harness.acceptance.authority',
+    'harness.acceptance.infrastructure',
+    'harness.acceptance.competency',
   ]
   return Object.freeze({
-    classifier:Object.freeze({classify(){return 'reversible_internal' as const}}),
+    classifier:Object.freeze({classify(request){
+      return request.action.target==='harness.acceptance.authority'
+        ? 'external_effect' as const
+        : 'reversible_internal' as const
+    }}),
     allowlist:Object.freeze(targets.flatMap(target=>[
       Object.freeze({actionKind:'read',target,rollback:'acceptance-scratch/noop'}),
       Object.freeze({actionKind:'write',target,rollback:'acceptance-scratch/delete'}),
@@ -184,6 +191,9 @@ function gatewayHost(db:Db):GatewayHost {
         }
         if(target==='harness.acceptance.cost') {
           return {ok:true,result:{completed:true},evidenceRefs:[evidence('cost',runId,'unexpected-execution')]}
+        }
+        if(target==='harness.acceptance.infrastructure'||target==='harness.acceptance.competency') {
+          return {ok:true,result:{completed:true},evidenceRefs:[evidence(target.endsWith('infrastructure')?'infrastructure':'competency',runId,'controlled-observation')]}
         }
         return {ok:false,error:'harness_acceptance_unknown_target'}
       },
@@ -272,7 +282,7 @@ export async function runPlatformHarnessProductionAcceptance(input:{
   // 2. Real reversible Production write. The retained row is acceptance evidence, not customer data.
   {
     const runId=`${suiteRunId}:write`
-    const scratchKey=`write:${randomUUID()}`
+    const scratchKey='write:latest'
     const cap=capability('harness.acceptance.write',{mutating:true,risk:'write'})
     const envelope=await runProductionHarnessEnvelope({
       request:createProductionHarnessRequest({
@@ -464,7 +474,126 @@ export async function runPlatformHarnessProductionAcceptance(input:{
     cases.push(captured)
   }
 
+
+  // 8. Infrastructure attribution must route only to Self-Healing.
+  {
+    const runId=`${suiteRunId}:infrastructure`
+    const cap=capability('harness.acceptance.infrastructure')
+    const envelope=await runProductionHarnessEnvelope({
+      request:createProductionHarnessRequest({
+        runId,objective:'Production Harness acceptance: infrastructure failure routing',tenantId:'itmounts',
+        portableId:'cos',agentId:'cos-production-acceptance',role:'chief_of_staff',
+        environmentId:'itmounts-production',requestedCapabilities:[cap.id],
+        limits:{maxToolCalls:1,maxConcurrency:1,deadlineMs:5_000},
+      }),
+      authority:authority(runId,[cap],{maxToolCalls:1,maxConcurrency:1,deadlineMs:5_000}),
+      capabilities,executor,
+      worker:{async run(ctx){await ctx.execute({actionId:'infra-observation',kind:'read',capabilityId:cap.id})}},
+      verifier:{async verify(){return {
+        verified:false,
+        verifierRef:'verifier://platform-harness-production-acceptance/infrastructure',
+        evidenceRefs:[evidence('infrastructure',runId,'controlled-provider-failure')],
+        reason:'acceptance_controlled_infrastructure_failure',
+        failureAttribution:'infrastructure' as const,
+      }}},
+      evidenceSink:sink,
+    })
+    const captured=capture('infrastructure',envelope)
+    if(captured.outcomeStatus!=='infrastructure_failure'||captured.route!=='self_healing') {
+      throw new Error('platform_harness_acceptance_infrastructure_routing_failed')
+    }
+    cases.push(captured)
+  }
+
+  // 9. Observable competency failure must route only to University remediation.
+  {
+    const runId=`${suiteRunId}:competency`
+    const cap=capability('harness.acceptance.competency')
+    const envelope=await runProductionHarnessEnvelope({
+      request:createProductionHarnessRequest({
+        runId,objective:'Production Harness acceptance: competency failure routing',tenantId:'itmounts',
+        portableId:'cos-software-specialist',agentId:'software-specialist-acceptance',role:'software_specialist',
+        environmentId:'itmounts-production',requestedCapabilities:[cap.id],
+        limits:{maxToolCalls:1,maxConcurrency:1,deadlineMs:5_000},
+      }),
+      authority:authority(runId,[cap],{maxToolCalls:1,maxConcurrency:1,deadlineMs:5_000}),
+      capabilities,executor,
+      worker:{async run(ctx){await ctx.execute({actionId:'competency-observation',kind:'read',capabilityId:cap.id})}},
+      verifier:{async verify(){return {
+        verified:false,
+        verifierRef:'verifier://platform-harness-production-acceptance/competency',
+        evidenceRefs:[evidence('competency',runId,'controlled-skill-failure')],
+        reason:'acceptance_controlled_competency_failure',
+        failureAttribution:'competency' as const,
+      }}},
+      evidenceSink:sink,
+    })
+    const captured=capture('competency',envelope)
+    if(captured.outcomeStatus!=='agent_failure'||captured.route!=='university_remediation') {
+      throw new Error('platform_harness_acceptance_competency_routing_failed')
+    }
+    cases.push(captured)
+  }
+
+  // 10. Consequential/external authority boundary must route only to Referee/Guardian.
+  {
+    const runId=`${suiteRunId}:authority`
+    const cap=capability('harness.acceptance.authority',{mutating:true,risk:'consequential'})
+    const envelope=await runProductionHarnessEnvelope({
+      request:createProductionHarnessRequest({
+        runId,objective:'Production Harness acceptance: authority boundary routing',tenantId:'itmounts',
+        portableId:'cos',agentId:'cos-production-acceptance',role:'chief_of_staff',
+        environmentId:'itmounts-production',requestedCapabilities:[cap.id],
+        limits:{maxToolCalls:1,maxConcurrency:1,deadlineMs:5_000},
+      }),
+      authority:authority(runId,[cap],{maxToolCalls:1,maxConcurrency:1,deadlineMs:5_000}),
+      capabilities,executor,
+      worker:{async run(ctx){await ctx.execute({
+        actionId:'authority-boundary',kind:'write',capabilityId:cap.id,
+        preconditionEvidenceRefs:[evidence('authority',runId,'precondition')],
+        compensation:{mode:'irreversible',reason:'acceptance case intentionally exercises human-only authority boundary'},
+      })}},
+      verifier:verified('authority',runId),
+      evidenceSink:sink,
+    })
+    const captured=capture('authority',envelope)
+    if(captured.outcomeStatus!=='authority_halt'||captured.route!=='referee_guardian') {
+      throw new Error('platform_harness_acceptance_authority_routing_failed')
+    }
+    cases.push(captured)
+  }
+
   const acceptedAt=new Date().toISOString()
+  const summary={
+    schema:PLATFORM_HARNESS_PRODUCTION_ACCEPTANCE_VERSION,
+    runId:suiteRunId,
+    acceptedAt,
+    productionCommit:input.productionCommit,
+    productionDeploymentFingerprint:input.productionDeploymentFingerprint,
+    caseCount:cases.length,
+    caseIds:cases.map(item=>item.caseId),
+    cases:cases.map(item=>({
+      caseId:item.caseId,
+      runId:item.runId,
+      outcomeStatus:item.outcomeStatus,
+      failureCode:item.failureCode,
+      route:item.route,
+      productionMutationObserved:item.productionMutationObserved,
+      compensationStatus:item.compensationStatus,
+      parentRunId:item.parentRunId,
+    })),
+  }
+  const suiteAudit:DbResult=await db.from('supervisor_audit_events').insert({
+    event_id:`platform-harness-production-acceptance-${suiteRunId}`,
+    execution_id:suiteRunId,
+    incident_id:suiteRunId,
+    event_type:PLATFORM_HARNESS_PRODUCTION_ACCEPTANCE_EVENT,
+    occurred_at:acceptedAt,
+    payload:summary,
+    schema_version:PLATFORM_HARNESS_PRODUCTION_ACCEPTANCE_VERSION,
+  })
+  if(suiteAudit.error) throw new Error('platform_harness_production_acceptance_summary_persist_failed')
+
   return Object.freeze({
     runId:suiteRunId,
     acceptedAt,

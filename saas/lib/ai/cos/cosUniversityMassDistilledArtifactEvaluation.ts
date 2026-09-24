@@ -348,44 +348,43 @@ async function waitReady(endpointId:string,deadlineMs:number){
   const until=Math.min(Date.now()+READY_TIMEOUT_MS,deadlineMs-ROUTE_RESERVE_MS)
   let status:number|null=null
   let lastError:string|null=null
-  // RunPod control-plane counters describe worker lifecycle, not whether the exact vLLM gateway has
-  // finished loading the model. Production canaries have successfully served this same endpoint while
-  // health reported workers.running=1 and workers.ready=0. Use control-plane health only to establish
-  // that a worker exists, then require the worker-local non-token /ping contract to report modelReady.
+  // RunPod control-plane counters are observational only. The worker-local /ping path is also the
+  // scale-from-zero trigger, so readiness must keep issuing bounded /ping requests even while health
+  // still reports workers.running=0/ready=0. Otherwise one timed-out wake can leave the evaluator
+  // polling a permanently cold endpoint until the route deadline.
   while(Date.now()<until){
     try{
       const health=await massDistilledRuntimeHealth(endpointId)
       status=health.httpStatus
       if(!health.ok&&health.error)lastError=health.error
-      const workerExists=health.workers.ready>0||health.workers.running>0
-      if(workerExists){
-        const remainingMs=until-Date.now()
-        if(remainingMs<=0)break
-        const timeoutMs=Math.max(1,Math.min(READY_PING_TIMEOUT_MS,remainingMs))
-        try{
-          const response=await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`,{
-            headers:{Authorization:`Bearer ${key}`},
-            signal:AbortSignal.timeout(timeoutMs),
-          })
-          status=response.status
-          if(response.ok){
-            const payload:any=await response.json().catch(()=>null)
-            const gatewayStatus=String(payload?.status||'')
-            if(payload?.modelReady===true&&(gatewayStatus==='ready'||gatewayStatus==='accepting_requests'))return
-            lastError='mass_distilled_gateway_model_not_ready'
-          }else{
-            lastError=`mass_distilled_gateway_ping_http_${response.status}`
-          }
-        }catch(error){
-          const name=error instanceof Error?error.name:''
-          lastError=name==='TimeoutError'||name==='AbortError'
-            ?'mass_distilled_gateway_ping_timeout'
-            :error instanceof Error?clean(error.message,500):'mass_distilled_gateway_ping_failed'
-        }
-      }
     }catch(error){
       lastError=error instanceof Error?clean(error.message,500):'mass_distilled_health_probe_failed'
     }
+
+    const remainingMs=until-Date.now()
+    if(remainingMs<=0)break
+    const timeoutMs=Math.max(1,Math.min(READY_PING_TIMEOUT_MS,remainingMs))
+    try{
+      const response=await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`,{
+        headers:{Authorization:`Bearer ${key}`},
+        signal:AbortSignal.timeout(timeoutMs),
+      })
+      status=response.status
+      if(response.ok){
+        const payload:any=await response.json().catch(()=>null)
+        const gatewayStatus=String(payload?.status||'')
+        if(payload?.modelReady===true&&(gatewayStatus==='ready'||gatewayStatus==='accepting_requests'))return
+        lastError='mass_distilled_gateway_model_not_ready'
+      }else{
+        lastError=`mass_distilled_gateway_ping_http_${response.status}`
+      }
+    }catch(error){
+      const name=error instanceof Error?error.name:''
+      lastError=name==='TimeoutError'||name==='AbortError'
+        ?'mass_distilled_gateway_ping_timeout'
+        :error instanceof Error?clean(error.message,500):'mass_distilled_gateway_ping_failed'
+    }
+
     if(Date.now()<until)await new Promise(resolve=>setTimeout(resolve,Math.min(READY_POLL_MS,until-Date.now())))
   }
   throw new Error(`mass_distilled_evaluation_runtime_not_ready:${status??(lastError?'health':'network')}`)

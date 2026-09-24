@@ -10,7 +10,7 @@
 // Recording is best effort by design: a lane must not fail because its status write failed. That is the
 // opposite of the rule for evidence, and deliberately so -- this table proves nothing.
 
-export type CosLaneOutcome = 'worked' | 'skipped' | 'failed'
+export type CosLaneOutcome = 'running' | 'worked' | 'skipped' | 'failed'
 
 export const COS_LANE_STATUS_FUNCTION = 'record_cos_lane_status' as const
 
@@ -47,7 +47,7 @@ export function buildCosLaneStatusArgs(input: {
   const reason = text(input.reason, 200)
   if (!lane) throw new Error('cos_lane_status_lane_missing')
   if (!reason) throw new Error('cos_lane_status_reason_missing')
-  if (input.outcome !== 'worked' && input.outcome !== 'skipped' && input.outcome !== 'failed') {
+  if (input.outcome !== 'running' && input.outcome !== 'worked' && input.outcome !== 'skipped' && input.outcome !== 'failed') {
     throw new Error('cos_lane_status_outcome_invalid')
   }
   return {

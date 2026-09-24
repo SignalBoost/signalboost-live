@@ -9,6 +9,7 @@ import {
   MASS_CANARY_ROLLING_MAX_APPROVALS,
   MASS_CANARY_ROLLING_WINDOW_HOURS,
   MASS_CANARY_COLD_START_FAILURE,
+  MASS_CANARY_NO_WORKER_FAILURE,
   MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS,
   MASS_CANARY_COLD_START_RESUME_COOLDOWN_MS,
   MASS_CANARY_MAX_COLD_START_RESUMES_PER_RUNTIME,
@@ -356,6 +357,33 @@ test('a second cold-start timeout on the same runtime falls back to the long fai
   const decision = decideMassCanaryRollingApproval({ artifacts:[a,b], events:[first,second], now, enabled:true })
   assert.ok('artifact' in decision)
   assert.equal(decision.artifact.candidateId, b.candidateId)
+})
+
+test('RunPod no-worker failures are infrastructure, yield the artifact, and never reuse the dead endpoint', () => {
+  assert.equal(MASS_CANARY_NO_WORKER_FAILURE, 'mass_distilled_runtime_worker_not_ready')
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const recent = event(a, 'local_distilled_runtime_canary_failed', '2026-09-17T16:55:00.000Z', {}, {
+    error: MASS_CANARY_NO_WORKER_FAILURE,
+    endpointId: 'deadendpoint1',
+    runtimeKey: '40461bb31f',
+  })
+  const yielded = decideMassCanaryRollingApproval({ artifacts:[a,b], events:[recent], now, enabled:true })
+  assert.ok('artifact' in yielded)
+  assert.equal(yielded.artifact.candidateId, b.candidateId)
+
+  const oldNoWorker = ['16:10','16:20','16:30','16:40'].map((time, index) =>
+    event(a, 'local_distilled_runtime_canary_failed', `2026-09-17T${time}:00.000Z`, {}, {
+      error: MASS_CANARY_NO_WORKER_FAILURE,
+      endpointId: `deadendpoint${index}`,
+      runtimeKey: `40461bb3${index}f`,
+    }))
+  const retry = decideMassCanaryRollingApproval({ artifacts:[a,b], events:oldNoWorker, now, enabled:true })
+  assert.ok('artifact' in retry)
+  assert.equal(retry.artifact.candidateId, a.candidateId)
+  assert.equal(retry.evidence.coldStartResume, undefined)
+  assert.equal(retry.evidence.coldStartResumeEndpointId, undefined)
+  assert.equal(retry.evidence.coldStartResumeRuntimeKey, undefined)
 })
 
 test('cold-start failures yield briefly, then remain retryable instead of becoming a permanent identical-error stop', () => {

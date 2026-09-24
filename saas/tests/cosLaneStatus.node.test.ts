@@ -14,6 +14,10 @@ const ROUTE = readFileSync(
   new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url),
   'utf8',
 )
+const RUNNING_MIGRATION = readFileSync(
+  new URL('../supabase/migrations/20260924193000_cos_lane_status_running.sql', import.meta.url),
+  'utf8',
+)
 
 test('args are built with the stored procedure parameter names', () => {
   const args = buildCosLaneStatusArgs({
@@ -97,6 +101,14 @@ test('the canary lane reports on every exit path', () => {
   assert.match(ROUTE, /MASS_CANARY_IN_FLIGHT_TTL_MS/)
   // The skip response now carries the rolling-authority reason too, which previously only reached a log line.
   assert.match(ROUTE, /reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling/)
+})
+
+test('schema stores active state without erasing the last terminal result', () => {
+  assert.match(RUNNING_MIGRATION, /'running','worked','skipped','failed'/)
+  assert.match(RUNNING_MIGRATION, /last_completed_outcome/)
+  assert.match(RUNNING_MIGRATION, /last_completed_reason/)
+  assert.match(RUNNING_MIGRATION, /last_completed_at/)
+  assert.match(RUNNING_MIGRATION, /when excluded\.outcome='running'/)
 })
 
 test('lane status is never written to the assurance ledger or read by a gate', () => {

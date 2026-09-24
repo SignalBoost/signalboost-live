@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/cosUniversityAgentExamRuntime.ts
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
-import { withEvaluationRuntimeHarness } from '@/platform-harness/adapters/evaluation-runtime'
+import { withEvaluationRuntimeHarness } from '../../../platform-harness/adapters/evaluation-runtime.ts'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { loadUniversityPracticeStudyMaterial } from './cosUniversityPracticeStudyMaterialRuntime.ts'

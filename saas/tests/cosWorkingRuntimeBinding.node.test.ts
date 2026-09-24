@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -147,4 +148,18 @@ test('Ollama digest normalization accepts optional sha256 prefix only', () => {
   assert.equal(normalizeOllamaDigest(DIGEST), DIGEST)
   assert.equal(normalizeOllamaDigest(`sha256:${DIGEST}`), DIGEST)
   assert.equal(normalizeOllamaDigest('not-a-digest'), null)
+})
+
+
+test('RunPod primary probe exposes digest/binding evidence without making it a repair trigger', () => {
+  const route = readFileSync(new URL('../app/api/cron/runpod-primary-probe/route.ts', import.meta.url), 'utf8')
+  const env = readFileSync(new URL('../.env.example', import.meta.url), 'utf8')
+  assert.match(route, /queryWorkingCosRuntimeIdentity\(inferenceConfig\)/)
+  assert.match(route, /inferenceDigest:\s*runtimeIdentity\.digest/)
+  assert.match(route, /workingCosRuntimeBinding:\s*workingCosRuntimeBindingFromEnv/)
+  assert.match(route, /runtimeIdentityError/)
+  assert.doesNotMatch(route, /hardServingFailure[\s\S]{0,300}runtimeIdentityError/)
+  assert.match(env, /COS_WORKING_DISTILLATION_RUNTIME_DIGEST=/)
+  assert.match(env, /COS_WORKING_DISTILLATION_BASE_MODEL_ID=Qwen\/Qwen3-30B-A3B-Thinking-2507/)
+  assert.match(env, /COS_WORKING_DISTILLATION_BASE_MODEL_REVISION=144afc2f379b542fdd4e85a1fcd5e1f79112d95d/)
 })

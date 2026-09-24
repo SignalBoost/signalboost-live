@@ -25,6 +25,7 @@ import {
   claimUniversityMassDistillationWorkflowLease,
   releaseUniversityMassDistillationWorkflowLease,
 } from './cosUniversityMassDistillationWorkflowLease.ts'
+import { readMassEvaluationBacklogGate } from './cosUniversityMassEvaluationBacklogGate.ts'
 
 export type MassDistillationWorkflowSource = 'scheduled_cron' | 'self_healing_supervisor'
 
@@ -141,8 +142,25 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   // authorized prepared batch cannot be starved by slow reconciliation or replenishment work.
   let rollingAuthorization: Record<string, unknown>
   const dispatchReadiness = massDistillationDispatchReadiness()
+  // New paid training may start only while downstream canary/evaluation can keep up. The backlog gate
+  // pauses NEW authorization and NEW paid dispatch; closure, reconciliation, recovery and in-flight jobs
+  // above and below still run, so the backlog drains and training resumes automatically.
+  const evaluationBacklog = await readMassEvaluationBacklogGate({ db: cosServiceDb() as any })
+  const backlogPaused = dispatchReadiness.ready && !evaluationBacklog.open
   try {
-    rollingAuthorization = dispatchReadiness.ready
+    rollingAuthorization = backlogPaused
+      ? {
+          ok: true,
+          authorized: false,
+          skipped: true,
+          reason: evaluationBacklog.reason,
+          pendingEvaluation: evaluationBacklog.pendingEvaluation,
+          backlogLimit: evaluationBacklog.limit,
+          automaticPromotionAuthorized: false,
+          runpodMutationAuthorized: false,
+          authorityExpanded: false,
+        }
+      : dispatchReadiness.ready
       ? { ...(await authorizeAvailableUniversityMassDistillationCampaigns()) }
       : {
           ok: false,
@@ -163,7 +181,18 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       authorityExpanded: false,
     }
   }
-  const initialResult = await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })
+  const initialResult: Record<string, any> = backlogPaused
+    ? {
+        ok: true,
+        skipped: true,
+        reason: evaluationBacklog.reason,
+        dispatched: 0,
+        externalCostUsd: 0,
+        pendingEvaluation: evaluationBacklog.pendingEvaluation,
+        backlogLimit: evaluationBacklog.limit,
+        authorityExpanded: false,
+      }
+    : await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })
   let result: Record<string, any> = initialResult
   let capacityRecovery: Record<string, any> = { ok: true, skipped: true, reason: 'capacity_recovery_not_needed' }
   let postRecoveryAuthorization: Record<string, any> = { ok: true, authorized: false, skipped: true, reason: 'capacity_recovery_not_needed' }
@@ -329,6 +358,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       preparedBeforeReplenishment,
       preparedAfterReplenishment,
       rollingAuthorization,
+      evaluationBacklog,
       slowMaintenanceDue,
       workflowSource: input.source,
       retryScheduled,

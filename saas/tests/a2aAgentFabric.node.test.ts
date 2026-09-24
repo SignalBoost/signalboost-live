@@ -276,8 +276,10 @@ test('Phase 2 preserves advisory execution and denies unauthorized skill without
   assert.equal(transports, 1)
 })
 
-test('specialist catalog defines Software, marketing, sales, and separated self-healing roles with explicit risk', () => {
-  assert.equal(A2A_SPECIALIST_FAMILIES.length, 6)
+test('specialist catalog defines Context Engineer, Software, marketing, sales, and separated self-healing roles with explicit risk', () => {
+  assert.equal(A2A_SPECIALIST_FAMILIES.length, 7)
+  const contextEngineer = getA2ASpecialistFamily('context-engineering')
+  assert.equal(contextEngineer.skills.every(skill => skill.risk === 'advisory'), true)
   const software = getA2ASpecialistFamily('software')
   assert.match(software.purpose, /Broadly proficient/i)
   assert.equal(software.skills.find(skill => skill.skillId === 'software.analyze')?.risk, 'advisory')

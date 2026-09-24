@@ -1,2 +1,2 @@
-base_sha=563c8d761605b5cf66eab653cd9ed329c2ddff9a
-branch=fix/evaluator-headroom-deadlock-20260924
+base_sha=ae1ec91929642f7265516563418a71c2e113f29b
+branch=feat/platform-harness-full-monty-final-v2-20260924

@@ -37,6 +37,7 @@ const tests = [
   'tests/cosUniversityStudySupplyPriority.node.test.ts',
   'tests/cosUniversityLearningSourceCooldown.node.test.ts',
   'tests/learningSourceMix.node.test.ts',
+  'tests/cosHuggingFaceOpenData.node.test.ts',
   'tests/openAlexAbstract.node.test.ts',
   'tests/cosUniversityAgentModelPolicy.node.test.ts',
   'tests/cosUniversityCredentialKeys.node.test.ts',

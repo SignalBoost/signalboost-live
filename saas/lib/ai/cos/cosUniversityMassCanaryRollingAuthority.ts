@@ -65,6 +65,9 @@ export type CanaryArtifact = Readonly<{
   frontierResponseAnchorItems?: number
   failureDerivedReplayRequired?: boolean
   failureDerivedReplayItems?: number
+  failureDerivedReplayEpochs?: number
+  failureDerivedReplayLearningRate?: number
+  remediationReplayProof?: boolean
 }>
 export type CanaryEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 export type CanaryDecision =
@@ -239,8 +242,7 @@ export function decideMassCanaryRollingApproval(input: {
   const builderProofNeeded = builderProofPasses < MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE
 
   const replayProofArtifact = (artifact: CanaryArtifact) =>
-    artifact.failureDerivedReplayRequired === true
-      && Number(artifact.failureDerivedReplayItems) > 0
+    artifact.remediationReplayProof === true
   const replayProofPasses = Number.isFinite(Number(input.remediationReplayProofPasses))
     ? Math.max(0, Math.floor(Number(input.remediationReplayProofPasses)))
     : new Set(valid

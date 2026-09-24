@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-knowledge-promotion/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { autoPromoteLearnedKnowledge } from '@/lib/ai/cos/autoPromoteLearning'
@@ -12,7 +13,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -40,4 +41,10 @@ export async function GET(req: NextRequest) {
   const promotion = await autoPromoteLearnedKnowledge(5, deadlineMs)
   const ok = platformSelfKnowledge.failed === 0 && promotion.status !== 'error' && semanticBackfill.status !== 'error' && corpusBackfill.status !== 'error' && creativeMemoryBackfill.failed === 0
   return NextResponse.json({ ok, platformSelfKnowledge, semanticBackfill, corpusBackfill, creativeMemoryBackfill, promotion }, { status: ok ? 200 : 500 })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-knowledge-promotion' }, async () => GETInsideScheduledHarness(...args))
 }

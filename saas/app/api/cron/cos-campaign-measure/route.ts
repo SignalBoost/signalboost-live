@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-campaign-measure/route.ts
 // Post-publish performance review — the "CEO checks what actually happened"
 // duty. Runs on a schedule, finds campaigns published long enough ago to have
@@ -34,7 +35,7 @@ function resolveTokenOwner(campaign: any, entry: any): string | null {
   return null
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -110,4 +111,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, measured, skipped })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-campaign-measure' }, async () => GETInsideScheduledHarness(...args))
 }

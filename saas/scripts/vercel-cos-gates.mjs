@@ -21,6 +21,7 @@ const tests = [
   'tests/cosWorkingDistillationDispatch.node.test.ts',
   'tests/platformHarnessFullEnforcement.node.test.ts',
   'tests/platformHarnessUniversalIngress.node.test.ts',
+  'tests/platformHarnessBypassDetector.node.test.ts',
   'tests/cosUniversityMassEvaluationBacklogGate.node.test.ts',
   'tests/platformHarnessAbsoluteDeadline.node.test.ts',
   'tests/platformHarnessCompensation.node.test.ts',

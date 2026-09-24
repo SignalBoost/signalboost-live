@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { COS_VIDEO_QUEUE_SQL } from '@/lib/operator/videoQueueSchema'
@@ -73,7 +74,7 @@ async function openTicket(sb: any, job: any, severity: 'orange' | 'red', detail:
   return data?.id || null
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   if (!allowed(req)) return NextResponse.json({ ok: false, error: 'Not allowed' }, { status: 401 })
 
   const sb = db()
@@ -166,4 +167,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, scanned: jobs?.length || 0, acted: results.length, results })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-video-queue-guard' }, async () => GETInsideScheduledHarness(...args))
 }

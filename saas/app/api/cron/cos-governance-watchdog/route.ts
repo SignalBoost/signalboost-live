@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { startSiteVideo, fetchSiteVideo } from '@/lib/operator/video'
@@ -148,7 +149,7 @@ async function startOrRestartRender(sb: any, campaign: any, reason: string) {
   return { action: 'restart_render', id: campaign.id, ok: true, requestId: started.requestId, fallbackFrom: (started as any).fallbackFrom || null }
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   if (!isCronRequest(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const sb = db()
   const report: any = { ok: true, at: now(), monitor: 'cos-governance-watchdog', mode: 'autonomous_except_life_critical', actions: [], escalations: [], scanned: 0 }
@@ -200,4 +201,13 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(report)
 }
 
-export async function POST(req: NextRequest) { return GET(req) }
+async function POSTInsideScheduledHarness(req: NextRequest) { return GET(req) }
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-governance-watchdog' }, async () => GETInsideScheduledHarness(...args))
+}
+export async function POST(...args: Parameters<typeof POSTInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-governance-watchdog' }, async () => POSTInsideScheduledHarness(...args))
+}

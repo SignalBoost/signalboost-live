@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { runConfiguredCosUniversityDeliberatePractice } from '@/lib/ai/cos/cosUniversityConfiguredPracticeRunner'
 import { reopenCosUniversityStudyAfterFailedPractice } from '@/lib/ai/cos/cosUniversityPracticeFailureRemediation'
@@ -14,7 +15,7 @@ export const maxDuration = 300
 // worker, now with buyer-controlled host configuration resolved before the underlying runner begins.
 const runCosUniversityDeliberatePractice = runConfiguredCosUniversityDeliberatePractice
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -70,4 +71,10 @@ export async function GET(req: NextRequest) {
     console.error('cron COS University deliberate practice failed:', message)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-university-practice' }, async () => GETInsideScheduledHarness(...args))
 }

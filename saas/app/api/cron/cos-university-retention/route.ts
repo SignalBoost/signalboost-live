@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-university-retention/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { listCosUniversityRegisteredAgents } from '@/lib/ai/cos/cosUniversityAgentRegistry'
@@ -12,7 +13,7 @@ export const maxDuration = 300
 // Every registered University agent proves delayed retention of its OWN passed transfer work. Each
 // hourly tick runs at most ONE agent's daily retention batch, in stable agent order, so the function
 // keeps the original single-batch duration envelope and each agent keeps once-per-UTC-day.
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -44,4 +45,10 @@ export async function GET(req: NextRequest) {
     await recordCosUniversityProductionPath({ path: 'delayed_retention', invocationSucceeded: false, evidence: { error: message, agentId: currentAgentId } })
     return NextResponse.json({ ok: false, error: message, agentId: currentAgentId }, { status: 500 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-university-retention' }, async () => GETInsideScheduledHarness(...args))
 }

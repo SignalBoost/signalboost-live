@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-learning-continuity/route.ts
 //
 // THE WATCHDOG. Learning stopping is a SILENT failure — there is no error, no red build, no failed
@@ -87,7 +88,7 @@ function emailHtml(report: ContinuityReport): string {
     </div>`
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -138,4 +139,10 @@ export async function GET(req: NextRequest) {
     reason: send.ok ? 'alert_sent' : ('error' in send ? send.error : 'send_failed'),
     report,
   })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-learning-continuity' }, async () => GETInsideScheduledHarness(...args))
 }

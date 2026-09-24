@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityLanguageARangeBatch } from '@/lib/ai/cos/cosUniversityLanguageARangeRunner'
 import { listCosUniversityRegisteredAgents } from '@/lib/ai/cos/cosUniversityAgentRegistry'
@@ -12,7 +13,7 @@ export const maxDuration = 300
 // Every registered University agent (COS and each specialist) earns its own transfer and capstone
 // evidence. Each hourly tick runs at most ONE agent's daily batch, in stable agent order, so the
 // function keeps the original single-batch duration envelope and each agent keeps once-per-UTC-day.
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -60,4 +61,10 @@ export async function GET(req: NextRequest) {
     console.error('cron COS University language A-range failed:', message)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-university-language-a-range' }, async () => GETInsideScheduledHarness(...args))
 }

@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { checkLocalInferenceHealth } from '@/lib/ai/local-inference'
 import { configuredRunpodApiKey, configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
@@ -19,7 +20,7 @@ function unhealthyRepairGraceSeconds(): number {
   return Math.max(60, Math.min(3600, Math.round(raw)))
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -234,4 +235,10 @@ export async function GET(req: NextRequest) {
     console.warn('[runpod-primary-probe]', JSON.stringify(result))
     return NextResponse.json(result, { status: 502 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/runpod-primary-probe' }, async () => GETInsideScheduledHarness(...args))
 }

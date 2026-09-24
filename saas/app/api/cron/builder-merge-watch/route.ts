@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/builder-merge-watch/route.ts
 //
 // Finishes what the in-request watch could not. A repair job that auto-merged and ran out of
@@ -18,7 +19,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-export async function GET(request: Request) {
+async function GETInsideScheduledHarness(request: Request) {
   const secret = process.env.CRON_SECRET
   if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -47,4 +48,10 @@ export async function GET(request: Request) {
     console.error('[builder_merge_watch_sweep_failed]', { message: error instanceof Error ? error.message : 'unknown' })
     return NextResponse.json({ ok: false, error: 'builder_merge_watch_sweep_failed' }, { status: 500 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/builder-merge-watch' }, async () => GETInsideScheduledHarness(...args))
 }

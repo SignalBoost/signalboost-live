@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { provisionRunpodServerlessEmbedding } from '@/lib/ai/cos/runpodServerlessEmbeddingProvision'
 
@@ -9,7 +10,7 @@ function provisioningEnabled(): boolean {
   return process.env.RUNPOD_SERVERLESS_EMBEDDING_PROVISION_ENABLED?.trim().toLowerCase() === 'true'
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
@@ -44,4 +45,10 @@ export async function GET(req: NextRequest) {
     console.error('[runpod-serverless-embedding-provision]', JSON.stringify({ ok: false, error: message }))
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/runpod-serverless-embedding-provision' }, async () => GETInsideScheduledHarness(...args))
 }

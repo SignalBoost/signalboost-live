@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle.ts'
 import { ContinuousLearningDirector, type ContinuousLearningPolicy } from '@/lib/cos-core/layers/learning/index.ts'
@@ -24,7 +25,7 @@ const CURRENT_WORLD_POLICY: ContinuousLearningPolicy = {
   maxExternalCostUsdPerCycle: 0,
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -110,4 +111,10 @@ export async function GET(req: NextRequest) {
     console.error('cron current-world learning failed:', message)
     return NextResponse.json({ ok: false, error: message }, { status: 503 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-current-world-learning' }, async () => GETInsideScheduledHarness(...args))
 }

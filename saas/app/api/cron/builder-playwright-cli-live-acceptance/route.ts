@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextResponse } from 'next/server'
 import { runBuilderPlaywrightCliLiveAcceptance } from '@/lib/builder/playwright-cli-live-acceptance'
 
@@ -5,7 +6,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
 
-export async function GET(request: Request) {
+async function GETInsideScheduledHarness(request: Request) {
   if (process.env.VERCEL_ENV !== 'production') {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
@@ -28,4 +29,10 @@ export async function GET(request: Request) {
   })
 
   return NextResponse.json(result, { status: result.ok ? 200 : 503 })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/builder-playwright-cli-live-acceptance' }, async () => GETInsideScheduledHarness(...args))
 }

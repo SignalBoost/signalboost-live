@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { runNativeMonitoring } from '@/self-healing-host/native-monitoring-runtime'
@@ -14,7 +15,7 @@ function authorized(req: NextRequest): boolean {
   return Boolean(secret && req.headers.get('authorization') === `Bearer ${secret}`)
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const nativeEnabled = process.env.SELF_HEALING_NATIVE_MONITORING_ENABLED !== 'false'
   try {
@@ -100,6 +101,15 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function POSTInsideScheduledHarness(req: NextRequest) {
   return GET(req)
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-university-distillation-supervisor' }, async () => GETInsideScheduledHarness(...args))
+}
+export async function POST(...args: Parameters<typeof POSTInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-university-distillation-supervisor' }, async () => POSTInsideScheduledHarness(...args))
 }

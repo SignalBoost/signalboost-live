@@ -5,6 +5,10 @@ import type { HarnessManifest } from '../core/types.ts'
 import { resolveHarnessManifest } from '../core/policy.ts'
 import { createProductionHarnessRequest } from './production.ts'
 import { withHarnessExecutionContext } from '../runtime/execution-context.ts'
+import {
+  WEB_KNOWLEDGE_RESEARCH_CAPABILITY,
+  WEB_KNOWLEDGE_RESEARCH_SCOPE,
+} from '../capabilities/web-knowledge.ts'
 
 export const COS_PRIMARY_HARNESS_AGENT_ID = 'cos-primary'
 export const COS_PRIMARY_HARNESS_PORTABLE_ID = 'cos'
@@ -15,10 +19,27 @@ export const COS_PRIMARY_SOFTWARE_DELEGATION_SCOPE = 'cos.specialist.software.de
 export const COS_PRIMARY_A2A_SPECIALIST_DELEGATION_CAPABILITY = 'agent.specialist.delegate'
 export const COS_PRIMARY_A2A_SPECIALIST_DELEGATION_SCOPE = 'cos.specialist.a2a.delegate'
 
-/** The only capabilities a COS parent run may grant to delegated children, each with its exact scope. */
-const COS_PRIMARY_DELEGATION_SCOPES: Readonly<Record<string, string>> = Object.freeze({
-  [COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY]: COS_PRIMARY_SOFTWARE_DELEGATION_SCOPE,
-  [COS_PRIMARY_A2A_SPECIALIST_DELEGATION_CAPABILITY]: COS_PRIMARY_A2A_SPECIALIST_DELEGATION_SCOPE,
+/** Exact capabilities the COS parent may carry. Read research never implies mutation or training authority. */
+const COS_PRIMARY_CAPABILITY_POLICY: Readonly<Record<string, Readonly<{
+  scope: string
+  mutating: boolean
+  risk: 'read' | 'write'
+}>>> = Object.freeze({
+  [COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY]: Object.freeze({
+    scope: COS_PRIMARY_SOFTWARE_DELEGATION_SCOPE,
+    mutating: true,
+    risk: 'write',
+  }),
+  [COS_PRIMARY_A2A_SPECIALIST_DELEGATION_CAPABILITY]: Object.freeze({
+    scope: COS_PRIMARY_A2A_SPECIALIST_DELEGATION_SCOPE,
+    mutating: true,
+    risk: 'write',
+  }),
+  [WEB_KNOWLEDGE_RESEARCH_CAPABILITY]: Object.freeze({
+    scope: WEB_KNOWLEDGE_RESEARCH_SCOPE,
+    mutating: false,
+    risk: 'read',
+  }),
 })
 
 export type CosHarnessIngressContext = {
@@ -45,7 +66,8 @@ function assertCosProductionManifest(manifest: HarnessManifest): void {
 /**
  * Build the mandatory top-level HarnessRun for one interactive COS request.
  *
- * This is intentionally a zero-capability host envelope. It grants no tool/model authority;
+ * This is zero-capability by default. Explicit bounded grants may be attached for child delegation
+ * or read-only Web Knowledge research; no capability is inferred from the user's wording.
  * capability-bearing work remains subject to the normal Harness/Governed Socket intersection.
  * Its job is to make a Production HarnessRun mandatory before COS reasoning can begin.
  */
@@ -65,18 +87,21 @@ export function createCosProductionIngressManifest(input: {
   )
   const requestedCapabilities = [...new Set(input.requestedCapabilities ?? [])]
   const unsupported = requestedCapabilities.filter(
-    capability => !Object.prototype.hasOwnProperty.call(COS_PRIMARY_DELEGATION_SCOPES, capability),
+    capability => !Object.prototype.hasOwnProperty.call(COS_PRIMARY_CAPABILITY_POLICY, capability),
   )
   if (unsupported.length) {
     throw new Error(`cos_harness_ingress_capability_forbidden:${unsupported.join(',')}`)
   }
-  const grants = requestedCapabilities.map(capability => Object.freeze({
-    id: capability,
-    environments: Object.freeze(['production'] as const),
-    mutating: true,
-    risk: 'write' as const,
-    scopes: Object.freeze([COS_PRIMARY_DELEGATION_SCOPES[capability]]),
-  }))
+  const grants = requestedCapabilities.map(capability => {
+    const policy = COS_PRIMARY_CAPABILITY_POLICY[capability]
+    return Object.freeze({
+      id: capability,
+      environments: Object.freeze(['production'] as const),
+      mutating: policy.mutating,
+      risk: policy.risk,
+      scopes: Object.freeze([policy.scope]),
+    })
+  })
 
   const request = createProductionHarnessRequest({
     runId,

@@ -31,12 +31,12 @@ export function checkpointDigest(value: string): string {
 
 export async function workspaceDigest(workspace: BuilderWorkspacePort, workspaceId: string): Promise<string> {
   const listing = await workspace.listFiles(workspaceId)
-  const files = await Promise.all([...listing].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
-    .map(async file => {
-      const current = await workspace.readFile(workspaceId, file.path)
-      if (!current) throw new Error('builder_checkpoint_workspace_changed')
-      return [file.path, current.content]
-    }))
+  const files: [string, string][] = []
+  for (const file of [...listing].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0)) {
+    const current = await workspace.readFile(workspaceId, file.path)
+    if (!current) throw new Error('builder_checkpoint_workspace_changed')
+    files.push([file.path, current.content])
+  }
   return checkpointDigest(JSON.stringify(files))
 }
 

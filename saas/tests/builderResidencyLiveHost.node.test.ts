@@ -127,15 +127,17 @@ test('live Residency routes model-controlled edits and commands through Governed
 })
 
 
-test('live Residency serializes governed workspace actions inside maxConcurrency one',async()=>{
+test('live Residency serializes every governed action inside maxConcurrency one',async()=>{
   const source=await readFile(
     new URL('../platform-harness/residency/live-builder-executor.ts',import.meta.url),
     'utf8',
   )
 
-  assert.match(source,/private serial:Promise<void>=Promise\.resolve\(\)/)
-  assert.match(source,/const run=this\.serial\.then\(async\(\)=>\{/)
-  assert.match(source,/this\.serial=run\.then\(\(\)=>undefined,\(\)=>undefined\)/)
+  assert.match(source,/class GovernedResidencyActionSerial/)
+  assert.match(source,/private tail:Promise<void>=Promise\.resolve\(\)/)
+  assert.match(source,/return this\.serial\.run\(async\(\)=>\{/)
+  assert.match(source,/new GovernedResidencyWorkspace\(context,workspaceId,governedActionSerial\)/)
+  assert.match(source,/new GovernedResidencyRunner\(context,workspaceId,governedActionSerial\)/)
   assert.match(source,/maxConcurrency:1/)
 })
 

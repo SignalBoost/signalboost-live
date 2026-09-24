@@ -11,11 +11,14 @@ test('Working COS readiness cron is secret-gated, scheduled, and non-spending',(
 
   assert.match(route,/CRON_SECRET/)
   assert.match(route,/ensureWorkingCosCandidateReadiness/)
+  assert.match(route,/\[working-cos-readiness\]/)
+  assert.match(route,/console\.info/)
+  assert.match(route,/console\.warn/)
   assert.doesNotMatch(route,/dispatchWorkingCosDatasetPreparation/)
   assert.doesNotMatch(route,/dispatchWorkingCosTraining/)
   assert.deepEqual(
     config.crons.find((item:{path:string})=>item.path==='/api/cron/cos-working-distillation-readiness'),
-    {path:'/api/cron/cos-working-distillation-readiness',schedule:'46 * * * *'},
+    {path:'/api/cron/cos-working-distillation-readiness',schedule:'*/5 * * * *'},
   )
 
   assert.match(dispatch,/semantics: 'non_spending_working_cos_candidate_readiness_registration'/)

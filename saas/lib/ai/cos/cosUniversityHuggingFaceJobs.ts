@@ -221,6 +221,39 @@ function workerBootstrap(packages: readonly string[]): readonly string[] {
   return Object.freeze(['bash', '-lc', shell])
 }
 
+function embeddedWorkingCosRowsValid(candidate: any): boolean {
+  const source = clean(candidate?.source, 2000)
+  const rows = candidate?.workingCosRows
+  if (!/^itmounts:\/\/working-cos\/bundle\/[a-f0-9]{64}$/i.test(source)) return false
+  if (!Array.isArray(rows) || rows.length < 20 || rows.length > 384) return false
+  const itemHashes = new Set<string>()
+  let training = 0
+  let holdout = 0
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') return false
+    const assetSetKey = clean(row.assetSetKey, 64).toLowerCase()
+    const subjectId = clean(row.subjectId, 240)
+    const promptId = clean(row.promptId, 160)
+    const prompt = clean(row.prompt, 100_000)
+    const response = clean(row.response, 100_000)
+    const text = String(row.text ?? '').trim().slice(0, 250_000)
+    const itemHash = clean(row.itemHash, 64).toLowerCase()
+    const portableContentHash = clean(row.portableContentHash, 64).toLowerCase()
+    const partition = clean(row.partition, 20)
+    if (!/^[a-f0-9]{64}$/.test(assetSetKey)
+      || !subjectId || !promptId || !prompt || !response || !text
+      || !/^[a-f0-9]{64}$/.test(itemHash)
+      || createHash('sha256').update(text).digest('hex') !== itemHash
+      || !/^[a-f0-9]{64}$/.test(portableContentHash)
+      || !['train', 'holdout'].includes(partition)) return false
+    if (itemHashes.has(itemHash)) return false
+    itemHashes.add(itemHash)
+    if (partition === 'train') training += 1
+    else holdout += 1
+  }
+  return training >= 8 && holdout >= 2
+}
+
 function embeddedHostedTeacherRowsValid(candidate: any): boolean {
   const source = clean(candidate?.source, 2000)
   const rows = candidate?.teacherRows
@@ -306,8 +339,18 @@ export function buildHuggingFaceJobSpec(input: {
     const source = candidate?.source
     const hasPinnedHfSource = isHuggingFaceDatasetRef(source)
     const hasEmbeddedHostedRows = embeddedHostedTeacherRowsValid(candidate)
-    if (!hasPinnedHfSource && !hasEmbeddedHostedRows) {
+    const hasEmbeddedWorkingCosRows = embeddedWorkingCosRowsValid(candidate)
+    if (!hasPinnedHfSource && !hasEmbeddedHostedRows && !hasEmbeddedWorkingCosRows) {
       throw new Error('huggingface_training_source_dataset_ref_required')
+    }
+    if (hasEmbeddedWorkingCosRows) {
+      const expectedTrainingManifestHash = clean((input.envelope as any)?.expectedTrainingManifestHash, 64)
+      const expectedHoldoutManifestHash = clean((input.envelope as any)?.expectedHoldoutManifestHash, 64)
+      if (!/^[a-f0-9]{64}$/.test(expectedTrainingManifestHash)
+        || !/^[a-f0-9]{64}$/.test(expectedHoldoutManifestHash)
+        || expectedTrainingManifestHash === expectedHoldoutManifestHash) {
+        throw new Error('huggingface_working_cos_partition_manifest_invalid')
+      }
     }
     dockerImage = 'python:3.12-slim'
     flavor = input.config.preparationFlavor

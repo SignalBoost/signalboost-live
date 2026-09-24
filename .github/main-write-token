@@ -1,2 +1,2 @@
-base_sha=545c148a2fd67f0e9d39b2dd4efdf1b1abf9fe13
-branch=fix/restore-complete-production-gate-20260923
+base_sha=c98253d0beca3f8226cc71a8b1b937137d9ae83d
+branch=fix/cos-freshness-guard-test-20260923-2330

@@ -378,7 +378,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     execute: () => tryCosSoftwareSpecialistLegacy(input),
   })
 
-  if (!harness.ok) {
+  if (harness.ok === false) {
     return NextResponse.json({
       reply: 'COS Software Specialist was blocked by the Production Harness. No software work was started.',
       source: 'cos-software-harness-blocked',

@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto'
 import type { AgentRequest, AllowlistEntry } from '../agent-gateway/index.ts'
+import { residencyRunpodRuntimeKey } from '../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts'
 import type { ChainAttempt, ChainExecutor } from './execution-chain.ts'
 import {
   MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS,
@@ -57,10 +57,9 @@ function hfRevision(evidenceRef:unknown):string{
 }
 
 function residencyRuntimeKey(candidateId:string,artifactHash:string):string{
-  return createHash('sha256')
-    .update(JSON.stringify(['builder-residency-runtime-v1',candidateId,artifactHash]))
-    .digest('hex')
-    .slice(0,10)
+  const key=residencyRunpodRuntimeKey(candidateId,artifactHash)
+  if(!key) throw new Error('residency_runtime_recovery_identity_invalid')
+  return key
 }
 
 export interface BuilderResidencyRuntimeRecoveryResult{

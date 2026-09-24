@@ -73,7 +73,7 @@ export function createCosProductionIngressManifest(input: {
     limits: { deadlineMs },
   })
 
-  if (!decision.allowed) {
+  if (decision.allowed === false) {
     throw new Error(`cos_harness_ingress_denied:${decision.reasons.join(',')}`)
   }
 

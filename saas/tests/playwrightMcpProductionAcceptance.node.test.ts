@@ -20,6 +20,8 @@ test('Production Playwright MCP acceptance uses the exact pinned package and rea
   assert.match(host, /browser_console_messages/)
   assert.match(host, /browser_network_requests/)
   assert.match(host, /browser_take_screenshot/)
+  assert.doesNotMatch(host, /return String\.raw\x60/)
+  assert.match(host, /return \x60/)
 })
 
 test('Production MCP canary preserves Provider Hub and origin policy evidence', () => {

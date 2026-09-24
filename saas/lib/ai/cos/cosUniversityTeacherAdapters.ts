@@ -1,4 +1,5 @@
 import type { UniversityTeacherDefinition } from './cosUniversityTeacherPool.ts'
+import { emitContextWindowTelemetry, planContextWindowRequest } from '../context-window-manager.ts'
 
 export type TeacherGenerationRequest = Readonly<{
   system: string
@@ -300,5 +301,33 @@ export async function generateWithUniversityTeacher(input: {
   if (input.teacher.transport === 'huggingface_job') throw new Error('university_teacher_transport_requires_local_executor')
   const adapter = input.adapterRegistry?.[input.teacher.transport] || BUILTIN_UNIVERSITY_TEACHER_ADAPTERS[input.teacher.transport]
   if (!adapter) throw new Error('university_teacher_transport_adapter_unavailable')
-  return adapter({ teacher: input.teacher, request: input.request, env, fetchImpl })
+
+  const model = modelFor(input.teacher, env)
+  if (!model) return adapter({ teacher: input.teacher, request: input.request, env, fetchImpl })
+
+  // Hosted faculty are a separate paid/provider transport, so they cannot rely on the local
+  // inference seam for context protection. Plan the exact request here before dispatch so every
+  // built-in or buyer-supplied hosted teacher shares the same model-aware context boundary.
+  const system = clean(input.request.system, 20_000)
+  const prompt = clean(input.request.prompt, 100_000)
+  const contextPlan = planContextWindowRequest({
+    model,
+    provider: input.teacher.provider,
+    systemPrompt: system,
+    prompt,
+    requestedOutputTokens: positiveInt(input.request.maxOutputTokens, 1200, 64, 8192),
+    env,
+  })
+  emitContextWindowTelemetry(contextPlan, `university_teacher_${input.teacher.id}`)
+  return adapter({
+    teacher: input.teacher,
+    request: {
+      ...input.request,
+      system,
+      prompt: contextPlan.prompt,
+      maxOutputTokens: contextPlan.maxOutputTokens,
+    },
+    env,
+    fetchImpl,
+  })
 }

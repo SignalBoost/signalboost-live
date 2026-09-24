@@ -1,3 +1,5 @@
+import { contextWindowOutputBudget } from '@/lib/ai/context-window-manager'
+
 // saas/lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts
 // The mass endpoint serves vLLM with --max-model-len 8192. Two Production rejections (2026-09-16) set the rules here:
 // 15:40 UTC, 8 holdout cases with 3360 output tokens; 18:33 UTC, the same 8 cases with 1307 output tokens, rejected as
@@ -80,14 +82,24 @@ export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought. /no_think'
 export const MASS_EVALUATION_MAX_OUTPUT_TOKENS = 1024
 export function massEvaluationOutputTokens(caseCount: number, userPrompt: string): number {
-  const estimatedPromptTokens=Math.ceil((MASS_EVALUATION_SYSTEM_PROMPT.length+userPrompt.length)/MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN)+128
   const desired=caseCount===1
     ? MASS_EVALUATION_MAX_OUTPUT_TOKENS
     : Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(768,caseCount*192))
-  const available=MASS_EVALUATION_MODEL_CONTEXT_TOKENS-estimatedPromptTokens
-  const maxTokens=Math.min(desired,available)
-  if(maxTokens<Math.max(256,caseCount*60))throw new Error(`mass_distilled_evaluation_context_budget_insufficient:cases=${caseCount}:estimatedPromptTokens=${estimatedPromptTokens}`)
-  return maxTokens
+  const minimum=Math.max(256,caseCount*60)
+  const estimatedPromptTokens=Math.ceil((MASS_EVALUATION_SYSTEM_PROMPT.length+userPrompt.length)/MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN)+128
+  try {
+    return contextWindowOutputBudget({
+      contextWindowTokens: MASS_EVALUATION_MODEL_CONTEXT_TOKENS,
+      systemPrompt: MASS_EVALUATION_SYSTEM_PROMPT,
+      prompt: userPrompt,
+      requestedOutputTokens: desired,
+      minOutputTokens: minimum,
+      estimatedCharsPerToken: MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN,
+      fixedOverheadTokens: 128,
+    }).maxOutputTokens
+  } catch {
+    throw new Error(`mass_distilled_evaluation_context_budget_insufficient:cases=${caseCount}:estimatedPromptTokens=${estimatedPromptTokens}`)
+  }
 }
 
 function splitEvenly<T>(items: readonly T[], groups: number): T[][] {

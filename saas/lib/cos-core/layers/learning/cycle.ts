@@ -75,6 +75,8 @@ function learningErrorMessage(error:unknown):string{
  * when multiple acquisition paths intentionally share one source kind.
  */
 export function learningAdapterAllowedForGap(gap:KnowledgeGap,adapter:ContinuousLearningSourceAdapter):boolean{
+  const exact=new Set((gap.allowedAdapterIds??[]).map(value=>String(value).trim()).filter(Boolean))
+  if(exact.size&&(!adapter.id||!exact.has(adapter.id)))return false
   const excluded=new Set((gap.excludedAdapterIds??[]).map(value=>String(value).trim()).filter(Boolean))
   if(adapter.id&&excluded.has(adapter.id))return false
   const allowed=gap.sourceKinds?.filter(Boolean)??[]

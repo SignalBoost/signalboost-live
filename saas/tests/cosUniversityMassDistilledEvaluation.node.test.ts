@@ -119,6 +119,8 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.match(provision, /itmounts-mass-distilled-\$\{suffix\}/)
   assert.match(runner, /massDistilledRuntimeHealth\(endpointId\)/)
   assert.match(runner, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
+  assert.match(runner, /payload\?\.modelReady===true/)
+  assert.match(runner, /gatewayStatus==='ready'\|\|gatewayStatus==='accepting_requests'/)
   assert.doesNotMatch(runner, /health\.workers\.ready>0\|\|health\.workers\.running>0/)
   assert.doesNotMatch(runner, /fetch\(\`\$\{root\}\/ready\`/)
   assert.match(runner, /const READY_TIMEOUT_MS = 280_000/)

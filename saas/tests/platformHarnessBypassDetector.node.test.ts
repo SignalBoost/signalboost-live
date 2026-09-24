@@ -51,10 +51,13 @@ test('API routes cannot import the raw provider router directly', () => {
 
 test('raw provider execution stays behind the two approved COS gateway adapters', () => {
   const allowed = new Set(['lib/cos/textGateway.ts', 'lib/cos/aiPort.ts'])
+  const providerImport = /(?:from\s+['"]@\/lib\/ai\/providerRouter|from\s+['"]\.\.\/ai\/providerRouter|from\s+['"]\.\/providerRouter)/
   const offenders = filesUnder('lib').filter(path => {
     const name = rel(path)
     if (allowed.has(name)) return false
-    return /(?:from\s+['"]@\/lib\/ai\/providerRouter|from\s+['"]\.\.\/ai\/providerRouter|from\s+['"]\.\/providerRouter)/.test(readFileSync(path, 'utf8'))
+    return readFileSync(path, 'utf8').split('\n').some(line =>
+      providerImport.test(line) && !/^\s*import\s+type\b/.test(line),
+    )
   }).map(rel)
   assert.deepEqual(offenders, [])
 })

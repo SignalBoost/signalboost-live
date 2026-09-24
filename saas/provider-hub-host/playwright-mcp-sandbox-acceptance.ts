@@ -398,10 +398,15 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
       cwd: ROOT,
       timeoutMs: ACCEPTANCE_TIMEOUT_MS,
     })
-    const parsed = parseAcceptance(await live.stdout())
+    const liveStdout = await live.stdout()
+    const parsed = parseAcceptance(liveStdout)
     checks.push(...parsed.checks)
     if (!parsed.ok || live.exitCode !== 0) {
-      throw new Error(parsed.error || 'playwright_mcp_live_checks_failed')
+      const stderr = bounded(await live.stderr(), 120)
+      const detail = parsed.error === 'playwright_mcp_acceptance_marker_missing'
+        ? `playwright_mcp_acceptance_marker_missing:exit=${live.exitCode};stderr=${stderr || 'empty'}`
+        : parsed.error
+      throw new Error(detail || 'playwright_mcp_live_checks_failed')
     }
   } catch (error) {
     checks.push(Object.freeze({

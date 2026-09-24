@@ -20,6 +20,7 @@ const tests = [
   'tests/cosUniversityTelemetry.node.test.ts',
   'tests/cosWorkingDistillationDispatch.node.test.ts',
   'tests/platformHarnessFullEnforcement.node.test.ts',
+  'tests/runpodMassDistilledCanaryReliability.node.test.ts',
   'tests/cosUniversityMassEvaluationBacklogGate.node.test.ts',
   'tests/platformHarnessAbsoluteDeadline.node.test.ts',
   'tests/platformHarnessCompensation.node.test.ts',

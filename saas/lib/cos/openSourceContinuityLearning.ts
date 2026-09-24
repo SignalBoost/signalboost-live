@@ -15,6 +15,7 @@ export type OpenSourceContinuityResult = {
   probationary: number
   rejected: Record<string, number>
   sourceErrors: Record<string, number>
+  semanticScholarApiKeyConfigured?: boolean
 }
 
 const OPEN_SOURCE_CONTINUITY_POLICY = {
@@ -104,6 +105,7 @@ export async function runOpenSourceContinuityLearning(input: {
     probationary: result.probationary,
     rejected: result.rejected,
     sourceErrors: result.sourceErrors,
+    semanticScholarApiKeyConfigured: Boolean(String(process.env.SEMANTIC_SCHOLAR_API_KEY || '').trim()),
   }
 
   console.info('[cos-open-source-continuity]', JSON.stringify(summary))

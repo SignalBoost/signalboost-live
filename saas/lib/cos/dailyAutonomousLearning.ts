@@ -130,14 +130,29 @@ const HF_GITHUB_CC0_DAILY_QUERIES = Object.freeze([
   'observability logging metrics tracing',
 ] as const)
 
+const HF_ARXIV_DAILY_QUERIES = Object.freeze([
+  'autonomous software repair agents',
+  'retrieval augmented generation evaluation',
+  'vector database semantic retrieval',
+  'large language model tool use',
+  'distributed systems reliability',
+  'database query optimization',
+  'software testing program repair',
+  'cybersecurity software supply chain',
+  'machine learning systems observability',
+  'multi agent systems coordination',
+  'code generation evaluation',
+  'cloud systems performance isolation',
+] as const)
+
 function utcLearningDay(now: Date): number {
   const value = now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date(0)
   return Math.floor(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()) / 86_400_000)
 }
 
 /**
- * Two zero-cost, bounded, rights-explicit daily study objectives keep the allowlisted Hugging Face
- * corpora from being starved behind the general live-source task queue. Discovery rotates by UTC day
+ * Three zero-cost, bounded daily study objectives keep the allowlisted Hugging Face corpora from
+ * being starved behind the general live-source task queue. Discovery rotates by UTC day
  * so the source does not rediscover the same top rows forever. The exact adapter allowlist means these
  * objectives cannot be satisfied by another public-dataset source, while the normal relevance,
  * confidence, deduplication, storage and internal-embedding gates remain unchanged.
@@ -146,6 +161,7 @@ export function huggingFaceOpenDatasetCurriculum(now: Date = new Date()): Knowle
   const day = utcLearningDay(now)
   const nistQuery = HF_NIST_DAILY_QUERIES[((day % HF_NIST_DAILY_QUERIES.length) + HF_NIST_DAILY_QUERIES.length) % HF_NIST_DAILY_QUERIES.length]
   const githubQuery = HF_GITHUB_CC0_DAILY_QUERIES[((day % HF_GITHUB_CC0_DAILY_QUERIES.length) + HF_GITHUB_CC0_DAILY_QUERIES.length) % HF_GITHUB_CC0_DAILY_QUERIES.length]
+  const arxivQuery = HF_ARXIV_DAILY_QUERIES[((day % HF_ARXIV_DAILY_QUERIES.length) + HF_ARXIV_DAILY_QUERIES.length) % HF_ARXIV_DAILY_QUERIES.length]
 
   return [
     {
@@ -182,6 +198,25 @@ export function huggingFaceOpenDatasetCurriculum(now: Date = new Date()): Knowle
       ],
       sourceKinds: ['public_dataset'],
       allowedAdapterIds: ['hf_github_cc0'],
+      curriculumAligned: true,
+    },
+    {
+      id: 'curriculum:hf-arxiv-metadata-continuous',
+      subject: 'Computer Science & Coding',
+      question: `What recent scientific research metadata is relevant to ${arxivQuery}?`,
+      discoveryQuery: arxivQuery,
+      portableIds: ['cos'],
+      expectedReuse: 40,
+      expectedAvoidedCostUsd: 1,
+      urgency: 98,
+      evidence: [
+        'bounded daily Hugging Face open-dataset curriculum',
+        'huggingface_dataset:librarian-bots/arxiv-metadata-snapshot',
+        'metadata_mirror_license:cc0-1.0',
+        'underlying_paper_training_rights:not_asserted',
+      ],
+      sourceKinds: ['public_dataset'],
+      allowedAdapterIds: ['hf_arxiv_cc0'],
       curriculumAligned: true,
     },
   ]

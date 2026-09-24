@@ -222,7 +222,7 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
     evidenceSink,
   })
 
-  if (!envelope.accepted) {
+  if (envelope.accepted === false) {
     return Object.freeze({
       ok: false,
       runId,

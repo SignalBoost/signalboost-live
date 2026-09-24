@@ -34,6 +34,7 @@ import type {
   GovernancePolicy,
 } from '../agent-gateway/index.ts'
 import { runGoverned } from '../agent-gateway/index.ts'
+import { withHostProductionHarnessIngress } from '../platform-harness/runtime/host-ingress.ts'
 
 /** Mirrors the executor enum in lib/cos/supervisor-thinker-prompt.ts. */
 export type SupervisorExecutor = 'api_executor' | 'code_agent' | 'cli_executor' | 'ui_agent' | 'human'
@@ -125,7 +126,7 @@ export function repairStepToRequest(
   }
 }
 
-export async function dispatchRepairPlan(
+async function dispatchRepairPlanInsideHarness(
   options: DispatchRepairPlanOptions,
 ): Promise<DispatchRepairPlanResult> {
   const resolve = options.resolveAction ?? resolveNothing
@@ -154,4 +155,23 @@ export async function dispatchRepairPlan(
     }
   }
   return { completed: true, results }
+}
+
+
+/** Recovery actuation is never allowed to begin outside the Platform Harness. */
+export async function dispatchRepairPlan(
+  options: DispatchRepairPlanOptions,
+): Promise<DispatchRepairPlanResult> {
+  return withHostProductionHarnessIngress({
+    objective: `Dispatch bounded Self-Healing repair for ${options.incident.incident_id}`,
+    portableId: 'self-healing-supervisor',
+    agentId: options.agentId ?? 'autonomous-supervisor',
+    role: 'self_healing_supervisor',
+    capabilityId: 'self_healing.repair.dispatch',
+    risk: 'consequential',
+    deadlineMs: 300_000,
+    maxConcurrency: 1,
+    maxToolCalls: Math.max(1, options.repairPlan.length),
+    runId: `self-healing-${safeAttemptId(options.incident.incident_id) || 'incident'}-${safeAttemptId(options.executionAttemptId) || 'attempt'}`,
+  }, () => dispatchRepairPlanInsideHarness(options))
 }

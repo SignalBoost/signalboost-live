@@ -1,3 +1,4 @@
+import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
 // saas/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
@@ -522,7 +523,7 @@ async function submitClaim(input:{claim:IndependentEvaluatorClaim;candidateId:st
   const bypassSecret=clean(process.env.VERCEL_AUTOMATION_BYPASS_SECRET,200);const publicOrigin=clean(process.env.ITMOUNTS_PUBLIC_ORIGIN||process.env.NEXT_PUBLIC_APP_URL,2000);const target=!bypassSecret&&publicOrigin?publicOrigin:origin
   const response=await fetch(new URL('/api/internal/cos/university-independent-evaluator/evidence',target),{method:'POST',headers:{'Content-Type':'application/json','x-itmounts-evaluator-profile':COS_UNIVERSITY_INDEPENDENT_EVALUATOR_PROFILE,'x-itmounts-evaluator-timestamp':timestamp,'x-itmounts-evaluator-idempotency-key':idempotencyKey,'x-itmounts-evaluator-signature':signature,...(bypassSecret?{'x-vercel-protection-bypass':bypassSecret}:{})},body:rawBody,signal:AbortSignal.timeout(timeout)});if(!response.ok)throw new Error(`independent_evaluator_evidence_http_${response.status}`)}
 
-export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvaluationClaim;deadlineMs:number;now?:Date}){
+async function runMassDistilledArtifactEvaluationInsideHarness(input:{claim:MassEvaluationClaim;deadlineMs:number;now?:Date}){
   if(input.claim.maxEndpointCalls!==ENDPOINT_CALLS||input.claim.maxJudgeCalls!==JUDGE_CALLS||input.claim.maxRuntimeWakeAttempts!==1||input.claim.maxEstimatedRuntimeWakeCostUsd<=0||input.claim.maxEstimatedRuntimeWakeCostUsd>0.2)throw new Error('mass_distilled_evaluation_claim_ceiling_invalid')
   const now=input.now||new Date();const training=await massRun(input.claim,now);const age=now.getTime()-training.trainedAt;if(age<MASS_DISTILLED_RETENTION_DELAY_MS)throw new Error('mass_distilled_evaluation_retention_delay_not_met')
   const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs,candidateId:input.claim.candidateId,legacyHosted:training.legacyHosted});const model=await servedCandidateModel(input.claim);await waitReady(input.claim.endpointId,input.deadlineMs)
@@ -584,4 +585,25 @@ zeroScoreJudgeExcerpts:Object.fromEntries(([['holdout',holdout],['safety',safety
     const lifecycle=await db.from('cos_local_distillation_artifacts').update({status:evaluationPassed?'runtime_pending':'quarantined',updated_at:now.toISOString()}).eq('candidate_id',input.claim.candidateId).eq('trained_artifact_hash',input.claim.artifactHash).eq('status','evaluation_pending');if(lifecycle.error)throw lifecycle.error
     return Object.freeze({ok:true as const,candidateId:input.claim.candidateId,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,endpointId:input.claim.endpointId,model,evaluatorId,holdout:{baselineScore:holdout.baselineScore,trainedArtifactScore:holdout.candidateScore,improved:holdoutImproved,cases:holdoutCases.length},safety:{score:safety.candidateScore,baselineScore:safety.baselineScore,passed:safetyPassed,absoluteThresholdMet:safetyAbsoluteThresholdMet},transfer:{baselineScore:transfer.baselineScore,trainedArtifactScore:transfer.candidateScore,passed:transferPassed},retention:{baselineScore:retention.baselineScore,trainedArtifactScore:retention.candidateScore,passed:retentionPassed,artifactAgeSeconds:Math.floor(age/1000)},evaluationPassed,nextStatus:evaluationPassed?'runtime_pending':'quarantined',productionTrafficAuthorized:false,endpointCalls:budget.used,judgeCalls:JUDGE_CALLS})
   }finally{if(keepalive)clearInterval(keepalive)}
+}
+
+
+/** Exact-artifact independent evaluation is always bound to a Production HarnessRun. */
+export async function runMassDistilledArtifactEvaluation(
+  input: Parameters<typeof runMassDistilledArtifactEvaluationInsideHarness>[0],
+): ReturnType<typeof runMassDistilledArtifactEvaluationInsideHarness> {
+  const remaining = Math.max(1, input.deadlineMs - Date.now())
+  return withHostProductionHarnessIngress({
+    objective: `Evaluate exact mass-distilled artifact ${input.claim.candidateId}`,
+    portableId: 'cos-university-evaluator',
+    agentId: 'cos-university-independent-evaluator',
+    role: 'independent_evaluator',
+    capabilityId: 'university.evaluation.execute',
+    risk: 'write',
+    deadlineMs: remaining,
+    maxConcurrency: 1,
+    maxToolCalls: input.claim.maxEndpointCalls + input.claim.maxJudgeCalls + input.claim.maxRuntimeWakeAttempts,
+    maxCostUsd: input.claim.maxEstimatedRuntimeWakeCostUsd,
+    runId: `mass-eval-${input.claim.candidateId}`,
+  }, () => runMassDistilledArtifactEvaluationInsideHarness(input))
 }

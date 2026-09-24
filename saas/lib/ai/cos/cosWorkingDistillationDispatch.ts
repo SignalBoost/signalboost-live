@@ -618,6 +618,20 @@ export async function dispatchWorkingCosTraining(input: {
   })
 }
 
+async function readRegisteredRuntimeRollback(db: any, candidateId: string) {
+  const result = await db.from('cos_working_distillation_candidates')
+    .select('rollback_artifact_ref,baseline_identity')
+    .eq('candidate_id', candidateId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (result.error) throw result.error
+  const rollbackArtifactRef = clean(result.data?.rollback_artifact_ref, 2000)
+  const baselineIdentity = clean(result.data?.baseline_identity, 500)
+  if (!rollbackArtifactRef || !baselineIdentity) throw new Error('working_cos_callback_runtime_rollback_missing')
+  return Object.freeze({ rollbackArtifactRef, baselineIdentity })
+}
+
 async function readDispatchIntent(db: any, candidateId: string, idempotencyKey: string) {
   const result = await db.from('cos_working_distillation_job_events')
     .select('operation,candidate_id,idempotency_key,runtime_binding_key,runtime_digest,base_model_id,base_model_revision,dataset_hash,training_manifest_hash,holdout_manifest_hash,evidence,created_at')
@@ -819,12 +833,23 @@ export async function recordWorkingCosTrainingExecutorEvidence(
   if (recordedEvidence.trainedArtifactId !== trainedArtifactId || recordedEvidence.trainedArtifactHash !== artifactHash) {
     throw new Error('working_cos_callback_rollback_artifact_binding_invalid')
   }
-  const rollbackArtifactRef = clean(input.rollbackArtifactRef, 2000)
-  if (!rollbackArtifactRef) throw new Error('working_cos_callback_rollback_ref_missing')
+  const trainingRollbackArtifactRef = clean(input.rollbackArtifactRef, 2000)
+  if (!trainingRollbackArtifactRef) throw new Error('working_cos_callback_rollback_ref_missing')
+  const runtimeRollback = await readRegisteredRuntimeRollback(db, candidateId)
+  const expectedTrainingRollback = `hf://models/${baseModel}`
+  if (trainingRollbackArtifactRef !== expectedTrainingRollback) {
+    throw new Error('working_cos_callback_training_rollback_binding_invalid')
+  }
+  const rollbackArtifactRef = runtimeRollback.rollbackArtifactRef
   const recorded = await recordFineTuneExecutorEvent(db, {
     candidateId,
     claim,
-    evidence: { ...common, rollbackArtifactRef },
+    evidence: {
+      ...common,
+      rollbackArtifactRef,
+      trainingRollbackArtifactRef,
+      workingCosBaselineIdentity: runtimeRollback.baselineIdentity,
+    },
   })
   await recordJobEvent(db, {
     candidateId,
@@ -839,7 +864,13 @@ export async function recordWorkingCosTrainingExecutorEvidence(
     datasetHash,
     trainingManifestHash,
     holdoutManifestHash,
-    evidence: { claim, fineTuneEventKey: recorded.eventKey, rollbackArtifactRef },
+    evidence: {
+      claim,
+      fineTuneEventKey: recorded.eventKey,
+      rollbackArtifactRef,
+      trainingRollbackArtifactRef,
+      workingCosBaselineIdentity: runtimeRollback.baselineIdentity,
+    },
   })
   return Object.freeze({ ok: true as const, candidateId, claim, rollbackArtifactRef })
 }

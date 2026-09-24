@@ -13,9 +13,21 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await ensureWorkingCosCandidateReadiness()
+    console.info('[working-cos-readiness]', JSON.stringify({
+      ok: true,
+      candidateId: result.candidateId,
+      bundleKey: result.bundleKey,
+      datasetHash: result.datasetHash,
+      itemCount: result.itemCount,
+      subjectCount: result.subjectCount,
+      runtimeModel: result.runtimeModel,
+      runtimeDigest: result.runtimeDigest,
+      nextGate: result.nextGate,
+    }))
     return NextResponse.json({ ok: true, ...result })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    console.warn('[working-cos-readiness]', JSON.stringify({ ok: false, error: message }))
     return NextResponse.json({ ok: false, error: message }, { status: 503 })
   }
 }

@@ -508,6 +508,29 @@ export async function GET() {
       }
     }
 
+    let workingCosCandidate: {
+      candidate_id?: unknown
+      status?: unknown
+      next_gate?: unknown
+      created_at?: unknown
+    } | null = null
+    if (
+      workingCosBundle.eligible
+      && workingCosRuntimeBinding?.eligible
+      && workingCosBundle.bundleKey
+      && workingCosRuntimeBinding.baselineIdentity
+    ) {
+      const candidateResult = await db.from('cos_working_distillation_candidates')
+        .select('candidate_id,status,next_gate,created_at')
+        .eq('bundle_key', workingCosBundle.bundleKey)
+        .eq('baseline_identity', workingCosRuntimeBinding.baselineIdentity)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (candidateResult.error) throw candidateResult.error
+      workingCosCandidate = candidateResult.data
+    }
+
     const hfObservedCostUsd24h = recentJobs.reduce(
       (total: number, job: any) => total + n(job.observed_cost_usd),
       0,
@@ -547,13 +570,18 @@ export async function GET() {
         runtimeBindingEligible: workingCosRuntimeBinding?.eligible === true,
         runtimeBindingBlockers: workingCosRuntimeBinding?.blockers || [],
         runtimeBindingSource: workingCosRuntimeBinding?.bindingSource || null,
+        candidateId: text(workingCosCandidate?.candidate_id, 240) || null,
+        candidateStatus: text(workingCosCandidate?.status, 80) || null,
+        candidateCreatedAt: iso(workingCosCandidate?.created_at),
         automaticTrainingAuthorized: false,
         productionTrafficAuthorized: false,
         nextGate: !workingCosBundle.eligible
           ? 'balanced_bundle_supply'
-          : workingCosRuntimeBinding?.eligible
-            ? workingCosRuntimeBinding.nextGate
-            : 'runtime_binding',
+          : !workingCosRuntimeBinding?.eligible
+            ? 'runtime_binding'
+            : workingCosCandidate
+              ? text(workingCosCandidate.next_gate, 120) || 'bounded_training_dispatch'
+              : 'working_cos_candidate_registration',
       },
       providers: Array.from(providers.values())
         .sort((a, b) => b.calls - a.calls || a.id.localeCompare(b.id)),

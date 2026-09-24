@@ -43,7 +43,51 @@ const REQUEST_TIMEOUT_MS = 8_000
 // however, only proves boot + exact binding and historically succeeds on 16 GB. Keep evaluator/graduate
 // policy 24 GB-only while allowing the canary to use RunPod's ordered 24 -> 16 GB availability fallback.
 const APPROVED_POOLS = ['AMPERE_24'] as const
-const CANARY_APPROVED_POOLS = ['AMPERE_24', 'AMPERE_16'] as const
+// Production 2026-09-24 20:34-21:01 UTC: three of five canaries ended with RunPod allocating no worker at all
+// (0 ready, 0 initializing) because neither Ampere pool had capacity. ADA_24 (RTX 4090, 24 GB) is a third,
+// ordered fallback for the SHORT canary only; the evaluator stays AMPERE_24-only above and narrows any
+// endpoint back to it. ADA_24 costs more per hour, so every canary pool carries an explicit hourly price
+// ceiling that is re-checked against RunPod's live catalog before use, and each ceiling must keep the
+// worst-case canary inside the unchanged absolute $0.20 per-canary authorization.
+const CANARY_APPROVED_POOLS = ['AMPERE_24', 'AMPERE_16', 'ADA_24'] as const
+export const MASS_DISTILLED_CANARY_POOL_PRICE_CEILING_USD_PER_HOUR = Object.freeze({
+  AMPERE_24: 0.69,
+  AMPERE_16: 0.69,
+  ADA_24: 1.10,
+} as const)
+// Conservative worst case: full readiness wait + full first-request window + idle scale-down tail.
+export const MASS_DISTILLED_CANARY_WORST_CASE_BILLED_SECONDS =
+  MASS_DISTILLED_READY_TIMEOUT_MS / 1000 + MASS_DISTILLED_CANARY_TIMEOUT_MS / 1000 + MASS_DISTILLED_IDLE_TIMEOUT_SECONDS
+// Used only when the live catalog cannot be read: the pools that were already approved at the old $0.69 cap.
+const CANARY_CATALOG_UNAVAILABLE_POOLS = ['AMPERE_24', 'AMPERE_16'] as const
+
+type CatalogGpu = { pool?: string; manufacturer?: string; memory?: number; availability?: string; price?: { serverless?: number | null } }
+
+export function massDistilledCanaryWorstCaseCostUsd(pricePerHourUsd: number): number {
+  return (MASS_DISTILLED_CANARY_WORST_CASE_BILLED_SECONDS * pricePerHourUsd) / 3600
+}
+
+/**
+ * Pure pool selection. A canary pool is used only when RunPod's catalog shows an available NVIDIA 16-24 GB GPU
+ * in it at or below that pool's explicit hourly ceiling, and that price keeps the worst-case canary inside the
+ * absolute per-canary cost authorization. Order is preserved (cheapest pools first).
+ */
+export function selectMassDistilledCanaryPools(gpus: readonly CatalogGpu[] | null | undefined): string[] {
+  if (!Array.isArray(gpus)) return [...CANARY_CATALOG_UNAVAILABLE_POOLS]
+  return CANARY_APPROVED_POOLS.filter(pool => {
+    const ceiling = MASS_DISTILLED_CANARY_POOL_PRICE_CEILING_USD_PER_HOUR[pool]
+    return gpus.some(gpu => {
+      const price = Number(gpu?.price?.serverless)
+      const memory = Number(gpu?.memory || 0)
+      return clean(gpu?.pool, 80) === pool
+        && clean(gpu?.manufacturer, 40).toUpperCase() === 'NVIDIA'
+        && memory >= 16 && memory <= 24
+        && clean(gpu?.availability, 40).toUpperCase() !== 'NONE'
+        && Number.isFinite(price) && price > 0 && price <= ceiling
+        && massDistilledCanaryWorstCaseCostUsd(price) <= MASS_DISTILLED_CANARY_MAX_COST_USD
+    })
+  })
+}
 
 export async function massDistilledServerlessWorkerCapacity() {
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
@@ -445,7 +489,16 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
 
 /** Short canary only: prefer 24 GB but permit 16 GB fallback for worker availability. */
 export async function provisionMassDistilledCanaryRuntime(input: MassDistilledRuntimeArtifact) {
-  return provisionMassDistilledRuntimeWithPools(input, CANARY_APPROVED_POOLS)
+  let catalogGpus: CatalogGpu[] | null = null
+  try {
+    const catalog = await requestV2<{ gpus?: CatalogGpu[] }>('/catalog/gpus')
+    catalogGpus = Array.isArray(catalog?.gpus) ? catalog.gpus : null
+  } catch {
+    catalogGpus = null
+  }
+  const pools = selectMassDistilledCanaryPools(catalogGpus)
+  if (!pools.length) throw new Error('mass_distilled_runtime_gpu_capacity_unavailable')
+  return provisionMassDistilledRuntimeWithPools(input, pools)
 }
 
 /**

@@ -22,7 +22,8 @@ test('short canary gets 24-to-16GB availability fallback before the paid invocat
   assert.ok(provisionIndex >= 0)
   assert.ok(invocationIndex > provisionIndex)
   assert.match(provisionV2, /export async function provisionMassDistilledCanaryRuntime/)
-  assert.match(provisionV2, /provisionMassDistilledRuntimeWithPools\(input, CANARY_APPROVED_POOLS\)/)
+  assert.match(provisionV2, /const pools = selectMassDistilledCanaryPools\(catalogGpus\)/)
+  assert.match(provisionV2, /return provisionMassDistilledRuntimeWithPools\(input, pools\)/)
   assert.match(provisionV2, /gpu: \{ pools: \[\.\.\.approvedPools\], count: 1 \}/)
 })
 

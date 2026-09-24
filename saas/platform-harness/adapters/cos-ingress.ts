@@ -9,6 +9,8 @@ export const COS_PRIMARY_HARNESS_AGENT_ID = 'cos-primary'
 export const COS_PRIMARY_HARNESS_PORTABLE_ID = 'cos'
 export const COS_PRIMARY_HARNESS_ENVIRONMENT_ID = 'itmounts-production'
 export const COS_PRIMARY_HARNESS_DEADLINE_MS = 285_000
+export const COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY = 'agent.software.delegate'
+export const COS_PRIMARY_SOFTWARE_DELEGATION_SCOPE = 'cos.specialist.software.delegate'
 
 export type CosHarnessIngressContext = {
   manifest: HarnessManifest
@@ -43,6 +45,7 @@ export function createCosProductionIngressManifest(input: {
   runId?: string
   tenantId?: string
   deadlineMs?: number
+  requestedCapabilities?: readonly string[]
 }): HarnessManifest {
   const runId = clean(input.runId, 160) || `cos-${randomUUID()}`
   const objective = clean(input.objective, 4_000) || 'Complete one COS request.'
@@ -51,6 +54,20 @@ export function createCosProductionIngressManifest(input: {
     COS_PRIMARY_HARNESS_DEADLINE_MS,
     Math.max(1, Math.floor(input.deadlineMs ?? COS_PRIMARY_HARNESS_DEADLINE_MS)),
   )
+  const requestedCapabilities = [...new Set(input.requestedCapabilities ?? [])]
+  const unsupported = requestedCapabilities.filter(
+    capability => capability !== COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY,
+  )
+  if (unsupported.length) {
+    throw new Error(`cos_harness_ingress_capability_forbidden:${unsupported.join(',')}`)
+  }
+  const grants = requestedCapabilities.map(capability => Object.freeze({
+    id: capability,
+    environments: Object.freeze(['production'] as const),
+    mutating: true,
+    risk: 'write' as const,
+    scopes: Object.freeze([COS_PRIMARY_SOFTWARE_DELEGATION_SCOPE]),
+  }))
 
   const request = createProductionHarnessRequest({
     runId,
@@ -61,7 +78,7 @@ export function createCosProductionIngressManifest(input: {
     role: 'chief_of_staff',
     environmentId: COS_PRIMARY_HARNESS_ENVIRONMENT_ID,
     environmentClass: 'production',
-    requestedCapabilities: [],
+    requestedCapabilities,
     limits: { deadlineMs },
   })
 
@@ -70,7 +87,7 @@ export function createCosProductionIngressManifest(input: {
     verified: true,
     verifiedBy: 'host',
     environments: ['production'],
-    capabilities: [],
+    capabilities: grants,
     limits: { deadlineMs },
   })
 

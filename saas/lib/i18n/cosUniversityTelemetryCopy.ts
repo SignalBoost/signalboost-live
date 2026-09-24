@@ -28,6 +28,13 @@ type Copy = Readonly<{
   workingCosSubjects: string
   workingCosItems: string
   workingCosNextGate: string
+  workingCosPrepare: string
+  workingCosPreparing: string
+  workingCosStartTraining: string
+  workingCosTraining: string
+  workingCosPreparationAccepted: string
+  workingCosTrainingAccepted: string
+  workingCosActionWarning: string
   providersTitle: string
   providersExplanation: string
   teacherCalls: string
@@ -69,7 +76,7 @@ type Copy = Readonly<{
 export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguage, Copy> = {
   en: {
     title: 'COS University — Distillation Telemetry',
-    subtitle: 'Read-only Production view. Auto-refreshes every 60 seconds.',
+    subtitle: 'Production telemetry with owner-only Working COS dispatch controls. Auto-refreshes every 60 seconds.',
     updated: 'Updated',
     refresh: 'Refresh',
     refreshing: 'Refreshing…',
@@ -94,6 +101,13 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workingCosSubjects: 'Subjects',
     workingCosItems: 'Items',
     workingCosNextGate: 'Next gate',
+    workingCosPrepare: 'Prepare Working COS dataset',
+    workingCosPreparing: 'Preparing…',
+    workingCosStartTraining: 'Start bounded Working COS training',
+    workingCosTraining: 'Starting training…',
+    workingCosPreparationAccepted: 'Working COS dataset preparation accepted',
+    workingCosTrainingAccepted: 'Working COS bounded training accepted',
+    workingCosActionWarning: 'Owner-only explicit dispatch. Provider cost remains hard-capped and Production activation stays blocked.',
     providersTitle: 'Frontier teacher providers · last 24h',
     providersExplanation: 'Calls and tokens are durable API telemetry. Provider account charges are not inferred here.',
     teacherCalls: 'teacher calls',
@@ -111,7 +125,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     training: 'Training',
     campaignBudget: 'Campaign budget',
     noRuns: 'No runs found.',
-    footer: 'This surface is read-only. It does not authorize spend, retrigger jobs, change providers, or promote artifacts.',
+    footer: 'Telemetry is read-only except the explicit owner-only Working COS dispatch controls. No control here promotes or activates an artifact.',
     unknownSubject: 'Unknown subject',
     unknownStage: 'Unknown',
     artifactsTitle: 'Evaluation & graduation',
@@ -222,6 +236,13 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workingCosSubjects: 'Assuntos',
     workingCosItems: 'Itens',
     workingCosNextGate: 'Próximo gate',
+    workingCosPrepare: 'Preparar dados do Working COS',
+    workingCosPreparing: 'Preparando…',
+    workingCosStartTraining: 'Iniciar treinamento limitado do Working COS',
+    workingCosTraining: 'Iniciando treinamento…',
+    workingCosPreparationAccepted: 'Preparação dos dados do Working COS aceita',
+    workingCosTrainingAccepted: 'Treinamento limitado do Working COS aceito',
+    workingCosActionWarning: 'Somente proprietário, despacho explícito. O custo continua limitado e a ativação em Produção permanece bloqueada.',
     providersTitle: 'Provedores professores frontier · últimas 24 h',
     providersExplanation: 'Chamadas e tokens são telemetria persistente de API. Os custos das contas dos provedores não são inferidos aqui.',
     teacherCalls: 'chamadas de professor',
@@ -286,6 +307,13 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workingCosSubjects: 'Tematy',
     workingCosItems: 'Elementy',
     workingCosNextGate: 'Następna bramka',
+    workingCosPrepare: 'Przygotuj dane Working COS',
+    workingCosPreparing: 'Przygotowywanie…',
+    workingCosStartTraining: 'Uruchom ograniczone trenowanie Working COS',
+    workingCosTraining: 'Uruchamianie treningu…',
+    workingCosPreparationAccepted: 'Przygotowanie danych Working COS przyjęte',
+    workingCosTrainingAccepted: 'Ograniczone trenowanie Working COS przyjęte',
+    workingCosActionWarning: 'Tylko właściciel, jawne uruchomienie. Koszt pozostaje twardo ograniczony, a aktywacja Produkcji zablokowana.',
     providersTitle: 'Dostawcy nauczycieli frontier · ostatnie 24 h',
     providersExplanation: 'Wywołania i tokeny są trwałą telemetrią API. Opłaty kont dostawców nie są tutaj szacowane.',
     teacherCalls: 'wywołania nauczyciela',
@@ -350,6 +378,13 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workingCosSubjects: 'Предметы',
     workingCosItems: 'Материалы',
     workingCosNextGate: 'Следующий шлюз',
+    workingCosPrepare: 'Подготовить данные Working COS',
+    workingCosPreparing: 'Подготовка…',
+    workingCosStartTraining: 'Запустить ограниченное обучение Working COS',
+    workingCosTraining: 'Запуск обучения…',
+    workingCosPreparationAccepted: 'Подготовка данных Working COS принята',
+    workingCosTrainingAccepted: 'Ограниченное обучение Working COS принято',
+    workingCosActionWarning: 'Только владелец, явный запуск. Стоимость жёстко ограничена, а активация в Production остаётся заблокированной.',
     providersTitle: 'Провайдеры frontier-учителей · последние 24 ч',
     providersExplanation: 'Вызовы и токены — сохранённая API-телеметрия. Списания со счетов провайдеров здесь не рассчитываются.',
     teacherCalls: 'вызовы учителя',

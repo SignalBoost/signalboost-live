@@ -97,7 +97,9 @@ async function enqueueRepositoryRepair(input: {
   objective: string
   userId: string
   target: SignalBoostRepositoryRepairTarget
+  signal?: AbortSignal
 }) {
+  if (input.signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
   const conversationId = conversationIdFrom(input.body) || crypto.randomUUID()
   const objective = readBuilderObjective({ objective: input.objective }).objective
   const job = await enqueueSignalBoostRepositoryRepairJob({
@@ -106,6 +108,11 @@ async function enqueueRepositoryRepair(input: {
     objective,
     target: input.target,
   })
+  if (input.signal?.aborted) return NextResponse.json({
+    reply: 'COS Software Specialist stopped before starting repository repair because its Harness deadline expired.',
+    execution_allowed: false,
+    external_action_taken: false,
+  }, { status: 503 })
   after(async () => { await runBuilderJob(job.jobId, input.userId) })
   return NextResponse.json({
     ...job,
@@ -122,9 +129,13 @@ async function enqueueRepositoryRepair(input: {
  * a coding brain. This function owns the software-specialist admission/execution decision while
  * preserving the existing public-workspace and owner-only repository-repair authority boundaries.
  */
-async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistRequest): Promise<NextResponse | null> {
+async function tryCosSoftwareSpecialistLegacy(
+  input: CosSoftwareSpecialistRequest,
+  signal?: AbortSignal,
+): Promise<NextResponse | null> {
   let objective = String(input.objective || '').trim()
   if (!objective) return null
+  if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
 
   const context = routingContext(input.body)
   const sourceAttached = hasSourceAttachment(context)
@@ -166,12 +177,14 @@ async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistReques
           if (job.status !== 'succeeded' || !proposal || !proposalMatches(proposal, {
             sourceJobId: job.id, fingerprint: await readBuilderWorkspaceFingerprint(userId, job.workspaceId), priorAnswer, now: Date.now(),
           })) return NextResponse.json({ reply: 'There is no current, unchanged Builder proposal to apply. Ask me to suggest the next improvement for this project.', execution_allowed: false })
+          if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
           const queued = await enqueueBuilderJob({ jobId: proposal.id, userId, conversationId, workspaceId: job.workspaceId,
             objective: proposal.objective, jobKind: 'standard', ownerAuthorized: false,
             metadata: { approvedProposalFingerprint: proposal.fingerprint, proposalSourceJobId: job.id,
               projectContext: { previousJobId: job.id, previousObjective: job.objective, previousStatus: job.status, previousCommands: [] } },
             runningReply: runningReply(proposal.id),
           })
+          if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
           after(async () => { await runBuilderJob(queued.jobId, userId) })
           return NextResponse.json({ ...queued, workspaceId: job.workspaceId, status: 'queued', source: 'cos-builder',
             ...softwareSpecialistFields('software.build') }, { status: 202 })
@@ -227,6 +240,7 @@ async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistReques
         objective,
         userId: access.userId,
         target,
+        signal,
       })
     }
   }
@@ -270,6 +284,7 @@ async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistReques
   }
 
   const workspaceId = project.workspaceId || workspaceIdFrom(input.body)
+  if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
   await workspace.ensureWorkspace(workspaceId)
   let stagedFiles = extractBuilderSourceFiles([
     ...(Array.isArray(input.body?.files) ? input.body.files : []),
@@ -285,7 +300,10 @@ async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistReques
       return NextResponse.json({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 422 })
     }
   }
-  for (const file of stagedFiles) await workspace.writeFile(workspaceId, file.path, file.content)
+  for (const file of stagedFiles) {
+    if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
+    await workspace.writeFile(workspaceId, file.path, file.content)
+  }
 
   const conversationId = conversationIdFrom(input.body) || crypto.randomUUID()
   const jobId = crypto.randomUUID()
@@ -294,6 +312,7 @@ async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistReques
   const specialistSkill = debugPlan ? 'software.repair' : 'software.build'
 
   try {
+    if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
     await enqueueBuilderJob({
       jobId,
       workspaceId,
@@ -324,6 +343,7 @@ async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistReques
       ...softwareSpecialistFields(specialistSkill),
     }, { status: 422 })
   }
+  if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
   after(async () => { await runBuilderJob(jobId, builderUserId) })
 
   return NextResponse.json({
@@ -404,7 +424,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     objective,
     tenantId,
     parentManifest: existingParent,
-    execute: () => tryCosSoftwareSpecialistLegacy(input),
+    execute: signal => tryCosSoftwareSpecialistLegacy(input, signal),
   })
 
   if (harness.ok === false) {

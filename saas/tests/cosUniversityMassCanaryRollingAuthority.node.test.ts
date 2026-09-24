@@ -359,6 +359,68 @@ test('a second cold-start timeout on the same runtime falls back to the long fai
   assert.equal(decision.artifact.candidateId, b.candidateId)
 })
 
+test('RunPod 502/503/504 are infrastructure failures and do not spend substantive attempts', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const events = [
+    event(a, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T14:00:00.000Z', { expiresAt: '2026-09-17T14:30:00.000Z' }, { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF }),
+    event(a, 'local_distilled_runtime_canary_failed', '2026-09-17T14:10:00.000Z', {}, { error:'HTTP 502' }),
+    event(a, 'local_distilled_runtime_canary_failed', '2026-09-17T14:20:00.000Z', {}, { error:'HTTP 503' }),
+    event(a, 'local_distilled_runtime_canary_failed', '2026-09-17T14:30:00.000Z', {}, { error:'HTTP 504' }),
+  ]
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a], events, now, enabled:true })
+  assert.ok('artifact' in decision, `gateway infrastructure failures must remain retryable: ${JSON.stringify(decision)}`)
+})
+
+test('one RunPod 502 with a live worker may resume the same exact runtime after the short cooldown', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const failedAt = new Date(now.getTime() - 2 * 60_000).toISOString()
+  const failure = event(a, 'local_distilled_runtime_canary_failed', failedAt, {}, {
+    error:'HTTP 502',
+    endpointId:'wy0sldg4am4tts',
+    runtimeKey:'9a492f8f63',
+    healthAfter:{workers:{idle:0,ready:0,running:1,initializing:0}},
+  })
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a], events:[failure], now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.evidence.coldStartResume, true)
+  assert.equal(decision.evidence.coldStartResumeEndpointId, 'wy0sldg4am4tts')
+  assert.equal(decision.evidence.coldStartResumeRuntimeKey, '9a492f8f63')
+})
+
+test('the Production timeout then 502 sequence stays bounded to one same-runtime continuation', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const first = event(a, 'local_distilled_runtime_canary_failed', new Date(now.getTime() - 8 * 60_000).toISOString(), {}, {
+    error:MASS_CANARY_COLD_START_FAILURE,
+    endpointId:'wy0sldg4am4tts',
+    runtimeKey:'9a492f8f63',
+    healthAfter:{workers:{idle:0,ready:0,running:1,initializing:0}},
+  })
+  const second = event(a, 'local_distilled_runtime_canary_failed', new Date(now.getTime() - 2 * 60_000).toISOString(), {}, {
+    error:'HTTP 502',
+    endpointId:'wy0sldg4am4tts',
+    runtimeKey:'9a492f8f63',
+    healthAfter:{workers:{idle:0,ready:0,running:1,initializing:0}},
+  })
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a,b], events:[first,second], now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId, b.candidateId)
+})
+
+test('a gateway failure with no live worker is infrastructure but does not pin a dead endpoint', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const recent = event(a, 'local_distilled_runtime_canary_failed', new Date(now.getTime() - 2 * 60_000).toISOString(), {}, {
+    error:'HTTP 503',
+    endpointId:'deadendpoint1',
+    runtimeKey:'40461bb31f',
+    healthAfter:{workers:{idle:0,ready:0,running:0,initializing:0}},
+  })
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a,b], events:[recent], now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId, b.candidateId)
+})
+
 test('RunPod no-worker failures are infrastructure, yield the artifact, and never reuse the dead endpoint', () => {
   assert.equal(MASS_CANARY_NO_WORKER_FAILURE, 'mass_distilled_runtime_worker_not_ready')
   const a = artifact(1, '2026-09-15T00:00:00.000Z')

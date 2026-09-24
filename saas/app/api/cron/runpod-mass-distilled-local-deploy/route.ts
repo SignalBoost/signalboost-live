@@ -342,10 +342,25 @@ export async function GET(req:NextRequest){
     if(coldStartResume && provisioned.endpointId!==coldStartResume.endpointId) {
       throw new Error('mass_distilled_cold_start_resume_endpoint_mismatch')
     }
+    const resumeEvidence=coldStartResume?{
+      coldStartResume:true,
+      coldStartResumeEndpointId:coldStartResume.endpointId,
+      coldStartResumeRuntimeKey:coldStartResume.runtimeKey,
+    }:{}
+    // RunPod's endpoint control plane exposes the configured/eligible pool set, not the physical GPU
+    // ultimately assigned to a worker. Persist exactly what is observable and mark actual-worker pool
+    // identity as unobserved rather than guessing it from the endpoint configuration.
+    const gpuTelemetry={
+      configuredGpuPools:provisioned.gpuPools,
+      canaryEligibleGpuPools:provisioned.canaryEligibleGpuPools,
+      canaryCatalogObserved:provisioned.canaryCatalogObserved,
+      canaryCatalogServerlessPriceUsdPerHourByPool:provisioned.canaryCatalogServerlessPriceUsdPerHourByPool,
+      actualWorkerGpuPoolObserved:provisioned.actualWorkerGpuPoolObserved,
+    }
 
     // This durable marker is the exact boundary where the single canary invocation becomes consumed.
     // It is written before /ready, because the first endpoint request can wake paid compute.
-    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:INVOCATION_STARTED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...(coldStartResume?{coldStartResume:true}:{}),providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:INVOCATION_STARTED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
     providerInvocationStarted=true
 
     const canary=await canaryMassDistilledRuntime({endpointId:provisioned.endpointId,modelName:provisioned.modelName})
@@ -354,13 +369,13 @@ export async function GET(req:NextRequest){
     catch(error){healthAfter={ok:false,error:error instanceof Error?clean(error.message,300):'mass_distilled_health_read_failed'}}
 
     if(!canary.ok){
-      await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,httpStatus:canary.httpStatus,error:clean(canary.error,300),healthAfter,readyTimeoutMs:MASS_DISTILLED_READY_TIMEOUT_MS,canaryTimeoutMs:MASS_DISTILLED_CANARY_TIMEOUT_MS,idleTimeoutSeconds:MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+      await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,httpStatus:canary.httpStatus,error:clean(canary.error,300),healthAfter,readyTimeoutMs:MASS_DISTILLED_READY_TIMEOUT_MS,canaryTimeoutMs:MASS_DISTILLED_CANARY_TIMEOUT_MS,idleTimeoutSeconds:MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
       await laneStatus('failed','canary_failed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,httpStatus:canary.httpStatus,error:clean(canary.error,300)})
       return NextResponse.json({ok:false,deployed:true,canaryPassed:false,candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,error:canary.error},{status:503})
     }
 
     const responseHash=hash(canary.text||'')
-    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false,healthAfter}})
+    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false,healthAfter}})
     await recordFineTuneCanary({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactId:runtimeArtifact.artifactId,artifactHash:runtimeArtifact.artifactHash,revisionKey,endpointId:provisioned.endpointId,responseHash})
     await laneStatus('worked','canary_passed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,model:provisioned.modelName})
     return NextResponse.json({ok:true,deployed:true,canaryPassed:true,candidateId:runtimeArtifact.candidateId,artifactHash:runtimeArtifact.artifactHash,endpointId:provisioned.endpointId,model:provisioned.modelName,productionTrafficAuthorized:false})

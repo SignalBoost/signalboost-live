@@ -95,10 +95,15 @@ function allForArtifact(events: readonly CanaryEvent[], artifact: CanaryArtifact
 
 function claim(event: CanaryEvent): string { return String(event.evidence?.claim || '') }
 
+function canaryTransientGatewayFailure(error: unknown): boolean {
+  return /^http (502|503|504)(?::|$)/.test(String(error || '').trim().toLowerCase())
+}
+
 function canaryInfrastructureFailure(error: unknown): boolean {
   const normalized = String(error || '').trim().toLowerCase()
   return normalized === MASS_CANARY_COLD_START_FAILURE
     || normalized === MASS_CANARY_NO_WORKER_FAILURE
+    || canaryTransientGatewayFailure(normalized)
 }
 
 function evaluationInfrastructureFailure(event: CanaryEvent): boolean {
@@ -339,10 +344,13 @@ export function decideMassCanaryRollingApproval(input: {
     // attempt. A no-worker failure whose recorded provider health still shows an initializing worker is therefore
     // resumable on the same endpoint, exactly like a request timeout. A no-worker failure with no worker at all
     // (no GPU allocated) keeps the old behaviour: yield, cool down, and derive a fresh runtime later.
-    const newestFailureWorkerInitializing = Number(
-      (newestFailure?.evidence as any)?.healthAfter?.workers?.initializing ?? 0) > 0
+    const newestFailureWorkers = (newestFailure?.evidence as any)?.healthAfter?.workers || {}
+    const newestFailureWorkerInitializing = Number(newestFailureWorkers?.initializing ?? 0) > 0
+    const newestFailureWorkerPresent = ['idle','ready','running','initializing']
+      .some(key => Number(newestFailureWorkers?.[key] ?? 0) > 0)
     const resumableColdStart = (newestFailureError === MASS_CANARY_COLD_START_FAILURE
-        || (newestFailureError === MASS_CANARY_NO_WORKER_FAILURE && newestFailureWorkerInitializing))
+        || (newestFailureError === MASS_CANARY_NO_WORKER_FAILURE && newestFailureWorkerInitializing)
+        || (canaryTransientGatewayFailure(newestFailureError) && newestFailureWorkerPresent))
       && /^[a-z0-9_-]{3,120}$/i.test(newestFailureEndpointId)
       && /^[a-z0-9]{10}$/.test(newestFailureRuntimeKey)
     const coldStartResumeCount = resumableColdStart
@@ -354,10 +362,10 @@ export function decideMassCanaryRollingApproval(input: {
       && coldStartResumeCount <= MASS_CANARY_MAX_COLD_START_RESUMES_PER_RUNTIME
     if (canaryInfrastructureFailure(newestFailureError)) {
       const newestFailureAt = at(newestFailure?.observedAt)
-      // A request-timeout may get one short continuation on the exact same runtime. A no-worker
-      // failure proves RunPod never allocated compute, so never pin the next attempt to that dead
-      // endpoint: yield it for the normal fairness cooldown and let a later approval derive a fresh
-      // runtime identity.
+      // A request-timeout or transient RunPod 502/503/504 with a still-present worker may get one short
+      // continuation on the exact same runtime. A no-worker failure with no provider worker proves RunPod
+      // never allocated usable compute, so never pin the next attempt to that dead endpoint: yield it for
+      // the normal fairness cooldown and let a later approval derive a fresh runtime identity.
       const cooldown = coldStartResumeAllowed
         ? MASS_CANARY_COLD_START_RESUME_COOLDOWN_MS
         : MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS

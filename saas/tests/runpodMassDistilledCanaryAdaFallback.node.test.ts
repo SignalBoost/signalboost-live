@@ -5,6 +5,7 @@ import {
   MASS_DISTILLED_CANARY_MAX_COST_USD,
   MASS_DISTILLED_CANARY_POOL_PRICE_CEILING_USD_PER_HOUR,
   massDistilledCanaryWorstCaseCostUsd,
+  massDistilledCanaryCatalogPriceSnapshot,
   selectMassDistilledCanaryPools,
 } from '../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
 
@@ -39,6 +40,21 @@ test('a pool priced above its live ceiling is refused, whichever pool it is', ()
   assert.deepEqual(selectMassDistilledCanaryPools([gpu('AMPERE_24', 0.95), gpu('ADA_24', 1.10)]), ['ADA_24'])
 })
 
+test('catalog telemetry snapshots the live qualifying price for every eligible pool', () => {
+  const catalog = [
+    gpu('ADA_24', 1.10),
+    gpu('AMPERE_16', 0.58, 16),
+    gpu('AMPERE_24', 0.69),
+  ]
+  const pools = selectMassDistilledCanaryPools(catalog)
+  assert.deepEqual(massDistilledCanaryCatalogPriceSnapshot(catalog, pools), {
+    AMPERE_24: 0.69,
+    AMPERE_16: 0.58,
+    ADA_24: 1.10,
+  })
+  assert.deepEqual(massDistilledCanaryCatalogPriceSnapshot(null, ['AMPERE_24', 'AMPERE_16']), {})
+})
+
 test('unavailable, unpriced, non-NVIDIA or oversized GPUs never admit a pool', () => {
   assert.deepEqual(selectMassDistilledCanaryPools([
     gpu('AMPERE_24', 0.69, 24, 'None'),
@@ -57,5 +73,5 @@ test('the live canary provisions only catalog-approved pools and fails closed wh
   assert.match(provisionV2, /requestV2<\{ gpus\?: CatalogGpu\[\] \}>\('\/catalog\/gpus'\)/)
   assert.match(provisionV2, /const pools = selectMassDistilledCanaryPools\(catalogGpus\)/)
   assert.match(provisionV2, /if \(!pools\.length\) throw new Error\('mass_distilled_runtime_gpu_capacity_unavailable'\)/)
-  assert.match(provisionV2, /return provisionMassDistilledRuntimeWithPools\(input, pools\)/)
+  assert.match(provisionV2, /const provisioned = await provisionMassDistilledRuntimeWithPools\(input, pools\)/)
 })

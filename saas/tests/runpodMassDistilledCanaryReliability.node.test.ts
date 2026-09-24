@@ -53,10 +53,10 @@ test('a durable preflight failure releases the short reservation lease immediate
 })
 
 test('canary compatibility permits ordered 24GB to 16GB availability fallback without changing evaluator policy', () => {
-  assert.match(compatibility, /const CANARY_APPROVED_POOLS = \['AMPERE_24', 'AMPERE_16'\] as const/)
+  assert.match(compatibility, /const CANARY_APPROVED_POOLS = \['AMPERE_24', 'AMPERE_16', 'ADA_24'\] as const/)
   assert.match(compatibility, /provisionMassDistilledCanaryRuntime/)
   assert.match(compatibility, /const pools = selectMassDistilledCanaryPools\(catalogGpus\)/)
-  assert.match(compatibility, /return provisionMassDistilledRuntimeWithPools\(input, pools\)/)
+  assert.match(compatibility, /const provisioned = await provisionMassDistilledRuntimeWithPools\(input, pools\)/)
   assert.match(compatibility, /provisionMassDistilledRuntimeWithPools\(input, APPROVED_POOLS\)/)
 })
 
@@ -71,6 +71,17 @@ test('compatibility layer can recover both legacy template and endpoint identity
   assert.match(compatibility, /mass_distilled_runtime_endpoint_template_rebind_failed/)
   assert.match(compatibility, /assertEndpointSafetyPolicy\(endpoint\)/)
   assert.match(compatibility, /materializedEndpointMatches/)
+})
+
+test('canary evidence persists exact resume identity plus observable RunPod GPU catalog telemetry', () => {
+  assert.match(route, /coldStartResumeEndpointId:coldStartResume\.endpointId/)
+  assert.match(route, /coldStartResumeRuntimeKey:coldStartResume\.runtimeKey/)
+  assert.match(route, /configuredGpuPools:provisioned\.gpuPools/)
+  assert.match(route, /canaryEligibleGpuPools:provisioned\.canaryEligibleGpuPools/)
+  assert.match(route, /canaryCatalogObserved:provisioned\.canaryCatalogObserved/)
+  assert.match(route, /canaryCatalogServerlessPriceUsdPerHourByPool:provisioned\.canaryCatalogServerlessPriceUsdPerHourByPool/)
+  assert.match(route, /actualWorkerGpuPoolObserved:provisioned\.actualWorkerGpuPoolObserved/)
+  assert.match(compatibility, /actualWorkerGpuPoolObserved: false as const/)
 })
 
 test('cold-start continuation reuses only the explicitly approved exact runtime identity', () => {

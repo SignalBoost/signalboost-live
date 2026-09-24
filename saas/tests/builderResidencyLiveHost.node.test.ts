@@ -125,6 +125,56 @@ test('live Residency routes model-controlled edits and commands through Governed
   assert.ok(runner.calls>=3)
 })
 
+test('live Residency serializes governed workspace snapshots under maxConcurrency 1',async()=>{
+  const base=BUILDER_RESIDENCY_CASES.find(
+    item=>item.competencyId==='root_cause_diagnosis',
+  )
+  assert.ok(base)
+  const practiceCase=Object.freeze({
+    ...base,
+    seedFiles:Object.freeze([
+      ...base.seedFiles,
+      Object.freeze({
+        path:'context.txt',
+        content:'Independent context file used to prove serialized governed reads.\n',
+      }),
+    ]),
+  })
+
+  const request=createBuilderResidencyHarnessRequest({
+    runId:'residency-live-test-serialized-reads',
+    objective:practiceCase.objective,
+    tenantId:'itmounts-university',
+    portableId:'builder-residency',
+    agentId:'builder-resident',
+    artifactId:'artifact-1',
+    artifactHash:H,
+    artifactRevision:R,
+    sandboxEnvironmentId:'builder-residency-sandbox-v1',
+    requestedCapabilities:BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
+    limits:{
+      deadlineMs:180_000,
+      maxToolCalls:60,
+      maxConcurrency:1,
+    },
+  })
+  const executor=createLiveBuilderResidencyExecutor({
+    db:{} as any,
+    sandboxRunner:new FixtureRunner(),
+    modelPortFactory:scriptedModelPort,
+  })
+
+  const result=await executor.run({
+    request,
+    authority:createBuilderResidencyNativeAuthority(),
+    practiceCase,
+    candidateId:'candidate-1',
+  })
+
+  assert.equal(result.outcome.status,'success')
+  assert.notEqual(result.outcome.failureCode,'harness_concurrency_limit_exceeded')
+})
+
 test('live Residency native authority is sandbox-only and non-consequential',()=>{
   const authority=createBuilderResidencyNativeAuthority()
   assert.deepEqual(authority.environments,['sandbox'])

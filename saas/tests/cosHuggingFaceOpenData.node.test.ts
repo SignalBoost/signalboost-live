@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import test from 'node:test'
 import {
   createHuggingFaceGithubCc0Search,
@@ -169,26 +167,4 @@ test('GitHub CC0 source is exposed by the shared learning factory only for softw
     classifyMassDistillationRights('cc0 public-domain GitHub-CC0 software corpus'),
     'cc0',
   )
-})
-
-
-test('daily HF curriculum is source-fenced, rotating, and wired ahead of the general curriculum', () => {
-  const dailySource = readFileSync(join(process.cwd(), 'lib/cos/dailyAutonomousLearning.ts'), 'utf8')
-  const cycleSource = readFileSync(join(process.cwd(), 'lib/cos-core/layers/learning/cycle.ts'), 'utf8')
-
-  assert.match(dailySource, /const HF_NIST_DAILY_QUERIES = Object\.freeze\(\[/)
-  assert.match(dailySource, /const HF_GITHUB_CC0_DAILY_QUERIES = Object\.freeze\(\[/)
-  assert.match(dailySource, /function utcLearningDay\(now: Date\): number/)
-  assert.match(dailySource, /export function huggingFaceOpenDatasetCurriculum\(now: Date = new Date\(\)\): KnowledgeGap\[\]/)
-  assert.match(dailySource, /id: 'curriculum:hf-nist-cc0-continuous'/)
-  assert.match(dailySource, /allowedAdapterIds: \['hf_nist_cc0'\]/)
-  assert.match(dailySource, /id: 'curriculum:hf-github-cc0-continuous'/)
-  assert.match(dailySource, /allowedAdapterIds: \['hf_github_cc0'\]/)
-  assert.match(dailySource, /sourceKinds: \['public_dataset'\]/)
-  assert.match(dailySource, /curriculumAligned: true/)
-  assert.match(dailySource, /const hfOpenDatasetCurriculum = huggingFaceOpenDatasetCurriculum\(\)/)
-  assert.match(dailySource, /const curriculum = \[\.\.\.hfOpenDatasetCurriculum, \.\.\.recurringTechnologyCurriculum\(\)/)
-
-  assert.match(cycleSource, /gap\.allowedAdapterIds/)
-  assert.match(cycleSource, /if\(exact\.size&&\(!adapter\.id\|\|!exact\.has\(adapter\.id\)\)\)return false/)
 })

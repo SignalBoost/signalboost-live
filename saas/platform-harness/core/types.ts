@@ -77,6 +77,11 @@ export interface HarnessAuthorityEnvelope {
   limits?: HarnessLimits
 }
 
+export interface HarnessRunParent {
+  runId: string
+  authorityManifestRef: string
+}
+
 export interface HarnessRunRequest {
   runId: string
   objective: string
@@ -85,6 +90,7 @@ export interface HarnessRunRequest {
   environment: HarnessEnvironment
   requestedCapabilities: readonly string[]
   requestedLimits?: HarnessLimits
+  parent?: HarnessRunParent
 }
 
 export interface HarnessManifest {
@@ -95,6 +101,7 @@ export interface HarnessManifest {
   environment: HarnessEnvironment
   capabilities: readonly HarnessCapabilityGrant[]
   authorityManifestRef: string
+  parent?: HarnessRunParent
   limits: HarnessLimits
   learningFeedbackAllowed: boolean
 }

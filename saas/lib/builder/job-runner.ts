@@ -1,3 +1,4 @@
+import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
 import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
 import { builderPendingWriteEvidence } from './evidence-events.ts'
@@ -296,7 +297,7 @@ async function runBuilderPlaywrightCliCanary(job: BuilderJobRecord): Promise<voi
  * Execute one already-enqueued Builder job. The atomic claim makes duplicate invocations harmless;
  * the browser never replays POST and polling GET has no execution authority.
  */
-export async function runBuilderJob(jobId: string, userId: string): Promise<void> {
+async function runBuilderJobInsideHarness(jobId: string, userId: string): Promise<void> {
   let job: BuilderJobRecord | null = null
   let lastTrace: readonly BuilderToolTrace[] = []
   try {
@@ -577,4 +578,21 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       })
     }
   }
+}
+
+
+/** Mandatory Platform Harness ingress for every durable Builder execution. */
+export async function runBuilderJob(jobId: string, userId: string): Promise<void> {
+  return withHostProductionHarnessIngress({
+    objective: `Execute durable Builder job ${jobId}`,
+    portableId: 'cos-builder',
+    agentId: 'cos-builder-worker',
+    role: 'software_specialist',
+    capabilityId: 'builder.job.execute',
+    risk: 'write',
+    deadlineMs: 300_000,
+    maxConcurrency: 1,
+    maxToolCalls: 200,
+    runId: `builder-job-${jobId}`,
+  }, () => runBuilderJobInsideHarness(jobId, userId))
 }

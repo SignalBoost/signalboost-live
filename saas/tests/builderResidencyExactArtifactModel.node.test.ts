@@ -4,6 +4,10 @@ import {
   createRunpodBuilderResidencyModelPort,
   type BuilderResidencyModelIdentity,
 } from '../platform-harness/residency/exact-artifact-model.ts'
+import {
+  BUILDER_RESIDENCY_RUNTIME_IDENTITY_VERSION,
+  residencyRunpodRuntimeKey,
+} from '../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts'
 
 const h=(c:string)=>c.repeat(64)
 const r40=(c:string)=>c.repeat(40)
@@ -107,7 +111,11 @@ test('Residency provisions the exact trained artifact without requiring prior ca
   assert.equal(provisions[0].artifactId,identity.artifactId)
   assert.equal(provisions[0].artifactHash,identity.artifactHash)
   assert.equal(provisions[0].artifactRevision,r40('c'))
-  assert.match(provisions[0].runtimeKey,/^[a-f0-9]{10}$/)
+  assert.equal(BUILDER_RESIDENCY_RUNTIME_IDENTITY_VERSION,'builder-residency-runtime-v2')
+  assert.equal(
+    provisions[0].runtimeKey,
+    residencyRunpodRuntimeKey(identity.candidateId,identity.artifactHash),
+  )
   assert.equal(provisions[0].idleTimeoutSeconds,720)
   assert.deepEqual([...new Set(reads)],['cos_local_distillation_artifacts'])
   assert.equal(calls.filter(item=>item.url.endsWith('/ping')).length,1)

@@ -162,9 +162,14 @@ test('live /api/cos-specialist route cannot orchestrate outside the Harness', ()
   const orchestrateCalls = source.match(/\.orchestrator\.orchestrate\(/g) ?? []
   assert.equal(orchestrateCalls.length, 1)
   const harnessCall = source.indexOf('runCosA2ASpecialistProductionHarness({')
-  const guardedCall = source.indexOf('orchestrateSpecialistInsideHarness(() => selectedHost.orchestrator.orchestrate(')
+  const guardedCall = source.indexOf('orchestrateSpecialistInsideHarness(() => {', harnessCall)
+  const orchestrateCall = source.indexOf('selectedHost.orchestrator.orchestrate(', guardedCall)
   assert.ok(harnessCall >= 0)
   assert.ok(guardedCall > harnessCall)
+  assert.ok(orchestrateCall > guardedCall)
+  // Harness cancellation is honored both before and inside the guarded orchestration.
+  const abortChecks = source.slice(harnessCall, orchestrateCall).match(/if \(signal\?\.aborted\) throw new Error\('harness_a2a_specialist_delegation_aborted'\)/g) ?? []
+  assert.equal(abortChecks.length, 2)
   const guard = source.indexOf('async function orchestrateSpecialistInsideHarness')
   assert.ok(guard >= 0)
   assert.ok(source.indexOf('requireCosA2ASpecialistHarnessIngress()', guard) > guard)

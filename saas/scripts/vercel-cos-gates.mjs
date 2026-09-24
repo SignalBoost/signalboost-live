@@ -1,22 +1,59 @@
-// saas/scripts/vercel-cos-gates.mjs
+// Diagnostic-only quarter of the full production regression gate. Never merge.
 import { spawnSync } from 'node:child_process'
-
-// Focused production repair gate for the regressions changed in this PR.
-// Broader historical suites remain independently tracked and must not hide these repaired failures.
 const tests = [
-  'tests/builderRepositoryRepairProofController.node.test.ts',
-  'tests/cosFreshnessPolicy.node.test.ts',
-  'tests/cosTravelPlanningFreshness.node.test.ts',
+  'tests/cosGeneralReasoningDiscipline.node.test.ts',
+  'tests/cosFeedbackReasoningGeneralization.node.test.ts',
+  'tests/cosCognitiveAutonomousCertification.node.test.ts',
+  'tests/cosUniversity.node.test.ts',
+  'tests/cosUniversityContinuousLearning.node.test.ts',
+  'tests/cosUniversityUndergraduateAcceptance.node.test.ts',
+  'tests/cosUniversityIndependentExam.node.test.ts',
+  'tests/cosUniversityExecutionBinding.node.test.ts',
+  'tests/cosUniversityRoleModelPolicy.node.test.ts',
+  'tests/cosUniversityMastersAgentScope.node.test.ts',
+  'tests/cosUniversityEvidenceSupply.node.test.ts',
+  'tests/cosUniversityARange.node.test.ts',
+  'tests/cosUniversityLanguageAuthenticity.node.test.ts',
+  'tests/cosUniversityContinuousEducation.node.test.ts',
+  'tests/cosUniversityPostRemediationStudyProof.node.test.ts',
+  'tests/cosUniversityPracticeInferenceFence.node.test.ts',
+  'tests/cosUniversityDeliberatePractice.node.test.ts',
+  'tests/cosUniversityGraduation.node.test.ts',
+  'tests/cosUniversityPrograms.node.test.ts',
+  'tests/cosUniversityExamRemediation.node.test.ts',
+  'tests/cosUniversityMasters.node.test.ts',
+  'tests/cosUniversityPhd.node.test.ts',
+  'tests/cosUniversityPhdRuntime.node.test.ts',
+  'tests/cosUniversityPhdResearchExecution.node.test.ts',
+  'tests/cosUniversityPhdMethodologyExam.node.test.ts',
+  'tests/cosUniversityAdmission.node.test.ts',
+  'tests/cosUniversityAdmissionRunner.node.test.ts',
+  'tests/cosUniversityActiveAcademicLane.node.test.ts',
+  'tests/cosBehavioralRobustness.node.test.ts',
+  'tests/cosCognitiveSkillRetrievalEfficiency.node.test.ts',
+  'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
+  'tests/releaseSignalSeverity.node.test.ts',
+  'regression/powerStabilizationRelease.node.test.ts',
+  'tests/cosAnswerPolicyCore.node.test.ts',
+  'tests/cosNormativeAnswerPolicy.node.test.ts',
+  'tests/normativeFreshEvidenceFallback.node.test.ts',
+  'tests/cosNeuralEvidenceReasoning.node.test.ts',
   'tests/cosPragmaticIntentCore.node.test.ts',
+  'tests/cosModelFirstAgentLoop.node.test.ts',
+  'tests/cosContextualInterpretationIsolation.node.test.ts',
+  'tests/cosOperatingCharter.node.test.ts',
+  'tests/publicRecordedProvenance.node.test.ts',
+  'tests/groundingConcepts.node.test.ts',
+  'tests/answerEvidenceAttributionRepair.node.test.ts',
+  'tests/conversationProvenanceIntent.node.test.ts',
+  'tests/localEmbeddingsWindowSafeTransport.node.test.ts',
+  'tests/publicCorpusEvidence.node.test.ts',
+  'tests/googleSheetsConnector.node.test.ts',
+  'tests/describeThrownValue.node.test.ts',
+  'tests/demoPricing.node.test.ts',
+  'tests/repositoryRepairAutoMerge.node.test.ts',
+  'tests/repositoryMergeWatch.node.test.ts',
 ]
-
-const result = spawnSync(process.execPath, ['--test', ...tests], {
-  cwd: process.cwd(),
-  env: process.env,
-  stdio: 'inherit',
-})
-if (result.error) {
-  console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
-  process.exit(1)
-}
+const result = spawnSync(process.execPath, ['--test', ...tests], { cwd: process.cwd(), env: process.env, stdio: 'inherit' })
+if (result.error) { console.error(result.error.message); process.exit(1) }
 process.exit(result.status ?? 1)

@@ -47,3 +47,16 @@ test('an evaluator defect records its own throw site, without leaking provider o
   // Only our own frames are kept: the error body itself is still truncated to the existing 500-character message.
   assert.match(route, /evidence: \{ error: clean\(message, 500\), \.\.\.\(frames\.length \? \{ errorFrames: frames \} : \{\}\) \}/)
 })
+
+
+test('readiness keeps retriggering scale-from-zero even before health reports a worker', () => {
+  const start = route.indexOf('async function waitReady(endpointId:string,deadlineMs:number)')
+  const end = route.indexOf('\nfunction batchPrompt', start)
+  assert.ok(start >= 0 && end > start)
+  const waitReady = route.slice(start, end)
+  assert.match(waitReady, /massDistilledRuntimeHealth\(endpointId\)/)
+  assert.match(waitReady, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
+  assert.doesNotMatch(waitReady, /const workerExists=/)
+  assert.doesNotMatch(waitReady, /if\(workerExists\)/)
+  assert.match(waitReady, /scale-from-zero trigger/)
+})

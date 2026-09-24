@@ -12,7 +12,7 @@ import { TurnRecorder, extractQueryFeatures } from '@/lib/ai/cos/turnExperience'
 import { hashPrompt, recordTurnExperience } from '@/lib/ai/cos/turnExperienceStore'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { AUDIT_UNTRUSTED_DATA_RULE } from '@/lib/audit/untrustedData'
-import { withProductionRuntimeHarness } from '@/platform-harness/adapters/production'
+import { withProductionRuntimeHarness } from '../../platform-harness/adapters/production.ts'
 
 export interface AuditModelArgs {
   prompt: string

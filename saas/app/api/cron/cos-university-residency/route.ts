@@ -158,9 +158,9 @@ export async function GET(req: Request) {
     await recordResidencyProductionPath(
       result.ok === true || result.state === 'waiting_for_residency_cases',
       {
-        runnerInvoked: Boolean(result.practiceCase),
+        runnerInvoked: Boolean(body.practiceCase),
         status: result.state,
-        residencyId: result.residencyId ?? null,
+        residencyId: body.residencyId ?? null,
         coverage: result.coverage ?? null,
         admission: body.admission ?? null,
         selfHealing: body.selfHealing ?? null,

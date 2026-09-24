@@ -3,10 +3,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { resolveResponseLanguage } from '../lib/i18n/responseLanguage.ts'
+import { SUPPORTED_LANGUAGES } from '../lib/i18n/supportedLanguages.ts'
 
-test('COS i18n supports exactly the five product languages', () => {
+test('COS i18n supports exactly the canonical five product languages', () => {
+  assert.deepEqual([...SUPPORTED_LANGUAGES], ['en', 'es', 'pt', 'pl', 'ru'])
   const source = readFileSync(join(process.cwd(), 'lib/i18n/responseLanguage.ts'), 'utf8')
-  assert.match(source, /\['en', 'es', 'pt', 'pl', 'ru'\]/)
+  assert.match(source, /supportedLanguages\.ts/)
+  assert.doesNotMatch(source, /const\s+SUPPORTED\s*=\s*new Set/)
 })
 
 test('prompt language overrides an English UI locale', () => {

@@ -37,10 +37,18 @@ export function withHarnessExecutionContext<T>(
 ): Promise<T> {
   const existing = harnessExecutionScope.getStore()
   if (existing) {
-    if (existing.manifest.runId !== manifest.runId) {
+    if (existing.manifest.runId === manifest.runId) return operation()
+    if (
+      manifest.parent?.runId !== existing.manifest.runId
+      || manifest.parent?.authorityManifestRef !== existing.manifest.authorityManifestRef
+    ) {
       throw new Error('harness_nested_execution_context_forbidden')
     }
-    return operation()
+    const parentDeadline = deadlineMs(existing.manifest.deadlineAt)
+    const childDeadline = deadlineMs(manifest.deadlineAt)
+    if (parentDeadline !== null && (childDeadline === null || childDeadline > parentDeadline)) {
+      throw new Error('harness_nested_deadline_widening_forbidden')
+    }
   }
   return harnessExecutionScope.run(Object.freeze({ manifest, signal }), operation)
 }

@@ -35,7 +35,7 @@ export type PlaywrightMcpProductionAcceptance = Readonly<{
     networkHeadersStored: false
     screenshotsStored: false
     credentialsStored: false
-    sandboxDestroyed: true
+    sandboxDestroyed: boolean
   }>
 }>
 
@@ -127,6 +127,7 @@ async function main() {
     '--browser',
     'chrome',
     '--no-sandbox',
+    '--no-webmcp',
     '--allowed-origins',
     [...approvedOrigins].join(';'),
     '--block-service-workers',
@@ -295,6 +296,7 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
   }))
 
   let sandbox: Awaited<ReturnType<typeof Sandbox.create>> | null = null
+  let sandboxDestroyed = false
   try {
     sandbox = await Sandbox.create({
       image: 'vercel/sandbox/node:24',
@@ -325,7 +327,6 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
         '--no-audit',
         '--no-fund',
         '@playwright/mcp@0.0.82',
-        '@playwright/test@^1.41.0',
       ],
       timeoutMs: BOOTSTRAP_TIMEOUT_MS,
     })
@@ -366,7 +367,7 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
       cmd: 'node',
       args: [
         '-e',
-        `const fs=require('node:fs');const {chromium}=require('${ROOT}/node_modules/@playwright/test');const p=chromium.executablePath();if(!p||!fs.existsSync(p)){process.exit(2)}process.stdout.write(p)`,
+        `const fs=require('node:fs');const {chromium}=require('${ROOT}/node_modules/playwright');const p=chromium.executablePath();if(!p||!fs.existsSync(p)){process.exit(2)}process.stdout.write(p)`,
       ],
       cwd: ROOT,
       timeoutMs: COMMAND_TIMEOUT_MS,
@@ -409,7 +410,21 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
       detail: bounded(error instanceof Error ? error.message : 'unknown_error'),
     }))
   } finally {
-    await sandbox?.stop().catch(() => undefined)
+    if (!sandbox) {
+      sandboxDestroyed = true
+    } else {
+      try {
+        await sandbox.stop()
+        sandboxDestroyed = true
+      } catch {
+        sandboxDestroyed = false
+      }
+    }
+    checks.push(Object.freeze({
+      name: 'sandbox_destroyed',
+      passed: sandboxDestroyed,
+      detail: `destroyed=${sandboxDestroyed}`,
+    }))
   }
 
   const required = new Set([
@@ -427,6 +442,7 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
     'console_diagnostics_live',
     'network_diagnostics_live',
     'screenshot_live',
+    'sandbox_destroyed',
   ])
   const ok = checks.every(check => check.passed) && [...required].every(name => checks.some(check => check.name === name && check.passed))
 
@@ -443,7 +459,7 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
       networkHeadersStored: false,
       screenshotsStored: false,
       credentialsStored: false,
-      sandboxDestroyed: true,
+      sandboxDestroyed,
     }),
   })
 }

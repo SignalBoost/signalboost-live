@@ -63,6 +63,7 @@ type TrainingDispatchAudit = Readonly<{
   trainingMode: TrainingMode | null
   revisionKey: string | null
   baseModel: string | null
+  baseModelRevision: string | null
   datasetHash: string | null
   distillationCandidate: ModelDistillationCandidateInput | null
   authorityExpanded: false
@@ -189,6 +190,13 @@ function candidatePlanId(candidateId: string): string {
   return match[1]
 }
 
+export function assertTrainingExecutorEvidenceCandidateId(candidateIdInput: unknown): string {
+  const candidateId = clean(candidateIdInput, 100)
+  if (/^working-cos:[a-f0-9]{64}$/i.test(candidateId)) return candidateId
+  candidatePlanId(candidateId)
+  return candidateId
+}
+
 async function readCandidatePlan(candidateId: string): Promise<CandidatePlanRow> {
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -237,6 +245,7 @@ async function recordExecutorEvent(input: {
 
 export function validateTrainingExecutorPartition(input: {
   baseModel: unknown
+  baseModelRevision?: unknown
   datasetHash: unknown
   trainingItemHashes: unknown
   holdoutItemHashes: unknown
@@ -246,6 +255,7 @@ export function validateTrainingExecutorPartition(input: {
   if (!trainingItemHashes || !holdoutItemHashes) return null
   const revision = buildFineTunePartitionRevision({
     baseModel: input.baseModel,
+    baseModelRevision: input.baseModelRevision,
     datasetHash: input.datasetHash,
     trainingItemHashes,
     holdoutItemHashes,
@@ -304,7 +314,7 @@ function distillationAuditSnapshot(candidate: ModelDistillationCandidateInput | 
   }
 }
 
-async function recordDispatchAudit(input: {
+export async function recordTrainingDispatchAudit(input: {
   candidateId: string
   subjectId?: string | null
   operation: 'prepare_dataset' | 'train'
@@ -313,6 +323,7 @@ async function recordDispatchAudit(input: {
   trainingMode?: TrainingMode
   revisionKey?: string | null
   baseModel?: string | null
+  baseModelRevision?: string | null
   datasetHash?: string | null
   distillation?: ModelDistillationCandidateInput | null
   now?: Date
@@ -330,6 +341,7 @@ async function recordDispatchAudit(input: {
     trainingMode: input.trainingMode || null,
     revisionKey: input.revisionKey || null,
     baseModel: input.baseModel || null,
+    baseModelRevision: input.baseModelRevision || null,
     datasetHash: input.datasetHash || null,
     distillationCandidate: distillationAuditSnapshot(input.distillation),
     authorityExpanded: false,
@@ -389,6 +401,7 @@ async function readMatchingDispatch(input: {
       trainingMode,
       revisionKey: clean(evidence?.revisionKey, 64) || null,
       baseModel: clean(evidence?.baseModel, 240) || null,
+      baseModelRevision: clean(evidence?.baseModelRevision, 40).toLowerCase() || null,
       datasetHash: clean(evidence?.datasetHash, 64).toLowerCase() || null,
       distillationCandidate: normalizedDistillationCandidate(evidence?.distillationCandidate),
       authorityExpanded: false,
@@ -399,7 +412,7 @@ async function readMatchingDispatch(input: {
 
 type DispatchPort = (url: string, init: RequestInit) => Promise<Response>
 
-async function dispatchSignedJob(input: {
+export async function dispatchSignedTrainingExecutorJob(input: {
   body: Record<string, unknown>
   idempotencyKey: string
   fetchImpl?: DispatchPort
@@ -458,7 +471,7 @@ export async function dispatchUniversityDatasetPreparation(input: {
   if (!baseModel) throw new Error('training_executor_base_model_missing')
   const datasetHash = controlledFineTuneDatasetHash(plan)
   const idempotencyKey = hash([COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE, 'prepare_dataset', input.candidateId, baseModel, datasetHash])
-  const result = await dispatchSignedJob({
+  const result = await dispatchSignedTrainingExecutorJob({
     idempotencyKey,
     fetchImpl: input.fetchImpl,
     body: {
@@ -473,7 +486,7 @@ export async function dispatchUniversityDatasetPreparation(input: {
       authorityExpanded: false,
     },
   })
-  await recordDispatchAudit({
+  await recordTrainingDispatchAudit({
     candidateId: input.candidateId,
     subjectId: plan.subject_id,
     operation: 'prepare_dataset',
@@ -527,7 +540,7 @@ export async function dispatchUniversityApprovedTraining(input: {
 
   const revisionKey = fineTuneRevisionKey(input.revision)
   const idempotencyKey = hash([COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE, 'train', input.trainingMode, input.candidateId, revisionKey])
-  const result = await dispatchSignedJob({
+  const result = await dispatchSignedTrainingExecutorJob({
     idempotencyKey,
     fetchImpl: input.fetchImpl,
     body: {
@@ -545,7 +558,7 @@ export async function dispatchUniversityApprovedTraining(input: {
       authorityExpanded: false,
     },
   })
-  await recordDispatchAudit({
+  await recordTrainingDispatchAudit({
     candidateId: input.candidateId,
     subjectId: plan.subject_id,
     operation: 'train',
@@ -574,6 +587,7 @@ export type TrainingExecutorEvidenceInput = Readonly<{
   evidenceRef?: unknown
   /** partition_manifests_registered */
   baseModel?: unknown
+  baseModelRevision?: unknown
   datasetHash?: unknown
   trainingItemHashes?: unknown
   holdoutItemHashes?: unknown
@@ -593,8 +607,7 @@ export async function recordUniversityTrainingExecutorEvidence(
 ) {
   const claim = clean(input?.claim, 80) as TrainingExecutorClaim
   if (!TRAINING_EXECUTOR_CLAIMS.includes(claim)) throw new Error('training_executor_claim_not_permitted')
-  const candidateId = clean(input?.candidateId, 100)
-  candidatePlanId(candidateId)
+  const candidateId = assertTrainingExecutorEvidenceCandidateId(input?.candidateId)
   const jobId = clean(input?.jobId, 240)
   if (!jobId) throw new Error('training_executor_job_id_missing')
   const idempotencyKey = clean(binding?.idempotencyKey, 128)
@@ -607,12 +620,15 @@ export async function recordUniversityTrainingExecutorEvidence(
     if (dispatch.operation !== 'prepare_dataset') throw new Error('training_executor_dispatch_operation_mismatch')
     const materialized = validateTrainingExecutorPartition({
       baseModel: input?.baseModel,
+      baseModelRevision: input?.baseModelRevision,
       datasetHash: input?.datasetHash,
       trainingItemHashes: input?.trainingItemHashes,
       holdoutItemHashes: input?.holdoutItemHashes,
     })
     if (!materialized) throw new Error('training_executor_partition_invalid')
-    if (materialized.revision.baseModel !== dispatch.baseModel || materialized.revision.datasetHash !== dispatch.datasetHash) {
+    if (materialized.revision.baseModel !== dispatch.baseModel
+      || materialized.revision.datasetHash !== dispatch.datasetHash
+      || (dispatch.baseModelRevision && materialized.revision.baseModelRevision !== dispatch.baseModelRevision)) {
       throw new Error('training_executor_partition_dispatch_mismatch')
     }
     const expectedKey = hash([
@@ -636,6 +652,7 @@ export async function recordUniversityTrainingExecutorEvidence(
         dispatchIdempotencyKey: idempotencyKey,
         revisionKey: fineTuneRevisionKey(materialized.revision),
         baseModel: materialized.revision.baseModel,
+        baseModelRevision: materialized.revision.baseModelRevision || null,
         datasetHash: materialized.revision.datasetHash,
         trainingItemHashes: materialized.trainingItemHashes,
         holdoutItemHashes: materialized.holdoutItemHashes,

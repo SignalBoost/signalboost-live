@@ -16,6 +16,58 @@ alter table public.cos_university_agent_registry
 alter table public.cos_university_agent_registry
   validate constraint cos_university_agent_registry_role_check;
 
+alter table public.cos_reasoning_worker_metrics
+  drop constraint if exists cos_reasoning_worker_metrics_worker_role_check;
+alter table public.cos_reasoning_worker_metrics
+  add constraint cos_reasoning_worker_metrics_worker_role_check
+  check (worker_role in ('primary','coder','critic','verifier','researcher','context_engineer')) not valid;
+alter table public.cos_reasoning_worker_metrics
+  validate constraint cos_reasoning_worker_metrics_worker_role_check;
+
+alter table public.cos_reasoning_comparison_results
+  drop constraint if exists cos_reasoning_comparison_results_worker_role_check;
+alter table public.cos_reasoning_comparison_results
+  add constraint cos_reasoning_comparison_results_worker_role_check
+  check (worker_role in ('primary','coder','critic','verifier','researcher','context_engineer')) not valid;
+alter table public.cos_reasoning_comparison_results
+  validate constraint cos_reasoning_comparison_results_worker_role_check;
+
+alter table public.cos_university_masters_evidence
+  drop constraint if exists cos_university_masters_evidence_program_id_check;
+alter table public.cos_university_masters_evidence
+  add constraint cos_university_masters_evidence_program_id_check check (program_id in (
+    'applied_ai_systems','context_engineering_systems','security_and_trust','quantitative_decision_science',
+    'enterprise_operations_and_governance','scientific_and_physical_systems','aerospace_nuclear_safety_systems',
+    'molecular_biomedical_sciences','neuroscience_biophysical_systems','actuarial_insurance_risk',
+    'quantum_theoretical_physics'
+  )) not valid;
+alter table public.cos_university_masters_evidence
+  validate constraint cos_university_masters_evidence_program_id_check;
+
+alter table public.cos_university_masters_learning_runs
+  drop constraint if exists cos_university_masters_learning_runs_program_id_check;
+alter table public.cos_university_masters_learning_runs
+  add constraint cos_university_masters_learning_runs_program_id_check check (program_id in (
+    'applied_ai_systems','context_engineering_systems','security_and_trust','quantitative_decision_science',
+    'enterprise_operations_and_governance','scientific_and_physical_systems','aerospace_nuclear_safety_systems',
+    'molecular_biomedical_sciences','neuroscience_biophysical_systems','actuarial_insurance_risk',
+    'quantum_theoretical_physics'
+  )) not valid;
+alter table public.cos_university_masters_learning_runs
+  validate constraint cos_university_masters_learning_runs_program_id_check;
+
+alter table public.cos_university_masters_exam_runs
+  drop constraint if exists cos_university_masters_exam_runs_program_id_check;
+alter table public.cos_university_masters_exam_runs
+  add constraint cos_university_masters_exam_runs_program_id_check check (program_id in (
+    'applied_ai_systems','context_engineering_systems','security_and_trust','quantitative_decision_science',
+    'enterprise_operations_and_governance','scientific_and_physical_systems','aerospace_nuclear_safety_systems',
+    'molecular_biomedical_sciences','neuroscience_biophysical_systems','actuarial_insurance_risk',
+    'quantum_theoretical_physics'
+  )) not valid;
+alter table public.cos_university_masters_exam_runs
+  validate constraint cos_university_masters_exam_runs_program_id_check;
+
 create or replace function public.cos_university_specialist_runtime_for_role(p_role text)
 returns text
 language sql

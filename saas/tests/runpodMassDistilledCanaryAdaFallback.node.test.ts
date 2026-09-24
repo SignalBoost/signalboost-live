@@ -73,5 +73,5 @@ test('the live canary provisions only catalog-approved pools and fails closed wh
   assert.match(provisionV2, /requestV2<\{ gpus\?: CatalogGpu\[\] \}>\('\/catalog\/gpus'\)/)
   assert.match(provisionV2, /const pools = selectMassDistilledCanaryPools\(catalogGpus\)/)
   assert.match(provisionV2, /if \(!pools\.length\) throw new Error\('mass_distilled_runtime_gpu_capacity_unavailable'\)/)
-  assert.match(provisionV2, /return provisionMassDistilledRuntimeWithPools\(input, pools\)/)
+  assert.match(provisionV2, /const provisioned = await provisionMassDistilledRuntimeWithPools\(input, pools\)/)
 })

@@ -19,15 +19,19 @@ const failures = (error: string) => Array.from({ length: MASS_EVALUATION_MAX_FAI
   ev('host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hash, error }, `2026-09-17T0${i + 1}:00:00Z`))
 const started = ev('host_controller', { claim: 'mass_distilled_independent_evaluation_started', artifactHash: hash }, '2026-09-17T00:21:00Z')
 
-test('evaluator uses control-plane worker existence plus worker-local model readiness', () => {
+test('evaluator retriggers non-token ping even while RunPod worker counters are zero', () => {
   const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
-  assert.match(source, /massDistilledRuntimeHealth\(endpointId\)/)
-  assert.match(source, /health\.workers\.ready>0\|\|health\.workers\.running>0/)
-  assert.match(source, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
-  assert.match(source, /payload\?\.modelReady===true/)
-  assert.match(source, /gatewayStatus==='ready'\|\|gatewayStatus==='accepting_requests'/)
-  assert.doesNotMatch(source, /fetch\(\`\$\{root\}\/ready\`/)
-  assert.doesNotMatch(source, /\/v1\/chat\/completions.*modelReady/s)
+  const start = source.indexOf('async function waitReady(endpointId:string,deadlineMs:number)')
+  const end = source.indexOf('\nfunction batchPrompt', start)
+  assert.ok(start >= 0 && end > start)
+  const readiness = source.slice(start, end)
+  assert.match(readiness, /massDistilledRuntimeHealth\(endpointId\)/)
+  assert.match(readiness, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
+  assert.match(readiness, /payload\?\.modelReady===true/)
+  assert.match(readiness, /gatewayStatus==='ready'\|\|gatewayStatus==='accepting_requests'/)
+  assert.doesNotMatch(readiness, /health\.workers\.ready>0\|\|health\.workers\.running>0/)
+  assert.doesNotMatch(readiness, /\/ready/)
+  assert.doesNotMatch(readiness, /\/v1\/chat\/completions/)
 })
 
 test('runtime and RunPod transport failures do not exhaust the artifact retry budget', () => {

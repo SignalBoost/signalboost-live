@@ -13,6 +13,7 @@ import {
   MASS_EVALUATION_REOPEN_CLAIM,
   MASS_EVALUATION_ROLLING_MAX_APPROVALS,
   MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT,
+  MASS_EVALUATION_MODEL_READY_REPAIR_AT,
   decideRollingMassEvaluationApproval,
   type RollingEvent,
 } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
@@ -516,6 +517,70 @@ test('pre-repair RunPod quota failures do not keep repaired artifacts in the old
   })
   assert.equal(decision.issue, true)
   if (decision.issue) assert.equal(decision.artifact.candidateId, artifact.candidateId)
+})
+
+
+test('pre-repair runtime-not-ready failures do not keep the repaired evaluator in the old cooldown generation', () => {
+  assert.equal(MASS_EVALUATION_MODEL_READY_REPAIR_AT, '2026-09-24T19:26:08.571Z')
+  const artifact = {
+    ...artifactB,
+    candidateId: 'mass:model-ready-repair:1',
+    artifactHash: '3'.repeat(64),
+    createdAt: '2026-09-20T15:00:00.000Z',
+  }
+  const events: RollingEvent[] = [
+    ev(artifact.candidateId, 'host_production_verifier', {
+      claim: 'production_canary_healthy',
+      artifactHash: artifact.artifactHash,
+      exactArtifact: true,
+      productionTrafficAuthorized: false,
+    }, '2026-09-24T14:07:24.000Z'),
+  ]
+  for (let i = 0; i < 6; i += 1) {
+    const minute = 10 + i * 2
+    events.push(ev(artifact.candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_failed',
+      artifactHash: artifact.artifactHash,
+      error: 'mass_distilled_evaluation_runtime_not_ready:200',
+    }, `2026-09-24T19:${String(minute).padStart(2, '0')}:00.000Z`))
+  }
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifact],
+    events,
+    now: new Date('2026-09-24T19:27:00.000Z'),
+  })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.artifact.candidateId, artifact.candidateId)
+})
+
+test('post-repair runtime-not-ready failures still retain the normal infrastructure cooldown', () => {
+  const artifact = {
+    ...artifactB,
+    candidateId: 'mass:model-ready-repair:2',
+    artifactHash: '4'.repeat(64),
+    createdAt: '2026-09-20T15:00:00.000Z',
+  }
+  const events: RollingEvent[] = [
+    ev(artifact.candidateId, 'host_production_verifier', {
+      claim: 'production_canary_healthy',
+      artifactHash: artifact.artifactHash,
+      exactArtifact: true,
+      productionTrafficAuthorized: false,
+    }, '2026-09-24T19:26:09.000Z'),
+    ev(artifact.candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_failed',
+      artifactHash: artifact.artifactHash,
+      error: 'mass_distilled_evaluation_runtime_not_ready:200',
+    }, '2026-09-24T19:27:00.000Z'),
+  ]
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifact],
+    events,
+    now: new Date('2026-09-24T19:30:00.000Z'),
+  })
+  assert.deepEqual(decision, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
 })
 
 test('post-repair RunPod quota failures still retain the normal infrastructure cooldown', () => {

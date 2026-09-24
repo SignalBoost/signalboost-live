@@ -7,7 +7,8 @@ import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillat
 // control loop. Provider training authority remains governed separately by the rolling policy.
 export const MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES = 5
 export const MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET = 10
-// Broader rotation keeps domain-scoped CC0 datasets productive instead of waiting many sweeps for a matching subject.\nexport const MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS = 6
+// Broader rotation keeps domain-scoped CC0 datasets productive instead of waiting many sweeps for a matching subject.
+export const MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS = 6
 export const MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT = 3
 export const MASS_DISTILLATION_DEFAULT_ACQUISITION_CANDIDATES_PER_CYCLE = 40
 export const MASS_DISTILLATION_DEFAULT_CORPUS_SCAN_ROWS = 5_000

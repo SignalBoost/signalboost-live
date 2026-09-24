@@ -109,3 +109,50 @@ export function buildWorkingCosDistillationPlan(input: WorkingCosDistillationInp
     nextGate: eligible ? 'bounded_training_dispatch' as const : 'blocked' as const,
   })
 }
+
+
+export type WorkingCosBalancedBundleLike = Readonly<{
+  eligible: boolean
+  bundleKey: string | null
+  combinedPortableManifestHash: string | null
+  itemCount: number
+  modelNeutral: boolean
+  containsPrivateProductionData: boolean
+  trainingRightsEligible: boolean
+  blockers?: readonly string[]
+}>
+
+/**
+ * Bind one already-balanced, model-neutral education bundle to an exact Working-COS runtime identity.
+ * Bundle construction and runtime authorization stay separate so education can keep accumulating while
+ * a served-model/rollback proof is unavailable. This function still grants no training or traffic.
+ */
+export function buildWorkingCosDistillationPlanFromBundle(input: Readonly<{
+  enabled: boolean
+  bundle: WorkingCosBalancedBundleLike
+  targetBaseModel: unknown
+  configuredRuntimeModel: unknown
+  baselineIdentity: unknown
+  rollbackArtifactRef: unknown
+}>) {
+  const plan = buildWorkingCosDistillationPlan({
+    enabled: input.enabled && input.bundle.eligible === true,
+    assetSetKey: input.bundle.bundleKey,
+    portableManifestHash: input.bundle.combinedPortableManifestHash,
+    itemCount: input.bundle.itemCount,
+    assetSetSealed: input.bundle.eligible === true,
+    modelNeutral: input.bundle.modelNeutral === true,
+    containsPrivateProductionData: input.bundle.containsPrivateProductionData === true,
+    trainingRightsEligible: input.bundle.trainingRightsEligible === true,
+    targetBaseModel: input.targetBaseModel,
+    configuredRuntimeModel: input.configuredRuntimeModel,
+    baselineIdentity: input.baselineIdentity,
+    rollbackArtifactRef: input.rollbackArtifactRef,
+  })
+  return Object.freeze({
+    ...plan,
+    bundleEligible: input.bundle.eligible === true,
+    bundleBlockers: Object.freeze([...(input.bundle.blockers || [])]),
+    semantics: 'balanced_portable_education_bound_to_exact_working_cos_runtime_no_dispatch_no_traffic' as const,
+  })
+}

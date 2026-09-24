@@ -17,6 +17,7 @@
 import type {
   AgentRequest,
   ConsequenceClass,
+  GatewayExecutionControl,
   GatewayHost,
   GatewayOutcome,
   GovernanceDecision,
@@ -114,6 +115,7 @@ export async function runGoverned(
   request: AgentRequest,
   policy: GovernancePolicy,
   host: GatewayHost,
+  control?: GatewayExecutionControl,
 ): Promise<GatewayOutcome> {
   const decision = evaluate(request, policy)
   const base = {
@@ -124,10 +126,21 @@ export async function runGoverned(
   }
 
   if (decision.verdict === 'execute') {
-    const r = await host.execution.perform(request)
+    if (control?.signal?.aborted) {
+      const error = 'governed_execution_aborted'
+      await host.audit?.record(auditEvent(request, 'agent.execution_failed', decision, { error }))
+      return { ...base, ok: false, error }
+    }
+    const r = await host.execution.perform(request, control)
     const eventType = r.ok ? 'agent.executed' : 'agent.execution_failed'
     await host.audit?.record(auditEvent(request, eventType, decision, r.ok ? undefined : { error: r.error }))
-    return { ...base, ok: r.ok, result: r.result, error: r.error }
+    return {
+      ...base,
+      ok: r.ok,
+      result: r.result,
+      ...(r.evidenceRefs?.length ? { evidenceRefs: [...r.evidenceRefs] } : {}),
+      error: r.error,
+    }
   }
 
   if (decision.verdict === 'halt_for_approval') {

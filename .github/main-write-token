@@ -1,2 +1,2 @@
-base_sha=0918a8f13d7eed3bde61690aa819d2571fc19b82
-branch=fix/vercel-regressions-full-gate-3029-20260923-2139
+base_sha=ed66e976cd370e238796a6da5f4eecdeb9632418
+branch=fix/restore-full-production-gate-20260923

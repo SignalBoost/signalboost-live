@@ -61,3 +61,13 @@ test('Semantic Scholar and Wikimedia continuity has a dedicated bounded 15-minut
   assert.match(vercel, /"path": "\/api\/cron\/cos-open-source-continuity"/)
   assert.match(vercel, /"schedule": "\*\/15 \* \* \* \*"/)
 })
+
+
+test('open-source continuity rotates on the 15-minute cron slot instead of hourly', () => {
+  const daily = readFileSync(join(process.cwd(), 'lib/cos/dailyAutonomousLearning.ts'), 'utf8')
+  assert.match(daily, /function utcLearningQuarterHour\(now: Date\): number/)
+  assert.match(daily, /Math\.floor\(value\.getTime\(\) \/ \(15 \* 60_000\)\)/)
+  assert.match(daily, /const slot = utcLearningQuarterHour\(now\)/)
+  assert.match(daily, /rotatingItem\(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, slot\)/)
+  assert.match(daily, /rotatingItem\(WIKIMEDIA_CONTINUOUS_TOPICS, slot \* 3 \+ offset\)/)
+})

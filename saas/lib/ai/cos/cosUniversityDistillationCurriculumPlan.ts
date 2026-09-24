@@ -138,3 +138,57 @@ export function buildMassDistillationReplenishmentGaps(
   }
   return gaps
 }
+
+
+/**
+ * Keep rights-cleared source acquisition alive even when the prepared training buffer is full.
+ * Computer Science and Cybersecurity are pinned because the currently allowlisted HF CC0 corpora
+ * are domain-specific; remaining slots rotate across the rest of the University so OpenAlex keeps
+ * broad coverage without turning buffer maintenance into paid/synthetic replenishment.
+ */
+export function buildMassDistillationOpenSourceMaintenanceGaps(
+  now = new Date(),
+  maxSubjects = MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS,
+  queriesPerSubject = 1,
+): KnowledgeGap[] {
+  const replenishmentSlot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
+  const limit = Math.max(1, Math.floor(maxSubjects))
+  const pinnedIds = new Set(['computer_science', 'cybersecurity'])
+  const pinned = COS_UNIVERSITY_SUBJECTS.filter(subject => pinnedIds.has(subject.id))
+  const rotatingPool = COS_UNIVERSITY_SUBJECTS.filter(subject => !pinnedIds.has(subject.id))
+  const rotated = rotatingPool.length
+    ? rotatingPool.map((_, index) => rotatingPool[(replenishmentSlot + index) % rotatingPool.length])
+    : []
+  const selected = [...pinned, ...rotated]
+    .filter((subject, index, all) => all.findIndex(item => item.id === subject.id) === index)
+    .slice(0, limit)
+
+  const gaps: KnowledgeGap[] = []
+  const queryCount = Math.max(1, Math.floor(queriesPerSubject))
+  for (const [subjectIndex, subject] of selected.entries()) {
+    for (let queryIndex = 0; queryIndex < queryCount; queryIndex += 1) {
+      const theme = subject.studyThemes[(replenishmentSlot + subjectIndex + queryIndex) % subject.studyThemes.length]
+      const lens = REPLENISHMENT_RESEARCH_LENSES[
+        (replenishmentSlot + subjectIndex * queryCount + queryIndex) % REPLENISHMENT_RESEARCH_LENSES.length
+      ]
+      gaps.push({
+        id: `distillation-open-source-maintenance:${subject.id}:q${queryIndex + 1}`,
+        subject: subject.title,
+        question: `What rigorous, reusable ${lens} strengthen ${theme} within ${subject.title}?`,
+        discoveryQuery: `${subject.title} ${theme} ${lens}`,
+        portableIds: ['cos'],
+        expectedReuse: 100,
+        expectedAvoidedCostUsd: 10,
+        urgency: 90,
+        evidence: [
+          'mass_distillation_open_source_maintenance',
+          'prepared_buffer_does_not_stop_free_acquisition',
+          `query_variant=${queryIndex + 1}/${queryCount}`,
+        ],
+        sourceKinds: ['scientific_journal', 'public_dataset'],
+        curriculumAligned: true,
+      })
+    }
+  }
+  return gaps
+}

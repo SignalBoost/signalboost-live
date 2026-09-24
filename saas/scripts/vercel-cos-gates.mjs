@@ -1,22 +1,61 @@
-// saas/scripts/vercel-cos-gates.mjs
+// Diagnostic-only quarter of the full production regression gate. Never merge.
 import { spawnSync } from 'node:child_process'
-
-// Focused production repair gate for the regressions changed in this PR.
-// Broader historical suites remain independently tracked and must not hide these repaired failures.
 const tests = [
-  'tests/builderRepositoryRepairProofController.node.test.ts',
-  'tests/cosFreshnessPolicy.node.test.ts',
-  'tests/cosTravelPlanningFreshness.node.test.ts',
-  'tests/cosPragmaticIntentCore.node.test.ts',
+  'tests/cosUniversityLaneExpectation.node.test.ts',
+  'tests/cosUniversityLaneFaultRecorder.node.test.ts',
+  'tests/cosUniversityFineTuneEvidence.node.test.ts',
+  'tests/cosUniversityFrontierDistillation.node.test.ts',
+  'tests/cosUniversityMassDistilledEvaluation.node.test.ts',
+  'tests/cosUniversityMassEvaluationJudgeTimeoutContract.node.test.ts',
+  'tests/cosUniversityGraduateActivationCron.node.test.ts',
+  'tests/universityDistillationRecoveryDrillSafety.node.test.ts',
+  'tests/cosUniversityRecoveryDrill.node.test.ts',
+  'tests/cosUniversityTeacherPool.node.test.ts',
+  'tests/cosUniversityTeacherAdapters.node.test.ts',
+  'tests/cosUniversityMassHostedTeacherStage.node.test.ts',
+  'tests/cosUniversityTelemetry.node.test.ts',
+  'tests/cosWorkingDistillationDispatch.node.test.ts',
+  'tests/platformHarnessFullEnforcement.node.test.ts',
+  'tests/cosUniversityDailyLaneCadence.node.test.ts',
+  'tests/cosUniversityPracticeGateParity.node.test.ts',
+  'tests/cosUniversitySpecialistRuntimes.node.test.ts',
+  'tests/cosUniversityPhdAgentScope.node.test.ts',
+  'tests/cosUniversitySpecialistRuntimeDatabase.node.test.ts',
+  'tests/cosUniversityMastersRuntimeAgentScope.node.test.ts',
+  'tests/cosUniversityMastersAgentAware.node.test.ts',
+  'tests/cosUniversityReceiptHonesty.node.test.ts',
+  'tests/cosUniversityPracticeDeferralPolicy.node.test.ts',
+  'tests/cosUniversityCurriculumExamAlignment.node.test.ts',
+  'tests/cosUniversityStudySupplyPriority.node.test.ts',
+  'tests/cosUniversityLearningSourceCooldown.node.test.ts',
+  'tests/learningSourceMix.node.test.ts',
+  'tests/openAlexAbstract.node.test.ts',
+  'tests/cosUniversityAgentModelPolicy.node.test.ts',
+  'tests/cosUniversityCredentialKeys.node.test.ts',
+  'tests/cosUniversityGraduationRuntimePolicy.node.test.ts',
+  'tests/cosUniversityAcademicExecutionPolicy.node.test.ts',
+  'tests/cosUniversityAgentGradeEligibility.node.test.ts',
+  'tests/cyberDependencyScanCoverage.node.test.ts',
+  'tests/cyberLegacyPresentation.node.test.ts',
+  'tests/cosUniversityExecutionReceipt.node.test.ts',
+  'tests/cosUniversityProductionReceiptIdentity.node.test.ts',
+  'tests/cosUniversityGraduationRemediation.node.test.ts',
+  'tests/cosUniversityAgentCapstone.node.test.ts',
+  'tests/builderToolLoop.node.test.ts',
+  'tests/builderMcpReadTools.node.test.ts',
+  'tests/builderPlaywrightCli.node.test.ts',
+  'tests/builderVerificationOrder.node.test.ts',
+  'tests/builderProjectLessons.node.test.ts',
+  'tests/builderProductReadiness.node.test.ts',
+  'tests/builderRepositorySearch.node.test.ts',
+  'tests/builderCertificationRunner.node.test.ts',
+  'tests/builderResidencyCaseRunner.node.test.ts',
+  'tests/builderCheckpoint.node.test.ts',
+  'tests/builderTaskCompletion.node.test.ts',
+  'tests/localOpenModelInference.node.test.ts',
+  'tests/runpodPrimaryRouting.node.test.ts',
+  'tests/builderRepairClassification.node.test.ts',
 ]
-
-const result = spawnSync(process.execPath, ['--test', ...tests], {
-  cwd: process.cwd(),
-  env: process.env,
-  stdio: 'inherit',
-})
-if (result.error) {
-  console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
-  process.exit(1)
-}
+const result = spawnSync(process.execPath, ['--test', ...tests], { cwd: process.cwd(), env: process.env, stdio: 'inherit' })
+if (result.error) { console.error(result.error.message); process.exit(1) }
 process.exit(result.status ?? 1)

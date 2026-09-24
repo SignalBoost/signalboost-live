@@ -18,7 +18,7 @@ test('HF open datasets receive bounded rotating exact-source daily acquisition',
   assert.match(daily, /id: 'curriculum:hf-github-cc0-continuous'[\s\S]*?sourceKinds: \['public_dataset'\][\s\S]*?allowedAdapterIds: \['hf_github_cc0'\]/)
   assert.match(daily, /id: 'curriculum:hf-arxiv-metadata-continuous'[\s\S]*?sourceKinds: \['public_dataset'\][\s\S]*?allowedAdapterIds: \['hf_arxiv_cc0'\]/)
   assert.match(daily, /const hfOpenDatasetCurriculum = huggingFaceOpenDatasetCurriculum\(\)/)
-  assert.match(daily, /const curriculum = \[\.\.\.hfOpenDatasetCurriculum, \.\.\.recurringTechnologyCurriculum\(\)/)
+  assert.match(daily, /const generalCurriculum = \[\.\.\.hfOpenDatasetCurriculum, \.\.\.recurringTechnologyCurriculum\(\)/)
 
   assert.match(cycle, /gap\.allowedAdapterIds/)
   assert.match(cycle, /if\(exact\.size&&\(!adapter\.id\|\|!exact\.has\(adapter\.id\)\)\)return false/)

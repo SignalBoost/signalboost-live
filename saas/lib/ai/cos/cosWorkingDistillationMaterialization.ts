@@ -17,6 +17,10 @@ function clean(value: unknown, max = 250_000): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
+function exactText(value: unknown, max = 250_000): string {
+  return String(value ?? '').trim().slice(0, max)
+}
+
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
@@ -74,9 +78,9 @@ function normalizedRows(rows: readonly WorkingCosMaterializationRow[]) {
     assetSetKey: clean(row.assetSetKey, 64).toLowerCase(),
     subjectId: clean(row.subjectId, 240),
     promptId: clean(row.promptId, 160),
-    prompt: clean(row.prompt, 100_000),
-    response: clean(row.response, 100_000),
-    text: clean(row.text, 250_000),
+    prompt: exactText(row.prompt, 100_000),
+    response: exactText(row.response, 100_000),
+    text: exactText(row.text, 250_000),
     itemHash: clean(row.itemHash, 64).toLowerCase(),
     portableContentHash: clean(row.portableContentHash, 64).toLowerCase(),
     trainingRights: clean(row.trainingRights, 120).toLowerCase(),
@@ -290,9 +294,9 @@ export async function prepareWorkingCosMaterialization(input: Readonly<{
     assetSetKey: clean(row.asset_set_key, 64),
     subjectId: clean(row.subject_id, 240),
     promptId: clean(row.prompt_id, 160),
-    prompt: clean(row.prompt_text, 100_000),
-    response: clean(row.response_text, 100_000),
-    text: clean(row.training_text, 250_000),
+    prompt: exactText(row.prompt_text, 100_000),
+    response: exactText(row.response_text, 100_000),
+    text: exactText(row.training_text, 250_000),
     itemHash: clean(row.source_item_hash, 64),
     portableContentHash: clean(row.portable_content_hash, 64),
     trainingRights: clean(row.training_rights, 120),

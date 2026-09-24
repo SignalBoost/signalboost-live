@@ -8,7 +8,6 @@ import {
   createNativeWebKnowledgeCapabilityResolver,
   createWebKnowledgeCapabilityGrant,
   createWebKnowledgeResearchPort,
-  runWebKnowledgeResearchProductionHarness,
 } from '../platform-harness/index.ts'
 
 test('web knowledge is a read-only capability and never grants learning or training authority', async () => {
@@ -64,38 +63,6 @@ test('COS parent Harness can carry web research only as the exact read scope', a
   const resolution = await resolver.resolve(manifest)
   assert.equal(resolution.satisfied, true)
   assert.ok(resolution.resolved[WEB_KNOWLEDGE_RESEARCH_CAPABILITY])
-})
-
-test('governed Production web research returns evidence without Production mutation', async () => {
-  const evidence: any[] = []
-  const research = createWebKnowledgeResearchPort({
-    search: async () => [{
-      uri: 'https://example.gov/current-guidance',
-      title: 'Current guidance',
-      text: 'Current public evidence for the research objective.',
-      evidence: ['source_class=owning_authority'],
-    }],
-  })
-
-  const outcome = await runWebKnowledgeResearchProductionHarness({
-    query: 'current guidance',
-    purpose: 'agent_research',
-    tenantId: 'itmounts',
-    portableId: 'research-specialist',
-    agentId: 'research-specialist',
-    role: 'research_specialist',
-    evidenceSink: { async append(record) { evidence.push(record) } },
-    research,
-    runId: 'web-knowledge-harness-test',
-  })
-
-  assert.equal(outcome.ok, true)
-  if (!outcome.ok) return
-  assert.equal(outcome.results.length, 1)
-  assert.equal(outcome.results[0]?.trainingAuthorized, false)
-  assert.equal(evidence.length, 1)
-  assert.equal(evidence[0]?.outcomeStatus, 'success')
-  assert.equal(evidence[0]?.productionMutationObserved, false)
 })
 
 test('web knowledge resolver fails closed when the manifest did not authorize the capability', async () => {

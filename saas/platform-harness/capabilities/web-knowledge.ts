@@ -210,6 +210,8 @@ export type WebKnowledgeHarnessResult =
 /**
  * Canonical Production execution path for agents that use Web Knowledge Acquisition.
  * A parent HarnessRun may delegate this read only when the parent already contains the same grant.
+ * The built-in acquisition path is provider-free; paid discovery must supply its own separately
+ * governed spend boundary rather than smuggling a paid call through this zero-cost native path.
  */
 export async function runWebKnowledgeResearchProductionHarness(input: {
   query: string
@@ -245,7 +247,7 @@ export async function runWebKnowledgeResearchProductionHarness(input: {
     role,
     environmentId,
     requestedCapabilities: [WEB_KNOWLEDGE_RESEARCH_CAPABILITY],
-    limits: { maxToolCalls: 1, maxConcurrency: 1, deadlineMs: 45_000, maxCostUsd: 0 },
+    limits: { maxToolCalls: 1, maxConcurrency: 1, deadlineMs: 45_000 },
     ...(input.parentManifest ? {
       parent: {
         runId: input.parentManifest.runId,
@@ -301,7 +303,7 @@ export async function runWebKnowledgeResearchProductionHarness(input: {
       verifiedBy: 'host',
       environments: Object.freeze(['production'] as const),
       capabilities: Object.freeze([grant]),
-      limits: Object.freeze({ maxToolCalls: 1, maxConcurrency: 1, deadlineMs: 45_000, maxCostUsd: 0 }),
+      limits: Object.freeze({ maxToolCalls: 1, maxConcurrency: 1, deadlineMs: 45_000 }),
     }),
     capabilities: createNativeWebKnowledgeCapabilityResolver({ tenantId, environmentId, portableId }),
     executor: createGovernedHarnessExecutor({ policy: researchPolicy(), host }),

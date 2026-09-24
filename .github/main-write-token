@@ -1,2 +1,2 @@
-base_sha=45bbb8451edd466279605be0ebe35a6d5723a5d5
-branch=fix/platform-harness-production-policy-narrowing-20260923
+base_sha=0918a8f13d7eed3bde61690aa819d2571fc19b82
+branch=feat/working-cos-readiness-cron-20260923

@@ -22,6 +22,7 @@ const tests = [
   'tests/cosUniversityTeacherAdapters.node.test.ts',
   'tests/cosUniversityMassHostedTeacherStage.node.test.ts',
   'tests/cosUniversityTelemetry.node.test.ts',
+  'tests/cosLaneStatus.node.test.ts',
   'tests/cosWorkingDistillationDispatch.node.test.ts',
   'tests/platformHarnessFullEnforcement.node.test.ts',
   'tests/deepInfraHarnessSpendGuard.node.test.ts',

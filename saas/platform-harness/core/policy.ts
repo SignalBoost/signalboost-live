@@ -187,8 +187,104 @@ export function resolveHarnessManifest(
       environment: Object.freeze({ ...request.environment }),
       capabilities: Object.freeze(resolved),
       authorityManifestRef: authority.manifestRef,
+      ...(request.parent
+        ? { parent: Object.freeze({ ...request.parent }) }
+        : {}),
       limits: constrainedLimits(request.requestedLimits, authority.limits, profile),
       learningFeedbackAllowed: profile.learningFeedbackAllowed,
     }),
   })
+}
+
+
+const RISK_RANK: Readonly<Record<'read' | 'write' | 'consequential', number>> = Object.freeze({
+  read: 0,
+  write: 1,
+  consequential: 2,
+})
+
+function childCapabilityDoesNotWiden(
+  child: HarnessManifest['capabilities'][number],
+  parent: HarnessManifest['capabilities'][number],
+): boolean {
+  if (child.mutating && !parent.mutating) return false
+  if (RISK_RANK[child.risk ?? (child.mutating ? 'write' : 'read')]
+    > RISK_RANK[parent.risk ?? (parent.mutating ? 'write' : 'read')]) return false
+  if (child.environments.some(environment => !parent.environments.includes(environment))) return false
+
+  const parentScopes = new Set(parent.scopes ?? [])
+  if ((child.scopes ?? []).some(scope => !parentScopes.has(scope))) return false
+
+  if (parent.preferredProviders?.length) {
+    const parentProviders = new Set(parent.preferredProviders)
+    if ((child.preferredProviders ?? []).some(provider => !parentProviders.has(provider))) return false
+  }
+  return true
+}
+
+function childLimitsDoNotWiden(
+  child: HarnessLimits,
+  parent: HarnessLimits,
+): boolean {
+  for (const key of ['maxCostUsd', 'maxToolCalls', 'deadlineMs', 'maxConcurrency'] as const) {
+    const parentValue = parent[key]
+    if (parentValue === undefined) continue
+    const childValue = child[key]
+    if (childValue === undefined || childValue > parentValue) return false
+  }
+  return true
+}
+
+/**
+ * Resolve one delegated child run. A child may only reduce the parent's executable surface.
+ * Separate child authority may further reduce the run, but it cannot add a capability, widen
+ * scope/risk/mutation, escape the parent environment/profile/tenant, or loosen a hard limit.
+ */
+export function resolveChildHarnessManifest(
+  request: HarnessRunRequest,
+  authority: HarnessAuthorityEnvelope,
+  parent: HarnessManifest,
+): HarnessPolicyDecision {
+  const reasons: string[] = []
+  if (!request.parent) reasons.push('child_parent_missing')
+  if (request.parent?.runId !== parent.runId) reasons.push('child_parent_run_mismatch')
+  if (request.parent?.authorityManifestRef !== parent.authorityManifestRef) {
+    reasons.push('child_parent_authority_mismatch')
+  }
+  if (request.profile !== parent.profile) reasons.push('child_profile_widening_forbidden')
+  if (request.environment.class !== parent.environment.class) {
+    reasons.push('child_environment_widening_forbidden')
+  }
+  if ((request.identity.tenantId ?? '') !== (parent.identity.tenantId ?? '')) {
+    reasons.push('child_tenant_mismatch')
+  }
+
+  const parentById = new Map(parent.capabilities.map(capability => [capability.id, capability]))
+  for (const rawId of request.requestedCapabilities) {
+    const capabilityId = clean(rawId, 320)
+    if (capabilityId && !parentById.has(capabilityId)) {
+      reasons.push(`child_capability_widening_forbidden:${capabilityId}`)
+    }
+  }
+  if (reasons.length) {
+    return Object.freeze({ allowed: false, reasons: Object.freeze(reasons) })
+  }
+
+  const decision = resolveHarnessManifest(request, authority)
+  if (decision.allowed === false) return decision
+
+  for (const childCapability of decision.manifest.capabilities) {
+    const parentCapability = parentById.get(childCapability.id)
+    if (!parentCapability || !childCapabilityDoesNotWiden(childCapability, parentCapability)) {
+      reasons.push(`child_capability_widening_forbidden:${childCapability.id}`)
+    }
+  }
+  if (!childLimitsDoNotWiden(decision.manifest.limits, parent.limits)) {
+    reasons.push('child_limits_widening_forbidden')
+  }
+  if (reasons.length) {
+    return Object.freeze({ allowed: false, reasons: Object.freeze(reasons) })
+  }
+
+  return decision
 }

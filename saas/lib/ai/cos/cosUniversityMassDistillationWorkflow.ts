@@ -143,9 +143,11 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   // authorized prepared batch cannot be starved by slow reconciliation or replenishment work.
   let rollingAuthorization: Record<string, unknown>
   const dispatchReadiness = massDistillationDispatchReadiness()
-  // New paid training may start only while downstream canary/evaluation can keep up. The backlog gate
-  // pauses NEW authorization and NEW paid dispatch; closure, reconciliation, recovery and in-flight jobs
-  // above and below still run, so the backlog drains and training resumes automatically.
+  // New campaigns may start only while downstream canary/evaluation can keep up. The backlog gate
+  // pauses NEW authorization, but it must not strand a campaign that already holds bounded authority:
+  // an authorized teacher/preparation/training lifecycle may drain to its terminal artifact so partial
+  // hosted-teacher work, provider reservations, and campaign capacity do not remain stuck forever.
+  // No authority is widened here; the consumer can only claim existing authorized/active campaigns.
   const evaluationBacklog = await readMassEvaluationBacklogGate({ db: cosServiceDb() as any })
   const backlogPaused = dispatchReadiness.ready && !evaluationBacklog.open
   try {
@@ -182,18 +184,23 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       authorityExpanded: false,
     }
   }
-  const initialResult: Record<string, any> = backlogPaused
+  const initialResult: Record<string, any> = await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })
+  const backlogDrainMode = backlogPaused && initialResult.ok === true
     ? {
-        ok: true,
-        skipped: true,
+        active: true,
         reason: evaluationBacklog.reason,
-        dispatched: 0,
-        externalCostUsd: 0,
         pendingEvaluation: evaluationBacklog.pendingEvaluation,
         backlogLimit: evaluationBacklog.limit,
+        newCampaignAuthorizationPaused: true,
+        existingCampaignDrainAllowed: true,
         authorityExpanded: false,
       }
-    : await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })
+    : {
+        active: false,
+        newCampaignAuthorizationPaused: backlogPaused,
+        existingCampaignDrainAllowed: true,
+        authorityExpanded: false,
+      }
   let result: Record<string, any> = initialResult
   let capacityRecovery: Record<string, any> = { ok: true, skipped: true, reason: 'capacity_recovery_not_needed' }
   let postRecoveryAuthorization: Record<string, any> = { ok: true, authorized: false, skipped: true, reason: 'capacity_recovery_not_needed' }
@@ -374,6 +381,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       preparedAfterReplenishment,
       rollingAuthorization,
       evaluationBacklog,
+      backlogDrainMode,
       slowMaintenanceDue,
       workflowSource: input.source,
       retryScheduled,

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { cosServiceDb } from '../../cos-core/storage/service-db.ts'
 
 export const COS_WORKING_DISTILLATION_BUNDLE_PROFILE = 'cos-working-distillation-balanced-bundle-v1' as const
 export const COS_WORKING_DISTILLATION_MIN_SUBJECTS = 8 as const
@@ -49,11 +50,21 @@ export type WorkingCosBalancedBundleBlocker =
   | 'insufficient_subject_coverage'
   | 'insufficient_training_items'
 
+type NormalizedWorkingCosAssetSet = Readonly<{
+  assetSetKey: string
+  portableManifestHash: string
+  subjectId: string
+  itemCount: number
+  trainingRights: string
+  createdAt: string | null
+  createdAtMs: number
+}>
+
 export function workingCosTrainingRightsEligible(value: unknown): boolean {
   return TRAINING_RIGHTS.has(clean(value, 120).toLowerCase())
 }
 
-function normalizedRows(rows: readonly WorkingCosVaultAssetSet[]) {
+function normalizedRows(rows: readonly WorkingCosVaultAssetSet[]): NormalizedWorkingCosAssetSet[] {
   return rows.flatMap(row => {
     const assetSetKey = clean(row.assetSetKey, 64).toLowerCase()
     const portableManifestHash = clean(row.portableManifestHash, 64).toLowerCase()
@@ -105,7 +116,7 @@ export function buildWorkingCosBalancedBundle(
   )
   const rotationSeed = clean(options.rotationSeed, 500) || COS_WORKING_DISTILLATION_BUNDLE_PROFILE
 
-  const bySubject = new Map<string, ReturnType<typeof normalizedRows>>()
+  const bySubject = new Map<string, NormalizedWorkingCosAssetSet[]>()
   for (const row of normalizedRows(rows)) {
     const current = bySubject.get(row.subjectId) || []
     current.push(row)
@@ -120,7 +131,7 @@ export function buildWorkingCosBalancedBundle(
   }
 
   const subjects = rotate([...bySubject.keys()].sort(), rotationSeed).slice(0, maxSubjects)
-  const selected = []
+  const selected: NormalizedWorkingCosAssetSet[] = []
   let totalItems = 0
   for (const subject of subjects) {
     const row = bySubject.get(subject)?.[0]
@@ -175,5 +186,44 @@ export function buildWorkingCosBalancedBundle(
     sourceSelection: 'newest_sealed_set_per_subject_balanced_before_volume' as const,
     automaticTrainingAuthorized: false as const,
     automaticActivationAuthorized: false as const,
+  })
+}
+
+
+/**
+ * Read sealed model-neutral asset sets from the durable University vault and build one balanced
+ * Working-COS education bundle. This is read-only and non-spending: it does not partition a dataset,
+ * dispatch training, mutate a runtime, or authorize Production traffic.
+ */
+export async function selectWorkingCosBalancedBundleFromVault(
+  options: WorkingCosBalancedBundleOptions = {},
+  dbOverride?: any,
+) {
+  const db = dbOverride || cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+
+  const result = await db.from('cos_university_distillation_asset_sets')
+    .select('asset_set_key,portable_manifest_hash,subject_id,item_count,training_rights,model_neutral,contains_private_production_data,created_at')
+    .eq('model_neutral', true)
+    .eq('contains_private_production_data', false)
+    .order('created_at', { ascending: false })
+    .limit(2000)
+  if (result.error) throw result.error
+
+  const bundle = buildWorkingCosBalancedBundle((result.data || []).map((row: any) => ({
+    assetSetKey: row.asset_set_key,
+    portableManifestHash: row.portable_manifest_hash,
+    subjectId: row.subject_id,
+    itemCount: row.item_count,
+    trainingRights: row.training_rights,
+    modelNeutral: row.model_neutral,
+    containsPrivateProductionData: row.contains_private_production_data,
+    createdAt: row.created_at,
+  })), options)
+
+  return Object.freeze({
+    ...bundle,
+    vaultRowsConsidered: (result.data || []).length,
+    semantics: 'read_only_balanced_working_cos_bundle_selection_no_training_no_runtime_mutation' as const,
   })
 }

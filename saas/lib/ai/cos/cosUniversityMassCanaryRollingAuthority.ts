@@ -8,12 +8,12 @@
 export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-17_mass_canary_without_manual_intervention' as const
 export const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1' as const
 export const MASS_CANARY_APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved' as const
-// Smooth the same 72/day owner spend envelope across four 6-hour windows. A bursty 24-hour
-// counter allowed 98 historical approvals to leave the canary lane dark for ~16 hours even though
-// the one-canary semaphore and <= $0.20 per-canary ceiling were healthy. 18 per 6 hours preserves
-// the same nominal worst-case rate (72/day, <= $14.40/day) without a long post-burst blackout.
-export const MASS_CANARY_ROLLING_WINDOW_HOURS = 6
-export const MASS_CANARY_ROLLING_MAX_APPROVALS = 18
+// Preserve the same 72/day owner spend envelope, but meter it hourly. The former 18-per-6h bucket
+// could be exhausted in a short burst and then leave the canary lane dark for hours while hundreds
+// of artifacts waited upstream. Three per rolling hour keeps the same nominal maximum
+// (72/day, <= $14.40/day) while bounding any budget-induced blackout to less than an hour.
+export const MASS_CANARY_ROLLING_WINDOW_HOURS = 1
+export const MASS_CANARY_ROLLING_MAX_APPROVALS = 3
 export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // A cold-start timeout is the runtime never answering, not the artifact failing. It is retried without spending one
 // of the three substantive attempts, and the identical-repeat stop below still prevents an endless loop.
@@ -203,8 +203,8 @@ export function decideMassCanaryRollingApproval(input: {
   // Budget the rolling window by provider invocations that actually started, plus any currently
   // armed approval that can still become one. Expired approvals that were never invoked consumed
   // neither provider work nor canary spend and therefore must not create an artificial blackout.
-  // This preserves the same maximum potential spend: at most 18 started-or-still-reserved canaries
-  // per six hours, each already bounded to <= $0.20 by the approval contract.
+  // This preserves the same maximum potential spend: at most three started-or-still-reserved canaries
+  // per rolling hour, each already bounded to <= $0.20 by the approval contract.
   const rollingWindowStart = nowMs - MASS_CANARY_ROLLING_WINDOW_HOURS * 3600_000
   const invokedInWindow = input.events.filter(event => event.verifier === 'host_controller'
     && claim(event) === 'local_distilled_runtime_canary_invocation_started'
@@ -250,7 +250,7 @@ export function decideMassCanaryRollingApproval(input: {
       if (aBuilder !== bBuilder) return aBuilder ? -1 : 1
     }
     // Once Builder proof is satisfied, give the first two post-GKD remediation-replay artifacts a
-    // bounded proof lane ahead of the legacy backlog. The 18/6h canary cap and all other authority remain unchanged.
+    // bounded proof lane ahead of the legacy backlog. The 3/hour canary cap and all other authority remain unchanged.
     if (replayProofNeeded) {
       const aReplay = replayProofArtifact(a)
       const bReplay = replayProofArtifact(b)

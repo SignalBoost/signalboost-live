@@ -276,13 +276,13 @@ test('an orphaned invocation marker releases after the bounded in-flight TTL', (
   assert.equal(decision.artifact.candidateId,a.candidateId)
 })
 
-test('the kill switch and the smoothed 6-hour paid-invocation cap stop issuance', () => {
+test('the kill switch and the hourly paid-invocation cap stop issuance', () => {
   const a=artifact(1)
-  assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 6)
+  assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 1)
   assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a],events:[],now,enabled:false}),{issue:false,reason:'mass_canary_rolling_authorization_disabled'})
   const starts=Array.from({length:MASS_CANARY_ROLLING_MAX_APPROVALS},(_,i)=>{
     const o=artifact(100+i)
-    return event(o,'local_distilled_runtime_canary_invocation_started','2026-09-17T13:00:00.000Z')
+    return event(o,'local_distilled_runtime_canary_invocation_started','2026-09-17T16:30:00.000Z')
   })
   assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a],events:starts,now,enabled:true}),{issue:false,reason:'mass_canary_rolling_window_exhausted'})
 })
@@ -383,21 +383,21 @@ test('the same canary failure repeating stops that artifact instead of looping',
   assert.equal(decision.artifact.candidateId, 'mass:2', 'the stuck artifact is skipped and the queue moves on')
 })
 
-test('the smoothed ceiling preserves the 72-per-day nominal spend envelope without a long blackout', () => {
-  assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 6)
-  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 18)
+test('the hourly ceiling preserves the 72-per-day nominal spend envelope without a long blackout', () => {
+  assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 1)
+  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 3)
   assert.equal((24 / MASS_CANARY_ROLLING_WINDOW_HOURS) * MASS_CANARY_ROLLING_MAX_APPROVALS, 72)
   const a = artifact(1)
   const exhausted = Array.from({ length:MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) => {
     const other = artifact(100 + index)
-    return event(other, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T13:00:00.000Z')
+    return event(other, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T16:30:00.000Z')
   })
   assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a], events:exhausted, now, enabled:true }),
     { issue:false, reason:'mass_canary_rolling_window_exhausted' })
 
-  const agedOut = exhausted.map(item => ({ ...item, observedAt:'2026-09-17T10:00:00.000Z' }))
+  const agedOut = exhausted.map(item => ({ ...item, observedAt:'2026-09-17T15:00:00.000Z' }))
   const resumed = decideMassCanaryRollingApproval({ artifacts:[a], events:agedOut, now, enabled:true })
-  assert.ok('artifact' in resumed, `expected admission after the 6-hour window aged out, got ${JSON.stringify(resumed)}`)
+  assert.ok('artifact' in resumed, `expected admission after the hourly window aged out, got ${JSON.stringify(resumed)}`)
   assert.equal(resumed.artifact.candidateId, a.candidateId)
 })
 
@@ -414,7 +414,7 @@ test('expired unused approvals do not consume spend capacity while a live armed 
 
   const starts = Array.from({ length:MASS_CANARY_ROLLING_MAX_APPROVALS - 1 }, (_, index) => {
     const other = artifact(300 + index)
-    return event(other, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T13:00:00.000Z')
+    return event(other, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T16:30:00.000Z')
   })
   const armedArtifact = artifact(999)
   const armed = event(armedArtifact, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T16:50:00.000Z',

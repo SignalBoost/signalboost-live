@@ -46,6 +46,9 @@ const replayArtifact = (candidateId: string, hashId: number, createdAt: string):
   createdAt,
   failureDerivedReplayRequired: true,
   failureDerivedReplayItems: 3,
+  failureDerivedReplayEpochs: 3,
+  failureDerivedReplayLearningRate: 5e-5,
+  remediationReplayProof: true,
 })
 const event = (a: CanaryArtifact, claim: string, observedAt: string, extra: Partial<CanaryEvent> = {}, evidence: Record<string, unknown> = {}): CanaryEvent =>
   ({ candidateId: a.candidateId, observedAt, expiresAt: null, verifier: 'host_controller', evidence: { profile: MASS_CANARY_PROFILE, claim, artifactHash: a.artifactHash, ...evidence }, ...extra })
@@ -306,6 +309,9 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.match(route,/frontierResponseAnchorItems:Number\(receipt\.frontierResponseAnchorItems\|\|0\)/)
   assert.match(route,/failureDerivedReplayRequired:receipt\.failureDerivedReplayRequired===true/)
   assert.match(route,/failureDerivedReplayItems:Number\(receipt\.failureDerivedReplayItems\|\|0\)/)
+  assert.match(route,/failureDerivedReplayEpochs:Number\(receipt\.failureDerivedReplayEpochs\|\|0\)/)
+  assert.match(route,/failureDerivedReplayLearningRate:Number\(receipt\.failureDerivedReplayLearningRate\|\|0\)/)
+  assert.match(route,/remediationReplayProof:isStrengthenedFailureDerivedReplayReceipt/)
   assert.match(route,/contains\('intended_use',\{trainingReceipt:\{failureDerivedReplayRequired:true\}\}\)/)
   assert.match(route,/builderProofPasses=\[\.\.\.passedCandidates\]/)
   assert.match(route,/remediationReplayProofPasses=\[\.\.\.passedCandidates\]/)

@@ -123,7 +123,7 @@ test('provider-confirmed truncation gets one larger retry and never executes par
     return Response.json({ choices: [{ finish_reason: observed.length === 1 ? 'length' : 'stop', message: { content: JSON.stringify({ type: 'answer', answer: 'Inspected.' }) } }] })
   }) as typeof fetch
   const result = await new BuilderToolLoop({ async generate(input) {
-    return callLocalModel({ ...input, jsonObject: true }, { baseUrl: 'http://localhost/v1', model: 'configured-builder', timeoutMs: 5000 })
+    return callLocalModel({ ...input, jsonObject: true }, { baseUrl: 'http://localhost/v1', model: 'configured-builder', timeoutMs: 5000, contextWindowTokens: 16_384 })
   } }, new InMemoryBuilderWorkspace(), { async run() { assert.fail('no execution authorized by this control') } })
     .run({ objective: 'Describe the workspace.', workspaceId: 'truncation', maxRounds: 1 })
   assert.equal(result.ok, true)
@@ -140,7 +140,7 @@ test('repeated provider length stops fail truthfully within the retry budget', a
     return Response.json({ choices: [{ finish_reason: 'length', message: { content: '{"type":"tool"' } }] })
   }) as typeof fetch
   const result = await new BuilderToolLoop({ async generate(input) {
-    return callLocalModel({ ...input, jsonObject: true }, { baseUrl: 'http://localhost/v1', model: 'configured-builder', timeoutMs: 5000 })
+    return callLocalModel({ ...input, jsonObject: true }, { baseUrl: 'http://localhost/v1', model: 'configured-builder', timeoutMs: 5000, contextWindowTokens: 16_384 })
   } }, new InMemoryBuilderWorkspace(), { async run() { assert.fail('partial output cannot execute') } })
     .run({ objective: 'Create:\n- one.js\n- two.js', workspaceId: 'repeated-truncation' })
   assert.equal(result.ok, false)

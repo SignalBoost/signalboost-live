@@ -10,16 +10,25 @@ export function servedCandidateModelFromCanary(
 ): string {
   const hash = input.artifactHash.toLowerCase()
   const prefix = `itmounts-mass-distilled-${hash.slice(0, 12)}`
-  const proven = events
+  const matching = events
     .filter(event => event.verifier === 'host_controller'
-      && event.evidence?.claim === 'local_distilled_runtime_canary_passed'
-      && event.evidence?.exactArtifact === true
       && event.evidence?.candidateId === input.candidateId
       && String(event.evidence?.artifactHash || '').toLowerCase() === hash
       && event.evidence?.endpointId === input.endpointId)
     .sort((a, b) => Date.parse(String(b.observed_at || '')) - Date.parse(String(a.observed_at || '')))
-    .map(event => String(event.evidence?.model || ''))
-    .find(model => /^[a-z0-9-]{1,80}$/.test(model) && (model === prefix || model.startsWith(`${prefix}-`)))
-  if (!proven) throw new Error('mass_distilled_evaluation_served_model_unproven')
-  return proven
+
+  const provenEvent = matching.find(event => event.evidence?.claim === 'local_distilled_runtime_canary_passed'
+    && event.evidence?.exactArtifact === true
+    && (() => {
+      const model = String(event.evidence?.model || '')
+      return /^[a-z0-9-]{1,80}$/.test(model) && (model === prefix || model.startsWith(`${prefix}-`))
+    })())
+  if (!provenEvent) throw new Error('mass_distilled_evaluation_served_model_unproven')
+
+  const provenAt = Date.parse(String(provenEvent.observed_at || ''))
+  const invalidated = matching.some(event => event.evidence?.claim === 'local_distilled_runtime_canary_failed'
+    && Date.parse(String(event.observed_at || '')) > provenAt)
+  if (invalidated) throw new Error('mass_distilled_evaluation_served_model_unproven')
+
+  return String(provenEvent.evidence?.model || '')
 }

@@ -1,6 +1,6 @@
 // Dynamic exact-artifact RunPod canary support for mass-distilled students.
 import { configuredRunpodApiKey } from './runpodConfig.ts'
-import { protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
+import { activeResidencyRunpodEndpointNames, protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
 
 const REST_V1 = 'https://rest.runpod.io/v1'
 const CONTROL_API_V2 = 'https://api.runpod.io/v2'
@@ -234,10 +234,14 @@ function reservedServerlessWorkerSlots(endpoints:Endpoint[]){
 }
 
 async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEndpointName:string){
-  const protectedEndpointIds=await protectedRunpodEndpointIds()
+  const [protectedEndpointIds,protectedResidencyEndpointNames]=await Promise.all([
+    protectedRunpodEndpointIds(),
+    activeResidencyRunpodEndpointNames(),
+  ])
   const retired=endpoints.filter(endpoint=>endpoint.name.startsWith('itmounts-mass-distilled-')
     && endpoint.name!==activeEndpointName
     && !protectedEndpointIds.has(clean(endpoint.id,160).toLowerCase())
+    && !protectedResidencyEndpointNames.has(clean(endpoint.name,240))
     && Number(endpoint.workers?.max??0)>0)
   for(const endpoint of retired){
     await requestV2<Endpoint>(`/serverless/${encodeURIComponent(endpoint.id)}`,{method:'PATCH',body:JSON.stringify({workers:{min:0,max:0,idleTimeout:Math.min(Number(endpoint.workers?.idleTimeout??IDLE_TIMEOUT_SECONDS),IDLE_TIMEOUT_SECONDS)}})})

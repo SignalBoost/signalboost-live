@@ -5,6 +5,7 @@ import test from 'node:test'
 import {
   MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET,
   MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
+  MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS,
   MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES,
   buildMassDistillationReplenishmentGaps,
   massDistillationThroughputProfile,
@@ -20,6 +21,7 @@ test('distillation throughput is deployment-owner controlled without a vendor cl
   assert.equal(MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES, 5)
   assert.equal(MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET, 10)
   assert.equal(MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT, 3)
+  assert.equal(MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS, 6)
   const defaults = massDistillationThroughputProfile({})
   assert.equal(defaults.preparedBatchBufferTarget, 10)
   assert.equal(defaults.queriesPerSubject, 3)

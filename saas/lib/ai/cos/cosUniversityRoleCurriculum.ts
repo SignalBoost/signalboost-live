@@ -7,6 +7,7 @@ import {
 export type CosUniversityAgentRole =
   | 'chief_of_staff_generalist'
   | 'software_engineering'
+  | 'context_engineering'
   | 'cybersecurity'
   | 'quantitative_data_science'
   | 'enterprise_operations_governance'
@@ -19,6 +20,7 @@ export type CosUniversityAgentRole =
 
 const ROLE_TRACK: Readonly<Record<Exclude<CosUniversityAgentRole, 'chief_of_staff_generalist'>, CosUniversityMastersTrackId>> = Object.freeze({
   software_engineering: 'applied_ai_systems',
+  context_engineering: 'context_engineering_systems',
   cybersecurity: 'security_and_trust',
   quantitative_data_science: 'quantitative_decision_science',
   enterprise_operations_governance: 'enterprise_operations_and_governance',

@@ -24,6 +24,8 @@ const providerImportAllowlist = new Set([
   'lib/ai/providerRouter.ts',
   'lib/cos/textGateway.ts',
   'lib/cos/aiPort.ts',
+  // Type-only compatibility shim; execution delegates into lib/cos/textGateway.ts.
+  'lib/ai/modelRouter.ts',
 ])
 
 for (const abs of files) {

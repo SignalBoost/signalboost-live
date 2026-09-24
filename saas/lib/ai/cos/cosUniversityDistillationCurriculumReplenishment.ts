@@ -3,7 +3,7 @@ import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector, type ContinuousLearningPolicy } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
+import { MASS_DISTILLATION_MAX_BATCH, type MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
 import { installHostedTeacherCurriculum } from './cosUniversityHostedTeacherCurriculum.ts'
 import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import {
@@ -30,7 +30,8 @@ const DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY = 10
 const DISTILLATION_SOURCE_CALL_BUDGET_MULTIPLIER = 6
 const DISTILLATION_RIGHTS_CLEARED_ADAPTERS = new Set(['openalex', 'hf_nist_cc0', 'hf_github_cc0'])
 const HYBRID_SYNTHETIC_MAX_PER_SUBJECT = 20
-const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = Math.max(1, Math.round(20 * HYBRID_FAILURE_DERIVED_TARGET))
+const FAILURE_DERIVED_VARIANTS_PER_EVALUATION = 4
+const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = Math.max(1, Math.round(MASS_DISTILLATION_MAX_BATCH * HYBRID_FAILURE_DERIVED_TARGET))
 const VERIFIED_FAILURE_LOOKBACK_DAYS = 30
 
 function rightsClearedPolicy(maxCandidatesPerCycle: number): ContinuousLearningPolicy {
@@ -182,9 +183,11 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   // existed and were never seeded for the subjects that were failing.
   //
   // Targets are now the subjects with verified failures, most-failing first, with shortfall only breaking ties.
-  // Volume stays bounded exactly as before: at most HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT seeds per subject per
-  // pass, at most maxSubjects subjects, and the content hash is derived from the failing candidate and its gate
-  // classes - so re-running produces nothing new and only a newly failed artifact creates new material.
+  // Volume stays bounded: at most HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT seeds per subject per pass and at most
+  // maxSubjects subjects. Each independently failed artifact can contribute a small fixed set of distinct practice
+  // variants, which makes the configured 30% remediation share achievable even for 128-item batches. Identity is
+  // candidate + failed gate classes + variant ordinal, so re-running is idempotent and a newly failed artifact adds
+  // only its own bounded variants.
   const since = new Date(input.now.getTime() - VERIFIED_FAILURE_LOOKBACK_DAYS * 86_400_000).toISOString()
 
   const rows = await input.db.from('cos_university_distilled_evaluation_runs')
@@ -226,76 +229,80 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   const bySubject: Array<{ subject: string; inserted: number }> = []
   for (const target of targets) {
     const verifiedFailures = failuresByTitle.get(target.subject) || []
-    // The per-subject ceiling still applies; the shortfall no longer caps it, because a subject with full
-    // inventory and failing artifacts needs remediation most, not least.
-    const needed = Math.min(
-      HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT,
-      verifiedFailures.length,
-    )
+    // A full 128-item batch needs about 38 failure-derived rows to honor the configured 30% share.
+    // One row per failed artifact cannot supply that ratio when a subject has only a few recent failures, so each
+    // independently failed artifact contributes a small fixed family of general-principle practice variants.
+    // This expands teaching diversity, not evidence authority: no raw evaluator case, prompt, reference, or judge
+    // output enters the curriculum.
     let subjectInserted = 0
-    for (let ordinal = 0; ordinal < needed; ordinal += 1) {
-      const failure = verifiedFailures[ordinal]
-      if (!failure) continue
-      // Bind remediation identity to the independently evaluated artifact + failed gate classes.
-      // Re-running the same evidence is idempotent; a newly failed artifact produces fresh curriculum.
-      const remediationKey = `${FAILURE_DERIVED_REMEDIATION_PROFILE}:${failure.candidateId}:${failure.gates.join(',')}`
-      const contentHash = failureDerivedSourceHash(target.subject, ordinal, remediationKey)
-      const remediationPrinciples = failureDerivedRemediationPrinciples(failure.gates)
-      const remediationVariant = failureDerivedPracticeVariant({
-        subjectId: target.subject,
-        candidateId: failure.candidateId,
-        ordinal,
-        gates: failure.gates,
-      })
-      const row = {
-        content_hash: contentHash,
-        source_kind: 'failure_derived_curriculum',
-        source_uri: `itmounts://cos-university/failure-derived/${encodeURIComponent(target.subject)}/${contentHash.slice(0, 16)}/${ordinal}`,
-        source_title: `${target.subject} — independently verified remediation seed ${ordinal + 1}`,
-        observed_at: input.now.toISOString(),
-        subject: target.subject,
-        summary: [
-          `Independent evaluation shows a remediation need in ${target.subject} for graduation gate classes: ${failure.gates.join(', ')}.`,
-          'Generate a distinct self-contained expert teaching example that targets the relevant failure class while preserving correct, safe, transferable, and retainable behavior.',
-          `Practice context: ${remediationVariant.context}. Verification mode: ${remediationVariant.verificationMode}. Difficulty twist: ${remediationVariant.difficultyTwist}.`,
-          `Variant-specific remediation requirements: ${remediationVariant.remediationRequirements.join(' ')}`,
-          `General remediation principles: ${remediationPrinciples.join(' ')}`,
-          'Use those general principles without recreating any hidden evaluation case. Do not reproduce training examples, raw conversations, private holdouts, hidden exams, evaluator output, user data, or private evidence.',
-        ].join(' '),
-        facts: [
-          {
-            origin: 'failure_derived',
+    let generated = 0
+    for (const failure of verifiedFailures) {
+      for (let variantOrdinal = 0; variantOrdinal < FAILURE_DERIVED_VARIANTS_PER_EVALUATION; variantOrdinal += 1) {
+        if (generated >= HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT) break
+        // Bind remediation identity to the independently evaluated artifact + failed gate classes + stable variant.
+        // Re-running the same evidence is idempotent; a newly failed artifact adds only its own bounded variants.
+        const remediationKey = `${FAILURE_DERIVED_REMEDIATION_PROFILE}:${failure.candidateId}:${failure.gates.join(',')}:variant-${variantOrdinal}`
+        const contentHash = failureDerivedSourceHash(target.subject, variantOrdinal, remediationKey)
+        const remediationPrinciples = failureDerivedRemediationPrinciples(failure.gates)
+        const remediationVariant = failureDerivedPracticeVariant({
+          subjectId: target.subject,
+          candidateId: failure.candidateId,
+          ordinal: variantOrdinal,
+          gates: failure.gates,
+        })
+        const row = {
+          content_hash: contentHash,
+          source_kind: 'failure_derived_curriculum',
+          source_uri: `itmounts://cos-university/failure-derived/${encodeURIComponent(target.subject)}/${contentHash.slice(0, 16)}/${variantOrdinal}`,
+          source_title: `${target.subject} — independently verified remediation seed ${generated + 1}`,
+          observed_at: input.now.toISOString(),
+          subject: target.subject,
+          summary: [
+            `Independent evaluation shows a remediation need in ${target.subject} for graduation gate classes: ${failure.gates.join(', ')}.`,
+            'Generate a distinct self-contained expert teaching example that targets the relevant failure class while preserving correct, safe, transferable, and retainable behavior.',
+            `Practice context: ${remediationVariant.context}. Verification mode: ${remediationVariant.verificationMode}. Difficulty twist: ${remediationVariant.difficultyTwist}.`,
+            `Variant-specific remediation requirements: ${remediationVariant.remediationRequirements.join(' ')}`,
+            `General remediation principles: ${remediationPrinciples.join(' ')}`,
+            'Use those general principles without recreating any hidden evaluation case. Do not reproduce training examples, raw conversations, private holdouts, hidden exams, evaluator output, user data, or private evidence.',
+          ].join(' '),
+          facts: [
+            {
+              origin: 'failure_derived',
+              profile: HYBRID_DISTILLATION_PROFILE,
+              remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE,
+              ordinal: variantOrdinal,
+              remediationGates: failure.gates,
+              remediationPrinciples,
+              remediationVariant,
+            },
+            { constraint: 'subject_level_remediation_general_principles_only_no_raw_chat_no_private_holdout_no_hidden_exam' },
+          ],
+          confidence: 1,
+          license: 'synthetic-benchmark-fixture',
+          evidence: [{
             profile: HYBRID_DISTILLATION_PROFILE,
             remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE,
-            ordinal,
+            origin: 'failure_derived',
+            independentEvaluationFailure: true,
             remediationGates: failure.gates,
-            remediationPrinciples,
-            remediationVariant,
-          },
-          { constraint: 'subject_level_remediation_general_principles_only_no_raw_chat_no_private_holdout_no_hidden_exam' },
-        ],
-        confidence: 1,
-        license: 'synthetic-benchmark-fixture',
-        evidence: [{
-          profile: HYBRID_DISTILLATION_PROFILE,
-          remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE,
-          origin: 'failure_derived',
-          independentEvaluationFailure: true,
-          remediationGates: failure.gates,
-          sourceEvaluationCandidateId: failure.candidateId,
-          sourceDetailsCopied: false,
-          authorityExpanded: false,
-        }],
+            sourceEvaluationCandidateId: failure.candidateId,
+            remediationVariantOrdinal: variantOrdinal,
+            sourceDetailsCopied: false,
+            authorityExpanded: false,
+          }],
+        }
+        const write = await input.db.from('cos_continuous_learning')
+          .upsert(row, { onConflict: 'content_hash', ignoreDuplicates: true })
+          .select('content_hash')
+        if (write.error) throw write.error
+        const created = Array.isArray(write.data) && write.data.length > 0
+        if (created) {
+          inserted += 1
+          subjectInserted += 1
+        }
+        generated += 1
       }
-      const write = await input.db.from('cos_continuous_learning')
-        .upsert(row, { onConflict: 'content_hash', ignoreDuplicates: true })
-        .select('content_hash')
-      if (write.error) throw write.error
-      const created = Array.isArray(write.data) && write.data.length > 0
-      if (created) {
-        inserted += 1
-        subjectInserted += 1
-      }
+      if (generated >= HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT) break
     }
     bySubject.push({ subject: target.subject, inserted: subjectInserted })
   }

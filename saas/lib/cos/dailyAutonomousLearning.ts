@@ -3,6 +3,7 @@ import type { ContinuousLearningSourceAdapter } from '@/lib/cos-core/layers/lear
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector, type ContinuousLearningStore, type KnowledgeGap } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
+import { withSharedLearningSourceProviderLeases } from '@/lib/cos-core/layers/learning/providerLease'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
@@ -525,7 +526,10 @@ export async function runDailyAutonomousLearning(input: {
   const hfOpenDatasetCurriculum = huggingFaceOpenDatasetCurriculum()
   const curriculum = [...hfOpenDatasetCurriculum, ...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum(), ...trackStudy]
   const gaps = [miningGap(input.miningSummary), ...autonomousGaps, ...curriculum]
-  const liveAdapters = createLiveLearningAdapters()
+  const liveAdapters = withSharedLearningSourceProviderLeases(
+    createLiveLearningAdapters(),
+    `daily:${input.miningSummary.run_id}`,
+  )
   const adapters = [
     miningAdapter(input.miningSummary),
     ...(approvedUrls.length ? [approvedUrlLearningAdapter(approvedUrls)] : []),

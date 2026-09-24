@@ -1307,6 +1307,63 @@ Repair contract:
 - legacy repository/service/domain identifiers may remain internal but cannot override public product identity;
 - the reported logo-then-company-name exchange is a mandatory regression.
 
+## Web Knowledge Acquisition / governed web-ingestion invariant — 2026-09-24
+
+iTMounts needs a **Web Knowledge Acquisition** capability, not an indiscriminate scraper. It extends the existing governed learning-source architecture and must not create a parallel crawler, parallel memory system, or parallel training path.
+
+Canonical acquisition priority:
+
+```text
+official API / MCP / open dataset
+-> RSS / Atom / sitemap discovery
+-> direct permitted HTML / PDF / Markdown / JSON / XML retrieval
+-> browser-rendered extraction for JavaScript-dependent sources
+-> controlled scraping only when no safer structured path exists
+```
+
+Canonical durable-ingestion flow:
+
+```text
+knowledge gap / Research Radar objective / approved source
+-> bounded discovery
+-> source identity + provenance
+-> robots / terms / license / training-rights classification
+-> fetch / render / extract
+-> normalize / remove navigation and boilerplate
+-> persistent identity / canonical URL / DOI where available
+-> deduplicate
+-> subject normalization + relevance / quality / freshness checks
+-> ordinary COS learning admission
+-> durable source evidence + internal embedding when warranted
+-> shared knowledge fabric
+   -> RAG / current research where appropriate
+   -> University curriculum when rights permit
+   -> Working-COS / specialist distillation only through existing training-rights gates
+```
+
+**Live web research and durable learning are separate decisions.** COS, Concierge, Builder, or a specialist may retrieve a page to answer a current question without admitting that page to durable memory, University curriculum, or model training. Retrieval permission is not training permission. Copyrighted, terms-restricted, or rights-unclear material may be used only in the live/reference path when permitted and must never silently cross into distillation.
+
+The existing `credible_web` / Web Data Layer is the first implementation seam. Extend that seam rather than adding an independent scraper service. Structured sources remain preferred because they provide cleaner provenance, lower fragility, lower cost, and clearer rights metadata.
+
+Browser acquisition is a fallback for pages whose substantive permitted content is unavailable to ordinary HTTP retrieval because rendering requires JavaScript. Playwright / Chrome DevTools may be used for that bounded extraction, but browser automation does not bypass authentication, paywalls, robots/terms restrictions, rate limits, or authorization boundaries.
+
+Controlled scraping requirements:
+
+- explicit source allow/deny policy and canonical source identity;
+- robots/terms/license observation where applicable, with conservative fail-closed handling for durable training rights;
+- per-domain concurrency, request-rate, byte, page-count, redirect, timeout, and retry ceilings;
+- content-type and maximum-size enforcement before parsing;
+- SSRF protection: no localhost, link-local, private-network, metadata-service, or unapproved internal targets;
+- no credential harvesting, paywall bypass, CAPTCHA circumvention, session hijacking, or access-control bypass;
+- canonical URL normalization plus content-hash and persistent-identity deduplication;
+- extraction provenance sufficient to reproduce which source supplied an admitted fact;
+- telemetry for attempted, retrieved, rejected, duplicate, rights-blocked, rate-limited, and accepted material;
+- source-specific circuit breakers and backoff so one failing site cannot stall or flood continuous learning.
+
+Acquired material is **shared once, consumed many times**. COS and specialists must not separately scrape/store/embed the same source merely because they follow different curricula. Accepted model-neutral educational assets enter the existing shared knowledge fabric and remain subject to tenant, provenance, retention, and training-rights policy.
+
+Current-world web material remains governed by the Freshness/evidence rules. A successfully scraped or rendered page is candidate evidence, not proof that its claims are accurate, current, authoritative, independently corroborated, learned, or mastered.
+
 ## Vector Intelligence / external semantic research invariant — 2026-09-23
 
 iTMounts already has an internal vector-database layer: Supabase PostgreSQL + pgvector stores and

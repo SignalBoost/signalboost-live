@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityPhdMethodologyExam } from '@/lib/ai/cos/cosUniversityPhdMethodologyExamRunner'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -8,7 +9,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -38,4 +39,10 @@ export async function GET(req: NextRequest) {
       error: error instanceof Error ? error.message : String(error),
     }, { status: 500 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-university-phd-methodology-exam' }, async () => GETInsideScheduledHarness(...args))
 }

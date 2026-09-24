@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { evaluateCosUniversityUndergraduateAcceptance } from '@/lib/ai/cos/cosUniversityUndergraduateAcceptance'
@@ -13,7 +14,7 @@ const DEFAULT_AGENT_ID = 'cos'
  * Read-only undergraduate Production acceptance board.
  * Does not invoke learners, write assurance events, change grades, or enable flags.
  */
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -90,4 +91,10 @@ export async function GET(req: NextRequest) {
       error: message,
     }, { status: 500, headers: { 'cache-control': 'no-store' } })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-university-undergrad-acceptance' }, async () => GETInsideScheduledHarness(...args))
 }

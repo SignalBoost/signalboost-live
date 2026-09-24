@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-auto-publish-ready/route.ts
 // Completes the intended one-approval workflow:
 // owner approves once -> COSA waits until the branded video is ready -> publish automatically.
@@ -115,7 +116,7 @@ async function ensureApprovalStamp(sb: any, campaign: any, owner: OwnerAccount):
   return { ok: true, userId: owner.id, userEmail: owner.email, recovered: true }
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env['CRON_' + 'SECRET']
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -182,6 +183,15 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, scanned: campaigns?.length || 0, eligible: targets.length, recoveredApprovals, published, results })
 }
 
-export async function POST(req: NextRequest) {
+async function POSTInsideScheduledHarness(req: NextRequest) {
   return GET(req)
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-auto-publish-ready' }, async () => GETInsideScheduledHarness(...args))
+}
+export async function POST(...args: Parameters<typeof POSTInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-auto-publish-ready' }, async () => POSTInsideScheduledHarness(...args))
 }

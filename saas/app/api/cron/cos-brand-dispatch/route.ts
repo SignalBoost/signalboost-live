@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-brand-dispatch/route.ts
 // Supabase-backed COSA branding watchdog.
 //
@@ -101,7 +102,7 @@ async function patchWatchdog(sb: any, campaign: any, patch: Record<string, unkno
   }).eq('id', campaign.id)
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   if (!isCronRequest(req)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
@@ -220,6 +221,15 @@ export async function GET(req: NextRequest) {
   }, { status: dispatch.ok ? 200 : 502 })
 }
 
-export async function POST(req: NextRequest) {
+async function POSTInsideScheduledHarness(req: NextRequest) {
   return GET(req)
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-brand-dispatch' }, async () => GETInsideScheduledHarness(...args))
+}
+export async function POST(...args: Parameters<typeof POSTInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-brand-dispatch' }, async () => POSTInsideScheduledHarness(...args))
 }

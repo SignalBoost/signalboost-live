@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // VOICE-ONLY stage. Produces the voiced + captioned (still UNBRANDED) video
 // per language and stores it in metadata.video.unbrandedVoiced[lang]. That is
 // its entire job.
@@ -212,7 +213,7 @@ async function processCampaign(
   return { status: ok ? 'voiced' : billingBlocked ? 'billing_blocked' : 'progressed', lang, error: ok ? undefined : patch.voiceError }
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env['CRON_' + 'SECRET']
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -252,4 +253,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, mode: 'auto-render + voice (banner burned by GitHub Actions FFmpeg worker)', rendersStarted: renders.started, renderErrors: renders.errors, voiced, progressed, exhausted, skipped, billingBlocked, results })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-brand-video' }, async () => GETInsideScheduledHarness(...args))
 }

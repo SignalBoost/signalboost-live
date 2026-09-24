@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -39,7 +40,7 @@ async function events(){const db=cosServiceDb();if(!db)throw new Error('service_
 async function record(claim:string,evidence:Record<string,unknown>,verifier='host_controller'){const db=cosServiceDb();if(!db)throw new Error('service_database_unavailable');const body={profile:PROFILE,claim,candidateId:CANDIDATE_ID,artifactHash:ARTIFACT_HASH,...evidence,authorityExpanded:false};const evidenceHash=hash(body);const r=await db.from('cos_university_learning_assurance_events').upsert({event_key:hash([PROFILE,claim,CANDIDATE_ID,ARTIFACT_HASH,evidenceHash]),event_type:'fine_tune',subject_id:'reasoning_decision_science',candidate_id:CANDIDATE_ID,evidence_hash:evidenceHash,evidence:body,verifier,observed_at:new Date().toISOString()},{onConflict:'event_key',ignoreDuplicates:true});if(r.error)throw r.error}
 async function recordCanonicalCanary(endpointId:string,responseHash:string){const db=cosServiceDb();if(!db)throw new Error('service_database_unavailable');const evidence={profile:'cos_university_fine_tune_evidence_v1',claim:'production_canary_healthy',candidateId:CANDIDATE_ID,revisionKey:REVISION_KEY,trainedArtifactId:DISTILLED_V6_ADAPTER_MODEL_ID,artifactHash:ARTIFACT_HASH,evidenceRef:`db://cos_university_learning_assurance_events/${hash(['v6-production-canary',endpointId,responseHash])}`,endpointId,responseHash,exactArtifact:true,scaleToZero:true,productionTrafficAuthorized:false,authorityExpanded:false};const evidenceHash=hash(evidence);const r=await db.from('cos_university_learning_assurance_events').upsert({event_key:hash(['cos_university_fine_tune_evidence_v1','production_canary_healthy',CANDIDATE_ID,ARTIFACT_HASH,endpointId,responseHash]),event_type:'fine_tune',subject_id:'reasoning_decision_science',candidate_id:CANDIDATE_ID,evidence_hash:evidenceHash,evidence,verifier:'host_production_verifier',observed_at:new Date().toISOString()},{onConflict:'event_key',ignoreDuplicates:true});if(r.error)throw r.error}
 
-export async function GET(req:NextRequest){
+async function GETInsideScheduledHarness(req:NextRequest){
   const secret=process.env.CRON_SECRET
   if(!secret||req.headers.get('authorization')!==`Bearer ${secret}`)return NextResponse.json({ok:false,error:'Unauthorized'},{status:401})
   try{
@@ -61,4 +62,10 @@ export async function GET(req:NextRequest){
     await recordCanonicalCanary(provisioned.endpointId,responseHash)
     return NextResponse.json({ok:true,deployed:true,canaryPassed:true,endpointId:provisioned.endpointId,model:DISTILLED_V6_MODEL_NAME,productionTrafficAuthorized:false})
   }catch(error){const message=error instanceof Error?error.message:String(error);console.error('[runpod-distilled-v6-local-deploy]',JSON.stringify({ok:false,error:clean(message)}));return NextResponse.json({ok:false,error:clean(message)},{status:500})}
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/runpod-distilled-v6-local-deploy' }, async () => GETInsideScheduledHarness(...args))
 }

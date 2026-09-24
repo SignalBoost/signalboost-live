@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
@@ -23,7 +24,7 @@ async function dispatchVoice(req: NextRequest, id: string, language: string) {
   })
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized_cron' }, { status: 401 })
@@ -60,4 +61,13 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, scanned: data?.length || 0, results })
 }
 
-export async function POST(req: NextRequest) { return GET(req) }
+async function POSTInsideScheduledHarness(req: NextRequest) { return GET(req) }
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-voice-dispatch' }, async () => GETInsideScheduledHarness(...args))
+}
+export async function POST(...args: Parameters<typeof POSTInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-voice-dispatch' }, async () => POSTInsideScheduledHarness(...args))
+}

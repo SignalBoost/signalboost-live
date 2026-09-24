@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // The last mile of "AI does everything; the human only starts and approves."
 // Every few minutes: find OWNER-APPROVED campaigns whose video is READY and
 // BRANDED, run the same autonomous quality gate as the manual publish route,
@@ -157,7 +158,7 @@ async function publishOne(sb: any, campaign: any): Promise<{ status: 'published'
   return { status: 'published' }
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env['CRON_' + 'SECRET']
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -186,4 +187,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, scanned: approved?.length || 0, published, skipped, blocked, failed, results })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-auto-publish' }, async () => GETInsideScheduledHarness(...args))
 }

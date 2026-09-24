@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextResponse } from 'next/server'
 import { listBuilderContinuations } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
@@ -44,7 +45,7 @@ async function queuedOwnedSelfHealingRepairs(): Promise<QueuedOwnedRepair[]> {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
-export async function GET(request: Request) {
+async function GETInsideScheduledHarness(request: Request) {
   const secret = process.env.CRON_SECRET
   if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -92,4 +93,10 @@ export async function GET(request: Request) {
     universityDistillationRepairRetried: universityRetry.retried,
     universityDistillationRepairRetryAttempt: universityRetry.attempt,
   })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/builder-continuations' }, async () => GETInsideScheduledHarness(...args))
 }

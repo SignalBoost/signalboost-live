@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { loadCosLiveMissionBindings, runCosLiveTick, type CosLiveMissionBinding } from '@/lib/ai/cos/autonomy/liveRuntime.ts'
 import { createSupabaseCosLiveTickStateStore } from '@/lib/ai/cos/autonomy/supabaseLiveState.ts'
@@ -78,5 +79,14 @@ async function run(req: NextRequest) {
   })
 }
 
-export async function GET(req: NextRequest) { return run(req) }
-export async function POST(req: NextRequest) { return run(req) }
+async function GETInsideScheduledHarness(req: NextRequest) { return run(req) }
+async function POSTInsideScheduledHarness(req: NextRequest) { return run(req) }
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-autonomy' }, async () => GETInsideScheduledHarness(...args))
+}
+export async function POST(...args: Parameters<typeof POSTInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-autonomy' }, async () => POSTInsideScheduledHarness(...args))
+}

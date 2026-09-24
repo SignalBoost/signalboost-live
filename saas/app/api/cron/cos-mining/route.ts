@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-mining/route.ts
 // Scheduled mining job, invoked by Vercel Cron (see saas/vercel.json). Secured with
 // CRON_SECRET exactly like the other crons. ?job=daily (default) or ?job=weekly.
@@ -35,7 +36,7 @@ type DailyLearningRuntimeResult = Awaited<ReturnType<typeof runDailyAutonomousLe
   acceptedGapIds?: unknown
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const routeStartedAt = Date.now()
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
@@ -274,4 +275,9 @@ export async function GET(req: NextRequest) {
     metacognition,
     corpus,
   })
+}
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-mining' }, async () => GETInsideScheduledHarness(...args))
 }

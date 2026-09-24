@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityGeneralistGraduationGate } from '@/lib/ai/cos/cosUniversityGraduationRunner'
 import { runCosUniversityAdmission } from '@/lib/ai/cos/cosUniversityAdmissionRunner'
@@ -14,7 +15,7 @@ export const maxDuration = 300
 // Every registered University agent graduates through the same host gate against its OWN enrollment,
 // minimum residence, deadline, evidence and capstone. Each hourly tick runs at most ONE agent's daily
 // batch with a rotating starting agent, so failures cannot monopolize the duration envelope.
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -53,4 +54,10 @@ export async function GET(req: NextRequest) {
     console.error('cron COS University generalist graduation failed:', message)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-university-graduation' }, async () => GETInsideScheduledHarness(...args))
 }

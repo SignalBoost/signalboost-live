@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/runpod-mass-distilled-local-deploy/route.ts
 // Exact-artifact bounded canary for mass-distilled students.
 import { createHash } from 'node:crypto'
@@ -312,7 +313,7 @@ async function approvedColdStartResume(input:{candidateId:string;artifactHash:st
   return Object.freeze({endpointId,runtimeKey})
 }
 
-export async function GET(req:NextRequest){
+async function GETInsideScheduledHarness(req:NextRequest){
   const secret=process.env.CRON_SECRET
   if(!secret||req.headers.get('authorization')!==`Bearer ${secret}`) return NextResponse.json({ok:false,error:'Unauthorized'},{status:401})
 
@@ -382,4 +383,10 @@ export async function GET(req:NextRequest){
     console.error('[runpod-mass-distilled-local-deploy]',JSON.stringify({ok:false,error:clean(message,300),claim:active?RESERVED:null,providerInvocationStarted}))
     return NextResponse.json({ok:false,error:clean(message,300),providerInvocationStarted},{status:500})
   }
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/runpod-mass-distilled-local-deploy' }, async () => GETInsideScheduledHarness(...args))
 }

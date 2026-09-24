@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-auto-publish-exact/route.ts
 // Retry owner-approved COSA video publication through the shared governed engine.
 // Email is handled only after a provider-confirmed live URL exists.
@@ -217,7 +218,7 @@ async function publishOne(sb: any, campaign: any): Promise<PublishAttemptResult>
   return { ok: true, language, videoUrl, liveUrl }
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const authorization = req.headers.get('authorization') || ''
   if (!secret || authorization !== `Bearer ${secret}`) {
@@ -276,6 +277,15 @@ export async function GET(req: NextRequest) {
   })
 }
 
-export async function POST(req: NextRequest) {
+async function POSTInsideScheduledHarness(req: NextRequest) {
   return GET(req)
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-auto-publish-exact' }, async () => GETInsideScheduledHarness(...args))
+}
+export async function POST(...args: Parameters<typeof POSTInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-auto-publish-exact' }, async () => POSTInsideScheduledHarness(...args))
 }

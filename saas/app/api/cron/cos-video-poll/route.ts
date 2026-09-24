@@ -1,3 +1,4 @@
+import { withScheduledProductionHarnessIngress } from '@/platform-harness/runtime/scheduled-ingress'
 // saas/app/api/cron/cos-video-poll/route.ts
 // Polls in-flight campaign video renders (metadata.video.status = 'rendering')
 // and writes the finished URL back, or marks failed. CRON_SECRET-gated like the
@@ -15,7 +16,7 @@ function db() {
   })
 }
 
-export async function GET(req: NextRequest) {
+async function GETInsideScheduledHarness(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) {
@@ -53,4 +54,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, advanced })
+}
+
+
+// Platform Harness scheduled ingress: no background worker logic starts outside a bounded run.
+export async function GET(...args: Parameters<typeof GETInsideScheduledHarness>) {
+  return withScheduledProductionHarnessIngress({ routePath: '/api/cron/cos-video-poll' }, async () => GETInsideScheduledHarness(...args))
 }

@@ -65,6 +65,10 @@ The full-enforcement requirements are:
 Platform-wide acceptance is not complete until Production evidence demonstrates the shared Harness on COS and representative specialists across read-only, write, consequential, delegated, failure/recovery, rollback, deadline, concurrency, and cost-ceiling cases. Unit tests or a Residency-only integration are necessary but not sufficient evidence for the platform-wide completion claim.
 
 
+### Scheduled/background Harness ingress invariant — 2026-09-24
+
+All hosted COS, University, Builder, and RunPod cron routes must enter a bounded Production HarnessRun before scheduled worker logic begins. The canonical adapter is `platform-harness/runtime/scheduled-ingress.ts`. A route may omit that wrapper only when it owns an explicit canonical Harness runtime itself (currently Builder Residency). The CI bypass detector fails closed on missing ingress and on API routes that import the raw provider router directly.
+
 ### Deployment-bound Platform Harness Production acceptance — 2026-09-24
 
 The canonical live acceptance implementation is `saas/platform-harness/acceptance/production-canary.ts`, executed only in the Production Vercel environment by `/api/cron/platform-harness-production-acceptance`. It is idempotent per exact `VERCEL_GIT_COMMIT_SHA` plus deployment fingerprint and persists sanitized case evidence to the immutable supervisor audit trail.

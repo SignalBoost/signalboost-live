@@ -1436,7 +1436,7 @@ University open-source provider status as of 2026-09-23:
 
 University telemetry must expose open-source acquisition separately from paid frontier faculty. The `openSources` lane reports configured/implemented sources and observed retained material without pretending that a configured source produced data when it did not. Open-source counts are acquisition evidence only; they do not imply training, mastery, evaluation, or graduation.
 
-Implementation status at introduction: `saas/lib/ai/cos/cosWorkingDistillation.ts` defines the fail-closed Working-COS candidate contract and exact-base-model binding. Automatic training dispatch and Production activation remain disabled until the dedicated fast evaluator, rollback proof, exact served-identity canary, and bounded activation path are implemented and independently tested.
+Implementation status at introduction: `saas/lib/ai/cos/cosWorkingDistillation.ts` defines the fail-closed Working-COS candidate contract. The bounded training dispatcher now exists behind explicit owner confirmation plus separate global and Working-COS kill switches; automatic training and Production activation remain disabled. The dedicated fast evaluator, exact served-identity canary, and bounded activation path remain independent gates.
 
 Implementation progress on 2026-09-23:
 
@@ -1451,7 +1451,23 @@ Implementation progress on 2026-09-23:
 - University telemetry now exposes Working-COS bundle readiness, selected subject coverage, item count, and the next gate. It deliberately reports `automaticTrainingAuthorized=false` and `productionTrafficAuthorized=false`.
 - Production Asset Vault supply at this point spans at least 14 subject families with 80+ vaulted items per family, so direct-COS education can be balanced rather than driven by whichever University subject produced the most recent or largest batch.
 
-Next gate after this slice: bind the balanced bundle to an **observed exact trainable COS base-model revision**, create immutable train/holdout manifests for the Working-COS candidate, register rollback evidence, and only then permit bounded training dispatch. The fast independent comparison/canary/activation gate remains separate from University graduation.
+Bounded Working-COS training implementation — 2026-09-23/24:
+
+- The first direct-COS cycle is deliberately **8 subjects / at most 224 items**, even though the reusable bundle library may hold more. `cosWorkingDistillationDataset.ts` re-reads the append-only vault, re-verifies every source/portable manifest and text hash, rejects duplicate training text, and deterministically assigns a per-subject holdout before any provider job exists.
+- The host computes immutable dataset, training-manifest and holdout-manifest hashes. Hugging Face preparation must return exactly those manifests; the worker cannot silently repartition the candidate.
+- Direct-COS training is accurately labelled `working_cos_supervised_distillation`: a bounded QLoRA/LoRA supervised adapter trained from durable model-neutral University teaching assets. It is **not** falsely described as dense token-logit GKD. Frontier GKD remains the separate University optimizer where a pinned dense teacher is actually present.
+- Preparation and training both require the live RunPod runtime digest to be re-observed and successfully bound to the pinned trainable Hugging Face base. The HF metadata endpoint must still report the exact pinned revision and Apache-2.0 license immediately before provider spend.
+- The Production `qwen3:30b` baseline remains immutable. Training produces a new adapter artifact; it never edits the running COS weights in place.
+- The HF worker now passes the pinned `baseModelRevision` to tokenizer/model loading and returns the same revision in signed callback evidence. Training “latest” while claiming a pinned revision is forbidden.
+- Paid execution is doubly fail-closed: the existing `COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED=true` switch and the separate `COS_WORKING_DISTILLATION_DISPATCH_ENABLED=true` switch must both be present, and each `prepare_dataset` or `train` request must also carry owner-authenticated `confirmDispatch=true`.
+- No 30.5B GPU flavor is guessed. `COS_WORKING_DISTILLATION_HF_TRAINING_FLAVOR` must be explicitly configured. Live HF pricing is checked before submission; hard ceilings are $1/hour, $0.25 for preparation, and $2.50 total for one training attempt, with lower operator-configured caps honored.
+- Provider dispatch is idempotent by deterministic job name and records append-only `cos_working_distillation_job_events` before and after provider acceptance. The event ledger itself cannot authorize traffic, graduation, or authority expansion.
+- Signed callbacks for `working-cos:<id>` are handled separately from ordinary University study-plan callbacks. Exact candidate, dispatch, base-model revision, dataset, train/holdout manifests and artifact hashes are revalidated before evidence is admitted.
+- Rollback evidence preserves **two different facts**: the worker proves the training artifact can fall back to its pinned HF base, while iTMounts separately preserves the exact pre-training Production RunPod/Ollama digest as the real Working-COS runtime rollback target.
+- A successfully trained adapter is tracked in the local artifact library as `evaluation_pending` / `runpod_primary_exact_baseline_adapter`. Training completion cannot activate it, send Production traffic, claim University graduation, or expand authority.
+- Owner control/readiness surface: `/api/admin/cos-working-distillation`. GET is read-only; POST exposes only `prepare_dataset` and `train`, both behind the gates above.
+
+Next gate after bounded training: a **fast independent Working-COS evaluator** comparing the exact active baseline against the exact trained adapter on untouched holdout, regression, safety/authority and cross-subject transfer evidence, followed by exact served-artifact canary + rollback proof before any bounded Production activation. The full University exams/Residency/graduation path continues independently in parallel.
 
 Working-COS runtime-binding implementation — 2026-09-23:
 

@@ -3,7 +3,7 @@ import { workingCosTrainingRightsEligible } from './cosWorkingDistillationBundle
 
 export const COS_WORKING_DATASET_PROFILE = 'cos-working-distillation-dataset-v1' as const
 export const COS_WORKING_DISPATCH_SUBJECTS = 8 as const
-export const COS_WORKING_DISPATCH_MAX_ITEMS = 160 as const
+export const COS_WORKING_DISPATCH_MAX_ITEMS = 224 as const
 
 const HEX64 = /^[a-f0-9]{64}$/i
 

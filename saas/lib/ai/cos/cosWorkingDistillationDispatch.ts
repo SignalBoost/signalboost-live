@@ -110,9 +110,10 @@ async function ensureCurrentCandidate(input: {
     baselineIdentity: context.binding.baselineIdentity,
     rollbackArtifactRef: context.binding.rollbackArtifactRef,
   }, db)
-  if (!registered.registered || !registered.candidateId) {
+  if (!registered.registered) {
     throw new Error(`working_cos_candidate_registration_blocked:${registered.blockers.join(',')}`)
   }
+  if (!registered.candidateId) throw new Error('working_cos_candidate_registration_identity_missing')
 
   const { candidate, materialization } = await readWorkingCosDatasetMaterialization({
     candidateId: registered.candidateId,

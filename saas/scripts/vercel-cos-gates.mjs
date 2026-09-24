@@ -229,6 +229,7 @@ const tests = [
   'tests/cosA2ASpecialistHarnessIngress.node.test.ts',
   'tests/cosWorkingDistillationReadinessCron.node.test.ts',
   'tests/builderResidencyLiveHost.node.test.ts',
+  'tests/builderResidencyFinalEvaluationGate.node.test.ts',
 
 ]
 

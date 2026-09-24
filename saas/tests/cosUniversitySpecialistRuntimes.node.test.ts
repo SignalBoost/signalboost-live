@@ -54,6 +54,7 @@ test('COS can never hold a bound specialist identity', () => {
   assert.equal(isBoundSpecialistIdentity('cos', 'software_engineering'), false)
   assert.equal(isBoundSpecialistIdentity('software-specialist', 'software_engineering'), true)
   assert.equal(isBoundSpecialistIdentity('cyber-specialist', 'cybersecurity'), true)
+  assert.equal(isBoundSpecialistIdentity('context-engineer', 'context_engineering'), true)
 })
 
 test('malformed agent ids are refused whatever the role', () => {

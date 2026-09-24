@@ -19,6 +19,7 @@ import { searchPublicWeb } from '@/lib/ai/tools/publicWebAgent'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
 import type { ExternalSignalInput } from '@/lib/cos/external-signals'
+import { searchThroughGovernedWebKnowledge } from '@/lib/ai/tools/governedWebKnowledgeSearch'
 
 export type SearchResult = {
   title: string
@@ -118,6 +119,17 @@ let searchPort: WebSearchPort | null = null
 function defaultSearchPort(): WebSearchPort {
   return {
     async search(query: string, count: number): Promise<SearchResult[]> {
+      const governed = await searchThroughGovernedWebKnowledge({ query, count })
+      if (governed.handled) {
+        if (governed.ok === false) throw new Error(governed.error)
+        if (!governed.results.length) throw new Error('Governed Web Knowledge returned no usable pages.')
+        return governed.results.map(row => ({
+          title: row.title,
+          url: row.url,
+          snippet: row.snippet,
+        }))
+      }
+
       const apiKey = process.env.BRAVE_SEARCH_API_KEY
       if (!apiKey) {
         const pages = await searchPublicWeb(query, count)

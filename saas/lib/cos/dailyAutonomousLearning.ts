@@ -200,9 +200,9 @@ const WIKIMEDIA_CONTINUOUS_TOPICS = Object.freeze([
   'World Wide Web',
 ] as const)
 
-function utcLearningHour(now: Date): number {
+function utcLearningQuarterHour(now: Date): number {
   const value = now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date(0)
-  return Math.floor(value.getTime() / 3_600_000)
+  return Math.floor(value.getTime() / (15 * 60_000))
 }
 
 function rotatingItem<T>(items: readonly T[], index: number): T {
@@ -216,13 +216,14 @@ function rotatingItem<T>(items: readonly T[], index: number): T {
  * Semantic Scholar is intentionally gap-only and has a one-call-per-cycle budget, while Wikimedia's
  * generic daily queries were mostly rejected or deduplicated. Put exact-source objectives FIRST so
  * Semantic Scholar spends its single call on a useful research query, and give Wikimedia three
- * entity-shaped lookups that match how an encyclopaedia actually searches. Rotation is hourly so
- * repeated cron ticks deduplicate cheaply while the source still advances throughout the day.
+ * entity-shaped lookups that match how an encyclopaedia actually searches. Rotation follows the
+ * dedicated 15-minute continuity cron so each tick advances to fresh source material instead of
+ * re-querying the same hourly topic and immediately hitting duplicate admission.
  */
 export function openSourceContinuityCurriculum(now: Date = new Date()): KnowledgeGap[] {
-  const hour = utcLearningHour(now)
-  const semanticQuery = rotatingItem(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, hour)
-  const wikiTopics = [0, 1, 2].map(offset => rotatingItem(WIKIMEDIA_CONTINUOUS_TOPICS, hour * 3 + offset))
+  const slot = utcLearningQuarterHour(now)
+  const semanticQuery = rotatingItem(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, slot)
+  const wikiTopics = [0, 1, 2].map(offset => rotatingItem(WIKIMEDIA_CONTINUOUS_TOPICS, slot * 3 + offset))
 
   return [
     {

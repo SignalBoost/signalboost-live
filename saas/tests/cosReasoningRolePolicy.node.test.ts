@@ -28,6 +28,16 @@ test('diagnostic work routes to critic', () => {
   assert.equal(selectCosReasoningWorkerRole('Diagnose the root cause of a p95 latency regression.').role, 'critic')
 })
 
+test('context engineering work routes to the dedicated specialist', () => {
+  const decision = selectCosReasoningWorkerRole('Diagnose why our context window is overflowing and improve prompt packing.')
+  assert.equal(decision.role, 'context_engineer')
+  assert.equal(decision.reason, 'context_engineering_signal')
+})
+
+test('ordinary references to context do not hijack unrelated work', () => {
+  assert.equal(selectCosReasoningWorkerRole('Explain the historical context of the treaty.').role, 'researcher')
+})
+
 test('stable explanatory research routes to researcher', () => {
   assert.equal(selectCosReasoningWorkerRole('What is semantic caching and how does it work?').role, 'researcher')
 })
@@ -52,4 +62,5 @@ test('role token caps bound explicit budgets without increasing unspecified budg
   assert.equal(boundedRoleMaxTokens('verifier', 6000), COS_ROLE_TOKEN_CAPS.verifier)
   assert.equal(boundedRoleMaxTokens('researcher', 1800), 1800)
   assert.equal(boundedRoleMaxTokens('coder', undefined), undefined)
+  assert.equal(boundedRoleMaxTokens('context_engineer', 9000), COS_ROLE_TOKEN_CAPS.context_engineer)
 })

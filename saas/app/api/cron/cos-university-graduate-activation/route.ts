@@ -83,16 +83,16 @@ async function resolvePendingGraduateServingIdentity(db: any, graduate: {
  */
 const SUBJECT_WORKER_SCOPE: Record<string, { workerRoles: string[]; problemClasses: string[] }> = {
   computer_science: {
-    workerRoles: ['coder', 'critic', 'verifier'],
-    problemClasses: ['university:computer_science', 'code and implementation', 'incident diagnosis'],
+    workerRoles: ['coder', 'critic', 'verifier', 'context_engineer'],
+    problemClasses: ['university:computer_science', 'code and implementation', 'incident diagnosis', 'context engineering'],
   },
   mathematics: {
     workerRoles: ['critic', 'verifier'],
     problemClasses: ['university:mathematics', 'math and calculation'],
   },
   statistics_data_science: {
-    workerRoles: ['critic', 'verifier', 'researcher'],
-    problemClasses: ['university:statistics_data_science', 'math and calculation'],
+    workerRoles: ['critic', 'verifier', 'researcher', 'context_engineer'],
+    problemClasses: ['university:statistics_data_science', 'math and calculation', 'context engineering'],
   },
   physics_natural_sciences: {
     workerRoles: ['critic', 'verifier', 'researcher'],
@@ -135,8 +135,8 @@ const SUBJECT_WORKER_SCOPE: Record<string, { workerRoles: string[]; problemClass
     problemClasses: ['university:history_culture_philosophy_religion'],
   },
   reasoning_decision_science: {
-    workerRoles: ['critic', 'verifier'],
-    problemClasses: ['university:reasoning_decision_science', 'opinion and judgment', 'planning and strategy'],
+    workerRoles: ['critic', 'verifier', 'context_engineer'],
+    problemClasses: ['university:reasoning_decision_science', 'opinion and judgment', 'planning and strategy', 'context engineering'],
   },
 }
 

@@ -38,6 +38,16 @@ test('eleven Master’s tracks expose four canonical curriculum modules each', (
   assert.equal(moduleKeys.size, 44)
 })
 
+test('Context Engineering has a dedicated evidence-gated graduate curriculum', () => {
+  const track = cosUniversityMastersTrackById('context_engineering_systems')
+  assert.ok(track)
+  assert.deepEqual(track.coreSubjects, ['computer_science', 'statistics_data_science', 'reasoning_decision_science'])
+  assert.equal(track.curriculumModules.length, 4)
+  assert.ok(track.curriculumModules.some(module => module.key === 'context_budget_compaction'))
+  assert.ok(track.curriculumModules.some(module => module.key === 'context_quality_evaluation'))
+  assert.ok(track.requiredDepthPasses >= 4)
+})
+
 test('advanced professional curricula preserve the common foundation and require practical proof', () => {
   const required = [
     'aerospace_nuclear_safety_systems', 'molecular_biomedical_sciences',

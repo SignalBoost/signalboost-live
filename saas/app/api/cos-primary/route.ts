@@ -5,6 +5,7 @@ import { isExplicitBuilderEvidenceRequest } from '@/lib/builder/execution-eviden
 
 import { after, NextRequest, NextResponse } from 'next/server'
 import { createCosProductionIngressManifest, requireCosHarnessIngress, withCosHarnessIngress } from '@/platform-harness/adapters/cos-ingress'
+import { WEB_KNOWLEDGE_RESEARCH_CAPABILITY } from '@/platform-harness/capabilities/web-knowledge'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
@@ -13,6 +14,7 @@ import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { classifyKnowledgeAccess } from '@/lib/ai/cos/knowledgeAccessPolicy'
 import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import {
   classifyAuthoritativeVolatileFact,
@@ -81,6 +83,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+function shouldGrantWebKnowledgeResearch(input:string):boolean{
+  const text=String(input||'').trim()
+  if(!text)return false
+  const access=classifyKnowledgeAccess(text).mode
+  if(access==='live_required'||access==='search_if_thin')return true
+  return /\b(?:research|investigate|look\s+up|find\s+(?:credible\s+)?sources?|literature\s+review|source\s+an\s+essay|essay\s+research|project\s+research|research\s+project)\b/i.test(text)
+}
 function latestUserText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role!=='user')continue;const content=messages[i]?.content;if(typeof content==='string')return content;if(Array.isArray(content))return content.map((block:any)=>String(block?.text||'')).join('\n').trim()}return''}
 function isOwnerRepoScanRequest(input:string):boolean{return /\b(?:scan|audit|review|inspect|analy[sz]e|look through)\b[\s\S]{0,80}\b(?:repo|repository|codebase|github)\b|\b(?:repo|repository|codebase|github)\b[\s\S]{0,80}\b(?:scan|audit|review|inspect|analy[sz]e)\b/i.test(input)}
 function requestsSelfHealingAssessment(input:string):boolean{return /\bself[ -]?healing(?:\s+supervisor)?\b/i.test(input)&&/\b(?:evaluate|evaluation|report|better|improve|sellable|fortune\s*500|enterprise)\b/i.test(input)}
@@ -994,6 +1003,9 @@ export async function POST(req: NextRequest) {
   try {
     harnessManifest = createCosProductionIngressManifest({
       objective: prompt || 'Complete one COS request.',
+      requestedCapabilities: shouldGrantWebKnowledgeResearch(prompt)
+        ? [WEB_KNOWLEDGE_RESEARCH_CAPABILITY]
+        : [],
     })
   } catch (error) {
     console.error('[cos-harness-ingress-failed]', error instanceof Error ? error.message : String(error))

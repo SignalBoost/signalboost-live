@@ -21,6 +21,13 @@ test('two distinct valid worker roles become deterministic candidate ids', () =>
   ])
 })
 
+test('Context Engineer is a valid controlled-comparison worker', () => {
+  assert.deepEqual(normalizeReasoningComparisonCandidates(['primary', 'context_engineer']), [
+    { id: 'primary-1', workerRole: 'primary' },
+    { id: 'context_engineer-2', workerRole: 'context_engineer' },
+  ])
+})
+
 test('invalid, duplicate, or incomplete candidates fail closed', () => {
   assert.throws(() => normalizeReasoningComparisonCandidates(['primary']), /exactly 2 worker roles/)
   assert.throws(() => normalizeReasoningComparisonCandidates(['primary', 'primary']), /different worker roles/)

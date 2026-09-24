@@ -1,6 +1,6 @@
 import type { CosReasoningWorkerRole } from '@/lib/ai/cos/cosReasoningControlPlane'
 
-export const COS_COMPARISON_ROLES: readonly CosReasoningWorkerRole[] = ['primary', 'coder', 'critic', 'verifier', 'researcher'] as const
+export const COS_COMPARISON_ROLES: readonly CosReasoningWorkerRole[] = ['primary', 'coder', 'critic', 'verifier', 'researcher', 'context_engineer'] as const
 export const MAX_REASONING_COMPARISON_CANDIDATES = 2
 export const MAX_REASONING_COMPARISON_CASES = 1
 export const MAX_REASONING_COMPARISON_EVALUATIONS = MAX_REASONING_COMPARISON_CANDIDATES * MAX_REASONING_COMPARISON_CASES

@@ -14,7 +14,7 @@ type CachedPreference = { expiresAt: number; preference: ReasoningProblemPrefere
 const preferenceCache = new Map<string, CachedPreference>()
 
 function validRole(value: unknown): value is CosReasoningWorkerRole {
-  return value === 'primary' || value === 'coder' || value === 'critic' || value === 'verifier' || value === 'researcher'
+  return value === 'primary' || value === 'coder' || value === 'critic' || value === 'verifier' || value === 'researcher' || value === 'context_engineer'
 }
 
 function finiteNumber(value: unknown, fallback = 0): number {

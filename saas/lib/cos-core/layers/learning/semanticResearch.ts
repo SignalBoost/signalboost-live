@@ -43,6 +43,49 @@ async function getJson(url: string, fetcher: FetchLike = fetch, headers: Record<
   }
 }
 
+function retryAfterMs(value: string | null, attempt: number): number {
+  const raw = String(value ?? '').trim()
+  if (raw) {
+    const seconds = Number(raw)
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(30_000, Math.round(seconds * 1000))
+    const at = Date.parse(raw)
+    if (Number.isFinite(at)) return Math.max(0, Math.min(30_000, at - Date.now()))
+  }
+  return [3_000, 8_000, 15_000][Math.min(attempt, 2)] ?? 15_000
+}
+
+async function getSemanticScholarJson(
+  url: string,
+  fetcher: FetchLike,
+  headers: Record<string, string>,
+): Promise<any> {
+  const apiKeyConfigured = Boolean(headers['x-api-key'])
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 12_000)
+    try {
+      const response = await fetcher(url, {
+        headers: { accept: 'application/json', 'user-agent': 'iTMounts-COS/1.0', ...headers },
+        signal: controller.signal,
+      })
+      if (response.ok) return await response.json()
+      if (response.status !== 429 || attempt === 2) {
+        throw new Error(`COS semantic research source failed: ${response.status}; provider=semantic_scholar; apiKeyConfigured=${apiKeyConfigured}`)
+      }
+      const waitMs = retryAfterMs(response.headers.get('retry-after'), attempt)
+      console.warn('cosLearning: Semantic Scholar rate limited; retrying', {
+        attempt: attempt + 1,
+        waitMs,
+        apiKeyConfigured,
+      })
+      if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs))
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  throw new Error(`COS semantic research source failed: 429; provider=semantic_scholar; apiKeyConfigured=${apiKeyConfigured}`)
+}
+
 function boundedScore(value: unknown): string | null {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return null
@@ -126,14 +169,13 @@ export function createSemanticScholarScientificSearch(options: {
       limit: String(Math.min(Math.max(1, limit), 10)),
       fields: 'title,url,abstract,year,citationCount,externalIds,embedding.specter_v2',
     })
-    const json = await getJson(
+    const json = await getSemanticScholarJson(
       `https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`,
       fetcher,
       apiKey ? { 'x-api-key': apiKey } : {},
     )
     return (json?.data ?? []).map((item: any): LearningConnectorResult | null => {
       const digest = vectorDigest(item?.embedding?.vector, space.dimensions)
-      if (!digest) return null
       const title = clean(item?.title, 1_000)
       const abstract = clean(item?.abstract, 40_000)
       const year = Number.isFinite(Number(item?.year)) ? String(item.year) : ''
@@ -147,16 +189,30 @@ export function createSemanticScholarScientificSearch(options: {
       const uri = clean(item?.url, 800)
         || doiUri(item?.externalIds?.DOI)
         || (item?.paperId ? `https://www.semanticscholar.org/paper/${encodeURIComponent(String(item.paperId))}` : '')
+      if (!uri || !text) return null
+
+      // SPECTER2 is useful provenance when present, but it is not an admission prerequisite.
+      // Production showed valid Semantic Scholar search results being silently discarded whenever
+      // the Graph API omitted the embedding payload. Keep the paper/abstract, mark vector absence
+      // explicitly, and let the ordinary COS learning pipeline re-embed accepted text internally.
       return {
         uri,
         title,
         text,
-        license: 'Semantic Scholar metadata/abstract with SPECTER2 discovery vector; training rights not asserted',
-        evidence: [
-          `external_semantic_index:${space.vectorSpace}`,
-          `external_vector_dimensions:${space.dimensions}`,
-          `external_vector_sha256:${digest}`,
-        ],
+        license: digest
+          ? 'Semantic Scholar metadata/abstract with SPECTER2 discovery vector; training rights not asserted'
+          : 'Semantic Scholar metadata/abstract from Graph relevance search; SPECTER2 vector unavailable; training rights not asserted',
+        evidence: digest
+          ? [
+              `external_semantic_index:${space.vectorSpace}`,
+              `external_vector_dimensions:${space.dimensions}`,
+              `external_vector_sha256:${digest}`,
+            ]
+          : [
+              'semantic_scholar_graph_relevance_v1',
+              `external_vector_unavailable:${space.vectorSpace}`,
+              'internal_reembedding_required',
+            ],
       }
     }).filter((item: LearningConnectorResult | null): item is LearningConnectorResult => Boolean(item?.uri && item.text))
   }

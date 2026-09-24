@@ -252,13 +252,16 @@ test('cron scans bounded legacy work and explicitly includes both Builder v2 and
   assert.match(route, /MASS_EVALUATION_FRONTIER_PROOF_SAMPLE/)
 })
 
-test('cron reserves the last RunPod worker slot for the incomplete remediation replay canary proof cohort', () => {
+test('cron reserves replay canary headroom only while the durable replay proof cohort is incomplete', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisionV2.ts', import.meta.url), 'utf8')
+  const durableProof = route.indexOf('let remediationReplayProofCompletions')
+  const headroom = route.indexOf("reason: 'replay_canary_runpod_headroom_reserved'")
+  assert.ok(durableProof >= 0 && headroom > durableProof)
+  assert.match(route, /remediationReplayProofCompletions < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE/)
+  assert.match(route, /remediationReplayCanaryPasses < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE/)
   assert.match(route, /massDistilledServerlessWorkerCapacity/)
-  assert.match(route, /remediationReplayCanaryPasses < 2/)
   assert.match(route, /capacity\.availableWorkers <= 1/)
-  assert.match(route, /replay_canary_runpod_headroom_reserved/)
   assert.match(provision, /export async function massDistilledServerlessWorkerCapacity/)
   assert.match(provision, /reservedWorkers/)
   assert.match(provision, /availableWorkers/)

@@ -206,8 +206,9 @@ function utcLearningHour(now: Date): number {
 }
 
 function rotatingItem<T>(items: readonly T[], index: number): T {
+  if (!items.length) throw new Error('continuous_learning_rotation_empty')
   const normalized = ((index % items.length) + items.length) % items.length
-  return items[normalized]
+  return items[normalized] as T
 }
 
 /**

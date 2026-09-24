@@ -130,6 +130,40 @@ async function ensureCurrentCandidate(input: {
   return Object.freeze({ db, context, bundle, registered, candidate, materialization })
 }
 
+export async function ensureWorkingCosCandidateReadiness(input: {
+  rotationSeed?: string
+  fetchImpl?: typeof fetch
+  db?: any
+} = {}) {
+  const context = await ensureCurrentCandidate(input)
+  return Object.freeze({
+    ready: true as const,
+    candidateId: context.registered.candidateId,
+    candidateKey: context.registered.candidateKey,
+    bundleKey: context.materialization.bundleKey,
+    portableManifestHash: context.materialization.portableManifestHash,
+    datasetHash: context.materialization.datasetHash,
+    itemCount: context.materialization.itemCount,
+    trainingItemCount: context.materialization.trainingItemCount,
+    holdoutItemCount: context.materialization.holdoutItemCount,
+    subjectCount: context.materialization.subjectCount,
+    subjects: context.materialization.subjectIds,
+    runtimeBindingKey: context.context.binding.bindingKey,
+    runtimeDigest: context.context.binding.observedRuntimeDigest,
+    runtimeModel: context.context.binding.observedRuntimeModel,
+    trainableBaseModelId: context.context.binding.trainableBaseModelId,
+    trainableBaseModelRevision: context.context.binding.trainableBaseModelRevision,
+    baselineIdentity: context.context.binding.baselineIdentity,
+    rollbackArtifactRef: context.context.binding.rollbackArtifactRef,
+    automaticTrainingAuthorized: false as const,
+    automaticActivationAuthorized: false as const,
+    productionTrafficAuthorized: false as const,
+    universityGraduationClaimed: false as const,
+    nextGate: 'explicit_owner_confirmed_dataset_preparation' as const,
+    semantics: 'non_spending_working_cos_candidate_readiness_registration' as const,
+  })
+}
+
 function dispatchEnabled(env: NodeJS.ProcessEnv = process.env) {
   installHuggingFaceTrainingExecutorEnv(env)
   const executor = trainingExecutorConfigFromEnv(env)

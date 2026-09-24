@@ -1,5 +1,5 @@
 // saas/platform-harness/evidence/durable-evidence.ts
-import type { HarnessManifest, HarnessRunResult } from '../core/types.ts'
+import type { HarnessManifest, HarnessRunResult, HarnessRunUsage } from '../core/types.ts'
 
 export interface HarnessEvidenceRecord {
   runId:string
@@ -20,6 +20,9 @@ export interface HarnessEvidenceRecord {
   compensationStatus?:NonNullable<HarnessRunResult['compensation']>['status']
   compensationAttempted?:number
   compensationCompleted?:number
+  compensationFailedActionIds?:readonly string[]
+  manualRecoveryActionIds?:readonly string[]
+  usage?:HarnessRunUsage
   trajectoryEvidenceRefs:readonly string[]
 }
 
@@ -29,7 +32,7 @@ export interface HarnessEvidenceSink { append(record:HarnessEvidenceRecord):Prom
 export function createHarnessEvidenceRecord(manifest:HarnessManifest,result:HarnessRunResult):HarnessEvidenceRecord {
   if(result.runId!==manifest.runId||result.profile!==manifest.profile) throw new Error('harness_evidence_identity_mismatch')
   const refs=[...new Set(result.trajectory.flatMap(event=>event.evidenceRefs??[]).filter(Boolean))]
-  return Object.freeze({runId:manifest.runId,profile:manifest.profile,environmentClass:manifest.environment.class,agentId:manifest.identity.agentId,...(manifest.identity.artifact?.artifactId?{artifactId:manifest.identity.artifact.artifactId}:{}),...(manifest.identity.artifact?.artifactHash?{artifactHash:manifest.identity.artifact.artifactHash}:{}),authorityManifestRef:manifest.authorityManifestRef,...(manifest.parent?{parentRunId:manifest.parent.runId,parentAuthorityManifestRef:manifest.parent.authorityManifestRef}:{}),outcomeStatus:result.outcome.status,...(result.outcome.verifierRef?{verifierRef:result.outcome.verifierRef}:{}),...(result.outcome.evidenceHash?{evidenceHash:result.outcome.evidenceHash}:{}),...(result.outcome.failureCode?{failureCode:result.outcome.failureCode}:{}),authorityExpanded:false,productionMutationObserved:result.productionMutationObserved,...(result.compensation?{compensationStatus:result.compensation.status,compensationAttempted:result.compensation.attempted,compensationCompleted:result.compensation.completed}:{}),trajectoryEvidenceRefs:Object.freeze(refs)})
+  return Object.freeze({runId:manifest.runId,profile:manifest.profile,environmentClass:manifest.environment.class,agentId:manifest.identity.agentId,...(manifest.identity.artifact?.artifactId?{artifactId:manifest.identity.artifact.artifactId}:{}),...(manifest.identity.artifact?.artifactHash?{artifactHash:manifest.identity.artifact.artifactHash}:{}),authorityManifestRef:manifest.authorityManifestRef,...(manifest.parent?{parentRunId:manifest.parent.runId,parentAuthorityManifestRef:manifest.parent.authorityManifestRef}:{}),outcomeStatus:result.outcome.status,...(result.outcome.verifierRef?{verifierRef:result.outcome.verifierRef}:{}),...(result.outcome.evidenceHash?{evidenceHash:result.outcome.evidenceHash}:{}),...(result.outcome.failureCode?{failureCode:result.outcome.failureCode}:{}),authorityExpanded:false,productionMutationObserved:result.productionMutationObserved,...(result.compensation?{compensationStatus:result.compensation.status,compensationAttempted:result.compensation.attempted,compensationCompleted:result.compensation.completed,...(result.compensation.failedActionIds.length?{compensationFailedActionIds:Object.freeze([...result.compensation.failedActionIds])}:{}),...(result.compensation.manualRecoveryActionIds?.length?{manualRecoveryActionIds:Object.freeze([...result.compensation.manualRecoveryActionIds])}:{})}:{}),...(result.usage?{usage:Object.freeze({...result.usage,limits:Object.freeze({...result.usage.limits})})}:{}),trajectoryEvidenceRefs:Object.freeze(refs)})
 }
 
 export async function persistHarnessEvidence(input:{manifest:HarnessManifest;result:HarnessRunResult;sink:HarnessEvidenceSink}):Promise<HarnessEvidenceRecord>{

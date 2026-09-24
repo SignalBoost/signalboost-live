@@ -23,6 +23,7 @@ import {
 } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import { readBuilderObjective } from '@/lib/builder/request-contract'
+import { runCosSoftwareSpecialistProductionHarness } from '@/lib/ai/cos/softwareSpecialistHarness'
 
 export type CosSoftwareSpecialistSurface = 'concierge' | 'assistant'
 
@@ -114,7 +115,7 @@ async function enqueueRepositoryRepair(input: {
  * a coding brain. This function owns the software-specialist admission/execution decision while
  * preserving the existing public-workspace and owner-only repository-repair authority boundaries.
  */
-export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistRequest): Promise<NextResponse | null> {
+async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistRequest): Promise<NextResponse | null> {
   let objective = String(input.objective || '').trim()
   if (!objective) return null
 
@@ -330,3 +331,55 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     ...softwareSpecialistFields(specialistSkill),
   }, { status: 202 })
 }
+
+/**
+ * Public COS-owned Software Specialist seam.
+ *
+ * Non-software turns exit before Harness admission. Every software-shaped turn is delegated through
+ * the Production Harness before the legacy specialist controller can read project state, enqueue a
+ * Builder job, or schedule repository repair. The legacy controller remains the deeper authority
+ * boundary for owner-only repository operations.
+ */
+export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistRequest): Promise<NextResponse | null> {
+  const objective = String(input.objective || '').trim()
+  if (!objective) return null
+
+  const context = routingContext(input.body)
+  const sourceAttached = hasSourceAttachment(context)
+  const mediaAttached = hasImageOrPdfAttachment(input.body)
+  const specialistRelevant = sourceAttached
+    || mediaAttached
+    || isConciergeBuilderObjective(objective, context)
+    || (DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective))
+    || builderRepositoryImportIntent(objective)
+    || isBuilderProposalApproval(objective)
+    || wantsBuilderProposal(objective)
+    || isBuilderEvidenceRequest(objective)
+    || isBuilderProjectQuestion(objective)
+    || (input.allowRepositoryRepair === true && isOperationalLogEvidence(objective))
+
+  if (!specialistRelevant) return null
+
+  const access = await getAccess().catch(() => null)
+  const tenantId = access?.userId || publicAuditUserId()
+  const harness = await runCosSoftwareSpecialistProductionHarness({
+    objective,
+    tenantId,
+    execute: () => tryCosSoftwareSpecialistLegacy(input),
+  })
+
+  if (!harness.ok) {
+    return NextResponse.json({
+      reply: 'COS Software Specialist was blocked by the Production Harness. No software work was started.',
+      source: 'cos-software-harness-blocked',
+      execution_allowed: false,
+      external_action_taken: false,
+      harness_run_id: harness.runId,
+      harness_failure_code: harness.code,
+      ...softwareSpecialistFields('software.delegate'),
+    }, { status: 503 })
+  }
+
+  return harness.value
+}
+

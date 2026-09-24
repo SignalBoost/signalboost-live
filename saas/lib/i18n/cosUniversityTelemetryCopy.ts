@@ -22,6 +22,12 @@ type Copy = Readonly<{
   sourceAccessCost: string
   openSourceStates: Readonly<Record<string, string>>
   noOpenSources: string
+  workingCosTitle: string
+  workingCosExplanation: string
+  workingCosBundleReady: string
+  workingCosSubjects: string
+  workingCosItems: string
+  workingCosNextGate: string
   providersTitle: string
   providersExplanation: string
   teacherCalls: string
@@ -82,6 +88,12 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     sourceAccessCost: 'Source access',
     openSourceStates: { observed: 'Observed', implemented: 'Implemented · no retained items in 24h', candidate: 'Candidate connector' },
     noOpenSources: 'No open-source providers configured.',
+    workingCosTitle: 'Working COS · direct distillation readiness',
+    workingCosExplanation: 'Balanced model-neutral education prepared from the same University Asset Vault. Training remains blocked until exact runtime identity and rollback evidence are proven.',
+    workingCosBundleReady: 'Bundle ready',
+    workingCosSubjects: 'Subjects',
+    workingCosItems: 'Items',
+    workingCosNextGate: 'Next gate',
     providersTitle: 'Frontier teacher providers · last 24h',
     providersExplanation: 'Calls and tokens are durable API telemetry. Provider account charges are not inferred here.',
     teacherCalls: 'teacher calls',
@@ -140,6 +152,12 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     sourceAccessCost: 'Acceso a la fuente',
     openSourceStates: { observed: 'Observado', implemented: 'Implementado · sin material retenido en 24 h', candidate: 'Conector candidato' },
     noOpenSources: 'No hay proveedores de fuentes abiertas configurados.',
+    workingCosTitle: 'Working COS · preparación para destilación directa',
+    workingCosExplanation: 'Educación equilibrada y neutral al modelo preparada desde el mismo Asset Vault de University. El entrenamiento permanece bloqueado hasta probar la identidad exacta del runtime y el rollback.',
+    workingCosBundleReady: 'Bundle listo',
+    workingCosSubjects: 'Materias',
+    workingCosItems: 'Elementos',
+    workingCosNextGate: 'Próxima compuerta',
     providersTitle: 'Proveedores docentes frontier · últimas 24 h',
     providersExplanation: 'Las llamadas y los tokens son telemetría duradera de API. Aquí no se infieren cargos de las cuentas de los proveedores.',
     teacherCalls: 'llamadas docentes',
@@ -198,6 +216,12 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     sourceAccessCost: 'Acesso à fonte',
     openSourceStates: { observed: 'Observado', implemented: 'Implementado · sem material retido em 24 h', candidate: 'Conector candidato' },
     noOpenSources: 'Nenhum provedor de fonte aberta configurado.',
+    workingCosTitle: 'Working COS · prontidão para destilação direta',
+    workingCosExplanation: 'Educação equilibrada e neutra ao modelo preparada a partir do mesmo Asset Vault da University. O treinamento permanece bloqueado até provar a identidade exata do runtime e o rollback.',
+    workingCosBundleReady: 'Bundle pronto',
+    workingCosSubjects: 'Assuntos',
+    workingCosItems: 'Itens',
+    workingCosNextGate: 'Próximo gate',
     providersTitle: 'Provedores professores frontier · últimas 24 h',
     providersExplanation: 'Chamadas e tokens são telemetria persistente de API. Os custos das contas dos provedores não são inferidos aqui.',
     teacherCalls: 'chamadas de professor',
@@ -256,6 +280,12 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     sourceAccessCost: 'Dostęp do źródła',
     openSourceStates: { observed: 'Zaobserwowane', implemented: 'Wdrożone · brak zachowanego materiału w 24 h', candidate: 'Kandydat na konektor' },
     noOpenSources: 'Brak skonfigurowanych dostawców otwartych źródeł.',
+    workingCosTitle: 'Working COS · gotowość do bezpośredniej destylacji',
+    workingCosExplanation: 'Zrównoważona, niezależna od modelu edukacja przygotowana z tego samego Asset Vault University. Trening pozostaje zablokowany do czasu potwierdzenia dokładnej tożsamości runtime i rollbacku.',
+    workingCosBundleReady: 'Bundle gotowy',
+    workingCosSubjects: 'Tematy',
+    workingCosItems: 'Elementy',
+    workingCosNextGate: 'Następna bramka',
     providersTitle: 'Dostawcy nauczycieli frontier · ostatnie 24 h',
     providersExplanation: 'Wywołania i tokeny są trwałą telemetrią API. Opłaty kont dostawców nie są tutaj szacowane.',
     teacherCalls: 'wywołania nauczyciela',
@@ -314,6 +344,12 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     sourceAccessCost: 'Доступ к источнику',
     openSourceStates: { observed: 'Наблюдается', implemented: 'Реализовано · нет сохранённых материалов за 24 ч', candidate: 'Кандидат-коннектор' },
     noOpenSources: 'Провайдеры открытых источников не настроены.',
+    workingCosTitle: 'Working COS · готовность прямой дистилляции',
+    workingCosExplanation: 'Сбалансированное, независимое от модели обучение подготовлено из того же Asset Vault University. Тренировка остаётся заблокированной до подтверждения точной runtime-идентичности и rollback.',
+    workingCosBundleReady: 'Bundle готов',
+    workingCosSubjects: 'Предметы',
+    workingCosItems: 'Материалы',
+    workingCosNextGate: 'Следующий шлюз',
     providersTitle: 'Провайдеры frontier-учителей · последние 24 ч',
     providersExplanation: 'Вызовы и токены — сохранённая API-телеметрия. Списания со счетов провайдеров здесь не рассчитываются.',
     teacherCalls: 'вызовы учителя',

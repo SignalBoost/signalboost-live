@@ -1402,6 +1402,19 @@ University telemetry must expose open-source acquisition separately from paid fr
 
 Implementation status at introduction: `saas/lib/ai/cos/cosWorkingDistillation.ts` defines the fail-closed Working-COS candidate contract and exact-base-model binding. Automatic training dispatch and Production activation remain disabled until the dedicated fast evaluator, rollback proof, exact served-identity canary, and bounded activation path are implemented and independently tested.
 
+Implementation progress on 2026-09-23:
+
+- `saas/lib/ai/cos/cosWorkingDistillationBundle.ts` now builds one deterministic **balanced cross-subject Working-COS education bundle** from sealed model-neutral Distillation Asset Vault sets.
+- Selection is breadth-first: the newest eligible set from each subject is chosen before any subject may dominate by volume. The default bundle requires at least 8 subjects and remains bounded to 384 items.
+- Eligible rights classes are `owned`, `open_license`, `contractually_permitted`, and existing governed hosted-teacher outputs. Unknown rights, private Production data, invalid manifests, undersized sets, or non-model-neutral material are excluded.
+- The selector is read-only/non-spending. It does not partition a training dataset, dispatch training, mutate a model, authorize traffic, or claim University graduation.
+- `buildWorkingCosDistillationPlanFromBundle` binds the balanced bundle to the existing fail-closed Working-COS runtime contract. An eligible bundle still cannot train unless the target base model exactly matches the configured/observed COS runtime identity and an explicit rollback artifact reference exists.
+- University telemetry now exposes Working-COS bundle readiness, selected subject coverage, item count, and the next gate. It deliberately reports `automaticTrainingAuthorized=false` and `productionTrafficAuthorized=false`.
+- Production Asset Vault supply at this point spans at least 14 subject families with 80+ vaulted items per family, so direct-COS education can be balanced rather than driven by whichever University subject produced the most recent or largest batch.
+
+Next gate after this slice: bind the balanced bundle to an **observed exact trainable COS base-model revision**, create immutable train/holdout manifests for the Working-COS candidate, register rollback evidence, and only then permit bounded training dispatch. The fast independent comparison/canary/activation gate remains separate from University graduation.
+
+
 ## University distillation asset portability invariant — 2026-09-23
 
 Distillation spend must create a durable iTMounts-controlled educational asset, not only a model-

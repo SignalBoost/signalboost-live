@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { universityTeacherPoolStatus } from '@/lib/ai/cos/cosUniversityTeacherPool'
+import { selectWorkingCosBalancedBundleFromVault } from '@/lib/ai/cos/cosWorkingDistillationBundle'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -108,7 +109,7 @@ export async function GET() {
     const db = getAdminSupabase()
     const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000).toISOString()
 
-    const [runsResult, campaignsResult, artifactsResult, evaluationsResult, graduatesResult, openLearningResult] = await Promise.all([
+    const [runsResult, campaignsResult, artifactsResult, evaluationsResult, graduatesResult, openLearningResult, workingCosBundle] = await Promise.all([
       db.from(RUNS)
         .select('id,campaign_id,subject_id,stage,failure_reason,teacher_model_id,teacher_source_ref,teacher_output_hashes,preparation_job_id,preparation_job_url,training_job_id,training_job_url,trained_artifact_id,created_at,updated_at,completed_at')
         .order('updated_at', { ascending: false })
@@ -134,6 +135,7 @@ export async function GET() {
         .gte('observed_at', since)
         .order('observed_at', { ascending: false })
         .limit(5000),
+      selectWorkingCosBalancedBundleFromVault({}, db),
     ])
     if (runsResult.error) throw runsResult.error
     if (campaignsResult.error) throw campaignsResult.error
@@ -469,6 +471,20 @@ export async function GET() {
         status: source.items24h > 0 ? 'observed' : source.integration,
         sourceAccessCostUsd24h: 0,
       })),
+      workingCos: {
+        bundleReady: workingCosBundle.eligible,
+        bundleKey: workingCosBundle.bundleKey,
+        portableManifestHash: workingCosBundle.combinedPortableManifestHash,
+        itemCount: workingCosBundle.itemCount,
+        subjectCount: workingCosBundle.subjectCount,
+        subjectIds: workingCosBundle.subjectIds,
+        blockers: workingCosBundle.blockers,
+        automaticTrainingAuthorized: false,
+        productionTrafficAuthorized: false,
+        nextGate: workingCosBundle.eligible
+          ? 'exact_runtime_identity_rollback_and_training_dispatch'
+          : 'balanced_bundle_supply',
+      },
       providers: Array.from(providers.values())
         .sort((a, b) => b.calls - a.calls || a.id.localeCompare(b.id)),
       runs: recentRuns,

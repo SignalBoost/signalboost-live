@@ -50,3 +50,10 @@ test('Production Playwright MCP route is production-only and CRON_SECRET gated',
   assert.equal(cron.schedule, '* * * * *')
   assert.match(gate, /playwrightMcpProductionAcceptance\.node\.test\.ts/)
 })
+
+
+test('generated Playwright MCP runtime avoids ROOT redeclaration', () => {
+  assert.match(host, /const RUNTIME_ROOT = \$\{JSON\.stringify\(ROOT\)\}/)
+  assert.doesNotMatch(host, /const ROOT = \$\{JSON\.stringify\(ROOT\)\}/)
+  assert.match(host, /cwd: RUNTIME_ROOT/)
+})

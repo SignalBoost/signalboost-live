@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  createHuggingFaceArxivMetadataSearch,
   createHuggingFaceGithubCc0Search,
   createHuggingFaceNistCybersecuritySearch,
   HUGGING_FACE_OPEN_DATASETS,
@@ -167,4 +168,82 @@ test('GitHub CC0 source is exposed by the shared learning factory only for softw
     classifyMassDistillationRights('cc0 public-domain GitHub-CC0 software corpus'),
     'cc0',
   )
+})
+
+
+test('HF dataset search failure falls back to one bounded deterministic row slice', async () => {
+  const requested: string[] = []
+  const fetcher = (async (url: string | URL | Request) => {
+    requested.push(String(url))
+    if (requested.length === 1) return fakeResponse({ error: 'search unavailable' }, 503)
+    return fakeResponse({
+      rows: [{
+        row_idx: 44,
+        row: {
+          text: 'NIST incident response guidance with bounded evidence collection.',
+          embedding: Array.from({ length: 1536 }, (_, i) => i / 1536),
+          metadata: JSON.stringify({ source: 'NIST incident response', type: 'section' }),
+        },
+      }],
+    })
+  }) as typeof fetch
+
+  const rows = await createHuggingFaceNistCybersecuritySearch(fetcher)('incident response', 3)
+  assert.equal(rows.length, 1)
+  assert.match(requested[0], /\/search\?/)
+  assert.match(requested[1], /\/rows\?/)
+  assert.ok(rows[0].evidence?.includes('huggingface_access_mode:rows_fallback'))
+})
+
+test('HF arXiv metadata source is searchable research discovery but does not assert paper training rights', async () => {
+  let requested = ''
+  const fetcher = (async (url: string | URL | Request) => {
+    requested = String(url)
+    return fakeResponse({
+      rows: [{
+        row_idx: 123,
+        row: {
+          id: '2609.01234',
+          title: 'Autonomous Software Repair with Retrieval-Augmented Agents',
+          abstract: 'We study retrieval-guided autonomous software repair and evaluate repair correctness.',
+          categories: 'cs.SE cs.AI',
+          update_date: '2026-09-18',
+          doi: '10.0000/example',
+        },
+      }],
+    })
+  }) as typeof fetch
+
+  const rows = await createHuggingFaceArxivMetadataSearch(fetcher)('autonomous software repair', 3)
+  assert.match(requested, /librarian-bots%2Farxiv-metadata-snapshot/)
+  assert.equal(rows.length, 1)
+  assert.match(rows[0].uri, /^hf:\/\/datasets\/librarian-bots\/arxiv-metadata-snapshot#train:123$/)
+  assert.match(rows[0].title || '', /Autonomous Software Repair/)
+  assert.ok(rows[0].evidence?.includes('huggingface_dataset:librarian-bots/arxiv-metadata-snapshot'))
+  assert.ok(rows[0].evidence?.includes('huggingface_dataset_license:cc0-1.0'))
+  assert.ok(rows[0].evidence?.includes('canonical_embedding_required:true'))
+  assert.equal(classifyMassDistillationRights(rows[0].license), null)
+})
+
+test('shared live-learning factory exposes HF arXiv research independently of the brittle GitHub corpus', async () => {
+  const adapters = createLiveLearningAdapters({
+    COS_LIVE_SOURCES_ENABLED: 'true',
+    COS_HF_OPEN_DATASETS_ENABLED: 'true',
+  })
+  assert.ok(adapters.some(adapter => adapter.id === 'hf_arxiv_cc0'))
+  assert.equal(HUGGING_FACE_OPEN_DATASETS.arxivMetadata.dataset, 'librarian-bots/arxiv-metadata-snapshot')
+  assert.equal(HUGGING_FACE_OPEN_DATASETS.arxivMetadata.license, 'cc0-1.0')
+
+  const adapter = adapters.find(item => item.id === 'hf_arxiv_cc0')!
+  const unrelated = await adapter.acquire({
+    id: 'gap-unrelated-arxiv',
+    subject: 'French literature',
+    question: 'What changed in nineteenth century poetry?',
+    portableIds: [],
+    expectedReuse: 1,
+    expectedAvoidedCostUsd: 0,
+    urgency: 1,
+    evidence: [],
+  })
+  assert.deepEqual(unrelated, [])
 })

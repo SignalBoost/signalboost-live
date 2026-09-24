@@ -334,6 +334,19 @@ function diagnose(value: unknown, knownPaths: readonly string[] = []): { failure
   if (/deploy|vercel|build|compile|production|preview/.test(message)) return { failureClass: 'deployment', remediation: 'Inspect the build or deployment evidence; do not treat local success as deployment proof.' }
   return { failureClass: 'unknown', remediation: 'Inspect the exact failure evidence before making another change.' }
 }
+async function readWorkspaceFilesSequentially(
+  workspace: BuilderWorkspacePort,
+  workspaceId: string,
+  listing: readonly { path: string }[],
+): Promise<BuilderFile[]> {
+  const files: BuilderFile[] = []
+  for (const item of listing) {
+    const file = await workspace.readFile(workspaceId, item.path)
+    if (file) files.push(file)
+  }
+  return files
+}
+
 export class BuilderToolLoop {
   private readonly ai: BuilderAiPort
   private readonly workspace: BuilderWorkspacePort
@@ -361,8 +374,11 @@ export class BuilderToolLoop {
       return { ok: false, error: 'builder_checkpoint_scope_mismatch', trace: [] }
     }
     const initialListing = await this.workspace.listFiles(input.workspaceId)
-    const files = (await Promise.all(initialListing.map(file => this.workspace.readFile(input.workspaceId, file.path))))
-      .filter((file): file is BuilderFile => file !== null)
+    const files = await readWorkspaceFilesSequentially(
+      this.workspace,
+      input.workspaceId,
+      initialListing,
+    )
     if (saved) {
       try { await validateBuilderCheckpoint(saved, this.workspace, input.workspaceId, input.objective) }
       catch (error) { return { ok: false, error: (error as Error).message, trace: saved.trace } }
@@ -618,8 +634,11 @@ export class BuilderToolLoop {
         if (repairObjective) {
           const listed = await this.workspace.listFiles(input.workspaceId)
           workspacePaths = listed.map(file => file.path)
-          const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
-            .filter((file): file is BuilderFile => file !== null)
+          const files = await readWorkspaceFilesSequentially(
+            this.workspace,
+            input.workspaceId,
+            listed,
+          )
           const proofFile = files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
           const observedFailedCommand = trace.find(item => item.toolId === 'run' && !item.ok)?.input.command
           const proofCommand = (typeof observedFailedCommand === 'string' ? observedFailedCommand : '')
@@ -795,8 +814,11 @@ export class BuilderToolLoop {
           if (chunks.size) throw new Error('builder_file_assembly_incomplete')
           const listed = await this.workspace.listFiles(input.workspaceId)
           workspacePaths = listed.map(file => file.path)
-          const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
-            .filter((file): file is BuilderFile => file !== null)
+          const files = await readWorkspaceFilesSequentially(
+            this.workspace,
+            input.workspaceId,
+            listed,
+          )
           const requestedCommand = text(action.input.command)
           let command = normalizeBuilderSandboxCommand(requestedCommand, files)
           if (!command) command = projectContext.recommendedTestCommand || ''

@@ -1,3 +1,4 @@
+// saas/tests/runpodMassDistilledLocalDeploy.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -30,7 +31,9 @@ test('mass-distilled runtime uses the proven v6 memory and cold-start contract i
   assert.match(provision, /runpod-volume\/huggingface-cache\/hub/)
   assert.match(provision, /IDLE_TIMEOUT_SECONDS = 60/)
   assert.match(provision, /READY_TIMEOUT_MS = 380_000/)
-  assert.match(provision, /CANARY_TIMEOUT_MS = 35_000/)
+  assert.match(provision, /CANARY_TIMEOUT_MS = 150_000/)
+  assert.match(provision, /CANARY_MIN_TIMEOUT_MS = 35_000/)
+  assert.match(provision, /READY_AND_CANARY_BUDGET_MS = READY_TIMEOUT_MS \+ CANARY_MIN_TIMEOUT_MS/)
   assert.match(provision, /REQUEST_TIMEOUT_MS = 8_000/)
   assert.match(provision, /HEALTH_TIMEOUT_MS = 5_000/)
   assert.match(provision, /enable_thinking.*False/)
@@ -41,11 +44,15 @@ test('mass-distilled runtime uses the proven v6 memory and cold-start contract i
 test('mass-distilled cold-start and inference windows remain inside the route deadline', () => {
   const ready = Number(/READY_TIMEOUT_MS = ([\d_]+)/.exec(provision)?.[1].replaceAll('_', ''))
   const canary = Number(/CANARY_TIMEOUT_MS = ([\d_]+)/.exec(provision)?.[1].replaceAll('_', ''))
+  const canaryFloor = Number(/CANARY_MIN_TIMEOUT_MS = ([\d_]+)/.exec(provision)?.[1].replaceAll('_', ''))
   assert.equal(ready, 380_000)
-  assert.equal(canary, 35_000)
-  assert.ok(ready + canary <= 415_000)
+  assert.equal(canary, 150_000)
+  assert.equal(canaryFloor, 35_000)
+  // Readiness and the first request share one budget, so the worst-case end is unchanged at 415s.
+  const worstCaseEndMs = ready + canaryFloor
+  assert.ok(worstCaseEndMs <= 415_000)
   assert.match(route, /maxDuration = 450/)
-  const worstCaseGpuCostUsd = ((60 + ready / 1000 + canary / 1000) * 0.69) / 3600
+  const worstCaseGpuCostUsd = ((60 + worstCaseEndMs / 1000) * 0.69) / 3600
   assert.ok(worstCaseGpuCostUsd < 0.2)
 })
 

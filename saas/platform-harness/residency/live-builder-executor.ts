@@ -160,28 +160,37 @@ function actionResult<T>(
   return result.gatewayOutcome.result as T
 }
 
+class GovernedResidencyActionSerial{
+  private tail:Promise<void>=Promise.resolve()
+  run<T>(task:()=>Promise<T>):Promise<T>{
+    const current=this.tail.then(task)
+    this.tail=current.then(()=>undefined,()=>undefined)
+    return current
+  }
+}
+
 class GovernedResidencyWorkspace implements BuilderWorkspacePort{
   private sequence=0
-  private serial:Promise<void>=Promise.resolve()
   private readonly context:HarnessWorkerContext
   private readonly workspaceId:string
+  private readonly serial:GovernedResidencyActionSerial
   constructor(
     context:HarnessWorkerContext,
     workspaceId:string,
+    serial:GovernedResidencyActionSerial,
   ){
     this.context=context
     this.workspaceId=workspaceId
+    this.serial=serial
   }
   private invoke<T>(
     capabilityId:NativeCapability,
     params:Record<string,unknown>,
   ):Promise<T>{
-    // BuilderToolLoop intentionally batches initial file reads with Promise.all. Residency keeps a
-    // maxConcurrency=1 authority envelope, so forwarding those reads directly makes the Harness reject
-    // its own second read as harness_concurrency_limit_exceeded. Serialize only this governed workspace
-    // adapter: callers may batch reads, but the authority boundary still observes one action at a time.
+    // BuilderToolLoop can overlap file operations with command execution. Residency keeps
+    // maxConcurrency=1, so EVERY governed action in the practical loop must share one queue.
     const actionId=`workspace-${++this.sequence}`
-    const run=this.serial.then(async()=>{
+    return this.serial.run(async()=>{
       const result=await this.context.execute({
         actionId,
         kind:KIND_BY_CAP[capabilityId],
@@ -190,8 +199,6 @@ class GovernedResidencyWorkspace implements BuilderWorkspacePort{
       })
       return actionResult<T>(result)
     })
-    this.serial=run.then(()=>undefined,()=>undefined)
-    return run
   }
   listFiles(_workspaceId:string){
     return this.invoke<readonly Pick<BuilderFile,'path'|'updatedAt'>[]>(
@@ -228,28 +235,34 @@ class GovernedResidencyRunner implements BuilderRunnerPort{
   private sequence=0
   private readonly context:HarnessWorkerContext
   private readonly workspaceId:string
+  private readonly serial:GovernedResidencyActionSerial
   constructor(
     context:HarnessWorkerContext,
     workspaceId:string,
+    serial:GovernedResidencyActionSerial,
   ){
     this.context=context
     this.workspaceId=workspaceId
+    this.serial=serial
   }
-  async run(input:{
+  run(input:{
     workspaceId:string
     command:string
     files:readonly BuilderFile[]
   }):Promise<BuilderRunResult>{
-    const result=await this.context.execute({
-      actionId:`run-${++this.sequence}`,
-      kind:KIND_BY_CAP['native.builder-residency.command.run'],
-      capabilityId:'native.builder-residency.command.run',
-      params:{
-        workspaceId:this.workspaceId,
-        command:input.command,
-      },
+    const actionId=`run-${++this.sequence}`
+    return this.serial.run(async()=>{
+      const result=await this.context.execute({
+        actionId,
+        kind:KIND_BY_CAP['native.builder-residency.command.run'],
+        capabilityId:'native.builder-residency.command.run',
+        params:{
+          workspaceId:this.workspaceId,
+          command:input.command,
+        },
+      })
+      return actionResult<BuilderRunResult>(result)
     })
-    return actionResult<BuilderRunResult>(result)
   }
 }
 
@@ -557,10 +570,11 @@ export function createLiveBuilderResidencyExecutor(input:{
             })
             return
           }
+          const governedActionSerial=new GovernedResidencyActionSerial()
           const governedWorkspace=
-            new GovernedResidencyWorkspace(context,workspaceId)
+            new GovernedResidencyWorkspace(context,workspaceId,governedActionSerial)
           const governedRunner=
-            new GovernedResidencyRunner(context,workspaceId)
+            new GovernedResidencyRunner(context,workspaceId,governedActionSerial)
           const deadline=Math.min(
             manifest.limits.deadlineMs??240_000,
             240_000,

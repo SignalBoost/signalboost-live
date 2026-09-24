@@ -10,8 +10,8 @@ import { activeGraduateRuntimesForRole } from '@/lib/ai/cos/cosUniversityGraduat
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { tryRunpodPrimaryInference } from '@/lib/ai/cos/runpodPrimaryInference'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
-import { withProductionRuntimeHarness } from '@/platform-harness/adapters/production'
-import { currentHarnessExecutionContext } from '@/platform-harness/runtime/execution-context'
+import { withProductionRuntimeHarness } from '../../platform-harness/adapters/production.ts'
+import { currentHarnessExecutionContext } from '../../platform-harness/runtime/execution-context.ts'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>

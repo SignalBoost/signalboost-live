@@ -22,9 +22,9 @@ export type GovernedWebSearchResult = Readonly<{
 }>
 
 export type GovernedWebSearchDecision =
-  | Readonly<{ handled: false; results: readonly [] }>
+  | Readonly<{ handled: false; results: readonly GovernedWebSearchResult[] }>
   | Readonly<{ handled: true; ok: true; results: readonly GovernedWebSearchResult[] }>
-  | Readonly<{ handled: true; ok: false; results: readonly []; error: string }>
+  | Readonly<{ handled: true; ok: false; results: readonly GovernedWebSearchResult[]; error: string }>
 
 function clean(value: unknown, max: number): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -104,7 +104,7 @@ export async function searchThroughGovernedWebKnowledge(input: {
     maxResults: Math.max(1, Math.min(5, Math.floor(Number(input.count) || 3))),
   })
 
-  if (!outcome.ok) {
+  if (outcome.ok === false) {
     return Object.freeze({
       handled: true,
       ok: false,

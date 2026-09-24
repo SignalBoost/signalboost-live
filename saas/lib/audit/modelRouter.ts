@@ -95,7 +95,7 @@ async function logAuditTask(row: {
   }
 }
 
-async function callAuditModelInsideHarness(args: AuditModelArgs): Promise<string | null> {
+export async function callAuditModel(args: AuditModelArgs): Promise<string | null> {
   const startedAt = Date.now()
   const { config, identity } = auditRuntimeConfigFromEnv()
   const recorder = new TurnRecorder()
@@ -105,12 +105,22 @@ async function callAuditModelInsideHarness(args: AuditModelArgs): Promise<string
     // The general prose reasoner may repair output into an {answer, confidence} envelope.
     // Audit requires several different strict JSON schemas, so it uses the same COS-only
     // LOCAL_AI transport while recording a COS-owned specialist turn directly.
-    text = await recorder.time('audit_specialist_reasoning', () => callLocalModel({
+    text = await recorder.time('audit_specialist_reasoning', () => withHostProductionHarnessIngress({
+      objective: 'Run COS software audit specialist reasoning',
+      portableId: 'cos-audit-specialist',
+      agentId: 'cos-audit-specialist',
+      role: 'software_audit_specialist',
+      capabilityId: 'audit.reasoning.execute',
+      risk: 'read',
+      deadlineMs: 120_000,
+      maxConcurrency: 1,
+      maxToolCalls: 1,
+    }, () => callLocalModel({
       prompt: args.prompt,
       systemPrompt: args.systemPrompt ?? AUDIT_SYSTEM_DEFAULT,
       maxTokens: args.maxTokens ?? DEFAULT_MAX,
       temperature: 0,
-    }, config), 'model')
+    }, config)), 'model')
   } finally {
     recordTurnExperience(recorder.snapshot({
       turnId,
@@ -130,20 +140,4 @@ async function callAuditModelInsideHarness(args: AuditModelArgs): Promise<string
     promptLen: args.prompt.length,
   })
   return text
-}
-
-
-/** COS Audit specialist inference is a Harness-bound specialist execution seam. */
-export async function callAuditModel(args: AuditModelArgs): Promise<string | null> {
-  return withHostProductionHarnessIngress({
-    objective: 'Run COS software audit specialist reasoning',
-    portableId: 'cos-audit-specialist',
-    agentId: 'cos-audit-specialist',
-    role: 'software_audit_specialist',
-    capabilityId: 'audit.reasoning.execute',
-    risk: 'read',
-    deadlineMs: 120_000,
-    maxConcurrency: 1,
-    maxToolCalls: 1,
-  }, () => callAuditModelInsideHarness(args))
 }

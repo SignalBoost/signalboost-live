@@ -1,2 +1,2 @@
-base_sha=8fcd2f2264f0e8fb08af54bcb60e880d79c38273
-branch=fix/evaluator-modelready-ping-20260924
+base_sha=8787bc300702ea5b834a7b0733e0016af17a621a
+branch=fix/evaluator-readiness-repair-epoch-20260924

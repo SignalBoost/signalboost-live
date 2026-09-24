@@ -270,6 +270,10 @@ export async function runCosA2ASpecialistProductionHarness<T>(input: {
             specialist: 'a2a',
             operation: 'delegate',
           }),
+          compensation: Object.freeze({
+            mode: 'delegated' as const,
+            reason: 'the A2A specialist runs as a governed child run; the mesh keeps its own checkpoint and write-recovery controls',
+          }),
         })
       },
     }),

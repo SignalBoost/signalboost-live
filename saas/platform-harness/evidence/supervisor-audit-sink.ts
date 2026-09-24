@@ -1,3 +1,4 @@
+// saas/platform-harness/evidence/supervisor-audit-sink.ts
 import type { HarnessEvidenceRecord, HarnessEvidenceSink } from './durable-evidence.ts'
 
 type InsertResult={error?:{message?:string}|null}
@@ -21,12 +22,15 @@ export function createSupervisorAuditHarnessEvidenceSink(db:AuditDb):HarnessEvid
           ...(record.artifactId?{artifactId:record.artifactId}:{}),
           ...(record.artifactHash?{artifactHash:record.artifactHash}:{}),
           authorityManifestRef:record.authorityManifestRef,
+          ...(record.parentRunId?{parentRunId:record.parentRunId}:{}),
+          ...(record.parentAuthorityManifestRef?{parentAuthorityManifestRef:record.parentAuthorityManifestRef}:{}),
           outcomeStatus:record.outcomeStatus,
           ...(record.verifierRef?{verifierRef:record.verifierRef}:{}),
           ...(record.evidenceHash?{evidenceHash:record.evidenceHash}:{}),
           ...(record.failureCode?{failureCode:record.failureCode}:{}),
           authorityExpanded:false,
           productionMutationObserved:record.productionMutationObserved,
+          ...(record.compensationStatus?{compensationStatus:record.compensationStatus,compensationAttempted:record.compensationAttempted??0,compensationCompleted:record.compensationCompleted??0}:{}),
           trajectoryEvidenceRefs:[...record.trajectoryEvidenceRefs],
         },
         schema_version:'platform-harness-evidence-v1',

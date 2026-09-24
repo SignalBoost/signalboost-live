@@ -1,2 +1,2 @@
-base_sha=0918a8f13d7eed3bde61690aa819d2571fc19b82
-branch=fix/vercel-regressions-full-gate-3029-20260923-2139
+base_sha=46c1bbc32358686422953d8595a107d7af38ac20
+branch=feat/working-cos-owner-controls-20260923

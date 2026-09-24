@@ -361,7 +361,17 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   if (!specialistRelevant) return null
 
   const access = await getAccess().catch(() => null)
-  const tenantId = access?.userId || publicAuditUserId()
+  const tenantId = String(access?.userId || publicAuditUserId() || '').trim()
+  if (!tenantId) {
+    return NextResponse.json({
+      reply: 'COS Software Specialist could not establish a durable execution identity. No software work was started.',
+      source: 'cos-software-harness-identity-unavailable',
+      execution_allowed: false,
+      external_action_taken: false,
+      ...softwareSpecialistFields('software.delegate'),
+    }, { status: 503 })
+  }
+
   const harness = await runCosSoftwareSpecialistProductionHarness({
     objective,
     tenantId,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   buildWorkingCosBalancedBundle,
+  COS_WORKING_DISTILLATION_CORE_SUBJECTS,
   selectWorkingCosBalancedBundleFromVault,
   workingCosTrainingRightsEligible,
 } from '../lib/ai/cos/cosWorkingDistillationBundle.ts'
@@ -52,6 +53,7 @@ test('Working COS bundle selects broad subject coverage before volume', () => {
   assert.equal(bundle.eligible, true)
   assert.equal(bundle.subjectCount, 8)
   assert.equal(new Set(bundle.subjectIds).size, 8)
+  assert.deepEqual(bundle.subjectIds, [...COS_WORKING_DISTILLATION_CORE_SUBJECTS].sort())
   assert.equal(bundle.assetSets.length, 8)
   assert.ok(bundle.itemCount >= 160)
   assert.match(String(bundle.bundleKey), /^[a-f0-9]{64}$/)
@@ -152,4 +154,23 @@ test('vault selector is read-only and uses sealed model-neutral rows', async () 
   assert.ok(calls.includes('from:cos_university_distillation_asset_sets'))
   assert.ok(calls.includes('eq:model_neutral:true'))
   assert.ok(calls.includes('eq:contains_private_production_data:false'))
+})
+
+
+test('Working COS generalist bundle fails closed when an eight-subject rotation omits a required core subject', () => {
+  const rows = [
+    ...COS_WORKING_DISTILLATION_CORE_SUBJECTS.slice(1).map((subject, index) => row(subject, index)),
+    row('History, Culture, Philosophy & Religion', 40),
+    row('Physics & Natural Sciences', 41),
+  ]
+  const bundle = buildWorkingCosBalancedBundle(rows, {
+    minSubjects: 8,
+    maxSubjects: 8,
+    maxItems: 224,
+    rotationSeed: 'must-not-substitute-core',
+  })
+
+  assert.equal(bundle.eligible, false)
+  assert.ok(bundle.blockers.includes('missing_core_subject_coverage'))
+  assert.ok(!bundle.subjectIds.includes('Business & Operations'))
 })

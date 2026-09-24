@@ -11,6 +11,7 @@ import {
   decideMassCanaryRollingApproval,
   type CanaryEvent,
 } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
+import { isStrengthenedFailureDerivedReplayReceipt } from '@/lib/ai/cos/cosUniversityFailureDerivedReplayReceipt'
 import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
 import { describeThrownValue } from '@/lib/ai/cos/describeThrownValue'
 import {
@@ -156,12 +157,8 @@ async function issueRollingCanaryApproval(now:Date){
       && Number(receipt.frontierResponseAnchorEpochs||0)===1
       && Number(receipt.frontierResponseAnchorItems||0)>0
   })
-  const confirmedReplayArtifacts=(replayArtifacts.data||[]).filter((row:any)=>{
-    const receipt=row?.intended_use?.trainingReceipt
-    return receipt&&typeof receipt==='object'
-      && receipt.failureDerivedReplayRequired===true
-      && Number(receipt.failureDerivedReplayItems||0)>0
-  })
+  const confirmedReplayArtifacts=(replayArtifacts.data||[])
+    .filter((row:any)=>isStrengthenedFailureDerivedReplayReceipt(row?.intended_use))
   const pendingBuilderArtifacts=confirmedBuilderArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const pendingReplayArtifacts=confirmedReplayArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const artifactByCandidate=new Map<string,any>()
@@ -251,6 +248,9 @@ async function issueRollingCanaryApproval(now:Date){
         frontierResponseAnchorItems:Number(receipt.frontierResponseAnchorItems||0),
         failureDerivedReplayRequired:receipt.failureDerivedReplayRequired===true,
         failureDerivedReplayItems:Number(receipt.failureDerivedReplayItems||0),
+        failureDerivedReplayEpochs:Number(receipt.failureDerivedReplayEpochs||0),
+        failureDerivedReplayLearningRate:Number(receipt.failureDerivedReplayLearningRate||0),
+        remediationReplayProof:isStrengthenedFailureDerivedReplayReceipt(row?.intended_use),
       }
     }),
     events:eventRows.map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),

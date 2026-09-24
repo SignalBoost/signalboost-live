@@ -72,7 +72,8 @@
     "test:cos-langgraph": "node --test tests/cosLangGraph.node.test.ts",
     "test:platform-harness": "node --test tests/platformHarness.node.test.ts tests/platformHarnessRuntime.node.test.ts tests/builderResidencyCaseRunner.node.test.ts tests/builderResidencyOrchestrator.node.test.ts tests/builderResidencyLiveHost.node.test.ts tests/builderResidencyExactArtifactModel.node.test.ts tests/builderResidencyCron.node.test.ts lib/ai/cos/cosUniversityResidency.test.ts tests/builderResidencyFinalEvaluationGate.node.test.ts tests/builderResidencyAdmission.node.test.ts tests/builderResidencyInfrastructureRetry.node.test.ts tests/builderResidencyRuntimeSelfHealing.node.test.ts tests/platformHarnessUniversalIngress.node.test.ts",
     "audit:i18n-hardcoded": "node scripts/check-hardcoded-copy.mjs",
-    "audit:i18n-migration": "node scripts/migrate-page-copy-to-locales.mjs"
+    "audit:i18n-migration": "node scripts/migrate-page-copy-to-locales.mjs",
+    "audit:platform-harness-bypasses": "node scripts/check-platform-harness-bypasses.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",

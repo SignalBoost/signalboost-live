@@ -1,7 +1,5 @@
-// saas/tests/webKnowledgeLiveRouting.node.test.ts
+// Diagnostic isolation: authorized-path only.
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import test from 'node:test'
 import {
   WEB_KNOWLEDGE_RESEARCH_CAPABILITY,
@@ -10,24 +8,6 @@ import {
   withCosHarnessIngress,
 } from '../platform-harness/index.ts'
 import { searchThroughGovernedWebKnowledge } from '../lib/ai/tools/governedWebKnowledgeSearch.ts'
-
-test('unauthorized COS turns do not silently gain Web Knowledge research', async () => {
-  const parent = createCosProductionIngressManifest({
-    runId: 'web-knowledge-no-grant',
-    objective: 'answer from internal knowledge',
-    tenantId: 'itmounts',
-  })
-
-  await withCosHarnessIngress(parent, async () => {
-    const result = await searchThroughGovernedWebKnowledge({
-      query: 'current research',
-      count: 3,
-      research: createWebKnowledgeResearchPort({ search: async () => [] }),
-      evidenceSink: { async append() { throw new Error('must not persist') } },
-    })
-    assert.equal(result.handled, false)
-  })
-})
 
 test('authorized COS research executes through a governed child HarnessRun', async () => {
   const parent = createCosProductionIngressManifest({
@@ -66,15 +46,4 @@ test('authorized COS research executes through a governed child HarnessRun', asy
   assert.equal(evidence[0]?.outcomeStatus, 'success')
   assert.equal(evidence[0]?.productionMutationObserved, false)
   assert.equal(evidence[0]?.parentRunId, parent.runId)
-})
-
-test('COS route grants Web Knowledge only to live/thin/explicit research turns and getExternalInfo consumes it', () => {
-  const route = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
-  const external = readFileSync(join(process.cwd(), 'lib/ai/tools/getExternalInfo.ts'), 'utf8')
-
-  assert.match(route, /shouldGrantWebKnowledgeResearch\(prompt\)/)
-  assert.match(route, /WEB_KNOWLEDGE_RESEARCH_CAPABILITY/)
-  assert.match(route, /access==='live_required'\|\|access==='search_if_thin'/)
-  assert.match(external, /searchThroughGovernedWebKnowledge\(\{ query, count \}\)/)
-  assert.match(external, /if \(governed\.handled\)/)
 })

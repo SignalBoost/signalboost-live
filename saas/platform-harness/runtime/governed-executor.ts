@@ -12,11 +12,35 @@ import type {
 } from '../../agent-gateway/types.ts'
 import type { HarnessManifest } from '../core/types.ts'
 
+export interface HarnessCompensationOutcome {
+  ok: boolean
+  evidenceRefs?: readonly string[]
+  error?: string
+}
+
+/**
+ * Universal compensation contract. In staging/production every mutating action must declare one:
+ * - compensate: an executable undo the Harness runs (reverse order) if the run does not verify;
+ * - delegated: the effect is a governed child HarnessRun that owns its own compensation;
+ * - irreversible: no undo exists; only allowed under an explicitly consequential grant, which the
+ *   Governed Socket routes to human approval.
+ * The contract is host-side only and is never sent to the governed action as params.
+ */
+export type HarnessCompensation =
+  | Readonly<{
+      mode: 'compensate'
+      compensationId: string
+      run(): Promise<HarnessCompensationOutcome>
+    }>
+  | Readonly<{ mode: 'delegated'; reason: string }>
+  | Readonly<{ mode: 'irreversible'; reason: string }>
+
 export interface HarnessAction {
   actionId: string
   kind: string
   capabilityId: string
   params?: Record<string, unknown>
+  compensation?: HarnessCompensation
 }
 
 export type HarnessActionStatus =

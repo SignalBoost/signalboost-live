@@ -213,6 +213,10 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
             specialist: 'software',
             operation: 'delegate',
           }),
+          compensation: Object.freeze({
+            mode: 'delegated' as const,
+            reason: 'the Software Specialist runs as its own governed child job; Builder/repository work keeps its own isolated rollback and owner authority',
+          }),
         })
       },
     }),

@@ -151,6 +151,20 @@ export interface HarnessOutcome {
   failureCode?: string
 }
 
+export type HarnessCompensationStatus =
+  | 'not_required'
+  | 'completed'
+  | 'partial'
+  | 'failed'
+
+/** Saga result for a run that did not verify: executed compensable actions are undone in reverse order. */
+export interface HarnessCompensationSummary {
+  status: HarnessCompensationStatus
+  attempted: number
+  completed: number
+  failedActionIds: readonly string[]
+}
+
 export interface HarnessRunResult {
   runId: string
   profile: HarnessProfile
@@ -158,4 +172,5 @@ export interface HarnessRunResult {
   outcome: HarnessOutcome
   authorityExpanded: false
   productionMutationObserved: boolean
+  compensation?: HarnessCompensationSummary
 }

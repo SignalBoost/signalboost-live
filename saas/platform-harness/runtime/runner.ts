@@ -1,4 +1,6 @@
+// saas/platform-harness/runtime/runner.ts
 import type {
+  HarnessCompensationSummary,
   HarnessManifest,
   HarnessObservableEvent,
   HarnessRunResult,
@@ -11,6 +13,8 @@ import type {
   GovernedHarnessExecutor,
   HarnessAction,
   HarnessActionResult,
+  HarnessCompensation,
+  HarnessCompensationOutcome,
 } from './governed-executor.ts'
 import type { HarnessCostBudgetPort } from './cost-budget.ts'
 import {
@@ -38,6 +42,106 @@ function diagnosticFailureCode(
     .slice(0,500)
 }
 
+const HARNESS_COMPENSATION_TIMEOUT_MS = 30_000
+
+type HarnessCompensationEntry = {
+  actionId: string
+  capabilityId: string
+  compensation: Extract<HarnessCompensation, { mode: 'compensate' }>
+}
+
+type HarnessJournal = ReturnType<typeof createTrajectoryJournal>
+
+/**
+ * Universal compensation contract check. Returns a failure code, or null when the action may run.
+ * Only staging/production mutating actions are bound; read-only and sandbox work is unaffected.
+ */
+export function harnessCompensationContractViolation(
+  manifest: HarnessManifest,
+  action: HarnessAction,
+): string | null {
+  const grant = manifest.capabilities.find(item => item.id === action.capabilityId)
+  if (!grant?.mutating) return null
+  const environmentClass = manifest.environment.class
+  if (environmentClass !== 'production' && environmentClass !== 'staging') return null
+  const compensation = action.compensation
+  if (!compensation) return 'harness_compensation_contract_required'
+  if (compensation.mode === 'compensate') {
+    return typeof compensation.run === 'function' && String(compensation.compensationId ?? '').trim()
+      ? null
+      : 'harness_compensation_contract_invalid'
+  }
+  if (compensation.mode !== 'delegated' && compensation.mode !== 'irreversible') {
+    return 'harness_compensation_contract_invalid'
+  }
+  if (!String(compensation.reason ?? '').trim()) return 'harness_compensation_contract_invalid'
+  if (compensation.mode === 'irreversible' && grant.risk !== 'consequential') {
+    return 'harness_irreversible_action_requires_consequential_grant'
+  }
+  return null
+}
+
+async function runOneCompensation(entry: HarnessCompensationEntry): Promise<HarnessCompensationOutcome> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const timeout = new Promise<HarnessCompensationOutcome>(resolve => {
+      timer = setTimeout(
+        () => resolve({ ok: false, error: 'harness_compensation_timeout' }),
+        HARNESS_COMPENSATION_TIMEOUT_MS,
+      )
+    })
+    const outcome = await Promise.race([entry.compensation.run(), timeout])
+    return outcome && typeof outcome === 'object'
+      ? outcome
+      : { ok: false, error: 'harness_compensation_invalid_result' }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message.slice(0, 300) : 'harness_compensation_failed',
+    }
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+/** Saga rollback: undo executed compensable actions in reverse order, journaling every step. */
+async function runHarnessCompensations(
+  journal: HarnessJournal,
+  stack: readonly HarnessCompensationEntry[],
+): Promise<HarnessCompensationSummary> {
+  if (!stack.length) {
+    return Object.freeze({ status: 'not_required', attempted: 0, completed: 0, failedActionIds: Object.freeze([]) })
+  }
+  let completed = 0
+  const failedActionIds: string[] = []
+  for (const entry of [...stack].reverse()) {
+    const outcome = await runOneCompensation(entry)
+    if (outcome.ok) completed += 1
+    else failedActionIds.push(entry.actionId)
+    journal.append({
+      kind: 'rollback',
+      summary: outcome.ok
+        ? `Compensation completed for ${entry.capabilityId}.`
+        : `Compensation failed for ${entry.capabilityId}.`,
+      ...(outcome.evidenceRefs?.length ? { evidenceRefs: [...outcome.evidenceRefs] } : {}),
+      data: {
+        actionId: entry.actionId,
+        capabilityId: entry.capabilityId,
+        compensationId: entry.compensation.compensationId,
+        ok: outcome.ok,
+        ...(outcome.ok ? {} : { error: String(outcome.error ?? 'harness_compensation_failed').slice(0, 300) }),
+      },
+    })
+  }
+  const status = completed === stack.length ? 'completed' : completed === 0 ? 'failed' : 'partial'
+  return Object.freeze({
+    status,
+    attempted: stack.length,
+    completed,
+    failedActionIds: Object.freeze(failedActionIds),
+  })
+}
+
 /**
  * Deterministic plan runner retained for simple callers.
  * Execution failures without independent attribution remain harness failures.
@@ -57,6 +161,12 @@ export async function runHarness(input: {
   })
 
   let productionMutationObserved = false
+  const compensations: HarnessCompensationEntry[] = []
+  const finish = async (result: HarnessRunResult): Promise<HarnessRunResult> => {
+    if (result.outcome.status === 'success') return result
+    const compensation = await runHarnessCompensations(journal, compensations)
+    return { ...result, trajectory: journal.snapshot(), compensation }
+  }
   for (const action of input.plan.actions) {
     const grant = manifest.capabilities.find(item => item.id === action.capabilityId)
     if (!grant) {
@@ -65,14 +175,31 @@ export async function runHarness(input: {
         summary: 'Action capability is outside resolved manifest',
         data: { actionId: action.actionId, capabilityId: action.capabilityId },
       })
-      return {
+      return finish({
         runId: manifest.runId,
         profile: manifest.profile,
         trajectory: journal.snapshot(),
         outcome: { status: 'authority_halt', failureCode: 'capability_outside_manifest' },
         authorityExpanded: false,
         productionMutationObserved,
-      }
+      })
+    }
+
+    const contractViolation = harnessCompensationContractViolation(manifest, action)
+    if (contractViolation) {
+      journal.append({
+        kind: 'failure',
+        summary: 'Mutating action has no valid compensation contract',
+        data: { actionId: action.actionId, capabilityId: action.capabilityId, code: contractViolation },
+      })
+      return finish({
+        runId: manifest.runId,
+        profile: manifest.profile,
+        trajectory: journal.snapshot(),
+        outcome: { status: 'harness_failure', failureCode: contractViolation },
+        authorityExpanded: false,
+        productionMutationObserved,
+      })
     }
 
     journal.append({
@@ -88,7 +215,7 @@ export async function runHarness(input: {
         summary: 'Governed Socket halted action at authority boundary',
         data: { actionId: action.actionId, capabilityId: action.capabilityId },
       })
-      return {
+      return finish({
         runId: manifest.runId,
         profile: manifest.profile,
         trajectory: journal.snapshot(),
@@ -98,7 +225,7 @@ export async function runHarness(input: {
         },
         authorityExpanded: false,
         productionMutationObserved,
-      }
+      })
     }
 
     if (result.status === 'execution_failed') {
@@ -111,7 +238,7 @@ export async function runHarness(input: {
           status: 'harness_failure',
         },
       })
-      return {
+      return finish({
         runId: manifest.runId,
         profile: manifest.profile,
         trajectory: journal.snapshot(),
@@ -121,11 +248,14 @@ export async function runHarness(input: {
         },
         authorityExpanded: false,
         productionMutationObserved,
-      }
+      })
     }
 
     if (manifest.environment.class === 'production' && grant.mutating) {
       productionMutationObserved = true
+    }
+    if (action.compensation?.mode === 'compensate') {
+      compensations.push({ actionId: action.actionId, capabilityId: action.capabilityId, compensation: action.compensation })
     }
     journal.append({
       kind: 'tool_result',
@@ -164,7 +294,7 @@ export async function runHarness(input: {
       : `Harness run routed to ${classification.destination}`,
   })
 
-  return {
+  return finish({
     runId: manifest.runId,
     profile: manifest.profile,
     trajectory: journal.snapshot(),
@@ -177,7 +307,7 @@ export async function runHarness(input: {
     },
     authorityExpanded: false,
     productionMutationObserved,
-  }
+  })
 }
 
 export interface HarnessWorkerContext {
@@ -221,6 +351,12 @@ export async function runHarnessWorker(input: {
   let authorityBoundaryReached = false
   let productionMutationObserved = false
   let harnessLimitFailure: string | null = null
+  const compensations: HarnessCompensationEntry[] = []
+  const finish = async (result: HarnessRunResult): Promise<HarnessRunResult> => {
+    if (result.outcome.status === 'success') return result
+    const compensation = await runHarnessCompensations(journal, compensations)
+    return { ...result, trajectory: journal.snapshot(), compensation }
+  }
 
   journal.append({
     kind: 'run_started',
@@ -320,6 +456,17 @@ export async function runHarnessWorker(input: {
       })
     }
 
+    const contractViolation = harnessCompensationContractViolation(input.manifest, action)
+    if (contractViolation) {
+      harnessLimitFailure = contractViolation
+      return Object.freeze({
+        actionId: action.actionId,
+        capabilityId: action.capabilityId,
+        status: 'execution_failed',
+        error: contractViolation,
+      })
+    }
+
     const maxConcurrency = input.manifest.limits.maxConcurrency
     if (maxConcurrency !== undefined && activeExecutions >= maxConcurrency) {
       harnessLimitFailure = 'harness_concurrency_limit_exceeded'
@@ -412,6 +559,13 @@ export async function runHarnessWorker(input: {
 
       const result = await input.executor.execute(input.manifest, action)
       actionResults.push(result)
+      if (result.status === 'executed' && action.compensation?.mode === 'compensate') {
+        compensations.push({
+          actionId: action.actionId,
+          capabilityId: action.capabilityId,
+          compensation: action.compensation,
+        })
+      }
       if (result.status === 'authority_boundary') authorityBoundaryReached = true
 
       const grant = input.manifest.capabilities.find(item => item.id === action.capabilityId)
@@ -463,14 +617,14 @@ export async function runHarnessWorker(input: {
       summary: 'Harness worker terminated unexpectedly.',
       data: { code },
     })
-    return {
+    return finish({
       runId: input.manifest.runId,
       profile: input.manifest.profile,
       trajectory: journal.snapshot(),
       outcome: { status: 'harness_failure', failureCode: code },
       authorityExpanded: false,
       productionMutationObserved,
-    }
+    })
   }
 
   const finalDeadlineMs = input.manifest.limits.deadlineMs
@@ -487,7 +641,7 @@ export async function runHarnessWorker(input: {
       kind: 'escalation',
       summary: 'Run halted at an authority boundary; alternate routing is forbidden.',
     })
-    return {
+    return finish({
       runId: input.manifest.runId,
       profile: input.manifest.profile,
       trajectory: journal.snapshot(),
@@ -497,7 +651,7 @@ export async function runHarnessWorker(input: {
       },
       authorityExpanded: false,
       productionMutationObserved,
-    }
+    })
   }
 
   if (harnessLimitFailure) {
@@ -506,14 +660,14 @@ export async function runHarnessWorker(input: {
       summary: 'Harness execution limit reached.',
       data: { code: harnessLimitFailure },
     })
-    return {
+    return finish({
       runId: input.manifest.runId,
       profile: input.manifest.profile,
       trajectory: journal.snapshot(),
       outcome: { status: 'harness_failure', failureCode: harnessLimitFailure },
       authorityExpanded: false,
       productionMutationObserved,
-    }
+    })
   }
 
   let verification: HarnessVerificationResult
@@ -575,7 +729,7 @@ export async function runHarnessWorker(input: {
       : 'Harness worker run completed without verified success.',
   })
 
-  return {
+  return finish({
     runId: input.manifest.runId,
     profile: input.manifest.profile,
     trajectory: journal.snapshot(),
@@ -588,5 +742,5 @@ export async function runHarnessWorker(input: {
     },
     authorityExpanded: false,
     productionMutationObserved,
-  }
+  })
 }

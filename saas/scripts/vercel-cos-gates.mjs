@@ -172,6 +172,7 @@ const tests = [
   'tests/cosLocalDiscovery.node.test.ts',
   'tests/cosCurrentWorldLearning.node.test.ts',
   'tests/cosWebTrainingDataLayer.node.test.ts',
+  'tests/webKnowledgeHarness.node.test.ts',
   'tests/cosWebTrainingPdfText.node.test.ts',
   'tests/cosLearningTargetLanguage.node.test.ts',
   'tests/cosLearnedCorpusContinuousIndexing.node.test.ts',

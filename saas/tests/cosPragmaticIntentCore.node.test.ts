@@ -51,7 +51,7 @@ test('the Production failure phrase can only come from a freshness path that con
 })
 
 test('ordinary answerable turns do not pay a semantic-classifier round trip', () => {
-  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& !modelPlannedFreshEvidence\s*&& \(heuristicRequiresFreshEvidence \|\| freshConversationContext\.contextUsed\)/)
+  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& !modelPlannedFreshEvidence\s*&& \(heuristicRequiresFreshEvidence \|\| requiresLiveTravelPlanningEvidence\(input\) \|\| freshConversationContext\.contextUsed\)/)
   const ownerFastPath = route.indexOf('if(access?.isOwner&&isPlatformSelfKnowledgePrompt(input))')
   const semanticGate = route.indexOf('const semanticTaskIntentNeeded=')
   assert.ok(ownerFastPath >= 0)

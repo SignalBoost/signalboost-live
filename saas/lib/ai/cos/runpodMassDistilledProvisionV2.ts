@@ -39,11 +39,11 @@ const PUBLIC_PORT = 8000
 const IDLE_TIMEOUT_SECONDS = MASS_DISTILLED_IDLE_TIMEOUT_SECONDS
 export const MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS = 720
 const REQUEST_TIMEOUT_MS = 8_000
-// Production mass-evaluation evidence on 2026-09-17 showed the exact LoRA candidate repeatedly
-// returning HTTP 502 after ~40s while the same endpoint passed the short exact-artifact canary and
-// the base-model holdout calls succeeded. Keep the existing 24 GB Ampere pool and remove the 16 GB
-// option for this exact-artifact runtime so long-form evaluator generation has deterministic VRAM headroom.
+// Independent evaluation needs deterministic 24 GB VRAM headroom. The short exact-artifact canary,
+// however, only proves boot + exact binding and historically succeeds on 16 GB. Keep evaluator/graduate
+// policy 24 GB-only while allowing the canary to use RunPod's ordered 24 -> 16 GB availability fallback.
 const APPROVED_POOLS = ['AMPERE_24'] as const
+const CANARY_APPROVED_POOLS = ['AMPERE_24', 'AMPERE_16'] as const
 
 export async function massDistilledServerlessWorkerCapacity() {
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
@@ -146,10 +146,14 @@ function assertNonGpuEndpointSafetyPolicy(endpoint: Endpoint, idleTimeoutSeconds
   if (Number(endpoint.gpu?.count ?? Number.NaN) !== 1) throw new Error('mass_distilled_runtime_endpoint_gpu_count_drift')
 }
 
-function assertEndpointSafetyPolicy(endpoint: Endpoint, idleTimeoutSeconds = IDLE_TIMEOUT_SECONDS) {
+function assertEndpointSafetyPolicy(
+  endpoint: Endpoint,
+  idleTimeoutSeconds = IDLE_TIMEOUT_SECONDS,
+  approvedPools: readonly string[] = APPROVED_POOLS,
+) {
   assertNonGpuEndpointSafetyPolicy(endpoint, idleTimeoutSeconds)
   const pools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
-  if (pools.length !== APPROVED_POOLS.length || !APPROVED_POOLS.every(pool => pools.includes(pool))) {
+  if (pools.length !== approvedPools.length || !approvedPools.every(pool => pools.includes(pool))) {
     throw new Error('mass_distilled_runtime_endpoint_gpu_pool_drift')
   }
 }
@@ -218,20 +222,28 @@ async function resolveEndpointControlPlane(endpointId: string, endpointName = ''
   throw new Error('mass_distilled_runtime_endpoint_id_missing')
 }
 
-async function constrainEndpointToApprovedGpu(endpointId: string, endpointName = '', idleTimeoutSeconds = IDLE_TIMEOUT_SECONDS) {
+async function constrainEndpointToApprovedGpu(
+  endpointId: string,
+  endpointName = '',
+  idleTimeoutSeconds = IDLE_TIMEOUT_SECONDS,
+  approvedPools: readonly string[] = APPROVED_POOLS,
+) {
   let endpoint = await resolveEndpointControlPlane(endpointId, endpointName)
   assertNonGpuEndpointSafetyPolicy(endpoint, idleTimeoutSeconds)
   const currentPools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
-  if (!currentPools.includes(APPROVED_POOLS[0])) throw new Error('mass_distilled_runtime_24gb_pool_unavailable')
-  if (currentPools.length === APPROVED_POOLS.length && APPROVED_POOLS.every(pool => currentPools.includes(pool))) return endpoint
+  if (!approvedPools.some(pool => currentPools.includes(pool))) {
+    const exact24Only = approvedPools.length === 1 && approvedPools[0] === 'AMPERE_24'
+    throw new Error(exact24Only ? 'mass_distilled_runtime_24gb_pool_unavailable' : 'mass_distilled_runtime_approved_gpu_pool_unavailable')
+  }
+  if (currentPools.length === approvedPools.length && approvedPools.every(pool => currentPools.includes(pool))) return endpoint
 
   const patchGpu = () => requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint?.id))}`, {
     method: 'PATCH',
-    body: JSON.stringify({ gpu: { pools: [...APPROVED_POOLS], count: 1 } }),
+    body: JSON.stringify({ gpu: { pools: [...approvedPools], count: 1 } }),
   })
   endpoint = await withWorkerQuotaRecovery(String(endpoint.id), patchGpu)
   if (!endpoint?.id) throw new Error('mass_distilled_runtime_gpu_pool_rebind_missing')
-  assertEndpointSafetyPolicy(endpoint, idleTimeoutSeconds)
+  assertEndpointSafetyPolicy(endpoint, idleTimeoutSeconds, approvedPools)
   return endpoint
 }
 
@@ -243,7 +255,11 @@ async function constrainEndpointToApprovedGpu(endpointId: string, endpointName =
  * mass:481a6760, whose endpoint showed 0 running workers and $0.00 billed). Restoring the one worker this
  * endpoint is allowed keeps the single-active-endpoint rule intact and creates nothing.
  */
-async function restoreRetiredEndpointCapacity(endpoint: Endpoint, idleTimeoutSeconds = IDLE_TIMEOUT_SECONDS) {
+async function restoreRetiredEndpointCapacity(
+  endpoint: Endpoint,
+  idleTimeoutSeconds = IDLE_TIMEOUT_SECONDS,
+  approvedPools: readonly string[] = APPROVED_POOLS,
+) {
   const maxWorkers = Number(endpoint.workers?.max ?? Number.NaN)
   const idleTimeout = Number(endpoint.workers?.idleTimeout ?? Number.NaN)
   if (maxWorkers >= 1 && idleTimeout === idleTimeoutSeconds) return endpoint
@@ -254,13 +270,17 @@ async function restoreRetiredEndpointCapacity(endpoint: Endpoint, idleTimeoutSec
   const restored = await withWorkerQuotaRecovery(String(endpoint.id), restore)
   if (!restored?.id) throw new Error('mass_distilled_runtime_capacity_restore_missing')
   if (Number(restored.workers?.max ?? Number.NaN) !== 1) throw new Error('mass_distilled_runtime_capacity_restore_rejected')
-  assertEndpointSafetyPolicy(restored, idleTimeoutSeconds)
+  assertEndpointSafetyPolicy(restored, idleTimeoutSeconds, approvedPools)
   return restored
 }
 
 /** Enforce the already-approved 24GB exact-artifact endpoint policy before evaluator inference. */
 export async function ensureMassDistilledEndpoint24Gb(endpointId: string) {
-  const endpoint = await restoreRetiredEndpointCapacity(await constrainEndpointToApprovedGpu(clean(endpointId, 160)))
+  const endpoint = await restoreRetiredEndpointCapacity(
+    await constrainEndpointToApprovedGpu(clean(endpointId, 160), '', IDLE_TIMEOUT_SECONDS, APPROVED_POOLS),
+    IDLE_TIMEOUT_SECONDS,
+    APPROVED_POOLS,
+  )
   return Object.freeze({
     endpointId: String(endpoint.id),
     gpuPools: Object.freeze([...(endpoint.gpu?.pools || [])]),
@@ -288,14 +308,24 @@ function materializedEndpointMatches(endpoint: Endpoint, input: MassDistilledRun
     && clean(env.HEALTH_CHECK_PATH, 80) === '/ping'
 }
 
-function assertMaterializedEndpointIdentity(endpoint: Endpoint, input: MassDistilledRuntimeArtifact, modelName: string, idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input)) {
-  assertEndpointSafetyPolicy(endpoint, idleTimeoutSeconds)
+function assertMaterializedEndpointIdentity(
+  endpoint: Endpoint,
+  input: MassDistilledRuntimeArtifact,
+  modelName: string,
+  idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input),
+  approvedPools: readonly string[] = APPROVED_POOLS,
+) {
+  assertEndpointSafetyPolicy(endpoint, idleTimeoutSeconds, approvedPools)
   if (!materializedEndpointMatches(endpoint, input, modelName)) {
     throw new Error('mass_distilled_runtime_materialized_identity_mismatch')
   }
 }
 
-async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact, recoveryFrom = '') {
+async function resolveExactEndpoint(
+  input: MassDistilledRuntimeArtifact,
+  recoveryFrom = '',
+  approvedPools: readonly string[] = APPROVED_POOLS,
+) {
   const ids = identity(input)
   const idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input)
   const templates = await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')
@@ -306,7 +336,7 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact, recover
   }
 
   let endpoint = await resolveEndpointControlPlane('', ids.endpointName)
-  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName, idleTimeoutSeconds)
+  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName, idleTimeoutSeconds, approvedPools)
 
   if (materializedEndpointMatches(endpoint, input, ids.modelName)) {
     return Object.freeze({ endpoint, ...ids, reboundTemplate: false })
@@ -317,8 +347,8 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact, recover
     body: JSON.stringify({ templateId: template.id }),
   })
   if (!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_template_rebind_missing')
-  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName, idleTimeoutSeconds)
-  assertMaterializedEndpointIdentity(endpoint, input, ids.modelName, idleTimeoutSeconds)
+  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName, idleTimeoutSeconds, approvedPools)
+  assertMaterializedEndpointIdentity(endpoint, input, ids.modelName, idleTimeoutSeconds, approvedPools)
   return Object.freeze({ endpoint, ...ids, reboundTemplate: true })
 }
 
@@ -326,7 +356,10 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact, recover
  * Preserve the proven creator first. Compatibility recovery handles provider response/identity drift,
  * but only after the exact approval-scoped endpoint passes the non-template safety policy.
  */
-export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeArtifact) {
+async function provisionMassDistilledRuntimeWithPools(
+  input: MassDistilledRuntimeArtifact,
+  approvedPools: readonly string[],
+) {
   const idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input)
   try {
     const legacySafeInput: MassDistilledRuntimeArtifact = input.idleTimeoutSeconds !== undefined && Number(input.idleTimeoutSeconds) > 300
@@ -334,14 +367,21 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
       : input
     const provisioned = await provisionLegacyMassDistilledRuntime(legacySafeInput)
     const endpoint = await restoreRetiredEndpointCapacity(
-      await constrainEndpointToApprovedGpu(String(provisioned.endpointId), String(provisioned.endpointName || ''), idleTimeoutSeconds),
+      await constrainEndpointToApprovedGpu(
+        String(provisioned.endpointId),
+        String(provisioned.endpointName || ''),
+        idleTimeoutSeconds,
+        approvedPools,
+      ),
       idleTimeoutSeconds,
+      approvedPools,
     )
     return Object.freeze({
       ...provisioned,
       workersMin: Number(endpoint.workers?.min),
       workersMax: Number(endpoint.workers?.max),
       idleTimeout: Number(endpoint.workers?.idleTimeout),
+      gpuPools: Object.freeze([...(endpoint.gpu?.pools || [])]),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -350,9 +390,9 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
       && message !== 'mass_distilled_runtime_endpoint_template_rebind_failed'
       && message !== 'mass_distilled_runtime_endpoint_gpu_pool_drift') throw error
 
-    const recovered = await resolveExactEndpoint(input, message)
+    const recovered = await resolveExactEndpoint(input, message, approvedPools)
     const endpoint = recovered.endpoint
-    assertMaterializedEndpointIdentity(endpoint, input, recovered.modelName, idleTimeoutSeconds)
+    assertMaterializedEndpointIdentity(endpoint, input, recovered.modelName, idleTimeoutSeconds, approvedPools)
     return Object.freeze({
       templateName: recovered.templateName,
       endpointName: recovered.endpointName,
@@ -364,11 +404,20 @@ export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeA
       workersMin: Number(endpoint.workers?.min),
       workersMax: Number(endpoint.workers?.max),
       idleTimeout: Number(endpoint.workers?.idleTimeout),
+      gpuPools: Object.freeze([...(endpoint.gpu?.pools || [])]),
       baseUrl: `https://${endpoint.id}.api.runpod.ai/v1`,
     })
   }
 }
 
+export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeArtifact) {
+  return provisionMassDistilledRuntimeWithPools(input, APPROVED_POOLS)
+}
+
+/** Short canary only: prefer 24 GB but permit 16 GB fallback for worker availability. */
+export async function provisionMassDistilledCanaryRuntime(input: MassDistilledRuntimeArtifact) {
+  return provisionMassDistilledRuntimeWithPools(input, CANARY_APPROVED_POOLS)
+}
 
 /**
  * Self-Healing control-plane reconciliation for an already-created exact-artifact runtime.

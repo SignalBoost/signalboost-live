@@ -6,6 +6,18 @@ export const COS_WORKING_RUNTIME_BINDING_PROFILE = 'cos-working-runtime-binding-
 const HEX64 = /^[a-f0-9]{64}$/i
 const HEX40 = /^[a-f0-9]{40}$/i
 
+const KNOWN_WORKING_COS_RUNTIME_BINDINGS = Object.freeze({
+  ad815644918f0eaab341c12b67837cc6dd4562342cdaf118f83d5d554cb37226: Object.freeze({
+    runtimeModel: 'qwen3:30b',
+    family: 'qwen3moe',
+    parameterSize: '30.5B',
+    quantizationLevel: 'Q4_K_M',
+    trainableBaseModelId: 'Qwen/Qwen3-30B-A3B-Thinking-2507',
+    trainableBaseModelRevision: '144afc2f379b542fdd4e85a1fcd5e1f79112d95d',
+    source: 'ollama_qwen3_30b_thinking_2507_q4_k_m' as const,
+  }),
+} as const)
+
 function clean(value: unknown, max = 2000): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
@@ -194,20 +206,49 @@ export function buildWorkingCosRuntimeBinding(input: WorkingCosRuntimeBindingInp
   })
 }
 
+function knownBindingForIdentity(identity: WorkingCosRuntimeIdentity) {
+  const digest = normalizeOllamaDigest(identity.digest)
+  if (!digest) return null
+  const known = KNOWN_WORKING_COS_RUNTIME_BINDINGS[digest as keyof typeof KNOWN_WORKING_COS_RUNTIME_BINDINGS]
+  if (!known) return null
+  if (identity.ready !== true
+    || clean(identity.model, 240) !== known.runtimeModel
+    || clean(identity.family, 120).toLowerCase() !== known.family
+    || clean(identity.parameterSize, 120).toUpperCase() !== known.parameterSize.toUpperCase()
+    || clean(identity.quantizationLevel, 120).toUpperCase() !== known.quantizationLevel.toUpperCase()) return null
+  return known
+}
+
 export function workingCosRuntimeBindingFromEnv(
   identity: WorkingCosRuntimeIdentity,
   podId: unknown,
   configuredRuntimeModel: unknown,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  return buildWorkingCosRuntimeBinding({
+  const overrideValues = [
+    env.COS_WORKING_DISTILLATION_RUNTIME_DIGEST,
+    env.COS_WORKING_DISTILLATION_BASE_MODEL_ID,
+    env.COS_WORKING_DISTILLATION_BASE_MODEL_REVISION,
+  ].map(value => clean(value, 500))
+  const operatorOverridePresent = overrideValues.some(Boolean)
+  const known = operatorOverridePresent ? null : knownBindingForIdentity(identity)
+
+  const binding = buildWorkingCosRuntimeBinding({
     runtimeReady: identity.ready,
     podId,
     configuredRuntimeModel,
     observedRuntimeModel: identity.model,
     observedRuntimeDigest: identity.digest,
-    declaredRuntimeDigest: env.COS_WORKING_DISTILLATION_RUNTIME_DIGEST,
-    trainableBaseModelId: env.COS_WORKING_DISTILLATION_BASE_MODEL_ID,
-    trainableBaseModelRevision: env.COS_WORKING_DISTILLATION_BASE_MODEL_REVISION,
+    declaredRuntimeDigest: operatorOverridePresent ? overrideValues[0] : identity.digest,
+    trainableBaseModelId: operatorOverridePresent ? overrideValues[1] : known?.trainableBaseModelId,
+    trainableBaseModelRevision: operatorOverridePresent ? overrideValues[2] : known?.trainableBaseModelRevision,
+  })
+
+  return Object.freeze({
+    ...binding,
+    bindingSource: binding.eligible
+      ? (operatorOverridePresent ? 'operator_override' as const : 'versioned_exact_digest_allowlist' as const)
+      : 'unbound' as const,
+    knownRuntimeSource: known?.source || null,
   })
 }

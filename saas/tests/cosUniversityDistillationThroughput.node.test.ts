@@ -86,7 +86,7 @@ test('paid authorization and dispatch precede slower ready-inventory maintenance
   assert.match(workflow, /if \(replenishmentMaterialInserted > 0\)/)
   assert.match(workflow, /maintainUniversityRightsClearedOpenSourceCorpus/)
   assert.match(workflow, /openSourceMaintenance/)
-  assert.match(workflow, /prepared_buffer_never_stops|prepared buffer.*never stop/i)
+  assert.match(workflow, /full prepared-job buffer[\s\S]*must never stop learning/i)
 })
 
 test('owner throughput control remains separate from University spending and authority', () => {

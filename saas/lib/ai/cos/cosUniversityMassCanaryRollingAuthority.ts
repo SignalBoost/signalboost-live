@@ -34,6 +34,14 @@ export const MASS_CANARY_MAX_IDENTICAL_FAILURES = 4
 // endpoint binding itself needs to be refreshed. Re-canary the SAME artifact before advancing the queue.
 export const MASS_CANARY_ENDPOINT_REFRESH_FAILURES = 2
 export const MASS_CANARY_MAX_COST_USD = 0.2
+// Production 2026-09-24 17:25-19:19 UTC: the whole 3-per-hour canary lane was spent re-canarying the SAME two
+// priority artifacts. Every failure they produced (worker never ready, request timeout, evaluator runtime not ready)
+// is classified as infrastructure, so none counted toward the substantive-failure caps, and the priority ordering
+// picked them first again after each cooldown. One artifact took 4 paid invocations in 81 minutes while ~1,100 others
+// got none. Whatever the failure class, an artifact now gets at most this many canary invocations per rolling day;
+// after that it yields the lane to the rest of the queue and becomes eligible again automatically a day later.
+export const MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_DAY = 3
+export const MASS_CANARY_ARTIFACT_INVOCATION_WINDOW_MS = 24 * 60 * 60 * 1000
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_CANARY_IN_FLIGHT_TTL_MS = 10 * 60 * 1000
 // Owner apprenticeship proof lane (2026-09-21): the first CONFIRMED response-anchor v2
@@ -296,6 +304,10 @@ export function decideMassCanaryRollingApproval(input: {
     // searching the queue rather than stopping the whole issuer.
     if (evaluationHandoffPending(input.events, artifact)) continue
     const own = forArtifact(input.events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
+    // Per-artifact daily invocation ceiling, independent of failure classification (see constant above).
+    const invocationsToday = own.filter(event => claim(event) === 'local_distilled_runtime_canary_invocation_started'
+      && nowMs - at(event.observedAt) < MASS_CANARY_ARTIFACT_INVOCATION_WINDOW_MS).length
+    if (invocationsToday >= MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_DAY) continue
     const refreshEndpoint = endpointRefreshRequired(input.events, artifact)
     if (own.some(event => claim(event) === 'local_distilled_runtime_canary_passed') && !refreshEndpoint) continue
     const latestControl = [...own].reverse().find(event => event.verifier === 'host_controller'

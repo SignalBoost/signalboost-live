@@ -2,6 +2,30 @@
 
 # iTMounts Engineering Blueprint
 
+
+## Universal Context Window Manager invariant — 2026-09-24
+
+All text-model execution has one final model-aware context boundary: `saas/lib/ai/context-window-manager.ts`. COS, Builder, active graduates, RunPod/DeepInfra/local inference, hosted University faculty, and the mass evaluator must budget against the actual served model window before dispatch. Feature-specific memory/retrieval/workspace compactors may reduce their own source material first, but they never replace or bypass the final context boundary.
+
+The invariant is:
+
+```text
+context sources
+-> source-specific relevance/compaction
+-> universal model/provider window resolution
+-> trusted system/tool contracts preserved
+-> deterministic request/history compaction when required
+-> output + safety reservation
+-> provider dispatch
+-> context/token telemetry
+```
+
+Context-window resolution precedence is exact runtime config -> model/provider override map -> provider/global environment value -> conservative recognized-model floor -> 8,192-token unknown-model floor. Assistant tool-call/tool-result exchanges remain atomic when history is reduced; newest task context is retained preferentially. System instructions and tool definitions are never silently truncated: if they cannot fit with minimum input/output headroom, execution fails closed with `context_window_budget_insufficient`.
+
+Context management is not an authority mechanism. Retained conversation, memory, vector retrieval, evidence, University knowledge, tool output, or compacted text can inform reasoning but can never grant capability, approval, spend, environment, Production scope, artifact promotion, or Referee/Guardian authority.
+
+Canonical operating documentation: `docs/CONTEXT-WINDOW-MANAGER.md`.
+
 ## iTMounts Platform Harness invariant — 2026-09-22
 
 The **Platform Harness** is a first-class iTMounts platform layer shared by COS, specialists, Builder, University Residency, Self-Healing, security exercises, replay, sandbox work, Production work, and independent evaluation runtime. It is not subordinate to University and it is not a replacement governance engine.

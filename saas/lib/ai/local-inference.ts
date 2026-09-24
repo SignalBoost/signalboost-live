@@ -5,6 +5,7 @@ import {
   currentHarnessExecutionContext,
   harnessDeadlineRemainingMs,
 } from '../../platform-harness/runtime/execution-context.ts'
+import { emitContextWindowTelemetry, planContextWindowRequest, type ContextWindowPlan } from './context-window-manager.ts'
 
 export type LocalModelToolDefinition = Readonly<{
   type: 'function'
@@ -93,6 +94,8 @@ export interface LocalInferenceConfig {
   graduateArtifactId?: string
   graduateArtifactHash?: string
   fallbackFromOwned?: boolean
+  /** Optional exact served-model context window. Universal manager env/model policy is used when absent. */
+  contextWindowTokens?: number
 }
 
 export interface LocalInferenceTelemetry {
@@ -119,6 +122,11 @@ export interface LocalInferenceTelemetry {
   totalTokens: number | null
   cachedPromptTokens: number | null
   providerEstimatedCostUsd: number | null
+  contextWindowTokens: number | null
+  contextEstimatedInputTokensBefore: number | null
+  contextEstimatedInputTokensAfter: number | null
+  contextCompacted: boolean
+  contextDroppedMessageCount: number
 }
 
 function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
@@ -334,7 +342,8 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   let providerEstimatedCostUsd: number | null = null
   let text: string | null = null
   let toolCalls: readonly LocalModelToolCall[] = Object.freeze([])
-  const requestedMaxTokens = args.maxTokens ?? 2048
+  let contextPlan: ContextWindowPlan | null = null
+  let requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
   const harnessContext = currentHarnessExecutionContext()
   const abortFromHarness = () => controller.abort()
@@ -389,6 +398,19 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       ? `${baseSystemPrompt} Output exactly the requested JSON schema. Do not add explanations, rationale, analysis, prose, repeated inputs, or extra keys.`
       : baseSystemPrompt
     const systemPrompt = qwenThinkingOff ? `${governedSystemPrompt} /no_think` : governedSystemPrompt
+    contextPlan = planContextWindowRequest({
+      model,
+      provider,
+      explicitContextWindowTokens: config.contextWindowTokens,
+      systemPrompt,
+      prompt: args.prompt,
+      messages: args.messages,
+      tools: args.tools,
+      requestedOutputTokens: requestedMaxTokens,
+    })
+    requestedMaxTokens = contextPlan.maxOutputTokens
+    emitContextWindowTelemetry(contextPlan, usageContext.feature)
+
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
@@ -405,7 +427,9 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
         ...(args.tools?.length ? { tools: args.tools, tool_choice: args.toolChoice ?? 'auto' } : {}),
         messages: [
           { role: 'system', content: systemPrompt },
-          ...(args.messages?.length ? args.messages : [{ role: 'user' as const, content: args.prompt }]),
+          ...(contextPlan.messages?.length
+            ? contextPlan.messages
+            : [{ role: 'user' as const, content: contextPlan.prompt }]),
         ],
       }),
     })
@@ -472,6 +496,11 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       latencyMs, startupLatencyMs: 0, inferenceLatencyMs,
       success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
       promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
+      contextWindowTokens: contextPlan?.contextWindowTokens ?? null,
+      contextEstimatedInputTokensBefore: contextPlan?.estimatedInputTokensBefore ?? null,
+      contextEstimatedInputTokensAfter: contextPlan?.estimatedInputTokensAfter ?? null,
+      contextCompacted: contextPlan?.compacted === true,
+      contextDroppedMessageCount: contextPlan?.droppedMessageCount ?? 0,
     })
     if (args.persistUsage !== false && !harnessContext?.signal.aborted && shouldPersistUsage(provider, config)) {
       await recordLocalInferenceUsage({

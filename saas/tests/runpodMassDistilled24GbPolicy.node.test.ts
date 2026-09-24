@@ -73,12 +73,20 @@ test('evaluator quota repair only releases sibling mass-distilled worker reserva
 })
 
 
-test('capacity reclamation never disables active graduate or evaluator endpoints', () => {
+test('capacity reclamation never disables active graduate, evaluator, or Residency endpoints', () => {
   assert.match(provisionLegacy, /protectedRunpodEndpointIds/)
+  assert.match(provisionLegacy, /activeResidencyRunpodEndpointNames/)
   assert.match(provisionLegacy, /!protectedEndpointIds\.has\(clean\(endpoint\.id,160\)\.toLowerCase\(\)\)/)
+  assert.match(provisionLegacy, /!protectedResidencyEndpointNames\.has\(clean\(endpoint\.name,240\)\)/)
   assert.match(provisionV2, /protectedRunpodEndpointIds/)
+  assert.match(provisionV2, /activeResidencyRunpodEndpointNames/)
   assert.match(provisionV2, /!protectedEndpointIds\.has\(clean\(endpoint\.id, 160\)\.toLowerCase\(\)\)/)
+  assert.match(provisionV2, /!protectedResidencyEndpointNames\.has\(clean\(endpoint\.name, 240\)\)/)
 
+  assert.match(endpointProtection, /cos_university_residency_enrollments/)
+  assert.match(endpointProtection, /\['resident', 'senior_resident', 'remediation_required'\]/)
+  assert.match(endpointProtection, /builder-residency-runtime-v1/)
+  assert.match(endpointProtection, /residency_endpoint_protection_database_unavailable/)
   assert.match(endpointProtection, /cos_university_graduate_model_registry/)
   assert.match(endpointProtection, /\.eq\('status', 'active'\)/)
   assert.match(endpointProtection, /\.eq\('runtime_provider', 'runpod'\)/)

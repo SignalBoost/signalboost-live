@@ -9,11 +9,11 @@ import {
   createWebKnowledgeResearchPort,
   runWebKnowledgeResearchProductionHarness,
   type WebKnowledgeResearchPort,
-} from '@/platform-harness/capabilities/web-knowledge'
-import { currentCosHarnessIngress } from '@/platform-harness/adapters/cos-ingress'
-import { createSupervisorAuditHarnessEvidenceSink } from '@/platform-harness/evidence/supervisor-audit-sink'
-import type { HarnessEvidenceSink } from '@/platform-harness/evidence/durable-evidence'
-import { cosServiceDb } from '@/lib/cos-core/storage/service-db'
+} from '../../../platform-harness/capabilities/web-knowledge.ts'
+import { currentCosHarnessIngress } from '../../../platform-harness/adapters/cos-ingress.ts'
+import { createSupervisorAuditHarnessEvidenceSink } from '../../../platform-harness/evidence/supervisor-audit-sink.ts'
+import type { HarnessEvidenceSink } from '../../../platform-harness/evidence/durable-evidence.ts'
+import { cosServiceDb } from '../../cos-core/storage/service-db.ts'
 
 export type GovernedWebSearchResult = Readonly<{
   title: string

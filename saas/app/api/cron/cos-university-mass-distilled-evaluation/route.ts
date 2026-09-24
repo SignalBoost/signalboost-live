@@ -43,7 +43,7 @@ const FAILED = 'mass_distilled_independent_evaluation_failed'
 const EXHAUSTED = 'mass_distilled_evaluation_attempts_exhausted'
 const ROUTE_BUDGET_MS = 570_000
 const ROUTE_RESERVE_MS = 25_000
-const RUNTIME_WAKE_TIMEOUT_MS = 20_000
+const RUNTIME_WAKE_TIMEOUT_MS = 150_000
 const MIN_BALANCE_USD = 1
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
@@ -82,9 +82,9 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
   const remainingMs = deadlineMs - Date.now() - ROUTE_RESERVE_MS
   if (remainingMs <= 0) throw new Error('mass_distilled_evaluation_route_deadline_exceeded')
   const timeoutMs = Math.max(1, Math.min(RUNTIME_WAKE_TIMEOUT_MS, remainingMs))
-  // /ping is only a scale-from-zero trigger. A cold RunPod LB request can stay open until a worker is
-  // routable, so waiting minutes for its response consumes the evaluator's entire route budget. Dispatch
-  // it briefly, then let the evaluator's control-plane health loop own startup readiness and the remaining deadline.
+  // /ping is only a scale-from-zero trigger. Keep the request alive through the bounded cold-start window:
+  // aborting it after 20s can cancel the only scale trigger before RunPod attaches a worker, while /health
+  // still returns HTTP 200 with workers.ready=0. The evaluator remains bounded by the absolute route deadline.
   try {
     const response = await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`, {
       headers: { Authorization: `Bearer ${key}` },
@@ -95,7 +95,7 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
       throw new Error(`mass_distilled_evaluation_runtime_wake_http_${response.status}:${detail}`)
     }
     const payload: any = await response.json().catch(() => null)
-    if (String(payload?.status || '') !== 'accepting_requests') {
+    if (!['accepting_requests', 'ready'].includes(String(payload?.status || ''))) {
       throw new Error('mass_distilled_evaluation_runtime_wake_invalid')
     }
     return Object.freeze({

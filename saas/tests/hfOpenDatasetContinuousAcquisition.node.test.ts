@@ -33,7 +33,7 @@ test('Semantic Scholar and Wikimedia receive exact-source rotating continuity ob
 
   assert.match(daily, /const SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES = Object\.freeze\(\[/)
   assert.match(daily, /const WIKIMEDIA_CONTINUOUS_TOPICS = Object\.freeze\(\[/)
-  assert.match(daily, /function utcLearningHour\(now: Date\): number/)
+  assert.match(daily, /function utcLearningQuarterHour\(now: Date\): number/)
   assert.match(daily, /export function openSourceContinuityCurriculum\(now: Date = new Date\(\)\): KnowledgeGap\[\]/)
 
   assert.match(daily, /id: 'curriculum:semantic-scholar-continuous'[\s\S]*?sourceKinds: \['scientific_journal'\][\s\S]*?allowedAdapterIds: \['semantic_scholar'\]/)

@@ -231,7 +231,10 @@ async function constrainEndpointToApprovedGpu(
   let endpoint = await resolveEndpointControlPlane(endpointId, endpointName)
   assertNonGpuEndpointSafetyPolicy(endpoint, idleTimeoutSeconds)
   const currentPools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
-  if (!approvedPools.some(pool => currentPools.includes(pool))) throw new Error('mass_distilled_runtime_approved_gpu_pool_unavailable')
+  if (!approvedPools.some(pool => currentPools.includes(pool))) {
+    const exact24Only = approvedPools.length === 1 && approvedPools[0] === 'AMPERE_24'
+    throw new Error(exact24Only ? 'mass_distilled_runtime_24gb_pool_unavailable' : 'mass_distilled_runtime_approved_gpu_pool_unavailable')
+  }
   if (currentPools.length === approvedPools.length && approvedPools.every(pool => currentPools.includes(pool))) return endpoint
 
   const patchGpu = () => requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint?.id))}`, {

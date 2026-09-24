@@ -43,6 +43,49 @@ async function getJson(url: string, fetcher: FetchLike = fetch, headers: Record<
   }
 }
 
+function retryAfterMs(value: string | null, attempt: number): number {
+  const raw = String(value ?? '').trim()
+  if (raw) {
+    const seconds = Number(raw)
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(30_000, Math.round(seconds * 1000))
+    const at = Date.parse(raw)
+    if (Number.isFinite(at)) return Math.max(0, Math.min(30_000, at - Date.now()))
+  }
+  return [3_000, 8_000, 15_000][Math.min(attempt, 2)] ?? 15_000
+}
+
+async function getSemanticScholarJson(
+  url: string,
+  fetcher: FetchLike,
+  headers: Record<string, string>,
+): Promise<any> {
+  const apiKeyConfigured = Boolean(headers['x-api-key'])
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 12_000)
+    try {
+      const response = await fetcher(url, {
+        headers: { accept: 'application/json', 'user-agent': 'iTMounts-COS/1.0', ...headers },
+        signal: controller.signal,
+      })
+      if (response.ok) return await response.json()
+      if (response.status !== 429 || attempt === 2) {
+        throw new Error(`COS semantic research source failed: ${response.status}; provider=semantic_scholar; apiKeyConfigured=${apiKeyConfigured}`)
+      }
+      const waitMs = retryAfterMs(response.headers.get('retry-after'), attempt)
+      console.warn('cosLearning: Semantic Scholar rate limited; retrying', {
+        attempt: attempt + 1,
+        waitMs,
+        apiKeyConfigured,
+      })
+      if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs))
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  throw new Error(`COS semantic research source failed: 429; provider=semantic_scholar; apiKeyConfigured=${apiKeyConfigured}`)
+}
+
 function boundedScore(value: unknown): string | null {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return null
@@ -126,7 +169,7 @@ export function createSemanticScholarScientificSearch(options: {
       limit: String(Math.min(Math.max(1, limit), 10)),
       fields: 'title,url,abstract,year,citationCount,externalIds,embedding.specter_v2',
     })
-    const json = await getJson(
+    const json = await getSemanticScholarJson(
       `https://api.semanticscholar.org/graph/v1/paper/search?${params.toString()}`,
       fetcher,
       apiKey ? { 'x-api-key': apiKey } : {},

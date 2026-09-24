@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 const tests = [
   'tests/cosTravelPlanningFreshness.node.test.ts',
   'tests/cosHarnessIngress.node.test.ts',
+  'tests/platformHarnessFullEnforcement.node.test.ts',
   'tests/cosSoftwareSpecialistProductionHarness.node.test.ts',
   'tests/cosA2ASpecialistHarnessIngress.node.test.ts',
 ]

@@ -1,7 +1,9 @@
+// saas/tests/platformHarnessFullEnforcement.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   createProductionHarnessRequest,
+  resolveChildHarnessManifest,
   runHarnessWorker,
   runProductionHarnessEnvelope,
   type HarnessManifest,
@@ -256,4 +258,98 @@ test('Production COS/specialist envelope resolves, executes, verifies, then pers
   assert.equal(completed.completed.evidence.profile, 'production')
   assert.equal(evidence.length, 1)
   assert.equal(evidence[0]?.runId, 'production-envelope-test')
+})
+
+
+test('recursive child HarnessRun may only reduce parent authority and limits', () => {
+  const parent: HarnessManifest = {
+    runId: 'parent-run',
+    objective: 'orchestrate software work',
+    identity: {
+      agentId: 'cos-primary',
+      role: 'chief_of_staff',
+      tenantId: 'itmounts',
+      portableId: 'cos',
+    },
+    profile: 'production',
+    environment: { environmentId: 'itmounts-production', class: 'production' },
+    capabilities: [{
+      id: 'agent.software.delegate',
+      environments: ['production'],
+      mutating: true,
+      risk: 'write',
+      scopes: ['cos.specialist.software.delegate'],
+    }],
+    authorityManifestRef: 'host://parent-run',
+    limits: { deadlineMs: 120_000, maxToolCalls: 4, maxConcurrency: 2 },
+    learningFeedbackAllowed: false,
+  }
+
+  const request = createProductionHarnessRequest({
+    runId: 'child-run',
+    objective: 'delegate bounded software work',
+    tenantId: 'itmounts',
+    portableId: 'cos-software-specialist',
+    agentId: 'cos-software-specialist',
+    role: 'software_specialist',
+    environmentId: 'signalboost-cloud',
+    requestedCapabilities: ['agent.software.delegate'],
+    limits: { deadlineMs: 60_000, maxToolCalls: 1, maxConcurrency: 1 },
+    parent: {
+      runId: parent.runId,
+      authorityManifestRef: parent.authorityManifestRef,
+    },
+  })
+
+  const authority = {
+    manifestRef: 'host://child-run',
+    verified: true as const,
+    verifiedBy: 'host' as const,
+    environments: ['production'] as const,
+    capabilities: [{
+      id: 'agent.software.delegate',
+      environments: ['production'] as const,
+      mutating: true,
+      risk: 'write' as const,
+      scopes: ['cos.specialist.software.delegate'] as const,
+    }],
+    limits: { deadlineMs: 60_000, maxToolCalls: 1, maxConcurrency: 1 },
+  }
+
+  const allowed = resolveChildHarnessManifest(request, authority, parent)
+  assert.equal(allowed.allowed, true)
+  if (allowed.allowed) {
+    assert.equal(allowed.manifest.parent?.runId, parent.runId)
+    assert.equal(allowed.manifest.limits.deadlineMs, 60_000)
+  }
+
+  const widenedCapability = resolveChildHarnessManifest({
+    ...request,
+    requestedCapabilities: ['agent.software.delegate', 'production.deploy'],
+  }, {
+    ...authority,
+    capabilities: [...authority.capabilities, {
+      id: 'production.deploy',
+      environments: ['production'] as const,
+      mutating: true,
+      risk: 'consequential' as const,
+      scopes: ['production.deploy'] as const,
+    }],
+  }, parent)
+  assert.equal(widenedCapability.allowed, false)
+  if (!widenedCapability.allowed) {
+    assert.ok(widenedCapability.reasons.includes('child_capability_widening_forbidden:production.deploy'))
+  }
+
+  const widenedDeadline = resolveChildHarnessManifest({
+    ...request,
+    requestedLimits: { deadlineMs: 180_000, maxToolCalls: 1, maxConcurrency: 1 },
+  }, {
+    ...authority,
+    limits: { deadlineMs: 180_000, maxToolCalls: 1, maxConcurrency: 1 },
+  }, parent)
+  assert.equal(widenedDeadline.allowed, false)
+  if (!widenedDeadline.allowed) {
+    assert.ok(widenedDeadline.reasons.includes('child_limits_widening_forbidden'))
+  }
 })

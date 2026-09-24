@@ -44,7 +44,7 @@ export type GraduateRuntimeBindingInput = Readonly<{
 }>
 
 const HEX64 = /^[a-f0-9]{64}$/i
-const ROLES = new Set<CosReasoningWorkerRole>(['primary', 'coder', 'critic', 'verifier', 'researcher'])
+const ROLES = new Set<CosReasoningWorkerRole>(['primary', 'coder', 'critic', 'verifier', 'researcher', 'context_engineer'])
 const RUNPOD_SERVERLESS_HOST = /^([a-z0-9]+)\.api\.runpod\.ai$/i
 
 function clean(value: unknown, limit = 500): string {

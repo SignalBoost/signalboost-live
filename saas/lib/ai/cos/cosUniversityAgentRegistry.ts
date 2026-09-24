@@ -1,7 +1,7 @@
 import type { CosUniversityAgentRole } from './cosUniversityRoleCurriculum.ts'
 
 export const COS_UNIVERSITY_AGENT_ROLES: readonly CosUniversityAgentRole[] = Object.freeze([
-  'chief_of_staff_generalist', 'software_engineering', 'cybersecurity',
+  'chief_of_staff_generalist', 'software_engineering', 'context_engineering', 'cybersecurity',
   'quantitative_data_science', 'enterprise_operations_governance',
   'scientific_physical_systems', 'aerospace_nuclear_safety',
   'molecular_biomedical_sciences', 'neuroscience_biophysics',

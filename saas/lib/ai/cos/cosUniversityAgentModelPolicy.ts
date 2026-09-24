@@ -35,6 +35,7 @@ export const UNIVERSITY_PRACTICE_MODEL_INVALID = 'university_practice_model_inva
  */
 export const ROLE_DOMAIN_SUBJECTS: Readonly<Record<string, readonly string[]>> = {
   software_engineering: ['computer_science'],
+  context_engineering: ['computer_science', 'statistics_data_science', 'reasoning_decision_science'],
   cybersecurity: ['cybersecurity'],
   quantitative_data_science: ['statistics_data_science', 'mathematics'],
   enterprise_operations_governance: ['business_operations', 'law_regulation_governance'],

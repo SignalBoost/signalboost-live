@@ -2,6 +2,7 @@ import type { A2ADelegationRisk } from './a2a-agent-registry.ts'
 
 export type A2ASpecialistFamilyId =
   | 'software'
+  | 'context-engineering'
   | 'marketing'
   | 'sales'
   | 'self-healing-diagnostic'
@@ -32,6 +33,16 @@ export const A2A_SPECIALIST_FAMILIES: readonly A2ASpecialistFamily[] = Object.fr
       Object.freeze({ skillId: 'software.repair', risk: 'write', purpose: 'Reproduce, repair, and verify supplied or explicitly authorized software failures.' }),
       Object.freeze({ skillId: 'software.platform-repair', risk: 'write', purpose: 'Repair an owner-authorized pinned SignalBoost revision, prove the change, and when a server-side write credential is configured publish a serialized review branch and PR. Merge and deployment remain separate governed actions.' }),
       Object.freeze({ skillId: 'software.verify', risk: 'advisory', purpose: 'Verify code, tests, build evidence, and repair claims independently of mutation authority.' }),
+    ]),
+  }),
+  Object.freeze({
+    familyId: 'context-engineering',
+    displayName: 'Context Engineer',
+    purpose: 'Diagnose and optimize bounded AI context selection, retrieval, memory continuity, prompt packing, compaction, provenance, and context-quality evaluation without expanding model capacity or execution authority.',
+    skills: Object.freeze([
+      Object.freeze({ skillId: 'context.analyze', risk: 'advisory', purpose: 'Analyze context-window pressure, retrieval quality, memory selection, provenance, truncation, and distraction without mutation.' }),
+      Object.freeze({ skillId: 'context.plan', risk: 'advisory', purpose: 'Prepare a bounded context-selection and token-allocation plan for an existing governed inference path.' }),
+      Object.freeze({ skillId: 'context.verify', risk: 'advisory', purpose: 'Verify that context packing preserves the newest objective, required constraints, provenance, tool-call integrity, and completion reserve.' }),
     ]),
   }),
   Object.freeze({

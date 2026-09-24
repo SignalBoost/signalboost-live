@@ -50,6 +50,12 @@ export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
 // ladder still adds the longer backoff for a truly repeating defect. This changes scheduling only: it does
 // not consume a substantive attempt, widen spend, change scores, or weaken any graduation gate.
 export const MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS = 10 * 60_000
+// A control-plane HTTP 200 with zero ready workers means the exact endpoint exists and may still be
+// finishing its cold start just after the evaluator's bounded readiness window. Give that SAME exact
+// artifact one immediate retry while its worker is warm instead of rotating to a new cold endpoint.
+// A second consecutive :200 readiness miss restores the normal fairness cooldown.
+export const MASS_EVALUATION_WARM_RETRY_WINDOW_MS = 10 * 60_000
+const MASS_EVALUATION_WARM_RETRY_ERROR = 'mass_distilled_evaluation_runtime_not_ready:200' as const
 // The identical-failure stop above had no time bound: once four identical failures were recorded, the artifact
 // was skipped on every subsequent tick forever, with nothing in the system able to release it except a
 // hand-inserted reopen event. That is correct for a permanent defect and wrong for a transient one, and the
@@ -121,6 +127,38 @@ const at = (value: string | null | undefined) => Date.parse(String(value || ''))
 const evaluationStarted = (event: RollingEvent) => event.evidence?.claim === 'mass_distilled_independent_evaluation_started'
 const evaluationTerminal = (event: RollingEvent) => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
   || event.evidence?.claim === 'mass_distilled_independent_evaluation_completed'
+
+function warmWorkerRetryEligible(
+  artifact: RollingArtifact,
+  events: readonly RollingEvent[],
+  nowMs: number,
+): boolean {
+  const hash = artifact.artifactHash.toLowerCase()
+  const failures = events
+    .filter(event => event.candidateId === artifact.candidateId
+      && String(event.evidence?.artifactHash || '').toLowerCase() === hash
+      && event.evidence?.claim === 'mass_distilled_independent_evaluation_failed')
+    .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+  const newest = failures[0]
+  if (!newest) return false
+  const newestAt = at(newest.observedAt)
+  if (!Number.isFinite(newestAt) || nowMs - newestAt < 0 || nowMs - newestAt >= MASS_EVALUATION_WARM_RETRY_WINDOW_MS) return false
+  const newestError = String(newest.evidence?.error || '').trim().toLowerCase()
+  if (newestError !== MASS_EVALUATION_WARM_RETRY_ERROR) return false
+
+  // One warm retry only. If the immediately preceding failure was the same readiness miss within
+  // the same warm-start episode, rotate away and let the ordinary cooldown/fairness policy resume.
+  const previous = failures[1]
+  if (previous) {
+    const previousAt = at(previous.observedAt)
+    const previousError = String(previous.evidence?.error || '').trim().toLowerCase()
+    if (previousError === MASS_EVALUATION_WARM_RETRY_ERROR
+      && Number.isFinite(previousAt)
+      && newestAt - previousAt >= 0
+      && newestAt - previousAt < MASS_EVALUATION_WARM_RETRY_WINDOW_MS) return false
+  }
+  return true
+}
 
 function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
   const error = String(event.evidence?.error || '').trim().toLowerCase()
@@ -365,7 +403,16 @@ export function decideRollingMassEvaluationApproval(input: {
   const builderV2ProofNeeded = builderV2Completions < MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
   const replayCompletions = Math.max(0, Math.floor(Number(input.remediationReplayProofCompletions ?? MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE)))
   const remediationReplayProofNeeded = replayCompletions < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
+  const warmRetryCandidates = new Set(input.artifacts
+    .filter(artifact => warmWorkerRetryEligible(artifact, input.events, nowMs))
+    .map(artifact => artifact.candidateId))
   const ordered = [...input.artifacts].sort((a, b) => {
+    // Reuse a worker that is already in the middle of an exact-artifact cold start before paying the
+    // startup cost again on another endpoint. This is a single bounded retry and does not bypass any
+    // retention, canary, scoring, spend, promotion, or Production-traffic gate below.
+    const aWarm = warmRetryCandidates.has(a.candidateId)
+    const bWarm = warmRetryCandidates.has(b.candidateId)
+    if (aWarm !== bWarm) return aWarm ? -1 : 1
     // Builder apprenticeship proof lane: until two confirmed response-anchor v2 Computer Science artifacts
     // have durable independent evaluation results, keep those exact artifacts ahead of the legacy backlog.
     // This changes scheduling only; the full 12-hour retention delay, exact canary, scoring, retry, spend,
@@ -443,10 +490,11 @@ export function decideRollingMassEvaluationApproval(input: {
     // the scheduler can try another eligible artifact. Different infrastructure error strings do not erase
     // the floor. Substantive model-quality failures do not enter this branch and retain their separate budget.
     const newestFailure = recentFailures[0]
+    const warmWorkerRetry = warmRetryCandidates.has(artifact.candidateId)
     if (newestFailure && evaluatorInfrastructureFailure(newestFailure)) {
       const newestFailureAt = at(newestFailure.observedAt)
       if (!Number.isFinite(newestFailureAt)) continue
-      if (nowMs - newestFailureAt < MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS) continue
+      if (!warmWorkerRetry && nowMs - newestFailureAt < MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS) continue
     }
 
     const recentErrors = recentFailures.map(event => String(event.evidence?.error || '').trim().toLowerCase())
@@ -511,6 +559,7 @@ export function decideRollingMassEvaluationApproval(input: {
         infrastructureRepairRef: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF,
         infrastructureRepairAt: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT,
         priorFailedAttempts: failures,
+        ...(warmWorkerRetry ? { warmWorkerRetry: true, warmWorkerRetryWindowMs: MASS_EVALUATION_WARM_RETRY_WINDOW_MS } : {}),
         ...(remediationReplayProofNeeded && artifact.remediationReplay === true ? { remediationReplayProofPriority: true } : {}),
         ...(repairedSuspension ? { resumeAfterSuspension: true, repairRef: MASS_EVALUATION_24GB_REPAIR_REF } : {}),
       },

@@ -1,2 +1,2 @@
-base_sha=a9ab757101642ca8580d18ead9d19811a45d3c2c
-branch=fix/playwright-mcp-disable-webmcp-runtime-v2-20260924
+base_sha=96d90a036acf07fc7c76586527e3807cdd7f64bf
+branch=fix/playwright-mcp-runtime-root-collision-20260924

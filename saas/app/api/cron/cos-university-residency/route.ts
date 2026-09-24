@@ -10,6 +10,7 @@ import { admitNextBuilderResidency } from '@/platform-harness/residency/admissio
 import { createSupabaseBuilderResidencyOrchestratorStore } from '@/platform-harness/residency/orchestrator-store'
 import { createSupervisorAuditHarnessEvidenceSink } from '@/platform-harness/evidence/supervisor-audit-sink'
 import { actuateBuilderResidencyRuntimeRecovery } from '@/self-healing-host/builder-residency-runtime-recovery'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -92,6 +93,17 @@ export async function GET(req: Request) {
   }
 
   if (!enabled()) {
+    await recordCosUniversityProductionPath({
+      path: 'residency',
+      invocationSucceeded: true,
+      evidence: {
+        enabled: false,
+        runnerInvoked: false,
+        state: 'disabled',
+        promotionAuthorized: false,
+        productionTrafficAuthorized: false,
+      },
+    })
     return NextResponse.json({
       ok: true,
       state: 'disabled',
@@ -128,19 +140,49 @@ export async function GET(req: Request) {
       repairInfrastructure: actuateBuilderResidencyRuntimeRecovery,
     })
 
-    return NextResponse.json(publicResult(result, admission), {
+    const evidence = publicResult(result, admission)
+    await recordCosUniversityProductionPath({
+      path: 'residency',
+      invocationSucceeded: result.ok || result.state === 'waiting_for_residency_cases',
+      evidence: {
+        ...evidence,
+        enabled: true,
+        runnerInvoked: true,
+      },
+    })
+    return NextResponse.json(evidence, {
       status: result.ok || result.state === 'waiting_for_residency_cases'
         ? 200
         : 503,
     })
   } catch (error) {
+    const message = error instanceof Error
+      ? error.message
+      : 'builder_residency_cron_failed'
+    try {
+      await recordCosUniversityProductionPath({
+        path: 'residency',
+        invocationSucceeded: false,
+        evidence: {
+          enabled: true,
+          runnerInvoked: true,
+          state: 'failed',
+          error: message,
+          promotionAuthorized: false,
+          productionTrafficAuthorized: false,
+        },
+      })
+    } catch (receiptError) {
+      console.error(
+        '[cos-university-residency-assurance-failed]',
+        receiptError instanceof Error ? receiptError.message : String(receiptError),
+      )
+    }
     return NextResponse.json(
       {
         ok: false,
         state: 'failed',
-        error: error instanceof Error
-          ? error.message
-          : 'builder_residency_cron_failed',
+        error: message,
         automaticFinalGateEnable: false,
         promotionAuthorized: false,
         productionTrafficAuthorized: false,

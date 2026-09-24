@@ -56,7 +56,7 @@ test('canary compatibility permits ordered 24GB to 16GB availability fallback wi
   assert.match(compatibility, /const CANARY_APPROVED_POOLS = \['AMPERE_24', 'AMPERE_16', 'ADA_24'\] as const/)
   assert.match(compatibility, /provisionMassDistilledCanaryRuntime/)
   assert.match(compatibility, /const pools = selectMassDistilledCanaryPools\(catalogGpus\)/)
-  assert.match(compatibility, /return provisionMassDistilledRuntimeWithPools\(input, pools\)/)
+  assert.match(compatibility, /const provisioned = await provisionMassDistilledRuntimeWithPools\(input, pools\)/)
   assert.match(compatibility, /provisionMassDistilledRuntimeWithPools\(input, APPROVED_POOLS\)/)
 })
 

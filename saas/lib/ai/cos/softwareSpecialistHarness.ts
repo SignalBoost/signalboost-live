@@ -1,9 +1,9 @@
 import {
   createProductionHarnessRequest,
   runProductionHarnessEnvelope,
-  type HarnessCapabilityResolverPort,
-  type HarnessEvidenceSink,
-} from '../../../platform-harness/index.ts'
+} from '../../../platform-harness/adapters/production.ts'
+import type { HarnessCapabilityResolverPort } from '../../../platform-harness/capabilities/resolver.ts'
+import type { HarnessEvidenceSink } from '../../../platform-harness/evidence/durable-evidence.ts'
 import { createGovernedHarnessExecutor } from '../../../platform-harness/runtime/governed-executor.ts'
 import { createSupervisorAuditHarnessEvidenceSink } from '../../../platform-harness/evidence/supervisor-audit-sink.ts'
 import { createPortableCapabilityDescriptor } from '../../../provider-hub-core/capability-runtime.ts'

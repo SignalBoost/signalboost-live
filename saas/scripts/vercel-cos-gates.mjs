@@ -145,6 +145,7 @@ const tests = [
   'tests/cosAdaptiveRetrieval.node.test.ts',
   'tests/cosRetrievalSelfReflection.node.test.ts',
   'tests/cosFreshnessPolicy.node.test.ts',
+  'tests/cosNativeAgentFreshnessGuard.node.test.ts',
   'tests/cosTravelPlanningFreshness.node.test.ts',
   'tests/cosFreshGroundedTask.node.test.ts',
   'tests/listCatalogIntent.node.test.ts',

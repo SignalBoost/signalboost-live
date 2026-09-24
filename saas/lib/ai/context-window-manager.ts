@@ -130,11 +130,19 @@ export function planContextWindow<T extends ContextMessage>(input: {
   let droppedMessages = 0
   let truncatedCharacters = 0
 
-  // Drop oldest complete messages first, but always retain at least the newest turn.
+  // Drop oldest coherent conversation groups first. An assistant tool-call and its following
+  // tool results are one atomic group so compaction never creates an invalid orphan tool message.
   while (estimatedPromptTokens > maxPromptForRequested && messages.length > 1) {
-    const removed = messages.shift()!
-    estimatedPromptTokens -= messageTokens(removed)
-    droppedMessages += 1
+    let removeCount = 1
+    const first = messages[0]
+    if (first.role === 'assistant' && first.tool_calls?.length) {
+      while (removeCount < messages.length && messages[removeCount].role === 'tool') removeCount += 1
+    }
+    // Never remove every message: preserve the newest turn even when the oldest group spans the list.
+    removeCount = Math.min(removeCount, messages.length - 1)
+    const removed = messages.splice(0, removeCount)
+    estimatedPromptTokens -= removed.reduce((sum, message) => sum + messageTokens(message), 0)
+    droppedMessages += removed.length
   }
 
   // If the newest turn itself is too large, compact it deterministically.

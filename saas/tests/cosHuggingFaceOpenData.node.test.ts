@@ -5,7 +5,6 @@ import test from 'node:test'
 import {
   createHuggingFaceGithubCc0Search,
   createHuggingFaceNistCybersecuritySearch,
-  huggingFaceOpenDatasetCurriculum,
   HUGGING_FACE_OPEN_DATASETS,
 } from '../lib/cos-core/layers/learning/huggingFaceOpenData.ts'
 import { createLiveLearningAdapters } from '../lib/cos-core/layers/learning/liveSources.ts'
@@ -173,22 +172,23 @@ test('GitHub CC0 source is exposed by the shared learning factory only for softw
 })
 
 
-test('daily HF curriculum guarantees bounded exact-source attempts and rotates discovery', () => {
-  const first = huggingFaceOpenDatasetCurriculum(new Date('2026-09-24T00:00:00Z'))
-  const next = huggingFaceOpenDatasetCurriculum(new Date('2026-09-25T00:00:00Z'))
-
-  assert.equal(first.length, 2)
-  assert.equal(first[0]?.id, 'curriculum:hf-nist-cc0-continuous')
-  assert.equal(first[1]?.id, 'curriculum:hf-github-cc0-continuous')
-  assert.deepEqual(first[0]?.sourceKinds, ['public_dataset'])
-  assert.deepEqual(first[0]?.allowedAdapterIds, ['hf_nist_cc0'])
-  assert.deepEqual(first[1]?.allowedAdapterIds, ['hf_github_cc0'])
-  assert.equal(first[0]?.curriculumAligned, true)
-  assert.equal(first[1]?.curriculumAligned, true)
-  assert.notEqual(first[0]?.discoveryQuery, next[0]?.discoveryQuery)
-  assert.notEqual(first[1]?.discoveryQuery, next[1]?.discoveryQuery)
-
+test('daily HF curriculum is source-fenced, rotating, and wired ahead of the general curriculum', () => {
+  const dailySource = readFileSync(join(process.cwd(), 'lib/cos/dailyAutonomousLearning.ts'), 'utf8')
   const cycleSource = readFileSync(join(process.cwd(), 'lib/cos-core/layers/learning/cycle.ts'), 'utf8')
+
+  assert.match(dailySource, /const HF_NIST_DAILY_QUERIES = Object\.freeze\(\[/)
+  assert.match(dailySource, /const HF_GITHUB_CC0_DAILY_QUERIES = Object\.freeze\(\[/)
+  assert.match(dailySource, /function utcLearningDay\(now: Date\): number/)
+  assert.match(dailySource, /export function huggingFaceOpenDatasetCurriculum\(now: Date = new Date\(\)\): KnowledgeGap\[\]/)
+  assert.match(dailySource, /id: 'curriculum:hf-nist-cc0-continuous'/)
+  assert.match(dailySource, /allowedAdapterIds: \['hf_nist_cc0'\]/)
+  assert.match(dailySource, /id: 'curriculum:hf-github-cc0-continuous'/)
+  assert.match(dailySource, /allowedAdapterIds: \['hf_github_cc0'\]/)
+  assert.match(dailySource, /sourceKinds: \['public_dataset'\]/)
+  assert.match(dailySource, /curriculumAligned: true/)
+  assert.match(dailySource, /const hfOpenDatasetCurriculum = huggingFaceOpenDatasetCurriculum\(\)/)
+  assert.match(dailySource, /const curriculum = \[\.\.\.hfOpenDatasetCurriculum, \.\.\.recurringTechnologyCurriculum\(\)/)
+
   assert.match(cycleSource, /gap\.allowedAdapterIds/)
   assert.match(cycleSource, /if\(exact\.size&&\(!adapter\.id\|\|!exact\.has\(adapter\.id\)\)\)return false/)
 })

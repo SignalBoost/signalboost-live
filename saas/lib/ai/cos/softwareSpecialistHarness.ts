@@ -9,9 +9,14 @@ import { createSupervisorAuditHarnessEvidenceSink } from '../../../platform-harn
 import { createPortableCapabilityDescriptor } from '../../../provider-hub-core/capability-runtime.ts'
 import { cosServiceDb } from '../../cos-core/storage/service-db.ts'
 import type { GatewayHost, GovernancePolicy } from '../../../agent-gateway/types.ts'
+import type { HarnessManifest } from '../../../platform-harness/core/types.ts'
+import {
+  COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY,
+  COS_PRIMARY_SOFTWARE_DELEGATION_SCOPE,
+} from '../../../platform-harness/adapters/cos-ingress.ts'
 
-export const COS_SOFTWARE_SPECIALIST_DELEGATION_CAPABILITY = 'agent.software.delegate'
-const SOFTWARE_SPECIALIST_SCOPE = 'cos.specialist.software.delegate'
+export const COS_SOFTWARE_SPECIALIST_DELEGATION_CAPABILITY = COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY
+const SOFTWARE_SPECIALIST_SCOPE = COS_PRIMARY_SOFTWARE_DELEGATION_SCOPE
 const PRODUCTION_ENVIRONMENT_ID = 'signalboost-cloud'
 const SOFTWARE_SPECIALIST_PORTABLE_ID = 'cos-software-specialist'
 
@@ -103,6 +108,7 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
   execute: () => Promise<T>
   evidenceSink?: HarnessEvidenceSink
   runId?: string
+  parentManifest?: HarnessManifest
 }): Promise<CosSoftwareSpecialistHarnessResult<T>> {
   const tenantId = String(input.tenantId || '').trim()
   const objective = String(input.objective || '').trim()
@@ -130,6 +136,14 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
       maxConcurrency: 1,
       deadlineMs: 60_000,
     },
+    ...(input.parentManifest
+      ? {
+          parent: {
+            runId: input.parentManifest.runId,
+            authorityManifestRef: input.parentManifest.authorityManifestRef,
+          },
+        }
+      : {}),
   })
 
   let value!: T
@@ -220,6 +234,7 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
       },
     }),
     evidenceSink,
+    ...(input.parentManifest ? { parentManifest: input.parentManifest } : {}),
   })
 
   if (envelope.accepted === false) {

@@ -1,4 +1,4 @@
-import { contextWindowOutputBudget } from '@/lib/ai/context-window-manager'
+import { contextWindowOutputBudget } from '../context-window-manager.ts'
 
 // saas/lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts
 // The mass endpoint serves vLLM with --max-model-len 8192. Two Production rejections (2026-09-16) set the rules here:

@@ -1,3 +1,4 @@
+// @ts-nocheck -- temporary diagnostic; remove after Preview identifies runtime viability
 import { Sandbox } from '@vercel/sandbox'
 import {
   PLAYWRIGHT_MCP_PROFILE,

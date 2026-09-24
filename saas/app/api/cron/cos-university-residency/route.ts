@@ -10,6 +10,7 @@ import { admitNextBuilderResidency } from '@/platform-harness/residency/admissio
 import { createSupabaseBuilderResidencyOrchestratorStore } from '@/platform-harness/residency/orchestrator-store'
 import { createSupervisorAuditHarnessEvidenceSink } from '@/platform-harness/evidence/supervisor-audit-sink'
 import { actuateBuilderResidencyRuntimeRecovery } from '@/self-healing-host/builder-residency-runtime-recovery'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,6 +31,24 @@ function authorized(req: Request): boolean {
 
 function enabled(): boolean {
   return process.env.COS_UNIVERSITY_RESIDENCY_ENABLED === 'true'
+}
+
+async function recordResidencyProductionPath(
+  invocationSucceeded: boolean,
+  evidence: Record<string, unknown>,
+) {
+  try {
+    await recordCosUniversityProductionPath({
+      path: 'builder_residency',
+      invocationSucceeded,
+      evidence,
+    })
+  } catch (error) {
+    console.error(
+      'cron COS University Residency assurance receipt failed:',
+      error instanceof Error ? error.message : String(error),
+    )
+  }
 }
 
 function publicResult(result: any, admission?: any) {
@@ -92,13 +111,20 @@ export async function GET(req: Request) {
   }
 
   if (!enabled()) {
-    return NextResponse.json({
+    const body = {
       ok: true,
       state: 'disabled',
       automaticFinalGateEnable: false,
       promotionAuthorized: false,
       productionTrafficAuthorized: false,
+    }
+    await recordResidencyProductionPath(true, {
+      runnerInvoked: false,
+      skipped: true,
+      status: 'disabled',
+      ...body,
     })
+    return NextResponse.json(body)
   }
 
   const db = getAdminSupabase()
@@ -128,19 +154,44 @@ export async function GET(req: Request) {
       repairInfrastructure: actuateBuilderResidencyRuntimeRecovery,
     })
 
-    return NextResponse.json(publicResult(result, admission), {
+    const body = publicResult(result, admission)
+    await recordResidencyProductionPath(
+      result.ok === true || result.state === 'waiting_for_residency_cases',
+      {
+        runnerInvoked: Boolean(result.practiceCase),
+        status: result.state,
+        residencyId: result.residencyId ?? null,
+        coverage: result.coverage ?? null,
+        admission: body.admission ?? null,
+        selfHealing: body.selfHealing ?? null,
+        automaticFinalGateEnable: false,
+        promotionAuthorized: false,
+        productionTrafficAuthorized: false,
+      },
+    )
+
+    return NextResponse.json(body, {
       status: result.ok || result.state === 'waiting_for_residency_cases'
         ? 200
         : 503,
     })
   } catch (error) {
+    const message = error instanceof Error
+      ? error.message
+      : 'builder_residency_cron_failed'
+    await recordResidencyProductionPath(false, {
+      runnerInvoked: true,
+      status: 'failed',
+      error: message,
+      automaticFinalGateEnable: false,
+      promotionAuthorized: false,
+      productionTrafficAuthorized: false,
+    })
     return NextResponse.json(
       {
         ok: false,
         state: 'failed',
-        error: error instanceof Error
-          ? error.message
-          : 'builder_residency_cron_failed',
+        error: message,
         automaticFinalGateEnable: false,
         promotionAuthorized: false,
         productionTrafficAuthorized: false,

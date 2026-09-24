@@ -85,6 +85,7 @@ test('assurance registry covers every scheduled University route explicitly', ()
     '/api/cron/cos-university-mass-distilled-evaluation': 'mass_distilled_independent_evaluation',
     '/api/cron/cos-university-mass-distillation': 'mass_distillation_campaign',
     '/api/cron/cos-university-distillation-supervisor': 'mass_distillation_supervision',
+    '/api/cron/cos-university-residency': 'residency',
   }
   assert.deepEqual(scheduled.filter((route: string) => !pathByRoute[route]), [])
   for (const route of scheduled) assert.ok(pathByRoute[route] in COS_UNIVERSITY_FEATURE_GATED_PATHS)
@@ -129,4 +130,15 @@ test('assurance evidence is service-only and append-only', () => {
   assert.doesNotMatch(migration, /grant .*update|grant .*delete/i)
   assert.match(migration, /before update or delete/i)
   assert.match(migration, /append-only/i)
+})
+
+
+test('Residency is an explicit assured Production path', () => {
+  assert.equal(COS_UNIVERSITY_FEATURE_GATED_PATHS.residency, 'COS_UNIVERSITY_RESIDENCY_ENABLED')
+  const source = fs.readFileSync(path.join(ROOT, 'app/api/cron/cos-university-residency/route.ts'), 'utf8')
+  assert.match(source, /recordCosUniversityProductionPath\s*\(/)
+  assert.match(source, /path:\s*'residency'/)
+  assert.match(source, /runnerInvoked:\s*true/)
+  assert.match(source, /promotionAuthorized:\s*false/)
+  assert.match(source, /productionTrafficAuthorized:\s*false/)
 })

@@ -37,6 +37,7 @@ const tests = [
   'tests/cosUniversityCurriculumExamAlignment.node.test.ts',
   'tests/cosUniversityStudySupplyPriority.node.test.ts',
   'tests/cosUniversityLearningSourceCooldown.node.test.ts',
+  'tests/cosLearningProviderLease.node.test.ts',
   'tests/learningSourceMix.node.test.ts',
   'tests/hfOpenDatasetContinuousAcquisition.node.test.ts',
   'tests/hfOpenDatasetTransport.node.test.ts',

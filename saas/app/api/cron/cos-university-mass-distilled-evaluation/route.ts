@@ -39,7 +39,7 @@ const FAILED = 'mass_distilled_independent_evaluation_failed'
 const EXHAUSTED = 'mass_distilled_evaluation_attempts_exhausted'
 const ROUTE_BUDGET_MS = 570_000
 const ROUTE_RESERVE_MS = 25_000
-const RUNTIME_WAKE_TIMEOUT_MS = 20_000
+const RUNTIME_WAKE_TIMEOUT_MS = 150_000
 const MIN_BALANCE_USD = 1
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
@@ -79,8 +79,9 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
   if (remainingMs <= 0) throw new Error('mass_distilled_evaluation_route_deadline_exceeded')
   const timeoutMs = Math.max(1, Math.min(RUNTIME_WAKE_TIMEOUT_MS, remainingMs))
   // /ping is only a scale-from-zero trigger. A cold RunPod LB request can stay open until a worker is
-  // routable, so waiting minutes for its response consumes the evaluator's entire route budget. Dispatch
-  // it briefly, then let the evaluator's control-plane health loop own startup readiness and the remaining deadline.
+  // routable, so keep it alive through the bounded cold scale window, then let the evaluator's control-plane
+  // health loop own any remaining startup readiness. Aborting at 20s cancels the only scale-from-zero trigger
+  // before RunPod can attach a worker; Production then reports HTTP 200 health with workers.ready=0.
   try {
     const response = await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`, {
       headers: { Authorization: `Bearer ${key}` },
@@ -91,7 +92,7 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
       throw new Error(`mass_distilled_evaluation_runtime_wake_http_${response.status}:${detail}`)
     }
     const payload: any = await response.json().catch(() => null)
-    if (String(payload?.status || '') !== 'accepting_requests') {
+    if (!['accepting_requests', 'ready'].includes(String(payload?.status || ''))) {
       throw new Error('mass_distilled_evaluation_runtime_wake_invalid')
     }
     return Object.freeze({

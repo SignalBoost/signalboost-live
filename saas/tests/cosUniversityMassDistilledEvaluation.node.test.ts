@@ -117,7 +117,9 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.match(runner, /manifestHash\(observed\)\s*!==\s*input\.expectedManifestHash/)
   // Endpoint/model naming moved out of the evaluator into the provisioner; assert it where it lives.
   assert.match(provision, /itmounts-mass-distilled-\$\{suffix\}/)
-  assert.match(runner, /payload\?\.ready===true/)
+  assert.match(runner, /massDistilledRuntimeHealth\(endpointId\)/)
+  assert.match(runner, /health\.workers\.ready>0/)
+  assert.doesNotMatch(runner, /fetch\(\`\$\{root\}\/ready\`/)
   assert.match(runner, /const READY_TIMEOUT_MS = 280_000/)
   assert.match(runner, /const ROUTE_RESERVE_MS = 25_000/)
   assert.match(runner, /teacherModelId/)

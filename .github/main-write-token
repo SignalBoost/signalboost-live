@@ -1,2 +1,2 @@
-base_sha=cccf20feeb8d9a7b287958b5ab49b8f16e3e0ecf
-branch=feat/working-cos-owner-controls-refresh2-20260923
+base_sha=f7f8c91cef3fe3a9aea1f4defb383f43b3a558e4
+branch=fix/residency-governed-read-concurrency-v2-20260923

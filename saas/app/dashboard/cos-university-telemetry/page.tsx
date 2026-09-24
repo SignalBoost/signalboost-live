@@ -31,6 +31,19 @@ type OpenSource = {
   sourceAccessCostUsd24h: number
 }
 
+type WorkingCos = {
+  bundleReady: boolean
+  bundleKey: string | null
+  portableManifestHash: string | null
+  itemCount: number
+  subjectCount: number
+  subjectIds: string[]
+  blockers: string[]
+  automaticTrainingAuthorized: boolean
+  productionTrafficAuthorized: boolean
+  nextGate: string
+}
+
 type Job = {
   jobId: string
   jobUrl: string | null
@@ -104,6 +117,7 @@ type Telemetry = {
     openSourceItems24h?: number
   }
   openSources?: OpenSource[]
+  workingCos?: WorkingCos
   providers?: Provider[]
   runs?: Run[]
   artifacts?: Artifact[]
@@ -206,6 +220,7 @@ export default function CosUniversityTelemetryPage() {
   const summary = data?.summary || {}
   const providers = data?.providers || []
   const openSources = data?.openSources || []
+  const workingCos = data?.workingCos || null
   const runs = data?.runs || []
   const artifacts = data?.artifacts || []
 
@@ -243,6 +258,29 @@ export default function CosUniversityTelemetryPage() {
         <Card label={copy.inFlight24h} value={String(summary.inFlightRuns24h ?? '—')} />
         <Card label={copy.failedRuns24h} value={String(summary.failedRuns24h ?? '—')} />
         <Card label={copy.hfObservedCost24h} value={money(summary.hfObservedCostUsd24h)} />
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <div className="mb-4">
+          <h2 className="font-semibold">{copy.workingCosTitle}</h2>
+          <p className="text-xs opacity-65">{copy.workingCosExplanation}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Card label={copy.workingCosBundleReady} value={workingCos ? (workingCos.bundleReady ? copy.pass : copy.pending) : '—'} />
+          <Card label={copy.workingCosSubjects} value={workingCos ? String(workingCos.subjectCount) : '—'} />
+          <Card label={copy.workingCosItems} value={workingCos ? String(workingCos.itemCount) : '—'} />
+          <Card label={copy.workingCosNextGate} value={workingCos?.nextGate || '—'} />
+        </div>
+        {workingCos?.subjectIds?.length ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {workingCos.subjectIds.map(subject => (
+              <span key={subject} className="rounded-full border px-2 py-1 text-xs">{subject}</span>
+            ))}
+          </div>
+        ) : null}
+        {workingCos?.blockers?.length ? (
+          <div className="mt-3 text-xs text-amber-300">{workingCos.blockers.join(' · ')}</div>
+        ) : null}
       </section>
 
       <section className="rounded-lg border p-4">

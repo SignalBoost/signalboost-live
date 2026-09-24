@@ -1,2 +1,2 @@
-base_sha=be3046d16ec0b0307a7647e11cc6302f9bcfad1e
-branch=fix/open-source-continuity-cron-20260924
+base_sha=f6008220894d50f0c481f96ec50c86ea96a6fc38
+branch=fix/evaluator-backlog-drain-20260924-v3

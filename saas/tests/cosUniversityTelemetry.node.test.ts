@@ -149,3 +149,17 @@ test('University telemetry wraps and humanizes long Working COS gate labels', ()
   assert.match(page, /replaceAll\('_', ' '\)/)
   assert.match(page, /overflowWrap:\s*'anywhere'/)
 })
+
+
+test('University telemetry exposes owner-only Working COS dispatch controls without promotion authority', () => {
+  const page = source('app/dashboard/cos-university-telemetry/page.tsx')
+  const route = source('app/api/admin/cos-working-distillation/route.ts')
+  assert.match(page, /\/api\/admin\/cos-working-distillation/)
+  assert.match(page, /confirmDispatch:\s*true/)
+  assert.match(page, /operation, confirmDispatch/)
+  assert.match(page, /runWorkingCosAction\('prepare_dataset'\)/)
+  assert.match(page, /runWorkingCosAction\('train'\)/)
+  assert.match(route, /await requireOwner\(\)/)
+  assert.match(route, /dispatchWorkingCosDatasetPreparation/)
+  assert.match(route, /dispatchWorkingCosTraining/)
+})

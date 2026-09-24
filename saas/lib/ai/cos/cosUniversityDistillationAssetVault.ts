@@ -65,15 +65,17 @@ export function buildDistillationAssetVaultRecords(input: DistillationAssetVault
   const promptSetHash = textValue(input.promptSetHash, 64).toLowerCase()
   const sourceRef = textValue(input.sourceRef, 2000)
   const trainingRights = textValue(input.trainingRights, 120)
-  const expectedItemHashes = [...new Set((input.expectedItemHashes || [])
+  const expectedItemHashes = (input.expectedItemHashes || [])
     .map(item => textValue(item, 64).toLowerCase())
-    .filter(item => HEX64.test(item)))].sort()
+    .sort()
 
   if (!candidateId) throw new Error('distillation_asset_candidate_missing')
   if (!HEX64.test(promptSetHash)) throw new Error('distillation_asset_prompt_set_hash_invalid')
   if (!sourceRef) throw new Error('distillation_asset_source_ref_missing')
   if (!trainingRights) throw new Error('distillation_asset_training_rights_missing')
-  if (!expectedItemHashes.length || expectedItemHashes.length !== input.expectedItemHashes.length) {
+  if (!expectedItemHashes.length
+    || expectedItemHashes.length !== input.expectedItemHashes.length
+    || expectedItemHashes.some(item => !HEX64.test(item))) {
     throw new Error('distillation_asset_expected_manifest_invalid')
   }
   if (!Array.isArray(input.rows) || input.rows.length !== expectedItemHashes.length) {
@@ -118,8 +120,8 @@ export function buildDistillationAssetVaultRecords(input: DistillationAssetVault
     })
   })
 
-  const observedItemHashes = [...new Set(rows.map(row => row.itemHash))].sort()
-  if (observedItemHashes.length !== rows.length
+  const observedItemHashes = rows.map(row => row.itemHash).sort()
+  if (new Set(rows.map(row => row.promptId)).size !== rows.length
     || JSON.stringify(observedItemHashes) !== JSON.stringify(expectedItemHashes)) {
     throw new Error('distillation_asset_manifest_mismatch')
   }

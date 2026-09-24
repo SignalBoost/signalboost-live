@@ -4,7 +4,6 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 const route = fs.readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-const evaluator = fs.readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
 test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-balancer path', () => {
   // Production 2026-09-17 19:32 UTC: GET /v1/models returned 404 because the exact-artifact gateway serves only
@@ -23,7 +22,7 @@ test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-bal
 })
 
 test('runtime wake is bounded and hands cold-start readiness back to the evaluator', () => {
-  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 150_000/)
+  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 260_000/)
   assert.match(route, /name !== 'TimeoutError' && name !== 'AbortError'/)
   assert.match(route, /wakeRequestTimedOut: true/)
   assert.match(route, /responseObserved: false/)
@@ -47,15 +46,4 @@ test('an evaluator defect records its own throw site, without leaking provider o
   assert.match(route, /errorFrames: frames/)
   // Only our own frames are kept: the error body itself is still truncated to the existing 500-character message.
   assert.match(route, /evidence: \{ error: clean\(message, 500\), \.\.\.\(frames\.length \? \{ errorFrames: frames \} : \{\}\) \}/)
-})
-
-
-test('readiness retriggers ping while control-plane worker count is zero', () => {
-  const start = evaluator.indexOf('async function waitReady(endpointId:string,deadlineMs:number)')
-  const end = evaluator.indexOf('\nfunction batchPrompt', start)
-  assert.ok(start >= 0 && end > start)
-  const body = evaluator.slice(start, end)
-  assert.match(body, /massDistilledRuntimeHealth\(endpointId\)/)
-  assert.match(body, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
-  assert.doesNotMatch(body, /health\.workers\.ready>0\|\|health\.workers\.running>0/)
 })

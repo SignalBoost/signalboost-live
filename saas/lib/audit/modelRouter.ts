@@ -1,4 +1,4 @@
-import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
+import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
 // Canonical Audit reasoning seam. Audit is a COS capability and therefore uses
 // only the configured LOCAL_AI_* runtime. There is no external-provider fallback.
 

@@ -1,4 +1,4 @@
-import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
+import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'

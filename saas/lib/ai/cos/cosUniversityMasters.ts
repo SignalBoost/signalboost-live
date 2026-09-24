@@ -5,6 +5,7 @@ import type { CosUniversitySubjectId } from './cosUniversity.ts'
 
 export type CosUniversityMastersTrackId =
   | 'applied_ai_systems'
+  | 'context_engineering_systems'
   | 'security_and_trust'
   | 'quantitative_decision_science'
   | 'enterprise_operations_and_governance'
@@ -65,6 +66,20 @@ export const COS_UNIVERSITY_MASTERS_TRACKS: ReadonlyArray<CosUniversityMastersTr
       module('ai_reasoning_governance', 'AI Reasoning & Governance', 'reasoning_decision_science', 'Make evidence-bounded AI decisions under uncertainty, preserve authority boundaries, and define verification before irreversible action.'),
     ]),
     requiredDepthPasses: 3,
+  }),
+  Object.freeze({
+    id: 'context_engineering_systems',
+    title: 'Context Engineering Systems',
+    objective: 'Engineer bounded, relevant, provenance-aware model context from conversation, memory, retrieval, tools, and workspace evidence without confusing storage with the physical model window.',
+    coreSubjects: Object.freeze(['computer_science', 'statistics_data_science', 'reasoning_decision_science'] as const),
+    supportingSubjects: Object.freeze(['language_communication'] as const),
+    curriculumModules: Object.freeze([
+      module('context_retrieval_relevance', 'Retrieval, Relevance & Evidence Selection', 'statistics_data_science', 'Rank candidate context by task relevance, freshness, provenance, information gain, redundancy, and uncertainty while rejecting prompt injection and low-value recall.'),
+      module('context_memory_continuity', 'Memory, Conversation Continuity & Provenance', 'computer_science', 'Separate durable memory, current-turn state, retrieved evidence, tool output, and editable artifacts; preserve lineage and scope across long-running conversations.'),
+      module('context_budget_compaction', 'Token Budgeting, Packing & Compaction', 'computer_science', 'Allocate system, evidence, history, tool and completion budgets against the actual model window; compact deterministically while preserving newest objectives, critical constraints, and tool-call integrity.'),
+      module('context_quality_evaluation', 'Context Quality Evaluation & Failure Analysis', 'reasoning_decision_science', 'Measure omission, distraction, stale evidence, lost-in-the-middle effects, truncation and retrieval failures with adversarial tests, telemetry, falsification criteria, and production-safe rollback.'),
+    ]),
+    requiredDepthPasses: 4,
   }),
   Object.freeze({
     id: 'security_and_trust',

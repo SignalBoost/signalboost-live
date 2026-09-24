@@ -94,6 +94,14 @@ const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_I
 export const MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT = '2026-09-24T16:00:00.000Z' as const
 const MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT)
 const RUNPOD_QUOTA_FAILURE_FRAGMENT = 'max workers across all endpoints must not exceed your workers quota' as const
+// Production 2026-09-24: #3165 replaced the false RunPod workers.ready-only evaluator gate with
+// exact worker-local /ping model readiness. Historical runtime_not_ready failures from the broken
+// predicate remain durable evidence, but must not keep repaired artifacts in the old identical-error
+// cooldown generation. Only pre-repair readiness failures are released; every other infrastructure
+// error and every post-repair readiness failure retains the normal fairness/cooldown policy.
+export const MASS_EVALUATION_MODEL_READY_REPAIR_AT = '2026-09-24T19:26:08.571Z' as const
+const MASS_EVALUATION_MODEL_READY_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_MODEL_READY_REPAIR_AT)
+const RUNTIME_NOT_READY_FAILURE_PREFIX = 'mass_distilled_evaluation_runtime_not_ready:' as const
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
@@ -434,9 +442,12 @@ export function decideRollingMassEvaluationApproval(input: {
       .filter(event => {
         const observedAt = at(event.observedAt)
         const error = String(event.evidence?.error || '').trim().toLowerCase()
-        return !(Number.isFinite(observedAt)
-          && observedAt < MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT_MS
-          && error.includes(RUNPOD_QUOTA_FAILURE_FRAGMENT))
+        if (!Number.isFinite(observedAt)) return true
+        if (observedAt < MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT_MS
+          && error.includes(RUNPOD_QUOTA_FAILURE_FRAGMENT)) return false
+        if (observedAt < MASS_EVALUATION_MODEL_READY_REPAIR_AT_MS
+          && error.startsWith(RUNTIME_NOT_READY_FAILURE_PREFIX)) return false
+        return true
       })
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
     // Fairness floor: any newest infrastructure/control-plane failure yields this artifact briefly so

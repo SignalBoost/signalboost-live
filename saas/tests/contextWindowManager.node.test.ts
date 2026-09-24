@@ -30,6 +30,26 @@ test('exact served-model override beats provider and built-in assumptions', () =
   }
 })
 
+
+
+test('planner preserves complete input by shrinking output before compacting useful context', () => {
+  const prompt = 'KEEP-ALL-' + 'p'.repeat(3_000) + '-END'
+  const plan = planContextWindowRequest({
+    model: 'test-model',
+    provider: 'test',
+    explicitContextWindowTokens: 2_048,
+    systemPrompt: 'trusted host policy',
+    prompt,
+    requestedOutputTokens: 1_500,
+    safetyTokens: 64,
+  })
+  assert.equal(plan.prompt, prompt)
+  assert.equal(plan.estimatedInputTokensAfter, plan.estimatedInputTokensBefore)
+  assert.ok(plan.maxOutputTokens < 1_500)
+  assert.ok(plan.maxOutputTokens >= 256)
+  assert.equal(plan.compacted, true)
+})
+
 test('oversized single prompts are deterministically middle-compacted while preserving the request edges and output budget', () => {
   const prompt = `BEGIN-REQUEST\n${'x'.repeat(12_000)}\nLATEST-DIAGNOSTIC-END`
   const plan = planContextWindowRequest({

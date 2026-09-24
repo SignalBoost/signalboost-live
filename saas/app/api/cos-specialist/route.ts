@@ -123,14 +123,20 @@ export async function POST(req: NextRequest) {
   const harness = await runCosA2ASpecialistProductionHarness({
     objective: prompt || `Delegate ${plan.skillId} to ${plan.familyId}.`,
     scope,
-    execute: () => orchestrateSpecialistInsideHarness(() => selectedHost.orchestrator.orchestrate({
+    execute: signal => {
+      if (signal?.aborted) throw new Error('harness_a2a_specialist_delegation_aborted')
+      return orchestrateSpecialistInsideHarness(() => {
+        if (signal?.aborted) throw new Error('harness_a2a_specialist_delegation_aborted')
+        return selectedHost.orchestrator.orchestrate({
       ...scope,
       messageId: text(body?.context?.messageId) || crypto.randomUUID(),
       text: prompt,
       plan,
       ...(body?.context?.a2aApproval ? { approval: body.context.a2aApproval } : {}),
-      ...(text(body?.context?.traceId) ? { traceId: text(body.context.traceId) } : {}),
-    })),
+          ...(text(body?.context?.traceId) ? { traceId: text(body.context.traceId) } : {}),
+        })
+      })
+    },
   })
 
   if (harness.ok === false) {

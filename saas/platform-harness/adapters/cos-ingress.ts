@@ -68,7 +68,7 @@ function assertCosProductionManifest(manifest: HarnessManifest): void {
  *
  * This is zero-capability by default. Explicit bounded grants may be attached for child delegation
  * or read-only Web Knowledge research; no capability is inferred from the user's wording.
- * capability-bearing work remains subject to the normal Harness/Governed Socket intersection.
+ * Capability-bearing work remains subject to the normal Harness/Governed Socket intersection.
  * Its job is to make a Production HarnessRun mandatory before COS reasoning can begin.
  */
 export function createCosProductionIngressManifest(input: {

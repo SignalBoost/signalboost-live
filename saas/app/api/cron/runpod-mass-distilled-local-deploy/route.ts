@@ -169,30 +169,74 @@ async function issueRollingCanaryApproval(now:Date){
     artifactByCandidate.set(String((row as any).candidate_id),row)
   }
   const artifactRows=[...artifactByCandidate.values()]
+
+  // Computer Science final canary is gated by exact Builder Residency completion in the atomic claim.
+  // Keep rolling authorization on the same eligibility set so an unclaimable CS approval cannot hold the
+  // queue-wide canary semaphore and starve replay proof for every other subject.
+  const builderRows=artifactRows.filter((row:any)=>String(row?.subject_id||'')==='Computer Science & Coding')
+  const builderRowByCandidate=new Map<string,any>(builderRows.map((row:any)=>[String(row.candidate_id),row]))
+  const builderCompletionAt=new Map<string,string>()
+  const builderCandidateIds=[...builderRowByCandidate.keys()]
+  for(let offset=0;offset<builderCandidateIds.length;offset+=75){
+    const residencyCandidateChunk=builderCandidateIds.slice(offset,offset+75)
+    const residency=await db.from('cos_university_residency_enrollments')
+      .select('candidate_id,trained_artifact_hash,completed_at')
+      .in('candidate_id',residencyCandidateChunk)
+      .eq('standing','residency_complete')
+      .eq('authority_expanded',false)
+      .not('completed_at','is',null)
+    if(residency.error) throw residency.error
+    for(const row of residency.data||[]){
+      const candidateId=String((row as any).candidate_id||'')
+      const artifact=builderRowByCandidate.get(candidateId)
+      const artifactHash=String((row as any).trained_artifact_hash||'').toLowerCase()
+      const completedAt=String((row as any).completed_at||'')
+      if(!artifact||artifactHash!==String(artifact.trained_artifact_hash||'').toLowerCase()||!Number.isFinite(Date.parse(completedAt))) continue
+      builderCompletionAt.set(candidateId,completedAt)
+    }
+  }
+  const finalGateArtifactRows=artifactRows.filter((row:any)=>
+    String(row?.subject_id||'')!=='Computer Science & Coding'
+      || builderCompletionAt.has(String(row.candidate_id)))
+  const eligibleBuilderProofIds=new Set(confirmedBuilderArtifacts
+    .map((row:any)=>String(row.candidate_id))
+    .filter((candidateId:string)=>builderCompletionAt.has(candidateId)))
+  const eligibleReplayProofIds=new Set(confirmedReplayArtifacts
+    .filter((row:any)=>String(row?.subject_id||'')!=='Computer Science & Coding'
+      || builderCompletionAt.has(String(row.candidate_id)))
+    .map((row:any)=>String(row.candidate_id)))
   const proofCandidateIds=[
-    ...confirmedBuilderArtifacts.map((row:any)=>String(row.candidate_id)),
-    ...confirmedReplayArtifacts.map((row:any)=>String(row.candidate_id)),
+    ...eligibleBuilderProofIds,
+    ...eligibleReplayProofIds,
   ]
-  const candidateIds=[...new Set([...artifactRows.map((row:any)=>String(row.candidate_id)),...proofCandidateIds])]
-  if(!artifactRows.length) return {issued:false,reason:'no_evaluation_pending_mass_artifacts'}
+  const candidateIds=[...new Set([...finalGateArtifactRows.map((row:any)=>String(row.candidate_id)),...proofCandidateIds])]
+  if(!finalGateArtifactRows.length) return {issued:false,reason:'no_final_gate_eligible_mass_artifacts'}
   // Read only the three policy-relevant evidence streams and page each stream completely.
   // The old global .limit(5000) mixed in teacher/training/provider history; as that history grew,
   // an older exact-artifact canary pass fell out of the window and the issuer re-approved the same
   // already-passed artifact. That approval was intentionally unclaimable and froze the queue.
-  const eventRows=await readRollingCanaryEvents(db,candidateIds)
+  const rawEventRows=await readRollingCanaryEvents(db,candidateIds)
+  // A canary observed before Builder Residency completion is teaching-stage evidence only. Remove it from
+  // final-canary policy state so Residency completion requires a fresh exact-artifact canary as the atomic
+  // claim contract requires.
+  const eventRows=rawEventRows.filter((row:any)=>{
+    const candidateId=String(row?.candidate_id||'')
+    const completedAt=builderCompletionAt.get(candidateId)
+    if(!completedAt) return true
+    if(String(row?.evidence?.profile||'')!==MASS_CANARY_PROFILE) return true
+    return Date.parse(String(row?.observed_at||''))>=Date.parse(completedAt)
+  })
   const passedCandidates=new Set(eventRows
     .filter((row:any)=>String(row?.evidence?.claim||'')==='local_distilled_runtime_canary_passed')
     .map((row:any)=>String(row.candidate_id)))
-  const builderCandidateIds=new Set(confirmedBuilderArtifacts.map((row:any)=>String(row.candidate_id)))
-  const replayCandidateIds=new Set(confirmedReplayArtifacts.map((row:any)=>String(row.candidate_id)))
-  const builderProofPasses=[...passedCandidates].filter(id=>builderCandidateIds.has(id)).length
-  const remediationReplayProofPasses=[...passedCandidates].filter(id=>replayCandidateIds.has(id)).length
+  const builderProofPasses=[...passedCandidates].filter(id=>eligibleBuilderProofIds.has(id)).length
+  const remediationReplayProofPasses=[...passedCandidates].filter(id=>eligibleReplayProofIds.has(id)).length
   const decision=decideMassCanaryRollingApproval({
     enabled:process.env.COS_MASS_CANARY_ROLLING_AUTHORIZATION!=='false',
     now,
     builderProofPasses,
     remediationReplayProofPasses,
-    artifacts:artifactRows.map((row:any)=>{
+    artifacts:finalGateArtifactRows.map((row:any)=>{
       const receipt=row?.intended_use?.trainingReceipt && typeof row.intended_use.trainingReceipt==='object'
         ? row.intended_use.trainingReceipt
         : {}

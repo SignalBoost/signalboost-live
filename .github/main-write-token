@@ -1,2 +1,2 @@
-base_sha=fe3dd3d792a9d9e64822c2c21d125eb29d29b40e
-branch=fix/evaluator-latest-canary-state-v2-20260924
+base_sha=aaba0353bde9d8f0549bd626f92959da1a78037a
+branch=fix/mass-evaluator-runtime-wake-headroom-20260924

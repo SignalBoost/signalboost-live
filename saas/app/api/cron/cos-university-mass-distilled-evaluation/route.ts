@@ -371,6 +371,38 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const now = new Date()
   const inFlightCount = (await activeEvaluationRunpodEndpointIds(now)).size
 
+  // The post-GKD remediation replay repair also needs a bounded proof cohort. Count durable
+  // independent evaluation rows from replay-proven artifacts across all statuses; once two exist,
+  // scheduling automatically returns to the pre-existing Builder/frontier/oldest-first order.
+  let remediationReplayProofCompletions = MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
+  try {
+    const replayProofArtifacts = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,intended_use')
+      .contains('intended_use', { trainingReceipt: { failureDerivedReplayRequired: true } })
+      .like('candidate_id', 'mass:%')
+      .limit(500)
+    if (!replayProofArtifacts.error) {
+      const replayIds = (replayProofArtifacts.data || [])
+        .filter((row: any) => isRemediationReplayReceipt(row?.intended_use))
+        .map((row: any) => clean(row.candidate_id, 240))
+        .filter(Boolean)
+      if (replayIds.length) {
+        const replayResults = await db.from('cos_university_distilled_evaluation_runs')
+          .select('candidate_id')
+          .in('candidate_id', replayIds)
+          .limit(500)
+        if (!replayResults.error) {
+          remediationReplayProofCompletions = new Set((replayResults.data || [])
+            .map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
+        }
+      } else {
+        remediationReplayProofCompletions = 0
+      }
+    }
+  } catch {
+    remediationReplayProofCompletions = MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
+  }
+
   const remediationReplayRows = rows.filter(row => row.remediationReplay === true)
   const remediationReplayCanaryPasses = new Set(remediationReplayRows
     .filter(row => {
@@ -384,10 +416,15 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     })
     .map(row => row.candidateId)).size
 
-  // Reserve canary headroom only when a replay artifact has actually crossed every prerequisite that
-  // precedes canarying. A pre-Residency Builder artifact cannot consume the canary lane, so reserving a
-  // RunPod worker for it would block unrelated eligible evaluations forever.
-  if (remediationReplayRows.length > 0 && remediationReplayCanaryPasses < 2) {
+  // Reserve canary headroom only while the bounded replay proof cohort is genuinely unfinished.
+  // Durable replay evaluation results are authoritative across artifact statuses; once the two-result
+  // proof cohort exists, do not keep reserving a worker merely because newer pending replay artifacts
+  // have not canaried yet. A pre-Residency Builder artifact still cannot consume the canary lane.
+  if (
+    remediationReplayProofCompletions < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
+    && remediationReplayRows.length > 0
+    && remediationReplayCanaryPasses < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
+  ) {
     const capacity = await massDistilledServerlessWorkerCapacity()
     if (capacity.availableWorkers <= 1) {
       return {
@@ -429,38 +466,6 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     }
   } catch {
     builderV2ProofCompletions = MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
-  }
-
-  // The post-GKD remediation replay repair also needs a bounded proof cohort. Count durable
-  // independent evaluation rows from replay-proven artifacts across all statuses; once two exist,
-  // scheduling automatically returns to the pre-existing Builder/frontier/oldest-first order.
-  let remediationReplayProofCompletions = MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
-  try {
-    const replayProofArtifacts = await db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,intended_use')
-      .contains('intended_use', { trainingReceipt: { failureDerivedReplayRequired: true } })
-      .like('candidate_id', 'mass:%')
-      .limit(500)
-    if (!replayProofArtifacts.error) {
-      const replayIds = (replayProofArtifacts.data || [])
-        .filter((row: any) => isRemediationReplayReceipt(row?.intended_use))
-        .map((row: any) => clean(row.candidate_id, 240))
-        .filter(Boolean)
-      if (replayIds.length) {
-        const replayResults = await db.from('cos_university_distilled_evaluation_runs')
-          .select('candidate_id')
-          .in('candidate_id', replayIds)
-          .limit(500)
-        if (!replayResults.error) {
-          remediationReplayProofCompletions = new Set((replayResults.data || [])
-            .map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
-        }
-      } else {
-        remediationReplayProofCompletions = 0
-      }
-    }
-  } catch {
-    remediationReplayProofCompletions = MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
   }
 
   // The current frontier recipe cannot improve itself until it receives independent measurements.

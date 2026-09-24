@@ -218,7 +218,10 @@ export function createRunpodBuilderResidencyModelPort(input:{
           if(state.ok){
             lastHealthError=`provider_workers_ready_${ready}_running_${running}_initializing_${initializing}_idle_${idle}_wake_attempts_${wakeAttempts}`
           }
-          if(state.ok&&ready>0){
+          // Once RunPod reports an allocated running worker, probe the application directly
+          // even if the provider has not promoted that worker to "ready" yet. This distinguishes
+          // a control-plane readiness lag from an actual gateway/vLLM bootstrap failure.
+          if(state.ok&&(ready>0||running>0)){
             try{
               const remaining=Math.max(1,deadline-Date.now())
               const application=await call(`${root}/ready`,{
@@ -232,8 +235,8 @@ export function createRunpodBuilderResidencyModelPort(input:{
                   `residency_exact_artifact_runtime_ready_http_${application.status}`,
                 )
               }
+              const raw=await application.text()
               if(application.status===200){
-                const raw=await application.text()
                 let parsed:any
                 try{parsed=JSON.parse(raw)}catch{
                   throw new Error(
@@ -256,7 +259,20 @@ export function createRunpodBuilderResidencyModelPort(input:{
                 }
                 lastHealthError=
                   'residency_exact_artifact_application_model_not_ready'
-              }else if(application.status!==204&&application.status!==503){
+              }else if(application.status===503){
+                let detail=''
+                try{detail=String(JSON.parse(raw)?.detail||'').trim()}catch{}
+                if(detail.startsWith('distilled_bootstrap_failed:')){
+                  const safe=detail
+                    .replace(/\b(bearer|token|secret|api[_-]?key)\b\s*[:=]?\s*[^,;\s]+/gi,'$1=[redacted]')
+                    .replace(/\s+/g,' ')
+                    .slice(0,180)
+                  throw new Error(
+                    `residency_exact_artifact_runtime_not_ready:bootstrap_failed:${safe}`,
+                  )
+                }
+                lastHealthError='residency_exact_artifact_runtime_ready_http_503'
+              }else if(application.status!==204){
                 lastHealthError=
                   `residency_exact_artifact_runtime_ready_http_${application.status}`
               }
@@ -266,6 +282,9 @@ export function createRunpodBuilderResidencyModelPort(input:{
                 :'residency_exact_artifact_application_ready_probe_failed'
               if(
                 /^residency_exact_artifact_runtime_ready_http_(?:401|403)$/.test(
+                  message,
+                )||
+                /^residency_exact_artifact_runtime_not_ready:bootstrap_failed:/.test(
                   message,
                 )
               ){

@@ -189,7 +189,7 @@ test('primary routing lets semantic task intent decide whether a freshness signa
   const heuristic = primaryRoute.indexOf('heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested')
   const semantic = primaryRoute.indexOf('? await classifyCosSemanticTaskIntent')
   const semanticFresh = primaryRoute.indexOf('semanticRequiresFreshEvidence=Boolean(')
-  const baseline = primaryRoute.indexOf('baselineRequiresFreshEvidence=(heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
+  const baseline = primaryRoute.indexOf('baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
   const finalGate = primaryRoute.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
   assert.ok(heuristic >= 0)
   assert.ok(semantic > heuristic)

@@ -1,3 +1,4 @@
+// saas/platform-harness/adapters/cos-ingress.ts
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
 import type { HarnessManifest } from '../core/types.ts'
@@ -73,7 +74,7 @@ export function createCosProductionIngressManifest(input: {
     limits: { deadlineMs },
   })
 
-  if (!decision.allowed) {
+  if (decision.allowed === false) {
     throw new Error(`cos_harness_ingress_denied:${decision.reasons.join(',')}`)
   }
 

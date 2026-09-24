@@ -12,6 +12,7 @@ import { TurnRecorder, extractQueryFeatures } from '@/lib/ai/cos/turnExperience'
 import { hashPrompt, recordTurnExperience } from '@/lib/ai/cos/turnExperienceStore'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { AUDIT_UNTRUSTED_DATA_RULE } from '@/lib/audit/untrustedData'
+import { withProductionRuntimeHarness } from '../../platform-harness/adapters/production.ts'
 
 export interface AuditModelArgs {
   prompt: string
@@ -94,7 +95,7 @@ async function logAuditTask(row: {
   }
 }
 
-export async function callAuditModel(args: AuditModelArgs): Promise<string | null> {
+async function callAuditModelInsideHarness(args: AuditModelArgs): Promise<string | null> {
   const startedAt = Date.now()
   const { config, identity } = auditRuntimeConfigFromEnv()
   const recorder = new TurnRecorder()
@@ -129,4 +130,19 @@ export async function callAuditModel(args: AuditModelArgs): Promise<string | nul
     promptLen: args.prompt.length,
   })
   return text
+}
+
+
+/** Audit reasoning is a first-class Production Harness workload, never a bare model call. */
+export async function callAuditModel(args: AuditModelArgs): Promise<string | null> {
+  return withProductionRuntimeHarness({
+    runId: `audit-model:${randomUUID()}`,
+    objective: 'Analyze one bounded software-audit work item.',
+    tenantId: 'itmounts',
+    portableId: 'audit',
+    agentId: 'cos-audit',
+    role: 'software_audit_specialist',
+    environmentId: 'itmounts-production',
+    limits: { deadlineMs: 180_000, maxToolCalls: 0, maxConcurrency: 1 },
+  }, () => callAuditModelInsideHarness(args))
 }

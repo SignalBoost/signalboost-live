@@ -75,6 +75,16 @@ Required live matrix: COS read-only verified success; specialist reversible Prod
 
 A green build or unit test is not final acceptance. The Platform Harness may be called platform-wide Production-complete only after the exact Production deployment has a persisted `platform_harness_production_acceptance_completed` event covering the required matrix.
 
+### Harness Everywhere live runtime enforcement — 2026-09-24
+
+The mandatory-ingress invariant now applies at shared live execution seams, not only at the Harness acceptance canary. Interactive COS keeps its Production ingress; A2A specialists keep their child Production Harness; Builder Residency and its Self-Healing handoff keep their governed paths. In addition, shared platform/Builder/local-appliance/external-teacher AI ports and Audit execute inside a zero-capability Production Harness context whenever no parent HarnessRun already exists.
+
+University practice, bound independent exams, graduation capstones, the standard distilled evaluator, and the mass-distilled evaluator enter the isolated `evaluation_runtime` profile before model/provider work. Evaluation ingress is bound to the exact agent, artifact id/hash/revision, fixture hash, sandbox environment, and deadline. A nested evaluation may reuse an existing evaluation Harness only when that exact identity matches; cross-artifact or cross-fixture reuse fails closed.
+
+These ingress envelopes **do not mint authority**. Their resolved capability set is empty. Existing academic approvals, evaluator secrets, exact-artifact canaries, call/spend ceilings, Provider Hub assignments, Governed Socket policies, Referee/Guardian decisions, and Self-Healing controls remain the authority owners. The purpose of ingress is to prevent a shared inference/runtime seam from silently executing outside Harness identity, isolation, deadline, and cancellation propagation.
+
+`tests/platformHarnessEverywhere.node.test.ts` is a mandatory Vercel COS gate and protects the live ingress wiring plus the existing COS, specialist, Residency and Self-Healing entrypoints.
+
 
 Ownership stays separated:
 

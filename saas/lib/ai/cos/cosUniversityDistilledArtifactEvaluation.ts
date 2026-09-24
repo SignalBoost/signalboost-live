@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts
 import { createHash, randomUUID } from 'node:crypto'
+import { withEvaluationRuntimeHarness } from '../../../platform-harness/adapters/evaluation-runtime.ts'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
@@ -1017,6 +1018,19 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
     throw new Error('distilled_evaluation_artifact_identity_invalid')
   }
 
+  return withEvaluationRuntimeHarness({
+    runId: `distilled-evaluation:${candidateId}:${revisionKey}`,
+    objective: 'Independently evaluate one exact distilled artifact.',
+    tenantId: 'itmounts',
+    portableId: 'cos-university',
+    agentId: 'cos-university-independent-evaluator',
+    artifactId,
+    artifactHash,
+    artifactRevision: revisionKey,
+    environmentId: 'distilled-independent-evaluation',
+    fixtureHash: datasetHash,
+    limits: { deadlineMs: EVAL_WALL_BUDGET_MS, maxToolCalls: 0, maxConcurrency: 1 },
+  }, async () => {
   const evidence = await registeredTrainingEvidence(candidateId, artifactHash, revisionKey)
   const trainedEvidence: any = evidence.trained.evidence
   const partitionEvidence: any = evidence.partition.evidence
@@ -1289,6 +1303,7 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
     judgeCalls: budget.judgeCalls,
     soloRetryCalls: budget.soloRetryCalls,
     callCeilings,
+  })
   })
   })
 }

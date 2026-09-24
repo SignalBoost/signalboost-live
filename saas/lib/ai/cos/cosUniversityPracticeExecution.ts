@@ -1,6 +1,7 @@
 // saas/lib/ai/cos/cosUniversityPracticeExecution.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
+import { withEvaluationRuntimeHarness } from '../../../platform-harness/adapters/evaluation-runtime.ts'
 import { universityPracticeModelFromEnv } from './cosUniversityAgentModelPolicy.ts'
 import { currentUniversityPracticeModelOverride } from './cosUniversityPracticeModelContext.ts'
 import {
@@ -74,14 +75,16 @@ async function executeCosPracticeOnConfiguredEconomyModel(
   }
 }
 
+export type UniversityPracticeExecutionPorts = {
+  cos(): Promise<ReasonerResult | null>
+  bound(request: AgentCapstoneRequest): Promise<{ reply: string; execution: AgentCapstoneExecution }>
+  practiceModel?: string | null
+}
+
 /** Host dispatch only. Rubrics stay in the caller and never reach either inference port. */
-export async function executeUniversityPractice(
+async function executeUniversityPracticeInsideHarness(
   request: AgentCapstoneRequest,
-  ports: {
-    cos(): Promise<ReasonerResult | null>
-    bound(request: AgentCapstoneRequest): Promise<{ reply: string; execution: AgentCapstoneExecution }>
-    practiceModel?: string | null
-  },
+  ports: UniversityPracticeExecutionPorts,
 ): Promise<UniversityPracticeExecution | null> {
   const practiceRequest = { ...request, purpose: 'practice' as const }
   await enforceUniversityPracticeCostGuard(practiceRequest)
@@ -117,4 +120,24 @@ export async function executeUniversityPractice(
     responseSource: execution.runtime,
     executionProvenance: execution,
   }
+}
+
+
+/** Every live University practice turn executes inside the isolated evaluation Harness profile. */
+export async function executeUniversityPractice(
+  request: AgentCapstoneRequest,
+  ports: UniversityPracticeExecutionPorts,
+): Promise<UniversityPracticeExecution | null> {
+  return withEvaluationRuntimeHarness({
+    runId: `${request.runId}:practice`,
+    objective: 'Execute one bounded University deliberate-practice turn.',
+    tenantId: 'itmounts',
+    portableId: 'cos-university',
+    agentId: request.agentId,
+    artifactId: `university-agent:${request.agentId}`,
+    artifactHash: request.manifestHash,
+    environmentId: 'university-practice',
+    fixtureHash: request.manifestHash,
+    limits: { deadlineMs: 90_000, maxToolCalls: 0, maxConcurrency: 1 },
+  }, () => executeUniversityPracticeInsideHarness(request, ports))
 }

@@ -1,2 +1,2 @@
-base_sha=c8358cc1623e06442339c7d3ebb3fd9a75c07aa7
-branch=feat/working-cos-balanced-bundles-20260923
+base_sha=728544c77e7fc2cc833fc08f0b6387a489ef5862
+branch=fix/residency-running-worker-app-readiness-v2-20260923

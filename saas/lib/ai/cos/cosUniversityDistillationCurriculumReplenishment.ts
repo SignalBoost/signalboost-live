@@ -24,14 +24,15 @@ import {
   type FailureDerivedRemediationGate,
 } from './cosUniversityHybridDistillation.ts'
 
-const DISTILLATION_OPENALEX_RESULTS_PER_QUERY = 10
+const DISTILLATION_RIGHTS_CLEARED_RESULTS_PER_QUERY = 10
+const DISTILLATION_RIGHTS_CLEARED_ADAPTER_IDS = new Set(['openalex', 'hf_nist_cc0', 'hf_github_cc0'])
 const HYBRID_SYNTHETIC_MAX_PER_SUBJECT = 20
 const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = Math.max(1, Math.round(20 * HYBRID_FAILURE_DERIVED_TARGET))
 const VERIFIED_FAILURE_LOOKBACK_DAYS = 30
 
 function rightsClearedPolicy(maxCandidatesPerCycle: number): ContinuousLearningPolicy {
   return {
-    allowedSourceKinds: new Set(['scientific_journal']),
+    allowedSourceKinds: new Set(['scientific_journal', 'public_dataset']),
     minimumConfidence: 0.80,
     maxCandidatesPerCycle,
     maxExternalCostUsdPerCycle: 0,
@@ -324,10 +325,20 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
   if (claim.error) throw claim.error
   if (!claim.data?.id) throw new Error('replenishment_slot_claim_failed')
 
+  // The University used to discard every live source except OpenAlex here. That made the
+  // HF CC0/NIST/GitHub adapters visible in general learning telemetry but effectively disconnected
+  // from mass distillation. Give this bounded five-minute replenishment sweep enough serialized
+  // calls to service every planned gap, while preserving each source's circuit breaker and interval.
+  const sourceCallBudget = Math.max(2, Math.min(24, gaps.length))
   const adapters = createLiveLearningAdapters({
     ...process.env,
-    COS_LEARNING_CAP_OPENALEX: String(DISTILLATION_OPENALEX_RESULTS_PER_QUERY),
-  }).filter(adapter => adapter.id === 'openalex')
+    COS_LEARNING_CAP_OPENALEX: String(DISTILLATION_RIGHTS_CLEARED_RESULTS_PER_QUERY),
+    COS_LEARNING_CAP_HF_NIST: String(DISTILLATION_RIGHTS_CLEARED_RESULTS_PER_QUERY),
+    COS_LEARNING_CAP_HF_GITHUB_CC0: String(DISTILLATION_RIGHTS_CLEARED_RESULTS_PER_QUERY),
+    COS_LEARNING_SOURCE_CALL_BUDGET_OPENALEX: String(sourceCallBudget),
+    COS_LEARNING_SOURCE_CALL_BUDGET_HF_NIST_CC0: String(sourceCallBudget),
+    COS_LEARNING_SOURCE_CALL_BUDGET_HF_GITHUB_CC0: String(sourceCallBudget),
+  }).filter(adapter => DISTILLATION_RIGHTS_CLEARED_ADAPTER_IDS.has(String(adapter.id || '')))
   if (!adapters.length) {
     await db.from('cos_university_continuous_runs').update({
       status: 'error', errors: ['rights_cleared_openalex_adapter_unavailable'], completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
@@ -371,7 +382,9 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       targets: [...new Set(gaps.map(gap => gap.subject))],
       queriesPerSubject,
       queryCount: gaps.length,
-      resultsPerQuery: DISTILLATION_OPENALEX_RESULTS_PER_QUERY,
+      resultsPerQuery: DISTILLATION_RIGHTS_CLEARED_RESULTS_PER_QUERY,
+      openSourceAdapters: adapters.map(adapter => adapter.id).filter(Boolean),
+      sourceCallBudget,
       maxCandidatesPerCycle,
       documentsAcquired: result.documentsAcquired,
       accepted: result.accepted,

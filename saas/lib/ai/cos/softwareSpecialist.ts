@@ -24,6 +24,12 @@ import {
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import { readBuilderObjective } from '@/lib/builder/request-contract'
 import { runCosSoftwareSpecialistProductionHarness } from '@/lib/ai/cos/softwareSpecialistHarness'
+import {
+  COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY,
+  createCosProductionIngressManifest,
+  currentCosHarnessIngress,
+  withCosHarnessIngress,
+} from '@/platform-harness/adapters/cos-ingress'
 
 export type CosSoftwareSpecialistSurface = 'concierge' | 'assistant'
 
@@ -142,6 +148,27 @@ async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistReques
   // the browser displaying "connection active" for minutes. Only software-shaped requests may cross
   // this boundary; general questions continue directly to the ordinary COS answer path.
   if (!specialistRelevant) return null
+
+  const existingParent = currentCosHarnessIngress()?.manifest ?? null
+  if (!existingParent) {
+    let parentManifest
+    try {
+      parentManifest = createCosProductionIngressManifest({
+        objective,
+        tenantId: 'itmounts',
+        requestedCapabilities: [COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY],
+      })
+    } catch {
+      return NextResponse.json({
+        reply: 'COS Software Specialist could not establish its parent Production Harness. No software work was started.',
+        source: 'cos-software-parent-harness-unavailable',
+        execution_allowed: false,
+        external_action_taken: false,
+        ...softwareSpecialistFields('software.delegate'),
+      }, { status: 503 })
+    }
+    return withCosHarnessIngress(parentManifest, () => tryCosSoftwareSpecialist(input))
+  }
 
   const access = await getAccess().catch(() => null)
 
@@ -361,7 +388,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   if (!specialistRelevant) return null
 
   const access = await getAccess().catch(() => null)
-  const tenantId = String(access?.userId || publicAuditUserId() || '').trim()
+  const tenantId = String(existingParent.identity.tenantId || access?.userId || publicAuditUserId() || '').trim()
   if (!tenantId) {
     return NextResponse.json({
       reply: 'COS Software Specialist could not establish a durable execution identity. No software work was started.',
@@ -375,6 +402,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const harness = await runCosSoftwareSpecialistProductionHarness({
     objective,
     tenantId,
+    parentManifest: existingParent,
     execute: () => tryCosSoftwareSpecialistLegacy(input),
   })
 

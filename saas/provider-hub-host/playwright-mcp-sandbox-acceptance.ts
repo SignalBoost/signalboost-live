@@ -127,6 +127,7 @@ async function main() {
     '--browser',
     'chrome',
     '--no-sandbox',
+    '--no-webmcp',
     '--allowed-origins',
     [...approvedOrigins].join(';'),
     '--block-service-workers',
@@ -325,7 +326,6 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
         '--no-audit',
         '--no-fund',
         '@playwright/mcp@0.0.82',
-        '@playwright/test@^1.41.0',
       ],
       timeoutMs: BOOTSTRAP_TIMEOUT_MS,
     })
@@ -366,7 +366,7 @@ export async function runPlaywrightMcpProductionAcceptance(): Promise<Playwright
       cmd: 'node',
       args: [
         '-e',
-        `const fs=require('node:fs');const {chromium}=require('${ROOT}/node_modules/@playwright/test');const p=chromium.executablePath();if(!p||!fs.existsSync(p)){process.exit(2)}process.stdout.write(p)`,
+        `const fs=require('node:fs');const {chromium}=require('${ROOT}/node_modules/playwright');const p=chromium.executablePath();if(!p||!fs.existsSync(p)){process.exit(2)}process.stdout.write(p)`,
       ],
       cwd: ROOT,
       timeoutMs: COMMAND_TIMEOUT_MS,

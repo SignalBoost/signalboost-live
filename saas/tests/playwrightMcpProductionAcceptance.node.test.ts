@@ -9,6 +9,9 @@ const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta
 
 test('Production Playwright MCP acceptance uses the exact pinned package and real Chromium', () => {
   assert.match(host, /@playwright\/mcp@0\.0\.82/)
+  assert.doesNotMatch(host, /@playwright\/test@/)
+  assert.match(host, /require\('\$\{ROOT\}\/node_modules\/playwright'\)/)
+  assert.match(host, /--no-webmcp/)
   assert.match(host, /install-deps.*chromium/s)
   assert.match(host, /install.*chromium/s)
   assert.match(host, /chromiumRuntime|chromium_runtime_probe|--version/)

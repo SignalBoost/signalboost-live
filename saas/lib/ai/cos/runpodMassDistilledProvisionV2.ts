@@ -72,21 +72,38 @@ export function massDistilledCanaryWorstCaseCostUsd(pricePerHourUsd: number): nu
  * in it at or below that pool's explicit hourly ceiling, and that price keeps the worst-case canary inside the
  * absolute per-canary cost authorization. Order is preserved (cheapest pools first).
  */
+function qualifyingCanaryCatalogPrice(gpu: CatalogGpu, pool: typeof CANARY_APPROVED_POOLS[number]): number | null {
+  const price = Number(gpu?.price?.serverless)
+  const memory = Number(gpu?.memory || 0)
+  const ceiling = MASS_DISTILLED_CANARY_POOL_PRICE_CEILING_USD_PER_HOUR[pool]
+  if (clean(gpu?.pool, 80) !== pool
+    || clean(gpu?.manufacturer, 40).toUpperCase() !== 'NVIDIA'
+    || memory < 16 || memory > 24
+    || clean(gpu?.availability, 40).toUpperCase() === 'NONE'
+    || !Number.isFinite(price) || price <= 0 || price > ceiling
+    || massDistilledCanaryWorstCaseCostUsd(price) > MASS_DISTILLED_CANARY_MAX_COST_USD) return null
+  return price
+}
+
 export function selectMassDistilledCanaryPools(gpus: readonly CatalogGpu[] | null | undefined): string[] {
   if (!Array.isArray(gpus)) return [...CANARY_CATALOG_UNAVAILABLE_POOLS]
-  return CANARY_APPROVED_POOLS.filter(pool => {
-    const ceiling = MASS_DISTILLED_CANARY_POOL_PRICE_CEILING_USD_PER_HOUR[pool]
-    return gpus.some(gpu => {
-      const price = Number(gpu?.price?.serverless)
-      const memory = Number(gpu?.memory || 0)
-      return clean(gpu?.pool, 80) === pool
-        && clean(gpu?.manufacturer, 40).toUpperCase() === 'NVIDIA'
-        && memory >= 16 && memory <= 24
-        && clean(gpu?.availability, 40).toUpperCase() !== 'NONE'
-        && Number.isFinite(price) && price > 0 && price <= ceiling
-        && massDistilledCanaryWorstCaseCostUsd(price) <= MASS_DISTILLED_CANARY_MAX_COST_USD
-    })
-  })
+  return CANARY_APPROVED_POOLS.filter(pool => gpus.some(gpu => qualifyingCanaryCatalogPrice(gpu, pool) !== null))
+}
+
+export function massDistilledCanaryCatalogPriceSnapshot(
+  gpus: readonly CatalogGpu[] | null | undefined,
+  pools: readonly string[],
+): Readonly<Record<string, number>> {
+  if (!Array.isArray(gpus)) return Object.freeze({})
+  const prices: Record<string, number> = {}
+  for (const pool of CANARY_APPROVED_POOLS) {
+    if (!pools.includes(pool)) continue
+    const qualifying = gpus
+      .map(gpu => qualifyingCanaryCatalogPrice(gpu, pool))
+      .filter((price): price is number => price !== null)
+    if (qualifying.length) prices[pool] = Math.min(...qualifying)
+  }
+  return Object.freeze(prices)
 }
 
 export async function massDistilledServerlessWorkerCapacity() {
@@ -498,7 +515,15 @@ export async function provisionMassDistilledCanaryRuntime(input: MassDistilledRu
   }
   const pools = selectMassDistilledCanaryPools(catalogGpus)
   if (!pools.length) throw new Error('mass_distilled_runtime_gpu_capacity_unavailable')
-  return provisionMassDistilledRuntimeWithPools(input, pools)
+  const catalogServerlessPriceUsdPerHourByPool = massDistilledCanaryCatalogPriceSnapshot(catalogGpus, pools)
+  const provisioned = await provisionMassDistilledRuntimeWithPools(input, pools)
+  return Object.freeze({
+    ...provisioned,
+    canaryEligibleGpuPools: Object.freeze([...pools]),
+    canaryCatalogObserved: Array.isArray(catalogGpus),
+    canaryCatalogServerlessPriceUsdPerHourByPool,
+    actualWorkerGpuPoolObserved: false as const,
+  })
 }
 
 /**

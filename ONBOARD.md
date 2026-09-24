@@ -67,7 +67,7 @@ Platform-wide acceptance is not complete until Production evidence demonstrates 
 
 ### Deployment-bound Platform Harness Production acceptance — 2026-09-24
 
-The canonical live acceptance implementation is `saas/platform-harness/acceptance/production-canary.ts`, executed only in the Production Vercel environment by `/api/cron/platform-harness-production-acceptance`. It is idempotent per exact `VERCEL_GIT_COMMIT_SHA` plus deployment fingerprint and persists sanitized case evidence to the immutable supervisor audit trail.
+The canonical live acceptance implementation is `saas/platform-harness/acceptance/production-canary.ts`, executed only in the Production Vercel environment by `/api/cron/platform-harness-production-acceptance`. It is idempotent per exact `VERCEL_GIT_COMMIT_SHA` plus deployment fingerprint and persists sanitized case evidence to the immutable supervisor audit trail. The cron runs every minute so a fast-moving `main` does not leave a successful Production deployment uncertified for a long window; already-certified deployments return idempotently without rerunning the matrix.
 
 The acceptance canary uses only `platform_harness_acceptance_scratch`, a service-role-only table containing bounded synthetic markers and no customer/business data. It exercises the same Production Harness, Governed Socket, capability resolution, hard limits, verifier, compensation, routing, and durable-evidence boundaries as live agents.
 

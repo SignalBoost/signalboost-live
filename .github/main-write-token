@@ -1,2 +1,2 @@
-base_sha=910fa27fb1adec6102ba65e8327741f31b698eda
-branch=fix/require-vercel-preview-before-main-20260924
+base_sha=563c8d761605b5cf66eab653cd9ed329c2ddff9a
+branch=fix/evaluator-headroom-deadlock-20260924

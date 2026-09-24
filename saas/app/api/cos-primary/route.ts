@@ -630,7 +630,7 @@ export async function postCosPrimary(req:NextRequest){
   // a compatibility fallback for legacy/no-plan turns where heuristic freshness needs adjudication.
   const semanticTaskIntentNeeded=!requestedAction
     && !modelPlannedFreshEvidence
-    && (heuristicRequiresFreshEvidence || freshConversationContext.contextUsed)
+    && (heuristicRequiresFreshEvidence || requiresLiveTravelPlanningEvidence(input) || freshConversationContext.contextUsed)
   const semanticTaskIntent=semanticTaskIntentNeeded
     ? await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     : null

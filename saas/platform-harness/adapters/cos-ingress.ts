@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import type { HarnessManifest } from '../core/types.ts'
 import { resolveHarnessManifest } from '../core/policy.ts'
 import { createProductionHarnessRequest } from './production.ts'
+import { withHarnessExecutionContext } from '../runtime/execution-context.ts'
 
 export const COS_PRIMARY_HARNESS_AGENT_ID = 'cos-primary'
 export const COS_PRIMARY_HARNESS_PORTABLE_ID = 'cos'
@@ -117,10 +118,22 @@ export function withCosHarnessIngress<T>(
     throw new Error('cos_harness_nested_ingress_forbidden')
   }
   if (existing) return operation()
+
+  const controller = new AbortController()
+  const deadlineAt = manifest.deadlineAt ? Date.parse(manifest.deadlineAt) : NaN
+  const remaining = Number.isFinite(deadlineAt) ? Math.max(0, deadlineAt - Date.now()) : null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  if (remaining !== null) {
+    if (remaining <= 0) controller.abort('harness_deadline_exceeded')
+    else timer = setTimeout(() => controller.abort('harness_deadline_exceeded'), remaining)
+  }
+
   return cosHarnessIngressScope.run(
     Object.freeze({ manifest, enteredAt: Date.now() }),
-    operation,
-  )
+    () => withHarnessExecutionContext(manifest, controller.signal, operation),
+  ).finally(() => {
+    if (timer) clearTimeout(timer)
+  })
 }
 
 export function currentCosHarnessIngress(): CosHarnessIngressContext | null {
@@ -134,5 +147,8 @@ export function requireCosHarnessIngress(): HarnessManifest {
   const context = cosHarnessIngressScope.getStore()
   if (!context) throw new Error('cos_harness_ingress_required')
   assertCosProductionManifest(context.manifest)
+  if (context.manifest.deadlineAt && Date.now() >= Date.parse(context.manifest.deadlineAt)) {
+    throw new Error('cos_harness_ingress_deadline_exceeded')
+  }
   return context.manifest
 }

@@ -83,6 +83,13 @@ export type HarnessPolicyDecision =
 
 const clean = (value: unknown, max = 512): string => String(value ?? '').trim().slice(0, max)
 
+function normalizedDeadlineAt(value: unknown): string | null {
+  const raw = clean(value, 80)
+  if (!raw) return null
+  const parsed = Date.parse(raw)
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null
+}
+
 function minDefined(...values: Array<number | undefined>): number | undefined {
   const valid = values.filter((value): value is number =>
     Number.isFinite(value) && Number(value) >= 0)
@@ -124,12 +131,14 @@ export function resolveHarnessManifest(
   const objective = clean(request.objective, 4_000)
   const agentId = clean(request.identity.agentId, 240)
   const role = clean(request.identity.role, 240)
+  const deadlineAt = normalizedDeadlineAt(request.deadlineAt)
 
   if (!runId) reasons.push('run_id_missing')
   if (!objective) reasons.push('objective_missing')
   if (!agentId || !role) reasons.push('identity_missing')
   if (!authority.verified) reasons.push('authority_not_verified')
   if (!clean(authority.manifestRef, 1_024)) reasons.push('authority_manifest_missing')
+  if (request.deadlineAt && !deadlineAt) reasons.push('deadline_at_invalid')
 
   if (!profile.allowedEnvironments.includes(request.environment.class)) {
     reasons.push('profile_environment_forbidden')
@@ -191,6 +200,7 @@ export function resolveHarnessManifest(
         ? { parent: Object.freeze({ ...request.parent }) }
         : {}),
       limits: constrainedLimits(request.requestedLimits, authority.limits, profile),
+      ...(deadlineAt ? { deadlineAt } : {}),
       learningFeedbackAllowed: profile.learningFeedbackAllowed,
     }),
   })
@@ -270,7 +280,22 @@ export function resolveChildHarnessManifest(
     return Object.freeze({ allowed: false, reasons: Object.freeze(reasons) })
   }
 
-  const decision = resolveHarnessManifest(request, authority)
+  const parentDeadline = normalizedDeadlineAt(parent.deadlineAt)
+  const requestedDeadline = normalizedDeadlineAt(request.deadlineAt)
+  if (parent.deadlineAt && !parentDeadline) reasons.push('child_parent_deadline_invalid')
+  if (request.deadlineAt && !requestedDeadline) reasons.push('child_deadline_invalid')
+  if (reasons.length) {
+    return Object.freeze({ allowed: false, reasons: Object.freeze(reasons) })
+  }
+
+  const effectiveDeadline = parentDeadline && requestedDeadline
+    ? new Date(Math.min(Date.parse(parentDeadline), Date.parse(requestedDeadline))).toISOString()
+    : parentDeadline ?? requestedDeadline ?? undefined
+
+  const decision = resolveHarnessManifest({
+    ...request,
+    ...(effectiveDeadline ? { deadlineAt: effectiveDeadline } : {}),
+  }, authority)
   if (decision.allowed === false) return decision
 
   for (const childCapability of decision.manifest.capabilities) {

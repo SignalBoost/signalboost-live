@@ -29,6 +29,7 @@ export function createProductionHarnessRequest(input: {
   environmentClass?: Extract<HarnessEnvironmentClass, 'staging' | 'production'>
   requestedCapabilities?: readonly string[]
   limits?: HarnessLimits
+  deadlineAt?: string
   artifact?: {
     artifactId: string
     artifactHash?: string
@@ -39,6 +40,13 @@ export function createProductionHarnessRequest(input: {
     authorityManifestRef: string
   }
 }): HarnessRunRequest {
+  const explicitDeadline = String(input.deadlineAt ?? '').trim()
+  const relativeDeadlineMs = Number(input.limits?.deadlineMs)
+  const derivedDeadline = Number.isFinite(relativeDeadlineMs) && relativeDeadlineMs >= 0
+    ? new Date(Date.now() + relativeDeadlineMs).toISOString()
+    : ''
+  const deadlineAt = explicitDeadline || derivedDeadline
+
   return Object.freeze({
     runId: input.runId,
     objective: input.objective,
@@ -57,6 +65,7 @@ export function createProductionHarnessRequest(input: {
       class: input.environmentClass ?? 'production',
     }),
     requestedCapabilities: Object.freeze([...(input.requestedCapabilities ?? [])]),
+    ...(deadlineAt ? { deadlineAt } : {}),
     ...(input.parent
       ? { parent: Object.freeze({ ...input.parent }) }
       : {}),

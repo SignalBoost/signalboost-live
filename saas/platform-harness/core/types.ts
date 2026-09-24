@@ -90,6 +90,8 @@ export interface HarnessRunRequest {
   environment: HarnessEnvironment
   requestedCapabilities: readonly string[]
   requestedLimits?: HarnessLimits
+  /** Absolute wall-clock ceiling. Delegated children can only inherit or shorten it. */
+  deadlineAt?: string
   parent?: HarnessRunParent
 }
 
@@ -103,6 +105,8 @@ export interface HarnessManifest {
   authorityManifestRef: string
   parent?: HarnessRunParent
   limits: HarnessLimits
+  /** Immutable absolute wall-clock ceiling when one is bound to the run. */
+  deadlineAt?: string
   learningFeedbackAllowed: boolean
 }
 
@@ -156,6 +160,7 @@ export type HarnessCompensationStatus =
   | 'completed'
   | 'partial'
   | 'failed'
+  | 'manual_recovery_required'
 
 /** Saga result for a run that did not verify: executed compensable actions are undone in reverse order. */
 export interface HarnessCompensationSummary {
@@ -163,6 +168,19 @@ export interface HarnessCompensationSummary {
   attempted: number
   completed: number
   failedActionIds: readonly string[]
+  /** Actions whose effect may exist but no safe executable compensation is available. */
+  manualRecoveryActionIds?: readonly string[]
+}
+
+export interface HarnessRunUsage {
+  startedAt: string
+  finishedAt: string
+  elapsedMs: number
+  toolCalls: number
+  maxConcurrentObserved: number
+  reservedCostUsd: number
+  deadlineAt?: string
+  limits: HarnessLimits
 }
 
 export interface HarnessRunResult {
@@ -172,5 +190,6 @@ export interface HarnessRunResult {
   outcome: HarnessOutcome
   authorityExpanded: false
   productionMutationObserved: boolean
+  usage?: HarnessRunUsage
   compensation?: HarnessCompensationSummary
 }

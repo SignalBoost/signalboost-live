@@ -6,6 +6,7 @@
 import { runGoverned } from '../../agent-gateway/governance.ts'
 import type {
   AgentRequest,
+  GatewayExecutionControl,
   GatewayHost,
   GatewayOutcome,
   GovernancePolicy,
@@ -30,6 +31,7 @@ export type HarnessCompensation =
   | Readonly<{
       mode: 'compensate'
       compensationId: string
+      /** Must be idempotent/no-op safe: a timed-out mutation can have an uncertain remote outcome. */
       run(): Promise<HarnessCompensationOutcome>
     }>
   | Readonly<{ mode: 'delegated'; reason: string }>
@@ -40,6 +42,8 @@ export interface HarnessAction {
   kind: string
   capabilityId: string
   params?: Record<string, unknown>
+  /** Evidence proving the consequential action's required pre-state before execution. */
+  preconditionEvidenceRefs?: readonly string[]
   compensation?: HarnessCompensation
 }
 
@@ -53,11 +57,16 @@ export interface HarnessActionResult {
   capabilityId: string
   status: HarnessActionStatus
   gatewayOutcome?: GatewayOutcome
+  evidenceRefs?: readonly string[]
   error?: string
 }
 
 export interface GovernedHarnessExecutor {
-  execute(manifest: HarnessManifest, action: HarnessAction): Promise<HarnessActionResult>
+  execute(
+    manifest: HarnessManifest,
+    action: HarnessAction,
+    control?: GatewayExecutionControl,
+  ): Promise<HarnessActionResult>
 }
 
 export function createGovernedHarnessExecutor(input: {
@@ -68,6 +77,7 @@ export function createGovernedHarnessExecutor(input: {
     async execute(
       manifest: HarnessManifest,
       action: HarnessAction,
+      control?: GatewayExecutionControl,
     ): Promise<HarnessActionResult> {
       const capability = manifest.capabilities.find(item => item.id === action.capabilityId)
       if (!capability) {
@@ -95,12 +105,13 @@ export function createGovernedHarnessExecutor(input: {
               environmentId: manifest.environment.environmentId,
               environmentClass: manifest.environment.class,
               authorityManifestRef: manifest.authorityManifestRef,
+              ...(manifest.deadlineAt ? { deadlineAt: manifest.deadlineAt } : {}),
             },
           },
         },
       }
 
-      const outcome = await runGoverned(request, input.policy, input.host)
+      const outcome = await runGoverned(request, input.policy, input.host, control)
 
       if (outcome.verdict !== 'execute') {
         return Object.freeze({
@@ -116,6 +127,7 @@ export function createGovernedHarnessExecutor(input: {
         capabilityId: action.capabilityId,
         status: outcome.ok ? 'executed' : 'execution_failed',
         gatewayOutcome: outcome,
+        ...(outcome.evidenceRefs?.length ? { evidenceRefs: [...outcome.evidenceRefs] } : {}),
         ...(outcome.error ? { error: outcome.error } : {}),
       })
     },

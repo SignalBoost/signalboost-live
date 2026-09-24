@@ -114,13 +114,23 @@ test('read-only production actions need no compensation contract', async () => {
   assert.equal(result.compensation, undefined)
 })
 
-test('irreversible actions require an explicitly consequential grant', () => {
+test('irreversible actions require consequential authority and precondition evidence', () => {
   const action: HarnessAction = {
     actionId: 'i1', kind: 'send', capabilityId: 'store.write',
     compensation: { mode: 'irreversible', reason: 'external email cannot be unsent' },
   }
   assert.equal(harnessCompensationContractViolation(manifest(), action), 'harness_irreversible_action_requires_consequential_grant')
-  assert.equal(harnessCompensationContractViolation(manifest({ risk: 'consequential' }), action), null)
+  assert.equal(
+    harnessCompensationContractViolation(manifest({ risk: 'consequential' }), action),
+    'harness_consequential_precondition_evidence_required',
+  )
+  assert.equal(
+    harnessCompensationContractViolation(manifest({ risk: 'consequential' }), {
+      ...action,
+      preconditionEvidenceRefs: ['evidence://precondition/recipient-confirmed'],
+    }),
+    null,
+  )
 })
 
 test('sandbox mutation is not bound by the Production compensation contract', () => {
@@ -222,4 +232,87 @@ test('durable supervisor evidence keeps parent lineage and compensation outcome'
   assert.equal(rows[0].payload.parentRunId, 'parent-1')
   assert.equal(rows[0].payload.parentAuthorityManifestRef, 'host://parent')
   assert.equal(rows[0].payload.compensationStatus, 'completed')
+})
+
+
+test('failed verification after an irreversible consequential action requires manual recovery', async () => {
+  const m = manifest({ risk: 'consequential' })
+  const result = await runHarnessWorker({
+    manifest: m,
+    capabilities,
+    executor: {
+      async execute(_manifest, action) {
+        return {
+          actionId: action.actionId,
+          capabilityId: action.capabilityId,
+          status: 'executed',
+          evidenceRefs: ['evidence://action/send-receipt'],
+        }
+      },
+    },
+    verifier: verifier(false),
+    worker: {
+      async run(ctx) {
+        await ctx.execute({
+          actionId: 'send-1',
+          kind: 'send',
+          capabilityId: 'store.write',
+          preconditionEvidenceRefs: ['evidence://precondition/recipient-confirmed'],
+          compensation: { mode: 'irreversible', reason: 'external message cannot be recalled safely' },
+        })
+      },
+    },
+  })
+
+  assert.equal(result.outcome.status, 'harness_failure')
+  assert.equal(result.outcome.failureCode, 'harness_manual_recovery_required')
+  assert.equal(result.compensation?.status, 'manual_recovery_required')
+  assert.deepEqual(result.compensation?.manualRecoveryActionIds, ['send-1'])
+  assert.ok(result.trajectory.some(event => event.kind === 'escalation'))
+  const durable = createHarnessEvidenceRecord(m, result)
+  assert.ok(durable.trajectoryEvidenceRefs.includes('evidence://precondition/recipient-confirmed'))
+  assert.ok(durable.trajectoryEvidenceRefs.includes('evidence://action/send-receipt'))
+})
+
+test('consequential execution without action evidence fails closed and enters recovery', async () => {
+  const undone: string[] = []
+  const m = manifest({ risk: 'consequential' })
+  const result = await runHarnessWorker({
+    manifest: m,
+    capabilities,
+    executor: executor([]),
+    verifier: verifier(true),
+    worker: {
+      async run(ctx) {
+        await ctx.execute({
+          ...compensable('missing-action-evidence', undone),
+          preconditionEvidenceRefs: ['evidence://precondition/ready'],
+        })
+      },
+    },
+  })
+
+  assert.equal(result.outcome.status, 'harness_failure')
+  assert.equal(result.outcome.failureCode, 'harness_consequential_action_evidence_required')
+  assert.deepEqual(undone, ['missing-action-evidence'])
+  assert.equal(result.compensation?.status, 'completed')
+})
+
+test('run usage records the hard-limit envelope without persisting worker content', async () => {
+  const result = await runHarnessWorker({
+    manifest: manifest(),
+    capabilities,
+    executor: executor([]),
+    verifier: verifier(true),
+    costBudget: undefined,
+    worker: { async run(ctx) { await ctx.execute({ actionId: 'r-usage', kind: 'read', capabilityId: 'store.read' }) } },
+  })
+  assert.equal(result.outcome.status, 'success')
+  assert.equal(result.usage?.toolCalls, 1)
+  assert.equal(result.usage?.maxConcurrentObserved, 1)
+  assert.equal(result.usage?.reservedCostUsd, 0)
+  assert.ok(result.usage?.deadlineAt)
+  const durable = createHarnessEvidenceRecord(manifest(), result)
+  assert.equal(durable.usage?.toolCalls, 1)
+  assert.equal(JSON.stringify(durable).includes('compensation contract test'), false)
 })

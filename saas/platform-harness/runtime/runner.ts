@@ -21,6 +21,7 @@ import {
   normalizeHarnessVerification,
   type HarnessTrajectoryVerifier,
 } from '../verification/outcome-verifier.ts'
+import { currentHarnessExecutionContext, withHarnessExecutionContext } from './execution-context.ts'
 
 export interface HarnessRunPlan {
   actions: readonly HarnessAction[]
@@ -50,6 +51,12 @@ type HarnessCompensationEntry = {
   compensation: Extract<HarnessCompensation, { mode: 'compensate' }>
 }
 
+type HarnessManualRecoveryEntry = {
+  actionId: string
+  capabilityId: string
+  reason: string
+}
+
 type HarnessJournal = ReturnType<typeof createTrajectoryJournal>
 
 /**
@@ -61,7 +68,15 @@ export function harnessCompensationContractViolation(
   action: HarnessAction,
 ): string | null {
   const grant = manifest.capabilities.find(item => item.id === action.capabilityId)
-  if (!grant?.mutating) return null
+  if (!grant) return null
+  const risk = grant.risk ?? (grant.mutating ? 'write' : 'read')
+  if (
+    risk === 'consequential'
+    && !(action.preconditionEvidenceRefs ?? []).some(value => String(value ?? '').trim())
+  ) {
+    return 'harness_consequential_precondition_evidence_required'
+  }
+  if (!grant.mutating) return null
   const environmentClass = manifest.environment.class
   if (environmentClass !== 'production' && environmentClass !== 'staging') return null
   const compensation = action.compensation
@@ -75,7 +90,7 @@ export function harnessCompensationContractViolation(
     return 'harness_compensation_contract_invalid'
   }
   if (!String(compensation.reason ?? '').trim()) return 'harness_compensation_contract_invalid'
-  if (compensation.mode === 'irreversible' && grant.risk !== 'consequential') {
+  if (compensation.mode === 'irreversible' && risk !== 'consequential') {
     return 'harness_irreversible_action_requires_consequential_grant'
   }
   return null
@@ -108,10 +123,8 @@ async function runOneCompensation(entry: HarnessCompensationEntry): Promise<Harn
 async function runHarnessCompensations(
   journal: HarnessJournal,
   stack: readonly HarnessCompensationEntry[],
+  manualRecovery: readonly HarnessManualRecoveryEntry[] = [],
 ): Promise<HarnessCompensationSummary> {
-  if (!stack.length) {
-    return Object.freeze({ status: 'not_required', attempted: 0, completed: 0, failedActionIds: Object.freeze([]) })
-  }
   let completed = 0
   const failedActionIds: string[] = []
   for (const entry of [...stack].reverse()) {
@@ -133,12 +146,34 @@ async function runHarnessCompensations(
       },
     })
   }
-  const status = completed === stack.length ? 'completed' : completed === 0 ? 'failed' : 'partial'
+  for (const entry of manualRecovery) {
+    journal.append({
+      kind: 'escalation',
+      summary: 'Manual recovery is required because the action has no safe executable compensation.',
+      data: {
+        actionId: entry.actionId,
+        capabilityId: entry.capabilityId,
+        reason: entry.reason.slice(0, 300),
+      },
+    })
+  }
+  const status = manualRecovery.length
+    ? 'manual_recovery_required'
+    : !stack.length
+      ? 'not_required'
+      : completed === stack.length
+        ? 'completed'
+        : completed === 0
+          ? 'failed'
+          : 'partial'
   return Object.freeze({
     status,
     attempted: stack.length,
     completed,
     failedActionIds: Object.freeze(failedActionIds),
+    ...(manualRecovery.length
+      ? { manualRecoveryActionIds: Object.freeze([...new Set(manualRecovery.map(entry => entry.actionId))]) }
+      : {}),
   })
 }
 
@@ -313,6 +348,9 @@ export async function runHarness(input: {
 export interface HarnessWorkerContext {
   manifest: HarnessManifest
   capabilities: Awaited<ReturnType<HarnessCapabilityResolverPort['resolve']>>['resolved']
+  signal: AbortSignal
+  deadlineAt?: string
+  remainingMs(): number | null
   execute(action: HarnessAction): Promise<HarnessActionResult>
   observe(input: {
     summary: string
@@ -325,11 +363,37 @@ export interface HarnessWorkerPort {
   run(context: HarnessWorkerContext): Promise<void>
 }
 
+function parseAbsoluteDeadline(value: string | undefined): number | null {
+  if (!value) return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function effectiveDeadlineAtMs(manifest: HarnessManifest, startedAt: number): number | null {
+  const candidates: number[] = []
+  const absolute = parseAbsoluteDeadline(manifest.deadlineAt)
+  if (absolute !== null) candidates.push(absolute)
+  const duration = Number(manifest.limits.deadlineMs)
+  if (Number.isFinite(duration) && duration >= 0) candidates.push(startedAt + duration)
+  return candidates.length ? Math.min(...candidates) : null
+}
+
+function deadlineError(): Error {
+  return new Error('harness_deadline_exceeded')
+}
+
+function isDeadlineError(error: unknown): boolean {
+  return error instanceof Error && error.message === 'harness_deadline_exceeded'
+}
+
 /**
  * Shared live-worker runner for COS/Specialists/Builder.
  *
- * Capability resolution is mandatory before the worker receives capabilities. The resolver may be Provider Hub, native host capabilities, or a bounded composition of both.
- * The worker cannot widen its manifest, and failure attribution belongs to the
+ * Capability resolution is mandatory before the worker receives capabilities. The resolver may be
+ * Provider Hub, native host capabilities, or a bounded composition of both. One absolute deadline
+ * controls discovery, spend reservation, governed actions, model/provider work reached through the
+ * execution context, worker orchestration, and independent verification. Child runs may only shorten
+ * that deadline. The worker cannot widen its manifest, and failure attribution belongs to the
  * independent trajectory verifier.
  */
 export async function runHarnessWorker(input: {
@@ -342,48 +406,185 @@ export async function runHarnessWorker(input: {
   now?: () => Date
 }): Promise<HarnessRunResult> {
   const now = input.now ?? (() => new Date())
-  const journal = createTrajectoryJournal(input.manifest.runId, now)
-  const actionResults: HarnessActionResult[] = []
   const startedAt = now().getTime()
+  const requestedAbsolute = input.manifest.deadlineAt
+  if (requestedAbsolute && parseAbsoluteDeadline(requestedAbsolute) === null) {
+    return {
+      runId: input.manifest.runId,
+      profile: input.manifest.profile,
+      trajectory: Object.freeze([]),
+      outcome: { status: 'harness_failure', failureCode: 'harness_deadline_invalid' },
+      authorityExpanded: false,
+      productionMutationObserved: false,
+    }
+  }
+
+  const deadlineAtMs = effectiveDeadlineAtMs(input.manifest, startedAt)
+  const runtimeManifest: HarnessManifest = deadlineAtMs === null
+    ? input.manifest
+    : Object.freeze({
+        ...input.manifest,
+        deadlineAt: new Date(deadlineAtMs).toISOString(),
+      })
+  const journal = createTrajectoryJournal(runtimeManifest.runId, now)
+  const actionResults: HarnessActionResult[] = []
+  const controller = new AbortController()
+  const parentExecution = currentHarnessExecutionContext()
+  const parentAbort = () => controller.abort()
+  if (parentExecution?.signal.aborted) controller.abort()
+  else parentExecution?.signal.addEventListener('abort', parentAbort, { once: true })
+
   let toolCalls = 0
   let activeExecutions = 0
+  let maxConcurrentObserved = 0
   let reservedCostUsd = 0
   let authorityBoundaryReached = false
   let productionMutationObserved = false
   let harnessLimitFailure: string | null = null
   const compensations: HarnessCompensationEntry[] = []
+  const manualRecovery: HarnessManualRecoveryEntry[] = []
+
+  const remainingMs = (): number | null => deadlineAtMs === null
+    ? null
+    : Math.max(0, deadlineAtMs - now().getTime())
+
+  const abortForDeadline = () => {
+    if (!controller.signal.aborted) controller.abort()
+  }
+
+  const withinDeadline = async <T>(operation: () => Promise<T>): Promise<T> => {
+    if (controller.signal.aborted) throw deadlineError()
+    const remaining = remainingMs()
+    if (remaining !== null && remaining <= 0) {
+      abortForDeadline()
+      throw deadlineError()
+    }
+    if (remaining === null) return operation()
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let abortListener: (() => void) | undefined
+    try {
+      const timeout = new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          abortForDeadline()
+          reject(deadlineError())
+        }, remaining)
+      })
+      const aborted = new Promise<T>((_resolve, reject) => {
+        abortListener = () => reject(deadlineError())
+        controller.signal.addEventListener('abort', abortListener, { once: true })
+      })
+      return await Promise.race([operation(), timeout, aborted])
+    } finally {
+      if (timer) clearTimeout(timer)
+      if (abortListener) controller.signal.removeEventListener('abort', abortListener)
+    }
+  }
+
+  const usage = () => {
+    const finishedAtMs = now().getTime()
+    return Object.freeze({
+      startedAt: new Date(startedAt).toISOString(),
+      finishedAt: new Date(finishedAtMs).toISOString(),
+      elapsedMs: Math.max(0, finishedAtMs - startedAt),
+      toolCalls,
+      maxConcurrentObserved,
+      reservedCostUsd: Number(reservedCostUsd.toFixed(8)),
+      ...(runtimeManifest.deadlineAt ? { deadlineAt: runtimeManifest.deadlineAt } : {}),
+      limits: Object.freeze({ ...runtimeManifest.limits }),
+    })
+  }
+
   const finish = async (result: HarnessRunResult): Promise<HarnessRunResult> => {
-    if (result.outcome.status === 'success') return result
-    const compensation = await runHarnessCompensations(journal, compensations)
-    return { ...result, trajectory: journal.snapshot(), compensation }
+    parentExecution?.signal.removeEventListener('abort', parentAbort)
+    if (result.outcome.status === 'success') {
+      return {
+        ...result,
+        trajectory: journal.snapshot(),
+        usage: usage(),
+      }
+    }
+    const compensation = await runHarnessCompensations(journal, compensations, manualRecovery)
+    const compensationFailed = compensation.status === 'failed'
+      || compensation.status === 'partial'
+      || compensation.status === 'manual_recovery_required'
+    const outcome = compensationFailed
+      ? {
+          status: 'harness_failure' as const,
+          verifierRef: result.outcome.verifierRef,
+          failureCode: compensation.status === 'manual_recovery_required'
+            ? 'harness_manual_recovery_required'
+            : 'harness_compensation_failed',
+        }
+      : result.outcome
+    return {
+      ...result,
+      trajectory: journal.snapshot(),
+      outcome,
+      usage: usage(),
+      compensation,
+    }
+  }
+
+  const registerPotentialMutationRecovery = (
+    action: HarnessAction,
+    reason: string,
+  ) => {
+    const grant = runtimeManifest.capabilities.find(item => item.id === action.capabilityId)
+    if (!grant?.mutating) return
+    if (action.compensation?.mode === 'compensate') {
+      if (!compensations.some(item => item.actionId === action.actionId)) {
+        compensations.push({
+          actionId: action.actionId,
+          capabilityId: action.capabilityId,
+          compensation: action.compensation,
+        })
+      }
+      return
+    }
+    if (action.compensation?.mode === 'irreversible') {
+      if (!manualRecovery.some(item => item.actionId === action.actionId)) {
+        manualRecovery.push({
+          actionId: action.actionId,
+          capabilityId: action.capabilityId,
+          reason,
+        })
+      }
+    }
   }
 
   journal.append({
     kind: 'run_started',
-    summary: `Harness worker run started in ${input.manifest.profile} profile.`,
-    evidenceRefs: [input.manifest.authorityManifestRef],
+    summary: `Harness worker run started in ${runtimeManifest.profile} profile.`,
+    evidenceRefs: [runtimeManifest.authorityManifestRef],
+    data: {
+      ...(runtimeManifest.deadlineAt ? { deadlineAt: runtimeManifest.deadlineAt } : {}),
+      limits: { ...runtimeManifest.limits },
+    },
   })
 
   let resolution
   try {
-    resolution = await input.capabilities.resolve(input.manifest)
-  } catch {
+    resolution = await withinDeadline(() => input.capabilities.resolve(runtimeManifest))
+  } catch (error) {
+    const code = isDeadlineError(error)
+      ? 'harness_deadline_exceeded'
+      : 'harness_capability_resolution_failed'
     journal.append({
       kind: 'failure',
-      summary: 'Harness capability resolution failed.',
-      data: { code: 'harness_capability_resolution_failed' },
+      summary: isDeadlineError(error)
+        ? 'Harness absolute deadline expired during capability resolution.'
+        : 'Harness capability resolution failed.',
+      data: { code },
     })
-    return {
-      runId: input.manifest.runId,
-      profile: input.manifest.profile,
+    return finish({
+      runId: runtimeManifest.runId,
+      profile: runtimeManifest.profile,
       trajectory: journal.snapshot(),
-      outcome: {
-        status: 'harness_failure',
-        failureCode: 'harness_capability_resolution_failed',
-      },
+      outcome: { status: 'harness_failure', failureCode: code },
       authorityExpanded: false,
       productionMutationObserved: false,
-    }
+    })
   }
 
   if (!resolution.satisfied) {
@@ -395,9 +596,9 @@ export async function runHarnessWorker(input: {
         missing: [...resolution.missing],
       },
     })
-    return {
-      runId: input.manifest.runId,
-      profile: input.manifest.profile,
+    return finish({
+      runId: runtimeManifest.runId,
+      profile: runtimeManifest.profile,
       trajectory: journal.snapshot(),
       outcome: {
         status: 'harness_failure',
@@ -405,7 +606,7 @@ export async function runHarnessWorker(input: {
       },
       authorityExpanded: false,
       productionMutationObserved: false,
-    }
+    })
   }
 
   journal.append({
@@ -424,8 +625,8 @@ export async function runHarnessWorker(input: {
       })
     }
 
-    const deadlineMs = input.manifest.limits.deadlineMs
-    if (deadlineMs !== undefined && now().getTime() - startedAt >= deadlineMs) {
+    if (controller.signal.aborted || (remainingMs() !== null && remainingMs()! <= 0)) {
+      abortForDeadline()
       harnessLimitFailure = 'harness_deadline_exceeded'
       return Object.freeze({
         actionId: action.actionId,
@@ -435,7 +636,7 @@ export async function runHarnessWorker(input: {
       })
     }
 
-    const maxToolCalls = input.manifest.limits.maxToolCalls
+    const maxToolCalls = runtimeManifest.limits.maxToolCalls
     if (maxToolCalls !== undefined && toolCalls >= maxToolCalls) {
       harnessLimitFailure = 'harness_tool_call_limit_exceeded'
       return Object.freeze({
@@ -456,7 +657,7 @@ export async function runHarnessWorker(input: {
       })
     }
 
-    const contractViolation = harnessCompensationContractViolation(input.manifest, action)
+    const contractViolation = harnessCompensationContractViolation(runtimeManifest, action)
     if (contractViolation) {
       harnessLimitFailure = contractViolation
       return Object.freeze({
@@ -467,7 +668,7 @@ export async function runHarnessWorker(input: {
       })
     }
 
-    const maxConcurrency = input.manifest.limits.maxConcurrency
+    const maxConcurrency = runtimeManifest.limits.maxConcurrency
     if (maxConcurrency !== undefined && activeExecutions >= maxConcurrency) {
       harnessLimitFailure = 'harness_concurrency_limit_exceeded'
       return Object.freeze({
@@ -479,9 +680,10 @@ export async function runHarnessWorker(input: {
     }
 
     activeExecutions += 1
+    maxConcurrentObserved = Math.max(maxConcurrentObserved, activeExecutions)
     let actionReservedCostUsd = 0
     try {
-      const maxCostUsd = input.manifest.limits.maxCostUsd
+      const maxCostUsd = runtimeManifest.limits.maxCostUsd
       if (maxCostUsd !== undefined) {
         if (!input.costBudget) {
           harnessLimitFailure = 'harness_cost_budget_required'
@@ -496,13 +698,15 @@ export async function runHarnessWorker(input: {
         const remainingCostUsd = Math.max(0, maxCostUsd - reservedCostUsd)
         let reservation
         try {
-          reservation = await input.costBudget.reserve({
-            manifest: input.manifest,
+          reservation = await withinDeadline(() => input.costBudget!.reserve({
+            manifest: runtimeManifest,
             action,
             remainingCostUsd,
-          })
-        } catch {
-          harnessLimitFailure = 'harness_cost_budget_reservation_failed'
+          }))
+        } catch (error) {
+          harnessLimitFailure = isDeadlineError(error)
+            ? 'harness_deadline_exceeded'
+            : 'harness_cost_budget_reservation_failed'
           return Object.freeze({
             actionId: action.actionId,
             capabilityId: action.capabilityId,
@@ -545,10 +749,14 @@ export async function runHarnessWorker(input: {
       journal.append({
         kind: 'tool_call',
         summary: `Governed capability requested: ${action.capabilityId}`,
+        ...(action.preconditionEvidenceRefs?.length
+          ? { evidenceRefs: [...new Set(action.preconditionEvidenceRefs.filter(Boolean))] }
+          : {}),
         data: {
           actionId: action.actionId,
           capabilityId: action.capabilityId,
-          ...(input.manifest.limits.maxCostUsd !== undefined
+          compensationMode: action.compensation?.mode ?? null,
+          ...(runtimeManifest.limits.maxCostUsd !== undefined
             ? {
                 reservedCostUsd: actionReservedCostUsd,
                 cumulativeReservedCostUsd: reservedCostUsd,
@@ -557,22 +765,69 @@ export async function runHarnessWorker(input: {
         },
       })
 
-      const result = await input.executor.execute(input.manifest, action)
-      actionResults.push(result)
-      if (result.status === 'executed' && action.compensation?.mode === 'compensate') {
-        compensations.push({
+      let result: HarnessActionResult
+      try {
+        result = await withinDeadline(() => input.executor.execute(
+          runtimeManifest,
+          action,
+          Object.freeze({
+            signal: controller.signal,
+            ...(runtimeManifest.deadlineAt ? { deadlineAt: runtimeManifest.deadlineAt } : {}),
+          }),
+        ))
+      } catch (error) {
+        const code = isDeadlineError(error)
+          ? 'harness_deadline_exceeded'
+          : diagnosticFailureCode(
+              {
+                verified: false,
+                verifierRef: 'harness://executor',
+                evidenceRefs: [],
+                reason: error instanceof Error ? error.message : 'harness_executor_failed',
+              },
+              'harness_executor_failed',
+            )
+        if (isDeadlineError(error)) harnessLimitFailure = code
+        registerPotentialMutationRecovery(action, code)
+        result = Object.freeze({
           actionId: action.actionId,
           capabilityId: action.capabilityId,
-          compensation: action.compensation,
+          status: 'execution_failed' as const,
+          error: code,
         })
       }
+
+      const grant = runtimeManifest.capabilities.find(item => item.id === action.capabilityId)
+      const executionReported = result.status === 'executed'
+      if (
+        executionReported
+        && (grant?.risk ?? (grant?.mutating ? 'write' : 'read')) === 'consequential'
+        && !(result.evidenceRefs ?? []).some(value => String(value ?? '').trim())
+      ) {
+        harnessLimitFailure = 'harness_consequential_action_evidence_required'
+        registerPotentialMutationRecovery(action, harnessLimitFailure)
+        result = Object.freeze({
+          ...result,
+          status: 'execution_failed' as const,
+          error: harnessLimitFailure,
+        })
+      } else if (executionReported && action.compensation?.mode === 'compensate') {
+        registerPotentialMutationRecovery(action, 'verification_or_later_run_failure')
+      } else if (executionReported && action.compensation?.mode === 'irreversible') {
+        registerPotentialMutationRecovery(action, action.compensation.reason)
+      } else if (result.status === 'execution_failed') {
+        // A remote mutation can fail after partially applying. Idempotent compensation is safer
+        // than assuming "failed" means "no effect"; irreversible uncertainty requires manual review.
+        registerPotentialMutationRecovery(action, result.error ?? 'governed_mutation_outcome_uncertain')
+      }
+
+      actionResults.push(result)
       if (result.status === 'authority_boundary') authorityBoundaryReached = true
 
-      const grant = input.manifest.capabilities.find(item => item.id === action.capabilityId)
       if (
-        result.status === 'executed' &&
-        input.manifest.environment.class === 'production' &&
-        grant?.mutating
+        executionReported
+        && runtimeManifest.environment.class === 'production'
+        && grant?.mutating
       ) {
         productionMutationObserved = true
       }
@@ -580,6 +835,7 @@ export async function runHarnessWorker(input: {
       journal.append({
         kind: 'tool_result',
         summary: `Governed capability result: ${result.status}`,
+        ...(result.evidenceRefs?.length ? { evidenceRefs: [...result.evidenceRefs] } : {}),
         data: {
           actionId: result.actionId,
           capabilityId: result.capabilityId,
@@ -594,32 +850,49 @@ export async function runHarnessWorker(input: {
   }
 
   try {
-    await input.worker.run({
-      manifest: input.manifest,
-      capabilities: resolution.resolved,
-      execute,
-      observe(observation) {
-        return journal.append({
-          kind: 'observation',
-          summary: observation.summary,
-          evidenceRefs: observation.evidenceRefs,
-          data: observation.data,
-        })
-      },
-    })
+    await withinDeadline(() => withHarnessExecutionContext(
+      runtimeManifest,
+      controller.signal,
+      () => input.worker.run({
+        manifest: runtimeManifest,
+        capabilities: resolution.resolved,
+        signal: controller.signal,
+        deadlineAt: runtimeManifest.deadlineAt,
+        remainingMs,
+        execute,
+        observe(observation) {
+          return journal.append({
+            kind: 'observation',
+            summary: observation.summary,
+            evidenceRefs: observation.evidenceRefs,
+            data: observation.data,
+          })
+        },
+      }),
+    ))
   } catch (error) {
-    const code=diagnosticFailureCode(
-      { verified:false, verifierRef:'harness://worker', evidenceRefs:[], reason:error instanceof Error?error.message:'harness_worker_failed' },
-      'harness_worker_failed',
-    )
+    const code = isDeadlineError(error)
+      ? 'harness_deadline_exceeded'
+      : diagnosticFailureCode(
+          {
+            verified: false,
+            verifierRef: 'harness://worker',
+            evidenceRefs: [],
+            reason: error instanceof Error ? error.message : 'harness_worker_failed',
+          },
+          'harness_worker_failed',
+        )
+    if (isDeadlineError(error)) harnessLimitFailure = code
     journal.append({
       kind: 'failure',
-      summary: 'Harness worker terminated unexpectedly.',
+      summary: isDeadlineError(error)
+        ? 'Harness absolute deadline expired while the worker was active.'
+        : 'Harness worker terminated unexpectedly.',
       data: { code },
     })
     return finish({
-      runId: input.manifest.runId,
-      profile: input.manifest.profile,
+      runId: runtimeManifest.runId,
+      profile: runtimeManifest.profile,
       trajectory: journal.snapshot(),
       outcome: { status: 'harness_failure', failureCode: code },
       authorityExpanded: false,
@@ -627,12 +900,11 @@ export async function runHarnessWorker(input: {
     })
   }
 
-  const finalDeadlineMs = input.manifest.limits.deadlineMs
   if (
-    !harnessLimitFailure &&
-    finalDeadlineMs !== undefined &&
-    now().getTime() - startedAt >= finalDeadlineMs
+    !harnessLimitFailure
+    && (controller.signal.aborted || (remainingMs() !== null && remainingMs()! <= 0))
   ) {
+    abortForDeadline()
     harnessLimitFailure = 'harness_deadline_exceeded'
   }
 
@@ -642,8 +914,8 @@ export async function runHarnessWorker(input: {
       summary: 'Run halted at an authority boundary; alternate routing is forbidden.',
     })
     return finish({
-      runId: input.manifest.runId,
-      profile: input.manifest.profile,
+      runId: runtimeManifest.runId,
+      profile: runtimeManifest.profile,
       trajectory: journal.snapshot(),
       outcome: {
         status: 'authority_halt',
@@ -657,12 +929,12 @@ export async function runHarnessWorker(input: {
   if (harnessLimitFailure) {
     journal.append({
       kind: 'failure',
-      summary: 'Harness execution limit reached.',
+      summary: 'Harness execution limit or action contract reached.',
       data: { code: harnessLimitFailure },
     })
     return finish({
-      runId: input.manifest.runId,
-      profile: input.manifest.profile,
+      runId: runtimeManifest.runId,
+      profile: runtimeManifest.profile,
       trajectory: journal.snapshot(),
       outcome: { status: 'harness_failure', failureCode: harnessLimitFailure },
       authorityExpanded: false,
@@ -672,18 +944,35 @@ export async function runHarnessWorker(input: {
 
   let verification: HarnessVerificationResult
   try {
-    verification = normalizeHarnessVerification(await input.verifier.verify({
-      manifest: input.manifest,
+    verification = normalizeHarnessVerification(await withinDeadline(() => input.verifier.verify({
+      manifest: runtimeManifest,
       trajectory: journal.snapshot(),
       actionResults: Object.freeze([...actionResults]),
-    }))
-  } catch {
+    })))
+  } catch (error) {
     verification = Object.freeze({
       verified: false,
       verifierRef: 'verifier://unavailable',
       evidenceRefs: Object.freeze([]),
-      reason: 'harness_verifier_failed',
+      reason: isDeadlineError(error) ? 'harness_deadline_exceeded' : 'harness_verifier_failed',
       failureAttribution: 'harness',
+    })
+    if (isDeadlineError(error)) harnessLimitFailure = 'harness_deadline_exceeded'
+  }
+
+  if (harnessLimitFailure) {
+    journal.append({
+      kind: 'failure',
+      summary: 'Harness absolute deadline expired before independent verification completed.',
+      data: { code: harnessLimitFailure },
+    })
+    return finish({
+      runId: runtimeManifest.runId,
+      profile: runtimeManifest.profile,
+      trajectory: journal.snapshot(),
+      outcome: { status: 'harness_failure', failureCode: harnessLimitFailure },
+      authorityExpanded: false,
+      productionMutationObserved,
     })
   }
 
@@ -730,15 +1019,15 @@ export async function runHarnessWorker(input: {
   })
 
   return finish({
-    runId: input.manifest.runId,
-    profile: input.manifest.profile,
+    runId: runtimeManifest.runId,
+    profile: runtimeManifest.profile,
     trajectory: journal.snapshot(),
     outcome: {
       status: classification.status,
       verifierRef: verification.verifierRef,
       ...(classification.status === 'success'
         ? {}
-        : { failureCode: diagnosticFailureCode(verification,classification.reason) }),
+        : { failureCode: diagnosticFailureCode(verification, classification.reason) }),
     },
     authorityExpanded: false,
     productionMutationObserved,

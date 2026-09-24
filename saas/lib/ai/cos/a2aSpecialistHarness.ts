@@ -154,7 +154,7 @@ export function requireCosA2ASpecialistHarnessIngress(): CosA2ASpecialistHarness
 export async function runCosA2ASpecialistProductionHarness<T>(input: {
   objective: string
   scope: CosA2ASpecialistHarnessScope
-  execute: () => Promise<T>
+  execute: (signal?: AbortSignal) => Promise<T>
   evidenceSink?: HarnessEvidenceSink
   runId?: string
   parentManifest?: HarnessManifest
@@ -212,7 +212,7 @@ export async function runCosA2ASpecialistProductionHarness<T>(input: {
   let invoked = false
   const host: GatewayHost = Object.freeze({
     execution: Object.freeze({
-      async perform(agentRequest) {
+      async perform(agentRequest, control) {
         if (
           agentRequest.action.kind !== 'delegate'
           || agentRequest.action.target !== COS_A2A_SPECIALIST_DELEGATION_CAPABILITY
@@ -220,11 +220,17 @@ export async function runCosA2ASpecialistProductionHarness<T>(input: {
         ) {
           return { ok: false, error: 'harness_a2a_specialist_host_scope_rejected' }
         }
+        if (control?.signal?.aborted) {
+          return { ok: false, error: 'harness_a2a_specialist_delegation_aborted' }
+        }
         try {
           value = await a2aSpecialistIngressScope.run(
             Object.freeze({ runId, parentRunId: parentManifest.runId, ...scope, enteredAt: Date.now() }),
-            input.execute,
+            () => input.execute(control?.signal),
           )
+          if (control?.signal?.aborted) {
+            return { ok: false, error: 'harness_a2a_specialist_delegation_aborted' }
+          }
           invoked = true
           return { ok: true, result: { delegated: true } }
         } catch (error) {

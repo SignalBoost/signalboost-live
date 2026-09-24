@@ -82,8 +82,16 @@ export interface GovernanceDecision {
   reason: string
 }
 
+export interface GatewayExecutionControl {
+  signal?: AbortSignal
+  deadlineAt?: string
+}
+
 export interface ExecutionPort {
-  perform(request: AgentRequest): Promise<{ ok: boolean; result?: unknown; error?: string }>
+  perform(
+    request: AgentRequest,
+    control?: GatewayExecutionControl,
+  ): Promise<{ ok: boolean; result?: unknown; error?: string; evidenceRefs?: readonly string[] }>
 }
 export interface ApprovalPort {
   requestApproval(request: AgentRequest, decision: GovernanceDecision): Promise<{ approvalId: string }>
@@ -101,6 +109,7 @@ export interface GatewayOutcome {
   ok: boolean
   result?: unknown
   approvalId?: string
+  evidenceRefs?: readonly string[]
   error?: string
   reason: string
 }

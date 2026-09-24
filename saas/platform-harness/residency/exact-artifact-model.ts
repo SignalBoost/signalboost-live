@@ -260,6 +260,7 @@ export function createRunpodBuilderResidencyModelPort(input:{
                 lastHealthError=
                   'residency_exact_artifact_application_model_not_ready'
               }else if(application.status===503){
+                const stage=String(parsed?.bootstrapStage||'').trim().replace(/[^a-z0-9_-]/gi,'').slice(0,80)
                 let detail=''
                 try{detail=String(JSON.parse(raw)?.detail||'').trim()}catch{}
                 if(detail.startsWith('distilled_bootstrap_failed:')){
@@ -271,7 +272,9 @@ export function createRunpodBuilderResidencyModelPort(input:{
                     `residency_exact_artifact_runtime_not_ready:bootstrap_failed:${safe}`,
                   )
                 }
-                lastHealthError='residency_exact_artifact_runtime_ready_http_503'
+                lastHealthError=stage
+                  ?`residency_exact_artifact_bootstrap_stage_${stage}`
+                  :'residency_exact_artifact_runtime_ready_http_503'
               }else if(application.status!==204){
                 lastHealthError=
                   `residency_exact_artifact_runtime_ready_http_${application.status}`

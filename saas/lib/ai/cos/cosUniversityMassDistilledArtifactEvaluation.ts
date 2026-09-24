@@ -11,7 +11,7 @@ import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { readPinnedHfParquetRows } from './hfPinnedParquetRows.ts'
 import { buildTeacherPrompts } from './cosUniversityMassDistillationConsumer.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
-import { runpodServerlessOpenAiBaseUrl } from './runpodServerlessDistilledProvision.ts'
+import { runpodServerlessOpenAiBaseUrl, runpodServerlessRootUrl } from './runpodServerlessDistilledProvision.ts'
 import { massDistilledRuntimeHealth } from './runpodMassDistilledProvisionV2.ts'
 import { fineTuneRevisionKey, type FineTuneRevision } from './cosUniversityFineTuneEvidence.ts'
 import {
@@ -51,6 +51,7 @@ const JUDGE_CALL_TIMEOUT_MS = 110_000
 // and endpoint/judge calls remain independently bounded, so this adds no worker, call, score or promotion authority.
 const READY_TIMEOUT_MS = 280_000
 const READY_POLL_MS = 3_000
+const READY_PING_TIMEOUT_MS = 15_000
 const ROUTE_RESERVE_MS = 25_000
 
 type EvalCase = Readonly<{ id:string; prompt:string; reference:string }>
@@ -342,18 +343,46 @@ async function pinnedHoldout(input:{
 }
 
 async function waitReady(endpointId:string,deadlineMs:number){
-  if(!configuredRunpodApiKey())throw new Error('mass_distilled_evaluation_runpod_key_missing')
+  const key=configuredRunpodApiKey()
+  if(!key)throw new Error('mass_distilled_evaluation_runpod_key_missing')
   const until=Math.min(Date.now()+READY_TIMEOUT_MS,deadlineMs-ROUTE_RESERVE_MS)
   let status:number|null=null
   let lastError:string|null=null
-  // A cold RunPod load balancer does not reliably route custom data-plane paths until its worker is healthy.
-  // Poll provider control-plane health instead; this observes worker readiness without model inference.
+  // RunPod control-plane counters describe worker lifecycle, not whether the exact vLLM gateway has
+  // finished loading the model. Production canaries have successfully served this same endpoint while
+  // health reported workers.running=1 and workers.ready=0. Use control-plane health only to establish
+  // that a worker exists, then require the worker-local non-token /ping contract to report modelReady.
   while(Date.now()<until){
     try{
       const health=await massDistilledRuntimeHealth(endpointId)
       status=health.httpStatus
       if(!health.ok&&health.error)lastError=health.error
-      if(health.workers.ready>0)return
+      const workerExists=health.workers.ready>0||health.workers.running>0
+      if(workerExists){
+        const remainingMs=until-Date.now()
+        if(remainingMs<=0)break
+        const timeoutMs=Math.max(1,Math.min(READY_PING_TIMEOUT_MS,remainingMs))
+        try{
+          const response=await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`,{
+            headers:{Authorization:`Bearer ${key}`},
+            signal:AbortSignal.timeout(timeoutMs),
+          })
+          status=response.status
+          if(response.ok){
+            const payload:any=await response.json().catch(()=>null)
+            const gatewayStatus=String(payload?.status||'')
+            if(payload?.modelReady===true&&(gatewayStatus==='ready'||gatewayStatus==='accepting_requests'))return
+            lastError='mass_distilled_gateway_model_not_ready'
+          }else{
+            lastError=`mass_distilled_gateway_ping_http_${response.status}`
+          }
+        }catch(error){
+          const name=error instanceof Error?error.name:''
+          lastError=name==='TimeoutError'||name==='AbortError'
+            ?'mass_distilled_gateway_ping_timeout'
+            :error instanceof Error?clean(error.message,500):'mass_distilled_gateway_ping_failed'
+        }
+      }
     }catch(error){
       lastError=error instanceof Error?clean(error.message,500):'mass_distilled_health_probe_failed'
     }

@@ -323,7 +323,7 @@
     },
     {
       "path": "/api/cron/cos-working-distillation-readiness",
-      "schedule": "46 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

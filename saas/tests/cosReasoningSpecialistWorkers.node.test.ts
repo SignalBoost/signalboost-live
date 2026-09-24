@@ -4,9 +4,9 @@ import test from 'node:test'
 
 const workerSource = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
 
-test('default COS engine registers all five bounded roles', () => {
-  assert.match(workerSource, /\['primary', 'coder', 'critic', 'verifier', 'researcher'\]/)
-  for (const role of ['CODER', 'CRITIC', 'VERIFIER', 'RESEARCHER']) {
+test('default COS engine registers all six bounded roles', () => {
+  assert.match(workerSource, /\['primary', 'coder', 'critic', 'verifier', 'researcher', 'context_engineer'\]/)
+  for (const role of ['CODER', 'CRITIC', 'VERIFIER', 'RESEARCHER', 'CONTEXT ENGINEER']) {
     assert.match(workerSource, new RegExp(`COS SPECIALIST ROLE: ${role}`))
   }
 })
@@ -25,5 +25,5 @@ test('compatibility primary requests are automatically classified unless forcePr
 
 test('role guidance preserves the caller output contract', () => {
   const matches = workerSource.match(/Preserve the caller\\'s exact output contract/g) ?? []
-  assert.equal(matches.length, 4)
+  assert.equal(matches.length, 5)
 })

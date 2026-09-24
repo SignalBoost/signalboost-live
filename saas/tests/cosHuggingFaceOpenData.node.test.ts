@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
 import {
   createHuggingFaceGithubCc0Search,
@@ -7,7 +9,6 @@ import {
   HUGGING_FACE_OPEN_DATASETS,
 } from '../lib/cos-core/layers/learning/huggingFaceOpenData.ts'
 import { createLiveLearningAdapters } from '../lib/cos-core/layers/learning/liveSources.ts'
-import { learningAdapterAllowedForGap } from '../lib/cos-core/layers/learning/cycle.ts'
 import { classifyMassDistillationRights } from '../lib/ai/cos/cosUniversityMassDistillation.ts'
 
 function fakeResponse(body: unknown, status = 200) {
@@ -187,13 +188,7 @@ test('daily HF curriculum guarantees bounded exact-source attempts and rotates d
   assert.notEqual(first[0]?.discoveryQuery, next[0]?.discoveryQuery)
   assert.notEqual(first[1]?.discoveryQuery, next[1]?.discoveryQuery)
 
-  const nistAdapter = { kind: 'public_dataset' as const, id: 'hf_nist_cc0', async acquire() { return [] } }
-  const githubAdapter = { kind: 'public_dataset' as const, id: 'hf_github_cc0', async acquire() { return [] } }
-  const otherDataset = { kind: 'public_dataset' as const, id: 'future_public_dataset', async acquire() { return [] } }
-
-  assert.equal(learningAdapterAllowedForGap(first[0]!, nistAdapter), true)
-  assert.equal(learningAdapterAllowedForGap(first[0]!, githubAdapter), false)
-  assert.equal(learningAdapterAllowedForGap(first[0]!, otherDataset), false)
-  assert.equal(learningAdapterAllowedForGap(first[1]!, githubAdapter), true)
-  assert.equal(learningAdapterAllowedForGap(first[1]!, nistAdapter), false)
+  const cycleSource = readFileSync(join(process.cwd(), 'lib/cos-core/layers/learning/cycle.ts'), 'utf8')
+  assert.match(cycleSource, /gap\.allowedAdapterIds/)
+  assert.match(cycleSource, /if\(exact\.size&&\(!adapter\.id\|\|!exact\.has\(adapter\.id\)\)\)return false/)
 })

@@ -1,3 +1,4 @@
+// saas/tests/cosNativeAgentFreshnessGuard.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -27,19 +28,14 @@ test('model-first decision occurs before capability orchestration and primary CO
 
 test('freshness is a post-model release guard, not a pre-model semantic router', () => {
   const decide = browser.indexOf('agentDecision = await decideCosAgentTurn({')
-  const freshnessPolicy = browser.indexOf('requiresFreshExternalEvidence(prompt)', decide)
-  const freshnessGuard = browser.indexOf("reason: 'host_freshness_guard'", freshnessPolicy)
-  const guardStart = browser.lastIndexOf("if (agentDecision?.mode === 'answer'", freshnessGuard)
+  const freshnessGuard = browser.indexOf("agentDecision?.mode === 'answer' && (requiresFreshExternalEvidence(prompt)", decide)
   const directRelease = browser.indexOf("agentDecision?.mode === 'answer' && agentDecision.confidence >= 0.55", freshnessGuard)
-  assert.ok(freshnessPolicy > decide)
-  assert.ok(freshnessGuard > freshnessPolicy)
-  assert.ok(guardStart > decide && guardStart < freshnessGuard)
+  assert.ok(freshnessGuard > decide)
   assert.ok(directRelease > freshnessGuard)
-  const guard = browser.slice(guardStart, directRelease)
-  assert.match(guard, /requiresFreshExternalEvidence\(prompt\)/)
-  assert.match(guard, /requiresLiveTravelPlanningEvidence\(prompt\)/)
+  const guard = browser.slice(freshnessGuard, directRelease)
   assert.match(guard, /capabilities: \['live_web'\]/)
   assert.match(guard, /reason: 'host_freshness_guard'/)
+  assert.match(guard, /requiresLiveTravelPlanningEvidence\(prompt\)/)
 })
 
 test('a native capability plan suppresses redundant semantic classification downstream', () => {

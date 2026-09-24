@@ -5,7 +5,7 @@ import { runPlaywrightMcpProductionAcceptance } from '@/provider-hub-host/playwr
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 240
+export const maxDuration = 300
 
 const PLAYWRIGHT_MCP_PRODUCTION_ACCEPTANCE_EVENT =
   'playwright_mcp_production_acceptance_completed' as const

@@ -57,3 +57,9 @@ test('generated Playwright MCP runtime avoids ROOT redeclaration', () => {
   assert.doesNotMatch(host, /const ROOT = \$\{JSON\.stringify\(ROOT\)\}/)
   assert.match(host, /cwd: RUNTIME_ROOT/)
 })
+
+
+test('Production Playwright MCP certificate reserves route headroom for live MCP checks', () => {
+  assert.match(host, /SANDBOX_TIMEOUT_MS = 285_000/)
+  assert.match(route, /maxDuration = 300/)
+})

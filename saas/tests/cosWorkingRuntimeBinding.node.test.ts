@@ -160,8 +160,10 @@ test('RunPod primary probe exposes digest/binding evidence without making it a r
   assert.match(route, /runtimeIdentityError/)
   assert.doesNotMatch(route, /hardServingFailure[\s\S]{0,300}runtimeIdentityError/)
   assert.match(env, /COS_WORKING_DISTILLATION_RUNTIME_DIGEST=/)
-  assert.match(env, /COS_WORKING_DISTILLATION_BASE_MODEL_ID=Qwen\/Qwen3-30B-A3B-Thinking-2507/)
-  assert.match(env, /COS_WORKING_DISTILLATION_BASE_MODEL_REVISION=144afc2f379b542fdd4e85a1fcd5e1f79112d95d/)
+  assert.match(env, /Known qwen3:30b mapping: Qwen\/Qwen3-30B-A3B-Thinking-2507/)
+  assert.match(env, /144afc2f379b542fdd4e85a1fcd5e1f79112d95d/)
+  assert.match(env, /COS_WORKING_DISTILLATION_BASE_MODEL_ID=\n/)
+  assert.match(env, /COS_WORKING_DISTILLATION_BASE_MODEL_REVISION=\n/)
 })
 
 

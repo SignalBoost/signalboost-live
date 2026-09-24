@@ -257,3 +257,48 @@ test('Semantic Scholar preserves SPECTER2 provenance when a valid vector is pres
   assert.ok(results[0].evidence?.some(value => value.startsWith('external_vector_sha256:')))
   assert.equal(results[0].evidence?.includes('internal_reembedding_required'), false)
 })
+
+
+test('Semantic Scholar retries a 429 and honors Retry-After before succeeding', async () => {
+  let calls = 0
+  const fetcher = (async () => {
+    calls += 1
+    if (calls === 1) {
+      return new Response(JSON.stringify({ message: 'rate limited' }), {
+        status: 429,
+        headers: { 'content-type': 'application/json', 'retry-after': '0' },
+      })
+    }
+    return new Response(JSON.stringify({
+      data: [{
+        paperId: 'paper-retry',
+        title: 'Embedding Retrieval Benchmark After Retry',
+        abstract: 'A substantive paper about embedding retrieval benchmarks and ranking evaluation.',
+        year: 2026,
+        citationCount: 3,
+        url: 'https://www.semanticscholar.org/paper/paper-retry',
+        embedding: null,
+      }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+
+  const search = createSemanticScholarScientificSearch({ fetcher })
+  const results = await search('embedding retrieval benchmark', 3)
+
+  assert.equal(calls, 2)
+  assert.equal(results.length, 1)
+  assert.ok(results[0].evidence?.includes('semantic_scholar_graph_relevance_v1'))
+})
+
+test('Semantic Scholar final 429 exposes whether an API key was configured without leaking it', async () => {
+  const fetcher = (async () => new Response(JSON.stringify({ message: 'rate limited' }), {
+    status: 429,
+    headers: { 'content-type': 'application/json', 'retry-after': '0' },
+  })) as typeof fetch
+
+  const search = createSemanticScholarScientificSearch({ fetcher, apiKey: 'test-secret-key' })
+  await assert.rejects(
+    () => search('embedding retrieval benchmark', 3),
+    /COS semantic research source failed: 429; provider=semantic_scholar; apiKeyConfigured=true/,
+  )
+})

@@ -160,6 +160,59 @@ test('dataset preparation accepts only hash-verified hosted teacher rows for the
   )
 })
 
+test('dataset preparation accepts a hash-bound Working COS bundle with explicit partitions', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv())!
+  const base = {
+    callbackUrl: 'https://itmounts.com/api/internal/cos/university-training-executor/evidence',
+    idempotencyKey: 'working-cos-prepare-key',
+    callbackSecret: 'k'.repeat(64),
+    config,
+  }
+  const workingCosRows = Array.from({ length: 20 }, (_, index) => {
+    const prompt = `Question ${index}`
+    const response = `Answer ${index}`
+    const text = `<user>\n${prompt}\n\n<assistant>\n${response}`
+    return {
+      assetSetKey: 'a'.repeat(64),
+      subjectId: index < 10 ? 'Computer Science & Coding' : 'Mathematics',
+      promptId: `working-${index}`,
+      prompt,
+      response,
+      text,
+      itemHash: createHash('sha256').update(text).digest('hex'),
+      portableContentHash: createHash('sha256').update(JSON.stringify({ prompt, response })).digest('hex'),
+      partition: index < 18 ? 'train' : 'holdout',
+    }
+  })
+  const envelope = {
+    operation: 'prepare_dataset',
+    candidateId: `working-cos:${'b'.repeat(64)}`,
+    candidate: {
+      source: `itmounts://working-cos/bundle/${'c'.repeat(64)}`,
+      workingCosRows,
+    },
+    expectedTrainingManifestHash: 'd'.repeat(64),
+    expectedHoldoutManifestHash: 'e'.repeat(64),
+    authorityExpanded: false,
+  }
+  const spec = buildHuggingFaceJobSpec({ ...base, envelope })
+  assert.equal(spec.flavor, 'cpu-upgrade')
+  assert.equal(spec.dockerImage, 'python:3.12-slim')
+
+  const badPartition = structuredClone(envelope)
+  badPartition.candidate.workingCosRows[0].partition = 'unknown'
+  assert.throws(
+    () => buildHuggingFaceJobSpec({ ...base, envelope: badPartition }),
+    /source_dataset_ref_required/,
+  )
+
+  const worker = readFileSync(new URL('../scripts/cos-university-hf-worker-base.py', import.meta.url), 'utf8')
+  assert.match(worker, /workingCosRows/)
+  assert.match(worker, /worker_working_cos_training_manifest_mismatch/)
+  assert.match(worker, /worker_working_cos_holdout_manifest_mismatch/)
+  assert.match(worker, /working_cos_partition/)
+})
+
 test('training defaults to the lowest-cost NVIDIA T4 and never auto-upgrades', () => {
   const config = huggingFaceJobsConfigFromEnv(hfEnv())!
   assert.equal(config.trainingFlavor, 't4-small')

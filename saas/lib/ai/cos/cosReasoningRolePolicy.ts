@@ -3,7 +3,7 @@ import { MAX_BUILDER_OBJECTIVE_CHARS } from '../../builder/request-contract.ts'
 import { isOperationalLogEvidence } from './pastedOperationalLog.ts'
 import { isContentGenerationRequest } from './contentGenerationIntent.ts'
 
-export type CosSpecialistRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher'
+export type CosSpecialistRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher' | 'context_engineer'
 
 export type CosReasoningRoleDecision = {
   role: CosSpecialistRole
@@ -23,6 +23,7 @@ export const COS_ROLE_TOKEN_CAPS: Readonly<Record<CosSpecialistRole, number>> = 
   critic: 4200,
   verifier: 2400,
   researcher: 3600,
+  context_engineer: 3600,
 }
 
 function clean(value: unknown, max = 4000): string {
@@ -180,6 +181,7 @@ const VOLATILE_FACT_OBJECT = /\b(?:weather|forecast|price|stock|score|standings|
 const EXPLICIT_LOOKUP_ACTION = /\b(?:check|find|verify|look\s*up|search|research|confirm|retrieve|fetch)\b/i
 const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latency|p9[59]|timeout|regression|failure mode|why (?:is|are|did|does).*(?:slow|fail|error|down|spike)|critique|audit|stress[- ]?test|find (?:the )?(?:flaw|weakness|problem))\b/i
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i
+const CONTEXT_ENGINEERING_SIGNAL = /\b(?:context engineering|context engineer|context window|token budget|prompt packing|prompt assembly|context packing|retrieval context|rag context|memory selection|memory retrieval|context compaction|context overflow|context truncation|context quality|lost in the middle)\b/i
 
 export function isAuthoringObjectiveWithoutLiveLookup(prompt: string): boolean {
   const objective = cosRoutingObjective(prompt)
@@ -197,6 +199,7 @@ export function selectCosReasoningWorkerRole(prompt: string, context?: CosCoding
   const objective = cosRoutingObjective(prompt)
   if (isCosCodingObjective(prompt, context)) return { role: 'coder', reason: 'code_or_implementation_signal', objective }
   if (isAuthoringObjectiveWithoutLiveLookup(objective)) return { role: 'primary', reason: 'authoring_without_live_lookup', objective }
+  if (CONTEXT_ENGINEERING_SIGNAL.test(objective)) return { role: 'context_engineer', reason: 'context_engineering_signal', objective }
   if (CURRENT_SIGNAL.test(objective)) return { role: 'verifier', reason: 'current_or_live_verification_signal', objective }
   if (CRITIC_SIGNAL.test(objective)) return { role: 'critic', reason: 'diagnostic_or_critical_reasoning_signal', objective }
   if (RESEARCH_SIGNAL.test(objective)) return { role: 'researcher', reason: 'research_or_explanatory_signal', objective }

@@ -1,3 +1,4 @@
+import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
 // saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
@@ -385,7 +386,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   }
 }
 
-export async function runCosUniversityMassDistillationWorkflow(input: {
+async function runCosUniversityMassDistillationWorkflowInsideHarness(input: {
   source: MassDistillationWorkflowSource
   now?: Date
 }): Promise<{
@@ -465,4 +466,22 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       }))
     }
   }
+}
+
+
+/** Scheduled and Self-Healing distillation must never start outside a HarnessRun. */
+export async function runCosUniversityMassDistillationWorkflow(
+  input: Parameters<typeof runCosUniversityMassDistillationWorkflowInsideHarness>[0],
+): ReturnType<typeof runCosUniversityMassDistillationWorkflowInsideHarness> {
+  return withHostProductionHarnessIngress({
+    objective: `Run COS University mass distillation (${input.source})`,
+    portableId: 'cos-university',
+    agentId: 'cos-university-mass-distillation',
+    role: 'university_worker',
+    capabilityId: 'university.distillation.execute',
+    risk: 'write',
+    deadlineMs: 300_000,
+    maxConcurrency: 1,
+    maxToolCalls: 200,
+  }, () => runCosUniversityMassDistillationWorkflowInsideHarness(input))
 }

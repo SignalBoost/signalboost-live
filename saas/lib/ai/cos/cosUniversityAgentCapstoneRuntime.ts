@@ -27,7 +27,7 @@ async function loadOwnProcedures(agentId: string): Promise<string[]> {
 }
 
 /** Uses the same explicitly configured software model as Builder, without Builder's JSON envelope. */
-async function executeSoftwareCapstoneRuntimeInsideHarness(request: AgentCapstoneRequest) {
+export async function executeSoftwareCapstoneRuntime(request: AgentCapstoneRequest) {
   await requireRegisteredCapstoneRuntime(request.agentId)
   const config = localInferenceConfigFromEnv()
   const model = requireBuilderCodingModel()
@@ -35,27 +35,19 @@ async function executeSoftwareCapstoneRuntimeInsideHarness(request: AgentCapston
     readRole: readCosUniversityAgentRole, loadProcedures: loadOwnProcedures, model,
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
-    infer: (input, selectedModel) => callLocalModel({ ...input, frequencyPenalty: 0, presencePenalty: 0 }, {
+    infer: (input, selectedModel) => withHostProductionHarnessIngress({
+      objective: `Run University graduation capstone inference for ${request.agentId}`,
+      portableId: 'cos-university-capstone',
+      agentId: request.agentId,
+      role: 'university_capstone_candidate',
+      capabilityId: 'university.capstone.execute',
+      risk: 'write',
+      deadlineMs: 120_000,
+      maxConcurrency: 1,
+      maxToolCalls: 1,
+      runId: `university-capstone-${request.runId}`,
+    }, () => callLocalModel({ ...input, frequencyPenalty: 0, presencePenalty: 0 }, {
       ...config, model: selectedModel, timeoutMs: Math.min(config.timeoutMs, 90_000),
-    }),
+    })),
   })
-}
-
-
-/** Graduation capstone execution is always Harness-bound. */
-export async function executeSoftwareCapstoneRuntime(
-  request: AgentCapstoneRequest,
-): ReturnType<typeof executeSoftwareCapstoneRuntimeInsideHarness> {
-  return withHostProductionHarnessIngress({
-    objective: `Run University graduation capstone for ${request.agentId}`,
-    portableId: 'cos-university-capstone',
-    agentId: request.agentId,
-    role: 'university_capstone_candidate',
-    capabilityId: 'university.capstone.execute',
-    risk: 'write',
-    deadlineMs: 120_000,
-    maxConcurrency: 1,
-    maxToolCalls: 4,
-    runId: `university-capstone-${request.runId}`,
-  }, () => executeSoftwareCapstoneRuntimeInsideHarness(request))
 }

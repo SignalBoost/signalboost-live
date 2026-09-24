@@ -72,6 +72,7 @@ test('browser MCP profiles are pinned, stdio, and deny dangerous tools by defaul
   assert.equal(PLAYWRIGHT_MCP_PROFILE.transport, 'stdio')
   assert.equal(PLAYWRIGHT_MCP_PROFILE.packageName, '@playwright/mcp')
   assert.equal(PLAYWRIGHT_MCP_PROFILE.packageVersion, '0.0.82')
+  assert.ok(PLAYWRIGHT_MCP_PROFILE.recommendedArgs.includes('--no-webmcp'))
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.transport, 'stdio')
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.packageName, 'chrome-devtools-mcp')
   assert.equal(CHROME_DEVTOOLS_MCP_PROFILE.packageVersion, '1.9.0')

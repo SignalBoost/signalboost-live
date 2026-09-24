@@ -302,3 +302,63 @@ test('Semantic Scholar final 429 exposes whether an API key was configured witho
     /COS semantic research source failed: 429; provider=semantic_scholar; apiKeyConfigured=true/,
   )
 })
+
+
+test('Semantic Scholar anonymous 429 falls back to explicitly labeled S2ORC mirror results', async () => {
+  let semanticCalls = 0
+  let mirrorCalls = 0
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    if (url.includes('api.semanticscholar.org')) {
+      semanticCalls += 1
+      return new Response(JSON.stringify({ message: 'rate limited' }), {
+        status: 429,
+        headers: { 'content-type': 'application/json', 'retry-after': '0' },
+      })
+    }
+    if (url.includes('datasets-server.huggingface.co/search')) {
+      mirrorCalls += 1
+      return new Response(JSON.stringify({
+        rows: [{
+          row_idx: 42,
+          row: {
+            title: 'Retrieval Evaluation from S2ORC',
+            abstract: 'A scientific abstract about dense retrieval evaluation, vector search, and benchmark robustness.',
+          },
+        }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    throw new Error(`unexpected URL ${url}`)
+  }) as typeof fetch
+
+  const search = createSemanticScholarScientificSearch({ fetcher })
+  const results = await search('vector database semantic retrieval', 3)
+
+  assert.equal(semanticCalls, 3)
+  assert.equal(mirrorCalls, 1)
+  assert.equal(results.length, 1)
+  assert.match(results[0].uri, /^hf:\/\/datasets\/sentence-transformers\/s2orc/)
+  assert.match(String(results[0].license), /S2ORC corpus mirror \(ODC-By 1\.0\)/)
+  assert.ok(results[0].evidence?.includes('semantic_scholar_s2orc_mirror_v1'))
+  assert.ok(results[0].evidence?.includes('semantic_scholar_graph_fallback:rate_limited'))
+  assert.ok(results[0].evidence?.includes('internal_reembedding_required'))
+})
+
+test('Semantic Scholar keyed 429 remains visible instead of silently falling back to anonymous mirror behavior', async () => {
+  let mirrorCalls = 0
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    if (url.includes('datasets-server.huggingface.co')) mirrorCalls += 1
+    return new Response(JSON.stringify({ message: 'rate limited' }), {
+      status: 429,
+      headers: { 'content-type': 'application/json', 'retry-after': '0' },
+    })
+  }) as typeof fetch
+
+  const search = createSemanticScholarScientificSearch({ fetcher, apiKey: 'configured-key' })
+  await assert.rejects(
+    () => search('vector database semantic retrieval', 3),
+    /provider=semantic_scholar; apiKeyConfigured=true/,
+  )
+  assert.equal(mirrorCalls, 0)
+})

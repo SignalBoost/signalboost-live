@@ -11,10 +11,17 @@ import { createSupervisorAuditHarnessEvidenceSink } from '../../../platform-harn
 import { createPortableCapabilityDescriptor } from '../../../provider-hub-core/capability-runtime.ts'
 import { cosServiceDb } from '../../cos-core/storage/service-db.ts'
 import type { GatewayHost, GovernancePolicy } from '../../../agent-gateway/types.ts'
+import type { HarnessManifest } from '../../../platform-harness/core/types.ts'
+import {
+  COS_PRIMARY_A2A_SPECIALIST_DELEGATION_CAPABILITY,
+  COS_PRIMARY_A2A_SPECIALIST_DELEGATION_SCOPE,
+  createCosProductionIngressManifest,
+  currentCosHarnessIngress,
+} from '../../../platform-harness/adapters/cos-ingress.ts'
 
-export const COS_A2A_SPECIALIST_DELEGATION_CAPABILITY = 'agent.specialist.delegate'
+export const COS_A2A_SPECIALIST_DELEGATION_CAPABILITY = COS_PRIMARY_A2A_SPECIALIST_DELEGATION_CAPABILITY
 export const COS_A2A_SPECIALIST_AGENT_ID = 'cos-a2a-specialist'
-const A2A_SPECIALIST_SCOPE = 'cos.specialist.a2a.delegate'
+const A2A_SPECIALIST_SCOPE = COS_PRIMARY_A2A_SPECIALIST_DELEGATION_SCOPE
 const A2A_SPECIALIST_DEADLINE_MS = 285_000
 
 export type CosA2ASpecialistHarnessScope = Readonly<{
@@ -25,6 +32,7 @@ export type CosA2ASpecialistHarnessScope = Readonly<{
 
 export type CosA2ASpecialistHarnessContext = Readonly<{
   runId: string
+  parentRunId: string
   tenantId: string
   environmentId: string
   portableId: string
@@ -136,6 +144,9 @@ export function requireCosA2ASpecialistHarnessIngress(): CosA2ASpecialistHarness
 /**
  * Mandatory Production Harness ingress for COS -> A2A specialist delegation.
  *
+ * The run is always a governed child of a COS parent run: it may not add a capability, widen
+ * scope/risk/mutation, escape the parent tenant/profile/environment class, or loosen a hard limit.
+ *
  * The Harness governs delegation admission under the exact tenant/environment/portable scope.
  * The delegated specialist mesh keeps its own qualification, approval, checkpoint and
  * write-recovery controls. This adapter does not mint approvals or widen downstream authority.
@@ -146,12 +157,28 @@ export async function runCosA2ASpecialistProductionHarness<T>(input: {
   execute: () => Promise<T>
   evidenceSink?: HarnessEvidenceSink
   runId?: string
+  parentManifest?: HarnessManifest
 }): Promise<CosA2ASpecialistHarnessResult<T>> {
   const runId = clean(input.runId, 160) || `cos-a2a-${crypto.randomUUID()}`
   const objective = clean(input.objective, 4_000)
   const scope = exactScope(input.scope)
   if (!scope || !objective) {
     return Object.freeze({ ok: false, runId, code: 'harness_a2a_specialist_identity_required' })
+  }
+
+  // Every A2A delegation is a child of a COS parent run. Use the caller's parent, else the active
+  // COS ingress run, else establish a bounded COS parent granting only this delegation capability.
+  let parentManifest: HarnessManifest
+  try {
+    parentManifest = input.parentManifest
+      ?? currentCosHarnessIngress()?.manifest
+      ?? createCosProductionIngressManifest({
+        objective,
+        tenantId: scope.tenantId,
+        requestedCapabilities: [COS_A2A_SPECIALIST_DELEGATION_CAPABILITY],
+      })
+  } catch {
+    return Object.freeze({ ok: false, runId, code: 'harness_a2a_specialist_parent_unavailable' })
   }
 
   const evidenceSink = input.evidenceSink ?? defaultEvidenceSink()
@@ -175,6 +202,10 @@ export async function runCosA2ASpecialistProductionHarness<T>(input: {
     environmentId: scope.environmentId,
     requestedCapabilities: [COS_A2A_SPECIALIST_DELEGATION_CAPABILITY],
     limits,
+    parent: {
+      runId: parentManifest.runId,
+      authorityManifestRef: parentManifest.authorityManifestRef,
+    },
   })
 
   let value!: T
@@ -191,7 +222,7 @@ export async function runCosA2ASpecialistProductionHarness<T>(input: {
         }
         try {
           value = await a2aSpecialistIngressScope.run(
-            Object.freeze({ runId, ...scope, enteredAt: Date.now() }),
+            Object.freeze({ runId, parentRunId: parentManifest.runId, ...scope, enteredAt: Date.now() }),
             input.execute,
           )
           invoked = true
@@ -261,6 +292,7 @@ export async function runCosA2ASpecialistProductionHarness<T>(input: {
       },
     }),
     evidenceSink,
+    parentManifest,
   })
 
   if (envelope.accepted === false) {

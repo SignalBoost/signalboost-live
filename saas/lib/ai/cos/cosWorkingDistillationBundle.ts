@@ -6,6 +6,16 @@ export const COS_WORKING_DISTILLATION_MIN_SUBJECTS = 8 as const
 export const COS_WORKING_DISTILLATION_MAX_SUBJECTS = 16 as const
 export const COS_WORKING_DISTILLATION_MAX_ITEMS = 384 as const
 export const COS_WORKING_DISTILLATION_MIN_SET_ITEMS = 20 as const
+export const COS_WORKING_DISTILLATION_CORE_SUBJECTS = Object.freeze([
+  'Business & Operations',
+  'Computer Science & Coding',
+  'Cybersecurity',
+  'Economics & Finance',
+  'Language & Communication',
+  'Mathematics',
+  'Reasoning & Decision Science',
+  'Statistics & Data Science',
+] as const)
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const TRAINING_RIGHTS = new Set([
@@ -48,6 +58,7 @@ export type WorkingCosBalancedBundleOptions = Readonly<{
 
 export type WorkingCosBalancedBundleBlocker =
   | 'insufficient_subject_coverage'
+  | 'missing_core_subject_coverage'
   | 'insufficient_training_items'
 
 type NormalizedWorkingCosAssetSet = Readonly<{
@@ -130,7 +141,14 @@ export function buildWorkingCosBalancedBundle(
       || a.assetSetKey.localeCompare(b.assetSetKey))
   }
 
-  const subjects = rotate([...bySubject.keys()].sort(), rotationSeed).slice(0, maxSubjects)
+  const availableSubjects = [...bySubject.keys()].sort()
+  const coreRequired = minSubjects >= COS_WORKING_DISTILLATION_CORE_SUBJECTS.length
+  const coreSubjects = COS_WORKING_DISTILLATION_CORE_SUBJECTS.filter(subject => bySubject.has(subject))
+  const remainingSubjects = rotate(
+    availableSubjects.filter(subject => !COS_WORKING_DISTILLATION_CORE_SUBJECTS.includes(subject as typeof COS_WORKING_DISTILLATION_CORE_SUBJECTS[number])),
+    rotationSeed,
+  )
+  const subjects = [...coreSubjects, ...remainingSubjects].slice(0, maxSubjects)
   const selected: NormalizedWorkingCosAssetSet[] = []
   let totalItems = 0
   for (const subject of subjects) {
@@ -143,6 +161,9 @@ export function buildWorkingCosBalancedBundle(
 
   const blockers: WorkingCosBalancedBundleBlocker[] = []
   if (selected.length < minSubjects) blockers.push('insufficient_subject_coverage')
+  if (coreRequired && coreSubjects.length !== COS_WORKING_DISTILLATION_CORE_SUBJECTS.length) {
+    blockers.push('missing_core_subject_coverage')
+  }
   if (totalItems < minSubjects * COS_WORKING_DISTILLATION_MIN_SET_ITEMS) blockers.push('insufficient_training_items')
 
   const eligible = blockers.length === 0
@@ -183,7 +204,7 @@ export function buildWorkingCosBalancedBundle(
     modelNeutral: true as const,
     containsPrivateProductionData: false as const,
     trainingRightsEligible: eligible,
-    sourceSelection: 'newest_sealed_set_per_subject_balanced_before_volume' as const,
+    sourceSelection: 'required_generalist_core_subjects_then_rotated_breadth_newest_set_per_subject' as const,
     automaticTrainingAuthorized: false as const,
     automaticActivationAuthorized: false as const,
   })

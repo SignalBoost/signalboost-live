@@ -113,6 +113,16 @@ test('University Self-Healing repair queue is single-flight across changing inci
   assert.match(universityCodeRepair, /Never create retry-job fan-out while an existing repair is queued\/running\/paused/)
 })
 
+test('University Self-Healing reconciles stale Builder execution leases before single-flight dedupe', () => {
+  assert.match(universityCodeRepair, /BUILDER_JOB_STALE_AFTER_MS/)
+  assert.match(universityCodeRepair, /reconcileStaleBuilderJobs/)
+  assert.match(universityCodeRepair, /select\('id,status,user_id,updated_at'\)/)
+  assert.match(universityCodeRepair, /status === 'queued' \|\| status === 'running'/)
+  assert.match(universityCodeRepair, /Date\.now\(\) - updatedAtMs >= BUILDER_JOB_STALE_AFTER_MS/)
+  assert.match(universityCodeRepair, /await reconcileStaleBuilderJobs\(\{ userId, jobId \}\)/)
+  assert.match(universityCodeRepair, /Paused jobs[\s\S]*remain active regardless of age/)
+})
+
 test('Self-Healing Builder capacity contention requeues the same job instead of terminal failure', () => {
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')

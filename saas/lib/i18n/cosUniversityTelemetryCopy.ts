@@ -1,4 +1,5 @@
 // saas/lib/i18n/cosUniversityTelemetryCopy.ts
+// saas/lib/i18n/cosUniversityTelemetryCopy.ts
 export type CosUniversityTelemetryLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 type Copy = Readonly<{
@@ -172,6 +173,13 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workingCosSubjects: 'Materias',
     workingCosItems: 'Elementos',
     workingCosNextGate: 'Próxima compuerta',
+    workingCosPrepare: 'Preparar datos de Working COS',
+    workingCosPreparing: 'Preparando…',
+    workingCosStartTraining: 'Iniciar entrenamiento limitado de Working COS',
+    workingCosTraining: 'Iniciando entrenamiento…',
+    workingCosPreparationAccepted: 'Preparación de datos de Working COS aceptada',
+    workingCosTrainingAccepted: 'Entrenamiento limitado de Working COS aceptado',
+    workingCosActionWarning: 'Solo propietario, envío explícito. El costo del proveedor sigue con tope estricto y la activación en Producción permanece bloqueada.',
     providersTitle: 'Proveedores docentes frontier · últimas 24 h',
     providersExplanation: 'Las llamadas y los tokens son telemetría duradera de API. Aquí no se infieren cargos de las cuentas de los proveedores.',
     teacherCalls: 'llamadas docentes',

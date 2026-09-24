@@ -1,2 +1,2 @@
-base_sha=4704b227c17af3ceeb19ae02e66348ce30884f21
-branch=fix/runpod-transient-gateway-retry-telemetry-20260924
+base_sha=bfefb2cb531d3d62dd7ad90dcc6d3fb8573bf086
+branch=fix/mass-canary-rolling-window-complete-20260924

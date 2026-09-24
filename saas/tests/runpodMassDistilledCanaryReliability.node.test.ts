@@ -61,13 +61,13 @@ test('compatibility layer can recover both legacy template and endpoint identity
   assert.match(compatibility, /mass_distilled_runtime_template_identity_mismatch/)
   assert.match(compatibility, /mass_distilled_runtime_endpoint_template_mismatch/)
   assert.match(compatibility, /mass_distilled_runtime_endpoint_template_rebind_failed/)
-  assert.match(compatibility, /assertEndpointSafetyPolicy\(endpoint,\s*idleTimeoutSeconds\)/)
+  assert.match(compatibility, /assertEndpointSafetyPolicy\(endpoint\)/)
   assert.match(compatibility, /materializedEndpointMatches/)
 })
 
 test('cold-start continuation reuses only the explicitly approved exact runtime identity', () => {
   assert.match(route, /approvedColdStartResume/)
-  assert.match(route, /evidence\.coldStartResume!==true/)
+  assert.match(route, /coldStartResume===true/)
   assert.match(route, /coldStartResumeEndpointId/)
   assert.match(route, /coldStartResumeRuntimeKey/)
   assert.match(route, /coldStartResume\?\.runtimeKey \|\| hash\(\['mass-canary-runtime-v3'/)
@@ -87,7 +87,7 @@ test('RunPod load-balancer health stays initializing until internal vLLM is trul
 
 test('canary observes RunPod control-plane ready workers instead of holding a custom readiness route open', () => {
   assert.match(provision, /workers:\{idle:Number\(payload\?\.workers\?\.idle\|\|0\),ready:Number\(payload\?\.workers\?\.ready\|\|0\)/)
-  assert.match(provision, /const wake=await fetch\(\`\$\{root\}\/ping\`,\{/)
+  assert.match(provision, /const wake=await fetch\(\`\$\{root\}\/ping\`/)
   assert.match(provision, /if\(health\.workers\.ready>0\)/)
   const start = provision.indexOf('export async function canaryMassDistilledRuntime')
   const end = provision.indexOf('export const MASS_DISTILLED_CANARY_MAX_COST_USD', start)

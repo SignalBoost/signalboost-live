@@ -24,6 +24,7 @@ import {
   type CanaryArtifact,
   type CanaryEvent,
 } from '../lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts'
+import { MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER } from '../lib/ai/cos/cosUniversityRemediationReplayProofGeneration.ts'
 
 const now = new Date('2026-09-17T17:00:00.000Z')
 const h = (n: number) => n.toString(16).padStart(64, '0')
@@ -105,12 +106,13 @@ test('bounded Builder apprenticeship proof lane counts only confirmed response-a
 
 test('first two post-GKD remediation replay artifacts get bounded canary proof priority after Builder proof is complete', () => {
   assert.equal(MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE, 2)
-  const proofNow = new Date('2026-09-22T20:00:00.000Z')
+  assert.equal(MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER, '2026-09-24T13:40:00.000Z')
+  const proofNow = new Date('2026-09-24T18:00:00.000Z')
   const legacy = artifact(80, '2026-09-20T00:00:00.000Z')
   const builderOne = v2BuilderArtifact('mass:builder-done-1', 81, '2026-09-21T17:00:00.000Z')
   const builderTwo = v2BuilderArtifact('mass:builder-done-2', 82, '2026-09-21T17:10:00.000Z')
-  const replayOne = replayArtifact('mass:replay-1', 83, '2026-09-22T18:07:59.000Z')
-  const replayTwo = replayArtifact('mass:replay-2', 84, '2026-09-22T18:20:00.000Z')
+  const replayOne = replayArtifact('mass:replay-1', 83, '2026-09-24T14:03:46.000Z')
+  const replayTwo = replayArtifact('mass:replay-2', 84, '2026-09-24T14:43:56.000Z')
   const builderDone = [
     event(builderOne, 'local_distilled_runtime_canary_passed', '2026-09-21T18:00:00.000Z'),
     event(builderTwo, 'local_distilled_runtime_canary_passed', '2026-09-21T18:10:00.000Z'),
@@ -123,14 +125,14 @@ test('first two post-GKD remediation replay artifacts get bounded canary proof p
   assert.equal(first.artifact.candidateId, replayOne.candidateId)
   assert.equal(first.evidence.remediationReplayProofPriority, true)
 
-  const firstPassed = event(replayOne, 'local_distilled_runtime_canary_passed', '2026-09-22T18:30:00.000Z')
+  const firstPassed = event(replayOne, 'local_distilled_runtime_canary_passed', '2026-09-24T16:30:00.000Z')
   const second = decideMassCanaryRollingApproval({
     artifacts:[legacy,builderOne,builderTwo,replayTwo,replayOne], events:[...builderDone,firstPassed], now:proofNow, enabled:true,
   })
   assert.ok('artifact' in second)
   assert.equal(second.artifact.candidateId, replayTwo.candidateId)
 
-  const secondPassed = event(replayTwo, 'local_distilled_runtime_canary_passed', '2026-09-22T18:40:00.000Z')
+  const secondPassed = event(replayTwo, 'local_distilled_runtime_canary_passed', '2026-09-24T16:40:00.000Z')
   const restored = decideMassCanaryRollingApproval({
     artifacts:[legacy,builderOne,builderTwo,replayTwo,replayOne],
     events:[...builderDone,firstPassed,secondPassed], now:proofNow, enabled:true,
@@ -140,11 +142,11 @@ test('first two post-GKD remediation replay artifacts get bounded canary proof p
 })
 
 test('replay proof lane proves a replay-trained Computer Science artifact before non-CS replay peers', () => {
-  const proofNow = new Date('2026-09-22T20:00:00.000Z')
+  const proofNow = new Date('2026-09-24T18:00:00.000Z')
   const legacy = artifact(87, '2026-09-20T00:00:00.000Z')
-  const olderLaw = replayArtifact('mass:replay-law', 88, '2026-09-22T18:07:59.000Z')
+  const olderLaw = replayArtifact('mass:replay-law', 88, '2026-09-24T14:03:46.000Z')
   const newerComputerScience: CanaryArtifact = {
-    ...replayArtifact('mass:replay-cs', 89, '2026-09-22T18:19:57.000Z'),
+    ...replayArtifact('mass:replay-cs', 89, '2026-09-24T14:48:40.000Z'),
     subjectId:'Computer Science & Coding',
   }
 
@@ -159,7 +161,7 @@ test('replay proof lane proves a replay-trained Computer Science artifact before
   assert.ok('artifact' in first)
   assert.equal(first.artifact.candidateId,newerComputerScience.candidateId)
 
-  const csPassed = event(newerComputerScience,'local_distilled_runtime_canary_passed','2026-09-22T18:40:00.000Z')
+  const csPassed = event(newerComputerScience,'local_distilled_runtime_canary_passed','2026-09-24T16:40:00.000Z')
   const second = decideMassCanaryRollingApproval({
     artifacts:[legacy,olderLaw,newerComputerScience],
     events:[csPassed],
@@ -173,9 +175,9 @@ test('replay proof lane proves a replay-trained Computer Science artifact before
 })
 
 test('durable proof counts survive proof artifacts leaving the pending canary queue', () => {
-  const proofNow = new Date('2026-09-22T20:00:00.000Z')
+  const proofNow = new Date('2026-09-24T18:00:00.000Z')
   const legacy = artifact(85, '2026-09-20T00:00:00.000Z')
-  const replay = replayArtifact('mass:replay-durable', 86, '2026-09-22T18:07:59.000Z')
+  const replay = replayArtifact('mass:replay-durable', 86, '2026-09-24T14:03:46.000Z')
 
   const replayNeeded = decideMassCanaryRollingApproval({
     artifacts:[legacy,replay],
@@ -307,6 +309,7 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.match(route,/failureDerivedReplayRequired:receipt\.failureDerivedReplayRequired===true/)
   assert.match(route,/failureDerivedReplayItems:Number\(receipt\.failureDerivedReplayItems\|\|0\)/)
   assert.match(route,/contains\('intended_use',\{trainingReceipt:\{failureDerivedReplayRequired:true\}\}\)/)
+  assert.match(route,/gte\('created_at',MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER\)/)
   assert.match(route,/builderProofPasses=\[\.\.\.passedCandidates\]/)
   assert.match(route,/remediationReplayProofPasses=\[\.\.\.passedCandidates\]/)
   assert.match(route,/builderProofPasses,/)

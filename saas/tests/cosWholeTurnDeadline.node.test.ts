@@ -36,8 +36,10 @@ test('nested scopes can only tighten the deadline', async () => {
 
 test('model calls and the durable worker are bound to the whole-turn deadline', () => {
   const inference = readFileSync(join(process.cwd(), 'lib/ai/local-inference.ts'), 'utf8')
-  assert.match(inference, /const turnRemainingMs = turnDeadlineRemainingMs\(\)/)
-  assert.match(inference, /Math\.min\(callerBoundTimeoutMs, turnRemainingMs\)/)
+  // The whole-turn budget and the outer Platform Harness deadline are both ceilings; the model call
+  // gets the strictest remaining bound.
+  assert.match(inference, /const remainingBounds = \[turnDeadlineRemainingMs\(\), harnessDeadlineRemainingMs\(\)\]/)
+  assert.match(inference, /Math\.min\(callerBoundTimeoutMs, outerRemainingMs\)/)
   const route = readFileSync(join(process.cwd(), 'app/api/cos-provenance-browser/route.ts'), 'utf8')
   assert.match(route, /const requestStartedAt = Date\.now\(\)/)
   assert.match(route, /DURABLE_TURN_MODEL_DEADLINE_MS = 150_000/)

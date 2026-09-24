@@ -21,6 +21,7 @@ import {
   normalizeHarnessVerification,
   type HarnessTrajectoryVerifier,
 } from '../verification/outcome-verifier.ts'
+import { withHarnessExecutionContext } from './execution-context.ts'
 
 export interface HarnessRunPlan {
   actions: readonly HarnessAction[]
@@ -50,6 +51,12 @@ type HarnessCompensationEntry = {
   compensation: Extract<HarnessCompensation, { mode: 'compensate' }>
 }
 
+type HarnessManualRecoveryEntry = {
+  actionId: string
+  capabilityId: string
+  reason: string
+}
+
 type HarnessJournal = ReturnType<typeof createTrajectoryJournal>
 
 /**
@@ -61,7 +68,15 @@ export function harnessCompensationContractViolation(
   action: HarnessAction,
 ): string | null {
   const grant = manifest.capabilities.find(item => item.id === action.capabilityId)
-  if (!grant?.mutating) return null
+  if (!grant) return null
+  const risk = grant.risk ?? (grant.mutating ? 'write' : 'read')
+  if (
+    risk === 'consequential'
+    && !(action.preconditionEvidenceRefs ?? []).some(value => String(value ?? '').trim())
+  ) {
+    return 'harness_consequential_precondition_evidence_required'
+  }
+  if (!grant.mutating) return null
   const environmentClass = manifest.environment.class
   if (environmentClass !== 'production' && environmentClass !== 'staging') return null
   const compensation = action.compensation
@@ -75,7 +90,7 @@ export function harnessCompensationContractViolation(
     return 'harness_compensation_contract_invalid'
   }
   if (!String(compensation.reason ?? '').trim()) return 'harness_compensation_contract_invalid'
-  if (compensation.mode === 'irreversible' && grant.risk !== 'consequential') {
+  if (compensation.mode === 'irreversible' && risk !== 'consequential') {
     return 'harness_irreversible_action_requires_consequential_grant'
   }
   return null
@@ -108,10 +123,8 @@ async function runOneCompensation(entry: HarnessCompensationEntry): Promise<Harn
 async function runHarnessCompensations(
   journal: HarnessJournal,
   stack: readonly HarnessCompensationEntry[],
+  manualRecovery: readonly HarnessManualRecoveryEntry[] = [],
 ): Promise<HarnessCompensationSummary> {
-  if (!stack.length) {
-    return Object.freeze({ status: 'not_required', attempted: 0, completed: 0, failedActionIds: Object.freeze([]) })
-  }
   let completed = 0
   const failedActionIds: string[] = []
   for (const entry of [...stack].reverse()) {
@@ -133,12 +146,34 @@ async function runHarnessCompensations(
       },
     })
   }
-  const status = completed === stack.length ? 'completed' : completed === 0 ? 'failed' : 'partial'
+  for (const entry of manualRecovery) {
+    journal.append({
+      kind: 'escalation',
+      summary: 'Manual recovery is required because the action has no safe executable compensation.',
+      data: {
+        actionId: entry.actionId,
+        capabilityId: entry.capabilityId,
+        reason: entry.reason.slice(0, 300),
+      },
+    })
+  }
+  const status = manualRecovery.length
+    ? 'manual_recovery_required'
+    : !stack.length
+      ? 'not_required'
+      : completed === stack.length
+        ? 'completed'
+        : completed === 0
+          ? 'failed'
+          : 'partial'
   return Object.freeze({
     status,
     attempted: stack.length,
     completed,
     failedActionIds: Object.freeze(failedActionIds),
+    ...(manualRecovery.length
+      ? { manualRecoveryActionIds: Object.freeze([...new Set(manualRecovery.map(entry => entry.actionId))]) }
+      : {}),
   })
 }
 

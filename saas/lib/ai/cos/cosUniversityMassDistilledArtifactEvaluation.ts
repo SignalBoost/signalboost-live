@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts
 import { createHash, randomUUID } from 'node:crypto'
-import { withEvaluationRuntimeHarness } from '@/platform-harness/adapters/evaluation-runtime'
+import { withEvaluationRuntimeHarness } from '../../../platform-harness/adapters/evaluation-runtime.ts'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { MASS_EVALUATION_ENDPOINT_CALLS, MASS_EVALUATION_JUDGE_CALLS, MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from './cosUniversityMassEvaluationContextBudget.ts'

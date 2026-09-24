@@ -47,7 +47,7 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
     return row.verifier === 'training_executor'
       && evidence?.profile === FINE_TUNE_EVIDENCE_PROFILE
       && evidence?.claim === 'trained_artifact_registered'
-      && evidence?.trainingMode === 'distillation'
+      && ['distillation', 'working_cos_supervised_distillation'].includes(String(evidence?.trainingMode || ''))
       && evidence?.authorityExpanded === false
   })
   if (!trained) return { tracked: false as const, reason: 'distilled_artifact_missing' as const }
@@ -57,8 +57,18 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
   const trainedArtifactHash = clean(trainedEvidence?.artifactHash, 64).toLowerCase()
   const evidenceRef = clean(trainedEvidence?.evidenceRef, 2000)
   const revisionKey = clean(trainedEvidence?.revisionKey, 64).toLowerCase()
-  const studentModelId = clean(trainedEvidence?.distillationCandidate?.studentModelId, 240)
-  const teacherModelId = clean(trainedEvidence?.distillationCandidate?.teacherModelId, 240)
+  const trainingMode = clean(trainedEvidence?.trainingMode, 80)
+  const workingCosTraining = trainingMode === 'working_cos_supervised_distillation'
+    ? (trainedEvidence?.workingCosTraining || null)
+    : null
+  const studentModelId = clean(
+    workingCosTraining?.baseModelId || trainedEvidence?.distillationCandidate?.studentModelId,
+    240,
+  )
+  const teacherModelId = clean(
+    workingCosTraining ? 'itmounts/university-asset-vault' : trainedEvidence?.distillationCandidate?.teacherModelId,
+    240,
+  )
   if (!trainedArtifactId || !evidenceRef || !studentModelId || !HEX64.test(trainedArtifactHash) || !HEX64.test(revisionKey)) {
     throw new Error('local_distillation_artifact_identity_invalid')
   }
@@ -117,14 +127,19 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
     rollback_artifact_ref: rollbackArtifactRef,
     status: lifecycle.status,
     runtime_target: 'itmounts_local',
-    runtime_preference: 'runpod_serverless_primary_deepinfra_fallback',
+    runtime_preference: trainingMode === 'working_cos_supervised_distillation'
+      ? 'runpod_primary_exact_baseline_adapter'
+      : 'runpod_serverless_primary_deepinfra_fallback',
     artifact_kind: 'lora_adapter',
     intended_use: {
       profile: COS_LOCAL_DISTILLATION_ARTIFACT_VERSION,
       owner: 'itmounts',
+      trainingMode,
       canonicalBaseModel: studentModelId,
       adapterModel: trainedArtifactId,
       teacherModel: teacherModelId || null,
+      workingCosRuntimeBindingKey: clean(workingCosTraining?.runtimeBindingKey, 64) || null,
+      workingCosRuntimeDigest: clean(workingCosTraining?.runtimeDigest, 64) || null,
       trafficAuthorized: lifecycle.trafficAuthorized,
       nextGate: lifecycle.nextGate,
     },
@@ -145,7 +160,10 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
     rollbackReady: Boolean(rollbackArtifactRef),
     status: lifecycle.status,
     runtimeTarget: 'itmounts_local' as const,
-    runtimePreference: 'runpod_serverless_primary_deepinfra_fallback' as const,
+    trainingMode,
+    runtimePreference: trainingMode === 'working_cos_supervised_distillation'
+      ? 'runpod_primary_exact_baseline_adapter' as const
+      : 'runpod_serverless_primary_deepinfra_fallback' as const,
     trafficAuthorized: lifecycle.trafficAuthorized,
     nextGate: lifecycle.nextGate,
   }
@@ -163,7 +181,6 @@ export async function reconcileLocalDistillationArtifacts(now = new Date(), limi
     .contains('evidence', {
       profile: FINE_TUNE_EVIDENCE_PROFILE,
       claim: 'trained_artifact_registered',
-      trainingMode: 'distillation',
     })
     .order('observed_at', { ascending: false })
     .limit(boundedLimit)

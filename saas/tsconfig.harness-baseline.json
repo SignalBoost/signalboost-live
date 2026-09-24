@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": [
+    "platform-harness/adapters/production.ts",
+    "platform-harness/runtime/runner.ts",
+    "platform-harness/runtime/governed-executor.ts"
+  ]
+}

@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  statuses: read
 
 concurrency:
   # Collapse repeated events for the same PR or branch/ref to the newest revision.
@@ -23,6 +24,49 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      - name: Validate Vercel production gate syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check saas/scripts/vercel-cos-gates.mjs
+
+      - name: Require successful Vercel Preview for exact PR head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 30); do
+            state="$(gh api \
+              -H 'Accept: application/vnd.github+json' \
+              "/repos/${GITHUB_REPOSITORY}/commits/${PR_HEAD}/status" \
+              --jq '[.statuses[] | select(.context == "Vercel")][0].state // "missing"')"
+
+            case "$state" in
+              success)
+                echo "Vercel Preview succeeded for exact PR head ${PR_HEAD}."
+                exit 0
+                ;;
+              error|failure)
+                echo "::error::Vercel Preview is ${state} for exact PR head ${PR_HEAD}."
+                exit 1
+                ;;
+              pending|missing)
+                echo "Waiting for Vercel Preview on ${PR_HEAD} (attempt ${attempt}/30; state=${state})."
+                sleep 10
+                ;;
+              *)
+                echo "::error::Unexpected Vercel status '${state}' for ${PR_HEAD}."
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "::error::Vercel Preview did not report success for exact PR head ${PR_HEAD} within the bounded wait."
+          exit 1
 
       - name: Verify acknowledgement matches current files and head
         shell: bash

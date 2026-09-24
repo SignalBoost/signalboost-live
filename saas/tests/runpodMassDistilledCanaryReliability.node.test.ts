@@ -16,8 +16,8 @@ test('normal approved canaries receive approval-scoped provider runtime identiti
   assert.match(route, /\.\.\.artifact,runtimeKey/)
 })
 
-test('provider preflight is completed before the one paid/model invocation is consumed', () => {
-  const provisionIndex = route.indexOf('provisionMassDistilledRuntime(runtimeArtifact)')
+test('canary-specific provider preflight is completed before the one paid/model invocation is consumed', () => {
+  const provisionIndex = route.indexOf('provisionMassDistilledCanaryRuntime(runtimeArtifact)')
   const invocationIndex = route.indexOf('claim:INVOCATION_STARTED')
   const canaryIndex = route.indexOf('canaryMassDistilledRuntime({endpointId:provisioned.endpointId')
   assert.ok(provisionIndex >= 0)
@@ -50,6 +50,13 @@ test('a durable preflight failure releases the short reservation lease immediate
   assert.match(migration, /t\.evidence->>'reservationEventKey'=s\.event_key/)
   assert.match(migration, /local_distilled_runtime_canary_preflight_failed/)
   assert.match(migration, /interval '8 minutes'/)
+})
+
+test('canary compatibility permits ordered 24GB to 16GB availability fallback without changing evaluator policy', () => {
+  assert.match(compatibility, /const CANARY_APPROVED_POOLS = \['AMPERE_24', 'AMPERE_16'\] as const/)
+  assert.match(compatibility, /provisionMassDistilledCanaryRuntime/)
+  assert.match(compatibility, /provisionMassDistilledRuntimeWithPools\(input, CANARY_APPROVED_POOLS\)/)
+  assert.match(compatibility, /provisionMassDistilledRuntimeWithPools\(input, APPROVED_POOLS\)/)
 })
 
 test('compatibility layer uses the same v4 template identity as the creator', () => {

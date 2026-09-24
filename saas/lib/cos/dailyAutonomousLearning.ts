@@ -146,6 +146,123 @@ const HF_ARXIV_DAILY_QUERIES = Object.freeze([
   'cloud systems performance isolation',
 ] as const)
 
+const SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES = Object.freeze([
+  'autonomous software repair agents evaluation',
+  'retrieval augmented generation evaluation',
+  'vector database semantic retrieval',
+  'large language model tool use',
+  'distributed systems reliability',
+  'database query optimization',
+  'software testing program repair',
+  'cybersecurity software supply chain',
+  'machine learning systems observability',
+  'multi agent systems coordination',
+  'code generation evaluation',
+  'cloud systems performance isolation',
+  'software architecture maintainability',
+  'program analysis vulnerability detection',
+  'database transaction concurrency control',
+  'service mesh reliability observability',
+  'agent memory retrieval evaluation',
+  'embedding retrieval benchmark',
+  'large language model code generation',
+  'AI agent planning tool execution',
+  'software dependency supply chain security',
+  'distributed cache consistency',
+  'queue backpressure retry reliability',
+  'database indexing query planning',
+] as const)
+
+const WIKIMEDIA_CONTINUOUS_TOPICS = Object.freeze([
+  'Artificial intelligence',
+  'Large language model',
+  'Cybersecurity',
+  'Quantum computing',
+  'Cloud computing',
+  'Software engineering',
+  'Data science',
+  'Robotics',
+  'Machine learning',
+  'Distributed computing',
+  'Database',
+  'Computer security',
+  'European Union',
+  'United States',
+  'Brazil',
+  'Poland',
+  'United Nations',
+  'NATO',
+  'NASA',
+  'Linux',
+  'PostgreSQL',
+  'Kubernetes',
+  'GitHub',
+  'World Wide Web',
+] as const)
+
+function utcLearningHour(now: Date): number {
+  const value = now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date(0)
+  return Math.floor(value.getTime() / 3_600_000)
+}
+
+function rotatingItem<T>(items: readonly T[], index: number): T {
+  if (!items.length) throw new Error('continuous_learning_rotation_empty')
+  const normalized = ((index % items.length) + items.length) % items.length
+  return items[normalized] as T
+}
+
+/**
+ * Semantic Scholar and Wikimedia were technically integrated but effectively starved in Production:
+ * Semantic Scholar is intentionally gap-only and has a one-call-per-cycle budget, while Wikimedia's
+ * generic daily queries were mostly rejected or deduplicated. Put exact-source objectives FIRST so
+ * Semantic Scholar spends its single call on a useful research query, and give Wikimedia three
+ * entity-shaped lookups that match how an encyclopaedia actually searches. Rotation is hourly so
+ * repeated cron ticks deduplicate cheaply while the source still advances throughout the day.
+ */
+export function openSourceContinuityCurriculum(now: Date = new Date()): KnowledgeGap[] {
+  const hour = utcLearningHour(now)
+  const semanticQuery = rotatingItem(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, hour)
+  const wikiTopics = [0, 1, 2].map(offset => rotatingItem(WIKIMEDIA_CONTINUOUS_TOPICS, hour * 3 + offset))
+
+  return [
+    {
+      id: 'curriculum:semantic-scholar-continuous',
+      subject: 'Computer Science & Coding',
+      question: `What reusable scientific evidence is relevant to ${semanticQuery}?`,
+      discoveryQuery: semanticQuery,
+      portableIds: ['cos'],
+      expectedReuse: 40,
+      expectedAvoidedCostUsd: 1,
+      urgency: 100,
+      evidence: [
+        'bounded continuous Semantic Scholar curriculum',
+        'external_semantic_index:semantic_scholar_specter2_proximity_v2',
+      ],
+      sourceKinds: ['scientific_journal'],
+      allowedAdapterIds: ['semantic_scholar'],
+      curriculumAligned: true,
+    },
+    ...wikiTopics.map((topic, index): KnowledgeGap => ({
+      id: `curriculum:wikimedia-continuous-${index + 1}`,
+      subject: topic,
+      question: `What current, reusable reference facts and status information are documented about ${topic}?`,
+      discoveryQuery: topic,
+      portableIds: ['cos'],
+      expectedReuse: 30,
+      expectedAvoidedCostUsd: 0.5,
+      urgency: 99 - index,
+      evidence: [
+        'bounded continuous Wikimedia reference curriculum',
+        'wikipedia / wikimedia',
+        'license:CC BY-SA 4.0',
+      ],
+      sourceKinds: ['approved_public_web'],
+      allowedAdapterIds: ['reference'],
+      curriculumAligned: true,
+    })),
+  ]
+}
+
 function utcLearningDay(now: Date): number {
   const value = now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date(0)
   return Math.floor(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()) / 86_400_000)
@@ -523,9 +640,13 @@ export async function runDailyAutonomousLearning(input: {
   const corpusExpansionGaps = normalizedDynamicGaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const autonomousGaps = [...reasoningGaps, ...corpusExpansionGaps].slice(0, 12)
   const trackStudy = curriculumTrackStudyGaps({ prioritySubjects: weaknessCurriculumSignals.map(signal => signal.subject) })
+  const openSourceContinuity = openSourceContinuityCurriculum()
   const hfOpenDatasetCurriculum = huggingFaceOpenDatasetCurriculum()
-  const curriculum = [...hfOpenDatasetCurriculum, ...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum(), ...trackStudy]
-  const gaps = [miningGap(input.miningSummary), ...autonomousGaps, ...curriculum]
+  const generalCurriculum = [...hfOpenDatasetCurriculum, ...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum(), ...trackStudy]
+  const curriculum = [...openSourceContinuity, ...generalCurriculum]
+  // Exact-source continuity objectives run first. Semantic Scholar has a one-call-per-cycle budget,
+  // so putting generic gaps ahead of it would consume that call before the dedicated query executes.
+  const gaps = [...openSourceContinuity, miningGap(input.miningSummary), ...autonomousGaps, ...generalCurriculum]
   const liveAdapters = withSharedLearningSourceProviderLeases(
     createLiveLearningAdapters(),
     `daily:${input.miningSummary.run_id}`,
@@ -548,6 +669,8 @@ export async function runDailyAutonomousLearning(input: {
     injectedGapSubjects: injectedGapSignals.map(signal => signal.subject),
     retainedKnowledge: dynamic.retained,
     curriculumGaps: curriculum.length,
+    openSourceContinuityGaps: openSourceContinuity.length,
+    openSourceContinuityQueries: openSourceContinuity.map(gap => ({ adapter: gap.allowedAdapterIds?.[0], query: gap.discoveryQuery })),
     hfOpenDatasetGaps: hfOpenDatasetCurriculum.length,
     hfOpenDatasetQueries: hfOpenDatasetCurriculum.map(gap => gap.discoveryQuery),
     trackStudyGaps: trackStudy.length,

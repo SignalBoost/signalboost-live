@@ -1,2 +1,2 @@
-base_sha=e18bd4423825e983df324c7f20f63849fd478d5a
-branch=fix/runpod-ada-canary-serialization-20260924
+base_sha=4704b227c17af3ceeb19ae02e66348ce30884f21
+branch=fix/runpod-transient-gateway-retry-telemetry-20260924

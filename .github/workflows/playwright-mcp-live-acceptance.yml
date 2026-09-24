@@ -16,6 +16,17 @@ on:
       - 'saas/provider-hub-host/browser-mcp-stdio-host.ts'
       - 'saas/scripts/browser-agent-host/run-playwright-mcp-acceptance.ts'
       - 'saas/tests/portableBrowserAdapterCatalog.node.test.ts'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/playwright-mcp-live-acceptance.yml'
+      - 'saas/provider-hub-host/mcp-stdio-transport.ts'
+      - 'saas/provider-hub-host/mcp-outbound-client.ts'
+      - 'saas/provider-hub-host/mcp-connection-registry.ts'
+      - 'saas/provider-hub-host/browser-mcp-profiles.ts'
+      - 'saas/provider-hub-host/browser-mcp-stdio-host.ts'
+      - 'saas/scripts/browser-agent-host/run-playwright-mcp-acceptance.ts'
+      - 'saas/tests/portableBrowserAdapterCatalog.node.test.ts'
   workflow_dispatch:
     inputs:
       probe_url:

@@ -8,6 +8,7 @@ import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_PROFILE,
+  MASS_CANARY_IN_FLIGHT_TTL_MS,
   MASS_CANARY_ROLLING_WINDOW_HOURS,
   decideMassCanaryRollingApproval,
   type CanaryEvent,
@@ -41,7 +42,7 @@ const MIN_BALANCE_USD = 1
 // Operational status only: never read by a gate. See lib/ai/cos/cosLaneStatus.ts for why this is not
 // recorded in the assurance ledger.
 const LANE = 'runpod-mass-distilled-local-deploy'
-const laneStatus = (outcome:'worked'|'skipped'|'failed',reason:string,detail?:Record<string,unknown>)=>recordCosLaneStatus({db:cosServiceDb(),lane:LANE,outcome,reason,detail})
+const laneStatus = (outcome:'running'|'worked'|'skipped'|'failed',reason:string,detail?:Record<string,unknown>)=>recordCosLaneStatus({db:cosServiceDb(),lane:LANE,outcome,reason,detail})
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const clean = (value: unknown, max = 1000) => String(value ?? '').replace(/\s+/g,' ').trim().slice(0,max)
@@ -348,6 +349,52 @@ async function approvedColdStartResume(input:{candidateId:string;artifactHash:st
   return Object.freeze({endpointId,runtimeKey})
 }
 
+async function readInFlightCanary(now:Date){
+  const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
+  const since=new Date(now.getTime()-MASS_CANARY_IN_FLIGHT_TTL_MS).toISOString()
+  const page=await db.from('cos_university_learning_assurance_events')
+    .select('candidate_id,observed_at,evidence')
+    .eq('event_type','fine_tune')
+    .eq('verifier','host_controller')
+    .contains('evidence',{profile:PROFILE})
+    .gte('observed_at',since)
+    .order('observed_at',{ascending:false})
+    .limit(200)
+  if(page.error) throw page.error
+  const rows=page.data||[]
+  for(const row of rows){
+    const evidence=(row as any)?.evidence
+    if(!evidence||evidence.claim!==INVOCATION_STARTED) continue
+    const candidateId=clean((row as any).candidate_id,240)
+    const artifactHash=clean(evidence.artifactHash,64).toLowerCase()
+    const reservationEventKey=clean(evidence.reservationEventKey,64)
+    const startedAt=String((row as any).observed_at||'')
+    if(!candidateId||!HEX64.test(artifactHash)||!Number.isFinite(Date.parse(startedAt))) continue
+    const terminal=rows.some((other:any)=>{
+      const otherEvidence=other?.evidence
+      if(!otherEvidence||(otherEvidence.claim!==PASSED&&otherEvidence.claim!==FAILED)) return false
+      if(String(other?.candidate_id||'')!==candidateId) return false
+      if(clean(otherEvidence.artifactHash,64).toLowerCase()!==artifactHash) return false
+      if(Date.parse(String(other?.observed_at||''))<Date.parse(startedAt)) return false
+      return !reservationEventKey || clean(otherEvidence.reservationEventKey,64)===reservationEventKey
+    })
+    if(terminal) continue
+    return Object.freeze({
+      candidateId,
+      artifactHash,
+      endpointId:clean(evidence.endpointId,120),
+      runtimeKey:clean(evidence.runtimeKey,32).toLowerCase(),
+      reservationEventKey,
+      startedAt,
+      coldStartResume:evidence.coldStartResume===true,
+      configuredGpuPools:evidence.configuredGpuPools,
+      canaryEligibleGpuPools:evidence.canaryEligibleGpuPools,
+      catalogPrices:evidence.canaryCatalogServerlessPriceUsdPerHourByPool,
+    })
+  }
+  return null
+}
+
 export async function GET(req:NextRequest){
   const secret=process.env.CRON_SECRET
   if(!secret||req.headers.get('authorization')!==`Bearer ${secret}`) return NextResponse.json({ok:false,error:'Unauthorized'},{status:401})
@@ -362,7 +409,15 @@ export async function GET(req:NextRequest){
     const rolling=await issueRollingCanaryApproval(new Date(Date.now()-1000))
     console.log('[cos-mass-distilled-rolling-canary-authorization]',JSON.stringify(rolling))
     const claim=await claimNext()
-    if(!claim){await laneStatus('skipped','no_atomically_claimable_mass_distilled_artifact',{approvalIssued:Boolean((rolling as any)?.issued),approvalReason:(rolling as any)?.reason});return NextResponse.json({ok:true,skipped:true,reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling})}
+    if(!claim){
+      const inFlight=await readInFlightCanary(new Date())
+      if(inFlight){
+        await laneStatus('running','canary_in_progress',inFlight)
+        return NextResponse.json({ok:true,running:true,reason:'canary_in_progress',candidateId:inFlight.candidateId,endpointId:inFlight.endpointId,startedAt:inFlight.startedAt,approval:rolling})
+      }
+      await laneStatus('skipped','no_atomically_claimable_mass_distilled_artifact',{approvalIssued:Boolean((rolling as any)?.issued),approvalReason:(rolling as any)?.reason})
+      return NextResponse.json({ok:true,skipped:true,reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling})
+    }
     const {artifact,revisionKey}=artifactFromClaim(claim)
     const approvedCost=Number(claim.max_estimated_canary_cost_usd)
     const approvalAt=String(claim.approval_observed_at||'')
@@ -398,6 +453,7 @@ export async function GET(req:NextRequest){
     // It is written before /ready, because the first endpoint request can wake paid compute.
     await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:INVOCATION_STARTED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
     providerInvocationStarted=true
+    await laneStatus('running','canary_in_progress',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,runtimeKey,coldStartResume:Boolean(coldStartResume),configuredGpuPools:provisioned.gpuPools,canaryEligibleGpuPools:provisioned.canaryEligibleGpuPools,catalogPrices:provisioned.canaryCatalogServerlessPriceUsdPerHourByPool})
 
     const canary=await canaryMassDistilledRuntime({endpointId:provisioned.endpointId,modelName:provisioned.modelName})
     let healthAfter:unknown

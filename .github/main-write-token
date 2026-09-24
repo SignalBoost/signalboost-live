@@ -1,2 +1,2 @@
-base_sha=bfefb2cb531d3d62dd7ad90dcc6d3fb8573bf086
-branch=fix/mass-canary-rolling-window-complete-20260924
+base_sha=1d5cf0a418302e61328bcbef8f42bbfd9b6c5a3c
+branch=fix/runpod-lane-active-state-20260924

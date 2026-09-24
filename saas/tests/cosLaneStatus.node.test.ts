@@ -14,6 +14,10 @@ const ROUTE = readFileSync(
   new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url),
   'utf8',
 )
+const RUNNING_MIGRATION = readFileSync(
+  new URL('../supabase/migrations/20260924193000_cos_lane_status_running.sql', import.meta.url),
+  'utf8',
+)
 
 test('args are built with the stored procedure parameter names', () => {
   const args = buildCosLaneStatusArgs({
@@ -40,6 +44,12 @@ test('detail drops nullish and non-finite values and stringifies objects', () =>
   assert.equal((args.p_detail as any).e, 0)
   assert.equal((args.p_detail as any).f, false)
   assert.equal((args.p_detail as any).g, '{"n":1}')
+})
+
+test('running is an explicit operational state', () => {
+  const args = buildCosLaneStatusArgs({ lane: 'l', outcome: 'running', reason: 'canary_in_progress', detail: { endpointId: 'ep1' } })
+  assert.equal(args.p_outcome, 'running')
+  assert.equal(args.p_reason, 'canary_in_progress')
 })
 
 test('empty detail, deployment and commit are accepted', () => {
@@ -86,8 +96,19 @@ test('the canary lane reports on every exit path', () => {
   for (const reason of ['runpod_balance_guard', 'no_atomically_claimable_mass_distilled_artifact', 'canary_failed', 'canary_passed', 'lane_error']) {
     assert.match(ROUTE, new RegExp(`laneStatus\\('(worked|skipped|failed)','${reason}'`), reason)
   }
+  assert.match(ROUTE, /laneStatus\('running','canary_in_progress'/)
+  assert.match(ROUTE, /readInFlightCanary\(new Date\(\)\)/)
+  assert.match(ROUTE, /MASS_CANARY_IN_FLIGHT_TTL_MS/)
   // The skip response now carries the rolling-authority reason too, which previously only reached a log line.
   assert.match(ROUTE, /reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling/)
+})
+
+test('schema stores active state without erasing the last terminal result', () => {
+  assert.match(RUNNING_MIGRATION, /'running','worked','skipped','failed'/)
+  assert.match(RUNNING_MIGRATION, /last_completed_outcome/)
+  assert.match(RUNNING_MIGRATION, /last_completed_reason/)
+  assert.match(RUNNING_MIGRATION, /last_completed_at/)
+  assert.match(RUNNING_MIGRATION, /when excluded\.outcome='running'/)
 })
 
 test('lane status is never written to the assurance ledger or read by a gate', () => {

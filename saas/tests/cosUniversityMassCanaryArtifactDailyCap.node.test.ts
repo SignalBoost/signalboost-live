@@ -80,3 +80,39 @@ test('the daily ceiling never issues an approval when every artifact is capped',
   assert.equal(decision.issue, false)
   if (decision.issue === false) assert.equal(decision.reason, 'no_mass_artifact_eligible_for_rolling_canary')
 })
+
+/** A no-worker failure carrying the exact endpoint/runtime identity and RunPod health at failure time. */
+function noWorkerAttempt(a: CanaryArtifact, startedMinutesAgo: number, initializing: number, runtimeKey = 'abcdef0123'): CanaryEvent[] {
+  return [
+    ev(a, MASS_CANARY_APPROVAL_CLAIM, minutesAgo(startedMinutesAgo), { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF }),
+    ev(a, 'local_distilled_runtime_canary_invocation_started', minutesAgo(startedMinutesAgo - 0.1), { endpointId: '4a9vadre1v4q1g', runtimeKey }),
+    ev(a, 'local_distilled_runtime_canary_failed', minutesAgo(startedMinutesAgo - 6), {
+      error: MASS_CANARY_NO_WORKER_FAILURE,
+      endpointId: '4a9vadre1v4q1g',
+      runtimeKey,
+      healthAfter: { ok: true, workers: { idle: 0, ready: 0, running: 0, initializing } },
+    }),
+  ]
+}
+
+test('the Production 19:37 shape: a worker still initializing is resumed on the same endpoint', () => {
+  const decision = decideMassCanaryRollingApproval({ artifacts: [waiting], events: noWorkerAttempt(waiting, 90, 1), now, enabled: true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId, 'mass:waiting')
+  assert.equal(decision.evidence.coldStartResume, true)
+  assert.equal(decision.evidence.coldStartResumeEndpointId, '4a9vadre1v4q1g')
+  assert.equal(decision.evidence.coldStartResumeRuntimeKey, 'abcdef0123')
+})
+
+test('the Production 19:55 shape: no worker allocated at all is never pinned to that endpoint', () => {
+  const decision = decideMassCanaryRollingApproval({ artifacts: [waiting], events: noWorkerAttempt(waiting, 90, 0), now, enabled: true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.evidence.coldStartResume, undefined)
+})
+
+test('an initializing endpoint is resumed at most once, then the artifact gets a fresh runtime', () => {
+  const events = [...noWorkerAttempt(waiting, 150, 1), ...noWorkerAttempt(waiting, 90, 1)]
+  const decision = decideMassCanaryRollingApproval({ artifacts: [waiting], events, now, enabled: true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.evidence.coldStartResume, undefined)
+})

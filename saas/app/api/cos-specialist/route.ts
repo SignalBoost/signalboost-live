@@ -1,3 +1,4 @@
+// saas/app/api/cos-specialist/route.ts
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
@@ -6,6 +7,10 @@ import { attachProductionSpecialistMeshEvidence } from '@/a2a-host/a2a-host-acti
 import { getCOSA2ARuntimeHost } from '@/a2a-host/cos-runtime-host'
 import { planCOSSpecialistFromText } from '@/a2a-host/cos-specialist-planner'
 import { selectCOSA2AHostForPlan } from '@/a2a-host/reference-cos-runtime-host'
+import {
+  requireCosA2ASpecialistHarnessIngress,
+  runCosA2ASpecialistProductionHarness,
+} from '@/lib/ai/cos/a2aSpecialistHarness'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -59,6 +64,12 @@ function exactScope(body: any): { tenantId: string; environmentId: string; porta
   return { tenantId, environmentId, portableId }
 }
 
+/** Specialist orchestration may only run inside the mandatory A2A specialist HarnessRun. */
+async function orchestrateSpecialistInsideHarness<T>(operation: () => Promise<T>): Promise<T> {
+  requireCosA2ASpecialistHarnessIngress()
+  return operation()
+}
+
 /**
  * COS specialist runtime bridge.
  * Buyer-installed hosts take precedence. In Production-capable server environments an installed host is
@@ -108,14 +119,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reply: 'No governed A2A specialist host is available for this specialist plan.', source: 'cos-a2a-host-unavailable', execution_allowed: false, external_action_taken: false }, { status: 503 })
   }
 
-  const result = await selected.host.orchestrator.orchestrate({
-    ...scope,
-    messageId: text(body?.context?.messageId) || crypto.randomUUID(),
-    text: prompt,
-    plan,
-    ...(body?.context?.a2aApproval ? { approval: body.context.a2aApproval } : {}),
-    ...(text(body?.context?.traceId) ? { traceId: text(body.context.traceId) } : {}),
+  const selectedHost = selected.host
+  const harness = await runCosA2ASpecialistProductionHarness({
+    objective: prompt || `Delegate ${plan.skillId} to ${plan.familyId}.`,
+    scope,
+    execute: () => orchestrateSpecialistInsideHarness(() => selectedHost.orchestrator.orchestrate({
+      ...scope,
+      messageId: text(body?.context?.messageId) || crypto.randomUUID(),
+      text: prompt,
+      plan,
+      ...(body?.context?.a2aApproval ? { approval: body.context.a2aApproval } : {}),
+      ...(text(body?.context?.traceId) ? { traceId: text(body.context.traceId) } : {}),
+    })),
   })
+
+  if (harness.ok === false) {
+    return NextResponse.json({
+      ok: false,
+      reply: 'Specialist delegation was blocked by the Production Harness. No specialist work was started.',
+      source: 'cos-a2a-harness-blocked',
+      harness_run_id: harness.runId,
+      harness_failure_code: harness.code,
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 503 })
+  }
+
+  const result = harness.value
 
   const reply = specialistReply(result.data) || (result.ok
     ? `Specialist ${result.selectedAgentId || result.agentId} completed ${result.skillId}.`
@@ -130,7 +160,8 @@ export async function POST(req: NextRequest) {
     a2a_mesh_evidence_source: installedHost && durableEvidenceDb ? 'supabase-service-role' : 'host-configured',
     specialist_plan_source: hasSuppliedPlan ? 'supplied' : 'natural_language',
     specialist_planner: hasSuppliedPlan ? undefined : inferredPlan,
+    harness_run_id: harness.runId,
     execution_allowed: result.ok,
     external_action_taken: false,
-  }, { status: result.ok ? 200 : 409 })
+  }, { status: result.ok ? 200 : 409, headers: { 'x-itmounts-harness-run-id': harness.runId, 'x-itmounts-harness-profile': 'production' } })
 }

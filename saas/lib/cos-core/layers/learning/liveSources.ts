@@ -47,7 +47,8 @@ function sourceCallBudgetMultiplier(env:LiveLearningEnvironment):number{
 export function sourceCallBudget(adapter:ContinuousLearningSourceAdapter,env:LiveLearningEnvironment=process.env):number{
   const id=adapter.id??adapter.kind
   let base=Number.POSITIVE_INFINITY
-  if(id==='semantic_scholar'||id==='openalex_semantic'||id==='hf_nist_cc0'||id==='hf_github_cc0'||id==='hf_arxiv_cc0')base=1
+  if(id==='semantic_scholar')base=3
+  else if(id==='openalex_semantic'||id==='hf_nist_cc0'||id==='hf_github_cc0'||id==='hf_arxiv_cc0')base=1
   else if(id==='openalex'||id==='europe_pmc')base=2
   if(!Number.isFinite(base))return base
   return base*sourceCallBudgetMultiplier(env)

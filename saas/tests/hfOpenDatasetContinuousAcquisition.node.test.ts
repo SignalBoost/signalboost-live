@@ -36,7 +36,9 @@ test('Semantic Scholar and Wikimedia receive exact-source rotating continuity ob
   assert.match(daily, /function utcLearningQuarterHour\(now: Date\): number/)
   assert.match(daily, /export function openSourceContinuityCurriculum\(now: Date = new Date\(\)\): KnowledgeGap\[\]/)
 
-  assert.match(daily, /id: 'curriculum:semantic-scholar-continuous'[\s\S]*?sourceKinds: \['scientific_journal'\][\s\S]*?allowedAdapterIds: \['semantic_scholar'\]/)
+  assert.match(daily, /curriculum:semantic-scholar-continuous-/)
+  assert.match(daily, /semanticQueries = \[0, 1, 2\]\.map/)
+  assert.match(daily, /sourceKinds: \['scientific_journal'\][\s\S]*?allowedAdapterIds: \['semantic_scholar'\]/)
   assert.ok(daily.includes('curriculum:wikimedia-continuous-'))
   assert.match(daily, /sourceKinds: \['approved_public_web'\][\s\S]*?allowedAdapterIds: \['reference'\]/)
   assert.match(daily, /const openSourceContinuity = openSourceContinuityCurriculum\(\)/)
@@ -68,6 +70,6 @@ test('open-source continuity rotates on the 15-minute cron slot instead of hourl
   assert.match(daily, /function utcLearningQuarterHour\(now: Date\): number/)
   assert.match(daily, /Math\.floor\(value\.getTime\(\) \/ \(15 \* 60_000\)\)/)
   assert.match(daily, /const slot = utcLearningQuarterHour\(now\)/)
-  assert.match(daily, /rotatingItem\(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, slot\)/)
+  assert.match(daily, /rotatingItem\(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, slot \* 3 \+ offset\)/)
   assert.match(daily, /rotatingItem\(WIKIMEDIA_CONTINUOUS_TOPICS, slot \* 3 \+ offset\)/)
 })

@@ -212,29 +212,29 @@ function rotatingItem<T>(items: readonly T[], index: number): T {
 }
 
 /**
- * Semantic Scholar and Wikimedia were technically integrated but effectively starved in Production:
- * Semantic Scholar is intentionally gap-only and has a one-call-per-cycle budget, while Wikimedia's
- * generic daily queries were mostly rejected or deduplicated. Put exact-source objectives FIRST so
- * Semantic Scholar spends its single call on a useful research query, and give Wikimedia three
- * entity-shaped lookups that match how an encyclopaedia actually searches. Rotation follows the
- * dedicated 15-minute continuity cron so each tick advances to fresh source material instead of
- * re-querying the same hourly topic and immediately hitting duplicate admission.
+ * Semantic Scholar and Wikimedia were technically integrated but effectively starved in Production.
+ * Give each 15-minute continuity tick three source-pinned Semantic Scholar/S2ORC research queries and
+ * three Wikimedia entity lookups. The provider guards still serialize requests, enforce the bounded
+ * source interval/circuit breaker, and keep external access cost at zero; this change removes the
+ * artificial one-query bottleneck rather than bypassing admission, provenance, or deduplication.
  */
 export function openSourceContinuityCurriculum(now: Date = new Date()): KnowledgeGap[] {
   const slot = utcLearningQuarterHour(now)
-  const semanticQuery = rotatingItem(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, slot)
+  const semanticQueries = [0, 1, 2].map(offset =>
+    rotatingItem(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, slot * 3 + offset),
+  )
   const wikiTopics = [0, 1, 2].map(offset => rotatingItem(WIKIMEDIA_CONTINUOUS_TOPICS, slot * 3 + offset))
 
   return [
-    {
-      id: 'curriculum:semantic-scholar-continuous',
+    ...semanticQueries.map((semanticQuery, index): KnowledgeGap => ({
+      id: `curriculum:semantic-scholar-continuous-${index + 1}`,
       subject: 'Computer Science & Coding',
       question: `What reusable scientific evidence is relevant to ${semanticQuery}?`,
       discoveryQuery: semanticQuery,
       portableIds: ['cos'],
       expectedReuse: 40,
       expectedAvoidedCostUsd: 1,
-      urgency: 100,
+      urgency: 100 - index,
       evidence: [
         'bounded continuous Semantic Scholar curriculum',
         'external_semantic_index:semantic_scholar_specter2_proximity_v2',
@@ -242,7 +242,7 @@ export function openSourceContinuityCurriculum(now: Date = new Date()): Knowledg
       sourceKinds: ['scientific_journal'],
       allowedAdapterIds: ['semantic_scholar'],
       curriculumAligned: true,
-    },
+    })),
     ...wikiTopics.map((topic, index): KnowledgeGap => ({
       id: `curriculum:wikimedia-continuous-${index + 1}`,
       subject: topic,

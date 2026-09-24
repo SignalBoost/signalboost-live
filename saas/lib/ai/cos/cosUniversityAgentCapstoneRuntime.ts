@@ -5,6 +5,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { executeBoundSoftwareCapstone, selectAgentCapstoneProcedures, type AgentCapstoneRequest } from './cosUniversityAgentCapstone.ts'
 import { requireCosUniversityGraduationRuntime } from './cosUniversityGraduationRuntimePolicy.ts'
+import { deepInfraMaxCallUsd, deepInfraMaxRunUsd } from './deepInfraSpendPolicy.ts'
 
 export async function requireRegisteredCapstoneRuntime(agentId: string): Promise<string> {
   const role = await readCosUniversityAgentRole(agentId)
@@ -35,7 +36,12 @@ async function executeSoftwareCapstoneRuntimeInsideHarness(request: AgentCapston
     readRole: readCosUniversityAgentRole, loadProcedures: loadOwnProcedures, model,
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
-    infer: (input, selectedModel) => callLocalModel({ ...input, frequencyPenalty: 0, presencePenalty: 0 }, {
+    infer: (input, selectedModel) => callLocalModel({
+      ...input,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+      maxEstimatedCostUsd: deepInfraMaxCallUsd('university_assessment'),
+    }, {
       ...config, model: selectedModel, timeoutMs: Math.min(config.timeoutMs, 90_000),
     }),
   })
@@ -56,6 +62,7 @@ export async function executeSoftwareCapstoneRuntime(
     deadlineMs: 120_000,
     maxConcurrency: 1,
     maxToolCalls: 4,
+    maxCostUsd: deepInfraMaxRunUsd('university_assessment'),
     runId: `university-capstone-${request.runId}`,
   }, () => executeSoftwareCapstoneRuntimeInsideHarness(request))
 }

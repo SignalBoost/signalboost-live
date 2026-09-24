@@ -7,9 +7,16 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type { HarnessManifest } from '../core/types.ts'
 
+type HarnessProviderCostLedger = {
+  maxCostUsd: number
+  reservedCostUsd: number
+}
+
 export type HarnessExecutionContext = Readonly<{
   manifest: HarnessManifest
   signal: AbortSignal
+  /** Present only for lightweight host ingress that explicitly enabled a hard provider-spend ceiling. */
+  providerCostLedger?: HarnessProviderCostLedger
 }>
 
 const harnessExecutionScope = new AsyncLocalStorage<HarnessExecutionContext>()
@@ -30,10 +37,49 @@ export function harnessDeadlineRemainingMs(now = Date.now()): number | null {
   return deadline === null ? null : Math.max(0, deadline - now)
 }
 
+export function reserveHarnessProviderCostUsd(maxEstimatedCostUsd: number): Readonly<{
+  maxCostUsd: number
+  reservedCostUsd: number
+  remainingCostUsd: number
+}> | null {
+  const context = harnessExecutionScope.getStore()
+  const ledger = context?.providerCostLedger
+  if (!ledger) return null
+  const reservation = Number(maxEstimatedCostUsd)
+  if (!Number.isFinite(reservation) || reservation <= 0) {
+    throw new Error('harness_provider_cost_reservation_invalid')
+  }
+  if (ledger.reservedCostUsd + reservation > ledger.maxCostUsd + Number.EPSILON) {
+    throw new Error('harness_provider_cost_budget_exceeded')
+  }
+  ledger.reservedCostUsd = Number((ledger.reservedCostUsd + reservation).toFixed(6))
+  return Object.freeze({
+    maxCostUsd: ledger.maxCostUsd,
+    reservedCostUsd: ledger.reservedCostUsd,
+    remainingCostUsd: Math.max(0, Number((ledger.maxCostUsd - ledger.reservedCostUsd).toFixed(6))),
+  })
+}
+
+export function withHarnessProviderCostBudget<T>(
+  maxCostUsd: number,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const existing = harnessExecutionScope.getStore()
+  if (!existing) return operation()
+  if (existing.providerCostLedger) return operation()
+  const max = Number(maxCostUsd)
+  if (!Number.isFinite(max) || max < 0) throw new Error('harness_provider_cost_budget_invalid')
+  return harnessExecutionScope.run(Object.freeze({
+    ...existing,
+    providerCostLedger: { maxCostUsd: max, reservedCostUsd: 0 },
+  }), operation)
+}
+
 export function withHarnessExecutionContext<T>(
   manifest: HarnessManifest,
   signal: AbortSignal,
   operation: () => Promise<T>,
+  options: Readonly<{ enforceProviderCostBudget?: boolean }> = {},
 ): Promise<T> {
   const existing = harnessExecutionScope.getStore()
   if (existing) {
@@ -50,5 +96,15 @@ export function withHarnessExecutionContext<T>(
       throw new Error('harness_nested_deadline_widening_forbidden')
     }
   }
-  return harnessExecutionScope.run(Object.freeze({ manifest, signal }), operation)
+  const configuredMaxCostUsd = Number(manifest.limits.maxCostUsd)
+  const providerCostLedger = options.enforceProviderCostBudget === true
+    && Number.isFinite(configuredMaxCostUsd)
+    && configuredMaxCostUsd >= 0
+    ? { maxCostUsd: configuredMaxCostUsd, reservedCostUsd: 0 }
+    : undefined
+  return harnessExecutionScope.run(Object.freeze({
+    manifest,
+    signal,
+    ...(providerCostLedger ? { providerCostLedger } : {}),
+  }), operation)
 }

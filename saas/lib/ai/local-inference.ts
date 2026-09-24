@@ -5,6 +5,7 @@ import { planContextWindow } from './context-window-manager.ts'
 import {
   currentHarnessExecutionContext,
   harnessDeadlineRemainingMs,
+  reserveHarnessProviderCostUsd,
 } from '../../platform-harness/runtime/execution-context.ts'
 
 export type LocalModelToolDefinition = Readonly<{
@@ -68,6 +69,11 @@ export interface LocalModelCallArgs {
   allowTruncatedText?: boolean
   /** Skip durable usage persistence when the caller must avoid a database dependency. */
   persistUsage?: boolean
+  /**
+   * Conservative upper bound reserved before a paid managed-provider call begins.
+   * Required when DeepInfra executes inside a Harness host-ingress run with maxCostUsd.
+   */
+  maxEstimatedCostUsd?: number
   /** OpenAI-compatible function tools exposed to the model. Host policy still owns authorization. */
   tools?: readonly LocalModelToolDefinition[]
   /** Let the model choose zero or more tools, suppress tools, or force one exact function. */
@@ -336,6 +342,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   let cachedPromptTokens: number | null = null
   let providerEstimatedCostUsd: number | null = null
   let text: string | null = null
+  let fatalGovernanceError: Error | null = null
   let toolCalls: readonly LocalModelToolCall[] = Object.freeze([])
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
@@ -360,6 +367,13 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     : Math.max(1, Math.min(callerBoundTimeoutMs, outerRemainingMs))
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
+    if (provider === 'deepinfra' && harnessContext?.providerCostLedger) {
+      const reservation = Number(args.maxEstimatedCostUsd)
+      if (!Number.isFinite(reservation) || reservation <= 0) {
+        throw new Error('deepinfra_harness_cost_reservation_required')
+      }
+      reserveHarnessProviderCostUsd(reservation)
+    }
     inferenceStartedAt = Date.now()
     // Independent University scoring needs a compact verdict rather than model scratch work.
     // Preserve the evaluator's one-call, strict-JSON contract even when the general reasoner is
@@ -483,6 +497,13 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     }
   } catch (error) {
     errorText = error instanceof Error ? error.message : String(error)
+    if (
+      error instanceof Error
+      && (
+        error.message === 'deepinfra_harness_cost_reservation_required'
+        || error.message.startsWith('harness_provider_cost_')
+      )
+    ) fatalGovernanceError = error
     console.error('localInference: request failed', error)
     text = null
   } finally {
@@ -516,6 +537,8 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       })
     }
   }
+
+  if (fatalGovernanceError) throw fatalGovernanceError
 
   if (finishReason === 'length') {
     if (args.allowTruncatedText === true && text?.trim()) {

@@ -11,6 +11,7 @@ import { resolveHarnessManifest } from '../core/policy.ts'
 import {
   currentHarnessExecutionContext,
   withHarnessExecutionContext,
+  withHarnessProviderCostBudget,
 } from './execution-context.ts'
 import type { HarnessCapabilityRisk } from '../core/types.ts'
 
@@ -45,7 +46,12 @@ export async function withHostProductionHarnessIngress<T>(
   input: HostProductionHarnessIngressInput,
   operation: () => Promise<T>,
 ): Promise<T> {
-  if (currentHarnessExecutionContext()) return operation()
+  if (currentHarnessExecutionContext()) {
+    const nestedMaxCostUsd = Number(input.maxCostUsd)
+    return Number.isFinite(nestedMaxCostUsd) && nestedMaxCostUsd >= 0
+      ? withHarnessProviderCostBudget(nestedMaxCostUsd, operation)
+      : operation()
+  }
 
   const risk = input.risk ?? 'write'
   const deadlineMs = boundedPositive(input.deadlineMs, 300_000)
@@ -109,7 +115,12 @@ export async function withHostProductionHarnessIngress<T>(
     : undefined
 
   try {
-    return await withHarnessExecutionContext(decision.manifest, controller.signal, operation)
+    return await withHarnessExecutionContext(
+      decision.manifest,
+      controller.signal,
+      operation,
+      { enforceProviderCostBudget: decision.manifest.limits.maxCostUsd !== undefined },
+    )
   } finally {
     if (timer) clearTimeout(timer)
   }

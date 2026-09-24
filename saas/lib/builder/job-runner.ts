@@ -25,6 +25,7 @@ import { retrieveValidatedCognitiveSkills, type CognitiveSkillContextResult } fr
 import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
 import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
+import { deepInfraMaxRunUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -593,6 +594,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     deadlineMs: 300_000,
     maxConcurrency: 1,
     maxToolCalls: 200,
+    maxCostUsd: deepInfraMaxRunUsd('builder'),
     runId: `builder-job-${jobId}`,
   }, () => runBuilderJobInsideHarness(jobId, userId))
 }

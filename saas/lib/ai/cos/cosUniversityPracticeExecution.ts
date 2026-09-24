@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { universityPracticeModelFromEnv } from './cosUniversityAgentModelPolicy.ts'
 import { currentUniversityPracticeModelOverride } from './cosUniversityPracticeModelContext.ts'
+import { deepInfraMaxCallUsd, deepInfraMaxRunUsd } from './deepInfraSpendPolicy.ts'
 import {
   enforceUniversityPracticeCostGuard,
   meterUniversityPracticeInvocation,
@@ -66,6 +67,7 @@ async function executeCosPracticeOnConfiguredEconomyModel(
       agentId: request.agentId,
       purpose: 'non_credit_training',
     },
+    maxEstimatedCostUsd: deepInfraMaxCallUsd('university_practice'),
   }, { ...config, model: practiceModel, timeoutMs: Math.min(config.timeoutMs, 90_000) })
   if (!text) throw new Error('university_practice_economy_inference_unavailable')
   return {
@@ -136,6 +138,7 @@ export async function executeUniversityPractice(
     deadlineMs: 120_000,
     maxConcurrency: 1,
     maxToolCalls: 4,
+    maxCostUsd: deepInfraMaxRunUsd('university_practice'),
     runId: `university-practice-${request.runId}`,
   }, () => executeUniversityPracticeInsideHarness(request, ports))
 }

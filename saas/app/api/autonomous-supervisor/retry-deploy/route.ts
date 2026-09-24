@@ -31,6 +31,7 @@ import { getCurrentUser } from '@/lib/auth/permission-middleware'
 import { runGoverned } from '@/agent-gateway/index.ts'
 import type { AgentRequest } from '@/agent-gateway/index.ts'
 import { createSignalBoostGatewayHost, GATEWAY_POLICY } from '@/agent-gateway-host/signalboost-host.ts'
+import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
 import {
   RETRY_DEPLOYMENT_KIND,
   RETRY_DEPLOYMENT_TARGET,
@@ -75,7 +76,20 @@ export async function POST(req: NextRequest) {
     },
   }
 
-  const outcome = await runGoverned(request, GATEWAY_POLICY, createSignalBoostGatewayHost())
+  const outcome = await withHostProductionHarnessIngress({
+    objective: incidentId
+      ? `Owner-approved production redeploy recovery for incident ${incidentId}`
+      : 'Owner-approved production redeploy recovery',
+    portableId: 'self-healing-supervisor',
+    agentId: 'owner-initiated-recovery',
+    role: 'self_healing_operator',
+    capabilityId: 'self_healing.production_redeploy',
+    risk: 'consequential',
+    deadlineMs: 120_000,
+    maxConcurrency: 1,
+    maxToolCalls: 1,
+    runId: request.requestId,
+  }, () => runGoverned(request, GATEWAY_POLICY, createSignalBoostGatewayHost()))
 
   // A halt is a real answer, not an error: it means the envelope no longer authorizes this.
   return NextResponse.json({

@@ -1,3 +1,4 @@
+import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
 // Canonical Audit reasoning seam. Audit is a COS capability and therefore uses
 // only the configured LOCAL_AI_* runtime. There is no external-provider fallback.
 
@@ -94,7 +95,7 @@ async function logAuditTask(row: {
   }
 }
 
-export async function callAuditModel(args: AuditModelArgs): Promise<string | null> {
+async function callAuditModelInsideHarness(args: AuditModelArgs): Promise<string | null> {
   const startedAt = Date.now()
   const { config, identity } = auditRuntimeConfigFromEnv()
   const recorder = new TurnRecorder()
@@ -129,4 +130,20 @@ export async function callAuditModel(args: AuditModelArgs): Promise<string | nul
     promptLen: args.prompt.length,
   })
   return text
+}
+
+
+/** COS Audit specialist inference is a Harness-bound specialist execution seam. */
+export async function callAuditModel(args: AuditModelArgs): Promise<string | null> {
+  return withHostProductionHarnessIngress({
+    objective: 'Run COS software audit specialist reasoning',
+    portableId: 'cos-audit-specialist',
+    agentId: 'cos-audit-specialist',
+    role: 'software_audit_specialist',
+    capabilityId: 'audit.reasoning.execute',
+    risk: 'read',
+    deadlineMs: 120_000,
+    maxConcurrency: 1,
+    maxToolCalls: 1,
+  }, () => callAuditModelInsideHarness(args))
 }

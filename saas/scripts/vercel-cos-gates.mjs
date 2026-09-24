@@ -1,6 +1,10 @@
 // saas/scripts/vercel-cos-gates.mjs
 // Full production regression gate restored after 2026-09-23 diagnostic isolation.
 import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+
+const bypassAudit = spawnSync(process.execPath, ['scripts/check-platform-harness-bypasses.mjs'], { stdio: 'inherit' })
+if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 const tests = [
   'tests/cosUniversityLaneExpectation.node.test.ts',

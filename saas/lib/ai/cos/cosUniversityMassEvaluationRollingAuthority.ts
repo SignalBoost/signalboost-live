@@ -417,12 +417,30 @@ export function decideRollingMassEvaluationApproval(input: {
     if (history.hasVerdict) continue
 
     const minimumCanaryAt = at(artifact.minimumCanaryObservedAt)
-    const canary = mine.some(event => event.verifier === 'host_production_verifier'
-      && event.evidence?.claim === 'production_canary_healthy'
-      && event.evidence?.exactArtifact === true
-      && event.evidence?.productionTrafficAuthorized === false
-      && (!Number.isFinite(minimumCanaryAt) || at(event.observedAt) >= minimumCanaryAt))
-    if (!canary) continue
+    const healthyCanaries = mine
+      .filter(event => event.verifier === 'host_production_verifier'
+        && event.evidence?.claim === 'production_canary_healthy'
+        && event.evidence?.exactArtifact === true
+        && event.evidence?.productionTrafficAuthorized === false
+        && (!Number.isFinite(minimumCanaryAt) || at(event.observedAt) >= minimumCanaryAt))
+      .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+    if (!healthyCanaries.length) continue
+
+    // Production 2026-09-24: an artifact had a valid canary pass at 14:07, then a later endpoint-refresh
+    // canary failed at 19:55 with mass_distilled_runtime_worker_not_ready. The evaluator authorization
+    // still accepted the stale healthy proof and repeatedly reused the dead endpoint. A newer failed
+    // exact-runtime canary invalidates every older healthy/pass proof until another canary passes.
+    const newestHealthyAt = at(healthyCanaries[0].observedAt)
+    const runtimeTerminals = mine
+      .filter(event => event.verifier === 'host_controller'
+        && (event.evidence?.claim === 'local_distilled_runtime_canary_passed'
+          || event.evidence?.claim === 'local_distilled_runtime_canary_failed')
+        && (!Number.isFinite(minimumCanaryAt) || at(event.observedAt) >= minimumCanaryAt))
+      .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+    const newestRuntimeTerminal = runtimeTerminals[0]
+    if (newestRuntimeTerminal
+      && at(newestRuntimeTerminal.observedAt) > newestHealthyAt
+      && newestRuntimeTerminal.evidence?.claim !== 'local_distilled_runtime_canary_passed') continue
 
     // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.
     // Do not mint another approval while this exact artifact already has a live started reservation.

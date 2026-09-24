@@ -89,15 +89,19 @@ test('the limit is owner-tunable, bounded, and invalid values fall back to the d
   }
 })
 
-test('the live workflow gates both new authorization and new paid dispatch on the backlog', () => {
+test('the live workflow pauses new campaign authorization but drains already-authorized campaigns', () => {
   const workflow = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts', import.meta.url), 'utf8')
   const gate = workflow.indexOf('const evaluationBacklog = await readMassEvaluationBacklogGate(')
   const authorization = workflow.indexOf('rollingAuthorization = backlogPaused')
-  const consumer = workflow.indexOf('const initialResult: Record<string, any> = backlogPaused')
+  const consumer = workflow.indexOf('const initialResult: Record<string, any> = await runMassDistillationCampaignConsumer')
   assert.ok(gate > 0)
   assert.ok(authorization > gate)
   assert.ok(consumer > authorization)
-  const guarded = workflow.slice(consumer, workflow.indexOf('let result: Record<string, any> = initialResult'))
-  assert.match(guarded, /: await runMassDistillationCampaignConsumer\(\{ now, maxDispatches: 5 \}\)/)
-  assert.match(workflow, /evaluationBacklog,\n\s+slowMaintenanceDue,/)
+  assert.match(workflow, /newCampaignAuthorizationPaused: true/)
+  assert.match(workflow, /existingCampaignDrainAllowed: true/)
+  assert.match(workflow, /evaluationBacklog,\n\s+backlogDrainMode,\n\s+slowMaintenanceDue,/)
+  assert.doesNotMatch(
+    workflow.slice(consumer - 80, consumer + 240),
+    /backlogPaused\s*\?\s*\{[\s\S]*dispatched:\s*0/,
+  )
 })

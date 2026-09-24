@@ -42,6 +42,15 @@ test('all five graded execution ledgers replace the software-only constraint wit
   assert.ok((binding.match(/not valid;/g) || []).length >= 5, 'historical rows must not be retroactively granted or revoked credit')
 })
 
+test('latest migration admits Context Engineer and all application Master’s programs', () => {
+  assert.match(binding, /'context_engineering'/)
+  assert.match(binding, /'university_context_engineering_specialist_v1'/)
+  assert.match(binding, /'context_engineering_systems'/)
+  assert.match(binding, /cos_university_masters_evidence_program_id_check/)
+  assert.match(binding, /cos_university_masters_learning_runs_program_id_check/)
+  assert.match(binding, /cos_university_masters_exam_runs_program_id_check/)
+})
+
 test('atomic practice recorder binds the registered learner to the same runtime map', () => {
   assert.match(practice, /registered_runtime := public\.cos_university_specialist_runtime_for_role\(registered_role\)/)
   assert.match(practice, /execution->>'runtime' = registered_runtime/)

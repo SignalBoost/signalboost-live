@@ -14,6 +14,7 @@ import { collectProviderTemplateSnapshot } from '@/lib/audit/providerTemplateSna
 import { writeSnapshot } from '@/lib/audit/snapshotCache'
 import { normalizeReportLang, reportLangFromCookie } from '@/lib/i18n/reportLanguage'
 import { preflightAuditCos } from '@/lib/audit/modelRouter'
+import { withProductionRuntimeHarness } from '@/platform-harness/adapters/production'
 import {
   authorizeOwnedAuditFindings,
   enqueueOwnedAuditEngineRepair,
@@ -123,12 +124,21 @@ export async function POST(req: NextRequest) {
         }
         runId = started.data.id as string
 
-        const result = await runAudit({
+        const result = await withProductionRuntimeHarness({
+          runId: `audit-run:${runId}`,
+          objective: 'Execute one bounded software Audit run.',
+          tenantId: 'itmounts',
+          portableId: 'audit',
+          agentId: 'cos-audit',
+          role: 'software_audit_specialist',
+          environmentId: 'itmounts-production',
+          limits: { deadlineMs: 780_000, maxToolCalls: 0, maxConcurrency: 1 },
+        }, () => runAudit({
           url: prefix,
           maxFiles,
           lang,
           onProgress: (done, total) => send({ phase: 'RUN_ANALYZERS', done, total }),
-        })
+        }))
 
         if (!result.ok) {
           const error = result.error || 'Audit runner failed.'

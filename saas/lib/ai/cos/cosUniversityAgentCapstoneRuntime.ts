@@ -1,4 +1,5 @@
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { withEvaluationRuntimeHarness } from '@/platform-harness/adapters/evaluation-runtime'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
@@ -26,7 +27,7 @@ async function loadOwnProcedures(agentId: string): Promise<string[]> {
 }
 
 /** Uses the same explicitly configured software model as Builder, without Builder's JSON envelope. */
-export async function executeSoftwareCapstoneRuntime(request: AgentCapstoneRequest) {
+async function executeSoftwareCapstoneRuntimeInsideHarness(request: AgentCapstoneRequest) {
   await requireRegisteredCapstoneRuntime(request.agentId)
   const config = localInferenceConfigFromEnv()
   const model = requireBuilderCodingModel()
@@ -38,4 +39,21 @@ export async function executeSoftwareCapstoneRuntime(request: AgentCapstoneReque
       ...config, model: selectedModel, timeoutMs: Math.min(config.timeoutMs, 90_000),
     }),
   })
+}
+
+
+/** Graduation capstones use the same isolated evaluation Harness boundary as exams. */
+export async function executeSoftwareCapstoneRuntime(request: AgentCapstoneRequest) {
+  return withEvaluationRuntimeHarness({
+    runId: `${request.runId}:capstone`,
+    objective: 'Execute one bound University graduation capstone.',
+    tenantId: 'itmounts',
+    portableId: 'cos-university',
+    agentId: request.agentId,
+    artifactId: `university-agent:${request.agentId}`,
+    artifactHash: request.manifestHash,
+    environmentId: 'university-capstone',
+    fixtureHash: request.manifestHash,
+    limits: { deadlineMs: 90_000, maxToolCalls: 0, maxConcurrency: 1 },
+  }, () => executeSoftwareCapstoneRuntimeInsideHarness(request))
 }

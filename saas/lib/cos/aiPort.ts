@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 // saas/lib/cos/aiPort.ts
 // Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
 // existing Portables gain durable reuse and single-flight protection without owning provider logic.
@@ -9,12 +10,43 @@ import { activeGraduateRuntimesForRole } from '@/lib/ai/cos/cosUniversityGraduat
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { tryRunpodPrimaryInference } from '@/lib/ai/cos/runpodPrimaryInference'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
+import { withProductionRuntimeHarness } from '@/platform-harness/adapters/production'
+import { currentHarnessExecutionContext } from '@/platform-harness/runtime/execution-context'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
 }
 
 export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
+
+type HarnessAiPortIdentity = Readonly<{
+  agentId: string
+  role: string
+  objective: string
+  portableId?: string
+  deadlineMs?: number
+}>
+
+function harnessAiPort(port: CosAiPort, identity: HarnessAiPortIdentity): CosAiPort {
+  return Object.freeze({
+    generate(input) {
+      return withProductionRuntimeHarness({
+        runId: `ai-port:${identity.agentId}:${randomUUID()}`,
+        objective: identity.objective,
+        tenantId: 'itmounts',
+        portableId: identity.portableId ?? 'cos',
+        agentId: identity.agentId,
+        role: identity.role,
+        environmentId: 'itmounts-production',
+        limits: {
+          deadlineMs: identity.deadlineMs ?? 120_000,
+          maxToolCalls: 0,
+          maxConcurrency: 1,
+        },
+      }, () => port.generate(input))
+    },
+  })
+}
 
 type GraduateAttempt = Readonly<{ text: string | null; attempted: boolean }>
 
@@ -72,7 +104,7 @@ function requireText(result: string | null, provider: string): string {
  * 3. existing DeepInfra/open-model gateway fallback.
  */
 export function createPlatformAiPort(): CosAiPort {
-  return {
+  const port: CosAiPort = {
     generate: async (input) => {
       const graduate = await tryActiveGraduate('primary', input)
       if (graduate.text) return graduate.text
@@ -93,6 +125,11 @@ export function createPlatformAiPort(): CosAiPort {
       )
     },
   }
+  return harnessAiPort(port, {
+    agentId: 'cos-platform-ai',
+    role: 'platform_ai',
+    objective: 'Generate one bounded platform text response.',
+  })
 }
 
 /**
@@ -105,7 +142,7 @@ export function createPlatformAiPort(): CosAiPort {
  * single-GPU queue instead of converting that contention into paid DeepInfra traffic.
  */
 export function createBuilderCodingAiPort(): CosAiPort {
-  return {
+  const port: CosAiPort = {
     generate: async (input) => {
       const graduate = await tryActiveGraduate('coder', input, { coding: true })
       if (graduate.text) return graduate.text
@@ -146,21 +183,35 @@ export function createBuilderCodingAiPort(): CosAiPort {
       }), 'builder coding')
     },
   }
+  return harnessAiPort(port, {
+    agentId: 'cos-builder-ai',
+    role: 'software_specialist',
+    objective: 'Generate one bounded Builder coding response.',
+    portableId: 'builder',
+  })
 }
 
 export function createLocalApplianceAiPort(): CosAiPort {
-  return {
+  return harnessAiPort({
     generate: async (input) => requireText(await callProviderModel({ ...input, modelPreference: 'local' }), 'local appliance'),
-  }
+  }, {
+    agentId: 'cos-local-appliance-ai',
+    role: 'platform_ai',
+    objective: 'Generate one bounded local-appliance response.',
+  })
 }
 
 export function createExternalTeacherAiPort(provider: ExternalTeacherProvider): CosAiPort {
-  return {
+  return harnessAiPort({
     generate: async (input) => requireText(
       await callProviderModel({ ...input, modelPreference: provider }),
       `external teacher ${provider}`,
     ),
-  }
+  }, {
+    agentId: 'cos-external-teacher-ai',
+    role: 'external_teacher',
+    objective: 'Generate one bounded external-teacher response.',
+  })
 }
 
 export type CosImageResult = { ok: boolean; b64?: string; url?: string; error?: string }
@@ -169,8 +220,26 @@ export interface CosImagePort {
   generate(input: { prompt: string; size?: string }): Promise<CosImageResult>
 }
 
+
+function harnessImagePort(port: CosImagePort): CosImagePort {
+  return Object.freeze({
+    generate(input) {
+      return withProductionRuntimeHarness({
+        runId: `image-port:cos-visual-ai:${randomUUID()}`,
+        objective: 'Generate one bounded platform visual artifact.',
+        tenantId: 'itmounts',
+        portableId: 'cos-visuals',
+        agentId: 'cos-visual-ai',
+        role: 'visual_specialist',
+        environmentId: 'itmounts-production',
+        limits: { deadlineMs: 120_000, maxToolCalls: 0, maxConcurrency: 1 },
+      }, () => port.generate(input))
+    },
+  })
+}
+
 export function createPlatformImagePort(): CosImagePort {
-  return {
+  return harnessImagePort({
     async generate({ prompt, size = '1024x1024' }): Promise<CosImageResult> {
       // Visual creation remains on its separately approved runtime; the text RunPod primary does not
       // repurpose itself as an image worker.
@@ -190,6 +259,7 @@ export function createPlatformImagePort(): CosImagePort {
             size,
             n: 1,
           }),
+          signal: currentHarnessExecutionContext()?.signal,
         })
         const raw = await response.text()
         let data: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } | string; detail?: string | { message?: string }; message?: string } = {}
@@ -207,6 +277,6 @@ export function createPlatformImagePort(): CosImagePort {
         return { ok: false, error: e?.message || 'Creative image generation failed.' }
       }
     },
-  }
+  })
 }
 

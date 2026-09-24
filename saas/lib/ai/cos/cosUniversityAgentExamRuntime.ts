@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cosUniversityAgentExamRuntime.ts
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { withEvaluationRuntimeHarness } from '@/platform-harness/adapters/evaluation-runtime'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { loadUniversityPracticeStudyMaterial } from './cosUniversityPracticeStudyMaterialRuntime.ts'
@@ -67,7 +68,7 @@ export async function readUniversityRoleDomainModel(role: unknown): Promise<stri
   return model
 }
 
-export async function executeBoundAgentExam(
+async function executeBoundAgentExamInsideHarness(
   request: AgentCapstoneRequest,
   /**
    * The University subject this work belongs to, when the caller knows it. Work inside the agent's
@@ -119,6 +120,29 @@ export async function executeBoundAgentExam(
       ...config, model: selectedModel, timeoutMs: Math.min(config.timeoutMs, 90_000),
     }),
   })
+}
+
+/** Independent exams/practice fail closed unless bound to the evaluation Harness runtime. */
+export async function executeBoundAgentExam(
+  request: AgentCapstoneRequest,
+  work?: { subjectId?: string | null; domain?: AgentWorkDomain },
+  practiceModelOverride?: string | null,
+) {
+  const purpose = request.purpose === 'practice' ? 'practice' : 'independent-exam'
+  return withEvaluationRuntimeHarness({
+    runId: `${request.runId}:${purpose}`,
+    objective: request.purpose === 'practice'
+      ? 'Execute one bound University practice turn.'
+      : 'Execute one bound independent University assessment.',
+    tenantId: 'itmounts',
+    portableId: 'cos-university',
+    agentId: request.agentId,
+    artifactId: `university-agent:${request.agentId}`,
+    artifactHash: request.manifestHash,
+    environmentId: request.purpose === 'practice' ? 'university-practice' : 'university-independent-exam',
+    fixtureHash: request.manifestHash,
+    limits: { deadlineMs: 90_000, maxToolCalls: 0, maxConcurrency: 1 },
+  }, () => executeBoundAgentExamInsideHarness(request, work, practiceModelOverride))
 }
 
 export { isBoundSoftwareCapstoneEvidence }

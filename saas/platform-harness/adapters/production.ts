@@ -12,6 +12,7 @@ import type { GovernedHarnessExecutor } from '../runtime/governed-executor.ts'
 import { runHarnessWorker, type HarnessWorkerPort } from '../runtime/runner.ts'
 import type { HarnessTrajectoryVerifier } from '../verification/outcome-verifier.ts'
 import type { HarnessCostBudgetPort } from '../runtime/cost-budget.ts'
+import { currentHarnessExecutionContext, withHarnessExecutionContext } from '../runtime/execution-context.ts'
 import {
   completeHarnessRun,
   type CompletedHarnessRun,
@@ -73,6 +74,76 @@ export function createProductionHarnessRequest(input: {
       ? { requestedLimits: Object.freeze({ ...input.limits }) }
       : {}),
   })
+}
+
+export type ProductionRuntimeHarnessInput = Readonly<{
+  runId: string
+  objective: string
+  tenantId: string
+  portableId: string
+  agentId: string
+  role: string
+  environmentId: string
+  environmentClass?: Extract<HarnessEnvironmentClass, 'staging' | 'production'>
+  limits?: HarnessLimits
+}>
+
+/**
+ * Mandatory zero-capability Production ingress for platform workloads that are not
+ * already inside a parent HarnessRun. It grants no model/tool/provider authority;
+ * it binds workload identity and absolute deadline/cancellation to downstream seams.
+ */
+export async function withProductionRuntimeHarness<T>(
+  input: ProductionRuntimeHarnessInput,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const existing = currentHarnessExecutionContext()
+  if (existing) return operation()
+
+  const environmentClass = input.environmentClass ?? 'production'
+  const request = createProductionHarnessRequest({
+    runId: input.runId,
+    objective: input.objective,
+    tenantId: input.tenantId,
+    portableId: input.portableId,
+    agentId: input.agentId,
+    role: input.role,
+    environmentId: input.environmentId,
+    environmentClass,
+    requestedCapabilities: [],
+    limits: { maxToolCalls: 0, maxConcurrency: 1, ...(input.limits ?? {}) },
+  })
+  const decision = resolveHarnessManifest(request, {
+    manifestRef: `host://production-runtime/${String(input.runId || 'run').slice(0, 160)}`,
+    verified: true,
+    verifiedBy: 'host',
+    environments: [environmentClass],
+    capabilities: [],
+    limits: { maxToolCalls: 0, maxConcurrency: 1, ...(input.limits ?? {}) },
+  })
+  if (decision.allowed === false) {
+    throw new Error(`production_runtime_harness_denied:${decision.reasons.join(',')}`)
+  }
+
+  const controller = new AbortController()
+  const deadlineAt = decision.manifest.deadlineAt ? Date.parse(decision.manifest.deadlineAt) : NaN
+  const relativeDeadlineMs = Number(decision.manifest.limits.deadlineMs)
+  const remaining = Number.isFinite(deadlineAt)
+    ? Math.max(0, deadlineAt - Date.now())
+    : Number.isFinite(relativeDeadlineMs)
+      ? Math.max(0, relativeDeadlineMs)
+      : null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  if (remaining !== null) {
+    if (remaining <= 0) controller.abort('harness_deadline_exceeded')
+    else timer = setTimeout(() => controller.abort('harness_deadline_exceeded'), remaining)
+  }
+
+  try {
+    return await withHarnessExecutionContext(decision.manifest, controller.signal, operation)
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 export type ProductionHarnessEnvelopeResult =

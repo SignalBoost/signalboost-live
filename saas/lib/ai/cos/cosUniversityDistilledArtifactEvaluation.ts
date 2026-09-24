@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts
 import { createHash, randomUUID } from 'node:crypto'
-import { withEvaluationRuntimeHarness } from '@/platform-harness/adapters/evaluation-runtime'
+import { withEvaluationRuntimeHarness } from '../../../platform-harness/adapters/evaluation-runtime.ts'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'

@@ -64,6 +64,27 @@ The full-enforcement requirements are:
 
 Platform-wide acceptance is not complete until Production evidence demonstrates the shared Harness on COS and representative specialists across read-only, write, consequential, delegated, failure/recovery, rollback, deadline, concurrency, and cost-ceiling cases. Unit tests or a Residency-only integration are necessary but not sufficient evidence for the platform-wide completion claim.
 
+### Deployment-bound Platform Harness Production acceptance — 2026-09-24
+
+The canonical live acceptance implementation is `saas/platform-harness/acceptance/production-canary.ts`, executed only in the Production Vercel environment by `/api/cron/platform-harness-production-acceptance`. It is idempotent per exact `VERCEL_GIT_COMMIT_SHA` plus deployment fingerprint and persists sanitized case evidence to the immutable supervisor audit trail.
+
+The acceptance canary uses only `platform_harness_acceptance_scratch`, a service-role-only table containing bounded synthetic markers and no customer/business data. It must exercise the same Production Harness, Governed Socket, capability resolution, hard limits, verifier, compensation, routing, and durable-evidence boundaries as live agents.
+
+Required live matrix:
+- COS read-only verified success;
+- specialist reversible Production write;
+- consequential precondition + forced verification failure + completed compensation/rollback;
+- parent -> narrowed child HarnessRun delegation;
+- absolute deadline cancellation;
+- concurrency ceiling enforcement;
+- hard cost ceiling fail-closed when exact host accounting is absent;
+- infrastructure attribution -> Self-Healing;
+- competency attribution -> University remediation;
+- authority boundary -> Referee/Guardian;
+- Harness/verification failure -> Harness assurance.
+
+A green build or unit test is not final acceptance. The Platform Harness may be called platform-wide Production-complete only after the exact Production deployment has a persisted `platform_harness_production_acceptance_completed` event covering the required matrix with no unverified case.
+
 
 Ownership stays separated:
 

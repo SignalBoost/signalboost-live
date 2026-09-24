@@ -136,6 +136,7 @@ async def bootstrap():
         async with httpx.AsyncClient(timeout=2.0) as client:
             for _ in range(300):
                 if proc.returncode is not None: raise RuntimeError(f'vllm_exited_{proc.returncode}')
+                # Surface a bootstrap failure promptly instead of leaving RunPod health at 204 until the outer readiness deadline.
                 try:
                     r=await client.get(f'http://127.0.0.1:{INTERNAL}/health')
                     if r.status_code==200: ready.set(); return

@@ -17,7 +17,6 @@ export type ContextWindowMessage = Readonly<{
   content?: string | null
   tool_call_id?: string
   tool_calls?: readonly unknown[]
-  [key: string]: unknown
 }>
 
 export type ContextWindowResolution = Readonly<{
@@ -389,9 +388,15 @@ export function planContextWindowRequest(input: {
     )
   }
 
-  const maxOutputPreservingInput = Math.max(minOutputTokens, roomAfterFixed - minimumInputTokens)
-  const maxOutputTokens = Math.min(requestedOutputTokens, maxOutputPreservingInput)
-  const inputBudget = Math.max(0, contextWindowTokens - fixedTokens - maxOutputTokens)
+  // Preserve the complete selected input before spending remaining capacity on output.
+  // Only compact input when the full input cannot coexist even with the minimum output reserve.
+  const outputWithFullInput = roomAfterFixed - inputBefore
+  const maxOutputTokens = inputBefore + requestedOutputTokens <= roomAfterFixed
+    ? requestedOutputTokens
+    : outputWithFullInput >= minOutputTokens
+      ? Math.min(requestedOutputTokens, outputWithFullInput)
+      : minOutputTokens
+  const inputBudget = Math.max(0, roomAfterFixed - maxOutputTokens)
 
   let prompt = String(input.prompt ?? '')
   let messages: readonly ContextWindowMessage[] | undefined = input.messages

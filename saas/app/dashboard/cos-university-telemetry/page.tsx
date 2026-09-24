@@ -178,6 +178,8 @@ export default function CosUniversityTelemetryPage() {
   const [data, setData] = useState<Telemetry | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [workingCosAction, setWorkingCosAction] = useState<'prepare_dataset' | 'train' | null>(null)
+  const [workingCosActionStatus, setWorkingCosActionStatus] = useState('')
   const inFlight = useRef(false)
   const consecutiveFailures = useRef(0)
 
@@ -205,6 +207,35 @@ export default function CosUniversityTelemetryPage() {
       setBusy(false)
     }
   }, [copy.requestFailed])
+
+  const runWorkingCosAction = useCallback(async (operation: 'prepare_dataset' | 'train') => {
+    setWorkingCosAction(operation)
+    setWorkingCosActionStatus('')
+    try {
+      const response = await fetch('/api/admin/cos-working-distillation', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ operation, confirmDispatch: true }),
+      })
+      const body = await response.json().catch(() => ({})) as Record<string, unknown>
+      if (!response.ok || body.ok !== true) {
+        throw new Error(String(body.error || copy.requestFailed))
+      }
+      const jobId = typeof body.jobId === 'string' ? body.jobId : ''
+      setWorkingCosActionStatus(
+        operation === 'prepare_dataset'
+          ? `${copy.workingCosPreparationAccepted}${jobId ? ' · ' + jobId : ''}`
+          : `${copy.workingCosTrainingAccepted}${jobId ? ' · ' + jobId : ''}`,
+      )
+      await load()
+    } catch (err) {
+      setWorkingCosActionStatus(err instanceof Error ? err.message : copy.requestFailed)
+    } finally {
+      setWorkingCosAction(null)
+    }
+  }, [copy.requestFailed, copy.workingCosPreparationAccepted, copy.workingCosTrainingAccepted, load])
 
   useEffect(() => {
     let cancelled = false
@@ -287,6 +318,28 @@ export default function CosUniversityTelemetryPage() {
         ) : null}
         {workingCos?.blockers?.length ? (
           <div className="mt-3 text-xs text-amber-300">{workingCos.blockers.join(' · ')}</div>
+        ) : null}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => { void runWorkingCosAction('prepare_dataset') }}
+            disabled={workingCosAction !== null || !workingCos?.bundleReady || workingCos?.runtimeBindingEligible === false}
+            className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            {workingCosAction === 'prepare_dataset' ? copy.workingCosPreparing : copy.workingCosPrepare}
+          </button>
+          <button
+            type="button"
+            onClick={() => { void runWorkingCosAction('train') }}
+            disabled={workingCosAction !== null || !workingCos?.bundleReady || workingCos?.runtimeBindingEligible === false}
+            className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            {workingCosAction === 'train' ? copy.workingCosTraining : copy.workingCosStartTraining}
+          </button>
+          <span className="text-xs opacity-65">{copy.workingCosActionWarning}</span>
+        </div>
+        {workingCosActionStatus ? (
+          <div className="mt-3 rounded-md border p-3 text-xs">{workingCosActionStatus}</div>
         ) : null}
       </section>
 

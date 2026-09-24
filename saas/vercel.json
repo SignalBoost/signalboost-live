@@ -324,6 +324,10 @@
     {
       "path": "/api/cron/cos-working-distillation-readiness",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/platform-harness-production-acceptance",
+      "schedule": "11,26,41,56 * * * *"
     }
   ]
 }

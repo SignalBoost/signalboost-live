@@ -4,11 +4,11 @@ import test from 'node:test'
 import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence, structuredLiveDataKind } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationIntent.ts'
 
-test('multilingual travel itineraries with mutable logistics require live evidence', () => {
+test('multilingual travel itineraries stay detectable without forcing strict fresh-fact verification', () => {
   const polish = 'Mam 9 godzin do zabicia w Amsterdamie w sobotę 17 października. Ląduję na Schiphol. Nie chcę wydawać za dużo pieniędzy. Przygotuj mi ekonomiczny plan zwiedzania między 9 a 18. Podaj środki transportu. Jeśli jest jakaś atrakcja płatna, której nie warto pomijać, uwzględnij ją.'
   assert.equal(requiresLiveTravelPlanningEvidence(polish), true)
   assert.equal(isContentGenerationRequest(polish), true)
-  assert.equal(requiresFreshExternalEvidence(polish), true)
+  assert.equal(requiresFreshExternalEvidence(polish), false)
   assert.equal(requiresLiveTravelPlanningEvidence('Prepare a cheap Amsterdam sightseeing plan from Schiphol with transport and one paid attraction.'), true)
 })
 

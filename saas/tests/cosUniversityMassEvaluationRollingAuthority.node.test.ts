@@ -12,6 +12,7 @@ import {
   MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
   MASS_EVALUATION_REOPEN_CLAIM,
   MASS_EVALUATION_ROLLING_MAX_APPROVALS,
+  MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT,
   decideRollingMassEvaluationApproval,
   type RollingEvent,
 } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
@@ -450,6 +451,81 @@ test('the same infrastructure failure repeating on one artifact stops instead of
   assert.ok('artifact' in decideRollingMassEvaluationApproval({ artifacts: [artifact], events: different, now, enabled: true } as Parameters<typeof decideRollingMassEvaluationApproval>[0]))
 })
 
+
+test('pre-repair RunPod quota failures do not keep repaired artifacts in the old cooldown generation', () => {
+  assert.equal(MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT, '2026-09-24T16:00:00.000Z')
+  const artifact = {
+    ...artifactB,
+    candidateId: 'mass:quota-repair:1',
+    artifactHash: '1'.repeat(64),
+    createdAt: '2026-09-20T15:00:00.000Z',
+  }
+  const quotaError = 'RunPod PATCH /serverless/example HTTP 400: Max workers across all endpoints must not exceed your workers quota (10).'
+  const events: RollingEvent[] = [
+    ev(artifact.candidateId, 'host_production_verifier', {
+      claim: 'production_canary_healthy',
+      artifactHash: artifact.artifactHash,
+      exactArtifact: true,
+      productionTrafficAuthorized: false,
+    }, '2026-09-24T13:00:00.000Z'),
+  ]
+  for (let i = 0; i < 5; i += 1) {
+    const minute = 47 + i * 2
+    events.push(ev(artifact.candidateId, 'host_controller', {
+      claim: 'distilled_independent_evaluation_approved',
+      artifactHash: artifact.artifactHash,
+      authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+    }, `2026-09-24T15:${String(minute).padStart(2, '0')}:00.000Z`, `2026-09-24T17:${String(minute).padStart(2, '0')}:00.000Z`))
+    events.push(ev(artifact.candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_started',
+      artifactHash: artifact.artifactHash,
+    }, `2026-09-24T15:${String(minute).padStart(2, '0')}:05.000Z`))
+    events.push(ev(artifact.candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_failed',
+      artifactHash: artifact.artifactHash,
+      error: quotaError,
+    }, `2026-09-24T15:${String(minute).padStart(2, '0')}:10.000Z`))
+  }
+
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifact],
+    events,
+    now: new Date('2026-09-24T16:20:00.000Z'),
+  })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.artifact.candidateId, artifact.candidateId)
+})
+
+test('post-repair RunPod quota failures still retain the normal infrastructure cooldown', () => {
+  const artifact = {
+    ...artifactB,
+    candidateId: 'mass:quota-repair:2',
+    artifactHash: '2'.repeat(64),
+    createdAt: '2026-09-20T15:00:00.000Z',
+  }
+  const quotaError = 'RunPod PATCH /serverless/example HTTP 400: Max workers across all endpoints must not exceed your workers quota (10).'
+  const events: RollingEvent[] = [
+    ev(artifact.candidateId, 'host_production_verifier', {
+      claim: 'production_canary_healthy',
+      artifactHash: artifact.artifactHash,
+      exactArtifact: true,
+      productionTrafficAuthorized: false,
+    }, '2026-09-24T16:01:00.000Z'),
+    ev(artifact.candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_failed',
+      artifactHash: artifact.artifactHash,
+      error: quotaError,
+    }, '2026-09-24T16:18:00.000Z'),
+  ]
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifact],
+    events,
+    now: new Date('2026-09-24T16:20:00.000Z'),
+  })
+  assert.deepEqual(decision, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
+})
 
 test('RunPod max-worker quota preflight failures do not consume the paid evaluation rolling window', () => {
   const infraEvents: RollingEvent[] = []

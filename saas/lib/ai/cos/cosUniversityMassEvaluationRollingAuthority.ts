@@ -87,6 +87,13 @@ export const MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF = 'mass_evaluation_absolu
 export const MASS_EVALUATION_REOPEN_CLAIM = 'mass_distilled_independent_evaluation_reopened' as const
 export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-18T01:48:45.894Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
+// Production 2026-09-24: the Residency endpoint lease repair released idle resident maxWorkers
+// reservations and stopped the account-wide RunPod quota failures. Failures from the broken quota
+// generation remain durable evidence, but must not hold a repaired artifact in the old exponential
+// cooldown for another hour or longer after the provider/control-plane defect is gone.
+export const MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT = '2026-09-24T16:00:00.000Z' as const
+const MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT)
+const RUNPOD_QUOTA_FAILURE_FRAGMENT = 'max workers across all endpoints must not exceed your workers quota' as const
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
@@ -424,6 +431,13 @@ export function decideRollingMassEvaluationApproval(input: {
     const recentFailures = mine
       .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
         && at(event.observedAt) >= infrastructureGenerationStart)
+      .filter(event => {
+        const observedAt = at(event.observedAt)
+        const error = String(event.evidence?.error || '').trim().toLowerCase()
+        return !(Number.isFinite(observedAt)
+          && observedAt < MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT_MS
+          && error.includes(RUNPOD_QUOTA_FAILURE_FRAGMENT))
+      })
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
     // Fairness floor: any newest infrastructure/control-plane failure yields this artifact briefly so
     // the scheduler can try another eligible artifact. Different infrastructure error strings do not erase

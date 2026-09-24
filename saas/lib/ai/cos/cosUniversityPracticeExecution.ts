@@ -55,7 +55,18 @@ async function executeCosPracticeOnConfiguredEconomyModel(
       : universityPracticeModelFromEnv()
   if (!practiceModel) return null
   const config = localInferenceConfigFromEnv()
-  const text = await callLocalModel({
+  const text = await withHostProductionHarnessIngress({
+    objective: `Run University deliberate practice inference for ${request.agentId}`,
+    portableId: 'cos-university-practice',
+    agentId: request.agentId,
+    role: 'university_learner',
+    capabilityId: 'university.practice.execute',
+    risk: 'write',
+    deadlineMs: 120_000,
+    maxConcurrency: 1,
+    maxToolCalls: 1,
+    runId: `university-practice-${request.runId}`,
+  }, () => callLocalModel({
     prompt: request.prompt,
     systemPrompt: COS_PRACTICE_SYSTEM_PROMPT,
     maxTokens: 1800,
@@ -66,7 +77,7 @@ async function executeCosPracticeOnConfiguredEconomyModel(
       agentId: request.agentId,
       purpose: 'non_credit_training',
     },
-  }, { ...config, model: practiceModel, timeoutMs: Math.min(config.timeoutMs, 90_000) })
+  }, { ...config, model: practiceModel, timeoutMs: Math.min(config.timeoutMs, 90_000) }))
   if (!text) throw new Error('university_practice_economy_inference_unavailable')
   return {
     text,
@@ -76,7 +87,7 @@ async function executeCosPracticeOnConfiguredEconomyModel(
 }
 
 /** Host dispatch only. Rubrics stay in the caller and never reach either inference port. */
-async function executeUniversityPracticeInsideHarness(
+export async function executeUniversityPractice(
   request: AgentCapstoneRequest,
   ports: {
     cos(): Promise<ReasonerResult | null>
@@ -118,24 +129,4 @@ async function executeUniversityPracticeInsideHarness(
     responseSource: execution.runtime,
     executionProvenance: execution,
   }
-}
-
-
-/** University practice inference cannot execute outside a bounded HarnessRun. */
-export async function executeUniversityPractice(
-  request: AgentCapstoneRequest,
-  ports: Parameters<typeof executeUniversityPracticeInsideHarness>[1],
-): ReturnType<typeof executeUniversityPracticeInsideHarness> {
-  return withHostProductionHarnessIngress({
-    objective: `Run University deliberate practice for ${request.agentId}`,
-    portableId: 'cos-university-practice',
-    agentId: request.agentId,
-    role: 'university_learner',
-    capabilityId: 'university.practice.execute',
-    risk: 'write',
-    deadlineMs: 120_000,
-    maxConcurrency: 1,
-    maxToolCalls: 4,
-    runId: `university-practice-${request.runId}`,
-  }, () => executeUniversityPracticeInsideHarness(request, ports))
 }

@@ -18,6 +18,7 @@
 /** Roles the registry admits. Kept in step with the agent registry's own check constraint. */
 export const UNIVERSITY_SPECIALIST_ROLES = [
   'software_engineering',
+  'context_engineering',
   'cybersecurity',
   'quantitative_data_science',
   'enterprise_operations_governance',
@@ -36,6 +37,7 @@ export const SOFTWARE_SPECIALIST_RUNTIME = 'university_software_specialist_v1' a
 
 const RUNTIME_BY_ROLE: Readonly<Record<UniversitySpecialistRole, string>> = {
   software_engineering: SOFTWARE_SPECIALIST_RUNTIME,
+  context_engineering: 'university_context_engineering_specialist_v1',
   cybersecurity: 'university_cybersecurity_specialist_v1',
   quantitative_data_science: 'university_quantitative_data_science_specialist_v1',
   enterprise_operations_governance: 'university_enterprise_operations_governance_specialist_v1',
@@ -50,6 +52,7 @@ const RUNTIME_BY_ROLE: Readonly<Record<UniversitySpecialistRole, string>> = {
 /** Human-readable role name for the learner's own system prompt. */
 const TITLE_BY_ROLE: Readonly<Record<UniversitySpecialistRole, string>> = {
   software_engineering: 'Software Specialist',
+  context_engineering: 'Context Engineer',
   cybersecurity: 'Cybersecurity Specialist',
   quantitative_data_science: 'Quantitative Data Science Specialist',
   enterprise_operations_governance: 'Enterprise Operations and Governance Specialist',

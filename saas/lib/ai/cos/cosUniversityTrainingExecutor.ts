@@ -189,6 +189,13 @@ function candidatePlanId(candidateId: string): string {
   return match[1]
 }
 
+export function assertTrainingExecutorEvidenceCandidateId(candidateIdInput: unknown): string {
+  const candidateId = clean(candidateIdInput, 100)
+  if (/^working-cos:[a-f0-9]{64}$/i.test(candidateId)) return candidateId
+  candidatePlanId(candidateId)
+  return candidateId
+}
+
 async function readCandidatePlan(candidateId: string): Promise<CandidatePlanRow> {
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -304,7 +311,7 @@ function distillationAuditSnapshot(candidate: ModelDistillationCandidateInput | 
   }
 }
 
-async function recordDispatchAudit(input: {
+export async function recordTrainingDispatchAudit(input: {
   candidateId: string
   subjectId?: string | null
   operation: 'prepare_dataset' | 'train'
@@ -399,7 +406,7 @@ async function readMatchingDispatch(input: {
 
 type DispatchPort = (url: string, init: RequestInit) => Promise<Response>
 
-async function dispatchSignedJob(input: {
+export async function dispatchSignedTrainingExecutorJob(input: {
   body: Record<string, unknown>
   idempotencyKey: string
   fetchImpl?: DispatchPort
@@ -458,7 +465,7 @@ export async function dispatchUniversityDatasetPreparation(input: {
   if (!baseModel) throw new Error('training_executor_base_model_missing')
   const datasetHash = controlledFineTuneDatasetHash(plan)
   const idempotencyKey = hash([COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE, 'prepare_dataset', input.candidateId, baseModel, datasetHash])
-  const result = await dispatchSignedJob({
+  const result = await dispatchSignedTrainingExecutorJob({
     idempotencyKey,
     fetchImpl: input.fetchImpl,
     body: {
@@ -473,7 +480,7 @@ export async function dispatchUniversityDatasetPreparation(input: {
       authorityExpanded: false,
     },
   })
-  await recordDispatchAudit({
+  await recordTrainingDispatchAudit({
     candidateId: input.candidateId,
     subjectId: plan.subject_id,
     operation: 'prepare_dataset',
@@ -527,7 +534,7 @@ export async function dispatchUniversityApprovedTraining(input: {
 
   const revisionKey = fineTuneRevisionKey(input.revision)
   const idempotencyKey = hash([COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE, 'train', input.trainingMode, input.candidateId, revisionKey])
-  const result = await dispatchSignedJob({
+  const result = await dispatchSignedTrainingExecutorJob({
     idempotencyKey,
     fetchImpl: input.fetchImpl,
     body: {
@@ -545,7 +552,7 @@ export async function dispatchUniversityApprovedTraining(input: {
       authorityExpanded: false,
     },
   })
-  await recordDispatchAudit({
+  await recordTrainingDispatchAudit({
     candidateId: input.candidateId,
     subjectId: plan.subject_id,
     operation: 'train',
@@ -593,8 +600,7 @@ export async function recordUniversityTrainingExecutorEvidence(
 ) {
   const claim = clean(input?.claim, 80) as TrainingExecutorClaim
   if (!TRAINING_EXECUTOR_CLAIMS.includes(claim)) throw new Error('training_executor_claim_not_permitted')
-  const candidateId = clean(input?.candidateId, 100)
-  candidatePlanId(candidateId)
+  const candidateId = assertTrainingExecutorEvidenceCandidateId(input?.candidateId)
   const jobId = clean(input?.jobId, 240)
   if (!jobId) throw new Error('training_executor_job_id_missing')
   const idempotencyKey = clean(binding?.idempotencyKey, 128)

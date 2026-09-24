@@ -1,6 +1,7 @@
 # .github/workflows/playwright-mcp-live-acceptance.yml
 #
 # Real reference-host acceptance for Playwright MCP through SignalBoost governance.
+# Certification refresh: 2026-09-24 full-monty production evidence.
 
 name: Playwright MCP Live Acceptance
 

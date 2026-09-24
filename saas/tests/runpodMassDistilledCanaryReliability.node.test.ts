@@ -55,7 +55,8 @@ test('a durable preflight failure releases the short reservation lease immediate
 test('canary compatibility permits ordered 24GB to 16GB availability fallback without changing evaluator policy', () => {
   assert.match(compatibility, /const CANARY_APPROVED_POOLS = \['AMPERE_24', 'AMPERE_16'\] as const/)
   assert.match(compatibility, /provisionMassDistilledCanaryRuntime/)
-  assert.match(compatibility, /provisionMassDistilledRuntimeWithPools\(input, CANARY_APPROVED_POOLS\)/)
+  assert.match(compatibility, /const pools = selectMassDistilledCanaryPools\(catalogGpus\)/)
+  assert.match(compatibility, /return provisionMassDistilledRuntimeWithPools\(input, pools\)/)
   assert.match(compatibility, /provisionMassDistilledRuntimeWithPools\(input, APPROVED_POOLS\)/)
 })
 

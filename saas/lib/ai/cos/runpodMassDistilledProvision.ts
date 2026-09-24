@@ -108,7 +108,7 @@ function identity(input:MassDistilledRuntimeArtifact){
   const suffix=input.artifactHash.slice(0,12).toLowerCase()
   const runtimeKey=clean(input.runtimeKey,32).toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,10)
   if(runtimeKey){
-    return {templateName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-template-v4`,endpointName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,modelName:`itmounts-mass-distilled-${suffix}-${runtimeKey}`}
+    return {templateName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-template-v5`,endpointName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-v4`,modelName:`itmounts-mass-distilled-${suffix}-${runtimeKey}`}
   }
   // Backward-compatible identity for historical callers. New approved canaries always provide runtimeKey.
   return {templateName:`itmounts-mass-distilled-${suffix}-v2`,endpointName:`itmounts-mass-distilled-${suffix}-v2`,modelName:`itmounts-mass-distilled-${suffix}`}
@@ -122,40 +122,42 @@ from huggingface_hub import snapshot_download
 BASE_ID=os.environ['ITMOUNTS_BASE_MODEL_ID']; BASE_REV=os.environ['ITMOUNTS_BASE_MODEL_REVISION']
 ADAPTER_ID=os.environ['ITMOUNTS_ADAPTER_MODEL_ID']; ADAPTER_REV=os.environ['ITMOUNTS_ADAPTER_MODEL_REVISION']
 MODEL=os.environ['ITMOUNTS_DISTILLED_MODEL_NAME']; TOKEN=os.environ['HF_TOKEN']; INTERNAL=8001
-app=FastAPI(); ready=asyncio.Event(); bootstrap_error=None; proc=None
+app=FastAPI(); ready=asyncio.Event(); bootstrap_error=None; bootstrap_stage='gateway_start'; proc=None
 def cached_base():
     org,name=BASE_ID.split('/',1); p=Path('/runpod-volume/huggingface-cache/hub')/f'models--{org}--{name}'/'snapshots'/BASE_REV
     return str(p) if p.is_dir() else None
 async def bootstrap():
-    global bootstrap_error,proc
+    global bootstrap_error,bootstrap_stage,proc
     try:
+        bootstrap_stage='base_model'
         base=cached_base() or await asyncio.to_thread(snapshot_download,repo_id=BASE_ID,revision=BASE_REV,local_dir='/models/base',token=TOKEN)
+        bootstrap_stage='adapter'
         adapter=await asyncio.to_thread(snapshot_download,repo_id=ADAPTER_ID,revision=ADAPTER_REV,local_dir='/models/adapter',token=TOKEN)
+        bootstrap_stage='vllm_start'
         lora=json.dumps({'name':MODEL,'path':adapter,'base_model_name':BASE_ID})
         proc=await asyncio.create_subprocess_exec('vllm','serve',base,'--host','127.0.0.1','--port',str(INTERNAL),'--served-model-name',BASE_ID,'--enable-lora','--max-lora-rank','16','--max-loras','1','--max-cpu-loras','1','--lora-modules',lora,'--gpu-memory-utilization','0.85','--max-model-len','8192','--dtype','auto','--enforce-eager')
+        bootstrap_stage='vllm_health'
         async with httpx.AsyncClient(timeout=2.0) as client:
             for _ in range(300):
                 if proc.returncode is not None: raise RuntimeError(f'vllm_exited_{proc.returncode}')
-                # Surface a bootstrap failure promptly instead of leaving RunPod health at 204 until the outer readiness deadline.
                 try:
                     r=await client.get(f'http://127.0.0.1:{INTERNAL}/health')
-                    if r.status_code==200: ready.set(); return
+                    if r.status_code==200: bootstrap_stage='ready'; ready.set(); return
                 except Exception: pass
                 await asyncio.sleep(1)
         raise TimeoutError('vllm_internal_health_timeout')
-    except Exception as exc: bootstrap_error=f'{type(exc).__name__}:{str(exc)[:240]}'
+    except Exception as exc: bootstrap_error=f'{type(exc).__name__}:{str(exc)[:240]}'; bootstrap_stage='failed'
 @app.on_event('startup')
 async def start(): asyncio.create_task(bootstrap())
 @app.get('/ping')
 async def ping():
-    if bootstrap_error: raise HTTPException(status_code=503,detail=f'distilled_bootstrap_failed:{bootstrap_error}')
-    if not ready.is_set(): return Response(status_code=204)
-    return {'status':'ready','modelReady':True,'model':MODEL}
+    # Provider health proves the gateway/container is routable; exact model readiness is owned by /ready.
+    return {'status':'gateway_ready','modelReady':ready.is_set(),'model':MODEL,'bootstrapStage':bootstrap_stage}
 @app.get('/ready')
 async def is_ready():
     if bootstrap_error: raise HTTPException(status_code=503,detail=f'distilled_bootstrap_failed:{bootstrap_error}')
-    if not ready.is_set(): return Response(status_code=204)
-    return {'ready':True,'model':MODEL}
+    if not ready.is_set(): return Response(content=json.dumps({'ready':False,'model':MODEL,'bootstrapStage':bootstrap_stage}),status_code=503,media_type='application/json')
+    return {'ready':True,'model':MODEL,'bootstrapStage':'ready'}
 async def proxy(req,path):
     if not ready.is_set(): raise HTTPException(status_code=503,detail='distilled_internal_vllm_not_ready')
     body=await req.body()

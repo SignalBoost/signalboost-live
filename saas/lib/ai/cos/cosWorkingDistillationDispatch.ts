@@ -93,12 +93,12 @@ async function ensureCurrentCandidate(input: {
   const bundle = await selectWorkingCosBalancedBundleFromVault({
     minSubjects: 8,
     maxSubjects: 8,
-    maxItems: 160,
+    maxItems: 224,
     rotationSeed: clean(input.rotationSeed, 500)
       || clean(process.env.COS_WORKING_DISTILLATION_ROTATION_SEED, 500)
       || 'working-cos-production-cycle-v1',
   }, db)
-  if (!bundle.eligible || bundle.subjectCount !== 8 || bundle.itemCount > 160) {
+  if (!bundle.eligible || bundle.subjectCount !== 8 || bundle.itemCount > 224) {
     throw new Error(`working_cos_bundle_blocked:${bundle.blockers.join(',')}`)
   }
 
@@ -289,7 +289,7 @@ export async function workingCosDispatchReadiness(input: {
   const bundle = await selectWorkingCosBalancedBundleFromVault({
     minSubjects: 8,
     maxSubjects: 8,
-    maxItems: 160,
+    maxItems: 224,
     rotationSeed: clean(input.rotationSeed, 500)
       || clean(process.env.COS_WORKING_DISTILLATION_ROTATION_SEED, 500)
       || 'working-cos-production-cycle-v1',

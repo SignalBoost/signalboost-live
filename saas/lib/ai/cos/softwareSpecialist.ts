@@ -149,27 +149,6 @@ async function tryCosSoftwareSpecialistLegacy(input: CosSoftwareSpecialistReques
   // this boundary; general questions continue directly to the ordinary COS answer path.
   if (!specialistRelevant) return null
 
-  const existingParent = currentCosHarnessIngress()?.manifest ?? null
-  if (!existingParent) {
-    let parentManifest
-    try {
-      parentManifest = createCosProductionIngressManifest({
-        objective,
-        tenantId: 'itmounts',
-        requestedCapabilities: [COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY],
-      })
-    } catch {
-      return NextResponse.json({
-        reply: 'COS Software Specialist could not establish its parent Production Harness. No software work was started.',
-        source: 'cos-software-parent-harness-unavailable',
-        execution_allowed: false,
-        external_action_taken: false,
-        ...softwareSpecialistFields('software.delegate'),
-      }, { status: 503 })
-    }
-    return withCosHarnessIngress(parentManifest, () => tryCosSoftwareSpecialist(input))
-  }
-
   const access = await getAccess().catch(() => null)
 
   const priorAnswer = (Array.isArray(input.body?.messages) ? input.body.messages : [])
@@ -386,6 +365,27 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     || (input.allowRepositoryRepair === true && isOperationalLogEvidence(objective))
 
   if (!specialistRelevant) return null
+
+  const existingParent = currentCosHarnessIngress()?.manifest ?? null
+  if (!existingParent) {
+    let parentManifest
+    try {
+      parentManifest = createCosProductionIngressManifest({
+        objective,
+        tenantId: 'itmounts',
+        requestedCapabilities: [COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY],
+      })
+    } catch {
+      return NextResponse.json({
+        reply: 'COS Software Specialist could not establish its parent Production Harness. No software work was started.',
+        source: 'cos-software-parent-harness-unavailable',
+        execution_allowed: false,
+        external_action_taken: false,
+        ...softwareSpecialistFields('software.delegate'),
+      }, { status: 503 })
+    }
+    return withCosHarnessIngress(parentManifest, () => tryCosSoftwareSpecialist(input))
+  }
 
   const access = await getAccess().catch(() => null)
   const tenantId = String(existingParent.identity.tenantId || access?.userId || publicAuditUserId() || '').trim()

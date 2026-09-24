@@ -18,6 +18,7 @@ export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // A cold-start timeout is the runtime never answering, not the artifact failing. It is retried without spending one
 // of the three substantive attempts, and the identical-repeat stop below still prevents an endless loop.
 export const MASS_CANARY_COLD_START_FAILURE = 'the operation was aborted due to timeout' as const
+export const MASS_CANARY_NO_WORKER_FAILURE = 'mass_distilled_runtime_worker_not_ready' as const
 // Provider cold starts are infrastructure, not artifact quality. Yield a recently cold-start-failed
 // artifact briefly so another eligible artifact can use the single canary lane; then allow retry.
 export const MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS = 10 * 60_000
@@ -85,6 +86,12 @@ function allForArtifact(events: readonly CanaryEvent[], artifact: CanaryArtifact
 }
 
 function claim(event: CanaryEvent): string { return String(event.evidence?.claim || '') }
+
+function canaryInfrastructureFailure(error: unknown): boolean {
+  const normalized = String(error || '').trim().toLowerCase()
+  return normalized === MASS_CANARY_COLD_START_FAILURE
+    || normalized === MASS_CANARY_NO_WORKER_FAILURE
+}
 
 function evaluationInfrastructureFailure(event: CanaryEvent): boolean {
   const error = String(event.evidence?.error || '').trim().toLowerCase()
@@ -299,7 +306,7 @@ export function decideMassCanaryRollingApproval(input: {
     const failures = firstRolling
       ? own.filter(event => at(event.observedAt) >= at(firstRolling.observedAt)
         && claim(event) === 'local_distilled_runtime_canary_failed'
-        && String(event.evidence?.error || '').trim().toLowerCase() !== MASS_CANARY_COLD_START_FAILURE).length
+        && !canaryInfrastructureFailure(event.evidence?.error)).length
       : 0
     if (failures >= MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
@@ -324,17 +331,22 @@ export function decideMassCanaryRollingApproval(input: {
       : 0
     const coldStartResumeAllowed = resumableColdStart
       && coldStartResumeCount <= MASS_CANARY_MAX_COLD_START_RESUMES_PER_RUNTIME
-    if (newestFailureError === MASS_CANARY_COLD_START_FAILURE) {
+    if (canaryInfrastructureFailure(newestFailureError)) {
       const newestFailureAt = at(newestFailure?.observedAt)
-      const cooldown = coldStartResumeAllowed
+      // A request-timeout may get one short continuation on the exact same runtime. A no-worker
+      // failure proves RunPod never allocated compute, so never pin the next attempt to that dead
+      // endpoint: yield it for the normal fairness cooldown and let a later approval derive a fresh
+      // runtime identity.
+      const cooldown = newestFailureError === MASS_CANARY_COLD_START_FAILURE && coldStartResumeAllowed
         ? MASS_CANARY_COLD_START_RESUME_COOLDOWN_MS
         : MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS
       if (!Number.isFinite(newestFailureAt) || nowMs - newestFailureAt < cooldown) continue
     }
 
-    // Consecutive identical NON-cold-start failures are a stuck artifact, not a repairable retry.
+    // Consecutive identical substantive failures are a stuck artifact. Provider cold-start/no-worker
+    // failures never become artifact-quality evidence or a permanent identical-error stop.
     const errors = failureEvents.map(event => String(event.evidence?.error || '').trim().toLowerCase())
-    if (errors.length && errors[0] !== MASS_CANARY_COLD_START_FAILURE) {
+    if (errors.length && !canaryInfrastructureFailure(errors[0])) {
       let identical = 0
       for (const error of errors) {
         if (error !== errors[0]) break

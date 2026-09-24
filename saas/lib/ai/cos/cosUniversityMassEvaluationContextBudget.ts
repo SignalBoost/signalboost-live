@@ -1,3 +1,5 @@
+import { ESTIMATED_CHARACTERS_PER_TOKEN, RUNPOD_CONTEXT_WINDOW_TOKENS, estimateContextTokens } from '../context-window-manager.ts'
+
 // saas/lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts
 // The mass endpoint serves vLLM with --max-model-len 8192. Two Production rejections (2026-09-16) set the rules here:
 // 15:40 UTC, 8 holdout cases with 3360 output tokens; 18:33 UTC, the same 8 cases with 1307 output tokens, rejected as
@@ -75,12 +77,12 @@
 export const MASS_EVALUATION_ENDPOINT_CALLS = 18
 export const MASS_EVALUATION_JUDGE_CALLS = 4
 
-export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
-export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
+export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = RUNPOD_CONTEXT_WINDOW_TOKENS
+export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = ESTIMATED_CHARACTERS_PER_TOKEN
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought. /no_think'
 export const MASS_EVALUATION_MAX_OUTPUT_TOKENS = 1024
 export function massEvaluationOutputTokens(caseCount: number, userPrompt: string): number {
-  const estimatedPromptTokens=Math.ceil((MASS_EVALUATION_SYSTEM_PROMPT.length+userPrompt.length)/MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN)+128
+  const estimatedPromptTokens=estimateContextTokens(MASS_EVALUATION_SYSTEM_PROMPT + userPrompt)+128
   const desired=caseCount===1
     ? MASS_EVALUATION_MAX_OUTPUT_TOKENS
     : Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(768,caseCount*192))

@@ -7,6 +7,7 @@ import {
 } from '@/lib/ai/cos/cosUniversityTrainingExecutor'
 import { installHuggingFaceTrainingExecutorEnv } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
 import { reconcileLocalDistillationCandidate } from '@/lib/ai/cos/cosLocalDistillationArtifacts'
+import { recordWorkingCosTrainingExecutorEvidence } from '@/lib/ai/cos/cosWorkingDistillationDispatch'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,7 +40,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await recordUniversityTrainingExecutorEvidence(body, { idempotencyKey })
+    const candidateId = String(body.candidateId || '')
+    const result = /^working-cos:[a-f0-9]{32}$/i.test(candidateId)
+      ? await recordWorkingCosTrainingExecutorEvidence(body, { idempotencyKey })
+      : await recordUniversityTrainingExecutorEvidence(body, { idempotencyKey })
     let localArtifactTracking: unknown = null
     if (body.claim === 'trained_artifact_registered' || body.claim === 'rollback_artifact_registered') {
       try {

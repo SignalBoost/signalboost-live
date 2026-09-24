@@ -659,11 +659,14 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     token = os.environ["HF_TOKEN"]
     revision = envelope.get("revision") if isinstance(envelope.get("revision"), dict) else {}
     base_model = base.clean(revision.get("baseModel"), 240)
+    base_model_revision = base.clean(revision.get("baseModelRevision"), 40).lower()
     dataset_hash = base.clean(revision.get("datasetHash"), 64).lower()
     training_manifest = base.clean(revision.get("trainingManifestHash"), 64).lower()
     holdout_manifest = base.clean(revision.get("holdoutManifestHash"), 64).lower()
     if not base_model or not all(base.HEX64.match(value) for value in (dataset_hash, training_manifest, holdout_manifest)):
         raise RuntimeError("worker_revision_invalid")
+    if base_model_revision and not base.HEX40.match(base_model_revision):
+        raise RuntimeError("worker_base_model_revision_invalid")
 
     training = base.load_dataset_ref(base.clean(envelope.get("trainingDataRef"), 2000))
     holdout = base.load_dataset_ref(base.clean(envelope.get("holdoutDataRef"), 2000))
@@ -689,7 +692,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         bnb_4bit_use_double_quant=True,
         bnb_4bit_compute_dtype=compute_dtype,
     )
-    tokenizer = AutoTokenizer.from_pretrained(base_model, token=token, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_model, revision=base_model_revision or None, token=token, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
@@ -757,6 +760,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             }
             anchor_model = AutoModelForCausalLM.from_pretrained(
                 base_model,
+                revision=base_model_revision or None,
                 token=token,
                 quantization_config=quantization,
                 device_map="auto",
@@ -907,6 +911,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
 
         model = AutoModelForCausalLM.from_pretrained(
             base_model,
+            revision=base_model_revision or None,
             token=token,
             quantization_config=quantization,
             device_map="auto",
@@ -1048,6 +1053,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         "jobId": job_id,
         "evidenceRef": evidence_ref,
         "baseModel": base_model,
+        "baseModelRevision": base_model_revision,
         "datasetHash": dataset_hash,
         "trainingManifestHash": training_manifest,
         "holdoutManifestHash": holdout_manifest,

@@ -513,8 +513,11 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
     job_id = clean(os.environ.get("JOB_ID"), 240)
     dataset_hash = clean(envelope.get("datasetHash"), 64).lower()
     base_model = clean(envelope.get("baseModel"), 240)
+    base_model_revision = clean(envelope.get("baseModelRevision"), 40).lower()
     if not HEX64.match(dataset_hash) or not base_model:
         raise RuntimeError("worker_dataset_identity_invalid")
+    if base_model_revision and not HEX40.match(base_model_revision):
+        raise RuntimeError("worker_dataset_base_revision_invalid")
 
     callback({
         "claim": "partition_manifests_registered",
@@ -522,6 +525,7 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
         "jobId": job_id,
         "evidenceRef": f"hf://datasets/{output_repo}@{pinned_revision}",
         "baseModel": base_model,
+        "baseModelRevision": base_model_revision,
         "datasetHash": dataset_hash,
         "trainingItemHashes": [digest for digest, _ in training_pairs],
         "holdoutItemHashes": [digest for digest, _ in holdout_pairs],
@@ -553,11 +557,14 @@ def train(envelope: dict[str, Any]) -> None:
     token = os.environ["HF_TOKEN"]
     revision = envelope.get("revision") if isinstance(envelope.get("revision"), dict) else {}
     base_model = clean(revision.get("baseModel"), 240)
+    base_model_revision = clean(revision.get("baseModelRevision"), 40).lower()
     dataset_hash = clean(revision.get("datasetHash"), 64).lower()
     training_manifest = clean(revision.get("trainingManifestHash"), 64).lower()
     holdout_manifest = clean(revision.get("holdoutManifestHash"), 64).lower()
     if not base_model or not all(HEX64.match(value) for value in (dataset_hash, training_manifest, holdout_manifest)):
         raise RuntimeError("worker_revision_invalid")
+    if base_model_revision and not HEX40.match(base_model_revision):
+        raise RuntimeError("worker_base_model_revision_invalid")
 
     training = load_dataset_ref(clean(envelope.get("trainingDataRef"), 2000))
     holdout = load_dataset_ref(clean(envelope.get("holdoutDataRef"), 2000))
@@ -574,11 +581,12 @@ def train(envelope: dict[str, Any]) -> None:
         bnb_4bit_use_double_quant=True,
         bnb_4bit_compute_dtype=compute_dtype,
     )
-    tokenizer = AutoTokenizer.from_pretrained(base_model, token=token, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_model, revision=base_model_revision or None, token=token, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
+        revision=base_model_revision or None,
         token=token,
         quantization_config=quantization,
         device_map="auto",
@@ -638,6 +646,7 @@ def train(envelope: dict[str, Any]) -> None:
         "jobId": job_id,
         "evidenceRef": evidence_ref,
         "baseModel": base_model,
+        "baseModelRevision": base_model_revision,
         "datasetHash": dataset_hash,
         "trainingManifestHash": training_manifest,
         "holdoutManifestHash": holdout_manifest,

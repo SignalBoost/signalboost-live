@@ -13,6 +13,7 @@ import {
   MASS_EVALUATION_REOPEN_CLAIM,
   MASS_EVALUATION_ROLLING_MAX_APPROVALS,
   MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT,
+  MASS_EVALUATION_WARM_RETRY_WINDOW_MS,
   decideRollingMassEvaluationApproval,
   type RollingEvent,
 } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
@@ -53,6 +54,107 @@ test('provider worker quota reserves one worker of canary headroom by capping ev
     inFlightCount: MASS_EVALUATION_MAX_IN_FLIGHT - 1,
   })
   assert.equal(available.issue, true)
+})
+
+test('one control-plane-ready cold-start miss gets one immediate exact-artifact warm retry', () => {
+  assert.equal(MASS_EVALUATION_WARM_RETRY_WINDOW_MS, 10 * 60_000)
+  const retryNow = new Date('2026-09-24T17:27:00Z')
+  const cold = {
+    ...artifactB,
+    candidateId: 'mass:cold-other:1',
+    artifactHash: '4'.repeat(64),
+    createdAt: '2026-09-20T10:00:00Z',
+  }
+  const warming = {
+    ...artifactA,
+    candidateId: 'mass:warming:1',
+    artifactHash: '5'.repeat(64),
+    createdAt: '2026-09-20T11:00:00Z',
+  }
+  const warmingFailure = ev(warming.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_failed',
+    artifactHash: warming.artifactHash,
+    error: 'mass_distilled_evaluation_runtime_not_ready:200',
+  }, '2026-09-24T17:26:20Z')
+
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [cold, warming],
+    events: [canary(cold as typeof artifactA), canary(warming as typeof artifactA), warmingFailure],
+    now: retryNow,
+  })
+  assert.equal(decision.issue && decision.artifact.candidateId, warming.candidateId)
+  if (!decision.issue) return
+  assert.equal(decision.evidence.warmWorkerRetry, true)
+  assert.equal(decision.evidence.warmWorkerRetryWindowMs, MASS_EVALUATION_WARM_RETRY_WINDOW_MS)
+  assert.equal(decision.evidence.maxEstimatedRuntimeWakeCostUsd, 0.2)
+  assert.equal(decision.evidence.productionTrafficAuthorized, false)
+  assert.equal(decision.evidence.authorityExpanded, false)
+})
+
+test('a second consecutive runtime-not-ready 200 restores cooldown and rotates to another artifact', () => {
+  const retryNow = new Date('2026-09-24T17:27:00Z')
+  const cold = {
+    ...artifactB,
+    candidateId: 'mass:cold-other:2',
+    artifactHash: '6'.repeat(64),
+    createdAt: '2026-09-20T10:00:00Z',
+  }
+  const warming = {
+    ...artifactA,
+    candidateId: 'mass:warming:2',
+    artifactHash: '7'.repeat(64),
+    createdAt: '2026-09-20T11:00:00Z',
+  }
+  const failures = [
+    ev(warming.candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_failed',
+      artifactHash: warming.artifactHash,
+      error: 'mass_distilled_evaluation_runtime_not_ready:200',
+    }, '2026-09-24T17:20:20Z'),
+    ev(warming.candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_failed',
+      artifactHash: warming.artifactHash,
+      error: 'mass_distilled_evaluation_runtime_not_ready:200',
+    }, '2026-09-24T17:26:20Z'),
+  ]
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [cold, warming],
+    events: [canary(cold as typeof artifactA), canary(warming as typeof artifactA), ...failures],
+    now: retryNow,
+  })
+  assert.equal(decision.issue && decision.artifact.candidateId, cold.candidateId)
+  if (decision.issue) assert.equal(decision.evidence.warmWorkerRetry, undefined)
+})
+
+test('network readiness failures keep the normal infrastructure fairness cooldown', () => {
+  const retryNow = new Date('2026-09-24T17:27:00Z')
+  const cold = {
+    ...artifactB,
+    candidateId: 'mass:cold-other:3',
+    artifactHash: '8'.repeat(64),
+    createdAt: '2026-09-20T10:00:00Z',
+  }
+  const failed = {
+    ...artifactA,
+    candidateId: 'mass:network-failed:1',
+    artifactHash: '9'.repeat(64),
+    createdAt: '2026-09-20T09:00:00Z',
+  }
+  const networkFailure = ev(failed.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_failed',
+    artifactHash: failed.artifactHash,
+    error: 'mass_distilled_evaluation_runtime_not_ready:network',
+  }, '2026-09-24T17:26:20Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [failed, cold],
+    events: [canary(failed as typeof artifactA), canary(cold as typeof artifactA), networkFailure],
+    now: retryNow,
+  })
+  assert.equal(decision.issue && decision.artifact.candidateId, cold.candidateId)
+  if (decision.issue) assert.equal(decision.evidence.warmWorkerRetry, undefined)
 })
 
 test('frontier proof sampling is bounded and then returns to oldest-first order', () => {

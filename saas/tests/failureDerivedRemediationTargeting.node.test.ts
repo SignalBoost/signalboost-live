@@ -47,13 +47,17 @@ test('a subject with no verified failure is never targeted', () => {
   assert.match(SOURCE, /const verifiedFailures = failuresByTitle\.get\(target\.subject\) \|\| \[\]/)
 })
 
-test('volume stays bounded: per-subject ceiling, subject count, and idempotent identity', () => {
-  assert.match(SOURCE, /HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT,\s*\n\s*verifiedFailures\.length,\s*\n\s*\)/)
+test('volume scales to the real 128-item batch while staying bounded and idempotent', () => {
+  assert.match(FILE, /MASS_DISTILLATION_MAX_BATCH \* HYBRID_FAILURE_DERIVED_TARGET/)
+  assert.match(FILE, /FAILURE_DERIVED_VARIANTS_PER_EVALUATION = 4/)
+  assert.match(SOURCE, /generated >= HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT/)
+  assert.match(SOURCE, /variantOrdinal < FAILURE_DERIVED_VARIANTS_PER_EVALUATION/)
   assert.match(SOURCE, /\.slice\(0, input\.maxSubjects\)/)
-  // Identity is the failing artifact plus its gate classes, so a re-run inserts nothing new and only a newly
-  // failed artifact produces new material.
+  // Identity is the failing artifact + gate classes + stable variant ordinal. Re-running inserts nothing new,
+  // while a newly failed artifact contributes only its own bounded variants.
   assert.match(SOURCE, /FAILURE_DERIVED_REMEDIATION_PROFILE/)
-  assert.match(SOURCE, /const remediationKey = `\$\{FAILURE_DERIVED_REMEDIATION_PROFILE\}:\$\{failure\.candidateId\}:\$\{failure\.gates\.join\(','\)\}`/)
+  assert.match(SOURCE, /variant-\$\{variantOrdinal\}/)
+  assert.match(SOURCE, /remediationVariantOrdinal: variantOrdinal/)
   assert.match(SOURCE, /remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE/)
   assert.match(SOURCE, /ignoreDuplicates: true/)
 })
@@ -75,7 +79,7 @@ test('the seeded material teaches the behaviours the failing cases actually test
   assert.match(principles, /do not assert a cause before the evidence supports it/)
 })
 
-test('newly failed artifacts produce materially distinct safe remediation variants without copying candidate identity', () => {
+test('each failed artifact can produce multiple distinct safe remediation variants without copying candidate identity', () => {
   const gates = ['holdout_improvement', 'safety', 'unseen_transfer', 'delayed_retention'] as const
   const first = failureDerivedPracticeVariant({
     subjectId: 'Computer Science & Coding',
@@ -85,12 +89,19 @@ test('newly failed artifacts produce materially distinct safe remediation varian
   })
   const second = failureDerivedPracticeVariant({
     subjectId: 'Computer Science & Coding',
+    candidateId: 'candidate-a',
+    ordinal: 1,
+    gates,
+  })
+  const third = failureDerivedPracticeVariant({
+    subjectId: 'Computer Science & Coding',
     candidateId: 'candidate-b',
     ordinal: 0,
     gates,
   })
   assert.notDeepEqual(first, second)
-  const material = JSON.stringify([first, second])
+  assert.notDeepEqual(first, third)
+  const material = JSON.stringify([first, second, third])
   assert.doesNotMatch(material, /candidate-a|candidate-b/)
   assert.match(material, /verification|evidence|check|invariant|authority|constraint/i)
 })

@@ -10,7 +10,7 @@ import {
   verifiedOutcomeCountForCandidate,
 } from '@/lib/ai/cos/reasoningComparisonProgress'
 
-type Role = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher'
+type Role = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher' | 'context_engineer'
 type BusyMode = 'single' | 'campaign' | null
 
 type ComparisonCase = {

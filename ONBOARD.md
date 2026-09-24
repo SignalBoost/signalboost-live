@@ -1900,3 +1900,13 @@ All iTMounts/COS open-model text inference must pass through `saas/lib/ai/contex
 The governor owns prompt/history/output budgeting, provider/deployment window selection, deterministic compaction, newest-turn preservation, tool-call/result atomicity, completion reserve, fail-closed overflow behavior, and compaction telemetry. RunPod defaults to the currently deployed 8,192-token serving window; other runtimes use the conservative central default unless deployment configuration supplies `LOCAL_AI_CONTEXT_WINDOW_TOKENS` or a per-model override. COS University mass evaluation reuses the same central estimator/constants; its evaluation, scoring, authority and promotion gates remain independent.
 
 Memory, retrieval, vector search and durable conversation recall are sources of candidate context, not substitutes for the physical context window. They must feed bounded relevant material through this governor before inference.
+
+## Context Engineer specialist — 2026-09-24
+
+Context Engineer is a first-class COS specialist and University learner with canonical agent id `context-engineer`, role `context_engineering`, and runtime identity `university_context_engineering_specialist_v1`.
+
+Its scope is context quality: retrieval/relevance selection, memory and conversation continuity, prompt/context packing, token budgeting, compaction, provenance, truncation/distraction diagnosis, and context-quality verification. The deterministic `saas/lib/ai/context-window-manager.ts` remains the hard enforcement boundary for physical model-window limits; Context Engineer may reason about and recommend context composition but may not override those limits.
+
+The A2A `context-engineering` family is advisory-only (`context.analyze`, `context.plan`, `context.verify`). This role grants no repository write, deployment, database mutation, model-capacity expansion, or other execution authority. COS retains orchestration/acceptance authority, and existing Referee/Guardian/Harness/tool authorization remains independently controlling.
+
+University education is separate from runtime authority. Context Engineer has the dedicated `context_engineering_systems` Master's curriculum covering retrieval relevance, memory continuity/provenance, token budgeting/packing/compaction, and context-quality failure analysis. Graduation or graduate-model activation may improve capability but must not expand authority.

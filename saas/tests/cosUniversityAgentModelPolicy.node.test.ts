@@ -21,6 +21,8 @@ test('a subject inside the role field is domain work; everything else is general
   assert.equal(agentWorkDomain('software_engineering', 'language_communication'), 'generalist')
   assert.equal(agentWorkDomain('cybersecurity', 'cybersecurity'), 'role_domain')
   assert.equal(agentWorkDomain('cybersecurity', 'computer_science'), 'generalist')
+  assert.equal(agentWorkDomain('context_engineering', 'computer_science'), 'role_domain')
+  assert.equal(agentWorkDomain('context_engineering', 'reasoning_decision_science'), 'role_domain')
 })
 
 test('an unknown role or missing subject falls to generalist, never to the role model', () => {

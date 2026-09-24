@@ -74,6 +74,11 @@ const ROLE_POLICY: ReadonlyArray<Readonly<{
     roles: Object.freeze(['software_engineering', 'cybersecurity', 'chief_of_staff_generalist'] as CosUniversityAgentRole[]),
   }),
   Object.freeze({
+    prefix: 'context.',
+    subjectId: 'computer_science',
+    roles: Object.freeze(['context_engineering', 'software_engineering', 'chief_of_staff_generalist'] as CosUniversityAgentRole[]),
+  }),
+  Object.freeze({
     prefix: 'self-healing.',
     subjectId: 'computer_science',
     roles: Object.freeze(['software_engineering', 'cybersecurity', 'enterprise_operations_governance', 'chief_of_staff_generalist'] as CosUniversityAgentRole[]),

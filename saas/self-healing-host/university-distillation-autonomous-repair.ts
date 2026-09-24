@@ -3,6 +3,7 @@ import type { SupervisorIncident } from '@/lib/supervisor/incident-schema'
 import { isOwnerEmail } from '@/lib/auth/ownerEmails'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
+import { BUILDER_JOB_STALE_AFTER_MS, reconcileStaleBuilderJobs } from '@/lib/builder/job-store'
 import { signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import {
   UNIVERSITY_DISTILLATION_HEALTH_ERROR_CODE,
@@ -108,14 +109,33 @@ function remediationKey(incident: SupervisorIncident): string {
 async function existingAttempt(key: string): Promise<{ disposition: 'already_active' | 'recently_attempted'; jobId: string } | null> {
   const admin = getAdminSupabase()
   const active = await admin.from('builder_jobs')
-    .select('id,status')
+    .select('id,status,user_id,updated_at')
     .in('status', ['queued', 'running', 'paused'])
     .contains('metadata', { selfHealingUniversityDistillation: true })
     .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+    .limit(20)
   if (active.error) throw new Error(`university_self_healing_dedupe_failed:${active.error.message}`)
-  if (active.data?.id) return { disposition: 'already_active', jobId: String(active.data.id) }
+
+  // Builder already owns a six-minute execution-lease recovery contract. Reconcile stale queued/running
+  // repair jobs through that canonical path before treating them as single-flight blockers. Paused jobs
+  // carry a durable checkpoint and remain active regardless of age; they are resumed by the continuation
+  // scheduler and must never be expired here.
+  for (const row of active.data || []) {
+    const jobId = String((row as any).id || '')
+    const status = String((row as any).status || '')
+    const userId = String((row as any).user_id || '')
+    const updatedAtMs = Date.parse(String((row as any).updated_at || ''))
+    const staleExecutionLease = (status === 'queued' || status === 'running')
+      && Number.isFinite(updatedAtMs)
+      && Date.now() - updatedAtMs >= BUILDER_JOB_STALE_AFTER_MS
+
+    if (!staleExecutionLease) {
+      if (jobId) return { disposition: 'already_active', jobId }
+      continue
+    }
+    if (!jobId || !userId) throw new Error('university_self_healing_stale_job_identity_missing')
+    await reconcileStaleBuilderJobs({ userId, jobId })
+  }
 
   const since = new Date(Date.now() - RETRY_SUPPRESSION_MS).toISOString()
   const recent = await admin.from('builder_jobs')

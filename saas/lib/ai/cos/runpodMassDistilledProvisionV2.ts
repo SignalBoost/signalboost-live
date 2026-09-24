@@ -241,7 +241,36 @@ async function constrainEndpointToApprovedGpu(
     method: 'PATCH',
     body: JSON.stringify({ gpu: { pools: [...approvedPools], count: 1 } }),
   })
-  endpoint = await withWorkerQuotaRecovery(String(endpoint.id), patchGpu)
+  try {
+    endpoint = await withWorkerQuotaRecovery(String(endpoint.id), patchGpu)
+  } catch (error) {
+    // RunPod validates the account-wide worker quota on otherwise unrelated endpoint PATCHes. At
+    // exactly quota, a safe GPU-pool narrowing can therefore be rejected even after every disposable
+    // sibling mass endpoint was retired. Drain only THIS exact mass endpoint's existing max-1
+    // reservation, apply the GPU-only patch, then restore the same bounded max-1 envelope. This
+    // temporarily reduces capacity; it never touches unknown endpoints or widens worker authority.
+    const endpointName = clean(endpoint.name, 240)
+    const originalMaxWorkers = Math.max(0, Math.min(1, Math.floor(Number(endpoint.workers?.max ?? 0))))
+    if (!runpodWorkerQuotaError(error)
+      || originalMaxWorkers < 1
+      || !endpointName.startsWith('itmounts-mass-distilled-')) {
+      throw error
+    }
+    const drained = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ workers: { min: 0, max: 0, idleTimeout: idleTimeoutSeconds } }),
+    })
+    if (!drained?.id || Number(drained.workers?.max ?? Number.NaN) !== 0) {
+      throw new Error('mass_distilled_runtime_quota_self_drain_rejected')
+    }
+    assertNonGpuEndpointSafetyPolicy(drained, idleTimeoutSeconds)
+    endpoint = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(drained.id))}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ gpu: { pools: [...approvedPools], count: 1 } }),
+    })
+    if (!endpoint?.id) throw new Error('mass_distilled_runtime_gpu_pool_rebind_missing')
+    endpoint = await restoreRetiredEndpointCapacity(endpoint, idleTimeoutSeconds, approvedPools)
+  }
   if (!endpoint?.id) throw new Error('mass_distilled_runtime_gpu_pool_rebind_missing')
   assertEndpointSafetyPolicy(endpoint, idleTimeoutSeconds, approvedPools)
   return endpoint

@@ -117,3 +117,21 @@ test('evaluator waits for RunPod quota settlement and defers cleanly when protec
   assert.match(evaluationRoute, /retryable: true/)
   assert.match(evaluationRoute, /\{ status: 200 \}/)
 })
+
+
+test('active evaluator endpoint self-drains only when a GPU policy PATCH hits account quota', () => {
+  assert.match(provisionV2, /originalMaxWorkers = Math\.max\(0, Math\.min\(1/)
+  assert.match(provisionV2, /endpointName\.startsWith\('itmounts-mass-distilled-'\)/)
+  assert.match(provisionV2, /mass_distilled_runtime_quota_self_drain_rejected/)
+  assert.match(provisionV2, /workers: \{ min: 0, max: 0, idleTimeout: idleTimeoutSeconds \}/)
+  assert.match(provisionV2, /restoreRetiredEndpointCapacity\(endpoint, idleTimeoutSeconds, approvedPools\)/)
+  assert.doesNotMatch(provisionV2, /method: 'DELETE'/)
+  assert.doesNotMatch(provisionV2, /max: [2-9]|min: [1-9]/)
+})
+
+test('quota self-drain cannot touch non-mass or already-retired endpoints', () => {
+  assert.match(provisionV2, /!runpodWorkerQuotaError\(error\)/)
+  assert.match(provisionV2, /originalMaxWorkers < 1/)
+  assert.match(provisionV2, /!endpointName\.startsWith\('itmounts-mass-distilled-'\)/)
+  assert.match(provisionV2, /throw error/)
+})

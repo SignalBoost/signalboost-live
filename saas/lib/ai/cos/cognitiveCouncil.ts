@@ -1,6 +1,7 @@
 // saas/lib/ai/cos/cognitiveCouncil.ts
 import { createHash } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { runCouncilMembersConcurrently } from '@/lib/ai/cos/councilConcurrency'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -434,12 +435,22 @@ export async function maybeBuildCognitiveCouncilAdvisory(input: {
   const opinions = await runCouncilMembersConcurrently<CouncilOpinion>(roles.map(role => async () => {
     const definition = ROLE_DEFINITIONS.find(item => item.role === role)!
     const credibilityWeight = await credibilityFor(role, problemClass)
-    const raw = await callLocalModel({
+    const raw = await withHostProductionHarnessIngress({
+      objective: `Run Cognitive Council ${role} specialist review`,
+      portableId: 'cos-cognitive-council',
+      agentId: `cos-council-${role}`,
+      role: 'cognitive_council_specialist',
+      capabilityId: 'cos.council.review',
+      risk: 'read',
+      deadlineMs: 120_000,
+      maxConcurrency: 1,
+      maxToolCalls: 1,
+    }, () => callLocalModel({
       temperature: 0,
       maxTokens: Number(process.env.COS_COUNCIL_MEMBER_MAX_TOKENS || '1800'),
       systemPrompt: 'You are a bounded specialist inside SignalBoost COS Council. Return only the requested structured review artifact.',
       prompt: memberPrompt(definition, question, input.prompt, allowedLabels),
-    }, inference).catch(() => null)
+    }, inference)).catch(() => null)
     if (!raw) return null
     const opinion = parseOpinion(raw, role, allowedLabels, credibilityWeight)
     if (!opinion) return null

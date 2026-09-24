@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cognitiveCouncilChallenge.ts
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { runCouncilMembersConcurrently } from '@/lib/ai/cos/councilConcurrency'
@@ -373,12 +374,22 @@ export async function runCouncilChallengeRound(input: {
     const target = opinionByRole.get(pair.targetRole)
     if (!challenger || !target || !target.claims[pair.targetClaimIndex]) return null
 
-    const rawChallenge = await callLocalModel({
+    const rawChallenge = await withHostProductionHarnessIngress({
+      objective: `Run Cognitive Council challenge: ${pair.challengerRole} -> ${pair.targetRole}`,
+      portableId: 'cos-cognitive-council',
+      agentId: `cos-council-${pair.challengerRole}`,
+      role: 'cognitive_council_challenger',
+      capabilityId: 'cos.council.challenge',
+      risk: 'read',
+      deadlineMs: 120_000,
+      maxConcurrency: 1,
+      maxToolCalls: 1,
+    }, () => callLocalModel({
       temperature: 0,
       maxTokens: Number(process.env.COS_COUNCIL_CHALLENGE_MAX_TOKENS || '900'),
       systemPrompt: 'You are a bounded adversarial reviewer inside SignalBoost COS Council. Return only the requested challenge artifact.',
       prompt: challengePrompt({ challenger, target, targetClaimIndex: pair.targetClaimIndex, governedPrompt: input.governedPrompt, allowedLabels }),
-    }, inference).catch(() => null)
+    }, inference)).catch(() => null)
     if (!rawChallenge) return null
 
     const parsedChallenge = parseChallenge(rawChallenge, pair, allowedLabels)
@@ -386,12 +397,22 @@ export async function runCouncilChallengeRound(input: {
     const id = await persistChallenge(input.council.sessionId, parsedChallenge, input.reasonerLabel)
     const challenge: CouncilChallenge = { ...parsedChallenge, id }
 
-    const rawRebuttal = await callLocalModel({
+    const rawRebuttal = await withHostProductionHarnessIngress({
+      objective: `Run Cognitive Council rebuttal for ${pair.targetRole}`,
+      portableId: 'cos-cognitive-council',
+      agentId: `cos-council-${pair.targetRole}`,
+      role: 'cognitive_council_rebuttal',
+      capabilityId: 'cos.council.rebuttal',
+      risk: 'read',
+      deadlineMs: 120_000,
+      maxConcurrency: 1,
+      maxToolCalls: 1,
+    }, () => callLocalModel({
       temperature: 0,
       maxTokens: Number(process.env.COS_COUNCIL_REBUTTAL_MAX_TOKENS || '900'),
       systemPrompt: 'You are a bounded Council member responding to a specific challenge. Return only the requested rebuttal artifact.',
       prompt: rebuttalPrompt({ target, targetClaimIndex: pair.targetClaimIndex, challenge, governedPrompt: input.governedPrompt }),
-    }, inference).catch(() => null)
+    }, inference)).catch(() => null)
     if (!rawRebuttal) return { challenge, rebuttal: null }
 
     const rebuttal = parseRebuttal(rawRebuttal, challenge)

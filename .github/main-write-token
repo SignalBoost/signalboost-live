@@ -1,2 +1,2 @@
-base_sha=cccf20feeb8d9a7b287958b5ab49b8f16e3e0ecf
-branch=feat/working-cos-owner-controls-refresh2-20260923
+base_sha=545c148a2fd67f0e9d39b2dd4efdf1b1abf9fe13
+branch=fix/restore-complete-production-gate-20260923

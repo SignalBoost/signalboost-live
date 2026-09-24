@@ -208,3 +208,11 @@ test('research source call budgets are provider-specific and leave ordinary sour
   assert.equal(sourceCallBudget(adapter('crossref')), Number.POSITIVE_INFINITY)
 })
 
+test('owner-scoped source call budgets can raise bounded University acquisition throughput without changing defaults', () => {
+  const adapter = (id: string): ContinuousLearningSourceAdapter => ({ kind: 'scientific_journal', id, async acquire() { return [] } })
+  assert.equal(sourceCallBudget(adapter('openalex'), { COS_LEARNING_SOURCE_CALL_BUDGET_OPENALEX: '9' }), 9)
+  assert.equal(sourceCallBudget(adapter('hf_github_cc0'), { COS_LEARNING_SOURCE_CALL_BUDGET_HF_GITHUB_CC0: '12' }), 12)
+  assert.equal(sourceCallBudget(adapter('hf_nist_cc0'), { COS_LEARNING_SOURCE_CALL_BUDGET_HF_NIST_CC0: '999' }), 64)
+  assert.equal(sourceCallBudget(adapter('openalex'), { COS_LEARNING_SOURCE_CALL_BUDGET_OPENALEX: 'invalid' }), 2)
+})
+

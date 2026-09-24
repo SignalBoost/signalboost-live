@@ -1,2 +1,2 @@
-base_sha=46c1bbc32358686422953d8595a107d7af38ac20
-branch=feat/cos-software-specialist-production-harness-20260923
+base_sha=ffd9c66dbc0738d5bf6918ec5c7f03a0bf797222
+branch=fix/working-cos-readiness-and-release-gate-20260923

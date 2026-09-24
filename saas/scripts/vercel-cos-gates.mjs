@@ -1,22 +1,61 @@
-// saas/scripts/vercel-cos-gates.mjs
+// Diagnostic-only quarter of the full production regression gate. Never merge.
 import { spawnSync } from 'node:child_process'
-
-// Focused production repair gate for the regressions changed in this PR.
-// Broader historical suites remain independently tracked and must not hide these repaired failures.
 const tests = [
+  'tests/builderProjectContext.node.test.ts',
+  'tests/builderExecutionEvidence.node.test.ts',
+  'tests/builderProjectContinuity.node.test.ts',
+  'tests/agentProgressStreaming.node.test.ts',
+  'tests/auditCosRuntime.node.test.ts',
+  'tests/deterministicUtilities.node.test.ts',
+  'tests/engineeringConstants.node.test.ts',
+  'tests/calcExpressions.node.test.ts',
+  'tests/publicDisclosureGate.node.test.ts',
+  'tests/cosIdentityDisclosureBoundary.node.test.ts',
+  'tests/publicGovernanceParity.node.test.ts',
+  'tests/conciergeBrowserIngressRouting.node.test.ts',
+  'tests/conciergeFullTranscript.node.test.ts',
+  'tests/conciergeTransportBudget.node.test.ts',
+  'tests/pastedOperationalLog.node.test.ts',
+  'tests/repairConfirmationIntent.node.test.ts',
+  'tests/attachedOperationalEvidence.node.test.ts',
+  'tests/builderOperationalLogRouting.node.test.ts',
+  'tests/builderContractOscillation.node.test.ts',
+  'tests/builderTimeBudget.node.test.ts',
+  'tests/builderControlRecovery.node.test.ts',
+  'tests/builderControlAdapter.node.test.ts',
+  'tests/builderRequestDeadline.node.test.ts',
+  'tests/builderTransportRecovery.node.test.ts',
+  'tests/builderAsyncJobs.node.test.ts',
+  'tests/builderObjectiveContract.node.test.ts',
+  'tests/builderDebugFileJob.node.test.ts',
+  'tests/builderRoutingStrict.node.test.ts',
+  'tests/assistantHistoryOrdering.node.test.ts',
+  'tests/assistantSourceFileBoundary.node.test.ts',
+  'tests/conciergeOperationalLogRouting.node.test.ts',
+  'tests/conciergeResultDelivery.node.test.ts',
+  'tests/fullAssistantConciergeIngress.node.test.ts',
+  'tests/builderRepositoryRepairTarget.node.test.ts',
   'tests/builderRepositoryRepairProofController.node.test.ts',
-  'tests/cosFreshnessPolicy.node.test.ts',
-  'tests/cosTravelPlanningFreshness.node.test.ts',
-  'tests/cosPragmaticIntentCore.node.test.ts',
+  'tests/builderRepositoryRepairSecurity.node.test.ts',
+  'tests/cosSoftwareSpecialistRouting.node.test.ts',
+  'tests/cosConciergeSoftwareArchitecture.node.test.ts',
+  'tests/conciergeGovernedRepairHardening.node.test.ts',
+  'tests/mainWriteDiscipline.node.test.ts',
+  'tests/conciergeVisuals.node.test.ts',
+  'tests/conciergeSemanticVisualIntent.node.test.ts',
+  'tests/conciergeVisualTypoRouting.node.test.ts',
+  'tests/visualObjectiveContract.node.test.ts',
+  'tests/visualPromptFormatNeutrality.node.test.ts',
+  'tests/namedSubjectIntent.node.test.ts',
+  'tests/runtimeAcceptanceCleanup.node.test.ts',
+  'tests/conciergeNamedPeopleRecovery.node.test.ts',
+  'tests/suggestedFollowups.node.test.ts',
+  'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',
+  'tests/cosDomainAvailability.node.test.ts',
+  'tests/assistantTransportClient.node.test.ts',
+  'tests/cosDurableTurnHistory.node.test.ts',
+  'tests/cosInteractiveGraduateLatency.node.test.ts',
 ]
-
-const result = spawnSync(process.execPath, ['--test', ...tests], {
-  cwd: process.cwd(),
-  env: process.env,
-  stdio: 'inherit',
-})
-if (result.error) {
-  console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
-  process.exit(1)
-}
+const result = spawnSync(process.execPath, ['--test', ...tests], { cwd: process.cwd(), env: process.env, stdio: 'inherit' })
+if (result.error) { console.error(result.error.message); process.exit(1) }
 process.exit(result.status ?? 1)

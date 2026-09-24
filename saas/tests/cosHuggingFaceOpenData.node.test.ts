@@ -6,6 +6,8 @@ import {
   HUGGING_FACE_OPEN_DATASETS,
 } from '../lib/cos-core/layers/learning/huggingFaceOpenData.ts'
 import { createLiveLearningAdapters } from '../lib/cos-core/layers/learning/liveSources.ts'
+import { learningAdapterAllowedForGap } from '../lib/cos-core/layers/learning/cycle.ts'
+import { huggingFaceOpenDatasetCurriculum } from '../lib/cos/dailyAutonomousLearning.ts'
 import { classifyMassDistillationRights } from '../lib/ai/cos/cosUniversityMassDistillation.ts'
 
 function fakeResponse(body: unknown, status = 200) {
@@ -167,4 +169,31 @@ test('GitHub CC0 source is exposed by the shared learning factory only for softw
     classifyMassDistillationRights('cc0 public-domain GitHub-CC0 software corpus'),
     'cc0',
   )
+})
+
+
+test('daily HF curriculum guarantees bounded exact-source attempts and rotates discovery', () => {
+  const first = huggingFaceOpenDatasetCurriculum(new Date('2026-09-24T00:00:00Z'))
+  const next = huggingFaceOpenDatasetCurriculum(new Date('2026-09-25T00:00:00Z'))
+
+  assert.equal(first.length, 2)
+  assert.equal(first[0]?.id, 'curriculum:hf-nist-cc0-continuous')
+  assert.equal(first[1]?.id, 'curriculum:hf-github-cc0-continuous')
+  assert.deepEqual(first[0]?.sourceKinds, ['public_dataset'])
+  assert.deepEqual(first[0]?.allowedAdapterIds, ['hf_nist_cc0'])
+  assert.deepEqual(first[1]?.allowedAdapterIds, ['hf_github_cc0'])
+  assert.equal(first[0]?.curriculumAligned, true)
+  assert.equal(first[1]?.curriculumAligned, true)
+  assert.notEqual(first[0]?.discoveryQuery, next[0]?.discoveryQuery)
+  assert.notEqual(first[1]?.discoveryQuery, next[1]?.discoveryQuery)
+
+  const nistAdapter = { kind: 'public_dataset' as const, id: 'hf_nist_cc0', async acquire() { return [] } }
+  const githubAdapter = { kind: 'public_dataset' as const, id: 'hf_github_cc0', async acquire() { return [] } }
+  const otherDataset = { kind: 'public_dataset' as const, id: 'future_public_dataset', async acquire() { return [] } }
+
+  assert.equal(learningAdapterAllowedForGap(first[0]!, nistAdapter), true)
+  assert.equal(learningAdapterAllowedForGap(first[0]!, githubAdapter), false)
+  assert.equal(learningAdapterAllowedForGap(first[0]!, otherDataset), false)
+  assert.equal(learningAdapterAllowedForGap(first[1]!, githubAdapter), true)
+  assert.equal(learningAdapterAllowedForGap(first[1]!, nistAdapter), false)
 })

@@ -7,6 +7,7 @@ import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillat
 import { installHostedTeacherCurriculum } from './cosUniversityHostedTeacherCurriculum.ts'
 import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import {
+  buildMassDistillationOpenSourceMaintenanceGaps,
   buildMassDistillationReplenishmentGaps,
   MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
   MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS,
@@ -45,6 +46,124 @@ function slotKey(now: Date): string {
   const interval = MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000
   const slot = new Date(Math.floor(now.getTime() / interval) * interval)
   return `distillation-replenishment-${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
+}
+
+function openSourceMaintenanceSlotKey(now: Date): string {
+  const interval = MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000
+  const slot = new Date(Math.floor(now.getTime() / interval) * interval)
+  return `distillation-open-source-maintenance-${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
+}
+
+function rightsClearedDistillationAdapters() {
+  return createLiveLearningAdapters({
+    ...process.env,
+    COS_LEARNING_CAP_OPENALEX: String(DISTILLATION_OPENALEX_RESULTS_PER_QUERY),
+    COS_LEARNING_CAP_HF_NIST: String(DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY),
+    COS_LEARNING_CAP_HF_GITHUB_CC0: String(DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY),
+    COS_LEARNING_SOURCE_CALL_BUDGET_MULTIPLIER: String(DISTILLATION_SOURCE_CALL_BUDGET_MULTIPLIER),
+  }).filter(adapter => Boolean(adapter.id && DISTILLATION_RIGHTS_CLEARED_ADAPTERS.has(adapter.id)))
+}
+
+export async function maintainUniversityRightsClearedOpenSourceCorpus(input: {
+  now?: Date
+  maxSubjects?: number
+  queriesPerSubject?: number
+  maxCandidatesPerCycle?: number
+}) {
+  const now = input.now || new Date()
+  const maxSubjects = Number.isSafeInteger(input.maxSubjects) && Number(input.maxSubjects) > 0 ? Number(input.maxSubjects) : 3
+  const queriesPerSubject = Number.isSafeInteger(input.queriesPerSubject) && Number(input.queriesPerSubject) > 0
+    ? Number(input.queriesPerSubject)
+    : 1
+  const maxCandidatesPerCycle = Number.isSafeInteger(input.maxCandidatesPerCycle) && Number(input.maxCandidatesPerCycle) > 0
+    ? Number(input.maxCandidatesPerCycle)
+    : 20
+  const db = cosServiceDb()
+  if (!db) throw new Error('persistent_learning_store_unavailable')
+  const stores = createSupabaseCOSStores()
+  if (!stores?.continuousLearning) throw new Error('persistent_learning_store_unavailable')
+
+  const gaps = buildMassDistillationOpenSourceMaintenanceGaps(now, maxSubjects, queriesPerSubject)
+  if (!gaps.length) {
+    return Object.freeze({ ok: true, skipped: true, reason: 'no_open_source_maintenance_gaps', externalCostUsd: 0 })
+  }
+
+  const key = openSourceMaintenanceSlotKey(now)
+  const claim = await db.from('cos_university_continuous_runs').insert({
+    slot_key: key,
+    status: 'running',
+    planned_count: gaps.length,
+    eligible_count: gaps.length,
+    gap_count: gaps.length,
+    started_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  }).select('id').maybeSingle()
+  if (String((claim.error as { code?: string } | null)?.code || '') === '23505') {
+    return Object.freeze({ ok: true, skipped: true, reason: 'open_source_maintenance_slot_already_claimed', slotKey: key, externalCostUsd: 0 })
+  }
+  if (claim.error) throw claim.error
+  if (!claim.data?.id) throw new Error('open_source_maintenance_slot_claim_failed')
+
+  const adapters = rightsClearedDistillationAdapters()
+  if (!adapters.length) {
+    const completedAt = new Date().toISOString()
+    await db.from('cos_university_continuous_runs').update({
+      status: 'error',
+      errors: ['rights_cleared_distillation_adapters_unavailable'],
+      completed_at: completedAt,
+      updated_at: completedAt,
+    }).eq('id', claim.data.id)
+    return Object.freeze({ ok: false, skipped: false, reason: 'rights_cleared_distillation_adapters_unavailable', slotKey: key, externalCostUsd: 0 })
+  }
+
+  try {
+    const cycle = new ContinuousLearningCycle(
+      new ContinuousLearningDirector(stores.continuousLearning, rightsClearedPolicy(maxCandidatesPerCycle)),
+      adapters,
+    )
+    const result = await cycle.run(gaps, 0)
+    const completedAt = new Date().toISOString()
+    const update = await db.from('cos_university_continuous_runs').update({
+      status: 'completed',
+      documents_acquired: result.documentsAcquired,
+      accepted_count: result.accepted,
+      probationary_count: result.probationary,
+      rejected_counts: result.rejected,
+      source_errors: result.sourceErrors,
+      gap_diagnostics: result.gapDiagnostics,
+      completed_at: completedAt,
+      updated_at: completedAt,
+    }).eq('id', claim.data.id)
+    if (update.error) throw update.error
+
+    return Object.freeze({
+      ok: true,
+      skipped: false,
+      reason: result.accepted > 0 ? 'open_source_maintenance_retained' : 'open_source_maintenance_no_new_material',
+      slotKey: key,
+      targets: [...new Set(gaps.map(gap => gap.subject))],
+      acquisitionAdapters: adapters.map(adapter => adapter.id).filter(Boolean),
+      queryCount: gaps.length,
+      maxCandidatesPerCycle,
+      documentsAcquired: result.documentsAcquired,
+      accepted: result.accepted,
+      probationary: result.probationary,
+      rejected: result.rejected,
+      sourceErrors: result.sourceErrors,
+      externalCostUsd: 0,
+      semantics: 'prepared_buffer_never_stops_bounded_rights_cleared_open_source_acquisition_no_hosted_teacher_no_synthetic_fill',
+    })
+  } catch (error) {
+    const message = String(error instanceof Error ? error.message : error || 'unknown_error').slice(0, 800)
+    const completedAt = new Date().toISOString()
+    await db.from('cos_university_continuous_runs').update({
+      status: 'error',
+      errors: [message],
+      completed_at: completedAt,
+      updated_at: completedAt,
+    }).eq('id', claim.data.id)
+    throw error
+  }
 }
 
 export async function installVerifiedFailureDerivedCurriculum(input: {
@@ -334,13 +453,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
   // enough free calls to fill its own shortage targets. Admission, relevance, rights, dedup and cost gates
   // remain unchanged; arXiv metadata is intentionally excluded because its underlying paper rights are not
   // asserted for training.
-  const adapters = createLiveLearningAdapters({
-    ...process.env,
-    COS_LEARNING_CAP_OPENALEX: String(DISTILLATION_OPENALEX_RESULTS_PER_QUERY),
-    COS_LEARNING_CAP_HF_NIST: String(DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY),
-    COS_LEARNING_CAP_HF_GITHUB_CC0: String(DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY),
-    COS_LEARNING_SOURCE_CALL_BUDGET_MULTIPLIER: String(DISTILLATION_SOURCE_CALL_BUDGET_MULTIPLIER),
-  }).filter(adapter => Boolean(adapter.id && DISTILLATION_RIGHTS_CLEARED_ADAPTERS.has(adapter.id)))
+  const adapters = rightsClearedDistillationAdapters()
   if (!adapters.length) {
     await db.from('cos_university_continuous_runs').update({
       status: 'error', errors: ['rights_cleared_distillation_adapters_unavailable'], completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),

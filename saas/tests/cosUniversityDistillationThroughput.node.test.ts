@@ -6,6 +6,7 @@ import {
   MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET,
   MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
   MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES,
+  buildMassDistillationOpenSourceMaintenanceGaps,
   buildMassDistillationReplenishmentGaps,
   massDistillationThroughputProfile,
 } from '../lib/ai/cos/cosUniversityDistillationCurriculumPlan.ts'
@@ -83,6 +84,9 @@ test('paid authorization and dispatch precede slower ready-inventory maintenance
   assert.match(workflow, /curriculumReplenishment\.hostedTeacherInserted/)
   assert.match(workflow, /curriculumReplenishment\.syntheticInserted/)
   assert.match(workflow, /if \(replenishmentMaterialInserted > 0\)/)
+  assert.match(workflow, /maintainUniversityRightsClearedOpenSourceCorpus/)
+  assert.match(workflow, /openSourceMaintenance/)
+  assert.match(workflow, /full prepared-job buffer[\s\S]*must never stop learning/i)
 })
 
 test('owner throughput control remains separate from University spending and authority', () => {
@@ -98,6 +102,13 @@ test('owner throughput control remains separate from University spending and aut
   assert.match(replenishment, /hf_nist_cc0/)
   assert.match(replenishment, /hf_github_cc0/)
   assert.doesNotMatch(replenishment, /\.filter\(adapter => adapter\.id === 'openalex'\)/)
+  const maintenanceStart = replenishment.indexOf('export async function maintainUniversityRightsClearedOpenSourceCorpus')
+  const remediationStart = replenishment.indexOf('export async function installVerifiedFailureDerivedCurriculum')
+  assert.ok(maintenanceStart > 0 && remediationStart > maintenanceStart)
+  const maintenance = replenishment.slice(maintenanceStart, remediationStart)
+  assert.match(maintenance, /maxExternalCostUsdPerCycle|rightsClearedPolicy/)
+  assert.doesNotMatch(maintenance, /installHostedTeacherCurriculum/)
+  assert.doesNotMatch(maintenance, /installTeacherSyntheticFallback/)
   const packaging = source('../lib/ai/cos/cosUniversityMassDistillation.ts')
   assert.doesNotMatch(packaging, /Math\.min\(100,\s*Math\.floor\(maxBatches\)\)/)
 })
@@ -133,6 +144,16 @@ test('shortage fallback stays planner-scoped while failure remediation sees all 
 test('empty canonical subjects rotate between slots instead of always asking the same three', () => {
   const at = (iso: string) => buildMassDistillationReplenishmentGaps([], new Date(iso), 3, 1).map(gap => gap.subject).join('|')
   assert.notEqual(at('2026-09-16T23:10:00.000Z'), at('2026-09-16T23:15:00.000Z'))
+})
+
+
+test('full prepared buffer still plans bounded rights-cleared source harvesting', () => {
+  const gaps = buildMassDistillationOpenSourceMaintenanceGaps(new Date('2026-09-24T15:50:00Z'), 3, 1)
+  assert.equal(gaps.length, 3)
+  assert.ok(gaps.some(gap => gap.subject === 'Computer Science & Coding'))
+  assert.ok(gaps.some(gap => gap.subject === 'Cybersecurity'))
+  assert.ok(gaps.every(gap => gap.evidence.includes('prepared_buffer_does_not_stop_free_acquisition')))
+  assert.ok(gaps.every(gap => gap.sourceKinds?.includes('scientific_journal') && gap.sourceKinds?.includes('public_dataset')))
 })
 
 

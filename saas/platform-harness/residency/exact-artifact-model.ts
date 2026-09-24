@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { residencyRunpodRuntimeKey } from '../../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts'
 import { MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS } from '../../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
 export interface BuilderResidencyModelIdentity {
   candidateId:string
@@ -74,14 +74,12 @@ type ArtifactRow=Readonly<{
 }>
 
 function runtimeKey(identity:BuilderResidencyModelIdentity):string{
-  return createHash('sha256')
-    .update(JSON.stringify([
-      'builder-residency-runtime-v1',
-      identity.candidateId,
-      identity.artifactHash.toLowerCase(),
-    ]))
-    .digest('hex')
-    .slice(0,10)
+  const key=residencyRunpodRuntimeKey(
+    identity.candidateId,
+    identity.artifactHash.toLowerCase(),
+  )
+  if(!key) throw new Error('residency_exact_artifact_runtime_identity_invalid')
+  return key
 }
 
 function artifactRevision(evidenceRef:unknown):string{

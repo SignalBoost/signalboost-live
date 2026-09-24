@@ -3,11 +3,11 @@ import test from 'node:test'
 import {
   createHuggingFaceGithubCc0Search,
   createHuggingFaceNistCybersecuritySearch,
+  huggingFaceOpenDatasetCurriculum,
   HUGGING_FACE_OPEN_DATASETS,
 } from '../lib/cos-core/layers/learning/huggingFaceOpenData.ts'
 import { createLiveLearningAdapters } from '../lib/cos-core/layers/learning/liveSources.ts'
 import { learningAdapterAllowedForGap } from '../lib/cos-core/layers/learning/cycle.ts'
-import { huggingFaceOpenDatasetCurriculum } from '../lib/cos/dailyAutonomousLearning.ts'
 import { classifyMassDistillationRights } from '../lib/ai/cos/cosUniversityMassDistillation.ts'
 
 function fakeResponse(body: unknown, status = 200) {

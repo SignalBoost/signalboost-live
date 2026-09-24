@@ -6,6 +6,7 @@ export type HarnessOutcomeRoute =
   | { destination:'durable_evidence'; result:HarnessRunResult }
   | { destination:'self_healing'; handoff:HarnessSelfHealingHandoff }
   | { destination:'university'; decision:UniversityHarnessEvidenceDecision }
+  | { destination:'university_remediation'; runId:string; failureCode:string }
   | { destination:'referee_guardian'; runId:string; failureCode:string }
   | { destination:'harness_assurance'; runId:string; failureCode:string }
 
@@ -24,6 +25,9 @@ export function routeCompletedHarnessRun(input:{manifest:HarnessManifest;result:
   }
   if(result.outcome.status==='agent_failure' && manifest.profile==='residency' && input.universityContext){
     return {destination:'university',decision:adaptResidencyRunToUniversity(manifest,result,input.universityContext)}
+  }
+  if(result.outcome.status==='agent_failure') {
+    return {destination:'university_remediation',runId:result.runId,failureCode:result.outcome.failureCode??'harness_agent_failure'}
   }
   if(result.outcome.status==='authority_halt') return {destination:'referee_guardian',runId:result.runId,failureCode:result.outcome.failureCode??'harness_authority_halt'}
   return {destination:'harness_assurance',runId:result.runId,failureCode:result.outcome.failureCode??'harness_outcome_unresolved'}

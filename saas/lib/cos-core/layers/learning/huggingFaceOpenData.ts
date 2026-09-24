@@ -64,7 +64,7 @@ function vectorDigest(value: unknown, dimensions: number): string | null {
   return createHash('sha256').update(JSON.stringify(vector)).digest('hex')
 }
 
-type DatasetAccessResult = Readonly<{ rows: any[]; mode: 'search' | 'rows_fallback' }>
+type DatasetAccessResult = Readonly<{ rows: any[]; mode: 'search' | 'rows_fallback' | 'first_rows_fallback' }>
 
 async function getJsonResponse(
   url: string,
@@ -82,8 +82,15 @@ async function getJsonResponse(
       signal: controller.signal,
     })
     let body: any = {}
-    try { body = await response.json() } catch {}
-    return { ok: response.ok, status: response.status, body }
+    let validJson = false
+    try {
+      body = await response.json()
+      validJson = true
+    } catch {}
+    // Hugging Face's Viewer can occasionally return an HTML error document with HTTP 200. Treating
+    // that as a successful empty JSON response hid the provider failure as "zero results" and starved
+    // the distillation lane. Only a parseable JSON response is successful here.
+    return { ok: response.ok && validJson, status: response.status, body }
   } catch (error) {
     // Dataset Viewer search is best-effort. A timeout/network abort must remain observable but it must
     // not prevent the bounded /rows fallback from running, otherwise one slow search endpoint opens the
@@ -139,10 +146,30 @@ async function readDatasetRows(source: { dataset: string; config: string; split:
     fallback = await getJsonResponse(`${DATASET_SERVER}/rows?${rowParams.toString()}`, fetcher, ROWS_REQUEST_TIMEOUT_MS)
     fallbackRows = Array.isArray(fallback.body?.rows) ? fallback.body.rows : []
   }
-  if (fallback.ok) return { rows: fallbackRows, mode: 'rows_fallback' }
+  if (fallback.ok && fallbackRows.length > 0) return { rows: fallbackRows, mode: 'rows_fallback' }
+
+  // /search and /rows are generated on demand and can both be unavailable while Hugging Face's cached
+  // /first-rows result is healthy. Use that cache only as the final bounded fallback, then choose a
+  // deterministic query-specific window so different curriculum queries do not all consume the same
+  // leading examples. Admission/relevance/deduplication still decide whether any selected row is retained.
+  const firstParams = new URLSearchParams({
+    dataset: source.dataset,
+    config: source.config,
+    split: source.split,
+  })
+  const first = await getJsonResponse(`${DATASET_SERVER}/first-rows?${firstParams.toString()}`, fetcher, ROWS_REQUEST_TIMEOUT_MS)
+  const firstRows = Array.isArray(first.body?.rows) ? first.body.rows : []
+  if (first.ok && firstRows.length > 0) {
+    const wanted = Math.min(Number(length), firstRows.length)
+    const start = deterministicOffset(source.dataset, query) % firstRows.length
+    const selected = Array.from({ length: wanted }, (_, index) => firstRows[(start + index) % firstRows.length])
+    return { rows: selected, mode: 'first_rows_fallback' }
+  }
 
   const searchState = searched.ok ? '200-empty' : String(searched.status)
-  throw new Error(`COS Hugging Face open-data source failed: dataset=${source.dataset}:search=${searchState}:rows=${fallback.status}`)
+  const rowsState = fallback.ok ? '200-empty' : String(fallback.status)
+  const firstState = first.ok ? '200-empty' : String(first.status)
+  throw new Error(`COS Hugging Face open-data source failed: dataset=${source.dataset}:search=${searchState}:rows=${rowsState}:first_rows=${firstState}`)
 }
 
 /**

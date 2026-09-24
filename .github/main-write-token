@@ -1,2 +1,2 @@
-base_sha=3c823c19b25539c1bf533786f3ef06ea0792476d
-branch=fix/context-window-postmerge-ci-20260924
+base_sha=03f4af24b481433444976cfc69938be72a08c998
+branch=fix/hf-first-rows-fallback-v2-20260924

@@ -247,6 +247,49 @@ test('HF dataset search abort falls back instead of opening the source circuit i
   assert.ok(rows[0].evidence?.includes('huggingface_access_mode:rows_fallback'))
 })
 
+
+test('HF non-JSON 200 responses fall back to cached first rows', async () => {
+  const requested: string[] = []
+  const html200 = {
+    ok: true,
+    status: 200,
+    async json() { throw new SyntaxError('Unexpected token <') },
+  } as Response
+  const fetcher = (async (url: string | URL | Request) => {
+    requested.push(String(url))
+    if (requested.length <= 3) return html200
+    return fakeResponse({
+      rows: [
+        {
+          row_idx: 70,
+          row: {
+            text: 'NIST cybersecurity risk management and incident response guidance.',
+            embedding: Array.from({ length: 1536 }, (_, i) => i / 1536),
+            metadata: JSON.stringify({ source: 'NIST cached row A', type: 'section' }),
+          },
+        },
+        {
+          row_idx: 71,
+          row: {
+            text: 'NIST zero trust architecture and identity access control guidance.',
+            embedding: Array.from({ length: 1536 }, (_, i) => i / 1536),
+            metadata: JSON.stringify({ source: 'NIST cached row B', type: 'section' }),
+          },
+        },
+      ],
+    })
+  }) as typeof fetch
+
+  const rows = await createHuggingFaceNistCybersecuritySearch(fetcher)('cybersecurity zero trust', 2)
+  assert.equal(rows.length, 2)
+  assert.equal(requested.length, 4)
+  assert.match(requested[0], /\/search\?/)
+  assert.match(requested[1], /\/rows\?/)
+  assert.match(requested[2], /\/rows\?/)
+  assert.match(requested[3], /\/first-rows\?/)
+  assert.ok(rows.every(row => row.evidence?.includes('huggingface_access_mode:first_rows_fallback')))
+})
+
 test('HF arXiv metadata source is searchable research discovery but does not assert paper training rights', async () => {
   let requested = ''
   const fetcher = (async (url: string | URL | Request) => {

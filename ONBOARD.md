@@ -1448,6 +1448,9 @@ Implementation progress on 2026-09-23:
 - `cos_working_distillation_candidates` is the append-only registry for an exact Working-COS candidate after that bundle/runtime/rollback binding passes. A registry row records the immutable bundle key, portable manifest, subject coverage, asset-set identities, exact target/runtime model identity, baseline identity, and rollback reference.
 - Candidate registration is evidence only. The table schema itself hard-fails `automatic_training_authorized`, `automatic_activation_authorized`, `production_traffic_authorized`, `university_graduation_claimed`, and `authority_expanded` to false. A registered candidate's next gate is bounded training dispatch, which remains separately governed and unimplemented until the exact trainable base revision and fast independent evaluator are proven.
 
+Production readiness automation: `/api/cron/cos-working-distillation-readiness` runs hourly under `CRON_SECRET` and may only re-prove the exact live runtime binding, select/materialize the balanced bundle, and register the immutable candidate. It is explicitly non-spending and cannot call Hugging Face, dispatch preparation/training, mutate the runtime, authorize traffic, claim University graduation, or expand authority. A successfully registered candidate still stops at `explicit_owner_confirmed_dataset_preparation`.
+
+
 - University telemetry now exposes Working-COS bundle readiness, selected subject coverage, item count, and the next gate. It deliberately reports `automaticTrainingAuthorized=false` and `productionTrafficAuthorized=false`.
 - Production Asset Vault supply at this point spans at least 14 subject families with 80+ vaulted items per family, so direct-COS education can be balanced rather than driven by whichever University subject produced the most recent or largest batch.
 

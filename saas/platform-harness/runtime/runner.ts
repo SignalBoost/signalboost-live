@@ -12,6 +12,7 @@ import type {
   HarnessAction,
   HarnessActionResult,
 } from './governed-executor.ts'
+import type { HarnessCostBudgetPort } from './cost-budget.ts'
 import {
   normalizeHarnessVerification,
   type HarnessTrajectoryVerifier,
@@ -207,6 +208,7 @@ export async function runHarnessWorker(input: {
   executor: GovernedHarnessExecutor
   worker: HarnessWorkerPort
   verifier: HarnessTrajectoryVerifier
+  costBudget?: HarnessCostBudgetPort
   now?: () => Date
 }): Promise<HarnessRunResult> {
   const now = input.now ?? (() => new Date())
@@ -214,6 +216,8 @@ export async function runHarnessWorker(input: {
   const actionResults: HarnessActionResult[] = []
   const startedAt = now().getTime()
   let toolCalls = 0
+  let activeExecutions = 0
+  let reservedCostUsd = 0
   let authorityBoundaryReached = false
   let productionMutationObserved = false
   let harnessLimitFailure: string | null = null
@@ -285,7 +289,7 @@ export async function runHarnessWorker(input: {
     }
 
     const deadlineMs = input.manifest.limits.deadlineMs
-    if (deadlineMs !== undefined && now().getTime() - startedAt > deadlineMs) {
+    if (deadlineMs !== undefined && now().getTime() - startedAt >= deadlineMs) {
       harnessLimitFailure = 'harness_deadline_exceeded'
       return Object.freeze({
         actionId: action.actionId,
@@ -316,37 +320,123 @@ export async function runHarnessWorker(input: {
       })
     }
 
-    toolCalls += 1
-    journal.append({
-      kind: 'tool_call',
-      summary: `Governed capability requested: ${action.capabilityId}`,
-      data: { actionId: action.actionId, capabilityId: action.capabilityId },
-    })
-
-    const result = await input.executor.execute(input.manifest, action)
-    actionResults.push(result)
-    if (result.status === 'authority_boundary') authorityBoundaryReached = true
-
-    const grant = input.manifest.capabilities.find(item => item.id === action.capabilityId)
-    if (
-      result.status === 'executed' &&
-      input.manifest.environment.class === 'production' &&
-      grant?.mutating
-    ) {
-      productionMutationObserved = true
+    const maxConcurrency = input.manifest.limits.maxConcurrency
+    if (maxConcurrency !== undefined && activeExecutions >= maxConcurrency) {
+      harnessLimitFailure = 'harness_concurrency_limit_exceeded'
+      return Object.freeze({
+        actionId: action.actionId,
+        capabilityId: action.capabilityId,
+        status: 'execution_failed',
+        error: harnessLimitFailure,
+      })
     }
 
-    journal.append({
-      kind: 'tool_result',
-      summary: `Governed capability result: ${result.status}`,
-      data: {
-        actionId: result.actionId,
-        capabilityId: result.capabilityId,
-        status: result.status,
-        verdict: result.gatewayOutcome?.verdict ?? null,
-      },
-    })
-    return result
+    activeExecutions += 1
+    let actionReservedCostUsd = 0
+    try {
+      const maxCostUsd = input.manifest.limits.maxCostUsd
+      if (maxCostUsd !== undefined) {
+        if (!input.costBudget) {
+          harnessLimitFailure = 'harness_cost_budget_required'
+          return Object.freeze({
+            actionId: action.actionId,
+            capabilityId: action.capabilityId,
+            status: 'execution_failed',
+            error: harnessLimitFailure,
+          })
+        }
+
+        const remainingCostUsd = Math.max(0, maxCostUsd - reservedCostUsd)
+        let reservation
+        try {
+          reservation = await input.costBudget.reserve({
+            manifest: input.manifest,
+            action,
+            remainingCostUsd,
+          })
+        } catch {
+          harnessLimitFailure = 'harness_cost_budget_reservation_failed'
+          return Object.freeze({
+            actionId: action.actionId,
+            capabilityId: action.capabilityId,
+            status: 'execution_failed',
+            error: harnessLimitFailure,
+          })
+        }
+
+        const requestedReservation = Number(reservation.reservedCostUsd)
+        if (
+          !reservation.allowed ||
+          !Number.isFinite(requestedReservation) ||
+          requestedReservation < 0
+        ) {
+          harnessLimitFailure = reservation.allowed
+            ? 'harness_cost_budget_invalid'
+            : 'harness_cost_budget_denied'
+          return Object.freeze({
+            actionId: action.actionId,
+            capabilityId: action.capabilityId,
+            status: 'execution_failed',
+            error: harnessLimitFailure,
+          })
+        }
+        if (requestedReservation > remainingCostUsd + Number.EPSILON) {
+          harnessLimitFailure = 'harness_cost_budget_exceeded'
+          return Object.freeze({
+            actionId: action.actionId,
+            capabilityId: action.capabilityId,
+            status: 'execution_failed',
+            error: harnessLimitFailure,
+          })
+        }
+
+        actionReservedCostUsd = requestedReservation
+        reservedCostUsd += requestedReservation
+      }
+
+      toolCalls += 1
+      journal.append({
+        kind: 'tool_call',
+        summary: `Governed capability requested: ${action.capabilityId}`,
+        data: {
+          actionId: action.actionId,
+          capabilityId: action.capabilityId,
+          ...(input.manifest.limits.maxCostUsd !== undefined
+            ? {
+                reservedCostUsd: actionReservedCostUsd,
+                cumulativeReservedCostUsd: reservedCostUsd,
+              }
+            : {}),
+        },
+      })
+
+      const result = await input.executor.execute(input.manifest, action)
+      actionResults.push(result)
+      if (result.status === 'authority_boundary') authorityBoundaryReached = true
+
+      const grant = input.manifest.capabilities.find(item => item.id === action.capabilityId)
+      if (
+        result.status === 'executed' &&
+        input.manifest.environment.class === 'production' &&
+        grant?.mutating
+      ) {
+        productionMutationObserved = true
+      }
+
+      journal.append({
+        kind: 'tool_result',
+        summary: `Governed capability result: ${result.status}`,
+        data: {
+          actionId: result.actionId,
+          capabilityId: result.capabilityId,
+          status: result.status,
+          verdict: result.gatewayOutcome?.verdict ?? null,
+        },
+      })
+      return result
+    } finally {
+      activeExecutions = Math.max(0, activeExecutions - 1)
+    }
   }
 
   try {
@@ -381,6 +471,15 @@ export async function runHarnessWorker(input: {
       authorityExpanded: false,
       productionMutationObserved,
     }
+  }
+
+  const finalDeadlineMs = input.manifest.limits.deadlineMs
+  if (
+    !harnessLimitFailure &&
+    finalDeadlineMs !== undefined &&
+    now().getTime() - startedAt >= finalDeadlineMs
+  ) {
+    harnessLimitFailure = 'harness_deadline_exceeded'
   }
 
   if (authorityBoundaryReached) {

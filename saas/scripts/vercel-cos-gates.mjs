@@ -1,12 +1,14 @@
+// saas/scripts/vercel-cos-gates.mjs
 // Focused production gate for the current live COS ingress path.
-// Preserve the existing travel freshness regression and add mandatory Harness ingress coverage.
+// Preserve the existing travel freshness regression and cover mandatory COS and specialist Harness ingress.
 // Broader platform-wide Harness acceptance remains a separate gate and is not claimed here.
 import { spawnSync } from 'node:child_process'
 
 const tests = [
   'tests/cosTravelPlanningFreshness.node.test.ts',
   'tests/cosHarnessIngress.node.test.ts',
-  'tests/cosWorkingDistillationReadinessCron.node.test.ts',
+  'tests/cosSoftwareSpecialistProductionHarness.node.test.ts',
+  'tests/cosA2ASpecialistHarnessIngress.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

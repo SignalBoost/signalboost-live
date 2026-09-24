@@ -1417,7 +1417,7 @@ Implementation progress on 2026-09-23:
 
 Bounded Working-COS training implementation — 2026-09-23/24:
 
-- The first direct-COS cycle is deliberately **8 subjects / at most 160 items**, even though the reusable bundle library may hold more. `cosWorkingDistillationDataset.ts` re-reads the append-only vault, re-verifies every source/portable manifest and text hash, rejects duplicate training text, and deterministically assigns a per-subject holdout before any provider job exists.
+- The first direct-COS cycle is deliberately **8 subjects / at most 224 items**, even though the reusable bundle library may hold more. `cosWorkingDistillationDataset.ts` re-reads the append-only vault, re-verifies every source/portable manifest and text hash, rejects duplicate training text, and deterministically assigns a per-subject holdout before any provider job exists.
 - The host computes immutable dataset, training-manifest and holdout-manifest hashes. Hugging Face preparation must return exactly those manifests; the worker cannot silently repartition the candidate.
 - Direct-COS training is accurately labelled `working_cos_supervised_distillation`: a bounded QLoRA/LoRA supervised adapter trained from durable model-neutral University teaching assets. It is **not** falsely described as dense token-logit GKD. Frontier GKD remains the separate University optimizer where a pinned dense teacher is actually present.
 - Preparation and training both require the live RunPod runtime digest to be re-observed and successfully bound to the pinned trainable Hugging Face base. The HF metadata endpoint must still report the exact pinned revision and Apache-2.0 license immediately before provider spend.

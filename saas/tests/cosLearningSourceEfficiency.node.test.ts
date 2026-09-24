@@ -6,6 +6,7 @@ import { youtubeLearningConnector } from '../lib/cos-core/layers/learning/connec
 import { DEFAULT_LEARNING_SOURCE_CAPS } from '../lib/cos-core/layers/learning/learningSourceCaps.ts'
 import { createLiveLearningAdapters, guardLearningSourceAdapter, runsOnDailyLearningPass, sourceCallBudget } from '../lib/cos-core/layers/learning/liveSources.ts'
 import { createYouTubeMetadataSearch, createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients.ts'
+import { createSemanticScholarScientificSearch } from '../lib/cos-core/layers/learning/semanticResearch.ts'
 
 const GAP: KnowledgeGap = {
   id: 'curriculum:multi-tenant-saas-performance',
@@ -208,3 +209,51 @@ test('research source call budgets are provider-specific and leave ordinary sour
   assert.equal(sourceCallBudget(adapter('crossref')), Number.POSITIVE_INFINITY)
 })
 
+
+
+test('Semantic Scholar keeps useful paper metadata when SPECTER2 is unavailable', async () => {
+  const fetcher = (async () => new Response(JSON.stringify({
+    data: [{
+      paperId: 'paper-123',
+      title: 'Dense Retrieval Evaluation Benchmark',
+      abstract: 'This paper evaluates dense embedding retrieval benchmarks, ranking quality, and retrieval robustness.',
+      year: 2026,
+      citationCount: 17,
+      url: 'https://www.semanticscholar.org/paper/paper-123',
+      externalIds: { DOI: '10.0000/example' },
+      embedding: null,
+    }],
+  }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch
+
+  const search = createSemanticScholarScientificSearch({ fetcher })
+  const results = await search('embedding retrieval benchmark', 3)
+
+  assert.equal(results.length, 1)
+  assert.match(results[0].text, /dense embedding retrieval/i)
+  assert.match(String(results[0].license), /SPECTER2 vector unavailable/i)
+  assert.ok(results[0].evidence?.includes('semantic_scholar_graph_relevance_v1'))
+  assert.ok(results[0].evidence?.includes('internal_reembedding_required'))
+})
+
+test('Semantic Scholar preserves SPECTER2 provenance when a valid vector is present', async () => {
+  const vector = Array.from({ length: 768 }, (_, index) => index / 768)
+  const fetcher = (async () => new Response(JSON.stringify({
+    data: [{
+      paperId: 'paper-456',
+      title: 'Semantic Retrieval with SPECTER2',
+      abstract: 'A substantive abstract about semantic scientific retrieval and representation learning.',
+      year: 2025,
+      citationCount: 9,
+      url: 'https://www.semanticscholar.org/paper/paper-456',
+      embedding: { model: 'specter_v2', vector },
+    }],
+  }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch
+
+  const search = createSemanticScholarScientificSearch({ fetcher })
+  const results = await search('semantic retrieval', 3)
+
+  assert.equal(results.length, 1)
+  assert.ok(results[0].evidence?.some(value => value === 'external_semantic_index:semantic_scholar_specter2_proximity_v2'))
+  assert.ok(results[0].evidence?.some(value => value.startsWith('external_vector_sha256:')))
+  assert.equal(results[0].evidence?.includes('internal_reembedding_required'), false)
+})

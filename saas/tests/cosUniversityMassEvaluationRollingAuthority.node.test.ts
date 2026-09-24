@@ -241,6 +241,8 @@ test('cron scans bounded legacy work and explicitly includes both Builder v2 and
   assert.match(route, /frontierRecipe: receipt\.profile === 'cos_university_frontier_gkd_v1'/)
   assert.match(route, /builderV2:/)
   assert.match(route, /remediationReplay: isRemediationReplayReceipt/)
+  assert.match(route, /isStrengthenedFailureDerivedReplayReceipt/)
+  assert.match(route, /return isStrengthenedFailureDerivedReplayReceipt\(intendedUse\)/)
   assert.match(route, /failureDerivedReplayRequired/)
   assert.match(route, /failureDerivedReplayItems/)
   assert.match(route, /frontierResponseAnchorItems/)

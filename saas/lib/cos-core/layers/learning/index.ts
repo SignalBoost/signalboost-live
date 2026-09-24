@@ -67,6 +67,8 @@ export type KnowledgeGap = {
    * language matches none of them; this lets the relevance gate recognise it as on-topic.
    */
   targetLanguage?: string
+  /** Optional exact adapter allowlist for objectives that must stay on a named source implementation. */
+  allowedAdapterIds?: string[]
   /** Optional adapter-level exclusions for objectives whose source-kind bucket is intentionally broader. */
   excludedAdapterIds?: string[]
   /**

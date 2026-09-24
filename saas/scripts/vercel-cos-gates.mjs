@@ -1,22 +1,20 @@
-// saas/scripts/vercel-cos-gates.mjs
+// Diagnostic-only Q2B2. Never merge.
 import { spawnSync } from 'node:child_process'
-
-// Focused production repair gate for the regressions changed in this PR.
-// Broader historical suites remain independently tracked and must not hide these repaired failures.
 const tests = [
-  'tests/builderRepositoryRepairProofController.node.test.ts',
-  'tests/cosFreshnessPolicy.node.test.ts',
-  'tests/cosTravelPlanningFreshness.node.test.ts',
-  'tests/cosPragmaticIntentCore.node.test.ts',
+  'tests/conciergeSemanticVisualIntent.node.test.ts',
+  'tests/conciergeVisualTypoRouting.node.test.ts',
+  'tests/visualObjectiveContract.node.test.ts',
+  'tests/visualPromptFormatNeutrality.node.test.ts',
+  'tests/namedSubjectIntent.node.test.ts',
+  'tests/runtimeAcceptanceCleanup.node.test.ts',
+  'tests/conciergeNamedPeopleRecovery.node.test.ts',
+  'tests/suggestedFollowups.node.test.ts',
+  'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',
+  'tests/cosDomainAvailability.node.test.ts',
+  'tests/assistantTransportClient.node.test.ts',
+  'tests/cosDurableTurnHistory.node.test.ts',
+  'tests/cosInteractiveGraduateLatency.node.test.ts',
 ]
-
-const result = spawnSync(process.execPath, ['--test', ...tests], {
-  cwd: process.cwd(),
-  env: process.env,
-  stdio: 'inherit',
-})
-if (result.error) {
-  console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
-  process.exit(1)
-}
+const result = spawnSync(process.execPath, ['--test', ...tests], { cwd: process.cwd(), env: process.env, stdio: 'inherit' })
+if (result.error) { console.error(result.error.message); process.exit(1) }
 process.exit(result.status ?? 1)

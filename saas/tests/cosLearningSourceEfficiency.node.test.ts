@@ -179,7 +179,7 @@ test('source guard serializes a provider burst and queued calls stop after the c
   assert.equal(settled.filter(result => result.status === 'fulfilled').length, 4)
 })
 
-test('fragile external research providers are bounded per cycle to avoid provider-rate bursts', async () => {
+test('Semantic Scholar continuity allows three serialized calls per cycle without provider-rate bursts', async () => {
   const calls: string[] = []
   const base: ContinuousLearningSourceAdapter = {
     kind: 'scientific_journal',
@@ -189,19 +189,20 @@ test('fragile external research providers are bounded per cycle to avoid provide
       return []
     },
   }
-  assert.equal(sourceCallBudget(base), 1)
+  assert.equal(sourceCallBudget(base), 3)
   const guarded = guardLearningSourceAdapter(base, 3, 0, sourceCallBudget(base))
   await Promise.all([
     guarded.acquire({ ...GAP, id: 'gap-1' }),
     guarded.acquire({ ...GAP, id: 'gap-2' }),
     guarded.acquire({ ...GAP, id: 'gap-3' }),
+    guarded.acquire({ ...GAP, id: 'gap-4' }),
   ])
-  assert.deepEqual(calls, ['gap-1'])
+  assert.deepEqual(calls, ['gap-1', 'gap-2', 'gap-3'])
 })
 
 test('research source call budgets are provider-specific and leave ordinary sources unbounded', () => {
   const adapter = (id: string): ContinuousLearningSourceAdapter => ({ kind: 'scientific_journal', id, async acquire() { return [] } })
-  assert.equal(sourceCallBudget(adapter('semantic_scholar')), 1)
+  assert.equal(sourceCallBudget(adapter('semantic_scholar')), 3)
   assert.equal(sourceCallBudget(adapter('openalex_semantic')), 1)
   assert.equal(sourceCallBudget(adapter('hf_github_cc0')), 1)
   assert.equal(sourceCallBudget(adapter('openalex')), 2)

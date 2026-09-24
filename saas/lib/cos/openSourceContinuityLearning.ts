@@ -29,10 +29,10 @@ const OPEN_SOURCE_CONTINUITY_POLICY = {
 }
 
 function continuityGaps(now: Date): KnowledgeGap[] {
-  const all = openSourceContinuityCurriculum(now)
-  const semantic = all.find(gap => gap.allowedAdapterIds?.includes('semantic_scholar'))
-  const wikimedia = all.find(gap => gap.allowedAdapterIds?.includes('reference'))
-  return [semantic, wikimedia].filter((gap): gap is KnowledgeGap => Boolean(gap))
+  return openSourceContinuityCurriculum(now).filter(gap =>
+    gap.allowedAdapterIds?.includes('semantic_scholar')
+    || gap.allowedAdapterIds?.includes('reference'),
+  )
 }
 
 export async function runOpenSourceContinuityLearning(input: {

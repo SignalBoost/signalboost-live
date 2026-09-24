@@ -42,6 +42,12 @@ test('detail drops nullish and non-finite values and stringifies objects', () =>
   assert.equal((args.p_detail as any).g, '{"n":1}')
 })
 
+test('running is an explicit operational state', () => {
+  const args = buildCosLaneStatusArgs({ lane: 'l', outcome: 'running', reason: 'canary_in_progress', detail: { endpointId: 'ep1' } })
+  assert.equal(args.p_outcome, 'running')
+  assert.equal(args.p_reason, 'canary_in_progress')
+})
+
 test('empty detail, deployment and commit are accepted', () => {
   const args = buildCosLaneStatusArgs({ lane: 'l', outcome: 'failed', reason: 'boom' })
   assert.deepEqual(args.p_detail, {})
@@ -86,6 +92,9 @@ test('the canary lane reports on every exit path', () => {
   for (const reason of ['runpod_balance_guard', 'no_atomically_claimable_mass_distilled_artifact', 'canary_failed', 'canary_passed', 'lane_error']) {
     assert.match(ROUTE, new RegExp(`laneStatus\\('(worked|skipped|failed)','${reason}'`), reason)
   }
+  assert.match(ROUTE, /laneStatus\('running','canary_in_progress'/)
+  assert.match(ROUTE, /readInFlightCanary\(new Date\(\)\)/)
+  assert.match(ROUTE, /MASS_CANARY_IN_FLIGHT_TTL_MS/)
   // The skip response now carries the rolling-authority reason too, which previously only reached a log line.
   assert.match(ROUTE, /reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling/)
 })

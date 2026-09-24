@@ -163,3 +163,50 @@ test('RunPod primary probe exposes digest/binding evidence without making it a r
   assert.match(env, /COS_WORKING_DISTILLATION_BASE_MODEL_ID=Qwen\/Qwen3-30B-A3B-Thinking-2507/)
   assert.match(env, /COS_WORKING_DISTILLATION_BASE_MODEL_REVISION=144afc2f379b542fdd4e85a1fcd5e1f79112d95d/)
 })
+
+
+test('known Production qwen3 digest binds automatically to the pinned Thinking-2507 base', () => {
+  const productionDigest = 'ad815644918f0eaab341c12b67837cc6dd4562342cdaf118f83d5d554cb37226'
+  const identity = {
+    ready: true,
+    model: 'qwen3:30b',
+    digest: productionDigest,
+    modifiedAt: '2026-09-14T01:35:28Z',
+    size: 18556699314,
+    family: 'qwen3moe',
+    parameterSize: '30.5B',
+    quantizationLevel: 'Q4_K_M',
+  } as const
+  const binding = workingCosRuntimeBindingFromEnv(identity, 'yvj6e9zboi7ofo', 'qwen3:30b', {})
+
+  assert.equal(binding.eligible, true)
+  assert.equal(binding.bindingSource, 'versioned_exact_digest_allowlist')
+  assert.equal(binding.knownRuntimeSource, 'ollama_qwen3_30b_thinking_2507_q4_k_m')
+  assert.equal(binding.observedRuntimeDigest, productionDigest)
+  assert.equal(binding.trainableBaseModelId, 'Qwen/Qwen3-30B-A3B-Thinking-2507')
+  assert.equal(binding.trainableBaseModelRevision, '144afc2f379b542fdd4e85a1fcd5e1f79112d95d')
+  assert.equal(binding.trainingDispatchAuthorized, false)
+  assert.equal(binding.productionTrafficAuthorized, false)
+})
+
+test('any partial operator override disables known-digest fallback and fails closed', () => {
+  const productionDigest = 'ad815644918f0eaab341c12b67837cc6dd4562342cdaf118f83d5d554cb37226'
+  const identity = {
+    ready: true,
+    model: 'qwen3:30b',
+    digest: productionDigest,
+    modifiedAt: null,
+    size: null,
+    family: 'qwen3moe',
+    parameterSize: '30.5B',
+    quantizationLevel: 'Q4_K_M',
+  } as const
+  const binding = workingCosRuntimeBindingFromEnv(identity, 'yvj6e9zboi7ofo', 'qwen3:30b', {
+    COS_WORKING_DISTILLATION_BASE_MODEL_ID: 'Qwen/Qwen3-30B-A3B-Thinking-2507',
+  })
+
+  assert.equal(binding.eligible, false)
+  assert.equal(binding.bindingSource, 'unbound')
+  assert.ok(binding.blockers.includes('declared_runtime_digest_invalid'))
+  assert.ok(binding.blockers.includes('trainable_base_revision_invalid'))
+})

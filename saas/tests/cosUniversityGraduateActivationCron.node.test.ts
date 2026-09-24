@@ -49,8 +49,10 @@ test('subjects stay bounded while COS-primary requires the explicit A/A+ general
     'reasoning_decision_science',
   ]
   for (const subject of subjects) assert.match(route, new RegExp(`university:${subject}`))
-  assert.match(route, /computer_science:[\s\S]{0,180}workerRoles: \['coder', 'critic', 'verifier'\]/)
+  assert.match(route, /computer_science:[\s\S]{0,220}workerRoles: \['coder', 'critic', 'verifier', 'context_engineer'\]/)
   assert.match(route, /cybersecurity:[\s\S]{0,180}workerRoles: \['coder', 'critic', 'verifier', 'researcher'\]/)
+  assert.match(route, /statistics_data_science:[\s\S]{0,220}context_engineer/)
+  assert.match(route, /reasoning_decision_science:[\s\S]{0,220}context_engineer/)
   assert.match(route, /canonicalSubjectId !== 'reasoning_decision_science'/)
   assert.match(route, /readCosUniversityGeneralistGraduationStatus\(new Date\(\), 'cos'\)/)
   assert.match(route, /status\.graduated === true/)

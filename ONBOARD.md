@@ -64,6 +64,8 @@ The full-enforcement requirements are:
 
 Platform-wide acceptance is not complete until Production evidence demonstrates the shared Harness on COS and representative specialists across read-only, write, consequential, delegated, failure/recovery, rollback, deadline, concurrency, and cost-ceiling cases. Unit tests or a Residency-only integration are necessary but not sufficient evidence for the platform-wide completion claim.
 
+Recursive delegation implementation note — 2026-09-23: COS -> Software Specialist delegation must carry explicit parent Harness lineage. A child run is valid only when its tenant, profile, environment class, requested capability surface, scopes/risk/mutation, and parent-defined hard limits are equal to or narrower than the parent run. Direct Software Specialist ingress first establishes a bounded COS parent with only the internal software-delegation capability; the specialist child cannot mint Production deploy/merge authority or widen the parent envelope.
+
 
 Ownership stays separated:
 

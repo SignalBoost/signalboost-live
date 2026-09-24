@@ -521,7 +521,7 @@ export async function provisionMassDistilledCanaryRuntime(input: MassDistilledRu
     ...provisioned,
     canaryEligibleGpuPools: Object.freeze([...pools]),
     canaryCatalogObserved: Array.isArray(catalogGpus),
-    canaryCatalogServerlessPriceUsdPerHourByPool,
+    canaryCatalogServerlessPriceUsdPerHourByPool: catalogServerlessPriceUsdPerHourByPool,
     actualWorkerGpuPoolObserved: false as const,
   })
 }

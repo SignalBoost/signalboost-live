@@ -30,10 +30,11 @@ export function createSupervisorAuditHarnessEvidenceSink(db:AuditDb):HarnessEvid
           ...(record.failureCode?{failureCode:record.failureCode}:{}),
           authorityExpanded:false,
           productionMutationObserved:record.productionMutationObserved,
-          ...(record.compensationStatus?{compensationStatus:record.compensationStatus,compensationAttempted:record.compensationAttempted??0,compensationCompleted:record.compensationCompleted??0}:{}),
+          ...(record.compensationStatus?{compensationStatus:record.compensationStatus,compensationAttempted:record.compensationAttempted??0,compensationCompleted:record.compensationCompleted??0,...(record.compensationFailedActionIds?.length?{compensationFailedActionIds:[...record.compensationFailedActionIds]}:{}),...(record.manualRecoveryActionIds?.length?{manualRecoveryActionIds:[...record.manualRecoveryActionIds]}:{})}:{}),
+          ...(record.usage?{usage:{...record.usage,limits:{...record.usage.limits}}}:{}),
           trajectoryEvidenceRefs:[...record.trajectoryEvidenceRefs],
         },
-        schema_version:'platform-harness-evidence-v1',
+        schema_version:'platform-harness-evidence-v2',
       })
       if(error) throw new Error('platform_harness_evidence_persist_failed')
     },

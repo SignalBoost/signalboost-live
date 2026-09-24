@@ -5,6 +5,7 @@ import { assignCosUniversityRoleCurriculum, type CosUniversityAgentRole } from '
 
 const ROLE_PROGRAMS: ReadonlyArray<[CosUniversityAgentRole, keyof typeof COS_UNIVERSITY_MASTERS_PROGRAMS]> = [
   ['software_engineering', 'applied_ai_systems'],
+  ['context_engineering', 'context_engineering_systems'],
   ['cybersecurity', 'security_and_trust'],
   ['quantitative_data_science', 'quantitative_decision_science'],
   ['enterprise_operations_governance', 'enterprise_operations_and_governance'],

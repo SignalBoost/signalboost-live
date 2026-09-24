@@ -262,10 +262,10 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     .map((row: any) => clean(row?.candidate_id, 240))
     .filter(Boolean))]
   for (let offset = 0; offset < builderCandidateIds.length; offset += ROLLING_CANDIDATE_CHUNK_SIZE) {
-    const candidateChunk = builderCandidateIds.slice(offset, offset + ROLLING_CANDIDATE_CHUNK_SIZE)
+    const residencyCandidateChunk = builderCandidateIds.slice(offset, offset + ROLLING_CANDIDATE_CHUNK_SIZE)
     const result = await db.from('cos_university_residency_enrollments')
       .select('candidate_id,trained_artifact_hash,completed_at')
-      .in('candidate_id', candidateChunk)
+      .in('candidate_id', residencyCandidateChunk)
       .eq('standing', 'residency_complete')
       .eq('authority_expanded', false)
       .not('completed_at', 'is', null)
@@ -294,13 +294,16 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     const candidateId = clean(row.candidate_id, 240)
     const artifactHash = clean(row.trained_artifact_hash, 64).toLowerCase()
     const isBuilder = String(row.subject_id || '') === 'Computer Science & Coding'
+    const minimumCanaryObservedAt = isBuilder
+      ? residencyCompletedAt.get(`${candidateId}:${artifactHash}`)
+      : undefined
     return {
       candidateId, subjectId: clean(row.subject_id, 240),
       artifactHash, createdAt: String(row.created_at || ''),
       frontierRecipe: receipt.profile === 'cos_university_frontier_gkd_v1',
       builderV2: isBuilder && isBuilderV2Receipt(row.intended_use),
       remediationReplay: isRemediationReplayReceipt(row.intended_use),
-      ...(isBuilder ? { minimumCanaryObservedAt: residencyCompletedAt.get(`${candidateId}:${artifactHash}`) } : {}),
+      ...(minimumCanaryObservedAt ? { minimumCanaryObservedAt } : {}),
     }
   })
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_final_gate_eligible' }

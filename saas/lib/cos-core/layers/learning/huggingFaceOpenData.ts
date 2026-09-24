@@ -1,6 +1,7 @@
 // saas/lib/cos-core/layers/learning/huggingFaceOpenData.ts
 import { createHash } from 'node:crypto'
 import type { LearningConnectorResult, LearningConnectorSearch } from './connectors.ts'
+import type { KnowledgeGap } from './index.ts'
 
 type FetchLike = typeof fetch
 
@@ -22,6 +23,95 @@ export const HUGGING_FACE_OPEN_DATASETS = Object.freeze({
     mode: 'cc0_code_corpus_search',
   }),
 } as const)
+
+
+
+const HF_NIST_DAILY_QUERIES = Object.freeze([
+  'zero trust architecture identity access',
+  'incident response risk management',
+  'post quantum cryptography migration',
+  'software supply chain secure development',
+  'cloud security controls authorization',
+  'privacy framework authentication',
+  'cybersecurity framework governance resilience',
+  'network security continuous monitoring',
+  'digital identity phishing resistant authentication',
+  'supply chain risk management controls',
+  'vulnerability management secure configuration',
+  'data protection encryption key management',
+] as const)
+
+const HF_GITHUB_CC0_DAILY_QUERIES = Object.freeze([
+  'typescript api testing error handling',
+  'javascript web application architecture',
+  'python automation database testing',
+  'go distributed systems concurrency',
+  'rust systems reliability error handling',
+  'sql database migrations transactions',
+  'react component accessibility testing',
+  'node api authentication middleware',
+  'devops ci testing deployment rollback',
+  'repository architecture dependency injection',
+  'cache queue retry backpressure',
+  'observability logging metrics tracing',
+] as const)
+
+function utcLearningDay(now: Date): number {
+  const value = now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date(0)
+  return Math.floor(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()) / 86_400_000)
+}
+
+/**
+ * Two zero-cost, bounded, rights-explicit daily study objectives keep the allowlisted Hugging Face
+ * corpora from being starved behind the general live-source task queue. Discovery rotates by UTC day
+ * so the source does not rediscover the same top rows forever. The exact adapter allowlist means these
+ * objectives cannot be satisfied by another public-dataset source, while the normal relevance,
+ * confidence, deduplication, storage and internal-embedding gates remain unchanged.
+ */
+export function huggingFaceOpenDatasetCurriculum(now: Date = new Date()): KnowledgeGap[] {
+  const day = utcLearningDay(now)
+  const nistQuery = HF_NIST_DAILY_QUERIES[((day % HF_NIST_DAILY_QUERIES.length) + HF_NIST_DAILY_QUERIES.length) % HF_NIST_DAILY_QUERIES.length]
+  const githubQuery = HF_GITHUB_CC0_DAILY_QUERIES[((day % HF_GITHUB_CC0_DAILY_QUERIES.length) + HF_GITHUB_CC0_DAILY_QUERIES.length) % HF_GITHUB_CC0_DAILY_QUERIES.length]
+
+  return [
+    {
+      id: 'curriculum:hf-nist-cc0-continuous',
+      subject: 'Cybersecurity',
+      question: `What reusable NIST cybersecurity guidance is relevant to ${nistQuery}?`,
+      discoveryQuery: nistQuery,
+      portableIds: ['cos'],
+      expectedReuse: 40,
+      expectedAvoidedCostUsd: 1,
+      urgency: 100,
+      evidence: [
+        'bounded daily Hugging Face open-dataset curriculum',
+        'huggingface_dataset:ethanolivertroy/nist-cybersecurity-training',
+        'huggingface_dataset_license:cc0-1.0',
+      ],
+      sourceKinds: ['public_dataset'],
+      allowedAdapterIds: ['hf_nist_cc0'],
+      curriculumAligned: true,
+    },
+    {
+      id: 'curriculum:hf-github-cc0-continuous',
+      subject: 'Computer Science & Coding',
+      question: `What reusable public-domain software engineering patterns are relevant to ${githubQuery}?`,
+      discoveryQuery: githubQuery,
+      portableIds: ['cos'],
+      expectedReuse: 40,
+      expectedAvoidedCostUsd: 1,
+      urgency: 99,
+      evidence: [
+        'bounded daily Hugging Face open-dataset curriculum',
+        'huggingface_dataset:KoalaAI/GitHub-CC0',
+        'huggingface_dataset_license:cc0-1.0',
+      ],
+      sourceKinds: ['public_dataset'],
+      allowedAdapterIds: ['hf_github_cc0'],
+      curriculumAligned: true,
+    },
+  ]
+}
 
 const DATASET_SERVER = 'https://datasets-server.huggingface.co'
 const REQUEST_TIMEOUT_MS = 12_000

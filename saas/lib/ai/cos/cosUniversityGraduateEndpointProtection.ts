@@ -1,4 +1,5 @@
 // saas/lib/ai/cos/cosUniversityGraduateEndpointProtection.ts
+import { createHash } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/service-db.ts'
 
 const ENDPOINT_ID = /^[a-z0-9_-]{3,120}$/i
@@ -17,6 +18,37 @@ export function graduateRunpodEndpointId(scope: unknown): string | null {
   } catch {
     return null
   }
+}
+
+export function residencyRunpodEndpointName(candidateId: unknown, artifactHash: unknown): string | null {
+  const candidate = String(candidateId || '').trim()
+  const artifact = String(artifactHash || '').trim().toLowerCase()
+  if (!candidate.startsWith('mass:') || !/^[a-f0-9]{64}$/.test(artifact)) return null
+  const runtimeKey = createHash('sha256')
+    .update(JSON.stringify(['builder-residency-runtime-v1', candidate, artifact]))
+    .digest('hex')
+    .slice(0, 10)
+  return `itmounts-mass-distilled-${artifact.slice(0, 12)}-${runtimeKey}-v3`
+}
+
+export async function activeResidencyRunpodEndpointNames(): Promise<ReadonlySet<string>> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('residency_endpoint_protection_database_unavailable')
+  const rows = await db.from('cos_university_residency_enrollments')
+    .select('candidate_id,trained_artifact_hash')
+    .in('standing', ['resident', 'senior_resident', 'remediation_required'])
+    .eq('authority_expanded', false)
+    .limit(32)
+  if (rows.error) throw rows.error
+  const names = new Set<string>()
+  for (const row of rows.data || []) {
+    const name = residencyRunpodEndpointName(
+      (row as { candidate_id?: unknown }).candidate_id,
+      (row as { trained_artifact_hash?: unknown }).trained_artifact_hash,
+    )
+    if (name) names.add(name)
+  }
+  return names
 }
 
 export async function activeGraduateRunpodEndpointIds(): Promise<ReadonlySet<string>> {

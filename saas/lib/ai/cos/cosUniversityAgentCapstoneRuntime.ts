@@ -1,3 +1,4 @@
+import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -26,7 +27,7 @@ async function loadOwnProcedures(agentId: string): Promise<string[]> {
 }
 
 /** Uses the same explicitly configured software model as Builder, without Builder's JSON envelope. */
-export async function executeSoftwareCapstoneRuntime(request: AgentCapstoneRequest) {
+async function executeSoftwareCapstoneRuntimeInsideHarness(request: AgentCapstoneRequest) {
   await requireRegisteredCapstoneRuntime(request.agentId)
   const config = localInferenceConfigFromEnv()
   const model = requireBuilderCodingModel()
@@ -38,4 +39,23 @@ export async function executeSoftwareCapstoneRuntime(request: AgentCapstoneReque
       ...config, model: selectedModel, timeoutMs: Math.min(config.timeoutMs, 90_000),
     }),
   })
+}
+
+
+/** Graduation capstone execution is always Harness-bound. */
+export async function executeSoftwareCapstoneRuntime(
+  request: AgentCapstoneRequest,
+): ReturnType<typeof executeSoftwareCapstoneRuntimeInsideHarness> {
+  return withHostProductionHarnessIngress({
+    objective: `Run University graduation capstone for ${request.agentId}`,
+    portableId: 'cos-university-capstone',
+    agentId: request.agentId,
+    role: 'university_capstone_candidate',
+    capabilityId: 'university.capstone.execute',
+    risk: 'write',
+    deadlineMs: 120_000,
+    maxConcurrency: 1,
+    maxToolCalls: 4,
+    runId: `university-capstone-${request.runId}`,
+  }, () => executeSoftwareCapstoneRuntimeInsideHarness(request))
 }

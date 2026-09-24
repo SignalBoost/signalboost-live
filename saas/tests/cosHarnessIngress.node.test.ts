@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import {
+  COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY,
   createCosProductionIngressManifest,
   currentCosHarnessIngress,
   requireCosHarnessIngress,
@@ -56,4 +57,36 @@ test('live COS route requires Harness ingress before postCosPrimary execution', 
   assert.ok(core >= 0)
   assert.ok(guard > core && guard < source.indexOf('const startedAt=Date.now()', core))
   assert.ok(wrapper >= 0 && wrapper < dispatch)
+})
+
+
+test('COS parent ingress can grant only the bounded internal software delegation capability', () => {
+  const manifest = createCosProductionIngressManifest({
+    runId: 'cos-parent-software-test',
+    objective: 'delegate one software task',
+    tenantId: 'itmounts',
+    requestedCapabilities: [COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY],
+  })
+
+  assert.deepEqual(manifest.capabilities.map(item => item.id), [
+    COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY,
+  ])
+  assert.deepEqual(manifest.capabilities[0]?.scopes, ['cos.specialist.software.delegate'])
+  assert.throws(() => createCosProductionIngressManifest({
+    runId: 'cos-parent-forbidden-test',
+    objective: 'attempt wider authority',
+    tenantId: 'itmounts',
+    requestedCapabilities: ['production.deploy'],
+  }), /cos_harness_ingress_capability_forbidden/)
+})
+
+test('Software Specialist seam binds its Production Harness to the current COS parent run', () => {
+  const source = readFileSync(join(process.cwd(), 'lib/ai/cos/softwareSpecialist.ts'), 'utf8')
+  const harness = readFileSync(join(process.cwd(), 'lib/ai/cos/softwareSpecialistHarness.ts'), 'utf8')
+
+  assert.match(source, /currentCosHarnessIngress\(\)\?\.manifest/)
+  assert.match(source, /requestedCapabilities: \[COS_PRIMARY_SOFTWARE_DELEGATION_CAPABILITY\]/)
+  assert.match(source, /parentManifest: existingParent/)
+  assert.match(harness, /parent:\s*\{[\s\S]*runId: input\.parentManifest\.runId[\s\S]*authorityManifestRef: input\.parentManifest\.authorityManifestRef/)
+  assert.match(harness, /parentManifest: input\.parentManifest/)
 })

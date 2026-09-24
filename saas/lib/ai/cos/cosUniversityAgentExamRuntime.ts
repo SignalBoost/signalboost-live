@@ -1,3 +1,4 @@
+import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
 // saas/lib/ai/cos/cosUniversityAgentExamRuntime.ts
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
@@ -67,7 +68,7 @@ export async function readUniversityRoleDomainModel(role: unknown): Promise<stri
   return model
 }
 
-export async function executeBoundAgentExam(
+async function executeBoundAgentExamInsideHarness(
   request: AgentCapstoneRequest,
   /**
    * The University subject this work belongs to, when the caller knows it. Work inside the agent's
@@ -122,3 +123,24 @@ export async function executeBoundAgentExam(
 }
 
 export { isBoundSoftwareCapstoneEvidence }
+
+
+/** Independent University exams run only inside a bounded HarnessRun. */
+export async function executeBoundAgentExam(
+  request: AgentCapstoneRequest,
+  work?: Parameters<typeof executeBoundAgentExamInsideHarness>[1],
+  practiceModelOverride?: string | null,
+): ReturnType<typeof executeBoundAgentExamInsideHarness> {
+  return withHostProductionHarnessIngress({
+    objective: `Run bound University exam for ${request.agentId}`,
+    portableId: 'cos-university-exam',
+    agentId: request.agentId,
+    role: 'university_exam_candidate',
+    capabilityId: 'university.exam.execute',
+    risk: 'write',
+    deadlineMs: 120_000,
+    maxConcurrency: 1,
+    maxToolCalls: 4,
+    runId: `university-exam-${request.runId}`,
+  }, () => executeBoundAgentExamInsideHarness(request, work, practiceModelOverride))
+}

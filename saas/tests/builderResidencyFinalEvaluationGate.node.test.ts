@@ -51,3 +51,38 @@ test('Residency final gate is scoped to Computer Science and preserves other sub
   assert.match(sql, /productionTrafficAuthorized',false/)
   assert.match(sql, /authorityExpanded',false/)
 })
+
+
+test('rolling evaluation authorization excludes Builder artifacts before Residency completion', async () => {
+  const route = await readFile(
+    new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url),
+    'utf8',
+  )
+  const policy = await readFile(
+    new URL('../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts', import.meta.url),
+    'utf8',
+  )
+
+  assert.match(route, /from\('cos_university_residency_enrollments'\)/)
+  assert.match(route, /\.eq\('standing', 'residency_complete'\)/)
+  assert.match(route, /const finalGateArtifactRows = artifactRows\.filter/)
+  assert.match(route, /no_mass_artifact_final_gate_eligible/)
+  assert.match(route, /minimumCanaryObservedAt/)
+  assert.match(
+    policy,
+    /!Number\.isFinite\(minimumCanaryAt\) \|\| at\(event\.observedAt\) >= minimumCanaryAt/,
+  )
+})
+
+test('replay canary headroom cannot block unrelated evaluation before Builder Residency is complete', async () => {
+  const route = await readFile(
+    new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url),
+    'utf8',
+  )
+
+  assert.match(route, /const remediationReplayRows = rows\.filter/)
+  assert.match(
+    route,
+    /if \(remediationReplayRows\.length > 0 && remediationReplayCanaryPasses < 2\)/,
+  )
+})

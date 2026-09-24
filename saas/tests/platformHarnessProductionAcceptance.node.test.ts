@@ -44,3 +44,11 @@ test('Production acceptance uses only service-role scratch state and immutable s
   assert.match(route,/deployment_already_accepted/)
   assert.match(route,/runPlatformHarnessProductionAcceptance/)
 })
+
+
+test('Production acceptance cadence stays near-immediate for fast-moving main',()=>{
+  const vercel=JSON.parse(source('vercel.json')) as {crons?: Array<{path?:string;schedule?:string}>}
+  const cron=vercel.crons?.find(item=>item.path==='/api/cron/platform-harness-production-acceptance')
+  assert.ok(cron,'Production Harness acceptance cron must remain registered')
+  assert.equal(cron.schedule,'* * * * *','exact deployments must be eligible for certification every minute')
+})

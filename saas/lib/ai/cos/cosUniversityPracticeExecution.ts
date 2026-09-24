@@ -1,3 +1,4 @@
+import { withHostProductionHarnessIngress } from '@/platform-harness/runtime/host-ingress'
 // saas/lib/ai/cos/cosUniversityPracticeExecution.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
@@ -75,7 +76,7 @@ async function executeCosPracticeOnConfiguredEconomyModel(
 }
 
 /** Host dispatch only. Rubrics stay in the caller and never reach either inference port. */
-export async function executeUniversityPractice(
+async function executeUniversityPracticeInsideHarness(
   request: AgentCapstoneRequest,
   ports: {
     cos(): Promise<ReasonerResult | null>
@@ -117,4 +118,24 @@ export async function executeUniversityPractice(
     responseSource: execution.runtime,
     executionProvenance: execution,
   }
+}
+
+
+/** University practice inference cannot execute outside a bounded HarnessRun. */
+export async function executeUniversityPractice(
+  request: AgentCapstoneRequest,
+  ports: Parameters<typeof executeUniversityPracticeInsideHarness>[1],
+): ReturnType<typeof executeUniversityPracticeInsideHarness> {
+  return withHostProductionHarnessIngress({
+    objective: `Run University deliberate practice for ${request.agentId}`,
+    portableId: 'cos-university-practice',
+    agentId: request.agentId,
+    role: 'university_learner',
+    capabilityId: 'university.practice.execute',
+    risk: 'write',
+    deadlineMs: 120_000,
+    maxConcurrency: 1,
+    maxToolCalls: 4,
+    runId: `university-practice-${request.runId}`,
+  }, () => executeUniversityPracticeInsideHarness(request, ports))
 }

@@ -10,6 +10,10 @@ import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependen
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { ensureMassDistilledEndpoint24Gb, massDistilledServerlessWorkerCapacity } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import { activeEvaluationRunpodEndpointIds } from '@/lib/ai/cos/cosUniversityGraduateEndpointProtection'
+import {
+  MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER,
+  isCurrentMassRemediationReplayProofGeneration,
+} from '@/lib/ai/cos/cosUniversityRemediationReplayProofGeneration'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import { runpodServerlessRootUrl } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
 import {
@@ -234,6 +238,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       .eq('status', 'evaluation_pending')
       .like('candidate_id', 'mass:%')
       .contains('intended_use', { trainingReceipt: { failureDerivedReplayRequired: true } })
+      .gte('created_at', MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER)
       .order('created_at', { ascending: true })
       .limit(100),
   ])
@@ -377,13 +382,14 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   let remediationReplayProofCompletions = MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
   try {
     const replayProofArtifacts = await db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,intended_use')
+      .select('candidate_id,created_at,intended_use')
       .contains('intended_use', { trainingReceipt: { failureDerivedReplayRequired: true } })
+      .gte('created_at', MASS_REMEDIATION_REPLAY_PROOF_GENERATION_AFTER)
       .like('candidate_id', 'mass:%')
       .limit(500)
     if (!replayProofArtifacts.error) {
       const replayIds = (replayProofArtifacts.data || [])
-        .filter((row: any) => isRemediationReplayReceipt(row?.intended_use))
+        .filter((row: any) => isCurrentMassRemediationReplayProofGeneration(row?.created_at) && isRemediationReplayReceipt(row?.intended_use))
         .map((row: any) => clean(row.candidate_id, 240))
         .filter(Boolean)
       if (replayIds.length) {
@@ -404,7 +410,8 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   }
 
 
-  const remediationReplayRows = rows.filter(row => row.remediationReplay === true)
+  const remediationReplayRows = rows.filter(row => row.remediationReplay === true
+    && isCurrentMassRemediationReplayProofGeneration(row.createdAt))
   const remediationReplayCanaryPasses = new Set(remediationReplayRows
     .filter(row => {
       const minimumCanaryAt = Date.parse(String(row.minimumCanaryObservedAt || ''))

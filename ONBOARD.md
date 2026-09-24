@@ -178,6 +178,35 @@ University exact-artifact serving, canary, and evaluation paths continue to use 
 
 Runtime identity and health must still be verified from live configuration/telemetry before making Production claims; this invariant defines intended routing priority, not proof that any particular provider is healthy at a given moment.
 
+### DeepInfra hard-spend invariant — 2026-09-24
+
+DeepInfra remains a bounded managed fallback/training/assessment provider. Observability alone is not sufficient: a paid DeepInfra request inside a cost-bounded HarnessRun must reserve a conservative worst-case allowance **before** the request leaves iTMounts. If a paid call has no reservation, or if the next reservation would exceed the Harness run ceiling, the call fails closed and must not reach DeepInfra.
+
+Default reservation ceilings are deliberately conservative and are server-side configurable:
+
+- Builder/Platform Engineer DeepInfra fallback: `DEEPINFRA_BUILDER_MAX_CALL_USD=0.08`, `DEEPINFRA_BUILDER_MAX_JOB_USD=0.24`.
+- University deliberate practice: `DEEPINFRA_UNIVERSITY_PRACTICE_MAX_CALL_USD=0.005`, `DEEPINFRA_UNIVERSITY_PRACTICE_MAX_RUN_USD=0.01`.
+- University independent assessment/capstone: `DEEPINFRA_UNIVERSITY_ASSESSMENT_MAX_CALL_USD=0.10`, `DEEPINFRA_UNIVERSITY_ASSESSMENT_MAX_RUN_USD=0.10`.
+
+Reservations are ceilings, not provider-price estimates. A retry consumes a new reservation and may therefore be denied even when earlier actual usage was cheaper. Unused reservation is not recycled within the same Harness run; this intentionally prevents retry loops from silently widening paid-provider authority.
+
+Builder remains RunPod-primary. Simple RunPod contention must not automatically become paid DeepInfra work. University practice may use an explicitly configured economy model, but no paid practice model is silently selected from source defaults. Independent evaluation keeps its separately governed evaluator/runtime separation.
+
+Provider billing/account state is external to iTMounts. A DeepInfra dashboard showing zero balance, requiring a payment-method refresh, or changing prepaid/invoiced state is **not** evidence that the platform integration was removed. Connectivity is established from current host configuration plus successful provider telemetry; billing failures must fail visibly and must not cause a hidden provider substitution.
+
+### Governed browser MCP completion invariant — 2026-09-24
+
+Playwright MCP and Chrome DevTools MCP are first-class governed browser capabilities behind Provider Hub and the Portable Connector Runtime. Playwright MCP is considered implemented at the platform/runtime layer: the pinned package/runtime, stdio host, isolated browser process, origin restrictions, approval gates, live capability projection, and reference-host acceptance harness all exist. A CI workflow failure must not be described as a missing Playwright capability unless the runtime/acceptance evidence itself failed.
+
+Canonical Playwright profile:
+- package: `@playwright/mcp@0.0.82`;
+- headless isolated Chrome, WebMCP disabled;
+- read surfaces include snapshot/find/screenshot/console/network diagnostics;
+- write surfaces require governed approval and exact host-origin enforcement;
+- arbitrary code/evaluation, file-write/upload, and unapproved host-write surfaces remain excluded.
+
+Browser MCP live-acceptance workflows are validation workflows. They run on `pull_request` for relevant changes and remain manually dispatchable. They must not also duplicate the same validation on `push`; duplicate push+PR validation wastes Actions capacity and violates the repository queue policy. Removing a duplicate trigger is CI hygiene only and does not alter browser runtime capability or authority.
+
 ### Private-repository runtime invariance — 2026-09-20
 
 Changing `SignalBoost/signalboost-live` between public and private must **not** change Production runtime health.

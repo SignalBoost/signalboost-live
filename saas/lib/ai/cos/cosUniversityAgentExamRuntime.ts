@@ -14,6 +14,7 @@ import {
 import { enforceUniversityPracticeCostGuard } from './cosUniversityPracticeBudget.ts'
 import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import { currentUniversityPracticeModelOverride } from './cosUniversityPracticeModelContext.ts'
+import { deepInfraMaxCallUsd, deepInfraMaxRunUsd } from './deepInfraSpendPolicy.ts'
 import {
   executeBoundSoftwareCapstone,
   isBoundSoftwareCapstoneEvidence,
@@ -116,6 +117,9 @@ async function executeBoundAgentExamInsideHarness(
         agentId: request.agentId,
         purpose: request.purpose === 'practice' ? 'non_credit_training' : 'independent_assessment',
       },
+      maxEstimatedCostUsd: deepInfraMaxCallUsd(
+        request.purpose === 'practice' ? 'university_practice' : 'university_assessment',
+      ),
     }, {
       ...config, model: selectedModel, timeoutMs: Math.min(config.timeoutMs, 90_000),
     }),
@@ -141,6 +145,9 @@ export async function executeBoundAgentExam(
     deadlineMs: 120_000,
     maxConcurrency: 1,
     maxToolCalls: 4,
+    maxCostUsd: deepInfraMaxRunUsd(
+      request.purpose === 'practice' ? 'university_practice' : 'university_assessment',
+    ),
     runId: `university-exam-${request.runId}`,
   }, () => executeBoundAgentExamInsideHarness(request, work, practiceModelOverride))
 }

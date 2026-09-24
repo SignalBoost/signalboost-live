@@ -9,6 +9,7 @@ import { activeGraduateRuntimesForRole } from '@/lib/ai/cos/cosUniversityGraduat
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { tryRunpodPrimaryInference } from '@/lib/ai/cos/runpodPrimaryInference'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
+import { deepInfraMaxCallUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
@@ -139,6 +140,7 @@ export function createBuilderCodingAiPort(): CosAiPort {
           feature: 'builder',
           purpose: ownedAttempted ? 'coding_harness_fallback_from_owned' : 'coding_harness',
         },
+        maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
       }, {
         ...config,
         model: builderCodingModelFromEnv(),

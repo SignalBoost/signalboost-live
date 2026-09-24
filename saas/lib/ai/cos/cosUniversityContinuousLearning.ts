@@ -2,6 +2,7 @@
 import { ContinuousLearningCycle, type LearningCycleResult } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
+import { withSharedLearningSourceProviderLeases } from '@/lib/cos-core/layers/learning/providerLease'
 import {
   generateKnowledgeGaps,
   knowledgeGapIdForSignal,
@@ -331,10 +332,15 @@ export async function runCosUniversityContinuousLearning(options: {
     const store = createSupabaseCOSStores()?.continuousLearning
     if (!store) throw new Error('persistent_learning_store_unavailable')
     const approvedUrls = parseApprovedLearningUrls()
-    const liveAdapters = createLiveLearningAdapters()
+    const liveAdapters = withSharedLearningSourceProviderLeases(
+      createLiveLearningAdapters(),
+      `university:${slotKey}:${agentId}`,
+    )
     // The in-process circuit breaker is rebuilt with the adapters every cycle, so a source that is
     // down all day is retried in full on every tick. Recent recorded failures are the only durable
     // memory of that, and a probe cycle re-admits a cooled-down source so recovery needs no deploy.
+    // Fragile external providers are also protected by a database-backed cross-lane lease/cooldown
+    // so COS and specialist serverless invocations cannot burst the same upstream API at one tick.
     const cooledSources = cooledDownSourceIds({ runs: laneHistory.sourceErrors, slotKey })
     const adapters = withoutCooledDownSources([
       ...(approvedUrls.length ? [approvedUrlLearningAdapter(approvedUrls)] : []),

@@ -110,7 +110,7 @@ async function ensureCurrentCandidate(input: {
     baselineIdentity: context.binding.baselineIdentity,
     rollbackArtifactRef: context.binding.rollbackArtifactRef,
   }, db)
-  if (!registered.registered) {
+  if (registered.registered === false) {
     throw new Error(`working_cos_candidate_registration_blocked:${registered.blockers.join(',')}`)
   }
   if (!registered.candidateId) throw new Error('working_cos_candidate_registration_identity_missing')

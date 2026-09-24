@@ -4,7 +4,7 @@ import type { ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/lea
 import type { KnowledgeGap } from '../lib/cos-core/layers/learning/index.ts'
 import { youtubeLearningConnector } from '../lib/cos-core/layers/learning/connectors.ts'
 import { DEFAULT_LEARNING_SOURCE_CAPS } from '../lib/cos-core/layers/learning/learningSourceCaps.ts'
-import { createLiveLearningAdapters, guardLearningSourceAdapter, runsOnDailyLearningPass } from '../lib/cos-core/layers/learning/liveSources.ts'
+import { createLiveLearningAdapters, guardLearningSourceAdapter, runsOnDailyLearningPass, sourceCallBudget } from '../lib/cos-core/layers/learning/liveSources.ts'
 import { createYouTubeMetadataSearch, createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients.ts'
 
 const GAP: KnowledgeGap = {
@@ -177,3 +177,34 @@ test('source guard serializes a provider burst and queued calls stop after the c
   assert.equal(settled.filter(result => result.status === 'rejected').length, 2)
   assert.equal(settled.filter(result => result.status === 'fulfilled').length, 4)
 })
+
+test('fragile external research providers are bounded per cycle to avoid provider-rate bursts', async () => {
+  const calls: string[] = []
+  const base: ContinuousLearningSourceAdapter = {
+    kind: 'scientific_journal',
+    id: 'semantic_scholar',
+    async acquire(gap) {
+      calls.push(gap.id)
+      return []
+    },
+  }
+  assert.equal(sourceCallBudget(base), 1)
+  const guarded = guardLearningSourceAdapter(base, 3, 0, sourceCallBudget(base))
+  await Promise.all([
+    guarded.acquire({ ...GAP, id: 'gap-1' }),
+    guarded.acquire({ ...GAP, id: 'gap-2' }),
+    guarded.acquire({ ...GAP, id: 'gap-3' }),
+  ])
+  assert.deepEqual(calls, ['gap-1'])
+})
+
+test('research source call budgets are provider-specific and leave ordinary sources unbounded', () => {
+  const adapter = (id: string): ContinuousLearningSourceAdapter => ({ kind: 'scientific_journal', id, async acquire() { return [] } })
+  assert.equal(sourceCallBudget(adapter('semantic_scholar')), 1)
+  assert.equal(sourceCallBudget(adapter('openalex_semantic')), 1)
+  assert.equal(sourceCallBudget(adapter('hf_github_cc0')), 1)
+  assert.equal(sourceCallBudget(adapter('openalex')), 2)
+  assert.equal(sourceCallBudget(adapter('europe_pmc')), 2)
+  assert.equal(sourceCallBudget(adapter('crossref')), Number.POSITIVE_INFINITY)
+})
+

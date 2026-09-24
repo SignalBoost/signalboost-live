@@ -39,6 +39,13 @@ function sourceIntervalMs(adapter:ContinuousLearningSourceAdapter,env:LiveLearni
   return 0
 }
 
+export function sourceCallBudget(adapter:ContinuousLearningSourceAdapter):number{
+  const id=adapter.id??adapter.kind
+  if(id==='semantic_scholar'||id==='openalex_semantic'||id==='hf_nist_cc0'||id==='hf_github_cc0'||id==='hf_arxiv_cc0')return 1
+  if(id==='openalex'||id==='europe_pmc')return 2
+  return Number.POSITIVE_INFINITY
+}
+
 /**
  * Keep each provider to one in-flight request stream. The learning cycle deliberately runs several
  * different sources concurrently, but allowing six workers to hit the SAME public API at once was
@@ -46,15 +53,17 @@ function sourceIntervalMs(adapter:ContinuousLearningSourceAdapter,env:LiveLearni
  * Queued calls re-check the breaker after earlier calls complete, so once a source reaches the
  * bounded failure limit no already-queued work continues hammering it.
  */
-export function guardLearningSourceAdapter(adapter:ContinuousLearningSourceAdapter,limit:number,minIntervalMs=0):ContinuousLearningSourceAdapter{
-  let failures=0,open=false,lastStartedAt=0
+export function guardLearningSourceAdapter(adapter:ContinuousLearningSourceAdapter,limit:number,minIntervalMs=0,maxCallsPerCycle=Number.POSITIVE_INFINITY):ContinuousLearningSourceAdapter{
+  let failures=0,open=false,lastStartedAt=0,calls=0
   let tail:Promise<void>=Promise.resolve()
   const run=async(gap:Parameters<ContinuousLearningSourceAdapter['acquire']>[0])=>{
     if(open)return[]
+    if(calls>=maxCallsPerCycle)return[]
     const wait=Math.max(0,minIntervalMs-(Date.now()-lastStartedAt))
     if(wait)await delay(wait)
-    if(open)return[]
+    if(open||calls>=maxCallsPerCycle)return[]
     lastStartedAt=Date.now()
+    calls+=1
     try{
       const documents=await adapter.acquire(gap)
       failures=0
@@ -147,5 +156,5 @@ export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.e
     }
   }
   const limit=failureLimit(env)
-  return adapters.map(gapScopeFor).map(adapter=>guardLearningSourceAdapter(adapter,limit,sourceIntervalMs(adapter,env)))
+  return adapters.map(gapScopeFor).map(adapter=>guardLearningSourceAdapter(adapter,limit,sourceIntervalMs(adapter,env),sourceCallBudget(adapter)))
 }

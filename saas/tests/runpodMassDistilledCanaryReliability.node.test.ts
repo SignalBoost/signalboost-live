@@ -61,13 +61,13 @@ test('compatibility layer can recover both legacy template and endpoint identity
   assert.match(compatibility, /mass_distilled_runtime_template_identity_mismatch/)
   assert.match(compatibility, /mass_distilled_runtime_endpoint_template_mismatch/)
   assert.match(compatibility, /mass_distilled_runtime_endpoint_template_rebind_failed/)
-  assert.match(compatibility, /assertEndpointSafetyPolicy\(endpoint\)/)
+  assert.match(compatibility, /assertEndpointSafetyPolicy\(endpoint,\s*idleTimeoutSeconds\)/)
   assert.match(compatibility, /materializedEndpointMatches/)
 })
 
 test('cold-start continuation reuses only the explicitly approved exact runtime identity', () => {
   assert.match(route, /approvedColdStartResume/)
-  assert.match(route, /coldStartResume===true/)
+  assert.match(route, /evidence\.coldStartResume!==true/)
   assert.match(route, /coldStartResumeEndpointId/)
   assert.match(route, /coldStartResumeRuntimeKey/)
   assert.match(route, /coldStartResume\?\.runtimeKey \|\| hash\(\['mass-canary-runtime-v3'/)

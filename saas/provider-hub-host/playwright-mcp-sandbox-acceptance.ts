@@ -1,4 +1,3 @@
-// @ts-nocheck -- temporary diagnostic; remove after Preview identifies runtime viability
 import { Sandbox } from '@vercel/sandbox'
 import {
   PLAYWRIGHT_MCP_PROFILE,
@@ -178,12 +177,12 @@ async function main() {
   add(
     'live_tool_discovery',
     liveTools.every(name => names.includes(name)),
-    `providerTools=${names.length}; requiredLiveTools=${liveTools.length}`,
+    'providerTools=' + names.length + '; requiredLiveTools=' + liveTools.length,
   )
   add(
     'dangerous_tools_not_host_projected',
     !liveTools.some(name => ${JSON.stringify(DANGEROUS_TOOLS)}.includes(name)),
-    `hostProjected=${liveTools.length}`,
+    'hostProjected=' + liveTools.length,
   )
 
   add('off_origin_host_rejected', !originAllowed('https://example.invalid/'), 'host_policy=rejected')
@@ -191,7 +190,7 @@ async function main() {
 
   const opened = await call('browser_navigate', { url: probeUrl })
   const finalOrigin = pageOriginFromResult(opened)
-  add('approved_itmounts_navigation', resultIsOk(opened) && finalOrigin !== null && approvedOrigins.has(finalOrigin), `finalOriginApproved=${Boolean(finalOrigin && approvedOrigins.has(finalOrigin))}`)
+  add('approved_itmounts_navigation', resultIsOk(opened) && finalOrigin !== null && approvedOrigins.has(finalOrigin), 'finalOriginApproved=' + Boolean(finalOrigin && approvedOrigins.has(finalOrigin)))
 
   const snapshot = await call('browser_snapshot', {})
   add('accessibility_snapshot_live', resultIsOk(snapshot), 'mcp_call=browser_snapshot')

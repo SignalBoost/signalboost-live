@@ -6,11 +6,11 @@ export async function workingCosDispatchReadiness() {
 }
 
 export async function dispatchWorkingCosDatasetPreparation(_input: { confirmDispatch: unknown; rotationSeed?: string }) {
-  throw new Error('diagnostic_stub')
+  return { accepted: false as const, diagnosticStub: true, operation: 'prepare_dataset' as const }
 }
 
 export async function dispatchWorkingCosTraining(_input: { confirmDispatch: unknown; rotationSeed?: string }) {
-  throw new Error('diagnostic_stub')
+  return { accepted: false as const, diagnosticStub: true, operation: 'train' as const }
 }
 
 export async function recordWorkingCosTrainingExecutorEvidence(
@@ -18,5 +18,5 @@ export async function recordWorkingCosTrainingExecutorEvidence(
   _binding: { idempotencyKey: string },
   _dbOverride?: any,
 ) {
-  throw new Error('diagnostic_stub')
+  return { ok: true as const, diagnosticStub: true }
 }

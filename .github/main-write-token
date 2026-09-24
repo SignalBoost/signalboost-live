@@ -1,2 +1,2 @@
-base_sha=6dd495f6654aebfc951c229f2a2d54ba4d77a5df
-branch=fix/evaluator-quota-repair-generation-20260924
+base_sha=4664ea832256d3e80be862bf6567d3562f0caf7f
+branch=fix/evaluator-runpod-control-plane-readiness-20260924

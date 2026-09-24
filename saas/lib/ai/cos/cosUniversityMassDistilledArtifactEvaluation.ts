@@ -11,6 +11,7 @@ import { readPinnedHfParquetRows } from './hfPinnedParquetRows.ts'
 import { buildTeacherPrompts } from './cosUniversityMassDistillationConsumer.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { runpodServerlessOpenAiBaseUrl } from './runpodServerlessDistilledProvision.ts'
+import { massDistilledRuntimeHealth } from './runpodMassDistilledProvisionV2.ts'
 import { fineTuneRevisionKey, type FineTuneRevision } from './cosUniversityFineTuneEvidence.ts'
 import {
   COS_UNIVERSITY_INDEPENDENT_EVALUATOR_PROFILE,
@@ -340,10 +341,28 @@ async function pinnedHoldout(input:{
 }
 
 async function waitReady(endpointId:string,deadlineMs:number){
-  const key=configuredRunpodApiKey();if(!key)throw new Error('mass_distilled_evaluation_runpod_key_missing')
-  const root=`https://${endpointId}.api.runpod.ai`;const until=Math.min(Date.now()+READY_TIMEOUT_MS,deadlineMs-ROUTE_RESERVE_MS);let status:number|null=null
-  while(Date.now()<until){const timeout=Math.max(1,Math.min(15_000,until-Date.now()));try{const response=await fetch(`${root}/ready`,{headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(timeout)});status=response.status;if(response.status===200){const raw=await response.text();let payload:any={};try{payload=raw?JSON.parse(raw):{}}catch{};if(payload?.ready===true)return}if(response.status===503){const detail=(await response.text()).slice(0,1000);if(detail.includes('distilled_bootstrap_failed'))throw new Error('mass_distilled_evaluation_runtime_bootstrap_failed')}}catch(error){if(error instanceof Error&&error.message==='mass_distilled_evaluation_runtime_bootstrap_failed')throw error}if(Date.now()<until)await new Promise(resolve=>setTimeout(resolve,Math.min(READY_POLL_MS,until-Date.now())))}
-  throw new Error(`mass_distilled_evaluation_runtime_not_ready:${status??'network'}`)
+  if(!configuredRunpodApiKey())throw new Error('mass_distilled_evaluation_runpod_key_missing')
+  const until=Math.min(Date.now()+READY_TIMEOUT_MS,deadlineMs-ROUTE_RESERVE_MS)
+  let status:number|null=null
+  let lastError:string|null=null
+  // RunPod does not route custom data-plane paths until the worker health check has passed. Polling
+  // https://<endpoint>.api.runpod.ai/ready while scale-to-zero is cold therefore observes only a
+  // gateway/network miss and can wait the full readiness budget without learning that a worker is
+  // initializing. The exact-artifact canary already uses the provider control plane for this reason.
+  // Reuse that authoritative worker-ready signal here; the configured /ping health check reaches 200
+  // only after the gateway's internal vLLM bootstrap is ready, so no model request is sent early.
+  while(Date.now()<until){
+    try{
+      const health=await massDistilledRuntimeHealth(endpointId)
+      status=health.httpStatus
+      if(!health.ok&&health.error)lastError=health.error
+      if(health.workers.ready>0)return
+    }catch(error){
+      lastError=error instanceof Error?clean(error.message,500):'mass_distilled_health_probe_failed'
+    }
+    if(Date.now()<until)await new Promise(resolve=>setTimeout(resolve,Math.min(READY_POLL_MS,until-Date.now())))
+  }
+  throw new Error(`mass_distilled_evaluation_runtime_not_ready:${status??(lastError?'health':'network')}`)
 }
 
 function batchPrompt(cases:readonly EvalCase[]){const input=cases.map(item=>`<<<CASE:${item.id}>>>\n${item.prompt}`).join('\n\n');const format=cases.map(item=>`<<<ANSWER:${item.id}>>>\nYOUR ANSWER\n<<<END:${item.id}>>>`).join('\n');return `Answer each independent case directly and concisely. Do not reveal hidden chain-of-thought or scratch work.\n\nCASES:\n${input}\n\nReturn every answer using exactly these markers and no extra sections:\n${format}`}

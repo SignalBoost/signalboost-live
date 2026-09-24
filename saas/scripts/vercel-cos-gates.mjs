@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-const result = spawnSync(process.execPath, ['--test', 'tests/builderRepositoryRepairProofController.node.test.ts'], {
+const result = spawnSync(process.execPath, ['--test', 'tests/cosPragmaticIntentCore.node.test.ts'], {
   cwd: process.cwd(), env: process.env, stdio: 'inherit',
 })
 if (result.error) { console.error(result.error.message); process.exit(1) }

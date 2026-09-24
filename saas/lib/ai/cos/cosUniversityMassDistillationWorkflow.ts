@@ -13,7 +13,7 @@ import {
   MASS_DISTILLATION_STUDENT_MODEL,
   prepareUniversityMassDistillationCurriculum,
 } from './cosUniversityMassDistillation.ts'
-import { installVerifiedFailureDerivedCurriculum, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
+import { installVerifiedFailureDerivedCurriculum, maintainUniversityRightsClearedOpenSourceCorpus, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
 import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
 import { authorizeAvailableUniversityMassDistillationCampaigns } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
@@ -236,6 +236,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   let preparedAfterReplenishment = 0
   let curriculum: Record<string, unknown>
   let curriculumReplenishment: Record<string, unknown> = { ok: true, skipped: true, reason: 'prepared_buffer_satisfied', externalCostUsd: 0 }
+  let openSourceMaintenance: Record<string, unknown> = { ok: true, skipped: true, reason: 'maintenance_not_due', externalCostUsd: 0 }
   if (slowMaintenanceDue) {
   try {
     curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
@@ -244,6 +245,16 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
     })) }
     preparedBeforeReplenishment = await preparedMassDistillationInventory(preparedBufferTarget)
     if (preparedBeforeReplenishment >= preparedBufferTarget) {
+      // A full prepared-job buffer may stop paid/synthetic fill, but it must never stop learning from
+      // free, rights-cleared sources. Run a small source-only harvest that cannot create hosted-teacher
+      // spend or synthetic curriculum and cannot widen training/production authority.
+      openSourceMaintenance = await isolatedStep('open_source_maintenance', () =>
+        maintainUniversityRightsClearedOpenSourceCorpus({
+          now,
+          maxSubjects: throughput.targetSubjectsPerReplenishment,
+          queriesPerSubject: 1,
+          maxCandidatesPerCycle: Math.min(20, throughput.acquisitionCandidatesPerCycle),
+        }))
       const failureDerived = await installVerifiedFailureDerivedCurriculum({
         db: cosServiceDb()!,
         supply: Array.isArray((curriculum.supply as { subjects?: unknown })?.subjects)
@@ -267,6 +278,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
         })) }
       }
     } else {
+      openSourceMaintenance = { ok: true, skipped: true, reason: 'shortfall_replenishment_active', externalCostUsd: 0 }
       curriculumReplenishment = { ...(await replenishUniversityMassDistillationCurriculum({
         supply: Array.isArray((curriculum.supply as { subjects?: unknown })?.subjects)
           ? (curriculum.supply as { subjects: any[] }).subjects
@@ -297,6 +309,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   } else {
     curriculum = { ok: true, skipped: true, reason: 'maintenance_not_due', externalCostUsd: 0, dispatchAuthorized: false }
     curriculumReplenishment = { ok: true, skipped: true, reason: 'maintenance_not_due', externalCostUsd: 0 }
+    openSourceMaintenance = { ok: true, skipped: true, reason: 'maintenance_not_due', externalCostUsd: 0 }
   }
   const consumerSkipped = 'skipped' in result && result.skipped === true
   const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
@@ -352,6 +365,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       semanticReconciliation,
       curriculum,
       curriculumReplenishment,
+      openSourceMaintenance,
       throughput,
       teacherPool,
       preparedBufferTarget,
@@ -363,7 +377,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       workflowSource: input.source,
       retryScheduled,
       transportSucceeded,
-      workflowSemantics: 'detect_repair_evict_inert_capacity_same_tick_reauthorize_dispatch_fill_available_dynamic_capacity_dispatch_any_compatible_lane_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
+      workflowSemantics: 'detect_repair_evict_inert_capacity_same_tick_reauthorize_dispatch_fill_available_dynamic_capacity_dispatch_any_compatible_lane_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_continue_bounded_rights_cleared_source_harvest_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
     },
     invocationSucceeded,
     transportSucceeded,

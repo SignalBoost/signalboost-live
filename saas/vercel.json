@@ -170,6 +170,10 @@
       "schedule": "30 6 * * *"
     },
     {
+      "path": "/api/cron/cos-open-source-continuity",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/cos-university-exam",
       "schedule": "0 * * * *"
     },

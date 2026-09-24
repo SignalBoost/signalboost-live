@@ -50,7 +50,7 @@ function allowedHosts(): readonly string[] {
 function runtimeScript(browserExecutable: string): string {
   const liveTools = JSON.stringify(liveBrowserMcpToolNames('playwright-mcp'))
   const origins = JSON.stringify(APPROVED_ORIGINS)
-  return String.raw`
+  return `
 const { spawn } = require('node:child_process')
 
 const RUNTIME_ROOT = ${JSON.stringify(ROOT)}

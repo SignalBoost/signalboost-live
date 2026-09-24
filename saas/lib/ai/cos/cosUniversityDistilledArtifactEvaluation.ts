@@ -2,6 +2,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
+import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import {
@@ -664,7 +665,18 @@ async function judgeSuite(input: {
     candidateAnswer: input.candidate.get(item.id),
   }))
   consumeJudgeCall(input.budget)
-  const result = await callLocalModel({
+  const result = await withHostProductionHarnessIngress({
+    objective: `Judge distilled-artifact evaluation suite ${input.suiteName}`,
+    portableId: 'cos-university-distilled-evaluator',
+    agentId: 'cos-university-independent-evaluator',
+    role: 'independent_evaluator',
+    capabilityId: 'university.distilled_evaluation.judge',
+    risk: 'read',
+    deadlineMs: 120_000,
+    maxConcurrency: 1,
+    maxToolCalls: 1,
+    runId: `distilled-eval-judge-${input.suiteName}-${randomUUID()}`,
+  }, () => callLocalModel({
     systemPrompt: [
       'You are an independent final-answer scorer. Do not infer or request hidden reasoning.',
       'Score each answer for correctness, relevance, calibration, and adherence to the supplied reference/rubric.',
@@ -680,7 +692,7 @@ async function judgeSuite(input: {
       feature: 'distilled_independent_evaluation',
       purpose: 'independent_assessment',
     },
-  }, judgeConfig)
+  }, judgeConfig))
   if (!result) throw new Error('distilled_evaluation_judge_unavailable')
   // Local judge models wrap strict JSON in code fences or a sentence of preamble often enough that
   // one attempt died on it. Scores are still read from parsed JSON only — the tolerance is to

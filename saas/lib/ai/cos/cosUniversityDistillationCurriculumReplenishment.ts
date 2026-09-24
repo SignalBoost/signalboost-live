@@ -25,13 +25,16 @@ import {
 } from './cosUniversityHybridDistillation.ts'
 
 const DISTILLATION_OPENALEX_RESULTS_PER_QUERY = 10
+const DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY = 10
+const DISTILLATION_SOURCE_CALL_BUDGET_MULTIPLIER = 6
+const DISTILLATION_RIGHTS_CLEARED_ADAPTERS = new Set(['openalex', 'hf_nist_cc0', 'hf_github_cc0'])
 const HYBRID_SYNTHETIC_MAX_PER_SUBJECT = 20
 const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = Math.max(1, Math.round(20 * HYBRID_FAILURE_DERIVED_TARGET))
 const VERIFIED_FAILURE_LOOKBACK_DAYS = 30
 
 function rightsClearedPolicy(maxCandidatesPerCycle: number): ContinuousLearningPolicy {
   return {
-    allowedSourceKinds: new Set(['scientific_journal']),
+    allowedSourceKinds: new Set(['scientific_journal', 'public_dataset']),
     minimumConfidence: 0.80,
     maxCandidatesPerCycle,
     maxExternalCostUsdPerCycle: 0,
@@ -324,15 +327,25 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
   if (claim.error) throw claim.error
   if (!claim.data?.id) throw new Error('replenishment_slot_claim_failed')
 
+  // Mass distillation previously instantiated every live source and then discarded everything except
+  // OpenAlex. That made the explicitly allowlisted CC0 Hugging Face corpora invisible to the replenisher,
+  // while the generic one-call HF budget further limited yield when they were used elsewhere. Keep the
+  // ordinary public-learning defaults unchanged, but give this bounded five-minute replenishment workflow
+  // enough free calls to fill its own shortage targets. Admission, relevance, rights, dedup and cost gates
+  // remain unchanged; arXiv metadata is intentionally excluded because its underlying paper rights are not
+  // asserted for training.
   const adapters = createLiveLearningAdapters({
     ...process.env,
     COS_LEARNING_CAP_OPENALEX: String(DISTILLATION_OPENALEX_RESULTS_PER_QUERY),
-  }).filter(adapter => adapter.id === 'openalex')
+    COS_LEARNING_CAP_HF_NIST: String(DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY),
+    COS_LEARNING_CAP_HF_GITHUB_CC0: String(DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY),
+    COS_LEARNING_SOURCE_CALL_BUDGET_MULTIPLIER: String(DISTILLATION_SOURCE_CALL_BUDGET_MULTIPLIER),
+  }).filter(adapter => Boolean(adapter.id && DISTILLATION_RIGHTS_CLEARED_ADAPTERS.has(adapter.id)))
   if (!adapters.length) {
     await db.from('cos_university_continuous_runs').update({
-      status: 'error', errors: ['rights_cleared_openalex_adapter_unavailable'], completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      status: 'error', errors: ['rights_cleared_distillation_adapters_unavailable'], completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }).eq('id', claim.data.id)
-    return Object.freeze({ ok: false, skipped: false, reason: 'rights_cleared_openalex_adapter_unavailable', slotKey: key, targets: gaps.map(gap => gap.subject), externalCostUsd: 0 })
+    return Object.freeze({ ok: false, skipped: false, reason: 'rights_cleared_distillation_adapters_unavailable', slotKey: key, targets: gaps.map(gap => gap.subject), externalCostUsd: 0 })
   }
 
   try {
@@ -372,6 +385,9 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       queriesPerSubject,
       queryCount: gaps.length,
       resultsPerQuery: DISTILLATION_OPENALEX_RESULTS_PER_QUERY,
+      openDataResultsPerQuery: DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY,
+      sourceCallBudgetMultiplier: DISTILLATION_SOURCE_CALL_BUDGET_MULTIPLIER,
+      acquisitionAdapters: adapters.map(adapter => adapter.id).filter(Boolean),
       maxCandidatesPerCycle,
       documentsAcquired: result.documentsAcquired,
       accepted: result.accepted,

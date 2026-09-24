@@ -87,7 +87,7 @@ test('RunPod load-balancer health stays initializing until internal vLLM is trul
 
 test('canary observes RunPod control-plane ready workers instead of holding a custom readiness route open', () => {
   assert.match(provision, /workers:\{idle:Number\(payload\?\.workers\?\.idle\|\|0\),ready:Number\(payload\?\.workers\?\.ready\|\|0\)/)
-  assert.match(provision, /const wake=await fetch\(\`\$\{root\}\/ping\`/)
+  assert.match(provision, /const wake=await fetch\(\`\$\{root\}\/ping\`,\{/)
   assert.match(provision, /if\(health\.workers\.ready>0\)/)
   const start = provision.indexOf('export async function canaryMassDistilledRuntime')
   const end = provision.indexOf('export const MASS_DISTILLED_CANARY_MAX_COST_USD', start)

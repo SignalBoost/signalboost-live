@@ -36,6 +36,16 @@ test('onboarding independently rejects stale main integration tokens', () => {
   assert.match(onboarding, /Every PR to main must modify/)
 })
 
+test('onboarding requires exact-head Vercel success and validates the production gate before merge readiness', () => {
+  const onboarding = readRoot('.github/workflows/onboard-enforcement.yml')
+  assert.match(onboarding, /statuses: read/)
+  assert.match(onboarding, /node --check saas\/scripts\/vercel-cos-gates\.mjs/)
+  assert.match(onboarding, /commits\/\$\{PR_HEAD\}\/status/)
+  assert.match(onboarding, /select\(\.context == "Vercel"\)/)
+  assert.match(onboarding, /Vercel Preview succeeded for exact PR head/)
+  assert.match(onboarding, /error\|failure/)
+})
+
 test('Vercel does not skip deployments based on Git commit provenance', () => {
   const vercel = JSON.parse(readRoot('saas/vercel.json'))
   assert.equal(vercel.ignoreCommand, undefined)

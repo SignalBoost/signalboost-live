@@ -1347,6 +1347,8 @@ The existing `credible_web` / Web Data Layer is the first implementation seam. E
 
 Platform-wide agent access is exposed through the read-only Harness capability `web.knowledge.research` with scope `web.public.research.read`. COS, University students, and specialists may request this capability when their current objective requires public-web evidence. The capability executes through the Governed Socket, is non-mutating, and returns research evidence with `durableLearningAuthorized=false` and `trainingAuthorized=false`. Any later retention, embedding, University admission, or distillation remains a separate governed decision.
 
+Live COS integration: the `/api/cos-primary` ingress grants `web.knowledge.research` only for live-required, thin-public-catalog, or explicit research objectives. The existing `getExternalInfo` seam detects that exact grant and routes retrieval through a governed child HarnessRun; once granted, failure is fail-closed and may not silently bypass the Harness through legacy direct search. Turns without the grant retain the existing adapter behavior. This makes Web Knowledge an exercised Production capability rather than a dormant catalog entry.
+
 Browser acquisition is a fallback for pages whose substantive permitted content is unavailable to ordinary HTTP retrieval because rendering requires JavaScript. Playwright / Chrome DevTools may be used for that bounded extraction, but browser automation does not bypass authentication, paywalls, robots/terms restrictions, rate limits, or authorization boundaries.
 
 Controlled scraping requirements:

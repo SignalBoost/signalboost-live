@@ -22,6 +22,7 @@ const tests = [
   'tests/platformHarnessFullEnforcement.node.test.ts',
   'tests/platformHarnessAbsoluteDeadline.node.test.ts',
   'tests/platformHarnessCompensation.node.test.ts',
+  'tests/platformHarnessProductionAcceptance.node.test.ts',
   'tests/cosUniversityDailyLaneCadence.node.test.ts',
   // Registered 2026-09-13. These regressions existed but were never in this gate, so they had
   // never run in CI: every "green" for them came from a sandbox. They defend the execution binding,

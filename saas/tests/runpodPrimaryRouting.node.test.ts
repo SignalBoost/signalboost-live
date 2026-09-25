@@ -130,7 +130,7 @@ test('fresh grounded tasks prefer owned RunPod, cap that attempt, then retain co
   assert.match(inference, /FRESH_GROUNDED_RUNPOD_ATTEMPT_MS = 16_000/)
   assert.match(inference, /const runpodArgs = freshGroundedTask\(args\)/)
   assert.match(inference, /timeoutMs: Math\.min\(/)
-  assert.match(inference, /return callConfiguredModelTurn\(args, ownedAttempted \? \{ \.\.\.config, fallbackFromOwned: true \} : config\)/)
+  assert.match(inference, /return callConfiguredModelTurn\(args, ownedAttempted \? \{ \.\.\.effectiveConfig, fallbackFromOwned: true \} : effectiveConfig\)/)
   const eligible = inference.slice(inference.indexOf('function eligibleForRunpodPrimary'), inference.indexOf('async function callConfiguredModel'))
   assert.match(eligible, /if \(interactiveUserResponse\(args\)\) return false/)
 })

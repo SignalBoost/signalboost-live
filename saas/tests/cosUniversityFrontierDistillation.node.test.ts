@@ -130,6 +130,9 @@ test('verified failure-derived rows survive partition metadata and replay only a
   assert.match(consumer, /source_kind, 80\) === 'failure_derived_curriculum'/)
   assert.match(consumer, /failureDerived: failureDerivedPromptIds\.has\(promptId\)/)
   assert.match(baseWorker, /"failure_derived": raw_row\.get\("failureDerived"\) is True/)
+  assert.match(baseWorker, /non_failure_pairs = \[item for item in ordered if item\[1\]\.get\("failure_derived"\) is not True\]/)
+  assert.match(baseWorker, /worker_mass_holdout_non_failure_rows_too_small/)
+  assert.match(baseWorker, /training_pairs = \[item for item in ordered if item\[0\] not in holdout_hashes\]/)
 
   const trainingFunction = worker.slice(worker.indexOf('def train_student'), worker.indexOf('def main()'))
   assert.match(trainingFunction, /failure_derived_replay_training/)

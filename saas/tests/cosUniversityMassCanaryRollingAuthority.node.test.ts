@@ -18,6 +18,7 @@ import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS,
   MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
   MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
@@ -49,7 +50,7 @@ const replayArtifact = (candidateId: string, hashId: number, createdAt: string):
   artifactHash: h(hashId),
   createdAt,
   failureDerivedReplayRequired: true,
-  failureDerivedReplayItems: 3,
+  failureDerivedReplayItems: MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS,
   failureDerivedReplayEpochs: MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
   failureDerivedReplayLearningRate: MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
 })
@@ -109,7 +110,8 @@ test('bounded Builder apprenticeship proof lane counts only confirmed response-a
   assert.equal(restored.artifact.candidateId, legacy.candidateId)
 })
 
-test('old weak replay receipts cannot satisfy the upgraded remediation proof cohort', () => {
+test('partial replay receipts cannot satisfy the full remediation proof cohort', () => {
+  assert.equal(MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS, 20)
   assert.equal(MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS, 3)
   assert.equal(MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE, 5e-5)
   const legacy = artifact(79, '2026-09-20T00:00:00.000Z')
@@ -120,8 +122,8 @@ test('old weak replay receipts cannot satisfy the upgraded remediation proof coh
     createdAt:'2026-09-22T17:00:00.000Z',
     failureDerivedReplayRequired:true,
     failureDerivedReplayItems:5,
-    failureDerivedReplayEpochs:1,
-    failureDerivedReplayLearningRate:2e-5,
+    failureDerivedReplayEpochs:MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
+    failureDerivedReplayLearningRate:MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   }
   const strongReplay = replayArtifact('mass:strong-replay', 77, '2026-09-22T18:00:00.000Z')
   const decision = decideMassCanaryRollingApproval({

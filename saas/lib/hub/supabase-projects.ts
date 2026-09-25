@@ -18,6 +18,12 @@
 const MGMT = 'https://api.supabase.com'
 const RPC_RETRY_DELAYS_MS = [0, 750, 1500]
 
+// Canonical project identities for the SignalBoost deployment. Keep identity
+// separate from credentials so a missing/rotated service-role key cannot make a
+// real project disappear from the picker.
+const SIGNALBOOST_PRIMARY_REF = 'qpblefwtnbivuusxmabv'
+const SIGNALBOOST_MARKETING_REF = 'vdtxulrusfvyxdtatryx'
+
 export type SupabaseProject = { ref: string; name: string; region?: string }
 
 type SqlResult = { handled: boolean; ok?: boolean; rows?: any[]; error?: string }
@@ -26,28 +32,33 @@ function refFromUrl(url: string): string {
   return ((url || '').split('//')[1] || '').split('.')[0] || ''
 }
 
+function secondaryIdentity(): { url: string; ref: string } {
+  const configuredUrl = process.env.SECONDARY_SUPABASE_URL || process.env.MARKETING_SUPABASE_URL || ''
+  const clean = configuredUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
+  const configuredRef = refFromUrl(clean)
+  const ref = configuredRef || SIGNALBOOST_MARKETING_REF
+  return { url: clean || `https://${ref}.supabase.co`, ref }
+}
+
 function secondaryConfig(): { url: string; key: string; ref: string } | null {
-  const url = process.env.SECONDARY_SUPABASE_URL || process.env.MARKETING_SUPABASE_URL || ''
+  const identity = secondaryIdentity()
   const key =
     process.env.SECONDARY_SUPABASE_SERVICE_ROLE_KEY ||
     process.env.MARKETING_SUPABASE_SERVICE_ROLE_KEY ||
     ''
-  const clean = url.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
-  const ref = refFromUrl(clean)
-  if (!clean || !key || !ref) return null
-  return { url: clean, key, ref }
+  if (!key) return null
+  return { ...identity, key }
 }
 
 function primaryProject(): SupabaseProject[] {
-  const ref = refFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || '')
-  if (!ref) return []
-  return [{ ref, name: ref }]
+  const configuredRef = refFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || '')
+  const ref = configuredRef || SIGNALBOOST_PRIMARY_REF
+  return [{ ref, name: "SignalBoost's Project" }]
 }
 
 function secondaryProject(): SupabaseProject[] {
-  const cfg = secondaryConfig()
-  if (!cfg) return []
-  return [{ ref: cfg.ref, name: cfg.ref }]
+  const identity = secondaryIdentity()
+  return [{ ref: identity.ref, name: 'SignalBoost-marketing' }]
 }
 
 export async function listSupabaseProjects(): Promise<{ ok: boolean; projects?: SupabaseProject[]; error?: string }> {
@@ -76,6 +87,26 @@ export async function listSupabaseProjects(): Promise<{ ok: boolean; projects?: 
         .filter((p: SupabaseProject) => !!p.ref)
         .map((p: SupabaseProject) => [p.ref, p]),
     )
+
+    // Some Supabase tokens/list calls can omit projects that live in another
+    // organization even when the token can address that project directly. Enrich
+    // missing configured refs individually instead of dropping them.
+    await Promise.all(configured.map(async p => {
+      if (byRef.has(p.ref)) return
+      try {
+        const detailRes = await fetch(`${MGMT}/v1/projects/${encodeURIComponent(p.ref)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        })
+        if (!detailRes.ok) return
+        const d = await detailRes.json()
+        byRef.set(p.ref, {
+          ref: d.id || d.ref || p.ref,
+          name: d.name || p.name,
+          region: d.region,
+        })
+      } catch {}
+    }))
 
     const projects = configured.map(p => byRef.get(p.ref) || p)
     return { ok: true, projects }
@@ -162,7 +193,7 @@ async function runSecondarySql(query: string, managementToken?: string): Promise
 }
 
 export async function runProjectSql(ref: string, query: string): Promise<SqlResult> {
-  const primaryRef = refFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || '')
+  const primaryRef = refFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || '') || SIGNALBOOST_PRIMARY_REF
   if (!ref || ref === 'primary' || ref === primaryRef) return { handled: false }
 
   const token = process.env.SUPABASE_ACCESS_TOKEN

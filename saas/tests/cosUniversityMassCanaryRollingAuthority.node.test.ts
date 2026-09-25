@@ -20,6 +20,7 @@ import {
   MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
   MASS_CANARY_IN_FLIGHT_TTL_MS,
   MASS_CANARY_MAX_IDENTICAL_FAILURES,
+  MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_ROLLING_WINDOW,
   decideMassCanaryRollingApproval,
   type CanaryArtifact,
   type CanaryEvent,
@@ -277,6 +278,21 @@ test('an orphaned invocation marker releases after the bounded in-flight TTL', (
   assert.equal(decision.artifact.candidateId,a.candidateId)
 })
 
+test('one infrastructure-failing artifact cannot consume more than two slots in the same rolling hour', () => {
+  assert.equal(MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_ROLLING_WINDOW, 2)
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const events = [
+    event(a, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T16:10:00.000Z'),
+    event(a, 'local_distilled_runtime_canary_failed', '2026-09-17T16:20:00.000Z', {}, { error:MASS_CANARY_COLD_START_FAILURE }),
+    event(a, 'local_distilled_runtime_canary_invocation_started', '2026-09-17T16:30:00.000Z'),
+    event(a, 'local_distilled_runtime_canary_failed', '2026-09-17T16:40:00.000Z', {}, { error:MASS_CANARY_NO_WORKER_FAILURE }),
+  ]
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a,b], events, now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId, b.candidateId)
+})
+
 test('the kill switch and the hourly paid-invocation cap stop issuance', () => {
   const a=artifact(1)
   assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 1)
@@ -473,10 +489,10 @@ test('the same canary failure repeating stops that artifact instead of looping',
   assert.equal(decision.artifact.candidateId, 'mass:2', 'the stuck artifact is skipped and the queue moves on')
 })
 
-test('the hourly ceiling preserves the 72-per-day nominal spend envelope without a long blackout', () => {
+test('the hourly ceiling preserves the 144-per-day nominal spend envelope without a long blackout', () => {
   assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 1)
-  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 3)
-  assert.equal((24 / MASS_CANARY_ROLLING_WINDOW_HOURS) * MASS_CANARY_ROLLING_MAX_APPROVALS, 72)
+  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 6)
+  assert.equal((24 / MASS_CANARY_ROLLING_WINDOW_HOURS) * MASS_CANARY_ROLLING_MAX_APPROVALS, 144)
   const a = artifact(1)
   const exhausted = Array.from({ length:MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) => {
     const other = artifact(100 + index)

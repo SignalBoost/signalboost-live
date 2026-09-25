@@ -414,11 +414,12 @@ export async function canaryMassDistilledRuntime(input:{endpointId:string;modelN
   let lastStatus:number|null=null
   let lastError:string|null=null
   let readyObserved=false
+  let controlPlaneReady=false
 
-  // A single direct LB request wakes scale-to-zero compute. RunPod does not route custom paths until
-  // the worker's configured /ping health check returns 200, so do not hold a /ready request open for
-  // the provider's ~2 minute "no worker available" gateway timeout. The gateway itself returns 204
-  // from /ping while vLLM is booting, which keeps the worker initializing rather than prematurely routable.
+  // A single direct LB request wakes scale-to-zero compute. A RunPod control-plane ready worker is
+  // necessary but not sufficient: Production 2026-09-25 showed workers.ready=1 while the LB request
+  // still blocked until timeout. Require the exact gateway /ping itself to return 200 before spending
+  // the inference canary request. The gateway returns 204 until internal vLLM is fully loaded.
   try{
     const wake=await fetch(`${root}/ping`,{
       headers:{Authorization:`Bearer ${key}`},
@@ -428,8 +429,8 @@ export async function canaryMassDistilledRuntime(input:{endpointId:string;modelN
     if(wake.status===401||wake.status===403) return {ok:false,httpStatus:wake.status,text:null,error:`mass_distilled_runtime_wake_http_${wake.status}`}
     if(wake.status===200) readyObserved=true
   }catch{
-    // The wake request is expected to miss/timeout while a scale-to-zero LB has no healthy worker.
-    // Readiness is authoritatively observed below through RunPod's endpoint health control plane.
+    // Expected during scale-to-zero startup. The control plane is polled below, but it never
+    // independently declares inference readiness; direct /ping must still prove the gateway is live.
   }
 
   while(!readyObserved&&Date.now()<deadline){
@@ -437,9 +438,27 @@ export async function canaryMassDistilledRuntime(input:{endpointId:string;modelN
       const health=await massDistilledRuntimeHealth(input.endpointId)
       lastStatus=health.httpStatus
       if(!health.ok&&health.error) lastError=health.error
-      if(health.workers.ready>0){readyObserved=true;break}
+      if(health.workers.ready>0||health.workers.idle>0||health.workers.running>0) controlPlaneReady=true
     }catch(error){
       lastError=error instanceof Error?clean(error.message):'mass_distilled_health_probe_failed'
+    }
+
+    if(controlPlaneReady&&Date.now()<deadline){
+      try{
+        const direct=await fetch(`${root}/ping`,{
+          headers:{Authorization:`Bearer ${key}`},
+          signal:AbortSignal.timeout(Math.min(8_000,Math.max(1000,deadline-Date.now()))),
+        })
+        lastStatus=direct.status
+        if(direct.status===401||direct.status===403) return {ok:false,httpStatus:direct.status,text:null,error:`mass_distilled_runtime_ready_http_${direct.status}`}
+        if(direct.status===200){readyObserved=true;break}
+        if(direct.status>=500){
+          const raw=await direct.text()
+          lastError=safeError(raw)||`HTTP ${direct.status}`
+        }
+      }catch(error){
+        lastError=error instanceof Error?clean(error.message):'mass_distilled_direct_ready_probe_failed'
+      }
     }
     if(Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,Math.min(3000,Math.max(0,deadline-Date.now()))))
   }

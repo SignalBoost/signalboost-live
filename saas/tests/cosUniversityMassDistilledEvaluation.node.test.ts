@@ -195,7 +195,7 @@ test('bounded queue-state denials may drain existing approvals while unknown or 
   const denial = route.indexOf('if (!rolling.issued && !mayDrainExistingApproval)')
   const claim = route.indexOf('claim = await claimNext()')
   const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
-  const wake = route.indexOf('wakeMassDistilledRuntime(claim.endpointId')
+  const wake = route.indexOf('activateMassDistilledEvaluationWorker(claim.endpointId')
   assert.ok(drain >= 0 && denial > drain && claim > denial && preflight > claim && wake > preflight)
   assert.match(route, /rolling\.reason === 'no_mass_artifact_eligible_for_rolling_evaluation'/)
   assert.match(route, /rolling\.reason === 'rolling_mass_evaluation_window_exhausted'/)

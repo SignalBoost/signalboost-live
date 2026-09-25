@@ -236,7 +236,7 @@ export function modelCapabilityProfileForId(modelId: string): PlatformModelProfi
 export function requireModelCapabilityProfile(modelId: string, use?: ModelProfileUse): PlatformModelProfile {
   const profile = modelCapabilityProfileForId(modelId)
   if (!profile) throw new Error('platform_model_not_registered')
-  if (use && !profile.uses.includes(use as never)) throw new Error('platform_model_use_not_registered')
+  if (use && !profile.uses.includes(use)) throw new Error('platform_model_use_not_registered')
   return profile
 }
 

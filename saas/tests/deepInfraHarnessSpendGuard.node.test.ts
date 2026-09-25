@@ -38,6 +38,7 @@ test('default DeepInfra reservations are conservative and run ceilings cannot un
     'DEEPINFRA_BUILDER_MAX_CALL_USD','DEEPINFRA_BUILDER_MAX_JOB_USD',
     'DEEPINFRA_UNIVERSITY_PRACTICE_MAX_CALL_USD','DEEPINFRA_UNIVERSITY_PRACTICE_MAX_RUN_USD',
     'DEEPINFRA_UNIVERSITY_ASSESSMENT_MAX_CALL_USD','DEEPINFRA_UNIVERSITY_ASSESSMENT_MAX_RUN_USD',
+    'DEEPINFRA_MASS_EVALUATION_JUDGE_MAX_CALL_USD','DEEPINFRA_MASS_EVALUATION_JUDGE_MAX_RUN_USD',
   ],()=>{
     assert.equal(deepInfraMaxCallUsd('builder'),0.08)
     assert.equal(deepInfraMaxRunUsd('builder'),0.24)
@@ -45,6 +46,8 @@ test('default DeepInfra reservations are conservative and run ceilings cannot un
     assert.equal(deepInfraMaxRunUsd('university_practice'),0.01)
     assert.equal(deepInfraMaxCallUsd('university_assessment'),0.10)
     assert.equal(deepInfraMaxRunUsd('university_assessment'),0.10)
+    assert.equal(deepInfraMaxCallUsd('mass_evaluation_judge'),0.05)
+    assert.equal(deepInfraMaxRunUsd('mass_evaluation_judge'),0.20)
   })
 })
 

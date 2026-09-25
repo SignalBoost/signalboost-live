@@ -101,11 +101,13 @@ test('mass-distilled provisioning recovers an omitted v2 endpoint id from the of
   assert.match(provision, /Never issue a second create while identity is settling/)
 })
 
-test('204 is never treated as inference-ready for mass artifacts', () => {
-  assert.match(provision, /if\(payload\?\.ready===true\) break/)
-  assert.match(provision, /if\(lastStatus!==200\) return/)
-  assert.doesNotMatch(provision, /lastStatus\s*!==\s*204/)
-  assert.doesNotMatch(provision, /lastStatus===204/)
+test('control-plane worker readiness never substitutes for direct gateway readiness', () => {
+  assert.match(provision, /let controlPlaneReady=false/)
+  assert.match(provision, /if\(health\.workers\.ready>0\|\|health\.workers\.idle>0\|\|health\.workers\.running>0\) controlPlaneReady=true/)
+  assert.match(provision, /if\(controlPlaneReady&&Date\.now\(\)<deadline\)/)
+  assert.match(provision, /const direct=await fetch\(\`\$\{root\}\/ping\`/)
+  assert.match(provision, /if\(direct\.status===200\)\{readyObserved=true;break\}/)
+  assert.doesNotMatch(provision, /if\(health\.workers\.ready>0\)\{readyObserved=true;break\}/)
   assert.match(provision, /if not ready\.is_set\(\): raise HTTPException\(status_code=503,detail='distilled_internal_vllm_not_ready'\)/)
 })
 

@@ -38,7 +38,11 @@ async function run() {
 
   const githubCertification = await certifyMcpProvider(gateway, {
     providerId: 'github-mcp',
-    expectedCapabilities: GITHUB_MCP_PROFILE.tools.map(item => `mcp.github-mcp.${item.capabilityName}`),
+    // github.token is repository-scoped and the remote MCP omits get_me for it.
+    // Keep identity.read in the runtime profile; exclude it only from this CI credential's proof.
+    expectedCapabilities: GITHUB_MCP_PROFILE.tools
+      .filter(item => item.capabilityName !== 'identity.read')
+      .map(item => `mcp.github-mcp.${item.capabilityName}`),
     probes: [
       {
         id: 'private_repo_read',

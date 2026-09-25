@@ -47,10 +47,23 @@ const SECRET_VALUE_PATTERNS: readonly RegExp[] = Object.freeze([
   /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}\b/gi,
   /\b(?:sk|xai)-[A-Za-z0-9_-]{16,}\b/gi,
   /\bgh[pousr]_[A-Za-z0-9]{20,}\b/gi,
-  /\bAKIA[0-9A-Z]{16}\b/g,
+  /\bAKIA[0-9A-Z]{16}\b/g,                                     // AWS access key id
+  /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\b/g,             // Stripe secret / restricted keys
+  /\bwhsec_[A-Za-z0-9]{24,}\b/g,                               // Stripe webhook signing secret
+  /\bsk_[A-Za-z0-9]{32,}\b/g,                                  // ElevenLabs and other sk_ secret keys
+  /\bAIza[0-9A-Za-z_-]{35}\b/g,                                // Google API key
+  /\bya29\.[0-9A-Za-z_-]{20,}/g,                               // Google OAuth access token
+  /\bxox[abposr]-[0-9A-Za-z-]{10,}\b/g,                        // Slack tokens
+  /\bhf_[A-Za-z0-9]{30,}\b/g,                                  // Hugging Face
+  /\brpa_[A-Za-z0-9]{30,}\b/g,                                 // RunPod
+  /\bsb_secret_[A-Za-z0-9_-]{16,}/g,                            // Supabase secret key
+  /\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/g,             // SendGrid
+  /\bglpat-[A-Za-z0-9_-]{20,}\b/g,                             // GitLab
+  /\bnpm_[A-Za-z0-9]{36}\b/g,                                  // npm
+  /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, // JWT
 ])
 
-const PRIVATE_KEY = /-----BEGIN(?: RSA| EC| OPENSSH)? PRIVATE KEY-----[\s\S]*?-----END(?: RSA| EC| OPENSSH)? PRIVATE KEY-----/gi
+const PRIVATE_KEY = /-----BEGIN(?: RSA| EC| DSA| OPENSSH| ENCRYPTED| PGP)? PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END(?: RSA| EC| DSA| OPENSSH| ENCRYPTED| PGP)? PRIVATE KEY(?: BLOCK)?-----/gi
 
 const OVERRIDE_PATTERNS: readonly RegExp[] = Object.freeze([
   /\bignore\s+(?:all\s+|any\s+|the\s+)?(?:(?:previous|prior|earlier)(?:\s+(?:system|developer))?|system|developer)\s+instructions?\b/i,

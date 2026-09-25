@@ -151,7 +151,10 @@ function projectGutenbergUsRightsEvidence(raw:string,discoveryEvidence:readonly 
   // Read only the ebook-specific preamble before START. Generic Project Gutenberg license text after
   // the book must never decide rights for the individual work.
   const start=/\*\*\*\s*START OF (?:THIS |THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
-  const preamble=value.slice(0,start?.index??Math.min(value.length,24000)).toLowerCase()
+  // Real Project Gutenberg plain-text files are commonly hard-wrapped with CRLF around ~70 columns.
+  // Collapse whitespace before rights matching so phrases such as "almost no restrictions\r\nwhatsoever"
+  // are interpreted exactly like their one-line equivalent.
+  const preamble=value.slice(0,start?.index??Math.min(value.length,24000)).toLowerCase().replace(/\s+/g,' ').trim()
   if(!preamble)return null
 
   // Exact ebook-specific restriction markers always fail closed, including when catalog metadata says

@@ -1,5 +1,5 @@
 import type { BuilderMcpReadCapability, BuilderMcpReadPort } from './contracts.ts'
-import { createUniversalMcpGateway, type UniversalMcpFigmaAuthorization } from '../../provider-hub-host/universal-mcp-gateway.ts'
+import { createUniversalMcpGateway, type UniversalMcpFigmaAuthorization, type UniversalMcpGatewayOptions } from '../../provider-hub-host/universal-mcp-gateway.ts'
 import {
   UNIVERSAL_MCP_PROFILES,
   type UniversalMcpProfileId,
@@ -53,6 +53,7 @@ export function createBuilderMcpReadPort(input: {
   fetcher?: typeof fetch
   figmaAuthorization?: UniversalMcpFigmaAuthorization
   securityObservationRecorder?: typeof recordAiSecuritySupervisorObservation
+  mcpAudit?: UniversalMcpGatewayOptions['audit']
 }): BuilderMcpReadPort {
   const gateway = createUniversalMcpGateway({
     tenantId: input.tenantId,
@@ -65,6 +66,7 @@ export function createBuilderMcpReadPort(input: {
     env: input.env,
     fetcher: input.fetcher,
     figmaAuthorization: input.figmaAuthorization,
+    audit: input.mcpAudit,
   })
   const catalog = allowedCatalog(input.ownerAuthorized)
   const securityObservationRecorder = input.securityObservationRecorder ?? recordAiSecuritySupervisorObservation

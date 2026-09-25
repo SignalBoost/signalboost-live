@@ -1,2 +1,2 @@
-base_sha=e16d84cc87bab3f946a56cd3962d6c9b22b4d1df
-branch=feat/mass-canary-throughput-backlog-compactor-20260925
+base_sha=3a4d67b7b5cdb31c3dc38f33ee888af5071f547e
+branch=fix/mass-backlog-production-assurance-20260925

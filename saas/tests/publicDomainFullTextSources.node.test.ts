@@ -88,7 +88,7 @@ test('Project Gutenberg falls through machine OPDS to Open Library ids and verif
         }],
       }), { status: 200, headers: { 'content-type': 'application/json' } })
     }
-    if (url === 'https://gutenberg.pglaf.org/cache/epub/20201/pg20201.txt') {
+    if (url === 'https://www.gutenberg.org/cache/epub/20201/pg20201.txt') {
       return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
     }
     return new Response('not found', { status: 404 })
@@ -103,7 +103,7 @@ test('Project Gutenberg falls through machine OPDS to Open Library ids and verif
   assert.ok(results[0].evidence?.includes('discovery:open_library_project_gutenberg_id'))
   assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
   assert.ok(calls.some(url => url.startsWith('https://openlibrary.org/search.json')))
-  assert.ok(calls.includes('https://gutenberg.pglaf.org/cache/epub/20201/pg20201.txt'))
+  assert.ok(calls.includes('https://www.gutenberg.org/cache/epub/20201/pg20201.txt'))
 })
 
 test('Project Gutenberg uses the machine-to-machine OPDS catalog before Gutendex', async () => {
@@ -120,7 +120,7 @@ test('Project Gutenberg uses the machine-to-machine OPDS catalog before Gutendex
         headers: { 'content-type': 'application/atom+xml' },
       })
     }
-    if (url === 'https://gutenberg.pglaf.org/cache/epub/34221/pg34221.txt') {
+    if (url === 'https://www.gutenberg.org/cache/epub/34221/pg34221.txt') {
       return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
     }
     return new Response('not found', { status: 404 })
@@ -155,7 +155,7 @@ test('Project Gutenberg broadens a multi-term University query when exact OPDS s
         headers: { 'content-type': 'application/atom+xml' },
       })
     }
-    if (url === 'https://gutenberg.pglaf.org/cache/epub/99991/pg99991.txt') {
+    if (url === 'https://www.gutenberg.org/cache/epub/99991/pg99991.txt') {
       return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
     }
     if (url.startsWith('https://gutendex.com/books/')) {
@@ -223,7 +223,7 @@ test('Project Gutenberg has a rights-neutral bootstrap catalog when every networ
     if (url.startsWith('https://openlibrary.org/search.json')) {
       return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
     }
-    if (url === 'https://gutenberg.pglaf.org/cache/epub/34221/pg34221.txt') {
+    if (url === 'https://www.gutenberg.org/cache/epub/34221/pg34221.txt') {
       return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
     }
     return new Response('not found', { status: 404 })
@@ -261,7 +261,7 @@ test('Project Gutenberg fallback catalog covers every rotating University book-s
     if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) return new Response('<?xml version="1.0"?><feed></feed>', { status: 200 })
     if (url.startsWith('https://openlibrary.org/search.json')) return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
     if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
-    if (url.startsWith('https://gutenberg.pglaf.org/cache/epub/')) return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    if (url.startsWith('https://www.gutenberg.org/cache/epub/')) return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
     return new Response('not found', { status: 404 })
   }) as typeof fetch
 
@@ -327,7 +327,7 @@ test('Project Gutenberg accepts official OPDS public-domain rights when fetched 
         <link href="/ebooks/33310" />
       </entry></feed>`, { status: 200, headers: { 'content-type': 'application/atom+xml' } })
     }
-    if (url === 'https://gutenberg.pglaf.org/cache/epub/33310/pg33310.txt') {
+    if (url === 'https://www.gutenberg.org/cache/epub/33310/pg33310.txt') {
       return new Response(body, { status: 200, headers: { 'content-type': 'text/plain' } })
     }
     return new Response('not found', { status: 404 })
@@ -339,6 +339,61 @@ test('Project Gutenberg accepts official OPDS public-domain rights when fetched 
   assert.ok(results[0].evidence?.includes('project_gutenberg_opds_rights:public_domain_in_usa'))
   assert.ok(results[0].evidence?.includes('project_gutenberg_text_preamble:no_restriction_marker'))
   assert.ok(results[0].evidence?.includes('project_gutenberg_rights:verified_public_domain_us'))
+})
+
+
+test('Project Gutenberg rejects malformed or legacy PGLAF cache bases and falls back to official Gutenberg cache', async () => {
+  const calls: string[] = []
+  const unrestricted = 'The Project Gutenberg eBook of Electricity and Magnetism\n'
+    + 'This eBook is for the use of anyone anywhere in the United States at no cost and with almost no restrictions whatsoever.\n'
+    + '*** START OF THIS PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***\n'
+    + 'Electricity magnetism physics engineering science current voltage field. '.repeat(30)
+    + '\n*** END OF THIS PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) return new Response('<?xml version="1.0"?><feed></feed>', { status: 200 })
+    if (url.startsWith('https://openlibrary.org/search.json')) return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url === 'https://www.gutenberg.org/cache/epub/34221/pg34221.txt') return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher, {
+    mirrorBaseUrl: 'https://gutenberg.pglaf.org/cache/epub}',
+  })('electricity magnetism physics', 1)
+
+  assert.equal(results.length, 1)
+  assert.ok(calls.includes('https://www.gutenberg.org/cache/epub/34221/pg34221.txt'))
+  assert.ok(!calls.some(url => /pglaf\.org|%7D|%7B/i.test(url)))
+})
+
+test('Project Gutenberg rejects the legacy PGLAF cache/epub base even when it is syntactically valid', async () => {
+  const calls: string[] = []
+  const unrestricted = 'The Project Gutenberg eBook of Electricity and Magnetism\n'
+    + 'This eBook is for the use of anyone anywhere in the United States at no cost and with almost no restrictions whatsoever.\n'
+    + '*** START OF THIS PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***\n'
+    + 'Electricity magnetism physics engineering science current voltage field. '.repeat(30)
+    + '\n*** END OF THIS PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) return new Response('<?xml version="1.0"?><feed></feed>', { status: 200 })
+    if (url.startsWith('https://openlibrary.org/search.json')) return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url === 'https://www.gutenberg.org/cache/epub/34221/pg34221.txt') return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher, {
+    mirrorBaseUrl: 'https://gutenberg.pglaf.org/cache/epub',
+  })('electricity magnetism physics', 1)
+
+  assert.equal(results.length, 1)
+  assert.ok(calls.includes('https://www.gutenberg.org/cache/epub/34221/pg34221.txt'))
+  assert.ok(!calls.some(url => url.startsWith('https://gutenberg.pglaf.org/cache/epub/')))
 })
 
 test('Project Gutenberg never upgrades a restricted ebook to training rights even when discovery points to it', async () => {

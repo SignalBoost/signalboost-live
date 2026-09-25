@@ -492,6 +492,7 @@ async function resolveExactEndpoint(
   const idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input)
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
   let endpoint = (listed.endpoints || []).find(item => clean(item.name, 240) === ids.endpointName)
+  let createdEndpoint = false
 
   if (!endpoint) {
     const config = nativeV2EndpointConfig(input, ids.modelName, approvedPools, idleTimeoutSeconds)
@@ -500,6 +501,7 @@ async function resolveExactEndpoint(
       body: JSON.stringify({ name: ids.endpointName, ...config }),
     }))
     if (!endpoint?.id) throw new Error(`mass_distilled_runtime_endpoint_id_missing:recovery_from=${clean(recoveryFrom, 100)}`)
+    createdEndpoint = true
   } else {
     assertNonGpuEndpointSafetyPolicy(endpoint, idleTimeoutSeconds)
     const existingPools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
@@ -521,7 +523,7 @@ async function resolveExactEndpoint(
     approvedPools,
   )
   assertMaterializedEndpointIdentity(endpoint, input, ids.modelName, idleTimeoutSeconds, approvedPools)
-  return Object.freeze({ endpoint, ...ids, reboundTemplate: false, nativeV2Inline: true as const })
+  return Object.freeze({ endpoint, ...ids, createdEndpoint, reboundTemplate: false, nativeV2Inline: true as const })
 }
 
 /**
@@ -541,7 +543,7 @@ async function provisionMassDistilledRuntimeWithPools(
     modelName: recovered.modelName,
     endpointId: String(endpoint.id),
     createdTemplate: false,
-    createdEndpoint: true,
+    createdEndpoint: recovered.createdEndpoint,
     reboundTemplate: false,
     nativeV2Inline: true as const,
     workersMin: Number(endpoint.workers?.min),

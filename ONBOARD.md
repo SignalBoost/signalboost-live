@@ -2344,3 +2344,6 @@ existing strict classifier must report zero silent days and GREEN.
 - The full portability contract is `docs/PLATFORM-MODEL-PORTABILITY-CONTRACT-2026-09-25.md`.
 - Phase 2 binds the live `local-inference.ts` route to this registry. Registered models must have validated chat capability and the exact wire protocol used by that seam; non-OpenAI transports cannot be silently sent to `/chat/completions`.
 - Existing deployments retain an explicit `legacy_openai_compatible` migration binding for unregistered runtime models. Buyers can enforce complete registration with `ITMOUNTS_MODEL_REGISTRY_REQUIRE_REGISTERED=true` once their model inventory is declared.
+- Phase 3 adds platform-owned built-in transport adapters for `openai_compatible`, `anthropic_messages`, and `google_generate_content`, configured through server-only `ITMOUNTS_MODEL_TRANSPORTS_JSON`. Credentials remain referenced by environment-variable name and are never stored in model/transport registry metadata.
+- Provider-native tool/JSON contracts must be preserved; adapters may not fake one provider's wire format as another. `native_sdk`, `local_runtime`, and `custom_http` require an injected host adapter rather than guessed behavior.
+- Portability transport tests are mandatory in `scripts/vercel-cos-gates.mjs`.

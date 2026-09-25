@@ -3,6 +3,7 @@ import { NextRequest,NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { compactMassEvaluationBacklog } from '@/lib/ai/cos/cosUniversityMassBacklogCompactor'
 import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { describeThrownValue } from '@/lib/ai/cos/describeThrownValue'
 
 export const runtime='nodejs'
@@ -22,6 +23,11 @@ export async function GET(req:NextRequest){
     const result=await compactMassEvaluationBacklog({db:cosServiceDb()})
     if(result.retired.length===0){
       await laneStatus('skipped','no_proven_superseded_mass_artifacts',{limit:result.limit,retired:0})
+      await recordCosUniversityProductionPath({
+        path:'mass_backlog_compaction',
+        invocationSucceeded:true,
+        evidence:{runnerInvoked:true,retired:0,limit:result.limit,noProvenSupersededArtifacts:true,authorityExpanded:false},
+      })
       return NextResponse.json({ok:true,retired:0,reason:'no_proven_superseded_mass_artifacts',limit:result.limit})
     }
     await laneStatus('worked','proven_superseded_mass_artifacts_retired',{
@@ -29,10 +35,26 @@ export async function GET(req:NextRequest){
       retired:result.retired.length,
       candidates:result.retired.slice(0,10).map(row=>row.retired_candidate_id),
     })
+    await recordCosUniversityProductionPath({
+      path:'mass_backlog_compaction',
+      invocationSucceeded:true,
+      evidence:{
+        runnerInvoked:true,
+        retired:result.retired.length,
+        limit:result.limit,
+        retiredCandidates:result.retired.slice(0,10).map(row=>row.retired_candidate_id),
+        authorityExpanded:false,
+      },
+    })
     return NextResponse.json({ok:true,retired:result.retired.length,limit:result.limit,rows:result.retired})
   }catch(error){
     const message=describeThrownValue(error,300)
     await laneStatus('failed','mass_backlog_compactor_failed',{error:message})
+    await recordCosUniversityProductionPath({
+      path:'mass_backlog_compaction',
+      invocationSucceeded:false,
+      evidence:{runnerInvoked:true,error:message,authorityExpanded:false},
+    }).catch(()=>null)
     return NextResponse.json({ok:false,error:message},{status:500})
   }
 }

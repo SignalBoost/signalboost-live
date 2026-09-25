@@ -5,6 +5,7 @@ export type A2ASpecialistFamilyId =
   | 'context-engineering'
   | 'marketing'
   | 'sales'
+  | 'security'
   | 'self-healing-diagnostic'
   | 'self-healing-remediation'
   | 'self-healing-verification'
@@ -65,6 +66,16 @@ export const A2A_SPECIALIST_FAMILIES: readonly A2ASpecialistFamily[] = Object.fr
       Object.freeze({ skillId: 'sales.outreach-plan', risk: 'advisory', purpose: 'Prepare outreach and follow-up plans without sending.' }),
       Object.freeze({ skillId: 'sales.crm-write', risk: 'write', purpose: 'Create or update approved CRM records through separately authorized tools.' }),
       Object.freeze({ skillId: 'sales.send-outreach', risk: 'write', purpose: 'Send approved outreach through separately authorized communications tools.' }),
+    ]),
+  }),
+  Object.freeze({
+    familyId: 'security',
+    displayName: 'Cybersecurity Specialist',
+    purpose: 'Investigate security findings, prompt/tool-content attacks, identity/authorization anomalies, secret exposure, and defensive evidence without expanding operational authority.',
+    skills: Object.freeze([
+      Object.freeze({ skillId: 'security.investigate', risk: 'advisory', purpose: 'Investigate a security finding from governed evidence and separate observation, hypothesis, and attribution.' }),
+      Object.freeze({ skillId: 'security.verify-ai-content', risk: 'advisory', purpose: 'Review AI-content security findings such as embedded instruction attacks, authority-bypass attempts, and credential-exfiltration requests.' }),
+      Object.freeze({ skillId: 'security.verify', risk: 'advisory', purpose: 'Independently verify that a security control or remediation outcome satisfies its evidence criteria.' }),
     ]),
   }),
   Object.freeze({

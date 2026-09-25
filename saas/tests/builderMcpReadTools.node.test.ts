@@ -198,6 +198,7 @@ test('Builder quarantines prompt-injected MCP output before the model control lo
     env: {},
     fetcher,
     securityObservationRecorder: async () => true,
+    mcpAudit: { async append() {} },
   })
   const result = await port.invoke({
     providerId: 'context7-mcp',

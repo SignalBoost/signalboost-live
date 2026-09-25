@@ -286,9 +286,7 @@ export function resolveModelRuntimeBinding(
   requireModelCapability(profile, 'inference', 'chatCompletion')
   const transportProtocol = profile.transportProtocols.includes('openai_compatible')
     ? 'openai_compatible' as const
-    : profile.transportProtocols.includes('local_runtime')
-      ? 'local_runtime' as const
-      : null
+    : null
   if (!transportProtocol) {
     throw new Error(`platform_model_transport_not_supported_by_local_inference:${profile.key}`)
   }

@@ -1,6 +1,7 @@
 // saas/lib/ai/cos/runpodMassDistilledProvisionV2.ts
-// RunPod REST v2 compatibility repair for exact-artifact mass-distilled canaries.
-// v2 applies templateId as a one-time materialization; it does not retain a persistent template link.
+// RunPod REST v2 exact-artifact runtime for mass-distilled canaries.
+// Native v2 endpoints carry their complete container configuration inline, so this path must not
+// depend on the legacy v1 template index. Exact identity is verified from the materialized endpoint.
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { activeResidencyRunpodEndpointNames, protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
 import {
@@ -13,7 +14,7 @@ import {
   MASS_DISTILLED_HEALTH_TIMEOUT_MS,
   canaryMassDistilledRuntime,
   massDistilledRuntimeHealth,
-  provisionMassDistilledRuntime as provisionLegacyMassDistilledRuntime,
+  massDistilledRuntimeInlineContainer,
   type MassDistilledRuntimeArtifact,
 } from './runpodMassDistilledProvision.ts'
 
@@ -127,10 +128,14 @@ type Endpoint = {
   type?: 'QUEUE' | 'LOAD_BALANCER'
   image?: string
   args?: string
+  disk?: number
   ports?: string[]
   env?: Record<string, unknown>
   workers?: { min?: number; max?: number; idleTimeout?: number }
   gpu?: { pools?: string[]; count?: number }
+  scaling?: { type?: 'REQUEST_COUNT' | 'QUEUE_DELAY'; requestCount?: number; queueDelay?: number }
+  timeout?: number
+  flashboot?: 'OFF' | 'FLASHBOOT' | 'PRIORITY_FLASHBOOT'
 }
 type RestEndpointIdentity = { id?: string; name?: string }
 
@@ -461,6 +466,23 @@ function assertMaterializedEndpointIdentity(
   }
 }
 
+function nativeV2EndpointConfig(
+  input: MassDistilledRuntimeArtifact,
+  modelName: string,
+  approvedPools: readonly string[],
+  idleTimeoutSeconds: number,
+) {
+  return Object.freeze({
+    ...massDistilledRuntimeInlineContainer(input, modelName),
+    type: ROUTING,
+    gpu: { pools: [...approvedPools], count: 1 },
+    workers: { min: 0, max: 1, idleTimeout: idleTimeoutSeconds },
+    scaling: { type: 'REQUEST_COUNT' as const, requestCount: 1 },
+    timeout: 300000,
+    flashboot: 'FLASHBOOT' as const,
+  })
+}
+
 async function resolveExactEndpoint(
   input: MassDistilledRuntimeArtifact,
   recoveryFrom = '',
@@ -468,28 +490,38 @@ async function resolveExactEndpoint(
 ) {
   const ids = identity(input)
   const idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input)
-  const templates = await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')
-  const template = templates.find(item => clean(item.name, 240) === ids.templateName && item.isServerless !== false)
-  if (!template?.id) {
-    const exactKeys = Object.keys(template || {}).sort().join(',') || 'none'
-    throw new Error(`mass_distilled_runtime_template_id_missing:v2_exact_visible=${Boolean(template)};v2_exact_keys=${exactKeys};v2_list_count=${templates.length};recovery_from=${clean(recoveryFrom, 100)}`)
+  const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+  let endpoint = (listed.endpoints || []).find(item => clean(item.name, 240) === ids.endpointName)
+
+  if (!endpoint) {
+    const config = nativeV2EndpointConfig(input, ids.modelName, approvedPools, idleTimeoutSeconds)
+    endpoint = await withWorkerQuotaRecovery('', () => requestV2<Endpoint>('/serverless', {
+      method: 'POST',
+      body: JSON.stringify({ name: ids.endpointName, ...config }),
+    }))
+    if (!endpoint?.id) throw new Error(`mass_distilled_runtime_endpoint_id_missing:recovery_from=${clean(recoveryFrom, 100)}`)
+  } else {
+    assertNonGpuEndpointSafetyPolicy(endpoint, idleTimeoutSeconds)
+    const existingPools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
+    const poolsAlreadyExact = existingPools.length === approvedPools.length
+      && approvedPools.every(pool => existingPools.includes(pool))
+    if (!materializedEndpointMatches(endpoint, input, ids.modelName) || !poolsAlreadyExact) {
+      const config = nativeV2EndpointConfig(input, ids.modelName, approvedPools, idleTimeoutSeconds)
+      endpoint = await withWorkerQuotaRecovery(String(endpoint.id), () => requestV2<Endpoint>(
+        `/serverless/${encodeURIComponent(String(endpoint?.id))}`,
+        { method: 'PATCH', body: JSON.stringify(config) },
+      ))
+      if (!endpoint?.id) throw new Error('mass_distilled_runtime_inline_rebind_missing')
+    }
   }
 
-  let endpoint = await resolveEndpointControlPlane('', ids.endpointName)
-  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName, idleTimeoutSeconds, approvedPools)
-
-  if (materializedEndpointMatches(endpoint, input, ids.modelName)) {
-    return Object.freeze({ endpoint, ...ids, reboundTemplate: false })
-  }
-
-  endpoint = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(endpoint.id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ templateId: template.id }),
-  })
-  if (!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_template_rebind_missing')
-  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName, idleTimeoutSeconds, approvedPools)
+  endpoint = await restoreRetiredEndpointCapacity(
+    await constrainEndpointToApprovedGpu(String(endpoint.id), ids.endpointName, idleTimeoutSeconds, approvedPools),
+    idleTimeoutSeconds,
+    approvedPools,
+  )
   assertMaterializedEndpointIdentity(endpoint, input, ids.modelName, idleTimeoutSeconds, approvedPools)
-  return Object.freeze({ endpoint, ...ids, reboundTemplate: true })
+  return Object.freeze({ endpoint, ...ids, reboundTemplate: false, nativeV2Inline: true as const })
 }
 
 /**
@@ -501,53 +533,23 @@ async function provisionMassDistilledRuntimeWithPools(
   approvedPools: readonly string[],
 ) {
   const idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input)
-  try {
-    const legacySafeInput: MassDistilledRuntimeArtifact = input.idleTimeoutSeconds !== undefined && Number(input.idleTimeoutSeconds) > 300
-      ? Object.freeze({ ...input, idleTimeoutSeconds: 300 })
-      : input
-    const provisioned = await provisionLegacyMassDistilledRuntime(legacySafeInput)
-    const endpoint = await restoreRetiredEndpointCapacity(
-      await constrainEndpointToApprovedGpu(
-        String(provisioned.endpointId),
-        String(provisioned.endpointName || ''),
-        idleTimeoutSeconds,
-        approvedPools,
-      ),
-      idleTimeoutSeconds,
-      approvedPools,
-    )
-    return Object.freeze({
-      ...provisioned,
-      workersMin: Number(endpoint.workers?.min),
-      workersMax: Number(endpoint.workers?.max),
-      idleTimeout: Number(endpoint.workers?.idleTimeout),
-      gpuPools: Object.freeze([...(endpoint.gpu?.pools || [])]),
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (message !== 'mass_distilled_runtime_template_identity_mismatch'
-      && message !== 'mass_distilled_runtime_endpoint_template_mismatch'
-      && message !== 'mass_distilled_runtime_endpoint_template_rebind_failed'
-      && message !== 'mass_distilled_runtime_endpoint_gpu_pool_drift') throw error
-
-    const recovered = await resolveExactEndpoint(input, message, approvedPools)
-    const endpoint = recovered.endpoint
-    assertMaterializedEndpointIdentity(endpoint, input, recovered.modelName, idleTimeoutSeconds, approvedPools)
-    return Object.freeze({
-      templateName: recovered.templateName,
-      endpointName: recovered.endpointName,
-      modelName: recovered.modelName,
-      endpointId: String(endpoint.id),
-      createdTemplate: false,
-      createdEndpoint: false,
-      reboundTemplate: recovered.reboundTemplate,
-      workersMin: Number(endpoint.workers?.min),
-      workersMax: Number(endpoint.workers?.max),
-      idleTimeout: Number(endpoint.workers?.idleTimeout),
-      gpuPools: Object.freeze([...(endpoint.gpu?.pools || [])]),
-      baseUrl: `https://${endpoint.id}.api.runpod.ai/v1`,
-    })
-  }
+  const recovered = await resolveExactEndpoint(input, 'native_v2_inline', approvedPools)
+  const endpoint = recovered.endpoint
+  return Object.freeze({
+    templateName: recovered.templateName,
+    endpointName: recovered.endpointName,
+    modelName: recovered.modelName,
+    endpointId: String(endpoint.id),
+    createdTemplate: false,
+    createdEndpoint: true,
+    reboundTemplate: false,
+    nativeV2Inline: true as const,
+    workersMin: Number(endpoint.workers?.min),
+    workersMax: Number(endpoint.workers?.max),
+    idleTimeout: Number(endpoint.workers?.idleTimeout),
+    gpuPools: Object.freeze([...(endpoint.gpu?.pools || [])]),
+    baseUrl: `https://${endpoint.id}.api.runpod.ai/v1`,
+  })
 }
 
 export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeArtifact) {

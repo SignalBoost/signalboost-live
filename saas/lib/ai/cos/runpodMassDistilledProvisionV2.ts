@@ -526,6 +526,85 @@ export async function provisionMassDistilledCanaryRuntime(input: MassDistilledRu
   })
 }
 
+function canaryEndpointPools(endpoint: Endpoint): string[] {
+  const pools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80)).filter(Boolean)
+  if (!pools.length || pools.some(pool => !CANARY_APPROVED_POOLS.includes(pool as typeof CANARY_APPROVED_POOLS[number]))) {
+    throw new Error('mass_distilled_runtime_canary_gpu_pool_drift')
+  }
+  return pools
+}
+
+function assertActiveCanaryWorkerPolicy(endpoint: Endpoint, approvedPools: readonly string[]) {
+  if (endpoint.type !== ROUTING) throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
+  if (Number(endpoint.workers?.min ?? Number.NaN) !== 1
+    || Number(endpoint.workers?.max ?? Number.NaN) !== 1
+    || Number(endpoint.workers?.idleTimeout ?? Number.NaN) > IDLE_TIMEOUT_SECONDS) {
+    throw new Error('mass_distilled_runtime_active_canary_worker_policy_drift')
+  }
+  if (Number(endpoint.gpu?.count ?? Number.NaN) !== 1) throw new Error('mass_distilled_runtime_endpoint_gpu_count_drift')
+  const pools = canaryEndpointPools(endpoint)
+  if (pools.length !== approvedPools.length || !approvedPools.every(pool => pools.includes(pool))) {
+    throw new Error('mass_distilled_runtime_canary_gpu_pool_drift')
+  }
+}
+
+/**
+ * A paid canary is already durably reserved before this function is called. Explicitly setting min=1
+ * asks RunPod to allocate the already-authorized single worker immediately instead of relying on the
+ * request-count scaler to notice a cold /ping request. The max worker count and GPU pools never widen.
+ */
+export async function activateMassDistilledCanaryWorker(endpointId: string) {
+  const endpoint = await resolveEndpointControlPlane(clean(endpointId, 160))
+  assertNonGpuEndpointSafetyPolicy(endpoint, IDLE_TIMEOUT_SECONDS)
+  const pools = canaryEndpointPools(endpoint)
+  let activated: Endpoint | null = null
+  try {
+    activated = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ workers: { min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+    })
+    if (!activated?.id) throw new Error('mass_distilled_runtime_canary_worker_activation_missing')
+    assertActiveCanaryWorkerPolicy(activated, pools)
+    return Object.freeze({
+      endpointId: String(activated.id),
+      workersMin: Number(activated.workers?.min),
+      workersMax: Number(activated.workers?.max),
+      idleTimeout: Number(activated.workers?.idleTimeout),
+      gpuPools: Object.freeze([...pools]),
+    })
+  } catch (error) {
+    // If RunPod accepted the warm-start patch but a later validation failed, immediately attempt to
+    // restore scale-to-zero before surfacing the error. Cleanup failure is intentionally not hidden by
+    // returning success; the original activation error remains the canary failure.
+    if (activated?.id) {
+      await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(activated.id))}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+      }).catch(() => undefined)
+    }
+    throw error
+  }
+}
+
+/** Restore the exact endpoint to its normal scale-to-zero envelope before canary proof is admissible. */
+export async function deactivateMassDistilledCanaryWorker(endpointId: string) {
+  const endpoint = await resolveEndpointControlPlane(clean(endpointId, 160))
+  const pools = canaryEndpointPools(endpoint)
+  const deactivated = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+  })
+  if (!deactivated?.id) throw new Error('mass_distilled_runtime_canary_worker_scale_down_missing')
+  assertEndpointSafetyPolicy(deactivated, IDLE_TIMEOUT_SECONDS, pools)
+  return Object.freeze({
+    endpointId: String(deactivated.id),
+    workersMin: Number(deactivated.workers?.min),
+    workersMax: Number(deactivated.workers?.max),
+    idleTimeout: Number(deactivated.workers?.idleTimeout),
+    gpuPools: Object.freeze([...pools]),
+  })
+}
+
 /**
  * Self-Healing control-plane reconciliation for an already-created exact-artifact runtime.
  *

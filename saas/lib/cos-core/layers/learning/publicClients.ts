@@ -213,8 +213,12 @@ async function projectGutenbergCandidatesFromOpds(query:string,bounded:number,fe
         seen.add(id)
         const authors=[...entry.matchAll(/<author\b[\s\S]*?<name(?:\s[^>]*)?>([\s\S]*?)<\/name>[\s\S]*?<\/author>/gi)]
           .map(match=>clean(match[1])).filter(Boolean).slice(0,5)
-        const rights=xmlTag(entry,'rights')
-        const opdsPublicDomain=/public domain in the (?:usa|u\.s\.|united states)/i.test(rights)
+        // Real Project Gutenberg OPDS uses a namespaced dcterms:rights element. The original
+        // Production repair tested only an unprefixed <rights> fixture, so live public-domain entries
+        // were still false-negatives. Match by XML local-name while preserving the same strict value gate.
+        const rightsMatch=/<(?:[a-z0-9_.-]+:)?rights(?:\s[^>]*)?>([\s\S]*?)<\/(?:[a-z0-9_.-]+:)?rights>/i.exec(entry)
+        const rights=rightsMatch?clean(rightsMatch[1]):''
+        const opdsPublicDomain=/^public domain in the (?:usa|u\.s\.|united states)\.?$/i.test(rights.trim())
         results.push({
           id,title,authors,
           discoveryEvidence:[

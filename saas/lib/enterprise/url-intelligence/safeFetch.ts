@@ -2,29 +2,17 @@
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import type { SafeFetchResult } from './types.ts'
+import { isBlockedNetworkAddress } from '../../security/publicFetchGuard.ts'
 
 const MAX_REDIRECTS = 4
 const MAX_BYTES = 1_500_000
 const TIMEOUT_MS = 8_000
 const ALLOWED_TYPES = ['text/html', 'application/xhtml+xml', 'application/json', 'text/plain']
 
-function isPrivateIpv4(address: string) {
-  const parts = address.split('.').map(Number)
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true
-  const [a, b] = parts
-  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19))
-}
-
-function isPrivateIpv6(address: string) {
-  const normalized = address.toLowerCase().split('%')[0]
-  return normalized === '::' || normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd') || /^fe[89ab]/.test(normalized) || normalized.startsWith('ff') || normalized.startsWith('2001:db8:')
-}
-
+// Address classification is shared with the Security Admission Shield guard so IPv4-mapped IPv6
+// (::ffff:127.0.0.1), NAT64 and 6to4 forms cannot slip past a narrower local copy.
 function isBlockedAddress(address: string) {
-  const family = isIP(address)
-  if (family === 4) return isPrivateIpv4(address)
-  if (family === 6) return isPrivateIpv6(address)
-  return true
+  return isBlockedNetworkAddress(address)
 }
 
 async function assertPublicUrl(value: string) {

@@ -33,7 +33,7 @@ function fakeDb(rows:Row[],serverCap=1000){
 
 function mustRows(result:ContinuityCorpusRead):Row[]{
   assert.equal(result.ok,true)
-  if(!result.ok)throw new Error(result.error)
+  if('error' in result)throw new Error(result.error)
   return result.rows as Row[]
 }
 

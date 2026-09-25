@@ -182,3 +182,15 @@ test('replenishment keeps the canonical subject at the front of bounded OpenAlex
   assert.ok(gaps.every(gap => gap.discoveryQuery?.startsWith('Cybersecurity ')))
   assert.ok(gaps.every(gap => (gap.discoveryQuery || '').split(/\s+/).slice(0, 8).some(term => /cybersecurity/i.test(term))))
 })
+
+
+test('corrective mass batches preserve five independent non-failure holdout sources before dispatch', () => {
+  const packager = source('../lib/ai/cos/cosUniversityMassDistillation.ts')
+  const migration = source('../supabase/migrations/20260925231000_mass_remediation_holdout_admission.sql')
+  assert.match(packager, /HYBRID_INDEPENDENT_HOLDOUT_MIN/)
+  assert.match(packager, /selectedFailureDerived >= 20 && selectedIndependent < HYBRID_INDEPENDENT_HOLDOUT_MIN/)
+  assert.match(migration, /source_kind = 'failure_derived_curriculum'/)
+  assert.match(migration, /source_kind <> 'failure_derived_curriculum'/)
+  assert.match(migration, />= 5/)
+  assert.match(migration, /set status = 'quarantined'/)
+})

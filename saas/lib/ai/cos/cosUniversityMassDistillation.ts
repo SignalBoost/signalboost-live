@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 // actually needs a client loads it lazily below, where Next resolves the alias normally.
 import type { cosServiceDb as CosServiceDbFactory } from '@/lib/cos-core/storage/supabase'
 import { classifyCosUniversitySubjects, cosUniversitySubjectById, type CosUniversitySubjectId } from './cosUniversity.ts'
-import { planHybridDistillationMix, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
+import { HYBRID_INDEPENDENT_HOLDOUT_MIN, planHybridDistillationMix, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
 import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from '../modelCapabilityRegistry.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const
@@ -259,7 +259,16 @@ function selectHybridDistillationChunk(rows: readonly NormalizedIdentity[]): Nor
     ...failure.slice(0, mix.failureDerived),
     ...synthetic.slice(0, mix.teacherSynthetic),
   ].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
-  return selected.length === targetSize ? selected : []
+  if (selected.length !== targetSize) return []
+  // Corrective batches require an independent holdout. The worker cannot use failure-derived
+  // remediation rows for that holdout without leaking the behavior being repaired into evaluation.
+  // Enforce the invariant at packaging time so malformed remediation-heavy batches never become
+  // prepared/authorizable provider work.
+  const selectedFailureDerived = selected.filter(row =>
+    massDistillationHybridOrigin(row.sourceKind) === 'failure_derived').length
+  const selectedIndependent = selected.length - selectedFailureDerived
+  if (selectedFailureDerived >= 20 && selectedIndependent < HYBRID_INDEPENDENT_HOLDOUT_MIN) return []
+  return selected
 }
 
 function normalizeIdentity(raw: RetainedDistillationIdentity): NormalizedIdentity {

@@ -2067,4 +2067,6 @@ Compaction is bounded to 50 artifacts per run by default and 200 maximum via
 `COS_UNIVERSITY_MASS_BACKLOG_COMPACTOR_MAX_PER_RUN`. Retirement records the exact successor candidate,
 successor artifact hash, proof profile and proof claim in `intended_use.retirement`. If no artifact meets the
 full proof contract, the compactor performs zero retirements and reports
-`no_proven_superseded_mass_artifacts`.
+`no_proven_superseded_mass_artifacts`. The cron is also a first-class University Production-assurance path
+(`mass_backlog_compaction`) and writes a host Production receipt on zero-retirement, retirement, and failure
+outcomes; operational compaction therefore cannot silently disappear from Production verification.

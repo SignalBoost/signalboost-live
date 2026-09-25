@@ -144,6 +144,16 @@ function numericProjectGutenbergIds(value:unknown):number[]{
   return values.map(item=>Number(String(item??'').trim())).filter(id=>Number.isInteger(id)&&id>0)
 }
 
+function projectGutenbergQueryVariants(query:string):string[]{
+  const full=compactQuery(query,8)
+  const stop=new Set(['and','the','for','with','from','into','scientific','science','mathematics','mathematical','physics','engineering','method','observation'])
+  const terms=full.toLowerCase().split(/\s+/).map(term=>term.replace(/[^a-z0-9-]/g,'')).filter(term=>term.length>=4&&!stop.has(term))
+  const variants=[full]
+  if(terms.length>=2)variants.push(terms.slice(0,2).join(' '))
+  variants.push(...terms)
+  return [...new Set(variants.map(value=>value.trim()).filter(Boolean))].slice(0,5)
+}
+
 async function projectGutenbergCandidatesFromGutendex(query:string,bounded:number,baseUrl:string,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
   try{
     const json=await getJson(`${baseUrl}/books/?search=${encodeURIComponent(compactQuery(query,8))}&copyright=false`,fetcher)
@@ -170,58 +180,63 @@ function xmlTag(entry:string,tag:string):string{
 }
 
 async function projectGutenbergCandidatesFromOpds(query:string,bounded:number,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
-  try{
-    const xml=await getText(`${DEFAULT_GUTENBERG_OPDS_SEARCH_URL}?query=${encodeURIComponent(compactQuery(query,8))}`,fetcher)
-    const entries=xml.match(/<entry\b[\s\S]*?<\/entry>/gi)??[]
-    const seen=new Set<number>()
-    const results:ProjectGutenbergCandidate[]=[]
-    for(const entry of entries){
-      const title=xmlTag(entry,'title')
-      if(!title||/^no records found\.?$/i.test(title))continue
-      const idText=xmlTag(entry,'id')
-      const hrefs=[idText,...[...entry.matchAll(/href=["']([^"']+)["']/gi)].map(match=>match[1])]
-      const id=hrefs.map(value=>/\/ebooks\/(\d+)/i.exec(value)?.[1]).map(Number).find(value=>Number.isInteger(value)&&value>0)
-      if(!id||seen.has(id))continue
-      seen.add(id)
-      const authors=[...entry.matchAll(/<author\b[\s\S]*?<name(?:\s[^>]*)?>([\s\S]*?)<\/name>[\s\S]*?<\/author>/gi)]
-        .map(match=>clean(match[1])).filter(Boolean).slice(0,5)
-      results.push({id,title,authors,discoveryEvidence:['discovery:project_gutenberg_opds']})
-      if(results.length>=Math.max(bounded*4,bounded))break
-    }
-    return results
-  }catch(error){
-    console.warn('[project-gutenberg] OPDS discovery unavailable',error instanceof Error?error.message:String(error))
-    return[]
-  }
-}
-
-async function projectGutenbergCandidatesFromOpenLibrary(query:string,bounded:number,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
-  const fields='key,title,author_name,id_project_gutenberg'
-  const json=await getJson(`${DEFAULT_OPEN_LIBRARY_SEARCH_URL}?q=${encodeURIComponent(compactQuery(query,8))}&fields=${encodeURIComponent(fields)}&limit=${Math.min(Math.max(bounded*10,20),50)}`,fetcher)
+  const target=Math.max(bounded*4,bounded)
   const seen=new Set<number>()
   const results:ProjectGutenbergCandidate[]=[]
-  for(const item of json?.docs??[]){
-    for(const id of numericProjectGutenbergIds(item?.id_project_gutenberg)){
-      if(seen.has(id))continue
-      seen.add(id)
-      results.push({
-        id,
-        title:clean(item?.title),
-        authors:Array.isArray(item?.author_name)?item.author_name.map((author:any)=>clean(author)).filter(Boolean).slice(0,5):[],
-        discoveryEvidence:['discovery:open_library_project_gutenberg_id'],
-      })
-      if(results.length>=Math.max(bounded*4,bounded))return results
+  for(const variant of projectGutenbergQueryVariants(query)){
+    try{
+      const xml=await getText(`${DEFAULT_GUTENBERG_OPDS_SEARCH_URL}?query=${encodeURIComponent(variant)}`,fetcher)
+      const entries=xml.match(/<entry\b[\s\S]*?<\/entry>/gi)??[]
+      for(const entry of entries){
+        const title=xmlTag(entry,'title')
+        if(!title||/^no records found\.?$/i.test(title))continue
+        const idText=xmlTag(entry,'id')
+        const hrefs=[idText,...[...entry.matchAll(/href=["']([^"']+)["']/gi)].map(match=>match[1])]
+        const id=hrefs.map(value=>/\/ebooks\/(\d+)/i.exec(value)?.[1]).map(Number).find(value=>Number.isInteger(value)&&value>0)
+        if(!id||seen.has(id))continue
+        seen.add(id)
+        const authors=[...entry.matchAll(/<author\b[\s\S]*?<name(?:\s[^>]*)?>([\s\S]*?)<\/name>[\s\S]*?<\/author>/gi)]
+          .map(match=>clean(match[1])).filter(Boolean).slice(0,5)
+        results.push({id,title,authors,discoveryEvidence:['discovery:project_gutenberg_opds',`discovery_query:${variant}`]})
+        if(results.length>=target)return results
+      }
+      if(results.length>=bounded)return results
+    }catch(error){
+      console.warn('[project-gutenberg] OPDS discovery variant unavailable',{variant,error:error instanceof Error?error.message:String(error)})
     }
   }
   return results
 }
 
-async function projectGutenbergCandidates(query:string,bounded:number,gutendexBaseUrl:string,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
-  const primary=await projectGutenbergCandidatesFromGutendex(query,bounded,gutendexBaseUrl,fetcher)
-  if(primary.length){
-    console.info('[project-gutenberg] discovery',{route:'gutendex',query:compactQuery(query,8),candidates:primary.length})
-    return primary
+async function projectGutenbergCandidatesFromOpenLibrary(query:string,bounded:number,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
+  const fields='key,title,author_name,id_project_gutenberg'
+  const target=Math.max(bounded*4,bounded)
+  const seen=new Set<number>()
+  const results:ProjectGutenbergCandidate[]=[]
+  for(const variant of projectGutenbergQueryVariants(query)){
+    const json=await getJson(`${DEFAULT_OPEN_LIBRARY_SEARCH_URL}?q=${encodeURIComponent(variant)}&fields=${encodeURIComponent(fields)}&limit=${Math.min(Math.max(bounded*10,20),50)}`,fetcher)
+    for(const item of json?.docs??[]){
+      for(const id of numericProjectGutenbergIds(item?.id_project_gutenberg)){
+        if(seen.has(id))continue
+        seen.add(id)
+        results.push({
+          id,
+          title:clean(item?.title),
+          authors:Array.isArray(item?.author_name)?item.author_name.map((author:any)=>clean(author)).filter(Boolean).slice(0,5):[],
+          discoveryEvidence:['discovery:open_library_project_gutenberg_id',`discovery_query:${variant}`],
+        })
+        if(results.length>=target)return results
+      }
+    }
+    if(results.length>=bounded)return results
   }
+  return results
+}
+
+async function projectGutenbergCandidates(query:string,bounded:number,gutendexBaseUrl:string,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
+  // Project Gutenberg OPDS is the first Production discovery surface: it is machine-oriented and
+  // avoids paying the repeated retry cost of Gutendex's observed Vercel 403. Multi-term University
+  // queries are broadened conservatively when the exact phrase returns no catalog entries.
   const opds=await projectGutenbergCandidatesFromOpds(query,bounded,fetcher)
   if(opds.length){
     console.info('[project-gutenberg] discovery',{route:'opds',query:compactQuery(query,8),candidates:opds.length})
@@ -235,9 +250,15 @@ async function projectGutenbergCandidates(query:string,bounded:number,gutendexBa
     console.info('[project-gutenberg] discovery',{route:'open_library',query:compactQuery(query,8),candidates:openLibrary.length})
     return openLibrary
   }
+  const gutendex=await projectGutenbergCandidatesFromGutendex(query,bounded,gutendexBaseUrl,fetcher)
+  if(gutendex.length){
+    console.info('[project-gutenberg] discovery',{route:'gutendex',query:compactQuery(query,8),candidates:gutendex.length})
+    return gutendex
+  }
   const bootstrap=projectGutenbergBootstrapCandidates(query,bounded)
   console.warn('[project-gutenberg] dynamic discovery returned no candidates; using rights-neutral bootstrap ids',{
     query:compactQuery(query,8),
+    variants:projectGutenbergQueryVariants(query),
     candidates:bootstrap.length,
   })
   return bootstrap

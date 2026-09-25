@@ -456,6 +456,109 @@ display changes: original evidence, approval history, action payloads and author
 untouched. Historical views disclose the display normalization in all five supported languages.
 The real-card regression suite is required in unit CI and the Vercel deployment gate.
 
+## Security prevention, AI Security Gateway, and Self-Healing security lifecycle — 2026-09-25
+
+Security must reduce risk **without turning normal platform access into an obstacle for legitimate users**. The platform therefore uses layered, evidence-driven controls rather than a single rigid blocking gate. Security controls must distinguish ordinary human use, suspicious content, confirmed policy violations, and consequential execution risk. A weak or ambiguous signal is not by itself permission to lock out a user, disable the platform, or discard a legitimate request.
+
+Canonical security lifecycle:
+
+```text
+Internet / user / file / web / connector / MCP / API / RAG
+-> Security Admission Shield (prevent before model exposure)
+-> AI Security Gateway (detect, classify, taint, contain unsafe AI-context influence)
+-> Self-Healing Supervisor (continuous monitor, correlate, triage, coordinate)
+-> Guardian + Cybersecurity Specialist (defensive observation + deep analysis)
+-> Referee / Agent Gateway (deterministic authority for consequential action)
+-> bounded containment / remediation
+-> independent verification
+-> continued monitoring + durable evidence + learning
+```
+
+### Security Admission Shield — prevention before detection
+
+The Security Admission Shield is a host-controlled preventive boundary in front of AI reasoning. It should reject or isolate **deterministically unsafe or invalid** traffic before COS, a specialist, Builder, RAG, or another model consumes it. It is not a competing AI brain and it does not replace authentication, RLS, Provider Hub, MCP assignment, Referee, Guardian, or the Agent Gateway.
+
+Its target responsibilities include:
+
+- request/protocol validation, bounded payload size, content-type and schema checks;
+- authentication/session integrity and existing tenant/environment isolation;
+- route-aware abuse/rate controls designed to stop floods without punishing normal use;
+- upload/file admission checks appropriate to the file class before model ingestion;
+- URL, redirect and SSRF protections for platform-controlled fetches;
+- secret/credential leakage prevention before sensitive material crosses a trust boundary;
+- deny-by-default MCP/provider/tool exposure using the existing exact host capability mappings;
+- provenance/trust labeling for web, RAG, file, email, connector, MCP and tool-supplied content;
+- blocking clearly invalid authority claims before they can become executable instructions.
+
+External or retrieved content that is legitimate enough to admit is still **untrusted evidence/data by default**. Admission does not convert a webpage, document, MCP result, tool result, email, retrieved memory, or provider response into policy, approval, credentials, tool authority, or executable instruction.
+
+### Legitimate-user access and false-positive invariant
+
+Security is not considered successful if it prevents ordinary legitimate customers from using the platform. The prevention layer must therefore apply the **least disruptive control that safely addresses the observed risk**.
+
+Non-negotiable usability rules:
+
+- ordinary valid public or authenticated traffic should continue without an unnecessary security challenge;
+- ambiguous signals should prefer bounded friction such as content isolation, scoped throttling, safe retry, step-up verification, or removal of one risky capability instead of a platform-wide/user-wide block;
+- high-confidence deterministic violations may be blocked at the affected boundary, but the block should be as narrow as technically practical;
+- consequential or credential/security-sensitive execution fails closed when required security/authority evidence is unavailable, but an unrelated read-only/user-facing function should not automatically become unavailable merely because a consequential lane is halted;
+- language, nationality, geography, timezone, accessibility tooling, writing style, security vocabulary, a VPN/proxy signal, an unfamiliar device, or a single anomaly must never by itself establish malicious intent or justify an account/platform lockout;
+- rate limits must be route/risk aware and should not treat a normal long conversation, large legitimate document, assistive workflow, or authorized automation as an attack solely because usage differs from an average user;
+- controls should expose a safe recovery/retry path where doing so does not reveal exploitable security detail;
+- false-positive rate, legitimate-request completion, security block reason class, retry/recovery success, and confirmed malicious-event yield should be measured so security can be tightened or corrected from evidence rather than intuition;
+- no model confidence score may convert an ambiguous user into a malicious actor or widen a block.
+
+A control outage must degrade by **risk class**, not by indiscriminately denying the whole product. Security-critical authorization, secrets, privileged writes, financial/destructive operations, and other consequential actions remain fail-closed. Ordinary harmless access may continue through already-safe deterministic paths when its required controls remain independently satisfied.
+
+### AI Security Gateway — content-trust boundary after admission
+
+The AI Security Gateway handles threats that are syntactically valid enough to enter the platform but could manipulate AI reasoning or cause unsafe data movement. Its core invariant is stronger than keyword-based prompt-injection detection:
+
+**untrusted content may inform reasoning as evidence, but it can never grant or expand authority.**
+
+The Gateway should preserve source/provenance and trust class, identify high-confidence prompt/tool/context manipulation indicators, prevent secrets or restricted data from unsafe egress, and ensure that external content cannot alter approval state, provider/tool scope, tenant/environment, data-residency policy, credentials, spend authority, deployment authority, or Referee decisions. Quoted or research material containing adversarial instructions may remain usable as data when safely isolated; the platform should not reject an entire legitimate document merely because it contains words associated with an attack.
+
+### Self-Healing Supervisor is the operational security supervisor
+
+Self-Healing Supervisor is **not only a repair service**. Its security responsibilities span the full operational loop:
+
+```text
+monitor
+-> observe security/prevention/gateway/Guardian signals
+-> correlate + deduplicate
+-> triage severity and affected scope
+-> gather governed evidence
+-> dispatch deep analysis where needed
+-> choose no-action / watch / isolate / contain / repair / escalate
+-> pass every consequential action through Referee / Agent Gateway
+-> verify the result independently
+-> continue monitoring for recurrence/regression
+-> preserve objective outcome evidence
+```
+
+SHS should monitor the Admission Shield and AI Security Gateway themselves. Repeated blocked prompt-injection attempts, SSRF attempts, secret-exfiltration attempts, anomalous MCP/tool use, provider/region drift, repeated auth abuse, poisoned-source patterns, or sudden changes in security-control behavior are operational signals even when prevention succeeds. A successful block may therefore create telemetry/evidence without being treated as a successful intrusion.
+
+Do **not** create a second parallel security orchestrator that duplicates SHS coordination, queues, leases, remediation state, or evidence. New security capabilities should attach to the existing Supervisor workflow and durable evidence model.
+
+### Guardian, Cybersecurity Specialist, Stranger, and Referee relationship
+
+- **Guardian** remains the resident defensive observer/investigator with environment familiarity, patrol telemetry, containment support, and recovery verification.
+- The existing University **Cybersecurity Specialist** (`university_cybersecurity_specialist_v1`) is the deep-analysis specialist for difficult security cases, including prompt injection, indirect injection, malicious RAG/tool content, AI supply-chain risk, data-exfiltration paths, permission drift, security architecture, and forensic reasoning. Specialist expertise never grants authority.
+- **Self-Healing Supervisor** owns operational monitoring, correlation, routing, lifecycle coordination, bounded remediation handoff, and verification.
+- **Referee / Agent Gateway** remains the deterministic host authority boundary. Neither SHS, Guardian, COS, the Cybersecurity Specialist, learning, nor a security detector may reason around a Referee halt or mint a new permission.
+- **Stranger Agent** remains separately isolated for signed-scope blind adversarial assessment and must not inherit Guardian/SHS/COS/Enterprise Memory beyond the engagement manifest.
+
+This creates one security operating model rather than several competing systems:
+
+```text
+prevent -> detect -> monitor/correlate -> investigate -> authorize
+-> contain/repair -> verify -> keep monitoring -> learn
+```
+
+Implementation must reuse existing authentication, CSP/security headers, RLS, tenant isolation, Provider Hub capability mapping, MCP deny-by-default assignment, Agent Gateway governance, Referee scope, Guardian patrol, Supervisor coordination, evidence/audit, data-residency controls, and University Cybersecurity Specialist runtime. Add only the missing preventive/content-trust bridges. Do not duplicate an existing control merely to create a new security label.
+
+This section defines the canonical target architecture and invariants. It is **not** evidence that every Admission Shield or AI Security Gateway enforcement point is already Production-complete; completion claims require exact code paths, tests, and Production evidence.
+
 ## Permanent Self-Healing monitor navigation — 2026-09-11
 
 The signed-in Security navbar now names `/dashboard/cybersecurity` explicitly as the

@@ -1,2 +1,2 @@
-base_sha=de71f86d30ae02327097848c10edd9e3307d8bf7
-branch=fix/evaluator-wake-order-regression-20260925
+base_sha=399a87d40d4227d831508d2254472dbe95c8ed27
+branch=fix/universal-mcp-supabase-live-baseline-v2-20260925

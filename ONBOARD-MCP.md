@@ -178,3 +178,12 @@ The governed Playwright MCP runtime has a separate Production certificate path i
 - `tests/playwrightMcpProductionAcceptance.node.test.ts` is mandatory in `vercel-cos-gates.mjs`. A green build without that regression is not sufficient evidence.
 - The Production certificate cron is eligible every minute, but the route is idempotent per exact `VERCEL_GIT_COMMIT_SHA` plus deployment fingerprint and records the successful metadata-only receipt in `supervisor_audit_events`. Already-certified deployments skip the Sandbox, so fast-moving `main` gets prompt exact-deployment certification without repeatedly launching Chromium.
 - Playwright MCP may be called Production-certified only after an exact deployed revision records every required certificate check as passed. Generic portable-browser catalog entries remain production-disabled by default and do not independently grant browser authority.
+
+## Available-provider live baseline — 2026-09-25
+
+The Universal MCP baseline now certifies every provider that can be exercised without unresolved provider-side client approval.
+
+- Live baseline scope is GitHub MCP, Supabase MCP, and Context7 MCP.
+- Supabase is no longer treated as a pending credential provider: the workflow requires the repository-owned `SUPABASE_ACCESS_TOKEN`, fixes the target to project `qpblefwtnbivuusxmabv`, and performs a real project-scoped `list_tables` probe.
+- Figma MCP and Vercel MCP remain outside this green baseline only because their durable OAuth client approval/connection is externally pending. They remain fail-closed and remain mandatory for the separate full five-provider Universal MCP acceptance.
+- The available-provider baseline must never be described as full Universal MCP certification. Its purpose is to preserve live evidence for the providers that are presently actionable while keeping external provider blocks explicit.

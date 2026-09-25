@@ -1,5 +1,5 @@
 name: Universal MCP Baseline Live Acceptance
-# Live proof trigger: 2026-09-22 v2
+# Available-provider live proof: GitHub + Supabase + Context7.
 
 on:
   pull_request:
@@ -25,6 +25,8 @@ jobs:
     timeout-minutes: 10
     env:
       GITHUB_MCP_TOKEN: ${{ github.token }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_MCP_PROJECT_REF: qpblefwtnbivuusxmabv
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,7 +35,14 @@ jobs:
       - name: Install TypeScript runner
         working-directory: saas
         run: npm install --no-save --ignore-scripts tsx@4.20.6
-      - name: Certify GitHub and Context7 MCP live
+      - name: Require available-provider credentials
+        shell: bash
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN repository secret is required for the available-provider MCP baseline."
+            exit 1
+          fi
+      - name: Certify GitHub Supabase and Context7 MCP live
         working-directory: saas
         run: npx tsx scripts/mcp-gateway/run-universal-mcp-baseline-acceptance.ts
       - name: Upload metadata-only MCP evidence

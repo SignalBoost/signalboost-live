@@ -12,7 +12,7 @@ import { NextResponse } from 'next/server'
 import { provenanceBoundarySecret } from './lib/ai/cos/provenanceBoundarySecret.ts'
 import { proxy as baseProxy } from './proxyBase.ts'
 import { isFastTextTransform } from './lib/ai/cos/fastTextTransformIntent.ts'
-import { evaluateSecurityAdmission } from './lib/security/securityAdmissionShield.ts'
+import { evaluateSecurityAdmission, isShieldOnlyAiIngress } from './lib/security/securityAdmissionShield.ts'
 
 const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 const FAST_TRANSFORM_INTERNAL_HEADER = 'x-signalboost-fast-transform-internal'
@@ -93,6 +93,10 @@ export async function proxy(req: NextRequest) {
     )
   }
 
+  // Routes added to the matcher only for the Admission Shield continue exactly as before: they never
+  // entered proxyBase, so they must not start now.
+  if (isShieldOnlyAiIngress(pathname, req.method)) return NextResponse.next()
+
   // Every browser-delivered answer crosses the provenance wrapper. Call proxyBase first so the
   // existing anonymous spend limit and other ingress guards remain authoritative; only a successful
   // continuation/rewrite is replaced with the provenance-aware destination.
@@ -144,6 +148,24 @@ export const config = {
     '/api/cos-browser',
     '/api/support',
     '/api/cos-primary',
+    // Security Admission Shield only (see SHIELD_ONLY_AI_INGRESS_PATHS); these pass straight through.
+    '/api/builder',
+    '/api/cos-specialist',
+    '/api/cos/run',
+    '/api/cos-fast-transform',
+    '/api/cos-provenance-browser',
+    '/api/artifacts',
+    '/api/items/generate',
+    '/api/sites/generate',
+    '/api/outreach/analyze',
+    '/api/outreach/deck',
+    '/api/visuals',
+    '/api/assistant/feedback',
+    '/api/a2a/qualification-assessment',
+    '/api/a2a/reference-diagnostic',
+    '/api/a2a/reference-diagnostic-secondary',
+    '/api/a2a/reference-write-acceptance-primary',
+    '/api/a2a/reference-write-acceptance-secondary',
     '/api/cron/:path*',
     '/api/webhook/:path*',
     '/api/hub/webhooks/:path*',

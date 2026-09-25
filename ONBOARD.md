@@ -2159,3 +2159,16 @@ The base normalizer also self-heals two Production configuration hazards:
 A controlled HTTPS override remains supported only when it exposes the same `/<ID>/pg<ID>.txt` layout. Existing
 bounded result caps, explicit U.S.-rights verification, restricted-work vetoes, relevance/confidence gates,
 embedding, University study, and mass-distillation admission rules remain unchanged.
+
+
+### Project Gutenberg wrapped license-header repair (2026-09-25)
+
+Production full-text acquisition reached real Project Gutenberg files, but legitimate public-domain books were
+still rejected because the standard unrestricted U.S. license sentence is hard-wrapped across CRLF/newline
+boundaries (for example `with almost no restrictions\r\nwhatsoever`). The rights verifier now collapses
+whitespace in the ebook-specific preamble before matching rights language.
+
+This normalization applies only to the preamble before the Gutenberg START marker. Explicit copyrighted,
+permission-only, or restricted-work markers remain fail-closed and still override catalog/OPDS rights metadata.
+The dedicated Production regression uses a real hard-wrapped CRLF header shape and separately proves that a
+wrapped restriction marker is still rejected.

@@ -15,7 +15,7 @@ function safeCode(value: unknown): string | null {
 export function createDurableMcpGatewayAuditPort(): PortableConnectorAuditPort {
   return Object.freeze({
     async append(event: PortableConnectorAuditEvent) {
-      const { cosServiceDb } = await import('../lib/cos-core/storage/supabase.ts')
+      const { cosServiceDb } = await import('../lib/cos-core/storage/service-db.ts')
       const db = cosServiceDb()
       if (!db) throw new Error('mcp_gateway_audit_database_unavailable')
       const { error } = await db.from('provider_hub_mcp_audit').insert({

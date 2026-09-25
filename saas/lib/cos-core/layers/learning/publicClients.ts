@@ -72,6 +72,12 @@ const PROJECT_GUTENBERG_BOOTSTRAP:ReadonlyArray<ProjectGutenbergCandidate & {ter
   {id:15114,title:'An Investigation of the Laws of Thought',authors:['George Boole'],terms:'logic reasoning probability mathematics boolean computing foundations',discoveryEvidence:['discovery:local_bootstrap_catalog']},
   {id:3300,title:'An Inquiry into the Nature and Causes of the Wealth of Nations',authors:['Adam Smith'],terms:'economics markets political economy labor trade finance',discoveryEvidence:['discovery:local_bootstrap_catalog']},
   {id:36525,title:'Notes on Recent Researches in Electricity and Magnetism',authors:['J. J. Thomson'],terms:'electricity magnetism physics research waves currents',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:22062,title:'The Mathematicall Praeface to Elements of Geometrie of Euclid of Megara',authors:['John Dee'],terms:'geometry geometrie mathematics mathematical algebra foundations',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:78112,title:'Astronomy for beginners',authors:['Hereward Carrington'],terms:'astronomy stars planets telescope observation celestial physics',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:14725,title:'Treatise on light',authors:['Christiaan Huygens'],terms:'optics light refraction reflection wave physics',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:78610,title:'Reflections on the motive power of heat',authors:['Sadi Carnot','William Thomson Kelvin'],terms:'thermodynamics heat energy engines physics machines',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:49445,title:'Mechanics: The Science of Machinery',authors:['A. Russell Bond'],terms:'mechanics dynamics physics engineering machines machinery',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:57120,title:'The Economy of Workshop Manipulation',authors:['John Richards'],terms:'engineering mechanics machines machinery workshop manufacturing',discoveryEvidence:['discovery:local_bootstrap_catalog']},
 ])
 
 function projectGutenbergBootstrapCandidates(query:string,bounded:number):ProjectGutenbergCandidate[]{

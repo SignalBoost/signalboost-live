@@ -18,25 +18,25 @@ test('RunPod v2 exact-artifact repair verifies materialized endpoint identity in
   assert.match(repair, /PORT_HEALTH/)
 })
 
-test('repair remains fail-closed on cost and GPU policy before any v2 endpoint mutation', () => {
-  const safetyIndex = repair.indexOf('assertEndpointSafetyPolicy(endpoint)')
-  const patchIndex = repair.indexOf("method: 'PATCH'")
-  assert.ok(safetyIndex >= 0 && patchIndex > safetyIndex)
+test('repair remains fail-closed on cost and GPU policy around native v2 endpoint mutation', () => {
+  assert.match(repair, /assertNonGpuEndpointSafetyPolicy\(endpoint, idleTimeoutSeconds\)/)
   assert.match(repair, /workers\?\.min/)
   assert.match(repair, /workers\?\.max/)
   assert.match(repair, /workers\?\.idleTimeout/)
   assert.match(repair, /gpu\?\.count/)
   assert.match(repair, /APPROVED_POOLS/)
-  assert.match(repair, /\/serverless\/\$\{encodeURIComponent\(endpoint\.id\)\}/)
-  assert.match(repair, /JSON\.stringify\(\{ templateId: template\.id \}\)/)
+  assert.match(repair, /nativeV2EndpointConfig/)
+  assert.match(repair, /requestV2<Endpoint>\('\/serverless', \{/)
+  assert.match(repair, /method: 'POST'/)
+  assert.match(repair, /method: 'PATCH'/)
   assert.match(repair, /mass_distilled_runtime_materialized_identity_mismatch/)
 })
 
-test('legacy creator is preserved and only the obsolete template-link mismatch enters compatibility repair', () => {
-  assert.match(repair, /provisionLegacyMassDistilledRuntime/)
-  assert.match(repair, /mass_distilled_runtime_endpoint_template_mismatch/)
-  assert.match(repair, /mass_distilled_runtime_endpoint_template_rebind_failed/)
-  assert.match(repair, /throw error/)
+test('native v2 provisioning is independent of the legacy v1 template index', () => {
+  assert.doesNotMatch(repair, /provisionLegacyMassDistilledRuntime/)
+  assert.doesNotMatch(repair, /includeEndpointBoundTemplates/)
+  assert.match(repair, /nativeV2Inline: true/)
+  assert.match(repair, /massDistilledRuntimeInlineContainer/)
   assert.match(route, /runpodMassDistilledProvisionV2/)
   assert.match(route, /productionTrafficAuthorized:false/)
   assert.doesNotMatch(route, /productionTrafficAuthorized:true/)

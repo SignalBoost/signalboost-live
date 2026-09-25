@@ -7,13 +7,16 @@ export type PlatformModelTransportBinding = Readonly<{
   provider: string
   endpoint: string | null
   credentialEnv: string | null
+  credentialRef: string | null
   apiVersion: string | null
   timeoutMs: number
+  maxCallCostUsd: number
 }>
 
 const KEY = /^[a-z0-9][a-z0-9._-]{1,119}$/
 const PROVIDER = /^[a-z0-9][a-z0-9._-]{0,79}$/
 const ENV_NAME = /^[A-Z][A-Z0-9_]{1,127}$/
+const CREDENTIAL_REF = /^model-vault:[0-9a-f-]{36}$/
 const PROTOCOLS: readonly ModelTransportProtocol[] = Object.freeze([
   'openai_compatible', 'anthropic_messages', 'google_generate_content',
   'native_sdk', 'local_runtime', 'custom_http',
@@ -51,18 +54,25 @@ export function parseModelTransportBindings(rawJson: string | undefined): readon
     const provider = String(row.provider || '').trim().toLowerCase()
     const credentialEnvRaw = String(row.credentialEnv || '').trim()
     const credentialEnv = credentialEnvRaw || null
+    const credentialRefRaw = String(row.credentialRef || '').trim()
+    const credentialRef = credentialRefRaw || null
     const apiVersion = String(row.apiVersion || '').trim().slice(0, 80) || null
     if (!KEY.test(profileKey) || !PROTOCOLS.includes(protocol) || !PROVIDER.test(provider)) {
       throw new Error('platform_model_transport_binding_identity_invalid')
     }
     if (credentialEnv && !ENV_NAME.test(credentialEnv)) throw new Error('platform_model_transport_credential_env_invalid')
+    if (credentialRef && !CREDENTIAL_REF.test(credentialRef)) throw new Error('platform_model_transport_credential_ref_invalid')
+    if (credentialEnv && credentialRef) throw new Error('platform_model_transport_credential_source_ambiguous')
     const endpoint = optionalHttpsEndpoint(row.endpoint)
     if (protocol === 'openai_compatible' && !endpoint) throw new Error('platform_model_transport_endpoint_required')
     const identity = `${profileKey}:${protocol}`
     if (identities.has(identity)) throw new Error('platform_model_transport_binding_duplicate')
     identities.add(identity)
+    const maxCallCostUsdRaw = Number(row.maxCallCostUsd ?? 0)
+    if (!Number.isFinite(maxCallCostUsdRaw) || maxCallCostUsdRaw < 0 || maxCallCostUsdRaw > 10_000) throw new Error('platform_model_transport_cost_ceiling_invalid')
     out.push(Object.freeze({
-      profileKey, protocol, provider, endpoint, credentialEnv, apiVersion, timeoutMs: boundedTimeout(row.timeoutMs),
+      profileKey, protocol, provider, endpoint, credentialEnv, credentialRef, apiVersion,
+      timeoutMs: boundedTimeout(row.timeoutMs), maxCallCostUsd: maxCallCostUsdRaw,
     }))
   }
   return Object.freeze(out)

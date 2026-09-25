@@ -21,6 +21,7 @@ import {
   MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
   MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  MASS_EVALUATION_REMEDIATION_REPLAY_MIN_ITEMS,
   MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS,
   MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
@@ -215,7 +216,7 @@ function isRemediationReplayReceipt(intendedUse: unknown): boolean {
   const receipt = (intendedUse as any).trainingReceipt
   return Boolean(receipt && typeof receipt === 'object'
     && receipt.failureDerivedReplayRequired === true
-    && Number(receipt.failureDerivedReplayItems) > 0
+    && Number(receipt.failureDerivedReplayItems) >= MASS_EVALUATION_REMEDIATION_REPLAY_MIN_ITEMS
     && Number(receipt.failureDerivedReplayEpochs) >= MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS
     && Number(receipt.failureDerivedReplayLearningRate) >= MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE)
 }

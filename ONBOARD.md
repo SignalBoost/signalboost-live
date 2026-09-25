@@ -2172,3 +2172,28 @@ This normalization applies only to the preamble before the Gutenberg START marke
 permission-only, or restricted-work markers remain fail-closed and still override catalog/OPDS rights metadata.
 The dedicated Production regression uses a real hard-wrapped CRLF header shape and separately proves that a
 wrapped restriction marker is still rejected.
+
+
+### COS learning continuity false-RED pagination repair (2026-09-25)
+
+The owner received a continuity email reporting **RED — 5 of the last 7 days retained nothing**, with
+`Corpus: 1000`, even though Production was actively retaining thousands of documents. Live database proof at the
+time showed **46,096** retained rows total, **2,819** retained in the preceding 24 hours across **79** subjects, and
+fresh retention within minutes.
+
+Root cause: `learningContinuityReport.ts` requested up to 5,000 newest corpus rows in one PostgREST query, but the
+Production Supabase API returned only its server-side maximum of **1,000 rows**. The continuity classifier then
+built seven calendar-day buckets from that truncated newest-only sample. Older days absent from the sample were
+incorrectly treated as true zero-retention days, manufacturing a RED condition and a misleading corpus total.
+
+The shared continuity reader now:
+- reads `cos_continuous_learning` in explicit **1,000-row pages** using `.range(from,to)`;
+- continues until a short page proves the effective corpus has been exhausted;
+- preserves the existing relevance-rejected filter and created-at semantics;
+- fails closed with an explicit read error if a bounded **250,000-row** paging ceiling is ever reached instead of
+  classifying a truncated corpus;
+- leaves all continuity severity thresholds unchanged.
+
+A mandatory Production regression simulates a Supabase server that caps every response at 1,000 rows while the
+true corpus contains 3,150 retained rows across all seven days. The reader must reconstruct all 3,150 rows and the
+existing strict classifier must report zero silent days and GREEN.

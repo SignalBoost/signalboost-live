@@ -23,12 +23,14 @@ test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-bal
 })
 
 test('runtime wake is bounded and hands cold-start readiness back to the evaluator', () => {
-  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 150_000/)
+  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 15_000/)
   assert.match(route, /name !== 'TimeoutError' && name !== 'AbortError'/)
   assert.match(route, /wakeRequestTimedOut: true/)
   assert.match(route, /responseObserved: false/)
-  // Guard against the previous five-minute regression without repeating the declaration token; the repository
-  // targeting scanner intentionally flags repeated declaration-like identifiers even when they appear in tests.
+  // The initial trigger must stay shorter than the evaluator-owned readiness window so the two phases
+  // cannot recreate the sequential 150s + 280s Production stall.
+  assert.match(evaluator, /const READY_TIMEOUT_MS = 280_000/)
+  assert.doesNotMatch(route, /150_000/)
   assert.doesNotMatch(route, /300_000/)
 })
 

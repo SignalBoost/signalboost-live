@@ -1,2 +1,2 @@
-base_sha=4f3e48055fc735f30c26e2133eb2c2c0602e81be
-branch=fix/security-gates-strip-order-20260925
+base_sha=c3023ad13b00b7760a1c106a9584bbe28eed47cd
+branch=fix/evaluation-cold-start-double-wait-20260925

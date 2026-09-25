@@ -36,10 +36,10 @@ export const UNIVERSAL_MCP_PROVIDER_CERTIFICATIONS: readonly UniversalMcpProvide
   }),
   Object.freeze({
     providerId: 'vercel-mcp',
-    state: 'certified',
-    evidence: 'vercel_preview_live_acceptance',
-    observedAt: '2026-09-22T17:12:42Z',
-    detail: 'Exact governed projection and real project-read probe passed in an isolated Vercel Preview.',
+    state: 'blocked_external',
+    evidence: 'provider_client_approval_pending',
+    observedAt: '2026-09-25',
+    detail: 'A prior isolated Preview proved the governed Vercel MCP project-read path, but durable Production OAuth is not accepted until Vercel allowlists the iTMounts client/redirect URI and a host-owned refreshable OAuth connection is available.',
   }),
   Object.freeze({
     providerId: 'figma-mcp',

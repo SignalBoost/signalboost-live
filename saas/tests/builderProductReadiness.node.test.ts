@@ -44,7 +44,8 @@ test('five separate create/run trials and five real fail/repair/pass variants', 
       action('run', { command: 'node --test math.test.js' }),
     ]), workspace, realNode).run({ objective: 'Fix the failing math test.', workspaceId: `repair-${n}` })
     assert.equal(repair.ok, true, JSON.stringify(repair))
-    assert.deepEqual(repair.trace.map(step => step.ok), [false, true, true])
+    assert.deepEqual(repair.trace.map(step => step.ok), [false, true, true, true])
+    assert.deepEqual(repair.trace.map(step => step.toolId), ['run', 'read_file', 'edit_file', 'run'])
   }
 })
 

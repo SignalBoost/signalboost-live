@@ -173,7 +173,7 @@ test('backlog pause admits only one full remediation campaign and keeps general 
   const migration = source('../supabase/migrations/20260925154847_university_remediation_backlog_exception.sql')
 
   assert.match(auth, /authorizeNextUniversityMassDistillationRemediationCampaign/)
-  assert.match(auth, /authorize_next_cos_university_mass_distillation_remediation_campaign/)
+  assert.match(auth, /authorize_next_cos_university_remediation_campaign/)
   assert.match(workflow, /backlogPaused[\s\S]*authorizeNextUniversityMassDistillationRemediationCampaign\(\)/)
   assert.match(workflow, /remediationOnly: true/)
   assert.match(workflow, /generalCampaignAuthorizationPaused: true/)
@@ -189,4 +189,16 @@ test('backlog pause admits only one full remediation campaign and keeps general 
   assert.match(migration, /authorityExpanded',false/)
   assert.match(migration, /revoke all on function public\.authorize_next_cos_university_mass_distillation_remediation_campaign\(\)/)
   assert.match(migration, /grant execute on function public\.authorize_next_cos_university_mass_distillation_remediation_campaign\(\)[\s\S]*to service_role/)
+})
+
+
+test('remediation RPC identifier remains inside PostgreSQL 63-byte identifier limit', () => {
+  const auth = source('../lib/ai/cos/cosUniversityMassDistillationRollingAuthorization.ts')
+  const forward = source('../supabase/migrations/20260925170000_shorten_university_remediation_rpc_name.sql')
+  const rpc = 'authorize_next_cos_university_remediation_campaign'
+  assert.ok(Buffer.byteLength(rpc, 'utf8') <= 63)
+  assert.match(auth, new RegExp(rpc))
+  assert.match(forward, /rename to authorize_next_cos_university_remediation_campaign/)
+  assert.match(forward, /revoke all on function public\.authorize_next_cos_university_remediation_campaign\(\)/)
+  assert.match(forward, /grant execute on function public\.authorize_next_cos_university_remediation_campaign\(\)[\s\S]*to service_role/)
 })

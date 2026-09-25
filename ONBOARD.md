@@ -2079,3 +2079,14 @@ full proof contract, the compactor performs zero retirements and reports
 `no_proven_superseded_mass_artifacts`. The cron is also a first-class University Production-assurance path
 (`mass_backlog_compaction`) and writes a host Production receipt on zero-retirement, retirement, and failure
 outcomes; operational compaction therefore cannot silently disappear from Production verification.
+
+
+### Mass evaluator DeepInfra spend reservation repair (2026-09-25)
+
+The exact-artifact mass evaluator intentionally uses **four independent DeepInfra judge calls**—holdout,
+safety, transfer, and retention. Harness provider-cost enforcement therefore uses the dedicated
+`mass_distilled_evaluation` spend class: **$0.10 maximum per judge call and $0.40 maximum per evaluation run**.
+Each judge call must declare `maxEstimatedCostUsd` before dispatch. The RunPod runtime wake/canary ceiling remains
+separately bounded by the signed evaluation claim at **<= $0.20**; this repair does not expand runtime wake,
+endpoint-call, scoring, promotion, or Production-traffic authority. A missing reservation fails closed before
+DeepInfra is called.

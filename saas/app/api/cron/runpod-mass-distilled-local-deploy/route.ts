@@ -157,13 +157,8 @@ async function issueRollingCanaryApproval(now:Date){
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
       .eq('status','evaluation_pending')
       .like('candidate_id','mass:%')
-      .contains('intended_use',{trainingReceipt:{
-        optimizer:MASS_CANARY_BUILDER_V2_OPTIMIZER,
-        frontierResponseAnchorRequired:true,
-        frontierResponseAnchorEpochs:1,
-      }})
-      .order('created_at',{ascending:true})
-      .limit(500),
+      .order('created_at',{ascending:false})
+      .limit(1000),
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
       .eq('subject_id','Computer Science & Coding')

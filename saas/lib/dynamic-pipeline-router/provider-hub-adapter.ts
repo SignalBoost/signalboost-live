@@ -25,6 +25,7 @@ export function dynamicPipelineCandidatesFromProviderHub(
       estimatedUnitCostUsd:metadata.estimatedUnitCostUsd==null?null:num(metadata.estimatedUnitCostUsd,0),
       estimatedLatencyMs:metadata.estimatedLatencyMs==null?null:num(metadata.estimatedLatencyMs,0),
       environments:Object.freeze([capability.environmentId]),
+      dataResidencyZones:capability.dataResidencyZones,
       metadata:Object.freeze({
         tenantId:capability.tenantId,
         connectionId:capability.connectionId,

@@ -17,6 +17,9 @@ export interface PortableCapabilityDescriptor {
   availability: PortableCapabilityAvailability
   requiresApproval: boolean
   scopes: readonly string[]
+  // Declares every zone in which sensitive payloads may be handled by this capability.
+  // Optional for backwards compatibility; residency-constrained routing rejects missing declarations.
+  dataResidencyZones?: readonly string[]
   inputSchemaId?: string
   outputSchemaId?: string
   healthCheckedAt?: string
@@ -74,6 +77,9 @@ export function createPortableCapabilityDescriptor(input: Omit<PortableCapabilit
     tenantId: required(input.tenantId, 'tenantId'),
     environmentId: required(input.environmentId, 'environmentId'),
     scopes: unique(input.scopes),
+    dataResidencyZones: input.dataResidencyZones
+      ? Object.freeze([...new Set(input.dataResidencyZones.map(value => required(value, 'dataResidencyZone')))])
+      : undefined,
     healthCheckedAt: input.healthCheckedAt ? new Date(input.healthCheckedAt).toISOString() : undefined,
     metadata: input.metadata ? Object.freeze({ ...input.metadata }) : undefined,
   }

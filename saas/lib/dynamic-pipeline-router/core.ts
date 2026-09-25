@@ -18,6 +18,9 @@ export interface DynamicPipelineCandidate {
   readonly estimatedUnitCostUsd?: number | null
   readonly estimatedLatencyMs?: number | null
   readonly environments?: readonly string[]
+  // Every zone where the payload may be processed, logged, cached, or persisted.
+  // When a workload carries a residency constraint, undeclared zones fail closed.
+  readonly dataResidencyZones?: readonly string[]
   readonly metadata?: Readonly<Record<string, string | number | boolean | null>>
 }
 
@@ -25,6 +28,8 @@ export interface DynamicPipelineWorkload {
   readonly workloadId: string
   readonly capabilityId: string
   readonly environment?: string
+  readonly allowedDataResidencyZones?: readonly string[]
+  readonly requireDeclaredDataResidency?: boolean
   readonly allowedProviderIds?: readonly string[]
   readonly preferredProviderIds?: readonly string[]
   readonly excludedProviderIds?: readonly string[]
@@ -108,6 +113,7 @@ export function createDynamicPipelineCandidate(input: DynamicPipelineCandidate):
     estimatedUnitCostUsd,
     estimatedLatencyMs,
     environments: input.environments ? unique(input.environments) : undefined,
+    dataResidencyZones: input.dataResidencyZones ? unique(input.dataResidencyZones) : undefined,
     metadata,
   })
 }
@@ -118,6 +124,14 @@ function compatible(request: DynamicPipelineWorkload, candidate: DynamicPipeline
   if(!candidate.capabilityIds.includes(request.capabilityId)) return false
   if(candidate.activeLeases>=candidate.maxConcurrency) return false
   if(request.environment && candidate.environments?.length && !candidate.environments.includes(request.environment)) return false
+  if(request.requireDeclaredDataResidency===true && !candidate.dataResidencyZones?.length) return false
+  if(request.allowedDataResidencyZones?.length){
+    if(!candidate.dataResidencyZones?.length) return false
+    const allowedZones=new Set(request.allowedDataResidencyZones)
+    // A candidate is compatible only when every place it may handle the payload is authorized.
+    // Merely having one EU region is insufficient if the provider may also process it in the US.
+    if(candidate.dataResidencyZones.some(zone=>!allowedZones.has(zone))) return false
+  }
   if(request.allowedProviderIds?.length && !request.allowedProviderIds.includes(candidate.providerId)) return false
   if(request.excludedProviderIds?.includes(candidate.providerId)) return false
   if(request.excludedPipelineIds?.includes(candidate.pipelineId)) return false
@@ -132,7 +146,12 @@ export function rankDynamicPipelineCandidates(
 ): readonly RankedDynamicPipeline[] {
   const workloadId=required(request.workloadId,'workload_id')
   const capabilityId=required(request.capabilityId,'capability_id')
-  const normalized={...request,workloadId,capabilityId}
+  const normalized={
+    ...request,
+    workloadId,
+    capabilityId,
+    allowedDataResidencyZones: request.allowedDataResidencyZones ? unique(request.allowedDataResidencyZones) : undefined,
+  }
   return Object.freeze(candidates
     .map(createDynamicPipelineCandidate)
     .filter(candidate=>compatible(normalized,candidate))

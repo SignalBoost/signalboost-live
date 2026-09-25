@@ -1928,6 +1928,10 @@ Non-negotiable:
 - owner/admin routes remain server-gated;
 - cron routes remain protected;
 - preserve tenant/org scoping and RLS/service-role assumptions;
+- sensitive or personal data may use only providers/capabilities that explicitly declare every processing, logging, caching, and persistence zone and fit the tenant's persisted residency allowlist;
+- residency-constrained sensitive workloads fail closed when provider residency is unknown, undeclared, mixed with a disallowed zone, or otherwise outside the tenant policy;
+- tenant residency policy is explicit host authority and must not be inferred from IP address, locale, language, or model reasoning;
+- contractual or legal transfer-basis metadata is audit evidence only and never widens the runtime residency allowlist;
 - no unauthenticated Production validation backdoors;
 - external/managed providers never become governance authority;
 - unknown/consequential/destructive/financial/security actions fail closed or require the applicable approval boundary;

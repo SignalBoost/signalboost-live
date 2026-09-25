@@ -1,2 +1,2 @@
-base_sha=d7979b46a3d4d48297b834fb60f57518afbfe7ad
-branch=fix/strong-replay-daily-cap-regression-20260925
+base_sha=017e23f343768601463a1df38b56babfddcd353e
+branch=feat/data-residency-governance-20260925

@@ -36,6 +36,8 @@ export const MASS_EVALUATION_MAX_IN_FLIGHT = 2
 export const MASS_EVALUATION_FRONTIER_PROOF_SAMPLE = 4
 export const MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE = 2
 export const MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE = 2
+export const MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS = 3
+export const MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE = 5e-5
 export const MASS_EVALUATION_BUILDER_V2_OPTIMIZER = 'frontier_response_anchor_then_stable_on_policy_distillation' as const
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact

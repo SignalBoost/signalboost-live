@@ -133,3 +133,39 @@ test('new v4 templates recover delayed provider id visibility without duplicate 
   const provisionBody = provision.slice(provisionStart)
   assert.equal((provisionBody.match(/requestV1<Template>\('\/templates',\{method:'POST'/g) || []).length, 1)
 })
+
+
+test('approved canary explicitly warm-starts exactly one worker then restores scale-to-zero before proof', () => {
+  assert.match(compatibility, /export async function activateMassDistilledCanaryWorker/)
+  assert.match(compatibility, /workers: \{ min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
+  assert.match(compatibility, /export async function deactivateMassDistilledCanaryWorker/)
+  assert.match(compatibility, /workers: \{ min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
+
+  const invocation = route.indexOf('claim:INVOCATION_STARTED')
+  const activate = route.indexOf('activateMassDistilledCanaryWorker(provisioned.endpointId)')
+  const canary = route.indexOf('canaryMassDistilledRuntime({endpointId:provisioned.endpointId')
+  const deactivate = route.indexOf('deactivateMassDistilledCanaryWorker(provisioned.endpointId)')
+  const scaleDownGate = route.indexOf('if(scaleDownError)')
+  const canonicalPass = route.indexOf('recordFineTuneCanary({candidateId:runtimeArtifact.candidateId')
+
+  assert.ok(invocation >= 0)
+  assert.ok(activate > invocation, 'paid worker activation must happen only after durable invocation evidence')
+  assert.ok(canary > activate, 'inference canary must run only after explicit worker activation')
+  assert.ok(deactivate > canary, 'worker must be restored after the canary')
+  assert.ok(scaleDownGate > deactivate, 'scale-down failure must be checked')
+  assert.ok(canonicalPass > scaleDownGate, 'canonical healthy proof must be written only after successful scale-down')
+  assert.match(route, /mass_distilled_canary_scale_down_failed/)
+  assert.match(route, /explicitWorkerWarmStart:true/)
+})
+
+test('explicit canary warm-start never widens worker count, GPU pools, promotion, or Production traffic authority', () => {
+  const activateStart = compatibility.indexOf('export async function activateMassDistilledCanaryWorker')
+  const deactivateStart = compatibility.indexOf('export async function deactivateMassDistilledCanaryWorker')
+  const block = compatibility.slice(activateStart, compatibility.indexOf('/** Restore the exact endpoint', activateStart))
+  assert.match(block, /min: 1, max: 1/)
+  assert.doesNotMatch(block, /max: [2-9]/)
+  assert.match(block, /canaryEndpointPools\(endpoint\)/)
+  assert.match(block, /CANARY_APPROVED_POOLS\.includes/)
+  assert.ok(deactivateStart > activateStart)
+  assert.doesNotMatch(route, /productionTrafficAuthorized:true|automaticPromotionAuthorized:true/)
+})

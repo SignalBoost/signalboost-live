@@ -15,6 +15,7 @@ import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { runpodServerlessOpenAiBaseUrl, runpodServerlessRootUrl } from './runpodServerlessDistilledProvision.ts'
 import { massDistilledRuntimeHealth } from './runpodMassDistilledProvisionV2.ts'
 import { fineTuneRevisionKey, type FineTuneRevision } from './cosUniversityFineTuneEvidence.ts'
+import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from '../modelCapabilityRegistry.ts'
 import {
   COS_UNIVERSITY_INDEPENDENT_EVALUATOR_PROFILE,
   independentEvaluatorConfigFromEnv,
@@ -24,7 +25,7 @@ import {
 
 export const COS_MASS_DISTILLED_EVALUATOR_VERSION = 'cos-mass-distilled-exact-artifact-evaluator-v2' as const
 export const MASS_DISTILLED_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
-const BASE_MODEL_ID = 'Qwen/Qwen3-4B'
+const BASE_MODEL_ID = CURRENT_UNIVERSITY_STUDENT_PROFILE.modelId
 const HEX40 = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40})#([A-Za-z0-9_.-]+)$/i

@@ -8,10 +8,11 @@ import { createHash } from 'node:crypto'
 import type { cosServiceDb as CosServiceDbFactory } from '@/lib/cos-core/storage/supabase'
 import { classifyCosUniversitySubjects, cosUniversitySubjectById, type CosUniversitySubjectId } from './cosUniversity.ts'
 import { planHybridDistillationMix, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
+import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from '../modelCapabilityRegistry.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const
 export const MASS_DISTILLATION_SOURCE_POLICY = 'public_domain_cc0_v1' as const
-export const MASS_DISTILLATION_STUDENT_MODEL = 'Qwen/Qwen3-4B' as const
+export const MASS_DISTILLATION_STUDENT_MODEL = CURRENT_UNIVERSITY_STUDENT_PROFILE.modelId
 export const MASS_DISTILLATION_MIN_CONFIDENCE = 0.80
 // Historical/structural minimum retained for legacy evidence compatibility.
 export const MASS_DISTILLATION_MIN_BATCH = 20

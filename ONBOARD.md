@@ -2332,3 +2332,13 @@ existing strict classifier must report zero silent days and GREEN.
 - Phase 2a landed the shared `cos-university-xsa-runtime.py` projection module. It applies XSA per attention head immediately before `o_proj`, uses the actual in-forward `v_proj` tensor (so QLoRA dropout is not recomputed), and explicitly handles Qwen3 grouped-query attention. The HF worker can fetch only this capability-token-protected source and validates contract markers/profile before import. This training-side runtime remains inert while rollout is 0%.
 - The current exact-artifact RunPod evaluator still serves through native vLLM and therefore **must not accept an XSA artifact yet**. `xsaServingRuntimeImplemented=false` remains durable evidence until the corresponding vLLM/Transformers serving path passes identical-forward tests. Non-zero rollout remains fail-closed until that flag can truthfully become true.
 - XSA does not expand authority, training rights, data residency scope, provider budget, or promotion permissions. Self-Healing may detect and recover XSA runtime failures, but it must not enable XSA, increase rollout, weaken evaluation, or substitute standard attention for an artifact whose receipt requires XSA.
+
+## Platform-wide Model Portability / Capability Registry invariant — 2026-09-25
+
+- **Model portability is platform-wide, not University-only.** The canonical registry is `saas/lib/ai/modelCapabilityRegistry.ts`; COS, Builder, specialists, University, inference routing and serving adapters may consume it.
+- The saleable product must not depend on Qwen, OpenAI, Anthropic, Google, vLLM, or any single model/provider family. `openai_compatible` is only one optional transport protocol alongside `anthropic_messages`, `google_generate_content`, `native_sdk`, `local_runtime`, and `custom_http`.
+- Buyer deployments may register additional model profiles through server-only `ITMOUNTS_MODEL_REGISTRY_JSON`. Invalid, duplicate or unsupported declarations fail closed.
+- Capabilities are explicit (`validated`, `experimental`, `blocked`, `not_validated`) and are never inferred from model names. A consuming subsystem may use a capability only when its policy requires and the selected profile is validated for that surface.
+- Cross-model fallback is never implicit. Switching model family/revision is a governed routing decision; absence of one optimization must fall back to the same model's ordinary supported path or fail safely, not silently choose another model.
+- The current Qwen3-4B University student remains unchanged. It is now a registered profile, not a permanent architectural dependency.
+- The full portability contract is `docs/PLATFORM-MODEL-PORTABILITY-CONTRACT-2026-09-25.md`.

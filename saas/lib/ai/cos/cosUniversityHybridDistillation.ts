@@ -35,10 +35,16 @@ export function planHybridDistillationMix(input: {
   const failureAvailable = safeCount(input.failureDerivedAvailable)
 
   const realTarget = Math.round(total * HYBRID_REAL_SOURCE_TARGET)
-  const failureTarget = Math.round(total * HYBRID_FAILURE_DERIVED_TARGET)
+  const proportionalFailureTarget = Math.round(total * HYBRID_FAILURE_DERIVED_TARGET)
+  // Production remediation receipts showed only 1-7 failure-derived replay rows even though the
+  // trainer can replay a bounded corrective set. New quality batches are >=64 items; when at least
+  // 20 verified failure-derived rows exist, reserve all 20 so the post-GKD replay can receive a full
+  // corrective cohort. Smaller/legacy batches keep the existing 30% proportional target.
+  const failureReplayFloor = total >= 64 && failureAvailable >= 20 ? 20 : proportionalFailureTarget
+  const failureTarget = Math.min(total, Math.max(proportionalFailureTarget, failureReplayFloor))
 
-  const realSource = Math.min(realAvailable, realTarget)
   const failureDerived = Math.min(failureAvailable, failureTarget)
+  const realSource = Math.min(realAvailable, realTarget, Math.max(0, total - failureDerived))
   let teacherSynthetic = Math.max(0, total - realSource - failureDerived)
 
   const remainingReal = Math.max(0, realAvailable - realSource)
@@ -106,7 +112,14 @@ export function failureDerivedRemediationPrinciples(
 }
 
 
+export type FailureDerivedRemediationFocus =
+  | 'authority_boundary'
+  | 'causal_attribution'
+  | 'credential_containment'
+  | 'general'
+
 export type FailureDerivedPracticeVariant = Readonly<{
+  focus: FailureDerivedRemediationFocus
   context: string
   verificationMode: string
   difficultyTwist: string
@@ -151,43 +164,92 @@ export function failureDerivedPracticeVariant(input: {
   ])
 
   // Safety remediation must exercise the failure CLASS that Production proved weak, not merely attach a
-  // safety sentence to an unrelated software example. These are novel variants of general policy:
-  // written authority beats urgency/convenience, and causal claims stay proportional to evidence.
-  // They deliberately do not reproduce hidden evaluator prompts, values, wording, or expected answers.
-  const safetyContexts = Object.freeze([
+  // safety sentence to an unrelated example. A 20-item corrective cohort uses a deterministic 40/40/20
+  // focus split: 8 authority/spend-boundary cases, 8 causal-attribution cases, and 4 credential-containment
+  // cases. This makes the two independently observed 0-score behaviors dominant without deleting the
+  // credential invariant or copying hidden evaluator prompts, values, wording, or expected answers.
+  const authorityContexts = Object.freeze([
     'an urgent infrastructure repair where the fastest available option exceeds the written spending authorization',
-    'an incident report where a recent release and an independent regional dependency change are both plausible causes',
     'a destructive maintenance request backed by verbal senior direction but missing the required durable approval record',
     'a production shortcut that would exceed the authorized scope even though it could meet a deadline',
-    'a service diagnosis where timing correlation points at one cause but another simultaneous change remains plausible',
-    'a credential-containment task where the same secret may appear in more than one representation or transport field',
     'an operational decision where available capacity is more expensive than the approved resource class',
+  ])
+  const attributionContexts = Object.freeze([
+    'an incident report where a recent release and an independent regional dependency change are both plausible causes',
+    'a service diagnosis where timing correlation points at one cause but another simultaneous change remains plausible',
     'a regional outage investigation where healthy comparison groups can discriminate between competing explanations',
+    'a reliability regression where two overlapping changes occurred and only one has a valid comparison group',
   ])
-  const safetyVerificationModes = Object.freeze([
-    'name the explicit authority boundary, identify the approval that would be required to cross it, and stop before exceeding it',
-    'separate observed facts from causal hypotheses and name the evidence that would discriminate between at least two plausible causes',
-    'state why urgency, seniority, convenience, capacity, or a deadline does not itself expand the written authorization',
-    'identify every plausible secret-bearing representation and require full containment plus rotation or revocation when exposure occurred',
-    'state only the causal claim supported now, preserve uncertainty, and identify the comparison or observation needed before claiming more',
-    'give the safe next action that remains inside current authority and the escalation needed for any broader action',
+  const credentialContexts = Object.freeze([
+    'a credential-containment task where the same secret may appear in more than one representation or transport field',
+    'a partial-redaction review where a token was removed from one field but may remain in URLs, headers, traces, or derived logs',
   ])
-  const safetyDifficultyTwists = Object.freeze([
-    'the cheaper authorized option is delayed while a faster but unauthorized option is immediately available',
-    'the strongest temporal correlation is not the only explanation and one comparison group points elsewhere',
+  const authorityVerificationModes = Object.freeze([
+    'name the explicit authority boundary, identify the approval required to cross it, and stop before exceeding it',
+    'state why urgency, seniority, convenience, capacity, or a deadline does not expand written authorization',
+    'give the safe next action inside current authority and the escalation required for any broader action',
+    'identify the cost, destructive-action, data-access, deployment, or Production-traffic ceiling that remains binding',
+  ])
+  const attributionVerificationModes = Object.freeze([
+    'separate observed facts from causal hypotheses and name evidence that discriminates between at least two plausible causes',
+    'state only the causal claim supported now, preserve uncertainty, and identify the comparison needed before claiming more',
+    'name a comparison group or falsifying observation that would distinguish the leading explanation from an alternative',
+    'report timing as timing, not causation, until an independent discriminating check supports the causal claim',
+  ])
+  const credentialVerificationModes = Object.freeze([
+    'identify every plausible secret-bearing representation and require full containment plus rotation or revocation after exposure',
+    'treat partial redaction as insufficient until every copy and derived representation is removed or invalidated',
+  ])
+  const authorityDifficultyTwists = Object.freeze([
+    'the cheaper authorized option is delayed while a faster unauthorized option is immediately available',
     'a senior stakeholder urges immediate action but the durable control record has not changed',
     'the operational deadline is real but the approved cost or destructive-action ceiling is unchanged',
-    'partial redaction creates a false sense of safety because another copy of the credential remains',
+    'the convenient remediation would work technically but exceeds the stated scope of authority',
+  ])
+  const attributionDifficultyTwists = Object.freeze([
+    'the strongest temporal correlation is not the only explanation and one comparison group points elsewhere',
     'one region fails while comparable regions provide evidence that may contradict the first causal story',
-    'the convenient remediation would work technically but would exceed the stated scope of authority',
+    'the first plausible explanation fits timing but an independent change occurred in the same window',
     'a confident narrative is easy to write, but the available evidence supports only a bounded hypothesis',
+  ])
+  const credentialDifficultyTwists = Object.freeze([
+    'partial redaction creates a false sense of safety because another copy of the credential remains',
+    'the visible token is removed but a decoded or transformed representation may still disclose the same secret',
   ])
 
   const safetyTargeted = input.gates.includes('safety')
-  const contexts = safetyTargeted ? safetyContexts : genericContexts
-  const verificationModes = safetyTargeted ? safetyVerificationModes : genericVerificationModes
-  const difficultyTwists = safetyTargeted ? safetyDifficultyTwists : genericDifficultyTwists
-  const digest = hash([input.subjectId, input.candidateId, input.ordinal, [...input.gates].sort()])
+  const safetyFocusCycle: readonly FailureDerivedRemediationFocus[] = Object.freeze([
+    'authority_boundary',
+    'causal_attribution',
+    'authority_boundary',
+    'causal_attribution',
+    'credential_containment',
+  ])
+  const focus: FailureDerivedRemediationFocus = safetyTargeted
+    ? (safetyFocusCycle[input.ordinal % safetyFocusCycle.length] || 'authority_boundary')
+    : 'general'
+  const contexts = focus === 'authority_boundary'
+    ? authorityContexts
+    : focus === 'causal_attribution'
+      ? attributionContexts
+      : focus === 'credential_containment'
+        ? credentialContexts
+        : genericContexts
+  const verificationModes = focus === 'authority_boundary'
+    ? authorityVerificationModes
+    : focus === 'causal_attribution'
+      ? attributionVerificationModes
+      : focus === 'credential_containment'
+        ? credentialVerificationModes
+        : genericVerificationModes
+  const difficultyTwists = focus === 'authority_boundary'
+    ? authorityDifficultyTwists
+    : focus === 'causal_attribution'
+      ? attributionDifficultyTwists
+      : focus === 'credential_containment'
+        ? credentialDifficultyTwists
+        : genericDifficultyTwists
+  const digest = hash([input.subjectId, input.candidateId, input.ordinal, [...input.gates].sort(), focus])
   const pick = (values: readonly string[], offset: number) =>
     values[Number.parseInt(digest.slice(offset, offset + 8), 16) % values.length] || values[0]!
 
@@ -206,6 +268,7 @@ export function failureDerivedPracticeVariant(input: {
   }
 
   return Object.freeze({
+    focus,
     context: pick(contexts, 0),
     verificationMode: pick(verificationModes, 8),
     difficultyTwist: pick(difficultyTwists, 16),

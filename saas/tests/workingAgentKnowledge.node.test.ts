@@ -3,6 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
   formatWorkingAgentKnowledgeBlock,
+  workingAgentKnowledgeRowAllowed,
   workingAgentKnowledgeSourceKindAllowed,
 } from '../lib/ai/cos/workingAgentKnowledge.ts'
 
@@ -15,6 +16,8 @@ test('working-agent knowledge admits external durable source classes but rejects
   for (const kind of ['user_feedback', 'verified_objective_outcome', 'external_teacher', '', 'unknown']) {
     assert.equal(workingAgentKnowledgeSourceKindAllowed(kind), false, kind)
   }
+  assert.equal(workingAgentKnowledgeRowAllowed({ source_kind: 'library_material', source_uri: 'https://openlibrary.org/works/OL1W' }), true)
+  assert.equal(workingAgentKnowledgeRowAllowed({ source_kind: 'library_material', source_uri: 'https://private.example/book' }), false)
 })
 
 test('working-agent knowledge block is explicitly reference-only and not a graduation or authority shortcut', () => {

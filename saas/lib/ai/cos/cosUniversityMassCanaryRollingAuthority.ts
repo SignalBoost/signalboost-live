@@ -262,6 +262,12 @@ export function decideMassCanaryRollingApproval(input: {
       .map(artifact => artifact.candidateId)).size
   const replayProofNeeded = replayProofPasses < MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE
 
+  const currentRecipeArtifact = (artifact: CanaryArtifact) =>
+    artifact.trainingOptimizer === MASS_CANARY_BUILDER_V2_OPTIMIZER
+      && artifact.frontierResponseAnchorRequired === true
+      && Number(artifact.frontierResponseAnchorEpochs) === 1
+      && Number(artifact.frontierResponseAnchorItems) > 0
+
   valid.sort((a, b) => {
     // Preserve the established Builder apprenticeship priority whenever that cohort is unfinished.
     if (builderProofNeeded) {
@@ -284,6 +290,12 @@ export function decideMassCanaryRollingApproval(input: {
         if (aComputerScience !== bComputerScience) return aComputerScience ? -1 : 1
       }
     }
+    // After bounded proof cohorts, prefer the recipe current training actually emits. Legacy artifacts
+    // remain eligible as fallback; they simply no longer consume the front of the paid canary queue while
+    // hundreds of anchored artifacts wait behind a 0-for-122 old-recipe quality cohort.
+    const aCurrent = currentRecipeArtifact(a)
+    const bCurrent = currentRecipeArtifact(b)
+    if (aCurrent !== bCurrent) return aCurrent ? -1 : 1
     return at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId)
   })
 
@@ -406,6 +418,7 @@ export function decideMassCanaryRollingApproval(input: {
           coldStartResumeRuntimeKey: newestFailureRuntimeKey,
         } : {}),
         ...(replayProofNeeded && replayProofArtifact(artifact) ? { remediationReplayProofPriority: true } : {}),
+        ...(currentRecipeArtifact(artifact) ? { currentRecipePriority: true } : {}),
         ...(refreshEndpoint ? { endpointRefresh: true, endpointRefreshReason: 'repeated_evaluation_endpoint_lifecycle_failure' } : {}),
       },
     }

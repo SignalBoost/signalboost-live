@@ -57,3 +57,56 @@ test('private key material is removed from allowed model context', () => {
   assert.equal(JSON.stringify(result.modelData).includes('abc123secretmaterial'), false)
   assert.equal(result.findings.some(item => item.code === 'private_key_material_redacted'), true)
 })
+
+// Fake credentials are assembled at runtime so no literal token-shaped string lives in the repository.
+function fake(prefix: string, length: number, alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'): string {
+  return prefix + Array.from({ length }, (_, index) => alphabet[(index * 7 + 3) % alphabet.length]).join('')
+}
+
+test('platform provider credential formats are redacted before model reasoning', () => {
+  const credentials: Record<string, string> = {
+    stripeSecret: fake('sk_' + 'live_', 24),
+    stripeRestricted: fake('rk_' + 'live_', 24),
+    stripeWebhook: fake('wh' + 'sec_', 32),
+    googleApi: fake('AI' + 'za', 35),
+    googleOauth: fake('ya' + '29.', 60),
+    slack: fake('xo' + 'xb-', 40, '0123456789abcdefghij-'),
+    githubFineGrained: fake('github' + '_pat_', 60, 'abcdefghijABCDEFGHIJ0123456789_'),
+    huggingFace: fake('h' + 'f_', 34),
+    runpod: fake('rp' + 'a_', 40, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
+    supabaseSecret: fake('sb_' + 'secret_', 32),
+    sendgrid: 'S' + 'G.' + fake('', 22) + '.' + fake('', 43),
+    elevenLabs: fake('s' + 'k_', 48, '0123456789abcdef'),
+    gitlab: fake('gl' + 'pat-', 20),
+    npm: fake('np' + 'm_', 36),
+    jwt: 'ey' + 'JhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' + fake('ey' + 'J', 60) + '.' + fake('', 43),
+  }
+  for (const [name, secret] of Object.entries(credentials)) {
+    const result = inspectUntrustedAiContent({ source: 'retrieved_content', data: { excerpt: `deploy notes ${secret} end of line` } })
+    assert.equal(JSON.stringify(result.modelData).includes(secret), false, `${name} leaked into model data`)
+    assert.equal(result.findings.some(item => item.code === 'secret_material_redacted'), true, name)
+  }
+})
+
+test('encrypted and DSA private keys are removed', () => {
+  for (const kind of ['ENCRYPTED ', 'DSA ']) {
+    const block = `-----BEGIN ${kind}PRIVATE KEY-----\nMIIFHzBJBgkqhkiG9w0BBQ0wPDAbBgkqhkiG\n-----END ${kind}PRIVATE KEY-----`
+    const result = inspectUntrustedAiContent({ source: 'retrieved_content', data: { text: `key: ${block}` } })
+    assert.equal(JSON.stringify(result.modelData).includes('MIIFHzBJBgkqhkiG'), false, kind)
+  }
+})
+
+test('ordinary prose, identifiers and public keys are not redacted', () => {
+  const benign = [
+    'The risk_assessment_document_for_the_quarter_is_ready_for_review today.',
+    'Use task_list and ask_follow_up_question when planning the rollout.',
+    'Publishable key pk_live_51HxyzABCDEFGHIJKLMNOP is safe to embed in the browser.',
+    'Visit https://huggingface.co/Qwen/Qwen3-4B for the model card.',
+    'Support ticket SG-4411 was resolved by the npm maintainers.',
+  ]
+  for (const text of benign) {
+    const result = inspectUntrustedAiContent({ source: 'retrieved_content', data: { text } })
+    assert.equal(result.redactedCount, 0, text)
+    assert.deepEqual(result.modelData, { text })
+  }
+})

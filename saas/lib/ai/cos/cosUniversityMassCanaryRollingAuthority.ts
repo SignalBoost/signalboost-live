@@ -8,12 +8,13 @@
 export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-17_mass_canary_without_manual_intervention' as const
 export const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1' as const
 export const MASS_CANARY_APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved' as const
-// Production 2026-09-24 proved the repaired RunPod lane with consecutive successful canaries and no
-// worker-not-ready/timeout failures after the transient-infrastructure repair. Raise the drain rate in
-// one bounded step from 3/hour to 6/hour rather than jumping directly to the observed training rate.
-// Six per rolling hour permits at most 144/day and <= $28.80/day at the hard $0.20/canary ceiling.
+// Production 2026-09-25: exact canaries are healthy but the 1,000+ artifact backlog cannot drain through
+// the original single-slot / 6-per-hour lane. Widen in one bounded step only: two concurrent exact canaries,
+// twelve started-or-armed canaries per rolling hour, with the unchanged <= $0.20 per-canary ceiling.
+// This caps nominal authority at 288 canaries/day and <= $57.60/day while preserving every artifact-local fence.
 export const MASS_CANARY_ROLLING_WINDOW_HOURS = 1
-export const MASS_CANARY_ROLLING_MAX_APPROVALS = 6
+export const MASS_CANARY_ROLLING_MAX_APPROVALS = 12
+export const MASS_CANARY_MAX_CONCURRENT = 2
 export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // A cold-start timeout is the runtime never answering, not the artifact failing. It is retried without spending one
 // of the three substantive attempts, and the identical-repeat stop below still prevents an endless loop.
@@ -234,7 +235,7 @@ export function decideMassCanaryRollingApproval(input: {
   // Budget the rolling window by provider invocations that actually started, plus any currently
   // armed approval that can still become one. Expired approvals that were never invoked consumed
   // neither provider work nor canary spend and therefore must not create an artificial blackout.
-  // This preserves the same maximum potential spend: at most six started-or-still-reserved canaries
+  // This bounds maximum potential spend: at most twelve started-or-still-reserved canaries
   // per rolling hour, each already bounded to <= $0.20 by the approval contract.
   const rollingWindowStart = nowMs - MASS_CANARY_ROLLING_WINDOW_HOURS * 3600_000
   const invokedInWindow = input.events.filter(event => event.verifier === 'host_controller'
@@ -312,13 +313,18 @@ export function decideMassCanaryRollingApproval(input: {
     return at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId)
   })
 
-  // Queue-wide semaphore has two phases: an unconsumed approval, then the actual in-flight canary
-  // invocation. The second phase matters because the approval ceases to be armed as soon as invocation starts.
-  if (valid.some(artifact => armedApproval(forArtifact(input.events, artifact), nowMs))) {
-    return { issue: false, reason: 'mass_canary_approval_already_armed' }
-  }
-  if (valid.some(artifact => canaryInvocationInFlight(forArtifact(input.events, artifact), nowMs))) {
-    return { issue: false, reason: 'mass_canary_invocation_already_in_flight' }
+  // Queue-wide semaphore has two phases per artifact: an unconsumed approval, then the actual
+  // in-flight canary invocation. Count distinct active candidates and admit at most two. The atomic SQL
+  // claim serializes reservation creation, while this policy prevents approval issuance from outrunning
+  // the bounded RunPod concurrency envelope.
+  const activeCanaryCandidates = new Set(valid
+    .filter(artifact => {
+      const own = forArtifact(input.events, artifact)
+      return armedApproval(own, nowMs) || canaryInvocationInFlight(own, nowMs)
+    })
+    .map(artifact => artifact.candidateId))
+  if (activeCanaryCandidates.size >= MASS_CANARY_MAX_CONCURRENT) {
+    return { issue: false, reason: 'mass_canary_concurrency_exhausted' }
   }
 
   // Awaiting independent evaluation is an ARTIFACT-LOCAL lifecycle condition and is excluded per
@@ -330,13 +336,15 @@ export function decideMassCanaryRollingApproval(input: {
   // single canary in flight.
 
   for (const artifact of valid) {
+    const own = forArtifact(input.events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
+    // An artifact that already owns one of the bounded slots must not receive another approval.
+    if (armedApproval(own, nowMs) || canaryInvocationInFlight(own, nowMs)) continue
     // Artifact-local: this one is done canarying and is waiting on the evaluator. Skip it and keep
     // searching the queue rather than stopping the whole issuer.
     if (evaluationHandoffPending(input.events, artifact)) continue
-    const own = forArtifact(input.events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
     // Per-artifact ceilings are independent of failure classification. The daily fence bounds total
     // spend; the rolling-hour fence prevents one infrastructure-failing runtime from monopolizing the
-    // global six-slot window while untouched artifacts wait behind it.
+    // global twelve-slot window while untouched artifacts wait behind it.
     const invocationStarts = own.filter(event => claim(event) === 'local_distilled_runtime_canary_invocation_started')
     const invocationsToday = invocationStarts
       .filter(event => nowMs - at(event.observedAt) < MASS_CANARY_ARTIFACT_INVOCATION_WINDOW_MS).length

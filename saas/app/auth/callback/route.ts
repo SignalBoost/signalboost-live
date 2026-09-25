@@ -6,18 +6,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";   
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
-import { cookies } from "next/headers";
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/onboarding";
+  const requestedNext = searchParams.get("next");
+  const next = requestedNext?.startsWith("/") && !requestedNext.startsWith("//")
+    ? requestedNext
+    : "/onboarding";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/?error=missing_code`);
   }
 
-  const cookieStore = await cookies();
+  // Bind every session-cookie mutation produced by exchangeCodeForSession() to the exact
+  // redirect response that the browser receives. Do not rely on an ambient cookies() store:
+  // a swallowed write failure can make Supabase report a successful token exchange while the
+  // browser receives no session and is immediately treated as signed out on /onboarding.
+  const redirectResponse = NextResponse.redirect(new URL(next, origin));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,17 +32,12 @@ export async function GET(req: NextRequest) {
       cookieOptions: saasSupabaseCookieOptions,
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          return req.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
-          } catch {
-            // Called from a Server Component — safe to ignore;
-            // middleware/route handlers will refresh the session.
-          }
+          cookiesToSet.forEach(({ name, value, options }) => {
+            redirectResponse.cookies.set(name, value, options);
+          });
         },
       },
     },
@@ -49,5 +50,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${origin}/?error=auth_failed`);
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  return redirectResponse;
 }

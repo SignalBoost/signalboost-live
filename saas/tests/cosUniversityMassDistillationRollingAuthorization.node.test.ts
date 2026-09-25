@@ -165,3 +165,28 @@ test('recovery never spends bounded campaign budget on already terminal campaign
   assert.match(migration, /if v_campaign\.completed_at is not null then[\s\S]*'reason','campaign_already_terminal'/)
   assert.match(migration, /and c\.completed_at is null[\s\S]*and c\.status in \('authorized','active','running','failed'\)/)
 })
+
+
+test('backlog pause admits only one full remediation campaign and keeps general training paused', () => {
+  const auth = source('../lib/ai/cos/cosUniversityMassDistillationRollingAuthorization.ts')
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  const migration = source('../supabase/migrations/20260925154847_university_remediation_backlog_exception.sql')
+
+  assert.match(auth, /authorizeNextUniversityMassDistillationRemediationCampaign/)
+  assert.match(auth, /authorize_next_cos_university_mass_distillation_remediation_campaign/)
+  assert.match(workflow, /backlogPaused[\s\S]*authorizeNextUniversityMassDistillationRemediationCampaign\(\)/)
+  assert.match(workflow, /remediationOnly: true/)
+  assert.match(workflow, /generalCampaignAuthorizationPaused: true/)
+  assert.match(workflow, /boundedRemediationCampaignException/)
+
+  assert.match(migration, /v_active_remediation_campaigns >= 1/)
+  assert.match(migration, /b\.source_count between 64 and 128/)
+  assert.match(migration, /cl\.source_kind = 'failure_derived_curriculum'/)
+  assert.match(migration, /count\(distinct cl\.content_hash\)[\s\S]*>= 20/)
+  assert.match(migration, /v_next_cost constant numeric\(10,6\) := 1\.825000/)
+  assert.match(migration, /automaticPromotionAuthorized',false/)
+  assert.match(migration, /runpodMutationAuthorized',false/)
+  assert.match(migration, /authorityExpanded',false/)
+  assert.match(migration, /revoke all on function public\.authorize_next_cos_university_mass_distillation_remediation_campaign\(\)/)
+  assert.match(migration, /grant execute on function public\.authorize_next_cos_university_mass_distillation_remediation_campaign\(\)[\s\S]*to service_role/)
+})

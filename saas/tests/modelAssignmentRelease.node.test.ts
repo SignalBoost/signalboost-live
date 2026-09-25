@@ -74,4 +74,3 @@ test('release is owner-confirmed, audited and wired through host, console and mi
   assert.match(migration, /grant execute on function public\.platform_release_model_assignment\(text,text,uuid\) to service_role/)
   assert.match(gate, /modelAssignmentRelease\.node\.test\.ts/)
 })
---------------------------------------------------------------

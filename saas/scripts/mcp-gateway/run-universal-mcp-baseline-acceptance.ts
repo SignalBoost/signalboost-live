@@ -95,7 +95,7 @@ async function run() {
     excludedPendingProviders: {
       'supabase-mcp': 'repository_credential_required',
       'figma-mcp': 'provider_client_approval_required',
-      'vercel-mcp': 'repository_credential_required',
+      'vercel-mcp': 'provider_client_approval_required',
     },
     certifications,
     checks,

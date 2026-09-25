@@ -28,6 +28,7 @@ function binding(agentId: string, skillId = 'software.verify', risk: 'advisory' 
 const universityAgents: readonly CosUniversityRegisteredAgent[] = Object.freeze([
   Object.freeze({ agentId: 'software-a', role: 'software_engineering' }),
   Object.freeze({ agentId: 'software-b', role: 'software_engineering' }),
+  Object.freeze({ agentId: 'cyber-a', role: 'cybersecurity' }),
   Object.freeze({ agentId: 'quant-a', role: 'quantitative_data_science' }),
 ])
 
@@ -142,4 +143,25 @@ test('write and consequential gaps receive higher education priority without cha
   assert.equal(a.candidateAuthorized, false)
   assert.equal(w.candidateAuthorized, false)
   assert.equal(c.candidateAuthorized, false)
+})
+
+
+test('security mesh capabilities map to the existing Cybersecurity University role', () => {
+  const [capability] = buildSpecialistMeshCoverageCapabilities([
+    binding('external-security', 'security.verify-ai-content', 'advisory'),
+  ])
+  assert.equal(capability.subjectId, 'cybersecurity')
+  assert.equal(capability.eligibleRoles.includes('cybersecurity'), true)
+
+  const decision = decideSpecialistMeshUniversityCoverage({
+    capability,
+    qualificationEvidence: {
+      'external-security': { qualified: true, evidenceRef: 'evidence://external-security' },
+    },
+    registeredAgents: universityAgents,
+  })
+  assert.equal(decision.status, 'training_priority')
+  assert.equal(decision.candidateAgentId, 'cyber-a')
+  assert.equal(decision.candidateRole, 'cybersecurity')
+  assert.equal(decision.candidateAuthorized, false)
 })

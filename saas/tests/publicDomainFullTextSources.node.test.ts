@@ -40,13 +40,13 @@ test('Project Gutenberg adapter fetches only explicit public-domain HTTPS Gutenb
         ],
       }), { status: 200, headers: { 'content-type': 'application/json' } })
     }
-    if (url === 'https://www.gutenberg.org/files/101/101-0.txt') {
+    if (url === 'https://mirror.example/gutenberg/101/pg101.txt') {
       return new Response(body, { status: 200, headers: { 'content-type': 'text/plain' } })
     }
     return new Response('not found', { status: 404 })
   }) as typeof fetch
 
-  const search = createProjectGutenbergPublicDomainSearch(fetcher)
+  const search = createProjectGutenbergPublicDomainSearch(fetcher, { mirrorBaseUrl: 'https://mirror.example/gutenberg' })
   const results = await search('mathematics geometry', 3)
 
   assert.equal(results.length, 1)
@@ -55,7 +55,8 @@ test('Project Gutenberg adapter fetches only explicit public-domain HTTPS Gutenb
   assert.ok(results[0].text.length >= 900)
   assert.match(results[0].text, /geometry algebra proof theorem/)
   assert.ok(results[0].evidence?.includes('gutendex_copyright:false'))
-  assert.ok(calls.includes('https://www.gutenberg.org/files/101/101-0.txt'))
+  assert.ok(calls.includes('https://mirror.example/gutenberg/101/pg101.txt'))
+  assert.ok(!calls.some(url => url.startsWith('https://www.gutenberg.org/files/')))
   assert.ok(!calls.includes('https://example.com/book.txt'))
 })
 

@@ -5,6 +5,7 @@ export type PlatformModelMessage = Readonly<{
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string | null
   toolCallId?: string | null
+  toolCalls?: readonly PlatformModelToolCall[]
 }>
 
 export type PlatformModelTool = Readonly<{
@@ -20,6 +21,7 @@ export type PlatformModelRequest = Readonly<{
   temperature?: number
   jsonObject?: boolean
   tools?: readonly PlatformModelTool[]
+  toolChoice?: 'auto' | 'none' | Readonly<{ name: string }>
   timeoutMs?: number
 }>
 
@@ -35,6 +37,9 @@ export type PlatformModelResponse = Readonly<{
   finishReason: string | null
   provider: string
   model: string
+  inputTokens: number | null
+  outputTokens: number | null
+  requestId: string | null
 }>
 
 export type ModelTransportHealth = Readonly<{

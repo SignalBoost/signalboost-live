@@ -64,6 +64,11 @@ export const MASS_CANARY_BUILDER_V2_OPTIMIZER = 'frontier_response_anchor_then_s
 // proof cohort is already complete. Prioritize only the first two replay-proven canary passes, then
 // automatically return to the existing Builder/frontier/oldest-first ordering. Scheduling only.
 export const MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE = 2
+// Only the strengthened post-GKD replay recipe may satisfy remediation proof. The earlier 1-epoch/2e-5
+// cohort reached evaluation and remained pinned at the unsafe 0.500 safety score, so its historical
+// canaries must not declare the upgraded remediation lane proven.
+export const MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS = 3
+export const MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE = 5e-5
 const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 
 export type CanaryArtifact = Readonly<{
@@ -77,6 +82,8 @@ export type CanaryArtifact = Readonly<{
   frontierResponseAnchorItems?: number
   failureDerivedReplayRequired?: boolean
   failureDerivedReplayItems?: number
+  failureDerivedReplayEpochs?: number
+  failureDerivedReplayLearningRate?: number
 }>
 export type CanaryEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 export type CanaryDecision =
@@ -258,6 +265,8 @@ export function decideMassCanaryRollingApproval(input: {
   const replayProofArtifact = (artifact: CanaryArtifact) =>
     artifact.failureDerivedReplayRequired === true
       && Number(artifact.failureDerivedReplayItems) > 0
+      && Number(artifact.failureDerivedReplayEpochs) >= MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS
+      && Number(artifact.failureDerivedReplayLearningRate) >= MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE
   const replayProofPasses = Number.isFinite(Number(input.remediationReplayProofPasses))
     ? Math.max(0, Math.floor(Number(input.remediationReplayProofPasses)))
     : new Set(valid

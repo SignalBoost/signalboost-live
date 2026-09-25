@@ -9,6 +9,8 @@ import {
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_PROFILE,
   MASS_CANARY_IN_FLIGHT_TTL_MS,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_CANARY_ROLLING_WINDOW_HOURS,
   decideMassCanaryRollingApproval,
   type CanaryEvent,
@@ -215,6 +217,8 @@ async function issueRollingCanaryApproval(now:Date){
     return receipt&&typeof receipt==='object'
       && receipt.failureDerivedReplayRequired===true
       && Number(receipt.failureDerivedReplayItems||0)>0
+      && Number(receipt.failureDerivedReplayEpochs||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS
+      && Number(receipt.failureDerivedReplayLearningRate||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE
   })
   const pendingCurrentRecipeArtifacts=confirmedCurrentRecipeArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const pendingBuilderArtifacts=confirmedBuilderArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
@@ -317,6 +321,8 @@ async function issueRollingCanaryApproval(now:Date){
         frontierResponseAnchorItems:Number(receipt.frontierResponseAnchorItems||0),
         failureDerivedReplayRequired:receipt.failureDerivedReplayRequired===true,
         failureDerivedReplayItems:Number(receipt.failureDerivedReplayItems||0),
+        failureDerivedReplayEpochs:Number(receipt.failureDerivedReplayEpochs||0),
+        failureDerivedReplayLearningRate:Number(receipt.failureDerivedReplayLearningRate||0),
       }
     }),
     events:eventRows.map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),

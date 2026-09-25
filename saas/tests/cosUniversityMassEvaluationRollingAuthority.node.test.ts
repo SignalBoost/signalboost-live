@@ -6,6 +6,8 @@ import {
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
   MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS,
+  MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   MASS_EVALUATION_MAX_IN_FLIGHT,
@@ -118,6 +120,16 @@ test('confirmed v2 Computer Science proof sampling outranks legacy work only unt
     builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   })
   assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
+})
+
+test('remediation evaluation proof is versioned to the strengthened replay recipe', () => {
+  assert.equal(MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS, 3)
+  assert.equal(MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE, 5e-5)
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /failureDerivedReplayEpochs/)
+  assert.match(route, /failureDerivedReplayLearningRate/)
+  assert.match(route, /MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS/)
+  assert.match(route, /MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE/)
 })
 
 test('post-GKD remediation replay proof sampling is bounded and never bypasses the 12-hour delay', () => {
@@ -235,7 +247,7 @@ test('an infrastructure-failed frontier start remains proof-prioritized until a 
 
 test('cron scans bounded legacy work and explicitly includes both Builder v2 and remediation replay proof cohorts', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /const \[oldestArtifacts, builderV2Artifacts, replayArtifacts\] = await Promise\.all/)
+  assert.match(route, /const \\[oldestArtifacts, currentRecipeArtifacts, builderV2Artifacts, replayArtifacts\\] = await Promise\\.all/)
   assert.match(route, /\.limit\(500\)/)
   assert.match(route, /\.eq\('subject_id', 'Computer Science & Coding'\)/)
   assert.match(route, /optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER/)
@@ -244,6 +256,8 @@ test('cron scans bounded legacy work and explicitly includes both Builder v2 and
   assert.match(route, /remediationReplay: isRemediationReplayReceipt/)
   assert.match(route, /failureDerivedReplayRequired/)
   assert.match(route, /failureDerivedReplayItems/)
+  assert.match(route, /failureDerivedReplayEpochs/)
+  assert.match(route, /failureDerivedReplayLearningRate/)
   assert.match(route, /frontierResponseAnchorItems/)
   assert.match(route, /cos_university_distilled_evaluation_runs/)
   assert.match(route, /builderV2ProofCompletions = new Set/)

@@ -17,6 +17,8 @@ import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
   MASS_CANARY_IN_FLIGHT_TTL_MS,
   MASS_CANARY_MAX_IDENTICAL_FAILURES,
@@ -47,6 +49,8 @@ const replayArtifact = (candidateId: string, hashId: number, createdAt: string):
   createdAt,
   failureDerivedReplayRequired: true,
   failureDerivedReplayItems: 3,
+  failureDerivedReplayEpochs: MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
+  failureDerivedReplayLearningRate: MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
 })
 const event = (a: CanaryArtifact, claim: string, observedAt: string, extra: Partial<CanaryEvent> = {}, evidence: Record<string, unknown> = {}): CanaryEvent =>
   ({ candidateId: a.candidateId, observedAt, expiresAt: null, verifier: 'host_controller', evidence: { profile: MASS_CANARY_PROFILE, claim, artifactHash: a.artifactHash, ...evidence }, ...extra })
@@ -102,6 +106,33 @@ test('bounded Builder apprenticeship proof lane counts only confirmed response-a
   })
   assert.ok('artifact' in restored)
   assert.equal(restored.artifact.candidateId, legacy.candidateId)
+})
+
+test('old weak replay receipts cannot satisfy the upgraded remediation proof cohort', () => {
+  assert.equal(MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS, 3)
+  assert.equal(MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE, 5e-5)
+  const legacy = artifact(79, '2026-09-20T00:00:00.000Z')
+  const weakReplay: CanaryArtifact = {
+    candidateId:'mass:weak-replay',
+    subjectId:'Law, Regulation & Governance',
+    artifactHash:h(78),
+    createdAt:'2026-09-22T17:00:00.000Z',
+    failureDerivedReplayRequired:true,
+    failureDerivedReplayItems:5,
+    failureDerivedReplayEpochs:1,
+    failureDerivedReplayLearningRate:2e-5,
+  }
+  const strongReplay = replayArtifact('mass:strong-replay', 77, '2026-09-22T18:00:00.000Z')
+  const decision = decideMassCanaryRollingApproval({
+    artifacts:[legacy,weakReplay,strongReplay],
+    events:[event(weakReplay,'local_distilled_runtime_canary_passed','2026-09-22T17:30:00.000Z')],
+    now:new Date('2026-09-22T20:00:00.000Z'),
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+  })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId,strongReplay.candidateId)
+  assert.equal(decision.evidence.remediationReplayProofPriority,true)
 })
 
 test('first two post-GKD remediation replay artifacts get bounded canary proof priority after Builder proof is complete', () => {
@@ -322,6 +353,8 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.match(route,/frontierResponseAnchorItems:Number\(receipt\.frontierResponseAnchorItems\|\|0\)/)
   assert.match(route,/failureDerivedReplayRequired:receipt\.failureDerivedReplayRequired===true/)
   assert.match(route,/failureDerivedReplayItems:Number\(receipt\.failureDerivedReplayItems\|\|0\)/)
+  assert.match(route,/failureDerivedReplayEpochs:Number\(receipt\.failureDerivedReplayEpochs\|\|0\)/)
+  assert.match(route,/failureDerivedReplayLearningRate:Number\(receipt\.failureDerivedReplayLearningRate\|\|0\)/)
   assert.match(route,/contains\('intended_use',\{trainingReceipt:\{failureDerivedReplayRequired:true\}\}\)/)
   assert.match(route,/builderProofPasses=\[\.\.\.passedCandidates\]/)
   assert.match(route,/remediationReplayProofPasses=\[\.\.\.passedCandidates\]/)

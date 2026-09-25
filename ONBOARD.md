@@ -2125,3 +2125,18 @@ entire normalized value to equal a U.S. public-domain assertion (`Public domain 
 `Public domain in the U.S.`, or `Public domain in the United States.`). Explicit restricted/copyright markers
 in the fetched ebook preamble continue to veto admission and cannot be overridden by OPDS metadata. The mandatory
 public-domain full-text regression now uses the real `dcterms:rights` form.
+
+
+### Mass canary rolling-evidence query scaling repair (2026-09-25)
+
+After current anchored-recipe artifacts were prioritized globally, Production had **845** matching
+`evaluation_pending` candidates. The canary authorization route passed the full candidate list into one
+Supabase/PostgREST `.in('candidate_id', ...)` filter. Because PostgREST serializes that filter into the request,
+the rolling-evidence lookup began returning generic HTTP 400 / `message=Bad Request` before the atomic claim and
+before any RunPod provider invocation.
+
+The route now preserves the complete eligibility set but chunks rolling-evidence candidate filters into **75 IDs
+per query**, while retaining independent pagination inside each chunk and each policy-relevant evidence profile.
+The global rolling-window invocation query remains candidate-agnostic, so the **6/hour** spend cap is unchanged and
+cannot be bypassed by chunking. The atomic claim RPC, exact-artifact gates, Builder Residency gates, cold-start
+resume bounds, and Production-traffic prohibition are unchanged.

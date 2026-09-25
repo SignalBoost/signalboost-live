@@ -8,7 +8,7 @@ test('GitHub Actions MCP certification scopes repository token without removing 
   const baseline = await readFile(new URL('../scripts/mcp-gateway/run-universal-mcp-baseline-acceptance.ts', import.meta.url), 'utf8')
   const full = await readFile(new URL('../scripts/mcp-gateway/run-universal-mcp-acceptance.ts', import.meta.url), 'utf8')
 
-  assert.match(baseline, /capabilityName !== 'identity\\.read'/)
-  assert.match(full, /capabilityName !== 'identity\\.read'/)
+  assert.match(baseline, /capabilityName !== 'identity\.read'/)
+  assert.match(full, /capabilityName !== 'identity\.read'/)
   assert.equal(GITHUB_MCP_PROFILE.tools.some(item => item.capabilityName === 'identity.read'), true)
 })

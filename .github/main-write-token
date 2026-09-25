@@ -1,2 +1,2 @@
-base_sha=178ad1a99565433d1b669e5fd33bd2358db085c0
-branch=docs/mcp-actions-token-scope-regression-v3-20260925
+base_sha=e81c6fdd37481a140f756f80c37a909e0dcc261a
+branch=fix/universal-mcp-actions-token-regex-20260925

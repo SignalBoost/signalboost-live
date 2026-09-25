@@ -1,2 +1,2 @@
-base_sha=99b4066e06a873d2f4098f74104b3be0a8535651
-branch=fix/security-fabric-production-gates-v2-20260925
+base_sha=4f3e48055fc735f30c26e2133eb2c2c0602e81be
+branch=fix/security-gates-strip-order-20260925

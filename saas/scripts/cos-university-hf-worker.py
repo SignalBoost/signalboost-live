@@ -39,6 +39,15 @@ TRAINING_LR_SCHEDULER = "cosine"
 TRAINING_MAX_GRAD_NORM = 1.0
 TRAINING_MAX_LENGTH = 2048
 
+# Muon is rolled out only as a bounded optimizer canary on the primary frontier QLoRA/GKD pass.
+# It never changes training rights, spend authority, evaluation, canary, retention, or promotion gates.
+# PyTorch's native Muon is used only when every trainable tensor is a 2-D LoRA matrix; otherwise the
+# trainer keeps its proven AdamW path. match_rms_adamw lets the canary reuse the existing tuned LR.
+MUON_ROLLOUT_PERCENT = 10
+MUON_MOMENTUM = 0.95
+MUON_NS_STEPS = 5
+MUON_ADJUST_LR_FN = "match_rms_adamw"
+
 FRONTIER_TRAINING_PROFILE = "cos_university_frontier_gkd_v1"
 FRONTIER_GKD_MAX_LENGTH = 1024
 FRONTIER_GKD_LEARNING_RATE = 5e-5
@@ -648,6 +657,65 @@ def _force_trainable_fp32(model) -> int:
     return changed
 
 
+def _configure_muon_canary(base, torch, trainer, candidate_id: str) -> dict[str, Any]:
+    """Apply native Muon only to an eligible deterministic frontier canary.
+
+    The current University lane trains LoRA adapters with bias="none", so eligible trainables should
+    all be 2-D matrices. Any future scalar/vector trainable makes the run ineligible instead of being
+    silently left unoptimized. Runtime images without native torch.optim.Muon stay on AdamW.
+    """
+    normalized_candidate = str(candidate_id or "").strip()
+    selected = bool(normalized_candidate) and (
+        int(base.sha256(normalized_candidate)[:8], 16) % 100 < MUON_ROLLOUT_PERCENT
+    )
+    trainable = [
+        (name, parameter)
+        for name, parameter in trainer.model.named_parameters()
+        if parameter.requires_grad
+    ]
+    matrix_params = [parameter for _, parameter in trainable if parameter.ndim == 2]
+    non_matrix_params = [parameter for _, parameter in trainable if parameter.ndim != 2]
+    runtime_available = callable(getattr(torch.optim, "Muon", None))
+    eligible = bool(matrix_params) and not non_matrix_params
+    applied = False
+    optimizer_name = "adamw_torch"
+    reason = "not_selected"
+
+    if selected:
+        if not runtime_available:
+            reason = "runtime_unavailable"
+        elif not eligible:
+            reason = "non_matrix_trainables"
+        else:
+            trainer.optimizer = torch.optim.Muon(
+                matrix_params,
+                lr=float(getattr(trainer.args, "learning_rate", 0.0) or 0.0),
+                weight_decay=float(getattr(trainer.args, "weight_decay", 0.0) or 0.0),
+                momentum=MUON_MOMENTUM,
+                nesterov=True,
+                ns_steps=MUON_NS_STEPS,
+                adjust_lr_fn=MUON_ADJUST_LR_FN,
+            )
+            applied = True
+            optimizer_name = "muon"
+            reason = "applied"
+
+    return {
+        "parameterOptimizer": optimizer_name,
+        "muonRolloutPercent": MUON_ROLLOUT_PERCENT,
+        "muonRolloutSelected": selected,
+        "muonRuntimeAvailable": runtime_available,
+        "muonEligible": eligible,
+        "muonApplied": applied,
+        "muonMomentum": MUON_MOMENTUM,
+        "muonNsSteps": MUON_NS_STEPS,
+        "muonAdjustLrFn": MUON_ADJUST_LR_FN,
+        "muonMatrixTensorCount": len(matrix_params),
+        "muonNonMatrixTensorCount": len(non_matrix_params),
+        "muonReason": reason,
+    }
+
+
 def train_student(base, envelope: dict[str, Any]) -> None:
     import torch
     from huggingface_hub import HfApi
@@ -948,6 +1016,34 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     recipe["ampEnabled"] = False
     recipe["trainableParameterDtype"] = "float32"
     recipe["trainableFp32TensorCount"] = trainable_fp32_tensors
+
+    if frontier_plan is not None:
+        optimizer_evidence = _configure_muon_canary(
+            base,
+            torch,
+            trainer,
+            base.clean(envelope.get("candidateId"), 200),
+        )
+        recipe.update(optimizer_evidence)
+    else:
+        recipe.update({
+            "parameterOptimizer": "adamw_torch",
+            "muonRolloutPercent": 0,
+            "muonRolloutSelected": False,
+            "muonRuntimeAvailable": callable(getattr(torch.optim, "Muon", None)),
+            "muonEligible": False,
+            "muonApplied": False,
+            "muonMomentum": MUON_MOMENTUM,
+            "muonNsSteps": MUON_NS_STEPS,
+            "muonAdjustLrFn": MUON_ADJUST_LR_FN,
+            "muonMatrixTensorCount": 0,
+            "muonNonMatrixTensorCount": 0,
+            "muonReason": "legacy_lane",
+        })
+    print(
+        f"itmounts_parameter_optimizer:{json.dumps({key: recipe[key] for key in ('parameterOptimizer','muonRolloutPercent','muonRolloutSelected','muonRuntimeAvailable','muonEligible','muonApplied','muonMomentum','muonNsSteps','muonAdjustLrFn','muonMatrixTensorCount','muonNonMatrixTensorCount','muonReason')}, ensure_ascii=True, separators=(',', ':'))}",
+        flush=True,
+    )
     print(
         f"itmounts_training_precision:{json.dumps({'quantizedComputeDtype':'float16','ampEnabled':False,'trainableParameterDtype':'float32','trainableFp32TensorCount':trainable_fp32_tensors}, ensure_ascii=True, separators=(',', ':'))}",
         flush=True,

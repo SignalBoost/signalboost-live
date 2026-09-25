@@ -30,6 +30,7 @@ const tests = [
   'tests/runpodMassDistilledCanaryAdaFallback.node.test.ts',
   'tests/cosUniversityMassCanaryRollingWindowComplete.node.test.ts',
   'tests/projectGutenbergWrappedLicenseHeader.node.test.ts',
+  'tests/cosLearningContinuityPagination.node.test.ts',
   'tests/massEvaluationJudgeSpendReservation.node.test.ts',
   'tests/cosUniversityMassBacklogCompactor.node.test.ts',
   'tests/platformHarnessUniversalIngress.node.test.ts',

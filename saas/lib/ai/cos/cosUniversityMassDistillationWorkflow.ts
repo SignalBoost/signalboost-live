@@ -10,7 +10,7 @@ import {
 } from './cosUniversityMassDistillationConsumer.ts'
 import {
   MASS_DISTILLATION_MAX_BATCH,
-  MASS_DISTILLATION_MIN_BATCH,
+  MASS_DISTILLATION_QUALITY_MIN_BATCH,
   MASS_DISTILLATION_STUDENT_MODEL,
   prepareUniversityMassDistillationCurriculum,
 } from './cosUniversityMassDistillation.ts'
@@ -84,7 +84,7 @@ async function preparedMassDistillationInventory(target: number): Promise<number
       .eq('dispatch_authorized', false)
       .eq('authority_expanded', false)
       .eq('student_model_id', MASS_DISTILLATION_STUDENT_MODEL)
-      .gte('source_count', MASS_DISTILLATION_MIN_BATCH)
+      .gte('source_count', MASS_DISTILLATION_QUALITY_MIN_BATCH)
       .lte('source_count', MASS_DISTILLATION_MAX_BATCH)
       .order('prepared_at', { ascending: true })
       .range(offset, offset + pageSize - 1)

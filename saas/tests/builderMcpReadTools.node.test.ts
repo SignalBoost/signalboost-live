@@ -131,11 +131,15 @@ test('ordinary Builder receives public Context7 only; owner Builder can receive 
       connected: true,
       async getAccessToken() { return 'host-figma' },
     },
+    vercelAuthorization: {
+      clientApproved: true,
+      connected: true,
+      async getAccessToken() { return 'host-vercel' },
+    },
     env: {
       GITHUB_MCP_TOKEN: 'host-github',
       SUPABASE_ACCESS_TOKEN: 'host-supabase',
       SUPABASE_MCP_PROJECT_REF: 'projectref',
-      VERCEL_MCP_OAUTH_ACCESS_TOKEN: 'host-vercel',
       VERCEL_MCP_TEAM_SLUG: 'team',
       VERCEL_MCP_PROJECT_SLUG: 'project',
     },
@@ -155,11 +159,15 @@ test('ordinary Builder receives public Context7 only; owner Builder can receive 
       connected: true,
       async getAccessToken() { return 'host-figma' },
     },
+    vercelAuthorization: {
+      clientApproved: true,
+      connected: true,
+      async getAccessToken() { return 'host-vercel' },
+    },
     env: {
       GITHUB_MCP_TOKEN: 'host-github',
       SUPABASE_ACCESS_TOKEN: 'host-supabase',
       SUPABASE_MCP_PROJECT_REF: 'projectref',
-      VERCEL_MCP_OAUTH_ACCESS_TOKEN: 'host-vercel',
       VERCEL_MCP_TEAM_SLUG: 'team',
       VERCEL_MCP_PROJECT_SLUG: 'project',
     },

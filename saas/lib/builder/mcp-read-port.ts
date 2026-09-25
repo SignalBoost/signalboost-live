@@ -49,6 +49,7 @@ export function createBuilderMcpReadPort(input: {
   environmentId: string
   ownerAuthorized: boolean
   env?: Environment
+  fetcher?: typeof fetch
   figmaAuthorization?: UniversalMcpFigmaAuthorization
 }): BuilderMcpReadPort {
   const gateway = createUniversalMcpGateway({
@@ -60,6 +61,7 @@ export function createBuilderMcpReadPort(input: {
       roles: input.ownerAuthorized ? ['owner'] : [],
     },
     env: input.env,
+    fetcher: input.fetcher,
     figmaAuthorization: input.figmaAuthorization,
   })
   const catalog = allowedCatalog(input.ownerAuthorized)

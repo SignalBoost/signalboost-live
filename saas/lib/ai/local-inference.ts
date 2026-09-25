@@ -619,7 +619,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
  */
 export async function callLocalModelTurn(args: LocalModelCallArgs, config?: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
-  if (!protectedIndependentEvaluation(args) && !feature.startsWith('university_')) {
+  if (config === undefined && !protectedIndependentEvaluation(args) && !feature.startsWith('university_')) {
     const assigned = await tryAssignedPlatformModelTurn(args)
     if (assigned.attempted) return assigned.result
   }

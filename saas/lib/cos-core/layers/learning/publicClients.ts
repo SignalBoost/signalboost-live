@@ -125,6 +125,15 @@ export const projectGutenbergPublicDomainSearch=createProjectGutenbergPublicDoma
  * retains a bounded relevant excerpt/facts plus provenance, which preserves the source policy while
  * letting confidence be based on substantive evidence instead of bibliographic stubs.
  */
+function trainingSafeEuropePmcLicense(value:unknown):string|null{
+  const raw=clean(value)
+  const normalized=raw.toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim()
+  if(!normalized)return null
+  if(normalized==='public domain'||normalized==='public domain mark')return'public domain'
+  if(normalized==='cc0'||normalized==='cc0 1.0'||normalized==='creative commons cc0'||normalized==='creative commons zero')return raw.toLowerCase().startsWith('cc0')?`cc0 ${raw.slice(3).trim()}`.trim():'cc0'
+  return null
+}
+
 export function createEuropePmcScientificSearch(fetcher:FetchLike=fetch):LearningConnectorSearch{return async(query,limit)=>{
   const bounded=Math.min(Math.max(limit,1),10)
   const json=await getJson(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(compactQuery(query,8))}&pageSize=${bounded}&resultType=core&format=json`,fetcher)
@@ -139,7 +148,20 @@ export function createEuropePmcScientificSearch(fetcher:FetchLike=fetch):Learnin
       try{
         const xml=await getText(`https://www.ebi.ac.uk/europepmc/webservices/rest/${encodeURIComponent(pmcid)}/fullTextXML`,fetcher)
         const full=cleanXmlArticle(xml)
-        if(full.length>=900)return{uri,title,text:full,license:'Europe PMC Open Access full text read for grounded learning; COS retains only facts, summary, and provenance'}
+        if(full.length>=900){
+          const trainingLicense=trainingSafeEuropePmcLicense(item.license)
+          return{
+            uri,
+            title,
+            text:full,
+            license:trainingLicense||'Europe PMC Open Access full text read for grounded learning; COS retains only facts, summary, and provenance',
+            evidence:[
+              `europe_pmc_open_access:${String(item.isOpenAccess??'').toUpperCase()==='Y'}`,
+              ...(clean(item.license)?[`europe_pmc_license:${clean(item.license)}`]:[]),
+              ...(trainingLicense?['training_rights:explicit_cc0_or_public_domain']:[]),
+            ],
+          }
+        }
       }catch{/* fall back to abstract/metadata without aborting the source */}
     }
     return{uri,title,text:metadata,license:abstract.length>=300?'Europe PMC abstract metadata':'metadata only'}

@@ -99,7 +99,7 @@ test('public-domain full-text source is wired into continuity, working-agent ret
   const telemetry = readFileSync(new URL('../app/api/admin/cos-university-telemetry/route.ts', import.meta.url), 'utf8')
   const onboard = readFileSync(new URL('../../ONBOARD.md', import.meta.url), 'utf8')
 
-  assert.match(live, /projectGutenbergPublicDomainSearch/)
+  assert.match(live, /createProjectGutenbergPublicDomainSearch/)
   assert.match(live, /project_gutenberg_pd/)
   assert.match(daily, /projectGutenbergFullTextCurriculum/)
   assert.match(daily, /training_rights:public_domain/)

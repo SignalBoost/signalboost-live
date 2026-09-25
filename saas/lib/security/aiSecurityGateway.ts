@@ -53,8 +53,8 @@ const SECRET_VALUE_PATTERNS: readonly RegExp[] = Object.freeze([
 const PRIVATE_KEY = /-----BEGIN(?: RSA| EC| OPENSSH)? PRIVATE KEY-----[\s\S]*?-----END(?: RSA| EC| OPENSSH)? PRIVATE KEY-----/gi
 
 const OVERRIDE_PATTERNS: readonly RegExp[] = Object.freeze([
-  /\bignore\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|earlier|system|developer)\s+instructions?\b/i,
-  /\bdisregard\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|system|developer)\s+instructions?\b/i,
+  /\bignore\s+(?:all\s+|any\s+|the\s+)?(?:(?:previous|prior|earlier)(?:\s+(?:system|developer))?|system|developer)\s+instructions?\b/i,
+  /\bdisregard\s+(?:all\s+|any\s+|the\s+)?(?:(?:previous|prior|earlier)(?:\s+(?:system|developer))?|system|developer)\s+instructions?\b/i,
   /\boverride\s+(?:the\s+)?(?:system|developer|security|safety|policy|guardrail)\b/i,
   /\breveal\s+(?:the\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b/i,
   /\byou\s+are\s+now\s+(?:the\s+)?system\b/i,

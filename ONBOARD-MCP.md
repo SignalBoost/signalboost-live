@@ -185,5 +185,6 @@ The Universal MCP baseline now certifies every provider that can be exercised wi
 
 - Live baseline scope is GitHub MCP, Supabase MCP, and Context7 MCP.
 - Supabase is no longer treated as a pending credential provider: the workflow requires the repository-owned `SUPABASE_ACCESS_TOKEN`, fixes the target to project `qpblefwtnbivuusxmabv`, and performs a real project-scoped `list_tables` probe.
+- GitHub Actions acceptance uses the repository-scoped `github.token`; GitHub MCP intentionally omits `get_me` / `identity.read` for that credential class. CI therefore excludes only `identity.read` from its expected projection while the canonical runtime profile continues to retain that capability for user credentials.
 - Figma MCP and Vercel MCP remain outside this green baseline only because their durable OAuth client approval/connection is externally pending. They remain fail-closed and remain mandatory for the separate full five-provider Universal MCP acceptance.
 - The available-provider baseline must never be described as full Universal MCP certification. Its purpose is to preserve live evidence for the providers that are presently actionable while keeping external provider blocks explicit.

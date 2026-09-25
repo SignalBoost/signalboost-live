@@ -541,6 +541,7 @@ export function decideRollingMassEvaluationApproval(input: {
         infrastructureRepairAt: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT,
         priorFailedAttempts: failures,
         ...(remediationReplayProofNeeded && artifact.remediationReplay === true ? { remediationReplayProofPriority: true } : {}),
+        ...(frontierProofNeeded && artifact.frontierRecipe === true ? { frontierProofPriority: true } : {}),
         ...(artifact.frontierRecipe === true ? { currentRecipePriority: true } : {}),
         ...(repairedSuspension ? { resumeAfterSuspension: true, repairRef: MASS_EVALUATION_24GB_REPAIR_REF } : {}),
       },

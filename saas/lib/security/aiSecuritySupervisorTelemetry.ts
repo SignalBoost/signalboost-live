@@ -1,7 +1,6 @@
-import 'server-only'
 import { createHash } from 'node:crypto'
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import type { AiSecurityDisposition, AiSecurityFinding, AiSecuritySource } from './aiSecurityGateway'
+import { cosServiceDb } from '../cos-core/storage/service-db.ts'
+import type { AiSecurityDisposition, AiSecurityFinding, AiSecuritySource } from './aiSecurityGateway.ts'
 
 export const AI_SECURITY_SUPERVISOR_OBSERVATION_VERSION = 'ai-security-supervisor-observation-v1' as const
 

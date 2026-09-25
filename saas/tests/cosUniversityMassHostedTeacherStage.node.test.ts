@@ -312,7 +312,7 @@ test('zero hosted rows are an explicit governed HF fallback, while partial hoste
   assert.match(consumer, /hosted\.rows === 0 && !hosted\.completed/)
   assert.match(consumer, /successfulHostedRows: 0/)
   assert.match(consumer, /silentFallbackAllowed: false/)
-  assert.match(consumer, /else if \(!hosted\.completed \|\| !hosted\.datasetHash \|\| hosted\.outputHashes\.length < 20\)/)
+  assert.match(consumer, /else if \(!hosted\.completed \|\| !hosted\.datasetHash \|\| hosted\.outputHashes\.length < hosted\.minimumRows\)/)
   assert.match(consumer, /mass_distillation_hosted_teacher_incomplete/)
 })
 

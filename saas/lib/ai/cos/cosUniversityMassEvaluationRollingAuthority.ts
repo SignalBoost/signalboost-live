@@ -391,12 +391,12 @@ export function decideRollingMassEvaluationApproval(input: {
       const bReplay = b.remediationReplay === true
       if (aReplay !== bReplay) return aReplay ? -1 : 1
     }
-    // Preserve the older bounded frontier proof lane for repositories where it is still incomplete.
-    if (frontierProofNeeded) {
-      const aProof = a.frontierRecipe === true
-      const bProof = b.frontierRecipe === true
-      if (aProof !== bProof) return aProof ? -1 : 1
-    }
+    // The first bounded sample still proves the lane, but current anchored-recipe artifacts remain ahead
+    // of legacy recipe work after that sample. This is ordering only: retention, canary, scoring, spend,
+    // retry, promotion and Production-traffic gates below remain identical.
+    const aFrontier = a.frontierRecipe === true
+    const bFrontier = b.frontierRecipe === true
+    if (aFrontier !== bFrontier) return aFrontier ? -1 : 1
     return at(a.createdAt) - at(b.createdAt)
   })
   for (const artifact of ordered) {
@@ -541,6 +541,7 @@ export function decideRollingMassEvaluationApproval(input: {
         infrastructureRepairAt: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT,
         priorFailedAttempts: failures,
         ...(remediationReplayProofNeeded && artifact.remediationReplay === true ? { remediationReplayProofPriority: true } : {}),
+        ...(artifact.frontierRecipe === true ? { currentRecipePriority: true } : {}),
         ...(repairedSuspension ? { resumeAfterSuspension: true, repairRef: MASS_EVALUATION_24GB_REPAIR_REF } : {}),
       },
     }

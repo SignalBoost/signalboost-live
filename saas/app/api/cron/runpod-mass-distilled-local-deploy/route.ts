@@ -144,15 +144,26 @@ function rollingEventKey(row:any){
 // Kill switch: COS_MASS_CANARY_ROLLING_AUTHORIZATION=false.
 async function issueRollingCanaryApproval(now:Date){
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
-  // Keep normal queue fairness bounded to the oldest 200, but separately include the small
-  // response-anchor v2 Computer Science proof cohort. Applying v2 priority only AFTER an oldest-200
-  // query is ineffective once the backlog exceeds 200: Production had 336 older uncanaried artifacts
-  // ahead of the first true v2 Builder candidate.
-  const [oldestArtifacts,v2BuilderArtifacts,replayArtifacts]=await Promise.all([
+  // Keep legacy fairness bounded to the oldest 200, but separately include the current anchored recipe
+  // across every subject. Production quality telemetry showed the old stable-on-policy cohort at 0 full passes
+  // across 122 independently evaluated artifacts; queueing only by age would spend days proving obsolete recipe
+  // generations before measuring the recipe that current training actually emits.
+  const [oldestArtifacts,currentRecipeArtifacts,v2BuilderArtifacts,replayArtifacts]=await Promise.all([
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status','evaluation_pending').like('candidate_id','mass:%')
       .order('created_at',{ascending:true}).limit(200),
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
+      .eq('status','evaluation_pending')
+      .like('candidate_id','mass:%')
+      .contains('intended_use',{trainingReceipt:{
+        optimizer:MASS_CANARY_BUILDER_V2_OPTIMIZER,
+        frontierResponseAnchorRequired:true,
+        frontierResponseAnchorEpochs:1,
+      }})
+      .order('created_at',{ascending:true})
+      .limit(500),
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
       .eq('subject_id','Computer Science & Coding')
@@ -172,8 +183,17 @@ async function issueRollingCanaryApproval(now:Date){
       .limit(50),
   ])
   if(oldestArtifacts.error) throw oldestArtifacts.error
+  if(currentRecipeArtifacts.error) throw currentRecipeArtifacts.error
   if(v2BuilderArtifacts.error) throw v2BuilderArtifacts.error
   if(replayArtifacts.error) throw replayArtifacts.error
+  const confirmedCurrentRecipeArtifacts=(currentRecipeArtifacts.data||[]).filter((row:any)=>{
+    const receipt=row?.intended_use?.trainingReceipt
+    return receipt&&typeof receipt==='object'
+      && receipt.optimizer===MASS_CANARY_BUILDER_V2_OPTIMIZER
+      && receipt.frontierResponseAnchorRequired===true
+      && Number(receipt.frontierResponseAnchorEpochs||0)===1
+      && Number(receipt.frontierResponseAnchorItems||0)>0
+  })
   const confirmedBuilderArtifacts=(v2BuilderArtifacts.data||[]).filter((row:any)=>{
     const receipt=row?.intended_use?.trainingReceipt
     return receipt&&typeof receipt==='object'
@@ -188,10 +208,11 @@ async function issueRollingCanaryApproval(now:Date){
       && receipt.failureDerivedReplayRequired===true
       && Number(receipt.failureDerivedReplayItems||0)>0
   })
+  const pendingCurrentRecipeArtifacts=confirmedCurrentRecipeArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const pendingBuilderArtifacts=confirmedBuilderArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const pendingReplayArtifacts=confirmedReplayArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const artifactByCandidate=new Map<string,any>()
-  for(const row of [...(oldestArtifacts.data||[]),...pendingBuilderArtifacts,...pendingReplayArtifacts]){
+  for(const row of [...(oldestArtifacts.data||[]),...pendingCurrentRecipeArtifacts,...pendingBuilderArtifacts,...pendingReplayArtifacts]){
     artifactByCandidate.set(String((row as any).candidate_id),row)
   }
   const artifactRows=[...artifactByCandidate.values()]

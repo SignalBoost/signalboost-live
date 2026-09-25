@@ -213,15 +213,27 @@ function isRemediationReplayReceipt(intendedUse: unknown): boolean {
 async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  // Keep normal queue work bounded to the oldest 500, but explicitly include the small confirmed-v2
-  // Computer Science proof cohort. Otherwise a growing legacy backlog can make the priority policy unreachable.
-  const [oldestArtifacts, builderV2Artifacts, replayArtifacts] = await Promise.all([
+  // Keep legacy work bounded to the oldest 500, but separately include the current anchored recipe
+  // across every subject. This keeps evaluation focused on the recipe current training emits instead of
+  // spending the front of the queue on the independently-observed zero-pass legacy cohort.
+  const [oldestArtifacts, currentRecipeArtifacts, builderV2Artifacts, replayArtifacts] = await Promise.all([
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status', 'evaluation_pending')
       .like('candidate_id', 'mass:%')
       .order('created_at', { ascending: true })
       .limit(500),
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+      .eq('status', 'evaluation_pending')
+      .like('candidate_id', 'mass:%')
+      .contains('intended_use', { trainingReceipt: {
+        optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
+        frontierResponseAnchorRequired: true,
+        frontierResponseAnchorEpochs: 1,
+      } })
+      .order('created_at', { ascending: true })
+      .limit(1000),
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status', 'evaluation_pending')
@@ -238,14 +250,17 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       .limit(100),
   ])
   if (oldestArtifacts.error) throw oldestArtifacts.error
+  if (currentRecipeArtifacts.error) throw currentRecipeArtifacts.error
   if (builderV2Artifacts.error) throw builderV2Artifacts.error
   if (replayArtifacts.error) throw replayArtifacts.error
+  const confirmedCurrentRecipeArtifacts = (currentRecipeArtifacts.data || [])
+    .filter((row: any) => isBuilderV2Receipt(row?.intended_use))
   const confirmedBuilderV2Artifacts = (builderV2Artifacts.data || [])
     .filter((row: any) => isBuilderV2Receipt(row?.intended_use))
   const confirmedReplayArtifacts = (replayArtifacts.data || [])
     .filter((row: any) => isRemediationReplayReceipt(row?.intended_use))
   const artifactByCandidate = new Map<string, any>()
-  for (const row of [...(oldestArtifacts.data || []), ...confirmedBuilderV2Artifacts, ...confirmedReplayArtifacts]) {
+  for (const row of [...(oldestArtifacts.data || []), ...confirmedCurrentRecipeArtifacts, ...confirmedBuilderV2Artifacts, ...confirmedReplayArtifacts]) {
     artifactByCandidate.set(String((row as any).candidate_id), row)
   }
   const artifactRows = [...artifactByCandidate.values()]
@@ -300,7 +315,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     return {
       candidateId, subjectId: clean(row.subject_id, 240),
       artifactHash, createdAt: String(row.created_at || ''),
-      frontierRecipe: receipt.profile === 'cos_university_frontier_gkd_v1',
+      frontierRecipe: isBuilderV2Receipt(row.intended_use),
       builderV2: isBuilder && isBuilderV2Receipt(row.intended_use),
       remediationReplay: isRemediationReplayReceipt(row.intended_use),
       ...(minimumCanaryObservedAt ? { minimumCanaryObservedAt } : {}),

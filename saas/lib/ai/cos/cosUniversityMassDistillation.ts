@@ -13,7 +13,13 @@ export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-dis
 export const MASS_DISTILLATION_SOURCE_POLICY = 'public_domain_cc0_v1' as const
 export const MASS_DISTILLATION_STUDENT_MODEL = 'Qwen/Qwen3-4B' as const
 export const MASS_DISTILLATION_MIN_CONFIDENCE = 0.80
+// Historical/structural minimum retained for legacy evidence compatibility.
 export const MASS_DISTILLATION_MIN_BATCH = 20
+// Production quality floor for NEW mass batches. 2026-09-22..25 telemetry showed 729/739 recent
+// jobs launched with only 20-31 sources and trained on roughly 16-25 examples; independently
+// evaluated artifacts showed no reliable holdout/retention gain. New packaging waits for 64 unique
+// rights-cleared teaching items so the existing small-batch trainer sees a materially larger cohort.
+export const MASS_DISTILLATION_QUALITY_MIN_BATCH = 64
 export const MASS_DISTILLATION_MAX_BATCH = 128
 // These are University defaults only. Deployment-owner throughput configuration may exceed them.
 export const MASS_DISTILLATION_MAX_BATCHES_PER_RUN = 20
@@ -227,7 +233,7 @@ function massDistillationHybridOrigin(sourceKind: string): HybridDistillationOri
 }
 
 function selectHybridDistillationChunk(rows: readonly NormalizedIdentity[]): NormalizedIdentity[] {
-  if (rows.length < MASS_DISTILLATION_MIN_BATCH) return []
+  if (rows.length < MASS_DISTILLATION_QUALITY_MIN_BATCH) return []
   const ordered = [...rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
   // Failure-derived curriculum rides inside a full-sized batch; it does not shrink the batch.
   // Production 2026-09-19 -> 2026-09-21: the previous rule packaged a minimum 20-item "corrective
@@ -320,9 +326,9 @@ export function analyzeMassDistillationSupply(
       subject: group.subject,
       canonicalSubjectId: group.canonicalSubjectId,
       uniqueBatchableItems: group.uniqueMaterialHashes.size,
-      shortfallToBatch: group.uniqueMaterialHashes.size >= MASS_DISTILLATION_MIN_BATCH
+      shortfallToBatch: group.uniqueMaterialHashes.size >= MASS_DISTILLATION_QUALITY_MIN_BATCH
         ? 0
-        : MASS_DISTILLATION_MIN_BATCH - group.uniqueMaterialHashes.size,
+        : MASS_DISTILLATION_QUALITY_MIN_BATCH - group.uniqueMaterialHashes.size,
     }))
     .filter(subject => subject.uniqueBatchableItems > 0)
     .sort((a, b) => b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))
@@ -385,9 +391,9 @@ export function buildMassDistillationBatches(
   const orderedGroups = [...groups.entries()].sort((a, b) => b[1].rows.length - a[1].rows.length || a[0].localeCompare(b[0]))
   for (const [subjectKey, group] of orderedGroups) {
     let remaining = [...group.rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
-    while (remaining.length >= MASS_DISTILLATION_MIN_BATCH) {
+    while (remaining.length >= MASS_DISTILLATION_QUALITY_MIN_BATCH) {
       const chunk = selectHybridDistillationChunk(remaining)
-      if (chunk.length < MASS_DISTILLATION_MIN_BATCH) break
+      if (chunk.length < MASS_DISTILLATION_QUALITY_MIN_BATCH) break
       const selectedHashes = new Set(chunk.map(item => item.contentHash))
       remaining = remaining.filter(item => !selectedHashes.has(item.contentHash))
       const sourceHashes = chunk.map(item => item.contentHash)

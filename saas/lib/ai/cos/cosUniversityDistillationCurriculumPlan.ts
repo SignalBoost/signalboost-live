@@ -12,8 +12,8 @@ export const MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT = 3
 export const MASS_DISTILLATION_DEFAULT_ACQUISITION_CANDIDATES_PER_CYCLE = 40
 export const MASS_DISTILLATION_DEFAULT_CORPUS_SCAN_ROWS = 5_000
 export const MASS_DISTILLATION_DEFAULT_MAX_BATCHES_PER_SWEEP = 20
-// Unique items one batch needs; mirrors MASS_DISTILLATION_MIN_BATCH (a type-only import keeps this module dependency-free).
-export const MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS = 20
+// Unique items a NEW quality batch needs; mirrors MASS_DISTILLATION_QUALITY_MIN_BATCH while keeping this module dependency-free.
+export const MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS = 64
 
 export type MassDistillationThroughputProfile = Readonly<{
   preparedBatchBufferTarget: number

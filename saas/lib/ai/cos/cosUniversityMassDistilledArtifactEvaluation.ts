@@ -39,13 +39,12 @@ const JUDGE_CALLS = MASS_EVALUATION_JUDGE_CALLS
 // extraction, which is why the constant is named for what it measures.
 const OBSERVED_GATEWAY_CUTOFF_MS = 40_000
 const ENDPOINT_CALL_TIMEOUT_MS = 50_000
-// Production telemetry 2026-09-19 shows the independent DeepInfra judge has a long but valid tail:
-// successful responses completed at ~98.5s and ~103.3s, while provider-side failures cluster at
-// ~120s and above. A 35s caller timeout was therefore aborting valid judge work and recycling the
-// artifact as infrastructure failure. Bound the judge at 110s: above the observed valid tail, below
-// the provider-failure band, and still capped by withinDeadline against the route's remaining budget.
-// Scoring prompts, evaluator identity, call count, thresholds, and promotion authority are unchanged.
-const JUDGE_CALL_TIMEOUT_MS = 110_000
+// Production 2026-09-25 after the 512-token judge cap: 32/32 successful DeepInfra judge calls
+// completed within 6.1s (p99 ~5.9s), while 8/8 failed calls from two overlapping evaluator runs
+// consumed the full 110s ceiling in two four-request bursts. Bound each judge call at 30s: almost
+// 5x the observed successful maximum, but short enough to fail fast on the measured provider stall.
+// Scoring prompts, evaluator identity, four-call ceiling, thresholds, and promotion authority are unchanged.
+const JUDGE_CALL_TIMEOUT_MS = 30_000
 // Production 2026-09-25 provider telemetry: 252 successful judge calls used 196.6 completion
 // tokens on average, p95=231, p99=310.5, max=340. The prior 2,200-token allowance reserved far
 // more generation than strict four-case JSON needs. Keep >50% headroom over the observed maximum.
@@ -606,12 +605,15 @@ async function runMassDistilledArtifactEvaluationInsideHarness(input:{claim:Mass
     const transferCandidate=await answersFor({...common,model,cases:transferCases(),maxGroups:1,reserveCallsAfter:2,feature:'mass_distilled_eval_transfer_candidate',candidate:true})
     const retentionBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:retentionCases(),maxGroups:1,reserveCallsAfter:1,feature:'mass_distilled_eval_retention_baseline',candidate:false})
     const retentionCandidate=await answersFor({...common,model,cases:retentionCases(),maxGroups:1,reserveCallsAfter:0,feature:'mass_distilled_eval_retention_candidate',candidate:true})
-    const [holdout,safety,transfer,retention]=await Promise.all([
-      suite({name:'holdout',cases:holdoutCases,baseline:holdoutBaseline,candidate:holdoutCandidate,deadlineMs:input.deadlineMs}),
-      suite({name:'safety',cases:safetyCases(),baseline:safetyBaseline,candidate:safetyCandidate,deadlineMs:input.deadlineMs}),
-      suite({name:'transfer',cases:transferCases(),baseline:transferBaseline,candidate:transferCandidate,deadlineMs:input.deadlineMs}),
-      suite({name:'retention',cases:retentionCases(),baseline:retentionBaseline,candidate:retentionCandidate,deadlineMs:input.deadlineMs}),
-    ])
+    // DeepInfra is the independent scorer, not a throughput fan-out target. Production 2026-09-25
+    // showed two overlapping evaluator runs each launching four judge calls at once; all eight stalled
+    // until the 110s client ceiling, while every successful post-cap call completed inside 6.1s.
+    // Judge the largest/most important holdout first and fail fast, then score the fixed suites one by one.
+    // This preserves the exact four calls and exact scoring inputs while removing the burst.
+    const holdout=await suite({name:'holdout',cases:holdoutCases,baseline:holdoutBaseline,candidate:holdoutCandidate,deadlineMs:input.deadlineMs})
+    const safety=await suite({name:'safety',cases:safetyCases(),baseline:safetyBaseline,candidate:safetyCandidate,deadlineMs:input.deadlineMs})
+    const transfer=await suite({name:'transfer',cases:transferCases(),baseline:transferBaseline,candidate:transferCandidate,deadlineMs:input.deadlineMs})
+    const retention=await suite({name:'retention',cases:retentionCases(),baseline:retentionBaseline,candidate:retentionCandidate,deadlineMs:input.deadlineMs})
     const evaluatorIds=new Set([holdout.evaluatorId,safety.evaluatorId,transfer.evaluatorId,retention.evaluatorId]);if(evaluatorIds.size!==1||evaluatorIds.has(training.teacherModelId))throw new Error('mass_distilled_evaluation_evaluator_separation_failed')
     // Safety is deliberately stricter than a simple no-regression comparison. University policy forbids
     // turning a legitimate failed exam into a pass by weakening grading. The artifact must therefore satisfy

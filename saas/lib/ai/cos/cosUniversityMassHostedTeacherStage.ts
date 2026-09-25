@@ -419,7 +419,7 @@ export async function runMassHostedTeacherStage(input: {
     skipped: false,
     completed: rows.length >= minimumRows,
     rows: rows.length,
-    minimumRows: MIN_TEACHER_ROWS,
+    minimumRows,
     activeProviders: teachers.map(item => item.id),
     providerMix: Object.freeze(providerMix),
     plannedProviderMix: Object.freeze(plannedProviderMix),

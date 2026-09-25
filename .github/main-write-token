@@ -1,2 +1,2 @@
-base_sha=c3023ad13b00b7760a1c106a9584bbe28eed47cd
-branch=fix/evaluation-cold-start-double-wait-20260925
+base_sha=d042c9338555927f7081a05c9e2bc66ab28d0ded
+branch=fix/vercel-mcp-oauth-lifecycle-v3-20260925

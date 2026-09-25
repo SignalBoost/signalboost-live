@@ -69,7 +69,7 @@ test('gateway readiness is honest: Context7 works anonymously while credentialed
       ['supabase-mcp', false, 'missing_credential'],
       ['context7-mcp', true, 'ready'],
       ['figma-mcp', false, 'provider_client_approval_required'],
-      ['vercel-mcp', false, 'missing_credential'],
+      ['vercel-mcp', false, 'provider_client_approval_required'],
     ],
   )
 })
@@ -240,10 +240,12 @@ test('durable MCP audit schema never persists tool arguments, results or credent
 })
 
 
-test('Universal MCP live acceptance never requests a static Figma access-token secret', async () => {
+test('Universal MCP live acceptance never requests static Figma or Vercel access-token secrets', async () => {
   const workflow = await readFile(new URL('../../.github/workflows/universal-mcp-live-acceptance.yml', import.meta.url), 'utf8')
   assert.doesNotMatch(workflow, /FIGMA_MCP_OAUTH_ACCESS_TOKEN/)
+  assert.doesNotMatch(workflow, /VERCEL_MCP_OAUTH_ACCESS_TOKEN/)
   assert.match(workflow, /Figma intentionally has no static token secret/)
+  assert.match(workflow, /Vercel intentionally has no static token secret/)
 })
 
 test('Figma remains fail-closed until the custom MCP client is approved and connected', async () => {
@@ -339,15 +341,38 @@ test('Vercel remains fail-closed without host-owned OAuth and exact project targ
   assert.equal(result.mode, 'mcp_provider_not_configured')
 })
 
-test('Vercel OAuth plus exact team/project exposes only read-only diagnostics', async () => {
+test('legacy static Vercel token environment variables do not enable the provider', async () => {
   const gateway = createUniversalMcpGateway({
     tenantId: 'tenant-a',
     environmentId: 'test',
     portableId: 'builder',
     env: {
-      VERCEL_MCP_OAUTH_ACCESS_TOKEN: 'oauth-access-token',
+      VERCEL_MCP_OAUTH_ACCESS_TOKEN: 'legacy-static-token-must-be-ignored',
       VERCEL_MCP_TEAM_SLUG: 'signalboost',
       VERCEL_MCP_PROJECT_SLUG: 'itmounts',
+    },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const vercel = gateway.readiness.find(item => item.providerId === 'vercel-mcp')
+  assert.equal(vercel?.configured, false)
+  assert.equal(vercel?.reason, 'provider_client_approval_required')
+  assert.deepEqual(await gateway.discover('vercel-mcp'), [])
+})
+
+test('approved host-owned Vercel authorization plus exact team/project exposes only read-only diagnostics', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {
+      VERCEL_MCP_TEAM_SLUG: 'signalboost',
+      VERCEL_MCP_PROJECT_SLUG: 'itmounts',
+    },
+    vercelAuthorization: {
+      clientApproved: true,
+      connected: true,
+      async getAccessToken() { return 'oauth-access-token' },
     },
     fetcher: fakeMcpFetch([]),
     audit: { async append() {} },
@@ -358,4 +383,27 @@ test('Vercel OAuth plus exact team/project exposes only read-only diagnostics', 
     VERCEL_MCP_PROFILE.tools.map(item => `mcp.vercel-mcp.${item.capabilityName}`).sort(),
   )
   assert.equal(visible.every(item => item.risk === 'read' && !item.requiresApproval), true)
+})
+
+test('approved Vercel client without a user connection remains fail-closed', async () => {
+  const gateway = createUniversalMcpGateway({
+    tenantId: 'tenant-a',
+    environmentId: 'test',
+    portableId: 'builder',
+    env: {
+      VERCEL_MCP_TEAM_SLUG: 'signalboost',
+      VERCEL_MCP_PROJECT_SLUG: 'itmounts',
+    },
+    vercelAuthorization: {
+      clientApproved: true,
+      connected: false,
+      async getAccessToken() { return null },
+    },
+    fetcher: fakeMcpFetch([]),
+    audit: { async append() {} },
+  })
+  const vercel = gateway.readiness.find(item => item.providerId === 'vercel-mcp')
+  assert.equal(vercel?.configured, false)
+  assert.equal(vercel?.reason, 'authorization_required')
+  assert.deepEqual(await gateway.discover('vercel-mcp'), [])
 })

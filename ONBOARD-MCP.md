@@ -138,15 +138,17 @@ The shared MCP certification framework now covers all three implemented Universa
 - Figma is part of the required Universal MCP Production set. Its official remote endpoint is `https://mcp.figma.com/mcp`. As of 2026-09-22, Figma documents that only clients in the Figma MCP Catalog can connect; a new custom MCP client must obtain provider approval first. iTMounts therefore reports `provider_client_approval_required` and stays fail-closed. A legacy/static `FIGMA_MCP_OAUTH_ACCESS_TOKEN` must not enable the provider. The HTTP transport accepts an async host-owned authorization resolver so, after Figma approves iTMounts, the authenticated user's OAuth connection can be resolved/refreshed from the server-side encrypted vault rather than copied into Vercel or GitHub secrets.
 
 
-## Vercel provider certification — 2026-09-21
+## Vercel provider certification — 2026-09-21 / OAuth lifecycle correction 2026-09-25
 
 Vercel is part of the required Universal MCP Production set after GitHub, Supabase, Context7, and governed Figma onboarding.
 
 - Official remote server: `https://mcp.vercel.com`; iTMounts uses Vercel's project-specific endpoint form `https://mcp.vercel.com/<teamSlug>/<projectSlug>` so the remote server receives exact team/project context.
-- Production configuration requires host-owned `VERCEL_MCP_OAUTH_ACCESS_TOKEN`, `VERCEL_MCP_TEAM_SLUG`, and `VERCEL_MCP_PROJECT_SLUG`. Missing OAuth or target fails closed.
+- Vercel MCP is an OAuth-protected resource and Vercel keeps an allowlist of approved MCP clients/redirect URIs. iTMounts remains fail-closed until that provider-side client approval exists.
+- `VERCEL_MCP_TEAM_SLUG` and `VERCEL_MCP_PROJECT_SLUG` are host-owned routing context. A copied/static `VERCEL_MCP_OAUTH_ACCESS_TOKEN` environment variable is legacy and must not enable the provider.
+- The runtime accepts only a host-owned asynchronous Vercel authorization resolver with `clientApproved=true`, `connected=true`, and a per-request access-token resolver. That resolver is the seam for encrypted refresh-token storage and automatic renewal; token material is never stored in MCP registry metadata or exposed to the model.
 - The initial allowlist is diagnostics-first and read-only: documentation search, project read, deployment listing/read, build logs, and runtime logs.
 - `deploy_to_vercel`, `use_vercel_cli`, domain purchase, protected-link creation, and other mutation/consequential tools are intentionally absent pending separate authority review.
-- Live Vercel certification requires the three host-owned Vercel secrets and exact governed capability projection plus a real project-details probe. Missing Vercel configuration is a failed full-suite acceptance, not a skip.
+- A prior isolated Preview on 2026-09-22 proved the governed project-read path, but that does not establish a durable Production OAuth lifecycle. Current certification status is `blocked_external` until Vercel approves the iTMounts client/redirect URI and the host-owned refreshable connection completes live acceptance.
 - Full Universal MCP acceptance requires GitHub, Supabase, Context7, Figma, and Vercel to certify on the same candidate revision; a green run may not omit Figma or Vercel.
 - Remote tool discovery never expands the host allowlist or project scope.
 

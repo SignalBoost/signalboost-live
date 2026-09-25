@@ -46,6 +46,12 @@ export interface UniversalMcpFigmaAuthorization {
   readonly getAccessToken: (scope: McpOutboundScope) => Promise<string | null>
 }
 
+export interface UniversalMcpVercelAuthorization {
+  readonly clientApproved: boolean
+  readonly connected: boolean
+  readonly getAccessToken: (scope: McpOutboundScope) => Promise<string | null>
+}
+
 export interface UniversalMcpGatewayOptions {
   tenantId: string
   environmentId: string
@@ -56,6 +62,7 @@ export interface UniversalMcpGatewayOptions {
   audit?: PortableConnectorAuditPort
   allowedGitHubRepos?: readonly string[]
   figmaAuthorization?: UniversalMcpFigmaAuthorization
+  vercelAuthorization?: UniversalMcpVercelAuthorization
 }
 
 function required(value: unknown, name: string): string {
@@ -105,12 +112,12 @@ function readinessFor(
   env: Environment,
   allowedRepos: readonly string[],
   figmaAuthorization?: UniversalMcpFigmaAuthorization,
+  vercelAuthorization?: UniversalMcpVercelAuthorization,
 ): readonly UniversalMcpProviderReadiness[] {
   const gitToken = githubToken(env)
   const sbToken = String(env.SUPABASE_ACCESS_TOKEN || '').trim()
   const sbRef = supabaseProjectRef(env)
   const context7Token = String(env.CONTEXT7_API_KEY || '').trim()
-  const vercelToken = String(env.VERCEL_MCP_OAUTH_ACCESS_TOKEN || '').trim()
   const vercelTeam = String(env.VERCEL_MCP_TEAM_SLUG || '').trim()
   const vercelProject = String(env.VERCEL_MCP_PROJECT_SLUG || '').trim()
   return Object.freeze([
@@ -153,10 +160,16 @@ function readinessFor(
     Object.freeze({
       providerId: 'vercel-mcp' as const,
       displayName: VERCEL_MCP_PROFILE.displayName,
-      configured: Boolean(vercelToken && vercelTeam && vercelProject),
-      reason: !vercelToken ? 'missing_credential' as const
-        : !vercelTeam || !vercelProject ? 'missing_target' as const
-          : 'ready' as const,
+      configured: vercelAuthorization?.clientApproved === true
+        && vercelAuthorization.connected === true
+        && Boolean(vercelTeam && vercelProject),
+      reason: vercelAuthorization?.clientApproved !== true
+        ? 'provider_client_approval_required' as const
+        : !vercelTeam || !vercelProject
+          ? 'missing_target' as const
+          : vercelAuthorization.connected !== true
+            ? 'authorization_required' as const
+            : 'ready' as const,
       authentication: 'bearer' as const,
       target: vercelTeam && vercelProject ? `${vercelTeam}/${vercelProject}` : 'unresolved',
     }),
@@ -167,6 +180,7 @@ function httpProfiles(
   env: Environment,
   ready: readonly UniversalMcpProviderReadiness[],
   figmaAuthorization?: UniversalMcpFigmaAuthorization,
+  vercelAuthorization?: UniversalMcpVercelAuthorization,
 ): readonly McpStreamableHttpProfile[] {
   const profiles: McpStreamableHttpProfile[] = []
   const gitToken = githubToken(env)
@@ -224,16 +238,19 @@ function httpProfiles(
     }))
   }
 
-  const vercelToken = String(env.VERCEL_MCP_OAUTH_ACCESS_TOKEN || '').trim()
   const vercelTeam = String(env.VERCEL_MCP_TEAM_SLUG || '').trim()
   const vercelProject = String(env.VERCEL_MCP_PROJECT_SLUG || '').trim()
-  if (vercelToken && vercelTeam && vercelProject) {
+  const vercelReady = ready.find(item => item.providerId === 'vercel-mcp')?.configured === true
+  if (vercelReady && vercelAuthorization && vercelTeam && vercelProject) {
     profiles.push(Object.freeze({
       serverId: VERCEL_MCP_PROFILE.serverId,
       transportRef: VERCEL_MCP_PROFILE.transportRef,
       endpoint: `https://mcp.vercel.com/${encodeURIComponent(vercelTeam)}/${encodeURIComponent(vercelProject)}`,
       protocolVersion: VERCEL_MCP_PROFILE.protocolVersion,
-      authorization: () => `Bearer ${vercelToken}`,
+      authorization: async scope => {
+        const token = String(await vercelAuthorization.getAccessToken(scope) || '').trim()
+        return token ? `Bearer ${token}` : null
+      },
     }))
   }
 
@@ -321,7 +338,7 @@ export function createUniversalMcpGateway(options: UniversalMcpGatewayOptions) {
   const portableId = required(options.portableId, 'portableId')
   const env: Environment = options.env ?? process.env
   const allowedRepos = githubRepos(env, options.allowedGitHubRepos)
-  const readiness = readinessFor(env, allowedRepos, options.figmaAuthorization)
+  const readiness = readinessFor(env, allowedRepos, options.figmaAuthorization, options.vercelAuthorization)
   const enabledProfiles = readiness.filter(item => item.configured).map(item => item.providerId)
   const registry = createInMemoryMcpConnectionRegistry(createUniversalMcpRegistryEntries({
     tenantId,
@@ -330,7 +347,7 @@ export function createUniversalMcpGateway(options: UniversalMcpGatewayOptions) {
     enabledProfiles,
   }))
   const http = createMcpStreamableHttpTransportFactory({
-    profiles: httpProfiles(env, readiness, options.figmaAuthorization),
+    profiles: httpProfiles(env, readiness, options.figmaAuthorization, options.vercelAuthorization),
     fetcher: options.fetcher,
   })
   const resolver = createMcpConnectionRegistryResolver({

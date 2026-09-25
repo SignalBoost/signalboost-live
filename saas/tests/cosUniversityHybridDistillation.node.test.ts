@@ -7,6 +7,7 @@ import {
   failureDerivedPracticeVariant,
   failureDerivedOrdinalForHash,
   failureDerivedSourceHash,
+  HYBRID_INDEPENDENT_HOLDOUT_MIN,
   planHybridDistillationMix,
   syntheticOrdinalForHash,
   teacherSyntheticPrompt,
@@ -28,6 +29,17 @@ test('hybrid mix prefers grounded and failure-derived material before synthetic 
     failureDerived: 0,
     teacherSynthetic: 2,
   })
+})
+
+test('remediation-heavy mixes preserve an independent non-failure holdout floor', () => {
+  const mix = planHybridDistillationMix({ batchSize: 81, realSourceAvailable: 4, failureDerivedAvailable: 77 })
+  assert.deepEqual(mix, {
+    total: 81,
+    realSource: 4,
+    failureDerived: 76,
+    teacherSynthetic: 1,
+  })
+  assert.equal(mix.realSource + mix.teacherSynthetic, HYBRID_INDEPENDENT_HOLDOUT_MIN)
 })
 
 test('failure-derived source identities are deterministic and self-attributing without raw failure content', () => {

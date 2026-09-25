@@ -83,14 +83,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     cert:'Certification', none:'No certification receipt', certify:'Run live certification', certifying:'Certifying…',
     spend:'Certification makes bounded live provider calls and may incur charges.',
     checks:'Checks', partial:'Unverified declared capabilities',
-    assignments:'Production assignments', assign:'Assign', assigning:'Assigning…', rollback:'Rollback', disabling:'Disabling…', disable:'Disable registration',
+    assignments:'Production assignments', assign:'Assign', assigning:'Assigning…', rollback:'Rollback', release:'Use platform default', disabling:'Disabling…', disable:'Disable registration',
     current:'Current', noAssignment:'No durable assignment', history:'Recent assignment history',
     confirmRegister:'Save this model registration and encrypted credential configuration?',
     confirmCert:'Run live certification? This can incur bounded provider charges.',
     confirmAssign:'Activate this exact certified model for this platform role? Cross-model fallback will remain disabled.',
     confirmRollback:'Rollback this role to its previous recorded model assignment?',
+    confirmRelease:'Release this assignment and return the role to platform default routing?',
     confirmDisable:'Disable this model registration? Active assignments must be rolled back first.',
-    saved:'Model registration saved.', assigned:'Model assignment changed.', rolledBack:'Model assignment rolled back.', disabledModel:'Model registration disabled.',
+    saved:'Model registration saved.', assigned:'Model assignment changed.', rolledBack:'Model assignment rolled back.', released:'Assignment released to platform default routing.', disabledModel:'Model registration disabled.',
   },
   es: {
     eyebrow:'Modelos de plataforma', title:'Consola de modelos y proveedores',
@@ -106,14 +107,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     cert:'Certificación', none:'Sin certificado', certify:'Ejecutar certificación', certifying:'Certificando…',
     spend:'La certificación realiza llamadas reales limitadas y puede generar cargos.',
     checks:'Pruebas', partial:'Capacidades declaradas no verificadas',
-    assignments:'Asignaciones de producción', assign:'Asignar', assigning:'Asignando…', rollback:'Revertir', disabling:'Desactivando…', disable:'Desactivar registro',
+    assignments:'Asignaciones de producción', assign:'Asignar', assigning:'Asignando…', rollback:'Revertir', release:'Usar valor predeterminado', disabling:'Desactivando…', disable:'Desactivar registro',
     current:'Actual', noAssignment:'Sin asignación durable', history:'Historial reciente',
     confirmRegister:'¿Guardar este registro y su configuración de credencial cifrada?',
     confirmCert:'¿Ejecutar certificación en vivo? Puede generar cargos limitados.',
     confirmAssign:'¿Activar este modelo certificado para este rol? No habrá fallback silencioso a otro modelo.',
     confirmRollback:'¿Revertir este rol a su asignación anterior?',
+    confirmRelease:'¿Liberar esta asignación y devolver el rol al enrutamiento predeterminado de la plataforma?',
     confirmDisable:'¿Desactivar este registro? Primero hay que revertir las asignaciones activas.',
-    saved:'Registro guardado.', assigned:'Asignación cambiada.', rolledBack:'Asignación revertida.', disabledModel:'Registro desactivado.',
+    saved:'Registro guardado.', assigned:'Asignación cambiada.', rolledBack:'Asignación revertida.', released:'Asignación liberada al enrutamiento predeterminado.', disabledModel:'Registro desactivado.',
   },
   pt: {
     eyebrow:'Modelos da plataforma', title:'Console de modelos e provedores',
@@ -129,14 +131,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     cert:'Certificação', none:'Sem certificado', certify:'Executar certificação', certifying:'Certificando…',
     spend:'A certificação faz chamadas reais limitadas e pode gerar cobranças.',
     checks:'Verificações', partial:'Capacidades declaradas não verificadas',
-    assignments:'Atribuições de produção', assign:'Atribuir', assigning:'Atribuindo…', rollback:'Rollback', disabling:'Desativando…', disable:'Desativar registro',
+    assignments:'Atribuições de produção', assign:'Atribuir', assigning:'Atribuindo…', rollback:'Rollback', release:'Usar padrão da plataforma', disabling:'Desativando…', disable:'Desativar registro',
     current:'Atual', noAssignment:'Sem atribuição durável', history:'Histórico recente',
     confirmRegister:'Salvar este registro e a configuração de credencial criptografada?',
     confirmCert:'Executar certificação ao vivo? Pode gerar cobranças limitadas.',
     confirmAssign:'Ativar este modelo certificado para este papel? Não haverá fallback silencioso para outro modelo.',
     confirmRollback:'Fazer rollback deste papel para a atribuição anterior?',
+    confirmRelease:'Liberar esta atribuição e retornar o papel ao roteamento padrão da plataforma?',
     confirmDisable:'Desativar este registro? Atribuições ativas precisam ser revertidas primeiro.',
-    saved:'Registro salvo.', assigned:'Atribuição alterada.', rolledBack:'Rollback concluído.', disabledModel:'Registro desativado.',
+    saved:'Registro salvo.', assigned:'Atribuição alterada.', rolledBack:'Rollback concluído.', released:'Atribuição liberada para o roteamento padrão da plataforma.', disabledModel:'Registro desativado.',
   },
   pl: {
     eyebrow:'Modele platformy', title:'Konsola modeli i dostawców',
@@ -152,14 +155,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     cert:'Certyfikacja', none:'Brak certyfikatu', certify:'Uruchom certyfikację', certifying:'Certyfikowanie…',
     spend:'Certyfikacja wykonuje ograniczone rzeczywiste wywołania i może naliczyć opłaty.',
     checks:'Kontrole', partial:'Niezweryfikowane zadeklarowane możliwości',
-    assignments:'Przypisania produkcyjne', assign:'Przypisz', assigning:'Przypisywanie…', rollback:'Rollback', disabling:'Wyłączanie…', disable:'Wyłącz rejestrację',
+    assignments:'Przypisania produkcyjne', assign:'Przypisz', assigning:'Przypisywanie…', rollback:'Rollback', release:'Użyj domyślnego routingu', disabling:'Wyłączanie…', disable:'Wyłącz rejestrację',
     current:'Aktualne', noAssignment:'Brak trwałego przypisania', history:'Ostatnia historia',
     confirmRegister:'Zapisać tę rejestrację i zaszyfrowane dane dostępowe?',
     confirmCert:'Uruchomić certyfikację na żywo? Może naliczyć ograniczone opłaty.',
     confirmAssign:'Aktywować ten certyfikowany model dla tej roli? Nie będzie cichego fallbacku do innego modelu.',
     confirmRollback:'Przywrócić poprzednie przypisanie modelu dla tej roli?',
+    confirmRelease:'Zwolnić to przypisanie i przywrócić domyślny routing platformy dla tej roli?',
     confirmDisable:'Wyłączyć rejestrację? Najpierw trzeba wycofać aktywne przypisania.',
-    saved:'Rejestracja zapisana.', assigned:'Przypisanie zmienione.', rolledBack:'Rollback zakończony.', disabledModel:'Rejestracja wyłączona.',
+    saved:'Rejestracja zapisana.', assigned:'Przypisanie zmienione.', rolledBack:'Rollback zakończony.', released:'Przypisanie zwolnione do domyślnego routingu platformy.', disabledModel:'Rejestracja wyłączona.',
   },
   ru: {
     eyebrow:'Модели платформы', title:'Консоль моделей и провайдеров',
@@ -175,14 +179,15 @@ const COPY: Record<Locale, Record<string, string>> = {
     cert:'Сертификация', none:'Нет сертификата', certify:'Запустить сертификацию', certifying:'Сертификация…',
     spend:'Сертификация выполняет ограниченные реальные вызовы и может быть платной.',
     checks:'Проверки', partial:'Непроверенные заявленные возможности',
-    assignments:'Назначения Production', assign:'Назначить', assigning:'Назначение…', rollback:'Откат', disabling:'Отключение…', disable:'Отключить регистрацию',
+    assignments:'Назначения Production', assign:'Назначить', assigning:'Назначение…', rollback:'Откат', release:'Маршрут платформы', disabling:'Отключение…', disable:'Отключить регистрацию',
     current:'Текущее', noAssignment:'Нет долговременного назначения', history:'Недавняя история',
     confirmRegister:'Сохранить регистрацию и зашифрованные учетные данные?',
     confirmCert:'Запустить живую сертификацию? Возможны ограниченные расходы.',
     confirmAssign:'Активировать эту сертифицированную модель для роли? Скрытого fallback на другую модель не будет.',
     confirmRollback:'Откатить роль к предыдущему назначению модели?',
+    confirmRelease:'Освободить это назначение и вернуть роль к маршрутизации платформы по умолчанию?',
     confirmDisable:'Отключить регистрацию? Активное назначение сначала нужно откатить.',
-    saved:'Регистрация сохранена.', assigned:'Назначение изменено.', rolledBack:'Откат выполнен.', disabledModel:'Регистрация отключена.',
+    saved:'Регистрация сохранена.', assigned:'Назначение изменено.', rolledBack:'Откат выполнен.', released:'Назначение освобождено; используется маршрутизация платформы по умолчанию.', disabledModel:'Регистрация отключена.',
   },
 }
 
@@ -294,6 +299,15 @@ export default function ModelConsole() {
     }, `rollback:${group.use}`, text.rolledBack)
   }
 
+  async function release(group: AssignmentGroup) {
+    if (!group.current || !window.confirm(text.confirmRelease)) return
+    await mutate({
+      action:'release', use:group.use,
+      expectedCurrentAssignmentId:group.current.assignmentId,
+      confirmRelease:true,
+    }, `release:${group.use}`, text.released)
+  }
+
   async function disable(profileKey: string) {
     if (!window.confirm(text.confirmDisable)) return
     await mutate({ action:'disable', profileKey, confirmMutation:true }, `disable:${profileKey}`, text.disabledModel)
@@ -363,6 +377,7 @@ export default function ModelConsole() {
                 </select>
                 <button disabled={running===`assign:${group.use}`} onClick={()=>assign(group)} type="button">{running===`assign:${group.use}` ? text.assigning : text.assign}</button>
                 <button disabled={!group.current?.previousAssignmentId || running===`rollback:${group.use}`} onClick={()=>rollback(group)} type="button">{text.rollback}</button>
+                <button disabled={!group.current || running===`release:${group.use}`} onClick={()=>release(group)} type="button">{text.release}</button>
               </div>
               {group.history.length ? <details style={{ marginTop:8 }}><summary>{text.history}</summary><ul>{group.history.map(item=><li key={item.assignmentId}>{item.createdAt} · {item.status} · {item.profileKey}</li>)}</ul></details> : null}
             </div>

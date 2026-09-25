@@ -52,6 +52,18 @@ export function workingAgentKnowledgeSourceKindAllowed(sourceKind: unknown): boo
   return ALLOWED_SOURCE_KINDS.has(String(sourceKind ?? '').trim().toLowerCase())
 }
 
+/**
+ * Library material is a broader internal source class than the public Open Library adapter, so the
+ * working-agent bridge requires the provider URI as well. Other admitted classes are already
+ * externally published by their connector contract.
+ */
+export function workingAgentKnowledgeRowAllowed(row: { source_kind?: unknown; source_uri?: unknown }): boolean {
+  const kind = String(row.source_kind ?? '').trim().toLowerCase()
+  if (!workingAgentKnowledgeSourceKindAllowed(kind)) return false
+  if (kind === 'library_material') return /^https:\/\/openlibrary\.org\//i.test(String(row.source_uri ?? '').trim())
+  return true
+}
+
 function rejected(row: { fact_extraction_error?: unknown }): boolean {
   return String(row.fact_extraction_error ?? '').trim().toLowerCase().startsWith('relevance_rejected:')
 }
@@ -113,7 +125,7 @@ async function lexicalCandidates(objective: string): Promise<LearnedCorpusRow[]>
 
 function chooseRows(objective: string, rows: readonly LearnedCorpusRow[], limit: number): LearnedCorpusRow[] {
   const eligible = rows.filter(row =>
-    workingAgentKnowledgeSourceKindAllowed(row.source_kind)
+    workingAgentKnowledgeRowAllowed(row)
     && domainCompatibleContext(objective, candidateText(row)),
   )
   const full = eligible.filter(row => classifyLearnedEvidence(row) === 'full')

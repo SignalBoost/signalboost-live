@@ -13,7 +13,8 @@ export type NativeMonitoringSignal =
   | "certificate-expiry"
   | "resource-pressure"
   | "configuration-drift"
-  | "deployment-health";
+  | "deployment-health"
+  | "security-observation";
 
 export type NativeMonitoringPolicy = {
   enabledByDefault: true;
@@ -45,6 +46,7 @@ export const SELF_HEALING_NATIVE_MONITORING: NativeMonitoringPolicy = Object.fre
     "resource-pressure",
     "configuration-drift",
     "deployment-health",
+    "security-observation",
   ] as NativeMonitoringSignal[]),
 });
 

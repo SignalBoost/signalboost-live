@@ -381,6 +381,56 @@ export async function ensureMassDistilledEndpoint24Gb(endpointId: string) {
   })
 }
 
+/** Realize the evaluator's already-authorized single runtime wake without widening authority. */
+export async function activateMassDistilledEvaluationWorker(endpointId: string) {
+  const endpoint = await resolveEndpointControlPlane(clean(endpointId, 160))
+  assertEndpointSafetyPolicy(endpoint, IDLE_TIMEOUT_SECONDS, APPROVED_POOLS)
+  const activated = await withWorkerQuotaRecovery(String(endpoint.id), () =>
+    requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ workers: { min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+    }))
+  if (!activated?.id
+    || Number(activated.workers?.min ?? Number.NaN) !== 1
+    || Number(activated.workers?.max ?? Number.NaN) !== 1) {
+    throw new Error('mass_distilled_evaluation_worker_activation_rejected')
+  }
+  const pools = (activated.gpu?.pools || []).map(pool => clean(pool, 80))
+  if (pools.length !== APPROVED_POOLS.length || !APPROVED_POOLS.every(pool => pools.includes(pool))) {
+    throw new Error('mass_distilled_runtime_endpoint_gpu_pool_drift')
+  }
+  return Object.freeze({
+    endpointId: String(activated.id),
+    workersMin: 1 as const,
+    workersMax: 1 as const,
+    idleTimeout: Number(activated.workers?.idleTimeout),
+    gpuPools: Object.freeze([...pools]),
+    authorityExpanded: false as const,
+  })
+}
+
+/** Return an explicitly woken evaluator endpoint to the normal scale-to-zero envelope. */
+export async function deactivateMassDistilledEvaluationWorker(endpointId: string) {
+  const endpoint = await resolveEndpointControlPlane(clean(endpointId, 160))
+  const pools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
+  if (pools.length !== APPROVED_POOLS.length || !APPROVED_POOLS.every(pool => pools.includes(pool))) {
+    throw new Error('mass_distilled_runtime_endpoint_gpu_pool_drift')
+  }
+  const deactivated = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+  })
+  if (!deactivated?.id) throw new Error('mass_distilled_evaluation_worker_scale_down_missing')
+  assertEndpointSafetyPolicy(deactivated, IDLE_TIMEOUT_SECONDS, APPROVED_POOLS)
+  return Object.freeze({
+    endpointId: String(deactivated.id),
+    workersMin: 0 as const,
+    workersMax: 1 as const,
+    idleTimeout: Number(deactivated.workers?.idleTimeout),
+    authorityExpanded: false as const,
+  })
+}
+
 function materializedEndpointMatches(endpoint: Endpoint, input: MassDistilledRuntimeArtifact, modelName: string) {
   const args = clean(endpoint.args, 20_000)
   const ports = endpoint.ports || []

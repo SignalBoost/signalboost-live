@@ -119,8 +119,8 @@ function projectGutenbergMirrorTextUrls(id:number,mirrorBaseUrl:string):string[]
 
 function projectGutenbergBody(raw:string):string{
   const value=String(raw??'').replace(/^\uFEFF/,'')
-  const start=/\*\*\*\s*START OF (?:THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
-  const end=/\*\*\*\s*END OF (?:THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
+  const start=/\*\*\*\s*START OF (?:THIS |THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
+  const end=/\*\*\*\s*END OF (?:THIS |THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
   const from=start?start.index+start[0].length:0
   const to=end&&end.index>from?end.index:value.length
   return clean(value.slice(from,to)).slice(0,60000)

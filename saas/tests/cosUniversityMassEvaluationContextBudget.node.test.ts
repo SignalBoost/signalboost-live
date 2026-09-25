@@ -148,11 +148,11 @@ test('endpoint requests get enough time to generate a fitted batch and remain bo
   assert.match(source, /const timeout=Math\.max\(1,Math\.min\(ENDPOINT_CALL_TIMEOUT_MS,remaining\(input\.deadlineMs\)\)\)/)
 })
 
-test('the four independent judge calls run concurrently inside the same route deadline', () => {
-  assert.match(source, /const \[holdout,safety,transfer,retention\]=await Promise\.all\(\[/)
+test('the four independent judge calls run sequentially and fail fast instead of bursting the scorer', () => {
   assert.equal((source.match(/suite\(\{name:'(holdout|safety|transfer|retention)'/g) || []).length, 4)
-  assert.match(source, /const JUDGE_CALL_TIMEOUT_MS = 110_000/)
-  assert.doesNotMatch(source, /const holdout=await suite[\s\S]*const safety=await suite/)
+  assert.match(source, /const JUDGE_CALL_TIMEOUT_MS = 30_000/)
+  assert.match(source, /const holdout=await suite[\s\S]*const safety=await suite[\s\S]*const transfer=await suite[\s\S]*const retention=await suite/)
+  assert.doesNotMatch(source, /Promise\.all\(\[[\s\S]*suite\(\{name:'holdout'/)
 })
 
 test('evaluation thresholds remain unchanged by transport recovery', () => {

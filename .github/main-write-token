@@ -1,2 +1,2 @@
-base_sha=c497a6c96c56f999dc50dce0be97c8dc9ddbce38
-branch=fix/model-console-type-contracts-v3-20260925
+base_sha=5c2b9bb7cfc9f9ecefa1f702bf8067450d5ac684
+branch=test/mcp-actions-token-scope-regression-20260925

@@ -51,7 +51,7 @@ export type UniversitySourcePlugin = Readonly<{
 }>
 
 export type UniversityMcpLearningPort = Readonly<{
-  search(input: Readonly<{ query: string; limit: number; subject: string }>): Promise<readonly LearningConnectorResult[]>
+  search(input: Readonly<{ query: string; limit: number }>): Promise<readonly LearningConnectorResult[]>
 }>
 
 const REQUIRED_CAPABILITIES = Object.freeze([
@@ -107,7 +107,7 @@ export function createUniversityMcpSourcePlugin(input: Readonly<{
       return new SearchLearningConnector(
         manifest.sourceKind,
         async (query, limit) => {
-          const rows = await input.port.search({ query, limit: Math.min(limit, maxResults), subject: query })
+          const rows = await input.port.search({ query, limit: Math.min(limit, maxResults) })
           return [...rows].slice(0, maxResults).map(row => ({
             uri: String(row.uri || '').trim(),
             title: row.title,

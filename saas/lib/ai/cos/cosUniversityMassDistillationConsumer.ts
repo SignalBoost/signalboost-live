@@ -36,11 +36,12 @@ import {
   runMassHostedTeacherStage,
 } from './cosUniversityMassHostedTeacherStage.ts'
 import { buildFrontierDistillationPlan } from './cosUniversityFrontierDistillation.ts'
+import { CURRENT_UNIVERSITY_STUDENT_PROFILE, CURRENT_UNIVERSITY_TEACHER_PROFILE } from './cosUniversityModelCapabilityRegistry.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
 export const MASS_DISTILLATION_CALLBACK_PATH = '/api/internal/cos/mass-distillation/evidence' as const
-export const MASS_DISTILLATION_TEACHER_MODEL = 'Qwen/Qwen3-8B' as const
-export const MASS_DISTILLATION_STUDENT_MODEL = 'Qwen/Qwen3-4B' as const
+export const MASS_DISTILLATION_TEACHER_MODEL = CURRENT_UNIVERSITY_TEACHER_PROFILE.modelId
+export const MASS_DISTILLATION_STUDENT_MODEL = CURRENT_UNIVERSITY_STUDENT_PROFILE.modelId
 export const MASS_DISTILLATION_TEACHER_COST_CEILING_USD = 0.20 as const
 export const MASS_DISTILLATION_PREPARATION_COST_CEILING_USD = 0.015 as const
 export const MASS_DISTILLATION_TRAINING_COST_CEILING_USD = 1.61 as const

@@ -81,6 +81,18 @@ Qwen3 is a current validated University model family, not an iTMounts dependency
 - RunPod now requires the selected profile's validated `vllm` capability before provisioning.
 - Added buyer-defined profile parsing through `ITMOUNTS_MODEL_REGISTRY_JSON`.
 - Made transport protocols vendor-neutral rather than treating OpenAI-compatible chat as the platform abstraction.
+## Phase 2 live-routing migration
+
+`saas/lib/ai/local-inference.ts` now resolves every selected runtime model against the platform registry before issuing the existing `/chat/completions` request.
+
+- A registered profile must have `inference.chatCompletion=validated`.
+- This particular inference seam additionally requires `openai_compatible`; a profile that declares Anthropic/Google/native/custom transport is refused here rather than being sent to the wrong wire protocol.
+- Existing unregistered runtime models remain available through a clearly marked `legacy_openai_compatible` migration binding so current deployments are not broken by the registry rollout.
+- Buyers can set `ITMOUNTS_MODEL_REGISTRY_REQUIRE_REGISTERED=true` after all runtime models are defined. Strict mode then refuses any unregistered selected model.
+- Runtime telemetry now records the resolved model-profile key and transport protocol, making portability state observable.
+
+This migration rule applies to feature-specific model overrides too: when strict mode is enabled, an override model must also be registered.
+
 
 ## Next phases
 

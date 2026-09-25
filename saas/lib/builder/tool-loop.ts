@@ -26,6 +26,7 @@ const MAX_GATE_NUDGES = 3
 const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const MAX_MODEL_ROUND_ATTEMPTS = 2
 const MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS = 1
+const MAX_REPAIR_INSPECTIONS_AFTER_FAILURE = 3
 /**
  * A round must not be started that the wall clock cannot finish. Reserving one model round plus a
  * command run means the loop stops with its evidence intact instead of dying inside a generation.
@@ -312,15 +313,15 @@ function verifiedRepairAnswer(trace: readonly BuilderToolTrace[]): string {
 function diagnose(value: unknown, knownPaths: readonly string[] = []): { failureClass: BuilderFailureClass; remediation: string } {
   const message = String(value || '').toLowerCase()
   if (/supabase|postgres|database|constraint|pgrst|duplicate key|relation .* does not exist/.test(message)) return { failureClass: 'storage', remediation: 'Inspect the exact database error and the storage contract before retrying.' }
-  if (/cannot find package|no module named|unable to resolve|npm err|dependency|lockfile/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
+  // Strong dependency evidence is specific. A bare word like "dependency" can appear in test names,
+  // assertion messages, or source paths and must not outrank an observed regression.
+  if (/cannot find package|no module named|unable to resolve|npm err|lockfile/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   if (/cannot find module\s+['"](?![./])[^'"]+['"]/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   if (/command not found|executable not found/.test(message)) return {
     failureClass: 'runtime',
     remediation: 'The shell cannot resolve a bare executable. Use the project package script or npm exec -- <binary> so the pinned local dependency is resolved; do not treat this as a missing source path.',
   }
-  if (/invalid_path|not found|no such file|module_not_found|cannot find module|enoent|path/.test(message)) {
-    // A generic "go list the files" nudge is not enough: the model has already listed them and still
-    // invents a directory prefix. Name the real paths so the next command cannot be a guess.
+  if (/invalid_path|invalid path|no such file|module_not_found|cannot find module|enoent|file not found/.test(message)) {
     const listing = knownPaths.slice(0, 20).join(', ')
     return {
       failureClass: 'path',
@@ -330,8 +331,11 @@ function diagnose(value: unknown, knownPaths: readonly string[] = []): { failure
     }
   }
   if (/node.*not found|command not found|runtime|timed out|timeout|sigkill/.test(message)) return { failureClass: 'runtime', remediation: 'Inspect the runtime evidence and choose an available command; do not guess environment capabilities.' }
-  if (/assert|expected|test|exit [1-9]|exit code [1-9]|syntaxerror|typeerror|referenceerror/.test(message)) return { failureClass: 'test', remediation: 'Read the failure output, make the smallest targeted change, then rerun the relevant test.' }
+  if (/assert(?:ionerror)?|expected|\btests?\b|not equal|strict(?:equal)?|deepequal|exit [1-9]|exit code [1-9]|syntaxerror|typeerror|referenceerror/.test(message)) {
+    return { failureClass: 'test', remediation: 'Read the failure output, make the smallest targeted source change, then rerun the exact failing command.' }
+  }
   if (/deploy|vercel|build|compile|production|preview/.test(message)) return { failureClass: 'deployment', remediation: 'Inspect the build or deployment evidence; do not treat local success as deployment proof.' }
+  if (/\bdependency\b/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   return { failureClass: 'unknown', remediation: 'Inspect the exact failure evidence before making another change.' }
 }
 export class BuilderToolLoop {
@@ -427,6 +431,31 @@ export class BuilderToolLoop {
       const lastWorkspaceChange = Math.max(...trace.map((item, index) => (
         item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file') ? index : -1
       )))
+      const latestFailedRunIndex = trace.reduce((latest, item, index) => (
+        item.toolId === 'run' && !item.ok ? index : latest
+      ), -1)
+      const repairTraceAfterFailure = latestFailedRunIndex >= 0 ? trace.slice(latestFailedRunIndex + 1) : []
+      const repairMutationAfterFailure = repairTraceAfterFailure.some(item => item.ok
+        && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+      const repairInspectionsAfterFailure = repairTraceAfterFailure.filter(item => item.ok
+        && (item.toolId === 'list_files' || item.toolId === 'read_file' || item.toolId === 'search_files' || item.toolId === 'mcp_read')).length
+      const repairProgressRefusalsAfterFailure = repairTraceAfterFailure.filter(item =>
+        item.toolId === 'model_control' && item.error === 'builder_repair_progress_required').length
+      const failedRun = latestFailedRunIndex >= 0 ? trace[latestFailedRunIndex] : undefined
+      const failedRunOutput = failedRun && isRecord(failedRun.output)
+        ? `${text(failedRun.output.stderr)}\n${text(failedRun.output.stdout)}`
+        : ''
+      const inspectedRepairPaths = new Set(repairTraceAfterFailure
+        .filter(item => item.ok && item.toolId === 'read_file')
+        .map(item => toolPath(item.input)))
+      const forcedRepairInspectionPath = repairObjective && latestFailedRunIndex >= 0
+        && !repairMutationAfterFailure && repairInspectionsAfterFailure === 0
+        ? workspacePaths.find(path => failedRunOutput.includes(path) && !inspectedRepairPaths.has(path))
+        : undefined
+      const repairMutationRequired = repairObjective && latestFailedRunIndex >= 0
+        && !repairMutationAfterFailure
+        && (repairInspectionsAfterFailure >= MAX_REPAIR_INSPECTIONS_AFTER_FAILURE
+          || (repairInspectionsAfterFailure > 0 && repairProgressRefusalsAfterFailure > 0))
       // The controller owns verification scheduling. Once a new build's declared files
       // exist, execute the user's explicit Run list before asking for any more edits.
       // A failed command is attempted only once per file revision, then returned to the
@@ -435,7 +464,9 @@ export class BuilderToolLoop {
         ? progress.pendingCommands.find(command => !trace.slice(lastWorkspaceChange + 1)
           .some(item => item.toolId === 'run' && (item.input.command === command || item.input.requestedCommand === command)))
         : undefined
-      const currentStep = chunks.size > 0 ? formatBuilderChunks(chunks) : !repairObjective && progress.missingFiles.length > 0
+      const currentStep = repairMutationRequired
+        ? 'CURRENT STEP: The defect is reproduced and the bounded diagnostic allowance is exhausted. Make the smallest justified edit/write now. Do not inspect more files and do not answer yet; verification will rerun after the mutation.'
+        : chunks.size > 0 ? formatBuilderChunks(chunks) : !repairObjective && progress.missingFiles.length > 0
         ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files. For large files use bounded append chunks; only final=true publishes the complete file.`
         : !repairObjective && progress.pendingCommands.length === 0 && !progress.testsSatisfied
           ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. Complete the test suite with distinct meaningful assertions covering the requested normal, edge, and failure cases. Do not duplicate empty tests or weaken the requirement. Verification will run again after the file changes.`
@@ -463,6 +494,7 @@ export class BuilderToolLoop {
         .filter(toolId => toolId !== 'browser_cli' || browserCliActions.size > 0)
         .filter(toolId => toolId !== blockedTool)
         .filter(toolId => !blockedInspectionTools.has(toolId))
+        .filter(toolId => !repairMutationRequired || toolId === 'write_file' || toolId === 'edit_file')
 
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -517,7 +549,11 @@ export class BuilderToolLoop {
         'When done: {"type":"answer","answer":"what changed and what ran"}',
       ].filter(Boolean)
 
-      let action: Action | null = verificationCommand ? { type: 'tool', toolId: 'run', input: { command: verificationCommand } } : null
+      let action: Action | null = verificationCommand
+        ? { type: 'tool', toolId: 'run', input: { command: verificationCommand } }
+        : forcedRepairInspectionPath
+          ? { type: 'tool', toolId: 'read_file', input: { path: forcedRepairInspectionPath } }
+          : null
       let blockedAction: ToolAction | null = null
       let controlFailure: ModelControlFailure | null = null
       for (let controlAttempt = 0; !action && controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
@@ -597,6 +633,22 @@ export class BuilderToolLoop {
       }
 
       if (action.type === 'answer') {
+        if (repairMutationRequired) {
+          trace.push({ round, toolId: 'model_control', input: {}, ok: false,
+            error: 'builder_repair_mutation_required',
+            failureClass: 'test',
+            remediation: 'The failure is reproduced and enough source has been inspected. Make the smallest justified source mutation now, then rerun the exact failing command.' })
+          continue
+        }
+        if (repairObjective && latestFailedRunIndex >= 0 && !repairMutationAfterFailure) {
+          trace.push({ round, toolId: 'model_control', input: {}, ok: false,
+            error: 'builder_repair_progress_required',
+            failureClass: 'test',
+            remediation: repairInspectionsAfterFailure > 0
+              ? 'The failure is reproduced. Do not answer yet; make the smallest justified source mutation, then rerun the exact failing command.'
+              : 'The failure is reproduced. Inspect a source path named by the failure, then make the smallest justified source mutation and rerun the exact failing command.' })
+          continue
+        }
         if (pendingOrder.length) {
           trace.push({ round, toolId: 'model_control', input: {}, ok: false, error: 'builder_verification_order_required', remediation: verificationOrderGuidance(pendingOrder) })
           if (++gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_verification_order_required', trace }

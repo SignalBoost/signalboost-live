@@ -2082,3 +2082,20 @@ full proof contract, the compactor performs zero retirements and reports
 `no_proven_superseded_mass_artifacts`. The cron is also a first-class University Production-assurance path
 (`mass_backlog_compaction`) and writes a host Production receipt on zero-retirement, retirement, and failure
 outcomes; operational compaction therefore cannot silently disappear from Production verification.
+
+
+### Mass evaluator DeepInfra spend reservation repair (2026-09-25)
+
+The exact-artifact mass evaluator intentionally uses **four independent DeepInfra judge calls**—holdout,
+safety, transfer, and retention. Each judge call must reserve against the Harness provider-cost ledger before
+dispatch. The dedicated `mass_evaluation_judge` spend class therefore defaults to **$0.05 per judge call** and
+**$0.20 for all four judge calls**.
+
+The enclosing HarnessRun carries an honest total paid ceiling:
+`maxEstimatedRuntimeWakeCostUsd + deepInfraMaxRunUsd('mass_evaluation_judge')`. With the signed RunPod wake
+ceiling at **$0.20**, the default total evaluation ceiling is **$0.40**. The signed evaluation claim still
+independently constrains RunPod wake/canary authority; the DeepInfra ledger consumes only judge reservations.
+Changing judge call count without raising the judge-run ceiling fails closed before provider dispatch.
+
+This repair does not weaken four-suite independence, endpoint-call ceilings, scoring thresholds, artifact
+binding, promotion gates, or Production-traffic authority. Missing or insufficient reservations fail closed.

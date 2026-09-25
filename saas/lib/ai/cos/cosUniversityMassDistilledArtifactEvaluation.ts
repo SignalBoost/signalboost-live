@@ -15,7 +15,7 @@ import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { runpodServerlessOpenAiBaseUrl, runpodServerlessRootUrl } from './runpodServerlessDistilledProvision.ts'
 import { massDistilledRuntimeHealth } from './runpodMassDistilledProvisionV2.ts'
 import { fineTuneRevisionKey, type FineTuneRevision } from './cosUniversityFineTuneEvidence.ts'
-import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from './cosUniversityModelCapabilityRegistry.ts'
+import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from '../modelCapabilityRegistry.ts'
 import {
   COS_UNIVERSITY_INDEPENDENT_EVALUATOR_PROFILE,
   independentEvaluatorConfigFromEnv,

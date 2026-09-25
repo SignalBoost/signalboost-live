@@ -118,6 +118,45 @@ export async function readProviderCircuit(input: { db: any; providerId: string; 
   }
 }
 
+export async function armProviderCircuitRecoveryProbe(input: {
+  db: any
+  providerId: string
+  capability: string
+  expectedFailureClass: ProviderFailureClass
+  expectedReason: string
+  verification: Record<string, unknown>
+  now?: Date
+}) {
+  const now = (input.now || new Date()).toISOString()
+  const providerId = String(input.providerId || '').trim().toLowerCase()
+  const capability = String(input.capability || '').trim().toLowerCase()
+  const expectedReason = String(input.expectedReason || '').trim()
+  if (!providerId || !capability || !expectedReason) throw new Error('provider_circuit_identity_invalid')
+  const result = await input.db.from('self_healing_provider_circuits').update({
+    failure_class: input.expectedFailureClass,
+    reason: expectedReason,
+    cost_bearing_retry_allowed: true,
+    last_observed_at: now,
+    recovery_verification: {
+      profile: PROVIDER_CIRCUIT_PROFILE,
+      state: 'half_open_probe_armed',
+      providerId,
+      capability,
+      ...input.verification,
+      armedAt: now,
+    },
+  })
+    .eq('provider_id', providerId)
+    .eq('capability', capability)
+    .eq('state', 'open')
+    .eq('cost_bearing_retry_allowed', false)
+    .select('provider_id,capability,failure_class,reason')
+    .maybeSingle()
+  if (result.error) throw result.error
+  if (!result.data) return { armed: false as const, reason: 'provider_circuit_not_armable' as const }
+  return { armed: true as const, providerId, capability, failureClass: input.expectedFailureClass, reason: expectedReason }
+}
+
 export async function consumeProviderCircuitRecoveryProbe(input: {
   db: any
   providerId: string

@@ -27,8 +27,12 @@ async function run() {
     }],
   })
 
+  // The workflow uses GitHub's repository-scoped Actions token. The remote MCP
+  // deliberately does not advertise get_me/identity.read for that credential,
+  // so CI certifies the repository capabilities it is actually authorized to use.
+  // Runtime user credentials still retain identity.read in GITHUB_MCP_PROFILE.
   const githubReadCapabilities = GITHUB_MCP_PROFILE.tools
-    .filter(item => item.risk === 'read')
+    .filter(item => item.risk === 'read' && item.capabilityName !== 'identity.read')
     .map(item => `mcp.github-mcp.${item.capabilityName}`)
     .sort()
   const githubReadiness = gateway.readiness.find(item => item.providerId === 'github-mcp')

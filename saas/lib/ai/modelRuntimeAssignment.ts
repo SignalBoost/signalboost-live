@@ -7,6 +7,40 @@ import type { AssignableModelUse } from './modelConfigurationPort.ts'
 import { currentHarnessExecutionContext, reserveHarnessProviderCostUsd } from '../../platform-harness/runtime/execution-context.ts'
 import type { LocalModelCallArgs, LocalModelTurnResult } from './local-inference.ts'
 
+export type AssignedModelDescriptor = Readonly<{
+  assignmentId: string
+  use: AssignableModelUse
+  profileKey: string
+  modelId: string
+  providerModelId: string
+  family: string
+  transportProtocol: string
+  provider: string
+}>
+
+export async function currentAssignedModelDescriptor(use: AssignableModelUse): Promise<AssignedModelDescriptor | null> {
+  let store
+  try { store = createSignalBoostModelConfigurationPort() } catch { return null }
+  try {
+    const current = await store.currentAssignment(use)
+    if (!current) return null
+    const registration = await store.getRegistration(current.profileKey)
+    if (!registration || !registration.enabled) return null
+    return Object.freeze({
+      assignmentId: current.assignmentId,
+      use,
+      profileKey: registration.profile.key,
+      modelId: registration.profile.modelId,
+      providerModelId: registration.profile.providerModelId,
+      family: registration.profile.family,
+      transportProtocol: registration.binding.protocol,
+      provider: registration.binding.provider,
+    })
+  } catch {
+    return null
+  }
+}
+
 export type AssignedModelAttempt = Readonly<{
   attempted: boolean
   result: LocalModelTurnResult | null

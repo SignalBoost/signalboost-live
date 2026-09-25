@@ -2,20 +2,17 @@
 // Lists the owner's Supabase projects for the Hub SQL Editor picker and runs
 // SQL against a chosen one.
 //
-// Sources, in order:
-//   1. "primary"   — this app's own connection (NEXT_PUBLIC_SUPABASE_URL).
-//   2. "secondary" — the marketing project, derived from the SECONDARY_* env
-//      vars that the affiliate tools already use. Always offered; needs NO
-//      Management API token. SQL runs through the marketing project's own
-//      hub_exec_sql RPC via its service-role key (same contract as primary).
-//   3. Real projects from the Management API when SUPABASE_ACCESS_TOKEN is
-//      configured (token from https://supabase.com/dashboard/account/tokens).
+// The primary Supabase console must never mix unrelated/secondary projects into
+// its picker. NEXT_PUBLIC_SUPABASE_URL is the source of truth for which project
+// this provider controls. When SUPABASE_ACCESS_TOKEN is present we use the
+// Management API only to enrich that exact project with its canonical name and
+// region. The secondary/marketing database has its own provider (supabase_mkt)
+// and remains addressable by the lower-level SQL helper, but is not advertised
+// here.
 //
 // Required env vars (Vercel > signalboost-live > Settings > Environment Variables):
-//   SECONDARY_SUPABASE_URL                 e.g. https://<ref>.supabase.co
-//   SECONDARY_SUPABASE_SERVICE_ROLE_KEY    the marketing project's service_role key
-//   (legacy MARKETING_SUPABASE_URL / _SERVICE_ROLE_KEY are honoured as fallback)
-//   SUPABASE_ACCESS_TOKEN                  optional, unlocks the full project list
+//   NEXT_PUBLIC_SUPABASE_URL               canonical primary project
+//   SUPABASE_ACCESS_TOKEN                  optional; enriches canonical metadata
 
 const MGMT = 'https://api.supabase.com'
 const RPC_RETRY_DELAYS_MS = [0, 750, 1500]
@@ -43,42 +40,36 @@ function secondaryConfig(): { url: string; key: string; ref: string } | null {
 function primaryProject(): SupabaseProject[] {
   const ref = refFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || '')
   if (!ref) return []
-  return [{ ref: 'primary', name: `Primary — ${ref} (this app)` }]
-}
-
-function secondaryProject(): SupabaseProject[] {
-  const cfg = secondaryConfig()
-  if (!cfg) return []
-  return [{ ref: 'secondary', name: `Marketing — ${cfg.ref} (secondary)` }]
+  return [{ ref, name: ref }]
 }
 
 export async function listSupabaseProjects(): Promise<{ ok: boolean; projects?: SupabaseProject[]; error?: string }> {
   const token = process.env.SUPABASE_ACCESS_TOKEN
-  const builtIns = [...primaryProject(), ...secondaryProject()]
+  const fallback = primaryProject()
+  const primaryRef = fallback[0]?.ref || ''
 
-  if (!token) return { ok: true, projects: builtIns }
+  if (!primaryRef) {
+    return { ok: false, error: 'Primary Supabase project is not configured' }
+  }
+
+  if (!token) return { ok: true, projects: fallback }
 
   try {
     const res = await fetch(`${MGMT}/v1/projects`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     })
-    if (!res.ok) {
-      return builtIns.length ? { ok: true, projects: builtIns } : { ok: false, error: `Management API ${res.status}` }
-    }
+    if (!res.ok) return { ok: true, projects: fallback }
+
     const data = await res.json()
     const list = Array.isArray(data) ? data : []
-    const projects: SupabaseProject[] = list
+    const canonical = list
       .map((p: any) => ({ ref: p.id || p.ref, name: p.name || p.id, region: p.region }))
-      .filter((p: SupabaseProject) => !!p.ref)
+      .find((p: SupabaseProject) => p.ref === primaryRef)
 
-    if (!projects.length) return { ok: true, projects: builtIns }
-
-    const cfg = secondaryConfig()
-    if (cfg && !projects.some((p) => p.ref === cfg.ref)) projects.push(...secondaryProject())
-    return { ok: true, projects }
-  } catch (err: any) {
-    return builtIns.length ? { ok: true, projects: builtIns } : { ok: false, error: err?.message || 'Management API error' }
+    return { ok: true, projects: canonical ? [canonical] : fallback }
+  } catch {
+    return { ok: true, projects: fallback }
   }
 }
 

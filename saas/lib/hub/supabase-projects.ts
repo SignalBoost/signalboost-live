@@ -2,16 +2,17 @@
 // Lists the owner's Supabase projects for the Hub SQL Editor picker and runs
 // SQL against a chosen one.
 //
-// The primary Supabase console must never mix unrelated/secondary projects into
-// its picker. NEXT_PUBLIC_SUPABASE_URL is the source of truth for which project
-// this provider controls. When SUPABASE_ACCESS_TOKEN is present we use the
-// Management API only to enrich that exact project with its canonical name and
-// region. The secondary/marketing database has its own provider (supabase_mkt)
-// and remains addressable by the lower-level SQL helper, but is not advertised
-// here.
+// The SQL Editor exposes the two configured Supabase projects:
+//   1. primary   — NEXT_PUBLIC_SUPABASE_URL
+//   2. secondary — SECONDARY_SUPABASE_URL / MARKETING_SUPABASE_URL
+// Project values use the real Supabase project refs (never synthetic
+// "primary"/"secondary" IDs). When SUPABASE_ACCESS_TOKEN is available, the
+// Management API enriches those same refs with their canonical project names.
 //
 // Required env vars (Vercel > signalboost-live > Settings > Environment Variables):
-//   NEXT_PUBLIC_SUPABASE_URL               canonical primary project
+//   NEXT_PUBLIC_SUPABASE_URL
+//   SECONDARY_SUPABASE_URL (or legacy MARKETING_SUPABASE_URL)
+//   SECONDARY_SUPABASE_SERVICE_ROLE_KEY (or legacy MARKETING_SUPABASE_SERVICE_ROLE_KEY)
 //   SUPABASE_ACCESS_TOKEN                  optional; enriches canonical metadata
 
 const MGMT = 'https://api.supabase.com'
@@ -43,33 +44,43 @@ function primaryProject(): SupabaseProject[] {
   return [{ ref, name: ref }]
 }
 
+function secondaryProject(): SupabaseProject[] {
+  const cfg = secondaryConfig()
+  if (!cfg) return []
+  return [{ ref: cfg.ref, name: cfg.ref }]
+}
+
 export async function listSupabaseProjects(): Promise<{ ok: boolean; projects?: SupabaseProject[]; error?: string }> {
   const token = process.env.SUPABASE_ACCESS_TOKEN
-  const fallback = primaryProject()
-  const primaryRef = fallback[0]?.ref || ''
+  const configured = [...primaryProject(), ...secondaryProject()]
+  const primaryRef = configured[0]?.ref || ''
 
   if (!primaryRef) {
     return { ok: false, error: 'Primary Supabase project is not configured' }
   }
 
-  if (!token) return { ok: true, projects: fallback }
+  if (!token) return { ok: true, projects: configured }
 
   try {
     const res = await fetch(`${MGMT}/v1/projects`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     })
-    if (!res.ok) return { ok: true, projects: fallback }
+    if (!res.ok) return { ok: true, projects: configured }
 
     const data = await res.json()
     const list = Array.isArray(data) ? data : []
-    const canonical = list
-      .map((p: any) => ({ ref: p.id || p.ref, name: p.name || p.id, region: p.region }))
-      .find((p: SupabaseProject) => p.ref === primaryRef)
+    const byRef = new Map<string, SupabaseProject>(
+      list
+        .map((p: any) => ({ ref: p.id || p.ref, name: p.name || p.id, region: p.region }))
+        .filter((p: SupabaseProject) => !!p.ref)
+        .map((p: SupabaseProject) => [p.ref, p]),
+    )
 
-    return { ok: true, projects: canonical ? [canonical] : fallback }
+    const projects = configured.map(p => byRef.get(p.ref) || p)
+    return { ok: true, projects }
   } catch {
-    return { ok: true, projects: fallback }
+    return { ok: true, projects: configured }
   }
 }
 
@@ -151,7 +162,8 @@ async function runSecondarySql(query: string, managementToken?: string): Promise
 }
 
 export async function runProjectSql(ref: string, query: string): Promise<SqlResult> {
-  if (!ref || ref === 'primary') return { handled: false }
+  const primaryRef = refFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || '')
+  if (!ref || ref === 'primary' || ref === primaryRef) return { handled: false }
 
   const token = process.env.SUPABASE_ACCESS_TOKEN
   const cfg = secondaryConfig()

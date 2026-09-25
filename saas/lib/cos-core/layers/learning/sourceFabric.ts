@@ -4,7 +4,7 @@
 // contribute training material. Source transport and training rights are intentionally separate.
 
 import type { ContinuousLearningSourceAdapter, LearningSourceDocument } from './cycle.ts'
-import { SearchLearningConnector, type LearningConnectorResult } from './connectors.ts'
+import type { LearningConnectorResult } from './connectors.ts'
 import type { KnowledgeGap } from './index.ts'
 
 export type UniversitySourceTransport =
@@ -104,23 +104,28 @@ export function createUniversityMcpSourcePlugin(input: Readonly<{
   return Object.freeze({
     manifest,
     createAdapter() {
-      return new SearchLearningConnector(
-        manifest.sourceKind,
-        async (query, limit) => {
-          const rows = await input.port.search({ query, limit: Math.min(limit, maxResults) })
-          return [...rows].slice(0, maxResults).map(row => ({
-            uri: String(row.uri || '').trim(),
-            title: row.title,
-            text: String(row.text || '').trim(),
-            observedAt: row.observedAt,
-            license: row.license,
-            evidence: row.evidence,
-          })).filter(row => Boolean(row.uri && row.text))
+      return {
+        kind: manifest.sourceKind,
+        id: manifest.id,
+        async acquire(gap: KnowledgeGap): Promise<LearningSourceDocument[]> {
+          const query = gap.discoveryQuery?.trim() || [gap.subject, gap.question].filter(Boolean).join(' ').trim()
+          if (!query) return []
+          const rows = await input.port.search({ query, limit: maxResults })
+          return [...rows]
+            .slice(0, maxResults)
+            .map(row => ({
+              sourceKind: manifest.sourceKind,
+              sourceUri: String(row.uri || '').trim(),
+              sourceTitle: row.title,
+              observedAt: row.observedAt ?? new Date().toISOString(),
+              subject: gap.subject,
+              text: String(row.text || '').trim(),
+              license: row.license,
+              evidence: row.evidence?.filter(Boolean),
+            }))
+            .filter(row => Boolean(row.sourceUri && row.text))
         },
-        maxResults,
-        manifest.id,
-        (gap: KnowledgeGap) => gap.discoveryQuery?.trim() || [gap.subject, gap.question].filter(Boolean).join(' ').trim(),
-      )
+      }
     },
   })
 }

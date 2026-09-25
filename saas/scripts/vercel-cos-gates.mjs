@@ -25,6 +25,8 @@ const tests = [
   'tests/modelTransportAdapters.node.test.ts',
   'tests/modelCertification.node.test.ts',
   'tests/modelConsole.node.test.ts',
+  'tests/modelTransportPlugin.node.test.ts',
+  'tests/modelPortabilitySaleAcceptance.node.test.ts',
   'tests/cosUniversityMassHostedTeacherStage.node.test.ts',
   'tests/cosUniversityTelemetry.node.test.ts',
   'tests/cosLaneStatus.node.test.ts',

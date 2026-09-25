@@ -22,6 +22,7 @@ create table if not exists public.tenant_data_residency_policies (
 
 alter table public.tenant_data_residency_policies enable row level security;
 revoke all on table public.tenant_data_residency_policies from anon, authenticated;
+grant select, insert, update, delete on table public.tenant_data_residency_policies to service_role;
 
 comment on table public.tenant_data_residency_policies is
   'Server-only tenant data residency policy. Region allowlists are runtime authority; transfer-basis text is audit evidence and never expands authority.';

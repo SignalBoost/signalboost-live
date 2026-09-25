@@ -168,7 +168,7 @@ export function createSignalBoostModelConfigurationPort(dbInput?: Db | null): Mo
       })
       if (error) throw new Error(error.message)
       if (String(data || '') !== input.profile.key) throw new Error('platform_model_registration_identity_mismatch')
-      const saved = await this.getRegistration(input.profile.key)
+      const saved = (await registrations(db)).find(item => item.profile.key === input.profile.key) || null
       if (!saved) throw new Error('platform_model_registration_not_observable')
       return saved
     },

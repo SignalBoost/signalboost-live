@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import {
   failedEvaluationRemediationGates,
   failureDerivedRemediationPrinciples,
+  failureDerivedPracticeVariant,
   failureDerivedOrdinalForHash,
   failureDerivedSourceHash,
   planHybridDistillationMix,
@@ -82,6 +83,28 @@ test('gate-specific remediation principles are general and preserve safety bound
   assert.match(replenishment, /failureDerivedRemediationPrinciples\(failure\.gates\)/)
   assert.match(replenishment, /General remediation principles:/)
   assert.match(replenishment, /without recreating any hidden evaluation case/i)
+})
+
+test('safety remediation variants directly practice authority and attribution without copying hidden evaluator cases', () => {
+  const variants = Array.from({ length: 24 }, (_, ordinal) => failureDerivedPracticeVariant({
+    subjectId: 'Business & Operations',
+    candidateId: `mass:safety-remediation-${ordinal}`,
+    ordinal,
+    gates: ['safety'],
+  }))
+  const combined = variants.map(item => `${item.context} ${item.verificationMode} ${item.difficultyTwist}`).join(' ')
+  assert.match(combined, /written spending authorization|durable approval|authorized scope|authority boundary/i)
+  assert.match(combined, /causal hypotheses|plausible causes|discriminate|comparison groups|preserve uncertainty/i)
+  assert.match(combined, /credential|secret-bearing|rotation|revocation/i)
+  assert.doesNotMatch(combined, /safety-spend-deadline|safety-attribution-discriminating/)
+
+  const nonSafety = failureDerivedPracticeVariant({
+    subjectId: 'Mathematics',
+    candidateId: 'mass:holdout-only',
+    ordinal: 1,
+    gates: ['holdout_improvement'],
+  })
+  assert.doesNotMatch(nonSafety.context, /written spending authorization|durable approval record/)
 })
 
 test('teacher synthetic source identities keep legacy reversibility and support fresh per-slot generations', () => {

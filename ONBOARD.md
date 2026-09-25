@@ -2342,3 +2342,5 @@ existing strict classifier must report zero silent days and GREEN.
 - Cross-model fallback is never implicit. Switching model family/revision is a governed routing decision; absence of one optimization must fall back to the same model's ordinary supported path or fail safely, not silently choose another model.
 - The current Qwen3-4B University student remains unchanged. It is now a registered profile, not a permanent architectural dependency.
 - The full portability contract is `docs/PLATFORM-MODEL-PORTABILITY-CONTRACT-2026-09-25.md`.
+- Phase 2 binds the live `local-inference.ts` route to this registry. Registered models must have validated chat capability and the exact wire protocol used by that seam; non-OpenAI transports cannot be silently sent to `/chat/completions`.
+- Existing deployments retain an explicit `legacy_openai_compatible` migration binding for unregistered runtime models. Buyers can enforce complete registration with `ITMOUNTS_MODEL_REGISTRY_REQUIRE_REGISTERED=true` once their model inventory is declared.

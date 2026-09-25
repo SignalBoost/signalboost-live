@@ -8,7 +8,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
-import { ensureMassDistilledEndpoint24Gb, massDistilledServerlessWorkerCapacity } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
+import { activateMassDistilledEvaluationWorker, deactivateMassDistilledEvaluationWorker, ensureMassDistilledEndpoint24Gb, massDistilledServerlessWorkerCapacity } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import { activeEvaluationRunpodEndpointIds } from '@/lib/ai/cos/cosUniversityGraduateEndpointProtection'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import { runpodServerlessRootUrl } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
@@ -681,6 +681,7 @@ export async function GET(req: NextRequest) {
   }
 
   let claim: MassEvaluationClaim | null = null
+  let evaluationWorkerActivated = false
   try {
     const evaluator = await independentEvaluatorConfig()
     if (!evaluator) {
@@ -783,12 +784,10 @@ export async function GET(req: NextRequest) {
     console.info('[cos-mass-distilled-runtime-preflight]', JSON.stringify(runtimePolicy))
 
     const deadlineMs = Date.now() + ROUTE_BUDGET_MS
-    // `/ready` is a worker-local probe. When the serverless endpoint has scaled fully to zero, repeatedly
-    // polling it can produce network-only failures without ever creating a worker. Wake through the actual
-    // load-balancer path first, using a route the exact-artifact gateway actually serves; `/ping` generates no
-    // tokens and does not consume one of the
-    // approved scoring calls. It does, however, realize the already-approved single runtime wake attempt.
-    const runtimeWake = await wakeMassDistilledRuntime(claim.endpointId, deadlineMs)
+    // The atomic claim already authorizes one bounded runtime wake. Realize it explicitly through
+    // RunPod's worker control plane; maxWorkers stays 1 and waitReady() remains non-token probing.
+    const runtimeWake = await activateMassDistilledEvaluationWorker(claim.endpointId)
+    evaluationWorkerActivated = true
     console.info('[cos-mass-distilled-runtime-wake]', JSON.stringify(runtimeWake))
 
     const result = await runMassDistilledArtifactEvaluation({ claim, deadlineMs, now: new Date() })
@@ -819,9 +818,19 @@ export async function GET(req: NextRequest) {
       endpointCalls: result.endpointCalls,
       judgeCalls: result.judgeCalls,
     }).catch(() => undefined)
+    if (evaluationWorkerActivated) {
+      await deactivateMassDistilledEvaluationWorker(claim.endpointId).catch(error =>
+        console.warn('[cos-mass-distilled-runtime-scale-down]', boundedErrorMessage(error)))
+      evaluationWorkerActivated = false
+    }
     console.info('[cos-mass-distilled-independent-evaluation]', JSON.stringify(result))
     return NextResponse.json(result, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
+    if (evaluationWorkerActivated && claim) {
+      await deactivateMassDistilledEvaluationWorker(claim.endpointId).catch(scaleDownError =>
+        console.warn('[cos-mass-distilled-runtime-scale-down]', boundedErrorMessage(scaleDownError)))
+      evaluationWorkerActivated = false
+    }
     const message = boundedErrorMessage(error)
     // A defect in our own code (2026-09-17 20:01 UTC: "Cannot read properties of undefined (reading 'length')")
     // is indistinguishable from a provider failure without the throw site. Record the first frames of our own

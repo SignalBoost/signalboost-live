@@ -5,7 +5,7 @@
 // the declared upper bound before a paid call begins; unused reservation is intentionally not
 // released within the run, so retries cannot silently exceed the run budget.
 
-export type DeepInfraSpendClass = 'builder' | 'university_practice' | 'university_assessment'
+export type DeepInfraSpendClass = 'builder' | 'university_practice' | 'university_assessment' | 'mass_distilled_evaluation'
 
 const DEFAULTS: Readonly<Record<DeepInfraSpendClass, Readonly<{ callUsd:number; runUsd:number }>>> = Object.freeze({
   // Production 2026-09-24 Builder fallback calls were roughly $0.02-$0.03. Reserve materially more
@@ -17,6 +17,10 @@ const DEFAULTS: Readonly<Record<DeepInfraSpendClass, Readonly<{ callUsd:number; 
   // Independent exams/capstones can use larger prompts/outputs than practice. One bounded paid call
   // is allowed by default; operators may lower the ceiling through environment configuration.
   university_assessment: Object.freeze({ callUsd: 0.10, runUsd: 0.10 }),
+  // The mass-distilled evaluator intentionally runs four independent judge suites. Preserve that
+  // separation and reserve one bounded DeepInfra call per suite rather than collapsing evaluation
+  // into one combined judgment. Four x $0.10 yields a hard $0.40 provider-spend ceiling per run.
+  mass_distilled_evaluation: Object.freeze({ callUsd: 0.10, runUsd: 0.40 }),
 })
 
 const ENV: Readonly<Record<DeepInfraSpendClass, Readonly<{ call:string; run:string }>>> = Object.freeze({
@@ -31,6 +35,10 @@ const ENV: Readonly<Record<DeepInfraSpendClass, Readonly<{ call:string; run:stri
   university_assessment: Object.freeze({
     call: 'DEEPINFRA_UNIVERSITY_ASSESSMENT_MAX_CALL_USD',
     run: 'DEEPINFRA_UNIVERSITY_ASSESSMENT_MAX_RUN_USD',
+  }),
+  mass_distilled_evaluation: Object.freeze({
+    call: 'DEEPINFRA_MASS_EVALUATION_MAX_CALL_USD',
+    run: 'DEEPINFRA_MASS_EVALUATION_MAX_RUN_USD',
   }),
 })
 

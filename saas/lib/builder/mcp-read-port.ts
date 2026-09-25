@@ -5,6 +5,7 @@ import {
   type UniversalMcpProfileId,
 } from '../../provider-hub-host/universal-mcp-profiles.ts'
 import { inspectUntrustedAiContent } from '../security/aiSecurityGateway.ts'
+import { recordAiSecuritySupervisorObservation } from '../security/aiSecuritySupervisorTelemetry.ts'
 
 type Environment = Readonly<Record<string, string | undefined>>
 
@@ -103,6 +104,16 @@ export function createBuilderMcpReadPort(input: {
         source: 'mcp_tool_output',
         data: 'data' in result ? result.data : undefined,
       })
+      if (inspected.findings.length) {
+        await recordAiSecuritySupervisorObservation({
+          source: 'mcp_tool_output',
+          surface: 'builder_mcp',
+          disposition: inspected.disposition,
+          findings: inspected.findings,
+          redactedCount: inspected.redactedCount,
+          traceId: request.traceId || `${request.providerId}:${request.capabilityId}`,
+        })
+      }
       if (inspected.disposition === 'quarantined') {
         return Object.freeze({
           ok: false,

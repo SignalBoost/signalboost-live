@@ -51,7 +51,7 @@ export const openLibrarySearch:LearningConnectorSearch=async(query,limit)=>{cons
 
 
 const DEFAULT_GUTENDEX_BASE_URL='https://gutendex.com'
-const DEFAULT_GUTENBERG_MIRROR_BASE_URL='https://gutenberg.pglaf.org/cache/epub'
+const DEFAULT_GUTENBERG_MIRROR_BASE_URL='https://www.gutenberg.org/cache/epub'
 const DEFAULT_GUTENBERG_OPDS_SEARCH_URL='https://m.gutenberg.org/ebooks/search.opds/'
 const DEFAULT_OPEN_LIBRARY_SEARCH_URL='https://openlibrary.org/search.json'
 
@@ -108,6 +108,24 @@ function normalizedHttpsBase(value:unknown,fallback:string):string{
     parsed.hash=''
     return parsed.toString().replace(/\/$/,'')
   }catch{return fallback}
+}
+
+function normalizedProjectGutenbergTextBase(value:unknown):string{
+  const raw=clean(value)
+  // A stray brace in the environment value is serialized by URL as %7D/%7B and creates a real 404.
+  // Fail closed to the known-valid official Project Gutenberg cache instead of preserving malformed input.
+  if(/[{}]/.test(raw)||/%7b|%7d/i.test(raw))return DEFAULT_GUTENBERG_MIRROR_BASE_URL
+  const normalized=normalizedHttpsBase(raw,DEFAULT_GUTENBERG_MIRROR_BASE_URL)
+  try{
+    const parsed=new URL(normalized)
+    const path=parsed.pathname.replace(/\/+$/,'')
+    // PGLAF is a Gutenberg mirror, but its filesystem layout is not /cache/epub/<id>/pg<id>.txt.
+    // Treat that historical configuration as invalid so older Production env values self-heal.
+    if(parsed.hostname.toLowerCase()==='gutenberg.pglaf.org'&&path==='/cache/epub'){
+      return DEFAULT_GUTENBERG_MIRROR_BASE_URL
+    }
+  }catch{return DEFAULT_GUTENBERG_MIRROR_BASE_URL}
+  return normalized
 }
 
 function projectGutenbergMirrorTextUrls(id:number,mirrorBaseUrl:string):string[]{
@@ -272,9 +290,11 @@ async function projectGutenbergCandidatesFromOpenLibrary(query:string,bounded:nu
  * Project Gutenberg license/header must explicitly say the work is unrestricted in the United States,
  * and restricted/permission-only markers fail closed. This is stricter than trusting catalog metadata.
  *
- * The primary website is never harvested. Generated plain text is fetched from the current PGLAF
- * mirror by default, or from COS_PROJECT_GUTENBERG_MIRROR_BASE_URL when the deployment supplies a
- * controlled HTTPS mirror.
+ * Canonical identity stays on https://www.gutenberg.org/ebooks/<ID>. Bounded generated plain text is
+ * fetched from Project Gutenberg's official https://www.gutenberg.org/cache/epub cache by default.
+ * COS_PROJECT_GUTENBERG_MIRROR_BASE_URL may still point to a controlled HTTPS mirror whose layout is
+ * compatible with /<ID>/pg<ID>.txt; the historical PGLAF /cache/epub base is rejected because that
+ * mirror does not expose the official cache layout.
  */
 export function createProjectGutenbergPublicDomainSearch(
   fetcher:FetchLike=fetch,
@@ -282,7 +302,7 @@ export function createProjectGutenbergPublicDomainSearch(
 ):LearningConnectorSearch{return async(query,limit)=>{
   const bounded=Math.min(Math.max(limit,1),5)
   const gutendexBaseUrl=normalizedHttpsBase(options.gutendexBaseUrl,DEFAULT_GUTENDEX_BASE_URL)
-  const mirrorBaseUrl=normalizedHttpsBase(options.mirrorBaseUrl,DEFAULT_GUTENBERG_MIRROR_BASE_URL)
+  const mirrorBaseUrl=normalizedProjectGutenbergTextBase(options.mirrorBaseUrl)
   const results:LearningConnectorResult[]=[]
   const seenIds=new Set<number>()
   let candidatesConsidered=0

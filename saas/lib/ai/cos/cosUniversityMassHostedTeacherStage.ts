@@ -97,7 +97,7 @@ export function massHostedTeacherStageConfig(env: Env = process.env) {
     maxCalls: boundedInt(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS, DEFAULT_MAX_CALLS, MIN_TEACHER_ROWS, HARD_MAX_CALLS),
     maxOutputTokens: boundedInt(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS, DEFAULT_MAX_OUTPUT_TOKENS, 128, HARD_MAX_OUTPUT_TOKENS),
     parallelism: boundedInt(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM, DEFAULT_PARALLELISM, 1, HARD_MAX_PARALLELISM),
-    minimumRows,
+    minimumRows: MIN_TEACHER_ROWS,
     // These are planning estimates, not billing claims. The router uses them to balance expected
     // dollars across active faculty while preserving at least one governed route to each teacher.
     providerEstimatedUnitCostUsd: numericMap(

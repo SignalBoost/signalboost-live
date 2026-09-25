@@ -158,6 +158,41 @@ test('Project Gutenberg has a rights-neutral bootstrap catalog when every networ
   assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
 })
 
+test('Project Gutenberg ignores generic restricted-work boilerplate after END when the ebook preamble is unrestricted', async () => {
+  const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
+    + 'Title: Short Optics Pamphlet\n'
+    + '*** START OF THE PROJECT GUTENBERG EBOOK SHORT OPTICS PAMPHLET ***\n'
+    + 'Optics light lens refraction reflection wavelength experiment physics. '.repeat(25)
+    + '\n*** END OF THE PROJECT GUTENBERG EBOOK SHORT OPTICS PAMPHLET ***\n'
+    + 'THE FULL PROJECT GUTENBERG LICENSE\n'
+    + 'This particular work is one of the few individual works restricted by copyright law and may be included with the permission of the copyright holder.\n'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    if (url.startsWith('https://gutendex.com/books/')) {
+      return new Response(JSON.stringify({
+        results: [{
+          id: 41839,
+          title: 'Short Optics Pamphlet',
+          copyright: false,
+          authors: [{ name: 'Example Author' }],
+          formats: { 'text/plain; charset=utf-8': 'https://www.gutenberg.org/cache/epub/41839/pg41839.txt' },
+        }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    if (url === 'https://mirror.example/gutenberg/41839/pg41839.txt') {
+      return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    }
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const search = createProjectGutenbergPublicDomainSearch(fetcher, { mirrorBaseUrl: 'https://mirror.example/gutenberg' })
+  const results = await search('optics light physics', 1)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].uri, 'https://www.gutenberg.org/ebooks/41839')
+  assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
+})
+
 test('Project Gutenberg never upgrades a restricted ebook to training rights even when discovery points to it', async () => {
   const restricted = 'This particular work is one of the few individual works restricted by copyright law in the United States.\n'
     + '*** START OF THE PROJECT GUTENBERG EBOOK RESTRICTED ***\n'

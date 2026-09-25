@@ -8,6 +8,7 @@ import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMes
 const match = { provider: 'signalboost-platform', environment: 'production', incidentClass: nativeRemediationClass({ source: 'cron', nativeProbe: 'api' }) }
 const builderJobRunner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
 const progressClient = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+const builderToolLoop = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
 
 test('only repeated clean objective outcomes become remediation suggestions', () => {
   const experience = summarizeRemediationExperience([
@@ -95,4 +96,21 @@ test('runtime repair paths are wired to operator narration instead of raw Builde
   assert.match(progressClient, /stage: terminalSucceeded \? 'verified' : 'blocked'/)
   assert.doesNotMatch(progressClient, /stage: poll\.ok \? 'verified' : 'blocked'/)
   assert.doesNotMatch(progressClient, /COS Builder job failed/)
+})
+
+
+test('Builder cannot inspect indefinitely after reproducing a repair failure', () => {
+  assert.match(builderToolLoop, /MAX_REPAIR_INSPECTIONS_AFTER_FAILURE = 3/)
+  assert.match(builderToolLoop, /repairMutationRequired = repairObjective && latestFailedRunIndex >= 0/)
+  assert.match(builderToolLoop, /!repairMutationRequired \|\| toolId === 'write_file' \|\| toolId === 'edit_file'/)
+  assert.match(builderToolLoop, /builder_repair_mutation_required/)
+  assert.match(builderToolLoop, /Make the smallest justified source mutation now, then rerun the exact failing command/)
+})
+
+test('Builder classifies assertion evidence before weak dependency wording', () => {
+  const testSignal = builderToolLoop.indexOf("if (/assert(?:ionerror)?|expected|\\btests?\\b")
+  const weakDependency = builderToolLoop.indexOf("if (/\\bdependency\\b/.test(message))")
+  assert.ok(testSignal >= 0, 'test-failure classifier must be present')
+  assert.ok(weakDependency > testSignal, 'a bare dependency word must not outrank a concrete test failure')
+  assert.match(builderToolLoop, /make the smallest targeted source change, then rerun the exact failing command/i)
 })

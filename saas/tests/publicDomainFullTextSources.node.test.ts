@@ -199,6 +199,44 @@ test('Project Gutenberg has a rights-neutral bootstrap catalog when every networ
   assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
 })
 
+test('Project Gutenberg fallback catalog covers every rotating University book-study topic', async () => {
+  const queries = [
+    'algebra mathematics geometry',
+    'calculus differential integral mathematics',
+    'probability statistics mathematical',
+    'physics mechanics dynamics',
+    'electricity magnetism engineering',
+    'thermodynamics heat energy physics',
+    'optics light physics',
+    'astronomy scientific observation',
+    'logic reasoning scientific method',
+    'economics political economy markets',
+    'computing calculation machine logic',
+    'engineering mechanics machines',
+  ]
+  const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
+    + '*** START OF THE PROJECT GUTENBERG EBOOK FALLBACK STUDY ***\n'
+    + 'Foundational educational material for mathematics science engineering logic economics and study. '.repeat(30)
+    + '\n*** END OF THE PROJECT GUTENBERG EBOOK FALLBACK STUDY ***'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) return new Response('<?xml version="1.0"?><feed></feed>', { status: 200 })
+    if (url.startsWith('https://openlibrary.org/search.json')) return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url.startsWith('https://gutenberg.pglaf.org/cache/epub/')) return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const search = createProjectGutenbergPublicDomainSearch(fetcher)
+  for (const query of queries) {
+    const results = await search(query, 1)
+    assert.equal(results.length, 1, `fallback catalog must yield a real ebook candidate for: ${query}`)
+    assert.ok(results[0].evidence?.includes('discovery:local_bootstrap_catalog'), query)
+    assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'), query)
+  }
+})
+
 test('Project Gutenberg ignores generic restricted-work boilerplate after END when the ebook preamble is unrestricted', async () => {
   const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
     + 'Title: Short Optics Pamphlet\n'

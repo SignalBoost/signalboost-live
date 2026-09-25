@@ -374,14 +374,14 @@ export default function CosUniversityTelemetryPage() {
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {openSources.length ? openSources.map(source => (
-            <div key={source.id} className="rounded-lg border p-4">
-              <div className="text-sm font-semibold">{source.name}</div>
-              <div className="mt-1 text-xs opacity-65">{source.vectorSpace || source.mode}</div>
-              <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-                <span className="rounded-full border px-2 py-1">{copy.openSourceStates[source.status] || source.status}</span>
-                <span className="opacity-55">{copy.sourceAccessCost}: {money(source.sourceAccessCostUsd24h)}</span>
+            <div key={source.id} className="min-w-0 overflow-hidden rounded-lg border p-4">
+              <div className="min-w-0 break-words text-sm font-semibold [overflow-wrap:anywhere]">{source.name}</div>
+              <div className="mt-1 min-w-0 break-words text-xs opacity-65 [overflow-wrap:anywhere]">{source.vectorSpace || source.mode}</div>
+              <div className="mt-3 flex min-w-0 flex-wrap items-start gap-2 text-xs">
+                <span className="max-w-full whitespace-normal break-words rounded-full border px-2 py-1 [overflow-wrap:anywhere]">{copy.openSourceStates[source.status] || source.status}</span>
+                <span className="min-w-0 break-words opacity-55 [overflow-wrap:anywhere]">{copy.sourceAccessCost}: {money(source.sourceAccessCostUsd24h)}</span>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+              <div className="mt-4 grid min-w-0 grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="opacity-60">{copy.acquiredItems}</span><br />
                   <strong className="text-xl tabular-nums">{source.items24h.toLocaleString()}</strong>

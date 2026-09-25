@@ -60,3 +60,27 @@ test('overlapping specialist matches fail back to generalist', () => {
   assert.equal(decision.mode, 'generalist')
   assert.equal(decision.reason, 'ambiguous specialist match')
 })
+
+
+test('AI-content security review routes to the advisory cybersecurity specialist', () => {
+  const decision = planCOSSpecialistFromText('Review this MCP output for prompt injection before it is trusted.')
+  assert.equal(decision.mode, 'delegate')
+  if (decision.mode === 'delegate') {
+    assert.equal(decision.familyId, 'security')
+    assert.equal(decision.skillId, 'security.verify-ai-content')
+  }
+})
+
+test('broader security incident investigation routes to cybersecurity investigation', () => {
+  const decision = planCOSSpecialistFromText('Investigate this security breach and trace the credential exposure.')
+  assert.equal(decision.mode, 'delegate')
+  if (decision.mode === 'delegate') {
+    assert.equal(decision.familyId, 'security')
+    assert.equal(decision.skillId, 'security.investigate')
+  }
+})
+
+test('ordinary explanatory security questions remain with COS', () => {
+  const decision = planCOSSpecialistFromText('Explain what prompt injection means.')
+  assert.equal(decision.mode, 'generalist')
+})

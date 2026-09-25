@@ -2110,3 +2110,18 @@ Changing judge call count without raising the judge-run ceiling fails closed bef
 
 This repair does not weaken four-suite independence, endpoint-call ceilings, scoring thresholds, artifact
 binding, promotion gates, or Production-traffic authority. Missing or insufficient reservations fail closed.
+
+
+### Project Gutenberg OPDS namespace production repair (2026-09-25)
+
+After #3204 reached Production, the 02:30 UTC continuity run still retained zero Gutenberg items. The live
+OPDS feed returned real candidates including ebook 2701, but every candidate logged
+`ebook rights evidence not eligible`. Root cause: the Production OPDS feed emits the machine-readable
+rights field as a namespaced XML element (for example `<dcterms:rights>Public domain in the USA.</dcterms:rights>`),
+while the first repair's regression used an unprefixed `<rights>` element.
+
+The parser now matches the XML **local name** `rights` with or without a namespace prefix and still requires the
+entire normalized value to equal a U.S. public-domain assertion (`Public domain in the USA.`,
+`Public domain in the U.S.`, or `Public domain in the United States.`). Explicit restricted/copyright markers
+in the fetched ebook preamble continue to veto admission and cannot be overridden by OPDS metadata. The mandatory
+public-domain full-text regression now uses the real `dcterms:rights` form.

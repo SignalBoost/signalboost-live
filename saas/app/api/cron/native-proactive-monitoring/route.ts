@@ -9,6 +9,7 @@ import { persistenceNativeMonitoringCollector } from '@/self-healing-host/native
 import { platformHealthNativeMonitoringCollector } from '@/self-healing-host/platform-health-monitoring-adapter'
 import { ownedSiteOptimizationMonitoringCollector } from '@/self-healing-host/owned-site-optimization-monitoring'
 import { ownedSiteCybersecurityMonitoringCollector } from '@/self-healing-host/owned-site-cybersecurity-monitoring'
+import { aiSecurityMonitoringCollector, AI_SECURITY_NATIVE_PROBE } from '@/self-healing-host/ai-security-monitoring'
 import { verifyPendingExactVercelRepairOutcomes } from '@/self-healing-host/vercel-deployment-outcome-verifier'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
@@ -81,6 +82,7 @@ export async function GET(req: NextRequest) {
   const quotaBytes = storageQuotaBytes()
   const baseUrl = productionBaseUrl()
   const collectors = [
+    aiSecurityMonitoringCollector({ db }),
     ownedSiteOptimizationMonitoringCollector({ apiBaseUrl: baseUrl }),
     ownedSiteCybersecurityMonitoringCollector({ apiBaseUrl: baseUrl }),
     ...createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes }),
@@ -114,6 +116,35 @@ export async function GET(req: NextRequest) {
   const preventive = [configurationIncident, confidenceIncident].filter(Boolean) as typeof result.incidents
   const incidents = [...result.incidents, ...preventive]
   const remediation = incidents.length ? await remediateNativeIncidents(incidents, { maxIncidents: 4 }) : []
+
+  const supervisedSecurityRows = remediation.flatMap(item => {
+    const incident = incidents.find(candidate => candidate.incidentId === item.incidentId)
+    if (incident?.metadata?.nativeProbe !== AI_SECURITY_NATIVE_PROBE) return []
+    const observationEventId = String(incident.metadata.observationEventId || '')
+    if (!observationEventId) return []
+    return [{
+      event_id: `ai-security-supervised-${observationEventId}`,
+      execution_id: item.incidentId,
+      incident_id: item.incidentId,
+      event_type: 'ai_security_observation_supervised',
+      occurred_at: new Date().toISOString(),
+      payload: {
+        observationEventId,
+        outcome: item.outcome,
+        securityReviewMode: item.securityReview?.mode || null,
+        findingCodes: item.securityReview?.findingCodes || incident.metadata.findingCodes || [],
+        rawContentPersisted: false,
+        authorityGranted: false,
+        automaticRepairAuthorized: false,
+      },
+      schema_version: 'ai-security-supervision-v1',
+    }]
+  })
+  if (supervisedSecurityRows.length) {
+    const { error } = await db.from('supervisor_audit_events').upsert(supervisedSecurityRows, { onConflict: 'event_id', ignoreDuplicates: true })
+    if (error) console.warn('[ai-security-supervision] audit acknowledgement failed', String(error.message || 'unknown').slice(0,160))
+  }
+
   const status = result.collectorErrors.length === collectors.length ? 503 : 200
   return NextResponse.json({
     ok: status === 200,

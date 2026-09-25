@@ -6,6 +6,7 @@ import { executeCosConnectorRecipe } from '@/lib/ai/cos/connectorDelegation'
 import { compactDelegatedEvidence } from '@/lib/ai/cos/evidenceCompaction'
 import { selectConnectorRecipe } from '@/lib/ai/cos/incidentRecipeRouter'
 import { createSignalBoostSupervisorConnectorRuntime, SIGNALBOOST_SUPERVISOR_CONNECTOR_TENANT } from './signalboost-supervisor-connectors.ts'
+import { requestSelfHealingSecuritySpecialistReview, type SelfHealingSecuritySpecialistReview } from './security-specialist-review.ts'
 import { createNativeRepairActionResolver, diagnoseRegisteredNativeRecovery } from './native-repair-action-resolver.ts'
 import { nativeRemediationClass } from './remediation-experience.ts'
 import { recordCouncilOutcomesFromRepairDispatch, type CouncilOutcomeBridgeSummary } from './council-outcome-bridge.ts'
@@ -27,6 +28,7 @@ import { resolveSupervisorRepairParams, summarizeRepairDispatch } from '@/agent-
 import type { RemediationMemoryStore } from '@/lib/supervisor/remediation-memory'
 import { SupabaseRemediationMemoryStore } from '@/lib/supervisor/remediation-memory-supabase'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { recordAiSecuritySupervisorObservation } from '@/lib/security/aiSecuritySupervisorTelemetry'
 
 export function nativeIncidentToNormalized(incident: SupervisorIncident, connectorEvidence: unknown): NormalizedIncidentPayload {
   return normalizeNativeIncident(incident, connectorEvidence)
@@ -39,6 +41,7 @@ export interface NativeRemediationResult {
   repairSteps: number
   outcome: 'no_action' | 'executed' | 'staged' | 'unavailable'
   message: string
+  securityReview?: SelfHealingSecuritySpecialistReview
   objectiveOutcomes?: CouncilOutcomeBridgeSummary
 }
 
@@ -57,9 +60,46 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
       recipe: selectConnectorRecipe(incident),
     })
     const evidence = compactDelegatedEvidence(delegated)
-    const normalized = nativeIncidentToNormalized(incident, evidence)
+    const gatewayFindings = evidence.items.flatMap(item => item.security.findings)
+    if (gatewayFindings.length) {
+      await recordAiSecuritySupervisorObservation({
+        source: 'connector_output',
+        surface: 'supervisor_connector',
+        disposition: evidence.items.some(item => item.security.disposition === 'quarantined')
+          ? 'quarantined'
+          : 'sanitized',
+        findings: gatewayFindings,
+        redactedCount: evidence.items.reduce((sum, item) => sum + item.security.redactedCount, 0),
+        traceId: incident.incidentId,
+      })
+    }
+    const securityReview = await requestSelfHealingSecuritySpecialistReview({ incident, evidence })
+    const diagnosticEvidence = securityReview
+      ? Object.freeze({ ...evidence, securitySpecialistReview: securityReview })
+      : evidence
+    const normalized = nativeIncidentToNormalized(incident, diagnosticEvidence)
     const diagnostic = diagnoseRegisteredNativeRecovery(incident) ?? await diagnoseIncident(normalized)
     const repairPlan = Array.isArray(diagnostic.repair_plan) ? diagnostic.repair_plan as RepairStep[] : []
+    const aiSecuritySignal = securityReview?.securitySignal === true
+
+    // Suspicious connector/tool content may inform diagnosis only through the sanitized gateway packet.
+    // It can never become an unattended mutation trigger. Security-specialist review is advisory and
+    // Referee / Agent Gateway remain the authorization boundary for any later action.
+    if (aiSecuritySignal) {
+      const reviewState = securityReview?.attempted
+        ? securityReview.ok ? 'completed' : `attempted but did not complete (${securityReview.mode})`
+        : `not available (${securityReview?.mode || 'specialist_unavailable'})`
+      results.push({
+        incidentId: incident.incidentId,
+        diagnosisConfidence: diagnostic.confidence_score,
+        diagnosis: diagnostic.diagnosis,
+        repairSteps: repairPlan.length,
+        outcome: 'staged',
+        message: `AI Security Gateway detected untrusted connector/tool content. Automatic mutation is disabled for this incident cycle; Cybersecurity Specialist review ${reviewState}. Any remediation must re-enter the normal governed approval/policy path with clean evidence.`,
+        securityReview: securityReview ?? undefined,
+      })
+      continue
+    }
 
     // Public/customer utilities remain report-only. Incidents from separately allowlisted
     // canonical-owned-site collectors are first-party Production evidence and may enter the

@@ -26,3 +26,16 @@ test('repository incident sources can disable automatic repair while retaining t
   assert.match(source, /options\.automaticRepairAllowed === false/)
   assert.match(source, /staged the proposed recovery for governed review/)
 })
+
+
+test('Self-Healing inspects connector evidence and disables unattended mutation on security signals', () => {
+  const source = readFileSync(new URL('../self-healing-host/native-autonomous-loop.ts', import.meta.url), 'utf8')
+  assert.match(source, /requestSelfHealingSecuritySpecialistReview/)
+  assert.match(source, /aiSecuritySignal/)
+  assert.match(source, /Automatic mutation is disabled for this incident cycle/)
+  const securityGate = source.indexOf('if (aiSecuritySignal)')
+  const ownedRepair = source.indexOf('if (optimizerIncident || cybersecurityIncident)')
+  const dispatch = source.indexOf('dispatchRepairPlan')
+  assert.ok(securityGate >= 0 && ownedRepair > securityGate, 'security hold must precede owned-site repair')
+  assert.ok(dispatch > securityGate, 'security hold must precede governed repair dispatch')
+})

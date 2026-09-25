@@ -49,6 +49,75 @@ export const openAlexScientificSearch:LearningConnectorSearch=async(query,limit)
 
 export const openLibrarySearch:LearningConnectorSearch=async(query,limit)=>{const json=await getJson(`https://openlibrary.org/search.json?q=${encodeURIComponent(compactQuery(query,8))}&limit=${Math.min(limit,10)}`);return(json?.docs??[]).map((item:any):LearningConnectorResult=>({uri:item.key?`https://openlibrary.org${item.key}`:'',title:clean(item.title),text:clean(`${item.title??''}. ${item.author_name?.join(', ')??''}. First published ${item.first_publish_year??'unknown'}. Subjects: ${item.subject?.slice(0,8).join(', ')??''}.`),license:'Open Library metadata'})).filter((x:LearningConnectorResult)=>x.uri&&x.text)}
 
+
+function projectGutenbergPlainTextUrl(formats:unknown):string{
+  if(!formats||typeof formats!=='object')return''
+  const map=formats as Record<string,unknown>
+  const candidate=[
+    map['text/plain; charset=utf-8'],
+    map['text/plain; charset=us-ascii'],
+    map['text/plain'],
+  ].find(value=>typeof value==='string'&&value.trim()) as string|undefined
+  if(!candidate)return''
+  try{
+    const parsed=new URL(candidate)
+    const host=parsed.hostname.toLowerCase()
+    if(parsed.protocol!=='https:'||!(host==='gutenberg.org'||host.endsWith('.gutenberg.org')))return''
+    return parsed.toString()
+  }catch{return''}
+}
+
+function projectGutenbergBody(raw:string):string{
+  const value=String(raw??'').replace(/^\uFEFF/,'')
+  const start=/\*\*\*\s*START OF (?:THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
+  const end=/\*\*\*\s*END OF (?:THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
+  const from=start?start.index+start[0].length:0
+  const to=end&&end.index>from?end.index:value.length
+  return clean(value.slice(from,to)).slice(0,60000)
+}
+
+/**
+ * Project Gutenberg public-domain full text.
+ *
+ * Gutendex is discovery only. A row is admitted here only when its catalog record explicitly says
+ * copyright=false AND it supplies an HTTPS text/plain URL on a Project Gutenberg host. The text
+ * itself is then fetched from Project Gutenberg, not from an arbitrary URL returned by discovery.
+ * This is the first book source whose retained rows may truthfully carry the exact "public domain"
+ * rights label used by the conservative mass-distillation packager.
+ */
+export function createProjectGutenbergPublicDomainSearch(fetcher:FetchLike=fetch):LearningConnectorSearch{return async(query,limit)=>{
+  const bounded=Math.min(Math.max(limit,1),5)
+  const json=await getJson(`https://gutendex.com/books/?search=${encodeURIComponent(compactQuery(query,8))}`,fetcher)
+  const rows=(json?.results??[]).filter((item:any)=>item?.copyright===false).slice(0,Math.max(bounded*3,bounded))
+  const results:LearningConnectorResult[]=[]
+  for(const item of rows){
+    if(results.length>=bounded)break
+    const id=Number(item?.id)
+    if(!Number.isInteger(id)||id<=0)continue
+    const textUrl=projectGutenbergPlainTextUrl(item?.formats)
+    if(!textUrl)continue
+    try{
+      const body=projectGutenbergBody(await getText(textUrl,fetcher))
+      if(body.length<900)continue
+      const title=clean(item?.title)
+      const authors=Array.isArray(item?.authors)?item.authors.map((author:any)=>clean(author?.name)).filter(Boolean).slice(0,5):[]
+      results.push({
+        uri:`https://www.gutenberg.org/ebooks/${id}`,
+        title,
+        text:clean(`${title}. ${authors.join(', ')}. ${body}`).slice(0,60000),
+        license:'public domain',
+        evidence:[
+          `project_gutenberg_ebook_id:${id}`,
+          'gutendex_copyright:false',
+          `project_gutenberg_text:${textUrl}`,
+        ],
+      })
+    }catch{/* one unavailable book must not abort the bounded source */}
+  }
+  return results
+}}
+export const projectGutenbergPublicDomainSearch=createProjectGutenbergPublicDomainSearch()
+
 /**
  * Europe PMC exposes Open Access full text through /{PMCID}/fullTextXML. Search with resultType=core
  * so PMCID/open-access state and abstracts are available, then fetch the full XML only for the small

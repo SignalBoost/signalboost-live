@@ -60,3 +60,12 @@ test('University and controlled evaluation contexts cannot receive working-agent
   assert.match(bridge, /currentReasoningEvaluationContext\(\)/)
   assert.match(bridge, /mode: 'none'/)
 })
+
+test('ONBOARD documents work-while-learning, vector-space boundaries, and source families', () => {
+  const onboard = readFileSync(new URL('../../ONBOARD.md', import.meta.url), 'utf8')
+  assert.match(onboard, /Working-agent immediate shared-knowledge bridge/)
+  assert.match(onboard, /agents work while they attend University/)
+  assert.match(onboard, /External embedding versus internal embedding versus distillation/)
+  assert.match(onboard, /not a portable "computer language"/)
+  assert.match(onboard, /OpenAlex, Semantic Scholar\/S2ORC, Hugging Face open datasets, Wikimedia\/Wikipedia, Crossref, Europe PMC, Open Library/)
+})

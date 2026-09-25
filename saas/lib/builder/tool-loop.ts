@@ -321,7 +321,7 @@ function diagnose(value: unknown, knownPaths: readonly string[] = []): { failure
     failureClass: 'runtime',
     remediation: 'The shell cannot resolve a bare executable. Use the project package script or npm exec -- <binary> so the pinned local dependency is resolved; do not treat this as a missing source path.',
   }
-  if (/invalid_path|not found|no such file|module_not_found|cannot find module|enoent|path/.test(message)) {
+  if (/invalid_path|invalid path|no such file|module_not_found|cannot find module|enoent|file not found/.test(message)) {
     const listing = knownPaths.slice(0, 20).join(', ')
     return {
       failureClass: 'path',
@@ -439,8 +439,23 @@ export class BuilderToolLoop {
         && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
       const repairInspectionsAfterFailure = repairTraceAfterFailure.filter(item => item.ok
         && (item.toolId === 'list_files' || item.toolId === 'read_file' || item.toolId === 'search_files' || item.toolId === 'mcp_read')).length
+      const repairProgressRefusalsAfterFailure = repairTraceAfterFailure.filter(item =>
+        item.toolId === 'model_control' && item.error === 'builder_repair_progress_required').length
+      const failedRun = latestFailedRunIndex >= 0 ? trace[latestFailedRunIndex] : undefined
+      const failedRunOutput = failedRun && isRecord(failedRun.output)
+        ? `${text(failedRun.output.stderr)}\n${text(failedRun.output.stdout)}`
+        : ''
+      const inspectedRepairPaths = new Set(repairTraceAfterFailure
+        .filter(item => item.ok && item.toolId === 'read_file')
+        .map(item => toolPath(item.input)))
+      const forcedRepairInspectionPath = repairObjective && latestFailedRunIndex >= 0
+        && !repairMutationAfterFailure && repairInspectionsAfterFailure === 0
+        ? workspacePaths.find(path => failedRunOutput.includes(path) && !inspectedRepairPaths.has(path))
+        : undefined
       const repairMutationRequired = repairObjective && latestFailedRunIndex >= 0
-        && !repairMutationAfterFailure && repairInspectionsAfterFailure >= MAX_REPAIR_INSPECTIONS_AFTER_FAILURE
+        && !repairMutationAfterFailure
+        && (repairInspectionsAfterFailure >= MAX_REPAIR_INSPECTIONS_AFTER_FAILURE
+          || (repairInspectionsAfterFailure > 0 && repairProgressRefusalsAfterFailure > 0))
       // The controller owns verification scheduling. Once a new build's declared files
       // exist, execute the user's explicit Run list before asking for any more edits.
       // A failed command is attempted only once per file revision, then returned to the
@@ -534,7 +549,11 @@ export class BuilderToolLoop {
         'When done: {"type":"answer","answer":"what changed and what ran"}',
       ].filter(Boolean)
 
-      let action: Action | null = verificationCommand ? { type: 'tool', toolId: 'run', input: { command: verificationCommand } } : null
+      let action: Action | null = verificationCommand
+        ? { type: 'tool', toolId: 'run', input: { command: verificationCommand } }
+        : forcedRepairInspectionPath
+          ? { type: 'tool', toolId: 'read_file', input: { path: forcedRepairInspectionPath } }
+          : null
       let blockedAction: ToolAction | null = null
       let controlFailure: ModelControlFailure | null = null
       for (let controlAttempt = 0; !action && controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
@@ -619,7 +638,15 @@ export class BuilderToolLoop {
             error: 'builder_repair_mutation_required',
             failureClass: 'test',
             remediation: 'The failure is reproduced and enough source has been inspected. Make the smallest justified source mutation now, then rerun the exact failing command.' })
-          if (++gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_repair_mutation_required', trace }
+          continue
+        }
+        if (repairObjective && latestFailedRunIndex >= 0 && !repairMutationAfterFailure) {
+          trace.push({ round, toolId: 'model_control', input: {}, ok: false,
+            error: 'builder_repair_progress_required',
+            failureClass: 'test',
+            remediation: repairInspectionsAfterFailure > 0
+              ? 'The failure is reproduced. Do not answer yet; make the smallest justified source mutation, then rerun the exact failing command.'
+              : 'The failure is reproduced. Inspect a source path named by the failure, then make the smallest justified source mutation and rerun the exact failing command.' })
           continue
         }
         if (pendingOrder.length) {

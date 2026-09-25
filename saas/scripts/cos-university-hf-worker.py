@@ -48,6 +48,14 @@ MUON_MOMENTUM = 0.95
 MUON_NS_STEPS = 5
 MUON_ADJUST_LR_FN = "match_rms_adamw"
 
+# Exclusive Self Attention (XSA) changes the model forward architecture rather than merely the
+# optimizer. An XSA-trained LoRA adapter must therefore be evaluated and later served with the same
+# XSA forward path. Phase 1 records the governed contract but deliberately keeps rollout at zero
+# until the University evaluator/runtime can prove exact training/inference symmetry.
+XSA_PROFILE = "exclusive_self_attention_v1"
+XSA_ROLLOUT_PERCENT = 0
+XSA_INFERENCE_SYMMETRY_REQUIRED = True
+
 FRONTIER_TRAINING_PROFILE = "cos_university_frontier_gkd_v1"
 FRONTIER_GKD_MAX_LENGTH = 1024
 FRONTIER_GKD_LEARNING_RATE = 5e-5
@@ -716,6 +724,30 @@ def _configure_muon_canary(base, torch, trainer, candidate_id: str) -> dict[str,
     }
 
 
+def _xsa_canary_evidence(base, candidate_id: str) -> dict[str, Any]:
+    """Return fail-closed evidence for the XSA architecture experiment.
+
+    XSA cannot be enabled by changing a percentage alone. The evaluator and serving runtime must
+    first share the exact same attention orthogonalization implementation as training. Until that
+    symmetric runtime exists, any non-zero deterministic selection fails closed before paid training.
+    """
+    normalized_candidate = str(candidate_id or "").strip()
+    selected = bool(normalized_candidate) and XSA_ROLLOUT_PERCENT > 0 and (
+        int(base.sha256(f"xsa:{normalized_candidate}")[:8], 16) % 100 < XSA_ROLLOUT_PERCENT
+    )
+    if selected:
+        raise RuntimeError("worker_xsa_selected_without_symmetric_runtime")
+    return {
+        "attentionArchitecture": "standard_attention",
+        "xsaProfile": XSA_PROFILE,
+        "xsaRolloutPercent": XSA_ROLLOUT_PERCENT,
+        "xsaRolloutSelected": False,
+        "xsaTrainingApplied": False,
+        "xsaInferenceSymmetryRequired": XSA_INFERENCE_SYMMETRY_REQUIRED,
+        "xsaReason": "disabled_pending_symmetric_runtime",
+    }
+
+
 def train_student(base, envelope: dict[str, Any]) -> None:
     import torch
     from huggingface_hub import HfApi
@@ -1025,6 +1057,10 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             base.clean(envelope.get("candidateId"), 200),
         )
         recipe.update(optimizer_evidence)
+        recipe.update(_xsa_canary_evidence(
+            base,
+            base.clean(envelope.get("candidateId"), 200),
+        ))
     else:
         recipe.update({
             "parameterOptimizer": "adamw_torch",
@@ -1039,6 +1075,13 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             "muonMatrixTensorCount": 0,
             "muonNonMatrixTensorCount": 0,
             "muonReason": "legacy_lane",
+            "attentionArchitecture": "standard_attention",
+            "xsaProfile": XSA_PROFILE,
+            "xsaRolloutPercent": 0,
+            "xsaRolloutSelected": False,
+            "xsaTrainingApplied": False,
+            "xsaInferenceSymmetryRequired": XSA_INFERENCE_SYMMETRY_REQUIRED,
+            "xsaReason": "legacy_lane",
         })
     print(
         f"itmounts_parameter_optimizer:{json.dumps({key: recipe[key] for key in ('parameterOptimizer','muonRolloutPercent','muonRolloutSelected','muonRuntimeAvailable','muonEligible','muonApplied','muonMomentum','muonNsSteps','muonAdjustLrFn','muonMatrixTensorCount','muonNonMatrixTensorCount','muonReason')}, ensure_ascii=True, separators=(',', ':'))}",
@@ -1046,6 +1089,10 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     )
     print(
         f"itmounts_training_precision:{json.dumps({'quantizedComputeDtype':'float16','ampEnabled':False,'trainableParameterDtype':'float32','trainableFp32TensorCount':trainable_fp32_tensors}, ensure_ascii=True, separators=(',', ':'))}",
+        flush=True,
+    )
+    print(
+        f"itmounts_attention_architecture:{json.dumps({key: recipe[key] for key in ('attentionArchitecture','xsaProfile','xsaRolloutPercent','xsaRolloutSelected','xsaTrainingApplied','xsaInferenceSymmetryRequired','xsaReason')}, ensure_ascii=True, separators=(',', ':'))}",
         flush=True,
     )
 

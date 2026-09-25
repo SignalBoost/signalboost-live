@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { classifyProviderFailure, openProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
+import { armProviderCircuitRecoveryProbe, classifyProviderFailure, openProviderCircuit, readProviderCircuit } from '@/lib/supervisor/provider-circuit.ts'
 import {
   HUGGING_FACE_JOBS_API,
   huggingFaceJobsConfigFromEnv,
@@ -122,6 +122,78 @@ async function record(input: {
     observed_at: new Date().toISOString(),
   }, { onConflict: 'event_key', ignoreDuplicates: true })
   if (inserted.error) throw inserted.error
+}
+
+export async function recoverHuggingFaceStorageCapacityCircuit(input: {
+  maxJobs?: number
+  fetchImpl?: FetchPort
+  now?: Date
+} = {}) {
+  const hf = huggingFaceJobsConfigFromEnv()
+  if (!hf) return { ok: false as const, skipped: true as const, reason: 'huggingface_not_configured' as const }
+  const db = cosServiceDb()
+  if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
+  const circuit = await readProviderCircuit({ db, providerId: 'huggingface', capability: 'model-training' })
+  if (!circuit.open || circuit.costBearingRetryAllowed) {
+    return { ok: true as const, skipped: true as const, reason: 'huggingface_storage_recovery_not_needed' as const }
+  }
+
+  const namespace = await resolveHuggingFaceNamespace({ token: hf.token, fetchImpl: input.fetchImpl })
+  const maxJobs = Math.max(1, Math.min(10, Math.floor(input.maxJobs ?? 3)))
+  const rows = await db.from('cos_university_mass_distillation_batch_runs')
+    .select('id,candidate_id,training_job_id,preparation_job_id,teacher_job_id')
+    .eq('stage', 'failed')
+    .order('updated_at', { ascending: false })
+    .limit(20)
+  if (rows.error) throw rows.error
+
+  let storageEvidence = 0
+  let inspected = 0
+  for (const run of rows.data || []) {
+    if (inspected >= maxJobs) break
+    const jobId = clean((run as any).training_job_id || (run as any).preparation_job_id || (run as any).teacher_job_id, 240)
+    if (!JOB_ID.test(jobId)) continue
+    inspected += 1
+    try {
+      const logTail = await fetchHuggingFaceJobLogTail({ namespace, jobId, token: hf.token, limit: 40, fetchImpl: input.fetchImpl })
+      const classification = classifyProviderFailure(logTail)
+      if (classification.failureClass === 'capacity_exhausted'
+        && classification.reason === 'provider_storage_capacity_exhausted') storageEvidence += 1
+    } catch {
+      // Read-only verification failure cannot authorize a paid probe.
+    }
+  }
+  if (storageEvidence === 0) {
+    return { ok: true as const, skipped: true as const, reason: 'huggingface_storage_capacity_not_verified' as const, inspected }
+  }
+
+  const armed = await armProviderCircuitRecoveryProbe({
+    db,
+    providerId: 'huggingface',
+    capability: 'model-training',
+    expectedFailureClass: 'capacity_exhausted',
+    expectedReason: 'provider_storage_capacity_exhausted',
+    verification: {
+      source: PROFILE,
+      recovery: 'bounded_storage_capacity_half_open_probe',
+      readOnlyProviderInspection: true,
+      storageEvidence,
+      inspected,
+      maxPaidVerificationDispatches: 1,
+      automaticPromotionAuthorized: false,
+      authorityExpanded: false,
+    },
+    now: input.now,
+  })
+  return {
+    ok: true as const,
+    skipped: !armed.armed,
+    reason: armed.armed ? 'huggingface_storage_capacity_recovery_probe_armed' as const : armed.reason,
+    storageEvidence,
+    inspected,
+    maxPaidVerificationDispatches: armed.armed ? 1 : 0,
+    authorityExpanded: false as const,
+  }
 }
 
 /** Diagnose settled provider failures and open the generic Self-Healing circuit before any later paid retry. */

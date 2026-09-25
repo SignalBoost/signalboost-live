@@ -52,6 +52,7 @@ export function createBuilderMcpReadPort(input: {
   env?: Environment
   fetcher?: typeof fetch
   figmaAuthorization?: UniversalMcpFigmaAuthorization
+  securityObservationRecorder?: typeof recordAiSecuritySupervisorObservation
 }): BuilderMcpReadPort {
   const gateway = createUniversalMcpGateway({
     tenantId: input.tenantId,
@@ -66,6 +67,7 @@ export function createBuilderMcpReadPort(input: {
     figmaAuthorization: input.figmaAuthorization,
   })
   const catalog = allowedCatalog(input.ownerAuthorized)
+  const securityObservationRecorder = input.securityObservationRecorder ?? recordAiSecuritySupervisorObservation
   const configured = new Set(
     gateway.readiness.filter(item => item.configured).map(item => item.providerId),
   )
@@ -105,7 +107,7 @@ export function createBuilderMcpReadPort(input: {
         data: 'data' in result ? result.data : undefined,
       })
       if (inspected.findings.length) {
-        await recordAiSecuritySupervisorObservation({
+        await securityObservationRecorder({
           source: 'mcp_tool_output',
           surface: 'builder_mcp',
           disposition: inspected.disposition,

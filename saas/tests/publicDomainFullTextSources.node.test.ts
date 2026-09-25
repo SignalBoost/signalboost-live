@@ -60,7 +60,7 @@ test('Project Gutenberg adapter fetches only explicit public-domain HTTPS Gutenb
   assert.ok(calls.includes('https://mirror.example/gutenberg/101/pg101.txt'))
   assert.ok(!calls.some(url => url.startsWith('https://www.gutenberg.org/files/')))
   assert.ok(!calls.includes('https://example.com/book.txt'))
-
+})
 
 test('Project Gutenberg falls back from Gutendex cloud 403 to Open Library ids and verifies rights in the ebook itself', async () => {
   const calls: string[] = []
@@ -128,8 +128,6 @@ test('Project Gutenberg never upgrades a restricted ebook to training rights eve
   const search = createProjectGutenbergPublicDomainSearch(fetcher, { mirrorBaseUrl: 'https://mirror.example/gutenberg' })
   const results = await search('technical', 1)
   assert.equal(results.length, 0)
-})
-
 })
 
 test('Europe PMC only upgrades explicit CC0/public-domain full text to mass-distillation rights', async () => {

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
 import { planContextWindow } from './context-window-manager.ts'
+import { modelCapabilityProfileForId, requireModelCapability, type ModelTransportProtocol } from './modelCapabilityRegistry.ts'
 import {
   currentHarnessExecutionContext,
   harnessDeadlineRemainingMs,
@@ -102,6 +103,10 @@ export interface LocalInferenceConfig {
   fallbackFromOwned?: boolean
   /** Physical serving-window override for this exact deployed model/runtime. */
   contextWindowTokens?: number
+  /** Optional platform registry identity for the configured runtime model. */
+  modelProfileKey?: string | null
+  /** Canonical transport actually used by this inference seam. */
+  transportProtocol?: ModelTransportProtocol | 'legacy_openai_compatible'
 }
 
 export interface LocalInferenceTelemetry {
@@ -109,6 +114,8 @@ export interface LocalInferenceTelemetry {
   requestId: string
   provider: string
   model: string
+  modelProfileKey: string | null
+  transportProtocol: ModelTransportProtocol | 'legacy_openai_compatible'
   feature: string
   routeOwner: 'itmounts' | 'external'
   graduateCandidateId: string | null
@@ -253,13 +260,53 @@ function strictJsonObjectRequested(args: LocalModelCallArgs): boolean {
   return /\bReturn ONLY strict JSON\b/i.test(String(args.systemPrompt ?? ''))
 }
 
+export type ModelRuntimeBinding = Readonly<{
+  model: string
+  profileKey: string | null
+  transportProtocol: ModelTransportProtocol | 'legacy_openai_compatible'
+  registered: boolean
+}>
+
+export function resolveModelRuntimeBinding(
+  model: string,
+  options: { requireRegistered?: boolean } = {},
+): ModelRuntimeBinding {
+  const normalized = String(model || '').trim()
+  if (!normalized) throw new Error('platform_runtime_model_required')
+  const profile = modelCapabilityProfileForId(normalized)
+  if (!profile) {
+    if (options.requireRegistered === true) throw new Error(`platform_runtime_model_not_registered:${normalized}`)
+    return Object.freeze({
+      model: normalized,
+      profileKey: null,
+      transportProtocol: 'legacy_openai_compatible' as const,
+      registered: false,
+    })
+  }
+  requireModelCapability(profile, 'inference', 'chatCompletion')
+  const transportProtocol = profile.transportProtocols.includes('openai_compatible')
+    ? 'openai_compatible' as const
+    : profile.transportProtocols.includes('local_runtime')
+      ? 'local_runtime' as const
+      : null
+  if (!transportProtocol) {
+    throw new Error(`platform_model_transport_not_supported_by_local_inference:${profile.key}`)
+  }
+  return Object.freeze({
+    model: normalized,
+    profileKey: profile.key,
+    transportProtocol,
+    registered: true,
+  })
+}
 export function localInferenceConfigFromEnv(): LocalInferenceConfig {
   const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || 'http://ai-brain:8000/v1')
   const model = (process.env.LOCAL_AI_MODEL || '').trim()
   if (!model) throw new Error('LOCAL_AI_MODEL is required when local inference is enabled')
+  const binding = resolveModelRuntimeBinding(model, { requireRegistered: process.env.ITMOUNTS_MODEL_REGISTRY_REQUIRE_REGISTERED?.trim().toLowerCase() === 'true' })
   const timeoutMs = Number(process.env.LOCAL_AI_TIMEOUT_MS || '120000')
   if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600000) throw new Error('LOCAL_AI_TIMEOUT_MS must be between 1000 and 600000')
-  return { baseUrl, model, apiKey: process.env.LOCAL_AI_API_KEY?.trim() || undefined, timeoutMs }
+  return { baseUrl, model, apiKey: process.env.LOCAL_AI_API_KEY?.trim() || undefined, timeoutMs, modelProfileKey: binding.profileKey, transportProtocol: binding.transportProtocol }
 }
 
 /** Managed/configured inference has no server-owned pod lifecycle to prepare. */
@@ -330,6 +377,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   const requestId = randomUUID()
   const provider = providerFor(config)
   const model = modelForRequest(args, config, provider)
+  const runtimeBinding = resolveModelRuntimeBinding(model, { requireRegistered: process.env.ITMOUNTS_MODEL_REGISTRY_REQUIRE_REGISTERED?.trim().toLowerCase() === 'true' })
   const routeOwner = routeOwnerFor(config)
   const usageContext: LocalInferenceUsageContext = args.usageContext || { feature: 'unattributed_local_inference' }
   let inferenceStartedAt: number | null = null
@@ -514,6 +562,8 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300
     emitLocalInferenceTelemetry({
       at: new Date().toISOString(), requestId, provider, model,
+      modelProfileKey: runtimeBinding.profileKey,
+      transportProtocol: runtimeBinding.transportProtocol,
       feature: usageContext.feature, routeOwner,
       graduateCandidateId: config.graduateCandidateId || null,
       graduateArtifactId: config.graduateArtifactId || null,

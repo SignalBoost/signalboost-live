@@ -8,12 +8,12 @@
 export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-17_mass_canary_without_manual_intervention' as const
 export const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1' as const
 export const MASS_CANARY_APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved' as const
-// Preserve the same 72/day owner spend envelope, but meter it hourly. The former 18-per-6h bucket
-// could be exhausted in a short burst and then leave the canary lane dark for hours while hundreds
-// of artifacts waited upstream. Three per rolling hour keeps the same nominal maximum
-// (72/day, <= $14.40/day) while bounding any budget-induced blackout to less than an hour.
+// Production 2026-09-24 proved the repaired RunPod lane with consecutive successful canaries and no
+// worker-not-ready/timeout failures after the transient-infrastructure repair. Raise the drain rate in
+// one bounded step from 3/hour to 6/hour rather than jumping directly to the observed training rate.
+// Six per rolling hour permits at most 144/day and <= $28.80/day at the hard $0.20/canary ceiling.
 export const MASS_CANARY_ROLLING_WINDOW_HOURS = 1
-export const MASS_CANARY_ROLLING_MAX_APPROVALS = 3
+export const MASS_CANARY_ROLLING_MAX_APPROVALS = 6
 export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // A cold-start timeout is the runtime never answering, not the artifact failing. It is retried without spending one
 // of the three substantive attempts, and the identical-repeat stop below still prevents an endless loop.
@@ -50,7 +50,7 @@ export const MASS_CANARY_IN_FLIGHT_TTL_MS = 10 * 60 * 1000
 // leaving the first true v2 artifact behind 336 older uncanaried artifacts. Prioritize only the first two
 // exact-artifact canary PASSES whose durable training receipt proves the v2 response-anchor recipe, then
 // automatically return to normal oldest-first scheduling. This changes ordering only: one-canary
-// concurrency, 72/day, <= $0.20, exact-artifact binding, evaluator gates, promotion rules and Production
+// concurrency, 144/day, <= $0.20 per canary, exact-artifact binding, evaluator gates, promotion rules and Production
 // traffic authority are unchanged.
 export const MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER = '2026-09-21T01:55:00.000Z' as const
 export const MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE = 2

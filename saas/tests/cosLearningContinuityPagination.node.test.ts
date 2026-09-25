@@ -6,7 +6,7 @@ import {
   CONTINUITY_CORPUS_PAGE_SIZE,
   readLearningContinuityCorpus,
   type ContinuityCorpusRead,
-} from '../lib/ai/cos/learningContinuityReport.ts'
+} from '../lib/ai/cos/learningContinuityPagination.ts'
 
 type Row={created_at:string;subject:string;source_kind:string}
 
@@ -55,7 +55,7 @@ test('continuity reader paginates through a server-side 1000-row cap instead of 
   rows.sort((a,b)=>b.created_at.localeCompare(a.created_at))
 
   const db=fakeDb(rows,1000)
-  const corpus=mustRows(await readLearningContinuityCorpus(db as any))
+  const corpus=mustRows(await readLearningContinuityCorpus(db as any,'fact_extraction_error.is.null'))
   assert.equal(corpus.length,3150)
   assert.deepEqual(db.ranges,[[0,999],[1000,1999],[2000,2999],[3000,3999]])
 
@@ -73,7 +73,7 @@ test('continuity reader does not mistake a short final page for a full-page serv
     source_kind:'library_material',
   }))
   const db=fakeDb(rows,1000)
-  const corpus=mustRows(await readLearningContinuityCorpus(db as any))
+  const corpus=mustRows(await readLearningContinuityCorpus(db as any,'fact_extraction_error.is.null'))
   assert.equal(corpus.length,1501)
   assert.deepEqual(db.ranges,[[0,999],[1000,1999]])
 })

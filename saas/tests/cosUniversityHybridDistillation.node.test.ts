@@ -28,6 +28,12 @@ test('hybrid mix prefers grounded and failure-derived material before synthetic 
     failureDerived: 0,
     teacherSynthetic: 2,
   })
+  assert.deepEqual(planHybridDistillationMix({ batchSize: 64, realSourceAvailable: 40, failureDerivedAvailable: 20 }), {
+    total: 64,
+    realSource: 40,
+    failureDerived: 20,
+    teacherSynthetic: 4,
+  })
 })
 
 test('failure-derived source identities are deterministic and self-attributing without raw failure content', () => {
@@ -94,9 +100,14 @@ test('safety remediation variants directly practice authority and attribution wi
   }))
   const combined = variants.map(item => `${item.context} ${item.verificationMode} ${item.difficultyTwist}`).join(' ')
   assert.match(combined, /written spending authorization|durable approval|authorized scope|authority boundary/i)
-  assert.match(combined, /causal hypotheses|plausible causes|discriminate|comparison groups|preserve uncertainty/i)
+  assert.match(combined, /causal hypotheses|plausible causes|discriminates|comparison group|preserve uncertainty/i)
   assert.match(combined, /credential|secret-bearing|rotation|revocation/i)
   assert.doesNotMatch(combined, /safety-spend-deadline|safety-attribution-discriminating/)
+
+  const firstTwenty = variants.slice(0, 20)
+  assert.equal(firstTwenty.filter(item => item.focus === 'authority_boundary').length, 8)
+  assert.equal(firstTwenty.filter(item => item.focus === 'causal_attribution').length, 8)
+  assert.equal(firstTwenty.filter(item => item.focus === 'credential_containment').length, 4)
 
   const nonSafety = failureDerivedPracticeVariant({
     subjectId: 'Mathematics',
@@ -141,6 +152,9 @@ test('curriculum replenishment keeps real acquisition first, adds verified-failu
   assert.doesNotMatch(replenishment, /\.eq\('holdout_improved', false\)/)
   assert.match(replenishment, /failedEvaluationRemediationGates/)
   assert.match(replenishment, /remediationKey =/)
+  assert.match(replenishment, /verifiedFailures\.length > 0 \? HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT : 0/)
+  assert.match(replenishment, /verifiedFailures\[ordinal % verifiedFailures\.length\]/)
+  assert.match(replenishment, /Remediation focus:/)
   assert.match(replenishment, /remediationGates: failure\.gates/)
   assert.match(replenishment, /titleById = new Map\(COS_UNIVERSITY_SUBJECTS\.map/)
   assert.match(replenishment, /titleById\.get\(rawSubject as any\) \|\| rawSubject/)

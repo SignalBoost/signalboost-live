@@ -76,20 +76,20 @@ test('mass-distilled canary waits safely when account-wide RunPod worker quota i
   assert.doesNotMatch(route, /runpod_worker_quota_full[\s\S]{0,300}status:500/)
 })
 
-test('v2 compatibility accepts a warm endpoint already narrowed to the governed 24GB pool', () => {
-  assert.match(provisionV2, /message !== 'mass_distilled_runtime_endpoint_gpu_pool_drift'/)
+test('v2 native provisioning preserves the governed 24GB evaluator pool', () => {
   assert.match(provisionV2, /const APPROVED_POOLS = \['AMPERE_24'\] as const/)
-  assert.match(provisionV2, /resolveExactEndpoint\(input\)/)
+  assert.match(provisionV2, /provisionMassDistilledRuntimeWithPools\(input, APPROVED_POOLS\)/)
+  assert.match(provisionV2, /resolveExactEndpoint\(input, 'native_v2_inline', approvedPools\)/)
   assert.match(provisionV2, /constrainEndpointToApprovedGpu/)
 })
 
-test('v2 compatibility recovery tolerates delayed endpoint visibility by exact governed name', () => {
+test('v2 control plane resolves exact endpoint identity by governed name', () => {
   assert.match(provisionV2, /resolveEndpointControlPlane/)
   assert.match(provisionV2, /requestV1<RestEndpointIdentity\[\]>\('\/endpoints'\)/)
   assert.match(provisionV2, /clean\(item\.name, 240\) === observedName/)
   assert.match(provisionV2, /for \(let attempt = 0; attempt < 5; attempt \+= 1\)/)
-  assert.match(provisionV2, /constrainEndpointToApprovedGpu\(String\(provisioned\.endpointId\), String\(provisioned\.endpointName \|\| ''\)\)/)
-  assert.match(provisionV2, /resolveEndpointControlPlane\('', ids\.endpointName\)/)
+  assert.match(provisionV2, /const listed = await requestV2<\{ endpoints\?: Endpoint\[\] \}>\('\/serverless'\)/)
+  assert.match(provisionV2, /clean\(item\.name, 240\) === ids\.endpointName/)
 })
 
 test('mass-distilled provisioning recovers an omitted v2 endpoint id from the official REST endpoint list', () => {
@@ -224,12 +224,11 @@ test('historical canary pass still blocks ordinary duplicate approvals', () => {
 })
 
 
-test('RunPod template discovery includes templates already bound to Serverless endpoints', () => {
+test('native v2 mass-canary provisioning no longer depends on the v1 template index', () => {
   const legacy = source('../lib/ai/cos/runpodMassDistilledProvision.ts')
   const compat = source('../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
-  const required = "/templates?includeEndpointBoundTemplates=true"
-  assert.ok((legacy.match(/includeEndpointBoundTemplates=true/g) || []).length >= 2)
-  assert.ok((compat.match(/includeEndpointBoundTemplates=true/g) || []).length >= 1)
-  assert.match(legacy, new RegExp(required.replace(/[?]/g, '\\?')))
-  assert.match(compat, new RegExp(required.replace(/[?]/g, '\\?')))
+  assert.match(legacy, /includeEndpointBoundTemplates=true/)
+  assert.doesNotMatch(compat, /includeEndpointBoundTemplates=true/)
+  assert.match(compat, /requestV2<Endpoint>\('\/serverless', \{/)
+  assert.match(compat, /nativeV2EndpointConfig/)
 })

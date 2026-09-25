@@ -135,6 +135,10 @@ begin
     api_version=excluded.api_version,timeout_ms=excluded.timeout_ms,max_call_cost_usd=excluded.max_call_cost_usd,
     enabled=true,updated_at=now();
 
+  if v_existing_ref is not null and v_ref is distinct from v_existing_ref then
+    delete from public.platform_model_credentials where credential_ref=v_existing_ref;
+  end if;
+
   return v_profile_key;
 end $$;
 

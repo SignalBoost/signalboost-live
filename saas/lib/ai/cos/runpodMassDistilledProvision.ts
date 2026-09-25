@@ -2,14 +2,15 @@
 // Dynamic exact-artifact RunPod canary support for mass-distilled students.
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { activeResidencyRunpodEndpointNames, protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
+import { CURRENT_UNIVERSITY_STUDENT_PROFILE, requireUniversityModelCapability } from './cosUniversityModelCapabilityRegistry.ts'
 
 const REST_V1 = 'https://rest.runpod.io/v1'
 const CONTROL_API_V2 = 'https://api.runpod.io/v2'
 const GRAPHQL_API = 'https://api.runpod.io/graphql'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
-const BASE_MODEL_ID = 'Qwen/Qwen3-4B'
-const BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
+const BASE_MODEL_ID = CURRENT_UNIVERSITY_STUDENT_PROFILE.modelId
+const BASE_MODEL_REVISION = CURRENT_UNIVERSITY_STUDENT_PROFILE.revision
 const BASE_MODEL_REFERENCE = `https://huggingface.co/${BASE_MODEL_ID}:${BASE_MODEL_REVISION}`
 const ROUTING = 'LOAD_BALANCER' as const
 const PUBLIC_PORT = 8000
@@ -337,6 +338,7 @@ async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string,idleTi
 
 export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeArtifact){
   assertArtifact(input)
+  requireUniversityModelCapability(CURRENT_UNIVERSITY_STUDENT_PROFILE,'serving','vllm')
   const idleTimeoutSeconds=artifactIdleTimeoutSeconds(input)
   const token=process.env.HF_TOKEN?.trim()||''; if(token.length<20) throw new Error('HF_TOKEN is not configured')
   const ids=identity(input); const templates=await requestV1<Template[]>('/templates?includeEndpointBoundTemplates=true')

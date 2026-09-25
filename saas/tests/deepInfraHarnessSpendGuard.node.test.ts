@@ -38,6 +38,7 @@ test('default DeepInfra reservations are conservative and run ceilings cannot un
     'DEEPINFRA_BUILDER_MAX_CALL_USD','DEEPINFRA_BUILDER_MAX_JOB_USD',
     'DEEPINFRA_UNIVERSITY_PRACTICE_MAX_CALL_USD','DEEPINFRA_UNIVERSITY_PRACTICE_MAX_RUN_USD',
     'DEEPINFRA_UNIVERSITY_ASSESSMENT_MAX_CALL_USD','DEEPINFRA_UNIVERSITY_ASSESSMENT_MAX_RUN_USD',
+    'DEEPINFRA_MASS_EVALUATION_MAX_CALL_USD','DEEPINFRA_MASS_EVALUATION_MAX_RUN_USD',
   ],()=>{
     assert.equal(deepInfraMaxCallUsd('builder'),0.08)
     assert.equal(deepInfraMaxRunUsd('builder'),0.24)
@@ -45,6 +46,8 @@ test('default DeepInfra reservations are conservative and run ceilings cannot un
     assert.equal(deepInfraMaxRunUsd('university_practice'),0.01)
     assert.equal(deepInfraMaxCallUsd('university_assessment'),0.10)
     assert.equal(deepInfraMaxRunUsd('university_assessment'),0.10)
+    assert.equal(deepInfraMaxCallUsd('mass_distilled_evaluation'),0.10)
+    assert.equal(deepInfraMaxRunUsd('mass_distilled_evaluation'),0.40)
   })
 })
 
@@ -103,6 +106,7 @@ test('Builder and University paid paths carry both per-call reservations and Har
   const practice=source('lib/ai/cos/cosUniversityPracticeExecution.ts')
   const exam=source('lib/ai/cos/cosUniversityAgentExamRuntime.ts')
   const capstone=source('lib/ai/cos/cosUniversityAgentCapstoneRuntime.ts')
+  const massEval=source('lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
   assert.match(builderPort,/maxEstimatedCostUsd: deepInfraMaxCallUsd\('builder'\)/)
   assert.match(builderJob,/maxCostUsd: deepInfraMaxRunUsd\('builder'\)/)
   assert.match(practice,/maxEstimatedCostUsd: deepInfraMaxCallUsd\('university_practice'\)/)
@@ -111,4 +115,6 @@ test('Builder and University paid paths carry both per-call reservations and Har
   assert.match(exam,/maxCostUsd: deepInfraMaxRunUsd/)
   assert.match(capstone,/maxEstimatedCostUsd: deepInfraMaxCallUsd\('university_assessment'\)/)
   assert.match(capstone,/maxCostUsd: deepInfraMaxRunUsd\('university_assessment'\)/)
+  assert.match(massEval,/maxEstimatedCostUsd:deepInfraMaxCallUsd\('mass_distilled_evaluation'\)/)
+  assert.match(massEval,/maxCostUsd: deepInfraMaxRunUsd\('mass_distilled_evaluation'\)/)
 })

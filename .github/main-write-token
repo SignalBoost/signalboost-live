@@ -1,2 +1,2 @@
-base_sha=e19c400e0eb33d7fecdbe807e601d495ea0e6736
-branch=fix/mass-canary-bounded-parallelism-20260925
+base_sha=5372097dd647123de72e8fd55696000518188007
+branch=feat/university-muon-optimizer-20260925

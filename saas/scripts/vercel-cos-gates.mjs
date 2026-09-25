@@ -89,6 +89,7 @@ const tests = [
   'tests/nativeAutonomousLoop.node.test.ts',
   'tests/builderPlaywrightCli.node.test.ts',
   'tests/playwrightMcpProductionAcceptance.node.test.ts',
+  'tests/chromeDevtoolsMcpProductionAcceptance.node.test.ts',
   'tests/builderVerificationOrder.node.test.ts',
   'tests/builderProjectLessons.node.test.ts',
   'tests/builderProductReadiness.node.test.ts',

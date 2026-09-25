@@ -59,12 +59,10 @@ const LIVE_TOOL_ALLOWLIST: Readonly<Record<BrowserMcpProfileId, ReadonlySet<stri
     'get_console_message',
     'list_network_requests',
     'get_network_request',
-    'get_css_styles',
     'lighthouse_audit',
     'performance_start_trace',
     'performance_stop_trace',
-    'performance_analyze_insight',
-    // Bounded navigation is allowed only because assertToolCall() validates the explicit URL
+    'performance_analyze_insight',    // Bounded navigation is allowed only because assertToolCall() validates the explicit URL
     // against the host's exact origin set before the request reaches Chrome.
     'navigate_page',
     'new_page',

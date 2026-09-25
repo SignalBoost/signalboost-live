@@ -118,7 +118,6 @@ export const CHROME_DEVTOOLS_MCP_PROFILE: BrowserMcpServerProfile = Object.freez
     readTool('get_console_message', 'console.get'),
     readTool('list_network_requests', 'network.list'),
     readTool('get_network_request', 'network.get'),
-    readTool('get_css_styles', 'css.inspect'),
     readTool('lighthouse_audit', 'lighthouse'),
     readTool('performance_start_trace', 'performance.start'),
     readTool('performance_stop_trace', 'performance.stop'),

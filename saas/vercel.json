@@ -344,6 +344,10 @@
     {
       "path": "/api/cron/playwright-mcp-live-acceptance",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/chrome-devtools-mcp-live-acceptance",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

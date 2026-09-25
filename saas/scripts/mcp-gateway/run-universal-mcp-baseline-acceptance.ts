@@ -39,8 +39,11 @@ async function run() {
     }],
   })
 
+  // GitHub Actions github.token is repository-scoped. The remote GitHub MCP
+  // intentionally omits get_me/identity.read for this credential class.
+  // Keep identity.read in the runtime profile; exclude it only from this CI proof.
   const githubReadCapabilities = GITHUB_MCP_PROFILE.tools
-    .filter(item => item.risk === 'read')
+    .filter(item => item.risk === 'read' && item.capabilityName !== 'identity.read')
     .map(item => `mcp.github-mcp.${item.capabilityName}`)
     .sort()
   const githubReadiness = gateway.readiness.find(item => item.providerId === 'github-mcp')

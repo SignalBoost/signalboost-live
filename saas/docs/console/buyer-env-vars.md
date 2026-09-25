@@ -25,6 +25,7 @@ Buyer deployments may register additional model profiles without changing iTMoun
 | --- | --- | --- |
 | `ITMOUNTS_MODEL_REGISTRY_JSON` | Optional | Server-only JSON array of additional governed model profiles. Each profile declares model identity, revision policy, intended uses, transport protocols, and explicit capability states. Invalid or duplicate profiles fail closed. |
 | `ITMOUNTS_MODEL_REGISTRY_REQUIRE_REGISTERED` | Optional | Set exactly `true` after all live runtime models are registered. Then an unregistered runtime model is refused instead of using the migration compatibility path. Default is `false` to preserve existing deployments during migration. |
+| `ITMOUNTS_MODEL_TRANSPORTS_JSON` | Optional | Server-only JSON array binding registered profile keys to transport protocol, provider label, HTTPS endpoint, credential environment-variable name, API version, and timeout. The JSON stores credential names only, never secret values. Built-ins currently implement `openai_compatible`, `anthropic_messages`, and `google_generate_content`; `native_sdk`, `local_runtime`, and `custom_http` remain host-injected. |
 
 Supported transport identifiers in the registry are `openai_compatible`, `anthropic_messages`, `google_generate_content`, `native_sdk`, `local_runtime`, and `custom_http`. A declared transport is metadata until a corresponding runtime adapter is installed and validated; declaring it never creates credentials or execution authority.
 

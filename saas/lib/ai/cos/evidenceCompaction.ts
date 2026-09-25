@@ -1,9 +1,16 @@
 import type { CosDelegationResult } from './connectorDelegation.ts'
+import { inspectUntrustedAiContent, type AiSecurityFinding } from '../../security/aiSecurityGateway.ts'
 
 export interface CosEvidenceSummaryItem {
   capabilityId: string
   ok: boolean
   providerId?: string
+  trust: 'untrusted_connector_data'
+  security: Readonly<{
+    disposition: 'allow' | 'sanitized' | 'quarantined'
+    findings: readonly AiSecurityFinding[]
+    redactedCount: number
+  }>
   summary: unknown
 }
 
@@ -41,11 +48,20 @@ export function compactDelegatedEvidence(result: CosDelegationResult): CosEviden
     mode: result.mode,
     ok: result.ok,
     missingRequired: Object.freeze([...result.missingRequired]),
-    items: Object.freeze(result.evidence.map(({ capabilityId, result: execution }) => Object.freeze({
-      capabilityId,
-      ok: execution.ok,
-      providerId: execution.providerId,
-      summary: compact(execution.data),
-    }))),
+    items: Object.freeze(result.evidence.map(({ capabilityId, result: execution }) => {
+      const inspected = inspectUntrustedAiContent({ source: 'connector_output', data: execution.data })
+      return Object.freeze({
+        capabilityId,
+        ok: execution.ok,
+        providerId: execution.providerId,
+        trust: 'untrusted_connector_data' as const,
+        security: Object.freeze({
+          disposition: inspected.disposition,
+          findings: inspected.findings,
+          redactedCount: inspected.redactedCount,
+        }),
+        summary: compact(inspected.modelData),
+      })
+    })),
   })
 }

@@ -1,7 +1,7 @@
 // saas/lib/ai/modelConfigurationSignalBoost.ts
 import { randomUUID } from 'node:crypto'
-import { cosServiceDb } from '@/lib/cos-core/storage/service-db'
-import { vaultDecrypt, vaultEncrypt } from '@/lib/vault/crypto'
+import { cosServiceDb } from '../cos-core/storage/service-db.ts'
+import { vaultDecrypt, vaultEncrypt } from '../vault/crypto.ts'
 import { parseBuyerModelProfiles, type PlatformModelProfile } from './modelCapabilityRegistry.ts'
 import { parseModelTransportBindings, type PlatformModelTransportBinding } from './modelTransportConfig.ts'
 import type {

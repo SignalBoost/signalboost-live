@@ -1626,7 +1626,7 @@ Built-in source manifests currently cover OpenAlex, Semantic Scholar/S2ORC, Euro
 University project work is first-class. Accepted source material may support project briefs, literature review, comparative analysis, lab/practice tasks, design work, implementation work and source-attributed reports. Project output is still not an academic grade by itself; fresh independent assessment and the normal University evidence gates remain authoritative.
 ### Project Gutenberg public-domain full-text lane — 2026-09-24
 
-Project Gutenberg is now the first dedicated **full-book text** source for this architecture. Routine robots must not harvest the primary Project Gutenberg website. `project_gutenberg_pd` therefore uses bounded metadata discovery plus an automation-safe Project Gutenberg mirror for the actual text. The current default generated-text mirror is `https://gutenberg.pglaf.org/cache/epub`; deployments may override it with `COS_PROJECT_GUTENBERG_MIRROR_BASE_URL`.
+Project Gutenberg is now the first dedicated **full-book text** source for this architecture. Routine robots must not scrape the human-facing Project Gutenberg HTML pages. `project_gutenberg_pd` uses bounded metadata discovery plus Project Gutenberg's official generated-text cache for machine retrieval. The current default text base is `https://www.gutenberg.org/cache/epub`; deployments may override it with `COS_PROJECT_GUTENBERG_MIRROR_BASE_URL` only when the replacement exposes the same generated-file layout.
 
 Gutendex remains the preferred discovery source, but Production proved on 2026-09-25 that the public Gutendex service can return HTTP 403 to the Vercel/serverless egress pool. Gutendex is therefore **not a single point of failure**. If Gutendex is unavailable or returns no usable candidates, the adapter falls back to Open Library search and reads only explicit `id_project_gutenberg` identifiers. That fallback grants discovery identity only; it does not grant training rights.
 
@@ -2140,3 +2140,22 @@ per query**, while retaining independent pagination inside each chunk and each p
 The global rolling-window invocation query remains candidate-agnostic, so the **6/hour** spend cap is unchanged and
 cannot be bypassed by chunking. The atomic claim RPC, exact-artifact gates, Builder Residency gates, cold-start
 resume bounds, and Production-traffic prohibition are unchanged.
+
+
+### Project Gutenberg official cache-base correction (2026-09-25)
+
+Production proof showed the Gutenberg adapter was constructing text URLs under
+`https://gutenberg.pglaf.org/cache/epub/<ID>/pg<ID>.txt`. That path is not the Project Gutenberg official cache
+layout and returns 404. The canonical ebook identity remains `https://www.gutenberg.org/ebooks/<ID>`, and the
+default generated-text acquisition base is now the verified official cache
+`https://www.gutenberg.org/cache/epub`, yielding paths such as
+`https://www.gutenberg.org/cache/epub/2701/pg2701.txt`.
+
+The base normalizer also self-heals two Production configuration hazards:
+- the historical `gutenberg.pglaf.org/cache/epub` value is rejected even when syntactically valid;
+- malformed overrides containing literal or encoded braces (for example a trailing `}`, rendered as `%7D`) are
+  rejected instead of being URL-encoded into a 404 path.
+
+A controlled HTTPS override remains supported only when it exposes the same `/<ID>/pg<ID>.txt` layout. Existing
+bounded result caps, explicit U.S.-rights verification, restricted-work vetoes, relevance/confidence gates,
+embedding, University study, and mass-distillation admission rules remain unchanged.

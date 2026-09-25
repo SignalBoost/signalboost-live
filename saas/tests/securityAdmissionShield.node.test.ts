@@ -44,7 +44,9 @@ test('missing content-type remains admitted so harmless compatible clients are n
 
 test('the live proxy invokes the admission shield before AI routing', () => {
   const source = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8')
+  const shield = readFileSync(new URL('../lib/security/securityAdmissionShield.ts', import.meta.url), 'utf8')
   assert.match(source, /evaluateSecurityAdmission/)
   assert.match(source, /security_admission_rejected/)
-  assert.match(source, /payload_too_large/)
+  assert.match(source, /reason: admission\.reason/)
+  assert.match(shield, /payload_too_large/)
 })

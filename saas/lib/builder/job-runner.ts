@@ -26,6 +26,7 @@ import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitive
 import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
 import { deepInfraMaxRunUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
+import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -419,6 +420,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       console.error('[builder_cognitive_skill_retrieval_failed]', { message: error instanceof Error ? error.message : 'unknown' })
       return emptyCognitiveContext()
     })
+    // Open/public retained knowledge is shared with the working Builder immediately. This is
+    // reference/RAG context only: it cannot authorize tools, prove current facts, or award University
+    // credit. The helper is bounded and fails open so ordinary work is not blocked by retrieval.
+    const workingKnowledge = await workingAgentKnowledgeBlock(job.objective, 'builder')
 
     const sliceStartedAtMs = Date.now()
     const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS
@@ -451,12 +456,14 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           runner,
           ai,
           cognitiveSkills: cognitive.items,
+          workingKnowledge,
         })
       : await new BuilderToolLoop(ai, workspace, runner, mcp, browserCli).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons,
           cognitiveSkills: cognitive.items,
+          workingKnowledge,
           projectContext: job.metadata.projectContext,
           checkpoint: job.checkpoint,
           documentationPaths,

@@ -90,7 +90,9 @@ function platformTools(args: LocalModelCallArgs) {
 
 function toolChoice(args: LocalModelCallArgs): 'auto' | 'none' | Readonly<{ name: string }> | undefined {
   const choice = args.toolChoice
-  if (!choice || choice === 'auto' || choice === 'none') return choice
+  if (choice === undefined) return undefined
+  if (choice === 'auto') return 'auto'
+  if (choice === 'none') return 'none'
   return Object.freeze({ name: choice.function.name })
 }
 

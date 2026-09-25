@@ -118,7 +118,7 @@ export async function authorizeNextUniversityMassDistillationRemediationCampaign
     authorized: false,
     reason: 'service_database_unavailable',
   })
-  const result = await db.rpc('authorize_next_cos_university_mass_distillation_remediation_campaign')
+  const result = await db.rpc('authorize_next_cos_university_remediation_campaign')
   if (result.error) throw result.error
   return normalizeMassDistillationRollingAuthorization(result.data)
 }

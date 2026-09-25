@@ -4,6 +4,7 @@ import {
   UNIVERSAL_MCP_PROFILES,
   type UniversalMcpProfileId,
 } from '../../provider-hub-host/universal-mcp-profiles.ts'
+import { inspectUntrustedAiContent } from '../security/aiSecurityGateway.ts'
 
 type Environment = Readonly<Record<string, string | undefined>>
 
@@ -48,6 +49,7 @@ export function createBuilderMcpReadPort(input: {
   environmentId: string
   ownerAuthorized: boolean
   env?: Environment
+  fetcher?: typeof fetch
   figmaAuthorization?: UniversalMcpFigmaAuthorization
 }): BuilderMcpReadPort {
   const gateway = createUniversalMcpGateway({
@@ -59,6 +61,7 @@ export function createBuilderMcpReadPort(input: {
       roles: input.ownerAuthorized ? ['owner'] : [],
     },
     env: input.env,
+    fetcher: input.fetcher,
     figmaAuthorization: input.figmaAuthorization,
   })
   const catalog = allowedCatalog(input.ownerAuthorized)
@@ -96,11 +99,23 @@ export function createBuilderMcpReadPort(input: {
         timeoutMs: 30_000,
       })
 
+      const inspected = inspectUntrustedAiContent({
+        source: 'mcp_tool_output',
+        data: 'data' in result ? result.data : undefined,
+      })
+      if (inspected.disposition === 'quarantined') {
+        return Object.freeze({
+          ok: false,
+          data: inspected.modelData,
+          error: 'mcp_output_quarantined_by_ai_security_gateway',
+          mode: 'ai_security_quarantined',
+        })
+      }
       return Object.freeze({
         ok: result.ok,
-        data: 'data' in result ? result.data : undefined,
+        data: inspected.modelData,
         error: result.error,
-        mode: result.mode,
+        mode: inspected.disposition === 'sanitized' ? 'ai_security_sanitized' : result.mode,
       })
     },
   })

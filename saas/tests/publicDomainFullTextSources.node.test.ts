@@ -309,6 +309,38 @@ test('Project Gutenberg ignores generic restricted-work boilerplate after END wh
   assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
 })
 
+test('Project Gutenberg accepts official OPDS public-domain rights when fetched text has no restricted-work marker', async () => {
+  const body = 'Title: On The Principles of Political Economy, and Taxation\n'
+    + 'Author: David Ricardo\n'
+    + '*** START OF THE PROJECT GUTENBERG EBOOK POLITICAL ECONOMY ***\n'
+    + 'Political economy value rent wages profits trade taxation markets capital labor. '.repeat(35)
+    + '\n*** END OF THE PROJECT GUTENBERG EBOOK POLITICAL ECONOMY ***'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) {
+      return new Response(`<?xml version="1.0"?><feed><entry>
+        <id>https://www.gutenberg.org/ebooks/33310</id>
+        <title>On The Principles of Political Economy, and Taxation</title>
+        <rights>Public domain in the USA.</rights>
+        <author><name>David Ricardo</name></author>
+        <link href="/ebooks/33310" />
+      </entry></feed>`, { status: 200, headers: { 'content-type': 'application/atom+xml' } })
+    }
+    if (url === 'https://gutenberg.pglaf.org/cache/epub/33310/pg33310.txt') {
+      return new Response(body, { status: 200, headers: { 'content-type': 'text/plain' } })
+    }
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher)('economics political economy markets', 1)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].uri, 'https://www.gutenberg.org/ebooks/33310')
+  assert.ok(results[0].evidence?.includes('project_gutenberg_opds_rights:public_domain_in_usa'))
+  assert.ok(results[0].evidence?.includes('project_gutenberg_text_preamble:no_restriction_marker'))
+  assert.ok(results[0].evidence?.includes('project_gutenberg_rights:verified_public_domain_us'))
+})
+
 test('Project Gutenberg never upgrades a restricted ebook to training rights even when discovery points to it', async () => {
   const restricted = 'This particular work is one of the few individual works restricted by copyright law in the United States.\n'
     + '*** START OF THE PROJECT GUTENBERG EBOOK RESTRICTED ***\n'

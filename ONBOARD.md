@@ -2108,3 +2108,26 @@ Changing judge call count without raising the judge-run ceiling fails closed bef
 
 This repair does not weaken four-suite independence, endpoint-call ceilings, scoring thresholds, artifact
 binding, promotion gates, or Production-traffic authority. Missing or insufficient reservations fail closed.
+
+
+### Project Gutenberg generated-mirror rights fallback (2026-09-25)
+
+Production proof after PR #3203 showed discovery/cascade working but Gutenberg still retained **0** items. At 02:15 UTC,
+`project_gutenberg_pd` discovered 15 candidates for the rotating economics query and fetched real mirror text,
+yet every fetched candidate was rejected by the ebook-rights check. The PGLAF generated-text mirror can omit the
+ebook-specific unrestricted-rights sentence even though the same generated-mirror directory publishes a per-book
+`pg<ID>.rdf` with Project Gutenberg's machine-readable rights field.
+
+The governed fallback is fail-closed:
+- explicit restricted/copyright/permission-only language in the ebook-specific preamble always rejects the work and
+  metadata is never allowed to override it;
+- explicit unrestricted U.S. rights in the ebook text remains the preferred proof;
+- only when the generated text is rights-neutral may COS fetch `pg<ID>.rdf` from the **same configured mirror**;
+- the RDF must bind the **same ebook ID** and its `dcterms:rights` value must equal exactly
+  `Public domain in the USA.`;
+- mismatched IDs, `Copyrighted.`, missing/unknown rights, unavailable RDF, or any parse ambiguity fail closed;
+- the human Project Gutenberg website is not harvested. Text and rights metadata stay on the automation-safe mirror path.
+
+Accepted rows retain explicit evidence identifying whether U.S.-rights proof came from the ebook preamble or the
+same-mirror RDF. All existing relevance, confidence, deduplication, embedding, University study, and
+mass-distillation gates remain unchanged.

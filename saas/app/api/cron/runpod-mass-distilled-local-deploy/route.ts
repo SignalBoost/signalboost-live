@@ -96,21 +96,29 @@ const ROLLING_EVENT_PROFILES = [
   'cos_distilled_independent_evaluation_authorization_v1',
 ] as const
 const ROLLING_EVENT_PAGE_SIZE = 1000
+// PostgREST encodes .in(...) as a URL filter. Production exceeded safe request size once the
+// current-recipe priority set grew to 845 pending candidates, yielding generic 400 Bad Request before
+// the atomic canary claim ran. Keep the full eligibility set, but bound each candidate filter.
+const ROLLING_EVENT_CANDIDATE_CHUNK_SIZE = 75
 
 async function readRollingCanaryEvents(db:any,candidateIds:string[]){
   const rows:any[]=[]
+  const uniqueCandidateIds=[...new Set(candidateIds.map(value=>String(value||'').trim()).filter(Boolean))]
   for(const profile of ROLLING_EVENT_PROFILES){
-    for(let from=0;;from+=ROLLING_EVENT_PAGE_SIZE){
-      const page=await db.from('cos_university_learning_assurance_events')
-        .select('candidate_id,observed_at,expires_at,verifier,evidence')
-        .eq('event_type','fine_tune').in('candidate_id',candidateIds)
-        .contains('evidence',{profile})
-        .order('observed_at',{ascending:false})
-        .range(from,from+ROLLING_EVENT_PAGE_SIZE-1)
-      if(page.error) throw page.error
-      const data=page.data||[]
-      rows.push(...data)
-      if(data.length<ROLLING_EVENT_PAGE_SIZE) break
+    for(let offset=0;offset<uniqueCandidateIds.length;offset+=ROLLING_EVENT_CANDIDATE_CHUNK_SIZE){
+      const candidateChunk=uniqueCandidateIds.slice(offset,offset+ROLLING_EVENT_CANDIDATE_CHUNK_SIZE)
+      for(let from=0;;from+=ROLLING_EVENT_PAGE_SIZE){
+        const page=await db.from('cos_university_learning_assurance_events')
+          .select('candidate_id,observed_at,expires_at,verifier,evidence')
+          .eq('event_type','fine_tune').in('candidate_id',candidateChunk)
+          .contains('evidence',{profile})
+          .order('observed_at',{ascending:false})
+          .range(from,from+ROLLING_EVENT_PAGE_SIZE-1)
+        if(page.error) throw page.error
+        const data=page.data||[]
+        rows.push(...data)
+        if(data.length<ROLLING_EVENT_PAGE_SIZE) break
+      }
     }
   }
   return rows

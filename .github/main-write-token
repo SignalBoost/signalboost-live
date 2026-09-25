@@ -1,2 +1,2 @@
-base_sha=6dd41150e05e0930bcbf6ded3e317d6ced81869d
-branch=fix/evaluation-explicit-worker-wake-v2-20260925
+base_sha=de71f86d30ae02327097848c10edd9e3307d8bf7
+branch=fix/evaluator-wake-order-regression-20260925

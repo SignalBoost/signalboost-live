@@ -244,5 +244,14 @@ revoke all on function public.platform_set_model_assignment(text,text,text,text,
 revoke all on function public.platform_rollback_model_assignment(text,text,uuid) from public, anon, authenticated;
 revoke all on function public.platform_disable_model(text,text) from public, anon, authenticated;
 
+grant select, insert, update, delete on public.platform_model_profiles to service_role;
+grant select, insert, update, delete on public.platform_model_credentials to service_role;
+grant select, insert, update, delete on public.platform_model_transports to service_role;
+grant select, insert, update, delete on public.platform_model_assignments to service_role;
+grant execute on function public.platform_register_model(jsonb,jsonb,text,text,text,text,text,text,text) to service_role;
+grant execute on function public.platform_set_model_assignment(text,text,text,text,uuid) to service_role;
+grant execute on function public.platform_rollback_model_assignment(text,text,uuid) to service_role;
+grant execute on function public.platform_disable_model(text,text) to service_role;
+
 comment on table public.platform_model_credentials is 'Encrypted model-provider credentials only. Plaintext must never be persisted.';
 comment on table public.platform_model_assignments is 'Governed append-style model routing history. Certification evidence never activates a model by itself.';

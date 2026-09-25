@@ -21,6 +21,8 @@ import {
   MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
   MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS,
+  MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   decideExhaustedMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
@@ -207,7 +209,9 @@ function isRemediationReplayReceipt(intendedUse: unknown): boolean {
   const receipt = (intendedUse as any).trainingReceipt
   return Boolean(receipt && typeof receipt === 'object'
     && receipt.failureDerivedReplayRequired === true
-    && Number(receipt.failureDerivedReplayItems) > 0)
+    && Number(receipt.failureDerivedReplayItems) > 0
+    && Number(receipt.failureDerivedReplayEpochs) >= MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS
+    && Number(receipt.failureDerivedReplayLearningRate) >= MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE)
 }
 
 async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
@@ -384,8 +388,8 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const now = new Date()
   const inFlightCount = (await activeEvaluationRunpodEndpointIds(now)).size
 
-  // The post-GKD remediation replay repair also needs a bounded proof cohort. Count durable
-  // independent evaluation rows from replay-proven artifacts across all statuses; once two exist,
+  // The strengthened post-GKD remediation replay repair also needs a bounded proof cohort. Count durable
+  // independent evaluation rows only from artifacts carrying the current 3-epoch/5e-5 replay receipt; once two exist,
   // scheduling automatically returns to the pre-existing Builder/frontier/oldest-first order.
   let remediationReplayProofCompletions = MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
   try {

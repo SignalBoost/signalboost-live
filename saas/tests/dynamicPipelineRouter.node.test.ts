@@ -136,6 +136,7 @@ test('residency persistence is server-only and transfer-basis text cannot grant 
   const migration=readFileSync(new URL('../supabase/migrations/20260925131500_data_residency_governance.sql',import.meta.url),'utf8')
   assert.match(migration,/enable row level security/i)
   assert.match(migration,/revoke all .* anon, authenticated/i)
+  assert.match(migration,/grant select, insert, update, delete .* service_role/i)
 
   const policy=defaultTenantDataResidencyPolicy('tenant-eu','EU_EEA')
   const residency=buildDataResidencyRoutingConstraint({

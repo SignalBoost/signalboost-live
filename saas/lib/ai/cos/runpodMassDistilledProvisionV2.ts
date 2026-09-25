@@ -613,11 +613,32 @@ export async function activateMassDistilledCanaryWorker(endpointId: string) {
   const pools = canaryEndpointPools(endpoint)
   let activated: Endpoint | null = null
   try {
-    activated = await withWorkerQuotaRecovery(String(endpoint.id), () =>
-      requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+    const activate = () => requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ workers: { min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+    })
+    try {
+      activated = await withWorkerQuotaRecovery(String(endpoint.id), activate)
+    } catch (error) {
+      // Production 2026-09-25: every disposable sibling could already be protected while RunPod's
+      // account-wide max-worker quota remained exactly full. RunPod then rejected this endpoint's
+      // min=1/max=1 warm-start even though max was already 1. Temporarily release THIS exact
+      // canary's own max-1 reservation, then restore the same min=1/max=1 envelope. This creates no
+      // endpoint, touches no protected sibling, and never raises the account's prior worker ceiling.
+      const endpointName = clean(endpoint.name, 240)
+      const originalMaxWorkers = Math.max(0, Math.min(1, Math.floor(Number(endpoint.workers?.max ?? 0))))
+      if (!runpodWorkerQuotaError(error)
+        || originalMaxWorkers !== 1
+        || !endpointName.startsWith('itmounts-mass-distilled-')) throw error
+      const drained = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
         method: 'PATCH',
-        body: JSON.stringify({ workers: { min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
-      }))
+        body: JSON.stringify({ workers: { min: 0, max: 0, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+      })
+      if (!drained?.id || Number(drained.workers?.max ?? Number.NaN) !== 0) {
+        throw new Error('mass_distilled_runtime_quota_self_drain_rejected')
+      }
+      activated = await activate()
+    }
     if (!activated?.id) throw new Error('mass_distilled_runtime_canary_worker_activation_missing')
     assertActiveCanaryWorkerPolicy(activated, pools)
     return Object.freeze({

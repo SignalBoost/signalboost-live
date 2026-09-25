@@ -154,3 +154,12 @@ test('canary warm-start uses bounded worker-quota recovery before provider invoc
   assert.match(activation, /workers: \{ min: 1, max: 1/)
   assert.match(provisionV2, /releaseOtherMassEndpointCapacity/)
 })
+
+
+test('canary quota recovery can self-drain only the exact mass endpoint before restoring the same max-one envelope', () => {
+  assert.match(source, /originalMaxWorkers !== 1/)
+  assert.match(source, /endpointName\.startsWith\('itmounts-mass-distilled-'\)/)
+  assert.match(source, /workers: \{ min: 0, max: 0, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
+  assert.match(source, /mass_distilled_runtime_quota_self_drain_rejected/)
+  assert.match(source, /workers: \{ min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
+})

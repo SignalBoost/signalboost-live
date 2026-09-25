@@ -182,6 +182,15 @@ test('rolling canary evidence loading cannot truncate old pass evidence behind u
   assert.doesNotMatch(route, /\.order\('observed_at',\{ascending:false\}\)\.limit\(5000\)/)
 })
 
+test('rolling canary evidence candidate filters are chunked before PostgREST URL encoding', () => {
+  assert.match(route, /ROLLING_EVENT_CANDIDATE_CHUNK_SIZE = 75/)
+  assert.match(route, /uniqueCandidateIds/)
+  assert.match(route, /offset<uniqueCandidateIds\.length;offset\+=ROLLING_EVENT_CANDIDATE_CHUNK_SIZE/)
+  assert.match(route, /candidateChunk=uniqueCandidateIds\.slice\(offset,offset\+ROLLING_EVENT_CANDIDATE_CHUNK_SIZE\)/)
+  assert.match(route, /\.in\('candidate_id',candidateChunk\)/)
+  assert.doesNotMatch(route, /\.in\('candidate_id',candidateIds\)/)
+})
+
 
 test('endpoint-refresh approval can re-canary an exact artifact that passed an older canary', () => {
   assert.match(endpointRefreshMigration, /create or replace function public\.claim_next_mass_distilled_runtime_canary\(\)/)

@@ -10,7 +10,7 @@ export type ModelAssignmentRecord = Readonly<{
   profileKey: string
   previousAssignmentId: string | null
   certificationEventId: string
-  status: 'active' | 'superseded' | 'rolled_back'
+  status: 'active' | 'superseded' | 'rolled_back' | 'released'
   createdBy: string
   createdAt: string
 }>
@@ -56,6 +56,16 @@ export interface ModelConfigurationPort {
     expectedCurrentAssignmentId?: string | null
   }): Promise<ModelAssignmentRecord>
   rollback(input: {
+    use: AssignableModelUse
+    actorId: string
+    expectedCurrentAssignmentId: string
+  }): Promise<ModelAssignmentRecord>
+  /**
+   * Ends the active durable assignment for a role without activating another model, returning that role to
+   * the host's ordinary platform routing. This is the only way to undo a role's FIRST assignment, which has
+   * no rollback target. Optimistic concurrency: the caller must name the assignment it believes is active.
+   */
+  release(input: {
     use: AssignableModelUse
     actorId: string
     expectedCurrentAssignmentId: string

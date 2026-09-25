@@ -159,6 +159,7 @@ The owner Console now implements the complete governed model lifecycle:
 6. **Switch** by creating a new immutable assignment record linked to the previous assignment.
 7. **Rollback** by creating a new active record pointing back to the previous certified profile.
 8. **Disable** a registration only when it is not an active assignment.
+9. **Release** a role back to ordinary platform routing without activating any other model (added 2026-09-25). Before release existed, a role's first assignment was irreversible: rollback needs a previous assignment and disable refuses an active model.
 
 The portable contracts are `ModelConfigurationPort` and `ModelCredentialVaultPort`. SignalBoost's host implementation uses Supabase for metadata/assignment records and the existing AES-256-GCM vault engine for credential ciphertext. A buyer may replace that host adapter with its own database and vault without modifying COS, Builder, model certification, or model routing.
 
@@ -167,7 +168,6 @@ Assignment is deliberately separate from certification. Certification never acti
 ## Host-injected transport SDK
 
 `native_sdk`, `local_runtime`, and `custom_http` are supported by `createHostInjectedModelTransportAdapter()`. A buyer implements only the external wire/SDK driver; iTMounts retains capability checks, certification, routing authority, spend governance, exact response-model validation, and normalized tool/JSON semantics.
-
 `runModelTransportPluginConformance()` verifies support, health, chat, structured JSON when declared, and tool calling when declared. A driver returning a different model identity than the assigned profile is rejected.
 
 ## Sale acceptance
@@ -175,3 +175,9 @@ Assignment is deliberately separate from certification. Certification never acti
 The mandatory Production gate includes `modelPortabilitySaleAcceptance.node.test.ts`. It creates two fictional future model families unknown to the built-in registry, registers them through a host-neutral in-memory `ModelConfigurationPort`, resolves credentials only through the vault reference, certifies both via a host-injected `custom_http` adapter, activates the first, executes live routing, switches to the second, executes again, and rolls back to the first. No core model/provider code is changed during that lifecycle.
 
 This acceptance proves the commercial portability contract: **new model family + new provider transport can be onboarded through configuration and a bounded adapter, not a rewrite of iTMounts core.**
+
+## Production state — 2026-09-25 (evening)
+
+- The Phase 4b schema (`20260925190000_platform_model_registry_full_monty.sql`) had merged to `main` but was never applied to the Production database; every durable lifecycle call failed on missing tables while live routing silently kept its existing path. The owner applied it on 2026-09-25 and all four tables were verified present and empty.
+- `20260925233000_platform_model_assignment_release.sql` adds the `released` status and `platform_release_model_assignment`. The whole lifecycle SQL (register → assign → switch → rollback → release → reassign, plus conflict and nothing-active refusals) was exercised against a real PostgreSQL before delivery.
+- A durable Production lifecycle proof (a real registered model certified, assigned, executed, rolled back and released in Production) has not been recorded yet. Architecture and gate tests are not that proof.

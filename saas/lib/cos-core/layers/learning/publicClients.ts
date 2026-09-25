@@ -1,5 +1,5 @@
 // saas/lib/cos-core/layers/learning/publicClients.ts
-import type { LearningConnectorSearch, LearningConnectorResult } from './connectors'
+import type { LearningConnectorSearch, LearningConnectorResult } from './connectors.ts'
 import { abstractFromInvertedIndex, abstractFromJats, openAlexAbstractIsSubstantive } from './openAlexAbstract.ts'
 
 type FetchLike=typeof fetch

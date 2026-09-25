@@ -44,7 +44,7 @@ async function run() {
     {
       id: 'read_projection_complete',
       passed: missingGithubReads.length === 0,
-      detail: `expected_read=${githubReadCapabilities.length};missing_read=${missingGithubReads.length}`,
+      detail: `expected_read=${githubReadCapabilities.length};missing_read=${missingGithubReads.length};missing=${missingGithubReads.join(',') || 'none'}`,
     },
   ]
 

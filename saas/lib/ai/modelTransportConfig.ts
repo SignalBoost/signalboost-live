@@ -68,6 +68,6 @@ export function parseModelTransportBindings(rawJson: string | undefined): readon
   return Object.freeze(out)
 }
 
-export function configuredModelTransportBindings(env: NodeJS.ProcessEnv = process.env): readonly PlatformModelTransportBinding[] {
+export function configuredModelTransportBindings(env: Record<string, string | undefined> = process.env): readonly PlatformModelTransportBinding[] {
   return parseModelTransportBindings(env.ITMOUNTS_MODEL_TRANSPORTS_JSON)
 }

@@ -76,7 +76,6 @@ export async function GET() {
       binding: binding ? {
         provider: binding.provider,
         protocol: binding.protocol,
-        endpoint: binding.endpoint,
         credentialEnv: binding.credentialEnv,
         credentialConfigured: binding.credentialEnv ? Boolean(process.env[binding.credentialEnv]) : true,
         apiVersion: binding.apiVersion,

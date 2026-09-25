@@ -45,6 +45,10 @@ export const MASS_DISTILLATION_STUDENT_MODEL = CURRENT_UNIVERSITY_STUDENT_PROFIL
 export const MASS_DISTILLATION_TEACHER_COST_CEILING_USD = 0.20 as const
 export const MASS_DISTILLATION_PREPARATION_COST_CEILING_USD = 0.015 as const
 export const MASS_DISTILLATION_TRAINING_COST_CEILING_USD = 1.61 as const
+const MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS = 20 as const
+const MASS_REMEDIATION_TEACHER_ROWS = 25 as const
+const MASS_REMEDIATION_TEACHER_MAX_CALLS = 32 as const
+const MASS_REMEDIATION_HOLDOUT_TARGET = 5 as const
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const HEX40 = /^[a-f0-9]{40}$/i
@@ -465,11 +469,35 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     if (hostedConfig.enabled) {
       const student = await resolveHuggingFaceModelMetadata({ modelId: MASS_DISTILLATION_STUDENT_MODEL, token: hf.token, fetchImpl })
       if (student.license !== 'apache-2.0') throw new Error('mass_distillation_student_model_rights_invalid')
+      const failureDerivedPromptIds = new Set(promptSet.failureDerivedPromptIds)
+      const remediationTeacherRequired = failureDerivedPromptIds.size >= MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS
+      const remediationTeacherPrompts = remediationTeacherRequired
+        ? (() => {
+            const failureDerived = promptSet.prompts.filter(item => failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
+            const ordinary = promptSet.prompts.filter(item => !failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
+            const ordinaryTarget = Math.min(MASS_REMEDIATION_HOLDOUT_TARGET, ordinary.length)
+            const failureDerivedTarget = MASS_REMEDIATION_TEACHER_ROWS - ordinaryTarget
+            if (failureDerived.length < failureDerivedTarget) {
+              throw new Error(`mass_distillation_remediation_teacher_floor_unreachable:${failureDerived.length}/${failureDerivedTarget}`)
+            }
+            const selected = [
+              ...failureDerived.slice(0, failureDerivedTarget),
+              ...ordinary.slice(0, ordinaryTarget),
+            ]
+            if (selected.length !== MASS_REMEDIATION_TEACHER_ROWS) {
+              throw new Error(`mass_distillation_remediation_teacher_selection_invalid:${selected.length}`)
+            }
+            return Object.freeze(selected)
+          })()
+        : promptSet.prompts
+
       const hosted = await runMassHostedTeacherStage({
         db: cosServiceDb(),
         run,
-        prompts: promptSet.prompts,
+        prompts: remediationTeacherPrompts,
         promptSetHash: promptSet.promptSetHash,
+        minimumRows: remediationTeacherRequired ? MASS_REMEDIATION_TEACHER_ROWS : undefined,
+        maxCalls: remediationTeacherRequired ? MASS_REMEDIATION_TEACHER_MAX_CALLS : undefined,
         fetchImpl: fetchImpl as typeof fetch | undefined,
       })
       if (hosted.skipped && hosted.reason === 'no_active_hosted_teacher_provider') {
@@ -516,7 +544,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
           },
           verifier: 'host_controller',
         })
-      } else if (!hosted.completed || !hosted.datasetHash || hosted.outputHashes.length < 20) {
+      } else if (!hosted.completed || !hosted.datasetHash || hosted.outputHashes.length < hosted.minimumRows) {
         throw new Error(`mass_distillation_hosted_teacher_incomplete:${hosted.rows}/${hosted.minimumRows}:${hosted.activeProviders.join(',') || 'none'}`)
       } else {
       const hostedIdempotencyKey = hash([
@@ -567,7 +595,10 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
           routingMode: hosted.routingMode,
           attemptedCalls: hosted.attemptedCalls,
           reroutedPrompts: hosted.reroutedPrompts,
-          maxCalls: hosted.config.maxCalls,
+          maxCalls: hosted.effectiveMaxCalls,
+          remediationTeacherRequired,
+          remediationTeacherRows: remediationTeacherRequired ? hosted.rows : 0,
+          remediationReplayTrainingFloor: remediationTeacherRequired ? MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS : 0,
           maxOutputTokens: hosted.config.maxOutputTokens,
           parallelism: hosted.config.parallelism,
           reservedCostCeilingUsd: expectedCeiling,

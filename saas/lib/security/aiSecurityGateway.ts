@@ -53,8 +53,11 @@ const SECRET_VALUE_PATTERNS: readonly RegExp[] = Object.freeze([
 const PRIVATE_KEY = /-----BEGIN(?: RSA| EC| OPENSSH)? PRIVATE KEY-----[\s\S]*?-----END(?: RSA| EC| OPENSSH)? PRIVATE KEY-----/gi
 
 const OVERRIDE_PATTERNS: readonly RegExp[] = Object.freeze([
-  /\bignore\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|earlier|system|developer)\s+instructions?\b/i,
-  /\bdisregard\s+(?:all\s+|any\s+|the\s+)?(?:previous|prior|system|developer)\s+instructions?\b/i,
+  // Cover both "ignore previous instructions" and the common nested form
+  // "ignore previous system/developer instructions". The latter previously slipped through as only an
+  // authority-bypass finding, which downgraded a compound prompt-injection attack to sanitized.
+  /\bignore\s+(?:all\s+|any\s+|the\s+)?(?:(?:previous|prior|earlier)\s+(?:(?:system|developer)\s+)?|(?:system|developer)\s+)instructions?\b/i,
+  /\bdisregard\s+(?:all\s+|any\s+|the\s+)?(?:(?:previous|prior|earlier)\s+(?:(?:system|developer)\s+)?|(?:system|developer)\s+)instructions?\b/i,
   /\boverride\s+(?:the\s+)?(?:system|developer|security|safety|policy|guardrail)\b/i,
   /\breveal\s+(?:the\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b/i,
   /\byou\s+are\s+now\s+(?:the\s+)?system\b/i,

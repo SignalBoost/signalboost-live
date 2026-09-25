@@ -47,7 +47,8 @@ export async function requestSelfHealingSecuritySpecialistReview(input: {
     `Provider: ${input.incident.provider}`,
     `Environment: ${input.incident.environment}`,
     `Gateway finding codes: ${codes.join(', ')}`,
-    `Incident evidence summaries: ${input.incident.evidence.map(item => item.summary).join(' | ').slice(0, 1800)}`,
+    `Incident error code: ${String(input.incident.errorCode || 'unspecified').slice(0, 160)}`,
+    'The suspicious connector/tool content itself is intentionally withheld. Review only the host-generated finding codes and normalized incident metadata.',
     'Separate observation from inference. Do not execute or authorize any action.',
   ].join('\n')
 

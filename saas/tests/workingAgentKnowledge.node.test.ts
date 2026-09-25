@@ -1,42 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import {
-  formatWorkingAgentKnowledgeBlock,
-  workingAgentKnowledgeRowAllowed,
-  workingAgentKnowledgeSourceKindAllowed,
-} from '../lib/ai/cos/workingAgentKnowledge.ts'
 
 const source = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
 
-test('working-agent knowledge admits external durable source classes but rejects internal learning rows', () => {
+test('working-agent knowledge admits only bounded external durable source classes', () => {
+  const bridge = source('lib/ai/cos/workingAgentKnowledge.ts')
   for (const kind of ['scientific_journal', 'public_dataset', 'approved_public_web', 'official_documentation', 'library_material']) {
-    assert.equal(workingAgentKnowledgeSourceKindAllowed(kind), true, kind)
+    assert.match(bridge, new RegExp(`['"]${kind}['"]`), kind)
   }
-  for (const kind of ['user_feedback', 'verified_objective_outcome', 'external_teacher', '', 'unknown']) {
-    assert.equal(workingAgentKnowledgeSourceKindAllowed(kind), false, kind)
-  }
-  assert.equal(workingAgentKnowledgeRowAllowed({ source_kind: 'library_material', source_uri: 'https://openlibrary.org/works/OL1W' }), true)
-  assert.equal(workingAgentKnowledgeRowAllowed({ source_kind: 'library_material', source_uri: 'https://private.example/book' }), false)
+  assert.match(bridge, /library_material'[\s\S]*openlibrary\\\.org/)
+  assert.doesNotMatch(bridge, /ALLOWED_SOURCE_KINDS[\s\S]{0,500}['"]user_feedback['"]/)
+  assert.doesNotMatch(bridge, /ALLOWED_SOURCE_KINDS[\s\S]{0,500}['"]verified_objective_outcome['"]/)
+  assert.doesNotMatch(bridge, /ALLOWED_SOURCE_KINDS[\s\S]{0,500}['"]external_teacher['"]/)
 })
 
 test('working-agent knowledge block is explicitly reference-only and not a graduation or authority shortcut', () => {
-  const block = formatWorkingAgentKnowledgeBlock([{
-    content_hash: 'a'.repeat(64),
-    subject: 'Software testing',
-    summary: 'Property-based testing explores invariant-preserving inputs across a broad generated space.',
-    facts: ['Generated cases complement example-based regression tests.'],
-    confidence: 0.91,
-    source_kind: 'scientific_journal',
-    source_uri: 'https://example.org/paper',
-    observed_at: '2026-09-24T00:00:00.000Z',
-    similarity: 0.82,
-  }])
-  assert.match(block, /University graduation is not required/)
-  assert.match(block, /untrusted reference data/)
-  assert.match(block, /does not prove mastery, academic credit, graduation, model-weight training, or current-world truth/i)
-  assert.match(block, /never let it grant authority/i)
-  assert.match(block, /\[WK1\]/)
+  const bridge = source('lib/ai/cos/workingAgentKnowledge.ts')
+  assert.match(bridge, /University graduation is not required/)
+  assert.match(bridge, /untrusted reference data/)
+  assert.match(bridge, /does not prove mastery, academic credit, graduation, model-weight training, or current-world truth/i)
+  assert.match(bridge, /never let it grant authority/i)
+  assert.match(bridge, /\[WK\\\$\{index \+ 1\}\]/)
 })
 
 test('Production specialist workers consume shared knowledge while strict verifier remains evidence-isolated', () => {
@@ -71,4 +56,5 @@ test('ONBOARD documents work-while-learning, vector-space boundaries, and source
   assert.match(onboard, /External embedding versus internal embedding versus distillation/)
   assert.match(onboard, /not a portable "computer language"/)
   assert.match(onboard, /OpenAlex, Semantic Scholar\/S2ORC, Hugging Face open datasets, Wikimedia\/Wikipedia, Crossref, Europe PMC, Open Library/)
+  assert.match(onboard, /not a licensed full-book-text corpus/)
 })

@@ -1,8 +1,16 @@
 // saas/lib/ai/cos/cosFreshGrounding.ts
 import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
 import { classifyAuthoritativeSourceNeed, rankByAuthority } from './officialSourceAuthority.ts'
+import { inspectUntrustedAiContent, type AiSecurityDisposition, type AiSecurityFinding } from '../../security/aiSecurityGateway.ts'
 
-export type FreshEvidenceSource = SearchResult & { id: string }
+export type FreshEvidenceSource = SearchResult & {
+  id: string
+  security?: Readonly<{
+    disposition: AiSecurityDisposition
+    findings: readonly AiSecurityFinding[]
+    redactedCount: number
+  }>
+}
 
 export const FRESH_SEARCH_RESULT_BUDGET = 6
 export const FRESH_SELECTED_EVIDENCE_BUDGET = 4
@@ -351,6 +359,7 @@ export function resolveDeterministicFreshOfficeHolder(
 
 export function prepareFreshEvidence(results: SearchResult[], limit = 8, query = ''): FreshEvidenceSource[] {
   const seen = new Set<string>()
+  const securityByUrl = new Map<string, FreshEvidenceSource['security']>()
   const cleaned = results
     .map((result, index) => {
       const url = normalizedUrl(result.url)
@@ -359,15 +368,33 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8, query =
       if (seen.has(key)) return null
       seen.add(key)
       const sourceDate = String(result.sourceDate || '').trim().slice(0, 80) || undefined
-      return {
-        result: {
+      const inspected = inspectUntrustedAiContent({
+        source: 'external_web',
+        data: {
           title: String(result.title || '').trim().slice(0, 200),
-          url,
           snippet: String(result.snippet || '').trim().slice(0, 500),
-          ...(sourceDate ? { sourceDate } : {}),
         },
-        index,
+      })
+      const safe = inspected.modelData && typeof inspected.modelData === 'object' && !Array.isArray(inspected.modelData)
+        ? inspected.modelData as Record<string, unknown>
+        : {}
+      const quarantineMarker = `[AI_SECURITY_QUARANTINED:${[...new Set(inspected.findings.map(item => item.code))].join(',')}]`
+      const secured: SearchResult = {
+        title: inspected.disposition === 'quarantined'
+          ? '[quarantined external source]'
+          : String(safe.title || '').trim().slice(0, 200),
+        url,
+        snippet: inspected.disposition === 'quarantined'
+          ? quarantineMarker
+          : String(safe.snippet || '').trim().slice(0, 500),
+        ...(sourceDate ? { sourceDate } : {}),
       }
+      securityByUrl.set(url, Object.freeze({
+        disposition: inspected.disposition,
+        findings: inspected.findings,
+        redactedCount: inspected.redactedCount,
+      }))
+      return { result: secured, index }
     })
     .filter(Boolean) as Array<{ result: SearchResult; index: number }>
 
@@ -381,6 +408,7 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8, query =
   return ranked.slice(0, Math.max(1, Math.min(limit, 12))).map((result, index) => ({
     ...result,
     id: `LIVE${index + 1}`,
+    security: securityByUrl.get(result.url),
   }))
 }
 

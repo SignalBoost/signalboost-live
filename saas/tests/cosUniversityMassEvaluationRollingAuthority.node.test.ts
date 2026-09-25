@@ -56,7 +56,7 @@ test('provider worker quota reserves one worker of canary headroom by capping ev
   assert.equal(available.issue, true)
 })
 
-test('frontier proof sampling is bounded and then returns to oldest-first order', () => {
+test('frontier proof sampling is bounded while current anchored recipe remains ahead of legacy work', () => {
   assert.equal(MASS_EVALUATION_FRONTIER_PROOF_SAMPLE, 4)
   const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
   const frontier = { ...artifactA, candidateId: 'mass:frontier:1', artifactHash: '9'.repeat(64), createdAt: '2026-09-15T22:34:00Z', frontierRecipe: true }
@@ -78,10 +78,11 @@ test('frontier proof sampling is bounded and then returns to oldest-first order'
     now,
     frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   })
-  assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
+  assert.equal(normal.issue && normal.artifact.candidateId, frontier.candidateId)
+  if (normal.issue) assert.equal(normal.evidence.currentRecipePriority, true)
 })
 
-test('confirmed v2 Computer Science proof sampling outranks legacy work only until two durable results exist', () => {
+test('confirmed v2 Computer Science bounded proof completes but its anchored recipe still outranks legacy work', () => {
   assert.equal(MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE, 2)
   const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
   const builderV2 = {
@@ -117,7 +118,8 @@ test('confirmed v2 Computer Science proof sampling outranks legacy work only unt
     frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
     builderV2ProofCompletions: MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   })
-  assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
+  assert.equal(normal.issue && normal.artifact.candidateId, builderV2.candidateId)
+  if (normal.issue) assert.equal(normal.evidence.currentRecipePriority, true)
 })
 
 test('post-GKD remediation replay proof sampling is bounded and never bypasses the 12-hour delay', () => {
@@ -235,11 +237,14 @@ test('an infrastructure-failed frontier start remains proof-prioritized until a 
 
 test('cron scans bounded legacy work and explicitly includes both Builder v2 and remediation replay proof cohorts', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /const \[oldestArtifacts, builderV2Artifacts, replayArtifacts\] = await Promise\.all/)
+  assert.match(route, /const \[oldestArtifacts, currentRecipeArtifacts, builderV2Artifacts, replayArtifacts\] = await Promise\.all/)
   assert.match(route, /\.limit\(500\)/)
   assert.match(route, /\.eq\('subject_id', 'Computer Science & Coding'\)/)
-  assert.match(route, /optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER/)
-  assert.match(route, /frontierRecipe: receipt\.profile === 'cos_university_frontier_gkd_v1'/)
+  assert.match(route, /currentRecipeArtifacts/)
+  assert.match(route, /const confirmedCurrentRecipeArtifacts = \(currentRecipeArtifacts\.data \|\| \[\]\)/)
+  assert.match(route, /filter\(\(row: any\) => isBuilderV2Receipt\(row\?\.intended_use\)\)/)
+  assert.match(route, /currentRecipeArtifacts[\s\S]*\.order\('created_at', \{ ascending: false \}\)[\s\S]*\.limit\(1000\)/)
+  assert.match(route, /frontierRecipe: isBuilderV2Receipt\(row\.intended_use\)/)
   assert.match(route, /builderV2:/)
   assert.match(route, /remediationReplay: isRemediationReplayReceipt/)
   assert.match(route, /failureDerivedReplayRequired/)

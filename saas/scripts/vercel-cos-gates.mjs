@@ -29,6 +29,7 @@ const tests = [
   'tests/cosUniversityMassCanaryArtifactDailyCap.node.test.ts',
   'tests/runpodMassDistilledCanaryAdaFallback.node.test.ts',
   'tests/cosUniversityMassCanaryRollingWindowComplete.node.test.ts',
+  'tests/cosUniversityMassBacklogCompactor.node.test.ts',
   'tests/platformHarnessUniversalIngress.node.test.ts',
   'tests/cosUniversityMassEvaluationBacklogGate.node.test.ts',
   'tests/platformHarnessAbsoluteDeadline.node.test.ts',

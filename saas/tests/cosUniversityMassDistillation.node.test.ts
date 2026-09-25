@@ -296,6 +296,8 @@ test('quality-floor migration releases only unspent undersized prepared batches'
   assert.match(migration, /dispatch_authorized=false/)
   assert.match(migration, /authority_expanded=false/)
   assert.match(migration, /set status='superseded'/)
+  assert.match(migration, /cos_umd_prepared_quality_floor_check/)
+  assert.match(migration, /check \(status <> 'prepared' or source_count >= 64\)/)
   assert.doesNotMatch(migration, /where status='consumed'/)
 })
 

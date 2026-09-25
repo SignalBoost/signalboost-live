@@ -28,6 +28,7 @@ import { resolveSupervisorRepairParams, summarizeRepairDispatch } from '@/agent-
 import type { RemediationMemoryStore } from '@/lib/supervisor/remediation-memory'
 import { SupabaseRemediationMemoryStore } from '@/lib/supervisor/remediation-memory-supabase'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { recordAiSecuritySupervisorObservation } from '@/lib/security/aiSecuritySupervisorTelemetry'
 
 export function nativeIncidentToNormalized(incident: SupervisorIncident, connectorEvidence: unknown): NormalizedIncidentPayload {
   return normalizeNativeIncident(incident, connectorEvidence)
@@ -59,6 +60,19 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
       recipe: selectConnectorRecipe(incident),
     })
     const evidence = compactDelegatedEvidence(delegated)
+    const gatewayFindings = evidence.items.flatMap(item => item.security.findings)
+    if (gatewayFindings.length) {
+      await recordAiSecuritySupervisorObservation({
+        source: 'connector_output',
+        surface: 'supervisor_connector',
+        disposition: evidence.items.some(item => item.security.disposition === 'quarantined')
+          ? 'quarantined'
+          : 'sanitized',
+        findings: gatewayFindings,
+        redactedCount: evidence.items.reduce((sum, item) => sum + item.security.redactedCount, 0),
+        traceId: incident.incidentId,
+      })
+    }
     const securityReview = await requestSelfHealingSecuritySpecialistReview({ incident, evidence })
     const diagnosticEvidence = securityReview
       ? Object.freeze({ ...evidence, securitySpecialistReview: securityReview })

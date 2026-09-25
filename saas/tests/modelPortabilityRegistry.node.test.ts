@@ -67,7 +67,7 @@ test('transport selection is protocol-neutral and fails closed without an instal
     protocol: 'google_generate_content',
     supports: candidate => candidate.modelId === profile.modelId,
     health: async candidate => ({ ok: true, provider: 'test', model: candidate.modelId, error: null }),
-    chat: async request => ({ text: 'ok', toolCalls: [], finishReason: 'stop', provider: 'test', model: request.profile.modelId }),
+    chat: async request => ({ text: 'ok', toolCalls: [], finishReason: 'stop', provider: 'test', model: request.profile.modelId, inputTokens: null, outputTokens: null, requestId: null }),
   }
   assert.equal(requireTransportForProfile(profile, [adapter]).id, 'test-google')
 })

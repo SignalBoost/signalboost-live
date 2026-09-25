@@ -9,6 +9,7 @@ import {
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_PROFILE,
   MASS_CANARY_IN_FLIGHT_TTL_MS,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS,
   MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
   MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_CANARY_ROLLING_WINDOW_HOURS,
@@ -218,7 +219,7 @@ async function issueRollingCanaryApproval(now:Date){
     const receipt=row?.intended_use?.trainingReceipt
     return receipt&&typeof receipt==='object'
       && receipt.failureDerivedReplayRequired===true
-      && Number(receipt.failureDerivedReplayItems||0)>0
+      && Number(receipt.failureDerivedReplayItems||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS
       && Number(receipt.failureDerivedReplayEpochs||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS
       && Number(receipt.failureDerivedReplayLearningRate||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE
   })

@@ -159,7 +159,9 @@ function createOpenAiCompatibleAdapter(binding: PlatformModelTransportBinding, e
           model: request.profile.providerModelId,
           max_tokens: positiveInt(request.maxOutputTokens, 2048, 1, 65_536),
           temperature: request.temperature ?? 0.2,
-          ...(request.jsonObject ? { response_format: { type: 'json_object' } } : {}),
+          ...(request.jsonObject ? { response_format: request.jsonSchema
+            ? { type: 'json_schema', json_schema: { name: 'itmounts_output', schema: request.jsonSchema, strict: true } }
+            : { type: 'json_object' } } : {}),
           ...(request.tools?.length ? {
             tools: request.tools.map(tool => ({
               type: 'function',
@@ -229,6 +231,8 @@ function createAnthropicAdapter(binding: PlatformModelTransportBinding, env: Env
       if (!request.profile.transportProtocols.includes('anthropic_messages')) throw new Error('platform_model_transport_profile_mismatch')
       const credential = credentialFor(binding, env)
       if (!credential) throw new Error('platform_model_transport_credential_missing')
+      if (request.jsonObject && !request.jsonSchema) throw new Error('platform_model_transport_json_schema_required:anthropic_messages')
+      if (request.jsonSchema && request.jsonSchema.additionalProperties !== false) throw new Error('platform_model_transport_json_schema_additional_properties_must_be_false:anthropic_messages')
       const response = await fetchImpl(bindingEndpoint(binding), {
         method: 'POST',
         headers: {
@@ -243,7 +247,7 @@ function createAnthropicAdapter(binding: PlatformModelTransportBinding, env: Env
           temperature: request.temperature ?? 0.2,
           ...(systemText(request.messages) ? { system: systemText(request.messages) } : {}),
           ...(request.jsonObject ? {
-            output_config: { format: { type: 'json_schema', schema: { type: 'object', additionalProperties: true } } },
+            output_config: { format: { type: 'json_schema', schema: request.jsonSchema } },
           } : {}),
           ...(request.tools?.length ? {
             tools: request.tools.map(tool => ({
@@ -293,12 +297,14 @@ function geminiContents(messages: readonly PlatformModelMessage[]): any[] {
     if (message.role === 'tool') {
       if (!message.toolCallId) throw new Error('platform_model_transport_tool_result_id_missing')
       const synthetic = message.toolCallId.startsWith('synthetic:')
+      const name = clean(message.toolName, 128)
+      if (!name) throw new Error('platform_model_transport_tool_result_name_missing:google_generate_content')
       return {
         role: 'user',
         parts: [{
           functionResponse: {
             ...(synthetic ? {} : { id: message.toolCallId }),
-            name: clean(message.content ? undefined : '', 128) || 'tool',
+            name,
             response: { result: message.content || '' },
           },
         }],
@@ -357,7 +363,7 @@ function createGoogleAdapter(binding: PlatformModelTransportBinding, env: Env, f
           generationConfig: {
             maxOutputTokens: positiveInt(request.maxOutputTokens, 2048, 1, 65_536),
             temperature: request.temperature ?? 0.2,
-            ...(request.jsonObject ? { responseMimeType: 'application/json' } : {}),
+            ...(request.jsonObject ? { responseMimeType: 'application/json', ...(request.jsonSchema ? { responseSchema: request.jsonSchema } : {}) } : {}),
           },
         }),
       })
@@ -395,7 +401,7 @@ export function createBuiltinModelTransportAdapters(input: {
 }): readonly ModelTransportAdapter[] {
   const env = input.env || process.env
   const fetchImpl = input.fetchImpl || fetch
-  const bindings = input.bindings || configuredModelTransportBindings(env as NodeJS.ProcessEnv)
+  const bindings = input.bindings || configuredModelTransportBindings(env)
   const profiles = new Map(input.profiles.map(profile => [profile.key, profile]))
   const adapters: ModelTransportAdapter[] = []
   for (const binding of bindings) {

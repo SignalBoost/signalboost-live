@@ -758,7 +758,8 @@ test('moving-head holdout revision failures are evaluator infrastructure and rel
 test('rolling approval evidence is candidate-scoped and paginated so old exact canaries cannot fall out of a global row cap', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const candidateIds = rows\.map\(row => row\.candidateId\)/)
-  assert.match(route, /\.in\('candidate_id', candidateIds\)/)
+  assert.equal((route.match(/\.in\('candidate_id', candidateChunk\)/g) || []).length, 2)
+  assert.doesNotMatch(route, /\.in\('candidate_id', candidateIds\)/)
   assert.match(route, /\.range\(from, to\)/)
   assert.match(route, /ROLLING_EVENT_PAGE_SIZE = 1000/)
   assert.match(route, /MASS_EVALUATION_ROLLING_AUTHORIZATION_REF/)

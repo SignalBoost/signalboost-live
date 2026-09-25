@@ -73,6 +73,15 @@ FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION = 1
 
 BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"
 BASE_WORKER_PATH = Path("/tmp/itmounts_hf_worker_base.py")
+XSA_RUNTIME_FILENAME = "cos-university-xsa-runtime.py"
+XSA_RUNTIME_PATH = Path("/tmp/itmounts_xsa_runtime.py")
+XSA_RUNTIME_PROFILE = "qwen3_xsa_projection_v1"
+XSA_RUNTIME_CONTRACT_MARKERS = (
+    "exclusive_self_attention_projection",
+    "install_qwen3_xsa",
+    "usesActualValueProjection",
+    "gqaAware",
+)
 BASE_CONTRACT_MARKERS = (
     "partition_manifests_registered",
     "trained_artifact_registered",
@@ -101,6 +110,27 @@ def _load_base_worker():
     spec.loader.exec_module(module)
     return module
 
+
+def _xsa_runtime_url() -> str:
+    current = str(os.environ.get("ITMOUNTS_HF_WORKER_URL") or "").strip()
+    if not current.startswith("https://") or not current.endswith("/cos-university-hf-worker.py"):
+        raise RuntimeError("worker_xsa_runtime_url_invalid")
+    return current.rsplit("/", 1)[0] + "/" + XSA_RUNTIME_FILENAME
+
+
+def _load_xsa_runtime():
+    urllib.request.urlretrieve(_xsa_runtime_url(), XSA_RUNTIME_PATH)
+    source = XSA_RUNTIME_PATH.read_text(encoding="utf-8")
+    if not all(marker in source for marker in XSA_RUNTIME_CONTRACT_MARKERS):
+        raise RuntimeError("worker_xsa_runtime_contract_invalid")
+    spec = importlib.util.spec_from_file_location("itmounts_xsa_runtime", XSA_RUNTIME_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("worker_xsa_runtime_import_invalid")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    if getattr(module, "XSA_RUNTIME_PROFILE", None) != XSA_RUNTIME_PROFILE:
+        raise RuntimeError("worker_xsa_runtime_profile_mismatch")
+    return module
 
 def _render_chat(tokenizer, messages: list[dict[str, str]]) -> str:
     try:
@@ -744,6 +774,9 @@ def _xsa_canary_evidence(base, candidate_id: str) -> dict[str, Any]:
         "xsaRolloutSelected": False,
         "xsaTrainingApplied": False,
         "xsaInferenceSymmetryRequired": XSA_INFERENCE_SYMMETRY_REQUIRED,
+        "xsaTrainingRuntimeProfile": XSA_RUNTIME_PROFILE,
+        "xsaTrainingRuntimeImplemented": True,
+        "xsaServingRuntimeImplemented": False,
         "xsaReason": "disabled_pending_symmetric_runtime",
     }
 
@@ -1081,6 +1114,9 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             "xsaRolloutSelected": False,
             "xsaTrainingApplied": False,
             "xsaInferenceSymmetryRequired": XSA_INFERENCE_SYMMETRY_REQUIRED,
+            "xsaTrainingRuntimeProfile": XSA_RUNTIME_PROFILE,
+            "xsaTrainingRuntimeImplemented": True,
+            "xsaServingRuntimeImplemented": False,
             "xsaReason": "legacy_lane",
         })
     print(
@@ -1092,7 +1128,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         flush=True,
     )
     print(
-        f"itmounts_attention_architecture:{json.dumps({key: recipe[key] for key in ('attentionArchitecture','xsaProfile','xsaRolloutPercent','xsaRolloutSelected','xsaTrainingApplied','xsaInferenceSymmetryRequired','xsaReason')}, ensure_ascii=True, separators=(',', ':'))}",
+        f"itmounts_attention_architecture:{json.dumps({key: recipe[key] for key in ('attentionArchitecture','xsaProfile','xsaRolloutPercent','xsaRolloutSelected','xsaTrainingApplied','xsaInferenceSymmetryRequired','xsaTrainingRuntimeProfile','xsaTrainingRuntimeImplemented','xsaServingRuntimeImplemented','xsaReason')}, ensure_ascii=True, separators=(',', ':'))}",
         flush=True,
     )
 

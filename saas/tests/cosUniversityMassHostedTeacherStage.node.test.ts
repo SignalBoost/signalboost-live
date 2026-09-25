@@ -312,7 +312,7 @@ test('zero hosted rows are an explicit governed HF fallback, while partial hoste
   assert.match(consumer, /hosted\.rows === 0 && !hosted\.completed/)
   assert.match(consumer, /successfulHostedRows: 0/)
   assert.match(consumer, /silentFallbackAllowed: false/)
-  assert.match(consumer, /else if \(!hosted\.completed \|\| !hosted\.datasetHash \|\| hosted\.outputHashes\.length < 20\)/)
+  assert.match(consumer, /else if \(!hosted\.completed \|\| !hosted\.datasetHash \|\| hosted\.outputHashes\.length < hosted\.minimumRows\)/)
   assert.match(consumer, /mass_distillation_hosted_teacher_incomplete/)
 })
 
@@ -407,4 +407,65 @@ test('hosted teacher routing balances dollars and gives expensive teachers compl
   assert.doesNotMatch(source, /teacher\.id === ['"]claude['"]/)
   assert.match(source, /DEFAULT_MAX_OUTPUT_TOKENS = 384/)
   assert.match(source, /HARD_MAX_OUTPUT_TOKENS = 512/)
+})
+
+
+test('remediation teacher override can produce twenty-five rows without widening the ordinary default', async () => {
+  const db = memoryDb()
+  const prompts = Array.from({ length: 25 }, (_, index) => ({
+    id: (index + 100).toString(16).padStart(64, '0'),
+    prompt: `Remediation prompt ${index + 1}`,
+  }))
+  let calls = 0
+  const result = await runMassHostedTeacherStage({
+    db,
+    run: {
+      id: '77777777-7777-4777-8777-777777777777',
+      candidate_id: 'mass:88888888-8888-4888-8888-888888888888:dddddddddddddddd',
+      batch_key: 'a'.repeat(64),
+    },
+    prompts,
+    promptSetHash: '9'.repeat(64),
+    minimumRows: 25,
+    maxCalls: 32,
+    env,
+    fetchImpl: async (input, init) => {
+      calls += 1
+      const url = String(input)
+      const body = JSON.parse(String(init?.body || '{}'))
+      const model = String(body.model)
+      const answer = `remediation-answer-${calls}-${model}`
+      if (url.includes('anthropic.com')) {
+        return new Response(JSON.stringify({
+          content: [{ type: 'text', text: answer }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }), { status: 200, headers: { 'request-id': `anthropic-remediation-${calls}` } })
+      }
+      if (url.includes('generativelanguage.googleapis.com')) {
+        return new Response(JSON.stringify({
+          candidates: [{ content: { parts: [{ text: answer }] } }],
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
+        }), { status: 200, headers: { 'x-goog-request-id': `gemini-remediation-${calls}` } })
+      }
+      if (url.includes('api.openai.com/v1/responses')) {
+        return new Response(JSON.stringify({
+          id: `resp-remediation-${calls}`,
+          output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: answer }] }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }), { status: 200, headers: { 'x-request-id': `openai-remediation-${calls}` } })
+      }
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: answer } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
+      }), { status: 200, headers: { 'x-request-id': `compatible-remediation-${calls}` } })
+    },
+  })
+
+  assert.equal(massHostedTeacherStageConfig(env).maxCalls, 20)
+  assert.equal(result.minimumRows, 25)
+  assert.equal(result.effectiveMaxCalls, 32)
+  assert.equal(result.rows, 25)
+  assert.equal(result.completed, true)
+  assert.equal(calls, 25)
+  assert.equal(db.rows.length, 25)
 })

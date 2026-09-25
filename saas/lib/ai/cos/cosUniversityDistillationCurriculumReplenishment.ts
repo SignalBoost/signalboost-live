@@ -30,7 +30,11 @@ const DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY = 10
 const DISTILLATION_SOURCE_CALL_BUDGET_MULTIPLIER = 6
 const DISTILLATION_RIGHTS_CLEARED_ADAPTERS = new Set(['openalex', 'hf_nist_cc0', 'hf_github_cc0'])
 const HYBRID_SYNTHETIC_MAX_PER_SUBJECT = 20
-const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = Math.max(1, Math.round(20 * HYBRID_FAILURE_DERIVED_TARGET))
+// A remediation source family must be able to satisfy the unchanged 20-unique-item packaging floor on its
+// own when older real-source material is already assigned to durable batches. The hybrid packager still
+// prefers the 30% failure-derived target when other unassigned material exists; this is a replenishment
+// ceiling, not a required mix or a weakened quality gate.
+const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = 20
 const VERIFIED_FAILURE_LOOKBACK_DAYS = 30
 
 function rightsClearedPolicy(maxCandidatesPerCycle: number): ContinuousLearningPolicy {
@@ -182,8 +186,8 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   // existed and were never seeded for the subjects that were failing.
   //
   // Targets are now the subjects with verified failures, most-failing first, with shortfall only breaking ties.
-  // Volume stays bounded exactly as before: at most HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT seeds per subject per
-  // pass, at most maxSubjects subjects, and the content hash is derived from the failing candidate and its gate
+  // Volume stays bounded: at most HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT seeds per subject per pass,
+  // at most maxSubjects subjects, and the content hash is derived from the failing candidate and its gate
   // classes - so re-running produces nothing new and only a newly failed artifact creates new material.
   const since = new Date(input.now.getTime() - VERIFIED_FAILURE_LOOKBACK_DAYS * 86_400_000).toISOString()
 

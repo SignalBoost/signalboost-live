@@ -47,6 +47,12 @@ test('a subject with no verified failure is never targeted', () => {
   assert.match(SOURCE, /const verifiedFailures = failuresByTitle\.get\(target\.subject\) \|\| \[\]/)
 })
 
+test('remediation ceiling can satisfy the unchanged 20-item packaging floor while remaining bounded', () => {
+  assert.match(FILE, /const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = 20/)
+  assert.match(FILE, /able to satisfy the unchanged 20-unique-item packaging floor/)
+  assert.match(FILE, /hybrid packager still[\s\S]*30% failure-derived target/)
+})
+
 test('volume stays bounded: per-subject ceiling, subject count, and idempotent identity', () => {
   assert.match(SOURCE, /HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT,\s*\n\s*verifiedFailures\.length,\s*\n\s*\)/)
   assert.match(SOURCE, /\.slice\(0, input\.maxSubjects\)/)

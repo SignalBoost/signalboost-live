@@ -18,7 +18,8 @@ export type UniversityModelProfile = Readonly<{
   role: UniversityModelRole
   family: string
   modelId: string
-  revision: string
+  revision: string | null
+  revisionPolicy: 'fixed' | 'resolve_and_pin_at_dispatch'
   tokenizerModelId: string
   artifactKind: 'base_model'
   training: Readonly<{
@@ -52,6 +53,7 @@ export const UNIVERSITY_MODEL_CAPABILITY_REGISTRY = Object.freeze({
     family: 'qwen3',
     modelId: 'Qwen/Qwen3-4B',
     revision: QWEN3_4B_REVISION,
+    revisionPolicy: 'fixed',
     tokenizerModelId: 'Qwen/Qwen3-4B',
     artifactKind: 'base_model',
     training: Object.freeze({
@@ -80,7 +82,8 @@ export const UNIVERSITY_MODEL_CAPABILITY_REGISTRY = Object.freeze({
     role: 'teacher',
     family: 'qwen3',
     modelId: 'Qwen/Qwen3-8B',
-    revision: '',
+    revision: null,
+    revisionPolicy: 'resolve_and_pin_at_dispatch',
     tokenizerModelId: 'Qwen/Qwen3-8B',
     artifactKind: 'base_model',
     training: Object.freeze({

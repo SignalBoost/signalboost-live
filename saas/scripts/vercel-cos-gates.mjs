@@ -54,6 +54,7 @@ const tests = [
   'tests/learningSourceMix.node.test.ts',
   'tests/hfOpenDatasetContinuousAcquisition.node.test.ts',
   'tests/publicDomainFullTextSources.node.test.ts',
+  'tests/universitySourceFabric.node.test.ts',
   'tests/hfOpenDatasetTransport.node.test.ts',
   'tests/openAlexAbstract.node.test.ts',
   'tests/cosUniversityAgentModelPolicy.node.test.ts',

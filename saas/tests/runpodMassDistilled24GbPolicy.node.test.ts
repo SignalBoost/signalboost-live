@@ -96,6 +96,13 @@ test('capacity reclamation never disables active graduate, evaluator, or Residen
   assert.match(endpointProtection, /\.eq\('runtime_provider', 'runpod'\)/)
   assert.match(endpointProtection, /graduate_endpoint_protection_database_unavailable/)
 
+  assert.match(endpointProtection, /MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1'/)
+  assert.match(endpointProtection, /MASS_CANARY_ACTIVE_MS = 10 \* 60 \* 1000/)
+  assert.match(endpointProtection, /local_distilled_runtime_canary_invocation_started/)
+  assert.match(endpointProtection, /local_distilled_runtime_canary_passed/)
+  assert.match(endpointProtection, /local_distilled_runtime_canary_failed/)
+  assert.match(endpointProtection, /canary_endpoint_protection_database_unavailable/)
+
   assert.match(endpointProtection, /MASS_EVALUATION_PROFILE = 'cos_mass_distilled_independent_evaluation_runtime_v1'/)
   assert.match(endpointProtection, /mass_distilled_independent_evaluation_started/)
   assert.match(endpointProtection, /reservationOnly === true/)
@@ -103,7 +110,7 @@ test('capacity reclamation never disables active graduate, evaluator, or Residen
   assert.match(endpointProtection, /mass_distilled_independent_evaluation_failed/)
   assert.match(endpointProtection, /MASS_EVALUATION_ACTIVE_MS = 12 \* 60 \* 1000/)
   assert.match(endpointProtection, /evaluation_endpoint_protection_database_unavailable/)
-  assert.match(endpointProtection, /new Set\(\[\.\.\.graduates, \.\.\.evaluations\]\)/)
+  assert.match(endpointProtection, /new Set\(\[\.\.\.graduates, \.\.\.evaluations, \.\.\.canaries\]\)/)
 })
 
 

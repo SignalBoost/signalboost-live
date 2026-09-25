@@ -1,2 +1,2 @@
-base_sha=c3023ad13b00b7760a1c106a9584bbe28eed47cd
-branch=fix/evaluation-cold-start-double-wait-20260925
+base_sha=1997e9474c3265ee020d65b89331ff3a773fedb0
+branch=fix/evaluation-explicit-worker-wake-20260925

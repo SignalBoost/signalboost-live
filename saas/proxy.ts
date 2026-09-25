@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { provenanceBoundarySecret } from './lib/ai/cos/provenanceBoundarySecret.ts'
 import { proxy as baseProxy } from './proxyBase.ts'
 import { isFastTextTransform } from './lib/ai/cos/fastTextTransformIntent.ts'
+import { evaluateSecurityAdmission } from './lib/security/securityAdmissionShield.ts'
 
 const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 const FAST_TRANSFORM_INTERNAL_HEADER = 'x-signalboost-fast-transform-internal'
@@ -73,6 +74,24 @@ function provenanceRewrite(req: NextRequest, forceAssistant = false) {
 
 export async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname
+
+  const admission = evaluateSecurityAdmission({
+    pathname,
+    method: req.method,
+    contentType: req.headers.get('content-type'),
+    contentLength: req.headers.get('content-length'),
+  })
+  if (admission.disposition === 'reject') {
+    return NextResponse.json(
+      {
+        error: 'security_admission_rejected',
+        reason: admission.reason,
+        execution_allowed: false,
+        external_action_taken: false,
+      },
+      { status: admission.status, headers: { 'Cache-Control': 'no-store' } },
+    )
+  }
 
   // Every browser-delivered answer crosses the provenance wrapper. Call proxyBase first so the
   // existing anonymous spend limit and other ingress guards remain authoritative; only a successful

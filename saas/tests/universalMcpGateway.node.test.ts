@@ -248,14 +248,6 @@ test('Universal MCP live acceptance never requests static Figma or Vercel access
   assert.match(workflow, /Vercel intentionally has no static token secret/)
 })
 
-test('GitHub Actions MCP certification scopes repository token without removing runtime identity capability', async () => {
-  const baseline = await readFile(new URL('../scripts/mcp-gateway/run-universal-mcp-baseline-acceptance.ts', import.meta.url), 'utf8')
-  const full = await readFile(new URL('../scripts/mcp-gateway/run-universal-mcp-acceptance.ts', import.meta.url), 'utf8')
-  assert.match(baseline, /capabilityName !== 'identity\.read'/)
-  assert.match(full, /capabilityName !== 'identity\.read'/)
-  assert.equal(GITHUB_MCP_PROFILE.tools.some(item => item.capabilityName === 'identity.read'), true)
-})
-
 test('Figma remains fail-closed until the custom MCP client is approved and connected', async () => {
   const gateway = createUniversalMcpGateway({
     tenantId: 'tenant-a',

@@ -3,7 +3,7 @@ import { ContinuousLearningDirector, type ContinuousLearningStore, type Knowledg
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { withSharedLearningSourceProviderLeases } from '@/lib/cos-core/layers/learning/providerLease'
 import { createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
-import { openSourceContinuityCurriculum } from './dailyAutonomousLearning.ts'
+import { openSourceContinuityCurriculum, projectGutenbergFullTextCurriculum } from './dailyAutonomousLearning.ts'
 
 export type OpenSourceContinuityResult = {
   status: 'skipped' | 'learned'
@@ -22,16 +22,18 @@ const OPEN_SOURCE_CONTINUITY_POLICY = {
   allowedSourceKinds: new Set([
     'scientific_journal',
     'approved_public_web',
+    'library_material',
   ] as const),
   minimumConfidence: 0.72,
-  maxCandidatesPerCycle: 12,
+  maxCandidatesPerCycle: 16,
   maxExternalCostUsdPerCycle: 0,
 }
 
 function continuityGaps(now: Date): KnowledgeGap[] {
-  return openSourceContinuityCurriculum(now).filter(gap =>
+  return [...openSourceContinuityCurriculum(now), ...projectGutenbergFullTextCurriculum(now)].filter(gap =>
     gap.allowedAdapterIds?.includes('semantic_scholar')
-    || gap.allowedAdapterIds?.includes('reference'),
+    || gap.allowedAdapterIds?.includes('reference')
+    || gap.allowedAdapterIds?.includes('project_gutenberg_pd'),
   )
 }
 

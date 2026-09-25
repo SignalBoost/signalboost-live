@@ -60,7 +60,7 @@ export function workingAgentKnowledgeSourceKindAllowed(sourceKind: unknown): boo
 export function workingAgentKnowledgeRowAllowed(row: { source_kind?: unknown; source_uri?: unknown }): boolean {
   const kind = String(row.source_kind ?? '').trim().toLowerCase()
   if (!workingAgentKnowledgeSourceKindAllowed(kind)) return false
-  if (kind === 'library_material') return /^https:\/\/openlibrary\.org\//i.test(String(row.source_uri ?? '').trim())
+  if (kind === 'library_material') return /^https:\/\/(?:openlibrary\.org|(?:www\.)?gutenberg\.org)\//i.test(String(row.source_uri ?? '').trim())
   return true
 }
 

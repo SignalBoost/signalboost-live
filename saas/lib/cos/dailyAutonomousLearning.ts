@@ -146,6 +146,22 @@ const HF_ARXIV_DAILY_QUERIES = Object.freeze([
   'cloud systems performance isolation',
 ] as const)
 
+
+const PROJECT_GUTENBERG_FULL_TEXT_TOPICS = Object.freeze([
+  ['Mathematics', 'algebra mathematics geometry'],
+  ['Mathematics', 'calculus differential integral mathematics'],
+  ['Statistics & Data Science', 'probability statistics mathematical'],
+  ['Physics & Natural Sciences', 'physics mechanics dynamics'],
+  ['Physics & Natural Sciences', 'electricity magnetism engineering'],
+  ['Physics & Natural Sciences', 'thermodynamics heat energy physics'],
+  ['Physics & Natural Sciences', 'optics light physics'],
+  ['Physics & Natural Sciences', 'astronomy scientific observation'],
+  ['Reasoning & Decision Science', 'logic reasoning scientific method'],
+  ['Economics & Finance', 'economics political economy markets'],
+  ['Computer Science & Coding', 'computing calculation machine logic'],
+  ['Physics & Natural Sciences', 'engineering mechanics machines'],
+] as const)
+
 const SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES = Object.freeze([
   'autonomous software repair agents evaluation',
   'retrieval augmented generation evaluation',
@@ -276,6 +292,38 @@ function utcLearningDay(now: Date): number {
  * objectives cannot be satisfied by another public-dataset source, while the normal relevance,
  * confidence, deduplication, storage and internal-embedding gates remain unchanged.
  */
+
+/**
+ * Public-domain full-text books are a rights-cleared complement to metadata-only Open Library.
+ * One rotating exact-source objective runs on every 15-minute open-source continuity slot. The
+ * Project Gutenberg adapter itself caps the number of books fetched and only labels a work
+ * "public domain" after Gutendex explicitly reports copyright=false and an HTTPS Gutenberg text
+ * payload is fetched. These rows may therefore serve Working COS/specialists immediately and can
+ * also enter the existing mass-distillation rights gate.
+ */
+export function projectGutenbergFullTextCurriculum(now: Date = new Date()): KnowledgeGap[] {
+  const slot = utcLearningQuarterHour(now)
+  const [subject, query] = rotatingItem(PROJECT_GUTENBERG_FULL_TEXT_TOPICS, slot)
+  return [{
+    id: 'curriculum:project-gutenberg-public-domain-fulltext',
+    subject,
+    question: `What durable public-domain textbook or book evidence is relevant to ${query}?`,
+    discoveryQuery: query,
+    portableIds: ['cos'],
+    expectedReuse: 60,
+    expectedAvoidedCostUsd: 1,
+    urgency: 97,
+    evidence: [
+      'Project Gutenberg public-domain full text',
+      'Gutendex copyright=false',
+      'training_rights:public_domain',
+    ],
+    sourceKinds: ['library_material'],
+    allowedAdapterIds: ['project_gutenberg_pd'],
+    curriculumAligned: true,
+  }]
+}
+
 export function huggingFaceOpenDatasetCurriculum(now: Date = new Date()): KnowledgeGap[] {
   const day = utcLearningDay(now)
   const nistQuery = HF_NIST_DAILY_QUERIES[((day % HF_NIST_DAILY_QUERIES.length) + HF_NIST_DAILY_QUERIES.length) % HF_NIST_DAILY_QUERIES.length]
@@ -641,7 +689,7 @@ export async function runDailyAutonomousLearning(input: {
   const corpusExpansionGaps = normalizedDynamicGaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const autonomousGaps = [...reasoningGaps, ...corpusExpansionGaps].slice(0, 12)
   const trackStudy = curriculumTrackStudyGaps({ prioritySubjects: weaknessCurriculumSignals.map(signal => signal.subject) })
-  const openSourceContinuity = openSourceContinuityCurriculum()
+  const openSourceContinuity = [...openSourceContinuityCurriculum(), ...projectGutenbergFullTextCurriculum()]
   const hfOpenDatasetCurriculum = huggingFaceOpenDatasetCurriculum()
   const generalCurriculum = [...hfOpenDatasetCurriculum, ...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum(), ...trackStudy]
   const curriculum = [...openSourceContinuity, ...generalCurriculum]

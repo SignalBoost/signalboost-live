@@ -64,6 +64,8 @@ test('University telemetry exposes a separate open-source acquisition lane with 
   assert.match(route, /Hugging Face open datasets[\s\S]*integration: 'implemented'/)
   assert.match(route, /allowlisted_cc0_corpora_source_vectors_plus_internal_reembedding/)
   assert.match(route, /Wikipedia \/ Wikimedia[\s\S]*integration: 'implemented'/)
+  assert.match(route, /Project Gutenberg full text[\s\S]*integration: 'implemented'/)
+  assert.match(route, /public_domain_full_text_internal_reembedding_and_distillation/)
   assert.match(route, /huggingface_dataset:/)
   assert.match(route, /hf:\/\/datasets\//)
   assert.match(route, /items24h/)

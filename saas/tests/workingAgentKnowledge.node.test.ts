@@ -10,6 +10,7 @@ test('working-agent knowledge admits only bounded external durable source classe
     assert.match(bridge, new RegExp(`['"]${kind}['"]`), kind)
   }
   assert.match(bridge, /library_material'[\s\S]*openlibrary\\\.org/)
+  assert.match(bridge, /gutenberg\\\.org/)
   assert.doesNotMatch(bridge, /ALLOWED_SOURCE_KINDS[\s\S]{0,500}['"]user_feedback['"]/)
   assert.doesNotMatch(bridge, /ALLOWED_SOURCE_KINDS[\s\S]{0,500}['"]verified_objective_outcome['"]/)
   assert.doesNotMatch(bridge, /ALLOWED_SOURCE_KINDS[\s\S]{0,500}['"]external_teacher['"]/)

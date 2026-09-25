@@ -1594,7 +1594,47 @@ Distillation eligibility is stricter than retrieval eligibility. Copyrighted or 
 
 The platform should preferentially exploit structured and already-indexed providers rather than scrape the same corpus itself. Existing acquisition seams already include OpenAlex, Semantic Scholar/S2ORC, Hugging Face open datasets, Wikimedia/Wikipedia, Crossref, Europe PMC, Open Library, the arXiv metadata mirror and approved official/public documentation sources. Provider-maintained vectors or indexes are discovery accelerators; full text, abstracts, metadata, code, documentation or other permitted records remain the actual knowledge assets.
 
-The current Open Library adapter is bibliographic discovery/metadata (title, author, publication year, subjects), **not a licensed full-book-text corpus**. It must never be counted as having distilled a book's contents. Full-book distillation requires a separate rights-cleared full-text source (for example public-domain or explicitly training-authorized text) and the ordinary content/provenance/training-rights gates. Europe PMC can supply open-access scientific full text where the source permits it; OpenAlex, Crossref, Semantic Scholar/S2ORC and the arXiv metadata mirror may provide metadata/abstract/discovery evidence without that metadata license automatically granting rights to train on the underlying paper.
+The current Open Library adapter is bibliographic discovery/metadata (title, author, publication year, subjects), **not a licensed full-book-text corpus**. It must never be counted as having distilled a book's contents. Full-book distillation requires a separate rights-cleared full-text source and the ordinary content/provenance/training-rights gates. Europe PMC can supply open-access scientific full text where the source permits it; OpenAlex, Crossref, Semantic Scholar/S2ORC and the arXiv metadata mirror may provide metadata/abstract/discovery evidence without that metadata license automatically granting rights to train on the underlying paper.
+
+### University Source Fabric / human-style study model — 2026-09-24
+
+The University is a **general learning institution for agents**, not an enterprise-only or Fortune-500-only curriculum. Agents are expected to learn the way strong human students do: books, textbooks, scientific papers, journals/magazines, official documentation, datasets, reference works, laboratories, projects, peer/tutor interaction, and real work can all contribute when the source is trustworthy and permitted.
+
+Source ingestion has two different educational outputs and they must not be conflated:
+
+```text
+source material
+  -> governed acquisition + provenance + rights
+  -> retained study asset / internal embedding
+       -> immediate Working COS + relevant specialist retrieval
+       -> University reading / coursework / projects / practice
+       -> educational distillation into bounded summaries, facts, exercises and project evidence
+       -> if and only if training rights permit:
+            weight distillation / fine-tuning candidate
+```
+
+Therefore a scientific book, magazine article, research paper or technical document can be valuable University material even when it is **not** eligible to change model weights. Reference/RAG/study/project use and model-weight training are separate rights decisions. University study must not discard useful permitted reading merely because its license is not a training license; conversely, access to readable material never silently grants weight-training rights.
+
+The canonical plug-in contract is `saas/lib/cos-core/layers/learning/sourceFabric.ts`. Every University source declares a manifest with: stable source id/name; source kind; transport (`native_api`, `semantic_index`, `dataset`, `feed`, `mirror`, or `mcp`); capabilities (`discovery`, metadata/abstract/full-text, external/internal embeddings, Working-agent RAG, University study, University projects, weight-distillation candidacy); rights mode; vector-space identity when relevant; cost class; and default enablement. A source claiming weight-distillation capability without a rights policy fails closed.
+
+`createLiveLearningAdapters(env, sourcePlugins)` is the plug-in seam. A new source should not require changes to the University planner, study strategy, practice runtime, retrieval bridge, embedding pipeline, or distillation packager. It supplies one bounded adapter plus a manifest and then passes through the same relevance, confidence, provenance, deduplication, rights, storage, internal-embedding, study, project and evaluation gates.
+
+Read-only MCP sources use `createUniversityMcpSourcePlugin(...)`. The MCP host owns authentication and exact tool allowlisting; the MCP transport itself grants no trust and no training rights. Native APIs, semantic/vector indexes, datasets, feeds, mirrors and MCPs are alternative transports into the same University Source Fabric, not separate learning systems.
+
+Built-in source manifests currently cover OpenAlex, Semantic Scholar/S2ORC, Europe PMC, Crossref, Open Library, Project Gutenberg full text, Hugging Face NIST CC0, Hugging Face GitHub CC0, the Hugging Face arXiv metadata mirror, Wikipedia/Wikimedia, and official technical documentation. Additional academic/library providers should be added as plug-ins instead of hard-coded special cases.
+
+University project work is first-class. Accepted source material may support project briefs, literature review, comparative analysis, lab/practice tasks, design work, implementation work and source-attributed reports. Project output is still not an academic grade by itself; fresh independent assessment and the normal University evidence gates remain authoritative.
+### Project Gutenberg public-domain full-text lane — 2026-09-24
+
+Project Gutenberg is now the first dedicated **full-book text** source for this architecture. Discovery uses Gutendex, whose `copyright=false` status means public domain in the United States. Routine robots must not fetch book payloads from the primary Project Gutenberg website, so `project_gutenberg_pd` reads the generated plain-text object from the documented ibiblio mirror by default; deployments may point `COS_PROJECT_GUTENBERG_MIRROR_BASE_URL` at their own HTTPS mirror. The Project Gutenberg landing page is provenance only. The adapter strips Gutenberg wrapper text, keeps a bounded substantive body, records ebook identity, mirror identity and the U.S. rights scope, and labels the retained row exactly `public domain` for the existing conservative training-rights gate. A copyright-true/unknown book, metadata-only result, missing plain-text rendition or failed mirror fetch cannot acquire that label.
+
+The source is deliberately bounded: one rotating exact-source study objective enters the 15-minute open-source continuity lane, while the adapter returns at most the configured small result cap and shares the normal provider lease/circuit-breaker behavior. Gutendex discovery and the mirror base are independently configurable (`COS_GUTENDEX_BASE_URL`, `COS_PROJECT_GUTENBERG_MIRROR_BASE_URL`) so Production can move to self-hosted catalog/mirror infrastructure without changing the admission contract. Topics rotate across mathematics, statistics, physics/engineering, logic, economics and computing foundations. Retained rows are internally embedded like other iTMounts knowledge, can immediately help Working COS and relevant specialists, and—because the rights label is explicit—may also cross the existing **mass-distillation rights gate** after the unchanged relevance, confidence, deduplication, canonical-subject and packaging checks.
+
+Project Gutenberg's copyright determination is U.S.-scoped; this implementation must not be described as proof that every retained book is public domain in every jurisdiction. Any future redistribution/export policy must evaluate the applicable jurisdiction independently.
+
+Europe PMC now has the same rights discipline for scientific full text: open access alone remains RAG/study material. Only a source record that explicitly identifies **CC0 or public-domain** rights is passed through as a mass-distillation-eligible license; CC BY, CC BY-NC, unspecified OA, metadata and abstracts do not become training-authorized merely because they are accessible.
+
+The University telemetry open-source catalog includes `Project Gutenberg full text` separately, so the owner can see retained and internally embedded items in the same 24-hour view as OpenAlex, Semantic Scholar, Hugging Face and Wikimedia. This is a source-access view, not proof of mastery or graduation.
 
 For future IT/scientific sources the order remains: use an official API/MCP/open dataset or provider-maintained semantic index first; preserve DOI/ISBN/repository/document identity and license/provenance; fetch only the permitted underlying material; deduplicate and normalize subjects; retain/re-embed only useful material; expose it immediately to appropriate working agents; and send it to distillation only when training rights are independently established. Do not build a second vector database or copy an entire scientific/book Internet merely because a provider exposes embeddings.
 

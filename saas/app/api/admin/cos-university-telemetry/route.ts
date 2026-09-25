@@ -42,6 +42,7 @@ const OPEN_SOURCE_CATALOG = Object.freeze([
   { id: 'semantic_scholar', name: 'Semantic Scholar / S2ORC', integration: 'implemented', vectorSpace: 'semantic_scholar_specter2_proximity_v2', mode: 'precomputed_document_vector' },
   { id: 'huggingface_open_datasets', name: 'Hugging Face open datasets', integration: 'implemented', vectorSpace: null, mode: 'allowlisted_cc0_corpora_source_vectors_plus_internal_reembedding' },
   { id: 'wikimedia', name: 'Wikipedia / Wikimedia', integration: 'implemented', vectorSpace: null, mode: 'open_reference_corpus' },
+  { id: 'project_gutenberg', name: 'Project Gutenberg full text', integration: 'implemented', vectorSpace: null, mode: 'public_domain_full_text_internal_reembedding_and_distillation' },
 ] as const)
 
 function n(value: unknown): number {
@@ -111,6 +112,9 @@ function openSourceId(row: any): string | null {
   if (haystack.includes('wikipedia.org')
     || haystack.includes('wikimedia.org')
     || haystack.includes('wikipedia / wikimedia')) return 'wikimedia'
+  if (haystack.includes('gutenberg.org')
+    || haystack.includes('project_gutenberg_ebook_id:')
+    || haystack.includes('project gutenberg public-domain full text')) return 'project_gutenberg'
   return null
 }
 

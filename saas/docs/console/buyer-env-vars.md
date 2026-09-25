@@ -17,15 +17,15 @@ console; provider keys are needed only for the providers you actually use.
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key. Used server-side by the PR engine, the credential vault, and the hub-user/role lookup. Never exposed to the browser. |
 | `VAULT_MASTER_KEY` | Master key the credential vault uses to encrypt stored provider keys at rest. Generate a strong random value and keep it stable. |
 
-## Model portability registry (optional)
+## Model portability registry
 
-Buyer deployments may register additional model profiles without changing iTMounts product logic.
+Buyer deployments can register and rotate additional model profiles directly in the owner-only `/admin/models` Console without changing iTMounts product logic. Model metadata is stored through the host-neutral `ModelConfigurationPort`; SignalBoost's reference host persists it in Supabase. Provider credentials are encrypted with `VAULT_MASTER_KEY` before persistence and are never returned to the browser. The environment JSON settings below remain optional bootstrap/migration inputs, not the primary self-service path.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `ITMOUNTS_MODEL_REGISTRY_JSON` | Optional | Server-only JSON array of additional governed model profiles. Each profile declares model identity, revision policy, intended uses, transport protocols, and explicit capability states. Invalid or duplicate profiles fail closed. |
 | `ITMOUNTS_MODEL_REGISTRY_REQUIRE_REGISTERED` | Optional | Set exactly `true` after all live runtime models are registered. Then an unregistered runtime model is refused instead of using the migration compatibility path. Default is `false` to preserve existing deployments during migration. |
-| `ITMOUNTS_MODEL_TRANSPORTS_JSON` | Optional | Server-only JSON array binding registered profile keys to transport protocol, provider label, HTTPS endpoint, credential environment-variable name, API version, and timeout. The JSON stores credential names only, never secret values. Built-ins currently implement `openai_compatible`, `anthropic_messages`, and `google_generate_content`; `native_sdk`, `local_runtime`, and `custom_http` remain host-injected. |
+| `ITMOUNTS_MODEL_TRANSPORTS_JSON` | Optional | Server-only bootstrap JSON binding registered profile keys to transport protocol, provider label, HTTPS endpoint, credential environment-variable name, API version, timeout, and optional call-cost ceiling. Built-ins implement `openai_compatible`, `anthropic_messages`, and `google_generate_content`; `native_sdk`, `local_runtime`, and `custom_http` use the host plug-in SDK and conformance suite. |
 
 Supported transport identifiers in the registry are `openai_compatible`, `anthropic_messages`, `google_generate_content`, `native_sdk`, `local_runtime`, and `custom_http`. A declared transport is metadata until a corresponding runtime adapter is installed and validated; declaring it never creates credentials or execution authority.
 

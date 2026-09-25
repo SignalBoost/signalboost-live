@@ -3,6 +3,7 @@ import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './lo
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
 import { planContextWindow } from './context-window-manager.ts'
 import { modelCapabilityProfileForId, requireModelCapability, type ModelTransportProtocol } from './modelCapabilityRegistry.ts'
+import { tryAssignedPlatformModelTurn } from './modelRuntimeAssignment.ts'
 import {
   currentHarnessExecutionContext,
   harnessDeadlineRemainingMs,
@@ -616,8 +617,15 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
  * the configured LOCAL_AI/DeepInfra transport only as a bounded fallback. Independent University
  * evaluation is intentionally excluded so the learner cannot silently change its evaluator runtime.
  */
-export async function callLocalModelTurn(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<LocalModelTurnResult | null> {
-  if (!eligibleForRunpodPrimary(args, config)) return callConfiguredModelTurn(args, config)
+export async function callLocalModelTurn(args: LocalModelCallArgs, config?: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
+  const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
+  if (config === undefined && !protectedIndependentEvaluation(args) && !feature.startsWith('university_')) {
+    const assigned = await tryAssignedPlatformModelTurn(args)
+    if (assigned.attempted) return assigned.result
+  }
+
+  const effectiveConfig = config ?? localInferenceConfigFromEnv()
+  if (!eligibleForRunpodPrimary(args, effectiveConfig)) return callConfiguredModelTurn(args, effectiveConfig)
 
   let ownedAttempted = false
   try {
@@ -662,10 +670,10 @@ export async function callLocalModelTurn(args: LocalModelCallArgs, config = loca
   }
 
   if (args.allowConfiguredFallback === false && ownedAttempted) return null
-  return callConfiguredModelTurn(args, ownedAttempted ? { ...config, fallbackFromOwned: true } : config)
+  return callConfiguredModelTurn(args, ownedAttempted ? { ...effectiveConfig, fallbackFromOwned: true } : effectiveConfig)
 }
 
-export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
+export async function callLocalModel(args: LocalModelCallArgs, config?: LocalInferenceConfig): Promise<string | null> {
   return (await callLocalModelTurn(args, config))?.content ?? null
 }
 

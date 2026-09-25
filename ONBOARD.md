@@ -2352,3 +2352,16 @@ existing strict classifier must report zero silent days and GREEN.
 - A model certification receipt is evidence only. It cannot activate a model, change routing, rewrite capability states, expand authority or authorize Production traffic.
 - The Phase 4a Console does not mutate model/provider registration or secrets. Registration remains governed server configuration until a portable host-neutral secret/configuration write backend exists.
 - Any declared validated capability outside the certification suite must remain visibly unverified; the receipt is `partial`, not passed.
+
+
+### Universal model portability full-lifecycle invariant — 2026-09-25
+
+- The saleable product must support a buyer-added model without core-product rewrites. The canonical contract is `docs/PLATFORM-MODEL-PORTABILITY-CONTRACT-2026-09-25.md`.
+- Owner model onboarding is a governed lifecycle: **register/update → encrypt credential → certify → explicitly assign → execute → switch/rollback**. Certification is evidence only and must never activate a model by itself.
+- `ModelConfigurationPort` and `ModelCredentialVaultPort` are host-neutral. SignalBoost's Supabase/AES-GCM implementation is a reference host, not a product dependency.
+- Provider secret values never enter model metadata, browser responses, logs, telemetry, or audit payloads. Credential rotation deletes the superseded encrypted record.
+- Durable assignments are role-scoped to `cos_reasoner`, `builder`, or `specialist`, require role-appropriate certification evidence and explicit owner activation, and use optimistic concurrency against the current assignment.
+- An active durable assignment never silently falls back to a different model family/revision. University controlled evaluation remains isolated from buyer Production assignments.
+- `native_sdk`, `local_runtime`, and `custom_http` enter through the host-injected transport plug-in SDK plus mandatory conformance tests; iTMounts does not guess vendor wire formats.
+- The mandatory sale-acceptance gate must prove two previously unknown buyer models can be registered, vaulted, certified, switched, executed, and rolled back through injected contracts without modifying the core registry or business logic.
+- Self-Healing may observe, quarantine, or disable an unhealthy assigned transport only where existing authority permits; it may not choose a replacement model, expand a model's declared capabilities, bypass certification, or activate/rollback an assignment on the owner's behalf.

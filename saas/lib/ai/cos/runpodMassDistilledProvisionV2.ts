@@ -613,10 +613,11 @@ export async function activateMassDistilledCanaryWorker(endpointId: string) {
   const pools = canaryEndpointPools(endpoint)
   let activated: Endpoint | null = null
   try {
-    activated = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ workers: { min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
-    })
+    activated = await withWorkerQuotaRecovery(String(endpoint.id), () =>
+      requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ workers: { min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+      }))
     if (!activated?.id) throw new Error('mass_distilled_runtime_canary_worker_activation_missing')
     assertActiveCanaryWorkerPolicy(activated, pools)
     return Object.freeze({

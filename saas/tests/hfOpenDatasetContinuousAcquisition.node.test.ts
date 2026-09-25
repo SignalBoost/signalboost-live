@@ -41,13 +41,13 @@ test('Semantic Scholar and Wikimedia receive exact-source rotating continuity ob
   assert.match(daily, /sourceKinds: \['scientific_journal'\][\s\S]*?allowedAdapterIds: \['semantic_scholar'\]/)
   assert.ok(daily.includes('curriculum:wikimedia-continuous-'))
   assert.match(daily, /sourceKinds: \['approved_public_web'\][\s\S]*?allowedAdapterIds: \['reference'\]/)
-  assert.match(daily, /const openSourceContinuity = openSourceContinuityCurriculum\(\)/)
+  assert.match(daily, /const openSourceContinuity = \[\.\.\.openSourceContinuityCurriculum\(\), \.\.\.projectGutenbergFullTextCurriculum\(\)\]/)
   assert.match(daily, /const gaps = \[\.\.\.openSourceContinuity, miningGap\(input\.miningSummary\), \.\.\.autonomousGaps, \.\.\.generalCurriculum\]/)
   assert.match(daily, /openSourceContinuityQueries:/)
 })
 
 
-test('Semantic Scholar and Wikimedia continuity has a dedicated bounded 15-minute cron', () => {
+test('Semantic Scholar, Wikimedia and Project Gutenberg continuity has a dedicated bounded 15-minute cron', () => {
   const continuity = readFileSync(join(process.cwd(), 'lib/cos/openSourceContinuityLearning.ts'), 'utf8')
   const route = readFileSync(join(process.cwd(), 'app/api/cron/cos-open-source-continuity/route.ts'), 'utf8')
   const vercel = readFileSync(join(process.cwd(), 'vercel.json'), 'utf8')
@@ -55,7 +55,9 @@ test('Semantic Scholar and Wikimedia continuity has a dedicated bounded 15-minut
   assert.match(continuity, /openSourceContinuityCurriculum/)
   assert.match(continuity, /allowedAdapterIds\?\.includes\('semantic_scholar'\)/)
   assert.match(continuity, /allowedAdapterIds\?\.includes\('reference'\)/)
-  assert.match(continuity, /maxCandidatesPerCycle: 12/)
+  assert.match(continuity, /allowedAdapterIds\?\.includes\('project_gutenberg_pd'\)/)
+  assert.match(continuity, /'library_material'/)
+  assert.match(continuity, /maxCandidatesPerCycle: 16/)
   assert.match(continuity, /maxExternalCostUsdPerCycle: 0/)
   assert.match(continuity, /\[cos-open-source-continuity\]/)
   assert.match(route, /runOpenSourceContinuityLearning/)
@@ -72,4 +74,6 @@ test('open-source continuity rotates on the 15-minute cron slot instead of hourl
   assert.match(daily, /const slot = utcLearningQuarterHour\(now\)/)
   assert.match(daily, /rotatingItem\(SEMANTIC_SCHOLAR_CONTINUOUS_QUERIES, slot \* 3 \+ offset\)/)
   assert.match(daily, /rotatingItem\(WIKIMEDIA_CONTINUOUS_TOPICS, slot \* 3 \+ offset\)/)
+  assert.match(daily, /projectGutenbergFullTextCurriculum/)
+  assert.match(daily, /rotatingItem\(PROJECT_GUTENBERG_FULL_TEXT_TOPICS, slot\)/)
 })

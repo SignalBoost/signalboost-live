@@ -115,7 +115,7 @@ test('Project Gutenberg uses the machine-to-machine OPDS catalog before Gutendex
     const url = String(input)
     if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
     if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) {
-      return new Response(`<?xml version="1.0"?><feed><entry><id>https://www.gutenberg.org/ebooks/34221</id><title>Electricity and Magnetism</title><author><name>Elisha Gray</name></author><link href="/ebooks/34221" /></entry></feed>`, {
+      return new Response(`<?xml version="1.0"?><feed xmlns:dcterms="http://purl.org/dc/terms/"><entry><id>https://www.gutenberg.org/ebooks/34221</id><title>Electricity and Magnetism</title><author><name>Elisha Gray</name></author><link href="/ebooks/34221" /></entry></feed>`, {
         status: 200,
         headers: { 'content-type': 'application/atom+xml' },
       })
@@ -322,7 +322,7 @@ test('Project Gutenberg accepts official OPDS public-domain rights when fetched 
       return new Response(`<?xml version="1.0"?><feed><entry>
         <id>https://www.gutenberg.org/ebooks/33310</id>
         <title>On The Principles of Political Economy, and Taxation</title>
-        <rights>Public domain in the USA.</rights>
+        <dcterms:rights>Public domain in the USA.</dcterms:rights>
         <author><name>David Ricardo</name></author>
         <link href="/ebooks/33310" />
       </entry></feed>`, { status: 200, headers: { 'content-type': 'application/atom+xml' } })

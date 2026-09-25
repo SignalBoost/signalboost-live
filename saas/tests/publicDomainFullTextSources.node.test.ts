@@ -309,6 +309,60 @@ test('Project Gutenberg ignores generic restricted-work boilerplate after END wh
   assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
 })
 
+test('Project Gutenberg accepts neutral generated-mirror text only when same-ID RDF proves U.S. public-domain rights', async () => {
+  const calls: string[] = []
+  const generated = 'The Project Gutenberg eBook of An Inquiry into the Nature and Causes of the Wealth of Nations\n'
+    + '*** START OF THIS PROJECT GUTENBERG EBOOK WEALTH OF NATIONS ***\n'
+    + 'Economics markets labor trade capital political economy production exchange. '.repeat(35)
+    + '\n*** END OF THIS PROJECT GUTENBERG EBOOK WEALTH OF NATIONS ***'
+  const rdf = '<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:pgterms="http://www.gutenberg.org/2009/pgterms/" xmlns:dcterms="http://purl.org/dc/terms/">'
+    + '<pgterms:ebook rdf:about="ebooks/3300"><dcterms:rights>Public domain in the USA.</dcterms:rights></pgterms:ebook></rdf:RDF>'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) return new Response('<?xml version="1.0"?><feed></feed>', { status: 200 })
+    if (url.startsWith('https://openlibrary.org/search.json')) return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url === 'https://gutenberg.pglaf.org/cache/epub/3300/pg3300.txt') return new Response(generated, { status: 200, headers: { 'content-type': 'text/plain' } })
+    if (url === 'https://gutenberg.pglaf.org/cache/epub/3300/pg3300.rdf') return new Response(rdf, { status: 200, headers: { 'content-type': 'application/rdf+xml' } })
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher)('economics political economy markets', 1)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].uri, 'https://www.gutenberg.org/ebooks/3300')
+  assert.equal(results[0].license, 'public domain')
+  assert.ok(results[0].evidence?.includes('project_gutenberg_rdf_rights:public_domain_in_usa'))
+  assert.ok(results[0].evidence?.includes('project_gutenberg_rights_evidence:mirror_rdf'))
+  assert.ok(calls.includes('https://gutenberg.pglaf.org/cache/epub/3300/pg3300.rdf'))
+})
+
+test('Project Gutenberg explicit restricted preamble cannot be overridden by public-domain RDF metadata', async () => {
+  const calls: string[] = []
+  const restricted = 'This is a copyrighted Project Gutenberg eBook.\n'
+    + '*** START OF THE PROJECT GUTENBERG EBOOK RESTRICTED ***\n'
+    + 'Economics markets labor trade capital political economy. '.repeat(40)
+    + '\n*** END OF THE PROJECT GUTENBERG EBOOK RESTRICTED ***'
+  const publicDomainRdf = '<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:pgterms="http://www.gutenberg.org/2009/pgterms/" xmlns:dcterms="http://purl.org/dc/terms/">'
+    + '<pgterms:ebook rdf:about="ebooks/3300"><dcterms:rights>Public domain in the USA.</dcterms:rights></pgterms:ebook></rdf:RDF>'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) return new Response('<?xml version="1.0"?><feed></feed>', { status: 200 })
+    if (url.startsWith('https://openlibrary.org/search.json')) return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url === 'https://gutenberg.pglaf.org/cache/epub/3300/pg3300.txt') return new Response(restricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    if (url === 'https://gutenberg.pglaf.org/cache/epub/3300/pg3300.rdf') return new Response(publicDomainRdf, { status: 200, headers: { 'content-type': 'application/rdf+xml' } })
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher)('economics political economy markets', 1)
+  assert.equal(results.length, 0)
+  assert.ok(!calls.includes('https://gutenberg.pglaf.org/cache/epub/3300/pg3300.rdf'), 'explicit restriction must stop before metadata fallback')
+})
+
 test('Project Gutenberg never upgrades a restricted ebook to training rights even when discovery points to it', async () => {
   const restricted = 'This particular work is one of the few individual works restricted by copyright law in the United States.\n'
     + '*** START OF THE PROJECT GUTENBERG EBOOK RESTRICTED ***\n'

@@ -79,7 +79,7 @@
     },
     {
       "path": "/api/cron/runpod-mass-distilled-local-deploy",
-      "schedule": "1,4,7,10,13,16,19,22,25,28,31,34,37,40,43,46,49,52,55,58 * * * *"
+      "schedule": "*/2 * * * *"
     },
     {
       "path": "/api/cron/cos-university-distilled-evaluation",

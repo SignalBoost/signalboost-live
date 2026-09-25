@@ -104,6 +104,26 @@ export async function authorizeNextUniversityMassDistillationCampaign(): Promise
 }
 
 /**
+ * Backlog-drain exception: authorize exactly one prepared remediation campaign while ordinary
+ * new training remains paused. The database RPC is stricter than the normal admission path:
+ * it requires a full quality batch (>=64 sources), >=20 verified failure-derived curriculum rows,
+ * and at most one active remediation campaign. All ordinary campaign spend and authority fences
+ * remain unchanged.
+ */
+export async function authorizeNextUniversityMassDistillationRemediationCampaign(): Promise<MassDistillationRollingAuthorization> {
+  const { cosServiceDb } = await import('@/lib/cos-core/storage/supabase')
+  const db = cosServiceDb()
+  if (!db) return normalizeMassDistillationRollingAuthorization({
+    ok: false,
+    authorized: false,
+    reason: 'service_database_unavailable',
+  })
+  const result = await db.rpc('authorize_next_cos_university_mass_distillation_remediation_campaign')
+  if (result.error) throw result.error
+  return normalizeMassDistillationRollingAuthorization(result.data)
+}
+
+/**
  * Fill currently available campaign capacity in one control-loop tick.
  *
  * This is work-driven admission, not a fixed pipeline sequence: keep claiming independent prepared

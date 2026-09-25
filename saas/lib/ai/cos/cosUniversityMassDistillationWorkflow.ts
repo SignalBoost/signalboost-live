@@ -16,7 +16,7 @@ import {
 } from './cosUniversityMassDistillation.ts'
 import { installVerifiedFailureDerivedCurriculum, maintainUniversityRightsClearedOpenSourceCorpus, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
 import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
-import { authorizeAvailableUniversityMassDistillationCampaigns } from './cosUniversityMassDistillationRollingAuthorization.ts'
+import { authorizeAvailableUniversityMassDistillationCampaigns, authorizeNextUniversityMassDistillationRemediationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
 import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
@@ -153,15 +153,11 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   try {
     rollingAuthorization = backlogPaused
       ? {
-          ok: true,
-          authorized: false,
-          skipped: true,
-          reason: evaluationBacklog.reason,
+          ...(await authorizeNextUniversityMassDistillationRemediationCampaign()),
+          remediationOnly: true,
+          generalCampaignAuthorizationPaused: true,
           pendingEvaluation: evaluationBacklog.pendingEvaluation,
           backlogLimit: evaluationBacklog.limit,
-          automaticPromotionAuthorized: false,
-          runpodMutationAuthorized: false,
-          authorityExpanded: false,
         }
       : dispatchReadiness.ready
       ? { ...(await authorizeAvailableUniversityMassDistillationCampaigns()) }
@@ -192,6 +188,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
         pendingEvaluation: evaluationBacklog.pendingEvaluation,
         backlogLimit: evaluationBacklog.limit,
         newCampaignAuthorizationPaused: true,
+        boundedRemediationCampaignException: rollingAuthorization.authorized === true,
         existingCampaignDrainAllowed: true,
         authorityExpanded: false,
       }

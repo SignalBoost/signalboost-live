@@ -41,7 +41,7 @@ export interface AiSecurityInspection {
   redactedCount: number
 }
 
-const SECRET_KEY = /(password|passphrase|api[_-]?key|access[_-]?token|refresh[_-]?token|secret|private[_-]?key|authorization|cookie|session[_-]?token|client[_-]?secret)/i
+const SECRET_KEY = /^(?:password|passphrase|api[_-]?key|apiKey|access[_-]?token|accessToken|refresh[_-]?token|refreshToken|secret|private[_-]?key|privateKey|authorization|cookie|session[_-]?token|sessionToken|client[_-]?secret|clientSecret)$/i
 
 const SECRET_VALUE_PATTERNS: readonly RegExp[] = Object.freeze([
   /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}\b/gi,

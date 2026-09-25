@@ -469,10 +469,20 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
         proportional = len(ordered) // 5
         if clean(envelope.get("candidateId"), 200).startswith("mass:"):
             holdout_count = max(1, min(proportional, MASS_HOLDOUT_MAX_ITEMS))
+            # Failure-derived rows exist specifically to repair independently observed graduation failures.
+            # Sending any of them to holdout silently removes them from the post-GKD replay. Keep the mass
+            # holdout independent by drawing it only from non-remediation rows; all verified failure-derived
+            # rows remain in training, so a 20-row corrective cohort can reach the replay intact.
+            non_failure_pairs = [item for item in ordered if item[1].get("failure_derived") is not True]
+            if len(non_failure_pairs) < holdout_count:
+                raise RuntimeError("worker_mass_holdout_non_failure_rows_too_small")
+            holdout_pairs = non_failure_pairs[:holdout_count]
+            holdout_hashes = {digest for digest, _ in holdout_pairs}
+            training_pairs = [item for item in ordered if item[0] not in holdout_hashes]
         else:
             holdout_count = max(1, min(proportional, 500))
-        holdout_pairs = ordered[:holdout_count]
-        training_pairs = ordered[holdout_count:]
+            holdout_pairs = ordered[:holdout_count]
+            training_pairs = ordered[holdout_count:]
     if not training_pairs or not holdout_pairs:
         raise RuntimeError("worker_partition_invalid")
 

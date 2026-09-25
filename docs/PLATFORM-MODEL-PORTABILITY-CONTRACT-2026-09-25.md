@@ -1,7 +1,7 @@
 # iTMounts Platform Model Portability Contract
 
 Date: 2026-09-25
-Status: active architecture invariant; phase 1 implementation
+Status: active architecture invariant; full governed portability lifecycle implemented
 
 ## Objective
 
@@ -145,4 +145,33 @@ Certification receipts are appended to the existing immutable `supervisor_audit_
 
 If a profile declares additional validated capabilities that this suite does not yet exercise (for example streaming, vLLM, speculative decoding, EAGLE, MTP or XSA), the receipt is `partial`, never fully passed.
 
-Registration remains server-configured in Phase 4a through `ITMOUNTS_MODEL_REGISTRY_JSON` and `ITMOUNTS_MODEL_TRANSPORTS_JSON`. The Console does not expose or mutate provider secrets. A future Phase 4b may add portable secure configuration writes only after a host-neutral secret/configuration backend exists.
+Phase 4a's server-configured registration remains available only as a bootstrap/migration path. Phase 4b supersedes it for ordinary buyer operation.
+
+## Phase 4b durable registration, activation and rollback
+
+The owner Console now implements the complete governed model lifecycle:
+
+1. **Register/update** a buyer profile and transport binding without changing core product code.
+2. **Encrypt credentials server-side** through the host vault before persistence; secret values are never returned to the browser or audit ledger.
+3. **Rotate credentials** atomically; the superseded ciphertext row is deleted.
+4. **Certify** the exact registered profile through its canonical transport adapter.
+5. **Assign** a certified profile independently to `cos_reasoner`, `builder`, or `specialist`.
+6. **Switch** by creating a new immutable assignment record linked to the previous assignment.
+7. **Rollback** by creating a new active record pointing back to the previous certified profile.
+8. **Disable** a registration only when it is not an active assignment.
+
+The portable contracts are `ModelConfigurationPort` and `ModelCredentialVaultPort`. SignalBoost's host implementation uses Supabase for metadata/assignment records and the existing AES-256-GCM vault engine for credential ciphertext. A buyer may replace that host adapter with its own database and vault without modifying COS, Builder, model certification, or model routing.
+
+Assignment is deliberately separate from certification. Certification never activates a model. Assignment requires explicit owner confirmation, exact certification evidence for the target profile, role-required certification checks, and optimistic concurrency against the currently active assignment ID. An active assigned model does not silently fall back to a different model family when execution fails.
+
+## Host-injected transport SDK
+
+`native_sdk`, `local_runtime`, and `custom_http` are supported by `createHostInjectedModelTransportAdapter()`. A buyer implements only the external wire/SDK driver; iTMounts retains capability checks, certification, routing authority, spend governance, exact response-model validation, and normalized tool/JSON semantics.
+
+`runModelTransportPluginConformance()` verifies support, health, chat, structured JSON when declared, and tool calling when declared. A driver returning a different model identity than the assigned profile is rejected.
+
+## Sale acceptance
+
+The mandatory Production gate includes `modelPortabilitySaleAcceptance.node.test.ts`. It creates two fictional future model families unknown to the built-in registry, registers them through a host-neutral in-memory `ModelConfigurationPort`, resolves credentials only through the vault reference, certifies both via a host-injected `custom_http` adapter, activates the first, executes live routing, switches to the second, executes again, and rolls back to the first. No core model/provider code is changed during that lifecycle.
+
+This acceptance proves the commercial portability contract: **new model family + new provider transport can be onboarded through configuration and a bounded adapter, not a rewrite of iTMounts core.**

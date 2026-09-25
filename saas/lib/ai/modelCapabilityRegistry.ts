@@ -8,6 +8,8 @@
 
 export type ModelCapabilityState = 'validated' | 'experimental' | 'blocked' | 'not_validated'
 
+export type ModelTransportProtocol = 'openai_compatible' | 'anthropic_messages' | 'google_generate_content' | 'native_sdk' | 'local_runtime' | 'custom_http'
+
 export type ModelProfileUse =
   | 'cos_reasoner'
   | 'builder'
@@ -26,8 +28,9 @@ export type PlatformModelProfile = Readonly<{
   revisionPolicy: 'fixed' | 'resolve_and_pin_at_dispatch' | 'runtime_owned'
   tokenizerModelId: string | null
   uses: readonly ModelProfileUse[]
+  transportProtocols: readonly ModelTransportProtocol[]
   inference: Readonly<{
-    openAiCompatibleChat: ModelCapabilityState
+    chatCompletion: ModelCapabilityState
     streaming: ModelCapabilityState
     toolCalling: ModelCapabilityState
     structuredJson: ModelCapabilityState
@@ -65,8 +68,9 @@ export const PLATFORM_MODEL_CAPABILITY_REGISTRY = Object.freeze({
     revisionPolicy: 'fixed',
     tokenizerModelId: 'Qwen/Qwen3-4B',
     uses: Object.freeze(['university_student'] as const),
+    transportProtocols: Object.freeze(['openai_compatible', 'local_runtime'] as const),
     inference: Object.freeze({
-      openAiCompatibleChat: 'validated',
+      chatCompletion: 'validated',
       streaming: 'validated',
       toolCalling: 'not_validated',
       structuredJson: 'not_validated',
@@ -100,8 +104,9 @@ export const PLATFORM_MODEL_CAPABILITY_REGISTRY = Object.freeze({
     revisionPolicy: 'resolve_and_pin_at_dispatch',
     tokenizerModelId: 'Qwen/Qwen3-8B',
     uses: Object.freeze(['university_teacher'] as const),
+    transportProtocols: Object.freeze(['native_sdk'] as const),
     inference: Object.freeze({
-      openAiCompatibleChat: 'validated',
+      chatCompletion: 'validated',
       streaming: 'not_validated',
       toolCalling: 'not_validated',
       structuredJson: 'not_validated',
@@ -136,6 +141,7 @@ export const CURRENT_UNIVERSITY_TEACHER_PROFILE = PLATFORM_MODEL_CAPABILITY_REGI
 const PROFILE_KEY = /^[a-z0-9][a-z0-9._-]{1,119}$/
 const MODEL_ID = /^[^\s]{1,240}$/
 const REVISION = /^[A-Za-z0-9._/-]{1,240}$/
+const TRANSPORT_PROTOCOLS: readonly ModelTransportProtocol[] = Object.freeze(['openai_compatible','anthropic_messages','google_generate_content','native_sdk','local_runtime','custom_http'])
 const USES: readonly ModelProfileUse[] = Object.freeze([
   'cos_reasoner', 'builder', 'specialist', 'university_student', 'university_teacher', 'embedding', 'draft_speculator',
 ])
@@ -153,7 +159,7 @@ function cleanCapabilities(raw: unknown, keys: readonly string[]): Readonly<Reco
 }
 
 const INFERENCE_CAPABILITIES = Object.freeze([
-  'openAiCompatibleChat', 'streaming', 'toolCalling', 'structuredJson', 'vllm',
+  'chatCompletion', 'streaming', 'toolCalling', 'structuredJson', 'vllm',
   'speculativeDecoding', 'eagle', 'dflash', 'mtp', 'xsa',
 ] as const)
 const TRAINING_CAPABILITIES = Object.freeze(['qlora', 'gkd', 'muonCanary', 'xsa', 'testTimeTraining'] as const)
@@ -178,12 +184,14 @@ export function parseBuyerModelProfiles(rawJson: string | undefined): readonly P
     const revisionPolicy = String(row.revisionPolicy || 'runtime_owned') as PlatformModelProfile['revisionPolicy']
     const tokenizerModelId = row.tokenizerModelId == null ? null : String(row.tokenizerModelId).trim()
     const usesRaw = Array.isArray(row.uses) ? row.uses.map(value => String(value)) : []
+    const transportProtocolsRaw = Array.isArray(row.transportProtocols) ? row.transportProtocols.map(value => String(value)) : []
     if (!PROFILE_KEY.test(key) || !family || !MODEL_ID.test(modelId) || !MODEL_ID.test(providerModelId)) throw new Error('platform_model_profile_identity_invalid')
     if (revisionRaw && !REVISION.test(revisionRaw)) throw new Error('platform_model_profile_revision_invalid')
     if (!['fixed','resolve_and_pin_at_dispatch','runtime_owned'].includes(revisionPolicy)) throw new Error('platform_model_profile_revision_policy_invalid')
     if (revisionPolicy === 'fixed' && !revisionRaw) throw new Error('platform_model_profile_fixed_revision_required')
     if (tokenizerModelId && !MODEL_ID.test(tokenizerModelId)) throw new Error('platform_model_profile_tokenizer_invalid')
     if (!usesRaw.length || usesRaw.some(value => !USES.includes(value as ModelProfileUse))) throw new Error('platform_model_profile_use_invalid')
+    if (!transportProtocolsRaw.length || transportProtocolsRaw.some(value => !TRANSPORT_PROTOCOLS.includes(value as ModelTransportProtocol))) throw new Error('platform_model_profile_transport_invalid')
     if (seenKeys.has(key) || seenIds.has(modelId) || key in PLATFORM_MODEL_CAPABILITY_REGISTRY) throw new Error('platform_model_profile_duplicate')
     const inference = cleanCapabilities(row.inference, INFERENCE_CAPABILITIES)
     const training = cleanCapabilities(row.training, TRAINING_CAPABILITIES)
@@ -192,6 +200,7 @@ export function parseBuyerModelProfiles(rawJson: string | undefined): readonly P
     const profile: PlatformModelProfile = Object.freeze({
       key, family, modelId, providerModelId, revision: revisionRaw, revisionPolicy, tokenizerModelId,
       uses: Object.freeze([...usesRaw]) as readonly ModelProfileUse[],
+      transportProtocols: Object.freeze([...transportProtocolsRaw]) as readonly ModelTransportProtocol[],
       inference: inference as PlatformModelProfile['inference'],
       training: training as PlatformModelProfile['training'],
       governance: Object.freeze({

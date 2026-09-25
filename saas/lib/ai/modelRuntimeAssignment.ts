@@ -88,9 +88,10 @@ function platformTools(args: LocalModelCallArgs) {
   }))
 }
 
-function toolChoice(args: LocalModelCallArgs) {
-  if (!args.toolChoice || args.toolChoice === 'auto' || args.toolChoice === 'none') return args.toolChoice
-  return { name: args.toolChoice.function.name }
+function toolChoice(args: LocalModelCallArgs): 'auto' | 'none' | Readonly<{ name: string }> | undefined {
+  const choice = args.toolChoice
+  if (!choice || choice === 'auto' || choice === 'none') return choice
+  return Object.freeze({ name: choice.function.name })
 }
 
 function localToolCalls(calls: readonly { id: string; name: string; arguments: string }[]) {

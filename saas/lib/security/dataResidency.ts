@@ -34,11 +34,11 @@ export interface DataResidencyRoutingConstraint {
   readonly requireDeclaredDataResidency: boolean
 }
 
-const PROFILE_DEFAULT_ZONES: Record<DataResidencyProfile, readonly DataResidencyZone[]> = Object.freeze({
-  GLOBAL: Object.freeze(['US', 'EU_EEA', 'BR', 'GLOBAL']),
-  US_ONLY: Object.freeze(['US']),
-  EU_EEA: Object.freeze(['EU_EEA']),
-  BR_ONLY: Object.freeze(['BR']),
+const PROFILE_DEFAULT_ZONES: Readonly<Record<DataResidencyProfile, readonly DataResidencyZone[]>> = Object.freeze({
+  GLOBAL: Object.freeze<DataResidencyZone[]>(['US', 'EU_EEA', 'BR', 'GLOBAL']),
+  US_ONLY: Object.freeze<DataResidencyZone[]>(['US']),
+  EU_EEA: Object.freeze<DataResidencyZone[]>(['EU_EEA']),
+  BR_ONLY: Object.freeze<DataResidencyZone[]>(['BR']),
 })
 
 function required(value: unknown, field: string): string {

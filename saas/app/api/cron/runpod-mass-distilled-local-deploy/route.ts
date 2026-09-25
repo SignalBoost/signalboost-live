@@ -21,7 +21,9 @@ import {
   MASS_DISTILLED_READY_TIMEOUT_MS,
   MASS_DISTILLED_CANARY_TIMEOUT_MS,
   MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,
+  activateMassDistilledCanaryWorker,
   canaryMassDistilledRuntime,
+  deactivateMassDistilledCanaryWorker,
   massDistilledRuntimeHealth,
   provisionMassDistilledCanaryRuntime,
   type MassDistilledRuntimeArtifact,
@@ -488,21 +490,37 @@ export async function GET(req:NextRequest){
     // It is written before /ready, because the first endpoint request can wake paid compute.
     await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:INVOCATION_STARTED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
     providerInvocationStarted=true
-    await laneStatus('running','canary_in_progress',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,runtimeKey,coldStartResume:Boolean(coldStartResume),configuredGpuPools:provisioned.gpuPools,canaryEligibleGpuPools:provisioned.canaryEligibleGpuPools,catalogPrices:provisioned.canaryCatalogServerlessPriceUsdPerHourByPool})
+    const workerWarmStart=await activateMassDistilledCanaryWorker(provisioned.endpointId)
+    await laneStatus('running','canary_in_progress',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,runtimeKey,coldStartResume:Boolean(coldStartResume),explicitWorkerWarmStart:true,workersMinDuringCanary:workerWarmStart.workersMin,configuredGpuPools:provisioned.gpuPools,canaryEligibleGpuPools:provisioned.canaryEligibleGpuPools,catalogPrices:provisioned.canaryCatalogServerlessPriceUsdPerHourByPool})
 
-    const canary=await canaryMassDistilledRuntime({endpointId:provisioned.endpointId,modelName:provisioned.modelName})
-    let healthAfter:unknown
-    try{healthAfter=await massDistilledRuntimeHealth(provisioned.endpointId)}
-    catch(error){healthAfter={ok:false,error:error instanceof Error?clean(error.message,300):'mass_distilled_health_read_failed'}}
+    let canary:Awaited<ReturnType<typeof canaryMassDistilledRuntime>>|null=null
+    let healthAfter:unknown=null
+    let workerScaleDown:unknown=null
+    let scaleDownError:string|null=null
+    try{
+      canary=await canaryMassDistilledRuntime({endpointId:provisioned.endpointId,modelName:provisioned.modelName})
+      try{healthAfter=await massDistilledRuntimeHealth(provisioned.endpointId)}
+      catch(error){healthAfter={ok:false,error:error instanceof Error?clean(error.message,300):'mass_distilled_health_read_failed'}}
+    }finally{
+      try{workerScaleDown=await deactivateMassDistilledCanaryWorker(provisioned.endpointId)}
+      catch(error){scaleDownError=describeThrownValue(error,300)}
+    }
+
+    if(scaleDownError){
+      await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,error:`mass_distilled_canary_scale_down_failed:${clean(scaleDownError,220)}`,healthAfter,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,explicitWorkerWarmStart:true,workerWarmStart,workerScaleDown:null,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+      await laneStatus('failed','canary_scale_down_failed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,error:clean(scaleDownError,220)})
+      return NextResponse.json({ok:false,deployed:true,canaryPassed:false,candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,error:'mass_distilled_canary_scale_down_failed'},{status:503})
+    }
+    if(!canary) throw new Error('mass_distilled_canary_result_missing')
 
     if(!canary.ok){
-      await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,httpStatus:canary.httpStatus,error:clean(canary.error,300),healthAfter,readyTimeoutMs:MASS_DISTILLED_READY_TIMEOUT_MS,canaryTimeoutMs:MASS_DISTILLED_CANARY_TIMEOUT_MS,idleTimeoutSeconds:MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+      await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,httpStatus:canary.httpStatus,error:clean(canary.error,300),healthAfter,readyTimeoutMs:MASS_DISTILLED_READY_TIMEOUT_MS,canaryTimeoutMs:MASS_DISTILLED_CANARY_TIMEOUT_MS,idleTimeoutSeconds:MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,explicitWorkerWarmStart:true,workerWarmStart,workerScaleDown,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
       await laneStatus('failed','canary_failed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,httpStatus:canary.httpStatus,error:clean(canary.error,300)})
       return NextResponse.json({ok:false,deployed:true,canaryPassed:false,candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,error:canary.error},{status:503})
     }
 
     const responseHash=hash(canary.text||'')
-    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false,healthAfter}})
+    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,explicitWorkerWarmStart:true,workerWarmStart,workerScaleDown,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false,healthAfter}})
     await recordFineTuneCanary({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactId:runtimeArtifact.artifactId,artifactHash:runtimeArtifact.artifactHash,revisionKey,endpointId:provisioned.endpointId,responseHash})
     await laneStatus('worked','canary_passed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,model:provisioned.modelName})
     return NextResponse.json({ok:true,deployed:true,canaryPassed:true,candidateId:runtimeArtifact.candidateId,artifactHash:runtimeArtifact.artifactHash,endpointId:provisioned.endpointId,model:provisioned.modelName,productionTrafficAuthorized:false})

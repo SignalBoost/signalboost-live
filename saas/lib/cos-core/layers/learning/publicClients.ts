@@ -50,21 +50,27 @@ export const openAlexScientificSearch:LearningConnectorSearch=async(query,limit)
 export const openLibrarySearch:LearningConnectorSearch=async(query,limit)=>{const json=await getJson(`https://openlibrary.org/search.json?q=${encodeURIComponent(compactQuery(query,8))}&limit=${Math.min(limit,10)}`);return(json?.docs??[]).map((item:any):LearningConnectorResult=>({uri:item.key?`https://openlibrary.org${item.key}`:'',title:clean(item.title),text:clean(`${item.title??''}. ${item.author_name?.join(', ')??''}. First published ${item.first_publish_year??'unknown'}. Subjects: ${item.subject?.slice(0,8).join(', ')??''}.`),license:'Open Library metadata'})).filter((x:LearningConnectorResult)=>x.uri&&x.text)}
 
 
-function projectGutenbergPlainTextUrl(formats:unknown):string{
-  if(!formats||typeof formats!=='object')return''
-  const map=formats as Record<string,unknown>
-  const candidate=[
-    map['text/plain; charset=utf-8'],
-    map['text/plain; charset=us-ascii'],
-    map['text/plain'],
-  ].find(value=>typeof value==='string'&&value.trim()) as string|undefined
-  if(!candidate)return''
+const DEFAULT_GUTENDEX_BASE_URL='https://gutendex.com'
+const DEFAULT_GUTENBERG_MIRROR_BASE_URL='https://www.ibiblio.org/gutenberg/cache/epub'
+
+function projectGutenbergHasPlainText(formats:unknown):boolean{
+  if(!formats||typeof formats!=='object')return false
+  return Object.keys(formats as Record<string,unknown>).some(key=>key.toLowerCase().startsWith('text/plain'))
+}
+
+function normalizedHttpsBase(value:unknown,fallback:string):string{
+  const raw=clean(value)||fallback
   try{
-    const parsed=new URL(candidate)
-    const host=parsed.hostname.toLowerCase()
-    if(parsed.protocol!=='https:'||!(host==='gutenberg.org'||host.endsWith('.gutenberg.org')))return''
-    return parsed.toString()
-  }catch{return''}
+    const parsed=new URL(raw)
+    if(parsed.protocol!=='https:')return fallback
+    parsed.search=''
+    parsed.hash=''
+    return parsed.toString().replace(/\/$/,'')
+  }catch{return fallback}
+}
+
+function projectGutenbergMirrorTextUrl(id:number,mirrorBaseUrl:string):string{
+  return `${mirrorBaseUrl}/${id}/pg${id}.txt`
 }
 
 function projectGutenbergBody(raw:string):string{
@@ -77,25 +83,30 @@ function projectGutenbergBody(raw:string):string{
 }
 
 /**
- * Project Gutenberg public-domain full text.
+ * Project Gutenberg public-domain-in-the-USA full text via an automation-safe mirror.
  *
- * Gutendex is discovery only. A row is admitted here only when its catalog record explicitly says
- * copyright=false AND it supplies an HTTPS text/plain URL on a Project Gutenberg host. The text
- * itself is then fetched from Project Gutenberg, not from an arbitrary URL returned by discovery.
- * This is the first book source whose retained rows may truthfully carry the exact "public domain"
- * rights label used by the conservative mass-distillation packager.
+ * Gutendex is discovery/rights metadata only. Project Gutenberg's primary website forbids routine
+ * robot fetching, so text is never downloaded from www.gutenberg.org here. By default the adapter
+ * reads the generated plain-text path from the official ibiblio mirror documented by Project
+ * Gutenberg; deployments may point COS_PROJECT_GUTENBERG_MIRROR_BASE_URL at their own HTTPS mirror.
+ * A row is retained only when Gutendex explicitly says copyright=false and advertises a plain-text
+ * rendition. The Project Gutenberg landing page remains provenance only.
  */
-export function createProjectGutenbergPublicDomainSearch(fetcher:FetchLike=fetch):LearningConnectorSearch{return async(query,limit)=>{
+export function createProjectGutenbergPublicDomainSearch(
+  fetcher:FetchLike=fetch,
+  options:{gutendexBaseUrl?:string;mirrorBaseUrl?:string}={},
+):LearningConnectorSearch{return async(query,limit)=>{
   const bounded=Math.min(Math.max(limit,1),5)
-  const json=await getJson(`https://gutendex.com/books/?search=${encodeURIComponent(compactQuery(query,8))}`,fetcher)
-  const rows=(json?.results??[]).filter((item:any)=>item?.copyright===false).slice(0,Math.max(bounded*3,bounded))
+  const gutendexBaseUrl=normalizedHttpsBase(options.gutendexBaseUrl,DEFAULT_GUTENDEX_BASE_URL)
+  const mirrorBaseUrl=normalizedHttpsBase(options.mirrorBaseUrl,DEFAULT_GUTENBERG_MIRROR_BASE_URL)
+  const json=await getJson(`${gutendexBaseUrl}/books/?search=${encodeURIComponent(compactQuery(query,8))}&copyright=false`,fetcher)
+  const rows=(json?.results??[]).filter((item:any)=>item?.copyright===false&&projectGutenbergHasPlainText(item?.formats)).slice(0,Math.max(bounded*4,bounded))
   const results:LearningConnectorResult[]=[]
   for(const item of rows){
     if(results.length>=bounded)break
     const id=Number(item?.id)
     if(!Number.isInteger(id)||id<=0)continue
-    const textUrl=projectGutenbergPlainTextUrl(item?.formats)
-    if(!textUrl)continue
+    const textUrl=projectGutenbergMirrorTextUrl(id,mirrorBaseUrl)
     try{
       const body=projectGutenbergBody(await getText(textUrl,fetcher))
       if(body.length<900)continue
@@ -109,14 +120,16 @@ export function createProjectGutenbergPublicDomainSearch(fetcher:FetchLike=fetch
         evidence:[
           `project_gutenberg_ebook_id:${id}`,
           'gutendex_copyright:false',
-          `project_gutenberg_text:${textUrl}`,
+          'rights_scope:public_domain_in_usa',
+          `project_gutenberg_mirror_text:${textUrl}`,
         ],
       })
-    }catch{/* one unavailable book must not abort the bounded source */}
+    }catch{/* one unavailable mirror object must not abort the bounded source */}
   }
   return results
 }}
 export const projectGutenbergPublicDomainSearch=createProjectGutenbergPublicDomainSearch()
+
 
 /**
  * Europe PMC exposes Open Access full text through /{PMCID}/fullTextXML. Search with resultType=core

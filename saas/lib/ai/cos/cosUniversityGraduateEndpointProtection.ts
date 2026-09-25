@@ -94,6 +94,50 @@ export async function activeGraduateRunpodEndpointIds(): Promise<ReadonlySet<str
 }
 
 
+const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1'
+const MASS_CANARY_ACTIVE_MS = 10 * 60 * 1000
+
+/**
+ * A concurrent exact-artifact canary owns its RunPod endpoint until a terminal pass/fail is recorded.
+ * Provisioning another artifact must not reclaim that endpoint's worker reservation during the bounded
+ * overlap window.
+ */
+export async function activeCanaryRunpodEndpointIds(now = new Date()): Promise<ReadonlySet<string>> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('canary_endpoint_protection_database_unavailable')
+  const since = new Date(now.getTime() - MASS_CANARY_ACTIVE_MS).toISOString()
+  const rows = await db.from('cos_university_learning_assurance_events')
+    .select('candidate_id,observed_at,evidence')
+    .eq('event_type', 'fine_tune')
+    .contains('evidence', { profile: MASS_CANARY_PROFILE })
+    .gte('observed_at', since)
+    .order('observed_at', { ascending: true })
+    .limit(1000)
+  if (rows.error) throw rows.error
+
+  const active = new Map<string, { endpointId: string; startedAt: number }>()
+  for (const row of rows.data || []) {
+    const evidence = (row as { evidence?: Record<string, unknown> }).evidence || {}
+    const claim = String(evidence.claim || '')
+    const artifactHash = String(evidence.artifactHash || '').toLowerCase()
+    const candidateId = String((row as { candidate_id?: unknown }).candidate_id || '')
+    const key = candidateId && artifactHash ? `${candidateId}\u0000${artifactHash}` : ''
+    const observedAt = Date.parse(String((row as { observed_at?: unknown }).observed_at || ''))
+    if (!key || !Number.isFinite(observedAt)) continue
+    if (claim === 'local_distilled_runtime_canary_invocation_started') {
+      const endpointId = String(evidence.endpointId || '').trim().toLowerCase()
+      if (ENDPOINT_ID.test(endpointId)) active.set(key, { endpointId, startedAt: observedAt })
+      continue
+    }
+    if (['local_distilled_runtime_canary_passed', 'local_distilled_runtime_canary_failed'].includes(claim)) {
+      const current = active.get(key)
+      if (current && observedAt >= current.startedAt) active.delete(key)
+    }
+  }
+  return new Set([...active.values()].map(value => value.endpointId))
+}
+
+
 const MASS_EVALUATION_PROFILE = 'cos_mass_distilled_independent_evaluation_runtime_v1'
 const MASS_EVALUATION_ACTIVE_MS = 12 * 60 * 1000
 
@@ -138,9 +182,10 @@ export async function activeEvaluationRunpodEndpointIds(now = new Date()): Promi
 }
 
 export async function protectedRunpodEndpointIds(now = new Date()): Promise<ReadonlySet<string>> {
-  const [graduates, evaluations] = await Promise.all([
+  const [graduates, evaluations, canaries] = await Promise.all([
     activeGraduateRunpodEndpointIds(),
     activeEvaluationRunpodEndpointIds(now),
+    activeCanaryRunpodEndpointIds(now),
   ])
-  return new Set([...graduates, ...evaluations])
+  return new Set([...graduates, ...evaluations, ...canaries])
 }

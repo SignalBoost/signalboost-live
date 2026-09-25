@@ -1,6 +1,8 @@
+// saas/app/api/podcast/optimize/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { getCurrentUser } from '@/utils/supabase/server'
+import { guardedPublicFetch, isPublicFetchDestinationRejection, PublicFetchError } from '@/lib/security/publicFetchGuard'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -25,29 +27,15 @@ function tagAttr(xml: string, tag: string, attr: string): string | null {
   const m = xml.match(new RegExp('<' + tag + '\\b[^>]*?\\b' + attr + '\\s*=\\s*["\']([^"\']*)["\']', 'i'))
   return m ? decode(m[1]).trim() : null
 }
-function isPrivateHost(host: string): boolean {
-  const h = host.toLowerCase()
-  if (h === 'localhost' || h.endsWith('.local')) return true
-  if (/^(127\.|10\.|192\.168\.|169\.254\.)/.test(h)) return true
-  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true
-  if (h === '0.0.0.0' || h === '::1') return true
-  return false
-}
-
+// Every hop (including redirects) is validated by the shared SSRF guard; see lib/security/publicFetchGuard.ts.
+// This also covers a feed URL returned by the Apple lookup, which is third-party controlled.
 async function fetchText(url: string, accept: string) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 12000)
-  try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'SignalBoostBot/1.0 (+podcast audit)', Accept: accept },
-      signal: controller.signal,
-      redirect: 'follow',
-    })
-    const text = (await res.text()).slice(0, 2_000_000)
-    return { status: res.status, text, finalUrl: res.url || url }
-  } finally {
-    clearTimeout(timer)
-  }
+  const res = await guardedPublicFetch(url, {
+    headers: { 'User-Agent': 'SignalBoostBot/1.0 (+podcast audit)', Accept: accept },
+    timeoutMs: 12_000,
+    maxBytes: 4_000_000,
+  })
+  return { status: res.status, text: res.text.slice(0, 2_000_000), finalUrl: res.finalUrl }
 }
 
 // Resolve an Apple Podcasts link to its RSS feed via the iTunes lookup API.
@@ -224,13 +212,12 @@ export async function POST(req: NextRequest) {
   let parsed: URL
   try { parsed = new URL(raw) } catch { return NextResponse.json({ error: 'That does not look like a valid URL.' }, { status: 400 }) }
   if (!/^https?:$/.test(parsed.protocol)) return NextResponse.json({ error: 'Only http and https URLs are supported.' }, { status: 400 })
-  if (isPrivateHost(parsed.hostname)) return NextResponse.json({ error: 'That host is not allowed.' }, { status: 400 })
 
   const language = String(body?.language || 'en')
 
   // If it's an Apple Podcasts link, resolve to the real RSS feed.
   let feedUrl = parsed.toString()
-  if (/apple\.com/i.test(parsed.hostname)) {
+  if (/(^|\.)apple\.com$/i.test(parsed.hostname)) {
     const resolved = await resolveAppleFeed(feedUrl)
     if (!resolved) return NextResponse.json({ error: 'Could not find an RSS feed for that Apple Podcasts link. Paste the RSS feed URL directly.' }, { status: 400 })
     feedUrl = resolved
@@ -240,7 +227,8 @@ export async function POST(req: NextRequest) {
   try {
     page = await fetchText(feedUrl, 'application/rss+xml, application/xml, text/xml')
   } catch (e: any) {
-    const msg = e?.name === 'AbortError' ? 'The feed took too long to respond.' : 'Could not reach that feed URL.'
+    if (isPublicFetchDestinationRejection(e)) return NextResponse.json({ error: 'That host is not allowed.' }, { status: 400 })
+    const msg = e instanceof PublicFetchError && e.code === 'public_fetch_timeout' ? 'The feed took too long to respond.' : 'Could not reach that feed URL.'
     return NextResponse.json({ error: msg }, { status: 502 })
   }
   if (page.status >= 400) return NextResponse.json({ error: `The feed returned HTTP ${page.status}.` }, { status: 502 })

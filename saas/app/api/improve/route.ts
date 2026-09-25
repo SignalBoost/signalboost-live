@@ -1,6 +1,8 @@
+// saas/app/api/improve/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server'
 import OpenAI from 'openai'
+import { guardedPublicFetch, isPublicFetchDestinationRejection, PublicFetchError } from '@/lib/security/publicFetchGuard'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -27,30 +29,16 @@ function stripTags(html: string): string {
     .trim()
 }
 
-function isPrivateHost(host: string): boolean {
-  const h = host.toLowerCase()
-  if (h === 'localhost' || h.endsWith('.local')) return true
-  if (/^(127\.|10\.|192\.168\.|169\.254\.)/.test(h)) return true
-  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true
-  if (h === '0.0.0.0' || h === '::1') return true
-  return false
-}
-
+// Every hop (including redirects) is validated by the shared SSRF guard; see lib/security/publicFetchGuard.ts.
 async function fetchPage(url: string) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 12000)
   const start = Date.now()
-  try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SignalBoostBot/1.0; +website audit)', Accept: 'text/html,application/xhtml+xml' },
-      signal: controller.signal,
-      redirect: 'follow',
-    })
-    const html = (await res.text()).slice(0, 800000)
-    return { status: res.status, html, finalUrl: res.url || url, ms: Date.now() - start, bytes: html.length }
-  } finally {
-    clearTimeout(timer)
-  }
+  const res = await guardedPublicFetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SignalBoostBot/1.0; +website audit)', Accept: 'text/html,application/xhtml+xml' },
+    timeoutMs: 12_000,
+    maxBytes: 4_000_000,
+  })
+  const html = res.text.slice(0, 800000)
+  return { status: res.status, html, finalUrl: res.finalUrl, ms: Date.now() - start, bytes: html.length }
 }
 
 function runChecks(html: string, finalUrl: string, ms: number, bytes: number): Check[] {
@@ -178,7 +166,6 @@ export async function POST(req: NextRequest) {
     let parsed: URL
     try { parsed = new URL(raw) } catch { return NextResponse.json({ error: 'That does not look like a valid URL.' }, { status: 400 }) }
     if (!/^https?:$/.test(parsed.protocol)) return NextResponse.json({ error: 'Only http and https URLs are supported.' }, { status: 400 })
-    if (isPrivateHost(parsed.hostname)) return NextResponse.json({ error: 'That host is not allowed.' }, { status: 400 })
 
     const language = String(body?.language || 'en')
 
@@ -186,7 +173,9 @@ export async function POST(req: NextRequest) {
     try {
       page = await fetchPage(parsed.toString())
     } catch (e: any) {
-      const msg = e?.name === 'AbortError' ? 'The site took too long to respond.' : `Could not reach that URL (${e?.message || 'network error'}).`
+      if (isPublicFetchDestinationRejection(e)) return NextResponse.json({ error: 'That host is not allowed.' }, { status: 400 })
+      // Never echo raw network errors: they would turn this tool into an internal host/port probe.
+      const msg = e instanceof PublicFetchError && e.code === 'public_fetch_timeout' ? 'The site took too long to respond.' : 'Could not reach that URL.'
       return NextResponse.json({ error: msg }, { status: 502 })
     }
 

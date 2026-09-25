@@ -8,6 +8,7 @@ import {
   classifyMassDistillationRights,
   MASS_DISTILLATION_MAX_BATCH,
   MASS_DISTILLATION_MIN_BATCH,
+  MASS_DISTILLATION_QUALITY_MIN_BATCH,
   retainedIdentityEligibleForMassDistillation,
   retainedMaterialHash,
   resolveMassDistillationSubject,
@@ -144,20 +145,20 @@ test('mass distillation requires confidence, row identity, material identity and
 })
 
 test('mass distillation batches are bounded, deterministic and do not reuse assigned hashes', () => {
-  const rows = Array.from({ length: MASS_DISTILLATION_MAX_BATCH + 25 }, (_, index) => ({
+  const rows = Array.from({ length: MASS_DISTILLATION_MAX_BATCH + MASS_DISTILLATION_QUALITY_MIN_BATCH }, (_, index) => ({
     contentHash: h(index + 1), materialHash: h(index + 10_000), subject: 'Reasoning & Decision Science', sourceKind: 'scientific_journal',
     license: index % 2 ? 'Public Domain' : 'OpenAlex CC0 abstract read for grounded learning', confidence: 0.9,
   }))
   const first = buildMassDistillationBatches(rows)
   assert.equal(first.length, 2)
   assert.equal(first[0].sourceCount, MASS_DISTILLATION_MAX_BATCH)
-  assert.equal(first[1].sourceCount, 25)
+  assert.equal(first[1].sourceCount, MASS_DISTILLATION_QUALITY_MIN_BATCH)
   assert.deepEqual(buildMassDistillationBatches(rows), first)
   const assigned = new Set(first[0].sourceHashes)
   const remaining = buildMassDistillationBatches(rows, assigned)
   assert.equal(remaining.length, 1)
-  assert.equal(remaining[0].sourceCount, 25)
-  assert.ok(remaining[0].sourceCount >= MASS_DISTILLATION_MIN_BATCH)
+  assert.equal(remaining[0].sourceCount, MASS_DISTILLATION_QUALITY_MIN_BATCH)
+  assert.ok(remaining[0].sourceCount >= MASS_DISTILLATION_QUALITY_MIN_BATCH)
 })
 
 
@@ -202,24 +203,24 @@ test('failure-derived material rides inside a full-sized hybrid batch instead of
 
 test('subject aliases package through the canonical University subject family without lowering the minimum', () => {
   const rows = [
-    ...Array.from({ length: 10 }, (_, index) => ({
+    ...Array.from({ length: 32 }, (_, index) => ({
       contentHash: h(index + 30_000), materialHash: h(index + 40_000), subject: 'TypeScript and Next.js',
       sourceKind: 'course_material', license: 'Public Domain', confidence: 0.95,
     })),
-    ...Array.from({ length: 10 }, (_, index) => ({
+    ...Array.from({ length: 32 }, (_, index) => ({
       contentHash: h(index + 31_000), materialHash: h(index + 41_000), subject: 'databases',
       sourceKind: 'course_material', license: 'Public Domain', confidence: 0.95,
     })),
   ]
   const prepared = buildMassDistillationBatches(rows)
   assert.equal(prepared.length, 1)
-  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MIN_BATCH)
+  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_QUALITY_MIN_BATCH)
   assert.equal(prepared[0].subjectId, 'Computer Science & Coding')
 })
 
 test('AI engineering labels join Computer Science distillation without lowering the minimum', () => {
   const rows = [
-    ...Array.from({ length: 19 }, (_, index) => ({
+    ...Array.from({ length: 63 }, (_, index) => ({
       contentHash: h(index + 50_000), materialHash: h(index + 60_000), subject: 'Retrieval-Augmented Generation (RAG)',
       sourceKind: 'course_material', license: 'Public Domain', confidence: 0.95,
     })),
@@ -230,7 +231,7 @@ test('AI engineering labels join Computer Science distillation without lowering 
   ]
   const prepared = buildMassDistillationBatches(rows)
   assert.equal(prepared.length, 1)
-  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MIN_BATCH)
+  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_QUALITY_MIN_BATCH)
   assert.equal(prepared[0].subjectId, 'Computer Science & Coding')
 })
 
@@ -241,13 +242,13 @@ test('storage hashes cannot manufacture a distillation batch from duplicate lear
   }))
   assert.equal(buildMassDistillationBatches(duplicateRows).length, 0)
 
-  const uniqueRows = Array.from({ length: MASS_DISTILLATION_MIN_BATCH }, (_, index) => ({
+  const uniqueRows = Array.from({ length: MASS_DISTILLATION_QUALITY_MIN_BATCH }, (_, index) => ({
     contentHash: h(index + 100), materialHash: h(index + 20_000), subject: 'Data Structures and Algorithms in Python',
     sourceKind: 'course_material', license: 'Public Domain', confidence: 0.95,
   }))
   const prepared = buildMassDistillationBatches([...duplicateRows, ...uniqueRows])
   assert.equal(prepared.length, 1)
-  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MIN_BATCH + 1)
+  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_QUALITY_MIN_BATCH + 1)
   assert.equal(new Set(prepared[0].sourceHashes).size, prepared[0].sourceCount)
 })
 
@@ -269,8 +270,8 @@ test('supply telemetry reports unique post-dedup batchable material and exact su
   assert.equal(supply.rawUnassignedRows, 23)
   assert.equal(supply.uniqueBatchableItems, 19)
   assert.deepEqual(supply.subjects.map(subject => [subject.subjectKey, subject.uniqueBatchableItems, subject.shortfallToBatch]), [
-    ['social_behavioral_sciences', 18, 2],
-    ['politics_government_international_relations', 1, 19],
+    ['social_behavioral_sciences', 18, 46],
+    ['politics_government_international_relations', 1, 63],
   ])
 })
 
@@ -283,8 +284,19 @@ test('targeted replenishment prioritizes the nearest canonical batches without w
   assert.deepEqual(gaps.map(gap => gap.subject).slice(0, 2), ['Social & Behavioral Sciences', 'Statistics & Data Science'])
   assert.equal(gaps.length, 3, 'the free slot goes to an empty canonical subject instead of idling')
   assert.ok(gaps.every(gap => gap.sourceKinds?.length === 1 && gap.sourceKinds[0] === 'scientific_journal'))
-  assert.match(gaps[0].evidence.join(' '), /shortfall_to_batch=2/)
-  assert.equal(MASS_DISTILLATION_MIN_BATCH, 20)
+  assert.match(gaps[0].evidence.join(' '), /shortfall_to_batch=46/)
+  assert.equal(MASS_DISTILLATION_MIN_BATCH, 20, 'legacy structural floor remains for historical evidence')
+  assert.equal(MASS_DISTILLATION_QUALITY_MIN_BATCH, 64)
+})
+
+test('quality-floor migration releases only unspent undersized prepared batches', () => {
+  const migration = source('../supabase/migrations/20260925023000_mass_distillation_quality_floor.sql')
+  assert.match(migration, /where status='prepared'/)
+  assert.match(migration, /source_count < 64/)
+  assert.match(migration, /dispatch_authorized=false/)
+  assert.match(migration, /authority_expanded=false/)
+  assert.match(migration, /set status='superseded'/)
+  assert.doesNotMatch(migration, /where status='consumed'/)
 })
 
 test('curriculum queue stores identities only and cannot authorize spend', () => {

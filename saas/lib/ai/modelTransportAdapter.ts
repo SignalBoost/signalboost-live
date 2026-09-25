@@ -5,6 +5,7 @@ export type PlatformModelMessage = Readonly<{
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string | null
   toolCallId?: string | null
+  toolName?: string | null
   toolCalls?: readonly PlatformModelToolCall[]
 }>
 
@@ -20,6 +21,7 @@ export type PlatformModelRequest = Readonly<{
   maxOutputTokens?: number
   temperature?: number
   jsonObject?: boolean
+  jsonSchema?: Readonly<Record<string, unknown>>
   tools?: readonly PlatformModelTool[]
   toolChoice?: 'auto' | 'none' | Readonly<{ name: string }>
   timeoutMs?: number

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import {
   UNIVERSITY_SOURCE_MANIFESTS,
   bindUniversitySourcePlugin,
@@ -80,21 +81,10 @@ test('MCP learning source is plug-compatible but still enters the ordinary Unive
   assert.equal(docs[0].sourceUri, 'https://example.org/paper/1')
 })
 
-test('live source factory has a plug-in seam instead of requiring University core changes', async () => {
-  const live = await import('../lib/cos-core/layers/learning/liveSources.ts')
-  const plugin = createUniversityMcpSourcePlugin({
-    manifest: {
-      id: 'example_docs_mcp',
-      name: 'Example Docs MCP',
-      sourceKind: 'official_documentation',
-      transport: 'mcp',
-      capabilities: ['discovery','full_text','internal_reembedding','working_agent_rag','university_study','university_projects'],
-      rightsMode: 'reference_only',
-      costClass: 'configured',
-      enabledByDefault: false,
-    },
-    port: { async search() { return [] } },
-  })
-  const adapters = live.createLiveLearningAdapters({ COS_LIVE_SOURCES_ENABLED: 'true', COS_HF_OPEN_DATASETS_ENABLED: 'false', COS_WEB_TRAINING_ENABLED: 'false' }, [plugin])
-  assert.ok(adapters.some((adapter: any) => adapter.id === 'example_docs_mcp'))
+test('live source factory has a plug-in seam instead of requiring University core changes', () => {
+  // Keep this regression source-level: importing the entire live-source graph under node --test
+  // would test Node's strip-only loader against unrelated provider modules rather than this seam.
+  const live = readFileSync(new URL('../lib/cos-core/layers/learning/liveSources.ts', import.meta.url), 'utf8')
+  assert.match(live, /createLiveLearningAdapters\(env:LiveLearningEnvironment=process\.env,sourcePlugins:readonly UniversitySourcePlugin\[\]=\[\]\)/)
+  assert.match(live, /for\(const plugin of sourcePlugins\)adapters\.push\(bindUniversitySourcePlugin\(plugin\)\)/)
 })

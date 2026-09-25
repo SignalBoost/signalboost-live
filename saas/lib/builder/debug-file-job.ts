@@ -261,7 +261,8 @@ function editFingerprint(edit: DebugEdit): string {
  * Bounded iterative debug protocol: read the attached source set (≤4 files), run the proof command,
  * then make up to three targeted edits across the admitted files. Every successful edit is followed
  * by the exact same proof command; a failed verification becomes evidence for the next repair round.
- * No knowledge retrieval, live search, repository authority, or extra filesystem inspection is available.
+ * A bounded retained public/open knowledge block may be supplied as read-only reference context. It is
+ * untrusted data and grants no live search, repository authority, or extra filesystem inspection.
  */
 export async function runDebugFileJob(input: {
   objective: string
@@ -271,6 +272,7 @@ export async function runDebugFileJob(input: {
   runner: BuilderRunnerPort
   ai: BuilderAiPort
   cognitiveSkills?: readonly import('@/lib/ai/cos/cognitiveSkillContext').CognitiveSkillContextItem[]
+  workingKnowledge?: string
 }): Promise<BuilderLoopResult> {
   const trace: BuilderToolTrace[] = []
   const plannedPaths = input.plan.files?.length ? input.plan.files : [input.plan.path]
@@ -337,6 +339,7 @@ export async function runDebugFileJob(input: {
   for (let repairIteration = 1; repairIteration <= MAX_REPAIR_ITERATIONS; repairIteration += 1) {
     const basePrompt = [
       formatBuilderCognitiveGuidance(input.cognitiveSkills || []),
+      input.workingKnowledge || '',
       `OBJECTIVE:\n${String(input.objective || '').slice(0, 2_000)}`,
       `REPAIR ITERATION: ${repairIteration} of ${MAX_REPAIR_ITERATIONS}`,
       sourceBlock(currentFiles),

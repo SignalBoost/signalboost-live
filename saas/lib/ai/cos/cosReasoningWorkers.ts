@@ -23,6 +23,7 @@ import {
   activeGraduateRuntimesForRole,
   type ActiveGraduateRuntime,
 } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
+import { workingAgentKnowledgeBlock, type WorkingAgentKnowledgeRole } from '@/lib/ai/cos/workingAgentKnowledge'
 
 const ROLE_GUIDANCE: Readonly<Record<Exclude<CosSpecialistRole, 'primary'>, string>> = {
   coder: [
@@ -312,8 +313,19 @@ export async function reasonThroughCosControlPlane(
 ) {
   const decision = await routingDecision(args, options)
   const engine = await createGraduateAwareCosReasoningEngine(decision.role, decision.objective)
+  // Working specialists consume the same already-admitted public/open knowledge fabric as COS while
+  // they are still in University. Keep strict verifier and controlled-comparison lanes clean: a
+  // verifier must judge only the evidence its caller supplied, and the helper itself also rejects
+  // University/evaluation contexts.
+  const workingKnowledgeRole = decision.role !== 'primary' && decision.role !== 'verifier'
+    ? decision.role as WorkingAgentKnowledgeRole
+    : null
+  const workingKnowledge = workingKnowledgeRole
+    ? await workingAgentKnowledgeBlock(decision.objective, workingKnowledgeRole)
+    : ''
   const execution = await engine.run({
     ...args,
+    ...(workingKnowledge ? { prompt: [args.prompt, workingKnowledge].join('\n\n') } : {}),
     requestedRole: decision.role,
     allowExternalEscalation: options.allowExternalEscalation,
   })

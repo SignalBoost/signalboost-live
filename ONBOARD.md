@@ -1480,6 +1480,8 @@ approved free/open sources + paid frontier faculty + verified internal outcomes
 -> provenance + rights + quality + deduplication + subject normalization
 -> durable model-neutral educational assets / internal embeddings
 -> shared knowledge fabric
+   -> Working COS inference-time retrieval
+   -> relevant working-specialist inference-time retrieval
    -> Working COS direct-distillation lane
    -> University curriculum for COS and all relevant specialists
 ```
@@ -1526,14 +1528,75 @@ free/open rights-cleared material first
 
 Frontier-provider spend is therefore an optimization layer, not the permanent store of University intelligence. SMB deployments may primarily consume shared graduates, retrieval, and bounded personalization; enterprise deployments may additionally fund private/customer-specific distillation with their own approved provider/compute budgets. Commercial packaging never changes tenant isolation, training rights, evaluator independence, or authority gates.
 
-University open-source provider status as of 2026-09-23:
+University / working-agent open-source provider status as of 2026-09-24:
 
 - **OpenAlex:** implemented and already observed retaining Production scientific material through the governed learning lane. Its external 1,024-dimensional semantic space remains discovery-only; accepted text is re-embedded internally.
 - **Wikipedia / Wikimedia:** implemented through the existing governed reference adapter and already observed retaining Production material under CC BY-SA provenance. It improves retrieval/current general knowledge but is not admitted to mass model distillation by the current public-domain/CC0 training-rights policy.
-- **Semantic Scholar / S2ORC:** SPECTER2 discovery adapter implemented. It remains truthful as implemented-but-unobserved until retained Production material appears.
+- **Semantic Scholar / S2ORC:** SPECTER2 discovery is implemented and Production telemetry has now observed retained material. SPECTER2 remains an external discovery/provenance vector space; accepted text is re-embedded internally for durable iTMounts retrieval.
 - **Hugging Face open datasets:** the first active allowlisted source is `ethanolivertroy/nist-cybersecurity-training`, explicitly CC0/public-domain, with 1,536-dimensional source embeddings. It is queried only for cybersecurity/NIST-relevant gaps. The source embedding is fingerprinted for provenance and never mixed into the canonical iTMounts pgvector space; accepted text is re-embedded with the active internal embedding model. Its CC0 material may enter University mass-distillation packaging only after the ordinary relevance, confidence, deduplication, subject-normalization, and rights gates pass.
  The second allowlisted source is `KoalaAI/GitHub-CC0`, an approximately 1.08M-row CC0/public-domain programming/code corpus. It is queried only for software-engineering/coding-relevant gaps. It has no accepted canonical external vector space, so the retained original text is embedded internally after admission. Repository name, language, filename and MIME metadata remain provenance. Its CC0 material is eligible for the same existing mass-distillation packaging gates; availability alone never bypasses relevance, quality, deduplication, or subject checks.
 - Hugging Face datasets without clear commercial training rights may be used only as discovery/RAG sources when permitted; their availability never implies training eligibility.
+
+### Working-agent immediate shared-knowledge bridge — 2026-09-24
+
+The owner's intended operating model is explicit: **agents work while they attend University**. University graduation is a long-horizon qualification and activation gate; it is not a reason to withhold already-admitted public/open knowledge from a working agent. Once a source item passes ordinary provenance, relevance, quality, deduplication, storage and retrieval-admission gates, the same retained model-neutral material may help appropriate Production work immediately through bounded retrieval.
+
+The Production bridge is `saas/lib/ai/cos/workingAgentKnowledge.ts` (`working-agent-shared-knowledge-v1`). It reads the existing `cos_continuous_learning` corpus rather than creating another store. It first uses the active iTMounts embedding space for semantic retrieval and falls back conservatively to lexical retrieval when a newly retained item is not yet available in that embedding space or semantic retrieval misses its budget. Only externally published durable source classes are eligible for this working-agent bridge: scientific journals, public datasets, approved public web/reference material, official documentation and public Open Library material. Because `library_material` is a broader internal source class, the bridge additionally requires an `https://openlibrary.org/` source URI before a library row can cross into working-agent inference. Internal feedback, verified private outcomes, teacher-only rows, private/other library rows and unknown source classes do not cross this bridge.
+
+Current Production consumers are:
+- normal COS inference, through the existing learned-corpus / Semantic Memory path;
+- Builder / Software Specialist durable jobs, including the bounded attached-file debug loop;
+- COS specialist workers in the `coder`, `critic`, `researcher` and `context_engineer` roles, including an active University graduate serving one of those roles.
+
+The bridge is intentionally **not** injected into the strict `verifier` role, independent University examinations, controlled comparisons, hidden holdouts, evaluator/judge prompts, or other evidence-isolated lanes. Those lanes must judge only their authorized evidence and must not be contaminated by material a candidate could have studied. Retrieval never grants tools, mutation rights, repository authority, Referee/Guardian authority, academic credit, mastery, graduation, or confidence by itself.
+
+Working-agent material is serialized as lower-trust reference data and explicitly labeled as non-instructional. Retrieved text may inform reasoning, but instructions embedded inside a source are never commands. Retained material also cannot establish mutable current-world truth; current facts still require the Freshness/live-evidence path. Retrieval failure is best-effort for ordinary Production work and must not make a healthy worker unavailable.
+
+#### External embedding versus internal embedding versus distillation
+
+These are three different mechanisms and must not be conflated:
+
+```text
+provider-side embedding / vector index
+  = coordinates created by that provider's embedding model
+  = useful for semantic discovery inside that provider's own vector space
+
+iTMounts internal embedding
+  = coordinates created by the active iTMounts embedding model
+  = durable locator used by pgvector / RAG / Semantic Memory
+
+distillation / fine-tuning
+  = tokenized text, examples, labels, teacher responses or other training records
+  -> optimizer updates model parameters / adapter weights
+```
+
+An embedding is **not a portable "computer language" representation that can be poured directly into another LLM's weights**. It is a model-specific semantic coordinate. OpenAlex GTE-Large-EN vectors, Semantic Scholar SPECTER2 vectors, Hugging Face dataset-provided vectors and iTMounts internal embeddings are different coordinate systems even when two happen to have the same number of dimensions. They may accelerate discovery, ranking and retrieval, but the underlying permitted text/structured record is what the reasoner reads and what a training pipeline tokenizes when training rights allow it.
+
+Therefore "already embedded" material still gives iTMounts an important advantage: it can make discovery much cheaper and faster and can supply strong similarity/proximity metadata. iTMounts should fingerprint or record that provider vector for provenance when useful, retrieve the underlying human-readable/structured material, admit only useful rows, and re-embed accepted material into the active internal vector space. Provider replacement then does not erase iTMounts memory.
+
+The immediate-benefit path and the weight-training path are deliberately parallel:
+
+```text
+pre-embedded/open provider
+-> semantic discovery
+-> permitted source text / structured record
+-> admission + provenance + rights
+-> retained shared asset
+   -> immediate COS / relevant specialist RAG (no graduation wait)
+   -> internal iTMounts embedding / lexical fallback for retrieval
+   -> University study/practice
+   -> rights-cleared Working-COS or University distillation
+```
+
+Distillation eligibility is stricter than retrieval eligibility. Copyrighted or rights-unclear books, magazines, papers and documentation may be useful as permitted reference/RAG material without becoming model-training material. Public-domain, CC0, or otherwise explicitly training-authorized material may continue through the existing distillation packaging gates. The presence of a provider embedding, tokenizer, vector column, dataset API, or machine-readable format **never establishes training rights**.
+
+#### IT and scientific books, papers, magazines and documentation
+
+The platform should preferentially exploit structured and already-indexed providers rather than scrape the same corpus itself. Existing acquisition seams already include OpenAlex, Semantic Scholar/S2ORC, Hugging Face open datasets, Wikimedia/Wikipedia, Crossref, Europe PMC, Open Library, the arXiv metadata mirror and approved official/public documentation sources. Provider-maintained vectors or indexes are discovery accelerators; full text, abstracts, metadata, code, documentation or other permitted records remain the actual knowledge assets.
+
+The current Open Library adapter is bibliographic discovery/metadata (title, author, publication year, subjects), **not a licensed full-book-text corpus**. It must never be counted as having distilled a book's contents. Full-book distillation requires a separate rights-cleared full-text source (for example public-domain or explicitly training-authorized text) and the ordinary content/provenance/training-rights gates. Europe PMC can supply open-access scientific full text where the source permits it; OpenAlex, Crossref, Semantic Scholar/S2ORC and the arXiv metadata mirror may provide metadata/abstract/discovery evidence without that metadata license automatically granting rights to train on the underlying paper.
+
+For future IT/scientific sources the order remains: use an official API/MCP/open dataset or provider-maintained semantic index first; preserve DOI/ISBN/repository/document identity and license/provenance; fetch only the permitted underlying material; deduplicate and normalize subjects; retain/re-embed only useful material; expose it immediately to appropriate working agents; and send it to distillation only when training rights are independently established. Do not build a second vector database or copy an entire scientific/book Internet merely because a provider exposes embeddings.
 
 HF open-dataset Production acquisition repair — 2026-09-23:
 - Production telemetry showed the HF open-dataset integration truthfully as implemented but with 0 retained / 0 embedded items in the prior 24h, while OpenAlex, Semantic Scholar and Wikimedia were producing retained material.

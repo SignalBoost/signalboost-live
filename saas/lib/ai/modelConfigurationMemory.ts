@@ -23,7 +23,7 @@ export function createMemoryModelConfigurationPort(): ModelConfigurationPort {
       return Object.freeze({ credentialRef, last4:value.slice(-4) })
     },
     async resolve(credentialRef:string){ return secrets.get(credentialRef) ?? null },
-    async remove(credentialRef:string){ secrets.delete(credentialRef) },
+    async remove(credentialRef:string, _actorId:string){ secrets.delete(credentialRef) },
   })
 
   function history(use:AssignableModelUse){ return assignments.get(use) || [] }

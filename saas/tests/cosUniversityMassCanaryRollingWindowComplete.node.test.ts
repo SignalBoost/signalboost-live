@@ -30,15 +30,10 @@ const invocation = (candidateId: string, observedAt: string): CanaryEvent => ({
 })
 
 test('invocations of artifacts no longer queued still consume the rolling hourly budget', () => {
-  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 6)
-  const events = [
-    invocation('mass:already-passed-1', minutesAgo(55)),
-    invocation('mass:already-passed-2', minutesAgo(45)),
-    invocation('mass:already-passed-3', minutesAgo(35)),
-    invocation('mass:already-passed-4', minutesAgo(25)),
-    invocation('mass:already-passed-5', minutesAgo(15)),
-    invocation('mass:already-passed-6', minutesAgo(5)),
-  ]
+  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 12)
+  const events = Array.from({ length: MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) =>
+    invocation(`mass:already-passed-${index + 1}`, minutesAgo(59 - index * 4)),
+  )
   const decision = decideMassCanaryRollingApproval({ artifacts: [queued], events, now, enabled: true })
   assert.equal('artifact' in decision, false)
   assert.equal((decision as { reason: string }).reason, 'mass_canary_rolling_window_exhausted')

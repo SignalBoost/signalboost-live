@@ -135,7 +135,7 @@ Recent recovery established the following engineering state and lessons:
 - Self-Healing gained provider failure classification/circuit breaking and a universal supervised-provider contract so deterministic billing/capacity/auth/config failures do not create paid retry storms while transient failures remain bounded.
 - The independent mass evaluator is operational and preserves unchanged holdout, safety, unseen-transfer and delayed-retention gates. Recent quarantines are model-quality evidence, not evaluator failure.
 - Failure-derived remediation was strengthened, including a bounded frontier response-anchor followed by stable on-policy distillation and a three-epoch remediation replay where governed by the current recipe. Evaluator thresholds must never be lowered to make a model pass.
-- Exact-artifact RunPod canary infrastructure remains the active infrastructure repair track. Repairs added endpoint recovery, bounded capacity recovery, safe GPU1 resting scale-to-zero (`min=0,max=1`) policy, rolling spend accounting based on real invocations/reservations, worker headroom, cold-start/readiness recovery, exact base revision caching, and bound-template lookup. After the durable paid-invocation marker is written, an already-authorized canary may temporarily force its exact endpoint to `min=1,max=1` so RunPod allocates the single worker instead of relying on a cold request-count wake; the endpoint must be restored to `min=0,max=1` before canonical `production_canary_healthy` evidence can be written. Scale-down failure invalidates that canary proof. This warm-start changes neither the <=$0.20 per-canary ceiling, exact artifact/GPU binding, one-canary concurrency, nor Production-traffic/promotion authority. Failures with `providerInvocationStarted:false` are control-plane/provisioning failures, not paid inference or model-quality results.
+- Exact-artifact RunPod canary infrastructure remains the active infrastructure repair track. Repairs added endpoint recovery, bounded capacity recovery, safe GPU1 resting scale-to-zero (`min=0,max=1`) policy, rolling spend accounting based on real invocations/reservations, worker headroom, cold-start/readiness recovery, exact base revision caching, and bound-template lookup. After the durable paid-invocation marker is written, an already-authorized canary may temporarily force its exact endpoint to `min=1,max=1` so RunPod allocates the single worker instead of relying on a cold request-count wake; the endpoint must be restored to `min=0,max=1` before canonical `production_canary_healthy` evidence can be written. Scale-down failure invalidates that canary proof. This warm-start changes neither the <=$0.20 per-canary ceiling, exact artifact/GPU binding, bounded two-canary concurrency, nor Production-traffic/promotion authority. Failures with `providerInvocationStarted:false` are control-plane/provisioning failures, not paid inference or model-quality results.
 - Safe RunPod template-identity diagnostics were added after Production continued to report `mass_distilled_runtime_template_id_missing`; use concrete provider response shape to repair identity rather than bypass exact binding or add speculative retries.
 - A containerized exact-artifact canary worker/gateway is the next controlled runtime direction. Its image/build path must remain exact-artifact bound and must not expand canary, spend, promotion, or Production authority.
 - Healthy distillation should not be disturbed while canary infrastructure and model quality are repaired in parallel. The near-term milestone is another legitimately improved graduate; the Computer Science graduate then enters the Builder Residency/apprenticeship path.
@@ -2178,10 +2178,14 @@ University education is separate from runtime authority. Context Engineer has th
 
 ## Mass-distillation evaluation backlog controls (2026-09-25)
 
-The mass-distilled exact-artifact canary lane drains at **six approvals per rolling hour**. The hard
-per-canary ceiling remains **$0.20**, so the canary authorization envelope is at most **144/day** and
-**$28.80/day**. This is a bounded throughput increase after Production demonstrated consecutive post-repair
-canary passes; it does not change exact-artifact binding, evaluator independence, promotion rules, or
+The mass-distilled exact-artifact canary lane uses a **two-slot database-backed semaphore** and admits at
+most **12 started-or-armed canaries per rolling hour**. The cron runs every two minutes so long-running
+canaries may overlap safely across separate Vercel invocations; the atomic claim transaction serializes
+reservation creation, prevents duplicate claims for the same exact artifact, and refuses a third active
+reservation. The hard per-canary ceiling remains **$0.20**, so the nominal canary authorization envelope is
+at most **288/day** and **$57.60/day**. Active canary endpoints are protected from sibling RunPod capacity
+reclamation until terminal pass/fail evidence or the bounded lease expires. This throughput increase does
+not change exact-artifact binding, per-artifact retry limits, evaluator independence, promotion rules, or
 Production-traffic authority.
 
 Backlog cleanup is conservative and evidence-based. The scheduled

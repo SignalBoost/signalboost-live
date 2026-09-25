@@ -7,6 +7,7 @@ const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisi
 const provisionV2 = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisionV2.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260915100500_mass_distilled_runtime_canary_claim.sql', import.meta.url), 'utf8')
+const boundedParallelMigration = readFileSync(new URL('../supabase/migrations/20260925143000_mass_canary_bounded_parallelism.sql', import.meta.url), 'utf8')
 const endpointRefreshMigration = readFileSync(new URL('../supabase/migrations/20260921154000_mass_distilled_canary_endpoint_refresh_claim.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
@@ -148,6 +149,17 @@ test('database atomically selects and reserves one owner-authorized canary acros
   assert.doesNotMatch(route, /\.limit\(20\)/)
 })
 
+test('latest database claim is a serialized two-slot semaphore, never a duplicate-artifact fanout', () => {
+  assert.match(boundedParallelMigration, /v_active_reservations integer := 0/)
+  assert.match(boundedParallelMigration, /select count\(\*\)::integer into v_active_reservations/)
+  assert.match(boundedParallelMigration, /if v_active_reservations >= 2 then return; end if/)
+  assert.match(boundedParallelMigration, /pg_advisory_xact_lock\(pg_catalog\.hashtextextended\('mass-distilled-runtime-canary-global'/)
+  assert.match(boundedParallelMigration, /s\.candidate_id=v_artifact\.candidate_id/)
+  assert.match(boundedParallelMigration, /s\.evidence->>'artifactHash'=v_artifact\.trained_artifact_hash/)
+  assert.match(boundedParallelMigration, /then continue; end if;/)
+  assert.doesNotMatch(boundedParallelMigration, /v_active_reservations >= [3-9]/)
+})
+
 test('route consumes the approval actual ceilings and never creates its own extra attempt', () => {
   assert.match(route, /Number\(claim\.max_canary_invocations\)!==1/)
   assert.match(route, /cost<=0\|\|cost>0\.2/)
@@ -167,8 +179,8 @@ test('mass pass evidence proves internal readiness and remains exact-artifact bo
   assert.match(route, /artifactHash:input\.artifactHash/)
 })
 
-test('mass-distilled route is scheduled independently from legacy and v6 single-artifact routes', () => {
-  assert.match(vercel, /\/api\/cron\/runpod-mass-distilled-local-deploy/)
+test('mass-distilled route is scheduled every two minutes independently from legacy and v6 routes', () => {
+  assert.match(vercel, /"path": "\/api\/cron\/runpod-mass-distilled-local-deploy"[\s\S]{0,100}"schedule": "\*\/2 \* \* \* \*"/)
   assert.match(vercel, /\/api\/cron\/runpod-distilled-local-deploy/)
   assert.match(vercel, /\/api\/cron\/runpod-distilled-v6-local-deploy/)
 })

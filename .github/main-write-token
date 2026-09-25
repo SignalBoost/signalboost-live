@@ -1,2 +1,2 @@
-base_sha=f9e63c0fc8c005e92e2fd7e5383314ff93a336a8
-branch=docs/security-admission-shield-20260925
+base_sha=e19c400e0eb33d7fecdbe807e601d495ea0e6736
+branch=fix/mass-canary-bounded-parallelism-20260925

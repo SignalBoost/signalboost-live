@@ -227,12 +227,10 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status', 'evaluation_pending')
       .like('candidate_id', 'mass:%')
-      .contains('intended_use', { trainingReceipt: {
-        optimizer: MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
-        frontierResponseAnchorRequired: true,
-        frontierResponseAnchorEpochs: 1,
-      } })
-      .order('created_at', { ascending: true })
+      // Avoid nested JSON containment here: the Production gate intentionally validates the full
+      // receipt in application code. Sampling newest pending artifacts keeps the current recipe
+      // reachable across every subject without relying on brittle PostgREST JSONB containment.
+      .order('created_at', { ascending: false })
       .limit(1000),
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')

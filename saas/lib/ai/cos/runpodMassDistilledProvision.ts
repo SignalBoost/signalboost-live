@@ -191,6 +191,25 @@ function startupCommand(input:MassDistilledRuntimeArtifact,modelName:string){
   return ['set -euo pipefail','mkdir -p /models/base /models/adapter /models/hf-cache',`export ITMOUNTS_BASE_MODEL_ID='${BASE_MODEL_ID}'`,`export ITMOUNTS_BASE_MODEL_REVISION='${BASE_MODEL_REVISION}'`,`export ITMOUNTS_ADAPTER_MODEL_ID='${input.artifactId}'`,`export ITMOUNTS_ADAPTER_MODEL_REVISION='${input.artifactRevision}'`,`export ITMOUNTS_DISTILLED_MODEL_NAME='${modelName}'`,`python3 -c "import base64;open('/tmp/itmounts_mass_gateway.py','wb').write(base64.b64decode('${gateway}'))"`,'exec python3 /tmp/itmounts_mass_gateway.py'].join('; ')
 }
 
+export function massDistilledRuntimeInlineContainer(input:MassDistilledRuntimeArtifact,modelName:string){
+  assertArtifact(input)
+  const token=process.env.HF_TOKEN?.trim()||''
+  if(token.length<20) throw new Error('HF_TOKEN is not configured')
+  return Object.freeze({
+    image:VLLM_IMAGE,
+    args:JSON.stringify({entrypoint:['bash','-lc'],cmd:[startupCommand(input,modelName)]}),
+    disk:50,
+    ports:[`${PUBLIC_PORT}/http`],
+    env:{
+      HF_TOKEN:token,
+      HF_HOME:'/models/hf-cache',
+      PORT:String(PUBLIC_PORT),
+      PORT_HEALTH:String(PUBLIC_PORT),
+      HEALTH_CHECK_PATH:'/ping',
+    },
+  })
+}
+
 function templateMatches(template:Template,input:MassDistilledRuntimeArtifact,modelName:string){
   const command=(template.dockerStartCmd||[]).join(' ')
   return template.imageName===VLLM_IMAGE&&(template.dockerEntrypoint||[]).join(' ').includes('bash')&&command.includes(BASE_MODEL_REVISION)&&command.includes(input.artifactRevision)&&command.includes(input.artifactId)&&command.includes(modelName)&&command.includes('--max-model-len')&&command.includes('8192')&&command.includes('--enforce-eager')&&command.includes('itmounts_mass_gateway.py')&&(template.ports||[]).includes(`${PUBLIC_PORT}/http`)

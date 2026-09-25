@@ -186,9 +186,10 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   // existed and were never seeded for the subjects that were failing.
   //
   // Targets are now the subjects with verified failures, most-failing first, with shortfall only breaking ties.
-  // Volume stays bounded: at most HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT seeds per subject per pass,
-  // at most maxSubjects subjects, and the content hash is derived from the failing candidate and its gate
-  // classes - so re-running produces nothing new and only a newly failed artifact creates new material.
+  // Volume stays bounded: one full 20-variant corrective cohort per targeted subject/pass, at most maxSubjects
+  // subjects. Variants round-robin across the verified failing artifacts and bind identity to candidate + failed
+  // gate classes + ordinal, so the same evidence is idempotent while a newly failed artifact can replenish
+  // corrective material after an earlier cohort has been consumed.
   const since = new Date(input.now.getTime() - VERIFIED_FAILURE_LOOKBACK_DAYS * 86_400_000).toISOString()
 
   const rows = await input.db.from('cos_university_distilled_evaluation_runs')
@@ -230,15 +231,14 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   const bySubject: Array<{ subject: string; inserted: number }> = []
   for (const target of targets) {
     const verifiedFailures = failuresByTitle.get(target.subject) || []
-    // The per-subject ceiling still applies; the shortfall no longer caps it, because a subject with full
-    // inventory and failing artifacts needs remediation most, not least.
-    const needed = Math.min(
-      HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT,
-      verifiedFailures.length,
-    )
+    // The per-subject ceiling is a corrective COHORT size, not a count of failed artifacts.
+    // Production showed 1-7 replay rows because this previously used verifiedFailures.length directly.
+    // One independently verified failure is sufficient to synthesize twenty distinct general-principle
+    // practice variants; multiple failures are round-robined so the cohort reflects the observed gate mix.
+    const needed = verifiedFailures.length > 0 ? HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT : 0
     let subjectInserted = 0
     for (let ordinal = 0; ordinal < needed; ordinal += 1) {
-      const failure = verifiedFailures[ordinal]
+      const failure = verifiedFailures[ordinal % verifiedFailures.length]
       if (!failure) continue
       // Bind remediation identity to the independently evaluated artifact + failed gate classes.
       // Re-running the same evidence is idempotent; a newly failed artifact produces fresh curriculum.
@@ -261,7 +261,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
         summary: [
           `Independent evaluation shows a remediation need in ${target.subject} for graduation gate classes: ${failure.gates.join(', ')}.`,
           'Generate a distinct self-contained expert teaching example that targets the relevant failure class while preserving correct, safe, transferable, and retainable behavior.',
-          `Practice context: ${remediationVariant.context}. Verification mode: ${remediationVariant.verificationMode}. Difficulty twist: ${remediationVariant.difficultyTwist}.`,
+          `Remediation focus: ${remediationVariant.focus}. Practice context: ${remediationVariant.context}. Verification mode: ${remediationVariant.verificationMode}. Difficulty twist: ${remediationVariant.difficultyTwist}.`,
           `Variant-specific remediation requirements: ${remediationVariant.remediationRequirements.join(' ')}`,
           `General remediation principles: ${remediationPrinciples.join(' ')}`,
           'Use those general principles without recreating any hidden evaluation case. Do not reproduce training examples, raw conversations, private holdouts, hidden exams, evaluator output, user data, or private evidence.',

@@ -200,6 +200,26 @@ test('durable proof counts survive proof artifacts leaving the pending canary qu
   assert.equal(cohortsDone.artifact.candidateId,legacy.candidateId)
 })
 
+test('current anchored recipe stays ahead of older legacy artifacts after bounded proof cohorts complete', () => {
+  const proofNow = new Date('2026-09-23T20:00:00.000Z')
+  const legacy = artifact(96, '2026-09-20T00:00:00.000Z')
+  const current: CanaryArtifact = {
+    ...v2BuilderArtifact('mass:current-non-cs', 97, '2026-09-22T00:00:00.000Z'),
+    subjectId: 'Statistics & Data Science',
+  }
+  const decision = decideMassCanaryRollingApproval({
+    artifacts:[legacy,current],
+    events:[],
+    now:proofNow,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId,current.candidateId)
+  assert.equal(decision.evidence.currentRecipePriority,true)
+})
+
 test('passed canary keeps its endpoint through one transient independent-evaluation lifecycle failure', () => {
   const a = artifact(1, '2026-09-15T00:00:00.000Z'); const b = artifact(2, '2026-09-15T01:00:00.000Z')
   const passed = event(a, 'local_distilled_runtime_canary_passed', '2026-09-17T16:00:00.000Z')
@@ -294,8 +314,11 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.doesNotMatch(route,/\.contains\('evidence',\{profile:MASS_CANARY_PROFILE\}\)/)
   assert.match(route,/db\.rpc\('claim_next_mass_distilled_runtime_canary'\)/)
   assert.match(route,/created_at,intended_use/)
-  assert.match(route,/oldestArtifacts,v2BuilderArtifacts,replayArtifacts/)
+  assert.match(route,/oldestArtifacts,currentRecipeArtifacts,v2BuilderArtifacts,replayArtifacts/)
   assert.match(route,/\.limit\(200\)/)
+  assert.match(route,/currentRecipeArtifacts/)
+  assert.match(route,/optimizer:MASS_CANARY_BUILDER_V2_OPTIMIZER/)
+  assert.match(route,/frontierResponseAnchorRequired:true/)
   assert.match(route,/\.eq\('subject_id','Computer Science & Coding'\)/)
   assert.match(route,/\.gte\('created_at',MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER\)/)
   assert.match(route,/\.contains\('intended_use',\{trainingReceipt:\{/)

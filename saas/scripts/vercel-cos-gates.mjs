@@ -23,6 +23,8 @@ const tests = [
   'tests/modelPortabilityRegistry.node.test.ts',
   'tests/modelPortabilityRouting.node.test.ts',
   'tests/modelTransportAdapters.node.test.ts',
+  'tests/modelCertification.node.test.ts',
+  'tests/modelConsole.node.test.ts',
   'tests/cosUniversityMassHostedTeacherStage.node.test.ts',
   'tests/cosUniversityTelemetry.node.test.ts',
   'tests/cosLaneStatus.node.test.ts',

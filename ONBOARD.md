@@ -2347,3 +2347,8 @@ existing strict classifier must report zero silent days and GREEN.
 - Phase 3 adds platform-owned built-in transport adapters for `openai_compatible`, `anthropic_messages`, and `google_generate_content`, configured through server-only `ITMOUNTS_MODEL_TRANSPORTS_JSON`. Credentials remain referenced by environment-variable name and are never stored in model/transport registry metadata.
 - Provider-native tool/JSON contracts must be preserved; adapters may not fake one provider's wire format as another. `native_sdk`, `local_runtime`, and `custom_http` require an injected host adapter rather than guessed behavior.
 - Portability transport tests are mandatory in `scripts/vercel-cos-gates.mjs`.
+- Phase 4a adds the owner-only `/admin/models` Console and `/api/admin/models` surface. GET is read-only; POST certification requires explicit `confirmSpend=true` because it can make bounded provider calls.
+- Certification persists metadata-only `platform-model-certification-v1` receipts to the immutable `supervisor_audit_events` ledger. Prompts, model outputs, tool arguments/results, credentials, tokens and provider response bodies must never be persisted in these receipts.
+- A model certification receipt is evidence only. It cannot activate a model, change routing, rewrite capability states, expand authority or authorize Production traffic.
+- The Phase 4a Console does not mutate model/provider registration or secrets. Registration remains governed server configuration until a portable host-neutral secret/configuration write backend exists.
+- Any declared validated capability outside the certification suite must remain visibly unverified; the receipt is `partial`, not passed.

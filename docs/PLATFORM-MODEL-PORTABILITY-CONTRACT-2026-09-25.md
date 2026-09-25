@@ -122,3 +122,27 @@ Provider differences remain explicit:
 - `native_sdk`, `local_runtime`, and `custom_http` are intentionally not guessed by built-ins. Buyers/hosts inject those adapters behind the same canonical interface.
 
 These adapters establish protocol execution capability. They do not by themselves authorize a model for COS/Builder/University; the model profile still needs the corresponding validated capability and routing policy.
+
+## Phase 4a Model Console and certification
+
+The owner Console at `/admin/models` is the operational surface for the portability registry.
+
+It is intentionally split into two authority levels:
+
+- **Inventory/readiness:** read-only inventory of registered profiles, intended uses, transport bindings, credential-presence metadata, declared inference/training capability states, adapter availability, and the latest durable certification receipt.
+- **Certification:** an explicit owner action. The POST route requires `confirmSpend=true` because certification performs bounded live provider calls and may incur provider charges.
+
+The transport certification suite currently proves:
+
+1. configured transport health/readiness metadata;
+2. a live chat-completion marker;
+3. structured JSON when the profile declares `structuredJson=validated`;
+4. tool calling when the profile declares `toolCalling=validated`.
+
+Latency and remote request IDs are retained as metadata. Prompts, outputs, tool arguments/results, credentials, tokens, and provider response bodies are not persisted.
+
+Certification receipts are appended to the existing immutable `supervisor_audit_events` ledger as `platform_model_certification_completed` using schema `platform-model-certification-v1`. A receipt is **evidence only**. It cannot activate a model, change routing, alter a capability declaration, expand authority, or authorize Production traffic.
+
+If a profile declares additional validated capabilities that this suite does not yet exercise (for example streaming, vLLM, speculative decoding, EAGLE, MTP or XSA), the receipt is `partial`, never fully passed.
+
+Registration remains server-configured in Phase 4a through `ITMOUNTS_MODEL_REGISTRY_JSON` and `ITMOUNTS_MODEL_TRANSPORTS_JSON`. The Console does not expose or mutate provider secrets. A future Phase 4b may add portable secure configuration writes only after a host-neutral secret/configuration backend exists.

@@ -355,7 +355,7 @@ export class BuilderToolLoop {
     this.browserCli = browserCli
   }
 
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; projectContext?: unknown; documentationPaths?: readonly string[] | null; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; cognitiveSkills?: readonly import('@/lib/ai/cos/cognitiveSkillContext').CognitiveSkillContextItem[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean; deadlineAtMs?: number; minimumStepMs?: number }): Promise<BuilderLoopResult> {
+  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; projectContext?: unknown; documentationPaths?: readonly string[] | null; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; cognitiveSkills?: readonly import('@/lib/ai/cos/cognitiveSkillContext').CognitiveSkillContextItem[]; workingKnowledge?: string; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean; deadlineAtMs?: number; minimumStepMs?: number }): Promise<BuilderLoopResult> {
     const saved = input.checkpoint
     if (saved && (saved.version !== 1 || saved.workspaceId !== input.workspaceId || saved.objectiveDigest !== checkpointDigest(input.objective))) {
       return { ok: false, error: 'builder_checkpoint_scope_mismatch', trace: [] }
@@ -467,6 +467,7 @@ export class BuilderToolLoop {
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
         formatBuilderCognitiveGuidance(input.cognitiveSkills || []),
+        input.workingKnowledge || '',
         BUILDER_REASONING_GUIDANCE,
         documentationPaths ? `DOCUMENTATION-ONLY TASK: mutations are restricted to ${JSON.stringify(documentationPaths)}. Inspect relevant code, update the requested documentation, and run the requested verification. Existing error behavior being documented does not require a failing baseline. Do not modify implementation, tests or configuration.` : '',
         verificationOrderGuidance(pendingOrder),

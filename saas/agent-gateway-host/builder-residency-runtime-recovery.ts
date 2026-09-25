@@ -161,7 +161,7 @@ export async function recoverBuilderResidencyRuntime(input:{
     endpointId:repaired.endpointId,
     endpointName:repaired.endpointName,
     modelName:repaired.modelName,
-    reboundTemplate:repaired.reboundTemplate===true,
+    reboundTemplate:repaired.reboundTemplate,
     workersMin:repaired.workersMin,
     workersMax:repaired.workersMax,
     idleTimeout:repaired.idleTimeout,

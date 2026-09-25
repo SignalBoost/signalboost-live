@@ -65,11 +65,12 @@ test('compatibility layer uses the same v4 template identity as the creator', ()
   assert.match(compatibility, /templateName: `itmounts-mass-distilled-\$\{suffix\}-\$\{runtimeKey\}-template-v4`/)
 })
 
-test('compatibility layer can recover both legacy template and endpoint identity drift', () => {
-  assert.match(compatibility, /mass_distilled_runtime_template_identity_mismatch/)
-  assert.match(compatibility, /mass_distilled_runtime_endpoint_template_mismatch/)
-  assert.match(compatibility, /mass_distilled_runtime_endpoint_template_rebind_failed/)
-  assert.match(compatibility, /assertEndpointSafetyPolicy\(endpoint\)/)
+test('native v2 layer repairs exact endpoint materialization without the v1 template index', () => {
+  assert.doesNotMatch(compatibility, /includeEndpointBoundTemplates/)
+  assert.doesNotMatch(compatibility, /provisionLegacyMassDistilledRuntime/)
+  assert.match(compatibility, /nativeV2EndpointConfig/)
+  assert.match(compatibility, /massDistilledRuntimeInlineContainer/)
+  assert.match(compatibility, /assertNonGpuEndpointSafetyPolicy\(endpoint, idleTimeoutSeconds\)/)
   assert.match(compatibility, /materializedEndpointMatches/)
 })
 

@@ -62,7 +62,7 @@ test('Project Gutenberg adapter fetches only explicit public-domain HTTPS Gutenb
   assert.ok(!calls.includes('https://example.com/book.txt'))
 })
 
-test('Project Gutenberg falls back from Gutendex cloud 403 to Open Library ids and verifies rights in the ebook itself', async () => {
+test('Project Gutenberg falls through machine OPDS to Open Library ids and verifies rights in the ebook itself', async () => {
   const calls: string[] = []
   const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
     + '*** START OF THE PROJECT GUTENBERG EBOOK FALLBACK ***\n'
@@ -73,6 +73,9 @@ test('Project Gutenberg falls back from Gutendex cloud 403 to Open Library ids a
     const url = String(input)
     calls.push(url)
     if (url.startsWith('https://gutendex.com/books/')) {
+      return new Response('blocked', { status: 403 })
+    }
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) {
       return new Response('blocked', { status: 403 })
     }
     if (url.startsWith('https://openlibrary.org/search.json')) {
@@ -101,6 +104,58 @@ test('Project Gutenberg falls back from Gutendex cloud 403 to Open Library ids a
   assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
   assert.ok(calls.some(url => url.startsWith('https://openlibrary.org/search.json')))
   assert.ok(calls.includes('https://gutenberg.pglaf.org/cache/epub/20201/pg20201.txt'))
+})
+
+test('Project Gutenberg uses the machine-to-machine OPDS catalog when Gutendex is blocked', async () => {
+  const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
+    + '*** START OF THE PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***\n'
+    + 'Electricity magnetism induction current voltage engineering physics. '.repeat(30)
+    + '\n*** END OF THE PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***'
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) {
+      return new Response(`<?xml version="1.0"?><feed><entry><id>https://www.gutenberg.org/ebooks/34221</id><title>Electricity and Magnetism</title><author><name>Elisha Gray</name></author><link href="/ebooks/34221" /></entry></feed>`, {
+        status: 200,
+        headers: { 'content-type': 'application/atom+xml' },
+      })
+    }
+    if (url === 'https://gutenberg.pglaf.org/cache/epub/34221/pg34221.txt') {
+      return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    }
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher)('electricity magnetism engineering', 2)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].uri, 'https://www.gutenberg.org/ebooks/34221')
+  assert.ok(results[0].evidence?.includes('discovery:project_gutenberg_opds'))
+  assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
+})
+
+test('Project Gutenberg has a rights-neutral bootstrap catalog when every network discovery surface is unavailable', async () => {
+  const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
+    + '*** START OF THE PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***\n'
+    + 'Electricity magnetism induction current voltage engineering physics. '.repeat(30)
+    + '\n*** END OF THE PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***'
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) return new Response('blocked', { status: 403 })
+    if (url.startsWith('https://openlibrary.org/search.json')) {
+      return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    if (url === 'https://gutenberg.pglaf.org/cache/epub/34221/pg34221.txt') {
+      return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    }
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher)('electricity magnetism engineering', 1)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].uri, 'https://www.gutenberg.org/ebooks/34221')
+  assert.ok(results[0].evidence?.includes('discovery:local_bootstrap_catalog'))
+  assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
 })
 
 test('Project Gutenberg never upgrades a restricted ebook to training rights even when discovery points to it', async () => {

@@ -9,8 +9,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   assessLearningContinuity,
   type ContinuityReport,
-  type GapStatusCount,
-  type RetentionRow,
+  type GapStatusCount
 } from '@/lib/ai/cos/learningContinuity'
 import {
   readLearningContinuityCorpus,
@@ -38,7 +37,7 @@ export async function readLearningContinuity(): Promise<ContinuityReadResult> {
   // relevance_rejected rows remain in the durable audit corpus but are not live retained knowledge,
   // so continuity must exclude them or quarantined duplicates can fabricate healthy learning volume.
   const corpusResult=await readLearningContinuityCorpus(db,EFFECTIVE_CORPUS_FILTER)
-  if(!corpusResult.ok)return {ok:false,error:corpusResult.error}
+  if('error' in corpusResult)return {ok:false,error:corpusResult.error}
 
   const gapResult = await db
     .from('cos_learning_gaps')

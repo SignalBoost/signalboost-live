@@ -36,7 +36,7 @@ import {
   runMassHostedTeacherStage,
 } from './cosUniversityMassHostedTeacherStage.ts'
 import { buildFrontierDistillationPlan } from './cosUniversityFrontierDistillation.ts'
-import { CURRENT_UNIVERSITY_STUDENT_PROFILE, CURRENT_UNIVERSITY_TEACHER_PROFILE } from './cosUniversityModelCapabilityRegistry.ts'
+import { CURRENT_UNIVERSITY_STUDENT_PROFILE, CURRENT_UNIVERSITY_TEACHER_PROFILE } from '../modelCapabilityRegistry.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
 export const MASS_DISTILLATION_CALLBACK_PATH = '/api/internal/cos/mass-distillation/evidence' as const

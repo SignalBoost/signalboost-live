@@ -50,3 +50,24 @@ test('bootstrap failures still count, because a bad artifact can cause them', ()
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifact], events: [canary, rolling, started, ...failures('mass_distilled_evaluation_runtime_bootstrap_failed')], now })
   assert.equal(decision.issue, false)
 })
+
+
+test('evaluation wake explicitly allocates only one worker and scales back down', () => {
+  const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvisionV2.ts', import.meta.url), 'utf8')
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  const activate = provision.slice(
+    provision.indexOf('export async function activateMassDistilledEvaluationWorker'),
+    provision.indexOf('/** Return an explicitly woken evaluator endpoint', provision.indexOf('export async function activateMassDistilledEvaluationWorker')),
+  )
+  const deactivate = provision.slice(
+    provision.indexOf('export async function deactivateMassDistilledEvaluationWorker'),
+    provision.indexOf('\nfunction materializedEndpointMatches', provision.indexOf('export async function deactivateMassDistilledEvaluationWorker')),
+  )
+  assert.match(activate, /workers: \{ min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
+  assert.match(activate, /APPROVED_POOLS/)
+  assert.match(activate, /authorityExpanded: false/)
+  assert.match(deactivate, /workers: \{ min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
+  assert.match(route, /await activateMassDistilledEvaluationWorker\(claim\.endpointId\)/)
+  assert.match(route, /await deactivateMassDistilledEvaluationWorker\(claim\.endpointId\)/)
+  assert.doesNotMatch(route, /const runtimeWake = await wakeMassDistilledRuntime\(claim\.endpointId, deadlineMs\)/)
+})

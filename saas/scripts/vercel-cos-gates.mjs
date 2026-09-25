@@ -183,6 +183,7 @@ const tests = [
   'tests/cosWebTrainingPdfText.node.test.ts',
   'tests/cosLearningTargetLanguage.node.test.ts',
   'tests/cosLearnedCorpusContinuousIndexing.node.test.ts',
+  'tests/workingAgentKnowledge.node.test.ts',
   'tests/cosDirectedStudy.node.test.ts',
   'tests/specialistLearning.node.test.ts',
   'tests/cosDirectedStudyPromotion.node.test.ts',

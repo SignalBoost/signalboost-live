@@ -3,7 +3,7 @@ import { allPlatformModelProfiles } from './modelCapabilityRegistry.ts'
 import { createBuiltinModelTransportAdapters } from './modelTransportAdapters.ts'
 import { requireTransportForProfile } from './modelTransportAdapter.ts'
 import { createSignalBoostModelConfigurationPort } from './modelConfigurationSignalBoost.ts'
-import type { AssignableModelUse } from './modelConfigurationPort.ts'
+import type { AssignableModelUse, ModelConfigurationPort } from './modelConfigurationPort.ts'
 import { currentHarnessExecutionContext, reserveHarnessProviderCostUsd } from '../../platform-harness/runtime/execution-context.ts'
 import type { LocalModelCallArgs, LocalModelTurnResult } from './local-inference.ts'
 
@@ -18,9 +18,12 @@ export type AssignedModelDescriptor = Readonly<{
   provider: string
 }>
 
-export async function currentAssignedModelDescriptor(use: AssignableModelUse): Promise<AssignedModelDescriptor | null> {
-  let store
-  try { store = createSignalBoostModelConfigurationPort() } catch { return null }
+export async function currentAssignedModelDescriptor(
+  use: AssignableModelUse,
+  options: { store?: ModelConfigurationPort } = {},
+): Promise<AssignedModelDescriptor | null> {
+  let store: ModelConfigurationPort
+  try { store = options.store || createSignalBoostModelConfigurationPort() } catch { return null }
   try {
     const current = await store.currentAssignment(use)
     if (!current) return null
@@ -101,10 +104,11 @@ function localToolCalls(calls: readonly { id: string; name: string; arguments: s
 export async function tryAssignedPlatformModelTurn(
   args: LocalModelCallArgs,
   requestedUse?: AssignableModelUse,
+  options: { store?: ModelConfigurationPort; adapters?: readonly import('./modelTransportAdapter.ts').ModelTransportAdapter[] } = {},
 ): Promise<AssignedModelAttempt> {
-  let store
+  let store: ModelConfigurationPort
   try {
-    store = createSignalBoostModelConfigurationPort()
+    store = options.store || createSignalBoostModelConfigurationPort()
   } catch {
     return Object.freeze({ attempted: false, result: null, profileKey: null, assignmentId: null })
   }
@@ -124,7 +128,7 @@ export async function tryAssignedPlatformModelTurn(
   if (registration.profile.inference.chatCompletion !== 'validated') throw new Error('platform_model_assignment_chat_not_validated')
 
   const profiles = Object.freeze([...allPlatformModelProfiles(), registration.profile])
-  const adapters = createBuiltinModelTransportAdapters({
+  const adapters = options.adapters || createBuiltinModelTransportAdapters({
     profiles,
     bindings: [registration.binding],
     resolveCredential: ref => store.vault.resolve(ref),

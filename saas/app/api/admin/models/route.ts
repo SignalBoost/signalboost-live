@@ -23,7 +23,31 @@ function safePayload(value: unknown): Record<string, unknown> {
     : {}
 }
 
-async function recentCertifications() {
+type StoredCertificationReceipt = Readonly<{
+  certificationId: unknown
+  occurredAt: unknown
+  schemaVersion: unknown
+  profileKey?: unknown
+  [key: string]: unknown
+}>
+
+function certificationAuditDb(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
+  return {
+    from(table: string) {
+      if (table !== 'supervisor_audit_events') {
+        throw new Error('platform_model_certification_audit_table_rejected')
+      }
+      return {
+        async insert(value: unknown) {
+          const { error } = await db.from('supervisor_audit_events').insert(value as never)
+          return { error: error ? { message: error.message } : null }
+        },
+      }
+    },
+  }
+}
+
+async function recentCertifications(): Promise<StoredCertificationReceipt[]> {
   const db = cosServiceDb()
   if (!db) return []
   const { data, error } = await db
@@ -33,12 +57,15 @@ async function recentCertifications() {
     .order('occurred_at', { ascending: false })
     .limit(100)
   if (error) return []
-  return (data || []).map(row => ({
-    certificationId: row.event_id,
-    occurredAt: row.occurred_at,
-    schemaVersion: row.schema_version,
-    ...safePayload(row.payload),
-  }))
+  return (data || []).map(row => {
+    const payload = safePayload(row.payload)
+    return {
+      ...payload,
+      certificationId: row.event_id,
+      occurredAt: row.occurred_at,
+      schemaVersion: row.schema_version,
+    } satisfies StoredCertificationReceipt
+  })
 }
 
 export async function GET() {
@@ -119,7 +146,7 @@ export async function POST(request: NextRequest) {
   if (!db) return noStore({ error: 'platform_model_certification_database_unavailable' }, { status: 503 })
 
   try {
-    const receipt = await runPlatformModelCertification({ profileKey, db })
+    const receipt = await runPlatformModelCertification({ profileKey, db: certificationAuditDb(db) })
     return noStore({ ok: receipt.status !== 'failed', receipt }, { status: receipt.status === 'failed' ? 422 : 200 })
   } catch (error) {
     const code = (error instanceof Error ? error.message : String(error || 'platform_model_certification_failed'))

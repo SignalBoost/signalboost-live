@@ -127,7 +127,7 @@ function safeError(error: unknown): string {
 function errorStatus(code: string): number {
   if (/not_found|unavailable/.test(code)) return 404
   if (/required|invalid|mismatch|capability/.test(code)) return 400
-  if (/conflict|already_active|no_rollback|certification_failed|transport_unavailable/.test(code)) return 409
+  if (/conflict|already_active|no_rollback|no_active|certification_failed|transport_unavailable/.test(code)) return 409
   return 500
 }
 
@@ -326,6 +326,20 @@ export async function POST(request: NextRequest) {
         crossModelFallbackAllowed: false,
       })
       return noStore({ ok: true, assignment: next })
+    }
+
+    if (action === 'release') {
+      if (body?.confirmRelease !== true) throw new Error('platform_model_release_explicit_confirmation_required')
+      const use = assignableUse(body?.use)
+      const expected = String(body?.expectedCurrentAssignmentId || '').trim()
+      if (!expected) throw new Error('platform_model_assignment_current_id_required')
+      const released = await store.release({ use, actorId, expectedCurrentAssignmentId: expected })
+      await appendGovernanceAudit(db, actorId, 'assignment_released', {
+        use, profileKey: released.profileKey, assignmentId: released.assignmentId,
+        routing: 'platform_default',
+        crossModelFallbackAllowed: false,
+      })
+      return noStore({ ok: true, assignment: released, routing: 'platform_default' })
     }
 
     if (action === 'disable') {

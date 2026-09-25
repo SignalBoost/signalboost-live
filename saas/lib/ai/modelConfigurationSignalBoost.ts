@@ -208,5 +208,14 @@ export function createSignalBoostModelConfigurationPort(dbInput?: Db | null): Mo
       if (error) throw new Error(error.message)
       return assignment(data)
     },
+    async release(input) {
+      const { data, error } = await db.rpc('platform_release_model_assignment', {
+        p_use: input.use,
+        p_actor: input.actorId,
+        p_expected_current_assignment_id: input.expectedCurrentAssignmentId,
+      })
+      if (error) throw new Error(error.message)
+      return assignment(data)
+    },
   })
 }

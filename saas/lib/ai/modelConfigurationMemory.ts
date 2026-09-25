@@ -108,6 +108,15 @@ export function createMemoryModelConfigurationPort(): ModelConfigurationPort {
       assignments.set(input.use,[next,...updated])
       return next
     },
+    async release(input){
+      const rows=[...history(input.use)]
+      const current=rows.find(row=>row.status==='active') || null
+      if(!current) throw new Error('platform_model_assignment_no_active_assignment')
+      if(current.assignmentId!==input.expectedCurrentAssignmentId) throw new Error('platform_model_assignment_conflict')
+      const released=Object.freeze({ ...current,status:'released' as const })
+      assignments.set(input.use,rows.map(row=>row.assignmentId===current.assignmentId ? released : row))
+      return released
+    },
   }
   return Object.freeze(port)
 }

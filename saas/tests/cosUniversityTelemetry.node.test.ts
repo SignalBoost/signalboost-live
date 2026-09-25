@@ -76,6 +76,8 @@ test('University telemetry exposes a separate open-source acquisition lane with 
   assert.match(page, /copy\.openSourceStates/)
   assert.match(page, /min-w-0 overflow-hidden rounded-lg border p-4/)
   assert.match(page, /\[overflow-wrap:anywhere\]/)
+  assert.match(page, /function openSourceDetail\(source: OpenSource\)/)
+  assert.match(page, /raw\.replaceAll\('_', ' '\)/)
   assert.match(page, /flex min-w-0 flex-wrap items-start gap-2/)
   assert.match(page, /max-w-full whitespace-normal break-words/)
   assert.match(page, /summary\.openSourceItems24h/)

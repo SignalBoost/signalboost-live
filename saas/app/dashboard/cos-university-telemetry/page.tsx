@@ -145,6 +145,12 @@ function gateLabel(value: string | null | undefined): string {
   return String(value || '—').replaceAll('_', ' ')
 }
 
+function openSourceDetail(source: OpenSource): string {
+  const raw = String(source.vectorSpace || source.mode || '—')
+  return source.vectorSpace ? raw : raw.replaceAll('_', ' ')
+}
+
+
 function short(value: string | null | undefined, length = 12): string {
   const text = String(value || '')
   return text.length <= length ? text : text.slice(0, length) + '…'
@@ -376,7 +382,7 @@ export default function CosUniversityTelemetryPage() {
           {openSources.length ? openSources.map(source => (
             <div key={source.id} className="min-w-0 overflow-hidden rounded-lg border p-4">
               <div className="min-w-0 break-words text-sm font-semibold [overflow-wrap:anywhere]">{source.name}</div>
-              <div className="mt-1 min-w-0 break-words text-xs opacity-65 [overflow-wrap:anywhere]">{source.vectorSpace || source.mode}</div>
+              <div className="mt-1 max-w-full whitespace-normal break-words text-xs leading-5 opacity-65 [overflow-wrap:anywhere]">{openSourceDetail(source)}</div>
               <div className="mt-3 flex min-w-0 flex-wrap items-start gap-2 text-xs">
                 <span className="max-w-full whitespace-normal break-words rounded-full border px-2 py-1 [overflow-wrap:anywhere]">{copy.openSourceStates[source.status] || source.status}</span>
                 <span className="min-w-0 break-words opacity-55 [overflow-wrap:anywhere]">{copy.sourceAccessCost}: {money(source.sourceAccessCostUsd24h)}</span>

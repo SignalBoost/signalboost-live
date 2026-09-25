@@ -239,36 +239,6 @@ async function projectGutenbergCandidatesFromOpenLibrary(query:string,bounded:nu
   return results
 }
 
-async function projectGutenbergCandidates(query:string,bounded:number,gutendexBaseUrl:string,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
-  // Project Gutenberg OPDS is the first Production discovery surface: it is machine-oriented and
-  // avoids paying the repeated retry cost of Gutendex's observed Vercel 403. Multi-term University
-  // queries are broadened conservatively when the exact phrase returns no catalog entries.
-  const opds=await projectGutenbergCandidatesFromOpds(query,bounded,fetcher)
-  if(opds.length){
-    console.info('[project-gutenberg] discovery',{route:'opds',query:compactQuery(query,8),candidates:opds.length})
-    return opds
-  }
-  const openLibrary=await projectGutenbergCandidatesFromOpenLibrary(query,bounded,fetcher).catch(error=>{
-    console.warn('[project-gutenberg] Open Library discovery fallback unavailable',error instanceof Error?error.message:String(error))
-    return[]
-  })
-  if(openLibrary.length){
-    console.info('[project-gutenberg] discovery',{route:'open_library',query:compactQuery(query,8),candidates:openLibrary.length})
-    return openLibrary
-  }
-  const gutendex=await projectGutenbergCandidatesFromGutendex(query,bounded,gutendexBaseUrl,fetcher)
-  if(gutendex.length){
-    console.info('[project-gutenberg] discovery',{route:'gutendex',query:compactQuery(query,8),candidates:gutendex.length})
-    return gutendex
-  }
-  const bootstrap=projectGutenbergBootstrapCandidates(query,bounded)
-  console.warn('[project-gutenberg] dynamic discovery returned no candidates; using rights-neutral bootstrap ids',{
-    query:compactQuery(query,8),
-    variants:projectGutenbergQueryVariants(query),
-    candidates:bootstrap.length,
-  })
-  return bootstrap
-}
 
 /**
  * Project Gutenberg U.S.-unrestricted full text through automation-safe discovery and mirror paths.
@@ -290,50 +260,84 @@ export function createProjectGutenbergPublicDomainSearch(
   const bounded=Math.min(Math.max(limit,1),5)
   const gutendexBaseUrl=normalizedHttpsBase(options.gutendexBaseUrl,DEFAULT_GUTENDEX_BASE_URL)
   const mirrorBaseUrl=normalizedHttpsBase(options.mirrorBaseUrl,DEFAULT_GUTENBERG_MIRROR_BASE_URL)
-  const rows=await projectGutenbergCandidates(query,bounded,gutendexBaseUrl,fetcher)
   const results:LearningConnectorResult[]=[]
-  for(const item of rows){
+  const seenIds=new Set<number>()
+  let candidatesConsidered=0
+  const discoveryRoutes:ReadonlyArray<Readonly<{
+    route:string
+    load:()=>Promise<ProjectGutenbergCandidate[]>
+  }>>=[
+    {route:'opds',load:()=>projectGutenbergCandidatesFromOpds(query,bounded,fetcher)},
+    {route:'open_library',load:()=>projectGutenbergCandidatesFromOpenLibrary(query,bounded,fetcher).catch(error=>{
+      console.warn('[project-gutenberg] Open Library discovery fallback unavailable',error instanceof Error?error.message:String(error))
+      return[]
+    })},
+    {route:'gutendex',load:()=>projectGutenbergCandidatesFromGutendex(query,bounded,gutendexBaseUrl,fetcher)},
+    {route:'bootstrap',load:async()=>projectGutenbergBootstrapCandidates(query,bounded)},
+  ]
+
+  // Discovery success is not acquisition success. A catalog route can return real ebooks that are
+  // unavailable on the mirror or fail the ebook-specific rights check. Keep cascading through the
+  // bounded discovery routes until an admissible full-text result is actually obtained.
+  for(const discovery of discoveryRoutes){
     if(results.length>=bounded)break
-    const id=Number(item.id)
-    if(!Number.isInteger(id)||id<=0)continue
-    let raw=''
-    let textUrl=''
-    let lastFetchError=''
-    for(const candidateUrl of projectGutenbergMirrorTextUrls(id,mirrorBaseUrl)){
-      try{
-        raw=await getText(candidateUrl,fetcher)
-        textUrl=candidateUrl
-        if(raw)break
-      }catch(error){lastFetchError=error instanceof Error?error.message:String(error)}
-    }
-    if(!raw){
-      console.warn('[project-gutenberg] mirror text unavailable',{id,mirrorBaseUrl,error:lastFetchError||'empty'})
-      continue
-    }
-    if(!projectGutenbergUsRightsVerified(raw)){
-      console.warn('[project-gutenberg] ebook rights header not eligible',{id})
-      continue
-    }
-    const body=projectGutenbergBody(raw)
-    if(body.length<900){
-      console.warn('[project-gutenberg] ebook text too short after wrapper removal',{id,length:body.length})
-      continue
-    }
-    results.push({
-      uri:`https://www.gutenberg.org/ebooks/${id}`,
-      title:item.title,
-      text:clean(`${item.title}. ${item.authors.join(', ')}. ${body}`).slice(0,60000),
-      license:'public domain',
-      evidence:[
-        `project_gutenberg_ebook_id:${id}`,
-        ...item.discoveryEvidence,
-        'project_gutenberg_license_header:verified_unrestricted_us',
-        'rights_scope:public_domain_in_usa',
-        `project_gutenberg_mirror_text:${textUrl}`,
-      ],
+    const rows=await discovery.load()
+    const freshRows=rows.filter(item=>{
+      const id=Number(item.id)
+      if(!Number.isInteger(id)||id<=0||seenIds.has(id))return false
+      seenIds.add(id)
+      return true
     })
+    console.info('[project-gutenberg] discovery',{
+      route:discovery.route,
+      query:compactQuery(query,8),
+      candidates:freshRows.length,
+      acceptedSoFar:results.length,
+    })
+    for(const item of freshRows){
+      if(results.length>=bounded)break
+      candidatesConsidered++
+      const id=Number(item.id)
+      let raw=''
+      let textUrl=''
+      let lastFetchError=''
+      for(const candidateUrl of projectGutenbergMirrorTextUrls(id,mirrorBaseUrl)){
+        try{
+          raw=await getText(candidateUrl,fetcher)
+          textUrl=candidateUrl
+          if(raw)break
+        }catch(error){lastFetchError=error instanceof Error?error.message:String(error)}
+      }
+      if(!raw){
+        console.warn('[project-gutenberg] mirror text unavailable',{id,route:discovery.route,mirrorBaseUrl,error:lastFetchError||'empty'})
+        continue
+      }
+      if(!projectGutenbergUsRightsVerified(raw)){
+        console.warn('[project-gutenberg] ebook rights header not eligible',{id,route:discovery.route})
+        continue
+      }
+      const body=projectGutenbergBody(raw)
+      if(body.length<900){
+        console.warn('[project-gutenberg] ebook text too short after wrapper removal',{id,route:discovery.route,length:body.length})
+        continue
+      }
+      results.push({
+        uri:`https://www.gutenberg.org/ebooks/${id}`,
+        title:item.title,
+        text:clean(`${item.title}. ${item.authors.join(', ')}. ${body}`).slice(0,60000),
+        license:'public domain',
+        evidence:[
+          `project_gutenberg_ebook_id:${id}`,
+          ...item.discoveryEvidence,
+          `acquisition_route:${discovery.route}`,
+          'project_gutenberg_license_header:verified_unrestricted_us',
+          'rights_scope:public_domain_in_usa',
+          `project_gutenberg_mirror_text:${textUrl}`,
+        ],
+      })
+    }
   }
-  console.info('[project-gutenberg] acquisition',{query:compactQuery(query,8),candidates:rows.length,acceptedResults:results.length,mirrorBaseUrl})
+  console.info('[project-gutenberg] acquisition',{query:compactQuery(query,8),candidatesConsidered,acceptedResults:results.length,mirrorBaseUrl})
   return results
 }}
 export const projectGutenbergPublicDomainSearch=createProjectGutenbergPublicDomainSearch()

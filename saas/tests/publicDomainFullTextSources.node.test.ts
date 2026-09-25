@@ -369,6 +369,33 @@ test('Project Gutenberg rejects malformed or legacy PGLAF cache bases and falls 
   assert.ok(!calls.some(url => /pglaf\.org|%7D|%7B/i.test(url)))
 })
 
+test('Project Gutenberg rejects the legacy PGLAF cache/epub base even when it is syntactically valid', async () => {
+  const calls: string[] = []
+  const unrestricted = 'The Project Gutenberg eBook of Electricity and Magnetism\n'
+    + 'This eBook is for the use of anyone anywhere in the United States at no cost and with almost no restrictions whatsoever.\n'
+    + '*** START OF THIS PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***\n'
+    + 'Electricity magnetism physics engineering science current voltage field. '.repeat(30)
+    + '\n*** END OF THIS PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) return new Response('<?xml version="1.0"?><feed></feed>', { status: 200 })
+    if (url.startsWith('https://openlibrary.org/search.json')) return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url === 'https://www.gutenberg.org/cache/epub/34221/pg34221.txt') return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher, {
+    mirrorBaseUrl: 'https://gutenberg.pglaf.org/cache/epub',
+  })('electricity magnetism physics', 1)
+
+  assert.equal(results.length, 1)
+  assert.ok(calls.includes('https://www.gutenberg.org/cache/epub/34221/pg34221.txt'))
+  assert.ok(!calls.some(url => url.startsWith('https://gutenberg.pglaf.org/cache/epub/')))
+})
+
 test('Project Gutenberg never upgrades a restricted ebook to training rights even when discovery points to it', async () => {
   const restricted = 'This particular work is one of the few individual works restricted by copyright law in the United States.\n'
     + '*** START OF THE PROJECT GUTENBERG EBOOK RESTRICTED ***\n'

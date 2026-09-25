@@ -17,6 +17,16 @@ console; provider keys are needed only for the providers you actually use.
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key. Used server-side by the PR engine, the credential vault, and the hub-user/role lookup. Never exposed to the browser. |
 | `VAULT_MASTER_KEY` | Master key the credential vault uses to encrypt stored provider keys at rest. Generate a strong random value and keep it stable. |
 
+## Model portability registry (optional)
+
+Buyer deployments may register additional model profiles without changing iTMounts product logic.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `ITMOUNTS_MODEL_REGISTRY_JSON` | Optional | Server-only JSON array of additional governed model profiles. Each profile declares model identity, revision policy, intended uses, transport protocols, and explicit capability states. Invalid or duplicate profiles fail closed. |
+
+Supported transport identifiers in the registry are `openai_compatible`, `anthropic_messages`, `google_generate_content`, `native_sdk`, `local_runtime`, and `custom_http`. A declared transport is metadata until a corresponding runtime adapter is installed and validated; declaring it never creates credentials or execution authority.
+
 ## Private local AI appliance (optional)
 
 Use these when the buyer wants text inference to remain on the physical appliance. The local endpoint is OpenAI-compatible and can be backed by vLLM or llama.cpp. Cloud fallback is disabled unless explicitly opted into.

@@ -47,6 +47,7 @@ const SECRET_VALUE_PATTERNS: readonly RegExp[] = Object.freeze([
   /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}\b/gi,
   /\b(?:sk|xai)-[A-Za-z0-9_-]{16,}\b/gi,
   /\bgh[pousr]_[A-Za-z0-9]{20,}\b/gi,
+  /\bgithub_pat_[A-Za-z0-9_]{40,}\b/g,                         // GitHub fine-grained tokens
   /\bAKIA[0-9A-Z]{16}\b/g,                                     // AWS access key id
   /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\b/g,             // Stripe secret / restricted keys
   /\bwhsec_[A-Za-z0-9]{24,}\b/g,                               // Stripe webhook signing secret

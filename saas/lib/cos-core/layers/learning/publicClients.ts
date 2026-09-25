@@ -52,6 +52,7 @@ export const openLibrarySearch:LearningConnectorSearch=async(query,limit)=>{cons
 
 const DEFAULT_GUTENDEX_BASE_URL='https://gutendex.com'
 const DEFAULT_GUTENBERG_MIRROR_BASE_URL='https://gutenberg.pglaf.org/cache/epub'
+const DEFAULT_GUTENBERG_OPDS_SEARCH_URL='https://m.gutenberg.org/ebooks/search.opds/'
 const DEFAULT_OPEN_LIBRARY_SEARCH_URL='https://openlibrary.org/search.json'
 
 type ProjectGutenbergCandidate={
@@ -59,6 +60,32 @@ type ProjectGutenbergCandidate={
   title:string
   authors:string[]
   discoveryEvidence:string[]
+}
+
+
+const PROJECT_GUTENBERG_BOOTSTRAP:ReadonlyArray<ProjectGutenbergCandidate & {terms:string}>=Object.freeze([
+  {id:34221,title:'Electricity and Magnetism',authors:['Elisha Gray'],terms:'electricity magnetism physics engineering science',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:48041,title:'The Study of Elementary Electricity and Magnetism by Experiment',authors:['Thomas M. St. John'],terms:'electricity magnetism experiment physics engineering laboratory',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:33283,title:'Calculus Made Easy',authors:['Silvanus P. Thompson'],terms:'calculus differential integral mathematics analysis',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:38769,title:'A Course of Pure Mathematics',authors:['G. H. Hardy'],terms:'mathematics calculus analysis functions series',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:32625,title:'A Treatise on Probability',authors:['John Maynard Keynes'],terms:'probability statistics uncertainty reasoning mathematics economics',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:15114,title:'An Investigation of the Laws of Thought',authors:['George Boole'],terms:'logic reasoning probability mathematics boolean computing foundations',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:3300,title:'An Inquiry into the Nature and Causes of the Wealth of Nations',authors:['Adam Smith'],terms:'economics markets political economy labor trade finance',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+  {id:36525,title:'Notes on Recent Researches in Electricity and Magnetism',authors:['J. J. Thomson'],terms:'electricity magnetism physics research waves currents',discoveryEvidence:['discovery:local_bootstrap_catalog']},
+])
+
+function projectGutenbergBootstrapCandidates(query:string,bounded:number):ProjectGutenbergCandidate[]{
+  const terms=new Set(compactQuery(query,12).toLowerCase().split(/\s+/).filter(term=>term.length>=4))
+  return PROJECT_GUTENBERG_BOOTSTRAP
+    .map(item=>{
+      const haystack=`${item.title} ${item.terms}`.toLowerCase()
+      const score=[...terms].filter(term=>haystack.includes(term)).length
+      return{item,score}
+    })
+    .filter(entry=>entry.score>0)
+    .sort((a,b)=>b.score-a.score||a.item.id-b.item.id)
+    .slice(0,Math.max(bounded*2,bounded))
+    .map(({item})=>({id:item.id,title:item.title,authors:[...item.authors],discoveryEvidence:[...item.discoveryEvidence]}))
 }
 
 function projectGutenbergHasPlainText(formats:unknown):boolean{
@@ -124,6 +151,38 @@ async function projectGutenbergCandidatesFromGutendex(query:string,bounded:numbe
   }
 }
 
+
+function xmlTag(entry:string,tag:string):string{
+  const match=new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tag}>`,'i').exec(entry)
+  return match?clean(match[1]):''
+}
+
+async function projectGutenbergCandidatesFromOpds(query:string,bounded:number,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
+  try{
+    const xml=await getText(`${DEFAULT_GUTENBERG_OPDS_SEARCH_URL}?query=${encodeURIComponent(compactQuery(query,8))}`,fetcher)
+    const entries=xml.match(/<entry\b[\s\S]*?<\/entry>/gi)??[]
+    const seen=new Set<number>()
+    const results:ProjectGutenbergCandidate[]=[]
+    for(const entry of entries){
+      const title=xmlTag(entry,'title')
+      if(!title||/^no records found\.?$/i.test(title))continue
+      const idText=xmlTag(entry,'id')
+      const hrefs=[idText,...[...entry.matchAll(/href=["']([^"']+)["']/gi)].map(match=>match[1])]
+      const id=hrefs.map(value=>/\/ebooks\/(\d+)/i.exec(value)?.[1]).map(Number).find(value=>Number.isInteger(value)&&value>0)
+      if(!id||seen.has(id))continue
+      seen.add(id)
+      const authors=[...entry.matchAll(/<author\b[\s\S]*?<name(?:\s[^>]*)?>([\s\S]*?)<\/name>[\s\S]*?<\/author>/gi)]
+        .map(match=>clean(match[1])).filter(Boolean).slice(0,5)
+      results.push({id,title,authors,discoveryEvidence:['discovery:project_gutenberg_opds']})
+      if(results.length>=Math.max(bounded*4,bounded))break
+    }
+    return results
+  }catch(error){
+    console.warn('[project-gutenberg] OPDS discovery unavailable',error instanceof Error?error.message:String(error))
+    return[]
+  }
+}
+
 async function projectGutenbergCandidatesFromOpenLibrary(query:string,bounded:number,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
   const fields='key,title,author_name,id_project_gutenberg'
   const json=await getJson(`${DEFAULT_OPEN_LIBRARY_SEARCH_URL}?q=${encodeURIComponent(compactQuery(query,8))}&fields=${encodeURIComponent(fields)}&limit=${Math.min(Math.max(bounded*10,20),50)}`,fetcher)
@@ -147,11 +206,29 @@ async function projectGutenbergCandidatesFromOpenLibrary(query:string,bounded:nu
 
 async function projectGutenbergCandidates(query:string,bounded:number,gutendexBaseUrl:string,fetcher:FetchLike):Promise<ProjectGutenbergCandidate[]>{
   const primary=await projectGutenbergCandidatesFromGutendex(query,bounded,gutendexBaseUrl,fetcher)
-  if(primary.length)return primary
-  return projectGutenbergCandidatesFromOpenLibrary(query,bounded,fetcher).catch(error=>{
+  if(primary.length){
+    console.info('[project-gutenberg] discovery',{route:'gutendex',query:compactQuery(query,8),candidates:primary.length})
+    return primary
+  }
+  const opds=await projectGutenbergCandidatesFromOpds(query,bounded,fetcher)
+  if(opds.length){
+    console.info('[project-gutenberg] discovery',{route:'opds',query:compactQuery(query,8),candidates:opds.length})
+    return opds
+  }
+  const openLibrary=await projectGutenbergCandidatesFromOpenLibrary(query,bounded,fetcher).catch(error=>{
     console.warn('[project-gutenberg] Open Library discovery fallback unavailable',error instanceof Error?error.message:String(error))
     return[]
   })
+  if(openLibrary.length){
+    console.info('[project-gutenberg] discovery',{route:'open_library',query:compactQuery(query,8),candidates:openLibrary.length})
+    return openLibrary
+  }
+  const bootstrap=projectGutenbergBootstrapCandidates(query,bounded)
+  console.warn('[project-gutenberg] dynamic discovery returned no candidates; using rights-neutral bootstrap ids',{
+    query:compactQuery(query,8),
+    candidates:bootstrap.length,
+  })
+  return bootstrap
 }
 
 /**
@@ -182,16 +259,27 @@ export function createProjectGutenbergPublicDomainSearch(
     if(!Number.isInteger(id)||id<=0)continue
     let raw=''
     let textUrl=''
+    let lastFetchError=''
     for(const candidateUrl of projectGutenbergMirrorTextUrls(id,mirrorBaseUrl)){
       try{
         raw=await getText(candidateUrl,fetcher)
         textUrl=candidateUrl
         if(raw)break
-      }catch{/* try the alternate generated plain-text filename */}
+      }catch(error){lastFetchError=error instanceof Error?error.message:String(error)}
     }
-    if(!raw||!projectGutenbergUsRightsVerified(raw))continue
+    if(!raw){
+      console.warn('[project-gutenberg] mirror text unavailable',{id,mirrorBaseUrl,error:lastFetchError||'empty'})
+      continue
+    }
+    if(!projectGutenbergUsRightsVerified(raw)){
+      console.warn('[project-gutenberg] ebook rights header not eligible',{id})
+      continue
+    }
     const body=projectGutenbergBody(raw)
-    if(body.length<900)continue
+    if(body.length<900){
+      console.warn('[project-gutenberg] ebook text too short after wrapper removal',{id,length:body.length})
+      continue
+    }
     results.push({
       uri:`https://www.gutenberg.org/ebooks/${id}`,
       title:item.title,
@@ -206,6 +294,7 @@ export function createProjectGutenbergPublicDomainSearch(
       ],
     })
   }
+  console.info('[project-gutenberg] acquisition',{query:compactQuery(query,8),candidates:rows.length,acceptedResults:results.length,mirrorBaseUrl})
   return results
 }}
 export const projectGutenbergPublicDomainSearch=createProjectGutenbergPublicDomainSearch()

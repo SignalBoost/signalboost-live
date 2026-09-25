@@ -11,6 +11,7 @@ import {
 
 const migration=readFileSync(new URL('../supabase/migrations/20260925010000_mass_distilled_backlog_compactor.sql',import.meta.url),'utf8')
 const route=readFileSync(new URL('../app/api/cron/cos-university-mass-backlog-compact/route.ts',import.meta.url),'utf8')
+const compactor=readFileSync(new URL('../lib/ai/cos/cosUniversityMassBacklogCompactor.ts',import.meta.url),'utf8')
 const vercel=readFileSync(new URL('../vercel.json',import.meta.url),'utf8')
 
 test('compactor limit is bounded and owner-tunable',()=>{
@@ -50,9 +51,11 @@ test('retirement is bounded, durable and names the exact successor proof',()=>{
   assert.match(migration,/proofClaim','mass_distilled_independent_evaluation_completed'/)
 })
 
-test('cron is authenticated, scheduled and calls only the bounded compactor RPC',()=>{
+test('cron is authenticated, scheduled and calls only the bounded compactor wrapper',()=>{
   assert.match(route,/CRON_SECRET/)
-  assert.match(route,new RegExp(MASS_BACKLOG_COMPACTOR_RPC))
+  assert.match(route,/compactMassEvaluationBacklog/)
+  assert.match(compactor,new RegExp(MASS_BACKLOG_COMPACTOR_RPC))
+  assert.match(compactor,/db\.rpc\(MASS_BACKLOG_COMPACTOR_RPC,\{p_limit:limit\}\)/)
   const config=JSON.parse(vercel)
   const cron=config.crons.find((item:any)=>item.path==='/api/cron/cos-university-mass-backlog-compact')
   assert.ok(cron)

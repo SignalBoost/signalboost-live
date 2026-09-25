@@ -1,2 +1,2 @@
-base_sha=e61738340f34ed7b1b2d088e48a9738e16455d05
-branch=fix/data-residency-service-role-grant-20260925
+base_sha=71ea136614eb2c2a52500b456fbd2d835606c6d7
+branch=fix/data-residency-service-role-least-privilege-20260925

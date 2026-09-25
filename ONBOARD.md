@@ -2044,3 +2044,27 @@ Its scope is context quality: retrieval/relevance selection, memory and conversa
 The A2A `context-engineering` family is advisory-only (`context.analyze`, `context.plan`, `context.verify`). This role grants no repository write, deployment, database mutation, model-capacity expansion, or other execution authority. COS retains orchestration/acceptance authority, and existing Referee/Guardian/Harness/tool authorization remains independently controlling.
 
 University education is separate from runtime authority. Context Engineer has the dedicated `context_engineering_systems` Master's curriculum covering retrieval relevance, memory continuity/provenance, token budgeting/packing/compaction, and context-quality failure analysis. Graduation or graduate-model activation may improve capability but must not expand authority.
+
+
+## Mass-distillation evaluation backlog controls (2026-09-25)
+
+The mass-distilled exact-artifact canary lane drains at **six approvals per rolling hour**. The hard
+per-canary ceiling remains **$0.20**, so the canary authorization envelope is at most **144/day** and
+**$28.80/day**. This is a bounded throughput increase after Production demonstrated consecutive post-repair
+canary passes; it does not change exact-artifact binding, evaluator independence, promotion rules, or
+Production-traffic authority.
+
+Backlog cleanup is conservative and evidence-based. The scheduled
+`/api/cron/cos-university-mass-backlog-compact` lane may retire an older `evaluation_pending` mass artifact
+only when a newer artifact has the same exact training lineage: subject, dataset hash, batch key, canonical
+base model, teacher identity, artifact/runtime shape, and byte-equivalent JSONB `trainingReceipt`. The newer
+artifact must already be `runtime_pending` or `active` and must have a durable
+`mass_distilled_independent_evaluation_completed` receipt for its exact artifact hash. The predecessor must
+have no canary or independent-evaluation runtime history. Shared subject, age, semantic similarity, or a
+different trained-artifact hash alone are never sufficient grounds for retirement.
+
+Compaction is bounded to 50 artifacts per run by default and 200 maximum via
+`COS_UNIVERSITY_MASS_BACKLOG_COMPACTOR_MAX_PER_RUN`. Retirement records the exact successor candidate,
+successor artifact hash, proof profile and proof claim in `intended_use.retirement`. If no artifact meets the
+full proof contract, the compactor performs zero retirements and reports
+`no_proven_superseded_mass_artifacts`.

@@ -121,10 +121,22 @@ function projectGutenbergBody(raw:string):string{
 }
 
 function projectGutenbergUsRightsVerified(raw:string):boolean{
-  const header=String(raw??'').slice(0,24000).toLowerCase()
-  if(!header)return false
-  if(/one of the few individual works restricted by copyright law|copyright holder|permission to distribute/i.test(header))return false
-  return /almost no restrictions whatsoever|not restricted by copyright in the united states|not protected by u\.s\. copyright law/i.test(header)
+  const value=String(raw??'')
+  if(!value)return false
+
+  // Rights are determined from the ebook-specific preamble before the START marker. The generic
+  // Project Gutenberg license (usually after the END marker) contains boilerplate mentioning
+  // "copyright holder" and the special restricted-work clause; scanning that boilerplate caused
+  // legitimate public-domain ebooks to be rejected in Production.
+  const start=/\*\*\*\s*START OF (?:THIS |THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
+  const preamble=value.slice(0,start?.index??Math.min(value.length,24000)).toLowerCase()
+  if(!preamble)return false
+
+  // Exact ebook-specific restriction markers fail closed. Avoid broad words such as "copyright
+  // holder" because those also appear inside the generic Project Gutenberg license text.
+  if(/this is a copyrighted project gutenberg ebook|this particular work is one of the few individual works restricted by copyright law|please follow the copyright guidelines in this file|included in the project gutenberg collection with the permission of the copyright holder/i.test(preamble))return false
+
+  return /almost no restrictions whatsoever|not restricted by copyright in the united states|not protected by u\.s\. copyright law|public domain in the united states/i.test(preamble)
 }
 
 function numericProjectGutenbergIds(value:unknown):number[]{

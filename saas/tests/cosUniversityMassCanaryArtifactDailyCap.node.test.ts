@@ -7,6 +7,8 @@ import {
   MASS_CANARY_ROLLING_AUTHORIZATION_REF,
   MASS_CANARY_NO_WORKER_FAILURE,
   MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_DAY,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   decideMassCanaryRollingApproval,
   type CanaryArtifact,
   type CanaryEvent,
@@ -24,6 +26,8 @@ const stuck: CanaryArtifact = {
   createdAt: '2026-09-24T10:00:00.000Z',
   failureDerivedReplayRequired: true,
   failureDerivedReplayItems: 3,
+  failureDerivedReplayEpochs: MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
+  failureDerivedReplayLearningRate: MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
 }
 const waiting: CanaryArtifact = {
   candidateId: 'mass:waiting',

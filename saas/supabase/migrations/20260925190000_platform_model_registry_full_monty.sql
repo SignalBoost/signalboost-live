@@ -81,7 +81,7 @@ create or replace function public.platform_register_model(
   p_last4 text default null
 ) returns text
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -150,7 +150,7 @@ create or replace function public.platform_set_model_assignment(
   p_expected_current_assignment_id uuid default null
 ) returns public.platform_model_assignments
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -196,7 +196,7 @@ create or replace function public.platform_rollback_model_assignment(
   p_expected_current_assignment_id uuid
 ) returns public.platform_model_assignments
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
@@ -228,7 +228,7 @@ end $$;
 create or replace function public.platform_disable_model(p_profile_key text,p_actor text)
 returns void
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin

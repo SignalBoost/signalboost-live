@@ -10,6 +10,7 @@ import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluat
 import { tryRunpodPrimaryInference } from '@/lib/ai/cos/runpodPrimaryInference'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
 import { deepInfraMaxCallUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
+import { tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
@@ -127,8 +128,23 @@ export function createBuilderCodingAiPort(): CosAiPort {
         throw new Error('builder_runpod_primary_busy')
       }
 
-      const config = localInferenceConfigFromEnv()
       const ownedAttempted = graduate.attempted || runpod.attempted
+      const assigned = await tryAssignedPlatformModelTurn({
+        prompt: input.prompt,
+        systemPrompt: input.systemPrompt,
+        maxTokens: input.maxTokens,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        jsonObject: true,
+        usageContext: {
+          feature: 'builder',
+          purpose: ownedAttempted ? 'coding_harness_assigned_after_owned' : 'coding_harness_assigned',
+        },
+        maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
+      }, 'builder')
+      if (assigned.attempted) return requireText(assigned.result?.content ?? null, 'assigned builder')
+
+      const config = localInferenceConfigFromEnv()
       return requireText(await callLocalModel({
         prompt: input.prompt,
         systemPrompt: input.systemPrompt,

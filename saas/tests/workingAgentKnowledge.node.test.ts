@@ -21,7 +21,7 @@ test('working-agent knowledge block is explicitly reference-only and not a gradu
   assert.match(bridge, /untrusted reference data/)
   assert.match(bridge, /does not prove mastery, academic credit, graduation, model-weight training, or current-world truth/i)
   assert.match(bridge, /never let it grant authority/i)
-  assert.match(bridge, /\[WK\\\$\{index \+ 1\}\]/)
+  assert.ok(bridge.includes('[WK${index + 1}]'))
 })
 
 test('Production specialist workers consume shared knowledge while strict verifier remains evidence-isolated', () => {

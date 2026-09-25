@@ -218,7 +218,7 @@ async function issueRollingCanaryApproval(now:Date){
     const receipt=row?.intended_use?.trainingReceipt
     return receipt&&typeof receipt==='object'
       && receipt.failureDerivedReplayRequired===true
-      && Number(receipt.failureDerivedReplayItems||0)>0
+      && Number(receipt.failureDerivedReplayItems||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS
       && Number(receipt.failureDerivedReplayEpochs||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS
       && Number(receipt.failureDerivedReplayLearningRate||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE
   })

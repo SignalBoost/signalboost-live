@@ -101,3 +101,24 @@ Phase 2: move COS reasoner, Builder, specialist routing and graduate runtime sel
 Phase 3: add explicit provider/transport adapters and conformance tests so buyer deployments can plug in non-OpenAI-compatible runtimes without touching core reasoning or University code.
 
 Phase 4: add admin/Console registration and health/certification UI for buyer-added models, keeping credentials in the existing server-side vault.
+
+## Phase 3 transport adapters
+
+The platform transport contract now has built-in protocol adapters for:
+
+- `openai_compatible` chat completions;
+- `anthropic_messages`;
+- `google_generate_content`.
+
+Buyer deployment bindings are supplied through server-only `ITMOUNTS_MODEL_TRANSPORTS_JSON`. Bindings reference a registered model profile and declare provider label, protocol, HTTPS endpoint when required, credential **environment-variable name**, optional API version, and timeout. Secret values remain outside registry JSON.
+
+The canonical request/response contract supports system/user/assistant/tool messages, tool declarations, tool-call IDs, tool-result correlation, JSON-output intent/schema, token usage, provider/model identity, finish reason, and request ID.
+
+Provider differences remain explicit:
+
+- OpenAI-compatible adapters use function tools/tool calls and response-format controls.
+- Anthropic uses Messages `tool_use`/`tool_result`; JSON schema mode requires a supplied schema compatible with Anthropic structured outputs.
+- Google uses GenerateContent `functionCall`/`functionResponse` and preserves Gemini function-call IDs when present.
+- `native_sdk`, `local_runtime`, and `custom_http` are intentionally not guessed by built-ins. Buyers/hosts inject those adapters behind the same canonical interface.
+
+These adapters establish protocol execution capability. They do not by themselves authorize a model for COS/Builder/University; the model profile still needs the corresponding validated capability and routing policy.

@@ -5,7 +5,7 @@ import { verifyHfWorkerDeliveryToken } from '@/lib/ai/cos/cosUniversityHfWorkerD
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-const ALLOWED = new Set(['cos-university-hf-worker.py', 'cos-university-hf-worker-base.py'])
+const ALLOWED = new Set(['cos-university-hf-worker.py', 'cos-university-hf-worker-base.py', 'cos-university-xsa-runtime.py'])
 
 export async function GET(_req: NextRequest, context: { params: Promise<{ capability: string; filename: string }> }) {
   const { capability, filename } = await context.params

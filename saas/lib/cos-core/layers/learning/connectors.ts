@@ -7,7 +7,20 @@ type LearningQueryBuilder=(gap:KnowledgeGap)=>string
 const defaultLearningQuery:LearningQueryBuilder=(gap)=>gap.discoveryQuery?.trim()||[gap.subject,gap.question].filter(Boolean).join(' ').trim()
 
 export class SearchLearningConnector implements ContinuousLearningSourceAdapter{
-  constructor(readonly kind:LearningSourceDocument['sourceKind'],private readonly search:LearningConnectorSearch,private readonly maxResults=5,readonly id?:string,private readonly queryForGap:LearningQueryBuilder=defaultLearningQuery){}
+  readonly kind:LearningSourceDocument['sourceKind']
+  private readonly search:LearningConnectorSearch
+  private readonly maxResults:number
+  readonly id?:string
+  private readonly queryForGap:LearningQueryBuilder
+
+  constructor(kind:LearningSourceDocument['sourceKind'],search:LearningConnectorSearch,maxResults=5,id?:string,queryForGap:LearningQueryBuilder=defaultLearningQuery){
+    this.kind=kind
+    this.search=search
+    this.maxResults=maxResults
+    this.id=id
+    this.queryForGap=queryForGap
+  }
+
   async acquire(gap:KnowledgeGap):Promise<LearningSourceDocument[]>{const query=this.queryForGap(gap).trim();if(!query)return[];const results=await this.search(query,this.maxResults);return results.filter(result=>Boolean(result.uri&&result.text.trim())).slice(0,this.maxResults).map(result=>({sourceKind:this.kind,sourceUri:result.uri,sourceTitle:result.title,observedAt:result.observedAt??new Date().toISOString(),subject:gap.subject,text:result.text,license:result.license,evidence:result.evidence?.filter(Boolean)}))}
 }
 

@@ -1,2 +1,2 @@
-base_sha=0589cd5119b03c4e9f31d77934b1a971c92578fe
-branch=fix/gutenberg-namespaced-opds-rights-20260925
+base_sha=dac0746ee50c07027d51c585fb56fc1945b7f021
+branch=fix/mass-canary-evidence-query-chunking-20260925

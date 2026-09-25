@@ -133,9 +133,92 @@ export type PlatformModelProfileKey = keyof typeof PLATFORM_MODEL_CAPABILITY_REG
 export const CURRENT_UNIVERSITY_STUDENT_PROFILE = PLATFORM_MODEL_CAPABILITY_REGISTRY['qwen3-4b-university-student-v1']
 export const CURRENT_UNIVERSITY_TEACHER_PROFILE = PLATFORM_MODEL_CAPABILITY_REGISTRY['qwen3-8b-university-teacher-v1']
 
+const PROFILE_KEY = /^[a-z0-9][a-z0-9._-]{1,119}$/
+const MODEL_ID = /^[^\s]{1,240}$/
+const REVISION = /^[A-Za-z0-9._/-]{1,240}$/
+const USES: readonly ModelProfileUse[] = Object.freeze([
+  'cos_reasoner', 'builder', 'specialist', 'university_student', 'university_teacher', 'embedding', 'draft_speculator',
+])
+const STATES: readonly ModelCapabilityState[] = Object.freeze(['validated', 'experimental', 'blocked', 'not_validated'])
+
+function cleanCapabilities(raw: unknown, keys: readonly string[]): Readonly<Record<string, ModelCapabilityState>> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const out: Record<string, ModelCapabilityState> = {}
+  for (const key of keys) {
+    const value = String((raw as Record<string, unknown>)[key] ?? 'not_validated') as ModelCapabilityState
+    if (!STATES.includes(value)) return null
+    out[key] = value
+  }
+  return Object.freeze(out)
+}
+
+const INFERENCE_CAPABILITIES = Object.freeze([
+  'openAiCompatibleChat', 'streaming', 'toolCalling', 'structuredJson', 'vllm',
+  'speculativeDecoding', 'eagle', 'dflash', 'mtp', 'xsa',
+] as const)
+const TRAINING_CAPABILITIES = Object.freeze(['qlora', 'gkd', 'muonCanary', 'xsa', 'testTimeTraining'] as const)
+
+export function parseBuyerModelProfiles(rawJson: string | undefined): readonly PlatformModelProfile[] {
+  const text = String(rawJson || '').trim()
+  if (!text) return Object.freeze([])
+  let parsed: unknown
+  try { parsed = JSON.parse(text) } catch { throw new Error('platform_model_registry_json_invalid') }
+  if (!Array.isArray(parsed) || parsed.length > 64) throw new Error('platform_model_registry_shape_invalid')
+  const profiles: PlatformModelProfile[] = []
+  const seenKeys = new Set<string>()
+  const seenIds = new Set<string>()
+  for (const item of parsed) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error('platform_model_profile_invalid')
+    const row = item as Record<string, unknown>
+    const key = String(row.key || '').trim().toLowerCase()
+    const family = String(row.family || '').trim().toLowerCase()
+    const modelId = String(row.modelId || '').trim()
+    const providerModelId = String(row.providerModelId || modelId).trim()
+    const revisionRaw = row.revision == null ? null : String(row.revision).trim()
+    const revisionPolicy = String(row.revisionPolicy || 'runtime_owned') as PlatformModelProfile['revisionPolicy']
+    const tokenizerModelId = row.tokenizerModelId == null ? null : String(row.tokenizerModelId).trim()
+    const usesRaw = Array.isArray(row.uses) ? row.uses.map(value => String(value)) : []
+    if (!PROFILE_KEY.test(key) || !family || !MODEL_ID.test(modelId) || !MODEL_ID.test(providerModelId)) throw new Error('platform_model_profile_identity_invalid')
+    if (revisionRaw && !REVISION.test(revisionRaw)) throw new Error('platform_model_profile_revision_invalid')
+    if (!['fixed','resolve_and_pin_at_dispatch','runtime_owned'].includes(revisionPolicy)) throw new Error('platform_model_profile_revision_policy_invalid')
+    if (revisionPolicy === 'fixed' && !revisionRaw) throw new Error('platform_model_profile_fixed_revision_required')
+    if (tokenizerModelId && !MODEL_ID.test(tokenizerModelId)) throw new Error('platform_model_profile_tokenizer_invalid')
+    if (!usesRaw.length || usesRaw.some(value => !USES.includes(value as ModelProfileUse))) throw new Error('platform_model_profile_use_invalid')
+    if (seenKeys.has(key) || seenIds.has(modelId) || key in PLATFORM_MODEL_CAPABILITY_REGISTRY) throw new Error('platform_model_profile_duplicate')
+    const inference = cleanCapabilities(row.inference, INFERENCE_CAPABILITIES)
+    const training = cleanCapabilities(row.training, TRAINING_CAPABILITIES)
+    if (!inference || !training) throw new Error('platform_model_profile_capabilities_invalid')
+    const trainable = usesRaw.includes('university_student')
+    const profile: PlatformModelProfile = Object.freeze({
+      key, family, modelId, providerModelId, revision: revisionRaw, revisionPolicy, tokenizerModelId,
+      uses: Object.freeze([...usesRaw]) as readonly ModelProfileUse[],
+      inference: inference as PlatformModelProfile['inference'],
+      training: training as PlatformModelProfile['training'],
+      governance: Object.freeze({
+        exactRevisionRequiredWhenTrainable: trainable,
+        exactArtifactEvaluationRequiredWhenTrainable: trainable,
+        rollbackRequiredWhenTrainable: trainable,
+        automaticFallbackToDifferentModel: false,
+      }),
+    })
+    seenKeys.add(key); seenIds.add(modelId); profiles.push(profile)
+  }
+  return Object.freeze(profiles)
+}
+
+export function configuredBuyerModelProfiles(env: NodeJS.ProcessEnv = process.env): readonly PlatformModelProfile[] {
+  return parseBuyerModelProfiles(env.ITMOUNTS_MODEL_REGISTRY_JSON)
+}
+
+export function allPlatformModelProfiles(env: NodeJS.ProcessEnv = process.env): readonly PlatformModelProfile[] {
+  return Object.freeze([
+    ...Object.values(PLATFORM_MODEL_CAPABILITY_REGISTRY),
+    ...configuredBuyerModelProfiles(env),
+  ])
+}
 export function modelCapabilityProfileForId(modelId: string): PlatformModelProfile | null {
   const normalized = String(modelId || '').trim()
-  for (const profile of Object.values(PLATFORM_MODEL_CAPABILITY_REGISTRY)) {
+  for (const profile of allPlatformModelProfiles()) {
     if (profile.modelId === normalized || profile.providerModelId === normalized) return profile
   }
   return null

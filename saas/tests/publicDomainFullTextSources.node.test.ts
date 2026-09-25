@@ -106,7 +106,7 @@ test('Project Gutenberg falls through machine OPDS to Open Library ids and verif
   assert.ok(calls.includes('https://gutenberg.pglaf.org/cache/epub/20201/pg20201.txt'))
 })
 
-test('Project Gutenberg uses the machine-to-machine OPDS catalog when Gutendex is blocked', async () => {
+test('Project Gutenberg uses the machine-to-machine OPDS catalog before Gutendex', async () => {
   const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
     + '*** START OF THE PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***\n'
     + 'Electricity magnetism induction current voltage engineering physics. '.repeat(30)
@@ -131,6 +131,47 @@ test('Project Gutenberg uses the machine-to-machine OPDS catalog when Gutendex i
   assert.equal(results[0].uri, 'https://www.gutenberg.org/ebooks/34221')
   assert.ok(results[0].evidence?.includes('discovery:project_gutenberg_opds'))
   assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
+})
+
+test('Project Gutenberg broadens a multi-term University query when exact OPDS search returns no records', async () => {
+  const calls: string[] = []
+  const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
+    + '*** START OF THE PROJECT GUTENBERG EBOOK ASTRONOMY ***\n'
+    + 'Astronomy stars planets telescope observation celestial motion science. '.repeat(30)
+    + '\n*** END OF THE PROJECT GUTENBERG EBOOK ASTRONOMY ***'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.includes('search.opds') && url.includes('astronomy%20scientific%20observation')) {
+      return new Response('<?xml version="1.0"?><feed><entry><title>No records found.</title></entry></feed>', {
+        status: 200,
+        headers: { 'content-type': 'application/atom+xml' },
+      })
+    }
+    if (url.includes('search.opds') && url.includes('query=astronomy')) {
+      return new Response('<?xml version="1.0"?><feed><entry><id>https://www.gutenberg.org/ebooks/99991</id><title>Astronomy for Students</title><author><name>Example Astronomer</name></author><link href="/ebooks/99991" /></entry></feed>', {
+        status: 200,
+        headers: { 'content-type': 'application/atom+xml' },
+      })
+    }
+    if (url === 'https://gutenberg.pglaf.org/cache/epub/99991/pg99991.txt') {
+      return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    }
+    if (url.startsWith('https://gutendex.com/books/')) {
+      throw new Error('Gutendex should not be reached after OPDS broadening succeeds')
+    }
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher)('astronomy scientific observation', 1)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].uri, 'https://www.gutenberg.org/ebooks/99991')
+  assert.ok(results[0].evidence?.includes('discovery:project_gutenberg_opds'))
+  assert.ok(results[0].evidence?.includes('discovery_query:astronomy'))
+  assert.ok(calls.some(url => url.includes('astronomy%20scientific%20observation')))
+  assert.ok(calls.some(url => url.includes('query=astronomy')))
+  assert.ok(!calls.some(url => url.startsWith('https://gutendex.com/books/')))
 })
 
 test('Project Gutenberg has a rights-neutral bootstrap catalog when every network discovery surface is unavailable', async () => {

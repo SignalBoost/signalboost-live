@@ -446,11 +446,10 @@ export async function callCosReasoner(
   if (!execution?.result.text?.trim()) return null
 
   const resolved = resolveCosReasoner()
-  if (!resolved.config) return null
   const rawKind = execution.result.metadata?.reasonerKind
   const kind: CosReasonerKind = rawKind === 'independent-local' || rawKind === 'managed-open-model'
     ? rawKind
-    : resolved.config.kind
+    : resolved.config?.kind ?? 'managed-open-model'
 
   console.info('[cos-reasoning-control-plane]', JSON.stringify({
     at: new Date().toISOString(),

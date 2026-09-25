@@ -1,2 +1,2 @@
-base_sha=67e75f9dc6ae7ada135aba0a2d49a57b7fadc2ed
-branch=fix/evaluation-judge-burst-timeout-20260925
+base_sha=bbe0ede9028bc56fb50a8e33c9a7e2fd55652756
+branch=fix/mcp-actions-token-scope-20260925

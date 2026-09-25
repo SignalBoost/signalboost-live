@@ -17,7 +17,7 @@ import {
 import { installVerifiedFailureDerivedCurriculum, maintainUniversityRightsClearedOpenSourceCorpus, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
 import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
 import { authorizeAvailableUniversityMassDistillationCampaigns, authorizeNextUniversityMassDistillationRemediationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
-import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
+import { diagnoseFailedMassDistillationHuggingFaceJobs, recoverHuggingFaceStorageCapacityCircuit } from './cosUniversityHuggingFaceJobDiagnostics.ts'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
 import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
 import { terminalizeFailedMassDistillationCampaignRuns } from './cosUniversityMassDistillationTerminalCleanup.ts'
@@ -134,6 +134,12 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
     reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 5 }))
   const diagnostics = await isolatedStep('provider_diagnostics', () =>
     diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 3 }))
+  // Deterministic Hugging Face storage exhaustion opens the provider circuit and correctly blocks
+  // blind paid retries. Self-Healing may only half-open it after fresh read-only provider evidence
+  // still classifies the condition as storage capacity, and that authority is one-shot: the consumer
+  // atomically consumes it for exactly one paid verification dispatch.
+  const providerStorageRecovery = await isolatedStep('provider_storage_recovery', () =>
+    recoverHuggingFaceStorageCapacityCircuit({ maxJobs: 3, now }))
   const stalledDispatchRecovery = await isolatedStep('stalled_dispatch_recovery', () =>
     recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 5 }))
   let recovery: Record<string, any> = slowMaintenanceDue
@@ -319,13 +325,15 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   const consumerSkipped = 'skipped' in result && result.skipped === true
   const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
   const diagnosticsSkipped = 'skipped' in diagnostics && diagnostics.skipped === true
+  const providerStorageRecoverySkipped = 'skipped' in providerStorageRecovery && providerStorageRecovery.skipped === true
   const stalledDispatchRecoverySkipped = 'skipped' in stalledDispatchRecovery && stalledDispatchRecovery.skipped === true
   const recoverySkipped = 'skipped' in recovery && recovery.skipped === true
   const capacityRecoverySkipped = 'skipped' in capacityRecovery && capacityRecovery.skipped === true
   const skipped = consumerSkipped && reconciliationSkipped && diagnosticsSkipped
-    && stalledDispatchRecoverySkipped && recoverySkipped && capacityRecoverySkipped
+    && providerStorageRecoverySkipped && stalledDispatchRecoverySkipped && recoverySkipped && capacityRecoverySkipped
   const supportingStepsSucceeded = reconciliation.ok === true
     && diagnostics.ok === true
+    && providerStorageRecovery.ok === true
     && stalledDispatchRecovery.ok === true
     && recovery.ok === true
     && campaignClosure.ok === true
@@ -363,6 +371,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       postRecoveryConsumer,
       reconciliation,
       diagnostics,
+    providerStorageRecovery,
       stalledDispatchRecovery,
       recovery,
       campaignClosure,

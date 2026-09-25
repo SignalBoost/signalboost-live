@@ -58,3 +58,19 @@ test('half-open provider recovery is one-shot and consumed before paid dispatch'
   const dispatchAt = consumerSource.indexOf('dispatchClaim(claim, input.fetchImpl)')
   assert.ok(consumeAt >= 0 && dispatchAt > consumeAt)
 })
+
+
+test('storage recovery is read-only verified before one paid half-open dispatch is armed', () => {
+  const circuitSource = fs.readFileSync(path.join(ROOT, 'lib/supervisor/provider-circuit.ts'), 'utf8')
+  const diagnosticsSource = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityHuggingFaceJobDiagnostics.ts'), 'utf8')
+  const workflowSource = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'), 'utf8')
+  assert.match(circuitSource, /armProviderCircuitRecoveryProbe/)
+  assert.match(circuitSource, /cost_bearing_retry_allowed: true/)
+  assert.match(circuitSource, /state: 'half_open_probe_armed'/)
+  assert.match(diagnosticsSource, /recoverHuggingFaceStorageCapacityCircuit/)
+  assert.match(diagnosticsSource, /classification\.failureClass === 'capacity_exhausted'/)
+  assert.match(diagnosticsSource, /classification\.reason === 'provider_storage_capacity_exhausted'/)
+  assert.match(diagnosticsSource, /maxPaidVerificationDispatches: 1/)
+  assert.match(workflowSource, /provider_storage_recovery/)
+  assert.match(workflowSource, /recoverHuggingFaceStorageCapacityCircuit\(\{ maxJobs: 3, now \}\)/)
+})

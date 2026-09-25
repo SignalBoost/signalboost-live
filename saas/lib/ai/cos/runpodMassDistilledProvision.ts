@@ -2,7 +2,7 @@
 // Dynamic exact-artifact RunPod canary support for mass-distilled students.
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { activeResidencyRunpodEndpointNames, protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
-import { CURRENT_UNIVERSITY_STUDENT_PROFILE, requireUniversityModelCapability } from '../modelCapabilityRegistry.ts'
+import { CURRENT_UNIVERSITY_STUDENT_PROFILE, requireModelCapability } from '../modelCapabilityRegistry.ts'
 
 const REST_V1 = 'https://rest.runpod.io/v1'
 const CONTROL_API_V2 = 'https://api.runpod.io/v2'

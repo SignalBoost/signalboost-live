@@ -8,6 +8,7 @@ import {
   MASS_CANARY_ROLLING_AUTHORIZATION_REF,
   MASS_CANARY_ROLLING_MAX_APPROVALS,
   MASS_CANARY_ROLLING_WINDOW_HOURS,
+  MASS_CANARY_MAX_CONCURRENT,
   MASS_CANARY_COLD_START_FAILURE,
   MASS_CANARY_NO_WORKER_FAILURE,
   MASS_CANARY_COLD_START_RETRY_COOLDOWN_MS,
@@ -279,24 +280,35 @@ test('three substantive evaluation failures release the endpoint handoff', () =>
   assert.equal((decideMassCanaryRollingApproval({ artifacts:[a,b], events, now, enabled:true }) as any).artifact.candidateId, 'mass:2')
 })
 
-test('an armed approval anywhere blocks a second one', () => {
-  const a=artifact(1); const b=artifact(2)
-  const armed=event(a,MASS_CANARY_APPROVAL_CLAIM,'2026-09-17T16:50:00.000Z',{expiresAt:'2026-09-17T18:50:00.000Z'})
-  assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a,b],events:[armed],now,enabled:true}),{issue:false,reason:'mass_canary_approval_already_armed'})
+test('one armed approval leaves the second bounded slot available', () => {
+  assert.equal(MASS_CANARY_MAX_CONCURRENT,2)
+  const a=artifact(1); const b=artifact(2); const d=artifact(3)
+  const armedA=event(a,MASS_CANARY_APPROVAL_CLAIM,'2026-09-17T16:50:00.000Z',{expiresAt:'2026-09-17T18:50:00.000Z'})
+  const second=decideMassCanaryRollingApproval({artifacts:[a,b,d],events:[armedA],now,enabled:true})
+  assert.ok('artifact' in second)
+  assert.equal(second.artifact.candidateId,b.candidateId)
+  const armedB=event(b,MASS_CANARY_APPROVAL_CLAIM,'2026-09-17T16:51:00.000Z',{expiresAt:'2026-09-17T18:51:00.000Z'})
+  assert.deepEqual(decideMassCanaryRollingApproval({artifacts:[a,b,d],events:[armedA,armedB],now,enabled:true}),{issue:false,reason:'mass_canary_concurrency_exhausted'})
 })
 
-test('a paid canary invocation remains a queue-wide semaphore until terminal evidence arrives', () => {
-  const a=artifact(1); const b=artifact(2)
-  const started=event(a,'local_distilled_runtime_canary_invocation_started','2026-09-17T16:55:00.000Z')
+test('one paid canary invocation leaves the second slot available until concurrency is exhausted', () => {
+  assert.equal(MASS_CANARY_MAX_CONCURRENT,2)
+  const a=artifact(1); const b=artifact(2); const d=artifact(3)
+  const startedA=event(a,'local_distilled_runtime_canary_invocation_started','2026-09-17T16:55:00.000Z')
+  const second=decideMassCanaryRollingApproval({artifacts:[a,b,d],events:[startedA],now,enabled:true})
+  assert.ok('artifact' in second)
+  assert.equal(second.artifact.candidateId,b.candidateId)
+
+  const startedB=event(b,'local_distilled_runtime_canary_invocation_started','2026-09-17T16:56:00.000Z')
   assert.deepEqual(
-    decideMassCanaryRollingApproval({artifacts:[a,b],events:[started],now,enabled:true}),
-    {issue:false,reason:'mass_canary_invocation_already_in_flight'},
+    decideMassCanaryRollingApproval({artifacts:[a,b,d],events:[startedA,startedB],now,enabled:true}),
+    {issue:false,reason:'mass_canary_concurrency_exhausted'},
   )
 
-  const passed=event(a,'local_distilled_runtime_canary_passed','2026-09-17T16:56:00.000Z')
-  const afterPass=decideMassCanaryRollingApproval({artifacts:[a,b],events:[started,passed],now,enabled:true})
+  const passedA=event(a,'local_distilled_runtime_canary_passed','2026-09-17T16:57:00.000Z')
+  const afterPass=decideMassCanaryRollingApproval({artifacts:[a,b,d],events:[startedA,startedB,passedA],now,enabled:true})
   assert.ok('artifact' in afterPass)
-  assert.equal(afterPass.artifact.candidateId,b.candidateId)
+  assert.equal(afterPass.artifact.candidateId,d.candidateId)
 })
 
 test('an orphaned invocation marker releases after the bounded in-flight TTL', () => {
@@ -522,10 +534,10 @@ test('the same canary failure repeating stops that artifact instead of looping',
   assert.equal(decision.artifact.candidateId, 'mass:2', 'the stuck artifact is skipped and the queue moves on')
 })
 
-test('the hourly ceiling preserves the 144-per-day nominal spend envelope without a long blackout', () => {
+test('the hourly ceiling preserves the bounded 288-per-day nominal spend envelope without a long blackout', () => {
   assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 1)
-  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 6)
-  assert.equal((24 / MASS_CANARY_ROLLING_WINDOW_HOURS) * MASS_CANARY_ROLLING_MAX_APPROVALS, 144)
+  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 12)
+  assert.equal((24 / MASS_CANARY_ROLLING_WINDOW_HOURS) * MASS_CANARY_ROLLING_MAX_APPROVALS, 288)
   const a = artifact(1)
   const exhausted = Array.from({ length:MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) => {
     const other = artifact(100 + index)
@@ -584,15 +596,21 @@ test('a canary-passed artifact awaiting evaluation never freezes the rest of the
   assert.equal(decision.artifact.candidateId, artifacts[1].candidateId)
 })
 
-test('the armed approval remains a queue-wide semaphore', () => {
-  // One canary endpoint at a time: a live approval on ANY artifact still stops issuance everywhere,
-  // even though an awaiting-evaluation artifact no longer does.
-  const a = artifact(1, '2026-09-15T00:00:00.000Z'); const b = artifact(2, '2026-09-15T01:00:00.000Z')
-  const armed = event(a, MASS_CANARY_APPROVAL_CLAIM, new Date(now.getTime() - 60_000).toISOString(),
+test('the bounded semaphore permits one additional approval but no third active slot', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const d = artifact(3, '2026-09-15T02:00:00.000Z')
+  const armedA = event(a, MASS_CANARY_APPROVAL_CLAIM, new Date(now.getTime() - 60_000).toISOString(),
     { expiresAt: new Date(now.getTime() + 3_600_000).toISOString() },
     { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF, canaryAuthorized: true })
-  assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a,b], events:[armed], now, enabled:true }),
-    { issue:false, reason:'mass_canary_approval_already_armed' })
+  const second=decideMassCanaryRollingApproval({ artifacts:[a,b,d], events:[armedA], now, enabled:true })
+  assert.ok('artifact' in second)
+  assert.equal(second.artifact.candidateId,b.candidateId)
+  const armedB = event(b, MASS_CANARY_APPROVAL_CLAIM, new Date(now.getTime() - 30_000).toISOString(),
+    { expiresAt: new Date(now.getTime() + 3_600_000).toISOString() },
+    { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF, canaryAuthorized: true })
+  assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a,b,d], events:[armedA,armedB], now, enabled:true }),
+    { issue:false, reason:'mass_canary_concurrency_exhausted' })
 })
 
 
@@ -608,13 +626,14 @@ test('a duplicate approval issued after an exact-artifact canary pass is stale a
   assert.equal(decision.artifact.candidateId, b.candidateId)
 })
 
-test('an explicit endpoint-refresh approval after a prior pass remains the queue semaphore', () => {
+test('an explicit endpoint-refresh approval occupies one bounded slot without freezing another artifact', () => {
   const a = artifact(1, '2026-09-15T00:00:00.000Z')
   const b = artifact(2, '2026-09-15T01:00:00.000Z')
   const passed = event(a, 'local_distilled_runtime_canary_passed', '2026-09-17T15:00:00.000Z')
   const refresh = event(a, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T16:00:00.000Z',
     { expiresAt: '2026-09-17T18:00:00.000Z' },
     { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF, canaryAuthorized: true, endpointRefresh: true })
-  assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a,b], events:[passed,refresh], now, enabled:true }),
-    { issue:false, reason:'mass_canary_approval_already_armed' })
+  const decision=decideMassCanaryRollingApproval({ artifacts:[a,b], events:[passed,refresh], now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId,b.candidateId)
 })

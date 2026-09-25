@@ -143,3 +143,14 @@ test('quota self-drain cannot touch non-mass or already-retired endpoints', () =
   assert.match(provisionV2, /!endpointName\.startsWith\('itmounts-mass-distilled-'\)/)
   assert.match(provisionV2, /throw error/)
 })
+
+
+test('canary warm-start uses bounded worker-quota recovery before provider invocation', () => {
+  const provisionV2 = source('../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
+  const start = provisionV2.indexOf('export async function activateMassDistilledCanaryWorker')
+  const end = provisionV2.indexOf('export async function deactivateMassDistilledCanaryWorker')
+  const activation = provisionV2.slice(start, end)
+  assert.match(activation, /withWorkerQuotaRecovery\(String\(endpoint\.id\)/)
+  assert.match(activation, /workers: \{ min: 1, max: 1/)
+  assert.match(provisionV2, /releaseOtherMassEndpointCapacity/)
+})

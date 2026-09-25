@@ -4,6 +4,7 @@ import { createUniversalMcpGateway } from '../../provider-hub-host/universal-mcp
 import {
   CONTEXT7_MCP_PROFILE,
   GITHUB_MCP_PROFILE,
+  SUPABASE_MCP_PROFILE,
 } from '../../provider-hub-host/universal-mcp-profiles.ts'
 
 async function run() {
@@ -23,6 +24,17 @@ async function run() {
       id: 'real_library_lookup',
       capabilityId: 'mcp.context7-mcp.library.resolve',
       args: { libraryName: 'next.js', query: 'App Router route handlers' },
+      expect: { ok: true },
+    }],
+  })
+
+  const supabase = await certifyMcpProvider(gateway, {
+    providerId: 'supabase-mcp',
+    expectedCapabilities: SUPABASE_MCP_PROFILE.tools.map(item => `mcp.supabase-mcp.${item.capabilityName}`),
+    probes: [{
+      id: 'real_project_table_read',
+      capabilityId: 'mcp.supabase-mcp.tables.list',
+      args: { schemas: ['public'] },
       expect: { ok: true },
     }],
   })
@@ -78,7 +90,7 @@ async function run() {
     checks: githubChecks,
   }
 
-  const certifications = [github, context7]
+  const certifications = [github, supabase, context7]
   const checks = certifications.flatMap(report =>
     report.checks.map(check => ({
       providerId: report.providerId,
@@ -89,11 +101,10 @@ async function run() {
   )
 
   const evidence = {
-    schemaVersion: 'universal-mcp-baseline-live-acceptance-v1',
+    schemaVersion: 'universal-mcp-baseline-live-acceptance-v2',
     observedAt: new Date().toISOString(),
-    scope: ['github-mcp', 'context7-mcp'],
+    scope: ['github-mcp', 'supabase-mcp', 'context7-mcp'],
     excludedPendingProviders: {
-      'supabase-mcp': 'repository_credential_required',
       'figma-mcp': 'provider_client_approval_required',
       'vercel-mcp': 'provider_client_approval_required',
     },

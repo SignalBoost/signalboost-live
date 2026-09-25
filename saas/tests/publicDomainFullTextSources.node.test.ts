@@ -174,6 +174,43 @@ test('Project Gutenberg broadens a multi-term University query when exact OPDS s
   assert.ok(!calls.some(url => url.startsWith('https://gutendex.com/books/')))
 })
 
+test('Project Gutenberg cascades to the next discovery route when discovered ebooks all fail rights or mirror checks', async () => {
+  const calls: string[] = []
+  const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
+    + '*** START OF THIS PROJECT GUTENBERG EBOOK LAWS OF THOUGHT ***\n'
+    + 'Logic reasoning probability mathematical thought algebra foundations. '.repeat(30)
+    + '\n*** END OF THIS PROJECT GUTENBERG EBOOK LAWS OF THOUGHT ***'
+  const restricted = 'This is a copyrighted Project Gutenberg eBook.\n'
+    + '*** START OF THE PROJECT GUTENBERG EBOOK RESTRICTED ***\n'
+    + 'Logic material. '.repeat(80)
+    + '\n*** END OF THE PROJECT GUTENBERG EBOOK RESTRICTED ***'
+
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.startsWith('https://m.gutenberg.org/ebooks/search.opds/')) {
+      return new Response('<?xml version="1.0"?><feed><entry><id>https://www.gutenberg.org/ebooks/90001</id><title>Restricted Logic</title><author><name>Example</name></author><link href="/ebooks/90001" /></entry></feed>', {
+        status: 200,
+        headers: { 'content-type': 'application/atom+xml' },
+      })
+    }
+    if (url.startsWith('https://openlibrary.org/search.json')) return new Response(JSON.stringify({ docs: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    if (url.startsWith('https://gutendex.com/books/')) return new Response('blocked', { status: 403 })
+    if (url.endsWith('/90001/pg90001.txt')) return new Response(restricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    if (url.endsWith('/15114/pg15114.txt')) return new Response(unrestricted, { status: 200, headers: { 'content-type': 'text/plain' } })
+    return new Response('not found', { status: 404 })
+  }) as typeof fetch
+
+  const results = await createProjectGutenbergPublicDomainSearch(fetcher)('logic reasoning scientific method', 1)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].uri, 'https://www.gutenberg.org/ebooks/15114')
+  assert.ok(results[0].evidence?.includes('discovery:local_bootstrap_catalog'))
+  assert.ok(results[0].evidence?.includes('acquisition_route:bootstrap'))
+  assert.ok(results[0].evidence?.includes('project_gutenberg_license_header:verified_unrestricted_us'))
+  assert.ok(calls.some(url => url.endsWith('/90001/pg90001.txt')))
+  assert.ok(calls.some(url => url.endsWith('/15114/pg15114.txt')))
+})
+
 test('Project Gutenberg has a rights-neutral bootstrap catalog when every network discovery surface is unavailable', async () => {
   const unrestricted = 'This eBook is for the use of anyone anywhere in the United States and most other parts of the world at no cost and with almost no restrictions whatsoever.\n'
     + '*** START OF THE PROJECT GUTENBERG EBOOK ELECTRICITY AND MAGNETISM ***\n'

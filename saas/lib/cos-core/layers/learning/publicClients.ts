@@ -126,23 +126,33 @@ function projectGutenbergBody(raw:string):string{
   return clean(value.slice(from,to)).slice(0,60000)
 }
 
-function projectGutenbergUsRightsVerified(raw:string):boolean{
+function projectGutenbergUsRightsEvidence(raw:string,discoveryEvidence:readonly string[]):string[]|null{
   const value=String(raw??'')
-  if(!value)return false
+  if(!value)return null
 
-  // Rights are determined from the ebook-specific preamble before the START marker. The generic
-  // Project Gutenberg license (usually after the END marker) contains boilerplate mentioning
-  // "copyright holder" and the special restricted-work clause; scanning that boilerplate caused
-  // legitimate public-domain ebooks to be rejected in Production.
+  // Read only the ebook-specific preamble before START. Generic Project Gutenberg license text after
+  // the book must never decide rights for the individual work.
   const start=/\*\*\*\s*START OF (?:THIS |THE )?PROJECT GUTENBERG EBOOK[^\n]*\*\*\*/i.exec(value)
   const preamble=value.slice(0,start?.index??Math.min(value.length,24000)).toLowerCase()
-  if(!preamble)return false
+  if(!preamble)return null
 
-  // Exact ebook-specific restriction markers fail closed. Avoid broad words such as "copyright
-  // holder" because those also appear inside the generic Project Gutenberg license text.
-  if(/this is a copyrighted project gutenberg ebook|this particular work is one of the few individual works restricted by copyright law|please follow the copyright guidelines in this file|included in the project gutenberg collection with the permission of the copyright holder/i.test(preamble))return false
+  // Exact ebook-specific restriction markers always fail closed, including when catalog metadata says
+  // public domain. This keeps the actual payload able to veto stale/incorrect discovery metadata.
+  if(/this is a copyrighted project gutenberg ebook|this particular work is one of the few individual works restricted by copyright law|please follow the copyright guidelines in this file|included in the project gutenberg collection with the permission of the copyright holder/i.test(preamble))return null
 
-  return /almost no restrictions whatsoever|not restricted by copyright in the united states|not protected by u\.s\. copyright law|public domain in the united states/i.test(preamble)
+  if(/almost no restrictions whatsoever|not restricted by copyright in the united states|not protected by u\.s\. copyright law|public domain in the united states/i.test(preamble)){
+    return['project_gutenberg_license_header:verified_unrestricted_us','project_gutenberg_rights:verified_public_domain_us']
+  }
+
+  // Project Gutenberg OPDS is an official machine-readable catalog and exposes an ebook-specific
+  // <rights> field. Production showed that generated plain-text files do not always repeat a positive
+  // public-domain sentence in their preamble, even when OPDS explicitly marks the same ebook public
+  // domain in the USA. Accept that official rights assertion only when the fetched ebook itself has no
+  // restricted-work marker.
+  if(discoveryEvidence.includes('project_gutenberg_opds_rights:public_domain_in_usa')){
+    return['project_gutenberg_text_preamble:no_restriction_marker','project_gutenberg_rights:verified_public_domain_us']
+  }
+  return null
 }
 
 function numericProjectGutenbergIds(value:unknown):number[]{
@@ -203,7 +213,16 @@ async function projectGutenbergCandidatesFromOpds(query:string,bounded:number,fe
         seen.add(id)
         const authors=[...entry.matchAll(/<author\b[\s\S]*?<name(?:\s[^>]*)?>([\s\S]*?)<\/name>[\s\S]*?<\/author>/gi)]
           .map(match=>clean(match[1])).filter(Boolean).slice(0,5)
-        results.push({id,title,authors,discoveryEvidence:['discovery:project_gutenberg_opds',`discovery_query:${variant}`]})
+        const rights=xmlTag(entry,'rights')
+        const opdsPublicDomain=/public domain in the (?:usa|u\.s\.|united states)/i.test(rights)
+        results.push({
+          id,title,authors,
+          discoveryEvidence:[
+            'discovery:project_gutenberg_opds',
+            `discovery_query:${variant}`,
+            ...(opdsPublicDomain?['project_gutenberg_opds_rights:public_domain_in_usa']:[]),
+          ],
+        })
         if(results.length>=target)return results
       }
       if(results.length>=bounded)return results
@@ -312,8 +331,9 @@ export function createProjectGutenbergPublicDomainSearch(
         console.warn('[project-gutenberg] mirror text unavailable',{id,route:discovery.route,mirrorBaseUrl,error:lastFetchError||'empty'})
         continue
       }
-      if(!projectGutenbergUsRightsVerified(raw)){
-        console.warn('[project-gutenberg] ebook rights header not eligible',{id,route:discovery.route})
+      const rightsEvidence=projectGutenbergUsRightsEvidence(raw,item.discoveryEvidence)
+      if(!rightsEvidence){
+        console.warn('[project-gutenberg] ebook rights evidence not eligible',{id,route:discovery.route})
         continue
       }
       const body=projectGutenbergBody(raw)
@@ -330,7 +350,7 @@ export function createProjectGutenbergPublicDomainSearch(
           `project_gutenberg_ebook_id:${id}`,
           ...item.discoveryEvidence,
           `acquisition_route:${discovery.route}`,
-          'project_gutenberg_license_header:verified_unrestricted_us',
+          ...rightsEvidence,
           'rights_scope:public_domain_in_usa',
           `project_gutenberg_mirror_text:${textUrl}`,
         ],

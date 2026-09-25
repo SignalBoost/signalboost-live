@@ -77,6 +77,7 @@ const tests = [
   'tests/cosUniversityAgentCapstone.node.test.ts',
   'tests/builderToolLoop.node.test.ts',
   'tests/builderMcpReadTools.node.test.ts',
+  'tests/universalMcpActionsTokenScope.node.test.ts',
   'tests/securityAdmissionShield.node.test.ts',
   'tests/aiSecurityGateway.node.test.ts',
   'tests/aiSecuritySupervisorTelemetry.node.test.ts',

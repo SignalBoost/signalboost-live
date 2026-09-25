@@ -41,7 +41,12 @@ const FAILED = 'mass_distilled_independent_evaluation_failed'
 const EXHAUSTED = 'mass_distilled_evaluation_attempts_exhausted'
 const ROUTE_BUDGET_MS = 570_000
 const ROUTE_RESERVE_MS = 25_000
-const RUNTIME_WAKE_TIMEOUT_MS = 150_000
+// Production 2026-09-25: the evaluator's initial /ping wake could consume 150s and then
+// waitReady() spent up to another 280s issuing the same worker-local /ping trigger. Completed
+// evaluations have a ~431s p90 while runtime_not_ready failures terminate around ~435s, so the
+// duplicated pre-wake was consuming scoring headroom without adding authority. Make the initial
+// wake a short trigger; waitReady() owns the bounded cold-start wait and continuously retriggers /ping.
+const RUNTIME_WAKE_TIMEOUT_MS = 15_000
 const MIN_BALANCE_USD = 1
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
@@ -80,9 +85,10 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
   const remainingMs = deadlineMs - Date.now() - ROUTE_RESERVE_MS
   if (remainingMs <= 0) throw new Error('mass_distilled_evaluation_route_deadline_exceeded')
   const timeoutMs = Math.max(1, Math.min(RUNTIME_WAKE_TIMEOUT_MS, remainingMs))
-  // /ping is only a scale-from-zero trigger. Keep the request alive through the bounded cold-start window:
-  // aborting it after 20s can cancel the only scale trigger before RunPod attaches a worker, while /health
-  // still returns HTTP 200 with workers.ready=0. The evaluator remains bounded by the absolute route deadline.
+  // /ping is only a scale-from-zero trigger. This first request is deliberately short: the evaluator's
+  // waitReady() loop immediately follows and continuously reissues the same worker-local /ping trigger until
+  // modelReady=true or its separate bounded readiness window expires. This avoids paying for two sequential
+  // cold-start waits while preserving the single approved runtime wake and the absolute route deadline.
   try {
     const response = await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`, {
       headers: { Authorization: `Bearer ${key}` },

@@ -151,6 +151,13 @@ function durableTrainingReceipt(profileValue: unknown, recipeValue: unknown) {
     muonMatrixTensorCount: integer('muonMatrixTensorCount', 0, 1_000_000),
     muonNonMatrixTensorCount: integer('muonNonMatrixTensorCount', 0, 1_000_000),
     muonReason: clean(raw.muonReason, 80) || null,
+    attentionArchitecture: clean(raw.attentionArchitecture, 80) || null,
+    xsaProfile: clean(raw.xsaProfile, 120) || null,
+    xsaRolloutPercent: integer('xsaRolloutPercent', 0, 100),
+    xsaRolloutSelected: boolean('xsaRolloutSelected'),
+    xsaTrainingApplied: boolean('xsaTrainingApplied'),
+    xsaInferenceSymmetryRequired: boolean('xsaInferenceSymmetryRequired'),
+    xsaReason: clean(raw.xsaReason, 120) || null,
     structuredItems: integer('structuredItems', 0, 100_000),
     fallbackItems: integer('fallbackItems', 0, 100_000),
   })

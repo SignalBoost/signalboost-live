@@ -5,6 +5,7 @@ export const FAILURE_DERIVED_REMEDIATION_PROFILE = 'cos-university-failure-deriv
 export const HYBRID_REAL_SOURCE_TARGET = 0.50
 export const HYBRID_FAILURE_DERIVED_TARGET = 0.30
 export const HYBRID_TEACHER_SYNTHETIC_TARGET = 0.20
+export const HYBRID_INDEPENDENT_HOLDOUT_MIN = 5
 
 export type HybridDistillationOrigin = 'real_source' | 'failure_derived' | 'teacher_synthetic'
 export type FailureDerivedRemediationGate = 'holdout_improvement' | 'safety' | 'unseen_transfer' | 'delayed_retention'
@@ -53,7 +54,15 @@ export function planHybridDistillationMix(input: {
   teacherSynthetic -= takeReal
 
   const remainingFailure = Math.max(0, failureAvailable - failureDerived)
-  const takeFailure = Math.min(teacherSynthetic, remainingFailure)
+  // A remediation-heavy batch still needs an independent non-failure holdout. Never backfill
+  // failure-derived rows into the final HYBRID_INDEPENDENT_HOLDOUT_MIN slots. If real/synthetic
+  // material cannot fill those slots, selectHybridDistillationChunk returns no batch and the
+  // replenishment path must acquire more ordinary rights-cleared curriculum first.
+  const independentHoldoutFloor = failureAvailable >= 20
+    ? Math.min(HYBRID_INDEPENDENT_HOLDOUT_MIN, total)
+    : 0
+  const failureBackfillCapacity = Math.max(0, total - independentHoldoutFloor - adjustedReal - failureDerived)
+  const takeFailure = Math.min(teacherSynthetic, remainingFailure, failureBackfillCapacity)
   const adjustedFailure = failureDerived + takeFailure
   teacherSynthetic -= takeFailure
 

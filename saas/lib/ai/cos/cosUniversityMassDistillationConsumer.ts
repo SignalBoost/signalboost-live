@@ -261,6 +261,7 @@ async function recordAssurance(input: {
 function terminalBatchFailure(reason: string): boolean {
   return reason === 'mass_distillation_source_subject_recheck_missing'
     || reason.startsWith('mass_distillation_source_subject_recheck_failed:')
+    || reason.startsWith('mass_distillation_remediation_holdout_floor_unreachable:')
 }
 
 async function markFailure(runId: string, campaignId: string, candidateId: string, subjectId: string, error: unknown) {
@@ -475,7 +476,10 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         ? (() => {
             const failureDerived = promptSet.prompts.filter(item => failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
             const ordinary = promptSet.prompts.filter(item => !failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
-            const ordinaryTarget = Math.min(MASS_REMEDIATION_HOLDOUT_TARGET, ordinary.length)
+            if (ordinary.length < MASS_REMEDIATION_HOLDOUT_TARGET) {
+              throw new Error(`mass_distillation_remediation_holdout_floor_unreachable:${ordinary.length}/${MASS_REMEDIATION_HOLDOUT_TARGET}`)
+            }
+            const ordinaryTarget = MASS_REMEDIATION_HOLDOUT_TARGET
             const failureDerivedTarget = MASS_REMEDIATION_TEACHER_ROWS - ordinaryTarget
             if (failureDerived.length < failureDerivedTarget) {
               throw new Error(`mass_distillation_remediation_teacher_floor_unreachable:${failureDerived.length}/${failureDerivedTarget}`)

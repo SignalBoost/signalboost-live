@@ -6,6 +6,7 @@ import {
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
   MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE,
   MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  MASS_EVALUATION_REMEDIATION_REPLAY_MIN_ITEMS,
   MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS,
   MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
@@ -123,11 +124,13 @@ test('confirmed v2 Computer Science proof sampling outranks legacy work only unt
 })
 
 test('remediation evaluation proof is versioned to the strengthened replay recipe', () => {
+  assert.equal(MASS_EVALUATION_REMEDIATION_REPLAY_MIN_ITEMS, 20)
   assert.equal(MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS, 3)
   assert.equal(MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE, 5e-5)
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.match(route, /failureDerivedReplayEpochs/)
   assert.match(route, /failureDerivedReplayLearningRate/)
+  assert.match(route, /MASS_EVALUATION_REMEDIATION_REPLAY_MIN_ITEMS/)
   assert.match(route, /MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS/)
   assert.match(route, /MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE/)
 })

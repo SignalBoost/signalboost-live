@@ -469,10 +469,33 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
         proportional = len(ordered) // 5
         if clean(envelope.get("candidateId"), 200).startswith("mass:"):
             holdout_count = max(1, min(proportional, MASS_HOLDOUT_MAX_ITEMS))
+            failure_derived_pairs = [item for item in ordered if item[1].get("failure_derived") is True]
+            ordinary_pairs = [item for item in ordered if item[1].get("failure_derived") is not True]
+            if len(failure_derived_pairs) >= 20:
+                # Remediation artifacts must preserve at least 20 verified failure-derived examples
+                # in TRAINING. Prefer ordinary rows for the independent holdout; only consume
+                # failure-derived rows if necessary, and never below the training floor.
+                holdout_pairs = ordinary_pairs[:holdout_count]
+                remaining_holdout = holdout_count - len(holdout_pairs)
+                max_failure_holdout = max(0, len(failure_derived_pairs) - 20)
+                if remaining_holdout > max_failure_holdout:
+                    raise RuntimeError(
+                        f"worker_remediation_training_floor_unreachable:{len(failure_derived_pairs)}/{holdout_count}"
+                    )
+                if remaining_holdout > 0:
+                    holdout_pairs = holdout_pairs + failure_derived_pairs[:remaining_holdout]
+                holdout_hashes = {digest for digest, _ in holdout_pairs}
+                training_pairs = [item for item in ordered if item[0] not in holdout_hashes]
+                replay_training_rows = sum(1 for _, row in training_pairs if row.get("failure_derived") is True)
+                if replay_training_rows < 20:
+                    raise RuntimeError(f"worker_remediation_training_floor_missed:{replay_training_rows}")
+            else:
+                holdout_pairs = ordered[:holdout_count]
+                training_pairs = ordered[holdout_count:]
         else:
             holdout_count = max(1, min(proportional, 500))
-        holdout_pairs = ordered[:holdout_count]
-        training_pairs = ordered[holdout_count:]
+            holdout_pairs = ordered[:holdout_count]
+            training_pairs = ordered[holdout_count:]
     if not training_pairs or not holdout_pairs:
         raise RuntimeError("worker_partition_invalid")
 

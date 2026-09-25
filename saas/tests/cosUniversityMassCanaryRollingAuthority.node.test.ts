@@ -18,6 +18,7 @@ import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
   MASS_CANARY_BUILDER_V2_OPTIMIZER,
   MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS,
   MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
   MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
@@ -49,7 +50,7 @@ const replayArtifact = (candidateId: string, hashId: number, createdAt: string):
   artifactHash: h(hashId),
   createdAt,
   failureDerivedReplayRequired: true,
-  failureDerivedReplayItems: 3,
+  failureDerivedReplayItems: MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS,
   failureDerivedReplayEpochs: MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS,
   failureDerivedReplayLearningRate: MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
 })
@@ -110,6 +111,7 @@ test('bounded Builder apprenticeship proof lane counts only confirmed response-a
 })
 
 test('old weak replay receipts cannot satisfy the upgraded remediation proof cohort', () => {
+  assert.equal(MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS, 20)
   assert.equal(MASS_CANARY_REMEDIATION_REPLAY_MIN_EPOCHS, 3)
   assert.equal(MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE, 5e-5)
   const legacy = artifact(79, '2026-09-20T00:00:00.000Z')
@@ -365,6 +367,7 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.match(route,/frontierResponseAnchorItems:Number\(receipt\.frontierResponseAnchorItems\|\|0\)/)
   assert.match(route,/failureDerivedReplayRequired:receipt\.failureDerivedReplayRequired===true/)
   assert.match(route,/failureDerivedReplayItems:Number\(receipt\.failureDerivedReplayItems\|\|0\)/)
+  assert.match(route,/MASS_CANARY_REMEDIATION_REPLAY_MIN_ITEMS/)
   assert.match(route,/failureDerivedReplayEpochs:Number\(receipt\.failureDerivedReplayEpochs\|\|0\)/)
   assert.match(route,/failureDerivedReplayLearningRate:Number\(receipt\.failureDerivedReplayLearningRate\|\|0\)/)
   assert.match(route,/contains\('intended_use',\{trainingReceipt:\{failureDerivedReplayRequired:true\}\}\)/)

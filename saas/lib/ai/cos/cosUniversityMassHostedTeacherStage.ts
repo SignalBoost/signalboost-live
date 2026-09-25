@@ -17,6 +17,7 @@ const HOSTED_TRANSPORTS: readonly UniversityTeacherTransport[] = Object.freeze([
 const MIN_TEACHER_ROWS = 20
 const DEFAULT_MAX_CALLS = 20
 const HARD_MAX_CALLS = 20
+const HARD_MAX_REMEDIATION_CALLS = 32
 const DEFAULT_MAX_OUTPUT_TOKENS = 384
 const HARD_MAX_OUTPUT_TOKENS = 512
 const DEFAULT_PARALLELISM = 8
@@ -173,17 +174,21 @@ export async function runMassHostedTeacherStage(input: {
   run: any
   prompts: readonly Prompt[]
   promptSetHash: string
+  minimumRows?: number
+  maxCalls?: number
   env?: Env
   fetchImpl?: typeof fetch
 }) {
   const env = input.env || process.env
   const config = massHostedTeacherStageConfig(env)
+  const minimumRows = boundedInt(input.minimumRows, MIN_TEACHER_ROWS, MIN_TEACHER_ROWS, HARD_MAX_REMEDIATION_CALLS)
+  const effectiveMaxCalls = boundedInt(input.maxCalls, config.maxCalls, minimumRows, HARD_MAX_REMEDIATION_CALLS)
   const teachers = hostedActiveTeachers(env)
 
   if (!config.enabled) {
     return Object.freeze({
       ok: true, skipped: true, reason: 'mass_hosted_teacher_disabled', completed: false,
-      rows: 0, minimumRows: MIN_TEACHER_ROWS, activeProviders: [], providerMix: Object.freeze({}),
+      rows: 0, minimumRows, activeProviders: [], providerMix: Object.freeze({}),
       failures: Object.freeze([]), outputHashes: Object.freeze([]), datasetHash: null,
       assetSetKey: null, portableManifestHash: null, config,
       authorityExpanded: false, silentFallbackAllowed: false,
@@ -192,7 +197,7 @@ export async function runMassHostedTeacherStage(input: {
   if (!teachers.length) {
     return Object.freeze({
       ok: true, skipped: true, reason: 'no_active_hosted_teacher_provider', completed: false,
-      rows: 0, minimumRows: MIN_TEACHER_ROWS, activeProviders: [], providerMix: Object.freeze({}),
+      rows: 0, minimumRows, activeProviders: [], providerMix: Object.freeze({}),
       failures: Object.freeze([]), outputHashes: Object.freeze([]), datasetHash: null,
       assetSetKey: null, portableManifestHash: null, config,
       authorityExpanded: false, silentFallbackAllowed: false,
@@ -229,7 +234,7 @@ export async function runMassHostedTeacherStage(input: {
   }
   const partialRetry = (existing.data || []).length > 0
     && missing.length < input.prompts.length
-    && input.prompts.length <= config.maxCalls
+    && input.prompts.length <= effectiveMaxCalls
 
   // The shared Dynamic Pipeline Router owns selection policy. This stage only supplies active,
   // authorized teacher pipelines and executes the returned order. Provider names are data, not
@@ -270,7 +275,7 @@ export async function runMassHostedTeacherStage(input: {
   // waves so every missing prompt gets one fair first route before spare budget is used for
   // another compatible pipeline.
   const providerChains = new Map<string, UniversityTeacherDefinition[]>()
-  let remainingAttempts = config.maxCalls
+  let remainingAttempts = effectiveMaxCalls
   for (let wave = 0; wave < teachers.length && remainingAttempts > 0; wave += 1) {
     for (const prompt of missing) {
       if (remainingAttempts <= 0) break
@@ -368,7 +373,7 @@ export async function runMassHostedTeacherStage(input: {
   const providerMix: Record<string, number> = {}
   for (const row of rows) providerMix[row.teacher_id] = (providerMix[row.teacher_id] || 0) + 1
 
-  const datasetHash = rows.length >= MIN_TEACHER_ROWS
+  const datasetHash = rows.length >= minimumRows
     ? hash({ items: rows.map(row => clean(row.response_hash, 64).toLowerCase()).sort() })
     : null
   const vaulted = datasetHash
@@ -410,11 +415,11 @@ export async function runMassHostedTeacherStage(input: {
   }
 
   return Object.freeze({
-    ok: rows.length >= MIN_TEACHER_ROWS,
+    ok: rows.length >= minimumRows,
     skipped: false,
-    completed: rows.length >= MIN_TEACHER_ROWS,
+    completed: rows.length >= minimumRows,
     rows: rows.length,
-    minimumRows: MIN_TEACHER_ROWS,
+    minimumRows,
     activeProviders: teachers.map(item => item.id),
     providerMix: Object.freeze(providerMix),
     plannedProviderMix: Object.freeze(plannedProviderMix),
@@ -428,6 +433,7 @@ export async function runMassHostedTeacherStage(input: {
     assetSetKey: vaulted?.assetSetKey || null,
     portableManifestHash: vaulted?.portableManifestHash || null,
     config,
+    effectiveMaxCalls,
     authorityExpanded: false,
     silentFallbackAllowed: false,
   })

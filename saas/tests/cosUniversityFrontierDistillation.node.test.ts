@@ -130,6 +130,12 @@ test('verified failure-derived rows survive partition metadata and replay only a
   assert.match(consumer, /source_kind, 80\) === 'failure_derived_curriculum'/)
   assert.match(consumer, /failureDerived: failureDerivedPromptIds\.has\(promptId\)/)
   assert.match(baseWorker, /"failure_derived": raw_row\.get\("failureDerived"\) is True/)
+  assert.match(consumer, /MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS = 20/)
+  assert.match(consumer, /MASS_REMEDIATION_TEACHER_ROWS = 25/)
+  assert.match(consumer, /minimumRows: remediationTeacherRequired \? MASS_REMEDIATION_TEACHER_ROWS : undefined/)
+  assert.match(baseWorker, /ordinary_pairs\[:holdout_count\]/)
+  assert.match(baseWorker, /len\(failure_derived_pairs\) - 20/)
+  assert.match(baseWorker, /worker_remediation_training_floor_missed/)
 
   const trainingFunction = worker.slice(worker.indexOf('def train_student'), worker.indexOf('def main()'))
   assert.match(trainingFunction, /failure_derived_replay_training/)

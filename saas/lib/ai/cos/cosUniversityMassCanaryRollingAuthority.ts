@@ -41,6 +41,10 @@ export const MASS_CANARY_MAX_COST_USD = 0.2
 // got none. Whatever the failure class, an artifact now gets at most this many canary invocations per rolling day;
 // after that it yields the lane to the rest of the queue and becomes eligible again automatically a day later.
 export const MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_DAY = 3
+// Fairness fence: one cold runtime may receive one bounded same-runtime continuation, but it may not
+// immediately consume a third paid slot while other artifacts have never had a canary. This is scoped
+// to the same rolling hour as the global spend cap, so an artifact automatically becomes retryable.
+export const MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_ROLLING_WINDOW = 2
 export const MASS_CANARY_ARTIFACT_INVOCATION_WINDOW_MS = 24 * 60 * 60 * 1000
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_CANARY_IN_FLIGHT_TTL_MS = 10 * 60 * 1000
@@ -223,7 +227,7 @@ export function decideMassCanaryRollingApproval(input: {
   // Budget the rolling window by provider invocations that actually started, plus any currently
   // armed approval that can still become one. Expired approvals that were never invoked consumed
   // neither provider work nor canary spend and therefore must not create an artificial blackout.
-  // This preserves the same maximum potential spend: at most three started-or-still-reserved canaries
+  // This preserves the same maximum potential spend: at most six started-or-still-reserved canaries
   // per rolling hour, each already bounded to <= $0.20 by the approval contract.
   const rollingWindowStart = nowMs - MASS_CANARY_ROLLING_WINDOW_HOURS * 3600_000
   const invokedInWindow = input.events.filter(event => event.verifier === 'host_controller'
@@ -276,7 +280,7 @@ export function decideMassCanaryRollingApproval(input: {
       if (aBuilder !== bBuilder) return aBuilder ? -1 : 1
     }
     // Once Builder proof is satisfied, give the first two post-GKD remediation-replay artifacts a
-    // bounded proof lane ahead of the legacy backlog. The 3/hour canary cap and all other authority remain unchanged.
+    // bounded proof lane ahead of the legacy backlog. The 6/hour canary cap and all other authority remain unchanged.
     if (replayProofNeeded) {
       const aReplay = replayProofArtifact(a)
       const bReplay = replayProofArtifact(b)
@@ -321,10 +325,16 @@ export function decideMassCanaryRollingApproval(input: {
     // searching the queue rather than stopping the whole issuer.
     if (evaluationHandoffPending(input.events, artifact)) continue
     const own = forArtifact(input.events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
-    // Per-artifact daily invocation ceiling, independent of failure classification (see constant above).
-    const invocationsToday = own.filter(event => claim(event) === 'local_distilled_runtime_canary_invocation_started'
-      && nowMs - at(event.observedAt) < MASS_CANARY_ARTIFACT_INVOCATION_WINDOW_MS).length
+    // Per-artifact ceilings are independent of failure classification. The daily fence bounds total
+    // spend; the rolling-hour fence prevents one infrastructure-failing runtime from monopolizing the
+    // global six-slot window while untouched artifacts wait behind it.
+    const invocationStarts = own.filter(event => claim(event) === 'local_distilled_runtime_canary_invocation_started')
+    const invocationsToday = invocationStarts
+      .filter(event => nowMs - at(event.observedAt) < MASS_CANARY_ARTIFACT_INVOCATION_WINDOW_MS).length
     if (invocationsToday >= MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_DAY) continue
+    const invocationsThisRollingWindow = invocationStarts
+      .filter(event => at(event.observedAt) > rollingWindowStart).length
+    if (invocationsThisRollingWindow >= MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_ROLLING_WINDOW) continue
     const refreshEndpoint = endpointRefreshRequired(input.events, artifact)
     if (own.some(event => claim(event) === 'local_distilled_runtime_canary_passed') && !refreshEndpoint) continue
     const latestControl = [...own].reverse().find(event => event.verifier === 'host_controller'

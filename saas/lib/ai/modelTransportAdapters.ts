@@ -15,6 +15,7 @@ import {
 
 type Env = Record<string, string | undefined>
 type FetchPort = typeof fetch
+type CredentialResolver = (credentialRef: string) => Promise<string | null>
 
 function clean(value: unknown, max = 200_000): string {
   return String(value ?? '').trim().slice(0, max)
@@ -26,8 +27,10 @@ function positiveInt(value: unknown, fallback: number, min: number, max: number)
   return Math.max(min, Math.min(max, Math.floor(parsed)))
 }
 
-function credentialFor(binding: PlatformModelTransportBinding, env: Env): string {
-  return binding.credentialEnv ? clean(env[binding.credentialEnv], 8192) : ''
+async function credentialFor(binding: PlatformModelTransportBinding, env: Env, resolveCredential?: CredentialResolver): Promise<string> {
+  if (binding.credentialEnv) return clean(env[binding.credentialEnv], 8192)
+  if (binding.credentialRef && resolveCredential) return clean(await resolveCredential(binding.credentialRef), 8192)
+  return ''
 }
 
 function bindingEndpoint(binding: PlatformModelTransportBinding): URL {
@@ -74,9 +77,9 @@ function parseArgs(argumentsText: string): Record<string, unknown> {
   }
 }
 
-function configuredHealth(profile: PlatformModelProfile, binding: PlatformModelTransportBinding, env: Env): ModelTransportHealth {
-  const credentialRequired = binding.protocol === 'anthropic_messages' || binding.protocol === 'google_generate_content'
-  const credential = credentialFor(binding, env)
+async function configuredHealth(profile: PlatformModelProfile, binding: PlatformModelTransportBinding, env: Env, resolveCredential?: CredentialResolver): Promise<ModelTransportHealth> {
+  const credentialRequired = binding.protocol === 'anthropic_messages' || binding.protocol === 'google_generate_content' || Boolean(binding.credentialEnv || binding.credentialRef)
+  const credential = await credentialFor(binding, env, resolveCredential)
   if (credentialRequired && !credential) {
     return Object.freeze({ ok: false, provider: binding.provider, model: profile.providerModelId, error: 'credential_missing' })
   }
@@ -137,17 +140,17 @@ function openAiMessages(messages: readonly PlatformModelMessage[]): any[] {
   })
 }
 
-function createOpenAiCompatibleAdapter(binding: PlatformModelTransportBinding, env: Env, fetchImpl: FetchPort): ModelTransportAdapter {
+function createOpenAiCompatibleAdapter(binding: PlatformModelTransportBinding, env: Env, fetchImpl: FetchPort, resolveCredential?: CredentialResolver): ModelTransportAdapter {
   return Object.freeze({
     id: `builtin:${binding.profileKey}:openai_compatible`,
     protocol: 'openai_compatible' as const,
     supports: profile => profile.key === binding.profileKey && profile.transportProtocols.includes('openai_compatible'),
-    health: async profile => configuredHealth(profile, binding, env),
+    health: async profile => configuredHealth(profile, binding, env, resolveCredential),
     async chat(request) {
       requestCapabilities(request)
       if (!request.profile.transportProtocols.includes('openai_compatible')) throw new Error('platform_model_transport_profile_mismatch')
       const endpoint = bindingEndpoint(binding)
-      const credential = credentialFor(binding, env)
+      const credential = await credentialFor(binding, env, resolveCredential)
       const response = await fetchImpl(endpoint, {
         method: 'POST',
         headers: {
@@ -220,16 +223,16 @@ function anthropicMessages(messages: readonly PlatformModelMessage[]): any[] {
   })
 }
 
-function createAnthropicAdapter(binding: PlatformModelTransportBinding, env: Env, fetchImpl: FetchPort): ModelTransportAdapter {
+function createAnthropicAdapter(binding: PlatformModelTransportBinding, env: Env, fetchImpl: FetchPort, resolveCredential?: CredentialResolver): ModelTransportAdapter {
   return Object.freeze({
     id: `builtin:${binding.profileKey}:anthropic_messages`,
     protocol: 'anthropic_messages' as const,
     supports: profile => profile.key === binding.profileKey && profile.transportProtocols.includes('anthropic_messages'),
-    health: async profile => configuredHealth(profile, binding, env),
+    health: async profile => configuredHealth(profile, binding, env, resolveCredential),
     async chat(request) {
       requestCapabilities(request)
       if (!request.profile.transportProtocols.includes('anthropic_messages')) throw new Error('platform_model_transport_profile_mismatch')
-      const credential = credentialFor(binding, env)
+      const credential = await credentialFor(binding, env, resolveCredential)
       if (!credential) throw new Error('platform_model_transport_credential_missing')
       if (request.jsonObject && !request.jsonSchema) throw new Error('platform_model_transport_json_schema_required:anthropic_messages')
       if (request.jsonSchema && request.jsonSchema.additionalProperties !== false) throw new Error('platform_model_transport_json_schema_additional_properties_must_be_false:anthropic_messages')
@@ -329,16 +332,16 @@ function geminiContents(messages: readonly PlatformModelMessage[]): any[] {
   })
 }
 
-function createGoogleAdapter(binding: PlatformModelTransportBinding, env: Env, fetchImpl: FetchPort): ModelTransportAdapter {
+function createGoogleAdapter(binding: PlatformModelTransportBinding, env: Env, fetchImpl: FetchPort, resolveCredential?: CredentialResolver): ModelTransportAdapter {
   return Object.freeze({
     id: `builtin:${binding.profileKey}:google_generate_content`,
     protocol: 'google_generate_content' as const,
     supports: profile => profile.key === binding.profileKey && profile.transportProtocols.includes('google_generate_content'),
-    health: async profile => configuredHealth(profile, binding, env),
+    health: async profile => configuredHealth(profile, binding, env, resolveCredential),
     async chat(request) {
       requestCapabilities(request)
       if (!request.profile.transportProtocols.includes('google_generate_content')) throw new Error('platform_model_transport_profile_mismatch')
-      const credential = credentialFor(binding, env)
+      const credential = await credentialFor(binding, env, resolveCredential)
       if (!credential) throw new Error('platform_model_transport_credential_missing')
       const endpoint = bindingEndpoint(binding)
       endpoint.pathname = `${endpoint.pathname.replace(/\/$/, '')}/${encodeURIComponent(request.profile.providerModelId)}:generateContent`
@@ -398,6 +401,7 @@ export function createBuiltinModelTransportAdapters(input: {
   bindings?: readonly PlatformModelTransportBinding[]
   env?: Env
   fetchImpl?: FetchPort
+  resolveCredential?: CredentialResolver
 }): readonly ModelTransportAdapter[] {
   const env = input.env || process.env
   const fetchImpl = input.fetchImpl || fetch
@@ -407,9 +411,9 @@ export function createBuiltinModelTransportAdapters(input: {
   for (const binding of bindings) {
     const profile = profiles.get(binding.profileKey)
     if (!profile || !profile.transportProtocols.includes(binding.protocol)) continue
-    if (binding.protocol === 'openai_compatible') adapters.push(createOpenAiCompatibleAdapter(binding, env, fetchImpl))
-    else if (binding.protocol === 'anthropic_messages') adapters.push(createAnthropicAdapter(binding, env, fetchImpl))
-    else if (binding.protocol === 'google_generate_content') adapters.push(createGoogleAdapter(binding, env, fetchImpl))
+    if (binding.protocol === 'openai_compatible') adapters.push(createOpenAiCompatibleAdapter(binding, env, fetchImpl, input.resolveCredential))
+    else if (binding.protocol === 'anthropic_messages') adapters.push(createAnthropicAdapter(binding, env, fetchImpl, input.resolveCredential))
+    else if (binding.protocol === 'google_generate_content') adapters.push(createGoogleAdapter(binding, env, fetchImpl, input.resolveCredential))
     // native_sdk, local_runtime and custom_http require an injected host adapter by design.
   }
   return Object.freeze(adapters)

@@ -2105,3 +2105,35 @@ Changing judge call count without raising the judge-run ceiling fails closed bef
 
 This repair does not weaken four-suite independence, endpoint-call ceilings, scoring thresholds, artifact
 binding, promotion gates, or Production-traffic authority. Missing or insufficient reservations fail closed.
+
+
+### Mass-distillation training-quality throughput repair (2026-09-25)
+
+Production quality evidence showed that mass distillation was converting curriculum into LoRA jobs too early:
+**729 of 739** batch runs observed over the preceding 72 hours had only **20–31 source items**. With the
+existing holdout partition this commonly yielded roughly 16–25 training examples. Independent evaluation of
+the legacy `stable_on_policy_distillation` cohort had **122 completed evaluations and zero full graduates**,
+while transfer/retention frequently regressed. Evaluator thresholds are not weakened to compensate.
+
+For NEW mass-distillation curriculum, the production quality floor is **64 unique rights-cleared teaching
+items per prepared batch**. `MASS_DISTILLATION_MIN_BATCH=20` remains only as a historical/structural
+compatibility floor for legacy evidence and semantic reconciliation; new packaging, prepared inventory and
+replenishment use `MASS_DISTILLATION_QUALITY_MIN_BATCH=64`. The database also enforces
+`status <> 'prepared' OR source_count >= 64`, so alternate admission paths cannot authorize a new
+undersized prepared batch.
+
+At the pre-deploy Production check, **82** batches were still `prepared` below 64 items and all had
+`dispatch_authorized=false`. Migration `20260925023000_mass_distillation_quality_floor.sql` supersedes
+only those unspent undersized prepared rows so their source identities can be repackaged. It does **not**
+mutate `consumed`, teacher/training-spent, or quarantined historical evidence.
+
+Canary and independent-evaluation scheduling prioritize the current anchored recipe
+(`frontier_response_anchor_then_stable_on_policy_distillation` with a durable frontier-response anchor)
+across all subjects before legacy recipe work. The supplemental priority scans are bounded and validate the
+exact receipt in application code rather than relying on nested JSONB containment. Legacy artifacts remain
+eligible as fallback and are not deleted or granted synthetic verdicts.
+
+Existing bounded Builder/replay proof lanes, exact-artifact binding, 12-hour retention delay,
+RunPod/DeepInfra spend ceilings, retry limits, evaluator scoring thresholds, promotion gates, rollback
+evidence, and Production-traffic prohibition are unchanged. A 64-item batch is a quality hypothesis, not a
+graduation claim: improvement requires new post-deploy exact-artifact independent evaluation evidence.

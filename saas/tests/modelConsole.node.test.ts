@@ -34,6 +34,15 @@ test('model console surfaces certification without exposing secret values', asyn
   assert.match(nav, /label: 'Models', href: '\/admin\/models'/)
 })
 
+test('model console adapts Supabase to the narrow certification audit port and types stored receipts', async () => {
+  const source = await readFile(routeUrl, 'utf8')
+  assert.match(source, /type StoredCertificationReceipt/)
+  assert.match(source, /profileKey\?: unknown/)
+  assert.match(source, /certificationAuditDb\(db\)/)
+  assert.match(source, /table !== 'supervisor_audit_events'/)
+  assert.match(source, /db\.from\('supervisor_audit_events'\)\.insert\(value as never\)/)
+})
+
 test('certification receipts use the existing immutable sanitized supervisor audit ledger', async () => {
   const source = await readFile(new URL('../lib/ai/modelCertification.ts', import.meta.url), 'utf8')
   assert.match(source, /supervisor_audit_events/)

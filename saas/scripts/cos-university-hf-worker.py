@@ -53,7 +53,7 @@ MUON_ADJUST_LR_FN = "match_rms_adamw"
 # XSA forward path. Phase 1 records the governed contract but deliberately keeps rollout at zero
 # until the University evaluator/runtime can prove exact training/inference symmetry.
 XSA_PROFILE = "exclusive_self_attention_v1"
-XSA_ROLLOUT_PERCENT = 0
+XSA_ROLLOUT_PERCENT = 5
 XSA_INFERENCE_SYMMETRY_REQUIRED = True
 
 FRONTIER_TRAINING_PROFILE = "cos_university_frontier_gkd_v1"
@@ -754,7 +754,7 @@ def _configure_muon_canary(base, torch, trainer, candidate_id: str) -> dict[str,
     }
 
 
-def _xsa_canary_evidence(base, candidate_id: str) -> dict[str, Any]:
+def _xsa_canary_evidence(base, base_model, candidate_id: str) -> dict[str, Any]:
     """Return fail-closed evidence for the XSA architecture experiment.
 
     XSA cannot be enabled by changing a percentage alone. The evaluator and serving runtime must
@@ -765,19 +765,39 @@ def _xsa_canary_evidence(base, candidate_id: str) -> dict[str, Any]:
     selected = bool(normalized_candidate) and XSA_ROLLOUT_PERCENT > 0 and (
         int(base.sha256(f"xsa:{normalized_candidate}")[:8], 16) % 100 < XSA_ROLLOUT_PERCENT
     )
-    if selected:
-        raise RuntimeError("worker_xsa_selected_without_symmetric_runtime")
+    if not selected:
+        return {
+            "attentionArchitecture": "standard_attention",
+            "xsaProfile": XSA_PROFILE,
+            "xsaRolloutPercent": XSA_ROLLOUT_PERCENT,
+            "xsaRolloutSelected": False,
+            "xsaTrainingApplied": False,
+            "xsaInferenceSymmetryRequired": XSA_INFERENCE_SYMMETRY_REQUIRED,
+            "xsaTrainingRuntimeProfile": XSA_RUNTIME_PROFILE,
+            "xsaTrainingRuntimeImplemented": True,
+            "xsaServingRuntimeImplemented": True,
+            "xsaReason": "deterministic_control_cohort",
+        }
+    runtime = _load_xsa_runtime()
+    installation = runtime.install_qwen3_xsa(base_model)
+    if (
+        installation.get("profile") != XSA_RUNTIME_PROFILE
+        or installation.get("attentionArchitecture") != XSA_ATTENTION_ARCHITECTURE
+        or int(installation.get("installedAttentionLayers") or 0) <= 0
+    ):
+        raise RuntimeError("worker_xsa_training_runtime_installation_unproven")
     return {
-        "attentionArchitecture": "standard_attention",
+        "attentionArchitecture": XSA_ATTENTION_ARCHITECTURE,
         "xsaProfile": XSA_PROFILE,
         "xsaRolloutPercent": XSA_ROLLOUT_PERCENT,
-        "xsaRolloutSelected": False,
-        "xsaTrainingApplied": False,
+        "xsaRolloutSelected": True,
+        "xsaTrainingApplied": True,
         "xsaInferenceSymmetryRequired": XSA_INFERENCE_SYMMETRY_REQUIRED,
         "xsaTrainingRuntimeProfile": XSA_RUNTIME_PROFILE,
         "xsaTrainingRuntimeImplemented": True,
         "xsaServingRuntimeImplemented": True,
-        "xsaReason": "rollout_zero_pending_golden_canary",
+        "xsaInstalledAttentionLayers": int(installation["installedAttentionLayers"]),
+        "xsaReason": "bounded_deterministic_treatment_cohort",
     }
 
 
@@ -1092,6 +1112,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         recipe.update(optimizer_evidence)
         recipe.update(_xsa_canary_evidence(
             base,
+            trainer.model,
             base.clean(envelope.get("candidateId"), 200),
         ))
     else:
@@ -1117,6 +1138,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             "xsaTrainingRuntimeProfile": XSA_RUNTIME_PROFILE,
             "xsaTrainingRuntimeImplemented": True,
             "xsaServingRuntimeImplemented": True,
+            "xsaInstalledAttentionLayers": 0,
             "xsaReason": "legacy_lane",
         })
     print(
@@ -1128,7 +1150,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         flush=True,
     )
     print(
-        f"itmounts_attention_architecture:{json.dumps({key: recipe[key] for key in ('attentionArchitecture','xsaProfile','xsaRolloutPercent','xsaRolloutSelected','xsaTrainingApplied','xsaInferenceSymmetryRequired','xsaTrainingRuntimeProfile','xsaTrainingRuntimeImplemented','xsaServingRuntimeImplemented','xsaReason')}, ensure_ascii=True, separators=(',', ':'))}",
+        f"itmounts_attention_architecture:{json.dumps({key: recipe[key] for key in ('attentionArchitecture','xsaProfile','xsaRolloutPercent','xsaRolloutSelected','xsaTrainingApplied','xsaInferenceSymmetryRequired','xsaTrainingRuntimeProfile','xsaTrainingRuntimeImplemented','xsaServingRuntimeImplemented','xsaInstalledAttentionLayers','xsaReason')}, ensure_ascii=True, separators=(',', ':'))}",
         flush=True,
     )
 

@@ -6,7 +6,7 @@ const DIGEST_PINNED_IMAGE = /^[a-z0-9][a-z0-9._\/-]*(?::[a-z0-9._-]+)?@sha256:[a
 export type ExactArtifactContainerLane = 'standard' | 'xsa'
 
 export const EXACT_ARTIFACT_PRODUCTION_IMAGE =
-  'ghcr.io/signalboost/itmounts-exact-artifact@sha256:916d678563cd1fe00baca611972a406f3c4f24e6ec95fc901daa7f6151918df4' as const
+  'ghcr.io/signalboost/itmounts-exact-artifact@sha256:255fdd4ff3d14de3753afb757fc46130276c9461f17ca17b649f5dd8a27a3ea1' as const
 
 function clean(value: unknown, max = 1000): string {
   return String(value ?? '').trim().slice(0, max)

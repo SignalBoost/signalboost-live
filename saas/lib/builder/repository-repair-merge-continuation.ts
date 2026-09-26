@@ -173,6 +173,7 @@ export async function completePendingRepositoryRepairMerges(input: {
     mergeWatchOutcome?: MergeWatchOutcome | null
     deploymentId?: string | null
     deploymentState?: string | null
+    preMergeSnapshotId?: string | null
   }> = []
 
   for (const pull of pulls) {
@@ -282,7 +283,8 @@ export async function completePendingRepositoryRepairMerges(input: {
       }
     }
     outcomes.push({ pullRequestNumber, outcome: 'merged', reason: null, baseBranch, detail,
-      mergeCommitSha: merge.mergeCommitSha, mergeWatchOutcome, deploymentId, deploymentState })
+      mergeCommitSha: merge.mergeCommitSha, mergeWatchOutcome, deploymentId, deploymentState,
+      preMergeSnapshotId: merge.preMergeSnapshotId })
   }
 
   return Object.freeze({

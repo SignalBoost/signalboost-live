@@ -232,7 +232,10 @@ async function tryCosSoftwareSpecialistLegacy(
     }
     const target = exactTarget
       ?? signalBoostDeployedRepairTarget(objective, deployment)
-      ?? signalBoostDeployedRepairTarget(objective, deployment, { ownerDeveloperLogSubmission })
+      ?? signalBoostDeployedRepairTarget(objective, deployment, {
+        ownerDeveloperLogSubmission,
+        ownerPlatformEngineeringSubmission: input.signalBoostDeploymentContext === true,
+      })
 
     if (target) {
       return enqueueRepositoryRepair({

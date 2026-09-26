@@ -13,6 +13,10 @@ import { createSupabaseMergeWatchStore } from '@/lib/builder/merge-watch-store'
 import { runPendingMergeWatches } from '@/lib/builder/merge-watch-runner'
 import { watchMergedDeployment } from '@/lib/builder/repository-merge-watch'
 import { builderAutoMergeSnapshotPort } from '@/lib/builder/repository-repair-snapshot-host'
+import {
+  completeBuilderRepositoryRepairAfterMerge,
+  failBuilderRepositoryRepairAfterMergedDeployment,
+} from '@/lib/builder/repository-repair-job-lifecycle'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,6 +45,30 @@ export async function GET(request: Request) {
         deadlineAtMs: Date.now() + 12_000,
         pollIntervalMs: 5_000,
       }),
+      onTerminal: async (pending, status, detail, observed) => {
+        if (!pending.pullRequestNumber) return
+        if (status === 'healthy') {
+          await completeBuilderRepositoryRepairAfterMerge({
+            pullRequestNumber: pending.pullRequestNumber,
+            mergeCommitSha: pending.mergeCommitSha,
+            baseBranch: 'main',
+            detail,
+            mergeWatchOutcome: 'healthy',
+            deploymentId: observed?.deploymentId ?? null,
+            deploymentState: observed?.deploymentState ?? null,
+            preMergeSnapshotId: pending.preMergeSnapshotId,
+          })
+          return
+        }
+        await failBuilderRepositoryRepairAfterMergedDeployment({
+          pullRequestNumber: pending.pullRequestNumber,
+          mergeCommitSha: pending.mergeCommitSha,
+          detail,
+          error: status === 'rolled_back'
+            ? 'builder_repository_production_rolled_back'
+            : 'builder_repository_production_unresolved',
+        })
+      },
     })
     return NextResponse.json({ ok: true, ...sweep })
   } catch (error) {

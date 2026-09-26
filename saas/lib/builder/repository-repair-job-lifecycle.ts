@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
 import type { MergeWatchOutcome } from './repository-merge-watch.ts'
+import { createSupabaseMergeWatchStore } from './merge-watch-store.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SAFE_SHA = /^[0-9a-f]{40}$/i
@@ -103,6 +104,7 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
   mergeWatchOutcome?: MergeWatchOutcome | null
   deploymentId?: string | null
   deploymentState?: string | null
+  preMergeSnapshotId?: string | null
 }): Promise<boolean> {
   if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber < 1 || !SAFE_SHA.test(input.mergeCommitSha) || !SAFE_BRANCH.test(input.baseBranch)) return false
   const db = serviceClient()
@@ -110,6 +112,29 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
 
   const row = await pausedRepairJob(db, input.pullRequestNumber)
   if (!row) return false
+
+  if (input.baseBranch === 'main' && input.mergeWatchOutcome !== 'healthy') {
+    if (input.mergeWatchOutcome === 'rolled_back') {
+      return failBuilderRepositoryRepairAfterMergedDeployment({
+        pullRequestNumber: input.pullRequestNumber,
+        mergeCommitSha: input.mergeCommitSha,
+        detail: input.detail || 'The merged Production deployment failed and was rolled back.',
+        error: 'builder_repository_production_rolled_back',
+      })
+    }
+    const snapshotId = String(input.preMergeSnapshotId || '').trim()
+    if (!snapshotId) return false
+    const store = createSupabaseMergeWatchStore()
+    if (!store) throw new Error('builder_merge_watch_storage_unavailable')
+    await store.record({
+      workspaceId: String(row.workspace_id),
+      userId: String(row.user_id),
+      mergeCommitSha: input.mergeCommitSha,
+      preMergeSnapshotId: snapshotId,
+      pullRequestNumber: input.pullRequestNumber,
+    })
+    return false
+  }
 
   const plainReply = `Builder completed the repository repair. PR #${input.pullRequestNumber} passed the governed merge gates and was merged into ${input.baseBranch} as ${input.mergeCommitSha}.${input.detail ? ` ${String(input.detail).trim()}` : ''}`
   let artifactFiles = files(record(row.result).files)
@@ -255,5 +280,61 @@ export async function failBuilderRepositoryRepairAfterSupersededBase(input: {
     jobId: row.id,
     message: error instanceof Error ? error.message : 'unknown',
   }))
+  return true
+}
+
+
+export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
+  pullRequestNumber: number
+  mergeCommitSha: string
+  detail: string
+  error: 'builder_repository_production_rolled_back' | 'builder_repository_production_unresolved'
+}): Promise<boolean> {
+  if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber < 1 || !SAFE_SHA.test(input.mergeCommitSha)) return false
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const row = await pausedRepairJob(db, input.pullRequestNumber)
+  if (!row) return false
+
+  const plainReply = `Builder merged PR #${input.pullRequestNumber} as ${input.mergeCommitSha}, but Production was not accepted. ${String(input.detail || '').trim()}`
+  let artifactFiles = files(record(row.result).files)
+  try {
+    artifactFiles = await persistResultArtifact({ userId: String(row.user_id), workspaceId: String(row.workspace_id) }, plainReply)
+  } catch {}
+  const reply = historyReply(plainReply, String(row.workspace_id), artifactFiles)
+  const previous = record(row.result)
+  const updatedAt = new Date().toISOString()
+  const terminalResult = {
+    ...previous,
+    status: 'failed',
+    repository_merge_pending: false,
+    merge_taken: true,
+    merge_commit_sha: input.mergeCommitSha,
+    error: input.error,
+    reply,
+    files: artifactFiles,
+  }
+  const { data: updated, error: updateError } = await db.from('builder_jobs').update({
+    status: 'failed',
+    checkpoint: null,
+    result: terminalResult,
+    error: input.error,
+    finished_at: updatedAt,
+    updated_at: updatedAt,
+  }).eq('id', row.id).eq('status', 'paused').eq('claim_generation', row.claim_generation).select('id').maybeSingle()
+  if (updateError) throw new Error('builder_repository_production_failure_finish_failed')
+  if (!updated) return false
+  await persistHistory({
+    db, row, status: 'failed', reply, pullRequestNumber: input.pullRequestNumber,
+    mergeCommitSha: input.mergeCommitSha, baseBranch: 'main', error: input.error,
+  })
+  await recordBuilderUniversityProductionOutcome({
+    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt },
+    status: 'failure',
+    verification: input.error === 'builder_repository_production_rolled_back'
+      ? 'generation_fenced_repository_merge_rolled_back'
+      : 'generation_fenced_repository_merge_without_healthy_production_proof',
+    facts: { pullRequestNumber: input.pullRequestNumber, mergeCommitSha: input.mergeCommitSha, error: input.error },
+  }).catch(() => undefined)
   return true
 }

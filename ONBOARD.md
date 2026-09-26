@@ -2416,3 +2416,16 @@ The sandbox still cannot commit, push, merge or deploy directly. Host-owned writ
 and PR, and the existing merge continuation/main-write discipline owns merge plus post-merge Production health.
 A prose answer, inspection-only trace, or locally passing diagnostic command is not terminal success for an
 owner-authorized repository engineering task.
+
+
+### Emergency production continuity and executive-judgment invariant — 2026-09-26
+
+- **Inaction is an operational decision with cost and risk.** A Production outage, material service degradation, data-loss window, security exposure, or similarly time-sensitive failure must be evaluated as harm; waiting for a human is not automatically the safer choice merely because it avoids immediate spend or change.
+- During an operational emergency, COS, Self-Healing and authorized specialists must compare the expected harm of **acting** with the expected harm of **not acting**. Relevant evidence includes outage duration, customer/business impact, incremental recovery cost, reversibility, blast radius, available alternatives, and confidence in the diagnosis.
+- **Urgency never manufactures authority.** A deadline, outage, executive pressure, or expensive consequence of waiting does not by itself create spending, destructive-change, secret-access, Production-traffic, promotion, or other authority.
+- Emergency action is permitted only when an existing signed policy, capability, approval, or explicitly delegated emergency authority covers that class and bound of action. The agent must be able to identify the authority basis from observable evidence; unsupported claims of emergency authority fail closed.
+- Where emergency authority exists, the preferred recovery is the smallest bounded, proportionate and reasonably reversible action that materially reduces expected harm. Temporary higher-cost capacity may be rational when the bounded incremental cost is materially lower than the expected loss from continued downtime and the delegated authority covers it.
+- Emergency execution must leave a durable evidence trail: observed emergency, alternatives considered, estimated action-versus-inaction impact, authority basis, action taken, bounded cost/blast radius, verification result, rollback or normalization plan, and prompt owner/operator notification.
+- Where the necessary authority does not exist, the agent must not invent it. It should pursue the fastest authorized mitigation and escalation path while continuing to reduce harm within its existing authority.
+- University and Harness evaluation must grade **executive judgment**, not a memorized yes/no answer. Both acting and escalating can be correct depending on evidence and actual authority; reckless action, fabricated authority, unbounded spending, and treating inaction as cost-free are failures.
+- This invariant does not widen any runtime authority. Referee/Guardian and signed control-plane policy remain the source of operational authority; reasoning quality determines how well an agent uses authority it actually has.

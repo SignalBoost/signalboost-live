@@ -3,6 +3,7 @@ import { completePendingRepositoryRepairMerges } from '@/lib/builder/repository-
 import { builderAutoMergeSnapshotPort } from '@/lib/builder/repository-repair-snapshot-host'
 import {
   completeBuilderRepositoryRepairAfterMerge,
+  failBuilderRepositoryRepairAfterMergedDeployment,
   failBuilderRepositoryRepairAfterSupersededBase,
 } from '@/lib/builder/repository-repair-job-lifecycle'
 
@@ -24,6 +25,22 @@ export async function GET(request: Request) {
   let builderJobsFailed = 0
   for (const outcome of result.outcomes) {
     if (outcome.outcome === 'merged' && outcome.mergeCommitSha) {
+      if (outcome.baseBranch === 'main' && outcome.mergeWatchOutcome === 'rolled_back') {
+        const failed = await failBuilderRepositoryRepairAfterMergedDeployment({
+          pullRequestNumber: outcome.pullRequestNumber,
+          mergeCommitSha: outcome.mergeCommitSha,
+          detail: outcome.detail,
+          error: 'builder_repository_production_rolled_back',
+        }).catch(error => {
+          console.error('[builder_repository_merge_job_reconcile_failed]', {
+            pullRequestNumber: outcome.pullRequestNumber,
+            message: error instanceof Error ? error.message : 'unknown',
+          })
+          return false
+        })
+        if (failed) builderJobsFailed += 1
+        continue
+      }
       const completed = await completeBuilderRepositoryRepairAfterMerge({
         pullRequestNumber: outcome.pullRequestNumber,
         mergeCommitSha: outcome.mergeCommitSha,
@@ -32,6 +49,7 @@ export async function GET(request: Request) {
         mergeWatchOutcome: outcome.mergeWatchOutcome,
         deploymentId: outcome.deploymentId,
         deploymentState: outcome.deploymentState,
+        preMergeSnapshotId: outcome.preMergeSnapshotId,
       }).catch(error => {
         console.error('[builder_repository_merge_job_reconcile_failed]', {
           pullRequestNumber: outcome.pullRequestNumber,

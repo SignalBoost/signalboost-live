@@ -391,11 +391,33 @@ export async function ensureMassDistilledEndpoint24Gb(endpointId: string) {
 export async function activateMassDistilledEvaluationWorker(endpointId: string) {
   const endpoint = await resolveEndpointControlPlane(clean(endpointId, 160))
   assertEndpointSafetyPolicy(endpoint, IDLE_TIMEOUT_SECONDS, APPROVED_POOLS)
-  const activated = await withWorkerQuotaRecovery(String(endpoint.id), () =>
-    requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+  const activate = () => requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ workers: { min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+  })
+  let activated: Endpoint
+  try {
+    activated = await withWorkerQuotaRecovery(String(endpoint.id), activate)
+  } catch (error) {
+    // RunPod revalidates the account-wide max-worker quota even when this exact endpoint already
+    // owns max=1 and the patch only changes min=0 -> min=1. At 10/10 that can reject a legitimate
+    // evaluator wake after every disposable sibling has already been retired. Release only THIS
+    // exact mass endpoint's existing max-1 reservation, then restore the identical min=1/max=1
+    // envelope. Capacity never exceeds the pre-existing bound and protected/unrelated endpoints
+    // remain untouched.
+    const endpointName = clean(endpoint.name, 240)
+    if (!runpodWorkerQuotaError(error)
+      || Number(endpoint.workers?.max ?? Number.NaN) !== 1
+      || !endpointName.startsWith('itmounts-mass-distilled-')) throw error
+    const drained = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
       method: 'PATCH',
-      body: JSON.stringify({ workers: { min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
-    }))
+      body: JSON.stringify({ workers: { min: 0, max: 0, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+    })
+    if (!drained?.id || Number(drained.workers?.max ?? Number.NaN) !== 0) {
+      throw new Error('mass_distilled_evaluation_quota_self_drain_rejected')
+    }
+    activated = await activate()
+  }
   if (!activated?.id
     || Number(activated.workers?.min ?? Number.NaN) !== 1
     || Number(activated.workers?.max ?? Number.NaN) !== 1) {

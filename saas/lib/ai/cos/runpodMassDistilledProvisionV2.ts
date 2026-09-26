@@ -688,29 +688,36 @@ export async function activateMassDistilledCanaryWorker(endpointId: string) {
     if (activated?.id) {
       await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(activated.id))}`, {
         method: 'PATCH',
-        body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+        body: JSON.stringify({ workers: { min: 0, max: 0, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
       }).catch(() => undefined)
     }
     throw error
   }
 }
 
-/** Restore the exact endpoint to its normal scale-to-zero envelope before canary proof is admissible. */
+/** Retire a terminal canary's worker reservation immediately. The exact endpoint remains materialized
+ * for canary evidence, later evaluation identity and rollback; restoreRetiredEndpointCapacity re-arms max=1
+ * when an authorized evaluator or rollback path actually needs it. */
 export async function deactivateMassDistilledCanaryWorker(endpointId: string) {
   const endpoint = await resolveEndpointControlPlane(clean(endpointId, 160))
   const pools = canaryEndpointPools(endpoint)
   const deactivated = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
     method: 'PATCH',
-    body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+    body: JSON.stringify({ workers: { min: 0, max: 0, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
   })
-  if (!deactivated?.id) throw new Error('mass_distilled_runtime_canary_worker_scale_down_missing')
-  assertEndpointSafetyPolicy(deactivated, IDLE_TIMEOUT_SECONDS, pools)
+  if (!deactivated?.id
+    || Number(deactivated.workers?.min ?? Number.NaN) !== 0
+    || Number(deactivated.workers?.max ?? Number.NaN) !== 0) {
+    throw new Error('mass_distilled_runtime_canary_worker_retirement_rejected')
+  }
+  assertNonGpuEndpointSafetyPolicy(deactivated, IDLE_TIMEOUT_SECONDS)
   return Object.freeze({
     endpointId: String(deactivated.id),
-    workersMin: Number(deactivated.workers?.min),
-    workersMax: Number(deactivated.workers?.max),
+    workersMin: 0 as const,
+    workersMax: 0 as const,
     idleTimeout: Number(deactivated.workers?.idleTimeout),
     gpuPools: Object.freeze([...pools]),
+    authorityExpanded: false as const,
   })
 }
 

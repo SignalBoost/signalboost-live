@@ -136,11 +136,13 @@ test('new v4 templates recover delayed provider id visibility without duplicate 
 })
 
 
-test('approved canary explicitly warm-starts exactly one worker then restores scale-to-zero before proof', () => {
+test('approved canary explicitly warm-starts exactly one worker then retires its reservation before proof', () => {
   assert.match(compatibility, /export async function activateMassDistilledCanaryWorker/)
   assert.match(compatibility, /workers: \{ min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
   assert.match(compatibility, /export async function deactivateMassDistilledCanaryWorker/)
-  assert.match(compatibility, /workers: \{ min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
+  assert.match(compatibility, /workers: \{ min: 0, max: 0, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
+  assert.match(compatibility, /mass_distilled_runtime_canary_worker_retirement_rejected/)
+  assert.match(compatibility, /restoreRetiredEndpointCapacity/)
 
   const invocation = route.indexOf('claim:INVOCATION_STARTED')
   const activate = route.indexOf('activateMassDistilledCanaryWorker(provisioned.endpointId)')

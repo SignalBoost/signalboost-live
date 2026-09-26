@@ -105,6 +105,7 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
   deploymentId?: string | null
   deploymentState?: string | null
   preMergeSnapshotId?: string | null
+  productionAcceptancePassed?: boolean
 }): Promise<boolean> {
   if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber < 1 || !SAFE_SHA.test(input.mergeCommitSha) || !SAFE_BRANCH.test(input.baseBranch)) return false
   const db = serviceClient()
@@ -112,6 +113,12 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
 
   const row = await pausedRepairJob(db, input.pullRequestNumber)
   if (!row) return false
+
+  if (input.baseBranch === 'main' && input.mergeWatchOutcome === 'healthy' && input.productionAcceptancePassed !== true) {
+    // A READY Vercel deployment is not end-to-end proof. The durable merge worker must run
+    // the live Playwright acceptance before this job may become terminal success.
+    return false
+  }
 
   if (input.baseBranch === 'main' && input.mergeWatchOutcome !== 'healthy') {
     if (input.mergeWatchOutcome === 'rolled_back') {
@@ -153,6 +160,8 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     status: 'succeeded',
     repository_merge_pending: false,
     merge_taken: true,
+    production_acceptance_required: input.baseBranch === 'main',
+    production_acceptance_passed: input.baseBranch === 'main' ? input.productionAcceptancePassed === true : null,
     merge_commit_sha: input.mergeCommitSha,
     merge_base_branch: input.baseBranch,
     reply,
@@ -195,7 +204,8 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
         : 'generation_fenced_repository_merge_without_healthy_production_proof',
     facts: { pullRequestNumber: input.pullRequestNumber, mergeCommitSha: input.mergeCommitSha,
       baseBranch: input.baseBranch, mergeWatchOutcome: input.mergeWatchOutcome ?? null,
-      deploymentId: input.deploymentId ?? null, deploymentState: input.deploymentState ?? null },
+      deploymentId: input.deploymentId ?? null, deploymentState: input.deploymentState ?? null,
+      productionAcceptancePassed: input.productionAcceptancePassed ?? null },
   }).catch(error => console.error('[builder_university_outcome_record_failed]', {
     jobId: row.id,
     message: error instanceof Error ? error.message : 'unknown',

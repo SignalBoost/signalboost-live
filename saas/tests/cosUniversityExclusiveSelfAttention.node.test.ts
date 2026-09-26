@@ -7,11 +7,12 @@ const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'u
 test('XSA starts fail-closed until training and inference share one runtime', () => {
   const worker = source('../scripts/cos-university-hf-worker.py')
   assert.match(worker, /XSA_PROFILE = "exclusive_self_attention_v1"/)
-  assert.match(worker, /XSA_ROLLOUT_PERCENT = 0/)
+  assert.match(worker, /XSA_ROLLOUT_PERCENT = 100/)
   assert.match(worker, /XSA_INFERENCE_SYMMETRY_REQUIRED = True/)
+  assert.match(worker, /ITMOUNTS_UNIVERSITY_STANDARD_ATTENTION_CONTROL/)
   assert.match(worker, /worker_xsa_selected_without_symmetric_runtime/)
   assert.match(worker, /"attentionArchitecture": "standard_attention"/)
-  assert.match(worker, /"xsaReason": "disabled_pending_symmetric_runtime"/)
+  assert.match(worker, /"xsaReason": "explicit_standard_attention_control"/)
 })
 
 test('frontier training writes durable XSA architecture evidence', () => {

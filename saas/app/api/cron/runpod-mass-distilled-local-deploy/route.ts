@@ -326,6 +326,9 @@ async function issueRollingCanaryApproval(now:Date){
         failureDerivedReplayItems:Number(receipt.failureDerivedReplayItems||0),
         failureDerivedReplayEpochs:Number(receipt.failureDerivedReplayEpochs||0),
         failureDerivedReplayLearningRate:Number(receipt.failureDerivedReplayLearningRate||0),
+        attentionArchitecture:receipt.xsaTrainingApplied===true
+          ? 'exclusive_self_attention_v1'
+          : 'standard_attention',
       }
     }),
     events:eventRows.map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),

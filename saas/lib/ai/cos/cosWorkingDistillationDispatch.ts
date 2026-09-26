@@ -83,6 +83,37 @@ async function currentWorkingCosContext(fetchImpl: typeof fetch = fetch) {
   return Object.freeze({ podId, config, identity, binding })
 }
 
+
+async function readActiveWorkingCosTrainingCandidate(db: any) {
+  const accepted = await db.from('cos_working_distillation_job_events')
+    .select('candidate_id,job_id,base_model_id,base_model_revision,created_at')
+    .eq('operation', 'train')
+    .eq('event_type', 'provider_accepted')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (accepted.error) throw accepted.error
+  if (!accepted.data?.candidate_id || !accepted.data?.job_id) return null
+
+  const terminal = await db.from('cos_working_distillation_job_events')
+    .select('event_type')
+    .eq('candidate_id', accepted.data.candidate_id)
+    .eq('operation', 'train')
+    .eq('job_id', accepted.data.job_id)
+    .in('event_type', ['provider_failed', 'callback_recorded'])
+    .limit(1)
+    .maybeSingle()
+  if (terminal.error) throw terminal.error
+  if (terminal.data) return null
+
+  return Object.freeze({
+    candidateId: clean(accepted.data.candidate_id, 160),
+    jobId: clean(accepted.data.job_id, 240),
+    baseModelId: clean(accepted.data.base_model_id, 300),
+    baseModelRevision: clean(accepted.data.base_model_revision, 40).toLowerCase(),
+  })
+}
+
 async function ensureCurrentCandidate(input: {
   rotationSeed?: string
   fetchImpl?: typeof fetch
@@ -136,7 +167,46 @@ export async function ensureWorkingCosCandidateReadiness(input: {
   fetchImpl?: typeof fetch
   db?: any
 } = {}) {
-  const context = await ensureCurrentCandidate(input)
+  const db = input.db || cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const activeTraining = await readActiveWorkingCosTrainingCandidate(db)
+  if (activeTraining) {
+    const runtime = await currentWorkingCosContext(input.fetchImpl)
+    const { candidate, materialization } = await readWorkingCosDatasetMaterialization({
+      candidateId: activeTraining.candidateId,
+      baseModelId: activeTraining.baseModelId,
+      baseModelRevision: activeTraining.baseModelRevision,
+    }, db)
+    return Object.freeze({
+      ready: true as const,
+      candidateId: activeTraining.candidateId,
+      candidateKey: clean(candidate.candidate_key, 64) || null,
+      bundleKey: materialization.bundleKey,
+      portableManifestHash: materialization.portableManifestHash,
+      datasetHash: materialization.datasetHash,
+      itemCount: materialization.itemCount,
+      trainingItemCount: materialization.trainingItemCount,
+      holdoutItemCount: materialization.holdoutItemCount,
+      subjectCount: materialization.subjectCount,
+      subjects: materialization.subjectIds,
+      runtimeBindingKey: runtime.binding.bindingKey,
+      runtimeDigest: runtime.binding.observedRuntimeDigest,
+      runtimeModel: runtime.binding.observedRuntimeModel,
+      trainableBaseModelId: activeTraining.baseModelId,
+      trainableBaseModelRevision: activeTraining.baseModelRevision,
+      baselineIdentity: runtime.binding.baselineIdentity,
+      rollbackArtifactRef: runtime.binding.rollbackArtifactRef,
+      activeTrainingJobId: activeTraining.jobId,
+      automaticTrainingAuthorized: false as const,
+      automaticActivationAuthorized: false as const,
+      productionTrafficAuthorized: false as const,
+      universityGraduationClaimed: false as const,
+      nextGate: 'working_cos_training_in_progress' as const,
+      semantics: 'active_training_candidate_readiness_pin' as const,
+    })
+  }
+
+  const context = await ensureCurrentCandidate({ ...input, db })
   return Object.freeze({
     ready: true as const,
     candidateId: context.registered.candidateId,
@@ -498,6 +568,132 @@ export async function reconcileWorkingCosPreparationProviderJob(input: {
     retryAuthorized: failedCount <= 1,
     failureCount: failedCount,
     automaticTrainingAuthorized: false as const,
+    productionTrafficAuthorized: false as const,
+  })
+}
+
+
+export async function reconcileWorkingCosTrainingProviderJob(input: {
+  candidateId: string
+  jobId: string
+  fetchImpl?: typeof fetch
+  db?: any
+}) {
+  const candidateId = clean(input.candidateId, 160)
+  const jobId = clean(input.jobId, 240)
+  if (!/^working-cos:[a-f0-9]{32}$/i.test(candidateId)) throw new Error('working_cos_training_reconcile_candidate_invalid')
+  if (!jobId) throw new Error('working_cos_training_reconcile_job_id_missing')
+  const db = input.db || cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+
+  const callbackRows = await db.from('cos_working_distillation_job_events')
+    .select('evidence')
+    .eq('candidate_id', candidateId)
+    .eq('operation', 'train')
+    .eq('event_type', 'callback_recorded')
+    .eq('job_id', jobId)
+    .limit(8)
+  if (callbackRows.error) throw callbackRows.error
+  const callbackClaims = new Set((callbackRows.data || []).map((row: any) => clean(row.evidence?.claim, 80)))
+  if (callbackClaims.has('trained_artifact_registered') && callbackClaims.has('rollback_artifact_registered')) {
+    return Object.freeze({
+      terminal: true as const,
+      callbackRecorded: true as const,
+      providerStage: 'CALLBACK_RECORDED' as const,
+      retryAuthorized: false as const,
+      automaticActivationAuthorized: false as const,
+      productionTrafficAuthorized: false as const,
+    })
+  }
+
+  const accepted = await db.from('cos_working_distillation_job_events')
+    .select('idempotency_key,job_url,runtime_binding_key,runtime_digest,base_model_id,base_model_revision,dataset_hash,training_manifest_hash,holdout_manifest_hash,provider_flavor,hourly_cost_usd,max_estimated_cost_usd,evidence,created_at')
+    .eq('candidate_id', candidateId)
+    .eq('operation', 'train')
+    .eq('event_type', 'provider_accepted')
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (accepted.error) throw accepted.error
+  if (!accepted.data) throw new Error('working_cos_training_reconcile_provider_acceptance_missing')
+
+  const hf = huggingFaceJobsConfigFromEnv()
+  if (!hf) throw new Error('working_cos_training_provider_not_configured')
+  const namespace = await resolveHuggingFaceNamespace({ token: hf.token, fetchImpl: input.fetchImpl })
+  const providerJob = await inspectHuggingFaceJob({ namespace, jobId, token: hf.token, fetchImpl: input.fetchImpl })
+  const terminalStage = ['COMPLETED', 'CANCELED', 'ERROR', 'DELETED'].includes(providerJob.stage)
+
+  if (!terminalStage) {
+    return Object.freeze({
+      terminal: false as const,
+      callbackRecorded: false as const,
+      providerStage: providerJob.stage,
+      retryAuthorized: false as const,
+      automaticActivationAuthorized: false as const,
+      productionTrafficAuthorized: false as const,
+    })
+  }
+
+  if (providerJob.stage === 'COMPLETED' && callbackClaims.size > 0) {
+    return Object.freeze({
+      terminal: false as const,
+      callbackRecorded: false as const,
+      providerStage: providerJob.stage,
+      callbackClaims: [...callbackClaims],
+      retryAuthorized: false as const,
+      automaticActivationAuthorized: false as const,
+      productionTrafficAuthorized: false as const,
+    })
+  }
+
+  const priorFailure = await db.from('cos_working_distillation_job_events')
+    .select('created_at')
+    .eq('candidate_id', candidateId)
+    .eq('operation', 'train')
+    .eq('event_type', 'provider_failed')
+    .eq('job_id', jobId)
+    .limit(1)
+    .maybeSingle()
+  if (priorFailure.error) throw priorFailure.error
+  if (!priorFailure.data) {
+    await recordJobEvent(db, {
+      candidateId,
+      operation: 'train',
+      eventType: 'provider_failed',
+      idempotencyKey: clean(accepted.data.idempotency_key, 64),
+      jobId,
+      jobUrl: clean(accepted.data.job_url, 2000),
+      runtimeBindingKey: clean(accepted.data.runtime_binding_key, 64),
+      runtimeDigest: clean(accepted.data.runtime_digest, 64),
+      baseModelId: clean(accepted.data.base_model_id, 300),
+      baseModelRevision: clean(accepted.data.base_model_revision, 40),
+      datasetHash: clean(accepted.data.dataset_hash, 64),
+      trainingManifestHash: clean(accepted.data.training_manifest_hash, 64),
+      holdoutManifestHash: clean(accepted.data.holdout_manifest_hash, 64),
+      providerFlavor: clean(accepted.data.provider_flavor, 80),
+      hourlyCostUsd: Number(accepted.data.hourly_cost_usd),
+      maxEstimatedCostUsd: Number(accepted.data.max_estimated_cost_usd),
+      evidence: {
+        error: providerJob.stage === 'COMPLETED'
+          ? 'huggingface_training_completed_without_required_callbacks'
+          : `huggingface_training_provider_${providerJob.stage.toLowerCase()}`,
+        providerStage: providerJob.stage,
+        providerMessage: providerJob.message,
+        callbackClaims: [...callbackClaims],
+        automaticRetryAuthorized: false,
+        providerInvocationStarted: true,
+      },
+    })
+  }
+
+  return Object.freeze({
+    terminal: true as const,
+    callbackRecorded: false as const,
+    providerStage: providerJob.stage,
+    callbackClaims: [...callbackClaims],
+    retryAuthorized: false as const,
+    automaticActivationAuthorized: false as const,
     productionTrafficAuthorized: false as const,
   })
 }

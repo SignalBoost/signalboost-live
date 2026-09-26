@@ -97,6 +97,18 @@ test('deterministic University worker exceptions do not classify Hugging Face as
   assert.equal(result.deterministic, true)
   assert.equal(result.costBearingRetryAllowed, false)
 
+  const nameError = classifyProviderFailure([
+    'File "/tmp/itmounts_hf_worker.py", line 786, in _xsa_canary_evidence',
+    "NameError: name 'XSA_ATTENTION_ARCHITECTURE' is not defined",
+  ])
+  assert.equal(nameError.failureClass, 'configuration_invalid')
+  assert.equal(nameError.reason, 'worker_contract_invalid')
+  assert.equal(nameError.deterministic, true)
+  assert.equal(nameError.costBearingRetryAllowed, false)
+
+  const worker = fs.readFileSync(path.join(ROOT, 'scripts/cos-university-hf-worker.py'), 'utf8')
+  assert.match(worker, /XSA_ATTENTION_ARCHITECTURE\s*=\s*"exclusive_self_attention_v1"/)
+
   const diagnostics = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityHuggingFaceJobDiagnostics.ts'), 'utf8')
   assert.match(diagnostics, /classification\.reason === 'worker_contract_invalid'/)
   assert.match(diagnostics, /worker_failure_not_provider_scoped/)

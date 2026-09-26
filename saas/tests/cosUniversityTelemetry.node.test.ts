@@ -171,3 +171,19 @@ test('University telemetry exposes owner-only Working COS dispatch controls with
   assert.match(route, /dispatchWorkingCosDatasetPreparation/)
   assert.match(route, /dispatchWorkingCosTraining/)
 })
+
+
+test('owner telemetry exposes the complete University lifecycle including Builder Residency',()=>{
+  assert.match(route,/cos_university_residency_enrollments/)
+  assert.match(route,/cos_university_residency_case_runs/)
+  assert.match(route,/cos_university_residency_competency_evidence/)
+  assert.match(route,/currentStage/)
+  assert.match(route,/waiting_for_residency_admission/)
+  assert.match(route,/fresh_exact_canary_required/)
+  assert.match(page,/University pipeline — live state/)
+  assert.match(page,/Builder Residency — live cohort/)
+  assert.match(page,/artifact\.currentStage/)
+  assert.match(page,/artifact\.blocker/)
+  assert.match(page,/artifact\.nextAction/)
+  assert.match(page,/infrastructureFailures/)
+})

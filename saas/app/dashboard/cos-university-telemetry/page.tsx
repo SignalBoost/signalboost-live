@@ -73,6 +73,8 @@ type Run = {
   completedAt: string | null
 }
 
+type Residency = { residencyId:string; candidateId:string; subject:string; artifactId:string; artifactHash:string; programId:string; programVersion:string; standing:string; demonstratedCompetencies:number; competenciesObserved:number; totalCompetencies:number; completedCases:number; realOutcomes:number; infrastructureFailures:number; latestCase:{competency:string;family:string;status:string;outcome:string|null;failureCode:string|null;startedAt:string|null;completedAt:string|null}|null; admittedAt:string|null; completedAt:string|null; remediationRequiredAt:string|null; updatedAt:string|null }
+
 type Artifact = {
   candidateId: string
   subject: string
@@ -83,6 +85,10 @@ type Artifact = {
   ageSeconds: number | null
   retentionEligibleAt: string | null
   claimability: string
+  currentStage: string
+  blocker: string
+  nextAction: string
+  residency: Residency | null
   evaluation: {
     evaluatedAt: string | null
     artifactAgeSeconds: number
@@ -124,6 +130,8 @@ type Telemetry = {
   providers?: Provider[]
   runs?: Run[]
   artifacts?: Artifact[]
+  residency?: Residency[]
+  pipeline?: { residencyTotal?:number; residencyResidents?:number; residencyRemediation?:number; residencyComplete?:number; activeGraduates?:number; evaluationPending?:number; quarantined?:number }
 }
 
 const REFRESH_MS = 60_000
@@ -267,6 +275,8 @@ export default function CosUniversityTelemetryPage() {
   const workingCos = data?.workingCos || null
   const runs = data?.runs || []
   const artifacts = data?.artifacts || []
+  const residency = data?.residency || []
+  const pipeline = data?.pipeline || {}
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
@@ -454,6 +464,25 @@ export default function CosUniversityTelemetryPage() {
       </section>
 
       <section className="rounded-lg border p-4">
+        <h2 className="font-semibold">University pipeline — live state</h2>
+        <p className="mt-1 text-xs opacity-65">Training → Residency → exact canary → evaluation → graduation → active runtime.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <Card label="Residency residents" value={String(pipeline.residencyResidents ?? 0)} />
+          <Card label="Residency remediation" value={String(pipeline.residencyRemediation ?? 0)} />
+          <Card label="Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
+          <Card label="Evaluation pending" value={String(pipeline.evaluationPending ?? 0)} />
+          <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
+          <Card label="Active graduates" value={String(pipeline.activeGraduates ?? 0)} />
+        </div>
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <h2 className="font-semibold">Builder Residency — live cohort</h2>
+        <p className="mt-1 text-xs opacity-65">Every enrolled Computer Science artifact and its durable progress.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">{residency.map(row => <div key={row.residencyId} className="rounded-lg border p-3 text-xs"><div className="font-semibold">{gateLabel(row.standing)} · {row.demonstratedCompetencies}/{row.totalCompetencies} competencies</div><div className="mt-1 font-mono opacity-60">{short(row.candidateId,28)}</div><div className="mt-2">{row.completedCases} cases · {row.realOutcomes} real outcomes · {row.infrastructureFailures} infrastructure failures</div><div className="mt-1">Latest: {row.latestCase ? gateLabel(row.latestCase.outcome || row.latestCase.status) : 'no case yet'}</div><div className="mt-1 font-medium">Next: {row.standing === 'residency_complete' ? 'fresh exact-artifact canary' : row.standing === 'remediation_required' ? 'remediation case' : 'continue competency cases'}</div></div>)}</div>
+      </section>
+
+      <section className="rounded-lg border p-4">
         <div className="mb-4">
           <h2 className="font-semibold">{copy.artifactsTitle}</h2>
           <p className="text-xs opacity-65">{copy.artifactsExplanation}</p>
@@ -463,7 +492,7 @@ export default function CosUniversityTelemetryPage() {
             <thead className="border-b text-xs uppercase opacity-60">
               <tr>
                 <th className="pb-3 pr-4">{copy.subject}</th>
-                <th className="pb-3 pr-4">{copy.artifactStatus}</th>
+                <th className="pb-3 pr-4">{copy.artifactStatus}</th><th className="pb-3 pr-4">Current stage</th><th className="pb-3 pr-4">Blocker</th><th className="pb-3 pr-4">Next action</th>
                 <th className="pb-3 pr-4">{copy.retentionGate}</th>
                 <th className="pb-3 pr-4">{copy.claimability}</th>
                 <th className="pb-3 pr-4">{copy.holdout}</th>
@@ -481,7 +510,7 @@ export default function CosUniversityTelemetryPage() {
                     <div className="font-medium">{artifact.subject || copy.unknownSubject}</div>
                     <div className="mt-1 font-mono text-[11px] opacity-50">{short(artifact.candidateId, 20)}</div>
                   </td>
-                  <td className="py-3 pr-4"><span className="rounded-full border px-2 py-1 text-xs">{artifact.status || copy.unknownStage}</span></td>
+                  <td className="py-3 pr-4"><span className="rounded-full border px-2 py-1 text-xs">{artifact.status || copy.unknownStage}</span></td><td className="py-3 pr-4 text-xs font-medium">{artifact.currentStage}</td><td className="py-3 pr-4 text-xs">{gateLabel(artifact.blocker)}</td><td className="py-3 pr-4 text-xs">{artifact.nextAction}</td>
                   <td className="py-3 pr-4 text-xs">{when(artifact.retentionEligibleAt)}</td>
                   <td className="py-3 pr-4 text-xs font-medium">{copy.claimabilityStates[artifact.claimability] || artifact.claimability}</td>
                   <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.holdoutImproved ? copy.pass : copy.fail) : copy.pending}</td>
@@ -492,7 +521,7 @@ export default function CosUniversityTelemetryPage() {
                   <td className="py-3 text-xs opacity-65">{when(artifact.updatedAt)}</td>
                 </tr>
               ))}
-              {!artifacts.length ? <tr><td colSpan={10} className="py-6 text-center text-sm opacity-60">{copy.noArtifacts}</td></tr> : null}
+              {!artifacts.length ? <tr><td colSpan={13} className="py-6 text-center text-sm opacity-60">{copy.noArtifacts}</td></tr> : null}
             </tbody>
           </table>
         </div>

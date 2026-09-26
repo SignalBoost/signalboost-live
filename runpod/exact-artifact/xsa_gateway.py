@@ -1,4 +1,4 @@
-import asyncio,importlib.util,os,urllib.request
+import asyncio,importlib.util,os
 from pathlib import Path
 import torch,uvicorn
 from fastapi import FastAPI,HTTPException
@@ -8,12 +8,12 @@ from transformers import AutoModelForCausalLM,AutoTokenizer
 from peft import PeftModel
 BASE_ID=os.environ["ITMOUNTS_BASE_MODEL_ID"];BASE_REV=os.environ["ITMOUNTS_BASE_MODEL_REVISION"]
 ADAPTER_ID=os.environ["ITMOUNTS_ADAPTER_MODEL_ID"];ADAPTER_REV=os.environ["ITMOUNTS_ADAPTER_MODEL_REVISION"]
-MODEL=os.environ["ITMOUNTS_DISTILLED_MODEL_NAME"];TOKEN=os.environ["HF_TOKEN"];RUNTIME_URL=os.environ["ITMOUNTS_XSA_RUNTIME_URL"];PROFILE=os.environ["ITMOUNTS_XSA_RUNTIME_PROFILE"]
+MODEL=os.environ["ITMOUNTS_DISTILLED_MODEL_NAME"];TOKEN=os.environ["HF_TOKEN"];PROFILE=os.environ["ITMOUNTS_XSA_RUNTIME_PROFILE"]
 app=FastAPI();ready=asyncio.Event();bootstrap_error=None;tokenizer=None;model=None;runtime_receipt=None
 class Chat(BaseModel):
     model:str;messages:list[dict];max_tokens:int=128;temperature:float=0
 def load_runtime():
-    path=Path("/tmp/itmounts_xsa_runtime.py");urllib.request.urlretrieve(RUNTIME_URL,path);source=path.read_text("utf-8")
+    path=Path("/opt/itmounts/cos-university-xsa-runtime.py");source=path.read_text("utf-8")
     for marker in ("exclusive_self_attention_projection","install_qwen3_xsa","usesActualValueProjection","gqaAware"):
         if marker not in source: raise RuntimeError("xsa_serving_runtime_contract_invalid")
     spec=importlib.util.spec_from_file_location("itmounts_xsa_runtime",path)
@@ -39,7 +39,7 @@ async def start(): asyncio.create_task(bootstrap())
 @app.get("/ping")
 async def ping():
     if bootstrap_error: raise HTTPException(status_code=503,detail=f"xsa_bootstrap_failed:{bootstrap_error}")
-    if not ready.is_set(): return {"status":"loading","modelReady":False}
+    if not ready.is_set(): raise HTTPException(status_code=503,detail="xsa_runtime_loading")
     return {"status":"ready","modelReady":True,"model":MODEL,"artifactRevision":ADAPTER_REV,"attentionArchitecture":"exclusive_self_attention_v1","xsaProfile":PROFILE,"runtimeReceipt":runtime_receipt}
 @app.get("/ready")
 async def is_ready(): return await ping()

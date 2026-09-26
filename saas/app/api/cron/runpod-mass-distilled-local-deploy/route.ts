@@ -106,6 +106,28 @@ const ROLLING_EVENT_PAGE_SIZE = 1000
 // the atomic canary claim ran. Keep the full eligibility set, but bound each candidate filter.
 const ROLLING_EVENT_CANDIDATE_CHUNK_SIZE = 75
 
+const RETEST_REOPEN_CLAIM = 'mass_distilled_independent_evaluation_reopened'
+const RETEST_REOPEN_REPAIR_REF = 'owner_explicit_direction_2026-09-26_retest_all_quarantined'
+
+async function readRetestGenerationEvents(db:any,candidateIds:string[]){
+  const rows:any[]=[]
+  const uniqueCandidateIds=[...new Set(candidateIds.map(value=>String(value||'').trim()).filter(Boolean))]
+  for(let offset=0;offset<uniqueCandidateIds.length;offset+=ROLLING_EVENT_CANDIDATE_CHUNK_SIZE){
+    const candidateChunk=uniqueCandidateIds.slice(offset,offset+ROLLING_EVENT_CANDIDATE_CHUNK_SIZE)
+    const page=await db.from('cos_university_learning_assurance_events')
+      .select('candidate_id,observed_at,expires_at,verifier,evidence')
+      .eq('event_type','fine_tune')
+      .eq('verifier','host_controller')
+      .in('candidate_id',candidateChunk)
+      .contains('evidence',{claim:RETEST_REOPEN_CLAIM,repairRef:RETEST_REOPEN_REPAIR_REF})
+      .order('observed_at',{ascending:false})
+      .limit(ROLLING_EVENT_PAGE_SIZE)
+    if(page.error) throw page.error
+    rows.push(...(page.data||[]))
+  }
+  return rows
+}
+
 async function readRollingCanaryEvents(db:any,candidateIds:string[]){
   const rows:any[]=[]
   const uniqueCandidateIds=[...new Set(candidateIds.map(value=>String(value||'').trim()).filter(Boolean))]
@@ -295,7 +317,11 @@ async function issueRollingCanaryApproval(now:Date){
   // The old global .limit(5000) mixed in teacher/training/provider history; as that history grew,
   // an older exact-artifact canary pass fell out of the window and the issuer re-approved the same
   // already-passed artifact. That approval was intentionally unclaimable and froze the queue.
-  const rawEventRows=await readRollingCanaryEvents(db,candidateIds)
+  const [rollingEventRows,retestGenerationRows]=await Promise.all([
+    readRollingCanaryEvents(db,candidateIds),
+    readRetestGenerationEvents(db,candidateIds),
+  ])
+  const rawEventRows=[...rollingEventRows,...retestGenerationRows]
   // A canary observed before Builder Residency completion is teaching-stage evidence only. Remove it from
   // final-canary policy state so Residency completion requires a fresh exact-artifact canary as the atomic
   // claim contract requires.

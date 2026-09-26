@@ -19,11 +19,18 @@ type ResidencySchedulerCaseRow=Readonly<{
 /**
  * Give one recently infrastructure-blocked resident the immediately following tick so a worker
  * that finished cold-starting just after the bounded readiness window is not discarded. A second
- * infrastructure failure inside the window rotates away, preserving cohort fairness.
+ * CONSECUTIVE infrastructure failure rotates away, preserving cohort fairness.
+ *
+ * Consecutive failures are counted across the resident's whole recent history, not only inside the
+ * warm window. Production, 2026-09-26 16:32-21:12 UTC: ticks run every 10 minutes and a failed tick
+ * finishes within seconds, so a 15-minute window only ever contained ONE prior failure. The resident
+ * therefore always looked like a first failure and was retried on every tick for 5 hours (29 identical
+ * infrastructure rejections) while three remediation residents were never scheduled.
  */
 export function selectBuilderResidencyEnrollmentForTick<T extends {id:unknown}>(input:{
   enrollments:readonly T[]
   recentCases:readonly ResidencySchedulerCaseRow[]
+  now?:Date
 }):T|null{
   const fallback=input.enrollments[0]??null
   if(!fallback) return null
@@ -31,11 +38,18 @@ export function selectBuilderResidencyEnrollmentForTick<T extends {id:unknown}>(
   if(!latest||String(latest.harness_outcome)!=='infrastructure_failure') return fallback
   const residencyId=String(latest.residency_id??'')
   if(!residencyId) return fallback
-  const recentInfrastructureAttempts=input.recentCases.filter(row=>
-    String(row.residency_id??'')===residencyId
-    && String(row.harness_outcome)==='infrastructure_failure',
-  ).length
-  if(recentInfrastructureAttempts===1){
+  const completedMs=Date.parse(String(latest.completed_at??''))
+  const nowMs=(input.now??new Date()).getTime()
+  const warm=Number.isFinite(completedMs)&&nowMs-completedMs<=BUILDER_RESIDENCY_WARM_RETRY_WINDOW_MS
+
+  let consecutiveInfrastructureFailures=0
+  for(const row of input.recentCases){
+    if(String(row.residency_id??'')!==residencyId) continue
+    if(String(row.harness_outcome)!=='infrastructure_failure') break
+    consecutiveInfrastructureFailures+=1
+  }
+
+  if(warm&&consecutiveInfrastructureFailures===1){
     return input.enrollments.find(row=>String(row.id)===residencyId)??fallback
   }
   return input.enrollments.find(row=>String(row.id)!==residencyId)??fallback
@@ -64,19 +78,20 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
       if(!enrollments.length) return null
 
       const residencyIds=enrollments.map(row=>String(row.id))
-      const recentSince=new Date(Date.now()-BUILDER_RESIDENCY_WARM_RETRY_WINDOW_MS).toISOString()
+      // Full recent history (not only the warm window): consecutive failures must be countable.
       const recent=await input.db
         .from('cos_university_residency_case_runs')
         .select('residency_id,harness_outcome,completed_at')
         .in('residency_id',residencyIds)
-        .gte('completed_at',recentSince)
+        .not('completed_at','is',null)
         .order('completed_at',{ascending:false})
-        .limit(32)
+        .limit(64)
       if(recent.error) throw recent.error
 
       const data=selectBuilderResidencyEnrollmentForTick({
         enrollments,
         recentCases:recent.data??[],
+        now:new Date(),
       })
       if(!data) return null
       return Object.freeze({

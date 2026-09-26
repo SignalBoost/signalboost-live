@@ -182,6 +182,38 @@ test('case selection prioritizes remediation before untouched competency',()=>{
   assert.notEqual(selected?.variantHash,second.variantHash)
 })
 
+test('case selection never replays a variant that already has competency evidence',()=>{
+  const first=BUILDER_RESIDENCY_CASES[0]
+  const failed=[
+    evidence({competencyId:first.competencyId,variantHash:first.variantHash,outcome:'fail',observedAt:'2026-09-22T10:00:00Z'}),
+  ]
+  const afterFail=selectNextBuilderResidencyCase({evidence:failed})
+  assert.ok(afterFail)
+  assert.notEqual(afterFail.variantHash,first.variantHash)
+
+  const passed=[
+    evidence({competencyId:first.competencyId,variantHash:first.variantHash,outcome:'pass'}),
+  ]
+  assert.notEqual(selectNextBuilderResidencyCase({evidence:passed})?.variantHash,first.variantHash)
+
+  const everyVariantRecorded=BUILDER_RESIDENCY_CASES.map(item=>
+    evidence({competencyId:item.competencyId,variantHash:item.variantHash,outcome:'fail'}))
+  assert.equal(selectNextBuilderResidencyCase({evidence:everyVariantRecorded}),null)
+})
+
+test('remediation is prioritized onto a different, unrecorded variant of the failed competency',()=>{
+  const first=BUILDER_RESIDENCY_CASES[0]
+  const second=BUILDER_RESIDENCY_CASES[1]
+  const alternate={...first,variantId:'v2-alternate',variantHash:h('e')}
+  const cases=[first,second,alternate]
+  const rows=[
+    evidence({competencyId:first.competencyId,variantHash:first.variantHash,outcome:'fail',observedAt:'2026-09-22T10:00:00Z'}),
+  ]
+  const selected=selectNextBuilderResidencyCase({evidence:rows,cases})
+  assert.equal(selected?.competencyId,first.competencyId)
+  assert.equal(selected?.variantHash,alternate.variantHash)
+})
+
 test('scheduler runs one bounded case and recomputes standing',async()=>{
   const mem=memoryStore()
   let calls=0

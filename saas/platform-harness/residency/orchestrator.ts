@@ -68,26 +68,39 @@ function passedVariantKeys(evidence:readonly ResidencyEvidenceForAssessment[]):S
   )
 }
 
+/**
+ * Variants this resident already has durable competency evidence for, pass OR fail.
+ *
+ * `cos_university_residency_competency_evidence` is unique on (residency_id, competency_id,
+ * variant_hash) by design: one variant yields one educational observation. Re-running a variant
+ * that already has evidence can never record a second result; remediation therefore requires a
+ * DIFFERENT variant, never a replay of the failed one.
+ */
+function recordedVariantKeys(evidence:readonly ResidencyEvidenceForAssessment[]):Set<string>{
+  return new Set(
+    evidence.map(item=>`${item.competencyId}:${item.variantHash}`),
+  )
+}
+
 export function selectNextBuilderResidencyCase(input:{
   evidence:readonly ResidencyEvidenceForAssessment[]
   cases?:readonly BuilderResidencyCase[]
 }):BuilderResidencyCase|null{
   const cases=input.cases??BUILDER_RESIDENCY_CASES
   const assessment=assessBuilderResidency(input.evidence)
-  const passed=passedVariantKeys(input.evidence)
+  const recorded=recordedVariantKeys(input.evidence)
+  const available=cases.filter(item=>
+    !recorded.has(`${item.competencyId}:${item.variantHash}`),
+  )
 
   const remediation=new Set(assessment.remediationCompetencies)
-  const remediationCase=cases.find(item=>
-    remediation.has(item.competencyId)&&
-    !passed.has(`${item.competencyId}:${item.variantHash}`),
-  )
+  const remediationCase=available.find(item=>remediation.has(item.competencyId))
   if(remediationCase) return remediationCase
 
   const stateByCompetency=new Map(
     assessment.competencies.map(item=>[item.competencyId,item.state]),
   )
-  return cases.find(item=>
-    !passed.has(`${item.competencyId}:${item.variantHash}`)&&
+  return available.find(item=>
     !['demonstrated','retained'].includes(String(stateByCompetency.get(item.competencyId))),
   )??null
 }

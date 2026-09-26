@@ -894,7 +894,90 @@ export const BUILDER_RESIDENCY_CASES=Object.freeze([
     ]),
     provingCommand:"node verify.js",
   }),
+  makeCase({
+    caseFamily:"slug_owner_dependency_trace",
+    competencyId:"repository_navigation",
+    variantId:"v4-slug-owner-trace",
+    objective:"app.js produces the wrong slug. Trace the imports to the module that actually owns slug generation (ignore unused files), make the smallest repair there, and prove node app.js.",
+    seedFiles:Object.freeze([
+      {path:"app.js",content:[
+        "const { slugify } = require('./lib')",
+        "const got = slugify(' Hello  Big World ')",
+        "if (got !== 'hello-big-world') throw new Error(got)",
+        "console.log(\"ok\")",
+        "",
+      ].join('\n')},
+      {path:"lib/index.js",content:[
+        "exports.slugify = require('./text/slug.js').slugify",
+        "",
+      ].join('\n')},
+      {path:"lib/text/slug.js",content:[
+        "exports.slugify = value => value.trim().toLowerCase().replace(' ', '-')",
+        "",
+      ].join('\n')},
+      {path:"lib/text/slug.old.js",content:[
+        "// Unused since the text module split.",
+        "exports.slugify = value => value.trim().toLowerCase().split(/\\s+/).join('-')",
+        "",
+      ].join('\n')},
+    ]),
+    provingCommand:"node app.js",
+  }),
+  makeCase({
+    caseFamily:"devtools_missing_asset_evidence",
+    competencyId:"chrome_devtools_evidence",
+    variantId:"v4-missing-asset",
+    objective:"Use the network evidence in devtools.txt to repair the broken asset reference in index.html. Do not add, rename or delete files under assets/. Prove node verify.js.",
+    seedFiles:Object.freeze([
+      {path:"devtools.txt",content:[
+        "GET https://app.example.test/assets/logo.svg 404 (Not Found)",
+        "",
+      ].join('\n')},
+      {path:"index.html",content:[
+        "<header><img src=\"/assets/logo.svg\" alt=\"Company logo\"></header>",
+        "",
+      ].join('\n')},
+      {path:"assets/brand-logo.svg",content:[
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"></svg>",
+        "",
+      ].join('\n')},
+      {path:"verify.js",content:[
+        "const fs = require('fs')",
+        "const html = fs.readFileSync('index.html', 'utf8')",
+        "const sources = [...html.matchAll(/src=\"([^\"]+)\"/g)].map(match => match[1])",
+        "if (!sources.length) throw new Error('image reference removed')",
+        "for (const source of sources) if (!fs.existsSync('.' + source)) throw new Error('404: ' + source)",
+        "if (JSON.stringify(fs.readdirSync('assets')) !== JSON.stringify(['brand-logo.svg'])) throw new Error('assets were changed')",
+        "console.log(\"ok\")",
+        "",
+      ].join('\n')},
+    ]),
+    provingCommand:"node verify.js",
+  }),
 ] as const)
+
+/**
+ * v1 cases whose seeded workspace already satisfies the proving command, so a "pass" proves nothing:
+ *   v1-entrypoint-trace   ' A  B ' trims to 'a  b', whose single double-space replace yields 'a-b'
+ *   v1-console-root-cause '/assets/app.jss' contains the substring '/assets/app.js' the check looks for
+ * They stay in the catalog so historical evidence still resolves to a case, but they are never scheduled
+ * and evidence recorded against them is not accepted toward any competency. v4 replacements keep three
+ * active variants for each affected competency. Editing the v1 fixtures instead would change their
+ * hashes and silently orphan the evidence already recorded.
+ */
+export const RETIRED_BUILDER_RESIDENCY_VARIANT_HASHES:ReadonlySet<string>=Object.freeze(new Set([
+  '9cc9718fde3a3d507a399fe2677fd20a57e1777719a800aa7ca3fe04688ab3e8',
+  '83c57ad161324c769debbd2ecd86c338d73df63fde26acd06d50605b5e6630f8',
+]))
+
+export function isRetiredBuilderResidencyVariant(variantHash:string):boolean{
+  return RETIRED_BUILDER_RESIDENCY_VARIANT_HASHES.has(String(variantHash??'').trim().toLowerCase())
+}
+
+/** The schedulable catalog: every case except retired variants. */
+export const ACTIVE_BUILDER_RESIDENCY_CASES=Object.freeze(
+  BUILDER_RESIDENCY_CASES.filter(item=>!isRetiredBuilderResidencyVariant(item.variantHash)),
+)
 
 export function builderResidencyCaseByVariantHash(value:string):BuilderResidencyCase|null{
   return BUILDER_RESIDENCY_CASES.find(item=>item.variantHash===value)??null

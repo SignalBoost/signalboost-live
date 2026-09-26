@@ -149,16 +149,23 @@ function canonicalGraduateSubjectId(value: unknown): string {
 }
 
 type GraduateWorkerScope = { workerRoles: string[]; problemClasses: string[] }
+type PrimaryGateEvidence = {
+  generalistGraduated?: boolean
+  credentialStanding?: string
+  currentStanding?: string
+  remediationPending?: number | null
+  statusReadError?: string
+}
 
 async function resolveGraduateWorkerScope(
   canonicalSubjectId: string,
   baseScope: GraduateWorkerScope,
-): Promise<{ scope: GraduateWorkerScope; cosPrimary: boolean; primaryGate: string }> {
+): Promise<{ scope: GraduateWorkerScope; cosPrimary: boolean; primaryGate: string; gateEvidence: PrimaryGateEvidence }> {
   if (canonicalSubjectId !== 'reasoning_decision_science') {
-    return { scope: baseScope, cosPrimary: false, primaryGate: 'specialist_subject' }
+    return { scope: baseScope, cosPrimary: false, primaryGate: 'specialist_subject', gateEvidence: {} }
   }
   if (String(process.env[GENERALIST_PRIMARY_ENABLED_FLAG] || '').trim() !== 'true') {
-    return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_primary_disabled' }
+    return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_primary_disabled', gateEvidence: {} }
   }
 
   try {
@@ -166,13 +173,20 @@ async function resolveGraduateWorkerScope(
     const credentialStanding = status.credential?.standing || 'not_graduated'
     const currentStanding = status.currentCompetenceStanding
     const remediationClear = status.remediation?.pendingCount === 0
+    const remediationPending = Number(status.remediation?.pendingCount ?? NaN)
     const qualified = status.graduated === true
       && (credentialStanding === 'A' || credentialStanding === 'A+')
       && (currentStanding === 'A' || currentStanding === 'A+')
       && remediationClear
+    const gateEvidence: PrimaryGateEvidence = {
+      generalistGraduated: status.graduated === true,
+      credentialStanding: String(credentialStanding ?? 'unknown'),
+      currentStanding: String(currentStanding ?? 'unknown'),
+      remediationPending: Number.isFinite(remediationPending) ? remediationPending : null,
+    }
 
     if (!qualified) {
-      return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_A_current_competence_required' }
+      return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_A_current_competence_required', gateEvidence }
     }
 
     return {
@@ -182,11 +196,12 @@ async function resolveGraduateWorkerScope(
       },
       cosPrimary: true,
       primaryGate: `generalist_${credentialStanding}_current_${currentStanding}_remediation_clear`,
+      gateEvidence,
     }
   } catch (error) {
-    console.warn('[cos-generalist-primary-gate] status read failed; retaining specialist scope',
-      error instanceof Error ? error.message : String(error))
-    return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_gate_unavailable' }
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn('[cos-generalist-primary-gate] status read failed; retaining specialist scope', message)
+    return { scope: baseScope, cosPrimary: false, primaryGate: 'generalist_gate_unavailable', gateEvidence: { statusReadError: message.slice(0, 200) } }
   }
 }
 
@@ -412,8 +427,10 @@ export async function GET(req: NextRequest) {
 
     let graduate: any = null
     let precomputedScopeDecision: Awaited<ReturnType<typeof resolveGraduateWorkerScope>> | null = null
+    let primaryUpgrade: Record<string, unknown> = { considered: false, primaryGate: 'generalist_primary_disabled' }
 
     if (String(process.env[GENERALIST_PRIMARY_ENABLED_FLAG] || '').trim() === 'true') {
+      primaryUpgrade = { considered: false, primaryGate: 'no_active_reasoning_graduate_awaiting_primary' }
       // A qualified COS-primary upgrade outranks ordinary pending specialist activation. Otherwise
       // a continually replenished specialist queue could leave COS nominally "the brain" forever.
       const active = await db.from('cos_university_graduate_model_registry')
@@ -428,6 +445,7 @@ export async function GET(req: NextRequest) {
       if (primaryCandidate) {
         const candidateScope = SUBJECT_WORKER_SCOPE.reasoning_decision_science
         const decision = await resolveGraduateWorkerScope('reasoning_decision_science', candidateScope)
+        primaryUpgrade = { considered: true, candidateId: primaryCandidate.candidate_id, cosPrimary: decision.cosPrimary, primaryGate: decision.primaryGate, ...decision.gateEvidence }
         if (decision.cosPrimary) {
           graduate = primaryCandidate
           precomputedScopeDecision = decision
@@ -456,9 +474,10 @@ export async function GET(req: NextRequest) {
           lifecycleSync,
           massRegistration,
           rollbackProof,
+          primaryUpgrade,
         },
       })
-      return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_or_primary_upgrade_candidate', lifecycleSync, massRegistration, rollbackProof })
+      return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_or_primary_upgrade_candidate', primaryUpgrade, lifecycleSync, massRegistration, rollbackProof })
     }
 
     const canonicalSubjectId = canonicalGraduateSubjectId(graduate.subject_id)

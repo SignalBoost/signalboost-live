@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityHuggingFaceJobs.ts
 import { createHash, createHmac } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import { deriveHfWorkerDeliveryToken } from './cosUniversityHfWorkerDelivery.ts'
@@ -63,6 +62,31 @@ type TrainingEnvelope = Readonly<Record<string, unknown>> & {
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9._-]+))?#([A-Za-z0-9_.-]+)$/
 const COMMIT_SHA = /^[a-f0-9]{40}$/i
 const MAX_WORKER_REQUEST_JSON_BYTES = 1_400_000
+/**
+ * Linux refuses to exec a process when any single environment string exceeds MAX_ARG_STRLEN
+ * (32 pages = 131,072 bytes), failing before the container command runs with
+ * "exec /usr/bin/bash: argument list too long". Production, 2026-09-26 02:22 UTC: the Working COS
+ * dataset preparation (204 embedded rows) produced a 215,904-character compressed request in ONE
+ * variable and Hugging Face job 6ab72c7b6b030d633f693011 died at start with exit 255. The compressed
+ * request is therefore split across numbered variables well below that ceiling and reassembled
+ * in-process by the bootstrap.
+ */
+export const MAX_WORKER_REQUEST_ENV_CHUNK_CHARS = 64_000
+export const WORKER_REQUEST_PARTS_ENV = 'ITMOUNTS_TRAINING_REQUEST_GZIP_B64_PARTS'
+export const WORKER_REQUEST_PART_ENV_PREFIX = 'ITMOUNTS_TRAINING_REQUEST_GZIP_B64_PART_'
+
+export function workerRequestEnvironmentChunks(encoded: string): Readonly<Record<string, string>> {
+  const value = String(encoded || '')
+  if (!value) throw new Error('huggingface_training_request_empty')
+  const parts: Record<string, string> = {}
+  let count = 0
+  for (let offset = 0; offset < value.length; offset += MAX_WORKER_REQUEST_ENV_CHUNK_CHARS) {
+    parts[`${WORKER_REQUEST_PART_ENV_PREFIX}${String(count).padStart(3, '0')}`] = value.slice(offset, offset + MAX_WORKER_REQUEST_ENV_CHUNK_CHARS)
+    count += 1
+  }
+  if (count > 999) throw new Error('huggingface_training_request_too_large')
+  return Object.freeze({ [WORKER_REQUEST_PARTS_ENV]: String(count), ...parts })
+}
 
 function clean(value: unknown, max = 4096): string {
   return String(value ?? '').trim().slice(0, max)
@@ -205,13 +229,15 @@ function requestDigest(input: TrainingEnvelope): string {
 
 /**
  * The provider API request carries a gzip/base64url envelope so large teacher curricula do not hit
- * the Jobs control-plane request-size ceiling. The bootstrap expands it only after the container has
+ * the Jobs control-plane request-size ceiling. The envelope is split across numbered environment
+ * variables (see MAX_WORKER_REQUEST_ENV_CHUNK_CHARS) so no single variable can exceed the kernel's
+ * per-string exec limit. The bootstrap reassembles and expands it only after the container has
  * started, then runs the existing worker contract unchanged. This also keeps explicit/custom worker
  * URLs compatible: they still receive the legacy ITMOUNTS_TRAINING_REQUEST_B64 variable in-process.
  */
 function workerBootstrap(packages: readonly string[]): readonly string[] {
   const install = packages.map(item => JSON.stringify(item)).join(' ')
-  const worker = `python -c "import os,base64,gzip,runpy; e=os.environ.pop('ITMOUNTS_TRAINING_REQUEST_GZIP_B64'); p='='*(-len(e)%4); raw=gzip.decompress(base64.urlsafe_b64decode(e+p)); assert len(raw)<=${MAX_WORKER_REQUEST_JSON_BYTES}; os.environ['ITMOUNTS_TRAINING_REQUEST_B64']=base64.urlsafe_b64encode(raw).rstrip(b'=').decode(); runpy.run_path('/tmp/itmounts_hf_worker.py', run_name='__main__')"`
+  const worker = `python -c "import os,base64,gzip,runpy; n=int(os.environ.pop('${WORKER_REQUEST_PARTS_ENV}')); e=''.join(os.environ.pop('${WORKER_REQUEST_PART_ENV_PREFIX}%03d'%i) for i in range(n)); p='='*(-len(e)%4); raw=gzip.decompress(base64.urlsafe_b64decode(e+p)); assert len(raw)<=${MAX_WORKER_REQUEST_JSON_BYTES}; os.environ['ITMOUNTS_TRAINING_REQUEST_B64']=base64.urlsafe_b64encode(raw).rstrip(b'=').decode(); runpy.run_path('/tmp/itmounts_hf_worker.py', run_name='__main__')"`
   const fetchWorker = `python -c "import os,urllib.request,pathlib; u=os.environ['ITMOUNTS_HF_WORKER_URL']; b=urllib.request.urlopen(u,timeout=30).read(); legacy=(b'ITMOUNTS_TRAINING_REQUEST' in b and b'HF_TOKEN' in b); wrapper=(b'BASE_WORKER_FILENAME' in b and b'BASE_CONTRACT_MARKERS' in b and b'base.main()' in b and b'HF_TOKEN' in b); assert legacy or wrapper, 'hf_worker_delivery_artifact_invalid'; pathlib.Path('/tmp/itmounts_hf_worker.py').write_bytes(b)"`
   const shell = [
     fetchWorker,
@@ -398,8 +424,8 @@ export function buildHuggingFaceJobSpec(input: {
     timeoutSeconds,
     environment: Object.freeze({
       ITMOUNTS_HF_WORKER_URL: input.config.workerUrl,
-      ITMOUNTS_TRAINING_REQUEST_GZIP_B64: requestGzipB64,
-      ITMOUNTS_TRAINING_REQUEST_ENCODING: 'gzip-base64url-v1',
+      ...workerRequestEnvironmentChunks(requestGzipB64),
+      ITMOUNTS_TRAINING_REQUEST_ENCODING: 'gzip-base64url-chunked-v2',
       ITMOUNTS_TRAINING_CALLBACK_URL: clean(input.callbackUrl, 2000),
       ITMOUNTS_TRAINING_IDEMPOTENCY_KEY: clean(input.idempotencyKey, 256),
       ITMOUNTS_HF_MAX_DATASET_ITEMS: String(input.config.maxDatasetItems),

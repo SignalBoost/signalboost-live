@@ -248,6 +248,13 @@ async function recordJobEvent(db: any, input: {
   return eventKey
 }
 
+export const TERMINAL_FAILED_PROVIDER_STAGES: ReadonlySet<string> = Object.freeze(new Set([
+  'ERROR',
+  'CANCELED',
+  'CANCELLED',
+  'DELETED',
+]))
+
 async function submitBoundedJob(input: {
   db: any
   operation: 'prepare_dataset' | 'train'
@@ -285,8 +292,13 @@ async function submitBoundedJob(input: {
       name: input.spec.labels.name,
       fetchImpl: input.fetchImpl,
     })
-    const accepted = existing
-      ? { jobId: existing.jobId, jobUrl: existing.jobUrl, adopted: true }
+    // Adoption exists so a retried dispatch never pays for a duplicate of a job that is queued,
+    // running or already finished. A job the provider reports as failed, cancelled or deleted can
+    // never produce a callback, and because the job name is derived from the request it would be
+    // re-adopted forever, so it must be replaced by a new submission instead.
+    const reusable = existing && !TERMINAL_FAILED_PROVIDER_STAGES.has(existing.providerStage) ? existing : null
+    const accepted = reusable
+      ? { jobId: reusable.jobId, jobUrl: reusable.jobUrl, adopted: true }
       : { ...(await submitHuggingFaceJob({ namespace, token: input.token, spec: input.spec, fetchImpl: input.fetchImpl })), adopted: false }
     await recordJobEvent(input.db, {
       ...input,
@@ -298,6 +310,7 @@ async function submitBoundedJob(input: {
         timeoutSeconds: input.timeoutSeconds,
         providerInvocationStarted: true,
         adoptedExistingProviderJob: accepted.adopted,
+        ...(existing && !reusable ? { replacedFailedProviderJob: existing.jobId, replacedProviderStage: existing.providerStage } : {}),
       },
     })
     return Object.freeze(accepted)
@@ -467,7 +480,7 @@ export async function dispatchWorkingCosDatasetPreparation(input: {
     productionTrafficAuthorized: false as const,
   })
 }
-
+-----------------------------------------------------------
 async function readPartition(input: {
   db: any
   candidateId: string

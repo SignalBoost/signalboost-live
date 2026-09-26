@@ -1,7 +1,8 @@
-// saas/tests/cosUniversityHuggingFaceJobs.node.test.ts
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import test from 'node:test'
 import { gunzipSync } from 'node:zlib'
 import { deriveHfWorkerDeliveryToken } from '../lib/ai/cos/cosUniversityHfWorkerDelivery.ts'
@@ -14,7 +15,17 @@ import {
   installHuggingFaceTrainingExecutorEnv,
   COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX,
   isHuggingFaceDatasetRef,
+  MAX_WORKER_REQUEST_ENV_CHUNK_CHARS,
+  WORKER_REQUEST_PARTS_ENV,
+  WORKER_REQUEST_PART_ENV_PREFIX,
 } from '../lib/ai/cos/cosUniversityHuggingFaceJobs.ts'
+
+function reassembledRequest(environment: Readonly<Record<string, string>>): string {
+  const count = Number(environment[WORKER_REQUEST_PARTS_ENV])
+  assert.ok(Number.isInteger(count) && count >= 1)
+  return Array.from({ length: count }, (_, index) =>
+    environment[`${WORKER_REQUEST_PART_ENV_PREFIX}${String(index).padStart(3, '0')}`]).join('')
+}
 
 const token = `hf_${'a'.repeat(48)}`
 const commit = '1'.repeat(40)
@@ -286,17 +297,89 @@ test('large teacher envelopes are gzip/base64url transported without truncating 
     callbackSecret: 'k'.repeat(64),
     config,
   })
-  const compressed = spec.environment.ITMOUNTS_TRAINING_REQUEST_GZIP_B64
+  const environment = spec.environment as Readonly<Record<string, string>>
+  const compressed = reassembledRequest(environment)
   assert.ok(compressed)
-  assert.equal(spec.environment.ITMOUNTS_TRAINING_REQUEST_B64, undefined)
-  assert.equal(spec.environment.ITMOUNTS_TRAINING_REQUEST_ENCODING, 'gzip-base64url-v1')
+  assert.equal(environment.ITMOUNTS_TRAINING_REQUEST_B64, undefined)
+  assert.equal(environment.ITMOUNTS_TRAINING_REQUEST_GZIP_B64, undefined)
+  assert.equal(environment.ITMOUNTS_TRAINING_REQUEST_ENCODING, 'gzip-base64url-chunked-v2')
   const restored = JSON.parse(gunzipSync(Buffer.from(compressed, 'base64url')).toString('utf8'))
   assert.deepEqual(restored, envelope)
   const rawB64Length = Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64url').length
   assert.ok(compressed.length < rawB64Length / 2)
   assert.match(spec.command.join(' '), /gzip\.decompress/)
-  assert.match(spec.command.join(' '), /ITMOUNTS_TRAINING_REQUEST_GZIP_B64/)
+  assert.match(spec.command.join(' '), /ITMOUNTS_TRAINING_REQUEST_GZIP_B64_PARTS/)
   assert.match(spec.command.join(' '), /ITMOUNTS_TRAINING_REQUEST_B64/)
+})
+
+test('a request too large for one environment variable is chunked and still starts and reassembles exactly', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv({
+    COS_UNIVERSITY_HF_WORKER_URL: 'https://workers.example.com/cos-university-hf-worker.py',
+  }))!
+  // Incompressible curriculum reproduces the Production failure: a compressed request larger than
+  // the kernel's 131,072-byte per-string exec limit (job 6ab72c7b..., "argument list too long").
+  const prompts = Array.from({ length: 54 }, (_, index) => ({
+    id: `prompt-${index}`,
+    prompt: `Standalone case ${index}: ${randomBytes(3200).toString('base64')}`,
+  }))
+  const envelope = {
+    profile: 'cos_university_training_executor_v1',
+    operation: 'generate_teacher_dataset',
+    candidateId: 'mass:00000000-0000-4000-8000-000000000001:abcdef0123456789',
+    subjectId: 'Build a Semantic Book Recommender',
+    promptProfile: 'cos-university-mass-distillation-campaign-v1',
+    promptSetHash: 'a'.repeat(64),
+    prompts,
+    teacher: { modelId: 'Qwen/Qwen3-8B', revision: '1'.repeat(40), license: 'apache-2.0' },
+    student: { modelId: 'Qwen/Qwen3-4B', revision: '2'.repeat(40), license: 'apache-2.0' },
+    trainingRights: 'open_license',
+    studentControlledByBuyer: true,
+    containsPrivateProductionData: false,
+    callbackPath: '/api/internal/cos/mass-distillation/evidence',
+    authorityExpanded: false,
+  }
+  const spec = buildHuggingFaceJobSpec({
+    envelope,
+    callbackUrl: 'https://itmounts.com/api/internal/cos/mass-distillation/evidence',
+    idempotencyKey: 'chunked-key',
+    callbackSecret: 'k'.repeat(64),
+    config,
+  })
+  const environment = spec.environment as Readonly<Record<string, string>>
+  const compressed = reassembledRequest(environment)
+  assert.ok(compressed.length > 131_072, 'fixture must exceed the single-string exec limit')
+  for (const [name, value] of Object.entries(environment)) {
+    assert.ok(`${name}=${value}`.length < 131_072, `${name} would exceed the exec limit`)
+    if (name.startsWith(WORKER_REQUEST_PART_ENV_PREFIX)) assert.ok(value.length <= MAX_WORKER_REQUEST_ENV_CHUNK_CHARS)
+  }
+  assert.deepEqual(JSON.parse(gunzipSync(Buffer.from(compressed, 'base64url')).toString('utf8')), envelope)
+
+  // Execute the real bootstrap: the container shell must start, and the worker must receive the
+  // exact request through the unchanged legacy ITMOUNTS_TRAINING_REQUEST_B64 contract.
+  const python = spawnSync('python', ['--version'], { encoding: 'utf8' })
+  if (python.status !== 0) return
+  const workerPath = '/tmp/itmounts_hf_worker.py'
+  const outputPath = `/tmp/itmounts_hf_worker_probe_${process.pid}.json`
+  writeFileSync(workerPath, [
+    'import base64, os',
+    'e = os.environ["ITMOUNTS_TRAINING_REQUEST_B64"]',
+    `open(${JSON.stringify(outputPath)}, "wb").write(base64.urlsafe_b64decode(e + "=" * (-len(e) % 4)))`,
+    '',
+  ].join('\n'))
+  try {
+    const shell = spec.command[2].split(' && ').at(-1)!
+    const run = spawnSync('bash', ['-lc', shell], {
+      env: { ...process.env, ...environment },
+      encoding: 'utf8',
+      timeout: 60_000,
+    })
+    assert.equal(run.error, undefined)
+    assert.equal(run.status, 0, run.stderr)
+    assert.deepEqual(JSON.parse(readFileSync(outputPath, 'utf8')), envelope)
+  } finally {
+    rmSync(workerPath, { force: true })
+    rmSync(outputPath, { force: true })
+  }
 })
 
 test('routes keep owner confirmation, signed callbacks and the global dispatch switch authoritative', () => {

@@ -70,6 +70,8 @@ test('mass-distilled canary waits safely when account-wide RunPod worker quota i
   assert.match(provision, /reservedServerlessWorkerSlots/)
   assert.match(provision, /mass_distilled_runtime_worker_quota_full/)
   assert.match(provisionV2, /restoreRetiredEndpointCapacity\([\s\S]*constrainEndpointToApprovedGpu/)
+  assert.match(provisionV2, /activateMassDistilledEvaluationWorker[\s\S]*mass_distilled_evaluation_quota_self_drain_rejected/)
+  assert.match(provisionV2, /activateMassDistilledEvaluationWorker[\s\S]*workers: \{ min: 0, max: 0[\s\S]*activated = await activate\(\)/)
   assert.match(route, /quotaBlocked/)
   assert.match(route, /runpod_worker_quota_full/)
   assert.match(route, /retryableWithinApproval:true/)

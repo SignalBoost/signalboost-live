@@ -308,6 +308,9 @@ export function decideMassCanaryRollingApproval(input: {
         const aComputerScience = a.subjectId === 'Computer Science & Coding'
         const bComputerScience = b.subjectId === 'Computer Science & Coding'
         if (aComputerScience !== bComputerScience) return aComputerScience ? -1 : 1
+        const aEvaluationReady = nowMs - at(a.createdAt) >= MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS
+        const bEvaluationReady = nowMs - at(b.createdAt) >= MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS
+        if (aEvaluationReady !== bEvaluationReady) return aEvaluationReady ? -1 : 1
         const newestReplayFirst = at(b.createdAt) - at(a.createdAt)
         if (newestReplayFirst !== 0) return newestReplayFirst
       }

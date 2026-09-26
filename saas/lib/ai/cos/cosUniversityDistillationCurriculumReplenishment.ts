@@ -218,13 +218,35 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
     failuresByTitle.set(subject, failures)
   }
 
-  // Select by failure, not by scarcity. A subject with no verified failure is never targeted, so this cannot
-  // manufacture curriculum for a subject that is doing fine.
+  // Prioritize failures that have not already produced corrective curriculum. Ranking by total historical
+  // failures allowed already-remediated high-volume subjects to monopolize maxSubjects forever while newer
+  // verified failures starved. Read only remediation provenance; hidden evaluation details remain isolated.
+  const remediationRows = await input.db.from('cos_continuous_learning')
+    .select('evidence')
+    .eq('source_kind', 'failure_derived_curriculum')
+    .gte('observed_at', since)
+    .limit(5000)
+  if (remediationRows.error) throw remediationRows.error
+  const remediatedCandidates = new Set<string>()
+  for (const row of (remediationRows.data || []) as any[]) {
+    const evidence = Array.isArray(row?.evidence) ? row.evidence : []
+    for (const item of evidence) {
+      const candidateId = String(item?.sourceEvaluationCandidateId || '').trim()
+      if (candidateId) remediatedCandidates.add(candidateId)
+    }
+  }
+  const unremediatedFailuresByTitle = new Map<string, Array<{ candidateId: string; gates: readonly FailureDerivedRemediationGate[] }>>()
+  for (const [subject, failures] of failuresByTitle) {
+    const pending = failures.filter(failure => !remediatedCandidates.has(failure.candidateId))
+    if (pending.length) unremediatedFailuresByTitle.set(subject, pending)
+  }
+
+  // Select by unremediated verified failure, not by scarcity or historical failure volume.
   // Build remediation targets from verified failures, not from the current supply snapshot. A newly
   // evaluated subject can be absent from supply after its prior batch was consumed; intersecting failures
   // with supply silently starves exactly the subject that needs corrective curriculum.
   const supplyByTitle = new Map(input.supply.map(subject => [subject.subject, subject] as const))
-  const targets: MassDistillationSubjectSupply[] = [...failuresByTitle.keys()]
+  const targets: MassDistillationSubjectSupply[] = [...unremediatedFailuresByTitle.keys()]
     .map(subjectTitle => {
       const supplied = supplyByTitle.get(subjectTitle)
       if (supplied) return supplied
@@ -239,7 +261,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
       } satisfies MassDistillationSubjectSupply
     })
     .filter((subject): subject is MassDistillationSubjectSupply => subject !== null)
-    .sort((a, b) => (failuresByTitle.get(b.subject) || []).length - (failuresByTitle.get(a.subject) || []).length
+    .sort((a, b) => (unremediatedFailuresByTitle.get(b.subject) || []).length - (unremediatedFailuresByTitle.get(a.subject) || []).length
       || b.shortfallToBatch - a.shortfallToBatch
       || a.subject.localeCompare(b.subject))
     .slice(0, input.maxSubjects)
@@ -247,7 +269,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   let inserted = 0
   const bySubject: Array<{ subject: string; inserted: number }> = []
   for (const target of targets) {
-    const verifiedFailures = failuresByTitle.get(target.subject) || []
+    const verifiedFailures = unremediatedFailuresByTitle.get(target.subject) || []
     // The per-subject ceiling is a corrective COHORT size, not a count of failed artifacts.
     // Production showed 1-7 replay rows because this previously used verifiedFailures.length directly.
     // One independently verified failure is sufficient to synthesize twenty distinct general-principle

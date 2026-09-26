@@ -202,12 +202,15 @@ export function parseSignalBoostRepositoryRepairTarget(input: string): SignalBoo
 export function signalBoostDeployedRepairTarget(
   input: string,
   deployment: { commitSha?: unknown; branch?: unknown },
-  options: { ownerDeveloperLogSubmission?: boolean } = {},
+  options: { ownerDeveloperLogSubmission?: boolean; ownerPlatformEngineeringSubmission?: boolean } = {},
 ): SignalBoostRepositoryRepairTarget | null {
   const objective = String(input || '').trim()
   const commitSha = String(deployment.commitSha || '').trim().toLowerCase()
   const branch = String(deployment.branch || 'main').trim()
   const engineering = isExplicitPlatformEngineeringObjective(objective)
+    || (options.ownerPlatformEngineeringSubmission === true
+      && PLATFORM_ENGINEERING_ACTION.test(objective)
+      && PLATFORM_PUBLISH_INTENT.test(objective))
   if (!objective || (!isExplicitPlatformRepairObjective(objective) && !engineering && options.ownerDeveloperLogSubmission !== true)) return null
   if (!/^[0-9a-f]{40}$/.test(commitSha) || !SAFE_BRANCH.test(branch)) return null
   return Object.freeze({

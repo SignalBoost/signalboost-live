@@ -3,6 +3,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   dispatchWorkingCosDatasetPreparation,
   ensureWorkingCosCandidateReadiness,
+  workingCosDispatchReadiness,
 } from '@/lib/ai/cos/cosWorkingDistillationDispatch'
 
 export const runtime = 'nodejs'
@@ -60,6 +61,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const dispatchReadiness = await workingCosDispatchReadiness()
+    console.info('[working-cos-owner-approved-prepare-readiness]', JSON.stringify({
+      bundleReady: dispatchReadiness.bundleReady,
+      runtimeBindingReady: dispatchReadiness.runtimeBindingReady,
+      providerInstalled: dispatchReadiness.providerInstalled,
+      providerConfigured: dispatchReadiness.providerConfigured,
+      globalDispatchEnabled: dispatchReadiness.globalDispatchEnabled,
+      workingCosDispatchEnabled: dispatchReadiness.workingCosDispatchEnabled,
+      trainingFlavorConfigured: dispatchReadiness.trainingFlavorConfigured,
+      nextGate: dispatchReadiness.nextGate,
+    }))
+
     const readiness = await ensureWorkingCosCandidateReadiness()
     if (readiness.candidateId !== APPROVED_CANDIDATE_ID) {
       throw new Error('working_cos_owner_approval_candidate_drift')
@@ -81,6 +94,7 @@ export async function GET(req: NextRequest) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    console.error('[working-cos-owner-approved-prepare]', JSON.stringify({ ok: false, error: message, candidateId: APPROVED_CANDIDATE_ID }))
     return NextResponse.json({
       ok: false,
       error: message,

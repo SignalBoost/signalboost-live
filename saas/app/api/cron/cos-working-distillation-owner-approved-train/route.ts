@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
         terminal: reconciliation.terminal,
         callbackRecorded: reconciliation.callbackRecorded,
         retryAuthorized: reconciliation.retryAuthorized,
+        providerLogTail: 'providerLogTail' in reconciliation ? reconciliation.providerLogTail : null,
       }))
       return NextResponse.json({
         ok: true,

@@ -405,6 +405,19 @@ export async function GET() {
       if (key !== ':') artifactRowsByKey.set(key, row)
     }
     const telemetryArtifactRows = Array.from(artifactRowsByKey.values())
+
+    // Evaluations are also recency-bounded. Pull the exact historical evaluation for every durable
+    // graduate so an active graduate renders its recorded PASS/FAIL gates instead of fake "Pending".
+    const graduateEvaluationsResult = graduateCandidateIds.length
+      ? await db.from(EVALUATIONS)
+        .select('candidate_id,trained_artifact_hash,artifact_age_seconds,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
+        .in('candidate_id', graduateCandidateIds)
+        .order('created_at', { ascending: false })
+        .limit(500)
+      : { data: [], error: null } as any
+    if (graduateEvaluationsResult.error) throw graduateEvaluationsResult.error
+    const telemetryEvaluationRows = [...(evaluationsResult.data || []), ...(graduateEvaluationsResult.data || [])]
+
     const artifactCandidates = Array.from(new Set(telemetryArtifactRows.map((row: any) => text(row.candidate_id, 240)).filter(Boolean)))
     const assuranceResult = artifactCandidates.length
       ? await db.from('cos_university_learning_assurance_events')
@@ -423,9 +436,12 @@ export async function GET() {
     }
 
     const latestEvaluationByArtifact = new Map<string, any>()
-    for (const row of evaluationsResult.data || []) {
+    for (const row of telemetryEvaluationRows) {
       const key = text(row.candidate_id, 240) + ':' + text(row.trained_artifact_hash, 80)
-      if (!latestEvaluationByArtifact.has(key)) latestEvaluationByArtifact.set(key, row)
+      const current = latestEvaluationByArtifact.get(key)
+      if (!current || Date.parse(String(row.created_at || '')) > Date.parse(String(current.created_at || ''))) {
+        latestEvaluationByArtifact.set(key, row)
+      }
     }
     const graduateByArtifact = new Map<string, any>()
     for (const row of graduatesResult.data || []) {

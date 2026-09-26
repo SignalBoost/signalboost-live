@@ -32,7 +32,7 @@ function videoContentType(fileName:string, declared:string):string|null {
 }
 export async function POST(request: Request) {
  const access=await getAccess().catch(()=>null)
- if(!access?.userId) return json({ok:false,data:null,error:'You must be signed in to upload a video.',meta:{locale:'en',generatedAt:new Date().toISOString()}},401)
+ if(!access?.userId) return json({ok:false,data:null,error:'You must be signed in to upload a video.',meta:{locale:'en',generatedAt:new Date().toISOString()}}, 401,)
  const form=await request.formData(); const lang=locale(form.get('locale')); const video=form.get('video')
  if(!(video instanceof File)) return json({ok:false,data:null,error:'A video file is required.',meta:{locale:lang,generatedAt:new Date().toISOString()}},400)
  const contentType=videoContentType(video.name||'',video.type||'')

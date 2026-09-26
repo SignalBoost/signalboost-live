@@ -215,3 +215,11 @@ test('Working COS supervised QLoRA pins the quantized model entirely to GPU 0',(
   assert.match(worker,/working_cos_device_map = \{\"\": 0\} if training_mode == \"working_cos_supervised_distillation\" else \"auto\"/)
   assert.match(worker,/device_map=working_cos_device_map/)
 })
+
+
+test('Working COS accepts only provider minute-to-hour rounding drift while budgeting exact rate',()=> {
+  const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
+  assert.match(dispatch,/providerHourlyRoundingToleranceUsd = 0\.005/)
+  assert.match(dispatch,/hardware\.hourlyCostUsd - hourlyCap > providerHourlyRoundingToleranceUsd/)
+  assert.match(dispatch,/Math\.floor\(maxCostUsd \* 3600 \/ hardware\.hourlyCostUsd\)/)
+})

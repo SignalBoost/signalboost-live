@@ -969,7 +969,10 @@ export async function dispatchWorkingCosTraining(input: {
     HARD_MAX_TRAINING_COST_USD,
   )
   const hardware = await resolveHuggingFaceHardwareRate({ flavor, token: provider.hf.token, fetchImpl: input.fetchImpl })
-  if (hardware.hourlyCostUsd <= 0 || hardware.hourlyCostUsd > hourlyCap) {
+  // HF's hardware API prices by minute; documented hourly prices are rounded display values.
+  // Permit only the minute->hour rounding delta while budgeting from the exact provider rate.
+  const providerHourlyRoundingToleranceUsd = 0.005
+  if (hardware.hourlyCostUsd <= 0 || hardware.hourlyCostUsd - hourlyCap > providerHourlyRoundingToleranceUsd) {
     throw new Error('working_cos_training_hourly_cost_cap_exceeded')
   }
   const budgetSeconds = Math.floor(maxCostUsd * 3600 / hardware.hourlyCostUsd)

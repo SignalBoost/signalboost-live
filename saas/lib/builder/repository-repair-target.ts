@@ -5,7 +5,7 @@ export const SIGNALBOOST_REPOSITORY = 'SignalBoost/signalboost-live' as const
 export const SIGNALBOOST_REPOSITORY_URL = 'https://github.com/SignalBoost/signalboost-live.git' as const
 
 export type SignalBoostRepositoryRepairTarget = Readonly<{
-  trigger: 'failed_build_log' | 'deployed_platform_objective'
+  trigger: 'failed_build_log' | 'deployed_platform_objective' | 'deployed_platform_engineering'
   repository: typeof SIGNALBOOST_REPOSITORY
   repositoryUrl: typeof SIGNALBOOST_REPOSITORY_URL
   branch: string
@@ -31,6 +31,8 @@ const EXPLICIT_PLATFORM_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|rep
 const PLATFORM_REPAIR_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|diagnose|resolve)\b/i
 const PLATFORM_REPAIR_SUBJECT = /\b(?:builder|cos|signalboost(?:\s+platform)?|repository|repo|platform)\b/i
 const PLATFORM_REPAIR_FAILURE = /\b(?:broken|failed|failing|stuck|not\s+working|did\s+not\s+(?:arrive|complete|produce|return)|finished\s+without|still\s+running|job\s+status|final\s+result|verifiable\s+(?:result|success|failure|outcome)|clear\s+(?:success|completion)|underlying\s+platform\s+issue)\b/i
+const PLATFORM_ENGINEERING_ACTION = /\b(?:implement|build|add|create|update|change|refactor|complete|finish|wire|integrate|upgrade|extend)\b/i
+const PLATFORM_PUBLISH_INTENT = /\b(?:commit(?:\s+it)?|push|open\s+(?:a\s+)?pr|pull\s+request|merge(?:\s+it)?|commit\s+and\s+merge|ship\s+it)\b/i
 
 function isExplicitPlatformRepairObjective(input: string): boolean {
   const objective = String(input || '').trim()
@@ -40,6 +42,13 @@ function isExplicitPlatformRepairObjective(input: string): boolean {
       && PLATFORM_REPAIR_SUBJECT.test(objective)
       && PLATFORM_REPAIR_FAILURE.test(objective)
     )
+}
+
+export function isExplicitPlatformEngineeringObjective(input: string): boolean {
+  const objective = String(input || '').trim()
+  return PLATFORM_ENGINEERING_ACTION.test(objective)
+    && PLATFORM_REPAIR_SUBJECT.test(objective)
+    && PLATFORM_PUBLISH_INTENT.test(objective)
 }
 
 function unique(values: readonly string[], limit: number): readonly string[] {
@@ -198,10 +207,11 @@ export function signalBoostDeployedRepairTarget(
   const objective = String(input || '').trim()
   const commitSha = String(deployment.commitSha || '').trim().toLowerCase()
   const branch = String(deployment.branch || 'main').trim()
-  if (!objective || (!isExplicitPlatformRepairObjective(objective) && options.ownerDeveloperLogSubmission !== true)) return null
+  const engineering = isExplicitPlatformEngineeringObjective(objective)
+  if (!objective || (!isExplicitPlatformRepairObjective(objective) && !engineering && options.ownerDeveloperLogSubmission !== true)) return null
   if (!/^[0-9a-f]{40}$/.test(commitSha) || !SAFE_BRANCH.test(branch)) return null
   return Object.freeze({
-    trigger: 'deployed_platform_objective',
+    trigger: engineering ? 'deployed_platform_engineering' : 'deployed_platform_objective',
     repository: SIGNALBOOST_REPOSITORY,
     repositoryUrl: SIGNALBOOST_REPOSITORY_URL,
     branch,
@@ -265,23 +275,34 @@ export function signalBoostRepositoryRepairObjective(target: SignalBoostReposito
     : recordedBuildProof
     ? `Narrow proof command: ${recordedBuildProof}. Re-run this exact recorded failing command from the mounted workspace root. Do not substitute an unrelated unit test file.`
     : 'Commands already start in the mounted saas workspace root. Do not cd into guessed absolute paths; use workspace-relative paths and the narrowest relevant proof command.'
+  const engineering = target.trigger === 'deployed_platform_engineering'
   const evidence = target.failureEvidence.length
     ? target.failureEvidence.join('\n')
     : target.trigger === 'failed_build_log'
       ? 'The pasted build evidence ended with a non-zero command exit.'
-      : 'No failing command was supplied. Inspect the current implementation and existing regressions, reproduce the reported behavior, and do not edit until a proof command fails.'
+      : engineering
+        ? 'This is an owner-authorized repository engineering task. Completion requires an actual repository mutation plus fresh task-specific verification.'
+        : 'No failing command was supplied. Inspect the current implementation and existing regressions, reproduce the reported behavior, and do not edit until a proof command fails.'
   return [
     target.trigger === 'failed_build_log'
       ? `Repair the failed ${target.repository} build at exact commit ${target.fullCommitSha || target.commitSha}.`
-      : `Diagnose and prepare a verified repair for ${target.repository} at exact deployed commit ${target.fullCommitSha || target.commitSha}.`,
+      : engineering
+        ? `Implement the owner-authorized repository engineering task for ${target.repository} at exact deployed commit ${target.fullCommitSha || target.commitSha}.`
+        : `Diagnose and prepare a verified repair for ${target.repository} at exact deployed commit ${target.fullCommitSha || target.commitSha}.`,
     `The host mounted the pinned repository's ${target.projectRoot}/ directory as this isolated workspace. Tool paths are relative to ${target.projectRoot}/.`,
-    'Inspect the implicated source, reproduce the failure with the narrowest relevant command, make the smallest source repair, and rerun the same command until it passes.',
+    engineering
+      ? 'Inspect current source and relevant repository context, implement the requested change, then run the narrowest task-specific tests/build/typecheck that prove the requested behavior. A prose answer, inspection-only trace, or passing diagnostic command is never completion.'
+      : 'Inspect the implicated source, reproduce the failure with the narrowest relevant command, make the smallest source repair, and rerun the same command until it passes.',
     // History is evidence. A missing property, a deleted import, or a signature that no longer
     // matches its callers is usually something a recent commit removed, and the current file
     // cannot show that. Reading the change is faster and more truthful than inferring intent.
-    'The mounted repository carries recent history. When a failure is a contract, type, or missing-symbol mismatch, first run `git log --oneline -15 -- <file>` and `git show <sha> -- <file>` on the implicated file and read what the recent commits removed. If a commit deleted the property, import, or branch the failure names, restore it from `git show <sha>^:<file>` rather than writing a replacement from scratch. Report the commit you found. These git commands are read-only; committing, pushing, and merging remain forbidden.',
+    engineering
+      ? 'Use repository history, MCP/context evidence, and Playwright/browser diagnostics when they materially reduce uncertainty. These are evidence tools, not substitutes for making and verifying the requested code change.'
+      : 'The mounted repository carries recent history. When a failure is a contract, type, or missing-symbol mismatch, first run `git log --oneline -15 -- <file>` and `git show <sha> -- <file>` on the implicated file and read what the recent commits removed. If a commit deleted the property, import, or branch the failure names, restore it from `git show <sha>^:<file>` rather than writing a replacement from scratch. Report the commit you found. These git commands are read-only; committing, pushing, and merging remain forbidden.',
     narrowProof,
-    'Do not weaken tests, access another repository, use the network, commit, push, merge, deploy, or claim success without fail-before/pass-after evidence.',
+    engineering
+      ? 'Do not weaken tests, access another repository, use the network, commit, push, merge, or deploy from the sandbox. The host owns publication. Do not claim completion until at least one requested source mutation exists and fresh task-specific verification passes.'
+      : 'Do not weaken tests, access another repository, use the network, commit, push, merge, deploy, or claim success without fail-before/pass-after evidence.',
     command,
     paths.length ? `Path hints: ${paths.join(', ')}` : '',
     target.symbolHints.length ? `Symbol hints: ${target.symbolHints.join(', ')}` : '',
@@ -290,6 +311,7 @@ export function signalBoostRepositoryRepairObjective(target: SignalBoostReposito
     target.missingModuleHints.length
       ? `MISSING MODULES — the build could not resolve these imports, which means these files do not exist: ${target.missingModuleHints.join(', ')}. Create each one. Infer its required exports from every file that imports it and from any migration or schema it maps to; read those importers before writing. The repair is NOT complete while any of these paths is still absent, even if another proof command passes. Prove each with a command that actually imports it, for example \`node --experimental-strip-types -e "import('./<path>').then(()=>console.log('resolved'))"\`.`
       : '',
+    engineering ? `Owner task:\n${target.rawLog}` : '',
     `Failure evidence:\n${evidence}`,
   ].filter(Boolean).join('\n\n').slice(0, 7_900)
 }

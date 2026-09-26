@@ -194,6 +194,23 @@ test('owner platform repair intent is pinned only from immutable deployment meta
   assert.equal(signalBoostDeployedRepairTarget('Fix the Builder.', { commitSha: sha, branch: '../unsafe' }), null)
 })
 
+test('owner repository engineering intent is pinned to deployed SignalBoost and cannot finish in sandbox-only Builder', () => {
+  const sha = 'c'.repeat(40)
+  const target = signalBoostDeployedRepairTarget(
+    'Implement the Builder harness completion contract in the SignalBoost platform, verify it, commit and merge it.',
+    { commitSha: sha, branch: 'main' },
+  )
+  assert.ok(target)
+  assert.equal(target.trigger, 'deployed_platform_engineering')
+  assert.equal(target.fullCommitSha, sha)
+  assert.equal(target.repository, 'SignalBoost/signalboost-live')
+
+  assert.equal(signalBoostDeployedRepairTarget(
+    'Create a calculator and commit it.',
+    { commitSha: sha, branch: 'main' },
+  ), null)
+})
+
 test('passive logs and test titles cannot manufacture platform-repair intent', () => {
   const sha = 'b'.repeat(40)
   const passive = [
@@ -227,6 +244,16 @@ test('owner COS repair forces the recorded build command instead of an unrelated
   assert.match(repair, /target\.failedCommand/)
   assert.match(repair, /vercel-cos-gates\|npm run prebuild\|next build\|check-cos-blueprint/)
   assert.match(repair, /function targetedRepositoryCommand/)
+})
+
+test('owner repository engineering skips synthetic fail-before proof but keeps governed repository verification and publication', () => {
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(repair, /target\.trigger === 'deployed_platform_engineering'/)
+  assert.match(repair, /engineeringTask \? null : createRepositoryRepairProofController/)
+  assert.match(repair, /proofController\?\.ai \?\? governedAi/)
+  assert.match(repair, /publishSignalBoostRepositoryRepair/)
+  assert.match(repair, /attemptSignalBoostRepositoryAutoMerge/)
+  assert.match(repair, /watchMergedDeployment/)
 })
 
 test('owner jobs that carry a failed SignalBoost clone log enter Platform Engineer', () => {

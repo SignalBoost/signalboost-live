@@ -116,3 +116,22 @@ test('a failed provider job is replaced, never re-adopted forever by its request
   assert.match(dispatch,/const accepted = reusable\n/)
   assert.match(dispatch,/replacedFailedProviderJob: existing\.jobId/)
 })
+
+
+test('Working COS preparation reconciles terminal HF jobs and permits only one bounded retry',()=> {
+  const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
+  const cron=source('app/api/cron/cos-working-distillation-owner-approved-prepare/route.ts')
+
+  assert.match(dispatch,/inspectHuggingFaceJob/)
+  assert.match(dispatch,/working_cos_reconcile_provider_acceptance_missing/)
+  assert.match(dispatch,/huggingface_completed_without_callback/)
+  assert.match(dispatch,/huggingface_provider_timeout_overdue/)
+  assert.match(dispatch,/excludeJobIds/)
+  assert.match(dispatch,/retryAuthorized: failedCount <= 1/)
+  assert.match(cron,/reconcileWorkingCosPreparationProviderJob/)
+  assert.match(cron,/working_cos_dataset_preparation_in_progress/)
+  assert.match(cron,/working_cos_dataset_preparation_retry_exhausted/)
+  assert.match(cron,/working-cos-owner-approved-prepare-retry/)
+  assert.match(cron,/automaticTrainingAuthorized: false/)
+  assert.match(cron,/productionTrafficAuthorized: false/)
+})

@@ -550,6 +550,14 @@ async function resolveExactEndpoint(
 
   if (!endpoint) {
     if (!allowCreate) throw new Error('mass_distilled_runtime_existing_endpoint_missing')
+    // Preserve one account-wide worker slot before creating a new exact endpoint. This prevents
+    // Residency from using the final reservation and turns quota cleanup into a preflight rather
+    // than waiting for RunPod to reject POST /serverless first.
+    const configuredQuota = Number(process.env.RUNPOD_SERVERLESS_WORKER_QUOTA || '10')
+    const workerQuota = Number.isFinite(configuredQuota) && configuredQuota >= 1 ? Math.floor(configuredQuota) : 10
+    const reservedWorkers = (listed.endpoints || []).reduce((total, item) =>
+      total + Math.max(0, Math.floor(Number(item.workers?.max ?? 0))), 0)
+    if (workerQuota - reservedWorkers <= 1) await releaseOtherMassEndpointCapacity('')
     const config = nativeV2EndpointConfig(input, ids.modelName, approvedPools, idleTimeoutSeconds)
     endpoint = await withWorkerQuotaRecovery('', () => requestV2<Endpoint>('/serverless', {
       method: 'POST',

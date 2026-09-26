@@ -85,6 +85,7 @@ const tests = [
   'tests/universalMcpActionsTokenScope.node.test.ts',
   'tests/securityAdmissionShield.node.test.ts',
   'tests/publicFetchGuard.node.test.ts',
+  'tests/promoteUploadAdmission.node.test.ts',
   'tests/aiSecurityGateway.node.test.ts',
   'tests/aiSecuritySupervisorTelemetry.node.test.ts',
   'tests/cosEvidenceCompaction.node.test.ts',

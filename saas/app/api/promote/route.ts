@@ -1,11 +1,16 @@
 import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/utils/supabase/server'
+import { inspectUntrustedAiContent } from '@/lib/security/aiSecurityGateway'
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
   return new OpenAI({ apiKey })
 }
+
+const MAX_ATTACHMENT_BYTES = 200_000
+const MAX_CONTEXT_CHARS = 32_000
 
 const LANGUAGE_NAMES: Record<string, string> = {
   en: 'English',
@@ -29,6 +34,11 @@ type PromoteRequest = {
 
 export async function POST(req: Request) {
   try {
+    const authedUser = await getCurrentUser()
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+    }
+
     const openai = getOpenAIClient()
     if (!openai) {
       return NextResponse.json(
@@ -56,6 +66,10 @@ export async function POST(req: Request) {
       }
 
       if (file instanceof File) {
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          return NextResponse.json({ error: 'Attachment is too large.' }, { status: 413 })
+        }
+
         body.attachmentName = file.name
 
         const safeTypes = [
@@ -101,18 +115,31 @@ export async function POST(req: Request) {
       body.websiteUrl?.trim() || ''
 
     const pastedContext =
-      body.pastedContext?.trim() || ''
+      (body.pastedContext?.trim() || '').slice(0, MAX_CONTEXT_CHARS)
 
     const attachmentText =
-      body.attachmentText?.trim() || ''
+      (body.attachmentText?.trim() || '').slice(0, MAX_CONTEXT_CHARS)
 
     const attachmentName =
       body.attachmentName?.trim() || ''
 
+    const screened = inspectUntrustedAiContent({
+      source: 'user_input',
+      data: { pastedContext, attachmentText },
+    })
+
+    if (screened.disposition === 'quarantined') {
+      return NextResponse.json({ error: 'The supplied content could not be used.' }, { status: 400 })
+    }
+
+    const screenedData = (screened.modelData || {}) as { pastedContext?: string; attachmentText?: string }
+    const safePastedContext = String(screenedData.pastedContext || '')
+    const safeAttachmentText = String(screenedData.attachmentText || '')
+
     if (
       !promotion &&
-      !pastedContext &&
-      !attachmentText &&
+      !safePastedContext &&
+      !safeAttachmentText &&
       !websiteUrl
     ) {
       return NextResponse.json(
@@ -146,13 +173,13 @@ Website:
 ${websiteUrl || 'None'}
 
 Additional context:
-${pastedContext || 'None'}
+${safePastedContext || 'None'}
 
 Attachment:
 ${attachmentName || 'None'}
 
 Attachment content:
-${attachmentText || 'None'}
+${safeAttachmentText || 'None'}
 
 Return ONLY valid JSON:
 

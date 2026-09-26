@@ -14,8 +14,8 @@ test('service-role video upload requires sign-in before reading the body', () =>
 })
 
 test('only real video containers are stored, with a server-chosen content type', () => {
-  assert.match(upload, /mp4:\s*'video\/mp4'/)
-  assert.match(upload, /webm:\s*'video\/webm'/)
+  assert.match(upload, /mp4: 'video\/mp4'/)
+  assert.match(upload, /webm: 'video\/webm'/)
   assert.match(upload, /videoContentType\(video\.name/)
   assert.match(upload, /415/)
   assert.doesNotMatch(upload, /contentType: video\.type/)
@@ -23,13 +23,13 @@ test('only real video containers are stored, with a server-chosen content type',
   assert.doesNotMatch(upload, /error: uploadError\.message/)
 })
 
-test('stored-video captioning signs in first and only reads the caller own objects', () => {
+test('stored-video captioning signs in first and only reads the caller\'s own objects', () => {
   const auth = transcribe.indexOf('const user = await getUser()')
   const read = transcribe.indexOf('await getVideoFromRequest(request, user.id)')
   assert.ok(auth > 0 && read > 0 && auth < read)
   assert.equal((transcribe.match(/await getUser\(\)/g) || []).length, 1)
   assert.match(transcribe, /bucket !== defaultStorageBucket \|\| !ownedStoragePath\(path, userId\)/)
-  assert.match(transcribe, /value\.startsWith\(/)
+  assert.match(transcribe, /value\.startsWith\(`\$\{userId\}\/`\)/)
   assert.doesNotMatch(transcribe, /throw new Error\(error\?\.message/)
 })
 

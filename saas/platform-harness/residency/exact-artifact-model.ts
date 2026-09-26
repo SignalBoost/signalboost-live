@@ -1,3 +1,4 @@
+// saas/platform-harness/residency/exact-artifact-model.ts
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS } from '../../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
@@ -134,6 +135,29 @@ async function resolveResidencyArtifact(
 }
 
 async function defaultSleep(ms:number){await new Promise(resolve=>setTimeout(resolve,ms))}
+
+/**
+ * The provider's rejection reason is part of the failure code. Production, 2026-09-26 21:52 UTC onward:
+ * two different residents failed with a bare `residency_exact_artifact_inference_http_400` while the
+ * response body — the only statement of WHY the served model rejected the request — was read and
+ * discarded. Keep a bounded, redacted excerpt so the recorded case run explains itself.
+ */
+export function inferenceHttpFailureCode(status:number,raw:string):string{
+  const code=`residency_exact_artifact_inference_http_${status}`
+  let detail=''
+  try{
+    const parsed=JSON.parse(String(raw||''))
+    detail=String(parsed?.message??parsed?.error?.message??parsed?.detail??parsed?.error??'')
+  }catch{
+    detail=String(raw||'')
+  }
+  const safe=detail
+    .replace(/\b(bearer|token|secret|api[_-]?key|authorization)\b\s*[:=]?\s*[^,;\s]+/gi,'$1=[redacted]')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,180)
+  return safe?`${code}:${safe}`:code
+}
 
 export function createRunpodBuilderResidencyModelPort(input:{
   db:SupabaseClient
@@ -348,7 +372,7 @@ export function createRunpodBuilderResidencyModelPort(input:{
           :AbortSignal.timeout(timeoutMs),
       })
       const raw=await response.text()
-      if(!response.ok) throw new Error(`residency_exact_artifact_inference_http_${response.status}`)
+      if(!response.ok) throw new Error(inferenceHttpFailureCode(response.status,raw))
       let parsed:any
       try{parsed=JSON.parse(raw)}catch{throw new Error('residency_exact_artifact_inference_invalid_json')}
       const text=String(parsed?.choices?.[0]?.message?.content||'').trim()

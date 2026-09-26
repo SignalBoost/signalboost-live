@@ -73,6 +73,8 @@ type Run = {
   completedAt: string | null
 }
 
+type Residency = { residencyId:string; candidateId:string; subject:string; artifactId:string; artifactHash:string; programId:string; programVersion:string; standing:string; demonstratedCompetencies:number; competenciesObserved:number; totalCompetencies:number; completedCases:number; realOutcomes:number; infrastructureFailures:number; latestCase:{competency:string;family:string;status:string;outcome:string|null;failureCode:string|null;startedAt:string|null;completedAt:string|null}|null; admittedAt:string|null; completedAt:string|null; remediationRequiredAt:string|null; updatedAt:string|null }
+
 type Artifact = {
   candidateId: string
   subject: string
@@ -83,6 +85,10 @@ type Artifact = {
   ageSeconds: number | null
   retentionEligibleAt: string | null
   claimability: string
+  currentStage: string
+  blocker: string
+  nextAction: string
+  residency: Residency | null
   evaluation: {
     evaluatedAt: string | null
     artifactAgeSeconds: number
@@ -124,6 +130,8 @@ type Telemetry = {
   providers?: Provider[]
   runs?: Run[]
   artifacts?: Artifact[]
+  residency?: Residency[]
+  pipeline?: { residencyTotal?:number; residencyResidents?:number; residencyRemediation?:number; residencyComplete?:number; activeGraduates?:number; evaluationPending?:number; quarantined?:number }
 }
 
 const REFRESH_MS = 60_000
@@ -267,6 +275,8 @@ export default function CosUniversityTelemetryPage() {
   const workingCos = data?.workingCos || null
   const runs = data?.runs || []
   const artifacts = data?.artifacts || []
+  const residency = data?.residency || []
+  const pipeline = data?.pipeline || {}
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">

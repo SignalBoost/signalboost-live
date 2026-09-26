@@ -1,6 +1,7 @@
 import {
   callLocalModel,
   checkLocalInferenceHealth,
+  LOCAL_MODEL_OUTPUT_TRUNCATED,
   type LocalInferenceConfig,
   type LocalModelCallArgs,
 } from '../local-inference.ts'
@@ -150,7 +151,29 @@ export async function tryRunpodPrimaryInference(
     }
 
     try {
-      const text = await callLocalModel(args, config)
+      let text: string | null = null
+      try {
+        text = await callLocalModel(args, config)
+      } catch (error) {
+        const emptyThinkingTruncation = error instanceof Error
+          && error.message === LOCAL_MODEL_OUTPUT_TRUNCATED
+          && (error as Error & { emptyContent?: boolean }).emptyContent === true
+        const maxTokens = Number(args.maxTokens)
+        const retryEligible = emptyThinkingTruncation
+          && args.disableThinking !== true
+          && Number.isFinite(maxTokens)
+          && maxTokens > 1024
+
+        if (!retryEligible) throw error
+
+        console.warn('[runpod-primary-thinking-retry]', JSON.stringify({
+          workload,
+          model: config.model,
+          feature: args.usageContext?.feature || 'unattributed_local_inference',
+          reason: 'empty_hidden_reasoning_exhausted_token_budget',
+        }))
+        text = await callLocalModel({ ...args, disableThinking: true }, config)
+      }
       return {
         text: text?.trim() ? text : null,
         attempted: true,

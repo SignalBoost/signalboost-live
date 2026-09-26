@@ -155,17 +155,17 @@ test('first two post-GKD remediation replay artifacts get bounded canary proof p
     artifacts:[legacy,builderOne,builderTwo,replayTwo,replayOne], events:builderDone, now:proofNow, enabled:true,
   })
   assert.ok('artifact' in first)
-  assert.equal(first.artifact.candidateId, replayOne.candidateId)
+  assert.equal(first.artifact.candidateId, replayTwo.candidateId)
   assert.equal(first.evidence.remediationReplayProofPriority, true)
 
-  const firstPassed = event(replayOne, 'local_distilled_runtime_canary_passed', '2026-09-22T18:30:00.000Z')
+  const firstPassed = event(replayTwo, 'local_distilled_runtime_canary_passed', '2026-09-22T18:30:00.000Z')
   const second = decideMassCanaryRollingApproval({
     artifacts:[legacy,builderOne,builderTwo,replayTwo,replayOne], events:[...builderDone,firstPassed], now:proofNow, enabled:true,
   })
   assert.ok('artifact' in second)
-  assert.equal(second.artifact.candidateId, replayTwo.candidateId)
+  assert.equal(second.artifact.candidateId, replayOne.candidateId)
 
-  const secondPassed = event(replayTwo, 'local_distilled_runtime_canary_passed', '2026-09-22T18:40:00.000Z')
+  const secondPassed = event(replayOne, 'local_distilled_runtime_canary_passed', '2026-09-22T18:40:00.000Z')
   const restored = decideMassCanaryRollingApproval({
     artifacts:[legacy,builderOne,builderTwo,replayTwo,replayOne],
     events:[...builderDone,firstPassed,secondPassed], now:proofNow, enabled:true,

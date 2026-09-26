@@ -304,6 +304,8 @@ export function decideMassCanaryRollingApproval(input: {
         const aComputerScience = a.subjectId === 'Computer Science & Coding'
         const bComputerScience = b.subjectId === 'Computer Science & Coding'
         if (aComputerScience !== bComputerScience) return aComputerScience ? -1 : 1
+        const newestReplayFirst = at(b.createdAt) - at(a.createdAt)
+        if (newestReplayFirst !== 0) return newestReplayFirst
       }
     }
     // After bounded proof cohorts, prefer the recipe current training actually emits. Legacy artifacts

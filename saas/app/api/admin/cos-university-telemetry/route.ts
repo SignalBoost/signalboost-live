@@ -385,7 +385,27 @@ export async function GET() {
     const failedRuns24h = n(failedRunCountResult.count)
     const inFlightRuns24h = Math.max(0, totalRuns24h - completedRuns24h - failedRuns24h)
 
-    const artifactCandidates = (artifactsResult.data || []).map((row: any) => text(row.candidate_id, 240)).filter(Boolean)
+    // The activity table is recency-bounded, but graduates are durable lifecycle state. Always merge
+    // every registry-backed graduate artifact into telemetry so an older active graduate cannot disappear
+    // merely because 100 newer artifacts were updated after it.
+    const recentArtifacts = artifactsResult.data || []
+    const graduateCandidateIds = Array.from(new Set((graduatesResult.data || [])
+      .map((row: any) => text(row.candidate_id, 240))
+      .filter(Boolean)))
+    const graduateArtifactsResult = graduateCandidateIds.length
+      ? await db.from(ARTIFACTS)
+        .select('candidate_id,subject_id,status,trained_artifact_id,trained_artifact_hash,revision_key,created_at,updated_at')
+        .in('candidate_id', graduateCandidateIds)
+        .limit(500)
+      : { data: [], error: null } as any
+    if (graduateArtifactsResult.error) throw graduateArtifactsResult.error
+    const artifactRowsByKey = new Map<string, any>()
+    for (const row of [...recentArtifacts, ...(graduateArtifactsResult.data || [])]) {
+      const key = text(row.candidate_id, 240) + ':' + text(row.trained_artifact_hash, 80)
+      if (key !== ':') artifactRowsByKey.set(key, row)
+    }
+    const telemetryArtifactRows = Array.from(artifactRowsByKey.values())
+    const artifactCandidates = Array.from(new Set(telemetryArtifactRows.map((row: any) => text(row.candidate_id, 240)).filter(Boolean)))
     const assuranceResult = artifactCandidates.length
       ? await db.from('cos_university_learning_assurance_events')
         .select('candidate_id,observed_at,expires_at,verifier,evidence')
@@ -412,7 +432,7 @@ export async function GET() {
       const key = text(row.candidate_id, 240) + ':' + text(row.trained_artifact_hash, 80)
       if (!graduateByArtifact.has(key)) graduateByArtifact.set(key, row)
     }
-    const artifacts = (artifactsResult.data || []).map((artifact: any) => {
+    const artifacts = telemetryArtifactRows.map((artifact: any) => {
       const candidateId = text(artifact.candidate_id, 240)
       const artifactHash = text(artifact.trained_artifact_hash, 80)
       const evaluation = latestEvaluationByArtifact.get(candidateId + ':' + artifactHash) || null

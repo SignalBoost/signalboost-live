@@ -147,7 +147,10 @@ test('Working COS owner-bound training cron uses deliberate repaired hardware an
 
   assert.match(route,/working-cos:d1be42c94d892b75bf272e3a34ad78e1/)
   assert.match(route,/fcbf51dae199418a11da0fb66a29b3098a7742e38e0b82a752c6a8a721b0eb52/)
-  assert.match(route,/dispatchWorkingCosTraining\(\{ confirmDispatch: true \}\)/)
+  assert.match(route,/dispatchWorkingCosTraining\(\{/)
+  assert.match(route,/confirmDispatch: true/)
+  assert.match(route,/candidateId: APPROVED_CANDIDATE_ID/)
+  assert.match(route,/expectedDatasetHash: APPROVED_DATASET_HASH/)
   assert.match(route,/working_cos_owner_training_approval_expired/)
   assert.match(route,/automaticActivationAuthorized: false/)
   assert.match(route,/productionTrafficAuthorized: false/)

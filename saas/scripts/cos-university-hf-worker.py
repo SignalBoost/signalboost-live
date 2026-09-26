@@ -50,10 +50,12 @@ MUON_ADJUST_LR_FN = "match_rms_adamw"
 
 # Exclusive Self Attention (XSA) changes the model forward architecture rather than merely the
 # optimizer. An XSA-trained LoRA adapter must therefore be evaluated and later served with the same
-# XSA forward path. Phase 1 records the governed contract but deliberately keeps rollout at zero
-# until the University evaluator/runtime can prove exact training/inference symmetry.
+# XSA forward path. Training/evaluation/serving symmetry is now implemented and fail-closed.
+# Future University students default to XSA. Standard attention remains an explicit control/fallback
+# only when the governed HF job sets ITMOUNTS_UNIVERSITY_STANDARD_ATTENTION_CONTROL=true.
 XSA_PROFILE = "exclusive_self_attention_v1"
-XSA_ROLLOUT_PERCENT = 5
+XSA_ROLLOUT_PERCENT = 100
+XSA_STANDARD_CONTROL_ENV = "ITMOUNTS_UNIVERSITY_STANDARD_ATTENTION_CONTROL"
 XSA_INFERENCE_SYMMETRY_REQUIRED = True
 
 FRONTIER_TRAINING_PROFILE = "cos_university_frontier_gkd_v1"
@@ -763,7 +765,8 @@ def _xsa_canary_evidence(base, base_model, candidate_id: str) -> dict[str, Any]:
     symmetric runtime exists, any non-zero deterministic selection fails closed before paid training.
     """
     normalized_candidate = str(candidate_id or "").strip()
-    selected = bool(normalized_candidate) and XSA_ROLLOUT_PERCENT > 0 and (
+    standard_control = str(os.environ.get(XSA_STANDARD_CONTROL_ENV) or "").strip().lower() == "true"
+    selected = bool(normalized_candidate) and not standard_control and XSA_ROLLOUT_PERCENT > 0 and (
         int(base.sha256(f"xsa:{normalized_candidate}")[:8], 16) % 100 < XSA_ROLLOUT_PERCENT
     )
     if not selected:
@@ -778,7 +781,7 @@ def _xsa_canary_evidence(base, base_model, candidate_id: str) -> dict[str, Any]:
             "xsaTrainingRuntimeImplemented": True,
             "xsaServingRuntimeImplemented": True,
             "xsaInstalledAttentionLayers": 0,
-            "xsaReason": "deterministic_control_cohort",
+            "xsaReason": "explicit_standard_attention_control" if standard_control else "deterministic_control_cohort",
         }
     runtime = _load_xsa_runtime()
     installation = runtime.install_qwen3_xsa(base_model)
@@ -799,7 +802,7 @@ def _xsa_canary_evidence(base, base_model, candidate_id: str) -> dict[str, Any]:
         "xsaTrainingRuntimeImplemented": True,
         "xsaServingRuntimeImplemented": True,
         "xsaInstalledAttentionLayers": int(installation["installedAttentionLayers"]),
-        "xsaReason": "bounded_deterministic_treatment_cohort",
+        "xsaReason": "xsa_default_future_student",
     }
 
 

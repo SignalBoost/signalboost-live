@@ -172,3 +172,12 @@ test('explicit canary warm-start never widens worker count, GPU pools, promotion
   assert.ok(deactivateStart > activateStart)
   assert.doesNotMatch(route, /productionTrafficAuthorized:true|automaticPromotionAuthorized:true/)
 })
+
+
+test('immutable endpoint generation transition preserves logical cold-start resume without pinning stale provider endpoint id', () => {
+  assert.match(route, /coldStartResumeEndpointRotated/)
+  assert.match(route, /immutable_endpoint_generation_transition/)
+  assert.match(route, /coldStartResumeReplacementEndpointId/)
+  assert.match(route, /mass_distilled_cold_start_resume_runtime_key_mismatch/)
+  assert.doesNotMatch(route, /throw new Error\('mass_distilled_cold_start_resume_endpoint_mismatch'\)/)
+})

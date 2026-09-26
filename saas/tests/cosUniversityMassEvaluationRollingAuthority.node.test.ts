@@ -873,3 +873,12 @@ test('rolling approval refuses a canary that the atomic claim would reject', () 
   assert.equal(decision.issue, false)
   if (!decision.issue) assert.equal(decision.reason, 'no_mass_artifact_eligible_for_rolling_evaluation')
 })
+
+
+test('baseline exact-model mismatch is infrastructure and does not exhaust substantive attempts', () => {
+  const failures = [1,2,3].map((n) => ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashA,
+    error: 'mass_distilled_evaluation_runpod_http_409:baseline:cases=2:{"detail":"distilled_exact_model_mismatch"}',
+  }, `2026-09-16T15:0${n}:00Z`))
+  assert.equal(decideExhaustedMassEvaluationArtifacts({ artifacts: [artifactA], events: failures, now: new Date('2026-09-16T16:00:00Z') }).length, 0)
+})

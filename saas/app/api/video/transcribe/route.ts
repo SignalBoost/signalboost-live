@@ -209,7 +209,7 @@ async function getVideoFromRequest(request: Request, userId: string): Promise<{
     const { data, error } = await supabase.storage.from(bucket).download(path)
 
     if (error || !data) {
-      throw new Error(error?.message || 'Could not download uploaded video from storage.')
+      throw new Error('Could not download uploaded video from storage.')
     }
 
     if (data.size > storageCaptionMaxMb * 1024 * 1024) {

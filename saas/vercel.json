@@ -49,7 +49,8 @@
     "COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_COST_USD_JSON": "{\"openai\":0.002,\"claude\":0.008,\"grok\":0.004,\"deepseek-api\":0.001,\"gemini\":0.0017}",
     "COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_MAX_OUTPUT_TOKENS_JSON": "{\"claude\":512}",
     "COS_UNIVERSITY_RESIDENCY_ENABLED": "true",
-    "COS_WORKING_DISTILLATION_DISPATCH_ENABLED": "true"
+    "COS_WORKING_DISTILLATION_DISPATCH_ENABLED": "true",
+    "COS_WORKING_DISTILLATION_HF_TRAINING_FLAVOR": "l4x1"
   },
   "routes": [
     {
@@ -352,6 +353,10 @@
     },
     {
       "path": "/api/cron/cos-working-distillation-owner-approved-prepare",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/cos-working-distillation-owner-approved-train",
       "schedule": "* * * * *"
     }
   ]

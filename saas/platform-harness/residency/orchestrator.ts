@@ -5,7 +5,7 @@ import {
   type ResidencyStanding,
 } from '../../lib/ai/cos/cosUniversityResidency.ts'
 import {
-  BUILDER_RESIDENCY_CASES,
+  ACTIVE_BUILDER_RESIDENCY_CASES,
   type BuilderResidencyCase,
 } from '../cases/builder-residency.ts'
 import type {
@@ -49,7 +49,7 @@ export interface BuilderResidencyCoverage {
 }
 
 export function assessBuilderResidencyCaseCoverage(
-  cases:readonly BuilderResidencyCase[]=BUILDER_RESIDENCY_CASES,
+  cases:readonly BuilderResidencyCase[]=ACTIVE_BUILDER_RESIDENCY_CASES,
 ):BuilderResidencyCoverage{
   const covered=new Set(cases.map(item=>item.competencyId))
   const missing=BUILDER_RESIDENCY_V1_COMPETENCIES.filter(item=>!covered.has(item))
@@ -86,7 +86,7 @@ export function selectNextBuilderResidencyCase(input:{
   evidence:readonly ResidencyEvidenceForAssessment[]
   cases?:readonly BuilderResidencyCase[]
 }):BuilderResidencyCase|null{
-  const cases=input.cases??BUILDER_RESIDENCY_CASES
+  const cases=input.cases??ACTIVE_BUILDER_RESIDENCY_CASES
   const assessment=assessBuilderResidency(input.evidence)
   const recorded=recordedVariantKeys(input.evidence)
   const available=cases.filter(item=>

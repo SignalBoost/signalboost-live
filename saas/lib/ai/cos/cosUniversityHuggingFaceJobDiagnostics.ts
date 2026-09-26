@@ -242,13 +242,15 @@ export async function diagnoseFailedMassDistillationHuggingFaceJobs(input: {
       // recovery probe because the next cron tick re-opens the circuit from stale logs.
       const circuit = wasRecorded
         ? { opened: false as const, reason: 'historical_failure_already_recorded' as const }
-        : await openProviderCircuit({
-            db,
-            providerId: 'huggingface',
-            capability: 'model-training',
-            classification,
-            evidence: { candidateId, jobId, runId: String((run as any).id || ''), source: PROFILE },
-          })
+        : classification.reason === 'worker_contract_invalid'
+          ? { opened: false as const, reason: 'worker_failure_not_provider_scoped' as const }
+          : await openProviderCircuit({
+              db,
+              providerId: 'huggingface',
+              capability: 'model-training',
+              classification,
+              evidence: { candidateId, jobId, runId: String((run as any).id || ''), source: PROFILE },
+            })
       diagnostics.push({ runId: (run as any).id, jobId, logLines: logTail.length, recorded: !wasRecorded, classification, circuit })
     } catch (error) {
       diagnostics.push({

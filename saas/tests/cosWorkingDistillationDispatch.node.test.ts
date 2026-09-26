@@ -40,7 +40,7 @@ test('Working COS dispatcher has hard provider-cost ceilings and no implicit 30B
   const env=source('.env.example')
 
   assert.match(dispatch,/HARD_MAX_PREPARATION_HOURLY_COST_USD = 1/)
-  assert.match(dispatch,/HARD_MAX_TRAINING_HOURLY_COST_USD = 2\\.5/)
+  assert.match(dispatch,/HARD_MAX_TRAINING_HOURLY_COST_USD = 2\.5/)
   assert.match(dispatch,/HARD_MAX_PREPARATION_COST_USD = 0\.25/)
   assert.match(dispatch,/HARD_MAX_TRAINING_COST_USD = 2\.5/)
   assert.match(dispatch,/working_cos_training_flavor_not_configured/)
@@ -199,7 +199,7 @@ test('Working COS A100 OOM repair retry is exact-job, exact-candidate, exact-dat
   assert.match(cron,/APPROVED_FAILED_OOM_JOB_ID = '6ab749a06b030d633f69326e'/)
   assert.match(cron,/APPROVED_REPAIR_FLAVOR = 'a100-large'/)
   assert.match(cron,/APPROVED_REPAIR_ERROR_SIGNATURE = 'CUDA out of memory'/)
-  assert.match(cron,/accepted\\.data\\.job_id === APPROVED_FAILED_OOM_JOB_ID/)
+  assert.match(cron,/accepted\.data\.job_id === APPROVED_FAILED_OOM_JOB_ID/)
   assert.match(cron,/providerLogTail\.includes\(APPROVED_REPAIR_ERROR_SIGNATURE\)/)
   assert.match(cron,/reconciliation\.providerStage === 'ERROR'/)
   assert.match(cron,/candidateId: APPROVED_CANDIDATE_ID/)

@@ -354,8 +354,24 @@ test('a request too large for one environment variable is chunked and still star
   }
   assert.deepEqual(JSON.parse(gunzipSync(Buffer.from(compressed, 'base64url')).toString('utf8')), envelope)
 
-  // The bootstrap contract is proven without a filesystem side-effect probe.
-  // Chunk bounds plus exact reassembly make this deterministic in Vercel build sandboxes.
+  // Execute the real reassembly bootstrap without network, pip, or filesystem side effects.
+  // This is the same Python transformation used by the production bootstrap before runpy.
+  const python = spawnSync('python', ['-c', [
+    'import os,base64,gzip,sys',
+    `n=int(os.environ["${WORKER_REQUEST_PARTS_ENV}"])`,
+    `e="".join(os.environ["${WORKER_REQUEST_PART_ENV_PREFIX}%03d"%i] for i in range(n))`,
+    'p="="*(-len(e)%4)',
+    'raw=gzip.decompress(base64.urlsafe_b64decode(e+p))',
+    'sys.stdout.buffer.write(raw)',
+  ].join('; ')], {
+    env: { ...process.env, ...environment },
+    encoding: 'utf8',
+    timeout: 60_000,
+  })
+  if (python.error && (python.error as NodeJS.ErrnoException).code === 'ENOENT') return
+  assert.equal(python.error, undefined)
+  assert.equal(python.status, 0, python.stderr)
+  assert.deepEqual(JSON.parse(python.stdout), envelope)
 })
 
 test('routes keep owner confirmation, signed callbacks and the global dispatch switch authoritative', () => {

@@ -152,3 +152,9 @@ test('Working COS owner-bound training cron uses deliberate L4 hardware and neve
   assert.match(vercel,/"COS_WORKING_DISTILLATION_HF_TRAINING_FLAVOR": "l4x1"/)
   assert.match(vercel,/cos-working-distillation-owner-approved-train/)
 })
+
+
+test('Working COS provider job ledger records the selected hardware flavor',()=> {
+  const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
+  assert.match(dispatch,/providerFlavor: input\.flavor/)
+})

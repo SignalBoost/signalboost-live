@@ -278,6 +278,7 @@ async function submitBoundedJob(input: {
 }) {
   await recordJobEvent(input.db, {
     ...input,
+    providerFlavor: input.flavor,
     eventType: 'dispatch_intent',
     evidence: {
       jobName: input.spec.labels.name,
@@ -314,6 +315,7 @@ async function submitBoundedJob(input: {
       : { ...(await submitHuggingFaceJob({ namespace, token: input.token, spec: input.spec, fetchImpl: input.fetchImpl })), adopted: false }
     await recordJobEvent(input.db, {
       ...input,
+      providerFlavor: input.flavor,
       eventType: 'provider_accepted',
       jobId: accepted.jobId,
       jobUrl: accepted.jobUrl,
@@ -330,6 +332,7 @@ async function submitBoundedJob(input: {
     const message = error instanceof Error ? clean(error.message, 400) : clean(error, 400)
     await recordJobEvent(input.db, {
       ...input,
+      providerFlavor: input.flavor,
       eventType: 'provider_failed',
       evidence: { error: message, providerInvocationStarted: true },
     }).catch(() => null)

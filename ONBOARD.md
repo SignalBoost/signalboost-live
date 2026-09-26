@@ -57,6 +57,37 @@ The full-enforcement requirements are:
 4. **Recursive delegation.** A COS-to-specialist or specialist-to-specialist delegation creates a child HarnessRun bound to the parent run and may only reduce the parent authority, budget, deadline, environment, and capability surface. Delegation can never launder or widen authority.
 5. **Consequential-action contract.** Consequential capabilities require explicit consequential authority plus an executable rollback or compensating-action contract where rollback is technically possible. The Harness records precondition evidence, action evidence, postcondition verification, rollback availability, rollback attempt/result when invoked, and escalation when safe rollback is impossible.
 6. **No success by assertion.** Model text, tool exit alone, HTTP 2xx alone, or a worker self-report cannot establish success. The independent verifier owns success/failure attribution from observable evidence. Verification failure cannot be converted into success by retrying through another provider or route outside the same authority envelope.
+### Agent corrigibility and evidence-discipline invariant — 2026-09-26
+
+iTMounts agents are not trained or evaluated as infallible systems. **A mistake is not itself a governance or Safety violation.** The required behavior is corrigibility: bound claims to evidence, detect contradiction, acknowledge and correct mistakes, learn the general lesson without leaking the exam, and demonstrate improved behavior on a distinct case.
+
+The canonical claim progression is:
+
+```text
+observation
+-> bounded claim
+-> hypothesis
+-> discriminating test
+-> verified conclusion
+-> correction when contradicted
+-> retained lesson
+-> transfer proof on a different case
+```
+
+The Harness must preserve these distinctions in consequential engineering work:
+
+- **Observation** reports only what a tool, log, test, deployment, database row, or other evidence directly establishes.
+- **Hypothesis** is an explanation still requiring a discriminating check. Correlation, timing, one error code, one file, one provider response, or one successful retry cannot be promoted to root cause by wording alone.
+- **Verified conclusion** requires evidence capable of distinguishing the claimed explanation from material alternatives.
+- **Completion claims are scope-bound.** A merged PR proves merge; a successful build proves buildability under that build; a READY deployment proves deployment readiness; a passing unit test proves that test; none alone proves Production functionality or end-to-end completion.
+- **Contradiction is a learning event.** When later evidence conflicts with an earlier claim, the agent must not defend, silently rewrite, or conceal the earlier conclusion. It records the observable contradiction, downgrades or retracts the unsupported claim, states the corrected bounded conclusion, and routes the failure class for learning where appropriate.
+- **Correction does not widen authority.** Discovering that the agent was wrong never authorizes a repair, spend, destructive action, promotion, secret disclosure, or Production mutation that was not already authorized.
+- **Learning is general, not answer leakage.** University remediation teaches the principle or failure pattern using distinct examples. Private holdout prompts, hidden evaluator answers, raw judge material, or exact exam cases must not be copied into training.
+- **Retesting must demonstrate transfer.** Repeating the exact corrected answer is not evidence of learning. A remediated agent must demonstrate the lesson on a materially different case and, where applicable, delayed retention.
+- **Evidence discipline applies to the platform itself.** COS, Builder, specialists, Self-Healing, University, and any collaborating agent must not label work `fixed`, `root cause`, `healthy`, `Production-ready`, `complete`, or `working end to end` beyond the strongest evidence actually observed.
+
+Failure routing remains semantic rather than punitive: authority/secrecy/unauthorized-spend violations remain hard Safety/governance failures; ordinary knowledge mistakes route to teaching; reasoning and unsupported-attribution mistakes route to evidence-discipline remediation; infrastructure defects route to Self-Healing; ambiguous attribution remains unresolved until discriminating evidence exists.
+
 7. **Strict recovery ownership.** Infrastructure failures route to Self-Healing; competency failures route to University/remediation where educational semantics apply; authority boundaries route to Referee/Guardian; Harness defects route to Harness assurance. Recovery executes only through a newly authorized/bounded HarnessRun or an already-authorized child run and must be reverified.
 8. **Production parity.** The same core Harness architecture applies in Production. Production is not a privileged bypass profile. Production may have broader separately granted authority, but all capability discovery, limits, governed execution, evidence, verification, and failure routing remain active.
 9. **Durable audit without hidden reasoning.** Persist run identity, authority reference, environment/profile, capability/tool observations, cost/latency/limit evidence, verification, rollback/recovery, routing, and outcome evidence. Never persist private chain-of-thought, hidden scratchpads, credentials, raw secrets, or unnecessary user content.

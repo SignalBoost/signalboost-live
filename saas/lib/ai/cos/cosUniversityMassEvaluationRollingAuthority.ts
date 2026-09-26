@@ -109,7 +109,10 @@ export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 // Standard gateway generation that accepts both the pinned base model and exact adapter alias.
 // A pre-repair canary proves the artifact but not this serving contract, so it cannot arm evaluation.
-export const MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT = '2026-09-26T04:19:00.000Z' as const
+// Production 2026-09-26 13:20 UTC: the v3 inline endpoint could not accept the full
+// container PATCH (RunPod HTTP 422) and its stale gateway rejected BASE_ID with HTTP 409.
+// Only a canary observed after the v4 immutable endpoint-generation repair may arm evaluation.
+export const MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT = '2026-09-26T13:20:32.748Z' as const
 export const MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT)
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
 const REPAIRED_SUSPENSION_REASON = 'candidate_502_pending_runpod_worker_logs' as const

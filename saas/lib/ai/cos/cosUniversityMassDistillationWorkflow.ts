@@ -304,8 +304,18 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
         ...failureDerived.persistedRemediationSubjects,
         ...failureDerived.bySubject.map(item => item.subject),
       ])
-      const remediationShortfalls = postRemediationSupply.filter(subject =>
-        remediationSubjects.has(String(subject?.subject || '')) && Number(subject?.shortfallToBatch || 0) > 0)
+      const remediationSupplyBySubject = new Map(
+        postRemediationSupply.map(subject => [String(subject?.subject || ''), subject] as const),
+      )
+      const remediationShortfalls = [...remediationSubjects]
+        .map(subject => remediationSupplyBySubject.get(subject) || {
+          subjectKey: subject.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
+          subject,
+          canonicalSubjectId: null,
+          uniqueBatchableItems: 0,
+          shortfallToBatch: 64,
+        })
+        .filter(subject => Number(subject?.shortfallToBatch || 0) > 0)
       if (remediationShortfalls.length > 0) {
         curriculumReplenishment = { ...(await replenishUniversityMassDistillationCurriculum({
           supply: remediationShortfalls,

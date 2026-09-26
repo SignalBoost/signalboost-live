@@ -144,6 +144,10 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error.startsWith('mass_distilled_evaluation_runpod_timeout:')
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
+    // The exact-artifact gateway rejecting BASE_ID is serving-contract/runtime drift: no baseline answer exists,
+    // so it is infrastructure evidence, never evidence about candidate quality.
+    || (error.startsWith('mass_distilled_evaluation_runpod_http_409:baseline:')
+      && error.includes('distilled_exact_model_mismatch'))
     // A missing judge result after the inference provider rejects/overloads the request is evaluator infrastructure,
     // not model quality. Release it from both the artifact retry budget and the 24h rolling approval window.
     || error === 'mass_distilled_evaluation_judge_unavailable'

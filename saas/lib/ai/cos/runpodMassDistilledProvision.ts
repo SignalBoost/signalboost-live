@@ -200,14 +200,22 @@ export function massDistilledRuntimeInlineContainer(input:MassDistilledRuntimeAr
   const token=process.env.HF_TOKEN?.trim()||''
   if(token.length<20) throw new Error('HF_TOKEN is not configured')
   const immutableImage=exactArtifactContainerImageFromEnv('standard')
+  const command=immutableImage
+    ? 'exec python3 /opt/itmounts/mass_gateway.py'
+    : startupCommand(input,modelName)
   return Object.freeze({
     image:immutableImage||VLLM_IMAGE,
-    args:JSON.stringify({entrypoint:['bash','-lc'],cmd:[startupCommand(input,modelName)]}),
+    args:JSON.stringify({entrypoint:['bash','-lc'],cmd:[command]}),
     disk:50,
     ports:[`${PUBLIC_PORT}/http`],
     env:{
       HF_TOKEN:token,
       HF_HOME:'/models/hf-cache',
+      ITMOUNTS_BASE_MODEL_ID:BASE_MODEL_ID,
+      ITMOUNTS_BASE_MODEL_REVISION:BASE_MODEL_REVISION,
+      ITMOUNTS_ADAPTER_MODEL_ID:input.artifactId,
+      ITMOUNTS_ADAPTER_MODEL_REVISION:input.artifactRevision,
+      ITMOUNTS_DISTILLED_MODEL_NAME:modelName,
       PORT:String(PUBLIC_PORT),
       PORT_HEALTH:String(PUBLIC_PORT),
       HEALTH_CHECK_PATH:'/ping',

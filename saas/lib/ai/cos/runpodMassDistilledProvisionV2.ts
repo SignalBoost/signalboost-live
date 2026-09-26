@@ -437,7 +437,9 @@ export async function activateMassDistilledEvaluationWorker(endpointId: string) 
   })
 }
 
-/** Return an explicitly woken evaluator endpoint to the normal scale-to-zero envelope. */
+/** Retire a terminal evaluator's worker reservation immediately. The exact endpoint remains materialized
+ * for audit/rollback identity and restoreRetiredEndpointCapacity can re-arm max=1 later when an authorized
+ * rollback/residency path actually needs it. This releases quota without deleting evidence or widening authority. */
 export async function deactivateMassDistilledEvaluationWorker(endpointId: string) {
   const endpoint = await resolveEndpointControlPlane(clean(endpointId, 160))
   const pools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
@@ -446,14 +448,18 @@ export async function deactivateMassDistilledEvaluationWorker(endpointId: string
   }
   const deactivated = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
     method: 'PATCH',
-    body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+    body: JSON.stringify({ workers: { min: 0, max: 0, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
   })
-  if (!deactivated?.id) throw new Error('mass_distilled_evaluation_worker_scale_down_missing')
-  assertEndpointSafetyPolicy(deactivated, IDLE_TIMEOUT_SECONDS, APPROVED_POOLS)
+  if (!deactivated?.id
+    || Number(deactivated.workers?.min ?? Number.NaN) !== 0
+    || Number(deactivated.workers?.max ?? Number.NaN) !== 0) {
+    throw new Error('mass_distilled_evaluation_worker_retirement_rejected')
+  }
+  assertNonGpuEndpointSafetyPolicy(deactivated, IDLE_TIMEOUT_SECONDS)
   return Object.freeze({
     endpointId: String(deactivated.id),
     workersMin: 0 as const,
-    workersMax: 1 as const,
+    workersMax: 0 as const,
     idleTimeout: Number(deactivated.workers?.idleTimeout),
     authorityExpanded: false as const,
   })

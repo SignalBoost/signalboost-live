@@ -416,23 +416,23 @@ export async function activeGraduateRuntimesForRole(
       console.warn('[cos-graduate-runtime] active binding no longer resolves; fail closed', error instanceof Error ? error.message : String(error))
     }
   }
-  // Traffic selection is a routing lease over already-active, scope-matched graduates.
-  // It does not alter lifecycle state or authority. A single eligible graduate remains selected;
-  // with multiple eligible graduates the stable pool advances exactly once per 24-hour UTC lease.
-  const rotation = selectGraduateFor24HourLease(result, new Date())
-  if (rotation.selected) {
-    console.info('[cos-graduate-24h-rotation]', JSON.stringify({
-      reason: rotation.reason,
-      leaseNumber: rotation.leaseNumber,
-      leaseStartedAt: rotation.leaseStartedAt,
-      leaseExpiresAt: rotation.leaseExpiresAt,
-      candidateId: rotation.selected.candidateId,
-      artifactHash: rotation.selected.trainedArtifactHash,
-      previousCandidateId: rotation.previous?.candidateId ?? null,
-      previousArtifactHash: rotation.previous?.trainedArtifactHash ?? null,
-      eligibleCount: result.length,
-      authorityExpanded: false,
-    }))
+  // Prefer the durable controller lease. If the controller has not established today's lease yet,
+  // fail over to the same deterministic selector so serving remains bounded to the identical eligible pool.
+  const lease = await db.from('cos_university_graduate_rotation_leases')
+    .select('candidate_id,trained_artifact_hash,lease_number,lease_started_at,lease_expires_at')
+    .lte('lease_started_at', new Date().toISOString())
+    .gt('lease_expires_at', new Date().toISOString())
+    .order('lease_started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!lease.error && lease.data) {
+    const leased = result.find(item =>
+      item.candidateId === lease.data.candidate_id &&
+      item.trainedArtifactHash === lease.data.trained_artifact_hash
+    )
+    if (leased) return [leased]
+    console.warn('[cos-graduate-24h-rotation] durable lease no longer eligible; failing closed to eligible selector')
   }
+  const rotation = selectGraduateFor24HourLease(result, new Date())
   return rotation.selected ? [rotation.selected] : []
 }

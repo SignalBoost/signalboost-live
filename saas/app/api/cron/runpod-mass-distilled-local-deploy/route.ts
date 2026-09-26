@@ -481,13 +481,23 @@ export async function GET(req:NextRequest){
     // Provisioning is preflight. Provider/API/template drift here may be repaired and retried within
     // the same unexpired approval because no model request or paid endpoint wake has happened yet.
     const provisioned=await provisionMassDistilledCanaryRuntime(runtimeArtifact)
-    if(coldStartResume && provisioned.endpointId!==coldStartResume.endpointId) {
-      throw new Error('mass_distilled_cold_start_resume_endpoint_mismatch')
+    // A cold-start continuation is pinned to the same logical runtimeKey, but an immutable
+    // endpoint-generation repair may deliberately materialize that runtime under a new provider endpoint ID.
+    // Production 2026-09-26: v3 -> v4 did exactly this after RunPod rejected in-place container PATCHes.
+    // Accept only that same-runtimeKey generation transition; all ordinary endpoint-ID drift remains fail-closed.
+    const coldStartResumeEndpointRotated=Boolean(coldStartResume && provisioned.endpointId!==coldStartResume.endpointId)
+    if(coldStartResumeEndpointRotated && runtimeKey!==coldStartResume?.runtimeKey) {
+      throw new Error('mass_distilled_cold_start_resume_runtime_key_mismatch')
     }
     const resumeEvidence=coldStartResume?{
       coldStartResume:true,
       coldStartResumeEndpointId:coldStartResume.endpointId,
       coldStartResumeRuntimeKey:coldStartResume.runtimeKey,
+      ...(coldStartResumeEndpointRotated?{
+        coldStartResumeEndpointRotated:true,
+        coldStartResumeReplacementEndpointId:provisioned.endpointId,
+        coldStartResumeRotationReason:'immutable_endpoint_generation_transition',
+      }:{}),
     }:{}
     // RunPod's endpoint control plane exposes the configured/eligible pool set, not the physical GPU
     // ultimately assigned to a worker. Persist exactly what is observable and mark actual-worker pool

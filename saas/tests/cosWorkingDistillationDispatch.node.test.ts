@@ -107,3 +107,12 @@ test('Working COS rollback evidence preserves both training-base rollback and li
   assert.match(dispatch,/working_cos_callback_training_rollback_binding_invalid/)
   assert.match(dispatch,/rollbackArtifactRef = runtimeRollback\.rollbackArtifactRef/)
 })
+
+test('a failed provider job is replaced, never re-adopted forever by its request-derived name',()=>{
+  const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
+  assert.match(dispatch,/TERMINAL_FAILED_PROVIDER_STAGES/)
+  for(const stage of ['ERROR','CANCELED','CANCELLED','DELETED']) assert.match(dispatch,new RegExp(`'${stage}'`))
+  assert.match(dispatch,/const reusable = existing && !TERMINAL_FAILED_PROVIDER_STAGES\.has\(existing\.providerStage\) \? existing : null/)
+  assert.match(dispatch,/const accepted = reusable\n/)
+  assert.match(dispatch,/replacedFailedProviderJob: existing\.jobId/)
+})

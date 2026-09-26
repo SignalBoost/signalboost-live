@@ -107,6 +107,10 @@ const MASS_EVALUATION_MODEL_READY_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_MODE
 const RUNTIME_NOT_READY_FAILURE_PREFIX = 'mass_distilled_evaluation_runtime_not_ready:' as const
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
+// Standard gateway generation that accepts both the pinned base model and exact adapter alias.
+// A pre-repair canary proves the artifact but not this serving contract, so it cannot arm evaluation.
+export const MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT = '2026-09-26T04:19:00.000Z' as const
+export const MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT)
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
 const REPAIRED_SUSPENSION_REASON = 'candidate_502_pending_runpod_worker_logs' as const
 
@@ -442,6 +446,9 @@ export function decideRollingMassEvaluationApproval(input: {
         && (!Number.isFinite(minimumCanaryAt) || at(event.observedAt) >= minimumCanaryAt))
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
     if (!healthyCanaries.length) continue
+    const attentionArchitecture = String(healthyCanaries[0].evidence?.attentionArchitecture || 'standard_attention')
+    if (attentionArchitecture === 'standard_attention'
+      && at(healthyCanaries[0].observedAt) < MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT_MS) continue
 
     // Production 2026-09-24: an artifact had a valid canary pass at 14:07, then a later endpoint-refresh
     // canary failed at 19:55 with mass_distilled_runtime_worker_not_ready. The evaluator authorization

@@ -40,7 +40,7 @@ test('Working COS dispatcher has hard provider-cost ceilings and no implicit 30B
   const env=source('.env.example')
 
   assert.match(dispatch,/HARD_MAX_PREPARATION_HOURLY_COST_USD = 1/)
-  assert.match(dispatch,/HARD_MAX_TRAINING_HOURLY_COST_USD = 1\.8/)
+  assert.match(dispatch,/HARD_MAX_TRAINING_HOURLY_COST_USD = 2\\.5/)
   assert.match(dispatch,/HARD_MAX_PREPARATION_COST_USD = 0\.25/)
   assert.match(dispatch,/HARD_MAX_TRAINING_COST_USD = 2\.5/)
   assert.match(dispatch,/working_cos_training_flavor_not_configured/)
@@ -155,8 +155,8 @@ test('Working COS owner-bound training cron uses deliberate repaired hardware an
   assert.match(route,/automaticActivationAuthorized: false/)
   assert.match(route,/productionTrafficAuthorized: false/)
   assert.match(route,/universityGraduationClaimed: false/)
-  assert.match(vercel,/"COS_WORKING_DISTILLATION_HF_TRAINING_FLAVOR": "l40sx1"/)
-  assert.match(vercel,/"COS_WORKING_DISTILLATION_MAX_HOURLY_COST_USD": "1.8"/)
+  assert.match(vercel,/"COS_WORKING_DISTILLATION_HF_TRAINING_FLAVOR": "a100-large"/)
+  assert.match(vercel,/"COS_WORKING_DISTILLATION_MAX_HOURLY_COST_USD": "2.5"/)
   assert.match(vercel,/"COS_WORKING_DISTILLATION_MAX_TRAINING_COST_USD": "2.5"/)
   assert.match(vercel,/cos-working-distillation-owner-approved-train/)
 })
@@ -188,7 +188,7 @@ test('Working COS readiness pins to an active training candidate and training re
 })
 
 
-test('Working COS L40S repair retry is exact-job, exact-candidate, exact-dataset and one-path only',()=> {
+test('Working COS A100 OOM repair retry is exact-job, exact-candidate, exact-dataset and one-path only',()=> {
   const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
   const cron=source('app/api/cron/cos-working-distillation-owner-approved-train/route.ts')
 
@@ -196,10 +196,10 @@ test('Working COS L40S repair retry is exact-job, exact-candidate, exact-dataset
   assert.match(dispatch,/working_cos_training_expected_dataset_drift/)
   assert.match(dispatch,/candidateId\?: string/)
   assert.match(dispatch,/expectedDatasetHash\?: string/)
-  assert.match(cron,/APPROVED_FAILED_DEVICE_MAP_JOB_ID = '6ab743896b030d633f6931f9'/)
-  assert.match(cron,/APPROVED_REPAIR_FLAVOR = 'l40sx1'/)
-  assert.match(cron,/APPROVED_REPAIR_ERROR_SIGNATURE = 'Some modules are dispatched on the CPU or the disk'/)
-  assert.match(cron,/accepted\.data\.job_id === APPROVED_FAILED_DEVICE_MAP_JOB_ID/)
+  assert.match(cron,/APPROVED_FAILED_OOM_JOB_ID = '6ab749a06b030d633f69326e'/)
+  assert.match(cron,/APPROVED_REPAIR_FLAVOR = 'a100-large'/)
+  assert.match(cron,/APPROVED_REPAIR_ERROR_SIGNATURE = 'CUDA out of memory'/)
+  assert.match(cron,/accepted\\.data\\.job_id === APPROVED_FAILED_OOM_JOB_ID/)
   assert.match(cron,/providerLogTail\.includes\(APPROVED_REPAIR_ERROR_SIGNATURE\)/)
   assert.match(cron,/reconciliation\.providerStage === 'ERROR'/)
   assert.match(cron,/candidateId: APPROVED_CANDIDATE_ID/)

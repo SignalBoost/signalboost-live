@@ -173,7 +173,12 @@ function decodeTranscript(id: string): CompletedTranscript | null {
   return null
 }
 
-async function getVideoFromRequest(request: Request): Promise<{
+function ownedStoragePath(path: string, userId: string): boolean {
+  const value = String(path || '')
+  return value.startsWith(`${userId}/`) && !value.includes('..') && !value.includes('//') && value.length <= 500
+}
+
+async function getVideoFromRequest(request: Request, userId: string): Promise<{
   file: File
   lang: SupportedVideoLocale
   durationSec: number
@@ -186,6 +191,10 @@ async function getVideoFromRequest(request: Request): Promise<{
     const bucket = String(body.bucket || defaultStorageBucket)
     const path = String(body.path || '')
     const durationSec = Number(body.durationSec || 0)
+
+    if (bucket !== defaultStorageBucket || !ownedStoragePath(path, userId)) {
+      throw new Error('That stored video is not available for captioning.')
+    }
 
     if (!path) {
       throw new Error('Stored video path is required.')
@@ -266,7 +275,7 @@ export async function POST(request: Request) {
   let durationSec = 0
 
   try {
-    const video = await getVideoFromRequest(request)
+    const video = await getVideoFromRequest(request, user.id)
     videoFile = video.file
     lang = video.lang
     durationSec = video.durationSec

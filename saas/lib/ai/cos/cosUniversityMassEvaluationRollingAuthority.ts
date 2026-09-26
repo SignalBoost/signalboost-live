@@ -420,11 +420,21 @@ export function decideRollingMassEvaluationApproval(input: {
     if (history.hasVerdict) continue
 
     const minimumCanaryAt = at(artifact.minimumCanaryObservedAt)
+    // Match the atomic claim's exact-canary contract before minting evaluation authority. A generic
+    // healthy canary is not enough: claim_next_mass_distilled_evaluation also requires the fine-tune
+    // evidence profile, exact artifact hash, internal vLLM readiness and non-expanded authority.
+    // Keeping these predicates symmetric prevents approvals that can never be atomically claimed.
     const healthyCanaries = mine
       .filter(event => event.verifier === 'host_production_verifier'
+        && event.evidence?.profile === 'cos_university_fine_tune_evidence_v1'
         && event.evidence?.claim === 'production_canary_healthy'
         && event.evidence?.exactArtifact === true
+        && String(event.evidence?.artifactHash || '').toLowerCase() === hash
+        && event.evidence?.internalVllmReady === true
         && event.evidence?.productionTrafficAuthorized === false
+        && event.evidence?.authorityExpanded === false
+        && typeof event.evidence?.endpointId === 'string'
+        && event.evidence.endpointId.trim().length > 0
         && (!Number.isFinite(minimumCanaryAt) || at(event.observedAt) >= minimumCanaryAt))
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
     if (!healthyCanaries.length) continue

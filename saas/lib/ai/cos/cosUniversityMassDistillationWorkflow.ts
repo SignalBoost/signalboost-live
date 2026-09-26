@@ -288,6 +288,39 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
           maxBatchesPerSweep: throughput.maxBatchesPerSweep,
         })) }
       }
+
+      // A globally full prepared buffer must not strand a canonically underfilled remediation subject.
+      // Re-read the post-remediation supply and run the existing bounded replenisher only for subjects
+      // that still cannot satisfy the unchanged quality batch floor. This may acquire rights-cleared
+      // material or install bounded teacher fallback, but it does not authorize provider dispatch,
+      // production traffic, promotion, or any authority expansion.
+      const postRemediationSupply = Array.isArray((curriculum.supply as { subjects?: unknown })?.subjects)
+        ? (curriculum.supply as { subjects: any[] }).subjects
+        : []
+      const remediationSubjects = new Set(failureDerived.bySubject.map(item => item.subject))
+      const remediationShortfalls = postRemediationSupply.filter(subject =>
+        remediationSubjects.has(String(subject?.subject || '')) && Number(subject?.shortfallToBatch || 0) > 0)
+      if (remediationShortfalls.length > 0) {
+        curriculumReplenishment = { ...(await replenishUniversityMassDistillationCurriculum({
+          supply: remediationShortfalls,
+          now,
+          maxSubjects: Math.min(throughput.targetSubjectsPerReplenishment, remediationShortfalls.length),
+          queriesPerSubject: throughput.queriesPerSubject,
+          maxCandidatesPerCycle: throughput.acquisitionCandidatesPerCycle,
+        })) }
+        const correctiveMaterialInserted = [
+          curriculumReplenishment.accepted,
+          curriculumReplenishment.failureDerivedInserted,
+          curriculumReplenishment.hostedTeacherInserted,
+          curriculumReplenishment.syntheticInserted,
+        ].reduce<number>((sum, value) => sum + Math.max(0, Number(value || 0)), 0)
+        if (correctiveMaterialInserted > 0) {
+          curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
+            corpusScanRows: throughput.corpusScanRows,
+            maxBatchesPerSweep: throughput.maxBatchesPerSweep,
+          })) }
+        }
+      }
     } else {
       openSourceMaintenance = { ok: true, skipped: true, reason: 'shortfall_replenishment_active', externalCostUsd: 0 }
       curriculumReplenishment = { ...(await replenishUniversityMassDistillationCurriculum({

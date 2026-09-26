@@ -144,3 +144,12 @@ test('failure-derived insertion telemetry counts only rows actually created', ()
   assert.match(SOURCE, /const created = Array\.isArray\(write\.data\) && write\.data\.length > 0/)
   assert.match(SOURCE, /if \(created\) \{\s*inserted \+= 1\s*subjectInserted \+= 1/)
 })
+
+
+test('remediation targeting excludes candidates already represented by corrective curriculum', () => {
+  assert.match(SOURCE, /\.eq\('source_kind', 'failure_derived_curriculum'\)/)
+  assert.match(SOURCE, /sourceEvaluationCandidateId/)
+  assert.match(SOURCE, /remediatedCandidates\.has\(failure\.candidateId\)/)
+  assert.match(SOURCE, /\[\.\.\.unremediatedFailuresByTitle\.keys\(\)\]/)
+  assert.match(SOURCE, /const verifiedFailures = unremediatedFailuresByTitle\.get\(target\.subject\) \|\| \[\]/)
+})

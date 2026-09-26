@@ -2416,3 +2416,17 @@ The sandbox still cannot commit, push, merge or deploy directly. Host-owned writ
 and PR, and the existing merge continuation/main-write discipline owns merge plus post-merge Production health.
 A prose answer, inspection-only trace, or locally passing diagnostic command is not terminal success for an
 owner-authorized repository engineering task.
+
+
+## Unified AI-agent observability plane — 2026-09-26
+
+iTMounts uses one metadata-only correlation contract for AI-agent execution evidence. A production request must remain traceable across Harness/COS, specialist A2A delegation, model/provider work, MCP/tool execution, authorization, action, evaluation, Self-Healing Supervisor remediation, and final outcome.
+
+- The canonical event schema is `itmounts-agent-trace-v1` in `saas/lib/observability/agentTrace.ts`.
+- Reuse an existing governed correlation identity whenever one exists: Harness `runId`, A2A/MCP `traceId`, or SHS `incidentId`. Do not create parallel unrelated IDs inside the same operation.
+- COS primary exposes `x-itmounts-trace-id` and emits request/outcome trace events bound to the Harness run.
+- A2A/MCP/SHS already propagate trace identity; new adapters must preserve it rather than replace it.
+- Trace events are metadata only. Never persist raw prompts, raw answers, tool arguments, endpoint URLs, headers, credentials, tokens, secrets, or private payloads in the observability event.
+- Observability does not expand execution authority. SHS may diagnose/remediate only through its existing governed capabilities, approval boundaries, and signed continuations.
+- Evaluation and remediation must remain distinguishable: a failed evaluator result is evidence; an SHS repair is a separate trace span/event; verification is a subsequent outcome.
+- Completion claims require traceable production evidence, not merely successful code deployment.

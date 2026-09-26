@@ -136,3 +136,19 @@ test('Working COS preparation reconciles terminal HF jobs and permits only one b
   assert.match(cron,/automaticTrainingAuthorized: false/)
   assert.match(cron,/productionTrafficAuthorized: false/)
 })
+
+
+test('Working COS owner-bound training cron uses deliberate L4 hardware and never authorizes activation',()=> {
+  const route=source('app/api/cron/cos-working-distillation-owner-approved-train/route.ts')
+  const vercel=source('vercel.json')
+
+  assert.match(route,/working-cos:d1be42c94d892b75bf272e3a34ad78e1/)
+  assert.match(route,/fcbf51dae199418a11da0fb66a29b3098a7742e38e0b82a752c6a8a721b0eb52/)
+  assert.match(route,/dispatchWorkingCosTraining\(\{ confirmDispatch: true \}\)/)
+  assert.match(route,/working_cos_owner_training_approval_expired/)
+  assert.match(route,/automaticActivationAuthorized: false/)
+  assert.match(route,/productionTrafficAuthorized: false/)
+  assert.match(route,/universityGraduationClaimed: false/)
+  assert.match(vercel,/"COS_WORKING_DISTILLATION_HF_TRAINING_FLAVOR": "l4x1"/)
+  assert.match(vercel,/cos-working-distillation-owner-approved-train/)
+})

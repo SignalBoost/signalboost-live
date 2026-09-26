@@ -25,7 +25,7 @@ function locale(value: FormDataEntryValue | null): SupportedVideoLocale {
 }
 function safeFileName(name: string) { return String(name || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').slice(0, 140) }
 function extensionFromName(name: string) { const match = name.match(/.([a-zA-Z0-9]+)$/); return match ? match[1].toLowerCase() : 'mp4' }
-const VIDEO_TYPES: Readonly<Record<string,string>> = Object.freeze({ mp4:'video/mp4', m4v:'video/x-m4v', mov:'video/quicktime', webm:'video/webm' })
+const VIDEO_TYPES: Readonly<Record<string,string>> = Object.freeze({ mp4: 'video/mp4', m4v: 'video/x-m4v', mov: 'video/quicktime', webm: 'video/webm' })
 function videoContentType(fileName:string, declared:string):string|null {
  const expected=VIDEO_TYPES[extensionFromName(fileName)]; if(!expected)return null
  const type=String(declared||'').split(';',1)[0].trim().toLowerCase(); if(type&&!type.startsWith('video/'))return null; return expected

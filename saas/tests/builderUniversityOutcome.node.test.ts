@@ -26,3 +26,14 @@ test('Builder distinguishes proven success, observed artifacts, and terminal fai
   assert.match(lifecycle, /verification: 'generation_fenced_repository_base_superseded'/)
   assert.match(lifecycle, /finishedAt: updatedAt/)
 })
+
+test('repository success is fail-closed until exact main Production health is proven', async () => {
+  const lifecycle = await readFile(new URL('../lib/builder/repository-repair-job-lifecycle.ts', import.meta.url), 'utf8')
+  const migration = await readFile(new URL('../supabase/migrations/20260926010500_builder_repository_production_completion_gate.sql', import.meta.url), 'utf8')
+  const specialist = await readFile(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
+  assert.match(lifecycle, /input\.baseBranch === 'main' && input\.mergeWatchOutcome !== 'healthy'/)
+  assert.match(lifecycle, /createSupabaseMergeWatchStore/)
+  assert.match(migration, /production_proof_pending/)
+  assert.match(migration, /merge_watch_outcome'.*healthy/s)
+  assert.match(specialist, /ownerPlatformEngineeringSubmission: input\.signalBoostDeploymentContext === true/)
+})

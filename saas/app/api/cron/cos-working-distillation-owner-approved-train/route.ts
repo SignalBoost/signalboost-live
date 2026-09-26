@@ -13,8 +13,9 @@ export const maxDuration = 120
 
 const APPROVED_CANDIDATE_ID = 'working-cos:d1be42c94d892b75bf272e3a34ad78e1'
 const APPROVED_DATASET_HASH = 'fcbf51dae199418a11da0fb66a29b3098a7742e38e0b82a752c6a8a721b0eb52'
-const APPROVED_FAILED_L4_JOB_ID = '6ab73ab96b030d633f693131'
+const APPROVED_FAILED_DEVICE_MAP_JOB_ID = '6ab743896b030d633f6931f9'
 const APPROVED_REPAIR_FLAVOR = 'l40sx1'
+const APPROVED_REPAIR_ERROR_SIGNATURE = 'Some modules are dispatched on the CPU or the disk'
 const APPROVAL_EXPIRES_AT = Date.parse('2026-09-26T05:00:00Z')
 
 export async function GET(req: NextRequest) {
@@ -63,10 +64,12 @@ export async function GET(req: NextRequest) {
         retryAuthorized: reconciliation.retryAuthorized,
         providerLogTail: 'providerLogTail' in reconciliation ? reconciliation.providerLogTail : null,
       }))
-      repairedRetryAuthorized = accepted.data.job_id === APPROVED_FAILED_L4_JOB_ID
+      const providerLogTail = 'providerLogTail' in reconciliation ? String(reconciliation.providerLogTail || '') : ''
+      repairedRetryAuthorized = accepted.data.job_id === APPROVED_FAILED_DEVICE_MAP_JOB_ID
         && reconciliation.terminal
         && !reconciliation.callbackRecorded
         && reconciliation.providerStage === 'ERROR'
+        && providerLogTail.includes(APPROVED_REPAIR_ERROR_SIGNATURE)
         && process.env.COS_WORKING_DISTILLATION_HF_TRAINING_FLAVOR === APPROVED_REPAIR_FLAVOR
 
       if (!repairedRetryAuthorized) {

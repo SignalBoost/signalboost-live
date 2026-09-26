@@ -41,7 +41,8 @@ export const COS_WORKING_DISTILLATION_TRAINING_MODE = 'working_cos_supervised_di
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const HEX40 = /^[a-f0-9]{40}$/i
-const HARD_MAX_HOURLY_COST_USD = 1
+const HARD_MAX_PREPARATION_HOURLY_COST_USD = 1
+const HARD_MAX_TRAINING_HOURLY_COST_USD = 1.8
 const HARD_MAX_PREPARATION_COST_USD = 0.25
 const HARD_MAX_TRAINING_COST_USD = 2.5
 const MIN_TRAINING_SECONDS = 900
@@ -723,7 +724,7 @@ export async function dispatchWorkingCosDatasetPreparation(input: {
 }) {
   requireExplicitTrainingDispatchConfirmation(input.confirmDispatch)
   const provider = dispatchEnabled()
-  const context = await ensureCurrentCandidate(input)
+  const context = await ensureWorkingCosTrainingCandidate(input)
   await verifyTrainableBase({
     modelId: context.context.binding.trainableBaseModelId!,
     revision: context.context.binding.trainableBaseModelRevision!,
@@ -748,7 +749,7 @@ export async function dispatchWorkingCosDatasetPreparation(input: {
     token: provider.hf.token,
     fetchImpl: input.fetchImpl,
   })
-  if (hardware.hourlyCostUsd <= 0 || hardware.hourlyCostUsd > HARD_MAX_HOURLY_COST_USD) {
+  if (hardware.hourlyCostUsd <= 0 || hardware.hourlyCostUsd > HARD_MAX_PREPARATION_HOURLY_COST_USD) {
     throw new Error('working_cos_preparation_hourly_cost_cap_exceeded')
   }
   const budgetSeconds = Math.floor(maxCostUsd * 3600 / hardware.hourlyCostUsd)
@@ -868,8 +869,53 @@ async function readPartition(input: {
   throw new Error('working_cos_partition_materialization_missing')
 }
 
+async function ensureWorkingCosTrainingCandidate(input: {
+  candidateId?: string
+  expectedDatasetHash?: string
+  rotationSeed?: string
+  fetchImpl?: typeof fetch
+  db?: any
+}) {
+  const candidateId = clean(input.candidateId, 160)
+  if (!candidateId) return ensureCurrentCandidate(input)
+
+  if (!/^working-cos:[a-f0-9]{32}$/i.test(candidateId)) {
+    throw new Error('working_cos_training_candidate_invalid')
+  }
+  const db = input.db || cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const context = await currentWorkingCosContext(input.fetchImpl)
+  const { candidate, materialization } = await readWorkingCosDatasetMaterialization({
+    candidateId,
+    baseModelId: context.binding.trainableBaseModelId!,
+    baseModelRevision: context.binding.trainableBaseModelRevision!,
+  }, db)
+  if (clean(candidate.target_base_model, 240) !== context.binding.observedRuntimeModel
+    || clean(candidate.configured_runtime_model, 240) !== context.binding.configuredRuntimeModel
+    || clean(candidate.baseline_identity, 500) !== context.binding.baselineIdentity
+    || clean(candidate.rollback_artifact_ref, 2000) !== context.binding.rollbackArtifactRef) {
+    throw new Error('working_cos_candidate_runtime_binding_drift')
+  }
+  const expectedDatasetHash = clean(input.expectedDatasetHash, 64).toLowerCase()
+  if (expectedDatasetHash && materialization.datasetHash !== expectedDatasetHash) {
+    throw new Error('working_cos_training_expected_dataset_drift')
+  }
+  return Object.freeze({
+    db,
+    context,
+    registered: Object.freeze({
+      candidateId,
+      candidateKey: clean(candidate.candidate_key, 64) || null,
+    }),
+    candidate,
+    materialization,
+  })
+}
+
 export async function dispatchWorkingCosTraining(input: {
   confirmDispatch: unknown
+  candidateId?: string
+  expectedDatasetHash?: string
   rotationSeed?: string
   fetchImpl?: typeof fetch
   db?: any
@@ -914,8 +960,8 @@ export async function dispatchWorkingCosTraining(input: {
   if (!flavor) throw new Error('working_cos_training_flavor_not_configured')
   const hourlyCap = boundedUsd(
     process.env.COS_WORKING_DISTILLATION_MAX_HOURLY_COST_USD,
-    HARD_MAX_HOURLY_COST_USD,
-    HARD_MAX_HOURLY_COST_USD,
+    HARD_MAX_TRAINING_HOURLY_COST_USD,
+    HARD_MAX_TRAINING_HOURLY_COST_USD,
   )
   const maxCostUsd = boundedUsd(
     process.env.COS_WORKING_DISTILLATION_MAX_TRAINING_COST_USD,

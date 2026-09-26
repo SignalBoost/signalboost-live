@@ -45,6 +45,9 @@ export type MassDistilledRuntimeArtifact = Readonly<{
   artifactId: string
   artifactRevision: string
   artifactHash: string
+  /** Exact forward architecture bound by the immutable training receipt. */
+  attentionArchitecture?: 'standard_attention' | 'exclusive_self_attention_v1'
+  xsaProfile?: 'qwen3_xsa_projection_v1'
   /** Host-derived approval-scoped key. It isolates a fresh provider runtime after a preflight failure. */
   runtimeKey?: string
   /** Optional bounded idle window for a caller that needs one warm retry. Defaults to the canary policy. */

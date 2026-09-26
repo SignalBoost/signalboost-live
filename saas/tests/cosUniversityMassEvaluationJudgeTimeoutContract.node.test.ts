@@ -7,10 +7,10 @@ const authority = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluatio
 
 test('case-score persistence coexists with the repaired judge timeout', () => {
   assert.match(evaluator, /persistDistilledEvaluationCaseScores/)
-  assert.match(evaluator, /const JUDGE_CALL_TIMEOUT_MS = 30_000/)
+  assert.match(evaluator, /const JUDGE_CALL_TIMEOUT_MS = 30_000/)\n  assert.match(evaluator, /const HOLDOUT_JUDGE_CALL_TIMEOUT_MS = 45_000/)
   assert.match(evaluator, /const JUDGE_MAX_OUTPUT_TOKENS = 512/)
   assert.match(evaluator, /maxTokens:JUDGE_MAX_OUTPUT_TOKENS/)
-  assert.match(evaluator, /timeoutMs:JUDGE_CALL_TIMEOUT_MS/)
+  assert.match(evaluator, /timeoutMs:input\\.suiteName==='holdout'\\?HOLDOUT_JUDGE_CALL_TIMEOUT_MS:JUDGE_CALL_TIMEOUT_MS/)\n  assert.match(evaluator, /input\\.deadlineMs,input\\.suiteName==='holdout'\\?HOLDOUT_JUDGE_CALL_TIMEOUT_MS:JUDGE_CALL_TIMEOUT_MS/)
   assert.match(evaluator, /mass_distilled_evaluation_judge_timeout:\$\{input\.suiteName\}/)
   assert.match(authority, /error\.startsWith\('mass_distilled_evaluation_judge_timeout:'\)/)
 })

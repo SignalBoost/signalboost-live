@@ -14,6 +14,7 @@ import {
   MASS_EVALUATION_MAX_IN_FLIGHT,
   MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
   MASS_EVALUATION_REOPEN_CLAIM,
+  MASS_EVALUATION_OWNER_FULL_RETEST_REF,
   MASS_EVALUATION_ROLLING_MAX_APPROVALS,
   MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT,
   MASS_EVALUATION_MODEL_READY_REPAIR_AT,
@@ -800,6 +801,24 @@ test('a repair reopen marker preserves old verdict evidence but permits one new 
     enabled: true,
     artifacts: [artifactA],
     events: [canary(artifactA), oldVerdict, oldCompleted, reopened],
+    now,
+  })
+  assert.equal(decision.issue, true)
+})
+
+test('owner full-quarantine retest marker starts a clean evaluation generation without erasing old verdicts', () => {
+  const oldVerdict = ev(artifactA.candidateId, 'independent_scorer', {
+    claim: 'independent_evaluation', artifactHash: hashA,
+  }, '2026-09-16T15:00:00Z')
+  const reopened = ev(artifactA.candidateId, 'host_controller', {
+    claim: MASS_EVALUATION_REOPEN_CLAIM,
+    artifactHash: hashA,
+    repairRef: MASS_EVALUATION_OWNER_FULL_RETEST_REF,
+  }, '2026-09-16T16:00:00Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA), oldVerdict, reopened],
     now,
   })
   assert.equal(decision.issue, true)

@@ -833,6 +833,10 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     recipe = _training_recipe(len(training))
     recipe["holdoutItems"] = len(holdout)
     recipe["trainingMode"] = training_mode or "unknown"
+    if training_mode == "working_cos_supervised_distillation":
+        # PEFT 0.17+ wraps some Qwen3 parameters with ParamWrapper; that path rejects non-zero
+        # LoRA dropout. Keep the proven 0.05 default for all other University lanes.
+        recipe["loraDropout"] = 0.0
 
     # Production 2026-09-20: T4 QLoRA exposed two BF16 failure modes. Keep the 4-bit
     # quantized forward/backward compute deterministic in FP16, disable AMP/GradScaler entirely,

@@ -188,7 +188,7 @@ test('Working COS readiness pins to an active training candidate and training re
 })
 
 
-test('Working COS A100 OOM repair retry is exact-job, exact-candidate, exact-dataset and one-path only',()=> {
+test('Working COS PEFT repair retry is exact-job, exact-candidate, exact-dataset and one-path only',()=> {
   const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
   const cron=source('app/api/cron/cos-working-distillation-owner-approved-train/route.ts')
 
@@ -196,10 +196,10 @@ test('Working COS A100 OOM repair retry is exact-job, exact-candidate, exact-dat
   assert.match(dispatch,/working_cos_training_expected_dataset_drift/)
   assert.match(dispatch,/candidateId\?: string/)
   assert.match(dispatch,/expectedDatasetHash\?: string/)
-  assert.match(cron,/APPROVED_FAILED_OOM_JOB_ID = '6ab749a06b030d633f69326e'/)
+  assert.match(cron,/APPROVED_FAILED_PEFT_JOB_ID = '6ab751216b030d633f6932bb'/)
   assert.match(cron,/APPROVED_REPAIR_FLAVOR = 'a100-large'/)
-  assert.match(cron,/APPROVED_REPAIR_ERROR_SIGNATURE = 'CUDA out of memory'/)
-  assert.match(cron,/accepted\.data\.job_id === APPROVED_FAILED_OOM_JOB_ID/)
+  assert.match(cron,/APPROVED_REPAIR_ERROR_SIGNATURE = 'lora.ParamWrapper does not work with lora_dropout != 0'/)
+  assert.match(cron,/accepted\.data\.job_id === APPROVED_FAILED_PEFT_JOB_ID/)
   assert.match(cron,/providerLogTail\.includes\(APPROVED_REPAIR_ERROR_SIGNATURE\)/)
   assert.match(cron,/reconciliation\.providerStage === 'ERROR'/)
   assert.match(cron,/candidateId: APPROVED_CANDIDATE_ID/)
@@ -222,4 +222,12 @@ test('Working COS accepts only provider minute-to-hour rounding drift while budg
   assert.match(dispatch,/providerHourlyRoundingToleranceUsd = 0\.005/)
   assert.match(dispatch,/hardware\.hourlyCostUsd - hourlyCap > providerHourlyRoundingToleranceUsd/)
   assert.match(dispatch,/Math\.floor\(maxCostUsd \* 3600 \/ hardware\.hourlyCostUsd\)/)
+})
+
+
+test('Working COS alone disables LoRA dropout for PEFT ParamWrapper compatibility',()=> {
+  const worker=source('scripts/cos-university-hf-worker.py')
+  assert.match(worker,/if training_mode == "working_cos_supervised_distillation":/)
+  assert.match(worker,/recipe\["loraDropout"\] = 0\.0/)
+  assert.match(worker,/"loraDropout": 0\.05/)
 })

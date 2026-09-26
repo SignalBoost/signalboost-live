@@ -776,8 +776,8 @@ def _xsa_canary_evidence(base, candidate_id: str) -> dict[str, Any]:
         "xsaInferenceSymmetryRequired": XSA_INFERENCE_SYMMETRY_REQUIRED,
         "xsaTrainingRuntimeProfile": XSA_RUNTIME_PROFILE,
         "xsaTrainingRuntimeImplemented": True,
-        "xsaServingRuntimeImplemented": False,
-        "xsaReason": "disabled_pending_symmetric_runtime",
+        "xsaServingRuntimeImplemented": True,
+        "xsaReason": "rollout_zero_pending_golden_canary",
     }
 
 
@@ -1116,7 +1116,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             "xsaInferenceSymmetryRequired": XSA_INFERENCE_SYMMETRY_REQUIRED,
             "xsaTrainingRuntimeProfile": XSA_RUNTIME_PROFILE,
             "xsaTrainingRuntimeImplemented": True,
-            "xsaServingRuntimeImplemented": False,
+            "xsaServingRuntimeImplemented": True,
             "xsaReason": "legacy_lane",
         })
     print(

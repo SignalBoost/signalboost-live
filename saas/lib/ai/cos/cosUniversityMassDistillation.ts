@@ -499,6 +499,29 @@ async function readMassDistillationCorpus(
     if (pageRows.length < expectedPageSize) break
   }
 
+  // Corrective rows can be visible while their independently corroborated same-subject material has
+  // aged out of the global newest-first corpus window. Rescue ordinary rights-eligible rows for the
+  // stored subjects that currently have unassigned remediation, then let resolveMassDistillationSubject
+  // re-admit them from retained title/material evidence. This never trusts the stored label for training.
+  const remediationSubjects = [...new Set(rows
+    .filter((row: any) => clean(row?.source_kind, 80) === 'failure_derived_curriculum'
+      && !assignedHashes.has(clean(row?.content_hash, 64).toLowerCase()))
+    .map((row: any) => clean(row?.subject, 240))
+    .filter(Boolean))]
+  for (const subject of remediationSubjects) {
+    const page = await db.from('cos_continuous_learning')
+      .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
+      .eq('subject', subject)
+      .gte('confidence', MASS_DISTILLATION_MIN_CONFIDENCE)
+      .or(EFFECTIVE_CORPUS_FILTER)
+      .order('created_at', { ascending: false })
+      .order('content_hash', { ascending: true })
+      .limit(MASS_DISTILLATION_CORPUS_PAGE_SIZE)
+    if (page.error) throw page.error
+    retain((page.data ?? []).filter((row: any) =>
+      !assignedHashes.has(clean(row?.content_hash, 64).toLowerCase())))
+  }
+
   // The newest-first window above can legitimately advance past corrective curriculum before enough
   // same-subject material is available to package it. Read a second, tightly bounded remediation-only
   // window so independently verified failures cannot be forgotten merely because general learning is busy.

@@ -268,3 +268,18 @@ test('Concierge still cannot inherit repository write', () => {
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(browser, /surface: 'concierge', allowRepositoryRepair: false/)
 })
+
+test('server-scoped owner engineering with publish intent enters Platform Engineer without requiring repo words', () => {
+  const sha = 'b'.repeat(40)
+  const objective = 'Finish model portability full monty, verify it, commit and merge.'
+  assert.equal(signalBoostDeployedRepairTarget(objective, { commitSha: sha, branch: 'main' }), null)
+  const target = signalBoostDeployedRepairTarget(
+    objective,
+    { commitSha: sha, branch: 'main' },
+    { ownerPlatformEngineeringSubmission: true },
+  )
+  assert.ok(target)
+  assert.equal(target.trigger, 'deployed_platform_engineering')
+  assert.equal(target.branch, 'main')
+  assert.equal(target.fullCommitSha, sha)
+})

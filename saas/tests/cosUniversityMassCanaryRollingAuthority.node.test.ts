@@ -748,3 +748,36 @@ test('replay proof lane prefers 12h evaluation-ready corrective artifact before 
   assert.equal(decision.evidence.remediationReplayProofPriority,true)
   assert.equal(decision.evidence.evaluationAgeReadyPriority,true)
 })
+
+
+test('owner retest starts a fresh canary generation instead of reusing an old pass or expired approval', () => {
+  const a = artifact(130, '2026-09-15T00:00:00.000Z')
+  const oldPass = event(a, 'local_distilled_runtime_canary_passed', '2026-09-25T15:00:00.000Z')
+  const oldApproval = event(a, MASS_CANARY_APPROVAL_CLAIM, '2026-09-25T14:00:00.000Z',
+    { expiresAt:'2026-09-25T16:00:00.000Z' },
+    { authorizationRef:MASS_CANARY_ROLLING_AUTHORIZATION_REF, canaryAuthorized:true })
+  const reopen: CanaryEvent = {
+    candidateId:a.candidateId,
+    observedAt:'2026-09-26T22:36:27.980Z',
+    expiresAt:null,
+    verifier:'host_controller',
+    evidence:{
+      claim:'mass_distilled_independent_evaluation_reopened',
+      repairRef:'owner_explicit_direction_2026-09-26_retest_all_quarantined',
+      artifactHash:a.artifactHash,
+      authorityExpanded:false,
+      productionTrafficAuthorized:false,
+    },
+  }
+  const decision=decideMassCanaryRollingApproval({
+    artifacts:[a],
+    events:[oldApproval,oldPass,reopen],
+    now:new Date('2026-09-26T22:40:00.000Z'),
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  })
+  assert.ok('artifact' in decision, `expected fresh canary approval after retest reopen, got ${JSON.stringify(decision)}`)
+  assert.equal(decision.artifact.candidateId,a.candidateId)
+  assert.equal(decision.evidence.canaryAuthorized,true)
+})

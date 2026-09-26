@@ -100,15 +100,34 @@ export type CanaryDecision =
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const at = (value: string | null | undefined) => Date.parse(String(value || ''))
+const MASS_CANARY_REOPEN_CLAIM = 'mass_distilled_independent_evaluation_reopened' as const
+const MASS_CANARY_OWNER_FULL_RETEST_REF = 'owner_explicit_direction_2026-09-26_retest_all_quarantined' as const
+
+function canaryGenerationStart(events: readonly CanaryEvent[], artifact: CanaryArtifact): number {
+  const hash = artifact.artifactHash.toLowerCase()
+  return events
+    .filter(event => event.candidateId === artifact.candidateId
+      && String(event.evidence?.artifactHash || '').toLowerCase() === hash
+      && event.verifier === 'host_controller'
+      && event.evidence?.claim === MASS_CANARY_REOPEN_CLAIM
+      && event.evidence?.repairRef === MASS_CANARY_OWNER_FULL_RETEST_REF)
+    .map(event => at(event.observedAt))
+    .filter(Number.isFinite)
+    .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY
+}
 
 function forArtifact(events: readonly CanaryEvent[], artifact: CanaryArtifact): CanaryEvent[] {
+  const generationStart = canaryGenerationStart(events, artifact)
   return events.filter(event => event.candidateId === artifact.candidateId
+    && at(event.observedAt) >= generationStart
     && event.evidence?.profile === MASS_CANARY_PROFILE
     && String(event.evidence?.artifactHash || '').toLowerCase() === artifact.artifactHash.toLowerCase())
 }
 
 function allForArtifact(events: readonly CanaryEvent[], artifact: CanaryArtifact): CanaryEvent[] {
+  const generationStart = canaryGenerationStart(events, artifact)
   return events.filter(event => event.candidateId === artifact.candidateId
+    && at(event.observedAt) >= generationStart
     && String(event.evidence?.artifactHash || '').toLowerCase() === artifact.artifactHash.toLowerCase())
 }
 

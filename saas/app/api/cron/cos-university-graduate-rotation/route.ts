@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'node:crypto'
-import { requireCronAuthorization } from '@/lib/security/cronAuth'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { resolveGraduateRuntimeProfile, proveGraduateServedIdentity } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { GRADUATE_ROTATION_VERSION, selectGraduateFor24HourLease } from '@/lib/ai/cos/cosUniversityGraduateRotation'
@@ -13,8 +12,8 @@ const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).dige
 const clean = (v: unknown, n=1000) => String(v ?? '').trim().slice(0,n)
 
 export async function GET(request: NextRequest) {
-  const denied = requireCronAuthorization(request)
-  if (denied) return denied
+  const secret = process.env.CRON_SECRET
+  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) return NextResponse.json({ ok:false, error:'Unauthorized' }, { status:401 })
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok:false, error:'service_database_unavailable' }, { status:503 })
   const now = new Date()

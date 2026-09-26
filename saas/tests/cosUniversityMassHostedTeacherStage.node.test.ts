@@ -469,3 +469,25 @@ test('remediation teacher override can produce twenty-five rows without widening
   assert.equal(calls, 25)
   assert.equal(db.rows.length, 25)
 })
+
+
+test('remediation consumer keeps ordinary subject examples in training after independent holdout', () => {
+  const consumer = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassDistillationConsumer.ts'), 'utf8')
+  const worker = fs.readFileSync(path.join(import.meta.dirname, '../scripts/cos-university-hf-worker-base.py'), 'utf8')
+
+  assert.match(consumer, /MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS = 20/)
+  assert.match(consumer, /MASS_REMEDIATION_HOLDOUT_TARGET = 5/)
+  assert.match(consumer, /MASS_REMEDIATION_ORDINARY_TRAINING_MIN = 2/)
+  assert.match(consumer, /MASS_REMEDIATION_ORDINARY_PROMPT_MIN = MASS_REMEDIATION_HOLDOUT_TARGET \+ MASS_REMEDIATION_ORDINARY_TRAINING_MIN/)
+  assert.match(consumer, /MASS_REMEDIATION_TEACHER_MIN_ROWS = 27/)
+  assert.match(consumer, /ordinary\.length < MASS_REMEDIATION_ORDINARY_PROMPT_MIN/)
+  assert.match(consumer, /failureDerivedTarget = MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS/)
+  assert.match(consumer, /MASS_REMEDIATION_TEACHER_MAX_CALLS - failureDerivedTarget/)
+  assert.match(consumer, /minimumRows: remediationTeacherRequired \? remediationTeacherPrompts\.length : undefined/)
+
+  // Mass preparation still withholds holdout exclusively from ordinary rows, so >=7 ordinary teacher
+  // rows means the five-row holdout cannot consume every ordinary subject example.
+  assert.match(worker, /non_failure_pairs = \[item for item in ordered if item\[1\]\.get\("failure_derived"\) is not True\]/)
+  assert.match(worker, /holdout_pairs = non_failure_pairs\[:holdout_count\]/)
+  assert.match(worker, /training_pairs = \[item for item in ordered if item\[0\] not in holdout_hashes\]/)
+})

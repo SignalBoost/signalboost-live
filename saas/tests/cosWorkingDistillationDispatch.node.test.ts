@@ -156,7 +156,7 @@ test('Working COS owner-bound training cron uses deliberate repaired hardware an
   assert.match(route,/productionTrafficAuthorized: false/)
   assert.match(route,/universityGraduationClaimed: false/)
   assert.match(vercel,/"COS_WORKING_DISTILLATION_HF_TRAINING_FLAVOR": "a100-large"/)
-  assert.match(vercel,/"COS_WORKING_DISTILLATION_MAX_HOURLY_COST_USD": "1.8"/)
+  assert.match(vercel,/"COS_WORKING_DISTILLATION_MAX_HOURLY_COST_USD": "2.5"/)
   assert.match(vercel,/"COS_WORKING_DISTILLATION_MAX_TRAINING_COST_USD": "2.5"/)
   assert.match(vercel,/cos-working-distillation-owner-approved-train/)
 })
@@ -188,7 +188,7 @@ test('Working COS readiness pins to an active training candidate and training re
 })
 
 
-test('Working COS L40S repair retry is exact-job, exact-candidate, exact-dataset and one-path only',()=> {
+test('Working COS A100 OOM repair retry is exact-job, exact-candidate, exact-dataset and one-path only',()=> {
   const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
   const cron=source('app/api/cron/cos-working-distillation-owner-approved-train/route.ts')
 

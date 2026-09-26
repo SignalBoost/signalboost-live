@@ -28,7 +28,7 @@ const hashB = '8cea7b8f'.padEnd(64, 'b')
 const artifactA = { candidateId: 'mass:cs:1', subjectId: 'Computer Science & Coding', artifactHash: hashA, createdAt: '2026-09-15T22:34:00Z' }
 const artifactB = { candidateId: 'mass:cyber:1', subjectId: 'Cybersecurity', artifactHash: hashB, createdAt: '2026-09-15T18:26:00Z' }
 const ev = (candidateId: string, verifier: string, evidence: Record<string, unknown>, observedAt = '2026-09-16T10:00:00Z', expiresAt: string | null = null): RollingEvent => ({ candidateId, verifier, evidence, observedAt, expiresAt })
-const canary = (a: typeof artifactA) => ev(a.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: a.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
+const canary = (a: typeof artifactA) => ev(a.candidateId, 'host_production_verifier', { profile: 'cos_university_fine_tune_evidence_v1', claim: 'production_canary_healthy', artifactHash: a.artifactHash, exactArtifact: true, internalVllmReady: true, endpointId: 'ep-exact', productionTrafficAuthorized: false, authorityExpanded: false })
 
 test('rolling throughput ceiling matches the owner-approved backlog-drain budget', () => {
   assert.equal(MASS_EVALUATION_ROLLING_MAX_APPROVALS, 300)
@@ -63,7 +63,7 @@ test('frontier proof sampling is bounded and then returns to oldest-first order'
   assert.equal(MASS_EVALUATION_FRONTIER_PROOF_SAMPLE, 4)
   const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
   const frontier = { ...artifactA, candidateId: 'mass:frontier:1', artifactHash: '9'.repeat(64), createdAt: '2026-09-15T22:34:00Z', frontierRecipe: true }
-  const frontierCanary = ev(frontier.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: frontier.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
+  const frontierCanary = ev(frontier.candidateId, 'host_production_verifier', { profile: 'cos_university_fine_tune_evidence_v1', claim: 'production_canary_healthy', artifactHash: frontier.artifactHash, exactArtifact: true, internalVllmReady: true, endpointId: 'ep-exact', productionTrafficAuthorized: false, authorityExpanded: false })
 
   const proof = decideRollingMassEvaluationApproval({
     enabled: true,
@@ -224,7 +224,7 @@ test('v2 Builder evaluation priority never bypasses the 12-hour retention delay'
 test('an infrastructure-failed frontier start remains proof-prioritized until a real result exists', () => {
   const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
   const frontier = { ...artifactA, candidateId: 'mass:frontier:retry', artifactHash: '7'.repeat(64), createdAt: '2026-09-15T22:34:00Z', frontierRecipe: true }
-  const frontierCanary = ev(frontier.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: frontier.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
+  const frontierCanary = ev(frontier.candidateId, 'host_production_verifier', { profile: 'cos_university_fine_tune_evidence_v1', claim: 'production_canary_healthy', artifactHash: frontier.artifactHash, exactArtifact: true, internalVllmReady: true, endpointId: 'ep-exact', productionTrafficAuthorized: false, authorityExpanded: false })
   const priorApproval = ev(frontier.candidateId, 'host_controller', {
     claim: 'distilled_independent_evaluation_approved',
     artifactHash: frontier.artifactHash,
@@ -434,7 +434,7 @@ test('an evaluator crash does not spend an artifact\'s substantive attempts', ()
   })
   const canary = {
     candidateId: artifact.candidateId, observedAt: '2026-09-17T17:27:00.000Z', expiresAt: null, verifier: 'host_production_verifier',
-    evidence: { claim: 'production_canary_healthy', artifactHash: artifact.artifactHash, exactArtifact: true, productionTrafficAuthorized: false },
+    evidence: { profile: 'cos_university_fine_tune_evidence_v1', claim: 'production_canary_healthy', artifactHash: artifact.artifactHash, exactArtifact: true, internalVllmReady: true, endpointId: 'ep-exact', productionTrafficAuthorized: false, authorityExpanded: false },
   }
   const events = [
     canary,
@@ -454,7 +454,7 @@ test('the same infrastructure failure repeating on one artifact stops instead of
   const artifact = { candidateId: 'mass:8f5af666', subjectId: 'economics_finance', artifactHash: 'd'.repeat(64), createdAt: '2026-09-14T19:12:00.000Z' }
   const canary = {
     candidateId: artifact.candidateId, observedAt: '2026-09-16T10:00:00.000Z', expiresAt: null, verifier: 'host_production_verifier',
-    evidence: { claim: 'production_canary_healthy', artifactHash: artifact.artifactHash, exactArtifact: true, productionTrafficAuthorized: false },
+    evidence: { profile: 'cos_university_fine_tune_evidence_v1', claim: 'production_canary_healthy', artifactHash: artifact.artifactHash, exactArtifact: true, internalVllmReady: true, endpointId: 'ep-exact', productionTrafficAuthorized: false, authorityExpanded: false },
   }
   const failure = (minute: number, error: string) => ({
     candidateId: artifact.candidateId, observedAt: `2026-09-17T21:${String(minute).padStart(2, '0')}:00.000Z`, expiresAt: null, verifier: 'host_controller',
@@ -861,4 +861,15 @@ test('frontier proof claim priority is enforced atomically before returning to o
   assert.match(migration, /v_max_judge<>4/)
   assert.match(migration, /v_max_wake<>1/)
   assert.match(migration, /v_max_cost>0\.200000/)
+})
+
+
+test('rolling approval refuses a canary that the atomic claim would reject', () => {
+  const incompleteCanary = ev(artifactA.candidateId, 'host_production_verifier', {
+    claim: 'production_canary_healthy', artifactHash: artifactA.artifactHash,
+    exactArtifact: true, productionTrafficAuthorized: false,
+  })
+  const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [incompleteCanary], now })
+  assert.equal(decision.issue, false)
+  if (!decision.issue) assert.equal(decision.reason, 'no_mass_artifact_eligible_for_rolling_evaluation')
 })

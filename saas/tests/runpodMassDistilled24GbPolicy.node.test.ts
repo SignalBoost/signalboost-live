@@ -76,6 +76,12 @@ test('quota repair reclaims account-wide stale scale-to-zero reservations and re
 })
 
 
+test('capacity reclamation permanently protects platform primary RunPod services', () => {
+  assert.match(provisionV2, /RUNPOD_PRIMARY_ENDPOINT_NAMES = new Set\(\['itmounts-distilled-reasoning-primary'\]\)/)
+  assert.match(provisionV2, /!RUNPOD_PRIMARY_ENDPOINT_NAMES\.has\(clean\(endpoint\.name, 240\)\.toLowerCase\(\)\)/)
+})
+
+
 test('capacity reclamation never disables active graduate, evaluator, or Residency endpoints', () => {
   assert.match(provisionLegacy, /protectedRunpodEndpointIds/)
   assert.match(provisionLegacy, /activeResidencyRunpodEndpointNames/)

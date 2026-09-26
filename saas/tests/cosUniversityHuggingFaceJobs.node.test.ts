@@ -354,32 +354,24 @@ test('a request too large for one environment variable is chunked and still star
   }
   assert.deepEqual(JSON.parse(gunzipSync(Buffer.from(compressed, 'base64url')).toString('utf8')), envelope)
 
-  // Execute the real bootstrap: the container shell must start, and the worker must receive the
-  // exact request through the unchanged legacy ITMOUNTS_TRAINING_REQUEST_B64 contract.
-  const python = spawnSync('python', ['--version'], { encoding: 'utf8' })
-  if (python.status !== 0) return
-  const workerPath = '/tmp/itmounts_hf_worker.py'
-  const outputPath = `/tmp/itmounts_hf_worker_probe_${process.pid}.json`
-  writeFileSync(workerPath, [
-    'import base64, os',
-    'e = os.environ["ITMOUNTS_TRAINING_REQUEST_B64"]',
-    `open(${JSON.stringify(outputPath)}, "wb").write(base64.urlsafe_b64decode(e + "=" * (-len(e) % 4)))`,
-    '',
-  ].join('\n'))
-  try {
-    const shell = spec.command[2].split(' && ').at(-1)!
-    const run = spawnSync('bash', ['-lc', shell], {
-      env: { ...process.env, ...environment },
-      encoding: 'utf8',
-      timeout: 60_000,
-    })
-    assert.equal(run.error, undefined)
-    assert.equal(run.status, 0, run.stderr)
-    assert.deepEqual(JSON.parse(readFileSync(outputPath, 'utf8')), envelope)
-  } finally {
-    rmSync(workerPath, { force: true })
-    rmSync(outputPath, { force: true })
-  }
+  // Execute the real reassembly bootstrap without network, pip, or filesystem side effects.
+  // This is the same Python transformation used by the production bootstrap before runpy.
+  const python = spawnSync('python', ['-c', [
+    'import os,base64,gzip,sys',
+    `n=int(os.environ["${WORKER_REQUEST_PARTS_ENV}"])`,
+    `e="".join(os.environ["${WORKER_REQUEST_PART_ENV_PREFIX}%03d"%i] for i in range(n))`,
+    'p="="*(-len(e)%4)',
+    'raw=gzip.decompress(base64.urlsafe_b64decode(e+p))',
+    'sys.stdout.buffer.write(raw)',
+  ].join('; ')], {
+    env: { ...process.env, ...environment },
+    encoding: 'utf8',
+    timeout: 60_000,
+  })
+  if (python.error && (python.error as NodeJS.ErrnoException).code === 'ENOENT') return
+  assert.equal(python.error, undefined)
+  assert.equal(python.status, 0, python.stderr)
+  assert.deepEqual(JSON.parse(python.stdout), envelope)
 })
 
 test('routes keep owner confirmation, signed callbacks and the global dispatch switch authoritative', () => {

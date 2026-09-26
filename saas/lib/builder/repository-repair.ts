@@ -14,6 +14,7 @@ import { parseSignalBoostRepositoryRepairTarget, resolveSignalBoostRepositoryCom
 import { publishSignalBoostRepositoryRepair } from './repository-repair-writeback.ts'
 import { attemptSignalBoostRepositoryAutoMerge, type AutoMergeResult } from './repository-repair-automerge.ts'
 import { watchMergedDeployment, type MergeWatchResult } from './repository-merge-watch.ts'
+import { createSupabaseMergeWatchStore } from './merge-watch-store.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
 import type { BuilderRunnerPort, BuilderToolTrace } from './contracts.ts'
 import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
@@ -354,6 +355,17 @@ export async function executeSignalBoostRepositoryRepair(input: {
         token: process.env.VERCEL_TOKEN || process.env.VERCEL_API_TOKEN || '',
         deadlineAtMs,
       })
+      if (mergeWatch.outcome === 'unresolved') {
+        const store = createSupabaseMergeWatchStore()
+        if (!store) throw new Error('builder_merge_watch_storage_unavailable')
+        await store.record({
+          workspaceId: input.workspaceId,
+          userId: input.userId,
+          mergeCommitSha: autoMerge.mergeCommitSha,
+          preMergeSnapshotId: autoMerge.preMergeSnapshotId,
+          pullRequestNumber: writeback.pullRequestNumber ?? null,
+        })
+      }
     }
 
     const autoMergeReply = !autoMerge

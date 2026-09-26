@@ -88,10 +88,10 @@ if __name__=="__main__": uvicorn.run(app,host="0.0.0.0",port=8000)`}
 export function xsaRuntimeInlineContainer(input:MassDistilledRuntimeArtifact,modelName:string){
   if(input.attentionArchitecture!=='exclusive_self_attention_v1'||input.xsaProfile!=='qwen3_xsa_projection_v1') throw new Error('xsa_runtime_artifact_contract_invalid')
   const token=clean(process.env.HF_TOKEN,500); if(token.length<20) throw new Error('HF_TOKEN is not configured')
-  const workerUrl=clean(process.env.ITMOUNTS_HF_WORKER_URL,2000)
-  if(!workerUrl.startsWith('https://')||!workerUrl.endsWith('/cos-university-hf-worker.py')) throw new Error('xsa_runtime_source_url_missing')
-  const runtimeUrl=workerUrl.replace(/cos-university-hf-worker\.py$/,'cos-university-xsa-runtime.py')
   const immutableImage=exactArtifactContainerImageFromEnv('xsa')
+  const workerUrl=clean(process.env.ITMOUNTS_HF_WORKER_URL,2000)
+  const runtimeUrl=immutableImage ? '' : workerUrl.replace(/cos-university-hf-worker\.py$/,'cos-university-xsa-runtime.py')
+  if(!immutableImage&&(!workerUrl.startsWith('https://')||!workerUrl.endsWith('/cos-university-hf-worker.py'))) throw new Error('xsa_runtime_source_url_missing')
   const command=immutableImage
     ? 'exec python3 /opt/itmounts/xsa_gateway.py'
     : [
@@ -107,7 +107,8 @@ export function xsaRuntimeInlineContainer(input:MassDistilledRuntimeArtifact,mod
     HF_TOKEN:token,HF_HOME:'/models/hf-cache',
     ITMOUNTS_BASE_MODEL_ID:BASE_ID,ITMOUNTS_BASE_MODEL_REVISION:BASE_REV,
     ITMOUNTS_ADAPTER_MODEL_ID:input.artifactId,ITMOUNTS_ADAPTER_MODEL_REVISION:input.artifactRevision,
-    ITMOUNTS_DISTILLED_MODEL_NAME:modelName,ITMOUNTS_XSA_RUNTIME_URL:runtimeUrl,
+    ITMOUNTS_DISTILLED_MODEL_NAME:modelName,
+    ...(runtimeUrl?{ITMOUNTS_XSA_RUNTIME_URL:runtimeUrl}:{}),
     ITMOUNTS_XSA_RUNTIME_PROFILE:'qwen3_xsa_projection_v1',
     PORT:String(PORT),PORT_HEALTH:String(PORT),HEALTH_CHECK_PATH:'/ping',
   }})

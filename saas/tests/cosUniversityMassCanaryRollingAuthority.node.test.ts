@@ -639,3 +639,35 @@ test('an explicit endpoint-refresh approval occupies one bounded slot without fr
   assert.ok('artifact' in decision)
   assert.equal(decision.artifact.candidateId,b.candidateId)
 })
+
+
+test('after bounded proof cohorts, newest current-recipe artifact is canaried before stale current-recipe backlog', () => {
+  const proofNow = new Date('2026-09-26T14:30:00.000Z')
+  const older: CanaryArtifact = {
+    candidateId:'mass:current-old',
+    subjectId:'Reasoning & Decision Science',
+    artifactHash:h(120),
+    createdAt:'2026-09-25T12:00:00.000Z',
+    trainingOptimizer:MASS_CANARY_BUILDER_V2_OPTIMIZER,
+    frontierResponseAnchorRequired:true,
+    frontierResponseAnchorEpochs:1,
+    frontierResponseAnchorItems:20,
+  }
+  const repaired: CanaryArtifact = {
+    ...older,
+    candidateId:'mass:current-repaired',
+    artifactHash:h(121),
+    createdAt:'2026-09-26T13:56:21.000Z',
+  }
+  const decision=decideMassCanaryRollingApproval({
+    artifacts:[older,repaired],
+    events:[],
+    now:proofNow,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId,repaired.candidateId)
+  assert.equal(decision.evidence.currentRecipePriority,true)
+})

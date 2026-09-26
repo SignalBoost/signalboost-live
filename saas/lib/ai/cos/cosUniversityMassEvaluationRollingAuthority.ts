@@ -104,6 +104,12 @@ const RUNPOD_QUOTA_FAILURE_FRAGMENT = 'max workers across all endpoints must not
 // error and every post-repair readiness failure retains the normal fairness/cooldown policy.
 export const MASS_EVALUATION_MODEL_READY_REPAIR_AT = '2026-09-24T19:26:08.571Z' as const
 const MASS_EVALUATION_MODEL_READY_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_MODEL_READY_REPAIR_AT)
+// Production 2026-09-26: the v4 exact-artifact canary proved an endpoint healthy, but the evaluator
+// rejected the same authenticated /ping response as runtime_not_ready:200 because it required a JSON
+// body shape the RunPod load balancer does not always preserve. Only the one observed pre-repair 200
+// readiness failure is released from cooldown; all non-200 readiness failures keep normal policy.
+export const MASS_EVALUATION_PING_200_REPAIR_AT = '2026-09-26T15:02:09.154Z' as const
+const MASS_EVALUATION_PING_200_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_PING_200_REPAIR_AT)
 const RUNTIME_NOT_READY_FAILURE_PREFIX = 'mass_distilled_evaluation_runtime_not_ready:' as const
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
@@ -492,6 +498,8 @@ export function decideRollingMassEvaluationApproval(input: {
           && error.includes(RUNPOD_QUOTA_FAILURE_FRAGMENT)) return false
         if (observedAt < MASS_EVALUATION_MODEL_READY_REPAIR_AT_MS
           && error.startsWith(RUNTIME_NOT_READY_FAILURE_PREFIX)) return false
+        if (observedAt < MASS_EVALUATION_PING_200_REPAIR_AT_MS
+          && error === 'mass_distilled_evaluation_runtime_not_ready:200') return false
         return true
       })
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))

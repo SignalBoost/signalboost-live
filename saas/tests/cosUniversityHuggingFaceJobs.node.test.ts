@@ -10,6 +10,7 @@ import {
   buildHuggingFaceJobSpec,
   decodeHuggingFaceDatasetRef,
   deriveHuggingFaceTrainingExecutorSecret,
+  fetchHuggingFaceJobLogTail,
   findHuggingFaceJobByName,
   huggingFaceJobsConfigFromEnv,
   installHuggingFaceTrainingExecutorEnv,
@@ -412,4 +413,32 @@ test('the delivered worker URL keeps the base-worker sibling path the Python wor
 
 test('without a deployment origin or explicit worker the adapter refuses instead of guessing a source', () => {
   assert.equal(huggingFaceJobsConfigFromEnv({ HF_TOKEN: token, VERCEL_GIT_COMMIT_SHA: commit }), null)
+})
+
+
+test('HF job diagnostics fetch only a bounded redacted log tail', async () => {
+  let requestedUrl = ''
+  const tail = await fetchHuggingFaceJobLogTail({
+    namespace: 'signalboost',
+    jobId: 'job-123',
+    token,
+    tailLines: 7,
+    maxChars: 4000,
+    fetchImpl: async url => {
+      requestedUrl = url
+      return new Response([
+        'starting training',
+        'Authorization: Bearer hf_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+        'token=hf_qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq',
+        'RuntimeError: CUDA out of memory',
+      ].join('\n'), { status: 200 })
+    },
+  })
+  const parsed = new URL(requestedUrl)
+  assert.equal(parsed.pathname, '/api/jobs/signalboost/job-123/logs')
+  assert.equal(parsed.searchParams.get('tail'), '7')
+  assert.match(tail, /CUDA out of memory/)
+  assert.doesNotMatch(tail, /hf_z/)
+  assert.doesNotMatch(tail, /hf_q/)
+  assert.match(tail, /REDACTED/)
 })

@@ -6,6 +6,7 @@ import type {
 } from './orchestrator.ts'
 import { createSupabaseBuilderResidencyEvidenceStore } from './supabase-store.ts'
 import { refreshBuilderResidencyAssessment } from './assessment-store.ts'
+import { isRetiredBuilderResidencyVariant } from '../cases/builder-residency.ts'
 
 export const BUILDER_RESIDENCY_WARM_RETRY_WINDOW_MS=15*60_000
 
@@ -105,7 +106,8 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
         variantHash:String(row.variant_hash),
         outcome:String(row.outcome)==='fail'?'fail' as const:'pass' as const,
         observedAt:String(row.observed_at),
-        accepted:true,
+        // Evidence from a retired (trivially passing) variant proves nothing and never counts.
+        accepted:!isRetiredBuilderResidencyVariant(String(row.variant_hash)),
       })))
     },
 

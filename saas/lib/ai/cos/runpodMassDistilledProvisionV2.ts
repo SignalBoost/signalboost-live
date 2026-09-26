@@ -18,6 +18,7 @@ import {
   type MassDistilledRuntimeArtifact,
 } from './runpodMassDistilledProvision.ts'
 import { xsaRuntimeInlineContainer } from './runpodXsaServingRuntime.ts'
+import { exactArtifactContainerImageFromEnv } from './runpodExactArtifactContainerImage.ts'
 
 export {
   MASS_DISTILLED_CANARY_MAX_COST_USD,
@@ -469,7 +470,8 @@ function materializedEndpointMatches(endpoint: Endpoint, input: MassDistilledRun
   const args = clean(endpoint.args, 20_000)
   const ports = endpoint.ports || []
   const env = endpoint.env || {}
-  const expectedImage = input.attentionArchitecture === 'exclusive_self_attention_v1' ? VLLM_IMAGE : VLLM_IMAGE
+  const lane = input.attentionArchitecture === 'exclusive_self_attention_v1' ? 'xsa' : 'standard'
+  const expectedImage = exactArtifactContainerImageFromEnv(lane) || VLLM_IMAGE
   const runtimeMarker = input.attentionArchitecture === 'exclusive_self_attention_v1' ? 'itmounts_xsa_gateway.py' : 'itmounts_mass_gateway.py'
   return endpoint.image === expectedImage
     && args.includes(BASE_MODEL_REVISION)

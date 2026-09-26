@@ -8,7 +8,8 @@ const route = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-
 test('RunPod v2 exact-artifact repair verifies materialized endpoint identity instead of persistent template linkage', () => {
   assert.match(repair, /one-time materialization/)
   assert.doesNotMatch(repair, /endpoint\.templateId/)
-  assert.match(repair, /endpoint\.image === VLLM_IMAGE/)
+  assert.match(repair, /exactArtifactContainerImageFromEnv\(lane\) \|\| VLLM_IMAGE/)
+  assert.match(repair, /endpoint\.image === expectedImage/)
   assert.match(repair, /args\.includes\(BASE_MODEL_REVISION\)/)
   assert.match(repair, /args\.includes\(input\.artifactRevision\)/)
   assert.match(repair, /args\.includes\(input\.artifactId\)/)

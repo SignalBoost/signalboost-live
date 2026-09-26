@@ -299,7 +299,7 @@
     },
     {
       "path": "/api/cron/native-proactive-monitoring",
-      "schedule": "5,35 * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/cos-owner-briefing",

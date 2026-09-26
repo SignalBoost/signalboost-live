@@ -2,7 +2,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  ACTIVE_BUILDER_RESIDENCY_CASES,
   BUILDER_RESIDENCY_CASES,
+  RETIRED_BUILDER_RESIDENCY_VARIANT_HASHES,
+  createSupabaseBuilderResidencyOrchestratorStore,
+  refreshBuilderResidencyAssessment,
   assessBuilderResidencyCaseCoverage,
   runBuilderResidencyOrchestrator,
   selectNextBuilderResidencyCase,
@@ -191,9 +195,9 @@ test('a failed competency is remediated on its next unrecorded variant, never th
   assert.notEqual(selected?.variantHash,first.variantHash)
 })
 
-test('every competency carries three distinct variants and the v1 variant hashes are unchanged',()=>{
+test('every competency carries three distinct active variants and the v1 variant hashes are unchanged',()=>{
   const byCompetency=new Map<string,Set<string>>()
-  for(const item of BUILDER_RESIDENCY_CASES){
+  for(const item of ACTIVE_BUILDER_RESIDENCY_CASES){
     const set=byCompetency.get(item.competencyId)??new Set<string>()
     set.add(item.variantHash)
     byCompetency.set(item.competencyId,set)
@@ -223,14 +227,6 @@ test('every competency carries three distinct variants and the v1 variant hashes
   })
 })
 
-// v1 fixtures cannot be edited without changing their variant hash and orphaning recorded evidence.
-// Two v1 cases already pass as seeded, so they prove nothing:
-//   v1-entrypoint-trace   ' A  B ' trims to 'a  b', whose single double-space replace yields 'a-b'
-//   v1-console-root-cause '/assets/app.jss' contains the substring '/assets/app.js' the check looks for
-// They are listed here explicitly rather than silently skipped; every other case, and every v2/v3
-// variant, must fail before the resident does any work.
-const KNOWN_TRIVIAL_V1_VARIANTS=new Set(['v1-entrypoint-trace','v1-console-root-cause'])
-
 test('every seeded case genuinely fails its proving command before any repair',()=>{
   for(const item of BUILDER_RESIDENCY_CASES){
     const dir=mkdtempSync(join(tmpdir(),'residency-case-'))
@@ -240,8 +236,10 @@ test('every seeded case genuinely fails its proving command before any repair',(
         writeFileSync(join(dir,file.path),file.content)
       }
       const proof=spawnSync('sh',['-c',item.provingCommand],{cwd:dir,encoding:'utf8',timeout:20_000})
-      if(KNOWN_TRIVIAL_V1_VARIANTS.has(item.variantId)){
-        assert.equal(proof.status,0,`${item.variantId} is no longer trivial; remove it from the exception list`)
+      if(RETIRED_BUILDER_RESIDENCY_VARIANT_HASHES.has(item.variantHash)){
+        // Retired precisely because the seeded workspace already passes; if that ever changes,
+        // the retirement reason is stale and must be revisited.
+        assert.equal(proof.status,0,`${item.variantId} is retired as trivial but no longer passes as seeded`)
         continue
       }
       assert.notEqual(proof.status,0,`${item.variantId} passes without any work`)
@@ -252,7 +250,7 @@ test('every seeded case genuinely fails its proving command before any repair',(
 })
 
 test('the catalog makes Residency completion and remediation reachable',()=>{
-  const variants=(competencyId:string)=>BUILDER_RESIDENCY_CASES.filter(item=>item.competencyId===competencyId)
+  const variants=(competencyId:string)=>ACTIVE_BUILDER_RESIDENCY_CASES.filter(item=>item.competencyId===competencyId)
   const twoPassesEach=BUILDER_RESIDENCY_V1_COMPETENCIES.flatMap(competencyId=>
     variants(competencyId).slice(0,2).map(item=>evidence({competencyId,variantHash:item.variantHash,outcome:'pass'})))
   assert.equal(assessBuilderResidency(twoPassesEach).residencyComplete,true)
@@ -266,6 +264,71 @@ test('the catalog makes Residency completion and remediation reachable',()=>{
   const state=assessBuilderResidency(remediated).competencies
     .find(item=>item.competencyId==='playwright_browser_verification')?.state
   assert.equal(state,'demonstrated')
+})
+
+test('retired trivial variants are exactly the two documented v1 cases and are never scheduled',()=>{
+  const retired=BUILDER_RESIDENCY_CASES
+    .filter(item=>RETIRED_BUILDER_RESIDENCY_VARIANT_HASHES.has(item.variantHash))
+    .map(item=>item.variantId)
+    .sort()
+  assert.deepEqual(retired,['v1-console-root-cause','v1-entrypoint-trace'])
+  assert.equal(ACTIVE_BUILDER_RESIDENCY_CASES.length,BUILDER_RESIDENCY_CASES.length-2)
+
+  const rows:ResidencyEvidenceForAssessment[]=[]
+  const scheduled:string[]=[]
+  for(let guard=0;guard<BUILDER_RESIDENCY_CASES.length+1;guard+=1){
+    const next=selectNextBuilderResidencyCase({evidence:rows})
+    if(!next) break
+    scheduled.push(next.variantHash)
+    rows.push(evidence({competencyId:next.competencyId,variantHash:next.variantHash,outcome:'fail'}))
+  }
+  assert.ok(scheduled.length>0)
+  assert.ok(scheduled.every(hash=>!RETIRED_BUILDER_RESIDENCY_VARIANT_HASHES.has(hash)))
+})
+
+function evidenceDb(rows:readonly Record<string,unknown>[]){
+  const updates:any[]=[]
+  const db:any={
+    from(table:string){
+      if(table==='cos_university_residency_competency_evidence'){
+        const chain:any={select:()=>chain,eq:()=>chain,order:async()=>({data:rows,error:null})}
+        return chain
+      }
+      if(table==='cos_university_residency_enrollments'){
+        return {update(value:any){
+          updates.push(value)
+          const chain:any={eq:()=>chain,select:()=>chain,maybeSingle:async()=>({data:{id:'residency-1',standing:value.standing,gate_enforced:false},error:null})}
+          return chain
+        }}
+      }
+      throw new Error(`unexpected table ${table}`)
+    },
+  }
+  return {db,updates}
+}
+
+test('evidence recorded against a retired variant is never accepted toward a competency',async()=>{
+  const retiredNavigation=BUILDER_RESIDENCY_CASES.find(item=>item.variantId==='v1-entrypoint-trace')!
+  const activeNavigation=ACTIVE_BUILDER_RESIDENCY_CASES.find(item=>item.competencyId==='repository_navigation')!
+  const rows=[
+    {competency_id:'repository_navigation',variant_hash:retiredNavigation.variantHash,outcome:'pass',observed_at:'2026-09-22T10:00:00Z'},
+    {competency_id:'repository_navigation',variant_hash:activeNavigation.variantHash,outcome:'pass',observed_at:'2026-09-22T11:00:00Z'},
+  ]
+
+  const {db}=evidenceDb(rows)
+  const store=createSupabaseBuilderResidencyOrchestratorStore({
+    db,tenantId:'t',portableId:'p',agentId:'a',sandboxEnvironmentId:'s',
+  })
+  const read=await store.readEvidence('residency-1')
+  assert.deepEqual(read.map(row=>row.accepted),[false,true])
+  const navigation=assessBuilderResidency(read).competencies.find(item=>item.competencyId==='repository_navigation')
+  assert.equal(navigation?.state,'supervised')
+  assert.equal(navigation?.distinctPasses,1)
+
+  const refreshed=evidenceDb(rows)
+  const saved=await refreshBuilderResidencyAssessment({db:refreshed.db,residencyId:'residency-1'})
+  assert.equal(saved.demonstratedCompetencies,0)
+  assert.equal(refreshed.updates[0].standing,'resident')
 })
 
 test('case selection never replays a variant that already has competency evidence',()=>{

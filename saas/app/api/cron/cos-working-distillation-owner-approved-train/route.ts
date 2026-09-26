@@ -3,6 +3,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   dispatchWorkingCosTraining,
   ensureWorkingCosCandidateReadiness,
+  reconcileWorkingCosTrainingProviderJob,
   workingCosDispatchReadiness,
 } from '@/lib/ai/cos/cosWorkingDistillationDispatch'
 
@@ -44,16 +45,54 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
   if (accepted.error) return NextResponse.json({ ok: false, error: accepted.error.message }, { status: 500 })
   if (accepted.data?.job_id) {
-    return NextResponse.json({
-      ok: true,
-      skipped: true,
-      reason: 'working_cos_training_already_accepted',
-      candidateId: APPROVED_CANDIDATE_ID,
-      jobId: accepted.data.job_id,
-      jobUrl: accepted.data.job_url,
-      automaticActivationAuthorized: false,
-      productionTrafficAuthorized: false,
-    })
+    try {
+      const reconciliation = await reconcileWorkingCosTrainingProviderJob({
+        candidateId: APPROVED_CANDIDATE_ID,
+        jobId: accepted.data.job_id,
+        db,
+      })
+      console.info('[working-cos-owner-approved-train-reconcile]', JSON.stringify({
+        candidateId: APPROVED_CANDIDATE_ID,
+        jobId: accepted.data.job_id,
+        providerStage: reconciliation.providerStage,
+        terminal: reconciliation.terminal,
+        callbackRecorded: reconciliation.callbackRecorded,
+        retryAuthorized: reconciliation.retryAuthorized,
+      }))
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: reconciliation.callbackRecorded
+          ? 'working_cos_training_callbacks_recorded'
+          : reconciliation.terminal
+            ? 'working_cos_training_terminal'
+            : 'working_cos_training_in_progress',
+        candidateId: APPROVED_CANDIDATE_ID,
+        jobId: accepted.data.job_id,
+        jobUrl: accepted.data.job_url,
+        reconciliation,
+        automaticActivationAuthorized: false,
+        productionTrafficAuthorized: false,
+        universityGraduationClaimed: false,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('[working-cos-owner-approved-train-reconcile]', JSON.stringify({
+        ok: false,
+        candidateId: APPROVED_CANDIDATE_ID,
+        jobId: accepted.data.job_id,
+        error: message,
+      }))
+      return NextResponse.json({
+        ok: false,
+        error: message,
+        candidateId: APPROVED_CANDIDATE_ID,
+        jobId: accepted.data.job_id,
+        automaticActivationAuthorized: false,
+        productionTrafficAuthorized: false,
+        universityGraduationClaimed: false,
+      }, { status: 500 })
+    }
   }
 
   try {

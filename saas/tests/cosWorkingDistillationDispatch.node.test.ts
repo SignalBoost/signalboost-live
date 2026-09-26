@@ -158,3 +158,23 @@ test('Working COS provider job ledger records the selected hardware flavor',()=>
   const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
   assert.match(dispatch,/providerFlavor: input\.flavor/)
 })
+
+
+test('Working COS readiness pins to an active training candidate and training reconciliation never auto-retries',()=> {
+  const dispatch=source('lib/ai/cos/cosWorkingDistillationDispatch.ts')
+  const cron=source('app/api/cron/cos-working-distillation-owner-approved-train/route.ts')
+
+  assert.match(dispatch,/readActiveWorkingCosTrainingCandidate/)
+  assert.match(dispatch,/active_training_candidate_readiness_pin/)
+  assert.match(dispatch,/working_cos_training_in_progress/)
+  assert.match(dispatch,/reconcileWorkingCosTrainingProviderJob/)
+  assert.match(dispatch,/huggingface_training_completed_without_required_callbacks/)
+  assert.match(dispatch,/automaticRetryAuthorized: false/)
+  assert.match(dispatch,/retryAuthorized: false as const/)
+  assert.match(cron,/working-cos-owner-approved-train-reconcile/)
+  assert.match(cron,/working_cos_training_callbacks_recorded/)
+  assert.match(cron,/working_cos_training_terminal/)
+  assert.match(cron,/working_cos_training_in_progress/)
+  assert.match(cron,/automaticActivationAuthorized: false/)
+  assert.match(cron,/productionTrafficAuthorized: false/)
+})

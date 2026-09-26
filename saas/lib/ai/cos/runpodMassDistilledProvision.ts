@@ -103,7 +103,9 @@ async function requestGraphQl<T>(query:string,variables:Record<string,unknown>):
   return payload.data
 }
 
-// Builder Residency spans the 10-minute cron cadence. Keep this bounded at the already-approved\n// Residency lease; at the approved $0.69/hr GPU ceiling 720s is $0.138, below the unchanged $0.20 cap.\nconst MAX_CALLER_IDLE_TIMEOUT_SECONDS = 720
+// Builder Residency spans the 10-minute cron cadence. Keep this bounded at the already-approved
+// Residency lease; at the approved $0.69/hr GPU ceiling 720s is $0.138, below the unchanged $0.20 cap.
+const MAX_CALLER_IDLE_TIMEOUT_SECONDS = 720
 
 function artifactIdleTimeoutSeconds(input:MassDistilledRuntimeArtifact){
   if(input.idleTimeoutSeconds===undefined) return IDLE_TIMEOUT_SECONDS

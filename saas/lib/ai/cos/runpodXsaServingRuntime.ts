@@ -91,16 +91,26 @@ export function xsaRuntimeInlineContainer(input:MassDistilledRuntimeArtifact,mod
   const workerUrl=clean(process.env.ITMOUNTS_HF_WORKER_URL,2000)
   if(!workerUrl.startsWith('https://')||!workerUrl.endsWith('/cos-university-hf-worker.py')) throw new Error('xsa_runtime_source_url_missing')
   const runtimeUrl=workerUrl.replace(/cos-university-hf-worker\.py$/,'cos-university-xsa-runtime.py')
-  const gateway=Buffer.from(gatewaySource(),'utf8').toString('base64')
-  const command=['set -euo pipefail',
-    `export ITMOUNTS_BASE_MODEL_ID='${BASE_ID}'`,`export ITMOUNTS_BASE_MODEL_REVISION='${BASE_REV}'`,
-    `export ITMOUNTS_ADAPTER_MODEL_ID='${input.artifactId}'`,`export ITMOUNTS_ADAPTER_MODEL_REVISION='${input.artifactRevision}'`,
-    `export ITMOUNTS_DISTILLED_MODEL_NAME='${modelName}'`,`export ITMOUNTS_XSA_RUNTIME_URL='${runtimeUrl}'`,
-    "export ITMOUNTS_XSA_RUNTIME_PROFILE='qwen3_xsa_projection_v1'",
-    `python3 -c "import base64;open('/tmp/itmounts_xsa_gateway.py','wb').write(base64.b64decode('${gateway}'))"`,
-    'exec python3 /tmp/itmounts_xsa_gateway.py'].join('; ')
   const immutableImage=exactArtifactContainerImageFromEnv('xsa')
-  return Object.freeze({image:immutableImage||IMAGE,args:JSON.stringify({entrypoint:['bash','-lc'],cmd:[command]}),disk:50,ports:[`${PORT}/http`],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PORT),PORT_HEALTH:String(PORT),HEALTH_CHECK_PATH:'/ping'}})
+  const command=immutableImage
+    ? 'exec python3 /opt/itmounts/xsa_gateway.py'
+    : [
+        'set -euo pipefail',
+        `export ITMOUNTS_BASE_MODEL_ID='${BASE_ID}'`,`export ITMOUNTS_BASE_MODEL_REVISION='${BASE_REV}'`,
+        `export ITMOUNTS_ADAPTER_MODEL_ID='${input.artifactId}'`,`export ITMOUNTS_ADAPTER_MODEL_REVISION='${input.artifactRevision}'`,
+        `export ITMOUNTS_DISTILLED_MODEL_NAME='${modelName}'`,`export ITMOUNTS_XSA_RUNTIME_URL='${runtimeUrl}'`,
+        "export ITMOUNTS_XSA_RUNTIME_PROFILE='qwen3_xsa_projection_v1'",
+        `python3 -c "import base64;open('/tmp/itmounts_xsa_gateway.py','wb').write(base64.b64decode('${Buffer.from(gatewaySource(),'utf8').toString('base64')}'))"`,
+        'exec python3 /tmp/itmounts_xsa_gateway.py',
+      ].join('; ')
+  return Object.freeze({image:immutableImage||IMAGE,args:JSON.stringify({entrypoint:['bash','-lc'],cmd:[command]}),disk:50,ports:[`${PORT}/http`],env:{
+    HF_TOKEN:token,HF_HOME:'/models/hf-cache',
+    ITMOUNTS_BASE_MODEL_ID:BASE_ID,ITMOUNTS_BASE_MODEL_REVISION:BASE_REV,
+    ITMOUNTS_ADAPTER_MODEL_ID:input.artifactId,ITMOUNTS_ADAPTER_MODEL_REVISION:input.artifactRevision,
+    ITMOUNTS_DISTILLED_MODEL_NAME:modelName,ITMOUNTS_XSA_RUNTIME_URL:runtimeUrl,
+    ITMOUNTS_XSA_RUNTIME_PROFILE:'qwen3_xsa_projection_v1',
+    PORT:String(PORT),PORT_HEALTH:String(PORT),HEALTH_CHECK_PATH:'/ping',
+  }})
 }
 
 export const XSA_SERVING_RUNTIME_IMPLEMENTED=true as const

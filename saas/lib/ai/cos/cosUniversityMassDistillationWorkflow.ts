@@ -297,7 +297,13 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       const postRemediationSupply = Array.isArray((curriculum.supply as { subjects?: unknown })?.subjects)
         ? (curriculum.supply as { subjects: any[] }).subjects
         : []
-      const remediationSubjects = new Set(failureDerived.bySubject.map(item => item.subject))
+      // Persisted corrective curriculum remains a remediation obligation until canonical packaging closes
+      // its shortfall. `bySubject` only describes newly unremediated failures in this invocation, so using
+      // it alone loses the subject on the next maintenance pass after seeding.
+      const remediationSubjects = new Set([
+        ...failureDerived.persistedRemediationSubjects,
+        ...failureDerived.bySubject.map(item => item.subject),
+      ])
       const remediationShortfalls = postRemediationSupply.filter(subject =>
         remediationSubjects.has(String(subject?.subject || '')) && Number(subject?.shortfallToBatch || 0) > 0)
       if (remediationShortfalls.length > 0) {

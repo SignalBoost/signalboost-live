@@ -16,7 +16,7 @@ const APPROVED_DATASET_HASH = 'fcbf51dae199418a11da0fb66a29b3098a7742e38e0b82a75
 const APPROVED_FAILED_OOM_JOB_ID = '6ab749a06b030d633f69326e'
 const APPROVED_REPAIR_FLAVOR = 'a100-large'
 const APPROVED_REPAIR_ERROR_SIGNATURE = 'CUDA out of memory'
-const APPROVAL_EXPIRES_AT = Date.parse('2026-09-26T05:00:00Z')
+const APPROVAL_EXPIRES_AT = Date.parse('2026-09-26T07:00:00Z')
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET

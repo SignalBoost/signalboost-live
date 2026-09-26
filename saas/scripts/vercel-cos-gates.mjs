@@ -100,6 +100,7 @@ const tests = [
   'tests/builderRepositorySearch.node.test.ts',
   'tests/builderCertificationRunner.node.test.ts',
   'tests/builderResidencyCaseRunner.node.test.ts',
+  'tests/builderResidencyOrchestrator.node.test.ts',
   'tests/builderCheckpoint.node.test.ts',
   'tests/builderTaskCompletion.node.test.ts',
   'tests/localOpenModelInference.node.test.ts',

@@ -88,6 +88,11 @@ export function identicalInfrastructureFailureCooldownMs(identical: number): num
 export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_judge_timeout_headroom' as const
 export const MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF = 'mass_evaluation_absolute_per_answer_judge_v2' as const
 export const MASS_EVALUATION_REOPEN_CLAIM = 'mass_distilled_independent_evaluation_reopened' as const
+export const MASS_EVALUATION_OWNER_FULL_RETEST_REF = 'owner_explicit_direction_2026-09-26_retest_all_quarantined' as const
+const isEvaluationReopen = (event: RollingEvent) => event.verifier === 'host_controller'
+  && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
+  && (event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF
+    || event.evidence?.repairRef === MASS_EVALUATION_OWNER_FULL_RETEST_REF)
 export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-18T01:48:45.894Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 // Production 2026-09-24: the Residency endpoint lease repair released idle resident maxWorkers
@@ -255,9 +260,7 @@ function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly 
     .sort((a, b) => at(a.observedAt) - at(b.observedAt))[0]
   if (!terminal) return at(start.expiresAt) > nowMs
   if (terminal.evidence?.claim === 'mass_distilled_independent_evaluation_completed') {
-    const reopenedAfter = candidateEvents.some(event => event.verifier === 'host_controller'
-      && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
-      && event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF
+    const reopenedAfter = candidateEvents.some(event => isEvaluationReopen(event)
       && at(event.observedAt) > at(terminal.observedAt))
     return !reopenedAfter
   }
@@ -282,9 +285,7 @@ function artifactHistory(artifact: RollingArtifact, events: readonly RollingEven
     && String(event.evidence?.artifactHash || '').toLowerCase() === hash)
 
   const reopenedAt = mine
-    .filter(event => event.verifier === 'host_controller'
-      && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
-      && event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF)
+    .filter(event => isEvaluationReopen(event))
     .map(event => at(event.observedAt))
     .filter(Number.isFinite)
     .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY
@@ -426,9 +427,7 @@ export function decideRollingMassEvaluationApproval(input: {
     const history = artifactHistory(artifact, input.events, nowMs)
     const mine = history.mine
     const reopenedAt = mine
-      .filter(event => event.verifier === 'host_controller'
-        && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
-        && event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF)
+      .filter(event => isEvaluationReopen(event))
       .map(event => at(event.observedAt))
       .filter(Number.isFinite)
       .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY

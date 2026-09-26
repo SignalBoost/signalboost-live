@@ -33,4 +33,7 @@ test('canary and independent evaluator bind XSA architecture evidence fail close
   assert.match(served,/event\.evidence\?\.servingRuntime === 'transformers_xsa'/)
   assert.match(evaluation,/mass_distilled_evaluation_xsa_receipt_invalid/)
   assert.match(evaluation,/attentionArchitecture:training\.attentionArchitecture/)
+  assert.match(evaluation,/type ServedCandidateArchitecture/)
+  assert.match(evaluation,/attentionArchitecture:claim\.attentionArchitecture/)
+  assert.match(evaluation,/xsaProfile:claim\.xsaProfile/)
 })

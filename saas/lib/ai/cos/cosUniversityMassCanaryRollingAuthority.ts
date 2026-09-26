@@ -314,6 +314,10 @@ export function decideMassCanaryRollingApproval(input: {
     const aCurrent = currentRecipeArtifact(a)
     const bCurrent = currentRecipeArtifact(b)
     if (aCurrent !== bCurrent) return aCurrent ? -1 : 1
+    if (aCurrent && bCurrent) {
+      const newestCurrentRecipeFirst = at(b.createdAt) - at(a.createdAt)
+      if (newestCurrentRecipeFirst !== 0) return newestCurrentRecipeFirst
+    }
     return at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId)
   })
 

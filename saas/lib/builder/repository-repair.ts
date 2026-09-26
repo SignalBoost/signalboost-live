@@ -355,7 +355,10 @@ export async function executeSignalBoostRepositoryRepair(input: {
         token: process.env.VERCEL_TOKEN || process.env.VERCEL_API_TOKEN || '',
         deadlineAtMs,
       })
-      if (mergeWatch.outcome === 'unresolved') {
+      // READY is only deployment evidence. Main-branch repairs remain pending until the durable
+      // worker also runs Playwright against the live Production domain. This prevents Builder
+      // from reporting "fixed" after build/deploy alone.
+      if (mergeWatch.outcome === 'unresolved' || (target.branch === 'main' && mergeWatch.outcome === 'healthy')) {
         const store = createSupabaseMergeWatchStore()
         if (!store) throw new Error('builder_merge_watch_storage_unavailable')
         await store.record({
@@ -410,6 +413,13 @@ export async function executeSignalBoostRepositoryRepair(input: {
         merge_commit_sha: autoMerge?.mergeCommitSha ?? null,
         pre_merge_snapshot_id: autoMerge?.preMergeSnapshotId ?? null,
         merge_watch_outcome: mergeWatch?.outcome ?? null,
+        repository_merge_pending: Boolean(
+          autoMerge?.merged
+          && target.branch === 'main'
+          && mergeWatch?.outcome !== 'rolled_back'
+        ),
+        production_acceptance_required: Boolean(autoMerge?.merged && target.branch === 'main'),
+        production_acceptance_passed: false,
         merge_watch_deployment_id: mergeWatch?.deploymentId ?? null,
         merge_watch_deployment_state: mergeWatch?.deploymentState ?? null,
         deployment_allowed: false,

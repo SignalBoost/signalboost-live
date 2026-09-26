@@ -20,6 +20,9 @@ const ARTIFACTS = 'cos_local_distillation_artifacts'
 const EVALUATIONS = 'cos_university_distilled_evaluation_runs'
 const GRADUATES = 'cos_university_graduate_model_registry'
 const LEARNING = 'cos_continuous_learning'
+const RESIDENCY_ENROLLMENTS = 'cos_university_residency_enrollments'
+const RESIDENCY_CASES = 'cos_university_residency_case_runs'
+const RESIDENCY_EVIDENCE = 'cos_university_residency_competency_evidence'
 const WINDOW_HOURS = 24
 const TELEMETRY_PAGE_SIZE = 1000
 const MAX_TELEMETRY_PAGES = 100
@@ -435,6 +438,91 @@ export async function GET() {
       assuranceByCandidate.get(candidateId)!.push(row)
     }
 
+    // Residency is a first-class University lifecycle stage. Expose the durable cohort and its
+    // actual case/evidence progress so the owner never has to infer it from database internals.
+    const residencyEnrollmentsResult = await db.from(RESIDENCY_ENROLLMENTS)
+      .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,program_id,program_version,standing,admitted_at,completed_at,remediation_required_at,updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1000)
+    if (residencyEnrollmentsResult.error) throw residencyEnrollmentsResult.error
+    const residencyIds = (residencyEnrollmentsResult.data || []).map((row: any) => text(row.id, 80)).filter(Boolean)
+    const [residencyCasesResult, residencyEvidenceResult] = await Promise.all([
+      residencyIds.length ? db.from(RESIDENCY_CASES)
+        .select('id,residency_id,case_family,competency_id,status,harness_outcome,failure_code,started_at,completed_at')
+        .in('residency_id', residencyIds).order('created_at', { ascending: false }).limit(5000)
+        : Promise.resolve({ data: [], error: null } as any),
+      residencyIds.length ? db.from(RESIDENCY_EVIDENCE)
+        .select('residency_id,competency_id,variant_hash,outcome,observed_at')
+        .in('residency_id', residencyIds).order('observed_at', { ascending: false }).limit(10000)
+        : Promise.resolve({ data: [], error: null } as any),
+    ])
+    if (residencyCasesResult.error) throw residencyCasesResult.error
+    if (residencyEvidenceResult.error) throw residencyEvidenceResult.error
+    const casesByResidency = new Map<string, any[]>()
+    for (const row of residencyCasesResult.data || []) {
+      const id = text(row.residency_id, 80)
+      if (!casesByResidency.has(id)) casesByResidency.set(id, [])
+      casesByResidency.get(id)!.push(row)
+    }
+    const evidenceByResidency = new Map<string, any[]>()
+    for (const row of residencyEvidenceResult.data || []) {
+      const id = text(row.residency_id, 80)
+      if (!evidenceByResidency.has(id)) evidenceByResidency.set(id, [])
+      evidenceByResidency.get(id)!.push(row)
+    }
+    const residencyByArtifact = new Map<string, any>()
+    const residency = (residencyEnrollmentsResult.data || []).map((row: any) => {
+      const residencyId = text(row.id, 80)
+      const cases = casesByResidency.get(residencyId) || []
+      const evidence = evidenceByResidency.get(residencyId) || []
+      const competencies = new Map<string, { passes: number; failures: number; latestAt: string | null }>()
+      for (const item of evidence) {
+        const competency = text(item.competency_id, 120)
+        const current = competencies.get(competency) || { passes: 0, failures: 0, latestAt: null }
+        if (item.outcome === 'pass') current.passes += 1
+        else current.failures += 1
+        const at = iso(item.observed_at)
+        if (at && (!current.latestAt || at > current.latestAt)) current.latestAt = at
+        competencies.set(competency, current)
+      }
+      const latestCase = cases[0] || null
+      const completedCases = cases.filter((item: any) => item.completed_at).length
+      const infrastructureFailures = cases.filter((item: any) => item.harness_outcome === 'infrastructure_failure').length
+      const realOutcomes = cases.filter((item: any) => item.harness_outcome && item.harness_outcome !== 'infrastructure_failure').length
+      const demonstratedCompetencies = Array.from(competencies.values()).filter(item => item.passes >= 2).length
+      const result = {
+        residencyId,
+        candidateId: text(row.candidate_id, 240),
+        subject: text(row.subject_id, 240),
+        artifactId: text(row.trained_artifact_id, 240),
+        artifactHash: text(row.trained_artifact_hash, 80),
+        programId: text(row.program_id, 120),
+        programVersion: text(row.program_version, 80),
+        standing: text(row.standing, 80),
+        demonstratedCompetencies,
+        competenciesObserved: competencies.size,
+        totalCompetencies: 13,
+        completedCases,
+        realOutcomes,
+        infrastructureFailures,
+        latestCase: latestCase ? {
+          competency: text(latestCase.competency_id, 120),
+          family: text(latestCase.case_family, 120),
+          status: text(latestCase.status, 80),
+          outcome: text(latestCase.harness_outcome, 120) || null,
+          failureCode: text(latestCase.failure_code, 240) || null,
+          startedAt: iso(latestCase.started_at),
+          completedAt: iso(latestCase.completed_at),
+        } : null,
+        admittedAt: iso(row.admitted_at),
+        completedAt: iso(row.completed_at),
+        remediationRequiredAt: iso(row.remediation_required_at),
+        updatedAt: iso(row.updated_at),
+      }
+      residencyByArtifact.set(result.candidateId + ':' + result.artifactHash, result)
+      return result
+    })
+
     const latestEvaluationByArtifact = new Map<string, any>()
     for (const row of telemetryEvaluationRows) {
       const key = text(row.candidate_id, 240) + ':' + text(row.trained_artifact_hash, 80)
@@ -453,6 +541,7 @@ export async function GET() {
       const artifactHash = text(artifact.trained_artifact_hash, 80)
       const evaluation = latestEvaluationByArtifact.get(candidateId + ':' + artifactHash) || null
       const graduate = graduateByArtifact.get(candidateId + ':' + artifactHash) || null
+      const residencyState = residencyByArtifact.get(candidateId + ':' + artifactHash) || null
       const createdAt = iso(artifact.created_at)
       const events = assuranceByCandidate.get(candidateId) || []
       const nowMs = Date.now()
@@ -495,6 +584,17 @@ export async function GET() {
         else claimability = 'claimable'
       }
       const ageSeconds = createdAt ? Math.max(0, Math.floor((Date.now() - Date.parse(createdAt)) / 1000)) : null
+      const evaluationPassed = evaluation?.holdout_improved === true && evaluation?.safety_passed === true && evaluation?.unseen_transfer_passed === true && evaluation?.delayed_retention_passed === true
+      let currentStage = 'Evaluation'
+      let blocker = claimability
+      let nextAction = 'Satisfy evaluation prerequisites'
+      if (graduate?.status === 'active') { currentStage = 'Active specialist'; blocker = 'none'; nextAction = 'Serving' }
+      else if (graduate) { currentStage = 'Runtime activation'; blocker = text(graduate.status, 80); nextAction = 'Activate exact graduated runtime' }
+      else if (residencyState && residencyState.standing !== 'residency_complete') { currentStage = 'Builder Residency'; blocker = residencyState.standing; nextAction = residencyState.standing === 'remediation_required' ? 'Run remediation case' : 'Continue competency cases' }
+      else if (residencyState?.standing === 'residency_complete') { currentStage = 'Exact canary'; blocker = canary ? 'none' : 'fresh_exact_canary_required'; nextAction = canary ? 'Run independent final evaluation' : 'Run fresh exact-artifact canary' }
+      else if (text(artifact.subject_id, 240) === 'Computer Science & Coding' && artifact.status === 'evaluation_pending') { currentStage = 'Builder Residency'; blocker = 'waiting_for_residency_admission'; nextAction = 'Admit when Residency cohort capacity opens' }
+      else if (evaluationPassed) { currentStage = 'Graduation'; blocker = 'awaiting_graduation'; nextAction = 'Graduate and register exact runtime' }
+      else if (artifact.status === 'quarantined') { currentStage = 'Evaluation remediation'; blocker = 'evaluation_failed'; nextAction = 'Review failed gates and remediation evidence' }
       return {
         candidateId,
         subject: text(artifact.subject_id, 240),
@@ -505,6 +605,10 @@ export async function GET() {
         ageSeconds,
         retentionEligibleAt: createdAt ? new Date(Date.parse(createdAt) + 12 * 60 * 60 * 1000).toISOString() : null,
         claimability,
+        currentStage,
+        blocker,
+        nextAction,
+        residency: residencyState,
         evaluation: evaluation ? {
           evaluatedAt: iso(evaluation.created_at),
           artifactAgeSeconds: n(evaluation.artifact_age_seconds),
@@ -626,6 +730,16 @@ export async function GET() {
       providers: Array.from(providers.values())
         .sort((a, b) => b.calls - a.calls || a.id.localeCompare(b.id)),
       runs: recentRuns,
+      residency,
+      pipeline: {
+        residencyTotal: residency.length,
+        residencyResidents: residency.filter((row: any) => ['resident','senior_resident'].includes(row.standing)).length,
+        residencyRemediation: residency.filter((row: any) => row.standing === 'remediation_required').length,
+        residencyComplete: residency.filter((row: any) => row.standing === 'residency_complete').length,
+        activeGraduates: (graduatesResult.data || []).filter((row: any) => row.status === 'active').length,
+        evaluationPending: artifacts.filter((row: any) => row.status === 'evaluation_pending').length,
+        quarantined: artifacts.filter((row: any) => row.status === 'quarantined').length,
+      },
       artifacts,
       campaigns: (campaignsResult.data || []).map((campaign: any) => ({
         id: text(campaign.id, 80),

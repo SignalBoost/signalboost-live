@@ -252,6 +252,8 @@ async function withWorkerQuotaRecovery<T>(activeEndpointId: string, operation: (
   throw lastError instanceof Error ? lastError : new Error('mass_distilled_runtime_worker_quota_full')
 }
 
+const RUNPOD_PRIMARY_ENDPOINT_NAMES = new Set(['itmounts-distilled-reasoning-primary'])
+
 async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
   const [protectedEndpointIds, protectedResidencyEndpointNames] = await Promise.all([
@@ -267,6 +269,7 @@ async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
     clean(endpoint.id, 160) !== activeEndpointId
     && !protectedEndpointIds.has(clean(endpoint.id, 160).toLowerCase())
     && !protectedResidencyEndpointNames.has(clean(endpoint.name, 240))
+    && !RUNPOD_PRIMARY_ENDPOINT_NAMES.has(clean(endpoint.name, 240).toLowerCase())
     && Number(endpoint.workers?.min ?? 0) === 0
     && Number(endpoint.workers?.max ?? 0) > 0)
   for (const endpoint of reclaimable) {

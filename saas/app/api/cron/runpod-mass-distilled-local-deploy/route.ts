@@ -161,7 +161,7 @@ async function issueRollingCanaryApproval(now:Date){
   // across every subject. Production quality telemetry showed the old stable-on-policy cohort at 0 full passes
   // across 122 independently evaluated artifacts; queueing only by age would spend days proving obsolete recipe
   // generations before measuring the recipe that current training actually emits.
-  const [oldestArtifacts,currentRecipeArtifacts,v2BuilderArtifacts,replayArtifacts]=await Promise.all([
+  const [oldestArtifacts,currentRecipeArtifacts,v2BuilderArtifacts,replayArtifacts,xsaArtifacts]=await Promise.all([
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
       .eq('status','evaluation_pending').like('candidate_id','mass:%')
@@ -194,11 +194,21 @@ async function issueRollingCanaryApproval(now:Date){
       .contains('intended_use',{trainingReceipt:{failureDerivedReplayRequired:true}})
       .order('created_at',{ascending:true})
       .limit(50),
+    // XSA architecture proof must not disappear behind the oldest-200/current-recipe cohorts.
+    // This query only widens candidate discovery; the existing rolling spend/concurrency gates still apply.
+    db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
+      .eq('status','evaluation_pending')
+      .like('candidate_id','mass:%')
+      .contains('intended_use',{trainingReceipt:{xsaTrainingApplied:true}})
+      .order('created_at',{ascending:true})
+      .limit(50),
   ])
   if(oldestArtifacts.error) throw oldestArtifacts.error
   if(currentRecipeArtifacts.error) throw currentRecipeArtifacts.error
   if(v2BuilderArtifacts.error) throw v2BuilderArtifacts.error
   if(replayArtifacts.error) throw replayArtifacts.error
+  if(xsaArtifacts.error) throw xsaArtifacts.error
   const confirmedCurrentRecipeArtifacts=(currentRecipeArtifacts.data||[]).filter((row:any)=>{
     const receipt=row?.intended_use?.trainingReceipt
     return receipt&&typeof receipt==='object'
@@ -226,8 +236,16 @@ async function issueRollingCanaryApproval(now:Date){
   const pendingCurrentRecipeArtifacts=confirmedCurrentRecipeArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const pendingBuilderArtifacts=confirmedBuilderArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const pendingReplayArtifacts=confirmedReplayArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
+  const confirmedXsaArtifacts=(xsaArtifacts.data||[]).filter((row:any)=>{
+    const receipt=row?.intended_use?.trainingReceipt
+    return receipt&&typeof receipt==='object'
+      && receipt.xsaTrainingApplied===true
+      && receipt.attentionArchitecture==='exclusive_self_attention_v1'
+      && receipt.xsaInferenceSymmetryRequired===true
+      && receipt.xsaTrainingRuntimeProfile==='qwen3_xsa_projection_v1'
+  })
   const artifactByCandidate=new Map<string,any>()
-  for(const row of [...(oldestArtifacts.data||[]),...pendingCurrentRecipeArtifacts,...pendingBuilderArtifacts,...pendingReplayArtifacts]){
+  for(const row of [...(oldestArtifacts.data||[]),...pendingCurrentRecipeArtifacts,...pendingBuilderArtifacts,...pendingReplayArtifacts,...confirmedXsaArtifacts]){
     artifactByCandidate.set(String((row as any).candidate_id),row)
   }
   const artifactRows=[...artifactByCandidate.values()]

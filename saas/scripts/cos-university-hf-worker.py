@@ -76,6 +76,7 @@ BASE_WORKER_PATH = Path("/tmp/itmounts_hf_worker_base.py")
 XSA_RUNTIME_FILENAME = "cos-university-xsa-runtime.py"
 XSA_RUNTIME_PATH = Path("/tmp/itmounts_xsa_runtime.py")
 XSA_RUNTIME_PROFILE = "qwen3_xsa_projection_v1"
+XSA_ATTENTION_ARCHITECTURE = "exclusive_self_attention_v1"
 XSA_RUNTIME_CONTRACT_MARKERS = (
     "exclusive_self_attention_projection",
     "install_qwen3_xsa",

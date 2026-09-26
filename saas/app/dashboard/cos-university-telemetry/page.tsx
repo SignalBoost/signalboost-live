@@ -477,6 +477,12 @@ export default function CosUniversityTelemetryPage() {
       </section>
 
       <section className="rounded-lg border p-4">
+        <h2 className="font-semibold">Builder Residency — live cohort</h2>
+        <p className="mt-1 text-xs opacity-65">Every enrolled Computer Science artifact and its durable progress.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">{residency.map(row => <div key={row.residencyId} className="rounded-lg border p-3 text-xs"><div className="font-semibold">{gateLabel(row.standing)} · {row.demonstratedCompetencies}/{row.totalCompetencies} competencies</div><div className="mt-1 font-mono opacity-60">{short(row.candidateId,28)}</div><div className="mt-2">{row.completedCases} cases · {row.realOutcomes} real outcomes · {row.infrastructureFailures} infrastructure failures</div><div className="mt-1">Latest: {row.latestCase ? gateLabel(row.latestCase.outcome || row.latestCase.status) : 'no case yet'}</div><div className="mt-1 font-medium">Next: {row.standing === 'residency_complete' ? 'fresh exact-artifact canary' : row.standing === 'remediation_required' ? 'remediation case' : 'continue competency cases'}</div></div>)}</div>
+      </section>
+
+      <section className="rounded-lg border p-4">
         <div className="mb-4">
           <h2 className="font-semibold">{copy.artifactsTitle}</h2>
           <p className="text-xs opacity-65">{copy.artifactsExplanation}</p>

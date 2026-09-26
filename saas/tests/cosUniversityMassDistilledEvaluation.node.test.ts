@@ -14,6 +14,7 @@ const claimMigration = readFileSync(new URL('../supabase/migrations/202609190300
 const concurrencyMigration = readFileSync(new URL('../supabase/migrations/20260920211800_mass_distilled_evaluation_bounded_concurrency.sql', import.meta.url), 'utf8')
 const builderV2PriorityMigration = readFileSync(new URL('../supabase/migrations/20260921185000_mass_distilled_v2_cs_evaluation_priority.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
+const canaryRoute = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 
 const MASS_REVISION = Object.freeze({
   baseModel: 'Qwen/Qwen3-4B',
@@ -276,3 +277,10 @@ test('chunked evidence reads restore global newest-first event order before poli
   assert.match(route, /Date\.parse\(String\(right\?\.observed_at \|\| ''\)\) - Date\.parse\(String\(left\?\.observed_at \|\| ''\)\)/)
 })
 
+
+
+test('production canary receipt persists readiness required by atomic evaluation claim', () => {
+  assert.match(canaryRoute, /claim:'production_canary_healthy'/)
+  assert.match(canaryRoute, /exactArtifact:true,internalVllmReady:true/)
+  assert.match(claimMigration, /evidence->>'internalVllmReady'='true'/)
+})

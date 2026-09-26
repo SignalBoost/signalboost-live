@@ -33,6 +33,8 @@ const RULES: ReadonlyArray<readonly [RegExp, ProviderFailureClassification]> = [
     { failureClass: 'authentication_failed', disposition: 'open_circuit', deterministic: true, costBearingRetryAllowed: false, reason: 'provider_authentication_failed' }],
   [/permission denied|forbidden|not authorized|authorization failed|\b403\b/i,
     { failureClass: 'authorization_failed', disposition: 'open_circuit', deterministic: true, costBearingRetryAllowed: false, reason: 'provider_authorization_failed' }],
+  [/\/tmp\/itmounts_hf_worker\.py[\s\S]*?(?:KeyError:|RuntimeError:\s*worker_)/i,
+    { failureClass: 'configuration_invalid', disposition: 'protected_halt', deterministic: true, costBearingRetryAllowed: false, reason: 'worker_contract_invalid' }],
   [/rate.?limit|too many requests|\b429\b/i,
     { failureClass: 'rate_limited', disposition: 'backoff', deterministic: false, costBearingRetryAllowed: false, reason: 'provider_rate_limited' }],
   [/service unavailable|provider unavailable|\b50[234]\b/i,

@@ -1,2 +1,2 @@
-base_sha=4d4b9e289b445e7b27be37db77a0ce86f6d90e08
-branch=fix/current-main-builder-qa-production-20260925
+base_sha=695412326792dbbdead7111ef2c5b4d60a7c4a9c
+branch=fix/self-healing-hf-local-worker-failure

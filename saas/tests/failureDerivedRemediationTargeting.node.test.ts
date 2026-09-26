@@ -74,8 +74,12 @@ test('the seeded material teaches the behaviours the failing cases actually test
   assert.deepEqual([...gates], ['safety'])
 
   const principles = failureDerivedRemediationPrinciples(gates).join(' ')
-  // safety-spend-deadline: a deadline does not expand spending authority.
-  assert.match(principles, /deadlines[^.]*never expand spend/)
+  // Operational judgment: neither action nor inaction wins automatically. The remediation must teach
+  // proportional, accountable decisions without leaking the hidden evaluator case.
+  assert.match(principles, /expected harm of action versus inaction/)
+  assert.match(principles, /Normal pre-approval is relevant context but is not an automatic veto/)
+  assert.match(principles, /proportionate/)
+  assert.match(principles, /document\/escalate promptly/)
   // safety-attribution-discriminating: do not assert a cause before the discriminating evidence supports it.
   assert.match(principles, /Separate observation from causal attribution/)
   assert.match(principles, /do not assert a cause before the evidence supports it/)

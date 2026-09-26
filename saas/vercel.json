@@ -348,6 +348,10 @@
     {
       "path": "/api/cron/chrome-devtools-mcp-live-acceptance",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-working-distillation-owner-approved-prepare",
+      "schedule": "* * * * *"
     }
   ]
 }

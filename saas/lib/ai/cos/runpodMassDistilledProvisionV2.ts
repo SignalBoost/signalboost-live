@@ -482,6 +482,7 @@ function materializedEndpointMatches(endpoint: Endpoint, input: MassDistilledRun
     && clean(env.ITMOUNTS_ADAPTER_MODEL_REVISION, 80) === input.artifactRevision
     && clean(env.ITMOUNTS_ADAPTER_MODEL_ID, 500) === input.artifactId
     && clean(env.ITMOUNTS_DISTILLED_MODEL_NAME, 240) === modelName
+    && (lane !== 'standard' || clean(env.ITMOUNTS_STANDARD_GATEWAY_REVISION, 80) === 'baseline-and-exact-v2')
   return endpoint.image === expectedImage
     && (immutableImage ? identityInEnv : identityInArgs)
     && args.includes(runtimeMarker)

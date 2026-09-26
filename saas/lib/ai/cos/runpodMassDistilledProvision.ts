@@ -179,6 +179,7 @@ async def proxy(req,path):
             payload=json.loads(body)
         except Exception:
             raise HTTPException(status_code=400,detail='distilled_chat_payload_invalid')
+        if payload.get('model') not in (BASE_ID,MODEL): raise HTTPException(status_code=409,detail='distilled_exact_model_mismatch')
         kwargs=payload.get('chat_template_kwargs')
         if not isinstance(kwargs,dict): kwargs={}
         kwargs['enable_thinking']=False
@@ -200,9 +201,9 @@ export function massDistilledRuntimeInlineContainer(input:MassDistilledRuntimeAr
   const token=process.env.HF_TOKEN?.trim()||''
   if(token.length<20) throw new Error('HF_TOKEN is not configured')
   const immutableImage=exactArtifactContainerImageFromEnv('standard')
-  const command=immutableImage
-    ? 'exec python3 /opt/itmounts/mass_gateway.py'
-    : startupCommand(input,modelName)
+  // Keep the approved immutable image/dependencies, but inject the versioned gateway source from this deployment.
+  // This lets endpoint config rebinding repair gateway defects without changing the image or worker authority.
+  const command=startupCommand(input,modelName)
   return Object.freeze({
     image:immutableImage||VLLM_IMAGE,
     args:JSON.stringify({entrypoint:['bash','-lc'],cmd:[command]}),
@@ -216,6 +217,7 @@ export function massDistilledRuntimeInlineContainer(input:MassDistilledRuntimeAr
       ITMOUNTS_ADAPTER_MODEL_ID:input.artifactId,
       ITMOUNTS_ADAPTER_MODEL_REVISION:input.artifactRevision,
       ITMOUNTS_DISTILLED_MODEL_NAME:modelName,
+      ITMOUNTS_STANDARD_GATEWAY_REVISION:'baseline-and-exact-v2',
       PORT:String(PUBLIC_PORT),
       PORT_HEALTH:String(PUBLIC_PORT),
       HEALTH_CHECK_PATH:'/ping',

@@ -571,6 +571,39 @@ export async function findHuggingFaceJobByName(input: {
   })
 }
 
+
+function redactHuggingFaceJobLog(value: string): string {
+  return value
+    .replace(/hf_[A-Za-z0-9_-]{12,}/g, '[REDACTED_HF_TOKEN]')
+    .replace(/Bearer\s+[A-Za-z0-9._~+\/-]{12,}/gi, 'Bearer [REDACTED]')
+    .replace(/(authorization|token|secret|password)(["'=:\s]+)[^\s"'<>]{8,}/gi, '$1$2[REDACTED]')
+}
+
+export async function fetchHuggingFaceJobLogTail(input: {
+  namespace: string
+  jobId: string
+  token: string
+  tailLines?: number
+  maxChars?: number
+  fetchImpl?: FetchPort
+}): Promise<string> {
+  const namespace = clean(input.namespace, 200)
+  const jobId = clean(input.jobId, 240)
+  if (!namespace) throw new Error('huggingface_training_namespace_missing')
+  if (!jobId) throw new Error('huggingface_training_job_id_missing')
+  const endpoint = new URL(`${HUGGING_FACE_JOBS_API}/api/jobs/${encodeURIComponent(namespace)}/${encodeURIComponent(jobId)}/logs`)
+  const tailLines = Math.max(1, Math.min(200, Number(input.tailLines) || 80))
+  endpoint.searchParams.set('tail', String(tailLines))
+  const response = await (input.fetchImpl || fetch)(endpoint.toString(), {
+    headers: { authorization: `Bearer ${input.token}` },
+    redirect: 'error',
+  })
+  if (!response.ok) throw new Error(`huggingface_training_job_logs_rejected:${response.status}`)
+  const raw = await response.text()
+  const maxChars = Math.max(1000, Math.min(40_000, Number(input.maxChars) || 12_000))
+  return redactHuggingFaceJobLog(raw).slice(-maxChars)
+}
+
 export async function submitHuggingFaceJob(input: {
   namespace: string
   token: string

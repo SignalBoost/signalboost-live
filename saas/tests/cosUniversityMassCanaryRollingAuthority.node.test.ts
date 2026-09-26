@@ -781,3 +781,13 @@ test('owner retest starts a fresh canary generation instead of reusing an old pa
   assert.equal(decision.artifact.candidateId,a.candidateId)
   assert.equal(decision.evidence.canaryAuthorized,true)
 })
+
+
+test('canary cron explicitly loads owner retest generation evidence outside profiled streams', () => {
+  const route = source('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts')
+  assert.match(route, /RETEST_REOPEN_CLAIM = 'mass_distilled_independent_evaluation_reopened'/)
+  assert.match(route, /RETEST_REOPEN_REPAIR_REF = 'owner_explicit_direction_2026-09-26_retest_all_quarantined'/)
+  assert.match(route, /readRetestGenerationEvents/)
+  assert.match(route, /readRollingCanaryEvents\(db,candidateIds\),[\s\S]*readRetestGenerationEvents\(db,candidateIds\)/)
+  assert.match(route, /rawEventRows=\[\.\.\.rollingEventRows,\.\.\.retestGenerationRows\]/)
+})

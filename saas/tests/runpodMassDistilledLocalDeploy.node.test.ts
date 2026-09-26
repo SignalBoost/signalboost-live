@@ -234,3 +234,11 @@ test('native v2 mass-canary provisioning no longer depends on the v1 template in
   assert.match(compat, /requestV2<Endpoint>\('\/serverless', \{/)
   assert.match(compat, /nativeV2EndpointConfig/)
 })
+
+
+test('standard exact runtime injects versioned gateway that serves only pinned base and exact adapter', () => {
+  assert.match(provision, /payload\.get\('model'\) not in \(BASE_ID,MODEL\)/)
+  assert.match(provision, /const command=startupCommand\(input,modelName\)/)
+  assert.match(provision, /ITMOUNTS_STANDARD_GATEWAY_REVISION:'baseline-and-exact-v2'/)
+  assert.match(provisionV2, /ITMOUNTS_STANDARD_GATEWAY_REVISION, 80\) === 'baseline-and-exact-v2'/)
+})

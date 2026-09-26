@@ -1062,12 +1062,13 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         recipe["fallbackItems"] = len(rendered_training) - structured_items
         print(f"itmounts_training_profile:{json.dumps(recipe, ensure_ascii=True, separators=(',', ':'))}", flush=True)
 
+        working_cos_device_map = {"": 0} if training_mode == "working_cos_supervised_distillation" else "auto"
         model = AutoModelForCausalLM.from_pretrained(
             base_model,
             revision=base_model_revision or None,
             token=token,
             quantization_config=quantization,
-            device_map="auto",
+            device_map=working_cos_device_map,
             torch_dtype=compute_dtype,
         )
         model.config.use_cache = False

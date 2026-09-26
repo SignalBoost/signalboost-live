@@ -85,3 +85,19 @@ test('signed Working COS or University training success closes the universal HF 
   assert.match(source, /training_executor_success_closes_provider_circuit_v1/)
   assert.doesNotMatch(source, /automaticPromotionAuthorized:\s*true|productionTrafficAuthorized:\s*true/)
 })
+
+
+test('deterministic University worker exceptions do not classify Hugging Face as unavailable', () => {
+  const result = classifyProviderFailure([
+    'File "/tmp/itmounts_hf_worker.py", line 1158, in train_student',
+    "KeyError: 'xsaInstalledAttentionLayers'",
+  ])
+  assert.equal(result.failureClass, 'configuration_invalid')
+  assert.equal(result.reason, 'worker_contract_invalid')
+  assert.equal(result.deterministic, true)
+  assert.equal(result.costBearingRetryAllowed, false)
+
+  const diagnostics = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityHuggingFaceJobDiagnostics.ts'), 'utf8')
+  assert.match(diagnostics, /classification\.reason === 'worker_contract_invalid'/)
+  assert.match(diagnostics, /worker_failure_not_provider_scoped/)
+})

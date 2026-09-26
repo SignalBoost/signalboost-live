@@ -20,6 +20,7 @@ test('frontier training writes durable XSA architecture evidence', () => {
   assert.match(training, /recipe\.update\(_xsa_canary_evidence\(/)
   assert.match(training, /itmounts_attention_architecture/)
   assert.match(training, /xsaInferenceSymmetryRequired/)
+  assert.match(worker, /\"xsaInstalledAttentionLayers\": 0/)
 
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   assert.match(consumer, /attentionArchitecture: clean\(raw\.attentionArchitecture, 80\) \|\| null/)

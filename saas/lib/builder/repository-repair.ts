@@ -219,21 +219,23 @@ export async function executeSignalBoostRepositoryRepair(input: {
       },
     }
 
-    // Repository repair proof is controller-owned, not a model suggestion. The exact recorded
-    // failing build/test runs on the pinned source before the first model edit and again after
-    // every successful mutation. This makes fail-before/change/pass-after unavoidable even when
-    // the model tries to finish with prose or spends a round on a diagnostic command.
-    const proofController = createRepositoryRepairProofController({
-      ai: createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: aiDeadlineAtMs }),
+    const governedAi = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: aiDeadlineAtMs })
+    const engineeringTask = target.trigger === 'deployed_platform_engineering'
+    // Repairs retain the controller-owned fail-before/change/pass-after proof. Owner-authorized
+    // feature/implementation work has no legitimate failing baseline to manufacture, so it runs
+    // through the same repository workspace/runner but must still mutate source and pass fresh
+    // task-specific verification before BuilderToolLoop can return success.
+    const proofController = engineeringTask ? null : createRepositoryRepairProofController({
+      ai: governedAi,
       workspace: session,
       runner: repositoryRunner,
       proofCommand: repositoryRepairProofCommand(target),
     })
 
     const result = await new BuilderToolLoop(
-      proofController.ai,
-      proofController.workspace,
-      proofController.runner,
+      proofController?.ai ?? governedAi,
+      proofController?.workspace ?? session,
+      proofController?.runner ?? repositoryRunner,
       undefined,
       browserCli,
     ).run({

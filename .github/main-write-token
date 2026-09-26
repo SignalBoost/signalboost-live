@@ -1,2 +1,2 @@
-base_sha=5c2b9bb7cfc9f9ecefa1f702bf8067450d5ac684
-branch=test/mcp-actions-token-scope-regression-20260925
+base_sha=3e7c3c6733aa434fd277b0e46dfde9adc53a4c16
+branch=fix/builder-owner-repo-completion-contract-20260925

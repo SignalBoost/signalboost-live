@@ -2368,3 +2368,20 @@ existing strict classifier must report zero silent days and GREEN.
 - `native_sdk`, `local_runtime`, and `custom_http` enter through the host-injected transport plug-in SDK plus mandatory conformance tests; iTMounts does not guess vendor wire formats.
 - The mandatory sale-acceptance gate must prove two previously unknown buyer models can be registered, vaulted, certified, switched, executed, and rolled back through injected contracts without modifying the core registry or business logic.
 - Self-Healing may observe, quarantine, or disable an unhealthy assigned transport only where existing authority permits; it may not choose a replacement model, expand a model's declared capabilities, bypass certification, or activate/rollback an assignment on the owner's behalf.
+
+
+### Builder owner repository completion invariant — 2026-09-25
+
+Owner-authorized SignalBoost engineering work that explicitly requests repository publication (for example
+implement/build/update the Builder, COS, platform or repository and commit/merge it) must enter Platform Engineer,
+not isolated sandbox-only Builder. The task is pinned to the immutable deployed SignalBoost revision.
+
+Repairs keep controller-owned fail-before/change/pass-after proof. Feature/implementation tasks must not invent a
+failing baseline; they must produce an actual source mutation and fresh task-specific verification before they can
+be published. Playwright/browser diagnostics, MCP reads, Context7/project context and repository history are
+evidence inputs, never substitutes for mutation and verification.
+
+The sandbox still cannot commit, push, merge or deploy directly. Host-owned writeback creates the governed branch
+and PR, and the existing merge continuation/main-write discipline owns merge plus post-merge Production health.
+A prose answer, inspection-only trace, or locally passing diagnostic command is not terminal success for an
+owner-authorized repository engineering task.

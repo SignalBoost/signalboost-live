@@ -91,11 +91,22 @@ function sha256(value:unknown){return createHash('sha256').update(JSON.stringify
 function manifestHash(items:readonly string[]){return sha256({items:[...items].sort()})}
 function average(values:readonly number[]){return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0}
 function score(value:unknown){const n=Number(value);return Number.isFinite(n)&&n>=0&&n<=1?n:null}
-async function servedCandidateModel(claim:MassEvaluationClaim){
+type ServedCandidateArchitecture = Readonly<{
+  attentionArchitecture?: string
+  xsaProfile?: string
+}>
+
+async function servedCandidateModel(claim:MassEvaluationClaim & ServedCandidateArchitecture){
   const db=cosServiceDb();if(!db)throw new Error('service_database_unavailable')
   const result=await db.from('cos_university_learning_assurance_events').select('verifier,evidence,observed_at').eq('event_type','fine_tune').eq('candidate_id',claim.candidateId).order('observed_at',{ascending:false}).limit(200)
   if(result.error)throw result.error
-  return servedCandidateModelFromCanary(result.data||[],{candidateId:claim.candidateId,artifactHash:claim.artifactHash,endpointId:claim.endpointId})
+  return servedCandidateModelFromCanary(result.data||[],{
+    candidateId:claim.candidateId,
+    artifactHash:claim.artifactHash,
+    endpointId:claim.endpointId,
+    attentionArchitecture:claim.attentionArchitecture,
+    xsaProfile:claim.xsaProfile,
+  })
 }
 
 function remaining(deadlineMs:number,reserve=ROUTE_RESERVE_MS){

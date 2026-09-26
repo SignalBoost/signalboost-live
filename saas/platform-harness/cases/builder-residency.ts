@@ -659,7 +659,7 @@ export const BUILDER_RESIDENCY_CASES=Object.freeze([
       {path:"app/page.tsx",content:[
         "import { Counter } from '../components/Counter'",
         "export const metadata = { title: 'Home' }",
-        "export default function Page() {",
+        "export default function HomePage() {",
         "  return <Counter />",
         "}",
         "",

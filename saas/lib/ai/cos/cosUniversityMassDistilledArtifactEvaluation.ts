@@ -401,10 +401,14 @@ async function waitReady(endpointId:string,deadlineMs:number){
       })
       status=response.status
       if(response.ok){
-        const payload:any=await response.json().catch(()=>null)
-        const gatewayStatus=String(payload?.status||'')
-        if(payload?.modelReady===true&&(gatewayStatus==='ready'||gatewayStatus==='accepting_requests'))return
-        lastError='mass_distilled_gateway_model_not_ready'
+        // Keep evaluator readiness aligned with the exact-artifact canary contract: on the
+        // authenticated RunPod load-balancer path, HTTP 200 from /ping is the gateway-ready
+        // signal. The v4 gateway itself returns 204 until internal vLLM is ready, and the
+        // subsequent exact-model inference still proves the artifact/runtime binding before
+        // any score can be written. Some RunPod LB responses do not preserve the gateway JSON
+        // body even when they preserve the 200 status; requiring modelReady/status here made a
+        // canary-proven endpoint fail as runtime_not_ready:200 without ever reaching inference.
+        return
       }else{
         lastError=`mass_distilled_gateway_ping_http_${response.status}`
       }

@@ -91,6 +91,7 @@ export type CanaryArtifact = Readonly<{
   failureDerivedReplayItems?: number
   failureDerivedReplayEpochs?: number
   failureDerivedReplayLearningRate?: number
+  attentionArchitecture?: 'standard_attention' | 'exclusive_self_attention_v1'
 }>
 export type CanaryEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 export type CanaryDecision =
@@ -282,6 +283,9 @@ export function decideMassCanaryRollingApproval(input: {
       .map(artifact => artifact.candidateId)).size
   const replayProofNeeded = replayProofPasses < MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE
 
+  const xsaProofArtifact = (artifact: CanaryArtifact) =>
+    artifact.attentionArchitecture === 'exclusive_self_attention_v1'
+
   const currentRecipeArtifact = (artifact: CanaryArtifact) =>
     artifact.trainingOptimizer === MASS_CANARY_BUILDER_V2_OPTIMIZER
       && artifact.frontierResponseAnchorRequired === true
@@ -315,6 +319,14 @@ export function decideMassCanaryRollingApproval(input: {
         if (newestReplayFirst !== 0) return newestReplayFirst
       }
     }
+    // XSA is a separate architecture experiment whose exact-artifact runtime is now Production-bound.
+    // Give XSA-trained artifacts a proof slot ahead of the general recipe backlog so architecture
+    // certification cannot be starved by ordinary canaries. Ordering only; all global/per-artifact
+    // invocation, spend, concurrency, evaluation, rollback, and Production-traffic gates remain unchanged.
+    const aXsa = xsaProofArtifact(a)
+    const bXsa = xsaProofArtifact(b)
+    if (aXsa !== bXsa) return aXsa ? -1 : 1
+
     // After bounded proof cohorts, prefer the recipe current training actually emits. Legacy artifacts
     // remain eligible as fallback; they simply no longer consume the front of the paid canary queue while
     // hundreds of anchored artifacts wait behind a 0-for-122 old-recipe quality cohort.
@@ -463,6 +475,7 @@ export function decideMassCanaryRollingApproval(input: {
           coldStartResumeRuntimeKey: newestFailureRuntimeKey,
         } : {}),
         ...(replayProofNeeded && replayProofArtifact(artifact) ? { remediationReplayProofPriority: true } : {}),
+        ...(xsaProofArtifact(artifact) ? { xsaArchitectureProofPriority: true } : {}),
         ...(currentRecipeArtifact(artifact) ? {
           currentRecipePriority: true,
           evaluationAgeReadyPriority: nowMs - at(artifact.createdAt) >= MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS,

@@ -156,3 +156,18 @@ test('healthy idle activation ticks still emit Production-path evidence for Self
   assert.match(primaryWindow, /recordCosUniversityProductionPath\(\{/)
   assert.match(primaryWindow, /invocationSucceeded: true/)
 })
+
+
+test('every activation tick records why the COS-primary upgrade did or did not happen', () => {
+  assert.match(route, /let primaryUpgrade: Record<string, unknown> = \{ considered: false, primaryGate: 'generalist_primary_disabled' \}/)
+  assert.match(route, /primaryGate: 'no_active_reasoning_graduate_awaiting_primary'/)
+  assert.match(route, /considered: true, candidateId: primaryCandidate\.candidate_id, cosPrimary: decision\.cosPrimary, primaryGate: decision\.primaryGate, \.\.\.decision\.gateEvidence/)
+  const idleAt = route.indexOf("reason: 'no_pending_runtime_or_primary_upgrade_candidate'")
+  assert.match(route.slice(idleAt, idleAt + 250), /primaryUpgrade,/)
+  assert.match(route, /generalistGraduated: status\.graduated === true/)
+  assert.match(route, /credentialStanding: String\(credentialStanding/)
+  assert.match(route, /currentStanding: String\(currentStanding/)
+  assert.match(route, /remediationPending: Number\.isFinite\(remediationPending\)/)
+  assert.match(route, /\(credentialStanding === 'A' \|\| credentialStanding === 'A\+'\)/)
+  assert.match(route, /\(currentStanding === 'A' \|\| currentStanding === 'A\+'\)/)
+})

@@ -431,13 +431,15 @@ export async function reconcileWorkingCosPreparationProviderJob(input: {
   const overdue = Number.isFinite(acceptedAt) && now.getTime() > acceptedAt + (timeoutSeconds + 120) * 1000
   const terminalStage = ['COMPLETED', 'CANCELED', 'ERROR', 'DELETED'].includes(providerJob.stage)
 
-  if (!terminalStage && !overdue) {
+  if (!terminalStage) {
     return Object.freeze({
       terminal: false as const,
       callbackRecorded: false as const,
       providerStage: providerJob.stage,
-      overdue: false as const,
+      overdue,
       retryAuthorized: false as const,
+      automaticTrainingAuthorized: false as const,
+      productionTrafficAuthorized: false as const,
     })
   }
 
@@ -450,9 +452,9 @@ export async function reconcileWorkingCosPreparationProviderJob(input: {
   if (priorFailures.error) throw priorFailures.error
   const alreadyFailed = (priorFailures.data || []).some((row: any) => clean(row.job_id, 240) === jobId)
   if (!alreadyFailed) {
-    const failureReason = terminalStage
-      ? (providerJob.stage === 'COMPLETED' ? 'huggingface_completed_without_callback' : `huggingface_provider_${providerJob.stage.toLowerCase()}`)
-      : 'huggingface_provider_timeout_overdue'
+    const failureReason = providerJob.stage === 'COMPLETED'
+      ? 'huggingface_completed_without_callback'
+      : `huggingface_provider_${providerJob.stage.toLowerCase()}`
     await recordJobEvent(db, {
       candidateId,
       operation: 'prepare_dataset',

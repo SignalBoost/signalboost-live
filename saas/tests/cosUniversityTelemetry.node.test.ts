@@ -174,6 +174,8 @@ test('University telemetry exposes owner-only Working COS dispatch controls with
 
 
 test('owner telemetry exposes the complete University lifecycle including Builder Residency',()=>{
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
+  const page = source('app/dashboard/cos-university-telemetry/page.tsx')
   assert.match(route,/cos_university_residency_enrollments/)
   assert.match(route,/cos_university_residency_case_runs/)
   assert.match(route,/cos_university_residency_competency_evidence/)

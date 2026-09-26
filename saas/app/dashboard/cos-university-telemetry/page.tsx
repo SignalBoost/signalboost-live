@@ -464,6 +464,19 @@ export default function CosUniversityTelemetryPage() {
       </section>
 
       <section className="rounded-lg border p-4">
+        <h2 className="font-semibold">University pipeline — live state</h2>
+        <p className="mt-1 text-xs opacity-65">Training → Residency → exact canary → evaluation → graduation → active runtime.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <Card label="Residency residents" value={String(pipeline.residencyResidents ?? 0)} />
+          <Card label="Residency remediation" value={String(pipeline.residencyRemediation ?? 0)} />
+          <Card label="Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
+          <Card label="Evaluation pending" value={String(pipeline.evaluationPending ?? 0)} />
+          <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
+          <Card label="Active graduates" value={String(pipeline.activeGraduates ?? 0)} />
+        </div>
+      </section>
+
+      <section className="rounded-lg border p-4">
         <div className="mb-4">
           <h2 className="font-semibold">{copy.artifactsTitle}</h2>
           <p className="text-xs opacity-65">{copy.artifactsExplanation}</p>

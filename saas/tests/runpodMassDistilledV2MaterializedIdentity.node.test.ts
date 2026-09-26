@@ -32,6 +32,15 @@ test('repair remains fail-closed on cost and GPU policy around native v2 endpoin
   assert.match(repair, /method: 'POST'/)
   assert.match(repair, /method: 'PATCH'/)
   assert.match(repair, /mass_distilled_runtime_materialized_identity_mismatch/)
+  assert.match(repair, /MASS_DISTILLED_EXACT_ENDPOINT_GENERATION = 'v4'/)
+  assert.match(repair, /mass_distilled_runtime_endpoint_generation_drift/)
+  assert.doesNotMatch(repair, /method: 'PATCH', body: JSON\.stringify\(config\)/)
+})
+
+test('existing-only reconciliation cannot create a missing exact-artifact endpoint', () => {
+  assert.match(repair, /allowCreate = true/)
+  assert.match(repair, /if \(!allowCreate\) throw new Error\('mass_distilled_runtime_existing_endpoint_missing'\)/)
+  assert.match(repair, /'self_healing_existing_only', APPROVED_POOLS, false/)
 })
 
 test('native v2 provisioning is independent of the legacy v1 template index', () => {

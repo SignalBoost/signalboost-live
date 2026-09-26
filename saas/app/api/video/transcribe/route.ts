@@ -209,7 +209,7 @@ async function getVideoFromRequest(request: Request, userId: string): Promise<{
     const { data, error } = await supabase.storage.from(bucket).download(path)
 
     if (error || !data) {
-      throw new Error(error?.message || 'Could not download uploaded video from storage.')
+      throw new Error('Could not download uploaded video from storage.')
     }
 
     if (data.size > storageCaptionMaxMb * 1024 * 1024) {
@@ -270,6 +270,20 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const user = await getUser()
+
+  if (!user?.id) {
+    return json(
+      {
+        ok: false,
+        data: null,
+        error: 'You must be signed in to generate AI captions.',
+        meta: { locale: 'en', generatedAt: new Date().toISOString() },
+      },
+      401,
+    )
+  }
+
   let videoFile: File
   let lang: SupportedVideoLocale
   let durationSec = 0
@@ -304,19 +318,6 @@ export async function POST(request: Request) {
     )
   }
 
-  const user = await getUser()
-
-  if (!user?.id) {
-    return json(
-      {
-        ok: false,
-        data: null,
-        error: 'You must be signed in to generate AI captions.',
-        meta: { locale: lang, generatedAt: new Date().toISOString() },
-      },
-      401,
-    )
-  }
 
   const credit = await spendVideoCredit(user.id)
 

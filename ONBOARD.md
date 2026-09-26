@@ -2416,3 +2416,16 @@ The sandbox still cannot commit, push, merge or deploy directly. Host-owned writ
 and PR, and the existing merge continuation/main-write discipline owns merge plus post-merge Production health.
 A prose answer, inspection-only trace, or locally passing diagnostic command is not terminal success for an
 owner-authorized repository engineering task.
+
+
+### University thinker-exam and observable-judgment invariant — 2026-09-26
+
+- **The University trains thinkers, not answer-key imitators.** Artifact examinations must test whether an agent can make and defend a reasonable decision from the evidence available at that particular time, not whether it reproduces a preferred yes/no phrase.
+- Examination cases must distinguish **objective** questions from **judgment** questions. Objective factual, mathematical, protocol, and other determinate questions may have a correct result. Judgment cases may have multiple defensible decisions.
+- For a judgment case, the independent examiner grades the agent's stated, auditable rationale: material observations and uncertainty; credible alternatives; consequences and expected cost/risk of **action and inaction**; actual constraints and authority; proportionality; decision; follow-up/reversibility; and, when relevant, what evidence would cause the decision to change.
+- A judgment answer may disagree with an exemplar and still receive full credit when its rationale is coherent, evidence-based, proportionate, and within actual authority. An answer that matches the exemplar may still fail when its rationale is irrational, fabricated, authority-expanding, or ignores material evidence.
+- References for judgment cases are **examiner exemplars, not answer keys**. They must not become private answers copied into remediation or training. Remediation teaches general principles through materially different scenarios; transfer and delayed-retention exams must prove learning on unseen variants.
+- Hard governance remains hard: an agent may not fabricate authority, expose secrets, or treat an emergency as unlimited permission. Emergency and operational judgment must, however, count the cost and risk of inaction as real evidence rather than treating waiting as automatically safe.
+- Observability for agent judgment records structured decision evidence, not private chain-of-thought: observations, bounded claims, assumptions stated in the answer, alternatives considered, authority basis, chosen action, expected outcome, actual outcome, contradiction/correction, and follow-up evidence where available.
+- The learning loop is **observe → reason → act → observe outcome → compare expectation with reality → correct → retain the general lesson → demonstrate transfer**. A mistake is a learning event when the agent recognizes and corrects it; repeated unsupported certainty or rationalizing a contradicted conclusion is a competency failure.
+- These rules apply to COS, Builder, specialists, Self-Healing, University artifacts, and future agent roles. No subsystem may convert judgment exams back into exact-answer matching merely to increase pass rates.

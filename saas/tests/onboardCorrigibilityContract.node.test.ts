@@ -21,3 +21,13 @@ test('ONBOARD forbids stronger completion claims than evidence supports', () => 
   assert.match(onboard, /none alone proves Production functionality or end-to-end completion/)
   assert.match(onboard, /must not label work .*fixed.*root cause.*healthy.*Production-ready.*complete.*working end to end.* beyond the strongest evidence actually observed/)
 })
+
+
+test('University examinations require thinker judgment rather than answer-key imitation', () => {
+  assert.match(SOURCE, /University thinker-exam and observable-judgment invariant/)
+  assert.match(SOURCE, /trains thinkers, not answer-key imitators/)
+  assert.match(SOURCE, /objective[\s\S]*judgment/)
+  assert.match(SOURCE, /action and inaction/)
+  assert.match(SOURCE, /examiner exemplars, not answer keys/)
+  assert.match(SOURCE, /observe → reason → act → observe outcome/)
+})

@@ -129,8 +129,8 @@ export function getIncidentIntake(): { runtime: ReturnType<typeof createIncident
         const remediation = await remediateNativeIncidents([incident], { maxIncidents: 1 })
         const repaired = remediation[0]
         return {
-          status: repaired?.status === 'fixed' ? 'completed' : outcome.status,
-          reason: `diagnosed (risk ${risk}); policy ${verdict}; native_shs=${repaired?.status ?? 'no_result'}; ${repaired?.summary ?? outcome.reason}`,
+          status: repaired?.outcome === 'executed' ? 'completed' : outcome.status,
+          reason: `diagnosed (risk ${risk}); policy ${verdict}; native_shs=${repaired?.outcome ?? 'no_result'}; ${repaired?.message ?? outcome.reason}`,
         }
       },
       records,

@@ -64,13 +64,14 @@ test('evaluation restores the one worker a retired endpoint is allowed, before i
 })
 
 
-test('evaluator quota repair only releases sibling mass-distilled worker reservations and retries boundedly', () => {
+test('quota repair reclaims account-wide stale scale-to-zero reservations and retries boundedly', () => {
   assert.match(provisionV2, /function runpodWorkerQuotaError/)
   assert.match(provisionV2, /max workers across all endpoints must not exceed your workers quota/)
-  assert.match(provisionV2, /clean\(endpoint\.name, 240\)\.startsWith\('itmounts-mass-distilled-'\)/)
+  assert.match(provisionV2, /Number\(endpoint\.workers\?\.min \?\? 0\) === 0/)
   assert.match(provisionV2, /clean\(endpoint\.id, 160\) !== activeEndpointId/)
   assert.match(provisionV2, /workers: \{ min: 0, max: 0, idleTimeout \}/)
   assert.match(provisionV2, /await releaseOtherMassEndpointCapacity\(String\(endpoint\.id\)\)/)
+  assert.match(provisionV2, /if \(workerQuota - reservedWorkers <= 1\) await releaseOtherMassEndpointCapacity\(''\)/)
   assert.doesNotMatch(provisionV2, /max: 2|min: 1/)
 })
 

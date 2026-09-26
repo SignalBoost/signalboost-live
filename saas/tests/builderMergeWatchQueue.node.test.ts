@@ -109,3 +109,16 @@ test('the cron accepts no request-supplied work and requires the shared secret',
   assert.match(route, /status: 401/)
   assert.doesNotMatch(route, /request\.json|searchParams/)
 })
+
+test('terminal production observations reconcile the originating repository job', async () => {
+  const s = store([pending()])
+  const terminal: Array<{ status: string; deploymentId?: string | null }> = []
+  await runPendingMergeWatches({
+    store: s.store as any,
+    watch: async () => outcome('healthy') as any,
+    onTerminal: async (_row, status, _detail, observed) => {
+      terminal.push({ status, deploymentId: observed?.deploymentId })
+    },
+  })
+  assert.deepEqual(terminal, [{ status: 'healthy', deploymentId: 'dpl_new' }])
+})

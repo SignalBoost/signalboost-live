@@ -41,7 +41,7 @@ async def chat(req:Request):
     body=await req.body()
     try: payload=json.loads(body)
     except Exception: raise HTTPException(status_code=400,detail="distilled_chat_payload_invalid")
-    if payload.get("model")!=MODEL: raise HTTPException(status_code=409,detail="distilled_exact_model_mismatch")
+    if payload.get("model") not in (BASE_ID,MODEL): raise HTTPException(status_code=409,detail="distilled_exact_model_mismatch")
     kwargs=payload.get("chat_template_kwargs") if isinstance(payload.get("chat_template_kwargs"),dict) else {}
     kwargs["enable_thinking"]=False;payload["chat_template_kwargs"]=kwargs
     async with httpx.AsyncClient(timeout=120.0) as client:

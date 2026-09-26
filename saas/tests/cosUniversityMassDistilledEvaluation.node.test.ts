@@ -15,6 +15,7 @@ const concurrencyMigration = readFileSync(new URL('../supabase/migrations/202609
 const builderV2PriorityMigration = readFileSync(new URL('../supabase/migrations/20260921185000_mass_distilled_v2_cs_evaluation_priority.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 const canaryRoute = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
+const exactArtifactGateway = readFileSync(new URL('../../runpod/exact-artifact/mass_gateway.py', import.meta.url), 'utf8')
 
 const MASS_REVISION = Object.freeze({
   baseModel: 'Qwen/Qwen3-4B',
@@ -283,4 +284,12 @@ test('production canary receipt persists readiness required by atomic evaluation
   assert.match(canaryRoute, /claim:'production_canary_healthy'/)
   assert.match(canaryRoute, /exactArtifact:true,internalVllmReady:true/)
   assert.match(claimMigration, /evidence->>'internalVllmReady'='true'/)
+})
+
+
+test('exact-artifact gateway serves only the pinned base and exact adapter identities', () => {
+  assert.match(exactArtifactGateway, /payload\.get\("model"\) not in \(BASE_ID,MODEL\)/)
+  assert.match(exactArtifactGateway, /--served-model-name[\",]+BASE_ID/)
+  assert.match(exactArtifactGateway, /--lora-modules[\",]+lora/)
+  assert.match(exactArtifactGateway, /distilled_exact_model_mismatch/)
 })

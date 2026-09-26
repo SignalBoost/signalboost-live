@@ -101,7 +101,7 @@ type AutoAdmissionArtifact = Readonly<{
 /**
  * Admit at most one trained Computer Science artifact per tick.
  *
- * The active-resident ceiling is throughput/backpressure only. Admission never
+ * The active-resident ceiling is throughput/backpressure only. Remediation-required enrollments\n * keep their durable remediation path but do not consume a teaching admission slot; otherwise a\n * failed cohort can permanently deadlock all later trained students. Admission never
  * grants final evaluation, promotion, Production traffic, or wider authority.
  */
 export async function admitNextBuilderResidency(input:{
@@ -113,7 +113,7 @@ export async function admitNextBuilderResidency(input:{
   const active=await input.db
     .from('cos_university_residency_enrollments')
     .select('id')
-    .in('standing',['resident','senior_resident','remediation_required'])
+    .in('standing',['resident','senior_resident'])
     .limit(activeLimit)
   if(active.error) throw active.error
   if((active.data??[]).length>=activeLimit){

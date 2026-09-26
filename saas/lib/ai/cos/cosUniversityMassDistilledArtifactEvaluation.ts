@@ -171,7 +171,7 @@ function retentionCases():EvalCase[]{return[
 async function massRun(claim:MassEvaluationClaim,now:Date){
   const db=cosServiceDb();if(!db)throw new Error('service_database_unavailable')
   const result=await db.from('cos_university_mass_distillation_batch_runs')
-    .select('id,batch_key,subject_id,student_model_id,student_model_revision,teacher_model_id,prompt_set_hash,teacher_source_ref,dataset_hash,training_manifest_hash,holdout_manifest_hash,revision_key,holdout_data_ref,trained_artifact_id,trained_artifact_hash,stage,completed_at')
+    .select('id,batch_key,subject_id,student_model_id,student_model_revision,teacher_model_id,prompt_set_hash,teacher_source_ref,dataset_hash,training_manifest_hash,holdout_manifest_hash,revision_key,holdout_data_ref,trained_artifact_id,trained_artifact_hash,stage,completed_at,candidate_id')
     .eq('candidate_id',claim.candidateId).maybeSingle()
   if(result.error)throw result.error
   const run:any=result.data
@@ -181,8 +181,15 @@ async function massRun(claim:MassEvaluationClaim,now:Date){
   const revision:FineTuneRevision={baseModel:clean(run.student_model_id,500),baseModelRevision:clean(run.student_model_revision,40).toLowerCase(),datasetHash:clean(run.dataset_hash,64).toLowerCase(),trainingManifestHash:clean(run.training_manifest_hash,64).toLowerCase(),holdoutManifestHash:clean(run.holdout_manifest_hash,64).toLowerCase()}
   if(revision.baseModel!==BASE_MODEL_ID||!HEX40.test(revision.baseModelRevision||'')||!HEX64.test(revision.datasetHash)||!HEX64.test(revision.trainingManifestHash)||!HEX64.test(revision.holdoutManifestHash)||fineTuneRevisionKey(revision)!==claim.revisionKey||revision.datasetHash!==claim.datasetHash||clean(run.trained_artifact_id,500)!==claim.artifactId||clean(run.trained_artifact_hash,64).toLowerCase()!==claim.artifactHash)throw new Error('mass_distilled_evaluation_revision_binding_mismatch')
   const teacherModelId=clean(run.teacher_model_id,240);if(!teacherModelId)throw new Error('mass_distilled_evaluation_teacher_identity_missing')
+  const artifactRow=await db.from('cos_local_distillation_artifacts').select('intended_use').eq('candidate_id',claim.candidateId).eq('trained_artifact_hash',claim.artifactHash).maybeSingle()
+  if(artifactRow.error)throw artifactRow.error
+  const receipt=(artifactRow.data as any)?.intended_use?.trainingReceipt
+  const xsaApplied=receipt?.xsaTrainingApplied===true
+  const attentionArchitecture=xsaApplied?clean(receipt?.attentionArchitecture,120):'standard_attention'
+  const xsaProfile=xsaApplied?clean(receipt?.xsaTrainingRuntimeProfile,120):''
+  if(xsaApplied&&(attentionArchitecture!=='exclusive_self_attention_v1'||xsaProfile!=='qwen3_xsa_projection_v1'||receipt?.xsaInferenceSymmetryRequired!==true))throw new Error('mass_distilled_evaluation_xsa_receipt_invalid')
   return {
-    revision,
+    revision,attentionArchitecture,xsaProfile,
     teacherModelId,
     holdoutDataRef: clean(run.holdout_data_ref, 2000),
     trainedAt: completedAt,
@@ -572,7 +579,7 @@ async function submitClaim(input:{claim:IndependentEvaluatorClaim;candidateId:st
 async function runMassDistilledArtifactEvaluationInsideHarness(input:{claim:MassEvaluationClaim;deadlineMs:number;now?:Date}){
   if(input.claim.maxEndpointCalls!==ENDPOINT_CALLS||input.claim.maxJudgeCalls!==JUDGE_CALLS||input.claim.maxRuntimeWakeAttempts!==1||input.claim.maxEstimatedRuntimeWakeCostUsd<=0||input.claim.maxEstimatedRuntimeWakeCostUsd>0.2)throw new Error('mass_distilled_evaluation_claim_ceiling_invalid')
   const now=input.now||new Date();const training=await massRun(input.claim,now);const age=now.getTime()-training.trainedAt;if(age<MASS_DISTILLED_RETENTION_DELAY_MS)throw new Error('mass_distilled_evaluation_retention_delay_not_met')
-  const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs,candidateId:input.claim.candidateId,legacyHosted:training.legacyHosted});const model=await servedCandidateModel(input.claim);await waitReady(input.claim.endpointId,input.deadlineMs)
+  const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs,candidateId:input.claim.candidateId,legacyHosted:training.legacyHosted});const model=await servedCandidateModel({...input.claim,attentionArchitecture:training.attentionArchitecture,xsaProfile:training.xsaProfile});await waitReady(input.claim.endpointId,input.deadlineMs)
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{
     const budget:EndpointCallBudget={used:0,max:ENDPOINT_CALLS};const common={endpointId:input.claim.endpointId,budget,claim:input.claim,deadlineMs:input.deadlineMs}

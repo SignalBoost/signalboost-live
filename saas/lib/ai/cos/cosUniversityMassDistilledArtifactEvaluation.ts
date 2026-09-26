@@ -39,16 +39,15 @@ const JUDGE_CALLS = MASS_EVALUATION_JUDGE_CALLS
 // extraction, which is why the constant is named for what it measures.
 const OBSERVED_GATEWAY_CUTOFF_MS = 40_000
 const ENDPOINT_CALL_TIMEOUT_MS = 50_000
-// Production 2026-09-25 after the 512-token judge cap: 32/32 successful DeepInfra judge calls
-// completed within 6.1s (p99 ~5.9s), while 8/8 failed calls from two overlapping evaluator runs
-// consumed the full 110s ceiling in two four-request bursts. Bound each judge call at 30s: almost
-// 5x the observed successful maximum, but short enough to fail fast on the measured provider stall.
-// Scoring prompts, evaluator identity, four-call ceiling, thresholds, and promotion authority are unchanged.
-const JUDGE_CALL_TIMEOUT_MS = 30_000
-// Holdout is the largest judge payload and accounts for 30/32 observed judge timeouts in the latest six-hour window.
-// Give that existing single call bounded transport headroom without adding a fifth judge call, changing its payload,
-// changing scoring, or widening the signed JUDGE_CALLS=4 authority.
-const HOLDOUT_JUDGE_CALL_TIMEOUT_MS = 45_000
+// Production 2026-09-26 live telemetry showed valid DeepInfra judge calls completing at 26.6s while
+// the 30s transfer ceiling aborted another request exactly at 30.0s, and holdout calls repeatedly hit
+// the 45s client abort. Those ceilings were clipping the live provider rather than proving evaluator
+// failure. Give the existing calls bounded transport headroom; call count, scoring, thresholds and
+// promotion authority remain unchanged.
+const JUDGE_CALL_TIMEOUT_MS = 60_000
+// Holdout remains the largest judge payload. Its existing single call gets extra bounded headroom without adding
+// another judge call, changing its payload, changing scoring, or widening the signed JUDGE_CALLS=4 authority.
+const HOLDOUT_JUDGE_CALL_TIMEOUT_MS = 75_000
 // Production 2026-09-25 provider telemetry: 252 successful judge calls used 196.6 completion
 // tokens on average, p95=231, p99=310.5, max=340. The prior 2,200-token allowance reserved far
 // more generation than strict four-case JSON needs. Keep >50% headroom over the observed maximum.

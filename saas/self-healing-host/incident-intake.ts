@@ -12,6 +12,7 @@ import { createTriageThinker } from '@/lib/supervisor/portable/triage-thinker'
 import { createReferenceVerifier } from '@/lib/supervisor/portable/reference-verifier'
 import { SupervisorOrchestrator } from '@/lib/supervisor/orchestrator'
 import { DefaultSupervisorPolicyEngine } from '@/lib/supervisor/policy-engine'
+import { remediateNativeIncidents } from '@/self-healing-host/native-autonomous-loop'
 import type { AuditEvent } from '@/lib/supervisor/execution-contracts'
 
 export const GENERIC_SOURCE_ID = 'generic'
@@ -122,7 +123,15 @@ export function getIncidentIntake(): { runtime: ReturnType<typeof createIncident
           executionContext: { executionId: `intake-${incident.incidentId}` },
         })
         const outcome = await orchestrator.run(incident)
-        return { status: outcome.status, reason: `diagnosed (risk ${risk}); policy ${verdict}; ${outcome.reason}` }
+        // Vendor alerts are observations, never authority. After passive diagnosis, feed the
+        // canonical incident into the same native SHS engine used by first-party collectors.
+        // Existing resolver/policy/Referee gates remain the only source of repair authority.
+        const remediation = await remediateNativeIncidents([incident], { maxIncidents: 1 })
+        const repaired = remediation[0]
+        return {
+          status: repaired?.status === 'fixed' ? 'completed' : outcome.status,
+          reason: `diagnosed (risk ${risk}); policy ${verdict}; native_shs=${repaired?.status ?? 'no_result'}; ${repaired?.summary ?? outcome.reason}`,
+        }
       },
       records,
     }),

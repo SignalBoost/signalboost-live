@@ -113,6 +113,10 @@ export interface LocalInferenceConfig {
 export interface LocalInferenceTelemetry {
   at: string
   requestId: string
+  /** Canonical distributed correlation identity. Harness-bound work uses the HarnessRun id. */
+  traceId: string
+  harnessRunId: string | null
+  parentHarnessRunId: string | null
   provider: string
   model: string
   modelProfileKey: string | null
@@ -559,8 +563,13 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300
+    const traceId = harnessContext?.manifest.runId || requestId
     emitLocalInferenceTelemetry({
-      at: new Date().toISOString(), requestId, provider, model,
+      at: new Date().toISOString(), requestId,
+      traceId,
+      harnessRunId: harnessContext?.manifest.runId || null,
+      parentHarnessRunId: harnessContext?.manifest.parent?.runId || null,
+      provider, model,
       modelProfileKey: runtimeBinding.profileKey,
       transportProtocol: runtimeBinding.transportProtocol,
       feature: usageContext.feature, routeOwner,

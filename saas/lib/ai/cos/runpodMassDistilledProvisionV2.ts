@@ -42,6 +42,12 @@ const PUBLIC_PORT = 8000
 const IDLE_TIMEOUT_SECONDS = MASS_DISTILLED_IDLE_TIMEOUT_SECONDS
 export const MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS = 720
 const REQUEST_TIMEOUT_MS = 8_000
+// Endpoint container/image/args/env are immutable-by-generation for this governed path. Production
+// 2026-09-26 showed RunPod rejecting an in-place full inline-container PATCH with HTTP 422 while the
+// stale endpoint kept the pre-baseline gateway and returned distilled_exact_model_mismatch for BASE_ID.
+// Bump the endpoint generation whenever that materialized container contract changes; create the new
+// exact endpoint through POST and leave PATCH for bounded worker/GPU policy only.
+export const MASS_DISTILLED_EXACT_ENDPOINT_GENERATION = 'v4' as const
 // Independent evaluation needs deterministic 24 GB VRAM headroom. The short exact-artifact canary,
 // however, only proves boot + exact binding and historically succeeds on 16 GB. Keep evaluator/graduate
 // policy 24 GB-only while allowing the canary to use RunPod's ordered 24 -> 16 GB availability fallback.
@@ -184,13 +190,13 @@ function identity(input: MassDistilledRuntimeArtifact) {
   if (runtimeKey) {
     return {
       templateName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-template-v4`,
-      endpointName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,
+      endpointName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-${MASS_DISTILLED_EXACT_ENDPOINT_GENERATION}`,
       modelName: `itmounts-mass-distilled-${suffix}-${runtimeKey}`,
     }
   }
   return {
     templateName: `itmounts-mass-distilled-${suffix}-v2`,
-    endpointName: `itmounts-mass-distilled-${suffix}-v2`,
+    endpointName: `itmounts-mass-distilled-${suffix}-${MASS_DISTILLED_EXACT_ENDPOINT_GENERATION}`,
     modelName: `itmounts-mass-distilled-${suffix}`,
   }
 }
@@ -529,6 +535,7 @@ async function resolveExactEndpoint(
   input: MassDistilledRuntimeArtifact,
   recoveryFrom = '',
   approvedPools: readonly string[] = APPROVED_POOLS,
+  allowCreate = true,
 ) {
   const ids = identity(input)
   const idleTimeoutSeconds = runtimeIdleTimeoutSeconds(input)
@@ -537,6 +544,7 @@ async function resolveExactEndpoint(
   let createdEndpoint = false
 
   if (!endpoint) {
+    if (!allowCreate) throw new Error('mass_distilled_runtime_existing_endpoint_missing')
     const config = nativeV2EndpointConfig(input, ids.modelName, approvedPools, idleTimeoutSeconds)
     endpoint = await withWorkerQuotaRecovery('', () => requestV2<Endpoint>('/serverless', {
       method: 'POST',
@@ -549,13 +557,15 @@ async function resolveExactEndpoint(
     const existingPools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
     const poolsAlreadyExact = existingPools.length === approvedPools.length
       && approvedPools.every(pool => existingPools.includes(pool))
-    if (!materializedEndpointMatches(endpoint, input, ids.modelName) || !poolsAlreadyExact) {
-      const config = nativeV2EndpointConfig(input, ids.modelName, approvedPools, idleTimeoutSeconds)
-      endpoint = await withWorkerQuotaRecovery(String(endpoint.id), () => requestV2<Endpoint>(
-        `/serverless/${encodeURIComponent(String(endpoint?.id))}`,
-        { method: 'PATCH', body: JSON.stringify(config) },
-      ))
-      if (!endpoint?.id) throw new Error('mass_distilled_runtime_inline_rebind_missing')
+    // Never PATCH image/args/env/ports onto an existing exact endpoint. RunPod's v2 control plane
+    // rejects that full container mutation (Production HTTP 422), and mutating a proved endpoint would
+    // also make old canary evidence ambiguous. Container drift requires a new named generation.
+    if (!materializedEndpointMatches(endpoint, input, ids.modelName)) {
+      throw new Error('mass_distilled_runtime_endpoint_generation_drift')
+    }
+    // GPU policy is independently mutable and constrained below; do not mix it with container identity.
+    if (!poolsAlreadyExact && !approvedPools.some(pool => existingPools.includes(pool))) {
+      throw new Error('mass_distilled_runtime_approved_gpu_pool_unavailable')
     }
   }
 
@@ -759,7 +769,7 @@ export async function reconcileExistingMassDistilledRuntime(input: MassDistilled
     artifactId,
     artifactRevision,
     artifactHash,
-  }, 'self_healing_existing_only')
+  }, 'self_healing_existing_only', APPROVED_POOLS, false)
   const endpoint = await restoreRetiredEndpointCapacity(recovered.endpoint, idleTimeoutSeconds)
   assertMaterializedEndpointIdentity(endpoint, {
     ...input,

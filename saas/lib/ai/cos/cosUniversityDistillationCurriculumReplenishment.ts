@@ -222,13 +222,16 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   // failures allowed already-remediated high-volume subjects to monopolize maxSubjects forever while newer
   // verified failures starved. Read only remediation provenance; hidden evaluation details remain isolated.
   const remediationRows = await input.db.from('cos_continuous_learning')
-    .select('evidence')
+    .select('subject,evidence')
     .eq('source_kind', 'failure_derived_curriculum')
     .gte('observed_at', since)
     .limit(5000)
   if (remediationRows.error) throw remediationRows.error
   const remediatedCandidates = new Set<string>()
+  const persistedRemediationSubjects = new Set<string>()
   for (const row of (remediationRows.data || []) as any[]) {
+    const persistedSubject = String(row?.subject || '').trim()
+    if (persistedSubject) persistedRemediationSubjects.add(persistedSubject)
     const evidence = Array.isArray(row?.evidence) ? row.evidence : []
     for (const item of evidence) {
       const candidateId = String(item?.sourceEvaluationCandidateId || '').trim()
@@ -342,7 +345,11 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
     }
     bySubject.push({ subject: target.subject, inserted: subjectInserted })
   }
-  return Object.freeze({ inserted, bySubject: Object.freeze(bySubject) })
+  return Object.freeze({
+    inserted,
+    bySubject: Object.freeze(bySubject),
+    persistedRemediationSubjects: Object.freeze([...persistedRemediationSubjects].sort()),
+  })
 }
 
 async function installTeacherSyntheticFallback(input: {

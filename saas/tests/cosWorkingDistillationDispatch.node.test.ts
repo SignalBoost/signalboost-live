@@ -127,6 +127,8 @@ test('Working COS preparation reconciles terminal HF jobs and permits only one b
   assert.match(dispatch,/huggingface_completed_without_callback/)
   assert.match(dispatch,/if \(!terminalStage\)/)
   assert.match(dispatch,/retryAuthorized: false as const/)
+  assert.match(dispatch,/fetchHuggingFaceJobLogTail/)
+  assert.match(dispatch,/providerLogTail/)
   assert.match(dispatch,/excludeJobIds/)
   assert.match(dispatch,/retryAuthorized: failedCount <= 1/)
   assert.match(cron,/reconcileWorkingCosPreparationProviderJob/)

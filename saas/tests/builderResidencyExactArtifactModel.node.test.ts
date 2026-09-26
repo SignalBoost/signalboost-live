@@ -1,7 +1,9 @@
+// saas/tests/builderResidencyExactArtifactModel.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   createRunpodBuilderResidencyModelPort,
+  inferenceHttpFailureCode,
   type BuilderResidencyModelIdentity,
 } from '../platform-harness/residency/exact-artifact-model.ts'
 
@@ -426,5 +428,58 @@ test('Residency rejects application readiness for a different model identity', a
   await assert.rejects(
     ()=>port.prepare!(identity),
     /residency_exact_artifact_runtime_not_ready:residency_exact_artifact_application_model_not_ready/,
+  )
+})
+
+
+test('an inference rejection records the provider reason, bounded and redacted',async()=>{
+  const reason="This model's maximum context length is 8192 tokens. However, you requested 9120 tokens (5024 in the messages, 4096 in the completion)."
+  assert.equal(
+    inferenceHttpFailureCode(400,JSON.stringify({object:'error',message:reason,type:'BadRequestError',code:400})),
+    `residency_exact_artifact_inference_http_400:${reason.slice(0,180)}`,
+  )
+  assert.equal(inferenceHttpFailureCode(400,''),'residency_exact_artifact_inference_http_400')
+  assert.equal(inferenceHttpFailureCode(502,'<html>bad gateway</html>'),'residency_exact_artifact_inference_http_502:<html>bad gateway</html>')
+  const redacted=inferenceHttpFailureCode(401,JSON.stringify({detail:'invalid Bearer abc123secret'}))
+  assert.doesNotMatch(redacted,/abc123secret/)
+  assert.ok(inferenceHttpFailureCode(400,'x'.repeat(5000)).length<=260)
+
+  const {db}=artifactDb()
+  const port=createRunpodBuilderResidencyModelPort({
+    db,
+    apiKey:'secret',
+    readyTimeoutMs:1000,
+    provisionImpl:async()=>({
+      endpointId:'ep_residency_123',
+      endpointName:'residency-endpoint',
+      templateName:'residency-template',
+      modelName:'itmounts-resident-model',
+      baseUrl:'https://ep_residency_123.api.runpod.ai/v1',
+      createdTemplate:false,
+      createdEndpoint:false,
+      reboundTemplate:false,
+      workersMin:0,
+      workersMax:1,
+      idleTimeout:720,
+    }),
+    healthImpl:async()=>({
+      ok:true,
+      httpStatus:200,
+      jobs:{inProgress:0,inQueue:0,failed:0,completed:0},
+      workers:{idle:0,ready:1,running:0,initializing:0},
+      error:null,
+    }),
+    sleepImpl:async()=>{},
+    fetchImpl:async(url:any)=>{
+      const value=String(url)
+      if(value.endsWith('/ping')) return new Response('',{status:204})
+      if(value.endsWith('/ready')) return new Response(JSON.stringify({ready:true,model:'itmounts-resident-model'}),{status:200})
+      if(value.endsWith('/chat/completions')) return new Response(JSON.stringify({object:'error',message:reason}),{status:400})
+      throw new Error('unexpected_fetch')
+    },
+  })
+  await assert.rejects(
+    port.complete({identity,system:'s',user:'u',maxTokens:4096}),
+    (error:unknown)=>error instanceof Error&&error.message.startsWith('residency_exact_artifact_inference_http_400:This model')
   )
 })

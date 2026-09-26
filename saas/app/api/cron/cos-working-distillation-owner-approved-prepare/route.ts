@@ -3,6 +3,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   dispatchWorkingCosDatasetPreparation,
   ensureWorkingCosCandidateReadiness,
+  reconcileWorkingCosPreparationProviderJob,
   workingCosDispatchReadiness,
 } from '@/lib/ai/cos/cosWorkingDistillationDispatch'
 
@@ -48,16 +49,74 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: accepted.error.message }, { status: 500 })
   }
   if (accepted.data?.job_id) {
-    return NextResponse.json({
-      ok: true,
-      skipped: true,
-      reason: 'working_cos_dataset_preparation_already_accepted',
-      candidateId: APPROVED_CANDIDATE_ID,
-      jobId: accepted.data.job_id,
-      jobUrl: accepted.data.job_url,
-      automaticTrainingAuthorized: false,
-      productionTrafficAuthorized: false,
-    })
+    try {
+      const reconciliation = await reconcileWorkingCosPreparationProviderJob({
+        candidateId: APPROVED_CANDIDATE_ID,
+        jobId: accepted.data.job_id,
+        db,
+      })
+      if (reconciliation.callbackRecorded) {
+        return NextResponse.json({
+          ok: true,
+          skipped: true,
+          reason: 'working_cos_dataset_preparation_callback_recorded',
+          candidateId: APPROVED_CANDIDATE_ID,
+          jobId: accepted.data.job_id,
+          jobUrl: accepted.data.job_url,
+          reconciliation,
+          automaticTrainingAuthorized: false,
+          productionTrafficAuthorized: false,
+        })
+      }
+      if (!reconciliation.terminal) {
+        return NextResponse.json({
+          ok: true,
+          skipped: true,
+          reason: 'working_cos_dataset_preparation_in_progress',
+          candidateId: APPROVED_CANDIDATE_ID,
+          jobId: accepted.data.job_id,
+          jobUrl: accepted.data.job_url,
+          reconciliation,
+          automaticTrainingAuthorized: false,
+          productionTrafficAuthorized: false,
+        })
+      }
+      if (!reconciliation.retryAuthorized) {
+        return NextResponse.json({
+          ok: false,
+          skipped: true,
+          reason: 'working_cos_dataset_preparation_retry_exhausted',
+          candidateId: APPROVED_CANDIDATE_ID,
+          jobId: accepted.data.job_id,
+          jobUrl: accepted.data.job_url,
+          reconciliation,
+          automaticTrainingAuthorized: false,
+          productionTrafficAuthorized: false,
+        }, { status: 503 })
+      }
+      console.warn('[working-cos-owner-approved-prepare-retry]', JSON.stringify({
+        candidateId: APPROVED_CANDIDATE_ID,
+        failedJobId: accepted.data.job_id,
+        providerStage: reconciliation.providerStage,
+        failureCount: reconciliation.failureCount,
+      }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('[working-cos-owner-approved-prepare-reconcile]', JSON.stringify({
+        ok: false,
+        candidateId: APPROVED_CANDIDATE_ID,
+        jobId: accepted.data.job_id,
+        error: message,
+      }))
+      return NextResponse.json({
+        ok: false,
+        error: message,
+        candidateId: APPROVED_CANDIDATE_ID,
+        jobId: accepted.data.job_id,
+        automaticTrainingAuthorized: false,
+        productionTrafficAuthorized: false,
+      }, { status: 500 })
+    }
   }
 
   try {

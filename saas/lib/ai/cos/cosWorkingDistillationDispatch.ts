@@ -9,6 +9,7 @@ import {
 import { selectWorkingCosBalancedBundleFromVault } from './cosWorkingDistillationBundle.ts'
 import { registerWorkingCosDistillationCandidate } from './cosWorkingDistillationCandidateRegistry.ts'
 import { COS_WORKING_DISPATCH_MAX_ITEMS, readWorkingCosDatasetMaterialization } from './cosWorkingDistillationDataset.ts'
+import { inspectHuggingFaceJob } from './cosUniversityHuggingFaceJobReconciler.ts'
 import {
   buildHuggingFaceJobSpec,
   findHuggingFaceJobByName,
@@ -286,10 +287,21 @@ async function submitBoundedJob(input: {
   })
   try {
     const namespace = await resolveHuggingFaceNamespace({ token: input.token, fetchImpl: input.fetchImpl })
+    const failedJobs = await input.db.from('cos_working_distillation_job_events')
+      .select('job_id')
+      .eq('candidate_id', input.candidateId)
+      .eq('operation', input.operation)
+      .eq('idempotency_key', input.idempotencyKey)
+      .eq('event_type', 'provider_failed')
+      .not('job_id', 'is', null)
+      .limit(8)
+    if (failedJobs.error) throw failedJobs.error
+    const excludeJobIds = (failedJobs.data || []).map((row: any) => clean(row.job_id, 240)).filter(Boolean)
     const existing = await findHuggingFaceJobByName({
       namespace,
       token: input.token,
       name: input.spec.labels.name,
+      excludeJobIds,
       fetchImpl: input.fetchImpl,
     })
     // Adoption exists so a retried dispatch never pays for a duplicate of a job that is queued,
@@ -366,6 +378,124 @@ export async function workingCosDispatchReadiness(input: {
     nextGate: bundle.eligible && context.binding.eligible
       ? 'explicit_owner_confirmed_dataset_preparation'
       : 'bundle_or_runtime_binding',
+  })
+}
+
+
+export async function reconcileWorkingCosPreparationProviderJob(input: {
+  candidateId: string
+  jobId: string
+  now?: Date
+  fetchImpl?: typeof fetch
+  db?: any
+}) {
+  const candidateId = clean(input.candidateId, 160)
+  const jobId = clean(input.jobId, 240)
+  if (!/^working-cos:[a-f0-9]{32}$/i.test(candidateId)) throw new Error('working_cos_reconcile_candidate_invalid')
+  if (!jobId) throw new Error('working_cos_reconcile_job_id_missing')
+  const db = input.db || cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+
+  const callback = await db.from('cos_working_distillation_job_events')
+    .select('created_at')
+    .eq('candidate_id', candidateId)
+    .eq('operation', 'prepare_dataset')
+    .eq('event_type', 'callback_recorded')
+    .eq('job_id', jobId)
+    .limit(1)
+    .maybeSingle()
+  if (callback.error) throw callback.error
+  if (callback.data) {
+    return Object.freeze({ terminal: true as const, callbackRecorded: true as const, providerStage: 'CALLBACK_RECORDED' as const, retryAuthorized: false as const })
+  }
+
+  const accepted = await db.from('cos_working_distillation_job_events')
+    .select('idempotency_key,job_url,runtime_binding_key,runtime_digest,base_model_id,base_model_revision,dataset_hash,training_manifest_hash,holdout_manifest_hash,provider_flavor,hourly_cost_usd,max_estimated_cost_usd,evidence,created_at')
+    .eq('candidate_id', candidateId)
+    .eq('operation', 'prepare_dataset')
+    .eq('event_type', 'provider_accepted')
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (accepted.error) throw accepted.error
+  if (!accepted.data) throw new Error('working_cos_reconcile_provider_acceptance_missing')
+
+  const hf = huggingFaceJobsConfigFromEnv()
+  if (!hf) throw new Error('working_cos_training_provider_not_configured')
+  const namespace = await resolveHuggingFaceNamespace({ token: hf.token, fetchImpl: input.fetchImpl })
+  const providerJob = await inspectHuggingFaceJob({ namespace, jobId, token: hf.token, fetchImpl: input.fetchImpl })
+  const timeoutSeconds = Math.max(300, Number((accepted.data as any)?.evidence?.timeoutSeconds || hf.preparationTimeoutSeconds))
+  const acceptedAt = Date.parse(String(accepted.data.created_at || ''))
+  const now = input.now || new Date()
+  const overdue = Number.isFinite(acceptedAt) && now.getTime() > acceptedAt + (timeoutSeconds + 120) * 1000
+  const terminalStage = ['COMPLETED', 'CANCELED', 'ERROR', 'DELETED'].includes(providerJob.stage)
+
+  if (!terminalStage) {
+    return Object.freeze({
+      terminal: false as const,
+      callbackRecorded: false as const,
+      providerStage: providerJob.stage,
+      overdue,
+      retryAuthorized: false as const,
+      automaticTrainingAuthorized: false as const,
+      productionTrafficAuthorized: false as const,
+    })
+  }
+
+  const priorFailures = await db.from('cos_working_distillation_job_events')
+    .select('job_id')
+    .eq('candidate_id', candidateId)
+    .eq('operation', 'prepare_dataset')
+    .eq('event_type', 'provider_failed')
+    .limit(8)
+  if (priorFailures.error) throw priorFailures.error
+  const alreadyFailed = (priorFailures.data || []).some((row: any) => clean(row.job_id, 240) === jobId)
+  if (!alreadyFailed) {
+    const failureReason = providerJob.stage === 'COMPLETED'
+      ? 'huggingface_completed_without_callback'
+      : `huggingface_provider_${providerJob.stage.toLowerCase()}`
+    await recordJobEvent(db, {
+      candidateId,
+      operation: 'prepare_dataset',
+      eventType: 'provider_failed',
+      idempotencyKey: clean(accepted.data.idempotency_key, 64),
+      jobId,
+      jobUrl: clean(accepted.data.job_url, 2000),
+      runtimeBindingKey: clean(accepted.data.runtime_binding_key, 64),
+      runtimeDigest: clean(accepted.data.runtime_digest, 64),
+      baseModelId: clean(accepted.data.base_model_id, 300),
+      baseModelRevision: clean(accepted.data.base_model_revision, 40),
+      datasetHash: clean(accepted.data.dataset_hash, 64),
+      trainingManifestHash: clean(accepted.data.training_manifest_hash, 64),
+      holdoutManifestHash: clean(accepted.data.holdout_manifest_hash, 64),
+      providerFlavor: clean(accepted.data.provider_flavor, 80),
+      hourlyCostUsd: Number(accepted.data.hourly_cost_usd),
+      maxEstimatedCostUsd: Number(accepted.data.max_estimated_cost_usd),
+      evidence: {
+        error: failureReason,
+        providerStage: providerJob.stage,
+        providerMessage: providerJob.message,
+        overdue,
+        providerInvocationStarted: true,
+        automaticRetryAuthorized: false,
+      },
+    })
+  }
+
+  const failedCount = new Set([
+    ...(priorFailures.data || []).map((row: any) => clean(row.job_id, 240)),
+    jobId,
+  ].filter(Boolean)).size
+  return Object.freeze({
+    terminal: true as const,
+    callbackRecorded: false as const,
+    providerStage: providerJob.stage,
+    overdue,
+    retryAuthorized: failedCount <= 1,
+    failureCount: failedCount,
+    automaticTrainingAuthorized: false as const,
+    productionTrafficAuthorized: false as const,
   })
 }
 

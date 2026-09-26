@@ -46,9 +46,11 @@ export const MASS_DISTILLATION_TEACHER_COST_CEILING_USD = 0.20 as const
 export const MASS_DISTILLATION_PREPARATION_COST_CEILING_USD = 0.015 as const
 export const MASS_DISTILLATION_TRAINING_COST_CEILING_USD = 1.61 as const
 const MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS = 20 as const
-const MASS_REMEDIATION_TEACHER_ROWS = 25 as const
+const MASS_REMEDIATION_TEACHER_MIN_ROWS = 27 as const
 const MASS_REMEDIATION_TEACHER_MAX_CALLS = 32 as const
 const MASS_REMEDIATION_HOLDOUT_TARGET = 5 as const
+const MASS_REMEDIATION_ORDINARY_TRAINING_MIN = 2 as const
+const MASS_REMEDIATION_ORDINARY_PROMPT_MIN = MASS_REMEDIATION_HOLDOUT_TARGET + MASS_REMEDIATION_ORDINARY_TRAINING_MIN
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const HEX40 = /^[a-f0-9]{40}$/i
@@ -476,19 +478,26 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         ? (() => {
             const failureDerived = promptSet.prompts.filter(item => failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
             const ordinary = promptSet.prompts.filter(item => !failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
-            if (ordinary.length < MASS_REMEDIATION_HOLDOUT_TARGET) {
-              throw new Error(`mass_distillation_remediation_holdout_floor_unreachable:${ordinary.length}/${MASS_REMEDIATION_HOLDOUT_TARGET}`)
+            if (ordinary.length < MASS_REMEDIATION_ORDINARY_PROMPT_MIN) {
+              throw new Error(`mass_distillation_remediation_ordinary_training_floor_unreachable:${ordinary.length}/${MASS_REMEDIATION_ORDINARY_PROMPT_MIN}`)
             }
-            const ordinaryTarget = MASS_REMEDIATION_HOLDOUT_TARGET
-            const failureDerivedTarget = MASS_REMEDIATION_TEACHER_ROWS - ordinaryTarget
+            const failureDerivedTarget = MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS
             if (failureDerived.length < failureDerivedTarget) {
               throw new Error(`mass_distillation_remediation_teacher_floor_unreachable:${failureDerived.length}/${failureDerivedTarget}`)
             }
+            // Preserve all 20 corrective prompts while adding as much independent ordinary subject material
+            // as the existing 32-call teacher ceiling permits. The preparation worker withholds five ordinary
+            // rows for holdout, leaving at least MASS_REMEDIATION_ORDINARY_TRAINING_MIN ordinary examples in
+            // training. This prevents a remediation batch from becoming "20 safety examples, 0 subject examples".
+            const ordinaryTarget = Math.min(
+              ordinary.length,
+              MASS_REMEDIATION_TEACHER_MAX_CALLS - failureDerivedTarget,
+            )
             const selected = [
               ...failureDerived.slice(0, failureDerivedTarget),
               ...ordinary.slice(0, ordinaryTarget),
             ]
-            if (selected.length !== MASS_REMEDIATION_TEACHER_ROWS) {
+            if (selected.length < MASS_REMEDIATION_TEACHER_MIN_ROWS || selected.length > MASS_REMEDIATION_TEACHER_MAX_CALLS) {
               throw new Error(`mass_distillation_remediation_teacher_selection_invalid:${selected.length}`)
             }
             return Object.freeze(selected)
@@ -500,7 +509,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         run,
         prompts: remediationTeacherPrompts,
         promptSetHash: promptSet.promptSetHash,
-        minimumRows: remediationTeacherRequired ? MASS_REMEDIATION_TEACHER_ROWS : undefined,
+        minimumRows: remediationTeacherRequired ? remediationTeacherPrompts.length : undefined,
         maxCalls: remediationTeacherRequired ? MASS_REMEDIATION_TEACHER_MAX_CALLS : undefined,
         fetchImpl: fetchImpl as typeof fetch | undefined,
       })

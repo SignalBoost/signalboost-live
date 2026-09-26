@@ -27,8 +27,9 @@ test('evaluator retriggers non-token ping even while RunPod worker counters are 
   const readiness = source.slice(start, end)
   assert.match(readiness, /massDistilledRuntimeHealth\(endpointId\)/)
   assert.match(readiness, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
-  assert.match(readiness, /payload\?\.modelReady===true/)
-  assert.match(readiness, /gatewayStatus==='ready'\|\|gatewayStatus==='accepting_requests'/)
+  assert.match(readiness, /if\(response\.ok\)\{[\s\S]*?return/)
+  assert.doesNotMatch(readiness, /payload\?\.modelReady===true/)
+  assert.doesNotMatch(readiness, /gatewayStatus==='ready'\|\|gatewayStatus==='accepting_requests'/)
   assert.doesNotMatch(readiness, /health\.workers\.ready>0\|\|health\.workers\.running>0/)
   assert.doesNotMatch(readiness, /\/ready/)
   assert.doesNotMatch(readiness, /\/v1\/chat\/completions/)
@@ -72,4 +73,12 @@ test('evaluation wake explicitly allocates only one worker and scales back down'
   assert.match(route, /await activateMassDistilledEvaluationWorker\(claim\.endpointId\)/)
   assert.match(route, /await deactivateMassDistilledEvaluationWorker\(claim\.endpointId\)/)
   assert.doesNotMatch(route, /const runtimeWake = await wakeMassDistilledRuntime\(claim\.endpointId, deadlineMs\)/)
+})
+
+
+test('pre-repair HTTP-200 ping contract failure is released without weakening other readiness failures', () => {
+  const authority = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts', import.meta.url), 'utf8')
+  assert.match(authority, /MASS_EVALUATION_PING_200_REPAIR_AT/)
+  assert.match(authority, /error === 'mass_distilled_evaluation_runtime_not_ready:200'/)
+  assert.match(authority, /observedAt < MASS_EVALUATION_PING_200_REPAIR_AT_MS/)
 })

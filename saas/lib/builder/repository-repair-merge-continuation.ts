@@ -41,6 +41,7 @@ export type RepositoryRepairMergeContinuationResult = Readonly<{
     mergeWatchOutcome?: MergeWatchOutcome | null
     deploymentId?: string | null
     deploymentState?: string | null
+    preMergeSnapshotId?: string | null
   }>>
 }>
 

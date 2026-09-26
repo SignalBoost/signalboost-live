@@ -157,3 +157,19 @@ test('ordinary knowledge questions are model-first rather than regex-classified 
   assert.match(decision, /COS_AGENT_DECISION_TIMEOUT_MS \|\| '10000'/)
   assert.match(inference, /feature === 'cos_interactive_answer'/)
 })
+
+
+test('direct RunPod primary retries one empty thinking truncation before managed fallback', () => {
+  const primary = source('../lib/ai/cos/runpodPrimaryInference.ts')
+  assert.match(primary, /LOCAL_MODEL_OUTPUT_TRUNCATED/)
+  assert.match(primary, /emptyContent\?: boolean/)
+  assert.match(primary, /args\.disableThinking !== true/)
+  assert.match(primary, /maxTokens > 1024/)
+  assert.match(primary, /\[runpod-primary-thinking-retry\]/)
+  assert.match(primary, /callLocalModel\(\{ \.\.\.args, disableThinking: true \}, config\)/)
+
+  const port = source('../lib/cos/aiPort.ts')
+  const builderStart = port.indexOf('export function createBuilderCodingAiPort')
+  const builder = port.slice(builderStart, port.indexOf('export function createLocalApplianceAiPort', builderStart))
+  assert.ok(builder.indexOf('tryRunpodPrimaryInference') < builder.indexOf('tryAssignedPlatformModelTurn'))
+})

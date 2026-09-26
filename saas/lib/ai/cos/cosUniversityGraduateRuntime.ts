@@ -12,6 +12,7 @@ import { classifyInferenceHost } from '@/lib/ai/cos/reasonerHostingDisclosure'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import type { CosReasonerConfig } from '@/lib/ai/cos/cosReasoner'
 import type { CosReasoningWorkerRole } from '@/lib/ai/cos/cosReasoningControlPlane'
+import { selectGraduateFor24HourLease } from '@/lib/ai/cos/cosUniversityGraduateRotation'
 
 export const COS_UNIVERSITY_GRADUATE_RUNTIME_VERSION = 'cos-university-graduate-runtime-v1' as const
 
@@ -415,5 +416,23 @@ export async function activeGraduateRuntimesForRole(
       console.warn('[cos-graduate-runtime] active binding no longer resolves; fail closed', error instanceof Error ? error.message : String(error))
     }
   }
-  return result
+  // Traffic selection is a routing lease over already-active, scope-matched graduates.
+  // It does not alter lifecycle state or authority. A single eligible graduate remains selected;
+  // with multiple eligible graduates the stable pool advances exactly once per 24-hour UTC lease.
+  const rotation = selectGraduateFor24HourLease(result, new Date())
+  if (rotation.selected) {
+    console.info('[cos-graduate-24h-rotation]', JSON.stringify({
+      reason: rotation.reason,
+      leaseNumber: rotation.leaseNumber,
+      leaseStartedAt: rotation.leaseStartedAt,
+      leaseExpiresAt: rotation.leaseExpiresAt,
+      candidateId: rotation.selected.candidateId,
+      artifactHash: rotation.selected.trainedArtifactHash,
+      previousCandidateId: rotation.previous?.candidateId ?? null,
+      previousArtifactHash: rotation.previous?.trainedArtifactHash ?? null,
+      eligibleCount: result.length,
+      authorityExpanded: false,
+    }))
+  }
+  return rotation.selected ? [rotation.selected] : []
 }

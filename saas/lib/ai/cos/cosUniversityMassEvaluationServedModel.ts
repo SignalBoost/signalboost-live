@@ -6,7 +6,7 @@ export type CanaryEventRow = Readonly<{ verifier?: unknown; evidence?: any; obse
 
 export function servedCandidateModelFromCanary(
   events: readonly CanaryEventRow[],
-  input: Readonly<{ candidateId: string; artifactHash: string; endpointId: string }>,
+  input: Readonly<{ candidateId: string; artifactHash: string; endpointId: string; attentionArchitecture?: string; xsaProfile?: string }>,
 ): string {
   const hash = input.artifactHash.toLowerCase()
   const prefix = `itmounts-mass-distilled-${hash.slice(0, 12)}`
@@ -19,6 +19,8 @@ export function servedCandidateModelFromCanary(
 
   const provenEvent = matching.find(event => event.evidence?.claim === 'local_distilled_runtime_canary_passed'
     && event.evidence?.exactArtifact === true
+    && String(event.evidence?.attentionArchitecture || 'standard_attention') === String(input.attentionArchitecture || 'standard_attention')
+    && (input.attentionArchitecture !== 'exclusive_self_attention_v1' || (event.evidence?.xsaProfile === input.xsaProfile && event.evidence?.servingRuntime === 'transformers_xsa'))
     && (() => {
       const model = String(event.evidence?.model || '')
       return /^[a-z0-9-]{1,80}$/.test(model) && (model === prefix || model.startsWith(`${prefix}-`))

@@ -82,9 +82,9 @@ async function record(input:{candidateId:string;subjectId:string;artifactHash:st
   if(result.error) throw result.error
 }
 
-async function recordFineTuneCanary(input:{candidateId:string;subjectId:string;artifactId:string;artifactHash:string;revisionKey:string;endpointId:string;responseHash:string}){
+async function recordFineTuneCanary(input:{candidateId:string;subjectId:string;artifactId:string;artifactHash:string;revisionKey:string;endpointId:string;responseHash:string;attentionArchitecture?:string;xsaProfile?:string}){
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
-  const evidence={profile:FINE_TUNE_PROFILE,claim:'production_canary_healthy',candidateId:input.candidateId,revisionKey:input.revisionKey,trainedArtifactId:input.artifactId,artifactHash:input.artifactHash,evidenceRef:`db://cos_university_learning_assurance_events/${hash(['mass-distilled-production-canary-v3',input.endpointId,input.responseHash])}`,endpointId:input.endpointId,responseHash:input.responseHash,exactArtifact:true,internalVllmReady:true,scaleToZero:true,productionTrafficAuthorized:false,authorityExpanded:false}
+  const evidence={profile:FINE_TUNE_PROFILE,claim:'production_canary_healthy',candidateId:input.candidateId,revisionKey:input.revisionKey,trainedArtifactId:input.artifactId,artifactHash:input.artifactHash,evidenceRef:`db://cos_university_learning_assurance_events/${hash(['mass-distilled-production-canary-v3',input.endpointId,input.responseHash])}`,endpointId:input.endpointId,responseHash:input.responseHash,exactArtifact:true,attentionArchitecture:input.attentionArchitecture||'standard_attention',xsaProfile:input.xsaProfile||null,servingRuntime:input.attentionArchitecture==='exclusive_self_attention_v1'?'transformers_xsa':'vllm',scaleToZero:true,productionTrafficAuthorized:false,authorityExpanded:false}
   const evidenceHash=hash(evidence)
   const result=await db.from('cos_university_learning_assurance_events').upsert({event_key:hash([FINE_TUNE_PROFILE,'production_canary_healthy',input.candidateId,input.artifactHash,input.endpointId,input.responseHash]),event_type:'fine_tune',subject_id:input.subjectId,candidate_id:input.candidateId,evidence_hash:evidenceHash,evidence,verifier:'host_production_verifier',observed_at:new Date().toISOString()},{onConflict:'event_key',ignoreDuplicates:true})
   if(result.error) throw result.error
@@ -350,7 +350,7 @@ async function claimNext():Promise<AtomicClaim|null>{
   return row||null
 }
 
-function artifactFromClaim(claim:AtomicClaim):{artifact:MassDistilledRuntimeArtifact;revisionKey:string}{
+async function artifactFromClaim(claim:AtomicClaim):Promise<{artifact:MassDistilledRuntimeArtifact;revisionKey:string}>{
   const candidateId=clean(claim.candidate_id,240)
   const subjectId=clean(claim.subject_id,240)
   const artifactId=clean(claim.artifact_id,500)
@@ -362,7 +362,20 @@ function artifactFromClaim(claim:AtomicClaim):{artifact:MassDistilledRuntimeArti
   const cost=Number(claim.max_estimated_canary_cost_usd)
   if(!Number.isFinite(cost)||cost<=0||cost>0.2) throw new Error('mass_distilled_atomic_claim_cost_ceiling_invalid')
   if(!clean(claim.reservation_event_key,64)) throw new Error('mass_distilled_atomic_claim_reservation_missing')
-  return {artifact:Object.freeze({candidateId,subjectId,artifactId,artifactRevision:revision,artifactHash}),revisionKey}
+  const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
+  const artifactRow=await db.from('cos_local_distillation_artifacts').select('intended_use').eq('candidate_id',candidateId).eq('trained_artifact_hash',artifactHash).maybeSingle()
+  if(artifactRow.error) throw artifactRow.error
+  const receipt=(artifactRow.data as any)?.intended_use?.trainingReceipt
+  const xsaApplied=receipt?.xsaTrainingApplied===true
+  const attentionArchitecture=xsaApplied?clean(receipt?.attentionArchitecture,120):'standard_attention'
+  const xsaProfile=xsaApplied?clean(receipt?.xsaTrainingRuntimeProfile,120):''
+  if(xsaApplied&&(attentionArchitecture!=='exclusive_self_attention_v1'||xsaProfile!=='qwen3_xsa_projection_v1'||receipt?.xsaInferenceSymmetryRequired!==true)) {
+    throw new Error('mass_distilled_xsa_training_receipt_invalid')
+  }
+  return {artifact:Object.freeze({candidateId,subjectId,artifactId,artifactRevision:revision,artifactHash,
+    attentionArchitecture:attentionArchitecture as MassDistilledRuntimeArtifact['attentionArchitecture'],
+    ...(xsaApplied?{xsaProfile:'qwen3_xsa_projection_v1' as const}:{}),
+  }),revisionKey}
 }
 
 async function approvedColdStartResume(input:{candidateId:string;artifactHash:string;approvalAt:string}){
@@ -456,7 +469,7 @@ export async function GET(req:NextRequest){
       await laneStatus('skipped','no_atomically_claimable_mass_distilled_artifact',{approvalIssued:Boolean((rolling as any)?.issued),approvalReason:(rolling as any)?.reason})
       return NextResponse.json({ok:true,skipped:true,reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling})
     }
-    const {artifact,revisionKey}=artifactFromClaim(claim)
+    const {artifact,revisionKey}=await artifactFromClaim(claim)
     const approvedCost=Number(claim.max_estimated_canary_cost_usd)
     const approvalAt=String(claim.approval_observed_at||'')
     const reservationEventKey=clean(claim.reservation_event_key,64)
@@ -522,7 +535,7 @@ export async function GET(req:NextRequest){
 
     const responseHash=hash(canary.text||'')
     await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,explicitWorkerWarmStart:true,workerWarmStart,workerScaleDown,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false,healthAfter}})
-    await recordFineTuneCanary({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactId:runtimeArtifact.artifactId,artifactHash:runtimeArtifact.artifactHash,revisionKey,endpointId:provisioned.endpointId,responseHash})
+    await recordFineTuneCanary({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactId:runtimeArtifact.artifactId,artifactHash:runtimeArtifact.artifactHash,revisionKey,endpointId:provisioned.endpointId,responseHash,attentionArchitecture:runtimeArtifact.attentionArchitecture,xsaProfile:runtimeArtifact.xsaProfile})
     await laneStatus('worked','canary_passed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,model:provisioned.modelName})
     return NextResponse.json({ok:true,deployed:true,canaryPassed:true,candidateId:runtimeArtifact.candidateId,artifactHash:runtimeArtifact.artifactHash,endpointId:provisioned.endpointId,model:provisioned.modelName,productionTrafficAuthorized:false})
   }catch(error){

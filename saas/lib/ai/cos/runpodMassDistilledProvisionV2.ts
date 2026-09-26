@@ -17,6 +17,7 @@ import {
   massDistilledRuntimeInlineContainer,
   type MassDistilledRuntimeArtifact,
 } from './runpodMassDistilledProvision.ts'
+import { xsaRuntimeInlineContainer } from './runpodXsaServingRuntime.ts'
 
 export {
   MASS_DISTILLED_CANARY_MAX_COST_USD,
@@ -440,12 +441,14 @@ function materializedEndpointMatches(endpoint: Endpoint, input: MassDistilledRun
   const args = clean(endpoint.args, 20_000)
   const ports = endpoint.ports || []
   const env = endpoint.env || {}
-  return endpoint.image === VLLM_IMAGE
+  const expectedImage = input.attentionArchitecture === 'exclusive_self_attention_v1' ? VLLM_IMAGE : VLLM_IMAGE
+  const runtimeMarker = input.attentionArchitecture === 'exclusive_self_attention_v1' ? 'itmounts_xsa_gateway.py' : 'itmounts_mass_gateway.py'
+  return endpoint.image === expectedImage
     && args.includes(BASE_MODEL_REVISION)
     && args.includes(input.artifactRevision)
     && args.includes(input.artifactId)
     && args.includes(modelName)
-    && args.includes('itmounts_mass_gateway.py')
+    && args.includes(runtimeMarker)
     && ports.includes(`${PUBLIC_PORT}/http`)
     && clean(env.HF_HOME, 200) === '/models/hf-cache'
     && clean(env.PORT, 40) === String(PUBLIC_PORT)
@@ -473,7 +476,9 @@ function nativeV2EndpointConfig(
   idleTimeoutSeconds: number,
 ) {
   return Object.freeze({
-    ...massDistilledRuntimeInlineContainer(input, modelName),
+    ...(input.attentionArchitecture === 'exclusive_self_attention_v1'
+      ? xsaRuntimeInlineContainer(input, modelName)
+      : massDistilledRuntimeInlineContainer(input, modelName)),
     type: ROUTING,
     gpu: { pools: [...approvedPools], count: 1 },
     workers: { min: 0, max: 1, idleTimeout: idleTimeoutSeconds },

@@ -25,15 +25,15 @@ test('HF delivery and worker loader bind the exact governed XSA runtime source',
   assert.match(worker, /worker_xsa_runtime_contract_invalid/)
   assert.match(worker, /worker_xsa_runtime_profile_mismatch/)
   assert.match(worker, /"xsaTrainingRuntimeImplemented": True/)
-  assert.match(worker, /"xsaServingRuntimeImplemented": False/)
+  assert.match(worker, /"xsaServingRuntimeImplemented": True/)
 })
 
-test('durable evidence keeps serving blocked until a matching XSA runtime exists', () => {
+test('durable evidence requires the matching XSA serving runtime before rollout', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   const onboard = source('../../ONBOARD.md')
   assert.match(consumer, /xsaTrainingRuntimeImplemented: boolean\('xsaTrainingRuntimeImplemented'\)/)
   assert.match(consumer, /xsaServingRuntimeImplemented: boolean\('xsaServingRuntimeImplemented'\)/)
-  assert.match(onboard, /current exact-artifact RunPod evaluator still serves through native vLLM/)
-  assert.match(onboard, /must not accept an XSA artifact yet/)
+  assert.match(onboard, /XSA exact-artifact serving\/evaluation lane/)
+  assert.match(onboard, /rollout remains 0%/)
   assert.match(onboard, /Non-zero rollout remains fail-closed/)
 })

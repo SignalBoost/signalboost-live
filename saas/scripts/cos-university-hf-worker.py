@@ -776,6 +776,7 @@ def _xsa_canary_evidence(base, base_model, candidate_id: str) -> dict[str, Any]:
             "xsaTrainingRuntimeProfile": XSA_RUNTIME_PROFILE,
             "xsaTrainingRuntimeImplemented": True,
             "xsaServingRuntimeImplemented": True,
+            "xsaInstalledAttentionLayers": 0,
             "xsaReason": "deterministic_control_cohort",
         }
     runtime = _load_xsa_runtime()

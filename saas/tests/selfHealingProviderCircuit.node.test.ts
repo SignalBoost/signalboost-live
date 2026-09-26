@@ -74,3 +74,14 @@ test('storage recovery is read-only verified before one paid half-open dispatch 
   assert.match(workflowSource, /provider_storage_recovery/)
   assert.match(workflowSource, /recoverHuggingFaceStorageCapacityCircuit\(\{ maxJobs: 3, now \}\)/)
 })
+
+
+test('signed Working COS or University training success closes the universal HF model-training circuit', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'app/api/internal/cos/university-training-executor/evidence/route.ts'), 'utf8')
+  assert.match(source, /body\.claim === 'trained_artifact_registered'/)
+  assert.match(source, /closeProviderCircuit\(\{/)
+  assert.match(source, /providerId: 'huggingface'/)
+  assert.match(source, /capability: 'model-training'/)
+  assert.match(source, /training_executor_success_closes_provider_circuit_v1/)
+  assert.doesNotMatch(source, /automaticPromotionAuthorized:\s*true|productionTrafficAuthorized:\s*true/)
+})

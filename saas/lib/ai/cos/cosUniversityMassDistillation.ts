@@ -398,20 +398,43 @@ export function buildMassDistillationBatches(
 
   const out: PreparedDistillationBatch[] = []
   const requestedMax = positiveSafeInteger(maxBatches, MASS_DISTILLATION_MAX_BATCHES_PER_RUN)
-  const orderedGroups = [...groups.entries()].sort((a, b) => b[1].rows.length - a[1].rows.length || a[0].localeCompare(b[0]))
-  for (const [subjectKey, group] of orderedGroups) {
-    let remaining = [...group.rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
-    while (remaining.length >= MASS_DISTILLATION_QUALITY_MIN_BATCH) {
-      const chunk = selectHybridDistillationChunk(remaining)
-      if (chunk.length < MASS_DISTILLATION_QUALITY_MIN_BATCH) break
+
+  // Batch slots are scarce. A large subject must not consume every slot before a subject with
+  // independently verified corrective curriculum gets one packaging opportunity. Rank subjects
+  // with failure-derived material first, then allocate at most one batch per subject per round.
+  // This changes packaging fairness only: quality, rights, deduplication, holdout and dispatch
+  // authorization fences remain inside selectHybridDistillationChunk and the caller.
+  const pending = [...groups.entries()]
+    .map(([subjectKey, group]) => ({
+      subjectKey,
+      group,
+      remaining: [...group.rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash)),
+      failureDerived: group.rows.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'failure_derived').length,
+    }))
+    .filter(entry => entry.remaining.length >= MASS_DISTILLATION_QUALITY_MIN_BATCH)
+    .sort((a, b) =>
+      Number(b.failureDerived > 0) - Number(a.failureDerived > 0)
+      || b.failureDerived - a.failureDerived
+      || b.remaining.length - a.remaining.length
+      || a.subjectKey.localeCompare(b.subjectKey))
+
+  while (pending.length && out.length < requestedMax) {
+    let progress = false
+    for (const entry of pending) {
+      if (out.length >= requestedMax || entry.remaining.length < MASS_DISTILLATION_QUALITY_MIN_BATCH) continue
+      const chunk = selectHybridDistillationChunk(entry.remaining)
+      if (chunk.length < MASS_DISTILLATION_QUALITY_MIN_BATCH) {
+        entry.remaining = []
+        continue
+      }
       const selectedHashes = new Set(chunk.map(item => item.contentHash))
-      remaining = remaining.filter(item => !selectedHashes.has(item.contentHash))
+      entry.remaining = entry.remaining.filter(item => !selectedHashes.has(item.contentHash))
       const sourceHashes = chunk.map(item => item.contentHash)
       const rightsClasses = [...new Set(chunk.map(item => classifyMassDistillationRights(item.license)).filter((value): value is DistillationRightsClass => Boolean(value)))].sort()
       const curriculumHash = hash({
         profile: COS_UNIVERSITY_MASS_DISTILLATION_PROFILE,
         sourcePolicy: MASS_DISTILLATION_SOURCE_POLICY,
-        subject: subjectKey,
+        subject: entry.subjectKey,
         studentModelId: MASS_DISTILLATION_STUDENT_MODEL,
         sourceHashes,
       })
@@ -423,14 +446,15 @@ export function buildMassDistillationBatches(
       out.push(Object.freeze({
         batchKey,
         curriculumHash,
-        subjectId: group.subject,
+        subjectId: entry.group.subject,
         studentModelId: MASS_DISTILLATION_STUDENT_MODEL,
         sourceHashes: Object.freeze(sourceHashes),
         rightsClasses: Object.freeze(rightsClasses),
         sourceCount: sourceHashes.length,
       }))
-      if (out.length >= requestedMax) return out
+      progress = true
     }
+    if (!progress) break
   }
   return out
 }

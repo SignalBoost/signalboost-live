@@ -171,15 +171,15 @@ test('coverage reports the complete Builder Residency v1 practical catalog',()=>
   assert.deepEqual(coverage.missingCompetencies,[])
 })
 
-test('case selection prioritizes remediation before untouched competency',()=>{
+test('case selection never replays an exhausted failed competency and advances to untouched curriculum',()=>{
   const first=BUILDER_RESIDENCY_CASES[0]
   const second=BUILDER_RESIDENCY_CASES[1]
   const rows=[
     evidence({competencyId:first.competencyId,variantHash:first.variantHash,outcome:'fail',observedAt:'2026-09-22T10:00:00Z'}),
   ]
   const selected=selectNextBuilderResidencyCase({evidence:rows})
-  assert.equal(selected?.competencyId,first.competencyId)
-  assert.notEqual(selected?.variantHash,second.variantHash)
+  assert.equal(selected?.competencyId,second.competencyId)
+  assert.notEqual(selected?.variantHash,first.variantHash)
 })
 
 test('case selection never replays a variant that already has competency evidence',()=>{
@@ -259,8 +259,8 @@ test('scheduler stops honestly when available case curriculum is exhausted',asyn
   assert.equal(out.state,'waiting_for_residency_cases')
   assert.equal(out.ok,false)
   assert.equal(mem.started.length,0)
-  assert.equal(out.coverage.coveredCompetencies,3)
-  assert.equal(out.coverage.missingCompetencies.length,10)
+  assert.equal(out.coverage.coveredCompetencies,13)
+  assert.equal(out.coverage.missingCompetencies.length,0)
   assert.equal(out.automaticFinalGateEnable,false)
 })
 

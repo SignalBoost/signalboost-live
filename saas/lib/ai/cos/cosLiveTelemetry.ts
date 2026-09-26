@@ -1,3 +1,4 @@
+import { agentTraceEvent, emitAgentTrace } from '../../observability/agentTrace.ts'
 export type CosLiveResponseSource =
   | 'deterministic'
   | 'semantic_cache'
@@ -21,6 +22,8 @@ export interface CosLiveTelemetryInput {
   similarityScore?: number
   promptChars?: number
   replyChars?: number
+  traceId?: string
+  actor?: string
 }
 
 export interface CosLiveTelemetryObservation extends CosLiveTelemetryInput {
@@ -74,4 +77,5 @@ export function buildCosLiveTelemetry(input: CosLiveTelemetryInput, at = new Dat
 
 export function emitCosLiveTelemetry(observation: CosLiveTelemetryObservation): void {
   console.info('[cos-live-telemetry]', JSON.stringify(observation))
+  if (observation.traceId) emitAgentTrace(agentTraceEvent({ traceId: observation.traceId, kind: 'model', name: 'cos.response', status: observation.responseSource === 'failed_closed' ? 'failed' : 'succeeded', actor: observation.actor || 'cos', model: observation.reasonerLabel || undefined, durationMs: observation.latencyMs, attributes: { responseSource: observation.responseSource, localModelInvoked: observation.localModelInvoked, externalAiInvoked: observation.externalAiInvoked, inferenceAvoided: observation.inferenceAvoided } }))
 }

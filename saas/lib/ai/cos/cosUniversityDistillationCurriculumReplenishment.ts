@@ -220,8 +220,25 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
 
   // Select by failure, not by scarcity. A subject with no verified failure is never targeted, so this cannot
   // manufacture curriculum for a subject that is doing fine.
-  const targets = [...input.supply]
-    .filter(subject => (failuresByTitle.get(subject.subject) || []).length > 0)
+  // Build remediation targets from verified failures, not from the current supply snapshot. A newly
+  // evaluated subject can be absent from supply after its prior batch was consumed; intersecting failures
+  // with supply silently starves exactly the subject that needs corrective curriculum.
+  const supplyByTitle = new Map(input.supply.map(subject => [subject.subject, subject] as const))
+  const targets: MassDistillationSubjectSupply[] = [...failuresByTitle.keys()]
+    .map(subjectTitle => {
+      const supplied = supplyByTitle.get(subjectTitle)
+      if (supplied) return supplied
+      const canonical = COS_UNIVERSITY_SUBJECTS.find(subject => subject.title === subjectTitle)
+      if (!canonical) return null
+      return {
+        subjectKey: canonical.id,
+        subject: canonical.title,
+        canonicalSubjectId: canonical.id,
+        uniqueBatchableItems: 0,
+        shortfallToBatch: MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS,
+      } satisfies MassDistillationSubjectSupply
+    })
+    .filter((subject): subject is MassDistillationSubjectSupply => subject !== null)
     .sort((a, b) => (failuresByTitle.get(b.subject) || []).length - (failuresByTitle.get(a.subject) || []).length
       || b.shortfallToBatch - a.shortfallToBatch
       || a.subject.localeCompare(b.subject))

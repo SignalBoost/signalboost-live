@@ -724,7 +724,7 @@ export async function dispatchWorkingCosDatasetPreparation(input: {
 }) {
   requireExplicitTrainingDispatchConfirmation(input.confirmDispatch)
   const provider = dispatchEnabled()
-  const context = await ensureWorkingCosTrainingCandidate(input)
+  const context = await ensureCurrentCandidate(input)
   await verifyTrainableBase({
     modelId: context.context.binding.trainableBaseModelId!,
     revision: context.context.binding.trainableBaseModelRevision!,
@@ -922,7 +922,7 @@ export async function dispatchWorkingCosTraining(input: {
 }) {
   requireExplicitTrainingDispatchConfirmation(input.confirmDispatch)
   const provider = dispatchEnabled()
-  const context = await ensureCurrentCandidate(input)
+  const context = await ensureWorkingCosTrainingCandidate(input)
   await verifyTrainableBase({
     modelId: context.context.binding.trainableBaseModelId!,
     revision: context.context.binding.trainableBaseModelRevision!,

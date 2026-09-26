@@ -492,7 +492,7 @@ export default function CosUniversityTelemetryPage() {
             <thead className="border-b text-xs uppercase opacity-60">
               <tr>
                 <th className="pb-3 pr-4">{copy.subject}</th>
-                <th className="pb-3 pr-4">{copy.artifactStatus}</th>
+                <th className="pb-3 pr-4">{copy.artifactStatus}</th><th className="pb-3 pr-4">Current stage</th><th className="pb-3 pr-4">Blocker</th><th className="pb-3 pr-4">Next action</th>
                 <th className="pb-3 pr-4">{copy.retentionGate}</th>
                 <th className="pb-3 pr-4">{copy.claimability}</th>
                 <th className="pb-3 pr-4">{copy.holdout}</th>
@@ -510,7 +510,7 @@ export default function CosUniversityTelemetryPage() {
                     <div className="font-medium">{artifact.subject || copy.unknownSubject}</div>
                     <div className="mt-1 font-mono text-[11px] opacity-50">{short(artifact.candidateId, 20)}</div>
                   </td>
-                  <td className="py-3 pr-4"><span className="rounded-full border px-2 py-1 text-xs">{artifact.status || copy.unknownStage}</span></td>
+                  <td className="py-3 pr-4"><span className="rounded-full border px-2 py-1 text-xs">{artifact.status || copy.unknownStage}</span></td><td className="py-3 pr-4 text-xs font-medium">{artifact.currentStage}</td><td className="py-3 pr-4 text-xs">{gateLabel(artifact.blocker)}</td><td className="py-3 pr-4 text-xs">{artifact.nextAction}</td>
                   <td className="py-3 pr-4 text-xs">{when(artifact.retentionEligibleAt)}</td>
                   <td className="py-3 pr-4 text-xs font-medium">{copy.claimabilityStates[artifact.claimability] || artifact.claimability}</td>
                   <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.holdoutImproved ? copy.pass : copy.fail) : copy.pending}</td>
@@ -521,7 +521,7 @@ export default function CosUniversityTelemetryPage() {
                   <td className="py-3 text-xs opacity-65">{when(artifact.updatedAt)}</td>
                 </tr>
               ))}
-              {!artifacts.length ? <tr><td colSpan={10} className="py-6 text-center text-sm opacity-60">{copy.noArtifacts}</td></tr> : null}
+              {!artifacts.length ? <tr><td colSpan={13} className="py-6 text-center text-sm opacity-60">{copy.noArtifacts}</td></tr> : null}
             </tbody>
           </table>
         </div>

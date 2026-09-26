@@ -48,6 +48,10 @@ export const MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_DAY = 3
 export const MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_ROLLING_WINDOW = 2
 export const MASS_CANARY_ARTIFACT_INVOCATION_WINDOW_MS = 24 * 60 * 60 * 1000
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
+// Keep canary scheduling aligned with the independent evaluator's unchanged 12-hour retention gate.
+// This does not shorten evaluation eligibility; it only avoids spending scarce canary slots on fresh
+// artifacts while equally valid current-recipe artifacts are already old enough to enter evaluation.
+export const MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_CANARY_IN_FLIGHT_TTL_MS = 10 * 60 * 1000
 // Owner apprenticeship proof lane (2026-09-21): the first CONFIRMED response-anchor v2
 // Computer Science artifacts must not sit behind the legacy canary backlog once they are ready to prove
@@ -315,6 +319,9 @@ export function decideMassCanaryRollingApproval(input: {
     const bCurrent = currentRecipeArtifact(b)
     if (aCurrent !== bCurrent) return aCurrent ? -1 : 1
     if (aCurrent && bCurrent) {
+      const aEvaluationReady = nowMs - at(a.createdAt) >= MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS
+      const bEvaluationReady = nowMs - at(b.createdAt) >= MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS
+      if (aEvaluationReady !== bEvaluationReady) return aEvaluationReady ? -1 : 1
       const newestCurrentRecipeFirst = at(b.createdAt) - at(a.createdAt)
       if (newestCurrentRecipeFirst !== 0) return newestCurrentRecipeFirst
     }
@@ -453,7 +460,10 @@ export function decideMassCanaryRollingApproval(input: {
           coldStartResumeRuntimeKey: newestFailureRuntimeKey,
         } : {}),
         ...(replayProofNeeded && replayProofArtifact(artifact) ? { remediationReplayProofPriority: true } : {}),
-        ...(currentRecipeArtifact(artifact) ? { currentRecipePriority: true } : {}),
+        ...(currentRecipeArtifact(artifact) ? {
+          currentRecipePriority: true,
+          evaluationAgeReadyPriority: nowMs - at(artifact.createdAt) >= MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS,
+        } : {}),
         ...(refreshEndpoint ? { endpointRefresh: true, endpointRefreshReason: 'repeated_evaluation_endpoint_lifecycle_failure' } : {}),
       },
     }

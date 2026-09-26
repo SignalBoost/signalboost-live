@@ -2,6 +2,7 @@
 // XSA changes Qwen3's forward path and must install the same shared runtime used in training.
 import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from '../modelCapabilityRegistry.ts'
 import type { MassDistilledRuntimeArtifact } from './runpodMassDistilledProvision.ts'
+import { exactArtifactContainerImageFromEnv } from './runpodExactArtifactContainerImage.ts'
 
 const IMAGE='vllm/vllm-openai:v0.29.0'
 const PORT=8000
@@ -98,7 +99,8 @@ export function xsaRuntimeInlineContainer(input:MassDistilledRuntimeArtifact,mod
     "export ITMOUNTS_XSA_RUNTIME_PROFILE='qwen3_xsa_projection_v1'",
     `python3 -c "import base64;open('/tmp/itmounts_xsa_gateway.py','wb').write(base64.b64decode('${gateway}'))"`,
     'exec python3 /tmp/itmounts_xsa_gateway.py'].join('; ')
-  return Object.freeze({image:IMAGE,args:JSON.stringify({entrypoint:['bash','-lc'],cmd:[command]}),disk:50,ports:[`${PORT}/http`],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PORT),PORT_HEALTH:String(PORT),HEALTH_CHECK_PATH:'/ping'}})
+  const immutableImage=exactArtifactContainerImageFromEnv('xsa')
+  return Object.freeze({image:immutableImage||IMAGE,args:JSON.stringify({entrypoint:['bash','-lc'],cmd:[command]}),disk:50,ports:[`${PORT}/http`],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PORT),PORT_HEALTH:String(PORT),HEALTH_CHECK_PATH:'/ping'}})
 }
 
 export const XSA_SERVING_RUNTIME_IMPLEMENTED=true as const

@@ -472,12 +472,18 @@ function materializedEndpointMatches(endpoint: Endpoint, input: MassDistilledRun
   const env = endpoint.env || {}
   const lane = input.attentionArchitecture === 'exclusive_self_attention_v1' ? 'xsa' : 'standard'
   const expectedImage = exactArtifactContainerImageFromEnv(lane) || VLLM_IMAGE
-  const runtimeMarker = input.attentionArchitecture === 'exclusive_self_attention_v1' ? 'itmounts_xsa_gateway.py' : 'itmounts_mass_gateway.py'
-  return endpoint.image === expectedImage
-    && args.includes(BASE_MODEL_REVISION)
+  const immutableImage = exactArtifactContainerImageFromEnv(lane)
+  const runtimeMarker = input.attentionArchitecture === 'exclusive_self_attention_v1' ? 'xsa_gateway.py' : 'mass_gateway.py'
+  const identityInArgs = args.includes(BASE_MODEL_REVISION)
     && args.includes(input.artifactRevision)
     && args.includes(input.artifactId)
     && args.includes(modelName)
+  const identityInEnv = clean(env.ITMOUNTS_BASE_MODEL_REVISION, 80) === BASE_MODEL_REVISION
+    && clean(env.ITMOUNTS_ADAPTER_MODEL_REVISION, 80) === input.artifactRevision
+    && clean(env.ITMOUNTS_ADAPTER_MODEL_ID, 500) === input.artifactId
+    && clean(env.ITMOUNTS_DISTILLED_MODEL_NAME, 240) === modelName
+  return endpoint.image === expectedImage
+    && (immutableImage ? identityInEnv : identityInArgs)
     && args.includes(runtimeMarker)
     && ports.includes(`${PUBLIC_PORT}/http`)
     && clean(env.HF_HOME, 200) === '/models/hf-cache'

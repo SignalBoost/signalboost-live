@@ -3,7 +3,7 @@
 // Decision logic for the builder merge watch cron. Storage is supplied through a port so
 // the decisions can be tested without a database.
 
-import type { MergeWatchStore, PendingMergeWatch } from './merge-watch-store'
+import type { MergeWatchStore, PendingMergeWatch } from './merge-watch-store.ts'
 
 export const MERGE_WATCH_MAX_ATTEMPTS = 3
 

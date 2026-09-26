@@ -12,6 +12,7 @@ import { COS_WORKING_DISPATCH_MAX_ITEMS, readWorkingCosDatasetMaterialization } 
 import { inspectHuggingFaceJob } from './cosUniversityHuggingFaceJobReconciler.ts'
 import {
   buildHuggingFaceJobSpec,
+  fetchHuggingFaceJobLogTail,
   findHuggingFaceJobByName,
   huggingFaceJobsConfigFromEnv,
   installHuggingFaceTrainingExecutorEnv,
@@ -647,6 +648,20 @@ export async function reconcileWorkingCosTrainingProviderJob(input: {
     })
   }
 
+  let providerLogTail: string | null = null
+  try {
+    providerLogTail = await fetchHuggingFaceJobLogTail({
+      namespace,
+      jobId,
+      token: hf.token,
+      tailLines: 80,
+      maxChars: 12_000,
+      fetchImpl: input.fetchImpl,
+    })
+  } catch (error) {
+    providerLogTail = `log_fetch_failed:${error instanceof Error ? clean(error.message, 300) : clean(error, 300)}`
+  }
+
   const priorFailure = await db.from('cos_working_distillation_job_events')
     .select('created_at')
     .eq('candidate_id', candidateId)
@@ -681,6 +696,7 @@ export async function reconcileWorkingCosTrainingProviderJob(input: {
         providerStage: providerJob.stage,
         providerMessage: providerJob.message,
         callbackClaims: [...callbackClaims],
+        providerLogTail,
         automaticRetryAuthorized: false,
         providerInvocationStarted: true,
       },
@@ -692,6 +708,7 @@ export async function reconcileWorkingCosTrainingProviderJob(input: {
     callbackRecorded: false as const,
     providerStage: providerJob.stage,
     callbackClaims: [...callbackClaims],
+    providerLogTail,
     retryAuthorized: false as const,
     automaticActivationAuthorized: false as const,
     productionTrafficAuthorized: false as const,

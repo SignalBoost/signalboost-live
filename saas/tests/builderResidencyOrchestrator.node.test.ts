@@ -17,7 +17,7 @@ import {
   type HarnessRunResult,
 } from '../platform-harness/index.ts'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
@@ -157,6 +157,7 @@ test('Residency scheduling retries one recent infrastructure failure then rotate
     recentCases:[
       {residency_id:'resident-b',harness_outcome:'infrastructure_failure',completed_at:'2026-09-23T15:08:00Z'},
     ],
+    now:new Date('2026-09-23T15:12:33Z'),
   })
   assert.equal(oneFailure?.id,'resident-b')
 
@@ -166,6 +167,7 @@ test('Residency scheduling retries one recent infrastructure failure then rotate
       {residency_id:'resident-b',harness_outcome:'infrastructure_failure',completed_at:'2026-09-23T15:18:00Z'},
       {residency_id:'resident-b',harness_outcome:'infrastructure_failure',completed_at:'2026-09-23T15:08:00Z'},
     ],
+    now:new Date('2026-09-23T15:22:33Z'),
   })
   assert.equal(secondFailure?.id,'resident-a')
 
@@ -174,8 +176,41 @@ test('Residency scheduling retries one recent infrastructure failure then rotate
     recentCases:[
       {residency_id:'resident-b',harness_outcome:'success',completed_at:'2026-09-23T15:18:00Z'},
     ],
+    now:new Date('2026-09-23T15:22:33Z'),
   })
   assert.equal(competencyResult?.id,'resident-a')
+})
+
+test('a resident failing on every 10-minute tick is not pinned: failures outside the warm window still count',()=>{
+  const enrollments=[{id:'remediation-oldest'},{id:'remediation-2'},{id:'failing-resident'}]
+  const history=[
+    {residency_id:'failing-resident',harness_outcome:'infrastructure_failure',completed_at:'2026-09-26T21:12:47Z'},
+    {residency_id:'failing-resident',harness_outcome:'infrastructure_failure',completed_at:'2026-09-26T21:02:50Z'},
+    {residency_id:'failing-resident',harness_outcome:'infrastructure_failure',completed_at:'2026-09-26T20:52:46Z'},
+  ]
+  const selected=selectBuilderResidencyEnrollmentForTick({enrollments,recentCases:history,now:new Date('2026-09-26T21:22:33Z')})
+  assert.equal(selected?.id,'remediation-oldest')
+
+  const afterSuccess=selectBuilderResidencyEnrollmentForTick({
+    enrollments,
+    recentCases:[
+      {residency_id:'failing-resident',harness_outcome:'infrastructure_failure',completed_at:'2026-09-26T21:12:47Z'},
+      {residency_id:'failing-resident',harness_outcome:'success',completed_at:'2026-09-26T21:02:50Z'},
+    ],
+    now:new Date('2026-09-26T21:22:33Z'),
+  })
+  assert.equal(afterSuccess?.id,'failing-resident')
+
+  const stale=selectBuilderResidencyEnrollmentForTick({
+    enrollments,
+    recentCases:[{residency_id:'failing-resident',harness_outcome:'infrastructure_failure',completed_at:'2026-09-26T20:00:00Z'}],
+    now:new Date('2026-09-26T21:22:33Z'),
+  })
+  assert.equal(stale?.id,'remediation-oldest')
+
+  const store=readFileSync(new URL('../platform-harness/residency/orchestrator-store.ts',import.meta.url),'utf8')
+  assert.doesNotMatch(store,/\.gte\('completed_at',recentSince\)/)
+  assert.match(store,/now:new Date\(\)/)
 })
 
 test('coverage reports the complete Builder Residency v1 practical catalog',()=>{

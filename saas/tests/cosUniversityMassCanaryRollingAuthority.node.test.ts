@@ -671,3 +671,43 @@ test('after bounded proof cohorts, newest current-recipe artifact is canaried be
   assert.equal(decision.artifact.candidateId,repaired.candidateId)
   assert.equal(decision.evidence.currentRecipePriority,true)
 })
+
+
+test('current-recipe canary scheduling spends scarce slots on 12h evaluation-ready artifacts before fresh ones', () => {
+  const now = new Date('2026-09-26T14:30:00.000Z')
+  const aged: CanaryArtifact = {
+    candidateId:'mass:aged-current',
+    subjectId:'Business & Operations',
+    artifactHash:h(122),
+    createdAt:'2026-09-25T23:23:58.000Z',
+    trainingOptimizer:MASS_CANARY_BUILDER_V2_OPTIMIZER,
+    frontierResponseAnchorRequired:true,
+    frontierResponseAnchorEpochs:1,
+    frontierResponseAnchorItems:20,
+  }
+  const fresh: CanaryArtifact = {
+    ...aged,
+    candidateId:'mass:fresh-current',
+    artifactHash:h(123),
+    createdAt:'2026-09-26T14:22:11.000Z',
+  }
+  const decision=decideMassCanaryRollingApproval({
+    artifacts:[fresh,aged],
+    events:[],
+    now,
+    enabled:true,
+    builderProofPasses:MASS_CANARY_BUILDER_APPRENTICESHIP_PROOF_SAMPLE,
+    remediationReplayProofPasses:MASS_CANARY_REMEDIATION_REPLAY_PROOF_SAMPLE,
+  })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId,aged.candidateId)
+  assert.equal(decision.evidence.currentRecipePriority,true)
+  assert.equal(decision.evidence.evaluationAgeReadyPriority,true)
+})
+
+test('canary evaluation-age priority preserves the same 12-hour delay as the independent evaluator', () => {
+  const authority = source('../lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts')
+  const evaluator = source('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
+  assert.match(authority, /MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS = 12 \* 60 \* 60 \* 1000/)
+  assert.match(evaluator, /MASS_DISTILLED_RETENTION_DELAY_MS = 12 \* 60 \* 60 \* 1000/)
+})

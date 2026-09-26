@@ -13,6 +13,7 @@ import { createSupabaseMergeWatchStore } from '@/lib/builder/merge-watch-store'
 import { runPendingMergeWatches } from '@/lib/builder/merge-watch-runner'
 import { watchMergedDeployment } from '@/lib/builder/repository-merge-watch'
 import { builderAutoMergeSnapshotPort } from '@/lib/builder/repository-repair-snapshot-host'
+import { acceptBuilderProductionRepair } from '@/lib/builder/repository-production-acceptance'
 import {
   completeBuilderRepositoryRepairAfterMerge,
   failBuilderRepositoryRepairAfterMergedDeployment,
@@ -20,7 +21,7 @@ import {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET
@@ -48,15 +49,32 @@ export async function GET(request: Request) {
       onTerminal: async (pending, status, detail, observed) => {
         if (!pending.pullRequestNumber) return
         if (status === 'healthy') {
-          await completeBuilderRepositoryRepairAfterMerge({
+          const snapshotPort = builderAutoMergeSnapshotPort()
+          const acceptance = await acceptBuilderProductionRepair({
+            preMergeSnapshotId: pending.preMergeSnapshotId,
+            snapshotPort,
+          })
+          if (acceptance.outcome === 'accepted') {
+            await completeBuilderRepositoryRepairAfterMerge({
+              pullRequestNumber: pending.pullRequestNumber,
+              mergeCommitSha: pending.mergeCommitSha,
+              baseBranch: 'main',
+              detail: `${detail} ${acceptance.detail}`,
+              mergeWatchOutcome: 'healthy',
+              deploymentId: observed?.deploymentId ?? null,
+              deploymentState: observed?.deploymentState ?? null,
+              preMergeSnapshotId: pending.preMergeSnapshotId,
+              productionAcceptancePassed: true,
+            })
+            return
+          }
+          await failBuilderRepositoryRepairAfterMergedDeployment({
             pullRequestNumber: pending.pullRequestNumber,
             mergeCommitSha: pending.mergeCommitSha,
-            baseBranch: 'main',
-            detail,
-            mergeWatchOutcome: 'healthy',
-            deploymentId: observed?.deploymentId ?? null,
-            deploymentState: observed?.deploymentState ?? null,
-            preMergeSnapshotId: pending.preMergeSnapshotId,
+            detail: acceptance.detail,
+            error: acceptance.outcome === 'rolled_back'
+              ? 'builder_repository_production_rolled_back'
+              : 'builder_repository_production_unresolved',
           })
           return
         }

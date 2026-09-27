@@ -72,3 +72,12 @@ test('native-language review runs on the interactive lane with hidden thinking o
   // A review that cannot finish must release the approved draft, not fail the turn.
   assert.match(entrypoint, /if \(!reviewed\?\.text\) \{/)
 })
+
+test('native-language review runs only when an explicitly protected literal is missing, in every language', () => {
+  // Production 2026-09-27 10:31 ET: the review pass cost 8.8s of a ~30s Polish answer for grammar polish only.
+  const reviewAt = entrypoint.indexOf('async function reviewNativeLanguageQuality(')
+  const review = entrypoint.slice(reviewAt, entrypoint.indexOf('const reviewed = await callCosReasoner({', reviewAt))
+  assert.ok(reviewAt > 0)
+  assert.match(review, /\n  if \(alreadyPreserved\) return protectedResult\n/)
+  assert.doesNotMatch(review, /language === 'en' && alreadyPreserved/)
+})

@@ -198,6 +198,13 @@ const SUBJECTIVE_RANKING_LOOKUP = /(?:\b(?:highest[-\s]?rated|top[-\s]?rated|mos
 const STABLE_REFERENCE_LOOKUP = /(?:^\s*(?:what|which)\b[^?!.]{0,80}\bcapital\s+of\b|^\s*when\b[^?!.]{1,120}\b(?:founded|established|created|invented|built|published)\b|^\s*who\s+(?:founded|created|invented|designed|wrote|painted|composed)\b|^\s*(?:qual|quais|cu[aá]l|cu[aá]les)\b[^?!.]{0,80}\bcapital\s+(?:de|do|da)\b|^\s*(?:jaki|jaka|jakie)\b[^?!.]{0,80}\bstolic[\p{L}]*\b|^\s*(?:какой|какая|какие)\b[^?!.]{0,80}\bстолиц[\p{L}]*\b)/iu
 const STABLE_TECHNICAL_REFERENCE = /\b(?:rank\s+of\s+(?:(?:this|the|a)\s+)?matrix|top[-\s]?level\s+domain|(?:best|worst|average)[-\s]?case\s+time\s+complexity)\b/i
 
+// Generic definitional questions are timeless conceptual requests, not current-world lookups.
+// In particular, an indefinite article ("what is an artifact?") asks for the meaning of a class,
+// not the current state of a named external entity. Keep this structural rather than enumerating
+// platform vocabulary so learned/internal knowledge remains reachable for unfamiliar concepts.
+const GENERIC_DEFINITIONAL_LOOKUP = /^\s*(?:what\s+(?:is|are)\s+(?:an?|the\s+concept\s+of)\s+|define\s+)(?!current\b|latest\b|today(?:'s)?\b)[\p{L}\p{N}][^?!.]{0,100}[?!.]*\s*$/iu
+const GENERIC_PLURAL_DEFINITION = /^\s*what\s+are\s+[\p{L}\p{N}][\p{L}\p{N}'’._-]*(?:\s+[\p{L}\p{N}][\p{L}\p{N}'’._-]*){0,5}\s*[?!.]*\s*$/iu
+
 function normalizedText(input: string): string {
   return englishNormalizedForClassification(String(input || '')).replace(/\s+/g, ' ').trim()
 }
@@ -349,6 +356,9 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (LOOKUP_INTENT.test(text) && NEWS_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
 
   if (CONCEPTUAL_OR_CREATIVE.test(text)) return false
+  // Definitions belong to internal/general reasoning. Do this before the conservative unknown
+  // lookup fallback so "What is an artifact?" cannot be misclassified as a live current fact.
+  if (GENERIC_DEFINITIONAL_LOOKUP.test(text) || GENERIC_PLURAL_DEFINITION.test(text)) return false
 
   // Mutable reference state and subjective/current ranking questions may benefit from live evidence
   // even without an explicit "current" marker. This is intentionally narrower than the old blanket

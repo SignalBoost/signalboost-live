@@ -146,7 +146,8 @@ export async function decideCosAgentTurn(input: {
   const nativeTurn = await callLocalModelTurn({
     usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_native_tool_choice' },
     temperature: 0.1,
-    maxTokens: 1_800,
+    // Planner output is a tool call or a fixed one-line JSON; it never writes the user's answer.
+    maxTokens: 300,
     disableThinking: true,
     timeoutMs,
     allowConfiguredFallback: false,
@@ -154,28 +155,26 @@ export async function decideCosAgentTurn(input: {
     tools,
     toolChoice: 'auto',
     systemPrompt: [
-      'You are the first-turn reasoning brain inside the COS agent runtime.',
-      'Answer the user completely now when stable model knowledge and supplied context are sufficient.',
-      'If information or action outside the model is materially required, call only the minimum function tools needed and do not answer yet.',
+      'You are the first-turn capability PLANNER inside the COS agent runtime. You never answer the user: COS reasons and answers every request.',
+      'Your only job: if information or action outside the model is materially required, call only the minimum function tools needed.',
       'A function call is a capability request, NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy.',
       'Do not call tools merely because a topic is sophisticated. A conceptual software question that stable knowledge can answer needs no tool.',
       'Current/future travel details such as transport, fares, opening hours, prices, availability, schedules, weather, or other mutable facts require live_web.',
       'Request semantic_memory when meaning-similar durable internal context would materially improve the answer beyond stable model knowledge.',
       'Request creative_memory when a planning, writing, ideation, recommendation, transformation, or problem-solving task would materially benefit from validated prior approaches or successful answer patterns. Creative Memory guides HOW to solve/present; never use it as factual evidence.',
-      'When answering directly, return ONLY strict JSON: {"mode":"answer","answer":"complete user-facing answer","confidence":0.0,"capabilities":[],"reason":"self_contained"}.',
+      'When no tool is required, do NOT write an answer. Return ONLY this exact JSON: {"mode":"answer","answer":"COS","confidence":1,"capabilities":[],"reason":"cos_answers"}.',
       input.surface === 'concierge'
         ? 'This is public Concierge. Only the public-safe tools supplied by the host exist for this turn; never imply access to private owner capabilities.'
         : input.ownerAuthenticated
           ? 'This is the authenticated owner Assistant. You may request only tools actually supplied by the host; host authorization remains final.'
           : 'This is Assistant without verified owner authority. Only the tools supplied by the host are available.',
-      input.language ? `Write a direct answer in the user language hint: ${input.language}.` : '',
     ].filter(Boolean).join(' '),
     prompt: [
       input.previousAssistant?.trim()
         ? `PRECEDING ASSISTANT TURN (conversation context only):\\n${input.previousAssistant.trim().slice(0, 5_000)}`
         : '',
       `CURRENT USER REQUEST:\\n${prompt}`,
-      'Answer directly or request the minimum tool capability now.',
+      'Call the minimum tool capability now, or return the no-tool JSON.',
     ].filter(Boolean).join('\\n\\n'),
   }, { ...config, timeoutMs }).catch(error => {
     console.warn('[cos-agent-native-tools] unavailable', error instanceof Error ? error.message : String(error))
@@ -212,30 +211,30 @@ export async function decideCosAgentTurn(input: {
   const raw = await callLocalModel({
     usageContext: { feature: 'cos_interactive_answer', purpose: 'agent_answer_or_capability_plan_compat' },
     temperature: 0.1,
-    maxTokens: 1_800,
+    // Planner output is a tool call or a fixed one-line JSON; it never writes the user's answer.
+    maxTokens: 300,
     disableThinking: true,
     timeoutMs,
     jsonObject: true,
     allowConfiguredFallback: false,
     persistUsage: false,
     systemPrompt: [
-      'You are the first-turn reasoning brain inside the COS agent runtime.',
-      'For this user request choose exactly one outcome: ANSWER it completely now, or REQUEST the minimum capabilities needed before a reliable answer/action can be completed.',
-      'Return ONLY strict JSON using exactly one of these shapes:',
-      '{"mode":"answer","answer":"complete user-facing answer","confidence":0.0,"capabilities":[],"reason":"self_contained"}',
+      'You are the first-turn capability PLANNER inside the COS agent runtime. You never answer the user: COS reasons and answers every request.',
+      'For this user request choose exactly one outcome: NO TOOL NEEDED, or REQUEST the minimum capabilities needed before a reliable answer/action can be completed.',
+      'Return ONLY strict JSON using exactly one of these shapes (never write an answer to the user):',
+      '{"mode":"answer","answer":"COS","confidence":1,"capabilities":[],"reason":"cos_answers"}',
       '{"mode":"orchestrate","answer":"","confidence":0.0,"capabilities":["live_web"],"reason":"brief reason"}',
-      'Prefer mode=answer when the request is reliably answerable from the request itself, conversation context supplied here, and stable model knowledge. Do not request capabilities merely to improve wording or because the topic sounds sophisticated.',
+      'Return the no-tool JSON when the request is reliably answerable from the request itself, conversation context supplied here, and stable model knowledge. Do not request capabilities merely to improve wording or because the topic sounds sophisticated.',
       'Use mode=orchestrate whenever correctness materially depends on information or action unavailable inside the model.',
       `Allowed capabilities for this turn: ${tools.map(tool => tool.function.name).join(', ')}.`,
       'A capability request is NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy before executing anything.',
-      input.language ? `Write a direct answer in the user language hint: ${input.language}.` : '',
     ].filter(Boolean).join(' '),
     prompt: [
       input.previousAssistant?.trim()
         ? `PRECEDING ASSISTANT TURN (conversation context only):\\n${input.previousAssistant.trim().slice(0, 5_000)}`
         : '',
       `CURRENT USER REQUEST:\\n${prompt}`,
-      'Choose ANSWER or ORCHESTRATE now.',
+      'Choose NO TOOL or ORCHESTRATE now.',
     ].filter(Boolean).join('\\n\\n'),
   }, { ...config, timeoutMs }).catch(error => {
     console.warn('[cos-agent-decision] compatibility fallback unavailable', error instanceof Error ? error.message : String(error))

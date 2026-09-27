@@ -117,3 +117,14 @@ test('the completion rescue lane carries the same COS identity and company knowl
   assert.match(enterprise, /export function cosIdentityPreamble\(audience:CosAudience\):string \{/)
   assert.match(enterprise, /You are COS, the reasoning brain of iTMounts \(itmounts\.com\)/)
 })
+
+test('interactive COS answers run with hidden thinking off so they finish inside the interactive timeout', () => {
+  // Production 2026-09-27: owner answers failed at ~22-28s (20s interactive model timeout) with thinking on.
+  const callAt = enterprise.indexOf("usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_response' },")
+  const call = enterprise.slice(callAt, enterprise.indexOf('systemPrompt:COS_REASONER_SYSTEM_PROMPT(', callAt))
+  assert.ok(callAt > 0)
+  assert.match(call, /disableThinking:true,/)
+  const primary = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  const rescue = primary.slice(primary.indexOf('async function runCompletionFirstRescue('), primary.indexOf('function completionFirstResponse('))
+  assert.match(rescue, /disableThinking:true,/)
+})

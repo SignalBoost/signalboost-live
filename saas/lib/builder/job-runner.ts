@@ -28,6 +28,7 @@ import { recordBuilderUniversityProductionOutcome } from './university-outcome.t
 import { deepInfraMaxRunUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
 import { formatBuilderEpisodesForPrompt, recordBuilderEpisode, retrieveBuilderEpisodes } from './episodic-memory.ts'
+import { recordBuilderCompetencyGap } from './competency-gap.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -213,6 +214,15 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
   }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
     jobId: job.id,
     message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
+  }))
+  await recordBuilderCompetencyGap({
+    jobId: job.id,
+    objective: job.objective,
+    error,
+    ownerAuthorized: job.ownerAuthorized === true,
+  }).catch(gapError => console.error('[builder_competency_gap_record_failed]', {
+    jobId: job.id,
+    message: gapError instanceof Error ? gapError.message : 'unknown',
   }))
 }
 

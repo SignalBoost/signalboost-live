@@ -139,6 +139,8 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
       mergeCommitSha: input.mergeCommitSha,
       preMergeSnapshotId: snapshotId,
       pullRequestNumber: input.pullRequestNumber,
+      acceptanceUrl: typeof record(row.result).production_acceptance_url === 'string' ? String(record(row.result).production_acceptance_url) : null,
+      acceptanceExpectedText: typeof record(row.result).production_acceptance_expected_text === 'string' ? String(record(row.result).production_acceptance_expected_text) : null,
     })
     return false
   }

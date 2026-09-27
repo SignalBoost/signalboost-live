@@ -142,3 +142,19 @@ test('chat answers are short by default in both the main COS call and the rescue
   const preamble = enterprise.slice(preambleAt, enterprise.indexOf('\n}\n', preambleAt))
   assert.match(preamble, /CHAT_ANSWER_LENGTH_RULE,/)
 })
+
+test('internal context sources are retrieved concurrently, before the semantic cache check', () => {
+  // Production 2026-09-27 10:31/10:53 ET (cos_ai_roi_metrics): a semantic-cache hit took 7.5-9.5s because five
+  // independent context sources were read one after another before the cache could be checked.
+  const retrievalAt = enterprise.indexOf('async function retrieveInternalContext(')
+  const retrieval = enterprise.slice(retrievalAt, enterprise.indexOf('\nfunction executionFunnel(', retrievalAt))
+  assert.ok(retrievalAt > 0)
+  for (const stage of ['knowledgeStage', 'enterpriseStage', 'userMemoryStage', 'creativeStage', 'skillStage']) {
+    assert.match(retrieval, new RegExp(`const ${stage} = \\(async \\(\\) => \\{`))
+  }
+  assert.match(retrieval, /await Promise\.all\(\[knowledgeStage, enterpriseStage, userMemoryStage, creativeStage, skillStage\]\)/)
+  // Systems keep the original sequential order so provenance is unchanged.
+  assert.match(retrieval, /systems\.push\(\.\.\.kgSystems, \.\.\.enterpriseSystems, \.\.\.userSystems, \.\.\.creativeSystems, \.\.\.skillSystems\)/)
+  // No stage may await another stage's work inline any more.
+  assert.doesNotMatch(retrieval, /\n  const creative = await retrieveCreativeMemory\(/)
+})

@@ -23,12 +23,19 @@ function normalizedProofCommand(value: unknown): string | null {
  * Vercel build did not identify a test file, the recorded build/prebuild command is
  * the proof. Unknown commands remain untrusted and do not manufacture a proof.
  */
-export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryRepairTarget, 'pathHints' | 'failedCommand'>): string | null {
+export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryRepairTarget, 'pathHints' | 'failedCommand' | 'failureEvidence'>): string | null {
   const failingTests = target.pathHints
     .map(path => path.replace(/^saas\//, ''))
     .filter(path => /^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))
     .slice(0, 4)
   if (failingTests.length) return `node --experimental-strip-types --test ${failingTests.join(' ')}`
+
+  // A Vercel build that already reached TypeScript has supplied a much narrower reproducible
+  // compiler failure than the complete 2,500+ test/gate command. Reproduce that compiler boundary
+  // directly so Platform Engineer spends its bounded repair window editing and verifying source,
+  // not replaying a minute of already-passing tests. PR CI still runs the complete production gate.
+  const evidence = Array.isArray(target.failureEvidence) ? target.failureEvidence.join('\n') : ''
+  if (/Failed to type check|(?:^|\\s)(?:error\\s+)?TS\\d{4}:/im.test(evidence)) return 'npm exec -- tsc --noEmit'
 
   const failedCommand = normalizedProofCommand(target.failedCommand)
   if (!failedCommand) return null

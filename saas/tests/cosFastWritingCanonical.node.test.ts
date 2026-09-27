@@ -35,23 +35,24 @@ test('production routing has a semantic authoring rescue and does not branch on 
   assert.doesNotMatch(primary, /my inlaws today celebrate their wedding 50 aniversary/i)
 })
 
-test('canonical COS fast authoring runs before auth, retrieval, and enterprise reasoning', () => {
+test('writing requests go straight to COS: fast authoring is never a detour in front of COS', () => {
+  // Production 2026-09-27 14:06 ET: two pre-COS fast-authoring detours each burned their full 18s budget and
+  // returned nothing before COS answered in 15.5s. runFastAuthoring survives only as the post-COS rescue.
   const eligible = primary.indexOf('const fastAuthoringEligible=')
-  const run = primary.indexOf('const fast=await runFastAuthoring(input,language)', eligible)
   const auth = primary.indexOf('const access=await getAccess()', eligible)
   const enterprise = primary.indexOf('tryCOSFirstAnswer({prompt:reasoningPrompt', eligible)
-
   assert.ok(eligible > 0)
-  assert.ok(run > eligible)
-  assert.ok(auth > run)
+  assert.ok(auth > eligible)
   assert.ok(enterprise > auth)
+  const beforeCos = primary.slice(eligible, enterprise)
+  assert.doesNotMatch(beforeCos, /await runFastAuthoring\(/)
+  assert.match(primary.slice(enterprise), /const semanticFast=await runFastAuthoring\(input,language\)/)
   assert.match(primary, /deepseek-ai\/DeepSeek-V4-Flash/)
   assert.match(primary, /FAST_AUTHORING_TIMEOUT_MS = 18_000/)
   assert.match(primary, /FAST_AUTHORING_ATTEMPT_MS = 9_000/)
   assert.match(primary, /usageContext:\{feature:'cos_fast_authoring'/)
   assert.match(primary, /source='cos-fast-authoring'/)
   assert.match(primary, /Respond in \$\{reportLanguageName\(language\)\}/)
-  assert.match(primary, /startsWith\('cos-fast-authoring'\)/)
 })
 
 test('browser direct edits delegate to canonical COS instead of running a competing reasoner', () => {

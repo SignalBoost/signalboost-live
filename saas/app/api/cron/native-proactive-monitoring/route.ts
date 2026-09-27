@@ -11,6 +11,7 @@ import { ownedSiteOptimizationMonitoringCollector } from '@/self-healing-host/ow
 import { ownedSiteCybersecurityMonitoringCollector } from '@/self-healing-host/owned-site-cybersecurity-monitoring'
 import { aiSecurityMonitoringCollector, AI_SECURITY_NATIVE_PROBE } from '@/self-healing-host/ai-security-monitoring'
 import { universityMassDistillationMonitoringCollector } from '@/self-healing-host/university-distillation-monitoring'
+import { interactiveModelHealthMonitoringCollector } from '@/self-healing-host/interactive-model-health-monitoring'
 import { verifyPendingExactVercelRepairOutcomes } from '@/self-healing-host/vercel-deployment-outcome-verifier'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
@@ -89,6 +90,8 @@ export async function GET(req: NextRequest) {
     ...createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes }),
     persistenceNativeMonitoringCollector({ db }),
     universityMassDistillationMonitoringCollector({ db }),
+    // Chat/model health (2026-09-27): observation-only; warning/critical samples reach the owner briefing.
+    interactiveModelHealthMonitoringCollector({ db }),
     livePlatformHealthCollector(db),
   ]
   const result = await runNativeMonitoring({ context: { provider: 'signalboost-platform', environment: 'production', metadata: { source: 'native-proactive-monitoring-cron', readOnly: true, providerMutations: false } }, collectors, nativeEnabled: process.env.SELF_HEALING_NATIVE_MONITORING_ENABLED !== 'false', externalConnected: process.env.SELF_HEALING_EXTERNAL_MONITORING_CONNECTED === 'true' })

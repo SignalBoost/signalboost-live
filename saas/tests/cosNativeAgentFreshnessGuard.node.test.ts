@@ -49,3 +49,17 @@ test('public Concierge cannot request owner-private capabilities', () => {
   assert.match(catalog, /input\.surface === 'concierge'\s*\n\s*\? \['live_web'\]/)
   assert.match(catalog, /input\.ownerAuthenticated\s*\n\s*\? COS_AGENT_CAPABILITIES/)
 })
+
+test('questions about this service skip the first-turn direct model answer', async () => {
+  // Production 2026-09-26: "What is iTMounts?" was answered directly by the first-turn model as
+  // "a digital mount management system" because that model has no identity or glossary.
+  const gate = browser.indexOf('const asksAboutThisService = isSignalBoostSpecificPublicRequest(prompt)')
+  const ownerOnly = browser.indexOf("|| (browserSurface !== 'concierge' && authenticatedOwner && mentionsPlatformConcept(prompt))", gate)
+  const guarded = browser.indexOf('!isPlatformSelfKnowledgePrompt(prompt) && !asksAboutThisService', ownerOnly)
+  const decide = browser.indexOf('agentDecision = await decideCosAgentTurn({', guarded)
+  assert.ok(gate > 0 && ownerOnly > gate && guarded > ownerOnly && decide > guarded)
+
+  const { isSignalBoostSpecificPublicRequest } = await import('../lib/ai/cos/publicScenarioScope.ts')
+  assert.equal(isSignalBoostSpecificPublicRequest('What is iTMounts?'), true)
+  assert.equal(isSignalBoostSpecificPublicRequest('What is a mountaineering harness?'), false)
+})

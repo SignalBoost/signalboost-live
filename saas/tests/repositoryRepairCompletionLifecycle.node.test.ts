@@ -65,7 +65,7 @@ test('rolled-back Production acceptance queues bounded owner-authorized repair-a
   assert.match(lifecycle, /enqueueSignalBoostRepositoryRepairJob/)
   assert.match(lifecycle, /selfHealingProductionRecovery: true/)
   assert.match(lifecycle, /productionRepairParentJobId/)
-  assert.match(lifecycle, /boundedProductionFailureDetail/)
+  assert.match(lifecycle, /boundedRecoveryText/)
   assert.match(lifecycle, /credential-redacted/)
   assert.match(lifecycle, /Do not weaken acceptance or verification/)
   assert.match(lifecycle, /input\.error === 'builder_repository_production_rolled_back'/)

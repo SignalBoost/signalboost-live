@@ -14,6 +14,8 @@ function pending(overrides: Partial<PendingMergeWatch> = {}): PendingMergeWatch 
     preMergeSnapshotId: 'dpl_previous',
     pullRequestNumber: 42,
     attempts: 1,
+    acceptanceUrl: 'https://itmounts.com/',
+    acceptanceExpectedText: 'expected repair evidence',
     ...overrides,
   })
 }
@@ -121,4 +123,30 @@ test('terminal production observations reconcile the originating repository job'
     },
   })
   assert.deepEqual(terminal, [{ status: 'healthy', deploymentId: 'dpl_new' }])
+})
+
+
+test('healthy deployment remains pending when production acceptance asks for retry', async () => {
+  const s = store([pending()])
+  const sweep = await runPendingMergeWatches({
+    store: s.store as any,
+    watch: async () => outcome('healthy') as any,
+    onTerminal: async () => 'retry',
+  })
+  assert.equal(sweep.healthy, 0)
+  assert.equal(sweep.stillPending, 1)
+  assert.equal(s.closed.length, 0)
+})
+
+test('production acceptance cron refuses generic smoke proof when repair contract is missing', () => {
+  const route = readFileSync(new URL('../app/api/cron/builder-merge-watch/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /!pending\.acceptanceUrl \|\| !pending\.acceptanceExpectedText/)
+  assert.match(route, /return 'retry'/)
+})
+
+test('latest completion gate preserves owner artifact and requires production acceptance', () => {
+  const sql = readFileSync(new URL('../supabase/migrations/20260927030000_builder_production_acceptance_completion_gate.sql', import.meta.url), 'utf8')
+  assert.match(sql, /builder-result\.txt/)
+  assert.match(sql, /assistant_conversations/)
+  assert.match(sql, /production_acceptance_passed/)
 })

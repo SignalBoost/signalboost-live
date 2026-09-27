@@ -28,8 +28,10 @@ test('fast travel planning has two bounded fast-model attempts and a completion 
   assert.match(route, /TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 16_000/)
   assert.match(route, /TRAVEL_PLAN_RETRY_TIMEOUT_MS = 10_000/)
   assert.match(route, /TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 28_000/)
-  assert.match(route, /TRAVEL_PLAN_RESCUE_MAX_TOKENS = 1_400/)
-  assert.match(route, /TRAVEL_PLAN_RETRY_MAX_TOKENS = 900/)
+  assert.match(route, /TRAVEL_PLAN_RESCUE_MAX_TOKENS = 900/)
+  assert.match(route, /TRAVEL_PLAN_RETRY_MAX_TOKENS = 600/)
+  // Travel attempts are recorded so their latency and failures are queryable.
+  assert.match(route, /persistUsage:true,\n        usageContext:\{feature:'cos_interactive_travel_plan',purpose:attempt\.purpose\}/)
   assert.match(route, /feature:'cos_interactive_travel_plan'/)
   assert.match(route, /purpose:'travel_plan_grounded_retry'/)
   assert.match(route, /timeoutMs:Math\.min\(attempt\.timeoutMs,remaining\)/)
@@ -42,10 +44,9 @@ test('fast travel planning has two bounded fast-model attempts and a completion 
 test('travel interactive profile bypasses RunPod readiness and uses the fast managed model profile', () => {
   assert.match(inference, /feature === 'cos_interactive_travel_plan'/)
   assert.match(inference, /COS_INTERACTIVE_TRAVEL_TIMEOUT_MS/)
-  assert.match(inference, /COS_INTERACTIVE_TRAVEL_MODEL/)
-  assert.match(inference, /deepseek-ai\/DeepSeek-V4-Flash/)
-  assert.match(inference, /zai-org\/GLM-5\.3-Flash/)
-  assert.match(inference, /COS_INTERACTIVE_TRAVEL_RETRY_MODEL/)
+  // Production 2026-09-27 14:24 ET: both travel attempts ran to their limits (26.5s) on the dedicated travel models.
+  assert.match(inference, /if \(interactiveTravelPlan\(args\)\) return config\.model/)
+  assert.doesNotMatch(inference, /process\.env\.COS_INTERACTIVE_TRAVEL_(?:RETRY_)?MODEL/)
   const eligible = inference.slice(inference.indexOf('function eligibleForRunpodPrimary'), inference.indexOf('async function callConfiguredModel'))
   assert.match(eligible, /if \(interactiveUserResponse\(args\)\) return false/)
 })

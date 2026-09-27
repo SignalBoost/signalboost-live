@@ -655,6 +655,37 @@ export function cosAudience(privileged:boolean):CosAudience {
   return privileged ? 'owner' : 'user'
 }
 
+function contextFallbackBudgetMs():number {
+  const value = Number(process.env.COS_CONTEXT_FALLBACK_BUDGET_MS || '2500')
+  return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 2500
+}
+
+/**
+ * Runs a lexical context fallback under its own time budget. The work returns a commit function; it is applied
+ * only when the work finishes inside the budget, so a late result never mutates context already sent to the model.
+ */
+async function boundedContextFallback(stage:string, work:() => Promise<(() => void)|null>):Promise<void> {
+  const startedAt = Date.now()
+  const budgetMs = contextFallbackBudgetMs()
+  let timer:ReturnType<typeof setTimeout>|undefined
+  const timedOut = Symbol('context_fallback_budget_exceeded')
+  const outcome = await Promise.race([
+    work().catch(error => {
+      console.warn('cosFirstAnswer: lexical context fallback failed', { stage, error: error instanceof Error ? error.message : String(error) })
+      return null
+    }),
+    new Promise<typeof timedOut>(resolve => { timer = setTimeout(() => resolve(timedOut), budgetMs) }),
+  ])
+  if (timer !== undefined) clearTimeout(timer)
+  if (outcome === timedOut) {
+    console.warn('cosFirstAnswer: lexical context fallback exceeded budget; continuing without it', { stage, budgetMs })
+    recordCosLatencyStage(`retrieval:${stage}:budget_exceeded`, Date.now() - startedAt)
+    return
+  }
+  recordCosLatencyStage(`retrieval:${stage}`, Date.now() - startedAt)
+  if (outcome) outcome()
+}
+
 function timedRetrievalStage(stage:string, run:() => Promise<void>):Promise<void> {
   const startedAt = Date.now()
   return run().finally(() => recordCosLatencyStage(`retrieval:${stage}`, Date.now() - startedAt))
@@ -699,6 +730,14 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         semanticLearnedCorpus(prompt),
       ])
 
+      // BOUNDED LEXICAL FALLBACK (2026-09-27). Production evidence (cos-latency-stage rows, owner Polish question
+      // 13:30 ET): retrieval:knowledgeStage took 9,428ms while every other context source finished in <=558ms. The
+      // semantic lookups above are already capped at the knowledge-fact budget (1.5s), so the rest of that time was
+      // spent in the uncapped lexical fallbacks below (a wide ilike scan, then embedding up to 128 corpus rows).
+      // Both fallbacks now run concurrently under their own budget. Each computes into locals and commits only when
+      // it finishes in time, so a late result can never mutate a context that was already used.
+      const fallbacks:Promise<void>[] = []
+
       const semanticRows = semanticResult.status === 'fulfilled' ? semanticResult.value : null
       if (publicAudience) {
         // Knowledge Graph facts are internal company records; never retrieved for the public audience.
@@ -714,19 +753,22 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
           facts.push(`[KG${facts.length + 1}] ${safeText(row.subject,180)} — ${safeText(row.predicate,120)} — ${safeText(row.object,600)} [confidence ${Number(row.confidence || 0).toFixed(2)}; similarity ${Number(row.similarityScore || 0).toFixed(2)}; source ${safeText(row.source,180)}]`)
         }
       } else if (terms.length) {
-        const factFilters = terms.flatMap(term => [`subject.ilike.%${term}%`, `predicate.ilike.%${term}%`, `object.ilike.%${term}%`]).join(',')
-        const result = await db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at')
-          .or(factFilters).order('confidence', { ascending:false }).order('updated_at', { ascending:false }).order('subject', { ascending:true }).limit(32)
-        if (!result.error) {
+        fallbacks.push(boundedContextFallback('kg_lexical', async () => {
+          const factFilters = terms.flatMap(term => [`subject.ilike.%${term}%`, `predicate.ilike.%${term}%`, `object.ilike.%${term}%`]).join(',')
+          const result = await db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at')
+            .or(factFilters).order('confidence', { ascending:false }).order('updated_at', { ascending:false }).order('subject', { ascending:true }).limit(32)
+          if (result.error) return null
           const rows = (result.data ?? []).filter(row => row.predicate !== 'excluded_from_cos_retrieval')
-          funnel.knowledgeGraph.retrieved = rows.length
-          funnel.knowledgeGraph.relevant = rows.length
           const selected = rows.slice(0, 16)
-          funnel.knowledgeGraph.selected = selected.length
-          for (const row of selected) {
-            facts.push(`[KG${facts.length + 1}] ${safeText(row.subject,180)} — ${safeText(row.predicate,120)} — ${safeText(row.object,600)} [confidence ${Number(row.confidence || 0).toFixed(2)}; source ${safeText(row.source,180)}]`)
+          return () => {
+            funnel.knowledgeGraph.retrieved = rows.length
+            funnel.knowledgeGraph.relevant = rows.length
+            funnel.knowledgeGraph.selected = selected.length
+            for (const row of selected) {
+              facts.push(`[KG${facts.length + 1}] ${safeText(row.subject,180)} — ${safeText(row.predicate,120)} — ${safeText(row.object,600)} [confidence ${Number(row.confidence || 0).toFixed(2)}; source ${safeText(row.source,180)}]`)
+            }
           }
-        }
+        }))
       }
 
       const semanticLearnedAll = semanticLearnedResult.status === 'fulfilled' ? semanticLearnedResult.value : null
@@ -746,29 +788,33 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
           learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; similarity ${Number(row.similarity || 0).toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
         }
       } else if (terms.length) {
-        const learnedResult = await db.from('cos_continuous_learning')
-          .select('subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error')
-          .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
-          .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(128)
-        if (!learnedResult.error) {
+        fallbacks.push(boundedContextFallback('learned_lexical', async () => {
+          const learnedResult = await db.from('cos_continuous_learning')
+            .select('subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error')
+            .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
+            .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(128)
+          if (learnedResult.error) return null
           const unfilteredRows = (learnedResult.data ?? []).filter(row => !rejectedLearningRow(row))
           const rows = publicAudience ? filterPublicCorpusRows(unfilteredRows) : unfilteredRows
           const candidates = rows.map(row => ({ item:row, text:corpusCandidateText(row) }))
           const ranked = await rankContextCandidates(prompt, candidates, { threshold:learnedContextSimilarityThreshold(), limit:candidates.length })
-          funnel.learnedCorpus.retrieved = rows.length
-          funnel.learnedCorpus.relevant = ranked.relevant.length
           // Same substance preference on the backfill-window path: candidates wrap the row in `item`.
           const rankedWithSummary = ranked.relevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
           const selected = selectLearnedCorpusRows<(typeof rankedWithSummary)[number]>(rankedWithSummary, 6)
-          funnel.learnedCorpus.selected = selected.length
-          if (ranked.mode === 'semantic' && rows.length) kgSystems.push('Continuous Learning semantic relevance')
-          for (const candidate of selected) {
-            const row = candidate.item
-            const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''
-            learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
+          return () => {
+            funnel.learnedCorpus.retrieved = rows.length
+            funnel.learnedCorpus.relevant = ranked.relevant.length
+            funnel.learnedCorpus.selected = selected.length
+            if (ranked.mode === 'semantic' && rows.length) kgSystems.push('Continuous Learning semantic relevance')
+            for (const candidate of selected) {
+              const row = candidate.item
+              const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''
+              learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
+            }
           }
-        }
+        }))
       }
+      await Promise.all(fallbacks)
     }
   })
   const enterpriseStage = timedRetrievalStage('enterpriseStage', async () => {

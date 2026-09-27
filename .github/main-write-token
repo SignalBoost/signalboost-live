@@ -1,2 +1,2 @@
-base_sha=7ae0da81442da1e95129006c44e8e9b5b5c089ce
-branch=fix/canary-v4-resume-transition-20260926-v2
+base_sha=9ba81dd37636164f0c14bf9a1902581f712cfdc3
+branch=chore/reconcile-3411-governance

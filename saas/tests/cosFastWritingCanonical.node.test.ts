@@ -1,3 +1,4 @@
+// saas/tests/cosFastWritingCanonical.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -80,7 +81,7 @@ test('completion-first routing semantically promotes natural research requests t
 test('ordinary low-confidence answers are completed instead of replaced by the generic refusal', () => {
   assert.match(primary, /completion_first_best_effort/)
   assert.match(primary, /source:'cos-local-best-effort'/)
-  assert.match(primary, /runCompletionFirstRescue\(input,language\)/)
+  assert.match(primary, /runCompletionFirstRescue\(input,language,cosAudience\(isPrivileged\)\)/)
   assert.match(primary, /cos-completion-first-rescue/)
   assert.ok(primary.indexOf('completion_first_best_effort') < primary.indexOf('buildHonestRefusalReply({prompt:input'))
 })

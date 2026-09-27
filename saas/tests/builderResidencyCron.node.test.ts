@@ -72,3 +72,12 @@ test('Residency cron drains a bounded sequential cohort without widening active 
   assert.match(source, /activeLimit:\s*4/)
   assert.doesNotMatch(source, /Promise\.all\([^)]*runBuilderResidencyOrchestrator/)
 })
+
+
+test('Residency cron circuit-breaks educational attempts when infrastructure recovery is not completed', async () => {
+  const source = await readFile(routeUrl, 'utf8')
+  assert.match(source, /result\.state === 'case_not_completed'/)
+  assert.match(source, /result\.execution\?\.result\?\.outcome\?\.status === 'infrastructure_failure'/)
+  assert.match(source, /result\.selfHealing\?\.completed !== true/)
+  assert.match(source, /\) break/)
+})

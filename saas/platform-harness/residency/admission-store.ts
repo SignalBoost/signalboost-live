@@ -128,52 +128,60 @@ export async function admitNextBuilderResidency(input:{
     })
   }
 
-  const artifacts=await input.db
-    .from('cos_local_distillation_artifacts')
-    .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,status,authority_expanded')
-    .eq('status','evaluation_pending')
-    .eq('subject_id','Computer Science & Coding')
-    .eq('authority_expanded',false)
-    .like('candidate_id','mass:%')
-    .order('created_at',{ascending:true})
-    .limit(12)
-  if(artifacts.error) throw artifacts.error
+  // Page through the complete eligible queue. Applying a small LIMIT before
+  // excluding existing enrollments starves every artifact after that window
+  // once the oldest rows have already been admitted.
+  const candidatePageSize=64
+  for(let offset=0;;offset+=candidatePageSize){
+    const artifacts=await input.db
+      .from('cos_local_distillation_artifacts')
+      .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,status,authority_expanded')
+      .eq('status','evaluation_pending')
+      .eq('subject_id','Computer Science & Coding')
+      .eq('authority_expanded',false)
+      .like('candidate_id','mass:%')
+      .order('created_at',{ascending:true})
+      .range(offset,offset+candidatePageSize-1)
+    if(artifacts.error) throw artifacts.error
 
-  for(const raw of artifacts.data??[]){
-    const artifact=raw as AutoAdmissionArtifact
-    const existing=await input.db
-      .from('cos_university_residency_enrollments')
-      .select('id')
-      .eq('artifact_row_id',artifact.id)
-      .eq('program_id',BUILDER_RESIDENCY_PROGRAM_ID)
-      .maybeSingle()
-    if(existing.error) throw existing.error
-    if(existing.data?.id) continue
+    for(const raw of artifacts.data??[]){
+      const artifact=raw as AutoAdmissionArtifact
+      const existing=await input.db
+        .from('cos_university_residency_enrollments')
+        .select('id')
+        .eq('artifact_row_id',artifact.id)
+        .eq('program_id',BUILDER_RESIDENCY_PROGRAM_ID)
+        .maybeSingle()
+      if(existing.error) throw existing.error
+      if(existing.data?.id) continue
 
-    const admission:ResidencyAdmissionInput={
-      artifactRowId:String(artifact.id),
-      candidateId:String(artifact.candidate_id),
-      subjectId:String(artifact.subject_id),
-      trainedArtifactId:String(artifact.trained_artifact_id),
-      trainedArtifactHash:String(artifact.trained_artifact_hash),
-      revisionKey:String(artifact.revision_key),
-      artifactStatus:String(artifact.status),
-      authorityExpanded:artifact.authority_expanded===true,
+      const admission:ResidencyAdmissionInput={
+        artifactRowId:String(artifact.id),
+        candidateId:String(artifact.candidate_id),
+        subjectId:String(artifact.subject_id),
+        trainedArtifactId:String(artifact.trained_artifact_id),
+        trainedArtifactHash:String(artifact.trained_artifact_hash),
+        revisionKey:String(artifact.revision_key),
+        artifactStatus:String(artifact.status),
+        authorityExpanded:artifact.authority_expanded===true,
+      }
+      const decision=await admitBuilderResidency({
+        db:input.db,
+        admission,
+        admissionEvidenceHash:admissionEvidenceHash(admission),
+      })
+
+      return Object.freeze({
+        ...decision,
+        admitted:decision.ok,
+        activeResidents:(active.data??[]).length,
+        activeLimit,
+        promotionAuthorized:false as const,
+        productionTrafficAuthorized:false as const,
+      })
     }
-    const decision=await admitBuilderResidency({
-      db:input.db,
-      admission,
-      admissionEvidenceHash:admissionEvidenceHash(admission),
-    })
 
-    return Object.freeze({
-      ...decision,
-      admitted:decision.ok,
-      activeResidents:(active.data??[]).length,
-      activeLimit,
-      promotionAuthorized:false as const,
-      productionTrafficAuthorized:false as const,
-    })
+    if((artifacts.data??[]).length<candidatePageSize) break
   }
 
   return Object.freeze({

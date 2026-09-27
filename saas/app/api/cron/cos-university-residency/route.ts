@@ -167,11 +167,18 @@ export async function GET(req: Request) {
       // execution reports infrastructure failure, the existing governed Self-Healing action gets
       // one opportunity to reconcile it. If that action does not complete, stop this cron batch:
       // additional case attempts cannot prove competency and only create retry churn.
-      if (
-        result.state === 'case_not_completed' &&
-        result.execution?.result?.outcome?.status === 'infrastructure_failure' &&
-        result.selfHealing?.completed !== true
-      ) break
+      if (result.state === 'case_not_completed') {
+        const execution = result.execution as {
+          result?: { outcome?: { status?: string } }
+        }
+        const selfHealing = 'selfHealing' in result
+          ? result.selfHealing as { completed?: boolean }
+          : undefined
+        if (
+          execution.result?.outcome?.status === 'infrastructure_failure' &&
+          selfHealing?.completed !== true
+        ) break
+      }
     }
 
     const result = results[results.length - 1]

@@ -27,6 +27,7 @@ import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
 import { deepInfraMaxRunUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
+import { formatBuilderEpisodesForPrompt, recordBuilderEpisode, retrieveBuilderEpisodes } from './episodic-memory.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -424,6 +425,17 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     // reference/RAG context only: it cannot authorize tools, prove current facts, or award University
     // credit. The helper is bounded and fails open so ordinary work is not blocked by retrieval.
     const workingKnowledge = await workingAgentKnowledgeBlock(job.objective, 'builder')
+    const priorEpisodes = await retrieveBuilderEpisodes({
+      userId: job.userId,
+      objective: job.objective,
+      excludeConversationId: job.conversationId,
+      limit: 4,
+    }).catch(error => {
+      console.warn('[builder_episode_read_failed]', { jobId, message: error instanceof Error ? error.message : 'unknown' })
+      return []
+    })
+    const episodicKnowledge = formatBuilderEpisodesForPrompt(priorEpisodes)
+    const combinedWorkingKnowledge = [workingKnowledge, episodicKnowledge].filter(Boolean).join('\n\n')
 
     const sliceStartedAtMs = Date.now()
     const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS
@@ -456,14 +468,14 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           runner,
           ai,
           cognitiveSkills: cognitive.items,
-          workingKnowledge,
+          workingKnowledge: combinedWorkingKnowledge,
         })
       : await new BuilderToolLoop(ai, workspace, runner, mcp, browserCli).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons,
           cognitiveSkills: cognitive.items,
-          workingKnowledge,
+          workingKnowledge: combinedWorkingKnowledge,
           projectContext: job.metadata.projectContext,
           checkpoint: job.checkpoint,
           documentationPaths,
@@ -524,6 +536,12 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         jobId: job.id,
         message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
       }))
+      await recordBuilderEpisode({
+        job,
+        outcome: 'failed',
+        summary: reply,
+        evidence: { error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, files, trace: trace.slice(-12) },
+      }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
       return
     }
 
@@ -562,6 +580,12 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       jobId: job.id,
       message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
     }))
+    await recordBuilderEpisode({
+      job,
+      outcome: 'succeeded',
+      summary: reply,
+      evidence: { files, successfulRuns: result.trace.filter(item => item.toolId === 'run' && item.ok).length, trace: trace.slice(-12) },
+    }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
     // Only after the generation-fenced terminal write; learning failure cannot undo task success.
     if (!plan) await workspace.recordJobRepairLesson(job.workspaceId, job.id, job.claimGeneration, result)
       .then(recorded => console.info('[builder_project_lesson_outcome]', { jobId, recorded, retrievedSignals: priorLessons.length }))

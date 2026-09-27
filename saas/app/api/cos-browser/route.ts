@@ -37,8 +37,6 @@ import { decideCosAgentTurn, type CosAgentDecision } from '@/lib/ai/cos/cosAgent
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
-import { publicDisclosureViolations } from '@/lib/ai/cos/publicDisclosureGate'
-import { hasUnsafePublicModelOutput } from '@/lib/ai/cos/publicPromptSecurity'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 
 export const runtime = 'nodejs'
@@ -406,10 +404,10 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId))
   }
 
-  // MODEL-FIRST AGENT LOOP: after hard host/security/surface special cases, the primary model sees
-  // every ordinary request before optional capability routing. It either answers now or requests the
-  // minimum native capability needed. Mutable/current requests still have the host freshness backstop
-  // below, but that guard runs only after the model's first semantic decision.
+  // CAPABILITY PLANNING, THEN COS: after hard host/security/surface special cases, a first-turn planner
+  // decides whether a native capability (live web, software specialist, ...) is materially required.
+  // It never answers the user — COS answers every request (Stage 2, 2026-09-27). Mutable/current
+  // requests still have the host freshness backstop below.
   let agentDecision: CosAgentDecision | null = null
   // Questions about this service itself (iTMounts, its products, COS and its platform concepts) must be
   // answered by the COS pipeline, which holds the owner-approved identity and glossary. The first-turn
@@ -450,51 +448,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (agentDecision?.mode === 'answer' && agentDecision.confidence >= 0.55) {
-    const publicUnsafe = browserSurface === 'concierge'
-      && (hasUnsafePublicModelOutput(agentDecision.answer) || publicDisclosureViolations(agentDecision.answer).length > 0)
-    if (!publicUnsafe) {
-      console.info('[cos-agent-decision]', JSON.stringify({
-        at: new Date().toISOString(),
-        mode: 'answer',
-        capabilities: [],
-        confidence: agentDecision.confidence,
-        reasoner: agentDecision.reasonerLabel,
-        decisionMs: Math.max(0, Date.now() - ingressStartedAt),
-      }))
-      const executionProvenance = {
-        schema_version: 4,
-        authority: 'server_execution_telemetry',
-        model_generated: false,
-        agent_decision: {
-          mode: 'answer',
-          capabilities: [],
-          reason: agentDecision.reason,
-          confidence: agentDecision.confidence,
-        },
-        local_reasoning: {
-          invoked: true,
-          model: agentDecision.reasonerLabel,
-          confidence: agentDecision.confidence,
-        },
-        external_ai: { invoked: false },
-      }
-      const direct = await withAgentDecisionMetadata(NextResponse.json({
-        ok: true,
-        reply: agentDecision.answer,
-        source: 'cos-model-direct',
-        confidence_score: agentDecision.confidence,
-        external_ai_invoked: false,
-        external_fallback_invoked: false,
-        local_model_invoked: true,
-        execution_provenance: executionProvenance,
-        execution_allowed: false,
-        external_action_taken: false,
-      }), agentDecision)
-      const decorated = await withSuggestedFollowups(direct, prompt, auditUserId)
-      return browserSurface === 'concierge' ? publicConciergePresentation(decorated) : decorated
-    }
-    console.warn('[cos-agent-decision] public direct answer rejected by disclosure/security gate')
+  // STAGE 2 — ONE ENTRANCE (owner decision 2026-09-26/27: "the LLM sends it to COS, COS reasons,
+  // decides how to answer and returns the answer"). The first-turn model is a capability PLANNER only.
+  // It never answers the user. A question that needs no tool goes straight to COS, which holds the
+  // identity, the who-is-asking rules and the release step. This block used to release the planner's
+  // own answer, so many questions never reached COS at all.
+  if (agentDecision?.mode === 'answer') {
+    console.info('[cos-agent-decision]', JSON.stringify({
+      at: new Date().toISOString(),
+      mode: 'cos_answers',
+      capabilities: [],
+      confidence: agentDecision.confidence,
+      reasoner: agentDecision.reasonerLabel,
+      decisionMs: Math.max(0, Date.now() - ingressStartedAt),
+    }))
     agentDecision = null
   }
 

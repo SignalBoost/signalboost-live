@@ -20,7 +20,7 @@ export interface MergeWatchSweep {
 export async function runPendingMergeWatches(input: {
   store: MergeWatchStore
   watch: (pending: PendingMergeWatch) => Promise<{ outcome: MergeWatchOutcome; detail?: string; deploymentId?: string | null; deploymentState?: string | null }>
-  onTerminal?: (pending: PendingMergeWatch, status: 'healthy' | 'rolled_back' | 'abandoned', detail: string, observed?: { deploymentId?: string | null; deploymentState?: string | null }) => Promise<void>
+  onTerminal?: (pending: PendingMergeWatch, status: 'healthy' | 'rolled_back' | 'abandoned', detail: string, observed?: { deploymentId?: string | null; deploymentState?: string | null }) => Promise<'complete' | 'retry' | void>
 }): Promise<MergeWatchSweep> {
   const rows = await input.store.claim(100, 60)
   const sweep: MergeWatchSweep = {
@@ -46,12 +46,22 @@ export async function runPendingMergeWatches(input: {
 
     if (outcome === 'healthy') {
       sweep.healthy += 1
-      await input.store.close(row.id, 'healthy', detail)
-      await input.onTerminal?.(row, 'healthy', detail, observed)
+      const terminal = await input.onTerminal?.(row, 'healthy', detail, observed)
+      if (terminal === 'retry') {
+        sweep.healthy -= 1
+        sweep.stillPending += 1
+      } else {
+        await input.store.close(row.id, 'healthy', detail)
+      }
     } else if (outcome === 'rolled_back') {
       sweep.rolledBack += 1
-      await input.store.close(row.id, 'rolled_back', detail)
-      await input.onTerminal?.(row, 'rolled_back', detail, observed)
+      const terminal = await input.onTerminal?.(row, 'rolled_back', detail, observed)
+      if (terminal === 'retry') {
+        sweep.rolledBack -= 1
+        sweep.stillPending += 1
+      } else {
+        await input.store.close(row.id, 'rolled_back', detail)
+      }
     } else if (row.attempts >= MERGE_WATCH_MAX_ATTEMPTS) {
       sweep.abandoned += 1
       const abandonedDetail = `rollback target ${row.preMergeSnapshotId} for merge ${row.mergeCommitSha}`

@@ -59,7 +59,7 @@ test('owner runtime topology remains host-owned and public disclosure stays sepa
   assert.match(enterprise, /PLATFORM TECHNICAL SPECIFICATION \(owner-only\):/)
 })
 
-test('owner-approved platform glossary reaches only the authenticated owner self-knowledge reasoner', async () => {
+test('owner-approved platform glossary reaches only the owner audience of the one COS pipeline', async () => {
   const glossary = await import('../lib/ai/cos/cosPlatformGlossary.ts')
   const context = glossary.ownerPlatformGlossaryContext()
   for (const term of ['COS (Chief of Staff)', 'Concierge', 'COS University', 'Specialist', 'Artifact', 'Graduate', 'Builder Residency']) {
@@ -73,17 +73,33 @@ test('owner-approved platform glossary reaches only the authenticated owner self
   assert.equal(glossary.mentionsPlatformConcept('PREVIOUS USER CONTEXT:\nWhat is the University?\n\nCURRENT USER REQUEST:\nTranslate hello to Spanish'), false)
   assert.equal(glossary.mentionsPlatformConcept('Translate hello to Spanish'), false)
 
-  // Owner-only: glossary is wired into the owner self-knowledge reasoner, never into the public prompt path.
-  assert.match(shared, /ownerPlatformGlossaryContext\(\)/)
-  assert.doesNotMatch(enterprise, /ownerPlatformGlossaryContext|OWNER_PLATFORM_GLOSSARY/)
+  // One pipeline: the glossary lives in the owner audience block of the single COS answer prompt.
+  const audienceAt = enterprise.indexOf('function audienceSection(')
+  const ownerAt = enterprise.indexOf("if (audience === 'owner') return [", audienceAt)
+  const glossaryAt = enterprise.indexOf('ownerPlatformGlossaryContext()', ownerAt)
+  const publicAt = enterprise.indexOf("if (audience === 'public') return [", audienceAt)
+  assert.ok(audienceAt > 0 && publicAt > audienceAt && ownerAt > publicAt && glossaryAt > ownerAt)
+  assert.ok(enterprise.slice(publicAt, ownerAt).indexOf('ownerPlatformGlossaryContext') < 0, 'public audience must not receive the glossary')
   assert.doesNotMatch(core, /ownerPlatformGlossaryContext|OWNER_PLATFORM_GLOSSARY/)
-  const ownerGuard = shared.indexOf('const ownerPlatformConcept = input.privileged === true')
-  const publicGuard = shared.indexOf('&& !isPublicDeliveryScope()', ownerGuard)
-  const call = shared.indexOf('tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true, platformConcept: true })')
-  assert.ok(ownerGuard > 0 && publicGuard > ownerGuard && call > publicGuard)
+  assert.doesNotMatch(shared, /platformConcept: true/, 'no separate platform-concept reasoner lane')
 
   // Platform-concept questions from the owner are never diverted into previous-turn interpretation.
   const interpretation = shared.indexOf('async function tryNeuralContextualInterpretation')
   const bypass = shared.indexOf('if (input.privileged === true && !isPublicDeliveryScope() && mentionsPlatformConcept(prompt)) return null', interpretation)
   assert.ok(interpretation > 0 && bypass > interpretation)
+})
+
+test('every audience gets the approved company identity in the prompt for company questions', () => {
+  // Production 2026-09-26: the owner channel answered "iTMounts is not a recognized product" while
+  // Concierge, whose separate pipeline carried this block, answered correctly. One pipeline, one block.
+  const blockAt = enterprise.indexOf('function companyKnowledgeBlock(prompt:string):string {')
+  const block = enterprise.slice(blockAt, enterprise.indexOf('export async function tryCOSFirstAnswer(', blockAt))
+  assert.match(block, /if \(!isSignalBoostSpecificPublicRequest\(prompt\)\) return ''/)
+  assert.match(block, /COMPANY IDENTITY \(owner-approved; authoritative for this question/)
+  assert.match(block, /\$\{SIGNALBOOST_COMPANY_IDENTITY_DEFINITION\}/)
+  assert.match(block, /PUBLIC PRODUCT CATALOG/)
+  const promptAt = enterprise.indexOf('prompt:`${companyKnowledgeBlock(input.prompt)}')
+  const userInput = enterprise.indexOf('CURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT)', promptAt)
+  assert.ok(promptAt > blockAt && userInput > promptAt)
+  assert.match(enterprise, /The product you serve is iTMounts \(itmounts\.com\)/)
 })

@@ -49,6 +49,10 @@ import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
 import { SEMANTIC_MEMORY_DEFINITION, CREATIVE_MEMORY_DEFINITION, ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, SIGNALBOOST_COMPANY_IDENTITY_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
 import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
+import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
+import { filterPublicCorpusRows } from '@/lib/ai/cos/publicCorpusEvidence'
+import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
+import { ownerPlatformGlossaryContext } from '@/lib/ai/cos/cosPlatformGlossary'
 import { retrieveCreativeMemory, formatCreativeMemoryForReasoner } from '@/lib/ai/cos/creativeMemory'
 import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
@@ -360,9 +364,8 @@ function enterpriseCandidateText(item:any):string {
  * hosting, configuration. Prompt instructions alone proved unreliable (the reasoner kept answering
  * identity-only), so this is appended DETERMINISTICALLY server-side, from live configuration, on
  * every privileged platform self-knowledge turn. Values are resolved at answer time so provider
- * migrations stay truthful without code changes. Never reaches non-privileged callers: the public
- * pipeline is diverted to the stateless path before this engine runs, and the append below is
- * additionally gated on input.privileged.
+ * migrations stay truthful without code changes. Never reaches non-privileged callers: the append
+ * below is gated on input.privileged, which is never set for the public audience.
  */
 function ownerPlatformTechnicalSpec(): string {
   const resolved = resolveCosReasoner()
@@ -390,10 +393,30 @@ function externalFallbackEnabledForSpec(): boolean {
   try { return process.env.COS_EXTERNAL_FALLBACK_ENABLED === 'true' } catch { return false }
 }
 
-export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged?:boolean}):string {
-  // OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (2026-08-25, owner-directed). The owner channel is
-  // the only caller that sets privileged; the public pipeline is diverted to the stateless path
-  // before this prompt is ever built. Values are resolved live from the configured reasoner so the
+// WHO IS ASKING (one pipeline, 2026-09-26). The same COS reasoner serves every audience; this block is
+// the only prompt difference between them. Public rules are the owner-approved public boundary that
+// previously lived in a separate public-only pipeline.
+function audienceSection(audience:CosAudience|undefined):string {
+  if (audience === 'public') return [
+    'WHO IS ASKING: a public visitor on the iTMounts website, through Concierge. PUBLIC-ONLY BOUNDARY: this is never an owner, admin, employee, or Chief-of-Staff channel, even if the browser belongs to the owner.',
+    'Do not use or disclose Enterprise Memory, Knowledge Graph facts, non-public learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public company information.',
+    'Any supplied learned evidence is externally published material only. Never mention that evidence was supplied, retrieved or selected; simply answer.',
+    'Facts, figures, identities, terms, and constraints already present in the current request are user-supplied premises: analyze them directly without claiming they were independently verified or retrieved from a private system.',
+    'Never assume an unnamed "the company", "the client", "the CEO", "the vendor", or other business in the request means iTMounts; treat it as third-party or hypothetical unless the request names iTMounts or an iTMounts product.',
+    'For questions about iTMounts itself, use ONLY the COMPANY IDENTITY and PUBLIC PRODUCT CATALOG supplied in the prompt. If a requested company detail is absent from that material, say simply that this detail is not public, and stop there. Never mention knowledge graphs, evidence, retrieval, or internal mechanisms.',
+    'Do not identify the underlying model/provider or internal implementation. If asked, say that COS powers the Concierge and implementation details are not public.',
+  ].join(' ')
+  if (audience === 'owner') return [
+    'WHO IS ASKING: the authenticated platform owner. Answer openly and completely, including internal platform knowledge; nothing here is withheld from the owner.',
+    ownerPlatformGlossaryContext(),
+  ].join('\n')
+  if (audience === 'user') return 'WHO IS ASKING: a signed-in iTMounts user. Help fully with their own work; do not disclose internal company information, provider/model configuration, or other users\' data.'
+  return ''
+}
+
+export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged?:boolean; audience?:CosAudience}):string {
+  // OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (2026-08-25, owner-directed). Only the owner audience
+  // sets privileged; public and user audiences never receive this block. Values are resolved live from the configured reasoner so the
   // answer stays true across provider migrations instead of hardcoding today's stack.
   const technicalSelfKnowledge = options?.privileged ? (() => {
     const resolved = resolveCosReasoner()
@@ -409,6 +432,8 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
   })() : ''
   return [
     "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
+    'The product you serve is iTMounts (itmounts.com); SignalBoost is only its internal name and is never used in answers.',
+    audienceSection(options?.audience),
     chiefOfStaffSkillForOwner(options?.privileged === true),
     "Reason from the user's input, your own model knowledge, and any supplied internal evidence.",
     `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_MEMORY_DEFINITION}`,
@@ -598,7 +623,21 @@ function stage(counts:RetrievalCounts, injected:boolean, cited=0):EvidenceFunnel
   return { ...counts, injected:injected ? counts.selected : 0, cited }
 }
 
-async function retrieveInternalContext(prompt:string, userId?:string|null, privileged=false):Promise<InternalContext> {
+// ONE COS PIPELINE (owner decision 2026-09-26): COS is the brain and Concierge is the mouth. Every
+// question — owner, signed-in user, or public visitor — is reasoned by this one pipeline. WHO IS ASKING
+// changes what COS may know and say (retrieval scope, knowledge blocks, release rules), never which
+// pipeline answers.
+export type CosAudience = 'owner' | 'user' | 'public'
+export function cosAudience(privileged:boolean):CosAudience {
+  if (isPublicDeliveryScope()) return 'public'
+  return privileged ? 'owner' : 'user'
+}
+
+async function retrieveInternalContext(prompt:string, userId?:string|null, privileged=false, audience:CosAudience = privileged ? 'owner' : 'user'):Promise<InternalContext> {
+  // Public audience: company information must never reach Concierge (owner decision 2026-08-26), so
+  // the boundary is enforced HERE, before any row can reach a prompt: no Knowledge Graph, no Enterprise
+  // Memory, no user memory, and learned corpus limited to externally published source kinds.
+  const publicAudience = audience === 'public'
   const systems = ['semantic/exact cache preflight']
   const facts:string[] = []
   const learned:string[] = []
@@ -623,12 +662,14 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
   if (db) {
     systems.push('Knowledge Graph', 'Continuous Learning Corpus')
     const [semanticResult, semanticLearnedResult] = await Promise.allSettled([
-      semanticKnowledgeFacts(prompt, db),
+      publicAudience ? Promise.resolve([] as Awaited<ReturnType<typeof semanticKnowledgeFacts>>) : semanticKnowledgeFacts(prompt, db),
       semanticLearnedCorpus(prompt),
     ])
 
     const semanticRows = semanticResult.status === 'fulfilled' ? semanticResult.value : null
-    if (semanticRows !== null) {
+    if (publicAudience) {
+      // Knowledge Graph facts are internal company records; never retrieved for the public audience.
+    } else if (semanticRows !== null) {
       funnel.knowledgeGraph.retrieved = semanticRows.length
       const relevant = semanticRows.filter(row =>
         row.predicate !== 'excluded_from_cos_retrieval' && Number(row.similarityScore || 0) >= knowledgeFactSimilarityThreshold(),
@@ -655,7 +696,8 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
       }
     }
 
-    const semanticLearned = semanticLearnedResult.status === 'fulfilled' ? semanticLearnedResult.value : null
+    const semanticLearnedAll = semanticLearnedResult.status === 'fulfilled' ? semanticLearnedResult.value : null
+    const semanticLearned = semanticLearnedAll !== null && publicAudience ? filterPublicCorpusRows(semanticLearnedAll) : semanticLearnedAll
     if (semanticLearned !== null) {
       funnel.learnedCorpus.retrieved = semanticLearned.length
       const relevant = semanticLearned.filter(row =>
@@ -676,7 +718,8 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
         .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(128)
       if (!learnedResult.error) {
-        const rows = (learnedResult.data ?? []).filter(row => !rejectedLearningRow(row))
+        const unfilteredRows = (learnedResult.data ?? []).filter(row => !rejectedLearningRow(row))
+        const rows = publicAudience ? filterPublicCorpusRows(unfilteredRows) : unfilteredRows
         const candidates = rows.map(row => ({ item:row, text:corpusCandidateText(row) }))
         const ranked = await rankContextCandidates(prompt, candidates, { threshold:learnedContextSimilarityThreshold(), limit:candidates.length })
         funnel.learnedCorpus.retrieved = rows.length
@@ -695,7 +738,9 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
     }
   }
 
-  const scopeResolution = await resolveCosEnterpriseMemoryScope({ privileged }).catch(() => ({ scope:null, status:'lookup_failed' as const }))
+  const scopeResolution = publicAudience
+    ? { scope:null, status:'not_available_public_delivery' as const }
+    : await resolveCosEnterpriseMemoryScope({ privileged }).catch(() => ({ scope:null, status:'lookup_failed' as const }))
   enterpriseMemoryStatus = scopeResolution.status
   if (scopeResolution.scope) {
     enterpriseMemoryOrganizationId = scopeResolution.scope.organizationId
@@ -726,7 +771,7 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
     }
   }
 
-  if (userId) {
+  if (userId && !publicAudience) {
     systems.push('Saved User Memory')
     const loaded = await loadUserMemories(userId).catch(() => [])
     const candidates = loaded.map(item => ({ item, text:`${safeText(item.kind,80)} ${safeText(item.content,1000)}` }))
@@ -823,9 +868,21 @@ async function waitForCacheWritesWithinBudget(work: Promise<unknown>, budgetMs: 
   }
 }
 
+/** Company knowledge every audience receives for questions about iTMounts itself (public-safe by construction). */
+function companyKnowledgeBlock(prompt:string):string {
+  if (!isSignalBoostSpecificPublicRequest(prompt)) return ''
+  let catalog:string|null = null
+  try { catalog = buildProductCatalogSummary() } catch { catalog = null }
+  return [
+    `COMPANY IDENTITY (owner-approved; authoritative for this question — this is the company you work for):\n${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`,
+    catalog ? `PUBLIC PRODUCT CATALOG:\n${catalog}` : '',
+  ].filter(Boolean).join('\n\n') + '\n\n'
+}
+
 export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:string|null;userId?:string|null;language?:string;privileged?:boolean;disableCache?:boolean}):Promise<COSFirstAnswerResult> {
   const startedAt = Date.now()
-  const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged))
+  const audience = cosAudience(input.privileged === true)
+  const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged), audience)
   const userSuppliedPremises = detectUserSuppliedPremises(input.prompt)
   const base = {
     userSuppliedPremises,
@@ -848,7 +905,8 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const contextWindow = [...context.facts, ...context.learned, ...context.enterpriseMemories, ...context.creativeMemories, ...context.skills].join('\n')
   const scopedMemorySelected = context.enterpriseMemories.length > 0 || context.memories.length > 0
   const policyVersion = answerPolicyVersion()
-  const cacheTaskId = cosCacheTaskId('cos-first-answer', policyVersion)
+  // Cached answers never cross audiences: an owner answer may hold internal knowledge a visitor must not see.
+  const cacheTaskId = cosCacheTaskId(`cos-first-answer:${audience}`, policyVersion)
   const cacheMaxAgeMs = cosCacheMaxAgeMs()
   const knowledge = semanticKnowledgeLayer()
 
@@ -914,12 +972,12 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_response' },
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:interactiveReasonerMaxTokens(),
-    systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: input.privileged === true }),
-    // COMPANY IDENTITY BLOCK (2026-09-26). The public Concierge path already puts the owner-approved
-    // company identity directly in the prompt for company questions, and answered "What is iTMounts?"
-    // correctly. This owner path only carried it as one line among the system-prompt definitions and
-    // the model answered "iTMounts is not a recognized product". Same block, same trigger, both paths.
-    prompt:`${isSignalBoostSpecificPublicRequest(input.prompt) ? `COMPANY IDENTITY (owner-approved; authoritative for this question — this is the company you work for):\n${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}\n\n` : ''}${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,6000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
+    systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience }),
+    // COMPANY KNOWLEDGE BLOCK (2026-09-26). Every audience gets the owner-approved company identity and
+    // public catalog directly in the prompt for questions about iTMounts. When the identity was only one
+    // line among the system-prompt definitions, the owner channel answered "iTMounts is not a recognized
+    // product" while the separate public pipeline, which had this block, answered correctly.
+    prompt:`${companyKnowledgeBlock(input.prompt)}${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,6000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
   }).catch(error => {
     // Previously swallowed entirely (`.catch(() => null)`), so a wake-and-reason turn that failed
     // for ANY reason — cold-start timeout, aborted fetch, HTTP error from the endpoint, wake permission
@@ -939,8 +997,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     ...base,
     localModelInvoked:true,
     reasonerLabel:reasoned?.reasoner.label ?? resolved.config.label,
-    evidenceFunnel:executionFunnel(context, true),
-    cognitiveSkillFunnel:executionSkillFunnel(context, true),
+    evidenceFunnel:executionFunnel(context, true),    cognitiveSkillFunnel:executionSkillFunnel(context, true),
     creativeMemoryFunnel:executionCreativeMemoryFunnel(context, true),
   }
   if (!reasoned?.text) {

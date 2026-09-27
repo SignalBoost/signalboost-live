@@ -346,7 +346,7 @@ async function tryNeuralContextualInterpretation(input: COSFirstAnswerInput): Pr
 
 async function tryOwnerNeuralSelfKnowledge(
   input: COSFirstAnswerInput,
-  options: { compatibilitySignal?: boolean; platformConcept?: boolean } = {},
+  options: { compatibilitySignal?: boolean } = {},
 ): Promise<COSFirstAnswerResult | null> {
   if (input.privileged !== true || isPublicDeliveryScope()) return null
   // Assistant IS COS. Do not spend a full neural call asking whether every ordinary owner turn is
@@ -656,16 +656,8 @@ export async function tryCOSFirstAnswer(input: COSFirstAnswerInput): Promise<COS
     return deterministicSelfKnowledge
   }
 
-  // Owner questions that name an owner-glossary platform concept go to the owner self-knowledge reasoner,
-  // which receives the owner-approved glossary. It still decides relevance itself; when the question is
-  // really about the general-world meaning of the word, it declines and the ordinary core answers.
-  const ownerPlatformConcept = input.privileged === true
-    && !isPublicDeliveryScope()
-    && mentionsPlatformConcept(input.prompt)
-  if (ownerPlatformConcept) {
-    const platformAnswer = await tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true, platformConcept: true })
-    if (platformAnswer) return reviewNativeLanguageQuality(input, platformAnswer)
-  }
+  // Platform-concept questions (COS, University, specialists, artifacts, graduates, Residency) are answered
+  // by the one COS pipeline below, whose owner audience carries the owner-approved glossary.
 
   let coreResult = await tryCoreCOSFirstAnswer(input)
   if (shouldRetryMalformedPublicCoreResult(coreResult)) {

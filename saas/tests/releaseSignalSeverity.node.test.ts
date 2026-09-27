@@ -87,17 +87,14 @@ test('the enterprise release gate consumes the split rather than failing on any 
   assert.match(gate.slice(advisory), /console\.warn/, 'advisory signals must be recorded, not discarded')
 })
 
-test('the public claim gate is filtered through the same severity rule', () => {
+test('public answers use the one claim gate, not a second copy of it', () => {
+  // One COS pipeline (2026-09-26): public answers are reasoned by the enterprise pipeline, whose
+  // release gate consumes the severity split (asserted above). The core keeps no parallel claim gate.
   const core = file('lib/ai/cos/cosFirstAnswerCore.ts')
-  assert.match(core, /import \{ blockingReleaseSignals \} from '\.\/releaseSignalSeverity\.ts'/)
-  // Real call sites only: the import line and the prose comment above them name the function too.
   const calls = core.split('\n')
     .filter(line => /executiveDecisionUnsupportedClaims\(\s*\w/.test(line) && !line.trim().startsWith('//'))
-  assert.ok(calls.length >= 2, `expected the claim-gate call sites, found ${calls.length}`)
-  for (const line of calls) {
-    assert.match(line, /blockingReleaseSignals\(\s*executiveDecisionUnsupportedClaims\(/,
-      `unsupported-claim signals must pass through the severity rule: ${line.trim()}`)
-  }
+  assert.equal(calls.length, 0, 'a second claim gate would let the two audiences drift apart again')
+  assert.match(core, /await releaseToPublic\(input, brain\)/)
 })
 
 test('this file is a test, not a module pasted over one', () => {

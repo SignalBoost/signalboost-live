@@ -74,12 +74,16 @@ test('empty and junk input is safe', () => {
 })
 
 test('the gate runs on every public answer and fails closed with no draft', () => {
+  // One COS pipeline (2026-09-26): every public answer passes through releaseToPublic.
   const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
-  assert.match(source, /const disclosures = publicDisclosureViolations\(parsed\.answer\)/)
-  const gateAt = source.indexOf('const disclosures = publicDisclosureViolations')
-  const tail = source.slice(gateAt, gateAt + 2400)
-  assert.ok(!/isSignalBoostSpecificPublicRequest/.test(tail), 'gate must apply to every public answer')
-  assert.ok(!/bestEffortReply\s*:/.test(tail.slice(0, tail.indexOf('parsed = redacted'))))
+  assert.match(source, /return learnFromTurn\(input, await releaseToPublic\(input, brain\)\)/)
+  const releaseAt = source.indexOf('async function releaseToPublic(')
+  const release = source.slice(releaseAt, source.indexOf('function harvestCatalogNames('))
+  assert.match(release, /const disclosures = publicDisclosureViolations\(answer\)/)
+  assert.ok(!/isSignalBoostSpecificPublicRequest/.test(release), 'gate must apply to every public answer')
+  const failClosed = release.slice(release.indexOf('const redacted ='), release.indexOf('answer = redacted.answer.trim()'))
+  assert.ok(!/bestEffortReply\s*:/.test(failClosed), 'a redaction failure must not surface a draft')
+  assert.match(release, /publicDisclosureViolations\(draft\)\.length/, 'low-confidence drafts are gated too')
 })
 
 test('detects a question about what runs the service', () => {
@@ -119,10 +123,10 @@ test('unknown language falls back to English', () => {
 
 test('the public self-referential branch runs before the redaction attempt', () => {
   const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
-  const branchAt = source.indexOf('asksAboutServiceIdentity(userRequest)')
-  const redactAt = source.indexOf('You are COS repairing a public answer that disclosed')
-  assert.ok(branchAt > 0 && redactAt > 0)
-  assert.ok(branchAt < redactAt, 'boundary reply must pre-empt the redaction pass')
+  const releaseAt = source.indexOf('async function releaseToPublic(')
+  const branchAt = source.indexOf('if (disclosures.length && asksAboutServiceIdentity(userRequest))', releaseAt)
+  const redactAt = source.indexOf('You are COS repairing a public answer that disclosed', releaseAt)
+  assert.ok(releaseAt > 0 && branchAt > releaseAt && redactAt > branchAt, 'boundary reply must pre-empt the redaction pass')
   const branch = source.slice(branchAt, branchAt + 400)
   assert.match(branch, /reply: publicImplementationDisclosureReply\(/)
 })
@@ -155,9 +159,10 @@ test('questions about other people building other things are not identity questi
 
 test('PUBLIC identity is answered before the public reasoner is called', () => {
   const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
-  const interceptAt = source.indexOf('if (asksAboutServiceIdentity(userRequest)) {')
-  const firstReasonerCall = source.indexOf('await callCosReasoner(')
-  assert.ok(interceptAt > 0, 'public intercept must exist')
-  assert.ok(firstReasonerCall > 0)
-  assert.ok(interceptAt < firstReasonerCall, 'public intercept must precede any public reasoner call')
+  const branchAt = source.indexOf('if (isPublicDeliveryScope()) {\n    // ONE COS PIPELINE')
+  const interceptAt = source.indexOf('if (asksAboutServiceIdentity(userRequest)) {', branchAt)
+  const reasonerAt = source.indexOf('const brain = await tryEnterpriseCOSFirstAnswer(input)', branchAt)
+  assert.ok(branchAt > 0, 'public branch must exist')
+  assert.ok(interceptAt > branchAt, 'public intercept must exist')
+  assert.ok(reasonerAt > interceptAt, 'public intercept must precede the COS reasoner call')
 })

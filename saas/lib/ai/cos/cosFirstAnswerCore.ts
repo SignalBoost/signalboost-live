@@ -1,11 +1,10 @@
-// saas/lib/ai/cos/cosFirstAnswer.ts
+// saas/lib/ai/cos/cosFirstAnswerCore.ts
 // Compatibility entrypoint. Ordinary COS reasoning remains in cosFirstAnswerEnterprise.
 // Volatile/current facts are intercepted here and MUST be re-verified live on every request before
 // any model is allowed to answer. No answer cache, Knowledge Graph, learned corpus, Enterprise
 // Memory, user memory, or pretrained/model memory is authoritative for this path.
 
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
-import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
@@ -60,19 +59,8 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
   return { ...parsed, answer: resolved.text }
 }
 
-import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
 import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
-import { executiveDecisionUnsupportedClaims } from './reasonerQuality.ts'
-import { filterPublicCorpusRows, publicCorpusFunnel } from './publicCorpusEvidence.ts'
-import { queryNearestLearnedCorpus } from './learnedCorpusSemantic.ts'
-import { selectGroundingEvidence, groundingPromptBlock } from './grounding.ts'
-import { blockingReleaseSignals } from './releaseSignalSeverity.ts'
-import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
-import {
-  isSignalBoostSpecificPublicRequest,
-  publicScenarioScopeViolations,
-  publicUserRequestText,
-} from './publicScenarioScope.ts'
+import { publicScenarioScopeViolations, publicUserRequestText } from './publicScenarioScope.ts'
 import {
   tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
   type COSFirstAnswerResult,
@@ -187,271 +175,60 @@ function freshProvenance(args: {
   }
 }
 
-function publicStatelessProvenance(reasonerLabel: string | null, invoked: boolean, catalogConsulted: boolean) {
-  return {
-    responseSource: invoked ? 'local_cos_reasoning' : 'external_fallback_required',
-    externalAiInvoked: false as const,
-    externalAiNecessary: !invoked,
-    escalationReasonCode: invoked ? null : 'public_reasoner_unavailable',
-    escalationReason: invoked ? null : 'The configured COS reasoner is unavailable for public-only stateless reasoning.',
-    localModelInvoked: invoked,
-    reasonerLabel,
-    internalSystemsConsulted: [
-      ...(catalogConsulted ? ['Public Product Catalog'] : []),
-      ...(invoked ? ['Independent Local Reasoner'] : []),
-    ],
-    knowledgeFactsUsed: 0,
-    learnedItemsUsed: 0,
-    enterpriseMemoriesUsed: 0,
-    userMemoriesUsed: 0,
-    cognitiveSkillsUsed: 0,
-    enterpriseMemoryStatus: 'not_available_public_delivery',
-    enterpriseMemoryOrganizationId: null,
-    evidenceFunnel: {
-      knowledgeGraph: emptyStage(),
-      learnedCorpus: emptyStage(),
-      enterpriseMemory: emptyStage(),
-      userMemory: emptyStage(),
-    },
-    cognitiveSkillFunnel: emptyStage(),
-    knowledgeFactsCited: 0,
-    learnedItemsCited: 0,
-    enterpriseMemoriesCited: 0,
-    userMemoriesCited: 0,
-    cognitiveSkillsCited: 0,
-    autonomousResearchAttempted: false,
-    researchDocumentsAcquired: 0,
-    knowledgeNewlyRetained: 0,
-    publicDeliveryOnly: true,
-  }
-}
-
-async function tryPublicStatelessAnswer(input: {
-  prompt: string
-  language?: string
-  previousAssistant?: string | null
-}): Promise<COSFirstAnswerResult> {
-  // Conversation continuity on the PUBLIC pipeline (2026-08-25). "Stateless" here has always
-  // meant: no Enterprise Memory, no learned corpus, no user memory, no private owner context.
-  // It must NOT mean amnesia about the visitor's own conversation: the routes now pass the
-  // preceding Concierge answer, and without it a follow-up like "what should the subject line
-  // be?" made the public face ask for an email it had just written itself.
-  const precedingPublicAnswer = String(input.previousAssistant ?? '').trim().slice(0, 8000)
+/**
+ * THE PUBLIC RELEASE STEP (one COS pipeline, 2026-09-26). COS reasons once, in the public audience; this
+ * is the only public-specific stage after reasoning, and it runs on EVERY public answer. It carries the
+ * owner-approved public protections that previously existed only in the separate public-only pipeline:
+ *  1. scope isolation — a generic or third-party question must not be answered with company material;
+ *  2. disclosure gate — no model, provider, infrastructure, internal component, metric or evidence label.
+ * Each has one bounded repair; if the repair does not clear it, the turn fails closed with NO draft.
+ */
+async function releaseToPublic(
+  input: { prompt: string; language?: string },
+  result: COSFirstAnswerResult,
+): Promise<COSFirstAnswerResult> {
   const userRequest = publicUserRequestText(input.prompt)
-  const signalBoostSpecific = isSignalBoostSpecificPublicRequest(input.prompt)
-
-  // SELF-IDENTITY IS ANSWERED DETERMINISTICALLY, BEFORE INFERENCE (2026-08-26).
-  // Asked "What model powers COS?" this path once replied "I am a large language model, trained
-  // by Google" — a false statement about the product, recited from the base model's own memorized
-  // identity text. No output-inspection gate can be relied on to catch that: it would require a
-  // complete list of every vendor a model might name itself after. The question has exactly one
-  // correct answer, known here at build time, so the model is never asked.
-  if (asksAboutServiceIdentity(userRequest)) {
-    return {
-      handled: true,
-      reply: publicImplementationDisclosureReply(input.language),
-      confidence: 1,
-      provenance: { responseSource: 'cos_local_primary' } as any,
+  const languageRule = input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.'
+  if (!result.handled) {
+    // A low-confidence draft is only ever shown if it would itself pass the disclosure gate.
+    const draft = 'bestEffortReply' in result ? String(result.bestEffortReply || '') : ''
+    if (draft && publicDisclosureViolations(draft).length) {
+      return { ...result, bestEffortReply: undefined, provenance: { ...(result.provenance as Record<string, unknown>), publicDraftWithheld: true } as any }
     }
-  }
-  const resolved = resolveCosReasoner()
-  if (!resolved.config) {
-    return {
-      handled: false,
-      confidence: 0,
-      reason: 'The configured COS reasoner is unavailable for public-only stateless reasoning.',
-      provenance: publicStatelessProvenance(null, false, signalBoostSpecific) as any,
-    }
+    return result
   }
 
-  // PUBLIC-SCOPE CORPUS EVIDENCE (2026-08-26, owner-approved).
-  //
-  // The Concierge reasons from the same research material the owner channel does, restricted to
-  // externally published source kinds. The restriction is applied HERE, before the rows ever reach
-  // a prompt: filterPublicCorpusRows() admits an allowlist of five public kinds and drops
-  // everything else, including internally-derived rows ('user_feedback',
-  // 'verified_objective_outcome', 'external_teacher') and any source kind added later.
-  //
-  // Best-effort by design. Any failure — embedding, RPC, or budget — yields no evidence and the
-  // turn proceeds exactly as it did before. A retrieval problem must never cost the visitor an
-  // answer.
-  let publicEvidenceBlock = ''
-  let publicEvidenceFunnel = { retrieved: 0, publicEligible: 0, excludedPrivate: 0 }
-  try {
-    const budgetMs = Math.max(1500, Number(process.env.PUBLIC_CORPUS_RETRIEVAL_BUDGET_MS || 6000))
-    const rows = await Promise.race([
-      (async () => {
-        const vector = await generateLocalEmbedding(userRequest)
-        return queryNearestLearnedCorpus(vector, { matchCount: 24, minSimilarity: 0 })
-      })(),
-      new Promise<null>(resolve => setTimeout(() => resolve(null), budgetMs)),
-    ])
-    if (Array.isArray(rows) && rows.length) {
-      publicEvidenceFunnel = publicCorpusFunnel(rows)
-      const publicRows = filterPublicCorpusRows(rows)
-      const texts = publicRows
-        .map(row => [row.subject, row.summary].filter(Boolean).join(' — ').trim())
-        .filter(Boolean)
-      if (texts.length) {
-        const selected = selectGroundingEvidence(userRequest, { kg: [], cl: texts, em: [] }, 4)
-        if (selected.length) publicEvidenceBlock = groundingPromptBlock(selected)
-      }
-      console.info('[cos-public-corpus]', JSON.stringify({
-        ...publicEvidenceFunnel,
-        injected: publicEvidenceBlock ? 1 : 0,
-      }))
-    }
-  } catch (error) {
-    console.warn('cosFirstAnswer: public corpus retrieval unavailable; answering without it', error)
-  }
+  let answer = String(result.reply || '').trim()
 
-  const publicCatalog = signalBoostSpecific ? buildProductCatalogSummary() : null
-  const reasoned = await callCosReasoner({
-    temperature: 0.2,
-    maxTokens: 2600,
-    systemPrompt: [
-      'You are COS, the reasoning engine behind the public SignalBoost Concierge.',
-      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-      'PUBLIC-ONLY BOUNDARY: this is never an owner, admin, employee, or Chief-of-Staff channel, even if the browser belongs to the owner.',
-      'Do not use or disclose Enterprise Memory, Knowledge Graph facts, non-public learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public SignalBoost company information.',
-      'If a PUBLIC REFERENCE EVIDENCE block is supplied below, it contains externally published material only (public web, news, official documentation, scientific journals, video transcripts) and you may use it. Never mention that evidence was supplied, retrieved or selected; simply answer.',
-      'The preceding turn of THIS public conversation is not private history: when a PRECEDING CONCIERGE ANSWER block is supplied in the prompt, use it to resolve what the visitor refers to ("the email", "it", "that draft") and to continue the same task naturally.',
-      'The public-only boundary protects SignalBoost private systems; it does NOT make facts typed by the user inaccessible. Facts, figures, identities, terms, and constraints already present in the current request are user-supplied premises. Analyze them directly without claiming they were independently verified or retrieved from a private system.',
-      'Never assume an unnamed "the company", "the client", "the CEO", "the vendor", "the investor", or other business in the request means SignalBoost. Treat it as third-party or hypothetical unless the actual user request explicitly names SignalBoost or a SignalBoost product.',
-      signalBoostSpecific
-        ? 'THIS REQUEST IS SIGNALBOOST-SPECIFIC. For SignalBoost-specific claims, use ONLY the PUBLIC COMPANY IDENTITY and PUBLIC SIGNALBOOST PRODUCT CATALOG supplied in the prompt. Company identity questions (what SignalBoost is, who owns it) are answered from the PUBLIC COMPANY IDENTITY text, phrased naturally. If a requested SignalBoost detail — such as the individual or corporate owner — is absent from that supplied material, say simply that this detail is not public, and stop there. Never mention knowledge graphs, evidence, retrieval, internal mechanisms, or what information you do or do not have access to; never editorialize about gaps in your sources.'
-        : 'THIS REQUEST IS NOT SIGNALBOOST-SPECIFIC. Do not mention SignalBoost products, its public catalog, its private financials, its roadmap, or its internal constraints. Answer the third-party or hypothetical scenario from the user-supplied premises and ordinary general reasoning.',
-      'Do not identify the underlying model/provider or internal implementation. If asked, say that COS powers the Concierge and implementation details are not public.',
-      'For ordinary timeless/general questions, you may use your general model knowledge. Do not turn mutable/current claims into facts without live evidence.',
-      'You may edit, rewrite, summarize, explain, brainstorm, reason, draft, and help with ordinary public tasks just like a general assistant, subject to the public-only boundary.',
-      'PROGRESSIVE PROACTIVE HELP: Answer the request first. When a concrete, directly relevant next step would help, briefly offer it after the answer. If the visitor accepts, complete that work, then offer the next useful continuation if one exists; there is no fixed lifetime cap. Do not pad answers with generic offers, repeat rejected options, or do extra research/actions before the visitor asks. State that a time-sensitive continuation will be verified live.',
-      'For diagnostic, troubleshooting, or root-cause questions, only state a cause as an actual finding when the request identifies a real, specific system or incident. For a generic, hypothetical, or architecture-design question with no real system named, present causes as illustrative reasoning about the class of problem, not as a diagnosis — do not label a cause "primary" or "most likely" as if it were confirmed.',
-      // ONE ANSWER POLICY (2026-08-26). Identical rules to the owner reasoner: quality must not
-      // depend on which surface the reader hit. See cosAnswerPolicyCore.ts.
-      ...QUANTITATIVE_ANSWER_POLICY,
-      ...COS_OPERATING_CHARTER,
-      input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
-    ].join(' '),
-    prompt: [
-      ...(signalBoostSpecific ? [`PUBLIC COMPANY IDENTITY (owner-approved public description):\n${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`] : []),
-      ...(publicCatalog ? [`PUBLIC SIGNALBOOST PRODUCT CATALOG:\n${publicCatalog}`] : []),
-      ...(precedingPublicAnswer ? [`PRECEDING CONCIERGE ANSWER IN THIS SAME PUBLIC CONVERSATION (context only — the visitor may refer to it; never treat it as external evidence):\n${precedingPublicAnswer}`] : []),
-      ...(publicEvidenceBlock ? [`PUBLIC REFERENCE EVIDENCE (externally published material only):\n${publicEvidenceBlock}`] : []),
-      `USER REQUEST:\n${userRequest}`,
-      'Answer the public user now.',
-    ].join('\n\n'),
-  }).catch(() => null)
-
-  const provenance = publicStatelessProvenance(reasoned?.reasoner.label ?? resolved.config.label, Boolean(reasoned?.text), signalBoostSpecific)
-  if (!reasoned?.text) {
-    return {
-      handled: false,
-      confidence: 0,
-      reason: 'The configured COS reasoner returned no public-only answer.',
-      provenance: provenance as any,
-    }
-  }
-
-  let parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
-  if (!parsed || parsed.truncated || !parsed.answer.trim()) {
-    return {
-      handled: false,
-      confidence: 0,
-      reason: 'The public-only COS result was empty, truncated, or unparseable.',
-      provenance: provenance as any,
-    }
-  }
-
-  // GOVERNANCE PARITY WITH THE OWNER CHANNEL (2026-08-26, owner-directed architecture).
-  //
-  // COS is the only reasoner and the Concierge renders passively, so the same claim gate must run
-  // on both. Until now the public path had no executive release check at all: it answered
-  // questions the owner channel refused, which is not a feature — it is the ungoverned path being
-  // the buyer-facing one. Measured on the same 512-H100 question, Concierge produced an answer
-  // whose own body contradicted its headline while COS failed closed.
-  //
-  // Deliberately NO data-boundary change here. executiveDecisionUnsupportedClaims() is a pure
-  // function of the prompt and the draft; it retrieves nothing. Public scope still fetches no
-  // enterprise memory, no user memory and no knowledge graph, exactly as before.
-  //
-  // The severity split applies as it does on the owner side, so a retrieval-quality advisory could
-  // never fail a public turn closed — though on this path none can arise, since nothing is injected.
-  const publicClaimSignals = blockingReleaseSignals(executiveDecisionUnsupportedClaims(input.prompt, reasoned.text))
-  if (publicClaimSignals.length) {
-    const claimRepair = await callCosReasoner({
-      temperature: 0,
-      maxTokens: 2600,
-      systemPrompt: [
-        'PUBLIC ANSWER RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-        'Rewrite the draft using only the facts supplied in the request. Remove unsupported commercial certainty, invented numeric limits and targets, fabricated timelines, market claims, legal conclusions, forecasts, and security frameworks the request did not state.',
-        'Keep the substantive answer intact and do not mention this repair.',
-        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
-      ].join(' '),
-      prompt: [`USER REQUEST:\n${userRequest}`, `REJECTED DRAFT:\n${parsed.answer}`, `SIGNALS:\n${publicClaimSignals.join(', ')}`].join('\n\n'),
-    }).catch(() => null)
-    const claimRepaired = withComputedArithmetic(claimRepair?.text ? parseLocalResult(claimRepair.text) : null)
-    const claimRepairUsable = Boolean(claimRepaired && !claimRepaired.truncated && claimRepaired.answer.trim())
-    const remaining = claimRepairUsable
-      ? blockingReleaseSignals(executiveDecisionUnsupportedClaims(input.prompt, claimRepair?.text ?? ''))
-      : publicClaimSignals
-    if (remaining.length) {
-      return {
-        handled: false,
-        confidence: 0,
-        reason: `Public answer release rejected: unsupported claim signals (${remaining.join(', ')}) remained after local repair.`,
-        provenance: provenance as any,
-      }
-    }
-    if (claimRepairUsable && claimRepaired) parsed = claimRepaired
-  }
-
-  const scopeViolations = publicScenarioScopeViolations(input.prompt, parsed.answer)
+  const scopeViolations = publicScenarioScopeViolations(input.prompt, answer)
   if (scopeViolations.length) {
     const repair = await callCosReasoner({
       temperature: 0,
       maxTokens: 2600,
       systemPrompt: [
         'You are COS repairing a public generic-business answer. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-        'The actual user request does not identify SignalBoost. Remove every SignalBoost-specific product, catalog, roadmap, financial, customer, or internal-company reference from the draft.',
+        'The actual user request does not identify iTMounts. Remove every company-specific product, catalog, roadmap, financial, customer, or internal-company reference from the draft.',
         'Do not say you cannot access, disclose, or analyze facts that are already written in the user request. Treat those facts as user-supplied premises and analyze them directly.',
-        'Do not claim the premises were independently verified. Do not add private-system claims or current-world facts that require live evidence.',
         'Answer the requested business decision or analysis directly using ordinary general reasoning. Do not mention this repair.',
-        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
+        languageRule,
       ].join(' '),
-      prompt: [
-        `USER REQUEST:\n${userRequest}`,
-        `REJECTED DRAFT:\n${parsed.answer}`,
-        `SCOPE VIOLATIONS:\n${scopeViolations.join(', ')}`,
-        'Return the corrected answer now.',
-      ].join('\n\n'),
+      prompt: [`USER REQUEST:\n${userRequest}`, `REJECTED DRAFT:\n${answer}`, `SCOPE VIOLATIONS:\n${scopeViolations.join(', ')}`, 'Return the corrected answer now.'].join('\n\n'),
     }).catch(() => null)
     const repaired = withComputedArithmetic(repair?.text ? parseLocalResult(repair.text) : null)
     if (!repaired || repaired.truncated || !repaired.answer.trim() || publicScenarioScopeViolations(input.prompt, repaired.answer).length) {
       return {
         handled: false,
         confidence: 0,
-        reason: `Public generic-scenario answer violated scope isolation (${scopeViolations.join(', ')}) and the bounded repair did not clear it.`,
-        provenance: provenance as any,
+        reason: `Public answer violated scope isolation (${scopeViolations.join(', ')}) and the bounded repair did not clear it.`,
+        provenance: result.provenance,
       }
     }
-    parsed = repaired
+    answer = repaired.answer.trim()
   }
 
-  // PUBLIC DISCLOSURE GATE (2026-08-26, owner-directed). COS is the only reasoner and the
-  // Concierge renders passively, so the company-information boundary is enforced HERE, before
-  // release — not downstream by a filter that could miss. Unlike the scenario-scope check above,
-  // this runs on EVERY public answer including SignalBoost-specific ones, because "what model
-  // powers COS?" is precisely the question that must not be answered on this surface.
-  const disclosures = publicDisclosureViolations(parsed.answer)
+  const disclosures = publicDisclosureViolations(answer)
   if (disclosures.length && asksAboutServiceIdentity(userRequest)) {
-    // The reader asked what runs this service. The honest public answer is the boundary itself,
-    // not an outage message and not a redaction attempt that will keep tripping the gate.
-    return {
-      handled: true,
-      reply: publicImplementationDisclosureReply(input.language),
-      confidence: 1,
-      provenance: provenance as any,
-    }
+    return { ...result, reply: publicImplementationDisclosureReply(input.language), confidence: 1 }
   }
   if (disclosures.length) {
     const redact = await callCosReasoner({
@@ -460,50 +237,31 @@ async function tryPublicStatelessAnswer(input: {
       systemPrompt: [
         'You are COS repairing a public answer that disclosed internal information. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
         'Remove every reference to the underlying model, model family, provider, hosting platform, infrastructure vendor, internal component name, internal metric, confidence value, threshold, evidence label, and retrieval or release machinery.',
-        'If the reader asked what powers this service, say only that COS is SignalBoost\'s own reasoning layer and that implementation details are not public. Do not name anything.',
+        'If the reader asked what powers this service, say only that COS is iTMounts\' own reasoning layer and that implementation details are not public. Do not name anything.',
         'Keep the substantive answer to the reader\'s actual question intact. Do not mention this repair.',
-        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
+        languageRule,
       ].join(' '),
-      prompt: [
-        `USER REQUEST:\n${userRequest}`,
-        `REJECTED DRAFT:\n${parsed.answer}`,
-        `DISCLOSURES:\n${disclosures.join(', ')}`,
-        'Return the corrected answer now.',
-      ].join('\n\n'),
+      prompt: [`USER REQUEST:\n${userRequest}`, `REJECTED DRAFT:\n${answer}`, `DISCLOSURES:\n${disclosures.join(', ')}`, 'Return the corrected answer now.'].join('\n\n'),
     }).catch(() => null)
     const redacted = withComputedArithmetic(redact?.text ? parseLocalResult(redact.text) : null)
     if (!redacted || redacted.truncated || !redacted.answer.trim() || publicDisclosureViolations(redacted.answer).length) {
-      // Fails closed with no best-effort draft. A draft containing internals must never be
-      // surfaced to the reader, not even labelled as low confidence.
+      // Fails closed with no draft: an answer containing internals must never reach the reader.
       return {
         handled: false,
         confidence: 0,
         reason: `Public answer disclosed internal information (${disclosures.join(', ')}) and the bounded redaction did not clear it.`,
-        provenance: provenance as any,
+        provenance: result.provenance,
       }
     }
-    parsed = redacted
-  }
-
-  const confidence = Math.max(0, Math.min(1, parsed.confidence))
-  if (confidence < confidenceThreshold()) {
-    return {
-      handled: false,
-      confidence,
-      reason: `Public-only COS confidence ${confidence.toFixed(2)} is below threshold ${confidenceThreshold().toFixed(2)}.`,
-      bestEffortReply: parsed.answer.trim(),
-      provenance: provenance as any,
-    }
+    answer = redacted.answer.trim()
   }
 
   return {
-    handled: true,
-    reply: parsed.answer.trim(),
-    confidence,
-    provenance: provenance as any,
+    ...result,
+    reply: answer,
+    provenance: { ...(result.provenance as Record<string, unknown>), publicReleaseApplied: true } as any,
   }
 }
-
 
 function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }>): string[] {
   // Join every field with the bullet so a source TITLE never glues onto the next snippet's name.
@@ -1048,26 +806,27 @@ export async function tryCOSFirstAnswer(input: {
   }
 
   if (isPublicDeliveryScope()) {
-    // ONE BRAIN. Concierge is a render window. Company-reserved and identity
-    // questions stay on the public-safe prompt. Everything else is the same COS
-    // enterprise answer, with disclosure stripped if internals leaked.
-    if (asksAboutServiceIdentity(input.prompt) || isSignalBoostSpecificPublicRequest(input.prompt)) {
-      return learnFromTurn(input, await tryPublicStatelessAnswer(input))
-    }
-    const brain = await tryEnterpriseCOSFirstAnswer(input)
-    if (brain.handled && 'reply' in brain && brain.reply && publicDisclosureViolations(String(brain.reply)).length) {
+    // ONE COS PIPELINE (owner decision 2026-09-26). Concierge is the mouth; COS is the brain. Public
+    // questions — including questions about iTMounts itself — run the SAME pipeline as the owner's,
+    // in the public audience: public-safe retrieval, the public boundary, and this release gate. The
+    // separate public-only pipeline that used to answer company questions has been removed.
+    //
+    // SELF-IDENTITY IS A RELEASE RULE, ANSWERED BEFORE INFERENCE (2026-08-26): "what model powers
+    // this?" has exactly one correct public answer, so the model is never asked.
+    const userRequest = publicUserRequestText(input.prompt)
+    if (asksAboutServiceIdentity(userRequest)) {
       return learnFromTurn(input, {
-        ...brain,
+        handled: true,
         reply: publicImplementationDisclosureReply(input.language),
-        confidence: Math.min(brain.confidence, 0.6),
-        provenance: { ...(brain.provenance as Record<string, unknown>), publicDisclosureStripped: true } as any,
+        confidence: 1,
+        provenance: { responseSource: 'cos_local_primary', selfKnowledgeDeterministic: true } as any,
       })
     }
-    return learnFromTurn(input, brain)
+    const brain = await tryEnterpriseCOSFirstAnswer(input)
+    return learnFromTurn(input, await releaseToPublic(input, brain))
   }
 
-  if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
-    try {
+  if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {    try {
       await ensureLocalInferenceRuntimeReady()
       await generateLocalEmbedding(input.prompt)
     } catch (error) {

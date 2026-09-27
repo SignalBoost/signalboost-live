@@ -56,3 +56,17 @@ test('failed live Production acceptance rolls back instead of reporting fixed', 
   assert.match(mergeRoute, /builder_repository_production_rolled_back/)
   assert.match(mergeWatchRoute, /builder_repository_production_rolled_back/)
 })
+
+
+test('rolled-back Production acceptance queues bounded owner-authorized repair-again work', () => {
+  assert.match(lifecycle, /MAX_PRODUCTION_REPAIR_ATTEMPTS = 3/)
+  assert.match(lifecycle, /input\.row\.owner_authorized !== true/)
+  assert.match(lifecycle, /nextAttempt > MAX_PRODUCTION_REPAIR_ATTEMPTS/)
+  assert.match(lifecycle, /enqueueSignalBoostRepositoryRepairJob/)
+  assert.match(lifecycle, /selfHealingProductionRecovery: true/)
+  assert.match(lifecycle, /productionRepairParentJobId/)
+  assert.match(lifecycle, /boundedRecoveryText/)
+  assert.match(lifecycle, /credential-redacted/)
+  assert.match(lifecycle, /Do not weaken acceptance or verification/)
+  assert.match(lifecycle, /input\.error === 'builder_repository_production_rolled_back'/)
+})

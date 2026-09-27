@@ -82,3 +82,11 @@ test('Playwright CLI canary persists metadata-only browser evidence', () => {
   assert.doesNotMatch(canary, /result:\s*observed/)
 })
 
+
+
+test('rolled-back production recovery is a first-class prioritized self-healing queue', () => {
+  assert.match(route, /selfHealingProductionRecovery/)
+  assert.match(route, /production-recovery/)
+  assert.match(route, /productionRecoveryQueued/)
+  assert.match(jobRunner, /job\.metadata\.selfHealingProductionRecovery === true/)
+})

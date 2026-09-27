@@ -9,11 +9,11 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type OwnedRepairKind = 'site' | 'audit' | 'university' | 'playwright-cli-canary'
+type OwnedRepairKind = 'site' | 'audit' | 'university' | 'production-recovery' | 'playwright-cli-canary'
 type QueuedOwnedRepair = { id: string; userId: string; kind: OwnedRepairKind; createdAt: string }
 
 async function queuedOwnedRepair(
-  metadataKey: 'selfHealingOwnedSite' | 'selfHealingOwnedAudit' | 'selfHealingUniversityDistillation' | 'builderPlaywrightCliCanary',
+  metadataKey: 'selfHealingOwnedSite' | 'selfHealingOwnedAudit' | 'selfHealingUniversityDistillation' | 'selfHealingProductionRecovery' | 'builderPlaywrightCliCanary',
   kind: OwnedRepairKind,
 ): Promise<QueuedOwnedRepair | null> {
   const db = getAdminSupabase()
@@ -35,12 +35,14 @@ async function queuedOwnedRepair(
 }
 
 async function queuedOwnedSelfHealingRepairs(): Promise<QueuedOwnedRepair[]> {
-  const [site, audit, university] = await Promise.all([
+  const [productionRecovery, site, audit, university] = await Promise.all([
+    queuedOwnedRepair('selfHealingProductionRecovery', 'production-recovery'),
     queuedOwnedRepair('selfHealingOwnedSite', 'site'),
     queuedOwnedRepair('selfHealingOwnedAudit', 'audit'),
     queuedOwnedRepair('selfHealingUniversityDistillation', 'university'),
   ])
-  return [site, audit, university].filter((job): job is QueuedOwnedRepair => Boolean(job))
+  // A rolled-back Production regression is the most urgent owned recovery lane.
+  return [productionRecovery, site, audit, university].filter((job): job is QueuedOwnedRepair => Boolean(job))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
@@ -83,6 +85,7 @@ export async function GET(request: Request) {
     candidates: jobs.length,
     executed: selected ? 1 : 0,
     deferred: Math.max(0, jobs.length - (selected ? 1 : 0)),
+    productionRecoveryQueued: ownedRepairs.some(job => job.kind === 'production-recovery'),
     ownedSiteRepairQueued: ownedRepairs.some(job => job.kind === 'site'),
     ownedAuditRepairQueued: ownedRepairs.some(job => job.kind === 'audit'),
     universityDistillationRepairQueued: ownedRepairs.some(job => job.kind === 'university'),

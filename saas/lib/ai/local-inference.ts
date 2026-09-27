@@ -1,3 +1,4 @@
+// saas/lib/ai/local-inference.ts
 import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
@@ -232,7 +233,7 @@ function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: nu
         : travelPlan
           ? 'COS_INTERACTIVE_TRAVEL_TIMEOUT_MS'
           : 'COS_INTERACTIVE_MODEL_TIMEOUT_MS'
-  const fallback = directEdit ? 12000 : authoring ? 15000 : simpleKnowledge ? 7000 : travelPlan ? 18000 : 20000
+  const fallback = directEdit ? 12000 : authoring ? 20000 : simpleKnowledge ? 7000 : travelPlan ? 18000 : 20000
   const configured = Number(process.env[variable] || String(fallback))
   const bounded = Number.isFinite(configured) ? Math.max(3000, Math.min(60000, configured)) : fallback
   return Math.min(configTimeoutMs, bounded)
@@ -243,9 +244,11 @@ function modelForRequest(args: LocalModelCallArgs, config: LocalInferenceConfig,
   if (directTextTransformation(args)) {
     return (process.env.COS_DIRECT_TEXT_MODEL || 'zai-org/GLM-5.3-Flash').trim() || config.model
   }
-  if (interactiveAuthoring(args)) {
-    return (process.env.COS_INTERACTIVE_AUTHORING_MODEL || 'zai-org/GLM-5.3-Flash').trim() || config.model
-  }
+  // AUTHORING LANE USES THE CONFIGURED MODEL (2026-09-27). Production evidence (provider_inference_usage,
+  // 02:13 and 02:14 ET): every cos_interactive_authoring call to zai-org/GLM-5.3-Flash ran the full 15001ms
+  // with no HTTP status, so COS's main answer never arrived and each question fell through to the slow
+  // RunPod rescue (~38s). The configured DeepInfra model answered the same turns' other calls in ~1.8s.
+  // Writing questions keep their own lane (reasoning off, own timeout) but no longer switch models.
   if (simpleKnowledgeResponse(args)) {
     return (process.env.COS_SIMPLE_KNOWLEDGE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash').trim() || config.model
   }

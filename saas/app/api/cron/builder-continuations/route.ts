@@ -4,6 +4,7 @@ import { runBuilderJob } from '@/lib/builder/job-runner'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { retryFailedOwnedAuditEngineRepair } from '@/self-healing-host/owned-audit-self-healing'
 import { retryFailedUniversityDistillationRepair } from '@/self-healing-host/university-distillation-autonomous-repair'
+import { reconcileBuilderCompetencyGaps } from '@/lib/builder/competency-gap'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -56,6 +57,13 @@ export async function GET(request: Request) {
   // authentication completes before this explicit continuation read. Owned Self-Healing recovery lanes
   // are then evaluated separately so they cannot weaken or obscure the normal continuation path.
   const continuations = await listBuilderContinuations()
+  const competencyReconciliation = await reconcileBuilderCompetencyGaps({ lookbackHours: 72, limit: 50 })
+    .catch(error => {
+      console.warn('[builder_competency_gap_reconciliation_failed]', {
+        message: error instanceof Error ? error.message : 'unknown',
+      })
+      return { scanned: 0, filed: 0 }
+    })
   const admin = getAdminSupabase()
   const [auditRetry, universityRetry] = await Promise.all([
     retryFailedOwnedAuditEngineRepair(admin),
@@ -83,6 +91,8 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     candidates: jobs.length,
+    competencyFailuresScanned: competencyReconciliation.scanned,
+    competencyGapsFiled: competencyReconciliation.filed,
     executed: selected ? 1 : 0,
     deferred: Math.max(0, jobs.length - (selected ? 1 : 0)),
     productionRecoveryQueued: ownedRepairs.some(job => job.kind === 'production-recovery'),

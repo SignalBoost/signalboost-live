@@ -34,6 +34,16 @@ export function selectBuilderResidencyEnrollmentForTick<T extends {id:unknown}>(
 }):T|null{
   const fallback=input.enrollments[0]??null
   if(!fallback) return null
+
+  // A newly admitted resident must receive its first practical case before residents
+  // with retry history consume another turn. Without this, long-running residents can
+  // keep brand-new admissions idle even though they already consume active capacity.
+  const residentsWithHistory=new Set(
+    input.recentCases.map(row=>String(row.residency_id??'')).filter(Boolean),
+  )
+  const unstarted=input.enrollments.find(row=>!residentsWithHistory.has(String(row.id)))
+  if(unstarted) return unstarted
+
   const latest=input.recentCases[0]
   if(!latest||String(latest.harness_outcome)!=='infrastructure_failure') return fallback
   const residencyId=String(latest.residency_id??'')

@@ -61,3 +61,14 @@ test('Residency cron auto-admits a bounded Builder cohort before practical execu
   assert.match(source, /promotionAuthorized:\s*false/)
   assert.match(source, /productionTrafficAuthorized:\s*false/)
 })
+
+
+test('Residency cron drains a bounded sequential cohort without widening active admission capacity', async () => {
+  const source = await readFile(routeUrl, 'utf8')
+  assert.match(source, /RESIDENCY_CASES_PER_TICK\s*=\s*4/)
+  assert.match(source, /attempt\s*<\s*RESIDENCY_CASES_PER_TICK/)
+  assert.match(source, /await runBuilderResidencyOrchestrator/)
+  assert.match(source, /parallelExecution:\s*false/)
+  assert.match(source, /activeLimit:\s*4/)
+  assert.doesNotMatch(source, /Promise\.all\([^)]*runBuilderResidencyOrchestrator/)
+})

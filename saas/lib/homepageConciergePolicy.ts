@@ -1,3 +1,4 @@
+// saas/lib/homepageConciergePolicy.ts
 export const USER_SUPPLIED_SCENARIO_DIRECTIVE = [
   'CURRENT-REQUEST PREMISE RULE:',
   'Facts, numbers, terms, identities, and constraints that the user explicitly supplies in this request may be used as task premises when they describe a third-party situation or an explicitly hypothetical scenario.',
@@ -13,7 +14,7 @@ export const USER_SUPPLIED_SCENARIO_DIRECTIVE = [
 
 const SCENARIO_DOMAIN = /\b(company|business|startup|vendor|contract|investor|financing|runway|valuation|board|ceo|cfo|employee|option pool|procurement|customer|tenant|provider)\b/i
 const SCENARIO_TASK = /\b(compare|matrix|analy[sz]e|assess|evaluate|recommend|decide|decision|trade-?off|structure|plan|triage|go\/no-go|what should|how should)\b/i
-const SIGNALBOOST_SELF_REFERENCE = /\b(?:signalboost(?:ai)?|self-healing supervisor|provider (?:connection )?hub|portable cos|agent operations|browser agent ecosystem|campaign studio|integrations hub|video maker|control center)\b/i
+const SIGNALBOOST_SELF_REFERENCE = /\b(?:signalboost(?:ai)?|itmounts|self-healing supervisor|provider (?:connection )?hub|portable cos|agent operations|browser agent ecosystem|campaign studio|integrations hub|video maker|control center)\b/i
 const EXPLICIT_HYPOTHETICAL = /\b(?:hypothetical(?:ly)?|suppose|assume for (?:this|the) scenario|imagine)\b/i
 
 // Browser-safe mirror of the explicit transformation-intent check. Do not import the server-side

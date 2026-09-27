@@ -18,6 +18,8 @@ export type PendingMergeWatch = Readonly<{
   preMergeSnapshotId: string
   pullRequestNumber: number | null
   attempts: number
+  acceptanceUrl: string | null
+  acceptanceExpectedText: string | null
 }>
 
 export interface MergeWatchStore {
@@ -49,6 +51,8 @@ function row(value: any): PendingMergeWatch {
     preMergeSnapshotId: String(value?.pre_merge_snapshot_id || ''),
     pullRequestNumber: typeof value?.pull_request_number === 'number' ? value.pull_request_number : null,
     attempts: Number(value?.attempts || 0),
+    acceptanceUrl: typeof value?.acceptance_url === 'string' ? value.acceptance_url : null,
+    acceptanceExpectedText: typeof value?.acceptance_expected_text === 'string' ? value.acceptance_expected_text : null,
   })
 }
 

@@ -24,14 +24,17 @@ function rollbackTarget(snapshotId: string): StateSnapshotRef {
 export async function acceptBuilderProductionRepair(input: {
   preMergeSnapshotId: string
   snapshotPort: StateSnapshotPort | null
+  targetUrl?: string
+  expectedText?: string
   runAcceptance?: typeof runBuilderPlaywrightCliLiveAcceptance
 }): Promise<BuilderProductionAcceptanceOutcome> {
   const runAcceptance = input.runAcceptance ?? runBuilderPlaywrightCliLiveAcceptance
-  const acceptance = await runAcceptance().catch(error => ({
-    ok: false,
-    checks: [],
-    error: error instanceof Error ? error.message : 'unknown',
-  } as any))
+  let acceptance: Awaited<ReturnType<typeof runBuilderPlaywrightCliLiveAcceptance>>
+  try {
+    acceptance = await runAcceptance({ targetUrl: input.targetUrl, expectedText: input.expectedText })
+  } catch (error) {
+    return Object.freeze({ outcome: 'unresolved', detail: 'Builder Production verifier could not execute. No rollback was attempted.' })
+  }
 
   if (acceptance.ok) {
     return Object.freeze({

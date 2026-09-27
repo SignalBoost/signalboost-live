@@ -34,7 +34,7 @@ function observationDetail(result: {
   ].join('; ')
 }
 
-export async function runBuilderPlaywrightCliLiveAcceptance(): Promise<BuilderPlaywrightCliLiveAcceptanceResult> {
+export async function runBuilderPlaywrightCliLiveAcceptance(input: { targetUrl?: string; expectedText?: string } = {}): Promise<BuilderPlaywrightCliLiveAcceptanceResult> {
   const checks: BuilderPlaywrightCliLiveAcceptanceCheck[] = []
   const port = createBuilderPlaywrightCliPort({
     ownerAuthorized: true,
@@ -55,7 +55,8 @@ export async function runBuilderPlaywrightCliLiveAcceptance(): Promise<BuilderPl
       detail: capability ? `actions=${capability.actions.join(',')}` : 'missing',
     }))
 
-    const opened = await port.invoke({ action: 'open', url: 'https://itmounts.com/' })
+    const targetUrl = input.targetUrl || 'https://itmounts.com/'
+    const opened = await port.invoke({ action: 'open', url: targetUrl })
     checks.push(Object.freeze({
       name: 'itmounts_open',
       passed: opened.ok,
@@ -66,8 +67,8 @@ export async function runBuilderPlaywrightCliLiveAcceptance(): Promise<BuilderPl
       const snapshot = await port.invoke({ action: 'snapshot' })
       checks.push(Object.freeze({
         name: 'live_snapshot',
-        passed: snapshot.ok && /Page|iTMounts|itmounts/i.test(snapshot.stdout),
-        detail: `${observationDetail(snapshot)}; pageEvidence=${/Page|iTMounts|itmounts/i.test(snapshot.stdout) ? 'present' : 'missing'}`,
+        passed: snapshot.ok && (input.expectedText ? snapshot.stdout.includes(input.expectedText) : /Page|iTMounts|itmounts/i.test(snapshot.stdout)),
+        detail: `${observationDetail(snapshot)}; repairEvidence=${input.expectedText ? (snapshot.stdout.includes(input.expectedText) ? 'present' : 'missing') : 'smoke'}`,
       }))
 
       const consoleResult = await port.invoke({ action: 'console', level: 'error' })

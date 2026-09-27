@@ -1,332 +1,397 @@
-// saas/tests/cosFreshnessPolicy.node.test.ts
-import assert from 'node:assert/strict'
-import test from 'node:test'
-import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence, structuredLiveDataKind } from '../lib/ai/cos/cosFreshnessPolicy.ts'
-import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationIntent.ts'
+// saas/lib/ai/cos/cosFreshnessPolicy.ts
+// Policy for deciding when pretrained/local knowledge is not sufficient because
+// the answer can change without a code or model update.
+//
+// This classifier is intentionally about EXTERNAL world state. Internal project,
+// campaign, calendar, CRM, inventory, workflow, and SignalBoost self-knowledge belong
+// to their owning system of record rather than being blindly sent to public web search.
 
-test('multilingual travel itineraries stay detectable without forcing strict fresh-fact verification', () => {
-  const polish = 'Mam 9 godzin do zabicia w Amsterdamie w sobotę 17 października. Ląduję na Schiphol. Nie chcę wydawać za dużo pieniędzy. Przygotuj mi ekonomiczny plan zwiedzania między 9 a 18. Podaj środki transportu. Jeśli jest jakaś atrakcja płatna, której nie warto pomijać, uwzględnij ją.'
-  assert.equal(requiresLiveTravelPlanningEvidence(polish), true)
-  assert.equal(isContentGenerationRequest(polish), true)
-  assert.equal(requiresFreshExternalEvidence(polish), false)
-  assert.equal(requiresLiveTravelPlanningEvidence('Prepare a cheap Amsterdam sightseeing plan from Schiphol with transport and one paid attraction.'), true)
-})
+import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
+import { isContentGenerationRequest } from './contentGenerationIntent.ts'
+import { detectDirectTextTransformation } from './textTransformationInput.ts'
+import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
+import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
+import { detectAdvisoryDiagnosisIntent } from './advisoryDiagnosisIntent.ts'
+import { isNamedCatalogListRequest } from './listCatalogIntent.ts'
+import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
 
-test('current public role holders require live external verification', () => {
-  assert.equal(requiresFreshExternalEvidence('Who is the current President of the United States?'), true)
-  assert.equal(requiresFreshExternalEvidence('Who is the President of the United States?'), true)
-  assert.equal(requiresFreshExternalEvidence('Who is currently the president of the United States?”'), true)
-  assert.equal(requiresFreshExternalEvidence('Is Donald Trump still the President of the United States?'), true)
-  assert.equal(requiresFreshExternalEvidence('Who is the CEO of Apple?'), true)
-})
+const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
 
-test('high-frequency public values require the structured real-time path', () => {
-  assert.equal(structuredLiveDataKind('What is the TSLA stock price?'), 'financial')
-  assert.equal(structuredLiveDataKind('TSLA stock price'), 'financial')
-  assert.equal(structuredLiveDataKind('What is the USD to EUR exchange rate?'), 'financial')
-  assert.equal(structuredLiveDataKind('Bitcoin price'), 'financial')
-  assert.equal(structuredLiveDataKind('Weather in Paramaribo?'), 'weather')
-  assert.equal(structuredLiveDataKind('What is the NBA score?'), 'sports')
-  assert.equal(structuredLiveDataKind('NBA standings'), 'sports')
-})
+const TEMPORAL_LIVE_MARKER = /\b(?:current|currently|today|today's|tonight|now|still|latest|live|breaking|recent|recently|newest|updated|right now|at present|as of today|as of now|this morning|this afternoon|this evening|this week|this month|this year)\b/i
+const LOOKUP_INTENT = /^\s*(?:who|what|when|where|which|is|are|has|have|did|does|do|can|could|show|give|check|find|tell\s+me|how\s+much|how\s+many)\b/i
+const HISTORICAL_ANCHOR = /\b(?:yesterday|last\s+(?:week|month|year)|historical(?:ly)?|formerly|previously|in\s+(?:19|20)\d{2}|as\s+of\s+(?:19|20)\d{2})\b/i
+const CONCEPTUAL_OR_CREATIVE = /^\s*(?:explain|describe|define|teach|write|draft|create|design|build|plan|recommend|suggest|how\s+(?:do|does|did|is|are|can|could|would|should)|why\s+(?:do|does|did|is|are|can|could|would|should))\b/i
 
-test('general mutable external facts route live even when the user does not say current', () => {
-  for (const prompt of [
-    'When did George Foreman die?',
-    'when Hulk Hogan died?',
-    'Is this public figure alive?',
-    'Has this actor passed away?',
-    'Is Acme still in business?',
-    'Is that package still maintained?',
-    'What is the latest Node.js release?',
-    'What is the current visa requirement for entry?',
-    'Is CVE-2026-12345 still unpatched?',
-    'What happened this month in the industry?',
-    'Is there a service outage?',
-    'What is flight status for AA123?',
-    'What are traffic conditions in Warsaw?',
-    'What is the election result?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-  }
-})
+const PRESENT_TENSE_OFFICE_HOLDER = new RegExp(`\\bwho\\s+(?:is|['’]s)\\s+(?:(?:the\\s+)?current(?:ly)?\\s+(?:the\\s+)?|(?:the\\s+)?)${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
+const TERSE_CURRENT_OFFICE_HOLDER = new RegExp(`^\\s*(?:current|currently)\\s+${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
+const CURRENT_LEADER = /\bwho\s+(?:currently\s+)?(?:leads|heads|runs)\b/i
+const ROLE_STATUS_CHECK = new RegExp(`^\\s*(?:is|are)\\s+[^?.!]{1,100}\\b(?:still\\s+)?(?:the\\s+)?${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
 
-test('mutable external reference facts are live-verified even without the word current', () => {
-  for (const prompt of [
-    "What is Poland's population?",
-    'Where is OpenAI headquartered?',
-    'Who owns Volvo Cars?',
-    'Which country has the largest population?',
-    'How many people live in Warsaw?',
-    'What languages are officially recognized in South Africa?',
-    'Is Lufthansa a member of Star Alliance?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-  }
-})
+// A simple "who is First Last?" request is an entity/reference lookup, not a reasoning task.
+// Route it through fresh public evidence so biographies do not silently inherit stale or fabricated
+// details from model weights. The determiner/pronoun exclusions keep conceptual and private queries
+// ("who is the...", "who is my...") out of this path.
+const SIMPLE_NAMED_ENTITY_LOOKUP = /^\s*who\s+(?:is|['’]s)\s+(?!the\b|a\b|an\b|my\b|our\b|your\b|his\b|her\b|their\b|this\b|that\b)(?:[\p{L}\p{M}'’.-]{2,50}\s+){1,4}[\p{L}\p{M}'’.-]{2,50}\s*[?.!]*\s*$/iu
 
-test('stable reference facts stay on the local answerability path', () => {
-  for (const prompt of [
-    'What is the capital of Spain?',
-    'what is the capital of Panama?',
-    'What is the capital of France?',
-    'What is the capital of Kazakhstan?',
-    'When was SpaceX founded?',
-    'Who created Python?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
-  }
-  assert.equal(requiresFreshExternalEvidence('What is the current capital of Kazakhstan?'), true)
-})
+const NEWS_STATE = /\b(?:news|headlines?|breaking news|news updates?)\b/i
+const LIVE_NEWS = /\b(?:latest|today(?:'s)?|live|breaking|recent|updated)\s+(?:news|headlines?|updates?)\b/i
 
-test('subjective ranking lookups may use current comparative evidence without hijacking technical terms', () => {
-  assert.equal(requiresFreshExternalEvidence("What is the best Denzel Washington's movie?"), true)
-  assert.equal(requiresFreshExternalEvidence('What are the top rated Denzel Washington movies?'), true)
-  assert.equal(requiresFreshExternalEvidence('What is the rank of this matrix?'), false)
-  assert.equal(requiresFreshExternalEvidence('What is the top-level domain for Germany?'), false)
-  assert.equal(requiresFreshExternalEvidence('What is the best-case time complexity of binary search?'), false)
-})
+// High-frequency public data that should use a structured real-time provider when available.
+const WEATHER_STATE = /\b(?:weather|weather forecast|forecast(?:s)?|temperature|rainfall|snowfall|storm warning|hurricane warning)\b/i
+const FINANCIAL_STATE = /\b(?:exchange rate|exchange rates|forex rate|forex rates|stock price|stock prices|share price|share prices|crypto price|crypto prices|cryptocurrency price|cryptocurrency prices|market data|market quote|market quotes|stock market|financial market|index value|index values|price\s+of\s+[a-z0-9._-]{1,20}\s+(?:stock|shares?))\b/i
+const TICKER_PRICE = /\b[A-Z]{1,6}(?:['’]s)?\s+(?:stock\s+)?price\b/
+const CRYPTO_PRICE = /\b(?:bitcoin|btc|ethereum|eth|solana|sol|cryptocurrency|crypto)\b.{0,35}\b(?:price|quote|rate)\b|\b(?:price|quote|rate)\b.{0,35}\b(?:bitcoin|btc|ethereum|eth|solana|sol|cryptocurrency|crypto)\b/i
+const SPORTS_STATE = /\b(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa|sports?|game|match)\b.{0,45}\b(?:score|scores|standings|schedule)\b|\b(?:score|scores|standings)\b.{0,45}\b(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa|sports?|game|match)\b/i
+const TERSE_SPORTS_STATE = /^\s*(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa)\b.{0,60}\b(?:score|scores|standings|schedule)\b/i
 
-test('explicit freshness wording forces live verification across volatile public domains', () => {
-  for (const prompt of [
-    'Who is the current CEO of Apple?',
-    'What is the exchange rate right now?',
-    "What is today's weather forecast?",
-    'What are the latest NBA standings?',
-    'What is the breaking news from Warsaw?',
-    'What are the recent election results?',
-    'Is there a live service outage?',
-    'What is the current regulation on this issue?',
-    'What is the latest software release?',
-    'What is the current security advisory status?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-  }
-})
+const OUTAGE_STATE = /\b(?:service|network|internet|cloud|website|site|api|platform)\s+(?:status|outage)|\b(?:outage|outages)\b/i
+const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live traffic|traffic conditions|road conditions)\b/i
 
-test('historical and conceptual questions keep their non-live reasoning route', () => {
-  assert.equal(requiresFreshExternalEvidence('Who was President of the United States in 1999?'), false)
-  assert.equal(requiresFreshExternalEvidence('What was the TSLA stock price in 2020?'), false)
-  assert.equal(structuredLiveDataKind('What was the TSLA stock price in 2020?'), null)
-  assert.equal(requiresFreshExternalEvidence('Explain how stock prices work.'), false)
-  assert.equal(structuredLiveDataKind('Explain how stock prices work.'), null)
-  assert.equal(requiresFreshExternalEvidence('How does weather forecasting work?'), false)
-  assert.equal(requiresFreshExternalEvidence('How is a prime minister elected?'), false)
-  assert.equal(requiresFreshExternalEvidence('Explain database transaction isolation levels.'), false)
-  assert.equal(requiresFreshExternalEvidence('Diagnose enterprise-only API latency with normal database CPU.'), false)
-})
+// Itinerary/recommendation requests often look like content generation but materially depend on
+// mutable external facts: airport/city transport, fares, schedules, opening hours, ticket prices,
+// closures, reservations, and attraction availability. Those facts must be live-grounded before
+// COS drafts the plan. This is multilingual and category-level; it does not encode any city,
+// attraction, operator, date, or answer.
+const TRAVEL_PLANNING_INTENT = /\b(?:itinerary|travel plan|trip plan|sightseeing plan|day plan|plan zwiedzania|plan wycieczk\p{L}*|zwiedzani\p{L}*|plan podr[oó]\p{L}*|plan de viaje|itinerario|roteiro|plano de viagem|маршрут|план поездк\p{L}*|план путешеств\p{L}*)\b/iu
+const TRAVEL_MUTABLE_DETAIL = /\b(?:airport|transport|public transport|train|bus|coach|metro|tram|ferry|fare|fares|ticket|tickets|price|prices|cost|costs|schedule|timetable|opening hours|open|closed|museum|attraction|reservation|booking|lotnisk\p{L}*|transport\p{L}*|poci[aą]g\p{L}*|autobus\p{L}*|metro|tramwaj\p{L}*|bilet\p{L}*|cen\p{L}*|koszt\p{L}*|godzin\p{L}* otwarcia|muze\p{L}*|atrakcj\p{L}*|rezerwacj\p{L}*|aeropuerto|transporte|tren|autob[uú]s|billete|precio|horario|museo|atracci[oó]n|reserva|aeroporto|comboio|trem|autocarro|[oô]nibus|bilhete|pre[cç]o|hor[aá]rio|museu|atra[cç][aã]o|reserva|аэропорт|транспорт|поезд|автобус|метро|трамва\p{L}*|билет\p{L}*|цен\p{L}*|расписан\p{L}*|музе\p{L}*|достопримечательност\p{L}*|бронирован\p{L}*)\b/iu
 
-test('private operational state stays with its system of record instead of public web search', () => {
-  for (const prompt of [
-    'What is our current pricing?',
-    'Is our campaign still running?',
-    'What is my latest invoice?',
-    'What is our current inventory?',
-    'What are the results of our latest campaign?',
-    'What is the availability of our sales team?',
-    'What is our current MRR?',
-    'What is the status of our deployment?',
-    'Can you code yourself with iterative model training, dynamic context integration, and procedural skill refinement?',
-    'How can COS improve its reasoning?',
-    'What are your reasoning capabilities?',
-    'What improvements can COS make to its reasoning and skills?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
-  }
-})
+// Whether a NONSTOP/DIRECT transport connection EXISTS is externally mutable: airlines and other
+// operators add, suspend, seasonally pause, and remove routes. These patterns keep route-existence
+// questions on the live-evidence path across EN/ES/PT/PL/RU instead of trusting model memory.
+// Trip-volatility terms are excluded here only because they already have dedicated live rules below.
+const ROUTE_DIRECTNESS = /\b(?:direct|non[- ]?stop|nonstop|directos?|directas?|diretos?|diretas?|bezpo[\u015b\u0073]redni[a-z\u017c\u017a\u0105\u0119]*|\u043f\u0440\u044f\u043c[\u0430-\u044f]+)\b/iu
+const TRANSPORT_ROUTE_NOUN = /\b(?:flights?|routes?|connections?|services?|trains?|ferr(?:y|ies)|buses|coach(?:es)?|rail|airlines?|carriers?|vuelos?|v[o\u00f4]os?|trenes?|comboios?|loty|lot[o\u00f3]w|poci[\u0105a]g[a-z\u00f3\u017c]*|\u0440\u0435\u0439\u0441[\u0430-\u044f]*|\u043f\u043e\u0435\u0437\u0434[\u0430-\u044f]*)\b/iu
+const TRIP_VOLATILITY = /\b(?:prices?|costs?|cheap(?:est|er)?|fares?|when|what\s+time|schedules?|timetables?|status|delay(?:ed|s)?|cancel(?:led|ed|s|lation)?|land(?:ed|s|ing)?|arriv(?:e|ed|al|es)|depart(?:ed|s|ure)?|board(?:ing)?|on\s+time|book(?:ing)?|available|availability|today|tonight|tomorrow|next|this\s+(?:week|weekend|month)|cu[a\u00e1]nto|precios?|barat[oa]s?|horarios?|cu[a\u00e1]ndo|quando|pre[\u00e7c]os?|ile\s+kosztuj|kiedy|ceny?|\u0446\u0435\u043d[\u0430-\u044f]|\u0441\u043a\u043e\u043b\u044c\u043a\u043e|\u043a\u043e\u0433\u0434\u0430|\u0440\u0430\u0441\u043f\u0438\u0441\u0430\u043d\u0438[\u0435\u044f])\b/iu
+const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
+const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements|e-?verify)\b/i
+const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
+const HIGH_STAKES_SECURITY_RELEASE = /\b(?:zero[- ]day|high[- ]severity\s+vulnerabilit|unauthorized\s+(?:read|access)|tenant\s+(?:metadata|data)|infosec|security\s+lead)\b/i
+// A supplied incident scenario asks COS to assess stated facts, not discover a real-world incident.
+// Live research is appropriate only when the user asks COS to establish an external fact or supplies
+// a concrete identifier (for example a CVE or dependency) that needs verification.
+const SECURITY_DECISION_SCENARIO = /\b(?:risk\s+triage|go\s*\/\s*no-?go|go\s+or\s+no-?go|launch\s+(?:decision|recommendation)|t-minus|launch\s+on\s+time)\b/i
+const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
 
-test('SignalBoost and COS self-knowledge stays on authoritative internal sources', () => {
-  for (const prompt of [
-    'What model does COS use now?',
-    'What is SignalBoost COS architecture?',
-    'How does COS Enterprise Memory work?',
-    'What is the COS Semantic Cache policy?',
-    'What is the current COS reasoner provider?',
-    'Show me COS execution provenance policy.',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
-  }
-})
+// Advice about regulated or high-consequence public processes must be verified even when it is
+// phrased conversationally, in a language other than English, or does not begin with a lookup word.
+// This is a routing boundary only: the live-evidence authority policy still decides whether COS may answer.
+const GOVERNED_GUIDANCE_TOPIC = /(?:legal|law|regulation|visa|immigration|tax|taxes|passport|identity card|driver(?:'s)? license|government (?:office|agency)|name change|change(?:d|ing)? (?:my|your|their)? ?(?:name|surname)|surname|benefits|insurance|medical|health|medication|diagnos(?:is|e)|treatment|invest(?:ment|ing)|loan|mortgage|bank(?:ing)?|z[\u0142l]o[\u017cż]y[\u0107c]|urz[\u0105a]d|dokument(?:y|u)?|nazwisk(?:o|a)|dow[oó]d osobisty|paszport|zus|nfz|podat(?:ek|ki)|prawo jazdy|wiza|ubezpieczen(?:ie|ia)|zdrow(?:ie|otny)|lekarz|leczenie|medicament(?:o|os)|impuesto|visado|seguro|salud|m[eé]dico|tratamiento|documentos?|passaporte|imigra[çc][ãa]o|impost(?:o|os)|seguro|sa[uú]de|tratamento|document(?:o|os)|паспор(?:т|та)|документ(?:ы|ов)?|налог(?:и|ов)?|страхов(?:ка|ки)|здоров(?:ье|я)|лечени(?:е|я)|виза)/iu
+const GUIDANCE_REQUEST = /(?:[?]|\b(?:what|which|when|where|who|how|should|need|must|can|could|do|does|czy|co|jak|gdzie|kiedy|kt[oó]r|powinn|trzeba|musz|mog[ęe]|debo|puedo|qu[eé]|c[oó]mo|d[oó]nde|cu[aá]ndo|devo|posso|o que|como|onde|quando|долж|нужно|как|что|где|когда|какие|могу)\b)/iu
 
-test('local deterministic utilities do not consume public freshness search', () => {
-  for (const prompt of [
-    'What is 24 * 17?',
-    '2 + 2',
-    'What is the current date?',
-    'What is the time now?',
-    'What day is it?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
-  }
-})
-
-test('a design request that states its situation FIRST is still creation, not a live lookup', () => {
-  // Production failure (2026-08-23): the authoring verb was required to be the first word of the
-  // whole prompt, so an executive brief that gives three sentences of context before "Design a
-  // 90-day..." missed the creation exclusion. The word "current" — describing the company's OWN
-  // premium tier, not a current-world fact — then routed it to live evidence, which was
-  // unavailable, and the user got a refusal instead of a strategy.
-  const brief = 'Gross margins have declined from 74% to 61% over the last two quarters due to soaring third-party inference and API costs. The Head of AI wants to maintain the current premium model tier to protect benchmark leadership, while the CFO demands an immediate migration to quantized open-source weights to restore margins to 70%. Design a 90-day phased optimization strategy that balances latency, model performance, and unit economics.'
-  assert.equal(isContentGenerationRequest(brief), true)
-  assert.equal(requiresFreshExternalEvidence(brief), false)
-
-  for (const trailing of [
-    'Our costs are up. Draft a memo to the board.',
-    'Margins fell this quarter. So write me a recovery plan.',
-    'The board meets Friday — draft the executive summary.',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(trailing), false, trailing)
-  }
-})
-
-test('an authoring verb buried mid-clause does not fake a creation request', () => {
-  // The verb must still LEAD its own clause, or ordinary lookups containing "designed"/"created"
-  // would stop being live-verified.
-  for (const lookup of [
-    'who designed the Eiffel Tower?',
-    'who created Python?',
-    'which company produces the most lithium?',
-  ]) {
-    assert.equal(isContentGenerationRequest(lookup), false, lookup)
-  }
-})
-
-test('a question about COS own prior answer can never become a public web search', () => {
-  // Structural safeguard independent of the introspection classifier's accuracy: when that
-  // classifier misses, the failure must degrade to a plain answer, never to searching the web and
-  // citing unrelated sources as the origin of COS's own reasoning (2026-08-23: an introspection
-  // question was answered from E-Verify and FAFSA pages).
-  for (const query of [
-    'show me where did you get the answert from?',
-    'where did you get this answer?',
-    'show me your sources',
-    'which rules shaped your previous answer?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(query), false, query)
-  }
-})
-
-test('the introspection exclusion does not disable genuine lookups about verification topics', () => {
-  for (const query of [
-    'what are the E-Verify requirements for employers?',
-    'where can I find answers about visas?',
-    'who is the current president of France?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(query), true, query)
-  }
-})
-
-test('creation/advice requests are not hijacked by public live-data routing', () => {
-  assert.equal(requiresFreshExternalEvidence('How should I market my latest product?'), false)
-  assert.equal(requiresFreshExternalEvidence('How should I price my latest product?'), false)
-  assert.equal(requiresFreshExternalEvidence('Create a marketing plan for my newest product.'), false)
-  assert.equal(requiresFreshExternalEvidence('Schedule my latest campaign for tomorrow.'), false)
-  assert.equal(requiresFreshExternalEvidence('Build a stock price dashboard component.'), false)
-  assert.equal(structuredLiveDataKind('Build a stock price dashboard component.'), null)
-})
-
-test('polite anniversary writing with incidental today never enters live-fact verification', () => {
-  const prompt = 'my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation'
-  assert.equal(requiresFreshExternalEvidence(prompt), false)
-})
-
-test('freshness-only polite authoring escape does not suppress genuine live lookups', () => {
-  assert.equal(requiresFreshExternalEvidence("Please check today's weather in Warsaw."), true)
-  assert.equal(requiresFreshExternalEvidence('Could you find the current CEO of Apple?'), true)
-})
+// Public-web freshness must not hijack private/system-of-record questions just because they contain
+// words such as current/latest/still. Temporal adjectives are allowed between the possessive and
+// object because real users ask "our current pricing" and "my latest invoice".
+const INTERNAL_TEMPORAL_MODIFIER = '(?:(?:current|latest|newest|recent|active|pending|next|last)\\s+)?'
+const INTERNAL_OBJECT = '(?:business|company|campaign|inventory|pricing|prices?|plan|subscription|account|invoice|order|team|crm|pipeline|leads?|customers?|metrics?|revenue|mrr|arr|credits?|usage|calendar|website|deployment|project|repository|database|sales|outreach|drafts?)'
+const INTERNAL_OPERATIONAL_STATE = new RegExp(
+  `\\b(?:my|our)\\s+${INTERNAL_TEMPORAL_MODIFIER}${INTERNAL_OBJECT}\\b|\\b(?:status|results?|availability|schedule)\\s+(?:of|for)\\s+(?:my|our)\\s+${INTERNAL_TEMPORAL_MODIFIER}(?:sales\\s+)?${INTERNAL_OBJECT}\\b`,
+  'i',
+)
 
 
+// COS may improve its application code, prompts, retrieval, tools, workflows, and validated
+// procedures through governed tests and approved changes. It cannot autonomously retrain or alter
+// its provider/base-model weights.
+const COS_SELF_IMPROVEMENT = /\b(?:can|could|how\s+(?:can|could|would|should)|what)\b.{0,80}\b(?:cos|yourself|you|your)\b.{0,140}\b(?:improve|learn|reason(?:ing)?|code|train(?:ing)?|model|retrieval|context|skill|procedure|capabilit(?:y|ies))\b|\b(?:improve|learn|reason(?:ing)?|code|train(?:ing)?|model|retrieval|context|skill|procedure|capabilit(?:y|ies))\b.{0,140}\b(?:cos|yourself)\b/i
 
-test('regulated public guidance is live-verified across supported languages', () => {
-  for (const prompt of [
-    'What documents should I change after changing my surname in Poland?',
-    'I changed my surname. What should I do and which offices must I notify?',
-    'zmieniłam nazwisko, co powinnam zrobić - jakie dokumenty zmienić, jakie instytucje powiadomić?',
-    'Quais documentos devo alterar depois de mudar meu sobrenome?',
-    '¿Qué documentos debo cambiar después de cambiar mi apellido?',
-    'Какие документы нужно изменить после смены фамилии?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-  }
-})
+// SignalBoost/COS self-description and runtime state come from repository/configuration/system-of-record
+// evidence, not the public web. This prevents the general external-fact default from breaking
+// authoritative internal self-knowledge such as "what model does COS use now?".
+const SELF_KNOWLEDGE_TOPIC = '(?:architecture|memory|cache|reasoner|model|provider|routing|retrieval|learning|benchmark|provenance|runpod|supabase|vercel|deployment|capability|knowledge|policy|enterprise memory|semantic cache)'
+const INTERNAL_PLATFORM_SELF_KNOWLEDGE = new RegExp(
+  `\\b(?:signalboost|cos)\\b.{0,120}\\b${SELF_KNOWLEDGE_TOPIC}\\b|\\b${SELF_KNOWLEDGE_TOPIC}\\b.{0,120}\\b(?:signalboost|cos)\\b`,
+  'i',
+)
+
+// Company-identity questions ("what is SignalBoost", "who owns SignalBoost") are self-knowledge
+// too, but they don't mention any SELF_KNOWLEDGE_TOPIC word above. Identity grammar must remain
+// local to the company mention: a Portuguese subordinate conjunction such as "que" later in an
+// operational request must not combine with an unrelated token such as the "e" in "e-mail" and
+// manufacture an identity question.
+const MENTIONS_SIGNALBOOST = /\bsignalboost\b/i
+const IDENTITY_INTERROGATIVE = /(?<![\p{L}\p{N}_])(?:who|what|whom|whose|qui[eé]n(?:es)?|qu[eé]|quem|o\s+que|kto|co|czyj[ae]?|кто|что|чей|чья)(?![\p{L}\p{N}_])/iu
+const IDENTITY_SUBJECT = /(?<![\p{L}\p{N}_])(?:is|are|owns?|owned|owner(?:s)?|founder(?:s)?|founded|created|built|runs?|behind|about|company|startup|business|platform|product(?:s)?|does|ceo|leadership|es|son|due[nñ]o|fundador(?:a|es)?|empresa|é|s[aã]o|dono|jest|w[lł]a[sś]ciciel(?:em)?|firma|это|владелец|владельц[аеу]|компани[яию]|основа[лт]|созда[лт])(?![\p{L}\p{N}_])/iu
+const PORTUGUESE_UNACCENTED_SIGNALBOOST_IDENTITY = /(?<![\p{L}\p{N}_])(?:quem|o\s+que)\s+e\s+(?:o\s+)?signalboost(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])signalboost\s+(?:e\s+o\s+que|e\s+quem)(?![\p{L}\p{N}_])/iu
+const SIGNALBOOST_IDENTITY_WINDOW = 120
+
+function isSignalboostIdentityQuestion(text: string): boolean {
+  const mention = text.search(MENTIONS_SIGNALBOOST)
+  if (mention < 0) return false
+  if (PORTUGUESE_UNACCENTED_SIGNALBOOST_IDENTITY.test(text)) return true
+  const start = Math.max(0, mention - SIGNALBOOST_IDENTITY_WINDOW)
+  const end = Math.min(text.length, mention + 'signalboost'.length + SIGNALBOOST_IDENTITY_WINDOW)
+  const local = text.slice(start, end)
+  return IDENTITY_INTERROGATIVE.test(local) && IDENTITY_SUBJECT.test(local)
+}
+
+/**
+ * Platform self-knowledge prompts — SignalBoost identity/ownership questions and questions about
+ * COS's own architecture, model, or configuration. Exported for the cache safety policy: these
+ * answers depend on live configuration (which model, which host, current policy) and on the
+ * caller's privilege, so a cached replay can serve yesterday's stack or the wrong disclosure
+ * tier. They must be reasoned afresh every turn (owner-verified 2026-08-25: the privileged
+ * technical self-description shipped, but repeated identity questions kept replaying the
+ * pre-change cached answer, so the owner never saw it).
+ */
+const PLATFORM_STACK_ASK = /(?:model|modelo|llm|reasoner|engine).{0,50}(?:platform|plataforma|this service|este servi[cç]o|cos|signalboost)|(?:platform|plataforma|this service|este servi[cç]o).{0,50}(?:model|modelo|llm|reasoner)/i
+const DIRECT_MODEL_IDENTITY_ASK = /^\s*(?:(?:what(?:'s|\s+is)?|which)\s+(?:is\s+)?(?:your|the)\s+(?:model|llm|reasoner|engine)|what\s+(?:model|llm|reasoner|engine)\s+(?:are\s+you|do\s+you\s+use)|which\s+(?:model|llm|reasoner|engine)\s+do\s+you\s+use)\s*[?!.]*\s*$/i
+
+// Owner-verified 2026-09-03: the production message was "what is your model/specs?" and it was
+// NOT recognised here. DIRECT_MODEL_IDENTITY_ASK anchors on end-of-string immediately after the
+// noun, so the single extra token "/specs" broke the anchor; the platform's own configuration
+// question then skipped the deterministic owner stack reply in cosFirstAnswer.ts and fell into
+// the full reasoner pipeline, where the page gave up waiting. Same failure family as the anchored
+// "what OR WHO is SignalBoost" and bare "subject line" regressions: literal matching where the
+// question needed meaning-scoping.
+//
+// Scope by MEANING: a possessive self-reference next to a specification noun ("your model",
+// "your specs", "tus especificaciones") is always a question about THIS platform, never a public
+// lookup — the platform is the sole authority on itself. Same for "what hardware do you run on".
+const SELF_SPEC_ASK = /(?<![\p{L}\p{N}_])(?:your|yours|tu|tus|seu|seus|sua|suas|tw[oó]j|twoje|twoja|twoich|twojej|ваш|ваша|ваше|ваши|вашей|вашего|вас|тебя)(?![\p{L}\p{N}_])[^?!.]{0,25}(?<![\p{L}\p{N}_])(?:model|models|llm|llms|reasoner|engine|spec|specs|specification|specifications|stack|hardware|gpu|gpus|architecture|configuration|config|provider|host|parameters|context\s+window|modelo|modelos|especificaci[oó]n|especificaciones|especifica[cç][oõ]es|arquitectura|arquitetura|configuraci[oó]n|configura[cç][ãa]o|proveedor|provedor|specyfikacj\p{L}*|architektur\p{L}*|konfiguracj\p{L}*|sprz[eę]t\p{L}*|модел\p{L}*|характеристик\p{L}*|архитектур\p{L}*|конфигурац\p{L}*|оборудован\p{L}*)(?![\p{L}\p{N}_])/iu
+const RUNS_ON_ASK = /(?<![\p{L}\p{N}_])(?:hardware|gpu|gpus|infrastructure|model|llm|engine|reasoner|provider)(?![\p{L}\p{N}_])[^?!.]{0,30}(?<![\p{L}\p{N}_])(?:(?:do|does)\s+(?:you|cos)\s+(?:run|running|use|using|host|hosted|operate|execute)|(?:hosts?|powers?|runs?|serves?)\s+(?:you|cos))(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])(?:are\s+)?(?:you|cos)\s+(?:run|runs|running|operate|operating)\s+on(?![\p{L}\p{N}_])/iu
+
+export function isPlatformSelfKnowledgePrompt(input: string): boolean {
+  const text = normalizedText(input)
+  if (!text) return false
+
+  // THE AUTHORING ESCAPE MUST COME FIRST (2026-09-04)
+  // ------------------------------------------------
+  // The comment below has always stated the intent — an authoring request that merely mentions the
+  // stack is not a self-knowledge question — but the check sat AFTER the four hard predicates, so
+  // it could never rescue a request those had already matched. Anything containing both a stack
+  // noun and a nearby "platform", "cos" or "signalboost" was classified as a question about the
+  // service, and cosFirstAnswerCore answers that deterministically at line 977, BEFORE the editor
+  // runs at line 989. The result: "edit this in a diplomatic way for the platform model review"
+  // and "COS still not writing well, edit this: our reasoner model needs work" both returned the
+  // canned implementation-disclosure reply instead of an edited draft. The user's own work was
+  // never seen, and no amount of editor improvement could reach it.
+  //
+  // A request that carries an artifact to transform, or asks for content to be produced, is by
+  // construction not a question about what runs this service — whatever nouns it happens to
+  // contain. Both are decided by the existing intent detectors, so no vocabulary is added here and
+  // the gate keeps every genuine identity question it caught before.
+  if (isContentGenerationRequest(input)) return false
+  if (detectDirectTextTransformation(input)) return false
+
+  if (
+    isSignalboostIdentityQuestion(text)
+    || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
+    || PLATFORM_STACK_ASK.test(text)
+    || DIRECT_MODEL_IDENTITY_ASK.test(text)
+  ) return true
+  return SELF_SPEC_ASK.test(text) || RUNS_ON_ASK.test(text)
+}
+
+// Pure arithmetic and local clock/date questions have deterministic utilities. They should never
+// consume a public search merely because they begin with "what".
+const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i
+const LOCAL_CLOCK_OR_DATE = /^\s*(?:what(?:'s|\s+is)?\s+)?(?:the\s+)?(?:current\s+)?(?:date|time|day)(?:\s+(?:today|now|is\s+it))?\s*[?!.]*\s*$/i
+
+/**
+ * Direct lookups are not fresh merely because they are phrased as a question. These markers
+ * identify reference facts whose answer can materially change without the user saying "current".
+ * Stable reference knowledge (for example a country's capital or a historical founding date)
+ * remains locally answerable unless a separate temporal/live rule above requires verification.
+ */
+const MUTABLE_REFERENCE_STATE = /\b(?:population|how\s+many\s+people|people\s+live\s+in|residents?|headquarter(?:ed|s)?|owns?|ownership|parent\s+company|subsidiar(?:y|ies)|member\s+of|membership|largest\s+population|smallest\s+population|most\s+populous|official(?:ly)?\s+recognized\s+languages?|official\s+languages?|languages?\s+(?:are\s+)?official(?:ly)?\s+recognized)\b/i
+const SUBJECTIVE_RANKING_LOOKUP = /(?:\b(?:highest[-\s]?rated|top[-\s]?rated|most\s+popular)\b|^\s*(?:what|which|who)\b[^?!.]{0,100}\b(?:best|greatest)\b(?![-\s]?case\b)|^\s*(?:qual|quais)\b[^?!.]{0,100}\bmelhor(?:es)?\b|^\s*(?:cu[aá]l|cu[aá]les)\b[^?!.]{0,100}\bmejor(?:es)?\b|^\s*(?:jaki|jaka|jakie|kt[oó]ry|kt[oó]ra|kt[oó]re)\b[^?!.]{0,100}\bnajlepsz[\p{L}]*\b|^\s*(?:какой|какая|какие|кто)\b[^?!.]{0,100}\bлуч[\p{L}]*\b)/iu
+const STABLE_REFERENCE_LOOKUP = /(?:^\s*(?:what|which)\b[^?!.]{0,80}\bcapital\s+of\b|^\s*when\b[^?!.]{1,120}\b(?:founded|established|created|invented|built|published)\b|^\s*who\s+(?:founded|created|invented|designed|wrote|painted|composed)\b|^\s*(?:qual|quais|cu[aá]l|cu[aá]les)\b[^?!.]{0,80}\bcapital\s+(?:de|do|da)\b|^\s*(?:jaki|jaka|jakie)\b[^?!.]{0,80}\bstolic[\p{L}]*\b|^\s*(?:какой|какая|какие)\b[^?!.]{0,80}\bстолиц[\p{L}]*\b)/iu
+// A request for what a thing IS ("What is an artifact?", "What does idempotent mean?", "What is the
+// definition of latency?") asks for a concept, not for present-day state of the outside world. Production
+// 2026-09-26: "What is an artifact?" fell through to the conservative LOOKUP_INTENT catch-all below, was sent
+// to strict live verification, and COS refused ("I could not verify this current fact..."). This check runs
+// only after every mutable-state rule above (news, prices, office holders, rules, outages, travel, security,
+// temporal markers) has already had its chance to require live evidence, and it excludes evaluative, price and
+// "near me" phrasings. Answer-side freshness self-reflection still guards any mutable claim in the reply.
+const DEFINITIONAL_CONCEPT = /^\s*(?:what\s+is\s+an?\s+|what\s+(?:is|are)\s+(?:the\s+)?(?:meaning|definition)s?\s+of\s+|what\s+is\s+meant\s+by\s+|what\s+does\s+)(?![^?!.]*\b(?:good|best|better|top|cheap(?:est)?|affordable|fair|typical|average|normal|safe(?:st)?|popular|recommended|current(?:ly)?|latest|today|tonight|now|price|prices|cost|costs|worth|salary|salaries|fee|fees|rent|rate|rates|score|scores|ranking|near\s+me|open)\b)[^?!.\n]{1,60}(?<=\S)(?:\s+mean)?\s*[?.!]*\s*$/i
+// A question whose subject is this service itself ("Is COS an artifact?", "What is iTMounts?", "Are you an
+// agent?") is answered from COS's own knowledge, never from the public web: the web cannot verify what COS is,
+// and Production 2026-09-26 refused "Is COS an artifact?" as an unverifiable current fact. Like
+// DEFINITIONAL_CONCEPT this runs only after every mutable-state rule above has had its chance to require live
+// evidence, so "latest news about iTMounts" and similar requests still go live.
+const SERVICE_SELF_SUBJECT = /(?:\b(?:cos|itmounts|signalboost)\b|^\s*(?:(?:are|were)\s+you|(?:what|who)\s+(?:are|were)\s+you)\b)/i
+const STABLE_TECHNICAL_REFERENCE = /\b(?:rank\s+of\s+(?:(?:this|the|a)\s+)?matrix|top[-\s]?level\s+domain|(?:best|worst|average)[-\s]?case\s+time\s+complexity)\b/i
+
+function normalizedText(input: string): string {
+  return englishNormalizedForClassification(String(input || '')).replace(/\s+/g, ' ').trim()
+}
+
+function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
+  if (!state.test(text)) return false
+  if (LOOKUP_INTENT.test(text)) return true
+  return !/[.!]\s+\w/.test(text) && text.split(/\s+/).length <= 12
+}
+
+function looksLikeInternalOperationalState(text: string): boolean {
+  return INTERNAL_OPERATIONAL_STATE.test(text) || COS_SELF_IMPROVEMENT.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || isSignalboostIdentityQuestion(text)
+}
+
+function isLocalDeterministicUtility(text: string): boolean {
+  return LOCAL_ARITHMETIC.test(text) || LOCAL_CLOCK_OR_DATE.test(text)
+}
+
+// Freshness-only normalization for polite authoring commands. Do not broaden the global
+// content-generation classifier because it also participates in execution/Builder routing.
+const POLITE_AUTHORING_PREFIX = /^(?:(?:please|kindly)\s+(?:(?:can|could|would)\s+you\s+)?|(?:can|could|would)\s+you\s+(?:please\s+)?|por\s+favor\s+|prosz[eę]\s+|пожалуйста\s+)/iu
+
+function isPoliteAuthoringForFreshness(input: string): boolean {
+  return String(input || '')
+    .split(/(?:[.!?;:]|\n+)/u)
+    .map(part => part.trim())
+    .filter(Boolean)
+    .some(clause => {
+      const stripped = clause.replace(POLITE_AUTHORING_PREFIX, '').trim()
+      return stripped !== clause && isContentGenerationRequest(stripped)
+    })
+}
 
 
-test('supplied security launch scenarios stay on the reasoning route', () => {
-  const scenario = 'It is T-minus 24 hours before the launch of the company\'s flagship product. The InfoSec lead discovers a high-severity zero-day vulnerability in an open-source dependency that could allow unauthorized read access to tenant metadata. Marketing has spent $250k on non-refundable event sponsorships. The VP of Product wants to launch on time and patch the exploit next week. Deliver your risk triage and go/no-go recommendation.'
-  assert.equal(requiresFreshExternalEvidence(scenario), false)
-  assert.equal(requiresFreshExternalEvidence('Is CVE-2026-12345 still unpatched?'), true)
-})
+function isGovernedPublicGuidance(text: string): boolean {
+  return GOVERNED_GUIDANCE_TOPIC.test(text) && GUIDANCE_REQUEST.test(text)
+}
 
+export function requiresLiveTravelPlanningEvidence(input: string): boolean {
+  const text = normalizedText(input)
+  if (!text) return false
+  return TRAVEL_PLANNING_INTENT.test(text) && TRAVEL_MUTABLE_DETAIL.test(text)
+}
 
-test('company identity questions never reach public web search, in any phrasing or platform language', () => {
-  for (const question of [
-    'what or who is signalboost and who owns it?',   // exact production phrasing 2026-08-25
-    'what is SignalBoost?',
-    'who owns SignalBoost?',
-    'who is the CEO of SignalBoost?',
-    'who founded signalboost and when?',
-    'what does the SignalBoost platform do?',
-    '¿quién es el dueño de SignalBoost?',
-    'quem é o dono da SignalBoost?',
-    'kto jest właścicielem SignalBoost?',
-    'кто владелец SignalBoost?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(question), false, question)
-  }
-  // The exclusion is scoped to SignalBoost itself — real-world ownership stays live-verified.
-  for (const question of ['who owns Nike?', 'who is the CEO of Microsoft?']) {
-    assert.equal(requiresFreshExternalEvidence(question), true, question)
-  }
-})
+// True when the question asks whether a DIRECT/NONSTOP transport route currently exists and is not
+// already a price/schedule/status/date-specific lookup handled by the dedicated live rules.
+function isRouteExistenceQuestion(text: string): boolean {
+  if (TRIP_VOLATILITY.test(text)) return false
+  return ROUTE_DIRECTNESS.test(text) && TRANSPORT_ROUTE_NOUN.test(text)
+}
 
+export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
 
-test('a current-office request stays live even when it also asks for historical context', () => {
-  assert.equal(
-    requiresFreshExternalEvidence('who is the current US secretary of State and give me a list of the past secretary of state for the past 20 years'),
-    true,
-  )
-})
+/**
+ * Identifies external high-frequency values for which ordinary web snippets are not an adequate
+ * source of truth. Callers should use a structured real-time provider and fail closed if that
+ * provider cannot return current data; they must not silently fall back to model memory.
+ */
+export function structuredLiveDataKind(input: string): StructuredLiveDataKind | null {
+  const text = normalizedText(input)
+  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text) || looksLikeInternalOperationalState(text) || isLocalDeterministicUtility(text)) return null
 
-test('definitional concept questions answer locally while mutable lookups stay live-verified', () => {
-  // Production 2026-09-26: "What is an artifact?" was refused as an unverifiable current fact.
-  for (const prompt of [
-    'What is an artifact?',
-    'what is an artifact',
-    'What is a vector database?',
-    'What does idempotent mean?',
-    'What is the meaning of latency?',
-    'What is the definition of a hash function?',
-    'What is meant by eventual consistency?',
-  ]) assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
+  if (isDirectOrTerseLookup(text, WEATHER_STATE)) return 'weather'
+  if (isDirectOrTerseLookup(text, FINANCIAL_STATE) || TICKER_PRICE.test(text) || isDirectOrTerseLookup(text, CRYPTO_PRICE)) return 'financial'
+  if (TERSE_SPORTS_STATE.test(text) || (LOOKUP_INTENT.test(text) && SPORTS_STATE.test(text))) return 'sports'
+  return null
+}
 
-  for (const prompt of [
-    'What is a good laptop to buy?',
-    'What is the price of bitcoin?',
-    'What is a fair salary for a nurse?',
-    'What is the weather in Merida?',
-    'What is a restaurant near me open now?',
-    'Who is the president of Mexico?',
-    'What is the latest news?',
-    'What does Tesla stock cost?',
-    'What is the current rate?',
-  ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-})
+/**
+ * Returns true when the request depends on EXTERNAL world facts that should be verified against
+ * current evidence rather than assumed from frozen model weights or durable memory.
+ *
+ * GENERAL DEFAULT: a direct factual lookup about the external world is live-verify-by-default even
+ * when the user does not say "current", "latest", or "today". That is the key stale-world guard:
+ * "What is Poland's population?", "Where is Company X headquartered?", "Who owns Brand Y?", and
+ * "Tell me about Person Z" all get current evidence before COS answers.
+ *
+ * Explicit exclusions remain for historical questions, conceptual/creative reasoning, local
+ * deterministic utilities, and private/internal system-of-record state.
+ *
+ * Hard rule: a positive result means model pretraining, local reasoning, durable memory,
+ * semantic/exact cache, and prior conversation facts are NOT permitted to establish the answer.
+ * COS must retrieve fresh external evidence on this turn, or fail closed if it cannot verify it.
+ */
+export function requiresFreshExternalEvidence(input: string): boolean {
+  const text = normalizedText(input)
+  if (!text) return false
+  // Advisory diagnosis / method briefs and "which files were injected?"
+  // are not live current-fact lookups.
+  if (detectAdvisoryDiagnosisIntent(input).suppressFreshnessAbort) return false
+  if (isNamedCatalogListRequest(input)) return false
+  if (isPlatformSelfKnowledgePrompt(input)) return false
+  // A compound request may ask for a current holder and historical context together. The
+  // current-holder portion remains volatile and must route through live research.
+  const asksCurrentOfficeHolder = PRESENT_TENSE_OFFICE_HOLDER.test(text)
+    || TERSE_CURRENT_OFFICE_HOLDER.test(text)
+    || CURRENT_LEADER.test(text)
+    || ROLE_STATUS_CHECK.test(text)
+  if (HISTORICAL_ANCHOR.test(text) && !asksCurrentOfficeHolder) return false
+  if (looksLikeInternalOperationalState(text)) return false
+  if (isLocalDeterministicUtility(text)) return false
+  if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
+  // Travel planning is detected separately so the route can ask the semantic planner whether live
+  // evidence is required. Do not force the strict fact-verification contract here: itineraries are
+  // synthesis tasks that may need live facts without becoming strict fact-verification requests.
+  if (isContentGenerationRequest(text) || isPoliteAuthoringForFreshness(input)) return false
 
-test('questions about the service itself are never sent to the public web', () => {
-  // Production 2026-09-26: "Is COS an artifact?" was refused as an unverifiable current fact.
-  for (const prompt of [
-    'Is COS an artifact?',
-    'is cos an artifact',
-    'What is COS?',
-    'What is iTMounts?',
-    'Is iTMounts an agent?',
-    'Are you an artifact?',
-  ]) assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
+  // A moral/civic/public-policy proposition is not itself a request for the current law. Route the
+  // whole class consistently through the normative answer contract instead of letting one keyword
+  // ("legal") force live guidance while an equivalent wording ("allowed") uses general reasoning.
+  // Any mutable present-world facts introduced by the draft remain subject to answer-side freshness.
+  if (isNormativePolicyQuestion(text)) return false
 
-  for (const prompt of [
-    'What is the latest news about iTMounts?',
-    'Can you find the CEO of Acme?',
-    'Is Tesla stock up today?',
-    'What is the weather in Merida?',
-  ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-})
+  // A question about COS's OWN previous answer is never a public-web lookup. This is a structural
+  // safeguard, not a duplicate of the introspection routing: when the introspection classifier
+  // misses (a typo like "the answert from", a phrasing nobody anticipated), the question used to
+  // fall through to live search — and on 2026-08-23 COS answered "where did you get the answer
+  // from?" using retrieved pages about E-Verify and FAFSA verification, because it searched the
+  // web for the word "verification". Failing to recognize introspection should degrade to a plain
+  // answer, never to confidently citing unrelated sources as the origin of its own reasoning.
+  if (isProvenanceIntrospection(text)) return false
+
+  // Direct/nonstop route existence is external operational state, not immutable model knowledge.
+  // Keep the multilingual route classifier so these questions live-verify even without English
+  // lookup-intent wording. The evidence-only local reasoner may synthesize after retrieval.
+  if (isRouteExistenceQuestion(text)) return true
+
+  // High-stakes guidance is never answered from model memory. This occurs before the
+  // conceptual/creative exclusion because questions such as "what should I do after changing my name?"
+  // are actionable public-administration guidance, not timeless advice.
+  if (isGovernedPublicGuidance(text)) return true
+
+  if (SIMPLE_NAMED_ENTITY_LOOKUP.test(text)) return true
+
+  // Shared temporal classifier: life/death, current holders, "still" status, latest/current mutable
+  // state, current rules/security state, and recent events. Domain-specific checks below remain as
+  // additional safeguards for terse lookups without explicit temporal wording.
+  if (classifyTemporalSensitivity(text).sensitive) return true
+  // If the user explicitly asks for current/latest/live state, do not override that request merely
+  // because the underlying fact is usually stable (for example, "current capital of X").
+  if (LOOKUP_INTENT.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
+
+  if (PRESENT_TENSE_OFFICE_HOLDER.test(text)) return true
+  if (TERSE_CURRENT_OFFICE_HOLDER.test(text)) return true
+  if (CURRENT_LEADER.test(text)) return true
+  if (ROLE_STATUS_CHECK.test(text)) return true
+
+  if (LIVE_NEWS.test(text)) return true
+  if (LOOKUP_INTENT.test(text) && NEWS_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
+
+  if (CONCEPTUAL_OR_CREATIVE.test(text)) return false
+
+  // Mutable reference state and subjective/current ranking questions may benefit from live evidence
+  // even without an explicit "current" marker. This is intentionally narrower than the old blanket
+  // rule that forced every direct factual lookup through public search.
+  if (LOOKUP_INTENT.test(text) && MUTABLE_REFERENCE_STATE.test(text)) return true
+  // Ranking/evaluative questions are comparative by nature and may depend on current evidence.
+  // Keep this multilingual and independent of English-only LOOKUP_INTENT.
+  if (SUBJECTIVE_RANKING_LOOKUP.test(text)) return true
+
+  if (structuredLiveDataKind(text)) return true
+  if (LOOKUP_INTENT.test(text) && OUTAGE_STATE.test(text)) return true
+  if (isDirectOrTerseLookup(text, TRAVEL_STATE)) return true
+  if (isDirectOrTerseLookup(text, ELECTION_STATE)) return true
+
+  if (LOOKUP_INTENT.test(text) && PUBLIC_RULE_STATE.test(text)) return true
+  if (LOOKUP_INTENT.test(text) && SOFTWARE_SECURITY_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
+  if (LOOKUP_INTENT.test(text) && LIFE_STATUS_STATE.test(text)) return true
+
+  // Positively identified stable reference facts are locally answerable. Keep this list narrow:
+  // unknown direct external lookups remain conservatively live-verified so a new mutable fact class
+  // cannot silently fall back to model memory.
+  if (STABLE_REFERENCE_LOOKUP.test(text)) return false
+  if (STABLE_TECHNICAL_REFERENCE.test(text)) return false
+
+  if (DEFINITIONAL_CONCEPT.test(text)) return false
+  if (SERVICE_SELF_SUBJECT.test(text)) return false
+
+  // Conservative stale-world protection for any direct lookup not proven stable above.
+  if (LOOKUP_INTENT.test(text)) return true
+
+  return false
+}

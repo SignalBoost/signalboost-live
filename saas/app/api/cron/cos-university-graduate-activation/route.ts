@@ -12,6 +12,7 @@ import { COS_UNIVERSITY_SUBJECTS } from '@/lib/ai/cos/cosUniversity'
 import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import { readCosUniversityGeneralistGraduationStatus } from '@/lib/ai/cos/cosUniversityGraduationRunner'
 import { createHash } from 'node:crypto'
+import { runGraduateRotationController } from '@/lib/ai/cos/cosUniversityGraduateRotationController'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -407,25 +408,12 @@ export async function GET(req: NextRequest) {
     const massRegistration = await registerNextMassGraduate()
     const rollbackProof = await proveNextGraduateRollback()
 
-    // Graduate activation and graduate work assignment are one lifecycle. Piggyback the governed
-    // rotation controller on this already-proven cron so work assignment cannot silently disappear
-    // when the provider's bounded cron-definition fleet omits the dedicated rotation schedule.
-    let workRotation: Record<string, unknown> = { ok: false, reason: 'not_attempted' }
-    try {
-      const rotationUrl = new URL('/api/cron/cos-university-graduate-rotation', req.url)
-      const rotationResponse = await fetch(rotationUrl, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${secret}`, 'User-Agent': 'SignalBoost-Graduate-Activation/1.0' },
-        cache: 'no-store',
-        signal: AbortSignal.timeout(245_000),
-      })
-      const body = await rotationResponse.json().catch(() => ({})) as Record<string, unknown>
-      workRotation = { ...body, httpStatus: rotationResponse.status }
-      console.info('[cos-graduate-work-rotation-piggyback]', JSON.stringify(workRotation))
-    } catch (error) {
-      workRotation = { ok: false, reason: 'rotation_invocation_failed', error: error instanceof Error ? error.message.slice(0, 180) : String(error).slice(0, 180) }
-      console.warn('[cos-graduate-work-rotation-piggyback]', JSON.stringify(workRotation))
-    }
+    // Graduate activation and work assignment share one governed controller. Call it directly:
+    // an internal HTTP hop can be intercepted by deployment routing/middleware and return a transport
+    // 200 without ever executing the rotation handler.
+    const rotation = await runGraduateRotationController()
+    const workRotation: Record<string, unknown> = { ...rotation.body, httpStatus: rotation.status }
+    console.info('[cos-graduate-work-rotation-direct]', JSON.stringify(workRotation))
 
     if (String(process.env[ACTIVATION_ENABLED_FLAG] || '').trim() !== 'true') {
       await recordCosUniversityProductionPath({

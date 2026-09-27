@@ -29,6 +29,7 @@ test('delete transport protects non-mass and worker-bearing endpoints',()=>{
   assert.match(provision,/runpod_endpoint_gc_not_mass_distilled/)
   assert.match(provision,/runpod_endpoint_gc_primary_protected/)
   assert.match(provision,/runpod_endpoint_gc_worker_reservation_present/)
+  assert.match(provision,/requestV2<Endpoint>\\(\\`\\/serverless\\/\\$\\{encodeURIComponent\\(id\\)\\}\\`\\)/)
   assert.match(provision,/\/endpoints\/\$\{encodeURIComponent\(id\)\}/)
   assert.match(provision,/method: 'DELETE'/)
 })

@@ -193,3 +193,17 @@ test('lexical context fallbacks run concurrently under their own budget and neve
   const learnedWork = stage.slice(stage.indexOf("boundedContextFallback('learned_lexical'"), stage.indexOf('return () => {', stage.indexOf("boundedContextFallback('learned_lexical'")))
   assert.doesNotMatch(learnedWork, /learned\.push\(/)
 })
+
+test('cos-primary records each step between ingress and the COS answer', () => {
+  // Production 2026-09-27 13:42 ET: 18s passed between the semantic-intent call and the first COS context
+  // read with no recorded step. Every await in that span now writes a cos-latency-stage row.
+  const primary = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  assert.match(primary, /if\(semanticTaskIntentNeeded\)recordCosLatencyStage\('primary:semantic_intent',Date\.now\(\)-semanticIntentStartedAt\)/)
+  for (const stage of ['web_search', 'web_page_reads', 'travel_planner', 'strategy_profile', 'conversation_recall', 'cos_first_answer', 'completion_rescue', 'legacy_concierge']) {
+    assert.match(primary, new RegExp(`timeCosStage\\('primary:${stage}',`))
+  }
+  assert.match(primary, /recordCosLatencyStage\('primary:before_cos_first',Date\.now\(\)-startedAt\)/)
+  const stages = readFileSync(new URL('../lib/ai/cos/cosLatencyStages.ts', import.meta.url), 'utf8')
+  assert.match(stages, /export async function timeCosStage<T>\(stage: string, work: \(\) => Promise<T>\): Promise<T> \{/)
+  assert.match(stages, /\} finally \{\n    recordCosLatencyStage\(stage, Date\.now\(\) - startedAt\)/)
+})

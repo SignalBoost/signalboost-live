@@ -41,8 +41,12 @@ export function selectBuilderResidencyEnrollmentForTick<T extends {id:unknown}>(
   const residentsWithHistory=new Set(
     input.recentCases.map(row=>String(row.residency_id??'')).filter(Boolean),
   )
-  const unstarted=input.enrollments.find(row=>!residentsWithHistory.has(String(row.id)))
-  if(unstarted) return unstarted
+  const unstarted=input.enrollments.filter(row=>!residentsWithHistory.has(String(row.id)))
+  // A single zero-case enrollment is a genuinely new admission and should not be starved by an
+  // older resident's retry history. When several enrollments have no history, however, treating
+  // the first one as "new" would suppress the deliberately allowed one-tick warm retry and make
+  // scheduling depend on array order. Let the retry/fairness logic below choose in that case.
+  if(unstarted.length===1) return unstarted[0]
 
   const latest=input.recentCases[0]
   if(!latest||String(latest.harness_outcome)!=='infrastructure_failure') return fallback

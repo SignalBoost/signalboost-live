@@ -414,6 +414,19 @@ function audienceSection(audience:CosAudience|undefined):string {
   return ''
 }
 
+/**
+ * The identity every COS model call carries, whichever lane runs it (owner decision 2026-09-26: one
+ * brain). Production that night: the main pipeline declined to release an answer and a secondary lane
+ * with no identity answered "What is iTMounts?" as "a typo for iMounts". Any lane that calls the model
+ * on behalf of COS must include this preamble and companyKnowledgeBlock().
+ */
+export function cosIdentityPreamble(audience:CosAudience):string {
+  return [
+    'You are COS, the reasoning brain of iTMounts (itmounts.com). SignalBoost is only its internal name and is never used in answers.',
+    audienceSection(audience),
+  ].filter(Boolean).join(' ')
+}
+
 export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged?:boolean; audience?:CosAudience}):string {
   // OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (2026-08-25, owner-directed). Only the owner audience
   // sets privileged; public and user audiences never receive this block. Values are resolved live from the configured reasoner so the
@@ -869,7 +882,7 @@ async function waitForCacheWritesWithinBudget(work: Promise<unknown>, budgetMs: 
 }
 
 /** Company knowledge every audience receives for questions about iTMounts itself (public-safe by construction). */
-function companyKnowledgeBlock(prompt:string):string {
+export function companyKnowledgeBlock(prompt:string):string {
   if (!isSignalBoostSpecificPublicRequest(prompt)) return ''
   let catalog:string|null = null
   try { catalog = buildProductCatalogSummary() } catch { catalog = null }

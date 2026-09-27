@@ -172,3 +172,24 @@ test('every chat stage in front of the answer records its duration for the owner
   const independence = readFileSync(new URL('../app/api/admin/cos-independence/route.ts', import.meta.url), 'utf8')
   assert.match(independence, /\.neq\('task_id', 'cos-latency-stage'\)/)
 })
+
+test('lexical context fallbacks run concurrently under their own budget and never commit late', () => {
+  // Production 2026-09-27 13:30 ET: retrieval:knowledgeStage took 9,428ms while every other source took <=558ms;
+  // the semantic lookups were already capped at 1.5s, so the uncapped lexical fallbacks held the rest.
+  assert.match(enterprise, /process\.env\.COS_CONTEXT_FALLBACK_BUDGET_MS \|\| '2500'/)
+  const helperAt = enterprise.indexOf('async function boundedContextFallback(')
+  const helper = enterprise.slice(helperAt, enterprise.indexOf('\n}\n', helperAt))
+  assert.ok(helperAt > 0)
+  assert.match(helper, /if \(outcome === timedOut\) \{[\s\S]*return\n  \}/)
+  assert.match(helper, /if \(outcome\) outcome\(\)/)
+  const stageAt = enterprise.indexOf("const knowledgeStage = timedRetrievalStage('knowledgeStage'")
+  const stage = enterprise.slice(stageAt, enterprise.indexOf("const enterpriseStage = timedRetrievalStage('enterpriseStage'", stageAt))
+  assert.match(stage, /fallbacks\.push\(boundedContextFallback\('kg_lexical'/)
+  assert.match(stage, /fallbacks\.push\(boundedContextFallback\('learned_lexical'/)
+  assert.match(stage, /await Promise\.all\(fallbacks\)/)
+  // Fallback work may not write shared context directly; it returns a commit applied only in budget.
+  const kgWork = stage.slice(stage.indexOf("boundedContextFallback('kg_lexical'"), stage.indexOf('return () => {', stage.indexOf("boundedContextFallback('kg_lexical'")))
+  assert.doesNotMatch(kgWork, /facts\.push\(/)
+  const learnedWork = stage.slice(stage.indexOf("boundedContextFallback('learned_lexical'"), stage.indexOf('return () => {', stage.indexOf("boundedContextFallback('learned_lexical'")))
+  assert.doesNotMatch(learnedWork, /learned\.push\(/)
+})

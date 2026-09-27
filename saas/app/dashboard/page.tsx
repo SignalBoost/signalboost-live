@@ -1,3 +1,4 @@
+// saas/app/dashboard/page.tsx
 'use client'
 import React, { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
@@ -126,6 +127,7 @@ export default function DashboardOverviewPage() {
   }, [dict, projects, projectsLoaded])
 
   const promptRef = useRef<HTMLDivElement>(null)
+  const promptConversationIdRef = useRef<string>('')
 
   const QUICK_ACTIONS = [
     { type: 'website' as const, icon: '🌐', label: t(dict, 'dash.actions.website.label'), subline: t(dict, 'dash.actions.website.subline'), href: '/dashboard/builder' },
@@ -199,16 +201,29 @@ export default function DashboardOverviewPage() {
     setPromptLoading(true)
 
     try {
-      const res = await fetch('/api/support', {
+      // ONE PIPELINE (2026-09-27, Stage 3): the dashboard prompt enters the same canonical browser
+      // ingress as the homepage Concierge (/api/cos-browser -> COS), instead of the older /api/support
+      // route whose fallback called an external model directly. The explicit surface header keeps this
+      // on the Concierge lane; only the owner Assistant page uses the privileged COS surface.
+      if (!promptConversationIdRef.current) promptConversationIdRef.current = crypto.randomUUID()
+      const res = await fetch('/api/cos-browser', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          accept: 'application/json',
+          'x-signalboost-surface': 'concierge',
+        },
         body: JSON.stringify({
           messages: newMessages,
           context: {
             userName: firstName,
-            currentPage: 'Dashboard',
+            currentPage: '/dashboard',
             userPlan: plan,
             language: lang,
+            conversationId: promptConversationIdRef.current,
+            cosMode: 'silent_background_planning',
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           },
         }),
       })

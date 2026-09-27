@@ -4,7 +4,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { COS_OPERATING_CHARTER, cosOperatingCharterText } from '../lib/ai/cos/cosOperatingCharter.ts'
 
-const REASONER_PROMPTS = ['lib/ai/cos/cosFirstAnswerCore.ts', 'lib/ai/cos/cosFirstAnswerEnterprise.ts']
+// One COS pipeline (2026-09-26): a single answer prompt serves every audience.
+const REASONER_PROMPTS = ['lib/ai/cos/cosFirstAnswerEnterprise.ts']
+
+test('there is no second, public-only answer prompt', () => {
+  const core = readFileSync('lib/ai/cos/cosFirstAnswerCore.ts', 'utf8')
+  assert.doesNotMatch(core, /reasoning engine behind the public/)
+  assert.doesNotMatch(core, /async function tryPublicStatelessAnswer/)
+})
 
 test('both reasoner prompts carry the charter', () => {
   for (const path of REASONER_PROMPTS) {
@@ -75,7 +82,6 @@ test('completion means the whole cycle, and unverified is not finished', () => {
   assert.match(text, /not verified is not finished/i)
   assert.match(text, /false report/i)
 })
-
 test('conflicting sources are ranked, and the choice is stated', () => {
   const text = cosOperatingCharterText()
   assert.match(text, /primary source over a report of it/i)

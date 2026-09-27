@@ -60,6 +60,35 @@ test('fails closed without exact proof: no canary, wrong verifier, foreign model
 
 test('the runner resolves the candidate model from canary proof', () => {
   const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
-  assert.match(source, /const model=await servedCandidateModel\(input\.claim\)/)
+  assert.match(source, /const model=await servedCandidateModel\(\{\.\.\.input\.claim,attentionArchitecture:training\.attentionArchitecture,xsaProfile:training\.xsaProfile\}\)/)
   assert.doesNotMatch(source, /const model=candidateModelName\(/)
+})
+
+// 2026-09-27 (mass:dabe6783): the canary lane records the serving architecture on its companion
+// production_canary_healthy record, not on the passed record. An exclusive-self-attention artifact therefore
+// failed served_model_unproven three times before any question was asked.
+const xsaInput = { ...input, attentionArchitecture: 'exclusive_self_attention_v1', xsaProfile: 'qwen3_xsa_projection_v1' }
+const companion = (evidence: Record<string, unknown>, observed_at = '2026-09-16T12:00:05Z') => ({
+  verifier: 'host_production_verifier', observed_at,
+  evidence: {
+    claim: 'production_canary_healthy', exactArtifact: true, candidateId: input.candidateId, artifactHash: hash, endpointId: input.endpointId,
+    attentionArchitecture: 'exclusive_self_attention_v1', xsaProfile: 'qwen3_xsa_projection_v1', servingRuntime: 'transformers_xsa', ...evidence,
+  },
+})
+
+test('an XSA artifact is proven by the companion production canary written in the same step', () => {
+  assert.equal(servedCandidateModelFromCanary([passed({}), companion({})], xsaInput), 'itmounts-mass-distilled-7f23dde56e39-a1b2c3d4e5')
+})
+
+test('an XSA artifact still fails closed without architecture proof, or with proof from the wrong place', () => {
+  assert.throws(() => servedCandidateModelFromCanary([passed({})], xsaInput), /served_model_unproven/)
+  assert.throws(() => servedCandidateModelFromCanary([passed({}), companion({ servingRuntime: 'vllm' })], xsaInput), /served_model_unproven/)
+  assert.throws(() => servedCandidateModelFromCanary([passed({}), companion({ endpointId: 'otherendpoint' })], xsaInput), /served_model_unproven/)
+  assert.throws(() => servedCandidateModelFromCanary([passed({}), { ...companion({}), verifier: 'host_controller' }], xsaInput), /served_model_unproven/)
+  assert.throws(() => servedCandidateModelFromCanary([passed({}), companion({}, '2026-09-16T14:00:00Z')], xsaInput), /served_model_unproven/)
+})
+
+test('a standard-attention artifact is not satisfied by an XSA canary', () => {
+  assert.throws(() => servedCandidateModelFromCanary([passed({}), companion({})].map(row => row.verifier === 'host_controller'
+    ? { ...row, evidence: { ...row.evidence, attentionArchitecture: 'exclusive_self_attention_v1' } } : row), input), /served_model_unproven/)
 })

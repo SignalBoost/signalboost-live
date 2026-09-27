@@ -207,3 +207,12 @@ test('cos-primary records each step between ingress and the COS answer', () => {
   assert.match(stages, /export async function timeCosStage<T>\(stage: string, work: \(\) => Promise<T>\): Promise<T> \{/)
   assert.match(stages, /\} finally \{\n    recordCosLatencyStage\(stage, Date\.now\(\) - startedAt\)/)
 })
+
+test('no fast-authoring detour runs in front of COS', () => {
+  // Production 2026-09-27 14:06 ET: primary:before_cos_first = 38,749ms, two 18s fast-authoring detours that failed.
+  const primary = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  const cosAt = primary.indexOf('tryCOSFirstAnswer({prompt:reasoningPrompt')
+  const handlerAt = primary.indexOf('const startedAt=Date.now(),body=await req.clone().json()')
+  assert.ok(handlerAt > 0 && cosAt > handlerAt)
+  assert.doesNotMatch(primary.slice(handlerAt, cosAt), /await runFastAuthoring\(/)
+})

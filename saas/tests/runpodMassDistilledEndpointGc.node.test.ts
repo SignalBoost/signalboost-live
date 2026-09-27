@@ -23,6 +23,10 @@ test('terminal endpoint GC is DB-first, quarantined-only, protected and bounded'
 test('retirement evidence advances later cleanup runs past deleted and 404 endpoints', () => {
   const gc = source('lib/ai/cos/runpodMassDistilledEndpointGc.ts')
   assert.ok(gc.includes('endpointRetired === true'))
+  assert.ok(gc.includes("createHash('sha256')"))
+  assert.ok(gc.includes(".digest('hex')"))
+  assert.ok(gc.includes('retiredEndpointIds.add(endpointId)'))
+  assert.ok(gc.includes('retiredEndpointIds.has(endpointId)'))
   assert.ok(gc.includes("claim: 'local_distilled_runtime_endpoint_retired'"))
   assert.ok(gc.includes("reason: 'deleted' | 'already_gone'"))
   assert.ok(gc.includes("recordRetired(endpointId, owner, 'deleted')"))

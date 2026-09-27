@@ -168,7 +168,7 @@ test('auto admission skips an already-enrolled artifact and admits the next cand
               eq(){return this},
               like(){return this},
               order(){return this},
-              async limit(){return {data:artifacts,error:null}},
+              async range(){return {data:artifacts,error:null}},
             }
           },
         }
@@ -221,4 +221,67 @@ test('auto admission skips an already-enrolled artifact and admits the next cand
   assert.equal(out.admitted,true)
   assert.equal(writes.length,1)
   assert.equal(writes[0].value.artifact_row_id,artifacts[1].id)
+})
+
+
+test('auto admission pages past an enrolled first window instead of starving an aged candidate',async()=>{
+  const writes:any[]=[]
+  const enrolled=Array.from({length:64},(_,i)=>({
+    id:`enrolled-${i}`,
+    candidate_id:`mass:enrolled-${i}:0123456789abcdef`,
+    subject_id:'Computer Science & Coding',
+    trained_artifact_id:`cadomos/enrolled-${i}`,
+    trained_artifact_hash:hash('a'),
+    revision_key:hash('b'),
+    status:'evaluation_pending',
+    authority_expanded:false,
+  }))
+  const aged={
+    id:'59152ebf-3634-4c01-beb1-35cb31d6ecaf',
+    candidate_id:'mass:aged:0123456789abcdef',
+    subject_id:'Computer Science & Coding',
+    trained_artifact_id:'cadomos/aged-candidate',
+    trained_artifact_hash:hash('c'),
+    revision_key:hash('d'),
+    status:'evaluation_pending',
+    authority_expanded:false,
+  }
+  const pages=[enrolled,[aged]]
+  let page=0
+  const db:any={
+    from(table:string){
+      if(table==='cos_local_distillation_artifacts') return {
+        select(){return {
+          eq(){return this}, like(){return this}, order(){return this},
+          async range(){return {data:pages[page++]??[],error:null}},
+        }},
+      }
+      if(table==='cos_university_residency_enrollments') return {
+        select(){
+          const state:any={
+            artifactId:'',
+            in(){return {async limit(){return {data:[],error:null}}}},
+            eq(column:string,value:string){if(column==='artifact_row_id') state.artifactId=value; return state},
+            async maybeSingle(){
+              return {data:state.artifactId.startsWith('enrolled-')?{id:`res-${state.artifactId}`}:null,error:null}
+            },
+          }
+          return state
+        },
+        upsert(value:any,options:any){
+          writes.push({value,options})
+          return {select(){return {async maybeSingle(){return {data:{id:'aged-residency',standing:'resident'},error:null}}}}}
+        },
+      }
+      throw new Error(`unexpected_table:${table}`)
+    },
+  }
+
+  const out=await admitNextBuilderResidency({db,activeLimit:4})
+  assert.equal(out.ok,true)
+  assert.equal(out.admitted,true)
+  assert.equal(out.residencyId,'aged-residency')
+  assert.equal(page,2)
+  assert.equal(writes.length,1)
+  assert.equal(writes[0].value.artifact_row_id,aged.id)
 })

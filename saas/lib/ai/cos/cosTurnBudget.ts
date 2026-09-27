@@ -65,6 +65,17 @@ export function runWithTurnDeadline<T>(deadlineAt: number, fn: () => Promise<T>)
   return turnDeadlineScope.run({ deadlineAt: effective }, fn)
 }
 
+/**
+ * Run durable work that must NOT inherit an interactive COS turn deadline.
+ * Next.js `after()` snapshots every AsyncLocalStorage context, so a Builder job queued from a
+ * Concierge/COS turn otherwise keeps that turn's wall clock: the owned RunPod attempt is cut off
+ * when the turn expires and the paid fallback is then issued with ~0 ms left and fails before any
+ * HTTP response. Durable jobs carry their own Platform Harness deadline instead.
+ */
+export function runWithoutTurnDeadline<T>(fn: () => Promise<T>): Promise<T> {
+  return turnDeadlineScope.exit(fn)
+}
+
 /** Milliseconds left in the enclosing whole-turn deadline, or null when no turn deadline is open. */
 export function turnDeadlineRemainingMs(now = Date.now()): number | null {
   const scope = turnDeadlineScope.getStore()

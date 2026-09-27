@@ -202,3 +202,14 @@ test('University telemetry pipeline counts use the complete paginated artifact l
   assert.match(route, /evaluationPending: artifacts\.filter/)
   assert.match(route, /quarantined: artifacts\.filter/)
 })
+
+
+test('University telemetry chunks complete-lifecycle assurance filters within PostgREST request limits', () => {
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
+  assert.match(route, /const ASSURANCE_CANDIDATE_CHUNK_SIZE = 75/)
+  assert.match(route, /offset < artifactCandidates\.length; offset \+= ASSURANCE_CANDIDATE_CHUNK_SIZE/)
+  assert.match(route, /artifactCandidates\.slice\(offset, offset \+ ASSURANCE_CANDIDATE_CHUNK_SIZE\)/)
+  assert.match(route, /\.in\('candidate_id', candidateChunk\)/)
+  assert.doesNotMatch(route, /\.in\('candidate_id', artifactCandidates\)/)
+  assert.match(route, /collectPages<any>[\s\S]*cos_university_learning_assurance_events[\s\S]*\.range\(from, to\)/)
+})

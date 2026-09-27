@@ -58,6 +58,9 @@ export async function garbageCollectTerminalMassDistilledEndpoints(input: { dryR
       const endpointName = clean(evidence.endpointName, 240)
       if (!terminalKeys.has(`${candidateId}\u0000${artifactHash}`)) continue
       if (!endpointId || !endpointName.startsWith('itmounts-mass-distilled-')) continue
+      // A durable retirement marker advances later runs past endpoints already deleted. Provider 404s
+      // are also persisted below so stale ownership evidence cannot pin the first batch forever.
+      if (evidence.endpointRetired === true) { ownership.delete(endpointId); continue }
       if (!ownership.has(endpointId)) ownership.set(endpointId, { candidateId, artifactHash, endpointName })
     }
   }
@@ -78,13 +81,32 @@ export async function garbageCollectTerminalMassDistilledEndpoints(input: { dryR
   let deleted = 0
   let alreadyGone = 0
   const failures: string[] = []
-  for (const [endpointId] of selected) {
+  const recordRetired = async (endpointId: string, owner: { candidateId: string; artifactHash: string; endpointName: string }, reason: 'deleted' | 'already_gone') => {
+    const evidence = { profile: PROFILE, claim: 'local_distilled_runtime_endpoint_retired', candidateId: owner.candidateId, artifactHash: owner.artifactHash, endpointId, endpointName: owner.endpointName, endpointRetired: true, reason, authorityExpanded: false }
+    const result = await db.from('cos_university_learning_assurance_events').insert({
+      event_key: `endpoint-retired:${endpointId}`,
+      event_type: 'fine_tune',
+      subject_id: null,
+      candidate_id: owner.candidateId,
+      evidence_hash: `endpoint-retired:${endpointId}`,
+      evidence,
+      verifier: 'host_controller',
+      observed_at: new Date().toISOString(),
+    })
+    if (result.error && !String(result.error.message || '').toLowerCase().includes('duplicate')) throw result.error
+  }
+  for (const [endpointId, owner] of selected) {
     try {
       await deleteTerminalMassDistilledRunpodEndpoint(endpointId)
+      await recordRetired(endpointId, owner, 'deleted')
       deleted += 1
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      if (/HTTP 404\b/.test(message)) { alreadyGone += 1; continue }
+      if (/HTTP 404\b/.test(message)) {
+        await recordRetired(endpointId, owner, 'already_gone')
+        alreadyGone += 1
+        continue
+      }
       failures.push(message.slice(0, 180))
     }
   }

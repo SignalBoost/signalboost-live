@@ -76,37 +76,38 @@ test('the allowlist stays narrow and deliberate', () => {
 // Wiring
 // ---------------------------------------------------------------------------------------------
 
-const PUBLIC = readFileSync('lib/ai/cos/cosFirstAnswerCore.ts', 'utf8')
+// One COS pipeline (2026-09-26): public questions are reasoned by the enterprise pipeline in the
+// public audience. The public boundary is enforced in its retrieval, before any row reaches a prompt.
+const PIPELINE = readFileSync('lib/ai/cos/cosFirstAnswerEnterprise.ts', 'utf8')
+const RETRIEVAL = PIPELINE.slice(
+  PIPELINE.indexOf('async function retrieveInternalContext('),
+  PIPELINE.indexOf('function executionFunnel('),
+)
 
-test('the public path filters before anything reaches a prompt', () => {
-  assert.match(PUBLIC, /filterPublicCorpusRows\(rows\)/)
-  const filterAt = PUBLIC.indexOf('filterPublicCorpusRows(rows)')
-  const promptAt = PUBLIC.indexOf('PUBLIC REFERENCE EVIDENCE')
-  assert.ok(filterAt > 0 && promptAt > 0)
-  assert.ok(filterAt < promptAt, 'rows must be filtered before they can be injected')
-})
-
-test('retrieved evidence is actually used, not merely fetched', () => {
-  assert.match(PUBLIC, /PUBLIC REFERENCE EVIDENCE \(externally published material only\)/)
+test('the public audience filters learned rows before anything reaches a prompt', () => {
+  assert.match(RETRIEVAL, /const publicAudience = audience === 'public'/)
+  assert.match(RETRIEVAL, /publicAudience \? filterPublicCorpusRows\(semanticLearnedAll\) : semanticLearnedAll/)
+  assert.match(RETRIEVAL, /const rows = publicAudience \? filterPublicCorpusRows\(unfilteredRows\) : unfilteredRows/)
+  const filterAt = PIPELINE.indexOf('filterPublicCorpusRows(semanticLearnedAll)')
+  const promptAt = PIPELINE.indexOf('CURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT)')
+  assert.ok(filterAt > 0 && promptAt > filterAt, 'rows must be filtered before they can be injected')
 })
 
 test('the boundary instruction distinguishes public from non-public corpus material', () => {
-  assert.match(PUBLIC, /non-public learned corpus items/)
-  assert.match(PUBLIC, /Never mention that evidence was supplied, retrieved or selected/)
+  assert.match(PIPELINE, /non-public learned corpus items/)
+  assert.match(PIPELINE, /Never mention that evidence was supplied, retrieved or selected/)
 })
 
 test('retrieval failure cannot cost the visitor an answer', () => {
-  const at = PUBLIC.indexOf('let publicEvidenceBlock')
-  const block = PUBLIC.slice(at, at + 2200)
-  assert.match(block, /try \{/)
-  assert.match(block, /catch \(error\)/)
-  assert.match(block, /PUBLIC_CORPUS_RETRIEVAL_BUDGET_MS/)
+  const at = PIPELINE.indexOf('async function semanticLearnedCorpus(')
+  const block = PIPELINE.slice(at, at + 1800)
+  assert.match(block, /\.catch\(error =>/)
+  assert.match(block, /return null/)
 })
 
-test('the public path still touches no private store', () => {
-  const at = PUBLIC.indexOf('async function tryPublicStatelessAnswer')
-  const body = PUBLIC.slice(at, PUBLIC.indexOf('async function tryFreshCurrentFact'))
-  for (const forbidden of [/enterpriseMemory/i, /knowledgeGraph/i, /userMemory/i, /queryNearestFacts/]) {
-    assert.ok(!forbidden.test(body), `public path must not touch ${forbidden}`)
-  }
+test('the public audience touches no private store', () => {
+  assert.match(RETRIEVAL, /publicAudience \? Promise\.resolve\(\[\] as Awaited<ReturnType<typeof semanticKnowledgeFacts>>\) : semanticKnowledgeFacts\(prompt, db\)/)
+  assert.match(RETRIEVAL, /if \(publicAudience\) \{\n\s*\/\/ Knowledge Graph facts are internal company records/)
+  assert.match(RETRIEVAL, /const scopeResolution = publicAudience\n\s*\? \{ scope:null, status:'not_available_public_delivery' as const \}/)
+  assert.match(RETRIEVAL, /if \(userId && !publicAudience\) \{/)
 })

@@ -680,158 +680,171 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
   let enterpriseMemoryStatus = privileged ? 'organization_not_found' : 'no_authorized_scope'
   let enterpriseMemoryOrganizationId:string|null = null
 
-  if (db) {
-    systems.push('Knowledge Graph', 'Continuous Learning Corpus')
-    const [semanticResult, semanticLearnedResult] = await Promise.allSettled([
-      publicAudience ? Promise.resolve([] as Awaited<ReturnType<typeof semanticKnowledgeFacts>>) : semanticKnowledgeFacts(prompt, db),
-      semanticLearnedCorpus(prompt),
-    ])
+  // PARALLEL RETRIEVAL (2026-09-27). Production evidence (cos_ai_roi_metrics, owner Polish question 10:31 and
+  // 10:53 ET): a semantic-cache HIT took 7.5-9.5s because these five independent sources were read one after
+  // another before the cache could be checked. Each stage writes only its own arrays and funnel entry, so they
+  // run concurrently; systems are merged in the original order, so output is identical to the sequential form.
+  const kgSystems:string[] = [], enterpriseSystems:string[] = [], userSystems:string[] = [], creativeSystems:string[] = [], skillSystems:string[] = []
+  const knowledgeStage = (async () => {
+    if (db) {
+      kgSystems.push('Knowledge Graph', 'Continuous Learning Corpus')
+      const [semanticResult, semanticLearnedResult] = await Promise.allSettled([
+        publicAudience ? Promise.resolve([] as Awaited<ReturnType<typeof semanticKnowledgeFacts>>) : semanticKnowledgeFacts(prompt, db),
+        semanticLearnedCorpus(prompt),
+      ])
 
-    const semanticRows = semanticResult.status === 'fulfilled' ? semanticResult.value : null
-    if (publicAudience) {
-      // Knowledge Graph facts are internal company records; never retrieved for the public audience.
-    } else if (semanticRows !== null) {
-      funnel.knowledgeGraph.retrieved = semanticRows.length
-      const relevant = semanticRows.filter(row =>
-        row.predicate !== 'excluded_from_cos_retrieval' && Number(row.similarityScore || 0) >= knowledgeFactSimilarityThreshold(),
-      )
-      funnel.knowledgeGraph.relevant = relevant.length
-      const selected = relevant.slice(0, 16)
-      funnel.knowledgeGraph.selected = selected.length
-      for (const row of selected) {
-        facts.push(`[KG${facts.length + 1}] ${safeText(row.subject,180)} — ${safeText(row.predicate,120)} — ${safeText(row.object,600)} [confidence ${Number(row.confidence || 0).toFixed(2)}; similarity ${Number(row.similarityScore || 0).toFixed(2)}; source ${safeText(row.source,180)}]`)
-      }
-    } else if (terms.length) {
-      const factFilters = terms.flatMap(term => [`subject.ilike.%${term}%`, `predicate.ilike.%${term}%`, `object.ilike.%${term}%`]).join(',')
-      const result = await db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at')
-        .or(factFilters).order('confidence', { ascending:false }).order('updated_at', { ascending:false }).order('subject', { ascending:true }).limit(32)
-      if (!result.error) {
-        const rows = (result.data ?? []).filter(row => row.predicate !== 'excluded_from_cos_retrieval')
-        funnel.knowledgeGraph.retrieved = rows.length
-        funnel.knowledgeGraph.relevant = rows.length
-        const selected = rows.slice(0, 16)
+      const semanticRows = semanticResult.status === 'fulfilled' ? semanticResult.value : null
+      if (publicAudience) {
+        // Knowledge Graph facts are internal company records; never retrieved for the public audience.
+      } else if (semanticRows !== null) {
+        funnel.knowledgeGraph.retrieved = semanticRows.length
+        const relevant = semanticRows.filter(row =>
+          row.predicate !== 'excluded_from_cos_retrieval' && Number(row.similarityScore || 0) >= knowledgeFactSimilarityThreshold(),
+        )
+        funnel.knowledgeGraph.relevant = relevant.length
+        const selected = relevant.slice(0, 16)
         funnel.knowledgeGraph.selected = selected.length
         for (const row of selected) {
-          facts.push(`[KG${facts.length + 1}] ${safeText(row.subject,180)} — ${safeText(row.predicate,120)} — ${safeText(row.object,600)} [confidence ${Number(row.confidence || 0).toFixed(2)}; source ${safeText(row.source,180)}]`)
+          facts.push(`[KG${facts.length + 1}] ${safeText(row.subject,180)} — ${safeText(row.predicate,120)} — ${safeText(row.object,600)} [confidence ${Number(row.confidence || 0).toFixed(2)}; similarity ${Number(row.similarityScore || 0).toFixed(2)}; source ${safeText(row.source,180)}]`)
+        }
+      } else if (terms.length) {
+        const factFilters = terms.flatMap(term => [`subject.ilike.%${term}%`, `predicate.ilike.%${term}%`, `object.ilike.%${term}%`]).join(',')
+        const result = await db.from('cos_knowledge_facts').select('subject,predicate,object,confidence,source,updated_at')
+          .or(factFilters).order('confidence', { ascending:false }).order('updated_at', { ascending:false }).order('subject', { ascending:true }).limit(32)
+        if (!result.error) {
+          const rows = (result.data ?? []).filter(row => row.predicate !== 'excluded_from_cos_retrieval')
+          funnel.knowledgeGraph.retrieved = rows.length
+          funnel.knowledgeGraph.relevant = rows.length
+          const selected = rows.slice(0, 16)
+          funnel.knowledgeGraph.selected = selected.length
+          for (const row of selected) {
+            facts.push(`[KG${facts.length + 1}] ${safeText(row.subject,180)} — ${safeText(row.predicate,120)} — ${safeText(row.object,600)} [confidence ${Number(row.confidence || 0).toFixed(2)}; source ${safeText(row.source,180)}]`)
+          }
         }
       }
-    }
 
-    const semanticLearnedAll = semanticLearnedResult.status === 'fulfilled' ? semanticLearnedResult.value : null
-    const semanticLearned = semanticLearnedAll !== null && publicAudience ? filterPublicCorpusRows(semanticLearnedAll) : semanticLearnedAll
-    if (semanticLearned !== null) {
-      funnel.learnedCorpus.retrieved = semanticLearned.length
-      const relevant = semanticLearned.filter(row =>
-        Number(row.similarity || 0) >= learnedContextSimilarityThreshold() && domainCompatibleContext(prompt, corpusCandidateText(row)),
-      )
-      funnel.learnedCorpus.relevant = relevant.length
-      // Substantive rows take the limited injection slots first; metadata pointers fill leftovers.
-      const selected = selectLearnedCorpusRows<(typeof relevant)[number]>(relevant, 6)
-      funnel.learnedCorpus.selected = selected.length
-      if (semanticLearned.length) systems.push('Continuous Learning semantic retrieval')
-      for (const row of selected) {
-        const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map(fact => safeText(fact,300)).join('; ') : ''
-        learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; similarity ${Number(row.similarity || 0).toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
-      }
-    } else if (terms.length) {
-      const learnedResult = await db.from('cos_continuous_learning')
-        .select('subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error')
-        .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
-        .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(128)
-      if (!learnedResult.error) {
-        const unfilteredRows = (learnedResult.data ?? []).filter(row => !rejectedLearningRow(row))
-        const rows = publicAudience ? filterPublicCorpusRows(unfilteredRows) : unfilteredRows
-        const candidates = rows.map(row => ({ item:row, text:corpusCandidateText(row) }))
-        const ranked = await rankContextCandidates(prompt, candidates, { threshold:learnedContextSimilarityThreshold(), limit:candidates.length })
-        funnel.learnedCorpus.retrieved = rows.length
-        funnel.learnedCorpus.relevant = ranked.relevant.length
-        // Same substance preference on the backfill-window path: candidates wrap the row in `item`.
-        const rankedWithSummary = ranked.relevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
-        const selected = selectLearnedCorpusRows<(typeof rankedWithSummary)[number]>(rankedWithSummary, 6)
+      const semanticLearnedAll = semanticLearnedResult.status === 'fulfilled' ? semanticLearnedResult.value : null
+      const semanticLearned = semanticLearnedAll !== null && publicAudience ? filterPublicCorpusRows(semanticLearnedAll) : semanticLearnedAll
+      if (semanticLearned !== null) {
+        funnel.learnedCorpus.retrieved = semanticLearned.length
+        const relevant = semanticLearned.filter(row =>
+          Number(row.similarity || 0) >= learnedContextSimilarityThreshold() && domainCompatibleContext(prompt, corpusCandidateText(row)),
+        )
+        funnel.learnedCorpus.relevant = relevant.length
+        // Substantive rows take the limited injection slots first; metadata pointers fill leftovers.
+        const selected = selectLearnedCorpusRows<(typeof relevant)[number]>(relevant, 6)
         funnel.learnedCorpus.selected = selected.length
-        if (ranked.mode === 'semantic' && rows.length) systems.push('Continuous Learning semantic relevance')
-        for (const candidate of selected) {
-          const row = candidate.item
-          const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''
-          learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
+        if (semanticLearned.length) kgSystems.push('Continuous Learning semantic retrieval')
+        for (const row of selected) {
+          const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map(fact => safeText(fact,300)).join('; ') : ''
+          learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; similarity ${Number(row.similarity || 0).toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
+        }
+      } else if (terms.length) {
+        const learnedResult = await db.from('cos_continuous_learning')
+          .select('subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error')
+          .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
+          .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(128)
+        if (!learnedResult.error) {
+          const unfilteredRows = (learnedResult.data ?? []).filter(row => !rejectedLearningRow(row))
+          const rows = publicAudience ? filterPublicCorpusRows(unfilteredRows) : unfilteredRows
+          const candidates = rows.map(row => ({ item:row, text:corpusCandidateText(row) }))
+          const ranked = await rankContextCandidates(prompt, candidates, { threshold:learnedContextSimilarityThreshold(), limit:candidates.length })
+          funnel.learnedCorpus.retrieved = rows.length
+          funnel.learnedCorpus.relevant = ranked.relevant.length
+          // Same substance preference on the backfill-window path: candidates wrap the row in `item`.
+          const rankedWithSummary = ranked.relevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
+          const selected = selectLearnedCorpusRows<(typeof rankedWithSummary)[number]>(rankedWithSummary, 6)
+          funnel.learnedCorpus.selected = selected.length
+          if (ranked.mode === 'semantic' && rows.length) kgSystems.push('Continuous Learning semantic relevance')
+          for (const candidate of selected) {
+            const row = candidate.item
+            const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''
+            learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
+          }
         }
       }
     }
-  }
-
-  const scopeResolution = publicAudience
-    ? { scope:null, status:'not_available_public_delivery' as const }
-    : await resolveCosEnterpriseMemoryScope({ privileged }).catch(() => ({ scope:null, status:'lookup_failed' as const }))
-  enterpriseMemoryStatus = scopeResolution.status
-  if (scopeResolution.scope) {
-    enterpriseMemoryOrganizationId = scopeResolution.scope.organizationId
-    systems.push('Organization Enterprise Memory')
-    try {
-      const context = await retrieveEnterpriseMemoryContext({
-        organizationId:scopeResolution.scope.organizationId,
-        workspace:scopeResolution.scope.workspace,
-        taskTags:terms,
-        limit:12,
-      })
-      const rows = context?.memories ?? []
-      const candidates = rows.map(item => ({ item, text:enterpriseCandidateText(item) }))
-      const ranked = await rankContextCandidates(prompt, candidates, { threshold:enterpriseMemorySimilarityThreshold(), limit:candidates.length })
-      funnel.enterpriseMemory.retrieved = rows.length
-      funnel.enterpriseMemory.relevant = ranked.relevant.length
+  })()
+  const enterpriseStage = (async () => {
+    const scopeResolution = publicAudience
+      ? { scope:null, status:'not_available_public_delivery' as const }
+      : await resolveCosEnterpriseMemoryScope({ privileged }).catch(() => ({ scope:null, status:'lookup_failed' as const }))
+    enterpriseMemoryStatus = scopeResolution.status
+    if (scopeResolution.scope) {
+      enterpriseMemoryOrganizationId = scopeResolution.scope.organizationId
+      enterpriseSystems.push('Organization Enterprise Memory')
+      try {
+        const context = await retrieveEnterpriseMemoryContext({
+          organizationId:scopeResolution.scope.organizationId,
+          workspace:scopeResolution.scope.workspace,
+          taskTags:terms,
+          limit:12,
+        })
+        const rows = context?.memories ?? []
+        const candidates = rows.map(item => ({ item, text:enterpriseCandidateText(item) }))
+        const ranked = await rankContextCandidates(prompt, candidates, { threshold:enterpriseMemorySimilarityThreshold(), limit:candidates.length })
+        funnel.enterpriseMemory.retrieved = rows.length
+        funnel.enterpriseMemory.relevant = ranked.relevant.length
+        const selected = ranked.relevant.slice(0, 4)
+        funnel.enterpriseMemory.selected = selected.length
+        enterpriseMemoryStatus = rows.length ? (selected.length ? 'connected' : 'scoped_no_relevant_memory') : 'scoped_no_memory'
+        if (ranked.mode === 'semantic' && rows.length) enterpriseSystems.push('Enterprise Memory semantic relevance')
+        for (const candidate of selected) {
+          const item = candidate.item
+          enterpriseMemories.push(`[OEM${enterpriseMemories.length + 1}] [organization ${scopeResolution.scope.organizationId}; ${safeText(item.kind,60)}${item.workspace ? `; workspace ${safeText(item.workspace,80)}` : ''}] ${safeText(item.payload,850)} [confidence ${Number(item.confidence || 0).toFixed(2)}; retrieval_score ${Number(item.score || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}]`)
+        }
+      } catch (error) {
+        enterpriseMemoryStatus = 'retrieval_error'
+        console.warn('[cos-enterprise-memory] retrieval failed', error)
+      }
+    }
+  })()
+  const userMemoryStage = (async () => {
+    if (userId && !publicAudience) {
+      userSystems.push('Saved User Memory')
+      const loaded = await loadUserMemories(userId).catch(() => [])
+      const candidates = loaded.map(item => ({ item, text:`${safeText(item.kind,80)} ${safeText(item.content,1000)}` }))
+      const ranked = await rankContextCandidates(prompt, candidates, { threshold:userMemorySimilarityThreshold(), limit:candidates.length })
+      funnel.userMemory.retrieved = loaded.length
+      funnel.userMemory.relevant = ranked.relevant.length
       const selected = ranked.relevant.slice(0, 4)
-      funnel.enterpriseMemory.selected = selected.length
-      enterpriseMemoryStatus = rows.length ? (selected.length ? 'connected' : 'scoped_no_relevant_memory') : 'scoped_no_memory'
-      if (ranked.mode === 'semantic' && rows.length) systems.push('Enterprise Memory semantic relevance')
+      funnel.userMemory.selected = selected.length
+      if (ranked.mode === 'semantic' && loaded.length) userSystems.push('User memory semantic relevance')
       for (const candidate of selected) {
         const item = candidate.item
-        enterpriseMemories.push(`[OEM${enterpriseMemories.length + 1}] [organization ${scopeResolution.scope.organizationId}; ${safeText(item.kind,60)}${item.workspace ? `; workspace ${safeText(item.workspace,80)}` : ''}] ${safeText(item.payload,850)} [confidence ${Number(item.confidence || 0).toFixed(2)}; retrieval_score ${Number(item.score || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}]`)
+        memories.push(`[EM${memories.length + 1}] [${item.kind}] ${safeText(item.content,500)} [relevance ${candidate.similarity.toFixed(2)}]`)
       }
-    } catch (error) {
-      enterpriseMemoryStatus = 'retrieval_error'
-      console.warn('[cos-enterprise-memory] retrieval failed', error)
     }
-  }
-
-  if (userId && !publicAudience) {
-    systems.push('Saved User Memory')
-    const loaded = await loadUserMemories(userId).catch(() => [])
-    const candidates = loaded.map(item => ({ item, text:`${safeText(item.kind,80)} ${safeText(item.content,1000)}` }))
-    const ranked = await rankContextCandidates(prompt, candidates, { threshold:userMemorySimilarityThreshold(), limit:candidates.length })
-    funnel.userMemory.retrieved = loaded.length
-    funnel.userMemory.relevant = ranked.relevant.length
-    const selected = ranked.relevant.slice(0, 4)
-    funnel.userMemory.selected = selected.length
-    if (ranked.mode === 'semantic' && loaded.length) systems.push('User memory semantic relevance')
-    for (const candidate of selected) {
-      const item = candidate.item
-      memories.push(`[EM${memories.length + 1}] [${item.kind}] ${safeText(item.content,500)} [relevance ${candidate.similarity.toFixed(2)}]`)
+  })()
+  const creativeStage = (async () => {
+    const creative = await retrieveCreativeMemory(prompt, { privileged, limit:4 }).catch(error => {
+      console.warn('[cos-creative-memory] retrieval failed', error)
+      return { retrieved:0, relevant:0, selected:[], mode:'unavailable' as const }
+    })
+    funnel.creativeMemory = {
+      retrieved:creative.retrieved,
+      relevant:creative.relevant,
+      selected:creative.selected.length,
     }
-  }
-
-  const creative = await retrieveCreativeMemory(prompt, { privileged, limit:4 }).catch(error => {
-    console.warn('[cos-creative-memory] retrieval failed', error)
-    return { retrieved:0, relevant:0, selected:[], mode:'unavailable' as const }
-  })
-  funnel.creativeMemory = {
-    retrieved:creative.retrieved,
-    relevant:creative.relevant,
-    selected:creative.selected.length,
-  }
-  if (creative.selected.length) {
-    systems.push('Creative Memory')
-    creativeMemories.push(...formatCreativeMemoryForReasoner(creative.selected))
-  }
-
-  const cognitive = await retrieveValidatedCognitiveSkills(prompt).catch(error => {
-    console.warn('[cos-cognitive-skill-context] ranking failed', error)
-    return { retrieved:0, relevant:0, selected:0, items:[] }
-  })
-  funnel.cognitiveSkills = { retrieved:cognitive.retrieved, relevant:cognitive.relevant, selected:cognitive.selected }
-  if (cognitive.retrieved > 0) systems.push('Validated Cognitive Skills')
-  for (const item of cognitive.items) {
-    skills.push(item.line)
-    skillIds.push(item.id)
-  }
+    if (creative.selected.length) {
+      creativeSystems.push('Creative Memory')
+      creativeMemories.push(...formatCreativeMemoryForReasoner(creative.selected))
+    }
+  })()
+  const skillStage = (async () => {
+    const cognitive = await retrieveValidatedCognitiveSkills(prompt).catch(error => {
+      console.warn('[cos-cognitive-skill-context] ranking failed', error)
+      return { retrieved:0, relevant:0, selected:0, items:[] }
+    })
+    funnel.cognitiveSkills = { retrieved:cognitive.retrieved, relevant:cognitive.relevant, selected:cognitive.selected }
+    if (cognitive.retrieved > 0) skillSystems.push('Validated Cognitive Skills')
+    for (const item of cognitive.items) {
+      skills.push(item.line)
+      skillIds.push(item.id)
+    }
+  })()
+  await Promise.all([knowledgeStage, enterpriseStage, userMemoryStage, creativeStage, skillStage])
+  systems.push(...kgSystems, ...enterpriseSystems, ...userSystems, ...creativeSystems, ...skillSystems)
 
   return {
     systems:[...new Set(systems)], facts, learned, enterpriseMemories, memories, creativeMemories, skills, skillIds,

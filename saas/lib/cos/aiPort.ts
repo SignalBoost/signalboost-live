@@ -57,6 +57,11 @@ async function tryActiveGraduate(
   return { text: null, attempted: true }
 }
 
+/** Builder control rounds need one compact JSON object; hidden reasoning is off unless explicitly re-enabled. */
+export function builderRunpodThinkingDisabled(): boolean {
+  return String(process.env.BUILDER_RUNPOD_THINKING || '').trim().toLowerCase() !== 'on'
+}
+
 /** Existing DeepInfra Builder model remains the emergency/fallback coding model. */
 export function builderCodingModelFromEnv(): string {
   return requireBuilderCodingModel()
@@ -121,6 +126,13 @@ export function createBuilderCodingAiPort(): CosAiPort {
             frequencyPenalty: 0,
             presencePenalty: 0,
             jsonObject: true,
+            // THINKING OFF FROM THE START (2026-09-27, evidence: provider_inference_usage, last 7 days).
+            // 638 builder_runpod_primary calls returned HTTP 200 with finish=length and EMPTY content: hidden
+            // reasoning spent the whole ~4k control budget (median 3,990 tokens, ~104s) before any JSON was
+            // written. Each one was then retried with thinking off by tryRunpodPrimaryInference, so the owned
+            // model already answers Builder in no-thinking mode; this skips the wasted first call.
+            // Set BUILDER_RUNPOD_THINKING=on to restore thinking (the empty-truncation retry still applies).
+            disableThinking: builderRunpodThinkingDisabled(),
             usageContext: { feature: 'builder_runpod_primary', purpose: 'coding_harness' },
           }, 'builder')
       if (runpod.text) return runpod.text
@@ -227,4 +239,3 @@ export function createPlatformImagePort(): CosImagePort {
     },
   }
 }
-

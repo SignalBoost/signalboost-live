@@ -171,3 +171,14 @@ test('every activation tick records why the COS-primary upgrade did or did not h
   assert.match(route, /\(credentialStanding === 'A' \|\| credentialStanding === 'A\+'\)/)
   assert.match(route, /\(currentStanding === 'A' \|\| currentStanding === 'A\+'\)/)
 })
+
+
+test('activation cron deterministically drives governed graduate work rotation without a separate cron slot', () => {
+  const route = readFileSync(join(process.cwd(), 'app/api/cron/cos-university-graduate-activation/route.ts'), 'utf8')
+  const vercel = JSON.parse(readFileSync(join(process.cwd(), 'vercel.json'), 'utf8'))
+  assert.match(route, /\/api\/cron\/cos-university-graduate-rotation/)
+  assert.match(route, /cos-graduate-work-rotation-piggyback/)
+  assert.match(route, /SignalBoost-Graduate-Activation/)
+  assert.equal(vercel.crons.some((item: any) => item.path === '/api/cron/cos-university-graduate-rotation'), false)
+  assert.equal(vercel.crons.some((item: any) => item.path === '/api/cron/cos-university-graduate-activation'), true)
+})

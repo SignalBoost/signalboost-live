@@ -570,11 +570,15 @@ export async function GET() {
       const approvalExpiresMs = approval?.expires_at ? Date.parse(String(approval.expires_at)) : 0
       let claimability = 'not_evaluation_pending'
       if (artifact.status === 'evaluation_pending') {
-        if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
-        // Rolling authority deliberately refuses to mint an evaluation approval until the exact-artifact
-        // Production canary exists. Report that upstream prerequisite first; otherwise every canary-less
-        // artifact is misleadingly labelled "missing approval" even though approval issuance is correctly blocked.
+        // Computer Science has a mandatory Residency gate before final canary/evaluation. Report
+        // upstream lifecycle prerequisites before the retention clock so telemetry never implies
+        // that age alone will make a non-resident artifact evaluable.
+        if (text(artifact.subject_id, 240) === 'Computer Science & Coding'
+          && residencyState?.standing !== 'residency_complete') claimability = residencyState
+            ? 'residency_incomplete'
+            : 'waiting_for_residency_admission'
         else if (!canary) claimability = 'missing_exact_canary'
+        else if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
         else if (!approval) claimability = 'missing_approval'
         else if (approval.evidence?.claim !== 'distilled_independent_evaluation_approved') claimability = 'approval_suspended'
         else if (!approvalExpiresMs || approvalExpiresMs <= nowMs) claimability = 'approval_expired'

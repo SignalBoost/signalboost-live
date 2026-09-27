@@ -1,2 +1,2 @@
-base_sha=a976009d21b989295b3467367ff8a3c920270204
-branch=feat/builder-competency-gap-loop
+base_sha=687a97a0491d7d3920d07d084869561f8f4feb57
+branch=fix/builder-production-log-repair

@@ -164,21 +164,36 @@ function safeError(raw: string): string | null {
 async function request<T>(base: string, path: string, init: RequestInit = {}): Promise<T> {
   const key = configuredRunpodApiKey()
   if (!key) throw new Error('RUNPOD_API_KEY is not configured')
-  const response = await fetch(`${base}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${key}`,
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init.headers || {}),
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  const raw = await response.text()
-  if (!response.ok) {
+
+  const method = String(init.method || 'GET').toUpperCase()
+  // RunPod's V2 control plane has produced transient 5xx responses while the primary inference
+  // endpoint remains healthy. Only idempotent GETs may retry here. Auth/client errors and every
+  // mutating request fail immediately. Three total attempts keep cron execution bounded.
+  const maxAttempts = method === 'GET' ? 3 : 1
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(`${base}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.headers || {}),
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
+    const raw = await response.text()
+    if (response.ok) return raw ? JSON.parse(raw) as T : {} as T
+
     const detail = safeError(raw)
-    throw new Error(`RunPod ${String(init.method || 'GET').toUpperCase()} ${path} HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
+    const error = new Error(`RunPod ${method} ${path} HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
+    const retryable = method === 'GET' && response.status >= 500 && response.status <= 599
+    if (!retryable || attempt === maxAttempts) throw error
+    lastError = error
+    await new Promise(resolve => setTimeout(resolve, 500 * attempt))
   }
-  return raw ? JSON.parse(raw) as T : {} as T
+
+  throw lastError ?? new Error(`RunPod ${method} ${path} request failed`)
 }
 
 const requestV1 = <T>(path: string, init: RequestInit = {}) => request<T>(REST_V1, path, init)

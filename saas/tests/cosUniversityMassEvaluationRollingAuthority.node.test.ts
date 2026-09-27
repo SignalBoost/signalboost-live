@@ -286,6 +286,10 @@ test('cron reserves replay canary headroom only while durable replay proof is in
   assert.match(route, /capacity\.availableWorkers <= 1 && inFlightCount > 0/)
   assert.match(provision, /export async function massDistilledServerlessWorkerCapacity/)
   assert.match(provision, /reservedWorkers/)
+  assert.match(provision, /const maxAttempts = method === 'GET' \? 3 : 1/)
+  assert.match(provision, /method === 'GET' && response\.status >= 500 && response\.status <= 599/)
+  assert.match(provision, /if \(!retryable \|\| attempt === maxAttempts\) throw error/)
+
   assert.match(provision, /availableWorkers/)
   assert.match(provision, /RUNPOD_SERVERLESS_WORKER_QUOTA \|\| '10'/)
 })

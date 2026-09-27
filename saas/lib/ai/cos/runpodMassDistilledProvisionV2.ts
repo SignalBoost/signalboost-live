@@ -828,3 +828,29 @@ export async function reconcileExistingMassDistilledRuntime(input: MassDistilled
     authorityExpanded: false as const,
   })
 }
+
+
+/** Read-only account inventory for bounded lifecycle maintenance. */
+export async function listMassDistilledRunpodEndpoints() {
+  const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+  return Object.freeze([...(listed.endpoints || [])])
+}
+
+/**
+ * Delete only an explicitly selected endpoint id. Selection/ownership/terminal-state authority belongs
+ * to the lifecycle GC; this transport deliberately refuses the protected primary by name and any
+ * endpoint that still has a worker reservation.
+ */
+export async function deleteTerminalMassDistilledRunpodEndpoint(endpointId: string) {
+  const id = clean(endpointId, 160)
+  if (!id) throw new Error('runpod_endpoint_gc_id_missing')
+  const endpoint = await resolveEndpointControlPlane(id)
+  const name = clean(endpoint.name, 240).toLowerCase()
+  if (!name.startsWith('itmounts-mass-distilled-')) throw new Error('runpod_endpoint_gc_not_mass_distilled')
+  if (RUNPOD_PRIMARY_ENDPOINT_NAMES.has(name)) throw new Error('runpod_endpoint_gc_primary_protected')
+  if (Number(endpoint.workers?.min ?? 0) !== 0 || Number(endpoint.workers?.max ?? 0) !== 0) {
+    throw new Error('runpod_endpoint_gc_worker_reservation_present')
+  }
+  await requestV1<Record<string, unknown>>(`/endpoints/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  return Object.freeze({ endpointId: id, endpointName: name, deleted: true as const, authorityExpanded: false as const })
+}

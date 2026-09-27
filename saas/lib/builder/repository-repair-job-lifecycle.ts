@@ -300,14 +300,14 @@ export async function failBuilderRepositoryRepairAfterSupersededBase(input: {
 }
 
 
-function boundedProductionFailureDetail(value: string): string {
+function boundedRecoveryText(value: string, limit = 700): string {
   return String(value || '')
     .replace(/https?:\/\/\S+/gi, '[url]')
     .replace(/(?:bearer|token|secret|password|api[_-]?key)\s*[:=]\s*\S+/gi, '[credential-redacted]')
     .replace(/[A-Za-z0-9_\-]{40,}/g, '[opaque-redacted]')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 700)
+    .slice(0, limit)
 }
 
 async function enqueueProductionRepairAgain(input: {
@@ -323,8 +323,8 @@ async function enqueueProductionRepairAgain(input: {
   const nextAttempt = Number.isInteger(previousAttempt) && previousAttempt >= 0 ? previousAttempt + 1 : 1
   if (nextAttempt > MAX_PRODUCTION_REPAIR_ATTEMPTS) return null
 
-  const safeDetail = boundedProductionFailureDetail(input.detail)
-  const originalObjective = String(input.row.objective || '').trim().slice(0, 4_000)
+  const safeDetail = boundedRecoveryText(input.detail)
+  const originalObjective = boundedRecoveryText(String(input.row.objective || ''), 4_000)
   const objective = [
     originalObjective,
     '',
@@ -393,7 +393,7 @@ export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
   }
   const plainReply = recoveryJobId
     ? `Builder merged PR #${input.pullRequestNumber} as ${input.mergeCommitSha}, but Production was not accepted and was rolled back. Automatic bounded recovery is queued as Builder job ${recoveryJobId}. The original authority was preserved; no new authority was granted.`
-    : `Builder merged PR #${input.pullRequestNumber} as ${input.mergeCommitSha}, but Production was not accepted. ${boundedProductionFailureDetail(input.detail)}`
+    : `Builder merged PR #${input.pullRequestNumber} as ${input.mergeCommitSha}, but Production was not accepted. ${boundedRecoveryText(input.detail)}`
   let artifactFiles = files(record(row.result).files)
   try {
     artifactFiles = await persistResultArtifact({ userId: String(row.user_id), workspaceId: String(row.workspace_id) }, plainReply)

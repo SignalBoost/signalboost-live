@@ -844,7 +844,12 @@ export async function listMassDistilledRunpodEndpoints() {
 export async function deleteTerminalMassDistilledRunpodEndpoint(endpointId: string) {
   const id = clean(endpointId, 160)
   if (!id) throw new Error('runpod_endpoint_gc_id_missing')
-  const endpoint = await resolveEndpointControlPlane(id)
+  // Do not call the account-wide /serverless list here: endpoint accumulation can make that very
+  // control-plane call fail. Individual lookup keeps cleanup capable of reducing a bloated account.
+  const endpoint = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(id)}`)
+  if (!endpoint?.id || clean(endpoint.id, 160).toLowerCase() !== id.toLowerCase()) {
+    throw new Error('runpod_endpoint_gc_identity_mismatch')
+  }
   const name = clean(endpoint.name, 240).toLowerCase()
   if (!name.startsWith('itmounts-mass-distilled-')) throw new Error('runpod_endpoint_gc_not_mass_distilled')
   if (RUNPOD_PRIMARY_ENDPOINT_NAMES.has(name)) throw new Error('runpod_endpoint_gc_primary_protected')

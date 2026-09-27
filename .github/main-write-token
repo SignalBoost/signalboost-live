@@ -1,2 +1,2 @@
-base_sha=f67e2b0992665988166df8eed601c31be445087d
-branch=fix/residency-throughput-fairness
+base_sha=72b3c0595c76880cb3803c498c9c65e42e9e6c10
+branch=fix/residency-throughput-test-contract

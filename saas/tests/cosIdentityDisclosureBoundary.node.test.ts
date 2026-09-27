@@ -103,3 +103,17 @@ test('every audience gets the approved company identity in the prompt for compan
   assert.ok(promptAt > blockAt && userInput > promptAt)
   assert.match(enterprise, /The product you serve is iTMounts \(itmounts\.com\)/)
 })
+
+test('the completion rescue lane carries the same COS identity and company knowledge', () => {
+  // Production 2026-09-27 04:36–04:38 UTC: both owner and Concierge answers to "What is iTMounts?" came
+  // from the completion rescue, a model call with no identity ("a typo for iMounts").
+  const primary = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  const rescueAt = primary.indexOf('async function runCompletionFirstRescue(input:string,language:string,audience:CosAudience)')
+  const rescue = primary.slice(rescueAt, primary.indexOf('function completionFirstResponse(', rescueAt))
+  assert.ok(rescueAt > 0)
+  assert.match(rescue, /cosIdentityPreamble\(audience\)/)
+  assert.match(rescue, /prompt:`\$\{companyKnowledgeBlock\(input\)\}\$\{input\}`/)
+  assert.match(primary, /runCompletionFirstRescue\(input,language,cosAudience\(isPrivileged\)\)/)
+  assert.match(enterprise, /export function cosIdentityPreamble\(audience:CosAudience\):string \{/)
+  assert.match(enterprise, /You are COS, the reasoning brain of iTMounts \(itmounts\.com\)/)
+})

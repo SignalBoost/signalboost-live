@@ -286,3 +286,20 @@ test('a current-office request stays live even when it also asks for historical 
     true,
   )
 })
+
+
+test('generic definitions use internal learned knowledge instead of live verification', () => {
+  for (const prompt of [
+    'What is an artifact?',
+    'What are artifacts?',
+    'What is an embedding?',
+    'What is a model adapter?',
+    'Define retrieval augmented generation.',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
+  }
+
+  // Named/current external entities remain protected by live verification.
+  assert.equal(requiresFreshExternalEvidence('What is the current population of Poland?'), true)
+  assert.equal(requiresFreshExternalEvidence('What is OpenAI headquartered?'), true)
+})

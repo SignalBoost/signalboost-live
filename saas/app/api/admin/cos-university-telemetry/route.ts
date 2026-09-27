@@ -26,6 +26,7 @@ const RESIDENCY_EVIDENCE = 'cos_university_residency_competency_evidence'
 const WINDOW_HOURS = 24
 const TELEMETRY_PAGE_SIZE = 1000
 const MAX_TELEMETRY_PAGES = 100
+const ASSURANCE_CANDIDATE_CHUNK_SIZE = 75
 
 async function collectPages<T>(load: (from: number, to: number) => any): Promise<T[]> {
   const rows: T[] = []
@@ -420,17 +421,19 @@ export async function GET() {
     const telemetryEvaluationRows = [...(evaluationsResult.data || []), ...(graduateEvaluationsResult.data || [])]
 
     const artifactCandidates = Array.from(new Set(telemetryArtifactRows.map((row: any) => text(row.candidate_id, 240)).filter(Boolean)))
-    const assuranceResult = artifactCandidates.length
-      ? await db.from('cos_university_learning_assurance_events')
+    const assuranceRows: any[] = []
+    for (let offset = 0; offset < artifactCandidates.length; offset += ASSURANCE_CANDIDATE_CHUNK_SIZE) {
+      const candidateChunk = artifactCandidates.slice(offset, offset + ASSURANCE_CANDIDATE_CHUNK_SIZE)
+      const chunkRows = await collectPages<any>((from, to) => db.from('cos_university_learning_assurance_events')
         .select('candidate_id,observed_at,expires_at,verifier,evidence')
         .eq('event_type', 'fine_tune')
-        .in('candidate_id', artifactCandidates)
+        .in('candidate_id', candidateChunk)
         .order('observed_at', { ascending: false })
-        .limit(5000)
-      : { data: [], error: null } as any
-    if (assuranceResult.error) throw assuranceResult.error
+        .range(from, to))
+      assuranceRows.push(...chunkRows)
+    }
     const assuranceByCandidate = new Map<string, any[]>()
-    for (const row of assuranceResult.data || []) {
+    for (const row of assuranceRows) {
       const candidateId = text(row.candidate_id, 240)
       if (!assuranceByCandidate.has(candidateId)) assuranceByCandidate.set(candidateId, [])
       assuranceByCandidate.get(candidateId)!.push(row)

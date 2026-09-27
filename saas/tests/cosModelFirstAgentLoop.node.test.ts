@@ -1,3 +1,4 @@
+// saas/tests/cosModelFirstAgentLoop.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -50,10 +51,16 @@ test('model capability requests cannot grant authority', () => {
   assert.match(browser, /if \(payload\.agent_decision\) delete payload\.agent_decision/)
 })
 
-test('public direct answers still pass disclosure and unsafe-output gates', () => {
-  assert.match(browser, /hasUnsafePublicModelOutput\(agentDecision\.answer\)/)
-  assert.match(browser, /publicDisclosureViolations\(agentDecision\.answer\)\.length > 0/)
-  assert.match(browser, /public direct answer rejected by disclosure\/security gate/)
+test('the first-turn planner never answers the user; COS answers every request (Stage 2)', () => {
+  // Owner decision 2026-09-26/27: one entrance. Direct planner answers used to bypass COS entirely.
+  assert.doesNotMatch(browser, /source: 'cos-model-direct'/)
+  assert.doesNotMatch(browser, /reply: agentDecision\.answer/)
+  const withheld = browser.indexOf("if (agentDecision?.mode === 'answer') {")
+  const cos = browser.indexOf('const executeCosRequest = () => cosPrimaryPost(routedRequest)', withheld)
+  assert.ok(withheld > 0 && cos > withheld)
+  assert.match(browser.slice(withheld, withheld + 700), /mode: 'cos_answers'[\s\S]*agentDecision = null/)
+  assert.match(decision, /You are the first-turn capability PLANNER inside the COS agent runtime\. You never answer the user/)
+  assert.doesNotMatch(decision, /complete user-facing answer/)
 })
 
 test('live_web and conversation_history plans steer COS without a second semantic classifier', () => {

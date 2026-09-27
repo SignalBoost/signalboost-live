@@ -531,7 +531,7 @@ function freshTelemetryProvenance(invoked:boolean,reasonerLabel:string|null){ret
 
 export async function postCosPrimary(req:NextRequest){
   requireCosHarnessIngress()
-  const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body,input)
+const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body,input)
 if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const precedingAssistant=previousAssistantText(body)
   const freshConversationContext=resolveFreshConversationContext(body, input)
@@ -557,10 +557,11 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     && !hasAttachments
     && isAuthoringObjectiveWithoutLiveLookup(input)
     && !isCosCodingObjective(input)
-  if(fastAuthoringEligible){
-    const fast=await runFastAuthoring(input,language)
-    if(fast)return fastAuthoringResponse(startedAt,input,fast)
-  }
+  // ONE PIPELINE, NO PRE-COS DETOUR (2026-09-27). Production evidence (cos-latency-stage rows, Concierge Polish
+  // question 14:06 ET): primary:before_cos_first was 38,749ms. Two fast-authoring detours each ran their full
+  // FAST_AUTHORING_TIMEOUT_MS (18s: two 9s attempts), returned nothing, and only then did COS answer in 15.5s.
+  // Writing requests now go straight to COS, which already has an authoring lane with hidden thinking off.
+  // runFastAuthoring remains only as the post-COS rescue below, never in front of COS.
 
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
 
@@ -660,12 +661,9 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       && semanticTaskIntent.confidence>=0.72,
   )
   const baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
-  // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh,
-  // trust whole-request semantic intent rather than forcing the user to know COS routing phrases.
-  if(!hasAttachments&&!isCosCodingObjective(input)&&semanticIntentIsSelfContainedContentGeneration(semanticTaskIntent)){
-    const semanticFast=await runFastAuthoring(input,language)
-    if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic')
-  }
+  // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh, the
+  // semantic intent below suppresses freshness and COS answers it. (The former second fast-authoring
+  // detour here cost another full 18s when it failed; see ONE PIPELINE above.)
   const requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness(semanticTaskIntent)
   if(agentCapabilities.size){
     console.info('[cos-agent-plan-applied]',JSON.stringify({

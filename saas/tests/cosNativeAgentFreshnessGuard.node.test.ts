@@ -29,7 +29,7 @@ test('model-first decision occurs before capability orchestration and primary CO
 test('freshness is a post-model release guard, not a pre-model semantic router', () => {
   const decide = browser.indexOf('agentDecision = await decideCosAgentTurn({')
   const freshnessGuard = browser.indexOf("agentDecision?.mode === 'answer' && (requiresFreshExternalEvidence(prompt)", decide)
-  const directRelease = browser.indexOf("agentDecision?.mode === 'answer' && agentDecision.confidence >= 0.55", freshnessGuard)
+  const directRelease = browser.indexOf("if (agentDecision?.mode === 'answer') {", freshnessGuard)
   assert.ok(freshnessGuard > decide)
   assert.ok(directRelease > freshnessGuard)
   const guard = browser.slice(freshnessGuard, directRelease)

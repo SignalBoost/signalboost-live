@@ -6,6 +6,7 @@ import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/su
 import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
 import { installHostedTeacherCurriculum } from './cosUniversityHostedTeacherCurriculum.ts'
 import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
+import { installBuilderGapDerivedCurriculum } from './cosUniversityBuilderGapCurriculum.ts'
 import {
   buildMassDistillationOpenSourceMaintenanceGaps,
   buildMassDistillationReplenishmentGaps,
@@ -433,6 +434,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     // Evaluation remediation is failure-driven, not inventory-driven. A subject can have a full curriculum
     // buffer and still repeatedly fail a graduation gate; that failure must remain able to seed bounded,
     // idempotent corrective curriculum even when OpenAlex/teacher replenishment has no shortage to fill.
+    const builderGapDerived = await installBuilderGapDerivedCurriculum({ db, now, maxGaps: maxSubjects })
     const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: input.supply, now, maxSubjects })
     const remediationTargets = failureDerived.bySubject.map(item => item.subject)
     return Object.freeze({
@@ -444,6 +446,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
           ? 'verified_failure_remediation_installed'
           : 'verified_failure_remediation_already_current',
       targets: remediationTargets,
+      builderGapDerivedInserted: builderGapDerived.inserted,
       failureDerivedInserted: failureDerived.inserted,
       failureDerivedBySubject: failureDerived.bySubject,
       externalCostUsd: 0,
@@ -522,6 +525,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     // Explicitly enabled hosted teachers then generate real multi-provider synthetic curriculum in
     // parallel. The zero-cost placeholder fallback remains last so unavailable hosted providers can
     // never stop curriculum growth.
+    const builderGapDerived = await installBuilderGapDerivedCurriculum({ db, now, maxGaps: maxSubjects })
     const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: remediationSupply, now, maxSubjects })
     const hostedTeachers = await installHostedTeacherCurriculum({ db, supply: replenishmentSupply, now, maxSubjects })
     const synthetic = await installTeacherSyntheticFallback({ db, supply: replenishmentSupply, now, maxSubjects })
@@ -557,6 +561,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       probationary: result.probationary,
       rejected: result.rejected,
       sourceErrors: result.sourceErrors,
+      builderGapDerivedInserted: builderGapDerived.inserted,
       failureDerivedInserted: failureDerived.inserted,
       failureDerivedBySubject: failureDerived.bySubject,
       hostedTeacherAttempted: hostedTeachers.attempted,

@@ -1,2 +1,2 @@
-base_sha=a8f3f1ad32960324997f6312ae7cd337c410401e
-branch=fix/builder-gap-reconciliation
+base_sha=d4e2a5f5846e8cd58ec5b76280fbb01cc06105b4
+branch=fix/residency-admission-starvation

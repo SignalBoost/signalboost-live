@@ -20,6 +20,7 @@ const RESIDENCY_TENANT = 'itmounts-university'
 const RESIDENCY_PORTABLE = 'builder-residency'
 const RESIDENCY_AGENT = 'builder-resident'
 const RESIDENCY_SANDBOX = 'builder-residency-sandbox-v1'
+const RESIDENCY_CASES_PER_TICK = 4
 
 function authorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET
@@ -145,35 +146,59 @@ export async function GET(req: Request) {
     // remain active concurrently.
     const admission = await admitNextBuilderResidency({ db, activeLimit: 4 })
 
-    const result = await runBuilderResidencyOrchestrator({
-      store,
-      executor,
-      harnessEvidenceSink,
-      authorityFor: async () => createBuilderResidencyNativeAuthority(),
-      requestedCapabilities: BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
-      repairInfrastructure: actuateBuilderResidencyRuntimeRecovery,
+    // Drain a small cohort each tick instead of serializing the entire Residency
+    // through one practical case every ten minutes. Every iteration independently
+    // re-selects an enrollment and crosses the same authority/evidence boundaries.
+    // Execution remains sequential to avoid multiplying RunPod worker pressure.
+    const results:any[] = []
+    for (let attempt = 0; attempt < RESIDENCY_CASES_PER_TICK; attempt += 1) {
+      const result = await runBuilderResidencyOrchestrator({
+        store,
+        executor,
+        harnessEvidenceSink,
+        authorityFor: async () => createBuilderResidencyNativeAuthority(),
+        requestedCapabilities: BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
+        repairInfrastructure: actuateBuilderResidencyRuntimeRecovery,
+      })
+      results.push(result)
+      if (result.state === 'idle') break
+    }
+
+    const result = results[results.length - 1]
+    const invocationSucceeded = results.every(item =>
+      item.ok === true || item.state === 'waiting_for_residency_cases',
+    )
+    const body = {
+      ...publicResult(result, admission),
+      batch: {
+        attempted: results.length,
+        completed: results.filter(item => item.state === 'case_completed').length,
+        infrastructureBlocked: results.filter(item =>
+          item.state === 'case_not_completed' &&
+          item.execution?.result?.outcome?.status === 'infrastructure_failure'
+        ).length,
+        residencyIds: [...new Set(results
+          .map(item => item.residencyId)
+          .filter((value): value is string => typeof value === 'string' && value.length > 0))],
+        maxCasesPerTick: RESIDENCY_CASES_PER_TICK,
+        parallelExecution: false,
+      },
+    }
+    await recordResidencyProductionPath(invocationSucceeded, {
+      runnerInvoked: results.some(item => Boolean(item.practiceCase)),
+      status: invocationSucceeded ? 'batch_completed' : 'batch_partially_blocked',
+      residencyId: body.residencyId ?? null,
+      coverage: result.coverage ?? null,
+      admission: body.admission ?? null,
+      selfHealing: body.selfHealing ?? null,
+      batch: body.batch,
+      automaticFinalGateEnable: false,
+      promotionAuthorized: false,
+      productionTrafficAuthorized: false,
     })
 
-    const body = publicResult(result, admission)
-    await recordResidencyProductionPath(
-      result.ok === true || result.state === 'waiting_for_residency_cases',
-      {
-        runnerInvoked: Boolean(body.practiceCase),
-        status: result.state,
-        residencyId: body.residencyId ?? null,
-        coverage: result.coverage ?? null,
-        admission: body.admission ?? null,
-        selfHealing: body.selfHealing ?? null,
-        automaticFinalGateEnable: false,
-        promotionAuthorized: false,
-        productionTrafficAuthorized: false,
-      },
-    )
-
     return NextResponse.json(body, {
-      status: result.ok || result.state === 'waiting_for_residency_cases'
-        ? 200
-        : 503,
+      status: invocationSucceeded ? 200 : 503,
     })
   } catch (error) {
     const message = error instanceof Error

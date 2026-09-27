@@ -169,3 +169,10 @@ test('learning alert points to current specialist telemetry and never obsolete R
   assert.match(continuityEmail, /api\/admin\/cos-specialist-learning/)
   assert.doesNotMatch(continuityEmail, /api\/admin\/cos-runpod/)
 })
+
+
+test('directed software evaluation drains a bounded cohort per governed cycle', () => {
+  assert.match(cognitiveOrchestrator, /COS_DIRECTED_SOFTWARE_EVALUATIONS_PER_CYCLE, 4, 8/)
+  assert.match(cognitiveOrchestrator, /index < directedLimit/)
+  assert.match(cognitiveOrchestrator, /lane: 'owner_directed_software'/)
+})

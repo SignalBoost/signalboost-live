@@ -1,2 +1,2 @@
-base_sha=fe2cfcb3c41e7b101be164df7fdcf0f9d315fcf0
-branch=fix/university-telemetry-lifecycle-v2
+base_sha=c2a5143d28cfb3ebc3c0575d658553e7dcc7180e
+branch=fix/runpod-terminal-endpoint-gc

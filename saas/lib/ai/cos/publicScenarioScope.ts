@@ -1,7 +1,8 @@
+// saas/lib/ai/cos/publicScenarioScope.ts
 const INTERNAL_SCENARIO_PREFIX = 'CURRENT-REQUEST PREMISE RULE:'
 const USER_REQUEST_MARKER = '\n\nUSER REQUEST:\n'
 
-const SIGNALBOOST_SELF_REFERENCE = /\b(?:signalboost(?:ai)?|self-healing supervisor|provider (?:connection )?hub|agent operations platform|browser automation governor|campaign studio|integrations hub|video maker|control center software|portable cos)\b/i
+const SIGNALBOOST_SELF_REFERENCE = /\b(?:signalboost(?:ai)?|itmounts|self-healing supervisor|provider (?:connection )?hub|agent operations platform|browser automation governor|campaign studio|integrations hub|video maker|control center software|portable cos)\b/i
 
 const SIGNALBOOST_CONTEXT_LEAK = /\b(?:signalboost(?:ai)?|public (?:signalboost )?product catalog|self-healing supervisor|provider (?:connection )?hub|agent operations platform|browser automation governor|integrations hub)\b/i
 

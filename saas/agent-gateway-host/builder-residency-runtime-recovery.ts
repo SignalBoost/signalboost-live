@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+// saas/agent-gateway-host/builder-residency-runtime-recovery.ts
 import type { AgentRequest, AllowlistEntry } from '../agent-gateway/index.ts'
 import type { ChainAttempt, ChainExecutor } from './execution-chain.ts'
 import {
@@ -7,6 +7,7 @@ import {
   reconcileExistingMassDistilledRuntime,
   type MassDistilledRuntimeArtifact,
 } from '../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
+import { builderResidencyRuntimeKey } from '../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts'
 
 export const BUILDER_RESIDENCY_RUNTIME_RECOVERY_KIND='supervisor_repair'
 export const BUILDER_RESIDENCY_RUNTIME_RECOVERY_TARGET='university.repair_builder_residency_runtime'
@@ -57,10 +58,9 @@ function hfRevision(evidenceRef:unknown):string{
 }
 
 function residencyRuntimeKey(candidateId:string,artifactHash:string):string{
-  return createHash('sha256')
-    .update(JSON.stringify(['builder-residency-runtime-v1',candidateId,artifactHash]))
-    .digest('hex')
-    .slice(0,10)
+  const key=builderResidencyRuntimeKey(candidateId,artifactHash)
+  if(!key) throw new Error('residency_runtime_recovery_identity_invalid')
+  return key
 }
 
 export interface BuilderResidencyRuntimeRecoveryResult{

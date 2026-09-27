@@ -311,3 +311,22 @@ test('definitional concept questions answer locally while mutable lookups stay l
     'What is the current rate?',
   ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })
+
+test('questions about the service itself are never sent to the public web', () => {
+  // Production 2026-09-26: "Is COS an artifact?" was refused as an unverifiable current fact.
+  for (const prompt of [
+    'Is COS an artifact?',
+    'is cos an artifact',
+    'What is COS?',
+    'What is iTMounts?',
+    'Is iTMounts an agent?',
+    'Are you an artifact?',
+  ]) assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
+
+  for (const prompt of [
+    'What is the latest news about iTMounts?',
+    'Can you find the CEO of Acme?',
+    'Is Tesla stock up today?',
+    'What is the weather in Merida?',
+  ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
+})

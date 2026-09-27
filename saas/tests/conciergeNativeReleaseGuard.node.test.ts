@@ -1,3 +1,4 @@
+// saas/tests/conciergeNativeReleaseGuard.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -17,7 +18,7 @@ test('explicit preservation is a release invariant, not merely a prompt instruct
 
   assert.match(entrypoint, /const explicitlyProtected = explicitlyPreservedCriticalTokens/)
   assert.match(entrypoint, /const alreadyPreserved = preservesExplicitlyRequestedCriticalTokens/)
-  assert.match(entrypoint, /language === 'en' && alreadyPreserved/)
+  assert.match(entrypoint, /if \(alreadyPreserved\) return protectedResult/)
   assert.match(entrypoint, /EXPLICITLY PROTECTED LITERALS/)
   assert.match(entrypoint, /if \(!preservesExplicitlyRequestedCriticalTokens\([\s\S]*restoredDecisionAnswer\)\) \{/)
   assert.match(entrypoint, /still missing after the bounded repair/)

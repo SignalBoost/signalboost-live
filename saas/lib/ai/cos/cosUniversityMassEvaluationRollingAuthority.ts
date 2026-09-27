@@ -214,6 +214,11 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'mass_distilled_evaluation_route_deadline_exceeded'
     || error === 'bounded_runtime_evaluation_authorization_missing_or_expired'
     || /\bis not a function\b/.test(error)
+    // RunPod's own REST/control plane failing (2026-09-27 18:13-18:17 UTC: "RunPod GET /serverless HTTP 500:
+    // failed to list endpoints", three times after the helper's own retries) quarantined mass:fce8f4ba without
+    // one evaluation prompt ever reaching the artifact. A provider 5xx or 429 on a control-plane call happens
+    // before inference and says nothing about model quality. The shape is produced only by our RunPod REST helper.
+    || /^runpod (get|post|patch|put|delete) \S+ http (5\d\d|429)\b/.test(error)
 }
 
 function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly RollingEvent[], nowMs: number): boolean {

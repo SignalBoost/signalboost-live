@@ -50,7 +50,11 @@ function failureLabel(value: unknown): string {
 }
 
 function latestFailure(trace: readonly OperatorTraceEntry[]): OperatorTraceEntry | undefined {
-  return [...trace].reverse().find(entry => entry.ok === false)
+  // Prefer an actually executed proving command over later bookkeeping/storage noise. A generated
+  // lockfile save can fail after the compiler/test already failed; that must never relabel the
+  // owner's real blocker as "storage failure".
+  return [...trace].reverse().find(entry => entry.ok === false && isProvingCommand(commandOf(entry)) && typeof entry.exitCode === 'number')
+    ?? [...trace].reverse().find(entry => entry.ok === false)
 }
 
 function latestRemediation(trace: readonly OperatorTraceEntry[]): string {

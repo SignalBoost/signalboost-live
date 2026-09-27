@@ -283,3 +283,16 @@ test('server-scoped owner engineering with publish intent enters Platform Engine
   assert.equal(target.branch, 'main')
   assert.equal(target.fullCommitSha, sha)
 })
+
+
+test('production TypeScript diagnostics use a narrow compiler proof instead of replaying the full Vercel gate', async () => {
+  const { repositoryRepairProofCommand } = await import('../lib/builder/repository-repair-proof-controller.ts')
+  assert.equal(repositoryRepairProofCommand({
+    pathHints: ['saas/lib/ai/cos/cosFirstAnswerCore.ts'],
+    failedCommand: 'node scripts/vercel-cos-gates.mjs && npm run prebuild && next build',
+    failureEvidence: [
+      "lib/ai/cos/cosFirstAnswerCore.ts(196,78): error TS2339: Property 'reason' does not exist on type 'COSFirstAnswerResult'.",
+      'Failed to type check.',
+    ],
+  } as any), 'npm exec -- tsc --noEmit')
+})

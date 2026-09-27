@@ -53,6 +53,8 @@ export async function GET(request: Request) {
           const acceptance = await acceptBuilderProductionRepair({
             preMergeSnapshotId: pending.preMergeSnapshotId,
             snapshotPort,
+            targetUrl: pending.acceptanceUrl || undefined,
+            expectedText: pending.acceptanceExpectedText || undefined,
           })
           if (acceptance.outcome === 'accepted') {
             await completeBuilderRepositoryRepairAfterMerge({

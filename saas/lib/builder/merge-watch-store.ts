@@ -32,6 +32,8 @@ export interface MergeWatchStore {
     mergeCommitSha: string
     preMergeSnapshotId: string
     pullRequestNumber: number | null
+    acceptanceUrl?: string | null
+    acceptanceExpectedText?: string | null
   }): Promise<void>
 }
 
@@ -89,6 +91,8 @@ export function createSupabaseMergeWatchStore(): MergeWatchStore | null {
         merge_commit_sha: input.mergeCommitSha.toLowerCase(),
         pre_merge_snapshot_id: input.preMergeSnapshotId,
         pull_request_number: input.pullRequestNumber,
+        acceptance_url: input.acceptanceUrl || null,
+        acceptance_expected_text: input.acceptanceExpectedText || null,
       })
       if (error && error.code !== '23505') throw new Error('builder_merge_watch_record_failed')
     },

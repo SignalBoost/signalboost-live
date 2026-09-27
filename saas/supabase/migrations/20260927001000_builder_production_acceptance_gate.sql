@@ -31,8 +31,8 @@ begin
   if coalesce(v_result->>'pull_request_number','') ~ '^[1-9][0-9]*$' then v_pr := (v_result->>'pull_request_number')::integer; end if;
   if coalesce(v_result->>'merge_commit_sha','') ~ '^[0-9a-fA-F]{40}$' then v_sha := lower(v_result->>'merge_commit_sha'); end if;
 
-  if v_platform_repair and p_status='succeeded' and coalesce(v_result->>'branch','main')='main' then
-    if coalesce(v_result->>'merge_taken','false')='true' and v_pr is not null and v_sha is not null then
+  if v_platform_repair and p_status='succeeded' then
+    if coalesce(v_result->>'merge_taken','false')='true' and v_pr is not null and v_sha is not null and coalesce(v_result->>'branch','main')='main' then
       update public.builder_jobs set
         status='paused', checkpoint=null, error=null, updated_at=now(),
         result=v_result || jsonb_build_object(
@@ -49,7 +49,9 @@ begin
         provenance=jsonb_build_object('schema','signalboost-builder-job-v1','jobId',p_job_id,'workspaceId',v_job.workspace_id,'status','paused','repositoryMergePending',true,'pullRequestNumber',v_pr)
       where id=v_job.history_message_id and user_id=p_user_id;
       return;
-    elsif coalesce(v_result->>'repository_write_stage','')='pr_created' and v_pr is not null then
+    elsif coalesce(v_result->>'merge_taken','false')='true' and v_pr is not null and v_sha is not null then
+      null;
+    elsif coalesce(v_result->>'repository_write_stage','')='pr_created' and coalesce(v_result->>'merge_allowed','false')='true' and v_pr is not null then
       update public.builder_jobs set
         status='paused', checkpoint=null, error=null, updated_at=now(),
         result=v_result || jsonb_build_object('status','paused','repository_merge_pending',true,'merge_taken',false)

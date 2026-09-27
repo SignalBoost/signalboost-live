@@ -140,7 +140,6 @@ export async function GET() {
       completedRunCountResult,
       failedRunCountResult,
       campaignsResult,
-      artifactsResult,
       evaluationsResult,
       graduatesResult,
       openLearningRows,

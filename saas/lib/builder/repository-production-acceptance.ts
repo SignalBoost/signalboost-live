@@ -36,6 +36,11 @@ export async function acceptBuilderProductionRepair(input: {
     return Object.freeze({ outcome: 'unresolved', detail: 'Builder Production verifier could not execute. No rollback was attempted.' })
   }
 
+  const runtimeFailure = acceptance.checks.some(check => check.name === 'runtime' && !check.passed)
+  if (runtimeFailure) {
+    return Object.freeze({ outcome: 'unresolved', detail: 'Builder Production verifier infrastructure failed. No rollback was attempted.' })
+  }
+
   if (acceptance.ok) {
     return Object.freeze({
       outcome: 'accepted',

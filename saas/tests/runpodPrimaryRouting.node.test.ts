@@ -86,7 +86,7 @@ test('interactive COS answers and authoring bypass RunPod primary and use bounde
   assert.match(inference, /COS_INTERACTIVE_REASONING_EFFORT/)
   assert.match(inference, /COS_INTERACTIVE_MODEL_TIMEOUT_MS/)
   assert.match(inference, /COS_INTERACTIVE_AUTHORING_TIMEOUT_MS/)
-  assert.match(inference, /COS_INTERACTIVE_AUTHORING_MODEL/)
+  assert.doesNotMatch(inference, /COS_INTERACTIVE_AUTHORING_MODEL/)
   assert.match(firstAnswer, /function interactiveReasonerFeature/)
   assert.match(firstAnswer, /'cos_interactive_authoring'/)
   assert.match(firstAnswer, /purpose:'user_facing_response'/)

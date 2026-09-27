@@ -93,6 +93,24 @@ test('infrastructure failures are retryable and are never disposed, however many
   assert.equal(sweep([canary, approval, ...failed(INFRASTRUCTURE, 25)]).length, 0)
 })
 
+// 2026-09-27: mass:fce8f4ba was quarantined after three evaluation attempts in which RunPod's REST control plane
+// returned HTTP 500 before any prompt reached the artifact. That is provider infrastructure, not model quality.
+test('a RunPod control-plane 5xx or 429 never spends the substantive attempt budget', () => {
+  const controlPlane = 'RunPod GET /serverless HTTP 500: failed to list endpoints'
+  const events = [canary, approval, ...failed(controlPlane, MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT)]
+  assert.equal(sweep(events).length, 0)
+  for (const error of [
+    'RunPod POST /endpoints HTTP 503: upstream unavailable',
+    'RunPod PATCH /endpoints/abc HTTP 502',
+    'RunPod GET /endpoints/abc HTTP 429: rate limited',
+  ]) assert.equal(sweep([canary, approval, ...failed(error, 5)]).length, 0, error)
+})
+
+test('a RunPod client error is not reclassified as infrastructure', () => {
+  const clientError = 'RunPod POST /endpoints HTTP 400: invalid template'
+  assert.equal(sweep([canary, approval, ...failed(clientError, MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT)]).length, 1)
+})
+
 test('an artifact with a verdict or a live run is not disposed here', () => {
   const spent = failed(SUBSTANTIVE, MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT)
 

@@ -1,3 +1,4 @@
+// saas/tests/localOpenModelInference.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -199,8 +200,8 @@ test('direct text transformations use the dedicated DeepInfra flash editor with 
   assert.deepEqual(observedBody.response_format, { type: 'json_object' })
 })
 
-test('interactive authoring uses the fast managed model with reasoning disabled', async () => {
-  delete process.env.COS_INTERACTIVE_AUTHORING_MODEL
+test('interactive authoring uses the configured model with reasoning disabled', async () => {
+  process.env.COS_INTERACTIVE_AUTHORING_MODEL = 'zai-org/GLM-5.3-Flash'
   let observedBody: Record<string, unknown> = {}
   globalThis.fetch = (async (input, init) => {
     if (String(input).includes('/chat/completions')) {
@@ -223,8 +224,10 @@ test('interactive authoring uses the fast managed model with reasoning disabled'
   })
 
   assert.equal(result, 'authoring answer')
-  assert.equal(observedBody.model, 'zai-org/GLM-5.3-Flash')
+  // A stale authoring-model override must not move COS's main answer off the configured model.
+  assert.equal(observedBody.model, 'Qwen/Qwen3.6-35B-A3B')
   assert.equal(observedBody.reasoning_effort, 'none')
+  delete process.env.COS_INTERACTIVE_AUTHORING_MODEL
 })
 
 test('ordinary interactive COS answers retain the configured stronger model', async () => {

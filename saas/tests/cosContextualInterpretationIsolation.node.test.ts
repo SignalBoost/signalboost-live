@@ -1,3 +1,4 @@
+// saas/tests/cosContextualInterpretationIsolation.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -58,4 +59,16 @@ test('context-only isolation stays neural and fail-safe', () => {
 
 test('the regression contains no motivating people or transcript names', () => {
   assert.doesNotMatch(entrypoint, /Eric Peterson|Professor Diamond|Luis/i)
+})
+
+test('native-language review runs on the interactive lane with hidden thinking off', () => {
+  // Production 2026-09-27 03:01:36-03:02:45 ET: the review had no usage context, ran on the RunPod thinking
+  // model, exhausted 1,800 tokens on hidden thinking (48s) and retried (21s) — 69s of a 71s owner answer.
+  const reviewAt = entrypoint.indexOf('async function reviewNativeLanguageQuality(')
+  const review = entrypoint.slice(reviewAt, entrypoint.indexOf("'You are the final native-language quality reviewer", reviewAt))
+  assert.ok(reviewAt > 0)
+  assert.match(review, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'native_language_review' \},/)
+  assert.match(review, /disableThinking: true,/)
+  // A review that cannot finish must release the approved draft, not fail the turn.
+  assert.match(entrypoint, /if \(!reviewed\?\.text\) \{/)
 })

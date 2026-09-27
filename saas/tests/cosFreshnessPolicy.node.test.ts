@@ -287,19 +287,27 @@ test('a current-office request stays live even when it also asks for historical 
   )
 })
 
-
-test('generic definitions use internal learned knowledge instead of live verification', () => {
+test('definitional concept questions answer locally while mutable lookups stay live-verified', () => {
+  // Production 2026-09-26: "What is an artifact?" was refused as an unverifiable current fact.
   for (const prompt of [
     'What is an artifact?',
-    'What are artifacts?',
-    'What is an embedding?',
-    'What is a model adapter?',
-    'Define retrieval augmented generation.',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
-  }
+    'what is an artifact',
+    'What is a vector database?',
+    'What does idempotent mean?',
+    'What is the meaning of latency?',
+    'What is the definition of a hash function?',
+    'What is meant by eventual consistency?',
+  ]) assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
 
-  // Named/current external entities remain protected by live verification.
-  assert.equal(requiresFreshExternalEvidence('What is the current population of Poland?'), true)
-  assert.equal(requiresFreshExternalEvidence('What is OpenAI headquartered?'), true)
+  for (const prompt of [
+    'What is a good laptop to buy?',
+    'What is the price of bitcoin?',
+    'What is a fair salary for a nurse?',
+    'What is the weather in Merida?',
+    'What is a restaurant near me open now?',
+    'Who is the president of Mexico?',
+    'What is the latest news?',
+    'What does Tesla stock cost?',
+    'What is the current rate?',
+  ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })

@@ -165,10 +165,10 @@ export async function GET() {
         .select('id,status,batch_count,max_total_cost_usd,committed_cost_usd,authorized_at,expires_at,completed_at,created_at,updated_at')
         .order('updated_at', { ascending: false })
         .limit(12),
-      db.from(ARTIFACTS)
+      collectPages<any>((from, to) => db.from(ARTIFACTS)
         .select('candidate_id,subject_id,status,trained_artifact_id,trained_artifact_hash,revision_key,created_at,updated_at')
         .order('updated_at', { ascending: false })
-        .limit(100),
+        .range(from, to)),
       db.from(EVALUATIONS)
         .select('candidate_id,trained_artifact_hash,artifact_age_seconds,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
         .order('created_at', { ascending: false })
@@ -388,10 +388,9 @@ export async function GET() {
     const failedRuns24h = n(failedRunCountResult.count)
     const inFlightRuns24h = Math.max(0, totalRuns24h - completedRuns24h - failedRuns24h)
 
-    // The activity table is recency-bounded, but graduates are durable lifecycle state. Always merge
-    // every registry-backed graduate artifact into telemetry so an older active graduate cannot disappear
-    // merely because 100 newer artifacts were updated after it.
-    const recentArtifacts = artifactsResult.data || []
+    // Artifact lifecycle telemetry is durable state, not a recency sample. The query above is safely
+    // paginated so pipeline counts and blocker stages represent every retained artifact.
+    const recentArtifacts = artifactsResult || []
     const graduateCandidateIds = Array.from(new Set((graduatesResult.data || [])
       .map((row: any) => text(row.candidate_id, 240))
       .filter(Boolean)))

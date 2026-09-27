@@ -364,10 +364,6 @@
     {
       "path": "/api/cron/cos-working-distillation-owner-approved-train",
       "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/cos-university-graduate-rotation",
-      "schedule": "17 * * * *"
     }
   ]
 }

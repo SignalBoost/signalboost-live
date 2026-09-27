@@ -1,3 +1,6 @@
+// saas/lib/ai/cos/deterministicUtilities.ts
+import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
+
 export type DeterministicUtilityName = 'current_time' | 'current_date' | 'current_datetime' | 'current_timezone' | 'current_season' | 'current_datetime_season' | 'signalboost_identity'
 
 export type DeterministicUtilityResult = {
@@ -61,7 +64,7 @@ function utilityFromQuestion(input: string): DeterministicUtilityName | null {
   // This approved public identity answer must remain available even when COS
   // reasoning, private systems, or live research are unavailable.
   if (
-    /\bwhat (?:is|s) signalboost\b/.test(normalized) &&
+    /\bwhat (?:is|s) (?:signalboost|itmounts)\b/.test(normalized) &&
     /\b(?:who (?:owns|own)|owner|ownership)\b/.test(normalized)
   ) return 'signalboost_identity'
 
@@ -153,7 +156,7 @@ export function tryDeterministicUtility(input: {
   if (utility === 'signalboost_identity') {
     return {
       handled: true,
-      reply: 'SignalBoost is a privately owned U.S. AI platform that develops intelligent software and automation solutions for small and medium-sized businesses, enterprises, and Fortune 500 organizations. Its platform supports English, Spanish, Portuguese, Polish, and Russian.',
+      reply: SIGNALBOOST_COMPANY_IDENTITY_DEFINITION,
       source: 'deterministic-signalboost-identity',
       confidence: 1,
       executionProvenance: provenance(utility, timeZone, input.confidenceThreshold),

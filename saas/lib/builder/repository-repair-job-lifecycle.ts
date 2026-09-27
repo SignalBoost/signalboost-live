@@ -5,6 +5,7 @@ import type { MergeWatchOutcome } from './repository-merge-watch.ts'
 import { createSupabaseMergeWatchStore } from './merge-watch-store.ts'
 import { enqueueSignalBoostRepositoryRepairJob } from './repository-repair-job.ts'
 import { signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
+import { recordBuilderEpisode } from './episodic-memory.ts'
 
 const MAX_PRODUCTION_REPAIR_ATTEMPTS = 3
 
@@ -89,6 +90,38 @@ async function persistHistory(input: {
   if (messageError) throw new Error('builder_repository_merge_job_message_failed')
   await input.db.from('assistant_conversations').update({ updated_at: new Date().toISOString() })
     .eq('id', input.row.conversation_id).eq('user_id', input.row.user_id)
+}
+
+
+function episodeJob(row: any, finishedAt: string) {
+  return {
+    id: String(row.id),
+    userId: String(row.user_id),
+    conversationId: String(row.conversation_id),
+    workspaceId: String(row.workspace_id),
+    objective: String(row.objective || ''),
+    ownerAuthorized: row.owner_authorized === true,
+    claimGeneration: Number(row.claim_generation),
+    finishedAt,
+  } as any
+}
+
+async function recordRepositoryRepairEpisode(input: {
+  row: any
+  outcome: 'succeeded' | 'failed'
+  summary: string
+  finishedAt: string
+  evidence: Record<string, unknown>
+}): Promise<void> {
+  await recordBuilderEpisode({
+    job: episodeJob(input.row, input.finishedAt),
+    outcome: input.outcome,
+    summary: input.summary,
+    evidence: input.evidence,
+  }).catch(error => console.error('[builder_repository_episode_write_failed]', {
+    jobId: input.row.id,
+    message: error instanceof Error ? error.message : 'unknown',
+  }))
 }
 
 /**
@@ -216,6 +249,19 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     jobId: row.id,
     message: error instanceof Error ? error.message : 'unknown',
   }))
+  await recordRepositoryRepairEpisode({
+    row,
+    outcome: 'succeeded',
+    summary: plainReply,
+    finishedAt: updatedAt,
+    evidence: {
+      verification: input.baseBranch === 'main' ? 'production_acceptance_passed' : 'governed_merge_completed',
+      pullRequestNumber: input.pullRequestNumber,
+      mergeCommitSha: input.mergeCommitSha,
+      productionAcceptancePassed: input.baseBranch === 'main' ? input.productionAcceptancePassed === true : false,
+      files: artifactFiles,
+    },
+  })
   return true
 }
 
@@ -434,5 +480,21 @@ export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
       : 'generation_fenced_repository_merge_without_healthy_production_proof',
     facts: { pullRequestNumber: input.pullRequestNumber, mergeCommitSha: input.mergeCommitSha, error: input.error },
   }).catch(() => undefined)
+  await recordRepositoryRepairEpisode({
+    row,
+    outcome: 'failed',
+    summary: plainReply,
+    finishedAt: updatedAt,
+    evidence: {
+      error: input.error,
+      verification: input.error === 'builder_repository_production_rolled_back'
+        ? 'production_acceptance_failed_and_rolled_back'
+        : 'production_acceptance_unresolved',
+      pullRequestNumber: input.pullRequestNumber,
+      mergeCommitSha: input.mergeCommitSha,
+      productionAcceptancePassed: false,
+      files: artifactFiles,
+    },
+  })
   return true
 }

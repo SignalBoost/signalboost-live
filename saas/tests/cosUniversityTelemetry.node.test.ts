@@ -105,6 +105,7 @@ test('University telemetry hot-path migration matches the Production sort/filter
 test('University telemetry exposes read-only evaluator claim blockers without changing authority', () => {
   const route = source('app/api/admin/cos-university-telemetry/route.ts')
   assert.match(route, /claimability = 'waiting_12h'/)
+  assert.match(route, /claimability = residencyState[\s\S]*'residency_incomplete'[\s\S]*'waiting_for_residency_admission'/)
   assert.match(route, /claimability = 'missing_approval'/)
   assert.match(route, /claimability = 'approval_expired'/)
   assert.match(route, /claimability = 'missing_exact_canary'/)
@@ -112,6 +113,8 @@ test('University telemetry exposes read-only evaluator claim blockers without ch
   assert.match(route, /claimability = 'evaluator_failed'/)
   assert.match(route, /claimability = 'claimable'/)
   assert.ok(route.indexOf("else if (!canary) claimability = 'missing_exact_canary'") < route.indexOf("else if (!approval) claimability = 'missing_approval'"), 'exact canary must be reported before the approval it gates')
+  assert.ok(route.indexOf("residencyState?.standing !== 'residency_complete'") < route.indexOf("else if (!canary) claimability = 'missing_exact_canary'"), 'Computer Science Residency must be reported before exact canary')
+  assert.ok(route.indexOf("else if (!canary) claimability = 'missing_exact_canary'") < route.indexOf("else if (nowMs < eligibleAtMs) claimability = 'waiting_12h'"), 'exact canary must be reported before the retention clock')
   assert.doesNotMatch(route, /export async function POST/)
 })
 

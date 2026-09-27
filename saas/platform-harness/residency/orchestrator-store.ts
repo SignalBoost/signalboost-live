@@ -42,11 +42,12 @@ export function selectBuilderResidencyEnrollmentForTick<T extends {id:unknown}>(
     input.recentCases.map(row=>String(row.residency_id??'')).filter(Boolean),
   )
   const unstarted=input.enrollments.filter(row=>!residentsWithHistory.has(String(row.id)))
-  // A single zero-case enrollment is a genuinely new admission and should not be starved by an
-  // older resident's retry history. When several enrollments have no history, however, treating
-  // the first one as "new" would suppress the deliberately allowed one-tick warm retry and make
-  // scheduling depend on array order. Let the retry/fairness logic below choose in that case.
-  if(unstarted.length===1) return unstarted[0]
+  // Capacity is already consumed once an enrollment becomes active. Every active resident must
+  // receive at least one governed practical case before any resident with history gets a warm
+  // infrastructure retry. This is intentionally stronger than the retry optimization: otherwise
+  // two or more fresh admissions can remain at zero cases indefinitely while an older resident
+  // repeatedly wins the retry path.
+  if(unstarted.length>0) return unstarted[0]
 
   const latest=input.recentCases[0]
   if(!latest||String(latest.harness_outcome)!=='infrastructure_failure') return fallback

@@ -1,3 +1,4 @@
+// saas/tests/runpodPrimaryRouting.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -172,4 +173,22 @@ test('direct RunPod primary retries one empty thinking truncation before managed
   const builderStart = port.indexOf('export function createBuilderCodingAiPort')
   const builder = port.slice(builderStart, port.indexOf('export function createLocalApplianceAiPort', builderStart))
   assert.ok(builder.indexOf('tryRunpodPrimaryInference') < builder.indexOf('tryAssignedPlatformModelTurn'))
+})
+
+test('Builder RunPod control rounds start with hidden thinking off (638 empty length cuts, 2026-09-27)', () => {
+  const port = source('../lib/cos/aiPort.ts')
+  const builderStart = port.indexOf('export function createBuilderCodingAiPort')
+  const builder = port.slice(builderStart, port.indexOf('export function createLocalApplianceAiPort', builderStart))
+  const runpodCall = builder.slice(builder.indexOf('tryRunpodPrimaryInference'), builder.indexOf("}, 'builder')"))
+  assert.match(runpodCall, /disableThinking: builderRunpodThinkingDisabled\(\)/)
+  assert.match(runpodCall, /feature: 'builder_runpod_primary'/)
+
+  // Thinking stays off unless the operator explicitly sets BUILDER_RUNPOD_THINKING=on.
+  const helper = port.slice(port.indexOf('export function builderRunpodThinkingDisabled'), port.indexOf('export function builderCodingModelFromEnv'))
+  assert.match(helper, /process\.env\.BUILDER_RUNPOD_THINKING/)
+  assert.match(helper, /\.trim\(\)\.toLowerCase\(\) !== 'on'/)
+
+  // The empty-thinking retry remains as the safety net when thinking is re-enabled.
+  const primary = source('../lib/ai/cos/runpodPrimaryInference.ts')
+  assert.match(primary, /args\.disableThinking !== true/)
 })

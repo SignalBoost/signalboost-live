@@ -1,2 +1,2 @@
-base_sha=72b3c0595c76880cb3803c498c9c65e42e9e6c10
-branch=fix/residency-throughput-test-contract
+base_sha=f73fb2bdcc6ebb73e868eafd589c5c104059952e
+branch=fix/residency-zero-case-starvation

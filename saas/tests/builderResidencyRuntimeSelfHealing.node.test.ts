@@ -33,6 +33,12 @@ test('Residency runtime recovery whitelist accepts transient runtime faults and 
   )
   assert.equal(
     isBuilderResidencyRuntimeRecoverableFailureCode(
+      'RunPod GET /serverless HTTP 500: failed to list endpoints',
+    ),
+    true,
+  )
+  assert.equal(
+    isBuilderResidencyRuntimeRecoverableFailureCode(
       'residency_exact_artifact_runtime_wake_http_401',
     ),
     false,

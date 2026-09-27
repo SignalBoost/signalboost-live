@@ -7,6 +7,47 @@ const COMPETENCY_FAILURES = new Set([
   'builder_repair_attempts_exhausted',
 ])
 
+const MODEL_CONTROL_FAILURES = new Set([
+  'builder_model_control_empty_response',
+  'builder_model_control_truncated',
+  'builder_model_control_reasoning_truncated',
+  'builder_model_control_reasoning_only',
+  'builder_model_control_schema_mismatch',
+  'builder_model_control_malformed_json',
+])
+
+const VERIFICATION_FAILURES = new Set([
+  'builder_verification_order_required',
+  'builder_regression_not_reproduced',
+  'builder_regression_evidence_required',
+])
+
+const TOOL_SELECTION_FAILURES = new Set([
+  'builder_stalled_repeated_inspection',
+])
+
+const REPAIR_EXHAUSTION_FAILURES = new Set([
+  'builder_repair_mutation_required',
+  'builder_repair_progress_required',
+  'builder_task_incomplete',
+  'builder_missing_deliverables',
+])
+
+/**
+ * Convert concrete runtime terminal errors into stable, portable capability classes.
+ * Operational capacity, timeout, storage, authority, scope, provider and budget failures are
+ * deliberately absent: the University must train only on demonstrated capability failures.
+ */
+export function classifyBuilderCompetencyFailure(error: unknown): string | null {
+  const code = bounded(error, 240).split(':', 1)[0]!.split(';', 1)[0]!.trim()
+  if (COMPETENCY_FAILURES.has(code)) return code
+  if (MODEL_CONTROL_FAILURES.has(code)) return 'builder_model_control_failed'
+  if (VERIFICATION_FAILURES.has(code)) return 'builder_verification_failed'
+  if (TOOL_SELECTION_FAILURES.has(code) || code === 'builder_repeated_tool_call') return 'builder_tool_selection_failed'
+  if (REPAIR_EXHAUSTION_FAILURES.has(code)) return 'builder_repair_attempts_exhausted'
+  return null
+}
+
 function bounded(value: unknown, max: number): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
@@ -32,8 +73,8 @@ export function builderCompetencyGapCandidate(input: {
   error: string
   ownerAuthorized: boolean
 }): { taskId: string; subject: string; capability: string; question: string; escalationReason: string } | null {
-  const error = bounded(input.error, 240)
-  if (!input.ownerAuthorized || !COMPETENCY_FAILURES.has(error)) return null
+  const error = classifyBuilderCompetencyFailure(input.error)
+  if (!input.ownerAuthorized || !error) return null
   const subject = subjectFor(input.objective)
   return {
     taskId: `builder:${input.jobId}`,

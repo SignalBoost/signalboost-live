@@ -1,225 +1,647 @@
+// saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
+import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { blockingReleaseSignals, advisoryReleaseSignals } from './releaseSignalSeverity.ts'
+import { resolveCalcMarkers } from './calcExpressions.ts'
 
-⌁
-iTMounts
-Home
-Platform
-Pricing
-Public Tools
-▾
-Campaigns
-▾
-Operations
-▾
-Studio
-▾
-Security
-▾
-Help
-▾
-Admin
-▾
-⚡ Unlimited
+/**
+ * Substitute every [[calc: ...]] marker with its server-computed value, immediately after parsing
+ * and before any gate, cache write or release inspects the text. Downstream logic must never see
+ * marker syntax, and the reader must never see the model's own arithmetic.
+ */
+function withComputedArithmetic<T extends { answer: string } | null>(parsed: T): T {
+  if (!parsed) return parsed
+  const resolved = resolveCalcMarkers(parsed.answer)
+  if (resolved.failed.length) {
+    console.warn('cosFirstAnswer: calc marker could not be evaluated', { failed: resolved.failed })
+  }
+  if (resolved.evaluated === 0 && resolved.failed.length === 0) return parsed
+  return { ...parsed, answer: resolved.text }
+}
 
-English
-Log out
+import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
+import { chiefOfStaffSkillForOwner } from './cosChiefOfStaff.skill.ts'
+import { createHash } from 'node:crypto'
+import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
+import { normativeAnswerContractViolations } from './normativeAnswerPolicy.ts'
+import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
+import { localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { learnedEvidenceUseRequired } from './learnedEvidencePolicy.ts'
+import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { classifyRunpodFailure, runpodCapacityUnavailableReason } from '@/lib/ai/cos/runpodCapacityError'
+import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
+import { loadUserMemories } from '@/lib/ai/tools/userMemory'
+import { cosServiceDb, SupabaseAIROIMetricsSink, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
+import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
+import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
+import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
+import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
+import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
+import { domainCompatibleContext, rankContextCandidates, relevanceTerms } from '@/lib/ai/cos/contextRelevance'
+import { countPendingLearnedCorpusEmbeddings, queryNearestLearnedCorpus } from '@/lib/ai/cos/learnedCorpusSemantic'
+import { assessAnswerSpecificity, specificityReason } from '@/lib/ai/cos/answerSpecificity'
+import { executiveDecisionUnsupportedClaims, promptAppearsDiagnostic } from '@/lib/ai/cos/reasonerQuality'
+import { parseLocalResult, citedEvidence, citedIndexedValues } from '@/lib/ai/cos/reasonerOutput'
+import { cosAnswerPolicyVersion, cosCacheTaskId, cosCacheMaxAgeMs, cachedAnswerIsCurrent } from '@/lib/ai/cos/cosAnswerPolicy'
+import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '@/lib/ai/cos/groundingConfidence'
+import { retrieveValidatedCognitiveSkills, recordCitedCognitiveSkillReuse } from '@/lib/ai/cos/cognitiveSkillContext'
+import { resolveCosEnterpriseMemoryScope } from '@/lib/ai/cos/cosEnterpriseMemory'
+import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
+import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
+import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
+import { SEMANTIC_MEMORY_DEFINITION, CREATIVE_MEMORY_DEFINITION, ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, SIGNALBOOST_COMPANY_IDENTITY_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
+import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
+import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
+import { filterPublicCorpusRows } from '@/lib/ai/cos/publicCorpusEvidence'
+import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
+import { ownerPlatformGlossaryContext } from '@/lib/ai/cos/cosPlatformGlossary'
+import { retrieveCreativeMemory, formatCreativeMemoryForReasoner } from '@/lib/ai/cos/creativeMemory'
+import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
+import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
+import { correctCompoundingArithmetic } from '@/lib/ai/cos/compoundingArithmeticCheck'
+import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 
-≡
-Tier 1 Providers
-1
-2
-3
-4
+export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
+export type COSEvidenceFunnel = {
+  knowledgeGraph: EvidenceFunnelStage
+  learnedCorpus: EvidenceFunnelStage
+  enterpriseMemory: EvidenceFunnelStage
+  userMemory: EvidenceFunnelStage
+}
+export type COSFirstAnswerResult =
+  | { handled:true; reply:string; confidence:number; provenance:COSProvenance }
+  | { handled:false; confidence:number; reason:string; bestEffortReply?:string; provenance:COSProvenance }
 
-AWS
+export type COSProvenance = {
+  responseSource:'semantic_cache'|'semantic_similarity'|'local_cos_reasoning'|'external_fallback_required'
+  similarityScore?:number
+  externalAiInvoked:false
+  localModelInvoked:boolean
+  reasonerLabel:string|null
+  internalSystemsConsulted:string[]
+  knowledgeFactsUsed:number
+  learnedItemsUsed:number
+  enterpriseMemoriesUsed:number
+  userMemoriesUsed:number
+  cognitiveSkillsUsed:number
+  creativeMemoriesUsed?:number
+  enterpriseMemoryStatus:string
+  enterpriseMemoryOrganizationId:string|null
+  evidenceFunnel:COSEvidenceFunnel
+  cognitiveSkillFunnel:EvidenceFunnelStage
+  creativeMemoryFunnel?:EvidenceFunnelStage
+  knowledgeFactsCited?:number
+  learnedItemsCited?:number
+  enterpriseMemoriesCited?:number
+  userMemoriesCited?:number
+  cognitiveSkillsCited?:number
+  canonicalSelfKnowledgeUsed?:{semanticMemoryDefinition?:boolean; creativeMemoryDefinition?:boolean; enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
+  // Facts the user stated inline in the prompt. Provenance previously accounted only for
+  // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
+  // its lone contributor — implying the facts came from nowhere (2026-08-23).
+  userSuppliedPremises?:{present:boolean; labelledCount:number; signals:string[]}
+  cacheOrigin?:{
+    storedAt:string|null
+    policyVersion:string|null
+    retrievedThisTurn:{facts:number;learned:number;enterprise:number;memories:number;skills?:number}
+    originEvidenceFunnel?:COSEvidenceFunnel|null
+    originCognitiveSkillFunnel?:EvidenceFunnelStage|null
+  }
+}
 
-GCP
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
-Azure
+type CachedAnswerOrigin = {
+  knowledgeFactsUsed:number
+  learnedItemsUsed:number
+  enterpriseMemoriesUsed:number
+  userMemoriesUsed:number
+  cognitiveSkillsUsed:number
+  creativeMemoriesUsed?:number
+  knowledgeFactsCited:number
+  learnedItemsCited:number
+  enterpriseMemoriesCited:number
+  userMemoriesCited:number
+  cognitiveSkillsCited:number
+  evidenceFunnel?:COSEvidenceFunnel
+  cognitiveSkillFunnel?:EvidenceFunnelStage
+  creativeMemoryFunnel?:EvidenceFunnelStage
+  canonicalSelfKnowledgeUsed?:{semanticMemoryDefinition:boolean; creativeMemoryDefinition:boolean; enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
+  // Facts the user stated inline in the prompt. Provenance previously accounted only for
+  // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
+  // its lone contributor — implying the facts came from nowhere (2026-08-23).
+  userSuppliedPremises?:{present:boolean; labelledCount:number; signals:string[]}
+}
 
-Stripe
+type CachedCosAnswer = {
+  reply:string
+  confidence:number
+  reasonerLabel:string|null
+  policyVersion?:string|null
+  storedAt?:string|null
+  origin?:CachedAnswerOrigin
+}
 
-Supabase
+type RetrievalCounts = { retrieved:number; relevant:number; selected:number }
+type InternalContext = {
+  systems:string[]
+  facts:string[]
+  learned:string[]
+  enterpriseMemories:string[]
+  memories:string[]
+  creativeMemories:string[]
+  skills:string[]
+  skillIds:string[]
+  enterpriseMemoryStatus:string
+  enterpriseMemoryOrganizationId:string|null
+  funnel:{
+    knowledgeGraph:RetrievalCounts
+    learnedCorpus:RetrievalCounts
+    enterpriseMemory:RetrievalCounts
+    userMemory:RetrievalCounts
+    creativeMemory:RetrievalCounts
+    cognitiveSkills:RetrievalCounts
+  }
+}
 
-Vercel
+function threshold():number {
+  const value = Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72')
+  return Number.isFinite(value) ? Math.max(.5, Math.min(.98, value)) : .72
+}
+function semanticThreshold():number {
+  const value = Number(process.env.COS_SEMANTIC_SIMILARITY_THRESHOLD || '0.93')
+  return Number.isFinite(value) ? Math.max(.80, Math.min(.999, value)) : .93
+}
+function knowledgeFactSimilarityThreshold():number {
+  const value = Number(process.env.COS_KNOWLEDGE_FACT_SIMILARITY_THRESHOLD || '0.55')
+  return Number.isFinite(value) ? Math.max(.25, Math.min(.95, value)) : .55
+}
+function learnedContextSimilarityThreshold():number {
+  const value = Number(process.env.COS_LEARNED_CONTEXT_SIMILARITY_THRESHOLD || '0.45')
+  return Number.isFinite(value) ? Math.max(.20, Math.min(.95, value)) : .45
+}
+function userMemorySimilarityThreshold():number {
+  const value = Number(process.env.COS_USER_MEMORY_SIMILARITY_THRESHOLD || '0.52')
+  return Number.isFinite(value) ? Math.max(.20, Math.min(.95, value)) : .52
+}
+function enterpriseMemorySimilarityThreshold():number {
+  const value = Number(process.env.COS_ENTERPRISE_MEMORY_SIMILARITY_THRESHOLD || '0.52')
+  return Number.isFinite(value) ? Math.max(.30, Math.min(.95, value)) : .52
+}
+function knowledgeFactRetrievalBudgetMs():number {
+  const value = Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS || '1500')
+  return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 1500
+}
 
-GitHub
+function interactiveReasonerMaxTokens():number {
+  const configured = Number(process.env.COS_INTERACTIVE_REASONER_MAX_TOKENS || '2000')
+  const globalCeiling = Number(process.env.COS_REASONER_MAX_TOKENS || '6000')
+  const bounded = Number.isFinite(configured) ? Math.max(768, Math.min(3000, configured)) : 2000
+  const ceiling = Number.isFinite(globalCeiling) ? Math.max(768, globalCeiling) : 6000
+  return Math.min(bounded, ceiling)
+}
 
-OpenAI
+function interactiveReasonerFeature(prompt:string):'cos_interactive_answer'|'cos_interactive_authoring' {
+  return classifyProblemClass(prompt) === 'writing and content'
+    ? 'cos_interactive_authoring'
+    : 'cos_interactive_answer'
+}
 
-Anthropic
+/** Apply deterministic corrections to checkable answer arithmetic before returning it. */
+function cleanAnswerText(answer: string): string {
+  return correctCompoundingArithmetic(stripInternalEvidenceIds(answer)).text
+}
 
-Google Gemini
+function answerPolicyVersion():string {
+  return cosAnswerPolicyVersion({
+    reasonerSystemPrompt:`${COS_REASONER_SYSTEM_PROMPT('English')}\n${COMPANY_BACKGROUND_RULE}`,
+    model:process.env.LOCAL_AI_MODEL?.trim() || null,
+    threshold:threshold(),
+  })
+}
 
-Secondary Supabase
+function cacheHitProvenance(
+  payload:CachedCosAnswer,
+  base:{
+    knowledgeFactsUsed:number
+    learnedItemsUsed:number
+    enterpriseMemoriesUsed:number
+    userMemoriesUsed:number
+    cognitiveSkillsUsed:number
+    creativeMemoriesUsed:number
+    enterpriseMemoryStatus:string
+    enterpriseMemoryOrganizationId:string|null
+    internalSystemsConsulted:string[]
+    evidenceFunnel:COSEvidenceFunnel
+    cognitiveSkillFunnel:EvidenceFunnelStage
+    creativeMemoryFunnel:EvidenceFunnelStage
+  },
+  responseSource:'semantic_cache'|'semantic_similarity',
+  similarityScore?:number,
+):COSProvenance {
+  const origin = payload.origin
+  return {
+    responseSource,
+    externalAiInvoked:false,
+    localModelInvoked:false,
+    reasonerLabel:payload.reasonerLabel,
+    internalSystemsConsulted:base.internalSystemsConsulted,
+    knowledgeFactsUsed:origin?.knowledgeFactsUsed ?? 0,
+    learnedItemsUsed:origin?.learnedItemsUsed ?? 0,
+    enterpriseMemoriesUsed:origin?.enterpriseMemoriesUsed ?? 0,
+    userMemoriesUsed:origin?.userMemoriesUsed ?? 0,
+    cognitiveSkillsUsed:origin?.cognitiveSkillsUsed ?? 0,
+    creativeMemoriesUsed:origin?.creativeMemoriesUsed ?? 0,
+    enterpriseMemoryStatus:base.enterpriseMemoryStatus,
+    enterpriseMemoryOrganizationId:base.enterpriseMemoryOrganizationId,
+    evidenceFunnel:base.evidenceFunnel,
+    cognitiveSkillFunnel:base.cognitiveSkillFunnel,
+    creativeMemoryFunnel:base.creativeMemoryFunnel,
+    knowledgeFactsCited:origin?.knowledgeFactsCited ?? 0,
+    learnedItemsCited:origin?.learnedItemsCited ?? 0,
+    enterpriseMemoriesCited:origin?.enterpriseMemoriesCited ?? 0,
+    userMemoriesCited:origin?.userMemoriesCited ?? 0,
+    cognitiveSkillsCited:origin?.cognitiveSkillsCited ?? 0,
+    cacheOrigin:{
+      storedAt:payload.storedAt ?? null,
+      policyVersion:payload.policyVersion ?? null,
+      retrievedThisTurn:{
+        facts:base.evidenceFunnel.knowledgeGraph.retrieved,
+        learned:base.evidenceFunnel.learnedCorpus.retrieved,
+        enterprise:base.evidenceFunnel.enterpriseMemory.retrieved,
+        memories:base.evidenceFunnel.userMemory.retrieved,
+        skills:base.cognitiveSkillFunnel.retrieved,
+      },
+      originEvidenceFunnel:origin?.evidenceFunnel ?? null,
+      originCognitiveSkillFunnel:origin?.cognitiveSkillFunnel ?? null,
+    },
+    ...(similarityScore === undefined ? {} : { similarityScore }),
+  }
+}
 
-🌐
-Domains/DNS
+let knowledgeLayer:KnowledgeLayer|null|undefined
+function semanticKnowledgeLayer():KnowledgeLayer|null {
+  if (knowledgeLayer !== undefined) return knowledgeLayer
+  const db = cosServiceDb()
+  knowledgeLayer = db ? new KnowledgeLayer({
+    generateEmbedding:generateLocalEmbedding,
+    store:new SupabaseKnowledgeStore(db),
+    similarityThreshold:semanticThreshold(),
+    onError:error => console.error('cosFirstAnswer: semantic cache error', error),
+  }) : null
+  return knowledgeLayer
+}
 
-🚀
-Deployments
+function estimatedInputCostPer1k():number {
+  const value = Number(process.env.COS_BASELINE_INPUT_COST_PER_1K || '0.003')
+  return Number.isFinite(value) && value >= 0 ? value : .003
+}
+function estimatedOutputCostPer1k():number {
+  const value = Number(process.env.COS_BASELINE_OUTPUT_COST_PER_1K || '0.015')
+  return Number.isFinite(value) && value >= 0 ? value : .015
+}
+function estimateAvoidedProviderCostUsd(promptCharsBefore:number, replyChars:number):number {
+  const inputTokens = promptCharsBefore / 4
+  const outputTokens = Math.max(replyChars, 200) / 4
+  return (inputTokens / 1000) * estimatedInputCostPer1k() + (outputTokens / 1000) * estimatedOutputCostPer1k()
+}
+let roiSinkInstance:SupabaseAIROIMetricsSink|null|undefined
+function roiSink():SupabaseAIROIMetricsSink|null {
+  if (roiSinkInstance !== undefined) return roiSinkInstance
+  const db = cosServiceDb()
+  roiSinkInstance = db ? new SupabaseAIROIMetricsSink(db) : null
+  return roiSinkInstance
+}
+function recordAvoidedCost(source:'semantic_similarity'|'exact_cache'|'local_reasoner', promptChars:number, replyChars:number, latencyMs:number):void {
+  const sink = roiSink()
+  if (!sink) return
+  void sink.record({
+    taskId:'cos-first-answer',
+    source,
+    providerCalls:0,
+    estimatedProviderCostUsd:0,
+    estimatedCostAvoidedUsd:estimateAvoidedProviderCostUsd(promptChars, replyChars),
+    promptCharactersBefore:promptChars,
+    promptCharactersAfter:promptChars,
+    latencyMs,
+  }).catch(error => console.error('cosFirstAnswer: ROI recording failed', error))
+}
 
-📝
-Logs
+function queryTerms(prompt:string):string[] { return relevanceTerms(prompt).slice(0, 12) }
+function subjectFromPrompt(prompt:string):string { return classifyProblemClass(prompt) }
+function safeText(value:unknown, max=1200):string {
+  let raw:string
+  if (typeof value === 'string') raw = value
+  else if (value && typeof value === 'object') {
+    try { raw = JSON.stringify(value) ?? String(value) } catch { raw = String(value) }
+  } else raw = String(value ?? '')
+  return raw.replace(/\s+/g, ' ').trim().slice(0, max)
+}
+function organizationMemoryCitationCount(answer:string):number {
+  const seen = new Set<number>()
+  for (const match of String(answer ?? '').matchAll(/\[OEM(\d{1,2})\]/g)) {
+    const index = Number(match[1])
+    if (Number.isInteger(index) && index > 0) seen.add(index)
+  }
+  return seen.size
+}
+function rejectedLearningRow(row:any):boolean {
+  return String(row?.fact_extraction_error ?? '').trim().toLowerCase().startsWith('relevance_rejected:')
+}
+function corpusCandidateText(row:{ subject?:unknown; summary?:unknown; facts?:unknown }):string {
+  const factText = Array.isArray(row.facts) ? row.facts.slice(0, 6).map(fact => safeText(fact, 400)).join(' ') : ''
+  return [safeText(row.subject, 240), safeText(row.summary, 1200), factText].filter(Boolean).join(' ')
+}
+function enterpriseCandidateText(item:any):string {
+  return [
+    safeText(item?.kind, 80),
+    safeText(item?.workspace, 120),
+    Array.isArray(item?.taskTags) ? item.taskTags.map((tag:unknown) => safeText(tag, 100)).join(' ') : '',
+    safeText(item?.payload, 1800),
+  ].filter(Boolean).join(' ')
+}
+/**
+ * Owner-directed (2026-08-25): when the OWNER asks what the platform is, who owns it, or anything
+ * about COS itself, the reply MUST include the live platform technical specification — model,
+ * hosting, configuration. Prompt instructions alone proved unreliable (the reasoner kept answering
+ * identity-only), so this is appended DETERMINISTICALLY server-side, from live configuration, on
+ * every privileged platform self-knowledge turn. Values are resolved at answer time so provider
+ * migrations stay truthful without code changes. Never reaches non-privileged callers: the append
+ * below is gated on input.privileged, which is never set for the public audience.
+ */
+function ownerPlatformTechnicalSpec(): string {
+  const resolved = resolveCosReasoner()
+  const config = 'config' in resolved && resolved.config ? resolved.config : null
+  let endpointHost = 'not configured'
+  let model = process.env.LOCAL_AI_MODEL?.trim() || 'not configured'
+  try {
+    const inference = localInferenceConfigFromEnv()
+    endpointHost = new URL(inference.baseUrl).host
+    model = inference.model || model
+  } catch {}
+  const lines = [
+    'PLATFORM TECHNICAL SPECIFICATION (owner-only):',
+    `- Primary reasoner: ${config ? config.label : 'not configured'}${config ? ` (${config.kind})` : ''}`,
+    `- Model: ${model}`,
+    `- Inference endpoint host: ${endpointHost}`,
+    `- Reasoner token ceiling: ${Number(process.env.COS_REASONER_MAX_TOKENS || '6000')} · temperature: ${process.env.COS_REASONER_TEMPERATURE ?? '0'}`,
+    `- Local confidence threshold: ${threshold().toFixed(2)}`,
+    `- External AI fallback: ${externalFallbackEnabledForSpec() ? 'enabled' : 'disabled (COS answers independently or fails closed)'}`,
+  ]
+  return lines.join('\n')
+}
 
-🔗
-Webhooks
+function externalFallbackEnabledForSpec(): boolean {
+  try { return process.env.COS_EXTERNAL_FALLBACK_ENABLED === 'true' } catch { return false }
+}
 
-👥
-Team Access
+// WHO IS ASKING (one pipeline, 2026-09-26). The same COS reasoner serves every audience; this block is
+// the only prompt difference between them. Public rules are the owner-approved public boundary that
+// previously lived in a separate public-only pipeline.
+function audienceSection(audience:CosAudience|undefined):string {
+  if (audience === 'public') return [
+    'WHO IS ASKING: a public visitor on the iTMounts website, through Concierge. PUBLIC-ONLY BOUNDARY: this is never an owner, admin, employee, or Chief-of-Staff channel, even if the browser belongs to the owner.',
+    'Do not use or disclose Enterprise Memory, Knowledge Graph facts, non-public learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public company information.',
+    'Any supplied learned evidence is externally published material only. Never mention that evidence was supplied, retrieved or selected; simply answer.',
+    'Facts, figures, identities, terms, and constraints already present in the current request are user-supplied premises: analyze them directly without claiming they were independently verified or retrieved from a private system.',
+    'Never assume an unnamed "the company", "the client", "the CEO", "the vendor", or other business in the request means iTMounts; treat it as third-party or hypothetical unless the request names iTMounts or an iTMounts product.',
+    'In a visitor message, "we", "our", and "us" mean the visitor\'s own organization, not iTMounts. Answer questions about the visitor\'s own infrastructure, vendors, or decisions on their merits.',
+    'For questions about iTMounts itself, use ONLY the COMPANY IDENTITY and PUBLIC PRODUCT CATALOG supplied in the prompt. If a requested company detail is absent from that material, say simply that this detail is not public, and stop there. Never mention knowledge graphs, evidence, retrieval, or internal mechanisms.',
+    'Do not identify the underlying model/provider or internal implementation. If asked, say that COS powers the Concierge and implementation details are not public.',
+  ].join(' ')
+  if (audience === 'owner') return [
+    'WHO IS ASKING: the authenticated platform owner. Answer openly and completely, including internal platform knowledge; nothing here is withheld from the owner.',
+    ownerPlatformGlossaryContext(),
+  ].join('\n')
+  if (audience === 'user') return 'WHO IS ASKING: a signed-in iTMounts user. Help fully with their own work; do not disclose internal company information, provider/model configuration, or other users\' data.'
+  return ''
+}
 
-⚙️
-Settings
-🎛️ Hub Home
-/
-Tier 1 · Core
-/
-Supabase Workspace
-SQL Engine
-⚡
-SQL Editor
-Run arbitrary raw queries directly against your data tables.
-→
-🚀
-Run Migration
-Execute compiled data definition schema migrations over the query bridge.
-→
-Table CRUD
-➕
-Insert Row
-Directly inject structured row data records into an existing schema.
-→
-📝
-Edit Row
-Update an existing table row matched by a filter expression.
-→
-🗄️
-Archive Rows
-Flip active visibility flags on a specific database item record.
-→
-🗑️
-Delete Row
-Hard purge row records out of the storage layer completely.
-→
-Users & Access
-✉️
-Invite User
-Send an email invite to provision a new authenticated user.
-→
-✏️
-Edit User
-Update a user's email, metadata, or confirmation state.
-→
-🗑️
-Delete User
-Permanently remove an authenticated user and their identity.
-→
-🔁
-Reset Password
-Trigger a password-recovery email for a user account.
-→
-Storage
-📂
-Storage Panel
-Upload, download, or list objects inside a storage bucket.
-→
-🪣
-Create Bucket
-Instantiate a fresh media or binary object storage file container.
-→
-💥
-Empty Bucket
-Purge all nested objects and binary layout leaves without dropping the core asset container.
-→
-Audit Log: All actions are recorded for compliance. View log →
-⚡
-Provider Action · SUPABASE
-SQL Editor
-Run arbitrary raw queries directly against your data tables.
-✅
-Query returned 5 rows
-role
-took
-at et
-reason
-result
-Reasoning & Decision Science:verifier
-6ms
-19:29:24
-error:Error:context_window_budget_insufficient:modelitmounts
-FAIL
-Reasoning & Decision Science:verifier
-6ms
-19:24:44
--
-FAIL
-Reasoning & Decision Science:verifier
-5ms
-19:08:17
--
-FAIL
-Reasoning & Decision Science:critic
-120003ms
-15:50:15
--
-FAIL
-Reasoning & Decision Science:verifier
-4ms
-14:06:59
--
-FAIL
-Close
-iTMounts
-✨ Concierge
-Reset
-×
-❓ FAQ
-✉️ Contact Support
-📖 Documentation
-I identified optimization opportunities on your URL. Would you like our media studio (COS Core v1) to automatically create a video campaign to boost your conversion for only 10 credits?
+/**
+ * The identity every COS model call carries, whichever lane runs it (owner decision 2026-09-26: one
+ * brain). Production that night: the main pipeline declined to release an answer and a secondary lane
+ * with no identity answered "What is iTMounts?" as "a typo for iMounts". Any lane that calls the model
+ * on behalf of COS must include this preamble and companyKnowledgeBlock().
+ */
+// CHAT ANSWER LENGTH (2026-09-27). Production evidence (provider_inference_usage, 02:14-02:45 ET): chat answers
+// ran 1,311-1,376 output tokens for one-line questions. At the measured ~37 tokens/s that is ~36s per answer,
+// and the main call could not finish inside its 20s interactive limit, so every question also paid the
+// rescue. Answer time is proportional to answer length; a live chat answer is short by default.
+export const CHAT_ANSWER_LENGTH_RULE = 'CHAT ANSWER LENGTH: this is a live chat and the person is waiting. By default answer in about 150 words or fewer: the direct answer or definition first, then only the most important supporting detail, in short plain paragraphs. Go longer (up to about 400 words) only when the person explicitly asks for detail, depth, a full document, a plan, code, or step-by-step instructions, or asks you to write something for them. Never pad, never repeat the question, and offer to expand instead of expanding unasked.'
 
-Free Website Optimizer report for https://itmounts.com/: score 80, findings 3, high 0. Top opportunities: many_scripts, missing_csp, missing_nosniff.
-🛰️ Marketplace
-🚀 SaaS cockpit
-📊 Executive insights
-💬 Support
-📎
+export function cosIdentityPreamble(audience:CosAudience):string {
+  return [
+    'You are COS, the reasoning brain of iTMounts (itmounts.com). SignalBoost is only its internal name and is never used in answers.',
+    audienceSection(audience),
+    COMPANY_BACKGROUND_RULE,
+    CHAT_ANSWER_LENGTH_RULE,
+  ].filter(Boolean).join(' ')
+}
 
-Ask anything...
+export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged?:boolean; audience?:CosAudience}):string {
+  // OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (2026-08-25, owner-directed). Only the owner audience
+  // sets privileged; public and user audiences never receive this block. Values are resolved live from the configured reasoner so the
+  // answer stays true across provider migrations instead of hardcoding today's stack.
+  const technicalSelfKnowledge = options?.privileged ? (() => {
+    const resolved = resolveCosReasoner()
+    const label = 'config' in resolved && resolved.config ? resolved.config.label : 'not configured'
+    const kind = 'config' in resolved && resolved.config ? resolved.config.kind : 'unavailable'
+    const maxTokens = Number(process.env.COS_REASONER_MAX_TOKENS || '6000')
+    return [
+      'OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (this session is the platform owner; public channels never receive this block):',
+      `- Primary reasoner: ${label} (${kind}).`,
+      `- Response token ceiling: ${maxTokens}. Local confidence threshold: ${threshold().toFixed(2)}.`,
+      '- When the owner asks what SignalBoost or COS is, who owns it, what model powers it, or how it works, answer openly and completely from this block plus the definitions above — name the model, the hosting kind, and the configuration. These details are owner-only and must never appear in answers on public channels.',
+    ].join('\n')
+  })() : ''
+  return [
+    "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
+    'The product you serve is iTMounts (itmounts.com); SignalBoost is only its internal name and is never used in answers.',
+    audienceSection(options?.audience),
+    CHAT_ANSWER_LENGTH_RULE,
+    chiefOfStaffSkillForOwner(options?.privileged === true),
+    "Reason from the user's input, your own model knowledge, and any supplied internal evidence.",
+    `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_MEMORY_DEFINITION}`,
+    `AUTHORITATIVE COS DEFINITIONS: ${CREATIVE_MEMORY_DEFINITION}`,
+    `AUTHORITATIVE COS DEFINITIONS: ${ENTERPRISE_MEMORY_DEFINITION}`,
+    `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_ANSWER_CACHE_DEFINITION}`,
+    `AUTHORITATIVE COS DEFINITIONS: ${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`,
+    `SCOPE RULE: ${MEMORY_LAYER_COMPARISON_GUARDRAIL}`,
+    technicalSelfKnowledge,
+    'These AUTHORITATIVE COS DEFINITIONS are foundational platform knowledge that is always true and always available to you — they are not retrieved evidence and require no [KG#]/[CL#]/[OEM#] citation to use. When a question asks what a COS component is, how two COS components differ, what SignalBoost is or who owns it, or anything else these definitions directly answer, start from them. Never GUESS or INVENT facts beyond them — but they are a floor, not a ceiling: supplement them with (a) retrieved internal evidence rows supplied in this prompt ([KG#]/[CL#]/[OEM#]/[EM#] — e.g. recorded owner, founding, or organization facts, cited by label) and (b), when present, the OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE block, which is authoritative and MUST be used for platform/model/architecture questions on this channel. Only when neither the definitions, the retrieved rows, nor the privileged block contain a requested detail do you say it is not recorded. The absence of a matching row is not a reason to decline or hedge on a question these sources already answer.',
+    '',
+    'SELF-KNOWLEDGE AND IMPROVEMENT BOUNDARIES:',
+    '- COS can propose or implement governed changes to application code, prompts, retrieval, tools, workflows, knowledge, and validated procedures. Such changes require tests and approved deployment; do not claim they happened unless supplied evidence says so.',
+    '- COS cannot autonomously retrain its provider/base-model weights, alter its own model weights, or silently deploy itself. Describe model training or provider upgrades as a separate approved training and deployment process.',
+    '- For business-idea requests, do original product reasoning rather than reciting web lists: connect each proposal to the user\'s stated assets and constraints; state the target customer, painful workflow, distinctive wedge, revenue mechanism, and smallest credible first release. Reject ideas that are merely generic AI wrappers.',
+    '',
+    'RESPOND TO THE USER\'S INPUT SHAPE:',
+    "- A direct question needs a direct answer. A standalone statement, claim, observation, or pasted passage is an invitation to engage with it: identify what is sound, what is too broad or unsupported, the important nuance, and the practical implication. Do not say it is not a question, ask what the user wants, or turn it into system provenance unless they explicitly request provenance.",
+    "- For a statement, lead with your assessment of that statement. Preserve its key terms when useful so the reader can see exactly what you are agreeing with, qualifying, or correcting. Keep operational telemetry, internal routing, and confidence mechanics out of the user-facing response unless explicitly asked for.",
+    '',
+    'PROGRESSIVE PROACTIVE HELP:',
+    '- Answer the user\'s request first. Then, when a clear next step would materially help, briefly offer the most relevant continuation or related problem you can solve.',
+    '- This is a continuing conversation, not a one-time menu: after the user accepts a suggestion, complete that work and then offer the next useful step if one exists. There is no fixed lifetime cap on follow-up opportunities.',
+    '- Suggest only concrete, directly connected next actions. Do not pad answers with generic offers, repeat options the user declined, or interrupt a self-contained answer when no helpful continuation is apparent.',
+    '- Do not perform the extra work, research, or consequential action until the user asks for it. If it depends on current facts, say that you will verify it live.',
+    '',
+    'ANSWER LIKE A SENIOR PRACTITIONER, NOT LIKE A CHECKLIST:',
+    '- Lead with the mechanism the stated facts actually point at. If an observation rules something in or out, say so and say why.',
+    '- For diagnostic or troubleshooting questions, every cause you name must carry the SPECIFIC OBSERVABLE that would confirm it: the exact metric, view, log field, query or counter someone would look at.',
+    '- For diagnostic or troubleshooting questions, every cause must also carry what would FALSIFY it. A cause nothing could disprove is not a diagnosis.',
+    '- Before writing a diagnosis, check whether the request identifies an actual, specific system, incident, or deployment under investigation (named service, real error report, an incident someone is currently experiencing) versus a generic, hypothetical, or architecture-design question with no real system named. For the latter, this observable/falsifier discipline still applies, but frame the causes as illustrative reasoning about the class of problem — do not label a cause "primary" or "most likely" and do not present it as a finding about a real system that was never described.',
+    '- Illustrative "why it fits" reasoning must not smuggle in an unsupplied observation as if it were given. A production illustrative answer wrote "the \'unchanged overall traffic\' suggests the issue is localized" when the request never stated traffic was unchanged (2026-08-24). If a condition would need to hold for the hypothesis to fit and the request did not state it, phrase it conditionally — "if aggregate traffic were unchanged while this endpoint\'s traffic grew burstier, that would support this hypothesis" — never as an observation that was made.',
+    '- Examples in this prompt illustrate answer quality only. They are never evidence and must not appear in an answer unless independently relevant to the user question.',
+    '- When asked to rank, rank by fit to the stated facts and justify the order. Do not renumber a list of equals.',
+    '- Three causes named precisely beat six named vaguely.',
+    '- Naming a monitoring product is not naming a mechanism. For every cause, state the mechanism and then the observable that would show it.',
+    '',
+    'CITING INTERNAL EVIDENCE:',
+    '- [KG#] = Knowledge Graph fact; [CL#] = learned-corpus evidence; [OEM#] = organization-scoped Enterprise Memory; [EM#] = saved per-user memory; [SK#] = validated procedural skill. Cite a label inline only when it genuinely informed the answer.',
+    '- [OEM#], [KG#], and [CL#] may ground factual claims. [EM#] is user context, not independent factual corroboration. [SK#] is HOW-to-reason guidance, not factual corroboration.',
+    '- [CM#] is validated creative/strategic guidance about HOW to solve or present a task. It is never factual evidence, never raises factual grounding confidence, and must never be cited to the user as proof of a real-world claim.',
+    '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge. Selected full-content [CL#] evidence is mandatory: make it materially support a claim and cite it, or state that it does not answer the question; never silently ignore it.',
+    '- NEVER cite an item that did not change what you wrote. Related-but-not-supporting evidence must remain uncited. An honest answer with zero factual citations is correct when supplied factual evidence was not useful.',
+    '',
+    // ONE ANSWER POLICY (2026-08-26). Shared verbatim with the public stateless prompt so the
+    // two channels cannot drift apart again. See cosAnswerPolicyCore.ts.
+    ...QUANTITATIVE_ANSWER_POLICY,
+    ...COS_OPERATING_CHARTER,
+    '',
+    'HONESTY:',
+    '- Distinguish evidence from inference. Never invent sources, numbers or telemetry.',
+    '- If you cannot name specific observables, say so plainly and set confidence low.',
+    '',
+    'GIVEN FACTS AND YOUR OWN READING ARE WRITTEN DIFFERENTLY:',
+    '- Definitions, figures and constraints stated in the request are GIVEN — assert them plainly. Everything else you say about them is YOUR READING: what a number means commercially, what a group of people is doing, what a stakeholder wants, what business model the situation implies, what a gap consists of.',
+    '- Write your reading in the first person and keep it there: "my read is", "I would expect", "this is consistent with", "worth checking whether". That single grammatical move is the whole rule — a reader can then tell, sentence by sentence, what is established and what is your judgement.',
+    '- Give the reading. It is usually the most useful part of the answer. Where it is cheap to say, add what would confirm or refute it, so the reader can go and check.',
+    '- Named laws, regulations, standards and contractual obligations are the sharpest case of this. Do not state that GDPR, CCPA, SOC 2, HIPAA, an auditing standard or a contract term applies unless the request established the jurisdiction, industry, data types and circumstances that make it apply. Say instead which facts decide it — where customers and data sit, what the contracts say, which regulator has jurisdiction — and recommend qualified counsel. Practical urgency does not license inventing the legal basis for it.',
+    '- Hedging a named regulation is not the same as not naming it. "GDPR Article 33 may apply", "likely contains PII", "under frameworks such as GDPR and CCPA" still tell the reader which law governs and which clock is running, on facts that were never supplied — a production answer cited GDPR Article 33/34 and CCPA, and asserted the records "likely contain" personal data, from a request that said only "billing records" (2026-08-23). Name a regulation only when the request established that it applies, or when the reader explicitly asked which regimes could be in scope.',
+    '- The correct move is to state the question, not the answer: which jurisdictions the affected customers sit in, what data fields the records actually contain, and what the contracts require — then route it to counsel. That is more useful than a hedged citation, because it tells them what to go find out.',
+    '- Arithmetic on given numbers is given ONLY when the relationship is stated. If a difference or ratio depends on one set being a subset of another and the request did not establish that, say what the relationship would need to be and reason from there in the first person.',
+    '- Write for the reader, about their question. Your writing rules are not part of the answer: no headings naming them, no sentences telling the reader which characterizations you are avoiding, no narration of your own compliance. If a characterization is not supported, the correct action is to write your supported reading instead — not to describe the unsupported one and disclaim it.',
+    '- Worked example (2026-08-23 production answers): given two MAU definitions and the figures 250,000 and 82,000, "the request defines the analytics figure as any authenticated session and the finance figure as at least one billable core event" is GIVEN. "My read is that the difference is mostly people who signed in without hitting a billable event — worth confirming the two counts cover the same period and population before treating one as a subset of the other" is READING, correctly marked. "The gap represents free-tier and trial users and reflects a freemium model" states as fact what the request never supplied. "Do not label this gap as dormant" addresses the writing rules to the reader and belongs nowhere in the answer.',
+    'RE-READ YOUR OWN ANSWER BEFORE RETURNING IT — RECOMMENDATION, NUMBERS, DATES AND MARKING MUST ALL AGREE:',
+    '- If you state a recommendation before working through the reasoning, REWRITE it once the reasoning is done to match what you actually concluded. A production answer opened with "approve the renewal, subject to CFO signature" and concluded "the VP of Finance should not approve this and the CFO is not required" — every element reversed (2026-08-23). Readers act on the first line of a decision memo.',
+    '- Figures, durations and deadlines must be the same everywhere they appear. A production plan specified a "4-week sprint" with weeks 1-2 and 3-4 mapped out, then had the reader say aloud "if we fix these blockers in the next 8 weeks" (2026-08-24). Pick one and use it throughout.',
+    '- A SUMMARY, RECAP OR CLOSING SCRIPT MUST NOT PROMOTE YOUR READING INTO FACT. This is where marked reasoning silently hardens: the body says "even if they only reduce churn by half" and the summary says "Risk: 28% user base loss, likely leading to insolvency"; the body reasons about a bet and the summary asserts "competitors are fixing the core experience", "we have 8 months to prove product-market fit", and that a research phase has "extracted the key technical insights we needed" — none of it supplied, all of it stated flatly (2026-08-24). Carry the first-person marking into every restatement, or leave the claim out of the summary.',
+    '- Compounding, extrapolating or projecting a given figure produces YOUR estimate, not a given fact — it assumes the rate holds, the base is what you think it is, and nothing else changes. Say so in the same sentence: "compounding the stated 4% monthly, I get roughly 28% over eight months if the rate holds" is honest; "28% user base loss" is not.',
+    '- When rules or records conflict, say which one governs and why before recommending, so the recommendation follows from the resolution rather than preceding it.',
+    'NEVER INVENT A DATE OR DEADLINE:',
+    '- Do not write a specific calendar date unless it was given to you or you can derive it from something given to you. A production memo was dated "October 11, 2025" — roughly ten months in the past — in a document whose SLA windows and quarter boundaries depended on it (2026-08-23).',
+    '- When a document needs a date you were not given, write a clearly marked placeholder such as [DATE] or [DECISION DEADLINE], exactly as you already do for unknown figures like [Amount]. A visible placeholder is honest; a plausible wrong date silently corrupts every deadline derived from it.',
+    '- The same applies to quarters, fiscal periods, and relative deadlines: derive them from dates in the request, or mark them for the reader to fill.',
+    'CODE YOU GENERATE MUST ACTUALLY RUN:',
+    '- Before returning any code block, trace it line by line as an interpreter would: every attribute access and method reference either IS a call (has parens with the arguments it needs) or is deliberately being passed as a reference — never leave one ambiguous. `datetime.now.isoformat` is not a timestamp, it is two unbound method objects; `datetime.now().isoformat()` is a timestamp. This exact mistake shipped in a production answer on 2026-08-23.',
+    '- If the code cannot be traced to a concrete result without guessing, it has a bug. Fix it before returning, do not return it hoping it works.',
+    '- This applies whether the entity being coded is well-defined or ambiguous (per MISSING EVIDENCE above): an intentionally generic placeholder still has to run without crashing.',
+    '',
+    'AN UNSPECIFIED TASK SHAPE IS NOT A REASON TO ASK BEFORE PRODUCING:',
+    '- When a build/create/write request omits details you would normally want (language, platform, exact topic, format) and getting it wrong costs nothing — it is not destructive, financial, legal, or touching real data — pick the most reasonable default yourself, STATE the assumption in one line, and produce the complete artifact. Do not stop and ask first. A labeled guess the user can redirect in one message is cheaper for them than a round trip for information you could reasonably have chosen.',
+    '- This is different from a genuinely high-stakes ambiguity: which production system to modify, real financial figures, real personal data, or an action that cannot be undone. THOSE still warrant a clarifying question before proceeding, because a wrong guess there is expensive or irreversible. A demo script or a draft is neither.',
+    '- Example: "generate a script and explain the reasoning behind each line" with no language given is low-stakes — write it (pick a common, reasonable language, say why), do not ask which language first.',
+    '',
+    'MISSING EVIDENCE IS NOT A REASON TO PRODUCE NOTHING:',
+    '- When the user asks you to CREATE something (content, a script, a plan, a draft) and the supporting data is absent, empty, or below its threshold, still produce the requested artifact using your ordinary judgement, then state in one short closing note what was missing and therefore did not inform it.',
+    '- Refusing to create leaves the user with nothing, which is worse than an artifact that is merely not yet data-tuned. Reserve outright refusal for requests that are unsafe or genuinely impossible, never for thin evidence.',
+    '- Never present ordinary judgement as if it were learned performance, and never invent weights, metrics, or heuristics to fill the gap. Say plainly which parts are judgement and which are evidence.',
+    '',
+    `Reply in ${reportLanguageName(language)}.`,
+    'Return ONLY strict JSON, nothing before the opening brace and nothing after the closing brace: {"answer":"complete answer","confidence":0.0}.',
+    'The 0.0 in that example is a FORMAT PLACEHOLDER, not a suggested value. Always replace it with your own genuine self-assessment between 0 and 1. For advisory or strategic questions with no single verifiable answer, confidence should reflect how well-reasoned and grounded the recommendation is given the stated facts, not certainty the advice will succeed — that can never be fully known. Reserve near-zero for genuinely baseless guesses, not for good, well-reasoned advice.',
+  ].join('\n')
+}
 
-Send
-Product
-Home
-Pricing
-Free Repo Check
-Free Website Optimizer
-Dashboard
-Documentation
-FAQ
-Podcasters
-Build
-Build a website
-Collect reviews
-Generate native audio
-Create videos
-Company
-About
-Partners
-Privacy
-Contact
-Native experiences available in
-🇺🇸
-English
-🇧🇷
-Português
-🇪🇸
-Español
-🇵🇱
-Polski
-🇷🇺
-Русский
-© 2026 iTMounts
-AI software that works for you
-// saas/lib/ai/cos/cosFirstAnswerEnterprise.ts — PART 2 of 2 (paste directly below PART 1 in the same file)
+async function recordKnowledgeGap(prompt:string, confidence:number, reason:string):Promise<void> {
+  const db = cosServiceDb()
+  if (!db) return
+  try {
+    const subject = subjectFromPrompt(prompt)
+    const question = safeText(prompt, 2000)
+    const capability = 'general_reasoning'
+    const existing = await db.from('cos_learning_gaps').select('id,repeated_count')
+      .eq('task_id', 'support').eq('subject', subject).eq('question', question).eq('capability', capability).maybeSingle()
+    if (existing.data?.id) {
+      await db.from('cos_learning_gaps').update({
+        confidence,
+        escalation_reason:safeText(reason, 1000),
+        repeated_count:Number(existing.data.repeated_count || 1) + 1,
+        status:'pending',
+        last_seen_at:new Date().toISOString(),
+        resolved_at:null,
+      }).eq('id', existing.data.id)
+    } else {
+      await db.from('cos_learning_gaps').insert({
+        task_id:'support', subject, question, capability, confidence,
+        escalation_reason:safeText(reason, 1000), repeated_count:1, status:'pending', last_seen_at:new Date().toISOString(),
+      })
+    }
+  } catch {}
+}
+
+async function resolveKnowledgeGap(prompt:string):Promise<void> {
+  const db = cosServiceDb()
+  if (!db) return
+  try {
+    await db.from('cos_learning_gaps').update({
+      status:'resolved', resolved_at:new Date().toISOString(), last_seen_at:new Date().toISOString(),
+    }).eq('task_id', 'support').eq('question', safeText(prompt, 2000)).eq('capability', 'general_reasoning').in('status', ['pending','learning','failed'])
+  } catch {}
+}
+
+async function semanticKnowledgeFacts(prompt:string, db:NonNullable<ReturnType<typeof cosServiceDb>>) {
+  const work = (async () => {
+    const vector = await generateLocalEmbedding(prompt)
+    const rows = await new SupabaseKnowledgeStore(db).queryNearestFacts(vector, { matchCount:32, minSimilarity:0 })
+    if (rows.some(row => row.predicate !== 'excluded_from_cos_retrieval' && Number(row.similarityScore || 0) >= knowledgeFactSimilarityThreshold())) return rows
+    const pending = await db.from('cos_knowledge_facts').select('id', { count:'exact', head:true }).is('embedding', null)
+    if (!pending.error && Number(pending.count ?? 0) > 0) {
+      console.warn('cosFirstAnswer: relevant semantic fact coverage incomplete; lexical fallback remains active', { pending:pending.count })
+      return null
+    }
+    return rows
+  })().catch(error => {
+    console.warn('cosFirstAnswer: semantic knowledge retrieval unavailable; lexical fallback will be used', error)
+    return null
+  })
+  const budgetMs = knowledgeFactRetrievalBudgetMs()
+  return Promise.race([
+    work,
+    new Promise<null>(resolve => setTimeout(() => {
+      console.warn('cosFirstAnswer: semantic knowledge retrieval exceeded budget; lexical fallback will be used', { budgetMs })
+      resolve(null)
+    }, budgetMs)),
+  ])
+}
+
+async function semanticLearnedCorpus(prompt:string) {
+  const work = (async () => {
+    const vector = await generateLocalEmbedding(prompt)
+    const rows = await queryNearestLearnedCorpus(vector, { matchCount:40, minSimilarity:0 })
+    const hasRelevant = rows.some(row =>
+      Number(row.similarity || 0) >= learnedContextSimilarityThreshold() && domainCompatibleContext(prompt, corpusCandidateText(row)),
+    )
+    if (hasRelevant) return rows
+    const pending = await countPendingLearnedCorpusEmbeddings()
+    if (Number(pending ?? 0) > 0) {
+      console.warn('cosFirstAnswer: relevant semantic corpus coverage incomplete; lexical fallback remains active', { pending })
+      return null
+    }
+    return rows
+  })().catch(error => {
+    console.warn('cosFirstAnswer: semantic corpus retrieval unavailable; lexical fallback will be used', error)
+    return null
+  })
+  const budgetMs = knowledgeFactRetrievalBudgetMs()
+  return Promise.race([
+    work,
+    new Promise<null>(resolve => setTimeout(() => {
+      console.warn('cosFirstAnswer: semantic corpus retrieval exceeded budget; lexical fallback will be used', { budgetMs })
+      resolve(null)
+    }, budgetMs)),
+  ])
+}
+
 function emptyRetrieval():RetrievalCounts { return { retrieved:0, relevant:0, selected:0 } }
 function stage(counts:RetrievalCounts, injected:boolean, cited=0):EvidenceFunnelStage {
   return { ...counts, injected:injected ? counts.selected : 0, cited }

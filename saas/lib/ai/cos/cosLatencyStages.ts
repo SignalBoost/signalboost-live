@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosLatencyStages.ts
 // LATENCY STAGE TIMINGS (2026-09-27, owner-directed speed work). Owner chat answers took ~25s and the
 // stages in front of the answer model (the first-turn planner, routing, and each internal-context
 // source) were not recorded anywhere the owner can query. Each stage writes one row to
@@ -27,5 +28,15 @@ export function recordCosLatencyStage(stage: string, latencyMs: number): void {
     })
   } catch (error) {
     console.warn('[cos-latency-stage] write failed', error instanceof Error ? error.message : String(error))
+  }
+}
+
+/** Awaits one pipeline step and records its duration as a cos-latency-stage row, whether it succeeds or throws. */
+export async function timeCosStage<T>(stage: string, work: () => Promise<T>): Promise<T> {
+  const startedAt = Date.now()
+  try {
+    return await work()
+  } finally {
+    recordCosLatencyStage(stage, Date.now() - startedAt)
   }
 }

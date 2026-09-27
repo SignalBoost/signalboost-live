@@ -1,2 +1,2 @@
-base_sha=3e683525ad93dcfec1f11ed2d8143cc4a62af2db
-branch=feat/builder-production-repair-again
+base_sha=c73606d113ff5429a6652df114415677e155fd3c
+branch=fix/builder-episodic-memory-safety

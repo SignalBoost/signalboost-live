@@ -551,7 +551,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         job,
         outcome: 'failed',
         summary: reply,
-        evidence: { error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, files, trace: trace.slice(-12) },
+        evidence: { error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, files, verification: 'generation_fenced_terminal_builder_failure' },
       }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
       return
     }
@@ -595,7 +595,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       job,
       outcome: 'succeeded',
       summary: reply,
-      evidence: { files, successfulRuns: result.trace.filter(item => item.toolId === 'run' && item.ok).length, trace: trace.slice(-12) },
+      evidence: { files, successfulRuns: result.trace.filter(item => item.toolId === 'run' && item.ok).length, verification: 'workspace_changed_and_host_command_exit_zero' },
     }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
     // Only after the generation-fenced terminal write; learning failure cannot undo task success.
     if (!plan) await workspace.recordJobRepairLesson(job.workspaceId, job.id, job.claimGeneration, result)

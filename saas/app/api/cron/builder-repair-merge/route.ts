@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
   const result = await completePendingRepositoryRepairMerges({
     snapshotPort: builderAutoMergeSnapshotPort(),
-    deadlineAtMs: Date.now() + 260_000,
+    deadlineAtMs: Date.now() + 60_000,
   })
   let builderJobsCompleted = 0
   let builderJobsFailed = 0

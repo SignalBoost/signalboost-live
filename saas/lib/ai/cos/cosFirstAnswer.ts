@@ -455,9 +455,11 @@ async function reviewNativeLanguageQuality(
   const prompt = String(input.prompt || '')
   const explicitlyProtected = explicitlyPreservedCriticalTokens(prompt)
   const alreadyPreserved = preservesExplicitlyRequestedCriticalTokens(prompt, original)
-  // English keeps the no-extra-call fast path unless an explicit literal-preservation invariant
-  // is already violated. Non-English always receives the existing bounded language review.
-  if (language === 'en' && alreadyPreserved) return protectedResult
+  // FAST NATIVE RELEASE (2026-09-27, owner-directed speed). All five supported languages (en/es/pt/pl/ru)
+  // take the no-extra-call path unless an explicitly protected literal is missing. The main answer is already
+  // written in the selected language under NATIVE_LANGUAGE_ANSWER_POLICY; production evidence (owner Polish
+  // question, 10:31 ET) showed this second rewrite pass cost 8.8s of a ~30s answer for grammar polish only.
+  if (alreadyPreserved) return protectedResult
 
   const reviewed = await callCosReasoner({
     // INTERACTIVE LANGUAGE REVIEW (2026-09-27). Production evidence (owner Polish question, 03:01:36-03:02:45 ET):

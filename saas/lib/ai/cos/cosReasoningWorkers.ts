@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
-import { callLocalModel, type LocalModelCallArgs } from '@/lib/ai/local-inference'
+import { callLocalModel, type LocalInferenceConfig, type LocalModelCallArgs } from '@/lib/ai/local-inference'
 import { currentAssignedModelDescriptor, tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import {
@@ -25,6 +25,26 @@ import {
   type ActiveGraduateRuntime,
 } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { workingAgentKnowledgeBlock, type WorkingAgentKnowledgeRole } from '@/lib/ai/cos/workingAgentKnowledge'
+
+/**
+ * Canonical raw execution seam for an independently configured open-model evaluator.
+ * The caller supplies a separately resolved runtime identity; no assigned-model or RunPod-primary
+ * routing is allowed here, so evaluation cannot silently drift back onto the learner/primary.
+ */
+export async function executeIndependentOpenEvaluator(
+  args: LocalModelCallArgs,
+  config: LocalInferenceConfig,
+): Promise<string | null> {
+  return callLocalModel({
+    ...args,
+    allowConfiguredFallback: false,
+    usageContext: {
+      feature: 'cos_independent_open_evaluation',
+      purpose: 'independent_evaluation',
+      correlationId: args.usageContext?.correlationId,
+    },
+  }, config)
+}
 
 const ROLE_GUIDANCE: Readonly<Record<Exclude<CosSpecialistRole, 'primary'>, string>> = {
   coder: [

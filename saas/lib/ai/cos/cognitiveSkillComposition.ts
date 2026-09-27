@@ -3,7 +3,7 @@ import { callCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { retrieveValidatedCognitiveSkills } from '@/lib/ai/cos/cognitiveSkillContext'
 import { evaluateAnswerAgainstRubric, type CognitivePracticeVariant } from '@/lib/ai/cos/cognitiveSkillCandidate'
-import { createExternalTeacherAiPort, type ExternalTeacherProvider } from '@/lib/cos/aiPort'
+import { callIndependentOpenEvaluator } from '@/lib/ai/cos/independentOpenEvaluator'
 import {
   buildCompositionDraftPrompt,
   buildCompositionEvaluatorPrompt,
@@ -41,11 +41,7 @@ function externalEvaluationEnabled(): boolean {
   return process.env.COS_COGNITIVE_EXTERNAL_EVALUATION_ENABLED === 'true'
 }
 
-function configuredEvaluatorProvider(): ExternalTeacherProvider {
-  const configured = process.env.COS_COGNITIVE_EVALUATOR_PROVIDER?.trim().toLowerCase()
-  if (configured === 'openai' || configured === 'claude' || configured === 'gemini') return configured
-  return 'gemini'
-}
+
 
 function compositionEvidence(row: any): CognitiveCompositionEvidence {
   return {
@@ -273,11 +269,9 @@ async function independentlyEvaluateComposition(
     return { evaluated: false, approved: false, transferQueued: 0, reason: 'member_skill_not_strong' }
   }
 
-  const provider = configuredEvaluatorProvider()
-  const port = createExternalTeacherAiPort(provider)
-  let raw: string
+  let evaluated: Awaited<ReturnType<typeof callIndependentOpenEvaluator>>
   try {
-    raw = await port.generate({
+    evaluated = await callIndependentOpenEvaluator({
       maxTokens: 3800,
       systemPrompt: 'You are a skeptical transfer evaluator. Return strict JSON only. Individual member validation does not prove composition.',
       prompt: buildCompositionEvaluatorPrompt({
@@ -287,9 +281,11 @@ async function independentlyEvaluateComposition(
       }),
     })
   } catch (error) {
-    return { evaluated: false, approved: false, transferQueued: 0, provider, reason: error instanceof Error ? error.message : String(error) }
+    return { evaluated: false, approved: false, transferQueued: 0, provider: 'independent-open-evaluator', reason: error instanceof Error ? error.message : String(error) }
   }
-  const evaluation = parseCompositionEvaluation(raw)
+  if (!evaluated) return { evaluated: false, approved: false, transferQueued: 0, provider: 'independent-open-evaluator', reason: 'open_evaluator_unavailable' }
+  const provider = evaluated.evaluator.label
+  const evaluation = parseCompositionEvaluation(evaluated.text)
   if (!evaluation) return { evaluated: false, approved: false, transferQueued: 0, provider, reason: 'evaluator_parse_failed' }
   const approved = evaluation.candidateApproved && evaluation.candidateScore >= 0.8
   const db = cosServiceDb()

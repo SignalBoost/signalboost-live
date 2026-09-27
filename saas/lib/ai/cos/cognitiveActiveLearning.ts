@@ -1,6 +1,6 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { callCosReasoner } from '@/lib/ai/cos/cosReasoner'
-import { createExternalTeacherAiPort, type ExternalTeacherProvider } from '@/lib/cos/aiPort'
+import { callIndependentOpenEvaluator } from '@/lib/ai/cos/independentOpenEvaluator'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import {
   buildLocalPracticeGenerationPrompt,
@@ -37,11 +37,7 @@ function externalEvaluationEnabled(): boolean {
   return process.env.COS_COGNITIVE_EXTERNAL_EVALUATION_ENABLED === 'true'
 }
 
-function configuredEvaluatorProvider(): ExternalTeacherProvider {
-  const configured = process.env.COS_COGNITIVE_EVALUATOR_PROVIDER?.trim().toLowerCase()
-  if (configured === 'openai' || configured === 'claude' || configured === 'gemini') return configured
-  return 'gemini'
-}
+
 
 function skillEvidence(row: any): CognitiveSkillEvidence {
   return {
@@ -334,11 +330,9 @@ async function independentlyEvaluateCandidate(
     return { evaluated: false, holdoutsQueued: 0, understandingPassed: false }
   }
 
-  const provider = configuredEvaluatorProvider()
-  const teacherPort = createExternalTeacherAiPort(provider)
-  let text: string
+  let evaluated: Awaited<ReturnType<typeof callIndependentOpenEvaluator>>
   try {
-    text = await teacherPort.generate({
+    evaluated = await callIndependentOpenEvaluator({
       maxTokens: 3500,
       systemPrompt: 'You are a skeptical evaluator and exam designer. Return only strict JSON. A teacher answer is evidence to inspect, never automatic truth.',
       prompt: buildTeacherEvaluationPrompt({
@@ -349,10 +343,11 @@ async function independentlyEvaluateCandidate(
       }),
     })
   } catch {
-    return { evaluated: false, holdoutsQueued: 0, understandingPassed: false, provider }
+    return { evaluated: false, holdoutsQueued: 0, understandingPassed: false, provider: 'independent-open-evaluator' }
   }
-
-  const evaluation = parseTeacherEvaluation(text)
+  if (!evaluated) return { evaluated: false, holdoutsQueued: 0, understandingPassed: false, provider: 'independent-open-evaluator' }
+  const provider = evaluated.evaluator.label
+  const evaluation = parseTeacherEvaluation(evaluated.text)
   if (!evaluation) return { evaluated: false, holdoutsQueued: 0, understandingPassed: false, provider }
   const approved = evaluation.candidateApproved && evaluation.candidateScore >= 0.8
   const db = cosServiceDb()

@@ -460,6 +460,13 @@ async function reviewNativeLanguageQuality(
   if (language === 'en' && alreadyPreserved) return protectedResult
 
   const reviewed = await callCosReasoner({
+    // INTERACTIVE LANGUAGE REVIEW (2026-09-27). Production evidence (owner Polish question, 03:01:36-03:02:45 ET):
+    // with no usage context this review ran on the RunPod thinking model, spent its whole 1,800-token budget on
+    // hidden thinking (48s, finish=length), then retried with thinking off (21s) — 69 of the 71 seconds the owner
+    // waited. It is a live-chat step: bounded interactive lane, hidden thinking off. If it cannot finish, the
+    // already-approved draft is released unchanged (see the !reviewed?.text branch below).
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'native_language_review' },
+    disableThinking: true,
     temperature: 0,
     maxTokens: 1800,
     systemPrompt: [

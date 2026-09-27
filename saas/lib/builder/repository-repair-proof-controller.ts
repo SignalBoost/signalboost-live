@@ -23,7 +23,7 @@ function normalizedProofCommand(value: unknown): string | null {
  * Vercel build did not identify a test file, the recorded build/prebuild command is
  * the proof. Unknown commands remain untrusted and do not manufacture a proof.
  */
-export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryRepairTarget, 'pathHints' | 'failedCommand' | 'failureEvidence'>): string | null {
+export function repositoryRepairProofCommand(target: Pick<SignalBoostRepositoryRepairTarget, 'pathHints' | 'failedCommand'> & Partial<Pick<SignalBoostRepositoryRepairTarget, 'failureEvidence'>>): string | null {
   const failingTests = target.pathHints
     .map(path => path.replace(/^saas\//, ''))
     .filter(path => /^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))

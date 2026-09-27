@@ -1,3 +1,4 @@
+// saas/self-healing-host/owned-site-autonomous-repair.ts
 import type { SupervisorIncident } from '@/lib/supervisor/incident-schema'
 import { isOwnerEmail } from '@/lib/auth/ownerEmails'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -15,8 +16,8 @@ import {
   OWNED_SITE_CYBERSECURITY_PROBE,
   OWNED_SITE_CYBERSECURITY_PROBE_FAILED_ERROR,
 } from './owned-site-cybersecurity-monitoring.ts'
+import { OWNED_SITE_REPAIR_RETRY_SUPPRESSION_MS, ownedSiteRepairBlocker } from './owned-site-repair-dedupe.ts'
 
-const RETRY_SUPPRESSION_MS = 6 * 60 * 60 * 1000
 const OPTIMIZER_STARTING_PATHS = Object.freeze([
   'saas/app/api/public/site-optimization/route.ts',
   'saas/next.config.mjs',
@@ -144,31 +145,31 @@ function objectiveFor(incident: SupervisorIncident, diagnosis: string, kind: Own
   ].join('\n')
 }
 
-async function findExistingAttempt(key: string): Promise<{ disposition: Exclude<RepairDisposition, 'queued'>; jobId: string } | null> {
+async function findExistingAttempt(key: string, kind: OwnedRepairKind): Promise<{ disposition: Exclude<RepairDisposition, 'queued'>; jobId: string } | null> {
+  // Dedupe on the findings, not on the deployed revision: every merge changes the revision, and matching the exact
+  // key queued a fresh repair for the same findings after each deploy (35 duplicates on 2026-09-27).
   const admin = getAdminSupabase()
   const { data: active, error: activeError } = await admin
     .from('builder_jobs')
-    .select('id,status')
+    .select('id,status,created_at,updated_at,metadata')
     .in('status', ['queued', 'running', 'paused'])
-    .contains('metadata', { selfHealingOwnedSite: true, selfHealingKey: key })
+    .contains('metadata', { selfHealingOwnedSite: true, selfHealingSource: kind })
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(200)
   if (activeError) throw new Error(`self_healing_builder_dedupe_failed:${activeError.message}`)
-  if (active?.id) return { disposition: 'already_active', jobId: String(active.id) }
 
-  const since = new Date(Date.now() - RETRY_SUPPRESSION_MS).toISOString()
+  const since = new Date(Date.now() - OWNED_SITE_REPAIR_RETRY_SUPPRESSION_MS).toISOString()
   const { data: recent, error: recentError } = await admin
     .from('builder_jobs')
-    .select('id,status')
+    .select('id,status,created_at,updated_at,metadata')
     .eq('status', 'succeeded')
     .gte('created_at', since)
-    .contains('metadata', { selfHealingOwnedSite: true, selfHealingKey: key })
+    .contains('metadata', { selfHealingOwnedSite: true, selfHealingSource: kind })
     .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(50)
   if (recentError) throw new Error(`self_healing_builder_recent_lookup_failed:${recentError.message}`)
-  return recent?.id ? { disposition: 'recently_attempted', jobId: String(recent.id) } : null
+
+  return ownedSiteRepairBlocker({ rows: [...(active || []), ...(recent || [])], key, nowMs: Date.now() })
 }
 
 async function enqueueOwnedSiteRepair(
@@ -182,7 +183,7 @@ async function enqueueOwnedSiteRepair(
   if (!authorized) throw new Error('owned_site_repair_incident_not_authorized')
 
   const key = remediationKey(incident, kind)
-  const existing = await findExistingAttempt(key)
+  const existing = await findExistingAttempt(key, kind)
   if (existing) return Object.freeze({ ...existing, remediationKey: key })
 
   const objective = objectiveFor(incident, diagnosis, kind)

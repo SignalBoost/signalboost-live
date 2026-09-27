@@ -26,6 +26,7 @@ const RESIDENCY_EVIDENCE = 'cos_university_residency_competency_evidence'
 const WINDOW_HOURS = 24
 const TELEMETRY_PAGE_SIZE = 1000
 const MAX_TELEMETRY_PAGES = 100
+const ASSURANCE_CANDIDATE_CHUNK_SIZE = 75
 
 async function collectPages<T>(load: (from: number, to: number) => any): Promise<T[]> {
   const rows: T[] = []
@@ -165,10 +166,10 @@ export async function GET() {
         .select('id,status,batch_count,max_total_cost_usd,committed_cost_usd,authorized_at,expires_at,completed_at,created_at,updated_at')
         .order('updated_at', { ascending: false })
         .limit(12),
-      db.from(ARTIFACTS)
+      collectPages<any>((from, to) => db.from(ARTIFACTS)
         .select('candidate_id,subject_id,status,trained_artifact_id,trained_artifact_hash,revision_key,created_at,updated_at')
         .order('updated_at', { ascending: false })
-        .limit(100),
+        .range(from, to)),
       db.from(EVALUATIONS)
         .select('candidate_id,trained_artifact_hash,artifact_age_seconds,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
         .order('created_at', { ascending: false })
@@ -190,7 +191,6 @@ export async function GET() {
       completedRunCountResult,
       failedRunCountResult,
       campaignsResult,
-      artifactsResult,
       evaluationsResult,
       graduatesResult,
     ]) {
@@ -388,10 +388,9 @@ export async function GET() {
     const failedRuns24h = n(failedRunCountResult.count)
     const inFlightRuns24h = Math.max(0, totalRuns24h - completedRuns24h - failedRuns24h)
 
-    // The activity table is recency-bounded, but graduates are durable lifecycle state. Always merge
-    // every registry-backed graduate artifact into telemetry so an older active graduate cannot disappear
-    // merely because 100 newer artifacts were updated after it.
-    const recentArtifacts = artifactsResult.data || []
+    // Artifact lifecycle telemetry is durable state, not a recency sample. The query above is safely
+    // paginated so pipeline counts and blocker stages represent every retained artifact.
+    const recentArtifacts = artifactsResult || []
     const graduateCandidateIds = Array.from(new Set((graduatesResult.data || [])
       .map((row: any) => text(row.candidate_id, 240))
       .filter(Boolean)))
@@ -422,17 +421,19 @@ export async function GET() {
     const telemetryEvaluationRows = [...(evaluationsResult.data || []), ...(graduateEvaluationsResult.data || [])]
 
     const artifactCandidates = Array.from(new Set(telemetryArtifactRows.map((row: any) => text(row.candidate_id, 240)).filter(Boolean)))
-    const assuranceResult = artifactCandidates.length
-      ? await db.from('cos_university_learning_assurance_events')
+    const assuranceRows: any[] = []
+    for (let offset = 0; offset < artifactCandidates.length; offset += ASSURANCE_CANDIDATE_CHUNK_SIZE) {
+      const candidateChunk = artifactCandidates.slice(offset, offset + ASSURANCE_CANDIDATE_CHUNK_SIZE)
+      const chunkRows = await collectPages<any>((from, to) => db.from('cos_university_learning_assurance_events')
         .select('candidate_id,observed_at,expires_at,verifier,evidence')
         .eq('event_type', 'fine_tune')
-        .in('candidate_id', artifactCandidates)
+        .in('candidate_id', candidateChunk)
         .order('observed_at', { ascending: false })
-        .limit(5000)
-      : { data: [], error: null } as any
-    if (assuranceResult.error) throw assuranceResult.error
+        .range(from, to))
+      assuranceRows.push(...chunkRows)
+    }
     const assuranceByCandidate = new Map<string, any[]>()
-    for (const row of assuranceResult.data || []) {
+    for (const row of assuranceRows) {
       const candidateId = text(row.candidate_id, 240)
       if (!assuranceByCandidate.has(candidateId)) assuranceByCandidate.set(candidateId, [])
       assuranceByCandidate.get(candidateId)!.push(row)
@@ -571,11 +572,15 @@ export async function GET() {
       const approvalExpiresMs = approval?.expires_at ? Date.parse(String(approval.expires_at)) : 0
       let claimability = 'not_evaluation_pending'
       if (artifact.status === 'evaluation_pending') {
-        if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
-        // Rolling authority deliberately refuses to mint an evaluation approval until the exact-artifact
-        // Production canary exists. Report that upstream prerequisite first; otherwise every canary-less
-        // artifact is misleadingly labelled "missing approval" even though approval issuance is correctly blocked.
+        // Computer Science has a mandatory Residency gate before final canary/evaluation. Report
+        // upstream lifecycle prerequisites before the retention clock so telemetry never implies
+        // that age alone will make a non-resident artifact evaluable.
+        if (text(artifact.subject_id, 240) === 'Computer Science & Coding'
+          && residencyState?.standing !== 'residency_complete') claimability = residencyState
+            ? 'residency_incomplete'
+            : 'waiting_for_residency_admission'
         else if (!canary) claimability = 'missing_exact_canary'
+        else if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
         else if (!approval) claimability = 'missing_approval'
         else if (approval.evidence?.claim !== 'distilled_independent_evaluation_approved') claimability = 'approval_suspended'
         else if (!approvalExpiresMs || approvalExpiresMs <= nowMs) claimability = 'approval_expired'

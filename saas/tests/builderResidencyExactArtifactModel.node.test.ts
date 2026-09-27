@@ -483,3 +483,36 @@ test('an inference rejection records the provider reason, bounded and redacted',
     (error:unknown)=>error instanceof Error&&error.message.startsWith('residency_exact_artifact_inference_http_400:This model')
   )
 })
+
+
+test('Residency runtime key is bound to the exact-artifact image so a new image never reuses a stale endpoint',async()=>{
+  const protection=await import('../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts')
+  const provisioner=await import('../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
+  const imageA='ghcr.io/signalboost/itmounts-exact-artifact@sha256:'+'1'.repeat(64)
+  const imageB='ghcr.io/signalboost/itmounts-exact-artifact@sha256:'+'2'.repeat(64)
+  const keyA=protection.builderResidencyRuntimeKey(identity.candidateId,identity.artifactHash,{ITMOUNTS_MASS_EXACT_ARTIFACT_IMAGE:imageA} as any)
+  const keyA2=protection.builderResidencyRuntimeKey(identity.candidateId,identity.artifactHash,{ITMOUNTS_MASS_EXACT_ARTIFACT_IMAGE:imageA} as any)
+  const keyB=protection.builderResidencyRuntimeKey(identity.candidateId,identity.artifactHash,{ITMOUNTS_MASS_EXACT_ARTIFACT_IMAGE:imageB} as any)
+  assert.match(String(keyA),/^[a-f0-9]{10}$/)
+  assert.equal(keyA,keyA2)
+  assert.notEqual(keyA,keyB)
+  assert.equal(protection.builderResidencyRuntimeKey('not-mass',identity.artifactHash),null)
+  assert.equal(protection.RESIDENCY_RUNPOD_ENDPOINT_GENERATION,provisioner.MASS_DISTILLED_EXACT_ENDPOINT_GENERATION)
+
+  const {db}=artifactDb()
+  const provisions:any[]=[]
+  const port=createRunpodBuilderResidencyModelPort({
+    db,
+    apiKey:'secret',
+    provisionImpl:async(artifact:any)=>{provisions.push(artifact);throw new Error('stop_after_identity')},
+    healthImpl:async()=>{throw new Error('must_not_probe')},
+    fetchImpl:async()=>{throw new Error('must_not_fetch')},
+  })
+  await assert.rejects(()=>port.prepare!(identity),/stop_after_identity/)
+  const expectedKey=protection.builderResidencyRuntimeKey(identity.candidateId,identity.artifactHash)
+  assert.equal(provisions[0].runtimeKey,expectedKey)
+  assert.equal(
+    protection.residencyRunpodEndpointName(identity.candidateId,identity.artifactHash),
+    `itmounts-mass-distilled-${identity.artifactHash.slice(0,12)}-${expectedKey}-${provisioner.MASS_DISTILLED_EXACT_ENDPOINT_GENERATION}`,
+  )
+})

@@ -330,6 +330,14 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   // Any mutable present-world facts introduced by the draft remain subject to answer-side freshness.
   if (isNormativePolicyQuestion(text)) return false
 
+  // Explicit mutable external lookup classes must win before broad conversational exclusions.
+  // Production 2026-09-26 exposed three regressions where traffic state, comparative rankings,
+  // and E-Verify requirements were incorrectly suppressed and never reached their live rules.
+  // Keep this after authoring/normative exclusions so creation and value-policy requests remain local.
+  if (SUBJECTIVE_RANKING_LOOKUP.test(text)) return true
+  if (isDirectOrTerseLookup(text, TRAVEL_STATE)) return true
+  if (LOOKUP_INTENT.test(text) && PUBLIC_RULE_STATE.test(text)) return true
+
   // A question about COS's OWN previous answer is never a public-web lookup. This is a structural
   // safeguard, not a duplicate of the introspection routing: when the introspection classifier
   // misses (a typo like "the answert from", a phrasing nobody anticipated), the question used to

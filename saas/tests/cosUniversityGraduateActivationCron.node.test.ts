@@ -174,12 +174,20 @@ test('every activation tick records why the COS-primary upgrade did or did not h
 })
 
 
-test('activation cron deterministically drives governed graduate work rotation without a separate cron slot', () => {
-  const route = readFileSync(join(process.cwd(), 'app/api/cron/cos-university-graduate-activation/route.ts'), 'utf8')
+test('activation cron deterministically invokes the governed rotation controller without a self-fetch', () => {
+  const activationRoute = readFileSync(join(process.cwd(), 'app/api/cron/cos-university-graduate-activation/route.ts'), 'utf8')
+  const rotationRoute = readFileSync(join(process.cwd(), 'app/api/cron/cos-university-graduate-rotation/route.ts'), 'utf8')
+  const controller = readFileSync(join(process.cwd(), 'lib/ai/cos/cosUniversityGraduateRotationController.ts'), 'utf8')
   const vercel = JSON.parse(readFileSync(join(process.cwd(), 'vercel.json'), 'utf8'))
-  assert.match(route, /\/api\/cron\/cos-university-graduate-rotation/)
-  assert.match(route, /cos-graduate-work-rotation-piggyback/)
-  assert.match(route, /SignalBoost-Graduate-Activation/)
+
+  assert.match(activationRoute, /runGraduateRotationController\(\)/)
+  assert.match(activationRoute, /cos-graduate-work-rotation-direct/)
+  assert.doesNotMatch(activationRoute, /fetch\([^\n]*cos-university-graduate-rotation/)
+  assert.doesNotMatch(activationRoute, /new URL\('\/api\/cron\/cos-university-graduate-rotation'/)
+  assert.match(rotationRoute, /runGraduateRotationController\(\)/)
+  assert.match(controller, /proveGraduateServedIdentity/)
+  assert.match(controller, /cos_university_graduate_rotation_leases/)
+  assert.match(controller, /authority_expanded: false/)
   assert.equal(vercel.crons.some((item: any) => item.path === '/api/cron/cos-university-graduate-rotation'), false)
   assert.equal(vercel.crons.some((item: any) => item.path === '/api/cron/cos-university-graduate-activation'), true)
 })

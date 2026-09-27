@@ -278,6 +278,7 @@ const tests = [
   'tests/cosWorkingDistillationReadinessCron.node.test.ts',
   'tests/builderResidencyLiveHost.node.test.ts',
   'tests/builderResidencyFinalEvaluationGate.node.test.ts',
+  'tests/cosInteractiveModelHealthMonitoring.node.test.ts',
 
 ]
 

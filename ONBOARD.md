@@ -2,6 +2,22 @@
 
 # iTMounts Engineering Blueprint
 
+## Interactive latency and one-pipeline invariant — 2026-09-27
+
+Owner COS and public Concierge answer in **≤ 5 seconds** (owner-verified 2026-09-27) through **one pipeline**. Full fix record, evidence and diagnosis runbook: `docs/COS-INTERACTIVE-LATENCY-2026-09-27.md`. Read it before changing `app/api/cos-browser`, `app/api/cos-primary`, `lib/ai/cos/cosFirstAnswer*.ts` or `lib/ai/local-inference.ts`.
+
+Binding rules:
+
+- **COS is the brain, Concierge is the mouth, one pipeline.** Browser -> `/api/cos-browser` -> `cosPrimaryPost` -> `tryCOSFirstAnswer` -> enterprise COS. Audience (`cosAudience`) changes reasoning context and disclosure, never the pipeline. The first-turn planner requests capabilities only and never releases an answer. No model call may answer the user in front of COS; `runFastAuthoring` and `runCompletionFirstRescue` are post-COS rescues only.
+- **Every chat-path model call carries a `usageContext`** (`cos_interactive_answer`, `cos_interactive_authoring`, `cos_interactive_travel_plan` + a distinct `purpose`). An unlabeled call is routed to the RunPod primary thinking model (~37 tok/s) and cost 25–70 s per turn on 2026-09-27.
+- **Interactive calls run with hidden thinking off** and inside the interactive limits (main/authoring 20 s, travel 16 s + 10 s). Authoring and travel use the **configured model**; `zai-org/GLM-5.3-Flash` never replied within 15 s on this account and must not be used for chat without fresh evidence.
+- **Answer length is latency:** keep `CHAT_ANSWER_LENGTH_RULE` (~150 words by default, ~400 only when detail/plan/code/writing is asked).
+- **Retrieval is parallel and budgeted:** the five context sources run concurrently; lexical fallbacks are capped by `COS_CONTEXT_FALLBACK_BUDGET_MS` (2.5 s) and commit only if they finish in time.
+- **The native-language review pass runs only when a user-protected literal is missing** (all five languages), on the interactive lane with thinking off.
+- **Every new step on the chat path is timed** with `recordCosLatencyStage` / `timeCosStage` (`lib/ai/cos/cosLatencyStages.ts`, rows in `cos_ai_roi_metrics` with `task_id='cos-latency-stage'`). Diagnose with the single SQL query in the runbook, never by guessing; filter out University/Builder/Self-Healing background traffic.
+
+This section supersedes the conflicting parts of *Self-contained authoring fast ingress*, *HMI semantic authoring resilience* and the travel sentence of *Interactive answerability* (all 2026-09-18/23) below.
+
 ## iTMounts Platform Harness invariant — 2026-09-22
 
 The **Platform Harness** is a first-class iTMounts platform layer shared by COS, specialists, Builder, University Residency, Self-Healing, security exercises, replay, sandbox work, Production work, and independent evaluation runtime. It is not subordinate to University and it is not a replacement governance engine.

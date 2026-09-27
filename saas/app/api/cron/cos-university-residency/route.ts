@@ -95,7 +95,7 @@ function publicResult(result: any, admission?: any) {
 /**
  * Bounded practical Residency tick.
  *
- * One invocation selects at most one enrollment and one practical case. The
+ * One invocation executes a bounded sequential cohort of practical cases. Each
  * exact trained artifact executes only inside the native sandbox Residency host,
  * every model-controlled action crosses Agent Gateway governance, and the
  * independent proof result is persisted before educational standing refresh.
@@ -162,6 +162,16 @@ export async function GET(req: Request) {
       })
       results.push(result)
       if (result.state === 'idle') break
+
+      // Infrastructure is a prerequisite, not educational evidence. Once an exact-artifact
+      // execution reports infrastructure failure, the existing governed Self-Healing action gets
+      // one opportunity to reconcile it. If that action does not complete, stop this cron batch:
+      // additional case attempts cannot prove competency and only create retry churn.
+      if (
+        result.state === 'case_not_completed' &&
+        result.execution?.result?.outcome?.status === 'infrastructure_failure' &&
+        result.selfHealing?.completed !== true
+      ) break
     }
 
     const result = results[results.length - 1]

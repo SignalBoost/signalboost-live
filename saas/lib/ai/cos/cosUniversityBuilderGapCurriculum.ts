@@ -4,6 +4,12 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 export const BUILDER_GAP_REMEDIATION_PROFILE = 'cos-university-builder-gap-remediation-v1' as const
 const BUILDER_GAP_PREFIX = 'verified_builder_failure:'
 const BUILDER_GAP_CURRICULUM_PER_GAP = 20
+const BUILDER_GAP_CAPABILITIES = new Set([
+  'builder_verification_failed',
+  'builder_model_control_failed',
+  'builder_tool_selection_failed',
+  'builder_repair_attempts_exhausted',
+])
 
 const SUBJECT_MAP: Readonly<Record<string, string>> = Object.freeze({
   'software engineering': 'Computer Science & Coding',
@@ -74,7 +80,10 @@ export function builderGapPracticeSeed(input: {
   const universitySubject = builderGapCurriculumSubject(normalized)
   const variants = PRACTICE[normalized]
   const capability = clean(input.capability, 160)
-  if (!universitySubject || !variants?.length || !/^builder_autonomous_completion:builder_[a-z0-9_]+$/.test(capability)) return null
+  const capabilityClass = capability.startsWith('builder_autonomous_completion:')
+    ? capability.slice('builder_autonomous_completion:'.length)
+    : ''
+  if (!universitySubject || !variants?.length || !BUILDER_GAP_CAPABILITIES.has(capabilityClass)) return null
   const ordinal = Number(input.ordinal)
   if (!Number.isSafeInteger(ordinal) || ordinal < 0 || ordinal >= BUILDER_GAP_CURRICULUM_PER_GAP) return null
   const focus = variants[ordinal % variants.length]!
@@ -113,7 +122,12 @@ export async function installBuilderGapDerivedCurriculum(input: {
     const gapId = clean(row.id, 120)
     const subject = clean(row.subject, 120)
     const capability = clean(row.capability, 160)
-    if (!gapId || !clean(row.escalation_reason, 200).startsWith(BUILDER_GAP_PREFIX)) continue
+    const capabilityClass = capability.startsWith('builder_autonomous_completion:')
+      ? capability.slice('builder_autonomous_completion:'.length)
+      : ''
+    const escalationReason = clean(row.escalation_reason, 200)
+    if (!gapId || !BUILDER_GAP_CAPABILITIES.has(capabilityClass)
+      || escalationReason !== `${BUILDER_GAP_PREFIX}${capabilityClass}`) continue
     let gapInserted = 0
     for (let ordinal = 0; ordinal < BUILDER_GAP_CURRICULUM_PER_GAP; ordinal += 1) {
       const seed = builderGapPracticeSeed({ gapId, subject, capability, ordinal })

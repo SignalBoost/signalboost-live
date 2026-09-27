@@ -35,6 +35,8 @@ import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransform
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
+import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { publicDisclosureViolations } from '@/lib/ai/cos/publicDisclosureGate'
 import { hasUnsafePublicModelOutput } from '@/lib/ai/cos/publicPromptSecurity'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
@@ -409,7 +411,13 @@ export async function POST(req: NextRequest) {
   // minimum native capability needed. Mutable/current requests still have the host freshness backstop
   // below, but that guard runs only after the model's first semantic decision.
   let agentDecision: CosAgentDecision | null = null
-  if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt)) {
+  // Questions about this service itself (iTMounts, its products, COS and its platform concepts) must be
+  // answered by the COS pipeline, which holds the owner-approved identity and glossary. The first-turn
+  // model has neither: Production 2026-09-26 answered "What is iTMounts?" directly from model memory as
+  // "a digital mount management system".
+  const asksAboutThisService = isSignalBoostSpecificPublicRequest(prompt)
+    || (browserSurface !== 'concierge' && authenticatedOwner && mentionsPlatformConcept(prompt))
+  if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt) && !asksAboutThisService) {
     agentDecision = await decideCosAgentTurn({
       prompt,
       previousAssistant: priorAnswer || null,

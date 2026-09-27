@@ -58,3 +58,32 @@ test('owner runtime topology remains host-owned and public disclosure stays sepa
   assert.doesNotMatch(core, /LOCAL_AI_MODEL \|\| 'Qwen\//)
   assert.match(enterprise, /PLATFORM TECHNICAL SPECIFICATION \(owner-only\):/)
 })
+
+test('owner-approved platform glossary reaches only the authenticated owner self-knowledge reasoner', async () => {
+  const glossary = await import('../lib/ai/cos/cosPlatformGlossary.ts')
+  const context = glossary.ownerPlatformGlossaryContext()
+  for (const term of ['COS (Chief of Staff)', 'Concierge', 'COS University', 'Specialist', 'Artifact', 'Graduate', 'Builder Residency']) {
+    assert.match(context, new RegExp(term.replace(/[()]/g, '\\$&')))
+  }
+  assert.match(context, /owner channel only/)
+
+  // Current request only: a wrapped follow-up is judged by what the owner is asking now.
+  assert.equal(glossary.mentionsPlatformConcept('What is the University?'), true)
+  assert.equal(glossary.mentionsPlatformConcept('What is a specialist?'), true)
+  assert.equal(glossary.mentionsPlatformConcept('PREVIOUS USER CONTEXT:\nWhat is the University?\n\nCURRENT USER REQUEST:\nTranslate hello to Spanish'), false)
+  assert.equal(glossary.mentionsPlatformConcept('Translate hello to Spanish'), false)
+
+  // Owner-only: glossary is wired into the owner self-knowledge reasoner, never into the public prompt path.
+  assert.match(shared, /ownerPlatformGlossaryContext\(\)/)
+  assert.doesNotMatch(enterprise, /ownerPlatformGlossaryContext|OWNER_PLATFORM_GLOSSARY/)
+  assert.doesNotMatch(core, /ownerPlatformGlossaryContext|OWNER_PLATFORM_GLOSSARY/)
+  const ownerGuard = shared.indexOf('const ownerPlatformConcept = input.privileged === true')
+  const publicGuard = shared.indexOf('&& !isPublicDeliveryScope()', ownerGuard)
+  const call = shared.indexOf('tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true, platformConcept: true })')
+  assert.ok(ownerGuard > 0 && publicGuard > ownerGuard && call > publicGuard)
+
+  // Platform-concept questions from the owner are never diverted into previous-turn interpretation.
+  const interpretation = shared.indexOf('async function tryNeuralContextualInterpretation')
+  const bypass = shared.indexOf('if (input.privileged === true && !isPublicDeliveryScope() && mentionsPlatformConcept(prompt)) return null', interpretation)
+  assert.ok(interpretation > 0 && bypass > interpretation)
+})

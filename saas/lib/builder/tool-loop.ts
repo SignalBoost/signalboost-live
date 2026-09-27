@@ -8,6 +8,7 @@ import { formatBuilderCognitiveGuidance } from './cognitive-application.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
+import { builderEngineeringGoal, formatBuilderEngineeringGoal } from './engineering-control-plane.ts'
 import { formatBuilderWorkingFiles } from './working-context.ts'
 import { formatBuilderCliTestGuidance } from './cli-test-guidance.ts'
 import { appendBuilderChunk, builderFilePath, formatBuilderChunks } from './file-chunks.ts'
@@ -380,6 +381,7 @@ export class BuilderToolLoop {
     const projectContext = discoverBuilderProjectContext(files)
     const initialPaths = new Set(saved?.initialPaths || initialListing.map(file => file.path))
     const task = builderTaskContract(input.objective)
+    const engineeringGoal = builderEngineeringGoal(input.objective)
     const mcpCapabilities = this.mcp ? await this.mcp.capabilities().catch(() => []) : []
     const mcpCapabilityKeys = new Set(mcpCapabilities.map(item => `${item.providerId}:${item.capabilityId}`))
     const browserCliCapability = this.browserCli ? await this.browserCli.capabilities().catch(() => null) : null
@@ -501,6 +503,7 @@ export class BuilderToolLoop {
         formatBuilderCognitiveGuidance(input.cognitiveSkills || []),
         input.workingKnowledge || '',
         BUILDER_REASONING_GUIDANCE,
+        formatBuilderEngineeringGoal(engineeringGoal),
         documentationPaths ? `DOCUMENTATION-ONLY TASK: mutations are restricted to ${JSON.stringify(documentationPaths)}. Inspect relevant code, update the requested documentation, and run the requested verification. Existing error behavior being documented does not require a failing baseline. Do not modify implementation, tests or configuration.` : '',
         verificationOrderGuidance(pendingOrder),
         `OBJECTIVE:\n${input.objective}`,

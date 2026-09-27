@@ -123,6 +123,87 @@ University Residency is the educational use of this shared platform world. Resid
 
 See `docs/PLATFORM-HARNESS.md` and `saas/platform-harness/`.
 
+
+## Builder Engineering Control Plane invariant — 2026-09-27
+
+Builder is a **goal-oriented, model-agnostic engineering agent inside the Platform Harness**, not a chat model that stops after generating code. The engineering outcome and its independently observable acceptance criteria are the unit of completion.
+
+Canonical Builder lifecycle:
+
+```text
+owner / COS engineering objective
+-> explicit Engineering Goal Contract
+-> relevant repository + project + episodic context
+-> governed model/runtime selection
+-> inspect / reproduce / plan
+-> edit in bounded workspace
+-> targeted tests and static/build verification
+-> browser/runtime verification when applicable
+-> commit / PR / authorized merge
+-> exact deployment observation
+-> task-specific Production acceptance
+-> if application regression: bounded rollback + failure evidence + repair-again cycle
+-> independently verified satisfied outcome
+-> durable episode + reusable verified lesson
+```
+
+The control plane owns orchestration; **no model provider is the platform**. Active promoted iTMounts graduates, RunPod, configured local/open models, and separately authorized external providers may supply reasoning/coding turns through the existing governed provider/runtime seams. Provider choice may optimize capability, latency, cost, or task fit, but it never widens tool, repository, deployment, spend, tenant, or Production authority. A provider failure may route to another already-authorized provider; it may not bypass the Harness or verification gates.
+
+### Goal and completion contract
+
+Every durable Builder task has an explicit engineering goal derived from the owner's objective and current repository evidence. The contract tracks required deliverables, requested/proving commands, regression evidence where repair semantics apply, and whether deployment/Production acceptance is part of the requested outcome.
+
+Canonical state progression:
+
+```text
+planning -> executing -> verifying -> production_acceptance -> satisfied
+                                      \-> blocked / recovery
+```
+
+A state may advance only from observable evidence. Model prose, a diff, a commit, PR creation, merge, CI green, Vercel READY, HTTP 2xx, or generic homepage smoke is not sufficient evidence for a task whose requested outcome is functioning Production behavior. If the objective includes Production/live/deploy semantics, task-specific Production acceptance is required before `satisfied`.
+
+Builder must continue toward the goal while authorized work remains possible. A failed test, CI run, deployment, or task-specific browser acceptance is new diagnostic evidence, not automatically a terminal conversation. Infrastructure uncertainty remains pending/retry and must not be mislabeled as an application regression. A verified application regression after deployment enters a **bounded repair-again loop**: preserve sanitized failure evidence, safely roll back when the existing authority/rollback contract permits it, start another governed repair attempt from current state, rerun verification, redeploy, and re-accept. Attempts are bounded; exhaustion escalates with evidence rather than looping indefinitely.
+
+### Episodic engineering memory
+
+Builder memory has distinct layers and they must not be conflated:
+
+- **Conversation continuity** preserves the current user/Builder exchange and durable job/workspace relationship.
+- **Episodic memory** records bounded engineering episodes: objective, job/conversation/workspace identity, observable actions/outcome, relevant artifacts, verification/failure evidence, and timestamps.
+- **Verified repair lessons / semantic learning** retain generalized reusable lessons only after their existing evidence/admission rules are satisfied.
+
+Episodic memory exists so a later conversation can recover relevant prior engineering context without requiring the owner to restate the entire history. Retrieval is always tenant/user scoped and relevance bounded. Raw secrets, credentials, hidden chain-of-thought, unrestricted browser state, unnecessary raw chats, or authority tokens are never episodic-memory payloads.
+
+**Memory is context, never authority or current-state proof.** A remembered successful deployment does not prove the current deployment is healthy; a remembered permission does not authorize a new action; a remembered diagnosis must be rechecked against current files/runtime. Current observable evidence outranks episodic recollection. Cross-user or cross-tenant episodic retrieval is prohibited.
+
+Terminal Builder outcomes should write a durable bounded episode after the generation-fenced terminal state is established. Learning/admission failure cannot retroactively change a successfully verified task outcome, and episode-write failure must be observable without falsely claiming that cross-chat continuity was persisted.
+
+### Tool discovery, execution and evidence
+
+Builder should receive the minimum relevant context and capabilities for the current goal rather than indiscriminately loading every MCP/tool/provider into prompt context. Tool discovery is capability discovery, not authorization. MCP, browser, repository, database, deployment, and provider operations remain behind their existing governed ports and Platform Harness authority.
+
+Parallel/subagent execution, isolated worktrees, additional provider routing, Chrome DevTools, Playwright, repository intelligence/code graphs, and specialist collaboration may improve engineering throughput, but each child execution must remain attributable to the parent HarnessRun and may only reduce inherited authority/budget/deadline/capability scope.
+
+The durable evidence record should make the engineering trajectory reconstructable without private reasoning: goal contract, relevant context references, selected runtime/provider identity where observable, tool actions/outcomes, changed artifacts, tests/builds, PR/merge/deployment identity, task-specific Production acceptance, rollback/recovery evidence, terminal outcome, and episodic/lesson admission status.
+
+### Builder acceptance target
+
+Builder is not “full-monty” complete merely because it can edit files or merge a PR. Production acceptance for this architecture requires representative end-to-end cases proving:
+
+1. new implementation from objective through verified deliverables;
+2. repository repair with fail-before/pass-after regression proof;
+3. PR/merge/deployment continuation without owner babysitting where already authorized;
+4. task-specific Playwright/browser Production acceptance rather than generic READY/smoke;
+5. Production application failure causing bounded rollback and automatic repair-again with preserved evidence;
+6. infrastructure verifier failure remaining pending/retry rather than causing false success or destructive rollback;
+7. cross-chat episodic recall recovering a relevant prior episode while current-state evidence still wins;
+8. strict user/tenant isolation and no memory-derived authority;
+9. provider/runtime fallback only inside the existing Harness spend/authority envelope;
+10. durable evidence sufficient to distinguish code-written, tested, merged, deployed, accepted, rolled-back, and truly satisfied states.
+
+The strategic target is a **model-agnostic engineering operating system**: Builder orchestrates the best already-authorized reasoning/runtime resources available, while iTMounts owns identity, context, memory, tools, execution, verification, deployment continuation, recovery, learning, observability, and authority.
+
+
 ## COS University Residency invariant — 2026-09-22
 
 The University includes a governed **Residency** stage: practical supervised work analogous to a medical residency. The harness is the infrastructure that runs realistic cases; Residency is the educational program. It applies to every specialist and eventually COS.

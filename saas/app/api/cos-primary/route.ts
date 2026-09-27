@@ -229,6 +229,7 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
   const result=await callCosReasoner({
     temperature:.2,
     maxTokens:2200,
+    disableThinking:true,
     systemPrompt:[
       cosIdentityPreamble(audience),
       'COMPLETION RESCUE: complete the user task now instead of asking them to narrow a broad but answerable request.',

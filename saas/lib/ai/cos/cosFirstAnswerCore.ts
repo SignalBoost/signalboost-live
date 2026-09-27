@@ -193,7 +193,7 @@ async function releaseToPublic(
     // A low-confidence draft is only ever shown if it would itself pass the disclosure gate.
     const draft = 'bestEffortReply' in result ? String(result.bestEffortReply || '') : ''
     if (draft && publicDisclosureViolations(draft).length) {
-      return { ...result, bestEffortReply: undefined, provenance: { ...(result.provenance as Record<string, unknown>), publicDraftWithheld: true } as any }
+      return { handled: false, confidence: result.confidence, reason: result.reason, provenance: { ...(result.provenance as Record<string, unknown>), publicDraftWithheld: true } as any }
     }
     return result
   }

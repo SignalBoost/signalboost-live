@@ -1,3 +1,4 @@
+// saas/lib/builder/vercel-repository-repair-session.ts
 import { Sandbox } from '@vercel/sandbox'
 import { posix as pathPosix } from 'node:path'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
@@ -167,10 +168,15 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
     const sandbox = await withinAbsoluteDeadline(Sandbox.create({
       runtime: 'node24',
       timeout: sandboxLifetimeMs,
-      resources: { vcpus: 2 },
+      // A full-repository `tsc --noEmit` needs a ~3 GB V8 heap: at Node's default heap it aborts with
+      // "JavaScript heap out of memory" (reproduced 2026-09-27 on main 1b7d2df; it completes at 3072 MB+).
+      // In the old 2-vCPU sandbox the Builder's type-check proof was killed with exit 137, so every
+      // TypeScript repair ended without reproduction evidence. 4 vCPUs gives the sandbox 8 GB; the explicit
+      // heap keeps node inside it and turns any future overrun into a readable V8 error, not a silent kill.
+      resources: { vcpus: 4 },
       persistent: false,
       networkPolicy: 'allow-all',
-      env: { CI: '1', npm_config_audit: 'false', npm_config_fund: 'false' },
+      env: { CI: '1', npm_config_audit: 'false', npm_config_fund: 'false', NODE_OPTIONS: '--max-old-space-size=6144' },
       tags: { surface: 'cos-platform-engineer', repository: 'signalboost-live' },
     }), deadlineAtMs)
     const session = new VercelRepositoryRepairSession(sandbox, target, deadlineAtMs)

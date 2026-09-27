@@ -263,11 +263,15 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
   // durable one-to-many lesson linkage prevents daily source reinforcement from pinning this lane.
   try {
     const linkedLessonIds = await loadLinkedDirectedSoftwareLessonIds()
-    const directedResult = await evaluateNextTeacherLesson({
-      lane: 'owner_directed_software',
-      excludeLessonIds: [...new Set([...processedLessonIds, ...linkedLessonIds])],
-    })
-    if (directedResult) {
+    // Directed Study can accumulate much faster than a once-daily single-item evaluator can consume it.
+    // Drain a small bounded cohort while preserving the exact same evaluation/promotion gates per lesson.
+    const directedLimit = positiveInt(process.env.COS_DIRECTED_SOFTWARE_EVALUATIONS_PER_CYCLE, 4, 8)
+    for (let index = 0; index < directedLimit; index += 1) {
+      const directedResult = await evaluateNextTeacherLesson({
+        lane: 'owner_directed_software',
+        excludeLessonIds: [...new Set([...processedLessonIds, ...linkedLessonIds])],
+      })
+      if (!directedResult) break
       recordProcessedLessonId(processedLessonIds, directedResult)
       summary.lessons.push({ ...directedResult, evaluationLane: 'owner_directed_software' })
       mergeCleanup(summary.cleanup, await discardUnnecessaryLocalCognitivePractice())

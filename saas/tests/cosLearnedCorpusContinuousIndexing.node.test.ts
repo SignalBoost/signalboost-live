@@ -31,8 +31,10 @@ test('indexing cron is authenticated, bounded, and wakes compute only when work 
   assert.ok(readiness > lease, 'runtime readiness must occur only after work is confirmed')
   assert.match(source, /if \(pending === 0\)/)
   assert.match(source, /reason: 'no_indexing_work'/)
-  assert.match(source, /limit: 16/)
+  assert.match(source, /MAX_BATCHES = 3/)
+  assert.match(source, /limit: 32/)
   assert.match(source, /concurrency: 4/)
+  assert.match(source, /remainingEligiblePending/)
 })
 
 test('current-world cron learns first and indexes newly accepted rows from the same run', () => {

@@ -48,6 +48,7 @@ import { freshFailureReply, type FreshEvidenceInternalFailureCode } from '@/lib/
 import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFreshEvidenceFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
@@ -223,12 +224,14 @@ function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;
   return NextResponse.json({ok:true,reply:fast.reply,source,cognitive_mode:fast.cognitiveMode,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
 }
 
-async function runCompletionFirstRescue(input:string,language:string):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+async function runCompletionFirstRescue(input:string,language:string,audience:CosAudience):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+  // ONE BRAIN: the rescue lane carries the same COS identity and company knowledge as the main pipeline.
   const result=await callCosReasoner({
     temperature:.2,
     maxTokens:2200,
     systemPrompt:[
-      'You are COS completion rescue. Complete the user task now instead of asking them to narrow a broad but answerable request.',
+      cosIdentityPreamble(audience),
+      'COMPLETION RESCUE: complete the user task now instead of asking them to narrow a broad but answerable request.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'Use reasonable low-risk assumptions when they do not materially change correctness, and label material uncertainty inside the answer.',
       'Give a useful partial answer when full completion is impossible. Never emit internal routing, confidence-gate, release-gate, provider, or fallback language.',
@@ -237,7 +240,7 @@ async function runCompletionFirstRescue(input:string,language:string):Promise<{r
       'Do not ask a clarifying question unless no meaningful partial answer can be given without the missing fact.',
       language ? 'Respond in the user language when appropriate: '+reportLanguageName(language)+'.' : '',
     ].filter(Boolean).join(' '),
-    prompt:input,
+    prompt:`${companyKnowledgeBlock(input)}${input}`,
   }).catch(()=>null)
   const parsed=result?.text?parseLocalResult(result.text):null
   const reply=parsed?.answer?.trim()||''
@@ -527,7 +530,7 @@ function freshTelemetryProvenance(invoked:boolean,reasonerLabel:string|null){ret
 export async function postCosPrimary(req:NextRequest){
   requireCosHarnessIngress()
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body,input)
-  if(!input)return legacyConciergePost(new NextRequest(req.clone()))
+if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const precedingAssistant=previousAssistantText(body)
   const freshConversationContext=resolveFreshConversationContext(body, input)
   const lookupInput=freshConversationContext.lookupInput
@@ -869,7 +872,7 @@ export async function postCosPrimary(req:NextRequest){
   // authoring: explanation, analysis, planning, and other low-risk tasks should still receive a
   // useful answer when the primary confidence gate declined to release one.
   if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)){
-    const completionRescue=await runCompletionFirstRescue(input,language)
+    const completionRescue=await runCompletionFirstRescue(input,language,cosAudience(isPrivileged))
     if(completionRescue)return completionFirstResponse(startedAt,input,completionRescue,'cos-completion-first-rescue')
   }
 

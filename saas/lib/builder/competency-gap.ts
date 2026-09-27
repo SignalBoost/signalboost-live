@@ -1,10 +1,10 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
-const NON_COMPETENCY_FAILURES = new Set([
-  'builder_proposal_source_changed',
-  'builder_repository_repair_owner_required',
-  'builder_repository_repair_target_unavailable',
-  'builder_runpod_primary_busy',
+const COMPETENCY_FAILURES = new Set([
+  'builder_verification_failed',
+  'builder_model_control_failed',
+  'builder_tool_selection_failed',
+  'builder_repair_attempts_exhausted',
 ])
 
 function bounded(value: unknown, max: number): string {
@@ -19,6 +19,13 @@ function subjectFor(objective: string): string {
   return 'general reasoning'
 }
 
+const QUESTION_BY_SUBJECT: Readonly<Record<string, string>> = Object.freeze({
+  'software engineering': 'How should an autonomous software engineer diagnose, repair, and independently verify a failed implementation without weakening tests or acceptance criteria?',
+  'agent systems': 'How should an autonomous agent diagnose and recover from a capability-level planning or tool-use failure while preserving authority and verification boundaries?',
+  'ml and ai engineering': 'How should an autonomous ML engineer diagnose and repair a capability-level model, inference, training, or evaluation failure while preserving independent evaluation?',
+  'general reasoning': 'What reusable reasoning procedure should an autonomous specialist use to diagnose a verified capability failure, attempt a bounded repair, and prove the corrected result?',
+})
+
 export function builderCompetencyGapCandidate(input: {
   jobId: string
   objective: string
@@ -26,24 +33,21 @@ export function builderCompetencyGapCandidate(input: {
   ownerAuthorized: boolean
 }): { taskId: string; subject: string; capability: string; question: string; escalationReason: string } | null {
   const error = bounded(input.error, 240)
-  if (!input.ownerAuthorized || !error || NON_COMPETENCY_FAILURES.has(error)) return null
-  if (/unauthor|forbidden|approval|required|budget|capacity|busy|rate.?limit|timeout/i.test(error)) return null
+  if (!input.ownerAuthorized || !COMPETENCY_FAILURES.has(error)) return null
   const subject = subjectFor(input.objective)
-  const objective = bounded(input.objective, 360)
-  if (!objective) return null
   return {
     taskId: `builder:${input.jobId}`,
     subject,
-    capability: 'builder_autonomous_completion',
-    question: `What reusable knowledge, procedure, or model capability would let Builder complete this class of objective without repeating the verified failure: ${objective}?`,
+    capability: `builder_autonomous_completion:${error}`,
+    question: QUESTION_BY_SUBJECT[subject] || QUESTION_BY_SUBJECT['general reasoning'],
     escalationReason: `verified_builder_failure:${error}`,
   }
 }
 
 /**
- * Convert a verified terminal Builder capability failure into durable University input.
- * This grants no authority, starts no training by itself, and stores no raw trace/stdout/secrets.
- * The existing governed learning cycle decides acquisition, study, evaluation, and graduation.
+ * Convert only an explicitly classified Builder capability failure into durable University input.
+ * The learning question is class-level and contains no raw objective/log text. This grants no
+ * authority and does not bypass the University's acquisition, independent evaluation or graduation.
  */
 export async function recordBuilderCompetencyGap(input: {
   jobId: string

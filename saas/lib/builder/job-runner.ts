@@ -547,11 +547,21 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         jobId: job.id,
         message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
       }))
+      const terminalError = result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error
+      await recordBuilderCompetencyGap({
+        jobId: job.id,
+        objective: job.objective,
+        error: terminalError,
+        ownerAuthorized: job.ownerAuthorized === true,
+      }).catch(gapError => console.error('[builder_competency_gap_record_failed]', {
+        jobId: job.id,
+        message: gapError instanceof Error ? gapError.message : 'unknown',
+      }))
       await recordBuilderEpisode({
         job,
         outcome: 'failed',
         summary: reply,
-        evidence: { error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, files, verification: 'generation_fenced_terminal_builder_failure' },
+        evidence: { error: terminalError, files, verification: 'generation_fenced_terminal_builder_failure' },
       }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
       return
     }

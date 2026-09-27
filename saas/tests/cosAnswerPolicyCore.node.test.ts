@@ -16,12 +16,14 @@ test('both reasoner prompts include the shared policy', () => {
   }
 })
 
-test('the policy is spliced into the public ANSWER prompt, not only the repair prompt', () => {
-  const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
-  const spliceAt = source.indexOf('...QUANTITATIVE_ANSWER_POLICY,')
-  const repairAt = source.indexOf('You are COS repairing a public generic-business answer')
-  assert.ok(spliceAt > 0 && repairAt > 0)
-  assert.ok(spliceAt < repairAt, 'policy must appear in the primary public prompt')
+test('public answers are reasoned by the one COS answer prompt that carries the policy', () => {
+  // One COS pipeline (2026-09-26): public questions run the same answer prompt as the owner's.
+  const owner = readFileSync(OWNER_PIPELINE, 'utf8')
+  const core = readFileSync(PUBLIC_PIPELINE, 'utf8')
+  const promptAt = owner.indexOf('export function COS_REASONER_SYSTEM_PROMPT(')
+  const spliceAt = owner.indexOf('...QUANTITATIVE_ANSWER_POLICY,', promptAt)
+  assert.ok(promptAt > 0 && spliceAt > promptAt, 'policy must be inside the one answer prompt')
+  assert.match(core, /const brain = await tryEnterpriseCOSFirstAnswer\(input\)\n\s*return learnFromTurn\(input, await releaseToPublic\(input, brain\)\)/)
 })
 
 test('the rules that were validated in production are present', () => {

@@ -94,7 +94,7 @@ test('every audience gets the approved company identity in the prompt for compan
   // Concierge, whose separate pipeline carried this block, answered correctly. One pipeline, one block.
   const blockAt = enterprise.indexOf('function companyKnowledgeBlock(prompt:string):string {')
   const block = enterprise.slice(blockAt, enterprise.indexOf('export async function tryCOSFirstAnswer(', blockAt))
-  assert.match(block, /if \(!isSignalBoostSpecificPublicRequest\(prompt\)\) return ''/)
+  assert.match(block, /if \(!isSignalBoostSpecificPublicRequest\(prompt\)\) return `\$\{COMPANY_BACKGROUND_RULE\}\\n\\n`/)
   assert.match(block, /COMPANY IDENTITY \(owner-approved; authoritative for this question/)
   assert.match(block, /\$\{SIGNALBOOST_COMPANY_IDENTITY_DEFINITION\}/)
   assert.match(block, /PUBLIC PRODUCT CATALOG/)
@@ -215,4 +215,29 @@ test('no fast-authoring detour runs in front of COS', () => {
   const handlerAt = primary.indexOf('const startedAt=Date.now(),body=await req.clone().json()')
   assert.ok(handlerAt > 0 && cosAt > handlerAt)
   assert.doesNotMatch(primary.slice(handlerAt, cosAt), /await runFastAuthoring\(/)
+})
+
+test('every COS prompt carries the company background, so the name alone is never guessed (2026-09-27)', () => {
+  // Production 2026-09-27 19:25 and 19:30 ET, public Concierge: "Compare the trade-offs of scaling our RunPod GPUs
+  // versus adding DeepInfra capacity" was answered by BOTH the main COS call (cos-local-primary) and the completion
+  // rescue (cos-completion-first-rescue) as "We specialize in physical mounting solutions" — the question did not
+  // name iTMounts, so neither prompt carried what the company does.
+  assert.match(enterprise, /export const COMPANY_BACKGROUND_RULE = `COMPANY BACKGROUND/)
+  const rule = enterprise.slice(enterprise.indexOf('export const COMPANY_BACKGROUND_RULE'), enterprise.indexOf('\n', enterprise.indexOf('export const COMPANY_BACKGROUND_RULE')))
+  assert.match(rule, /\$\{SIGNALBOOST_COMPANY_IDENTITY_DEFINITION\}/)
+  assert.match(rule, /never a hardware, mounting, bracket, or equipment company/)
+  assert.match(rule, /never decline a question because it falls outside iTMounts' own products/)
+
+  // Main COS call: the user prompt starts with companyKnowledgeBlock, which now always returns at least the background.
+  assert.match(enterprise, /prompt:`\$\{companyKnowledgeBlock\(input\.prompt\)\}/)
+  // Rescue lane: the system preamble carries it too.
+  const preambleAt = enterprise.indexOf('export function cosIdentityPreamble(audience:CosAudience):string {')
+  const preamble = enterprise.slice(preambleAt, enterprise.indexOf('\n}\n', preambleAt))
+  assert.match(preamble, /COMPANY_BACKGROUND_RULE,/)
+
+  // Cache version includes the background, so pre-fix answers are never replayed from the semantic cache.
+  assert.match(enterprise, /reasonerSystemPrompt:`\$\{COS_REASONER_SYSTEM_PROMPT\('English'\)\}\\n\$\{COMPANY_BACKGROUND_RULE\}`/)
+
+  // Public audience: a visitor's "our" is the visitor's organization, not iTMounts.
+  assert.match(enterprise, /In a visitor message, "we", "our", and "us" mean the visitor\\'s own organization, not iTMounts/)
 })

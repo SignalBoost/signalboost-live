@@ -1,4 +1,5 @@
-import { callLocalModel, type LocalInferenceConfig, type LocalModelCallArgs } from '@/lib/ai/local-inference'
+import type { LocalInferenceConfig, LocalModelCallArgs } from '@/lib/ai/local-inference'
+import { executeIndependentOpenEvaluator } from '@/lib/ai/cos/cosReasoningWorkers'
 
 export type OpenEvaluatorIdentity = Readonly<{ model: string; baseUrl: string; label: string }>
 
@@ -42,7 +43,7 @@ export function resolveIndependentOpenEvaluator(): { identity: OpenEvaluatorIden
 export async function callIndependentOpenEvaluator(args: LocalModelCallArgs): Promise<{ text: string; evaluator: OpenEvaluatorIdentity } | null> {
   const resolved = resolveIndependentOpenEvaluator()
   if (!resolved) return null
-  const text = await callLocalModel({
+  const text = await executeIndependentOpenEvaluator({
     ...args,
     allowConfiguredFallback: false,
     usageContext: {

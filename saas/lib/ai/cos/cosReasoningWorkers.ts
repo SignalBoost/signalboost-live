@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosReasoningWorkers.ts
 import { randomUUID } from 'node:crypto'
 import { callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { callLocalModel, type LocalInferenceConfig, type LocalModelCallArgs } from '@/lib/ai/local-inference'
@@ -20,6 +21,7 @@ import { learnedRoutingOverride } from '@/lib/ai/cos/reasoningOutcomeLearning'
 import { recordReasoningWorkerMetric } from '@/lib/ai/cos/reasoningWorkerMetrics'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { COS_GENERAL_REASONING_DISCIPLINE } from '@/lib/ai/cos/cosGeneralReasoningDiscipline'
+import { fitGraduateCall } from '@/lib/ai/cos/graduateContextFit'
 import {
   activeGraduateRuntimesForRole,
   type ActiveGraduateRuntime,
@@ -247,11 +249,23 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
     priority: 200,
     async execute(request) {
       const effective = toLocalModelCallArgs(request, role)
+      // The graduate serves an 8k window; COS worker requests are sized for the managed reasoner. Fit them first
+      // or every call fails locally with context_window_budget_insufficient before reaching the endpoint.
+      const fitted = fitGraduateCall({
+        model: runtime.runtimeModelId,
+        provider: runtime.inference.provider,
+        contextWindowTokens: runtime.inference.contextWindowTokens,
+        systemPrompt: effective.systemPrompt,
+        prompt: effective.prompt,
+        maxTokens: effective.maxTokens,
+      })
       const turnId = randomUUID()
       const startedAt = Date.now()
       const graduateTimeoutMs = interactiveGraduateAttemptTimeout(request, effective.timeoutMs)
       const text = await callLocalModel({
         ...effective,
+        ...(fitted.systemPrompt === undefined ? {} : { systemPrompt: fitted.systemPrompt }),
+        maxTokens: fitted.maxTokens,
         ...(graduateTimeoutMs === undefined ? {} : { timeoutMs: graduateTimeoutMs }),
         usageContext: {
           feature: 'cos_university_graduate_worker',
@@ -271,7 +285,7 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
         reasonerLabel: runtime.reasoner.label,
         latencyMs: Date.now() - startedAt,
         prompt: request.prompt,
-        systemPrompt: effective.systemPrompt,
+        systemPrompt: fitted.systemPrompt ?? effective.systemPrompt,
         response: text,
       })
       return {
@@ -281,7 +295,8 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
           reasonerKind: runtime.reasoner.kind,
           reasonerLabel: runtime.reasoner.label,
           workerRole: role,
-          effectiveMaxTokens: effective.maxTokens ?? null,
+          effectiveMaxTokens: fitted.maxTokens,
+          graduateSystemCompactedCharacters: fitted.systemCompactedCharacters,
           universityGraduate: true,
           graduateRegistryId: runtime.registryId,
           graduateCandidateId: runtime.candidateId,

@@ -147,7 +147,9 @@ owner / COS engineering objective
 -> durable episode + reusable verified lesson
 ```
 
-The control plane owns orchestration; **no model provider is the platform**. Active promoted iTMounts graduates, RunPod, configured local/open models, and separately authorized external providers may supply reasoning/coding turns through the existing governed provider/runtime seams. Provider choice may optimize capability, latency, cost, or task fit, but it never widens tool, repository, deployment, spend, tenant, or Production authority. A provider failure may route to another already-authorized provider; it may not bypass the Harness or verification gates.
+The control plane owns orchestration; **no model provider is the platform**. The intended autonomous Builder/COS runtime is iTMounts-owned/trained graduates plus approved open-model compute such as Qwen/DeepSeek-class models on governed infrastructure. Proprietary frontier models (including OpenAI/Anthropic/Claude-class services) are **not a dependency, default, fallback, or required teacher for autonomous operation**. Builder must never silently purchase frontier inference because the open-model stack is uncertain or fails. If the governed open-model stack cannot complete an objective, the system routes the observed competency gap into University/remediation when appropriate or escalates to the owner with evidence.
+
+Provider/runtime choice inside the approved open-model estate may optimize capability, latency, cost, or task fit, but it never widens tool, repository, deployment, spend, tenant, or Production authority. A runtime failure may route to another already-authorized open/local runtime; it may not bypass the Harness or verification gates. Any future owner-approved use of a proprietary provider is an explicit optional capability, not an architectural dependency, and its removal must not erase COS/Builder knowledge.
 
 ### Goal and completion contract
 
@@ -182,7 +184,27 @@ Terminal Builder outcomes should write a durable bounded episode after the gener
 
 Builder should receive the minimum relevant context and capabilities for the current goal rather than indiscriminately loading every MCP/tool/provider into prompt context. Tool discovery is capability discovery, not authorization. MCP, browser, repository, database, deployment, and provider operations remain behind their existing governed ports and Platform Harness authority.
 
-Parallel/subagent execution, isolated worktrees, additional provider routing, Chrome DevTools, Playwright, repository intelligence/code graphs, and specialist collaboration may improve engineering throughput, but each child execution must remain attributable to the parent HarnessRun and may only reduce inherited authority/budget/deadline/capability scope.
+Parallel/subagent execution, isolated worktrees, open-model/runtime routing, Chrome DevTools, Playwright, repository intelligence/code graphs, and specialist collaboration may improve engineering throughput, but each child execution must remain attributable to the parent HarnessRun and may only reduce inherited authority/budget/deadline/capability scope.
+
+### Durable agent identity and model portability
+
+**COS/Builder owns the knowledge; the inference model is replaceable compute.** Agent identity must never be synonymous with Qwen, DeepSeek, a RunPod endpoint, a particular checkpoint, or any future model/provider.
+
+Durable agent capability is externalized wherever practical into conversation continuity, episodic memory, semantic/knowledge-graph memory, verified repair lessons, skills/procedures, repository/project intelligence, University curriculum, verified outcomes, tool/MCP knowledge, deployment evidence, and failure/remediation history. Replacing the inference model must preserve those stores and their provenance, isolation, authority boundaries, and retrieval semantics.
+
+Some learned capability may also live in trained model weights. University must therefore retain a portable, rights-cleared representation of important curriculum, competency definitions, training recipes, evaluations, and verified outcome evidence so a successor open model can be distilled/trained and independently requalified. A model migration is not allowed to declare inherited competency merely because the old model possessed it; the successor must pass the applicable unchanged evaluation/Residency/Production gates.
+
+Canonical replacement principle:
+
+```text
+durable COS/Builder identity
++ memory / knowledge / skills / curriculum / verified experience
++ governed tools / Harness / Referee / Evaluator
++ replaceable approved open-model reasoning engine
+= continuing agent
+```
+
+Changing Qwen/DeepSeek versions, model families, serving infrastructure, or trained artifacts must not reset the agent's accumulated organizational knowledge. Conversely, memory/knowledge portability must never be used to copy secrets, hidden evaluator material, private chain-of-thought, or another tenant/user's context.
 
 The durable evidence record should make the engineering trajectory reconstructable without private reasoning: goal contract, relevant context references, selected runtime/provider identity where observable, tool actions/outcomes, changed artifacts, tests/builds, PR/merge/deployment identity, task-specific Production acceptance, rollback/recovery evidence, terminal outcome, and episodic/lesson admission status.
 
@@ -198,10 +220,10 @@ Builder is not “full-monty” complete merely because it can edit files or mer
 6. infrastructure verifier failure remaining pending/retry rather than causing false success or destructive rollback;
 7. cross-chat episodic recall recovering a relevant prior episode while current-state evidence still wins;
 8. strict user/tenant isolation and no memory-derived authority;
-9. provider/runtime fallback only inside the existing Harness spend/authority envelope;
+9. open/local provider/runtime fallback only inside the existing Harness spend/authority envelope, with no automatic proprietary-frontier purchase;
 10. durable evidence sufficient to distinguish code-written, tested, merged, deployed, accepted, rolled-back, and truly satisfied states.
 
-The strategic target is a **model-agnostic engineering operating system**: Builder orchestrates the best already-authorized reasoning/runtime resources available, while iTMounts owns identity, context, memory, tools, execution, verification, deployment continuation, recovery, learning, observability, and authority.
+The strategic target is a **model-portable, open-model engineering operating system**: Builder orchestrates approved iTMounts graduates and open/local reasoning runtimes, while iTMounts owns identity, context, memory, knowledge, skills, curriculum, tools, execution, verification, deployment continuation, recovery, learning, observability, and authority. Better future open models may replace today's reasoning engine without replacing the agent.
 
 
 ## COS University Residency invariant — 2026-09-22

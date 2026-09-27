@@ -146,6 +146,23 @@ function successfulResult(runId:string):HarnessRunResult{
 const sink:HarnessEvidenceSink={async append(){}}
 
 
+test('Residency scheduling serves a newly admitted zero-case resident before retry history',()=>{
+  const enrollments=[
+    {id:'resident-old-a'},
+    {id:'resident-new'},
+    {id:'resident-old-b'},
+  ]
+  const selected=selectBuilderResidencyEnrollmentForTick({
+    enrollments,
+    recentCases:[
+      {residency_id:'resident-old-a',harness_outcome:'success',completed_at:'2026-09-27T15:08:00Z'},
+      {residency_id:'resident-old-b',harness_outcome:'infrastructure_failure',completed_at:'2026-09-27T15:07:00Z'},
+    ],
+    now:new Date('2026-09-27T15:12:33Z'),
+  })
+  assert.equal(selected?.id,'resident-new')
+})
+
 test('Residency scheduling retries one recent infrastructure failure then rotates for fairness',()=>{
   const enrollments=[
     {id:'resident-a'},

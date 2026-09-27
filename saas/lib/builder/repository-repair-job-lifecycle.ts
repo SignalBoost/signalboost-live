@@ -3,6 +3,10 @@ import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
 import type { MergeWatchOutcome } from './repository-merge-watch.ts'
 import { createSupabaseMergeWatchStore } from './merge-watch-store.ts'
+import { enqueueSignalBoostRepositoryRepairJob } from './repository-repair-job.ts'
+import { signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
+
+const MAX_PRODUCTION_REPAIR_ATTEMPTS = 3
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SAFE_SHA = /^[0-9a-f]{40}$/i
@@ -46,7 +50,7 @@ async function persistResultArtifact(job: { userId: string; workspaceId: string 
 
 async function pausedRepairJob(db: SupabaseClient, pullRequestNumber: number) {
   const { data: row, error } = await db.from('builder_jobs')
-    .select('id,user_id,workspace_id,conversation_id,history_message_id,claim_generation,metadata,result')
+    .select('id,user_id,workspace_id,conversation_id,history_message_id,claim_generation,metadata,result,objective,owner_authorized')
     .eq('status', 'paused')
     .contains('metadata', { platformRepair: true })
     .contains('result', { pull_request_number: pullRequestNumber, repository_merge_pending: true })
@@ -296,6 +300,69 @@ export async function failBuilderRepositoryRepairAfterSupersededBase(input: {
 }
 
 
+function boundedProductionFailureDetail(value: string): string {
+  return String(value || '')
+    .replace(/https?:\/\/\S+/gi, '[url]')
+    .replace(/(?:bearer|token|secret|password|api[_-]?key)\s*[:=]\s*\S+/gi, '[credential-redacted]')
+    .replace(/[A-Za-z0-9_\-]{40,}/g, '[opaque-redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 700)
+}
+
+async function enqueueProductionRepairAgain(input: {
+  db: SupabaseClient
+  row: any
+  pullRequestNumber: number
+  mergeCommitSha: string
+  detail: string
+}): Promise<string | null> {
+  if (input.row.owner_authorized !== true) return null
+  const metadata = record(input.row.metadata)
+  const previousAttempt = Number(metadata.productionRepairAttempt || 0)
+  const nextAttempt = Number.isInteger(previousAttempt) && previousAttempt >= 0 ? previousAttempt + 1 : 1
+  if (nextAttempt > MAX_PRODUCTION_REPAIR_ATTEMPTS) return null
+
+  const safeDetail = boundedProductionFailureDetail(input.detail)
+  const originalObjective = String(input.row.objective || '').trim().slice(0, 4_000)
+  const objective = [
+    originalObjective,
+    '',
+    `Automatic Production recovery attempt ${nextAttempt}/${MAX_PRODUCTION_REPAIR_ATTEMPTS}.`,
+    `The previous governed repair merged as PR #${input.pullRequestNumber} at ${input.mergeCommitSha}, failed Production acceptance, and was rolled back.`,
+    safeDetail ? `Sanitized Production evidence: ${safeDetail}` : 'Production acceptance failed after merge and rollback.',
+    'Inspect current main, reproduce the Production failure before editing, repair the root cause, rerun the narrow proof and repository gates, then require a new governed PR, merge, deployment watch, and task-specific Production acceptance. Do not weaken acceptance or verification.',
+  ].join('\n')
+
+  const target = signalBoostDeployedRepairTarget(objective, {
+    commitSha: input.mergeCommitSha,
+    branch: 'main',
+  }, { ownerDeveloperLogSubmission: true })
+  if (!target) return null
+
+  const child = await enqueueSignalBoostRepositoryRepairJob({
+    userId: String(input.row.user_id),
+    conversationId: String(input.row.conversation_id),
+    objective,
+    target,
+  })
+  const { data: childRow, error: childReadError } = await input.db.from('builder_jobs')
+    .select('metadata').eq('id', child.jobId).eq('user_id', input.row.user_id).maybeSingle()
+  if (childReadError || !childRow) throw new Error('builder_production_repair_again_child_read_failed')
+  const childMetadata = record(childRow.metadata)
+  const { error: tagError } = await input.db.from('builder_jobs').update({
+    metadata: {
+      ...childMetadata,
+      selfHealingProductionRecovery: true,
+      productionRepairAttempt: nextAttempt,
+      productionRepairParentJobId: String(input.row.id),
+      productionRepairParentPr: input.pullRequestNumber,
+    },
+  }).eq('id', child.jobId).eq('user_id', input.row.user_id)
+  if (tagError) throw new Error('builder_production_repair_again_child_tag_failed')
+  return child.jobId
+}
+
 export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
   pullRequestNumber: number
   mergeCommitSha: string
@@ -308,7 +375,25 @@ export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
   const row = await pausedRepairJob(db, input.pullRequestNumber)
   if (!row) return false
 
-  const plainReply = `Builder merged PR #${input.pullRequestNumber} as ${input.mergeCommitSha}, but Production was not accepted. ${String(input.detail || '').trim()}`
+  let recoveryJobId: string | null = null
+  if (input.error === 'builder_repository_production_rolled_back') {
+    recoveryJobId = await enqueueProductionRepairAgain({
+      db,
+      row,
+      pullRequestNumber: input.pullRequestNumber,
+      mergeCommitSha: input.mergeCommitSha,
+      detail: input.detail,
+    }).catch(error => {
+      console.error('[builder_production_repair_again_enqueue_failed]', {
+        jobId: row.id,
+        message: error instanceof Error ? error.message : 'unknown',
+      })
+      return null
+    })
+  }
+  const plainReply = recoveryJobId
+    ? `Builder merged PR #${input.pullRequestNumber} as ${input.mergeCommitSha}, but Production was not accepted and was rolled back. Automatic bounded recovery is queued as Builder job ${recoveryJobId}. The original authority was preserved; no new authority was granted.`
+    : `Builder merged PR #${input.pullRequestNumber} as ${input.mergeCommitSha}, but Production was not accepted. ${boundedProductionFailureDetail(input.detail)}`
   let artifactFiles = files(record(row.result).files)
   try {
     artifactFiles = await persistResultArtifact({ userId: String(row.user_id), workspaceId: String(row.workspace_id) }, plainReply)
@@ -323,6 +408,7 @@ export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
     merge_taken: true,
     merge_commit_sha: input.mergeCommitSha,
     error: input.error,
+    production_recovery_job_id: recoveryJobId,
     reply,
     files: artifactFiles,
   }

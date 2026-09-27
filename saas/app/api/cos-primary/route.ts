@@ -329,11 +329,13 @@ async function runFreshGroundedTaskCompletion(input:string,language:string,sourc
 // Do not stack the 40s grounded JSON lane, shared synthesis, and two 60s rescue calls. Once live
 // sources are available, give one bounded direct planner profile two short attempts inside a single
 // 16-second model budget. This profile bypasses RunPod wake/readiness through local-inference.ts.
+// Travel answers are capped at a concise itinerary (900 / 600 tokens) so one attempt finishes inside its limit on
+// the configured model (~60-75 tokens/s measured 2026-09-27); 1,400 could not fit in 16s.
 export const TRAVEL_PLAN_RESCUE_TIMEOUT_MS = 16_000
 export const TRAVEL_PLAN_RETRY_TIMEOUT_MS = 10_000
 export const TRAVEL_PLAN_TOTAL_MODEL_BUDGET_MS = 28_000
-export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 1_400
-export const TRAVEL_PLAN_RETRY_MAX_TOKENS = 900
+export const TRAVEL_PLAN_RESCUE_MAX_TOKENS = 900
+export const TRAVEL_PLAN_RETRY_MAX_TOKENS = 600
 async function runTravelPlanAssumptionRescue(input:string,language:string,sources:any[],declines:string[]=[],privileged=false):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   const creative=await retrieveCreativeMemory(input,{privileged,limit:2}).catch(()=>({retrieved:0,relevant:0,selected:[],mode:'unavailable' as const}))
   const creativeGuidance=creative.selected.length
@@ -382,7 +384,8 @@ async function runTravelPlanAssumptionRescue(input:string,language:string,source
         allowTruncatedText:true,
         timeoutMs:Math.min(attempt.timeoutMs,remaining),
         allowConfiguredFallback:false,
-        persistUsage:false,
+        // Recorded (2026-09-27): each travel attempt now appears in provider_inference_usage with its latency.
+        persistUsage:true,
         usageContext:{feature:'cos_interactive_travel_plan',purpose:attempt.purpose},
         systemPrompt:attempt.systemPrompt,
         prompt:attempt.prompt,

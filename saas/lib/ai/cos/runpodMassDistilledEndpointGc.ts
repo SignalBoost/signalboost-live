@@ -38,7 +38,7 @@ export async function garbageCollectTerminalMassDistilledEndpoints(input: { dryR
         ? `${candidateId}\u0000${artifactHash}` : ''
     }).filter(Boolean))
   const candidateIds = [...new Set(terminalArtifacts.map(row => clean(row.candidate_id, 300)).filter(Boolean))]
-  if (!candidateIds.length) return Object.freeze({ terminalArtifacts: 0, ownedEndpoints: 0, eligible: 0, deleted: 0, dryRun: input.dryRun === true })
+  if (!candidateIds.length) return Object.freeze({ terminalArtifacts: 0, ownedEndpoints: 0, eligible: 0, selected: 0, deleted: 0, alreadyGone: 0, failed: 0, failures: Object.freeze([] as string[]), dryRun: input.dryRun === true })
 
   const ownership = new Map<string, { candidateId: string; artifactHash: string; endpointName: string }>()
   const retiredEndpointIds = new Set<string>()
@@ -82,7 +82,7 @@ export async function garbageCollectTerminalMassDistilledEndpoints(input: { dryR
   const selected = eligible.slice(0, maxDeletes)
 
   if (input.dryRun === true) {
-    return Object.freeze({ terminalArtifacts: terminalKeys.size, ownedEndpoints: ownership.size, eligible: eligible.length, selected: selected.length, deleted: 0, dryRun: true })
+    return Object.freeze({ terminalArtifacts: terminalKeys.size, ownedEndpoints: ownership.size, eligible: eligible.length, selected: selected.length, deleted: 0, alreadyGone: 0, failed: 0, failures: Object.freeze([] as string[]), dryRun: true })
   }
 
   let deleted = 0

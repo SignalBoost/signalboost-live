@@ -92,3 +92,21 @@ test('candidate stores the stable class, never the raw emitted failure detail', 
   assert.equal(gap?.escalationReason, 'verified_builder_failure:builder_model_control_failed')
   assert.doesNotMatch(JSON.stringify(gap), /malformed_json/)
 })
+
+
+test('missed competency reconciliation is bounded, owner-only, terminal-only, and reuses the classifier', () => {
+  const source = readFileSync(new URL('../lib/builder/competency-gap.ts', import.meta.url), 'utf8')
+  assert.match(source, /export async function reconcileBuilderCompetencyGaps/)
+  assert.match(source, /\.eq\('status', 'failed'\)/)
+  assert.match(source, /\.eq\('owner_authorized', true\)/)
+  assert.match(source, /Math\.min\(168/)
+  assert.match(source, /Math\.min\(100/)
+  assert.match(source, /classifyBuilderCompetencyFailure\(row\.error\)/)
+  assert.match(source, /recordBuilderCompetencyGap\(\{/)
+})
+
+test('continuation cron self-heals missed Builder competency gaps without accepting request work', () => {
+  const source = readFileSync(new URL('../app/api/cron/builder-continuations/route.ts', import.meta.url), 'utf8')
+  assert.match(source, /reconcileBuilderCompetencyGaps\(\{ lookbackHours: 72, limit: 50 \}\)/)
+  assert.match(source, /competencyGapsFiled/)
+})

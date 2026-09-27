@@ -136,3 +136,42 @@ export async function recordBuilderCompetencyGap(input: {
   if (insert.error) throw insert.error
   return { filed: true }
 }
+
+
+/**
+ * Recover durable University gaps missed before the classifier existed or after a transient
+ * learning-store failure. Reads only terminal owner-authorized failures, reuses the same classifier,
+ * and remains idempotent because recordBuilderCompetencyGap coalesces by stable capability/question.
+ */
+export async function reconcileBuilderCompetencyGaps(input: {
+  now?: Date
+  lookbackHours?: number
+  limit?: number
+} = {}): Promise<Readonly<{ scanned: number; filed: number }>> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('persistent_learning_store_unavailable')
+  const now = input.now || new Date()
+  const lookbackHours = Number.isFinite(input.lookbackHours) ? Math.min(168, Math.max(1, Number(input.lookbackHours))) : 72
+  const limit = Number.isSafeInteger(input.limit) ? Math.min(100, Math.max(1, Number(input.limit))) : 50
+  const cutoff = new Date(now.getTime() - lookbackHours * 60 * 60 * 1000).toISOString()
+  const jobs = await db.from('builder_jobs')
+    .select('id,objective,error,owner_authorized')
+    .eq('status', 'failed')
+    .eq('owner_authorized', true)
+    .gte('updated_at', cutoff)
+    .order('updated_at', { ascending: false })
+    .limit(limit)
+  if (jobs.error) throw jobs.error
+  let filed = 0
+  for (const row of (jobs.data || []) as any[]) {
+    if (!classifyBuilderCompetencyFailure(row.error)) continue
+    const result = await recordBuilderCompetencyGap({
+      jobId: bounded(row.id, 120),
+      objective: bounded(row.objective, 2_000),
+      error: bounded(row.error, 240),
+      ownerAuthorized: row.owner_authorized === true,
+    })
+    if (result.filed) filed += 1
+  }
+  return Object.freeze({ scanned: (jobs.data || []).length, filed })
+}

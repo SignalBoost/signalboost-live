@@ -1,2 +1,2 @@
-base_sha=d0f290d52b4bad64a7c0e6e28f56db9d1597714f
-branch=test/throughput-batch-floor
+base_sha=2e473716d79c164b64dde96543e20b0aa80e32b0
+branch=fix/builder-competency-failure-classification

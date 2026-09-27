@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { builderCompetencyGapCandidate } from '../lib/builder/competency-gap.ts'
+import { builderCompetencyGapCandidate, classifyBuilderCompetencyFailure } from '../lib/builder/competency-gap.ts'
 import { readFileSync } from 'node:fs'
 
 test('verified coding failure becomes focused portable University input', () => {
@@ -49,4 +49,46 @@ test('ordinary terminal Builder result path records competency gaps', () => {
   const ordinaryFailure = runner.slice(runner.indexOf('if (result.ok === false)'), runner.indexOf('if (verifiedBuilderCognitiveApplication(result))'))
   assert.match(ordinaryFailure, /recordBuilderCompetencyGap/)
   assert.match(ordinaryFailure, /terminalError/)
+})
+
+
+test('runtime-emitted Builder failures map only to stable capability classes', () => {
+  assert.equal(classifyBuilderCompetencyFailure('builder_model_control_schema_mismatch'), 'builder_model_control_failed')
+  assert.equal(classifyBuilderCompetencyFailure('builder_verification_order_required'), 'builder_verification_failed')
+  assert.equal(classifyBuilderCompetencyFailure('builder_regression_not_reproduced'), 'builder_verification_failed')
+  assert.equal(classifyBuilderCompetencyFailure('builder_stalled_repeated_inspection'), 'builder_tool_selection_failed')
+  assert.equal(classifyBuilderCompetencyFailure('builder_repeated_tool_call:run; choose a different next step'), 'builder_tool_selection_failed')
+  assert.equal(classifyBuilderCompetencyFailure('builder_repair_progress_required'), 'builder_repair_attempts_exhausted')
+  assert.equal(classifyBuilderCompetencyFailure('builder_task_incomplete'), 'builder_repair_attempts_exhausted')
+})
+
+test('operational and authority failures never become competency training', () => {
+  for (const error of [
+    'builder_runpod_primary_busy',
+    'builder_turn_timeout',
+    'builder_time_budget_reached',
+    'builder_job_storage_unavailable',
+    'builder_run_budget_exhausted',
+    'builder_write_budget_exhausted',
+    'builder_round_budget_exhausted',
+    'builder_checkpoint_scope_mismatch',
+    'builder_documentation_scope_invalid',
+    'builder_repository_repair_owner_required',
+    'approval_required',
+    'budget_exhausted',
+    'rate_limit',
+    'some_unknown_exception',
+  ]) assert.equal(classifyBuilderCompetencyFailure(error), null, error)
+})
+
+test('candidate stores the stable class, never the raw emitted failure detail', () => {
+  const gap = builderCompetencyGapCandidate({
+    jobId: 'job-runtime',
+    objective: 'Repair and verify the TypeScript implementation',
+    error: 'builder_model_control_malformed_json',
+    ownerAuthorized: true,
+  })
+  assert.equal(gap?.capability, 'builder_autonomous_completion:builder_model_control_failed')
+  assert.equal(gap?.escalationReason, 'verified_builder_failure:builder_model_control_failed')
+  assert.doesNotMatch(JSON.stringify(gap), /malformed_json/)
 })

@@ -72,3 +72,19 @@ test('mass curriculum replenishment consumes Builder-gap remediation in both inv
 test('profile is explicit and versioned for portable lineage', () => {
   assert.equal(BUILDER_GAP_REMEDIATION_PROFILE, 'cos-university-builder-gap-remediation-v1')
 })
+
+
+test('fake Builder-looking capability classes fail closed', () => {
+  assert.equal(builderGapPracticeSeed({
+    gapId: 'gap-fake',
+    subject: 'software engineering',
+    capability: 'builder_autonomous_completion:builder_some_unknown_failure',
+    ordinal: 0,
+  }), null)
+})
+
+test('Builder curriculum source requires exact capability and escalation provenance pairing', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityBuilderGapCurriculum.ts', import.meta.url), 'utf8')
+  assert.match(source, /BUILDER_GAP_CAPABILITIES\.has\(capabilityClass\)/)
+  assert.match(source, /escalationReason !== `\$\{BUILDER_GAP_PREFIX\}\$\{capabilityClass\}`/)
+})

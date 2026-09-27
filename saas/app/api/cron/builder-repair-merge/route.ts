@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { completePendingRepositoryRepairMerges } from '@/lib/builder/repository-repair-merge-continuation'
 import { builderAutoMergeSnapshotPort } from '@/lib/builder/repository-repair-snapshot-host'
-import { acceptBuilderProductionRepair } from '@/lib/builder/repository-production-acceptance'
 import {
   completeBuilderRepositoryRepairAfterMerge,
   failBuilderRepositoryRepairAfterMergedDeployment,
@@ -42,25 +41,23 @@ export async function GET(request: Request) {
         if (failed) builderJobsFailed += 1
         continue
       }
+      // Main repairs never terminalize in this merge-continuation route. READY is deployment
+      // evidence only; completeBuilderRepositoryRepairAfterMerge records/reuses the durable watch,
+      // which owns task-specific Playwright acceptance and retry semantics.
       let productionAcceptancePassed = false
       if (outcome.baseBranch === 'main' && outcome.mergeWatchOutcome === 'healthy') {
-        const acceptance = await acceptBuilderProductionRepair({
-          preMergeSnapshotId: outcome.preMergeSnapshotId || '',
-          snapshotPort: builderAutoMergeSnapshotPort(),
+        await completeBuilderRepositoryRepairAfterMerge({
+          pullRequestNumber: outcome.pullRequestNumber,
+          mergeCommitSha: outcome.mergeCommitSha,
+          baseBranch: 'main',
+          detail: outcome.detail,
+          mergeWatchOutcome: null,
+          deploymentId: outcome.deploymentId,
+          deploymentState: outcome.deploymentState,
+          preMergeSnapshotId: outcome.preMergeSnapshotId,
+          productionAcceptancePassed: false,
         })
-        if (acceptance.outcome !== 'accepted') {
-          const failed = await failBuilderRepositoryRepairAfterMergedDeployment({
-            pullRequestNumber: outcome.pullRequestNumber,
-            mergeCommitSha: outcome.mergeCommitSha,
-            detail: acceptance.detail,
-            error: acceptance.outcome === 'rolled_back'
-              ? 'builder_repository_production_rolled_back'
-              : 'builder_repository_production_unresolved',
-          })
-          if (failed) builderJobsFailed += 1
-          continue
-        }
-        productionAcceptancePassed = true
+        continue
       }
       const completed = await completeBuilderRepositoryRepairAfterMerge({
         pullRequestNumber: outcome.pullRequestNumber,

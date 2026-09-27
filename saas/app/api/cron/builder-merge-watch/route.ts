@@ -49,6 +49,11 @@ export async function GET(request: Request) {
       onTerminal: async (pending, status, detail, observed) => {
         if (!pending.pullRequestNumber) return
         if (status === 'healthy') {
+          if (!pending.acceptanceUrl || !pending.acceptanceExpectedText) {
+            // A generic homepage smoke test cannot prove a specific repair. Keep the durable
+            // watch open until the originating job supplies a task-specific acceptance contract.
+            return 'retry'
+          }
           const snapshotPort = builderAutoMergeSnapshotPort()
           const acceptance = await acceptBuilderProductionRepair({
             preMergeSnapshotId: pending.preMergeSnapshotId,
@@ -68,8 +73,9 @@ export async function GET(request: Request) {
               preMergeSnapshotId: pending.preMergeSnapshotId,
               productionAcceptancePassed: true,
             })
-            return
+            return 'complete'
           }
+          if (acceptance.outcome === 'unresolved') return 'retry'
           await failBuilderRepositoryRepairAfterMergedDeployment({
             pullRequestNumber: pending.pullRequestNumber,
             mergeCommitSha: pending.mergeCommitSha,
@@ -78,7 +84,7 @@ export async function GET(request: Request) {
               ? 'builder_repository_production_rolled_back'
               : 'builder_repository_production_unresolved',
           })
-          return
+          return 'complete'
         }
         await failBuilderRepositoryRepairAfterMergedDeployment({
           pullRequestNumber: pending.pullRequestNumber,
@@ -88,6 +94,7 @@ export async function GET(request: Request) {
             ? 'builder_repository_production_rolled_back'
             : 'builder_repository_production_unresolved',
         })
+        return 'complete'
       },
     })
     return NextResponse.json({ ok: true, ...sweep })

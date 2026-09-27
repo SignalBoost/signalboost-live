@@ -124,6 +124,17 @@ function targetedRepositoryCommand(command: string, target: SignalBoostRepositor
   return normalized
 }
 
+function productionAcceptanceContract(target: SignalBoostRepositoryRepairTarget, result: { trace: readonly BuilderToolTrace[] }): { url: string; expectedText: string } | null {
+  // Only browser evidence observed during the verified repair may authorize a later Production
+  // assertion. Never invent acceptance text from the model answer or fall back to a homepage smoke.
+  const browser = [...result.trace].reverse().find(item => item.toolId === 'browser_cli' && item.ok && item.output && typeof item.output === 'object')
+  const output = browser?.output as Record<string, unknown> | undefined
+  const stdout = typeof output?.stdout === 'string' ? output.stdout.replace(/\s+/g, ' ').trim() : ''
+  const expectedText = stdout.slice(0, 240)
+  if (!expectedText) return null
+  return { url: 'https://itmounts.com/', expectedText }
+}
+
 function isBroadRepositoryTestCommand(command: string): boolean {
   const normalized = normalizeBuilderSandboxCommand(command)
   return /^npm\s+(?:run\s+)?test(?:\s*(?:2?>&?1)?\s*\|.*)?$/i.test(normalized)
@@ -263,6 +274,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
       })
     }
 
+    const acceptanceContract = productionAcceptanceContract(target, result)
     const changes = await session.collectChanges()
     const patchPresent = Boolean(changes.patch.trim())
     const patchPath = result.ok && patchPresent ? 'repository-repair.patch' : 'repository-repair-unverified.patch'
@@ -367,6 +379,8 @@ export async function executeSignalBoostRepositoryRepair(input: {
           mergeCommitSha: autoMerge.mergeCommitSha,
           preMergeSnapshotId: autoMerge.preMergeSnapshotId,
           pullRequestNumber: writeback.pullRequestNumber ?? null,
+          acceptanceUrl: acceptanceContract?.url ?? null,
+          acceptanceExpectedText: acceptanceContract?.expectedText ?? null,
         })
       }
     }
@@ -420,6 +434,8 @@ export async function executeSignalBoostRepositoryRepair(input: {
         ),
         production_acceptance_required: Boolean(autoMerge?.merged && target.branch === 'main'),
         production_acceptance_passed: false,
+        production_acceptance_url: acceptanceContract?.url ?? null,
+        production_acceptance_expected_text: acceptanceContract?.expectedText ?? null,
         merge_watch_deployment_id: mergeWatch?.deploymentId ?? null,
         merge_watch_deployment_state: mergeWatch?.deploymentState ?? null,
         deployment_allowed: false,

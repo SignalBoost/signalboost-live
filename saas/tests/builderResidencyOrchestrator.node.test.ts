@@ -163,6 +163,22 @@ test('Residency scheduling serves a newly admitted zero-case resident before ret
   assert.equal(selected?.id,'resident-new')
 })
 
+test('Residency scheduling never warm-retries past multiple zero-case active residents',()=>{
+  const enrollments=[
+    {id:'resident-old'},
+    {id:'resident-new-a'},
+    {id:'resident-new-b'},
+  ]
+  const selected=selectBuilderResidencyEnrollmentForTick({
+    enrollments,
+    recentCases:[
+      {residency_id:'resident-old',harness_outcome:'infrastructure_failure',completed_at:'2026-09-27T16:42:34Z'},
+    ],
+    now:new Date('2026-09-27T16:45:00Z'),
+  })
+  assert.equal(selected?.id,'resident-new-a')
+})
+
 test('Residency scheduling retries one recent infrastructure failure then rotates for fairness',()=>{
   const enrollments=[
     {id:'resident-a'},

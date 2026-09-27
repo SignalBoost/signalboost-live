@@ -189,3 +189,13 @@ test('owner telemetry exposes the complete University lifecycle including Builde
   assert.match(page,/artifact\.nextAction/)
   assert.match(page,/infrastructureFailures/)
 })
+
+
+test('University telemetry pipeline counts use the complete paginated artifact lifecycle, not a 100-row sample', () => {
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
+  assert.match(route, /collectPages<any>\(\(from, to\) => db\.from\(ARTIFACTS\)/)
+  assert.match(route, /\.range\(from, to\)/)
+  assert.doesNotMatch(route, /db\.from\(ARTIFACTS\)[\s\S]{0,300}\.limit\(100\)/)
+  assert.match(route, /evaluationPending: artifacts\.filter/)
+  assert.match(route, /quarantined: artifacts\.filter/)
+})

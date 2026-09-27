@@ -1,3 +1,4 @@
+// saas/lib/builder/job-runner.ts
 import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
 import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
@@ -26,6 +27,7 @@ import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitive
 import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
 import { deepInfraMaxRunUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
+import { runWithoutTurnDeadline } from '../ai/cos/cosTurnBudget.ts'
 import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
 import { formatBuilderEpisodesForPrompt, recordBuilderEpisode, retrieveBuilderEpisodes } from './episodic-memory.ts'
 import { recordBuilderCompetencyGap } from './competency-gap.ts'
@@ -634,9 +636,13 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
 }
 
 
-/** Mandatory Platform Harness ingress for every durable Builder execution. */
+/**
+ * Mandatory Platform Harness ingress for every durable Builder execution.
+ * A durable job never inherits the interactive COS turn deadline of the request that queued it
+ * (Next.js after() snapshots that context); its only clock is this Harness deadline.
+ */
 export async function runBuilderJob(jobId: string, userId: string): Promise<void> {
-  return withHostProductionHarnessIngress({
+  return runWithoutTurnDeadline(() => withHostProductionHarnessIngress({
     objective: `Execute durable Builder job ${jobId}`,
     portableId: 'cos-builder',
     agentId: 'cos-builder-worker',
@@ -648,5 +654,5 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     maxToolCalls: 200,
     maxCostUsd: deepInfraMaxRunUsd('builder'),
     runId: `builder-job-${jobId}`,
-  }, () => runBuilderJobInsideHarness(jobId, userId))
+  }, () => runBuilderJobInsideHarness(jobId, userId)))
 }

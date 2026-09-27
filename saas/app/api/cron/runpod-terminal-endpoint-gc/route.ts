@@ -16,7 +16,11 @@ export async function GET(req: NextRequest) {
   }
   try {
     const result = await garbageCollectTerminalMassDistilledEndpoints()
-    await recordCosLaneStatus({ db: cosServiceDb(), lane: LANE, outcome: result.deleted > 0 ? 'worked' : 'skipped', reason: result.deleted > 0 ? 'terminal_endpoints_deleted' : 'no_safe_terminal_endpoints', detail: result })
+    if (result.failed > 0) {
+      await recordCosLaneStatus({ db: cosServiceDb(), lane: LANE, outcome: 'failed', reason: 'endpoint_deletions_failed', detail: result })
+      return NextResponse.json({ ok: false, ...result, error: 'endpoint_deletions_failed' }, { status: 503, headers: { 'Cache-Control': 'no-store, max-age=0' } })
+    }
+    await recordCosLaneStatus({ db: cosServiceDb(), lane: LANE, outcome: result.deleted > 0 || result.alreadyGone > 0 ? 'worked' : 'skipped', reason: result.deleted > 0 ? 'terminal_endpoints_deleted' : result.alreadyGone > 0 ? 'terminal_endpoints_reconciled' : 'no_safe_terminal_endpoints', detail: result })
     return NextResponse.json({ ok: true, ...result }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

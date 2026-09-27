@@ -213,3 +213,16 @@ test('University telemetry chunks complete-lifecycle assurance filters within Po
   assert.doesNotMatch(route, /\.in\('candidate_id', artifactCandidates\)/)
   assert.match(route, /collectPages<any>[\s\S]*cos_university_learning_assurance_events[\s\S]*\.range\(from, to\)/)
 })
+
+
+test('University telemetry scopes evaluator failure to the current reopen generation', () => {
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
+  assert.match(route, /mass_distilled_independent_evaluation_reopened/)
+  assert.match(route, /generationStartedAt/)
+  assert.match(route, /inCurrentEvaluationGeneration/)
+  assert.match(route, /inCurrentEvaluationGeneration\(row\)[\s\S]*mass_distilled_independent_evaluation_started/)
+  assert.match(route, /inCurrentEvaluationGeneration\(row\)[\s\S]*mass_distilled_independent_evaluation_completed/)
+  assert.match(route, /historicalEvaluationFailure/)
+  assert.match(route, /evaluationGeneration: reopen \? 'reopened' : 'original'/)
+  assert.match(route, /artifact\.status === 'quarantined'[\s\S]*currentStage = 'Evaluation remediation'/)
+})

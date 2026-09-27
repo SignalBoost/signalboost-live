@@ -562,10 +562,20 @@ export async function GET() {
         && row.evidence?.productionTrafficAuthorized === false
         && row.evidence?.authorityExpanded === false
         && text(row.evidence?.endpointId, 120))
-      const started = events.find((row: any) => row.evidence?.profile === 'cos_mass_distilled_independent_evaluation_runtime_v1'
+      // Evaluation events are immutable audit history. Current-state telemetry must only fold events
+      // from the latest explicit reopen generation; otherwise an older failure is displayed as a
+      // current blocker after the artifact has already been reopened for a new evaluation.
+      const reopen = events.find((row: any) => row.verifier === 'host_controller'
+        && row.evidence?.claim === 'mass_distilled_independent_evaluation_reopened'
+        && row.evidence?.artifactHash === artifactHash)
+      const generationStartedAt = reopen ? Date.parse(String(reopen.observed_at || '')) : Number.NEGATIVE_INFINITY
+      const inCurrentEvaluationGeneration = (row: any) => Date.parse(String(row.observed_at || '')) >= generationStartedAt
+      const started = events.find((row: any) => inCurrentEvaluationGeneration(row)
+        && row.evidence?.profile === 'cos_mass_distilled_independent_evaluation_runtime_v1'
         && row.evidence?.claim === 'mass_distilled_independent_evaluation_started'
         && row.evidence?.artifactHash === artifactHash)
-      const terminal = events.find((row: any) => row.evidence?.profile === 'cos_mass_distilled_independent_evaluation_runtime_v1'
+      const terminal = events.find((row: any) => inCurrentEvaluationGeneration(row)
+        && row.evidence?.profile === 'cos_mass_distilled_independent_evaluation_runtime_v1'
         && ['mass_distilled_independent_evaluation_completed', 'mass_distilled_independent_evaluation_failed'].includes(row.evidence?.claim)
         && row.evidence?.artifactHash === artifactHash
         && (!started || Date.parse(String(row.observed_at || '')) >= Date.parse(String(started.observed_at || ''))))
@@ -610,6 +620,10 @@ export async function GET() {
         ageSeconds,
         retentionEligibleAt: createdAt ? new Date(Date.parse(createdAt) + 12 * 60 * 60 * 1000).toISOString() : null,
         claimability,
+        evaluationGeneration: reopen ? 'reopened' : 'original',
+        historicalEvaluationFailure: events.some((row: any) => row.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+          && row.evidence?.artifactHash === artifactHash
+          && !inCurrentEvaluationGeneration(row)),
         currentStage,
         blocker,
         nextAction,

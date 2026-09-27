@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 const route = readFileSync('app/api/cron/cos-university-graduate-activation/route.ts', 'utf8')
 const vercel = readFileSync('vercel.json', 'utf8')

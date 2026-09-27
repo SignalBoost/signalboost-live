@@ -1,2 +1,2 @@
-base_sha=d4e2a5f5846e8cd58ec5b76280fbb01cc06105b4
-branch=fix/residency-admission-starvation
+base_sha=f67e2b0992665988166df8eed601c31be445087d
+branch=fix/residency-throughput-fairness

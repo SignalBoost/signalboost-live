@@ -21,17 +21,36 @@ export function graduateRunpodEndpointId(scope: unknown): string | null {
   }
 }
 
+// Must equal MASS_DISTILLED_EXACT_ENDPOINT_GENERATION in runpodMassDistilledProvisionV2.ts. Kept as a
+// literal to avoid an import cycle (V2 imports this module); the gated Residency test locks them together.
 export const RESIDENCY_RUNPOD_ENDPOINT_GENERATION = 'v4' as const
 
-export function builderResidencyRuntimeKey(candidateId: unknown, artifactHash: unknown, env: NodeJS.ProcessEnv = process.env): string | null {
+/**
+ * The one Residency runtime key. The immutable exact-artifact image digest is part of the key, so a new
+ * published image always yields a new Residency endpoint name. RunPod rejects container mutation of an
+ * existing endpoint, and the provisioner correctly fails closed on image drift; without the digest here,
+ * an endpoint created under an older image would reject that resident forever.
+ */
+export function builderResidencyRuntimeKey(
+  candidateId: unknown,
+  artifactHash: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
   const candidate = String(candidateId || '').trim()
   const artifact = String(artifactHash || '').trim().toLowerCase()
   if (!candidate.startsWith('mass:') || !/^[a-f0-9]{64}$/.test(artifact)) return null
   const image = exactArtifactContainerImageFromEnv('standard', env)
-  return createHash('sha256').update(JSON.stringify(['builder-residency-runtime-v1', candidate, artifact, image])).digest('hex').slice(0, 10)
+  return createHash('sha256')
+    .update(JSON.stringify(['builder-residency-runtime-v1', candidate, artifact, image]))
+    .digest('hex')
+    .slice(0, 10)
 }
 
-export function residencyRunpodEndpointName(candidateId: unknown, artifactHash: unknown, env: NodeJS.ProcessEnv = process.env): string | null {
+export function residencyRunpodEndpointName(
+  candidateId: unknown,
+  artifactHash: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
   const runtimeKey = builderResidencyRuntimeKey(candidateId, artifactHash, env)
   if (!runtimeKey) return null
   const artifact = String(artifactHash || '').trim().toLowerCase()

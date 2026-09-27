@@ -86,6 +86,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/cron/runpod-terminal-endpoint-gc",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/cos-university-distilled-evaluation",
       "schedule": "4,14,24,34,44,54 * * * *"
     },

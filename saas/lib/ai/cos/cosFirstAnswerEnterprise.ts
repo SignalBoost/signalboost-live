@@ -48,6 +48,7 @@ import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriev
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
 import { SEMANTIC_MEMORY_DEFINITION, CREATIVE_MEMORY_DEFINITION, ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, SIGNALBOOST_COMPANY_IDENTITY_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
+import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
 import { retrieveCreativeMemory, formatCreativeMemoryForReasoner } from '@/lib/ai/cos/creativeMemory'
 import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
@@ -914,7 +915,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:interactiveReasonerMaxTokens(),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: input.privileged === true }),
-    prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,6000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
+    // COMPANY IDENTITY BLOCK (2026-09-26). The public Concierge path already puts the owner-approved
+    // company identity directly in the prompt for company questions, and answered "What is iTMounts?"
+    // correctly. This owner path only carried it as one line among the system-prompt definitions and
+    // the model answered "iTMounts is not a recognized product". Same block, same trigger, both paths.
+    prompt:`${isSignalBoostSpecificPublicRequest(input.prompt) ? `COMPANY IDENTITY (owner-approved; authoritative for this question — this is the company you work for):\n${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}\n\n` : ''}${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,6000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
   }).catch(error => {
     // Previously swallowed entirely (`.catch(() => null)`), so a wake-and-reason turn that failed
     // for ANY reason — cold-start timeout, aborted fetch, HTTP error from the endpoint, wake permission

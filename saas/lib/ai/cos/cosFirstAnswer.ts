@@ -19,6 +19,7 @@ import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence } from './
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
 import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
 import { ownerPlatformIdentityContext } from './platformIdentityContext.ts'
+import { mentionsPlatformConcept, ownerPlatformGlossaryContext } from './cosPlatformGlossary.ts'
 import { recordCosTurnExperience } from './cognitiveTurnExperience.ts'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import {
@@ -249,6 +250,10 @@ function contextualInterpretationProvenance(reasonerLabel: string | null, invoke
 async function tryNeuralContextualInterpretation(input: COSFirstAnswerInput): Promise<COSFirstAnswerResult | null> {
   const prompt = String(input.prompt || '').trim()
   if (!prompt) return null
+  // An owner question that names a platform concept (COS, University, specialist, artifact, graduate,
+  // Residency, Concierge) asks about the platform itself, not about the meaning of the previous turn.
+  // Production 2026-09-26: "What is the University?" was interpreted as "a typo for iTMounts".
+  if (input.privileged === true && !isPublicDeliveryScope() && mentionsPlatformConcept(prompt)) return null
 
   // The route already performs this semantic check for freshness-sensitive turns, but this shared
   // entrypoint must enforce the same boundary because the mature enterprise reasoner can otherwise
@@ -341,7 +346,7 @@ async function tryNeuralContextualInterpretation(input: COSFirstAnswerInput): Pr
 
 async function tryOwnerNeuralSelfKnowledge(
   input: COSFirstAnswerInput,
-  options: { compatibilitySignal?: boolean } = {},
+  options: { compatibilitySignal?: boolean; platformConcept?: boolean } = {},
 ): Promise<COSFirstAnswerResult | null> {
   if (input.privileged !== true || isPublicDeliveryScope()) return null
   // Assistant IS COS. Do not spend a full neural call asking whether every ordinary owner turn is
@@ -350,7 +355,7 @@ async function tryOwnerNeuralSelfKnowledge(
   // or when the compatibility core emitted a concrete self-knowledge signal that needs neural repair.
   if (!options.compatibilitySignal && !isPlatformSelfKnowledgePrompt(input.prompt)) return null
 
-  const runtimeContext = ownerPlatformIdentityContext()
+  const runtimeContext = `${ownerPlatformIdentityContext()}\n\n${ownerPlatformGlossaryContext()}`
   const previousAssistant = String(input.previousAssistant ?? '').trim().slice(0, 8_000)
   const reasoned = await callCosReasoner({
     usageContext: { feature: 'cos_interactive_answer', purpose: 'owner_self_knowledge_fallback' },
@@ -363,7 +368,7 @@ async function tryOwnerNeuralSelfKnowledge(
       "You are COS's authenticated owner-channel semantic self-knowledge reasoner.",
       'Use neural semantic reasoning over the complete request and relevant conversation context. Do not use keyword rules, regex intent matching, canned replies, or answer templates.',
       'Return ONLY strict JSON: {"relevant":true|false,"answer":"...","confidence":0.0}.',
-      'Set relevant=true only when the request is actually asking about, comparing, following up on, or materially depends on SignalBoost/COS/Concierge/Builder/Platform Engineer itself: its identity, models, provider, runtime, architecture, technical specs, or the relationship between its general and specialized model roles.',
+      'Set relevant=true only when the request is actually asking about, comparing, following up on, or materially depends on SignalBoost/COS/Concierge/Builder/Platform Engineer itself: its identity, models, provider, runtime, architecture, technical specs, the relationship between its general and specialized model roles, or any term in the OWNER-APPROVED PLATFORM GLOSSARY (COS University, specialists, artifacts, graduates, Builder Residency).',
       'A general question about AI models, a third-party product specification, or a writing request that merely contains model-related words is not platform self-knowledge; set relevant=false and answer="".',
       'When relevant=true, reason from the TRUSTED OWNER RUNTIME CONTEXT as authoritative current configuration facts. The preceding assistant turn is conversational context only, not an authority if it conflicts with runtime facts. Compose the answer in your own words and at the level of detail the request warrants.',
       'Distinguish the general COS reasoner from Builder/Platform Engineer coding specialization whenever that distinction materially answers the question. Never imply that a specialist model powers the whole platform unless the supplied runtime facts say so.',
@@ -649,6 +654,17 @@ export async function tryCOSFirstAnswer(input: COSFirstAnswerInput): Promise<COS
     const neuralFallback = await tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true })
     if (neuralFallback) return reviewNativeLanguageQuality(input, neuralFallback)
     return deterministicSelfKnowledge
+  }
+
+  // Owner questions that name an owner-glossary platform concept go to the owner self-knowledge reasoner,
+  // which receives the owner-approved glossary. It still decides relevance itself; when the question is
+  // really about the general-world meaning of the word, it declines and the ordinary core answers.
+  const ownerPlatformConcept = input.privileged === true
+    && !isPublicDeliveryScope()
+    && mentionsPlatformConcept(input.prompt)
+  if (ownerPlatformConcept) {
+    const platformAnswer = await tryOwnerNeuralSelfKnowledge(input, { compatibilitySignal: true, platformConcept: true })
+    if (platformAnswer) return reviewNativeLanguageQuality(input, platformAnswer)
   }
 
   let coreResult = await tryCoreCOSFirstAnswer(input)

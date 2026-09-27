@@ -1,3 +1,4 @@
+// saas/tests/deterministicUtilities.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { tryDeterministicUtility } from '../lib/ai/cos/deterministicUtilities.ts'
@@ -45,4 +46,18 @@ test('answers the approved public SignalBoost identity without COS availability'
   assert.match(result.reply, /privately owned U\.S\. AI platform/)
   assert.match(result.reply, /English, Spanish, Portuguese, Polish, and Russian/)
   assert.equal(result.executionProvenance.model_generated, false)
+})
+
+test('company identity names iTMounts and never SignalBoost', async () => {
+  const { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } = await import('../lib/ai/cos/cosMemoryLayerDefinitions.ts')
+  const { isSignalBoostSpecificPublicRequest } = await import('../lib/ai/cos/publicScenarioScope.ts')
+  // Production 2026-09-26: "What is iTMounts?" was answered as a mountaineering guess.
+  assert.match(SIGNALBOOST_COMPANY_IDENTITY_DEFINITION, /^iTMounts \(itmounts\.com\) is a privately owned U\.S\. AI platform/)
+  assert.doesNotMatch(SIGNALBOOST_COMPANY_IDENTITY_DEFINITION, /signalboost/i)
+  assert.equal(isSignalBoostSpecificPublicRequest('What is iTMounts?'), true)
+  const result = run('what is iTMounts and who owns it?')
+  assert.ok(result)
+  assert.equal(result.source, 'deterministic-signalboost-identity')
+  assert.doesNotMatch(result.reply, /signalboost/i)
+  assert.match(result.reply, /English, Spanish, Portuguese, Polish, and Russian/)
 })

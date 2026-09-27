@@ -6,6 +6,7 @@ import {
   MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET,
   MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
   MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES,
+  MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS,
   buildMassDistillationOpenSourceMaintenanceGaps,
   buildMassDistillationReplenishmentGaps,
   massDistillationThroughputProfile,
@@ -122,7 +123,7 @@ test('replenishment keeps acquiring when every canonical subject was just consum
   assert.equal(gaps.length, 3)
   assert.equal(new Set(gaps.map(gap => gap.subject)).size, 3)
   assert.ok(gaps.every(gap => gap.sourceKinds?.includes('scientific_journal') && gap.sourceKinds?.includes('public_dataset')))
-  assert.ok(gaps.every(gap => gap.evidence.includes('shortfall_to_batch=20')))
+  assert.ok(gaps.every(gap => gap.evidence.includes(`shortfall_to_batch=${MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS}`)))
 })
 
 test('shortage fallback stays planner-scoped while failure remediation sees all failing supplied subjects', () => {

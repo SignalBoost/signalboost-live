@@ -1,2 +1,2 @@
-base_sha=6f43c4c81cee7dfdb2db66ad9ef226795d111a97
-branch=fix/university-builder-gap-bridge
+base_sha=d0f290d52b4bad64a7c0e6e28f56db9d1597714f
+branch=test/throughput-batch-floor

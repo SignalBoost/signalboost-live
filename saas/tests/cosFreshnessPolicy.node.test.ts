@@ -330,3 +330,19 @@ test('questions about the service itself are never sent to the public web', () =
     'What is the weather in Merida?',
   ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })
+
+test('platform-concept questions are not public-web lookups while real-world ones still are', () => {
+  for (const prompt of [
+    'What is the University?',
+    'What are the graduates?',
+    'What is Builder Residency?',
+    'How does COS University train specialists?',
+    'What is the Concierge?',
+  ]) assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
+
+  for (const prompt of [
+    'What is the best university in Mexico?',
+    'Who is the president of Harvard University?',
+    'What is the tuition at Stanford University this year?',
+  ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
+})

@@ -983,6 +983,12 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   let reasonerFailureMessage: string | null = null
   const reasoned = await callCosReasoner({
     usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_response' },
+    // INTERACTIVE SPEED (2026-09-27). This call runs under the 20s interactive model timeout
+    // (COS_INTERACTIVE_MODEL_TIMEOUT_MS). With hidden thinking on, every owner question in Production
+    // failed at ~22-28s with "Independent COS inference did not return an answer" and fell through to the
+    // slow rescue (43-106s total), while the thinking-off first-turn lane answered in ~5s. Chat answers
+    // reason in the visible answer instead of hidden scratch work.
+    disableThinking:true,
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:interactiveReasonerMaxTokens(),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience }),

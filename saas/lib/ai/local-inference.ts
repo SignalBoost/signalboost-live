@@ -352,6 +352,30 @@ function nonNegativeNumber(value: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null
 }
 
+/**
+ * A transport failure with no HTTP response (thrown before or during fetch) used to persist as
+ * `success=false, http_status=null, finish_reason=null` — no reason at all. On 2026-09-27 the only active
+ * graduate failed 66/66 live calls this way (some in 2-5 ms) and the cause existed only in a Vercel log line.
+ * Persist a short, credential-free failure class in `finish_reason` so the owner can query it. Only the error
+ * name, a bounded message prefix and the low-level cause code are kept: no headers, prompts, bodies or keys.
+ */
+export function transportFailureTag(error: unknown): string {
+  const err = error instanceof Error ? error : new Error(String(error))
+  const cause = (err as Error & { cause?: { code?: unknown; name?: unknown } }).cause
+  const causeCode = cause && typeof cause === 'object'
+    ? String(cause.code || cause.name || '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 24)
+    : ''
+  const message = String(err.message || '')
+    .replace(/bearer\s+\S+/gi, 'bearer ***')
+    .replace(/(key|token|secret|password)=\S+/gi, '$1=***')
+    .replace(/[^A-Za-z0-9 _.:/-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 48)
+  const name = String(err.name || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 20)
+  return ['error', name, message, causeCode].filter(Boolean).join(':').slice(0, 80)
+}
+
 function protectedIndependentEvaluation(args: LocalModelCallArgs): boolean {
   const feature = String(args.usageContext?.feature || '').toLowerCase()
   const purpose = String(args.usageContext?.purpose || '').toLowerCase()
@@ -396,6 +420,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   let providerEstimatedCostUsd: number | null = null
   let text: string | null = null
   let fatalGovernanceError: Error | null = null
+  let transportFailure: string | null = null
   let toolCalls: readonly LocalModelToolCall[] = Object.freeze([])
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
@@ -550,6 +575,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     }
   } catch (error) {
     errorText = error instanceof Error ? error.message : String(error)
+    if (httpStatus === null) transportFailure = transportFailureTag(error)
     if (
       error instanceof Error
       && (
@@ -591,7 +617,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
         graduateArtifactHash: config.graduateArtifactHash || null,
         fallbackFromOwned: config.fallbackFromOwned === true,
         promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
-        success, httpStatus, latencyMs, finishReason,
+        success, httpStatus, latencyMs, finishReason: finishReason ?? transportFailure,
       }).catch(error => {
         console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error))
       })

@@ -712,3 +712,17 @@ test('an unsatisfied task gate cannot erase a recorded passing command', async (
   assert.match(reply, /repair gate remains unsatisfied/)
   assert.doesNotMatch(reply, /proof has not passed|Verification — not passed|reproduced the reported failure/)
 })
+
+
+test('operator narration keeps the executed compiler failure primary over later storage bookkeeping', async () => {
+  const { formatBuilderOperatorRepairReply } = await import('../lib/builder/operator-narration.ts')
+  const reply = formatBuilderOperatorRepairReply({ ok: false, error: 'builder_regression_evidence_required', trace: [
+    { toolId: 'run', ok: false, command: 'npm exec -- tsc --noEmit', exitCode: 2, failureClass: 'test',
+      remediation: 'Read the failure output, make the smallest targeted source change, then rerun the exact failing command.' },
+    { toolId: 'write_file', ok: false, path: 'package-lock.json', failureClass: 'storage',
+      remediation: 'The command ran, but its generated package-lock.json could not be saved.' },
+  ] })
+  assert.match(reply, /reproduced the reported failure/)
+  assert.match(reply, /npm exec -- tsc --noEmit/)
+  assert.doesNotMatch(reply, /remaining blocker is a storage failure/)
+})

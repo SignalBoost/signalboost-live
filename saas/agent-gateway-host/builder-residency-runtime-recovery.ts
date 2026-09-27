@@ -23,6 +23,7 @@ const HEX40=/^[a-f0-9]{40}$/
 const RECOVERABLE=[
   /^residency_exact_artifact_runtime_not_ready(?::.*)?$/,
   /^residency_exact_artifact_inference_timeout$/,
+  /^RunPod GET \/serverless HTTP 5\d\d: failed to list endpoints$/,
   /^mass_distilled_runtime_worker_quota_full(?::.*)?$/,
   /^mass_distilled_runtime_endpoint_worker_policy_drift$/,
   /^mass_distilled_runtime_endpoint_gpu_pool_drift$/,

@@ -40,6 +40,7 @@ function selfHealingCapacityJob(job: BuilderJobRecord): boolean {
     job.metadata.selfHealingUniversityDistillation === true
     || job.metadata.selfHealingOwnedSite === true
     || job.metadata.selfHealingOwnedAudit === true
+    || job.metadata.selfHealingProductionRecovery === true
   )
 }
 

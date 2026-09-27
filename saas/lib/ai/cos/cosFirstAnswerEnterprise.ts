@@ -31,6 +31,7 @@ import { classifyRunpodFailure, runpodCapacityUnavailableReason } from '@/lib/ai
 import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
 import { loadUserMemories } from '@/lib/ai/tools/userMemory'
 import { cosServiceDb, SupabaseAIROIMetricsSink, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
+import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
 import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
@@ -654,6 +655,11 @@ export function cosAudience(privileged:boolean):CosAudience {
   return privileged ? 'owner' : 'user'
 }
 
+function timedRetrievalStage(stage:string, run:() => Promise<void>):Promise<void> {
+  const startedAt = Date.now()
+  return run().finally(() => recordCosLatencyStage(`retrieval:${stage}`, Date.now() - startedAt))
+}
+
 async function retrieveInternalContext(prompt:string, userId?:string|null, privileged=false, audience:CosAudience = privileged ? 'owner' : 'user'):Promise<InternalContext> {
   // Public audience: company information must never reach Concierge (owner decision 2026-08-26), so
   // the boundary is enforced HERE, before any row can reach a prompt: no Knowledge Graph, no Enterprise
@@ -685,7 +691,7 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
   // another before the cache could be checked. Each stage writes only its own arrays and funnel entry, so they
   // run concurrently; systems are merged in the original order, so output is identical to the sequential form.
   const kgSystems:string[] = [], enterpriseSystems:string[] = [], userSystems:string[] = [], creativeSystems:string[] = [], skillSystems:string[] = []
-  const knowledgeStage = (async () => {
+  const knowledgeStage = timedRetrievalStage('knowledgeStage', async () => {
     if (db) {
       kgSystems.push('Knowledge Graph', 'Continuous Learning Corpus')
       const [semanticResult, semanticLearnedResult] = await Promise.allSettled([
@@ -764,8 +770,8 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         }
       }
     }
-  })()
-  const enterpriseStage = (async () => {
+  })
+  const enterpriseStage = timedRetrievalStage('enterpriseStage', async () => {
     const scopeResolution = publicAudience
       ? { scope:null, status:'not_available_public_delivery' as const }
       : await resolveCosEnterpriseMemoryScope({ privileged }).catch(() => ({ scope:null, status:'lookup_failed' as const }))
@@ -798,8 +804,8 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         console.warn('[cos-enterprise-memory] retrieval failed', error)
       }
     }
-  })()
-  const userMemoryStage = (async () => {
+  })
+  const userMemoryStage = timedRetrievalStage('userMemoryStage', async () => {
     if (userId && !publicAudience) {
       userSystems.push('Saved User Memory')
       const loaded = await loadUserMemories(userId).catch(() => [])
@@ -815,8 +821,8 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         memories.push(`[EM${memories.length + 1}] [${item.kind}] ${safeText(item.content,500)} [relevance ${candidate.similarity.toFixed(2)}]`)
       }
     }
-  })()
-  const creativeStage = (async () => {
+  })
+  const creativeStage = timedRetrievalStage('creativeStage', async () => {
     const creative = await retrieveCreativeMemory(prompt, { privileged, limit:4 }).catch(error => {
       console.warn('[cos-creative-memory] retrieval failed', error)
       return { retrieved:0, relevant:0, selected:[], mode:'unavailable' as const }
@@ -830,8 +836,8 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
       creativeSystems.push('Creative Memory')
       creativeMemories.push(...formatCreativeMemoryForReasoner(creative.selected))
     }
-  })()
-  const skillStage = (async () => {
+  })
+  const skillStage = timedRetrievalStage('skillStage', async () => {
     const cognitive = await retrieveValidatedCognitiveSkills(prompt).catch(error => {
       console.warn('[cos-cognitive-skill-context] ranking failed', error)
       return { retrieved:0, relevant:0, selected:0, items:[] }
@@ -842,7 +848,7 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
       skills.push(item.line)
       skillIds.push(item.id)
     }
-  })()
+  })
   await Promise.all([knowledgeStage, enterpriseStage, userMemoryStage, creativeStage, skillStage])
   systems.push(...kgSystems, ...enterpriseSystems, ...userSystems, ...creativeSystems, ...skillSystems)
 

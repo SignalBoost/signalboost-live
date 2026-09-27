@@ -24,7 +24,7 @@ export async function GET() {
       // 'source' added Aug 12 so the dashboard can show WHY each call was avoided —
       // reused from a paraphrase (semantic_similarity), reused verbatim (exact_cache),
       // or answered fresh by COS's own reasoner (local_reasoner) with no cloud call.
-      db.from('cos_ai_roi_metrics').select('source,provider_calls,estimated_cost_avoided_usd').order('created_at', { ascending: false }).limit(1000),
+      db.from('cos_ai_roi_metrics').select('source,provider_calls,estimated_cost_avoided_usd').neq('task_id', 'cos-latency-stage').order('created_at', { ascending: false }).limit(1000),
     ])
 
     learning = measureLearningQuality((learningRows ?? []).map((row: any) => ({

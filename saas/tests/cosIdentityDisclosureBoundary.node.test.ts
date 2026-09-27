@@ -150,11 +150,25 @@ test('internal context sources are retrieved concurrently, before the semantic c
   const retrieval = enterprise.slice(retrievalAt, enterprise.indexOf('\nfunction executionFunnel(', retrievalAt))
   assert.ok(retrievalAt > 0)
   for (const stage of ['knowledgeStage', 'enterpriseStage', 'userMemoryStage', 'creativeStage', 'skillStage']) {
-    assert.match(retrieval, new RegExp(`const ${stage} = \\(async \\(\\) => \\{`))
+    assert.match(retrieval, new RegExp(`const ${stage} = timedRetrievalStage\\('${stage}', async \\(\\) => \\{`))
   }
   assert.match(retrieval, /await Promise\.all\(\[knowledgeStage, enterpriseStage, userMemoryStage, creativeStage, skillStage\]\)/)
   // Systems keep the original sequential order so provenance is unchanged.
   assert.match(retrieval, /systems\.push\(\.\.\.kgSystems, \.\.\.enterpriseSystems, \.\.\.userSystems, \.\.\.creativeSystems, \.\.\.skillSystems\)/)
   // No stage may await another stage's work inline any more.
   assert.doesNotMatch(retrieval, /\n  const creative = await retrieveCreativeMemory\(/)
+})
+
+
+test('every chat stage in front of the answer records its duration for the owner to query', () => {
+  const stages = readFileSync(new URL('../lib/ai/cos/cosLatencyStages.ts', import.meta.url), 'utf8')
+  assert.match(stages, /task_id: COS_LATENCY_STAGE_TASK_ID/)
+  assert.match(stages, /export const COS_LATENCY_STAGE_TASK_ID = 'cos-latency-stage'/)
+  assert.match(enterprise, /return run\(\)\.finally\(\(\) => recordCosLatencyStage\(`retrieval:\$\{stage\}`, Date\.now\(\) - startedAt\)\)/)
+  const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.match(browser, /recordCosLatencyStage\(`\$\{browserSurface\}:planner`, Date\.now\(\) - plannerStartedAt\)/)
+  assert.match(browser, /recordCosLatencyStage\(`\$\{browserSurface\}:before_cos`, Date\.now\(\) - ingressStartedAt\)/)
+  assert.match(browser, /recordCosLatencyStage\(`\$\{browserSurface\}:total`, Date\.now\(\) - ingressStartedAt\)/)
+  const independence = readFileSync(new URL('../app/api/admin/cos-independence/route.ts', import.meta.url), 'utf8')
+  assert.match(independence, /\.neq\('task_id', 'cos-latency-stage'\)/)
 })

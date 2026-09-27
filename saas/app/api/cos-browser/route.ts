@@ -38,6 +38,7 @@ import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresL
 import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
+import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -416,6 +417,7 @@ export async function POST(req: NextRequest) {
   const asksAboutThisService = isSignalBoostSpecificPublicRequest(prompt)
     || (browserSurface !== 'concierge' && authenticatedOwner && mentionsPlatformConcept(prompt))
   if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt) && !asksAboutThisService) {
+    const plannerStartedAt = Date.now()
     agentDecision = await decideCosAgentTurn({
       prompt,
       previousAssistant: priorAnswer || null,
@@ -423,6 +425,7 @@ export async function POST(req: NextRequest) {
       ownerAuthenticated: authenticatedOwner,
       language,
     })
+    recordCosLatencyStage(`${browserSurface}:planner`, Date.now() - plannerStartedAt)
   }
 
   // The model gets first semantic choice. Host policy may still require MORE evidence before release.
@@ -520,6 +523,7 @@ export async function POST(req: NextRequest) {
   // ANSWERABILITY FIRST: ordinary questions reach COS before optional semantic routers. The
   // routers above are admitted only when the request is identity/visual-shaped. This timestamp
   // makes it visible whether time was spent understanding/routing or actually answering.
+  recordCosLatencyStage(`${browserSurface}:before_cos`, Date.now() - ingressStartedAt)
   console.info('[cos-answerability-first]', JSON.stringify({
     at: new Date().toISOString(),
     stage: 'local_answer_attempt',
@@ -560,5 +564,6 @@ export async function POST(req: NextRequest) {
   } catch {}
 
   const decorated = await withSuggestedFollowups(response, prompt, auditUserId)
+  recordCosLatencyStage(`${browserSurface}:total`, Date.now() - ingressStartedAt)
   return browserSurface === 'concierge' ? publicConciergePresentation(decorated) : decorated
 }

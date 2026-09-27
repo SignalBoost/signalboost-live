@@ -252,13 +252,12 @@ function modelForRequest(args: LocalModelCallArgs, config: LocalInferenceConfig,
   if (simpleKnowledgeResponse(args)) {
     return (process.env.COS_SIMPLE_KNOWLEDGE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash').trim() || config.model
   }
-  if (interactiveTravelPlan(args)) {
-    const retry = String(args.usageContext?.purpose || '').trim().toLowerCase() === 'travel_plan_grounded_retry'
-    const selected = retry
-      ? process.env.COS_INTERACTIVE_TRAVEL_RETRY_MODEL || 'zai-org/GLM-5.3-Flash'
-      : process.env.COS_INTERACTIVE_TRAVEL_MODEL || 'deepseek-ai/DeepSeek-V4-Flash'
-    return selected.trim() || config.model
-  }
+  // TRAVEL LANE USES THE CONFIGURED MODEL (2026-09-27). Production evidence (cos-latency-stage, Concierge Polish
+  // itinerary 14:24 ET): primary:travel_planner took 26,515ms = both attempts running to their 16s + 10s limits,
+  // after which Concierge sent the canned itinerary backstop. The retry model (GLM-5.3-Flash) had already been
+  // verified to never reply within 15s on this account; the owner channel answered the same request well on the
+  // configured model. Both travel attempts now use it (COS_INTERACTIVE_TRAVEL_MODEL / _RETRY_MODEL no longer apply).
+  if (interactiveTravelPlan(args)) return config.model
   return config.model
 }
 

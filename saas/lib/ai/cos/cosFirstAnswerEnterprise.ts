@@ -420,10 +420,17 @@ function audienceSection(audience:CosAudience|undefined):string {
  * with no identity answered "What is iTMounts?" as "a typo for iMounts". Any lane that calls the model
  * on behalf of COS must include this preamble and companyKnowledgeBlock().
  */
+// CHAT ANSWER LENGTH (2026-09-27). Production evidence (provider_inference_usage, 02:14-02:45 ET): chat answers
+// ran 1,311-1,376 output tokens for one-line questions. At the measured ~37 tokens/s that is ~36s per answer,
+// and the main call could not finish inside its 20s interactive limit, so every question also paid the
+// rescue. Answer time is proportional to answer length; a live chat answer is short by default.
+export const CHAT_ANSWER_LENGTH_RULE = 'CHAT ANSWER LENGTH: this is a live chat and the person is waiting. By default answer in about 150 words or fewer: the direct answer or definition first, then only the most important supporting detail, in short plain paragraphs. Go longer (up to about 400 words) only when the person explicitly asks for detail, depth, a full document, a plan, code, or step-by-step instructions, or asks you to write something for them. Never pad, never repeat the question, and offer to expand instead of expanding unasked.'
+
 export function cosIdentityPreamble(audience:CosAudience):string {
   return [
     'You are COS, the reasoning brain of iTMounts (itmounts.com). SignalBoost is only its internal name and is never used in answers.',
     audienceSection(audience),
+    CHAT_ANSWER_LENGTH_RULE,
   ].filter(Boolean).join(' ')
 }
 
@@ -447,6 +454,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
     'The product you serve is iTMounts (itmounts.com); SignalBoost is only its internal name and is never used in answers.',
     audienceSection(options?.audience),
+    CHAT_ANSWER_LENGTH_RULE,
     chiefOfStaffSkillForOwner(options?.privileged === true),
     "Reason from the user's input, your own model knowledge, and any supplied internal evidence.",
     `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_MEMORY_DEFINITION}`,

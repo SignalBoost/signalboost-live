@@ -23,6 +23,7 @@ import { graduateServingErrorOutcome, recordGraduateServingAttempt } from '@/lib
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { COS_GENERAL_REASONING_DISCIPLINE } from '@/lib/ai/cos/cosGeneralReasoningDiscipline'
 import { fitGraduateCall } from '@/lib/ai/cos/graduateContextFit'
+import { runpodGraduateEndpointWarm } from '@/lib/ai/cos/graduateWarmGate'
 import {
   activeGraduateRuntimesForRole,
   type ActiveGraduateRuntime,
@@ -249,6 +250,10 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
     label: runtime.reasoner.label,
     priority: 200,
     async execute(request) {
+      // WARM-ONLY IN LIVE CHAT (2026-09-27): graduates run on RunPod serverless scaled 0/1. A cold endpoint cannot
+      // answer inside the 8s chat budget (0/59 successes this week), so live chat skips it and the base worker answers.
+      if (INTERACTIVE_GRADUATE_FEATURES.has(String(request.usageContext?.feature || '').trim().toLowerCase())
+        && !(await runpodGraduateEndpointWarm(runtime.inference.baseUrl))) return null
       const effective = toLocalModelCallArgs(request, role)
       // The graduate serves an 8k window; COS worker requests are sized for the managed reasoner. Fit them first
       // or every call fails locally with context_window_budget_insufficient before reaching the endpoint.

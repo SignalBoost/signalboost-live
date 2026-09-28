@@ -143,7 +143,7 @@ export type RollingEvent = Readonly<{ candidateId: string; observedAt: string; e
 
 export type RollingDecision =
   | Readonly<{ issue: true; artifact: RollingArtifact; evidence: Record<string, unknown> }>
-  | Readonly<{ issue: false; reason: string }>
+  | Readonly<{ issue: false; reason: string; considered?: number; skipped?: Readonly<Record<string, number>> }>
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const at = (value: string | null | undefined) => Date.parse(String(value || ''))
@@ -361,7 +361,7 @@ export function decideExhaustedMassEvaluationArtifacts(input: {
   const nowMs = input.now.getTime()
   const exhausted: ExhaustedMassEvaluationArtifact[] = []
   for (const artifact of input.artifacts) {
-    if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
+    if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) { skip('not_mass_or_bad_hash'); continue }
     const history = artifactHistory(artifact, input.events, nowMs)
     // A verdict has its own lifecycle write, and a live run must be left alone.
     if (history.hasVerdict || history.liveStart) continue
@@ -432,9 +432,9 @@ export function decideRollingMassEvaluationApproval(input: {
     if (aFrontier !== bFrontier) return aFrontier ? -1 : 1
     return at(a.createdAt) - at(b.createdAt)
   })
-  for (const artifact of ordered) {
+  // Why each artifact was passed over, so an all-skipped tick is diagnosable from its receipt (2026-09-28: 470\n  // consecutive ticks said only 'no eligible artifact' and nothing recorded which rule held ~1,300 artifacts).\n  // Observation only: no rule, threshold or authority depends on these counts.\n  const skipped: Record<string, number> = {}\n  const skip = (reason: string) => { skipped[reason] = (skipped[reason] || 0) + 1 }\n  for (const artifact of ordered) {
     if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
-    if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) continue
+    if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) { skip('younger_than_12h'); continue }
     const hash = artifact.artifactHash.toLowerCase()
     const history = artifactHistory(artifact, input.events, nowMs)
     const mine = history.mine
@@ -445,7 +445,7 @@ export function decideRollingMassEvaluationApproval(input: {
       .sort((a, b) => b - a)[0] ?? Number.NEGATIVE_INFINITY
     const inCurrentGeneration = history.inCurrentGeneration
 
-    if (history.hasVerdict) continue
+    if (history.hasVerdict) { skip('already_has_verdict'); continue }
 
     const minimumCanaryAt = at(artifact.minimumCanaryObservedAt)
     // Match the atomic claim's exact-canary contract before minting evaluation authority. A generic
@@ -465,10 +465,10 @@ export function decideRollingMassEvaluationApproval(input: {
         && event.evidence.endpointId.trim().length > 0
         && (!Number.isFinite(minimumCanaryAt) || at(event.observedAt) >= minimumCanaryAt))
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
-    if (!healthyCanaries.length) continue
+    if (!healthyCanaries.length) { skip('no_exact_healthy_canary'); continue }
     const attentionArchitecture = String(healthyCanaries[0].evidence?.attentionArchitecture || 'standard_attention')
     if (attentionArchitecture === 'standard_attention'
-      && at(healthyCanaries[0].observedAt) < MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT_MS) continue
+      && at(healthyCanaries[0].observedAt) < MASS_EVALUATION_STANDARD_GATEWAY_REPAIR_AT_MS) { skip('standard_canary_before_gateway_repair'); continue }
 
     // Production 2026-09-24: an artifact had a valid canary pass at 14:07, then a later endpoint-refresh
     // canary failed at 19:55 with mass_distilled_runtime_worker_not_ready. The evaluator authorization
@@ -484,14 +484,14 @@ export function decideRollingMassEvaluationApproval(input: {
     const newestRuntimeTerminal = runtimeTerminals[0]
     if (newestRuntimeTerminal
       && at(newestRuntimeTerminal.observedAt) > newestHealthyAt
-      && newestRuntimeTerminal.evidence?.claim !== 'local_distilled_runtime_canary_passed') continue
+      && newestRuntimeTerminal.evidence?.claim !== 'local_distilled_runtime_canary_passed') { skip('newer_canary_failed'); continue }
 
     // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.
     // Do not mint another approval while this exact artifact already has a live started reservation.
-    if (history.liveStart) continue
+    if (history.liveStart) { skip('exam_already_running'); continue }
 
     const failures = history.substantiveFailures
-    if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
+    if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) { skip('failed_attempts_exhausted'); continue }
 
     // Before the repair exists, preserve the historical circuit breaker. At/after the named repair epoch, only failures
     // from the repaired generation count so the fixed evaluator gets one honest retry without erasing prior evidence.
@@ -520,8 +520,8 @@ export function decideRollingMassEvaluationApproval(input: {
     const newestFailure = recentFailures[0]
     if (newestFailure && evaluatorInfrastructureFailure(newestFailure)) {
       const newestFailureAt = at(newestFailure.observedAt)
-      if (!Number.isFinite(newestFailureAt)) continue
-      if (nowMs - newestFailureAt < MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS) continue
+      if (!Number.isFinite(newestFailureAt)) { skip('infra_failure_time_unreadable'); continue }
+      if (nowMs - newestFailureAt < MASS_EVALUATION_INFRASTRUCTURE_FAILURE_MIN_COOLDOWN_MS) { skip('infra_failure_cooldown_10m'); continue }
     }
 
     const recentErrors = recentFailures.map(event => String(event.evidence?.error || '').trim().toLowerCase())
@@ -536,8 +536,8 @@ export function decideRollingMassEvaluationApproval(input: {
         // Wait out the cooldown instead of skipping forever. An unreadable timestamp is treated as still
         // cooling: releasing an artifact on evidence we cannot read is the unsafe reading.
         const newestFailureAt = at(recentFailures[0].observedAt)
-        if (!Number.isFinite(newestFailureAt)) continue
-        if (nowMs - newestFailureAt < identicalInfrastructureFailureCooldownMs(identical)) continue
+        if (!Number.isFinite(newestFailureAt)) { skip('identical_failure_time_unreadable'); continue }
+        if (nowMs - newestFailureAt < identicalInfrastructureFailureCooldownMs(identical)) { skip('identical_failure_cooldown'); continue }
       }
     }
 
@@ -548,7 +548,7 @@ export function decideRollingMassEvaluationApproval(input: {
     const latest = controls[0]
     const repairedSuspension = latest?.evidence?.claim === 'distilled_independent_evaluation_suspended'
       && String(latest.evidence?.reason || '') === REPAIRED_SUSPENSION_REASON
-    if (latest?.evidence?.claim === 'distilled_independent_evaluation_suspended' && !repairedSuspension) continue
+    if (latest?.evidence?.claim === 'distilled_independent_evaluation_suspended' && !repairedSuspension) { skip('approval_suspended'); continue }
     if (latest && latest.evidence?.claim === 'distilled_independent_evaluation_approved') {
       const startedAfter = mine.some(event => inCurrentGeneration(event) && event.evidence?.claim === 'mass_distilled_independent_evaluation_started' && at(event.observedAt) >= at(latest.observedAt))
       // An armed approval only reserves the slot while it is still CLAIMABLE. The claim validator accepts an approval
@@ -562,7 +562,7 @@ export function decideRollingMassEvaluationApproval(input: {
       // at all is treated as blocking, because releasing a reserved slot on missing evidence is the unsafe reading.
       const recordedCalls = Number(latest.evidence?.maxEndpointCalls)
       const staleCeiling = Number.isFinite(recordedCalls) && recordedCalls !== MASS_EVALUATION_ENDPOINT_CALLS
-      if (!staleCeiling && !startedAfter && at(latest.expiresAt) > nowMs) continue
+      if (!staleCeiling && !startedAfter && at(latest.expiresAt) > nowMs) { skip('approval_already_armed'); continue }
     }
 
     return {
@@ -592,5 +592,5 @@ export function decideRollingMassEvaluationApproval(input: {
       },
     }
   }
-  return { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' }
+  return { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation', considered: ordered.length, skipped: Object.freeze(skipped) }
 }

@@ -800,7 +800,6 @@ export async function GET(req: NextRequest) {
         status: 'not_claimed',
         reason: 'no_atomically_claimable_mass_distilled_evaluation',
         approvalReason: rolling.reason,
-        approvalConsidered: rolling.considered, approvalSkipped: rolling.skipped,
       }).catch(() => undefined)
       return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
     }

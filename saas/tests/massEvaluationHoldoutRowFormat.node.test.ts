@@ -115,17 +115,19 @@ test('response-only legacy hosted rows are recovered only after immutable manife
 // Legacy hosted rows are immutable response-only evidence; prompt recovery must stay exact-bound and fail closed.
 
 
-test('teacher content-generation instructions are never accepted as deterministic holdout questions', () => {
-  assert.match(SOURCE, /function holdoutPromptIsGenerative/)
-  assert.match(SOURCE, /generate a distinct, self-contained/)
-  assert.match(SOURCE, /turn the supplied material into one rigorous standalone teaching example/)
-  assert.match(SOURCE, /return only the final teaching response/)
-  assert.match(SOURCE, /mass_distilled_evaluation_holdout_not_exam_ready:\$\{row\.itemHash\.slice\(0,16\)\}/)
+test('teacher content-generation instructions are never asked as Holdout questions', () => {
+  // Superseded 2026-09-27: instead of throwing a substantive error on every pre-existing holdout (which also left a
+  // literal "\\n" in the evaluator source and broke parsing), the row prompt is no longer asked at all. Each withheld
+  // essay is asked as its own written exam question with a short answer key.
+  assert.doesNotMatch(SOURCE, /mass_distilled_evaluation_holdout_not_exam_ready:\$\{row\.itemHash/)
+  assert.match(SOURCE, /readReadyHoldoutExamItems\(db, validated\.map\(row => row\.itemHash\)\)/)
+  assert.match(SOURCE, /prompt: item\.question, reference: item\.answerKey, evaluationMode: 'deterministic'/)
 })
 
 
-test('new Holdout rows require the versioned assessment-ready contract', () => {
-  assert.match(SOURCE, /holdoutFormat: clean\(row\.holdout_format,80\)/)
-  assert.match(SOURCE, /row\.holdoutFormat !== 'assessment_ready_v1'/)
-  assert.match(SOURCE, /mass_distilled_evaluation_holdout_format_unversioned/)
+test('the exam question never depends on an unversioned or generative row prompt', () => {
+  // The pinned-parquet reader returns text/item_hash/prompt/response only, so a holdout_format check could never
+  // pass. The question comes from the written exam item keyed by the immutable item hash instead.
+  assert.doesNotMatch(SOURCE, /throw new Error\(`mass_distilled_evaluation_holdout_format_unversioned/)
+  assert.doesNotMatch(SOURCE, /holdoutPromptIsGenerative\(parsed\.prompt\)/)
 })

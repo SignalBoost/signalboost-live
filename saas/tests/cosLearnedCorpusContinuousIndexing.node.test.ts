@@ -52,6 +52,6 @@ test('Vercel schedules frequent indexing and hourly current-world refresh', () =
   const config = JSON.parse(read('../vercel.json'))
   const indexer = config.crons.find((entry: any) => entry.path === '/api/cron/cos-learning-indexer')
   const currentWorld = config.crons.find((entry: any) => entry.path === '/api/cron/cos-current-world-learning')
-  assert.equal(indexer?.schedule, '3,18,33,48 * * * *')
+  assert.equal(indexer?.schedule, '*/5 * * * *')
   assert.equal(currentWorld?.schedule, '14 * * * *')
 })

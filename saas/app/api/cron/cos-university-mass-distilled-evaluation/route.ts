@@ -4,6 +4,7 @@ import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniver
 import { isTerminalHoldoutDataDefect } from '@/lib/ai/cos/cosUniversityMassEvaluationTerminalDefect'
 import { REQUIRED_EVALUATION_RUN_COLUMNS, isMissingColumnError, missingColumnsFromError } from '@/lib/ai/cos/cosUniversityEvaluationSchemaPreflight'
 import { NextRequest, NextResponse } from 'next/server'
+import { holdoutExamReadyArtifacts } from '@/lib/ai/cos/cosUniversityHoldoutExamItems'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
@@ -533,11 +534,16 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       candidates: disposed.map(item => item.candidateId).slice(0, 20),
     }))
   }
-  const remaining = disposed.length
+  const undisposed = disposed.length
     ? rows.filter(row => !disposed.some(item => item.candidateId === row.candidateId
       && item.artifactHash === row.artifactHash))
     : rows
-  if (!remaining.length) return { issued: false, reason: 'no_mass_artifact_pending', disposed: disposed.length }
+  if (!undisposed.length) return { issued: false, reason: 'no_mass_artifact_pending', disposed: disposed.length }
+  // Holdout is asked as real exam questions (owner decision 2026-09-27). Only approve artifacts whose questions are
+  // already written; request the rest so cron/cos-university-holdout-exam-items prepares them. No GPU is woken for an
+  // artifact that could not be examined properly yet.
+  const remaining = await holdoutExamReadyArtifacts(db, undisposed, now)
+  if (!remaining.length) return { issued: false, reason: 'no_mass_artifact_with_holdout_exam_ready', disposed: disposed.length }
   const decision = decideRollingMassEvaluationApproval({
     enabled: process.env.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false',
     artifacts: remaining,

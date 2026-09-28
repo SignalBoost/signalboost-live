@@ -100,15 +100,19 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
       const detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
       throw new Error(`mass_distilled_evaluation_runtime_wake_http_${response.status}:${detail}`)
     }
-    const payload: any = await response.json().catch(() => null)
-    if (!['accepting_requests', 'ready'].includes(String(payload?.status || ''))) {
-      throw new Error('mass_distilled_evaluation_runtime_wake_invalid')
-    }
+    // Any 2xx means the wake reached the worker. The exact-artifact gateway answers 204 (empty body) while its
+    // model is still loading, which is the NORMAL reply to a scale-from-zero wake, and the RunPod load balancer
+    // can drop the JSON body even on 200 (see waitReady in the evaluator). Requiring a JSON status here threw
+    // mass_distilled_evaluation_runtime_wake_invalid on healthy cold starts: 104 exams / 47 students in
+    // Production 2026-09-24..28, each sent back to the queue until its approval expired. Readiness is decided
+    // by the evaluator's waitReady() loop, and the exact-model inference still proves the artifact binding.
+    const payload: any = response.status === 204 ? null : await response.json().catch(() => null)
     return Object.freeze({
       ok: true as const,
       endpointId,
       responseObserved: true,
       modelReady: payload?.modelReady === true,
+      workerInitializing: response.status === 204,
       tokenGeneratingRequest: false,
     })
   } catch (error) {

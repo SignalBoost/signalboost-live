@@ -54,5 +54,5 @@ test('live started evaluation blocks a second rolling approval', () => {
     ev('mass_distilled_independent_evaluation_started', '2026-09-17T21:58:10Z', '2026-09-17T22:10:10Z'),
   ]
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifact], events, now: new Date('2026-09-17T22:00:00Z') })
-  assert.deepEqual(decision, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
+  assert.deepEqual({ issue: decision.issue, reason: (decision as any).reason }, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
 })

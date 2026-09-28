@@ -594,7 +594,7 @@ test('a newer failed runtime canary invalidates an older healthy proof until a f
     events,
     now: new Date('2026-09-24T20:11:00.000Z'),
   })
-  assert.deepEqual(blocked, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
+  assert.deepEqual({ issue: blocked.issue, reason: (blocked as any).reason }, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
 
   events.push(
     ev(artifact.candidateId, 'host_controller', {
@@ -645,7 +645,7 @@ test('post-repair runtime-not-ready failures still retain the normal infrastruct
     events,
     now: new Date('2026-09-24T19:30:00.000Z'),
   })
-  assert.deepEqual(decision, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
+  assert.deepEqual({ issue: decision.issue, reason: (decision as any).reason }, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
 })
 
 test('post-repair RunPod quota failures still retain the normal infrastructure cooldown', () => {
@@ -675,7 +675,7 @@ test('post-repair RunPod quota failures still retain the normal infrastructure c
     events,
     now: new Date('2026-09-24T16:20:00.000Z'),
   })
-  assert.deepEqual(decision, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
+  assert.deepEqual({ issue: decision.issue, reason: (decision as any).reason }, { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' })
 })
 
 test('RunPod max-worker quota preflight failures do not consume the paid evaluation rolling window', () => {

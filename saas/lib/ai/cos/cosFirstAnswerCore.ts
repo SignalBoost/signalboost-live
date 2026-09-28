@@ -192,7 +192,7 @@ async function releaseToPublic(
   if (!result.handled) {
     // A low-confidence draft is only ever shown if it would itself pass the disclosure gate.
     const draft = 'bestEffortReply' in result ? String(result.bestEffortReply || '') : ''
-    if (draft && publicDisclosureViolations(draft).length) {
+    if (draft && publicDisclosureViolations(draft, userRequest).length) {
       return { handled: false, confidence: result.confidence, reason: 'reason' in result ? result.reason : 'Public draft withheld.', provenance: { ...(result.provenance as Record<string, unknown>), publicDraftWithheld: true } as any }
     }
     return result
@@ -202,7 +202,11 @@ async function releaseToPublic(
 
   const scopeViolations = publicScenarioScopeViolations(input.prompt, answer)
   if (scopeViolations.length) {
+    // Labeled interactive call with thinking off (2026-09-27): unlabeled, it ran on the background RunPod
+    // reasoner with hidden thinking (36s for one repair on public Concierge).
     const repair = await callCosReasoner({
+      usageContext: { feature: 'cos_interactive_answer', purpose: 'public_scope_repair' },
+      disableThinking: true,
       temperature: 0,
       maxTokens: 2600,
       systemPrompt: [
@@ -226,12 +230,16 @@ async function releaseToPublic(
     answer = repaired.answer.trim()
   }
 
-  const disclosures = publicDisclosureViolations(answer)
+  const disclosures = publicDisclosureViolations(answer, userRequest)
   if (disclosures.length && asksAboutServiceIdentity(userRequest)) {
     return { ...result, reply: publicImplementationDisclosureReply(input.language), confidence: 1 }
   }
   if (disclosures.length) {
+    // Labeled interactive call with thinking off (2026-09-27): production 19:56 ET this redaction ran unlabeled on
+    // the background RunPod reasoner with hidden thinking — 36.1s and 1,311 tokens for one public answer.
     const redact = await callCosReasoner({
+      usageContext: { feature: 'cos_interactive_answer', purpose: 'public_disclosure_redaction' },
+      disableThinking: true,
       temperature: 0,
       maxTokens: 2600,
       systemPrompt: [
@@ -244,7 +252,7 @@ async function releaseToPublic(
       prompt: [`USER REQUEST:\n${userRequest}`, `REJECTED DRAFT:\n${answer}`, `DISCLOSURES:\n${disclosures.join(', ')}`, 'Return the corrected answer now.'].join('\n\n'),
     }).catch(() => null)
     const redacted = withComputedArithmetic(redact?.text ? parseLocalResult(redact.text) : null)
-    if (!redacted || redacted.truncated || !redacted.answer.trim() || publicDisclosureViolations(redacted.answer).length) {
+    if (!redacted || redacted.truncated || !redacted.answer.trim() || publicDisclosureViolations(redacted.answer, userRequest).length) {
       // Fails closed with no draft: an answer containing internals must never reach the reader.
       return {
         handled: false,

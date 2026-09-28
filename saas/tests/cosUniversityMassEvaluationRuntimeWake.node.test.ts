@@ -11,7 +11,10 @@ test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-bal
   // /ping, /ready and POST /v1/chat/completions. The wake uses a path the runtime actually serves.
   assert.match(route, /runpodServerlessRootUrl\(endpointId\)\}\/ping`/)
   assert.doesNotMatch(route, /\/models`/)
-  assert.match(route, /\['accepting_requests', 'ready'\]\.includes/)
+  // A 204 "still loading" or a body-less 200 is a successful wake; readiness belongs to waitReady().
+  // Production 2026-09-24..28: requiring a JSON status threw runtime_wake_invalid on 104 healthy cold starts.
+  assert.doesNotMatch(route, /throw new Error\('mass_distilled_evaluation_runtime_wake_invalid'\)/)
+  assert.match(route, /workerInitializing: response\.status === 204/)
   // The wake result reads only fields /ping actually returns.
   assert.match(route, /modelReady: payload\?\.modelReady === true/)
   assert.doesNotMatch(route, /payload\.data\.length/)

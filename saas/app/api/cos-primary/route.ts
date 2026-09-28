@@ -231,6 +231,7 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
     temperature:.2,
     maxTokens:2200,
     disableThinking:true,
+    usageContext:{feature:'cos_interactive_answer',purpose:'completion_rescue'},
     systemPrompt:[
       cosIdentityPreamble(audience),
       'COMPLETION RESCUE: complete the user task now instead of asking them to narrow a broad but answerable request.',

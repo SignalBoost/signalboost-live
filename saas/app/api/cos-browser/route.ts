@@ -39,6 +39,7 @@ import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioS
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
+import { runWithTurnDeadline, turnDeadlineRemainingMs } from '@/lib/ai/cos/cosTurnBudget'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -164,7 +165,7 @@ function builderRoutingContextFromBody(body: any) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function executeBrowserTurn(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const messages = Array.isArray(body?.messages) ? body.messages : []
   const userMessages = messages.filter((message: any) => message?.role === 'user' && typeof message?.content === 'string')
@@ -566,4 +567,92 @@ export async function POST(req: NextRequest) {
   const decorated = await withSuggestedFollowups(response, prompt, auditUserId)
   recordCosLatencyStage(`${browserSurface}:total`, Date.now() - ingressStartedAt)
   return browserSurface === 'concierge' ? publicConciergePresentation(decorated) : decorated
+}
+
+
+// WHOLE-TURN DEADLINE FOR THE BROWSER INGRESS (Sep 28 2026).
+//
+// VERIFIED DEFECT THIS FIXES. lib/ai/cos/cosTurnBudget.ts exists because one COS turn chains
+// several model round-trips (semantic task intent, the answer itself, the direct-text editor,
+// quality/citation repair). Each call is bounded on its own, nothing bounded the SUM, and every
+// call is clamped to the time left ONLY while a whole-turn deadline is open — local-inference.ts
+// takes turnDeadlineRemainingMs() as one of its bounds and, when it returns null, runs each call
+// on a fresh full clock. runWithTurnDeadline() was wired into /api/cos-provenance-browser, but the
+// browser posts to /api/cos-browser (agentProgressClient.ts: "the canonical browser ingress"), and
+// nothing in the UI calls the provenance ingress. So in production no deadline was ever open: the
+// per-call timeouts stacked, the turn ran past the 290 s client deadline in
+// app/dashboard/assistant/page.tsx, and the owner got "The page stopped waiting before it received
+// the COS response" on work as ordinary as editing an email.
+//
+// Two bounds, matching the provenance ingress so both ingresses behave identically:
+//  - a 150 s model deadline, which every model HTTP call and every startTurnBudget() is clamped to,
+//    so optional phases are skipped rather than overrunning and the answer COS already has is
+//    returned;
+//  - a 172 s watchdog as the backstop, well inside both the 290 s client deadline and the 300 s
+//    platform ceiling, so a turn ALWAYS answers instead of being killed mid-flight.
+const BROWSER_TURN_MODEL_DEADLINE_MS = 150_000
+const BROWSER_TURN_WATCHDOG_MS = 172_000
+
+const BROWSER_TURN_DEADLINE_REPLY: Record<string, string> = {
+  en: 'COS ran out of time on this turn before it produced a verified response, so nothing was sent in its place. The request was not replayed.',
+  es: 'COS agotó el tiempo de este turno antes de producir una respuesta verificada, así que no se envió nada en su lugar. La solicitud no se repitió.',
+  pt: 'O COS esgotou o tempo deste turno antes de produzir uma resposta verificada, portanto nada foi enviado em seu lugar. O pedido não foi repetido.',
+  pl: 'COS przekroczył czas tej tury, zanim przygotował zweryfikowaną odpowiedź, więc nic nie zostało wysłane w zamian. Żądanie nie zostało powtórzone.',
+  ru: 'COS исчерпал время этого хода до того, как подготовил проверенный ответ, поэтому взамен ничего не отправлено. Запрос не повторялся.',
+}
+
+class BrowserTurnWatchdogElapsed extends Error {}
+
+export async function POST(req: NextRequest) {
+  // /api/cos-provenance-browser already opened a whole-turn deadline and runs its own watchdog
+  // before delegating here. Nesting a second pair would only duplicate an existing bound.
+  if (turnDeadlineRemainingMs() !== null) return executeBrowserTurn(req)
+
+  const startedAt = Date.now()
+  const watchdogTimer: { handle: ReturnType<typeof setTimeout> | null } = { handle: null }
+  try {
+    const watchdog = new Promise<never>((_, reject) => {
+      watchdogTimer.handle = setTimeout(
+        () => reject(new BrowserTurnWatchdogElapsed('cos_browser_turn_deadline')),
+        Math.max(1_000, startedAt + BROWSER_TURN_WATCHDOG_MS - Date.now()),
+      )
+    })
+    const worker = runWithTurnDeadline(
+      startedAt + BROWSER_TURN_MODEL_DEADLINE_MS,
+      () => executeBrowserTurn(req),
+    )
+    // The loser of the race must not surface as an unhandled rejection.
+    worker.catch(() => undefined)
+    return await Promise.race([worker, watchdog])
+  } catch (error) {
+    if (!(error instanceof BrowserTurnWatchdogElapsed)) throw error
+    const body = await req.clone().json().catch(() => ({} as any))
+    const prompt = (() => {
+      const messages = Array.isArray(body?.messages) ? body.messages : []
+      for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index]
+        if (message?.role === 'user' && typeof message?.content === 'string') return message.content
+      }
+      return ''
+    })()
+    const language = resolveResponseLanguage(prompt, body?.context?.language)
+    const elapsedMs = Date.now() - startedAt
+    console.error('[cos_browser_turn_deadline]', JSON.stringify({
+      at: new Date().toISOString(),
+      elapsedMs,
+      surface: req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge',
+      promptChars: prompt.length,
+    }))
+    return NextResponse.json({
+      ok: false,
+      reply: BROWSER_TURN_DEADLINE_REPLY[language] || BROWSER_TURN_DEADLINE_REPLY.en,
+      error: 'cos_browser_turn_deadline',
+      source: 'cos-browser-turn-deadline',
+      elapsed_ms: elapsedMs,
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 200 })
+  } finally {
+    if (watchdogTimer.handle) clearTimeout(watchdogTimer.handle)
+  }
 }

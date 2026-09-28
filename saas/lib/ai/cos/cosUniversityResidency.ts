@@ -10,7 +10,7 @@ export type ResidencyLevel = (typeof RESIDENCY_LEVELS)[number]
 export const RESIDENCY_COMPETENCY_STATES = ['unproven','supervised','demonstrated','retained','remediation_required'] as const
 export type ResidencyCompetencyState = (typeof RESIDENCY_COMPETENCY_STATES)[number]
 
-export const RESIDENCY_STANDINGS = ['resident','senior_resident','residency_complete','remediation_required'] as const
+export const RESIDENCY_STANDINGS = ['resident','senior_resident','residency_complete','remediation_required','residency_failed'] as const
 export type ResidencyStanding = (typeof RESIDENCY_STANDINGS)[number]
 
 export const BUILDER_RESIDENCY_V1_COMPETENCIES = Object.freeze([

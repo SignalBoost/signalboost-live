@@ -589,7 +589,10 @@ async function tryFreshCurrentFact(input: {
   }
 
   const evidenceBlock = freshEvidenceGroundingBlock(input.prompt, sources, retrievedAt)
+  // Labeled (2026-09-27): the live-fact answer uses the fresh-grounded lane's bounded policy instead of running
+  // unlabeled on the background reasoner.
   const synthesisRequest = {
+    usageContext: { feature: 'cos_fresh_grounded_task', purpose: 'live_fact_synthesis' },
     temperature: 0,
     maxTokens: 1800,
     systemPrompt: [
@@ -662,7 +665,10 @@ async function reflectOrdinaryAnswerFreshness(
   const signals = answerFreshnessSignals(result.reply)
   if (!signals.length) return result
 
+  // Labeled interactive call with thinking off (2026-09-27): unlabeled chat calls ran on the slow background reasoner.
   const repair = await callCosReasoner({
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'answer_freshness_reflection' },
+    disableThinking: true,
     temperature: 0,
     maxTokens: 1400,
     systemPrompt: [

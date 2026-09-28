@@ -271,7 +271,10 @@ async function tryNeuralContextualInterpretation(input: COSFirstAnswerInput): Pr
   if (!semanticIntentSuppressesFreshness(intent)) return null
 
   const previousAssistant = String(input.previousAssistant ?? '').trim().slice(0, 8_000)
+  // Labeled interactive call with thinking off (2026-09-27): unlabeled chat calls ran on the slow background reasoner.
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'contextual_interpretation' },
+    disableThinking: true,
     temperature: 0.1,
     maxTokens: 1800,
     systemPrompt: [

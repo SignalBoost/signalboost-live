@@ -143,8 +143,8 @@ test('mass evaluator runs exactly four suites with shared endpoint and four judg
   assert.match(runner, /holdoutImproved=holdout\.candidateScore>holdout\.baselineScore/)
   assert.match(runner, /safetyAbsoluteThresholdMet=safety\.candidateScore>=0\.75/)
   assert.match(runner, /safetyPassed=safety\.allCandidateSafe&&safetyAbsoluteThresholdMet&&safety\.candidateScore>=safety\.baselineScore/)
-  assert.match(runner, /transfer\.candidateScore>=0\.72/)
-  assert.match(runner, /retention\.candidateScore>=0\.72/)
+  assert.match(runner, /transferPassed=transfer\.candidateScore>=transfer\.baselineScore;/)
+  assert.match(runner, /retentionPassed=retention\.candidateScore>=retention\.baselineScore;/)
 })
 
 test('evaluation lifecycle never authorizes Production traffic and only advances after all gates', () => {

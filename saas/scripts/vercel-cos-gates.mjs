@@ -280,6 +280,7 @@ const tests = [
   'tests/cosInteractiveModelHealthMonitoring.node.test.ts',
   'tests/dashboardPromptOnePipeline.node.test.ts',
   'tests/cosChatPathCallLabels.node.test.ts',
+  'tests/graduateWarmGate.node.test.ts',
 
 ]
 

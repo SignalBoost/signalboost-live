@@ -336,7 +336,7 @@ async function pinnedHoldout(input:{
     const parsed = structuredPrompt && structuredReference
       ? { prompt: structuredPrompt, reference: structuredReference }
       : parseTrainingText(text)
-    return Object.freeze({ text, itemHash, parsed })
+    return Object.freeze({ text, itemHash, parsed, holdoutFormat: clean(row.holdout_format,80) })
   })
 
   const observed = normalized.map(row => row.itemHash)
@@ -358,7 +358,7 @@ async function pinnedHoldout(input:{
       prompt: legacyPrompts.get(row.itemHash) || '',
       reference: row.text,
     }
-    if (parsed.prompt && parsed.reference && holdoutPromptIsGenerative(parsed.prompt)) throw new Error(`mass_distilled_evaluation_holdout_not_exam_ready:${row.itemHash.slice(0,16)}`)
+    if (parsed.prompt && parsed.reference && holdoutPromptIsGenerative(parsed.prompt)) throw new Error(`mass_distilled_evaluation_holdout_not_exam_ready:${row.itemHash.slice(0,16)}`)\n    if (row.parsed && row.holdoutFormat !== 'assessment_ready_v1') throw new Error(`mass_distilled_evaluation_holdout_format_unversioned:${row.itemHash.slice(0,16)}`)
     if (!parsed.prompt || !parsed.reference) {
       // Production 2026-09-20 01:25-01:29: this error repeated every two minutes, each attempt consuming a
       // rolling approval, and named nothing about the row that caused it - so the shape could not be told

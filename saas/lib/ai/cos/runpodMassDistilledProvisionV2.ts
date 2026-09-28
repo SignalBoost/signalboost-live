@@ -301,6 +301,22 @@ async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
 async function resolveEndpointControlPlane(endpointId: string, endpointName = ''): Promise<Endpoint> {
   let observedId = clean(endpointId, 160)
   const observedName = clean(endpointName, 240)
+  // Production 2026-09-28 22:15-22:31 UTC: every exam that started died on "RunPod GET /serverless HTTP 500:
+  // failed to list endpoints". This helper listed EVERY endpoint on the account (~860 never-retired mass
+  // endpoints) just to find the one it already had the id of, on each GPU check, wake and shutdown. When the id
+  // is known, read that single endpoint directly - the same call deleteTerminalMassDistilledRunpodEndpoint uses
+  // for exactly this reason - and fall back to the account-wide list only for name-only lookups or a miss.
+  if (observedId) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const direct = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(observedId)}`)
+        if (direct?.id && clean(direct.id, 160).toLowerCase() === observedId.toLowerCase()) return direct
+        break
+      } catch {
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 750 * (attempt + 1)))
+      }
+    }
+  }
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
     const endpoint = (listed.endpoints || []).find(item =>

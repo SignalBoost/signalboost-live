@@ -1,5 +1,5 @@
-import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 // saas/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts
+import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
@@ -10,6 +10,7 @@ import { recoverStoppedOpenAnswer, recoverStoppedSoloMismatchedMarkerAnswer, rec
 import { servedCandidateModelFromCanary } from './cosUniversityMassEvaluationServedModel.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { readPinnedHfParquetRows } from './hfPinnedParquetRows.ts'
+import { HOLDOUT_EXAM_ITEMS_MISSING_ERROR, readReadyHoldoutExamItems } from './cosUniversityHoldoutExamItems.ts'
 import { buildTeacherPrompts } from './cosUniversityMassDistillationConsumer.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { runpodServerlessOpenAiBaseUrl, runpodServerlessRootUrl } from './runpodServerlessDistilledProvision.ts'
@@ -93,12 +94,6 @@ function clean(value:unknown,max=4000){return String(value??'').trim().slice(0,m
 function sha256Raw(value:string){return createHash('sha256').update(value).digest('hex')}
 function sha256(value:unknown){return createHash('sha256').update(JSON.stringify(value)).digest('hex')}
 function manifestHash(items:readonly string[]){return sha256({items:[...items].sort()})}
-function holdoutPromptIsGenerative(value:string){
-  const prompt=value.toLowerCase()
-  return prompt.includes('generate a distinct, self-contained')
-    || prompt.includes('turn the supplied material into one rigorous standalone teaching example')
-    || prompt.includes('return only the final teaching response')
-}
 function average(values:readonly number[]){return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0}
 function score(value:unknown){const n=Number(value);return Number.isFinite(n)&&n>=0&&n<=1?n:null}
 type ServedCandidateArchitecture = Readonly<{
@@ -336,7 +331,7 @@ async function pinnedHoldout(input:{
     const parsed = structuredPrompt && structuredReference
       ? { prompt: structuredPrompt, reference: structuredReference }
       : parseTrainingText(text)
-    return Object.freeze({ text, itemHash, parsed, holdoutFormat: clean(row.holdout_format,80) })
+    return Object.freeze({ text, itemHash, parsed })
   })
 
   const observed = normalized.map(row => row.itemHash)
@@ -353,13 +348,16 @@ async function pinnedHoldout(input:{
       })
     : new Map<string, string>()
 
-  return normalized.map(row => {
+  const validated = normalized.map(row => {
     const parsed = row.parsed || {
       prompt: legacyPrompts.get(row.itemHash) || '',
       reference: row.text,
     }
-    if (parsed.prompt && parsed.reference && holdoutPromptIsGenerative(parsed.prompt)) throw new Error(`mass_distilled_evaluation_holdout_not_exam_ready:${row.itemHash.slice(0,16)}`)
-    if (row.parsed && row.holdoutFormat !== 'assessment_ready_v1') throw new Error(`mass_distilled_evaluation_holdout_format_unversioned:${row.itemHash.slice(0,16)}`)
+    // 2026-09-27 (#3451/#3453) rejected teacher generation instructions here, but by throwing a substantive error on
+    // every pre-existing holdout, with a literal "\n" that made this module fail to parse, and with a holdout_format
+    // check the pinned-parquet reader never populates (so it would have rejected every row). The exam question no
+    // longer comes from this row at all: each withheld essay has its own written exam item (see below), so a
+    // generative instruction or an unversioned row is never asked. The row still supplies identity and the essay.
     if (!parsed.prompt || !parsed.reference) {
       // Production 2026-09-20 01:25-01:29: this error repeated every two minutes, each attempt consuming a
       // rolling approval, and named nothing about the row that caused it - so the shape could not be told
@@ -377,7 +375,25 @@ async function pinnedHoldout(input:{
       ].join(':')
       throw new Error(`mass_distilled_evaluation_holdout_format_invalid:${shape}`)
     }
-    return Object.freeze({ id: row.itemHash.slice(0, 16), prompt: parsed.prompt, reference: parsed.reference })
+    return Object.freeze({ id: row.itemHash.slice(0, 16), itemHash: row.itemHash })
+  })
+
+  // Real Holdout exam questions (owner decision 2026-09-27). A holdout row is a withheld TEACHING ESSAY whose
+  // prompt column was the teacher's generation instruction ("... turn the supplied material into one rigorous
+  // standalone teaching example ...") or, since #3453, a generic "explain the source teaching case" request the
+  // student cannot answer because it never sees that case. Grading freshly written examples against the teacher's
+  // one essay scored both models 0 on every case: 279 of 529 Holdout failures were both-zero.
+  // Each withheld essay now has one self-contained exam question + short answer key (cos_university_holdout_exam_items,
+  // written by cron/cos-university-holdout-exam-items). The integrity checks above are unchanged; every item must
+  // have its exam question or the evaluation stops before any model is asked (evaluator infrastructure, not quality).
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const examItems = await readReadyHoldoutExamItems(db, validated.map(row => row.itemHash))
+  const missing = validated.filter(row => !examItems.has(row.itemHash))
+  if (missing.length) throw new Error(`${HOLDOUT_EXAM_ITEMS_MISSING_ERROR}:${missing.length}/${validated.length}`)
+  return validated.map(row => {
+    const item = examItems.get(row.itemHash)!
+    return Object.freeze({ id: row.id, prompt: item.question, reference: item.answerKey, evaluationMode: 'deterministic' as const })
   })
 }
 

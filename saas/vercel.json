@@ -74,6 +74,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/cron/cos-university-holdout-exam-items",
+      "schedule": "4,14,24,34,44,54 * * * *"
+    },
+    {
       "path": "/api/cron/runpod-distilled-local-deploy",
       "schedule": "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"
     },

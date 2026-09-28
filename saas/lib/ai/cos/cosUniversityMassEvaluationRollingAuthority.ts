@@ -361,7 +361,7 @@ export function decideExhaustedMassEvaluationArtifacts(input: {
   const nowMs = input.now.getTime()
   const exhausted: ExhaustedMassEvaluationArtifact[] = []
   for (const artifact of input.artifacts) {
-    if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) { skip('not_mass_or_bad_hash'); continue }
+    if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
     const history = artifactHistory(artifact, input.events, nowMs)
     // A verdict has its own lifecycle write, and a live run must be left alone.
     if (history.hasVerdict || history.liveStart) continue
@@ -432,7 +432,12 @@ export function decideRollingMassEvaluationApproval(input: {
     if (aFrontier !== bFrontier) return aFrontier ? -1 : 1
     return at(a.createdAt) - at(b.createdAt)
   })
-  // Why each artifact was passed over, so an all-skipped tick is diagnosable from its receipt (2026-09-28: 470\n  // consecutive ticks said only 'no eligible artifact' and nothing recorded which rule held ~1,300 artifacts).\n  // Observation only: no rule, threshold or authority depends on these counts.\n  const skipped: Record<string, number> = {}\n  const skip = (reason: string) => { skipped[reason] = (skipped[reason] || 0) + 1 }\n  for (const artifact of ordered) {
+  // Why each artifact was passed over, so an all-skipped tick is diagnosable from its receipt (2026-09-28: 470
+  // consecutive ticks said only 'no eligible artifact' and nothing recorded which rule held ~1,300 artifacts).
+  // Observation only: no rule, threshold or authority depends on these counts.
+  const skipped: Record<string, number> = {}
+  const skip = (reason: string) => { skipped[reason] = (skipped[reason] || 0) + 1 }
+  for (const artifact of ordered) {
     if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) { skip('not_mass_or_bad_hash'); continue }
     if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) { skip('younger_than_12h'); continue }
     const hash = artifact.artifactHash.toLowerCase()

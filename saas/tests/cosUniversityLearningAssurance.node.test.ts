@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityLearningAssurance.node.test.ts
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -84,6 +85,7 @@ test('assurance registry covers every scheduled University route explicitly', ()
     '/api/cron/cos-university-distilled-evaluation': 'distilled_independent_evaluation',
     '/api/cron/cos-university-mass-distilled-evaluation': 'mass_distilled_independent_evaluation',
     '/api/cron/cos-university-mass-backlog-compact': 'mass_backlog_compaction',
+    '/api/cron/cos-university-holdout-exam-items': 'holdout_exam_preparation',
     '/api/cron/cos-university-mass-distillation': 'mass_distillation_campaign',
     '/api/cron/cos-university-distillation-supervisor': 'mass_distillation_supervision',
     '/api/cron/cos-university-residency': 'builder_residency',

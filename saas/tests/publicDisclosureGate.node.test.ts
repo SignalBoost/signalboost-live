@@ -79,11 +79,11 @@ test('the gate runs on every public answer and fails closed with no draft', () =
   assert.match(source, /return learnFromTurn\(input, await releaseToPublic\(input, brain\)\)/)
   const releaseAt = source.indexOf('async function releaseToPublic(')
   const release = source.slice(releaseAt, source.indexOf('function harvestCatalogNames('))
-  assert.match(release, /const disclosures = publicDisclosureViolations\(answer\)/)
+  assert.match(release, /const disclosures = publicDisclosureViolations\(answer, userRequest\)/)
   assert.ok(!/isSignalBoostSpecificPublicRequest/.test(release), 'gate must apply to every public answer')
   const failClosed = release.slice(release.indexOf('const redacted ='), release.indexOf('answer = redacted.answer.trim()'))
   assert.ok(!/bestEffortReply\s*:/.test(failClosed), 'a redaction failure must not surface a draft')
-  assert.match(release, /publicDisclosureViolations\(draft\)\.length/, 'low-confidence drafts are gated too')
+  assert.match(release, /publicDisclosureViolations\(draft, userRequest\)\.length/, 'low-confidence drafts are gated too')
 })
 
 test('detects a question about what runs the service', () => {
@@ -165,4 +165,37 @@ test('PUBLIC identity is answered before the public reasoner is called', () => {
   assert.ok(branchAt > 0, 'public branch must exist')
   assert.ok(interceptAt > branchAt, 'public intercept must exist')
   assert.ok(reasonerAt > interceptAt, 'public intercept must precede the COS reasoner call')
+})
+
+test('a vendor the visitor named is part of the answer, not a stack disclosure (2026-09-27)', () => {
+  // Production, public Concierge 19:56 ET: this question took 65s because every correct draft names the vendors.
+  const request = 'Compare the trade-offs of scaling our RunPod GPUs versus adding DeepInfra capacity — which is the better decision and why?'
+  const answer = 'Scaling RunPod GPUs gives you dedicated capacity and predictable latency; adding DeepInfra capacity is pay-per-token and scales instantly. Choose RunPod for steady high volume and DeepInfra for spiky demand.'
+  assert.deepEqual(publicDisclosureViolations(answer, request), [])
+  // Without the visitor naming them, the same text is still a stack disclosure.
+  assert.ok(publicDisclosureViolations(answer).includes('infrastructure_identifier'))
+  assert.ok(publicDisclosureViolations(answer, 'Which GPU cloud should we pick?').includes('infrastructure_identifier'))
+})
+
+test('a vendor the visitor named is still a disclosure when the answer attributes it to itself', () => {
+  const request = 'Is RunPod good for inference?'
+  assert.ok(publicDisclosureViolations('Yes. This service runs on RunPod, so I can say it works well.', request).includes('infrastructure_identifier'))
+  assert.ok(publicDisclosureViolations('RunPod works well; we are powered by RunPod ourselves.', request).includes('infrastructure_identifier'))
+})
+
+test('ordinary facts about a visitor-named vendor are not self-attribution', () => {
+  const request = 'Compare RunPod and DeepInfra for our inference.'
+  assert.deepEqual(publicDisclosureViolations('RunPod runs on dedicated NVIDIA GPUs billed hourly. DeepInfra is built on shared serverless capacity.', request), [])
+})
+
+test('naming one vendor never licenses a different unnamed vendor', () => {
+  const request = 'Should we use RunPod?'
+  assert.ok(publicDisclosureViolations('RunPod is fine, and our data lives in Supabase.', request).includes('infrastructure_identifier'))
+})
+
+test('public repair and redaction are labeled interactive calls with thinking off', () => {
+  const core = readFileSync(PUBLIC_PIPELINE, 'utf8')
+  assert.match(core, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'public_scope_repair' \},\n      disableThinking: true,/)
+  assert.match(core, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'public_disclosure_redaction' \},\n      disableThinking: true,/)
+  assert.match(core, /publicDisclosureViolations\(redacted\.answer, userRequest\)/)
 })

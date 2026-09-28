@@ -85,6 +85,38 @@ const INTERNAL_COMPONENT =
 const INTERNAL_METRIC =
   /(?<![\p{L}\p{N}_])(?:confidence\s+(?:score\s+)?(?:of\s+)?0?\.\d+|threshold\s+(?:of\s+)?0?\.\d+|confidence\s+threshold|token\s+ceiling|max[_\s]?tokens)(?![\p{L}\p{N}_])/iu
 
+/**
+ * VISITOR-NAMED VENDORS (2026-09-27). Production, public Concierge 19:56 ET: "Compare the trade-offs of scaling
+ * our RunPod GPUs versus adding DeepInfra capacity". Every correct answer must name RunPod and DeepInfra, so Tier A
+ * flagged each draft as a stack disclosure, a 36s redaction ran, could not remove the names without destroying
+ * the answer, and the turn failed closed into the rescue (65s total). Naming a vendor the visitor already named is
+ * answering their question, not revealing our stack. It is still a disclosure when the answer attributes that
+ * vendor to itself ("we run on RunPod", "powered by DeepInfra"), and any vendor the visitor did NOT name stays a
+ * violation wherever it appears.
+ */
+function infrastructureDisclosed(answer: string, userRequest: string): boolean {
+  const finder = new RegExp(INFRASTRUCTURE_IDENTIFIER.source, 'giu')
+  const requested = new Set<string>()
+  if (userRequest.trim()) {
+    let named: RegExpExecArray | null
+    while ((named = finder.exec(userRequest)) !== null) requested.add(named[0].toLowerCase())
+    finder.lastIndex = 0
+  }
+  let match: RegExpExecArray | null
+  const mentioned = new Set<string>()
+  while ((match = finder.exec(answer)) !== null) mentioned.add(match[0].toLowerCase())
+  if (!mentioned.size) return false
+  for (const vendor of mentioned) if (!requested.has(vendor)) return true
+  // Sentence-level self-attribution. The generic SELF_REFERENCE phrases ("runs on", "built on") are too broad here:
+  // "RunPod runs on NVIDIA GPUs" is ordinary content in an answer about RunPod.
+  const vendorPattern = new RegExp(INFRASTRUCTURE_IDENTIFIER.source, 'iu')
+  return answer.split(/(?<=[.!?])\s+|\n+/).some(sentence => vendorPattern.test(sentence) && VENDOR_SELF_ATTRIBUTION.test(sentence))
+}
+
+/** The answer talking about its own stack: this service/COS/iTMounts, first person, or "powered by". */
+const VENDOR_SELF_ATTRIBUTION =
+  /(?<![\p{L}\p{N}_])(?:this\s+(?:assistant|system|concierge|service|platform|site)|COS|itmounts|I\s+(?:am|run|use|was)|we\s+(?:run|are|use|host|rely|deploy)|our\s+own|powered\s+by|hosted\s+(?:on|by))(?![\p{L}\p{N}_])/iu
+
 function selfAttributedWindows(answer: string): string[] {
   const windows: string[] = []
   const finder = new RegExp(SELF_REFERENCE.source, 'giu')
@@ -102,12 +134,12 @@ function selfAttributedWindows(answer: string): string[] {
  * Internal disclosures present in a public-scope answer. Empty array means the answer is safe to
  * render publicly. Applies to every public answer, on every subject.
  */
-export function publicDisclosureViolations(answer: string): PublicDisclosureViolation[] {
+export function publicDisclosureViolations(answer: string, userRequest = ''): PublicDisclosureViolation[] {
   const value = String(answer ?? '')
   if (!value.trim()) return []
   const violations: PublicDisclosureViolation[] = []
 
-  if (INFRASTRUCTURE_IDENTIFIER.test(value)) violations.push('infrastructure_identifier')
+  if (infrastructureDisclosed(value, String(userRequest ?? ''))) violations.push('infrastructure_identifier')
   if (INTERNAL_IDENTIFIER.test(value)) violations.push('internal_identifier')
   if (EVIDENCE_LABEL.test(value)) violations.push('evidence_label')
   if (PROVENANCE_FUNNEL.test(value)) violations.push('provenance_funnel')

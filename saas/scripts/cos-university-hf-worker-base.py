@@ -502,7 +502,15 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
     # Training keeps the original supervised teacher-generation pair. Holdout deliberately does not:
     # those prompts ask for a new teaching example and cannot be graded deterministically against one
     # teacher essay. Preserve text/item_hash identity, but emit a separate assessment-ready pair.
-    training = Dataset.from_list([row for _, row in training_pairs])
+    # Both splits must carry an IDENTICAL column set. datasets' DatasetDict.push_to_hub calls
+    # _check_values_features() and raises ValueError when they differ, which exits the job with code 1.
+    # Production 2026-09-28: holdout rows gained "holdout_format" (assessment-ready pairs, owner decision
+    # 2026-09-27) while training rows did not, so EVERY preparation job failed from that change onward and
+    # the University stopped producing artifacts. The split is still distinguished by the DatasetDict key
+    # and by this column's value; it is simply present on both sides so the feature sets match.
+    training = Dataset.from_list([
+        {**row, "holdout_format": "training_pair_v1"} for _, row in training_pairs
+    ])
     holdout_rows = []
     for _, row in holdout_pairs:
         exam_prompt, exam_reference = holdout_assessment_pair(row)

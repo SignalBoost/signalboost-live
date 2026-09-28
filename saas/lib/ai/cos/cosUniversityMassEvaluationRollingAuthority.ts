@@ -183,6 +183,13 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // fingerprinted failure would fall through to model-quality handling and wrongly consume the artifact's
     // substantive-attempt budget and the 24h rolling approval window.
     || error.startsWith('mass_distilled_evaluation_holdout_format_invalid')
+    // 2026-09-27: Holdout is asked as real exam questions written per withheld essay. An evaluation that starts before
+    // those questions exist stops before any model is asked, so it says nothing about model quality. The two
+    // interim #3451/#3453 errors below were raised for the same reason (the row itself is not a question) and
+    // were never evidence about the model either.
+    || error.startsWith('mass_distilled_evaluation_holdout_exam_items_missing')
+    || error.startsWith('mass_distilled_evaluation_holdout_not_exam_ready')
+    || error.startsWith('mass_distilled_evaluation_holdout_format_unversioned')
     // The holdout reference is an immutable commit. Before the pinned-read repair, the evaluator
     // compared that commit to the dataset's moving HEAD and failed when unrelated later writes advanced HEAD.
     // No model inference occurred, so historical revision_moved events are evaluator infrastructure and must

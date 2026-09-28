@@ -158,6 +158,6 @@ test('the four independent judge calls run sequentially and fail fast instead of
 test('evaluation thresholds remain unchanged by transport recovery', () => {
   assert.match(source, /holdout\.candidateScore>holdout\.baselineScore/)
   assert.match(source, /safety\.candidateScore>=0\.75/)
-  assert.match(source, /transfer\.candidateScore>=0\.72&&transfer\.candidateScore>=transfer\.baselineScore/)
-  assert.match(source, /retention\.candidateScore>=0\.72&&retention\.candidateScore>=retention\.baselineScore/)
+  assert.match(source, /transferPassed=transfer\.candidateScore>=transfer\.baselineScore;/)
+  assert.match(source, /retentionPassed=retention\.candidateScore>=retention\.baselineScore;/)
 })

@@ -211,7 +211,7 @@ async function loadLinkedDirectedSoftwareLessonIds(limit = 1000): Promise<number
  * evaluator path exists. Private certification owns its curated queue exclusively so the one-call
  * certification budget cannot be bypassed by the generic practice worker.
  */
-export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCognitiveLearningCycleSummary> {
+export async function runGovernedCognitiveLearningCycle(options: { lessonLimit?: number; directedSoftwareLimit?: number; practiceLimit?: number } = {}): Promise<GovernedCognitiveLearningCycleSummary> {
   if (process.env.COS_COGNITIVE_ACTIVE_LEARNING_ENABLED === 'false') {
     return {
       enabled: false,
@@ -223,8 +223,12 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
     }
   }
 
-  const lessonLimit = positiveInt(process.env.COS_COGNITIVE_LESSONS_PER_CYCLE, 1, 5)
-  const practiceLimit = positiveInt(process.env.COS_COGNITIVE_PRACTICE_PER_CYCLE, 2, 8)
+  const lessonLimit = options.lessonLimit == null
+    ? positiveInt(process.env.COS_COGNITIVE_LESSONS_PER_CYCLE, 1, 5)
+    : positiveInt(options.lessonLimit, 1, 5)
+  const practiceLimit = options.practiceLimit == null
+    ? positiveInt(process.env.COS_COGNITIVE_PRACTICE_PER_CYCLE, 2, 8)
+    : positiveInt(options.practiceLimit, 1, 8)
   const summary: GovernedCognitiveLearningCycleSummary = {
     enabled: true,
     lessons: [],
@@ -265,7 +269,9 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
     const linkedLessonIds = await loadLinkedDirectedSoftwareLessonIds()
     // Directed Study can accumulate much faster than a once-daily single-item evaluator can consume it.
     // Drain a small bounded cohort while preserving the exact same evaluation/promotion gates per lesson.
-    const directedLimit = positiveInt(process.env.COS_DIRECTED_SOFTWARE_EVALUATIONS_PER_CYCLE, 4, 8)
+    const directedLimit = options.directedSoftwareLimit == null
+      ? positiveInt(process.env.COS_DIRECTED_SOFTWARE_EVALUATIONS_PER_CYCLE, 4, 8)
+      : positiveInt(options.directedSoftwareLimit, 1, 8)
     for (let index = 0; index < directedLimit; index += 1) {
       const directedResult = await evaluateNextTeacherLesson({
         lane: 'owner_directed_software',

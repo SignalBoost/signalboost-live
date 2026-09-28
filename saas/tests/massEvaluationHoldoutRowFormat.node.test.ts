@@ -113,3 +113,12 @@ test('response-only legacy hosted rows are recovered only after immutable manife
 })
 
 // Legacy hosted rows are immutable response-only evidence; prompt recovery must stay exact-bound and fail closed.
+
+
+test('teacher content-generation instructions are never accepted as deterministic holdout questions', () => {
+  assert.match(SOURCE, /function holdoutPromptIsGenerative/)
+  assert.match(SOURCE, /generate a distinct, self-contained/)
+  assert.match(SOURCE, /turn the supplied material into one rigorous standalone teaching example/)
+  assert.match(SOURCE, /return only the final teaching response/)
+  assert.match(SOURCE, /mass_distilled_evaluation_holdout_not_exam_ready:\$\{row\.itemHash\.slice\(0,16\)\}/)
+})

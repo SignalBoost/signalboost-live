@@ -152,10 +152,34 @@ test('the evaluator asks the exam question, grades against the key, and stops be
 
 test('the evaluation route only approves exam-ready artifacts, and a missing-items stop is infrastructure', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /const remaining = await holdoutExamReadyArtifacts\(db, undisposed, now\)/)
+  // Production 2026-09-28: questions requested for every pending artifact at once left 33 random artifacts ready and
+  // none eligible; the lane examined nobody for two hours. The approval policy now picks first, and questions are
+  // prepared only for its next few picks.
+  assert.match(route, /const HOLDOUT_EXAM_LOOKAHEAD = 6/)
   assert.match(route, /artifacts: remaining,/)
+  assert.match(route, /const examReady = await holdoutExamReadyArtifacts\(db, picks\.map\(pick => pick\.artifact\), now\)/)
+  assert.doesNotMatch(route, /holdoutExamReadyArtifacts\(db, undisposed, now\)/)
+  assert.ok(route.indexOf('decideRollingMassEvaluationApproval({', route.indexOf('HOLDOUT_EXAM_LOOKAHEAD; index'))
+    < route.indexOf('await holdoutExamReadyArtifacts(db, picks'), 'the policy picks before questions are requested')
   const rolling = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts', import.meta.url), 'utf8')
   assert.match(rolling, /error\.startsWith\('mass_distilled_evaluation_holdout_exam_items_missing'\)/)
   const vercel = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
   assert.ok(vercel.crons.some((c: any) => c.path === '/api/cron/cos-university-holdout-exam-items'))
+})
+
+
+test('artifacts the route asks about again jump the question-writing queue, newest first', async () => {
+  const old = '2026-09-28T02:57:00.000Z'
+  const db = fakeDb({ sets: [
+    { candidate_id: 'mass:old', trained_artifact_hash: H('e'), status: 'requested', updated_at: old },
+    { candidate_id: 'mass:next', trained_artifact_hash: H('f'), status: 'requested', updated_at: old },
+  ] })
+  const now = new Date('2026-09-28T05:00:00.000Z')
+  const ready = await holdoutExamReadyArtifacts(db, [{ candidateId: 'mass:next', artifactHash: H('f') }], now)
+  assert.equal(ready.length, 0)
+  const sets = db.tables.cos_university_holdout_exam_sets
+  assert.equal(sets.find(r => r.candidate_id === 'mass:next')?.updated_at, now.toISOString())
+  assert.equal(sets.find(r => r.candidate_id === 'mass:old')?.updated_at, old)
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityHoldoutExamItems.ts', import.meta.url), 'utf8')
+  assert.match(source, /\.order\('updated_at', \{ ascending: false \}\)/)
 })

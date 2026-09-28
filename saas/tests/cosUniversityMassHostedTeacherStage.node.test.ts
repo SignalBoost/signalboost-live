@@ -496,7 +496,8 @@ test('remediation consumer keeps ordinary subject examples in training after ind
 test('dataset preparation emits assessment-ready Holdout rows without changing training pairs', () => {
   const worker = fs.readFileSync(path.join(import.meta.dirname, '../scripts/cos-university-hf-worker-base.py'), 'utf8')
   assert.match(worker, /def holdout_assessment_pair\(row: dict\[str, Any\]\)/)
-  assert.match(worker, /training = Dataset\.from_list\(\[row for _, row in training_pairs\]\)/)
+  assert.match(worker, /training = Dataset\.from_list\(\[/)
+  assert.match(worker, /\{\*\*row, "holdout_format": "training_pair_v1"\} for _, row in training_pairs/)
   assert.match(worker, /"holdout_format": "assessment_ready_v1"/)
   assert.match(worker, /Do not invent a different example/)
 })

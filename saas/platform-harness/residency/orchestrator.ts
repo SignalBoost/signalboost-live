@@ -6,6 +6,7 @@ import {
 } from '../../lib/ai/cos/cosUniversityResidency.ts'
 import {
   ACTIVE_BUILDER_RESIDENCY_CASES,
+  builderResidencyCaseByVariantHash,
   type BuilderResidencyCase,
 } from '../cases/builder-residency.ts'
 import type {
@@ -30,8 +31,23 @@ export interface BuilderResidencyEnrollment {
   standing:ResidencyStanding
 }
 
+export interface UnrecoverableResidencyCompetency {
+  competencyId:string
+  passesAfterLastFailure:number
+  untriedVariants:number
+  attempts:readonly Readonly<{variantId:string;variantHash:string;outcome:'pass'|'fail';observedAt:string}>[]
+}
+
 export interface BuilderResidencyOrchestratorStore extends BuilderResidencyEvidenceStore {
   nextEnrollment():Promise<BuilderResidencyEnrollment|null>
+  /**
+   * Terminal FAIL for a resident that can no longer clear a remediation competency. Optional so stores
+   * without it keep the previous behaviour (`waiting_for_residency_cases`).
+   */
+  closeFailedResidency?(input:{
+    enrollment:BuilderResidencyEnrollment
+    competencies:readonly UnrecoverableResidencyCompetency[]
+  }):Promise<{closed:boolean;artifactQuarantined:boolean}>
   readEvidence(residencyId:string):Promise<readonly ResidencyEvidenceForAssessment[]>
   refreshAssessment(residencyId:string):Promise<{
     standing:ResidencyStanding
@@ -80,6 +96,50 @@ function recordedVariantKeys(evidence:readonly ResidencyEvidenceForAssessment[])
   return new Set(
     evidence.map(item=>`${item.competencyId}:${item.variantHash}`),
   )
+}
+
+/**
+ * Remediation competencies that can no longer be cleared.
+ *
+ * After a failure a competency needs two DISTINCT later passes, and each variant can be attempted once
+ * (competency evidence is unique per residency, competency and variant). When the later passes already
+ * recorded plus the variants still untried add up to fewer than two, no future case can clear it: the
+ * Residency evaluation has reached its result and the requirement was not met. Production 2026-09-28:
+ * 26 of 37 active residents were here (almost all root_cause_diagnosis fail -> pass -> fail on its three
+ * variants), stayed `remediation_required` forever and kept taking practical-case turns from residents
+ * that can still finish. The standard is unchanged; only a result that is already certain is recorded.
+ */
+export function unrecoverableBuilderResidencyCompetencies(input:{
+  evidence:readonly ResidencyEvidenceForAssessment[]
+  cases?:readonly BuilderResidencyCase[]
+}):readonly UnrecoverableResidencyCompetency[]{
+  const cases=input.cases??ACTIVE_BUILDER_RESIDENCY_CASES
+  const assessment=assessBuilderResidency(input.evidence)
+  const recorded=recordedVariantKeys(input.evidence)
+  const unrecoverable:UnrecoverableResidencyCompetency[]=[]
+  for(const competency of assessment.competencies){
+    if(competency.state!=='remediation_required') continue
+    const untriedVariants=cases.filter(item=>
+      item.competencyId===competency.competencyId&&!recorded.has(`${item.competencyId}:${item.variantHash}`),
+    ).length
+    if(competency.distinctPasses+untriedVariants>=2) continue
+    const attempts=input.evidence
+      .filter(item=>item.accepted&&item.competencyId===competency.competencyId)
+      .map(item=>Object.freeze({
+        variantId:builderResidencyCaseByVariantHash(item.variantHash)?.variantId??'unknown',
+        variantHash:item.variantHash,
+        outcome:item.outcome,
+        observedAt:item.observedAt,
+      }))
+      .sort((a,b)=>Date.parse(a.observedAt)-Date.parse(b.observedAt))
+    unrecoverable.push(Object.freeze({
+      competencyId:competency.competencyId,
+      passesAfterLastFailure:competency.distinctPasses,
+      untriedVariants,
+      attempts:Object.freeze(attempts),
+    }))
+  }
+  return Object.freeze(unrecoverable)
 }
 
 export function selectNextBuilderResidencyCase(input:{
@@ -148,6 +208,41 @@ export async function runBuilderResidencyOrchestrator(input:{
       promotionAuthorized:false as const,
       productionTrafficAuthorized:false as const,
     })
+  }
+
+  // A resident that can no longer clear a remediation competency gets its final result instead of another
+  // practical case that cannot change it.
+  const unrecoverable=unrecoverableBuilderResidencyCompetencies({evidence:beforeEvidence})
+  if(unrecoverable.length&&input.store.closeFailedResidency){
+    try{
+      const closure=await input.store.closeFailedResidency({enrollment,competencies:unrecoverable})
+      return Object.freeze({
+        ok:true,
+        state:'residency_failed' as const,
+        residencyId:enrollment.residencyId,
+        assessment:before,
+        unrecoverableCompetencies:unrecoverable,
+        closed:closure.closed,
+        artifactQuarantined:closure.artifactQuarantined,
+        coverage,
+        automaticFinalGateEnable:false as const,
+        promotionAuthorized:false as const,
+        productionTrafficAuthorized:false as const,
+      })
+    }catch(error){
+      return Object.freeze({
+        ok:false,
+        state:'residency_failure_not_recorded' as const,
+        residencyId:enrollment.residencyId,
+        assessment:before,
+        unrecoverableCompetencies:unrecoverable,
+        error:error instanceof Error?error.message:String(error),
+        coverage,
+        automaticFinalGateEnable:false as const,
+        promotionAuthorized:false as const,
+        productionTrafficAuthorized:false as const,
+      })
+    }
   }
 
   const practiceCase=selectNextBuilderResidencyCase({evidence:beforeEvidence})

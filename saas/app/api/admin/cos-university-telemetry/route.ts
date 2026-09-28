@@ -1,4 +1,3 @@
-// saas/app/api/admin/cos-university-telemetry/route.ts
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -605,6 +604,8 @@ export async function GET() {
       let nextAction = 'Satisfy evaluation prerequisites'
       if (graduate?.status === 'active') { currentStage = 'Active specialist'; blocker = 'none'; nextAction = 'Serving' }
       else if (graduate) { currentStage = 'Runtime activation'; blocker = text(graduate.status, 80); nextAction = 'Activate exact graduated runtime' }
+      // Terminal Residency FAIL: a remediation competency could no longer be cleared. It is a result, not work in progress.
+      else if (residencyState?.standing === 'residency_failed') { currentStage = 'Builder Residency'; blocker = 'residency_failed'; nextAction = 'Retrain on the failed Residency competencies' }
       else if (residencyState && residencyState.standing !== 'residency_complete') { currentStage = 'Builder Residency'; blocker = residencyState.standing; nextAction = residencyState.standing === 'remediation_required' ? 'Run remediation case' : 'Continue competency cases' }
       else if (residencyState?.standing === 'residency_complete') { currentStage = 'Exact canary'; blocker = canary ? 'none' : 'fresh_exact_canary_required'; nextAction = canary ? 'Run independent final evaluation' : 'Run fresh exact-artifact canary' }
       else if (text(artifact.subject_id, 240) === 'Computer Science & Coding' && artifact.status === 'evaluation_pending') { currentStage = 'Builder Residency'; blocker = 'waiting_for_residency_admission'; nextAction = 'Admit when Residency cohort capacity opens' }
@@ -755,6 +756,7 @@ export async function GET() {
         residencyResidents: residency.filter((row: any) => ['resident','senior_resident'].includes(row.standing)).length,
         residencyRemediation: residency.filter((row: any) => row.standing === 'remediation_required').length,
         residencyComplete: residency.filter((row: any) => row.standing === 'residency_complete').length,
+        residencyFailed: residency.filter((row: any) => row.standing === 'residency_failed').length,
         activeGraduates: (graduatesResult.data || []).filter((row: any) => row.status === 'active').length,
         evaluationPending: artifacts.filter((row: any) => row.status === 'evaluation_pending').length,
         quarantined: artifacts.filter((row: any) => row.status === 'quarantined').length,

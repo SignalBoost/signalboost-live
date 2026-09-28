@@ -1,14 +1,34 @@
+import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ResidencyEvidenceForAssessment, ResidencyStanding } from '../../lib/ai/cos/cosUniversityResidency.ts'
-import type {
-  BuilderResidencyEnrollment,
-  BuilderResidencyOrchestratorStore,
+import {
+  unrecoverableBuilderResidencyCompetencies,
+  type BuilderResidencyEnrollment,
+  type BuilderResidencyOrchestratorStore,
+  type UnrecoverableResidencyCompetency,
 } from './orchestrator.ts'
 import { createSupabaseBuilderResidencyEvidenceStore } from './supabase-store.ts'
 import { refreshBuilderResidencyAssessment } from './assessment-store.ts'
 import { isRetiredBuilderResidencyVariant } from '../cases/builder-residency.ts'
 
 export const BUILDER_RESIDENCY_WARM_RETRY_WINDOW_MS=15*60_000
+export const BUILDER_RESIDENCY_FINAL_DISPOSITION_PROFILE='cos_builder_residency_final_disposition_v1' as const
+export const BUILDER_RESIDENCY_FAILED_CLAIM='builder_residency_failed' as const
+const ACTIVE_RESIDENCY_STANDINGS=['resident','senior_resident','remediation_required'] as const
+const RESIDENCY_FAILURE_SWEEP_LIMIT=200
+
+const sha256=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex')
+
+export type BuilderResidencyFailureSweep=Readonly<{
+  checked:number
+  closedResidencyIds:readonly string[]
+  quarantinedArtifacts:number
+  errors:readonly string[]
+}>
+
+export type SupabaseBuilderResidencyOrchestratorStore=BuilderResidencyOrchestratorStore&Readonly<{
+  closeUnrecoverableResidencies():Promise<BuilderResidencyFailureSweep>
+}>
 
 type ResidencySchedulerCaseRow=Readonly<{
   residency_id:unknown
@@ -75,16 +95,150 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
   portableId:string
   agentId:string
   sandboxEnvironmentId:string
-}):BuilderResidencyOrchestratorStore{
+}):SupabaseBuilderResidencyOrchestratorStore{
   const evidenceStore=createSupabaseBuilderResidencyEvidenceStore(input.db)
+
+  const toEnrollment=(data:any):BuilderResidencyEnrollment=>Object.freeze({
+    residencyId:String(data.id),
+    candidateId:String(data.candidate_id),
+    subjectId:String(data.subject_id),
+    tenantId:input.tenantId,
+    portableId:input.portableId,
+    agentId:input.agentId,
+    artifactId:String(data.trained_artifact_id),
+    artifactHash:String(data.trained_artifact_hash),
+    artifactRevision:String(data.revision_key),
+    sandboxEnvironmentId:input.sandboxEnvironmentId,
+    standing:String(data.standing) as ResidencyStanding,
+  })
+
+  async function readEvidence(residencyId:string):Promise<readonly ResidencyEvidenceForAssessment[]>{
+    const {data,error}=await input.db
+      .from('cos_university_residency_competency_evidence')
+      .select('competency_id,variant_hash,outcome,observed_at')
+      .eq('residency_id',residencyId)
+      .order('observed_at',{ascending:true})
+    if(error) throw error
+    return Object.freeze((data??[]).map(row=>Object.freeze({
+      competencyId:String(row.competency_id),
+      variantHash:String(row.variant_hash),
+      outcome:String(row.outcome)==='fail'?'fail' as const:'pass' as const,
+      observedAt:String(row.observed_at),
+      // Evidence from a retired (trivially passing) variant proves nothing and never counts.
+      accepted:!isRetiredBuilderResidencyVariant(String(row.variant_hash)),
+    })))
+  }
+
+  /**
+   * Record the terminal Residency FAIL: the evidence of WHY first (idempotent on a deterministic key), then
+   * the student's artifact verdict (quarantined, only from evaluation_pending), then the enrollment standing
+   * (only from an active standing). Every step is conditional, so a retry after a partial failure repeats
+   * nothing and completes the rest. This records an educational result; it never evaluates, scores,
+   * promotes, spends or touches Production.
+   */
+  async function closeFailedResidency(close:{
+    enrollment:BuilderResidencyEnrollment
+    competencies:readonly UnrecoverableResidencyCompetency[]
+  }):Promise<{closed:boolean;artifactQuarantined:boolean}>{
+    const now=new Date().toISOString()
+    const enrollment=close.enrollment
+    const body={
+      profile:BUILDER_RESIDENCY_FINAL_DISPOSITION_PROFILE,
+      claim:BUILDER_RESIDENCY_FAILED_CLAIM,
+      residencyId:enrollment.residencyId,
+      candidateId:enrollment.candidateId,
+      artifactHash:enrollment.artifactHash,
+      failedCompetencies:close.competencies.map(item=>({
+        competencyId:item.competencyId,
+        passesAfterLastFailure:item.passesAfterLastFailure,
+        untriedVariants:item.untriedVariants,
+        attempts:item.attempts,
+      })),
+      requirement:'after a failure, two distinct later passes on different variants; each variant is attempted once',
+      nextStatus:'quarantined',
+      nextStanding:'residency_failed',
+      terminalDisposition:true,
+      evaluationPassed:false,
+      productionTrafficAuthorized:false,
+      authorityExpanded:false,
+    }
+    const event=await input.db.from('cos_university_learning_assurance_events').upsert({
+      event_key:sha256([BUILDER_RESIDENCY_FINAL_DISPOSITION_PROFILE,BUILDER_RESIDENCY_FAILED_CLAIM,enrollment.residencyId]),
+      event_type:'fine_tune',
+      subject_id:enrollment.subjectId||null,
+      candidate_id:enrollment.candidateId,
+      evidence_hash:sha256(body),
+      evidence:body,
+      verifier:'host_controller',
+      observed_at:now,
+    },{onConflict:'event_key',ignoreDuplicates:true})
+    if(event.error) throw event.error
+
+    const artifact=await input.db.from('cos_local_distillation_artifacts')
+      .update({status:'quarantined',updated_at:now})
+      .eq('candidate_id',enrollment.candidateId)
+      .eq('trained_artifact_hash',enrollment.artifactHash)
+      .eq('status','evaluation_pending')
+      .select('id')
+    if(artifact.error) throw artifact.error
+
+    const standing=await input.db.from('cos_university_residency_enrollments')
+      .update({standing:'residency_failed',updated_at:now})
+      .eq('id',enrollment.residencyId)
+      .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
+      .select('id')
+    if(standing.error) throw standing.error
+
+    return {closed:(standing.data??[]).length>0,artifactQuarantined:(artifact.data??[]).length>0}
+  }
+
   return Object.freeze({
     ...evidenceStore,
+
+    closeFailedResidency,
+
+    /**
+     * One pass over every active resident, run once per tick before admission and case selection, so all
+     * residents whose result is already certain leave the queue at once instead of one per case turn.
+     * A failure on one resident is reported and never blocks the others or the rest of the tick.
+     */
+    async closeUnrecoverableResidencies():Promise<BuilderResidencyFailureSweep>{
+      const active=await input.db
+        .from('cos_university_residency_enrollments')
+        .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,standing,updated_at')
+        .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
+        .order('updated_at',{ascending:true})
+        .limit(RESIDENCY_FAILURE_SWEEP_LIMIT)
+      if(active.error) throw active.error
+      const closedResidencyIds:string[]=[]
+      const errors:string[]=[]
+      let quarantinedArtifacts=0
+      for(const row of active.data??[]){
+        const enrollment=toEnrollment(row)
+        try{
+          const competencies=unrecoverableBuilderResidencyCompetencies({evidence:await readEvidence(enrollment.residencyId)})
+          if(!competencies.length) continue
+          const closure=await closeFailedResidency({enrollment,competencies})
+          if(closure.closed) closedResidencyIds.push(enrollment.residencyId)
+          if(closure.artifactQuarantined) quarantinedArtifacts+=1
+        }catch(error){
+          const message=error instanceof Error?error.message:String((error as any)?.message??error)
+          errors.push(`${enrollment.residencyId.slice(0,8)}:${message.slice(0,200)}`)
+        }
+      }
+      return Object.freeze({
+        checked:(active.data??[]).length,
+        closedResidencyIds:Object.freeze(closedResidencyIds),
+        quarantinedArtifacts,
+        errors:Object.freeze(errors),
+      })
+    },
 
     async nextEnrollment():Promise<BuilderResidencyEnrollment|null>{
       const active=await input.db
         .from('cos_university_residency_enrollments')
         .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,standing,updated_at')
-        .in('standing',['resident','senior_resident','remediation_required'])
+        .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
         .order('updated_at',{ascending:true})
         .limit(32)
       if(active.error) throw active.error
@@ -108,37 +262,10 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
         now:new Date(),
       })
       if(!data) return null
-      return Object.freeze({
-        residencyId:String(data.id),
-        candidateId:String(data.candidate_id),
-        subjectId:String(data.subject_id),
-        tenantId:input.tenantId,
-        portableId:input.portableId,
-        agentId:input.agentId,
-        artifactId:String(data.trained_artifact_id),
-        artifactHash:String(data.trained_artifact_hash),
-        artifactRevision:String(data.revision_key),
-        sandboxEnvironmentId:input.sandboxEnvironmentId,
-        standing:String(data.standing) as ResidencyStanding,
-      })
+      return toEnrollment(data)
     },
 
-    async readEvidence(residencyId:string):Promise<readonly ResidencyEvidenceForAssessment[]>{
-      const {data,error}=await input.db
-        .from('cos_university_residency_competency_evidence')
-        .select('competency_id,variant_hash,outcome,observed_at')
-        .eq('residency_id',residencyId)
-        .order('observed_at',{ascending:true})
-      if(error) throw error
-      return Object.freeze((data??[]).map(row=>Object.freeze({
-        competencyId:String(row.competency_id),
-        variantHash:String(row.variant_hash),
-        outcome:String(row.outcome)==='fail'?'fail' as const:'pass' as const,
-        observedAt:String(row.observed_at),
-        // Evidence from a retired (trivially passing) variant proves nothing and never counts.
-        accepted:!isRetiredBuilderResidencyVariant(String(row.variant_hash)),
-      })))
-    },
+    readEvidence,
 
     async refreshAssessment(residencyId:string){
       return refreshBuilderResidencyAssessment({

@@ -141,6 +141,11 @@ export async function GET(req: Request) {
     createSupervisorAuditHarnessEvidenceSink(db as any)
 
   try {
+    // Final results first. A resident that can no longer clear a remediation competency (too few untried
+    // variants left for two distinct later passes) gets its Residency FAIL now, so it stops taking case
+    // turns and never sits in PENDING. Production 2026-09-28: 26 of 37 active residents were in that state.
+    const residencyFailures = await store.closeUnrecoverableResidencies()
+
     // Admission is bounded separately from practical execution. At most one new
     // exact artifact is admitted per tick, and no more than four residents may
     // remain active concurrently.
@@ -187,9 +192,17 @@ export async function GET(req: Request) {
     )
     const body = {
       ...publicResult(result, admission),
+      residencyFailures: {
+        checked: residencyFailures.checked,
+        closed: residencyFailures.closedResidencyIds.length,
+        residencyIds: residencyFailures.closedResidencyIds,
+        quarantinedArtifacts: residencyFailures.quarantinedArtifacts,
+        errors: residencyFailures.errors,
+      },
       batch: {
         attempted: results.length,
         completed: results.filter(item => item.state === 'case_completed').length,
+        residencyFailed: results.filter(item => item.state === 'residency_failed').length,
         infrastructureBlocked: results.filter(item =>
           item.state === 'case_not_completed' &&
           item.execution?.result?.outcome?.status === 'infrastructure_failure'
@@ -207,6 +220,7 @@ export async function GET(req: Request) {
       residencyId: body.residencyId ?? null,
       coverage: result.coverage ?? null,
       admission: body.admission ?? null,
+      residencyFailures: body.residencyFailures,
       selfHealing: body.selfHealing ?? null,
       batch: body.batch,
       automaticFinalGateEnable: false,

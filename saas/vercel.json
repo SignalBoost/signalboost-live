@@ -203,7 +203,11 @@
     },
     {
       "path": "/api/cron/cos-learning-indexer",
-      "schedule": "3,18,33,48 * * * *"
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/agent-learning-application",
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/cos-university-language-a-range",

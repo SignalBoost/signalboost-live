@@ -170,6 +170,20 @@ export async function holdoutExamReadyArtifacts<T extends ArtifactKey>(db: any, 
       .upsert(requests, { onConflict: 'candidate_id,trained_artifact_hash', ignoreDuplicates: true })
     if (inserted.error) throw inserted.error
   }
+  // Already-requested sets the evaluation route asks about again are the ones it will examine next: refresh them so
+  // the writer (newest first) prepares them before the backlog. Production 2026-09-28: every pending artifact was
+  // requested at once, the writer filled 33 effectively at random, none was eligible for approval, and the exam
+  // lane examined nobody for over two hours.
+  for (const item of artifacts) {
+    const key = keyOf(item)
+    if (!known.has(key) || ready.has(key) || !HEX64.test(clean(item.artifactHash, 64).toLowerCase())) continue
+    const touched = await db.from(HOLDOUT_EXAM_SETS_TABLE)
+      .update({ updated_at: now.toISOString() })
+      .eq('candidate_id', clean(item.candidateId, 240))
+      .eq('trained_artifact_hash', clean(item.artifactHash, 64).toLowerCase())
+      .eq('status', 'requested')
+    if (touched?.error) throw touched.error
+  }
   return artifacts.filter(item => ready.has(keyOf(item)))
 }
 
@@ -217,7 +231,8 @@ export async function fillRequestedHoldoutExamSets(input: {
     .select('candidate_id,trained_artifact_hash,status,attempts')
     .in('status', ['requested', 'failed'])
     .lt('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS)
-    .order('updated_at', { ascending: true })
+    // Newest request first: the evaluation route requests (or refreshes) exactly the artifacts it will examine next.
+    .order('updated_at', { ascending: false })
     .limit(limit)
   if (pending.error) throw pending.error
   const sets = pending.data || []

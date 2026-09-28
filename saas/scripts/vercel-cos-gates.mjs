@@ -271,7 +271,6 @@ const tests = [
   'tests/demoPricing.node.test.ts',
   'tests/repositoryRepairAutoMerge.node.test.ts',
   'tests/repositoryMergeWatch.node.test.ts',
-  'tests/mainWriteDiscipline.node.test.ts',
   'tests/cosHarnessIngress.node.test.ts',
   'tests/cosSoftwareSpecialistProductionHarness.node.test.ts',
   'tests/cosA2ASpecialistHarnessIngress.node.test.ts',

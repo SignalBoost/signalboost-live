@@ -126,6 +126,19 @@ def supervised_pair(row: dict[str, Any], text: str) -> tuple[str, str]:
 def manifest_hash(items: list[str]) -> str:
     return sha256(json.dumps({"items": sorted(items)}, separators=(",", ":")))
 
+def holdout_assessment_pair(row: dict[str, Any]) -> tuple[str, str]:
+    response = clean(row.get("response"), 100_000)
+    if not response:
+        return "", ""
+    # The teacher response is immutable source material. Holdout asks the student to recover and
+    # explain its substantive content; it never reuses the teacher's content-generation instruction.
+    question = (
+        "Explain the central concept, mechanism, or decision rule demonstrated in the source teaching "
+        "case. Reconstruct the important causal or quantitative reasoning and state the conclusion. "
+        "Do not invent a different example; answer the case represented by the reference material."
+    )
+    return question, response
+
 
 def sign_callback(timestamp: str, idempotency_key: str, raw_body: str, secret: str) -> str:
     message = "\n".join((timestamp, idempotency_key, raw_body)).encode("utf-8")
@@ -486,8 +499,17 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
     if not training_pairs or not holdout_pairs:
         raise RuntimeError("worker_partition_invalid")
 
+    # Training keeps the original supervised teacher-generation pair. Holdout deliberately does not:
+    # those prompts ask for a new teaching example and cannot be graded deterministically against one
+    # teacher essay. Preserve text/item_hash identity, but emit a separate assessment-ready pair.
     training = Dataset.from_list([row for _, row in training_pairs])
-    holdout = Dataset.from_list([row for _, row in holdout_pairs])
+    holdout_rows = []
+    for _, row in holdout_pairs:
+        exam_prompt, exam_reference = holdout_assessment_pair(row)
+        if not exam_prompt or not exam_reference:
+            raise RuntimeError("worker_holdout_assessment_pair_missing")
+        holdout_rows.append({**row, "prompt": exam_prompt, "response": exam_reference, "holdout_format": "assessment_ready_v1"})
+    holdout = Dataset.from_list(holdout_rows)
 
     api = HfApi(token=token)
     namespace = api.whoami()["name"]

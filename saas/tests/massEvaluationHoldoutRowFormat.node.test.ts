@@ -122,3 +122,10 @@ test('teacher content-generation instructions are never accepted as deterministi
   assert.match(SOURCE, /return only the final teaching response/)
   assert.match(SOURCE, /mass_distilled_evaluation_holdout_not_exam_ready:\$\{row\.itemHash\.slice\(0,16\)\}/)
 })
+
+
+test('new Holdout rows require the versioned assessment-ready contract', () => {
+  assert.match(SOURCE, /holdoutFormat: clean\(row\.holdout_format,80\)/)
+  assert.match(SOURCE, /row\.holdoutFormat !== 'assessment_ready_v1'/)
+  assert.match(SOURCE, /mass_distilled_evaluation_holdout_format_unversioned/)
+})

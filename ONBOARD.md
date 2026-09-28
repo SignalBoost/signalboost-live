@@ -2,6 +2,10 @@
 
 # iTMounts Engineering Blueprint
 
+## Mass Holdout exam-shape invariant — 2026-09-27
+
+Mass-distilled Holdout evaluation must grade an assessment-ready question against a reference answer. Teacher content-generation instructions such as "generate a distinct, self-contained ... teaching example" are curriculum-generation prompts, not deterministic exam questions. After pinned dataset revision, row hash, and manifest verification, the evaluator fails closed with `mass_distilled_evaluation_holdout_not_exam_ready:<item>` when one of those generative prompt contracts reaches Holdout. Never convert that infrastructure defect into a model-quality zero or weaken exact-artifact identity, independent judging, or graduation thresholds. Upstream dataset generation must emit assessment-ready question/reference pairs before affected artifacts can be legitimately re-evaluated.
+
 ## Interactive latency and one-pipeline invariant — 2026-09-27
 
 Owner COS and public Concierge answer in **≤ 5 seconds** (owner-verified 2026-09-27) through **one pipeline**. Full fix record, evidence and diagnosis runbook: `docs/COS-INTERACTIVE-LATENCY-2026-09-27.md`. Read it before changing `app/api/cos-browser`, `app/api/cos-primary`, `lib/ai/cos/cosFirstAnswer*.ts` or `lib/ai/local-inference.ts`.

@@ -93,6 +93,12 @@ function clean(value:unknown,max=4000){return String(value??'').trim().slice(0,m
 function sha256Raw(value:string){return createHash('sha256').update(value).digest('hex')}
 function sha256(value:unknown){return createHash('sha256').update(JSON.stringify(value)).digest('hex')}
 function manifestHash(items:readonly string[]){return sha256({items:[...items].sort()})}
+function holdoutPromptIsGenerative(value:string){
+  const prompt=value.toLowerCase()
+  return prompt.includes('generate a distinct, self-contained')
+    || prompt.includes('turn the supplied material into one rigorous standalone teaching example')
+    || prompt.includes('return only the final teaching response')
+}
 function average(values:readonly number[]){return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0}
 function score(value:unknown){const n=Number(value);return Number.isFinite(n)&&n>=0&&n<=1?n:null}
 type ServedCandidateArchitecture = Readonly<{
@@ -352,6 +358,7 @@ async function pinnedHoldout(input:{
       prompt: legacyPrompts.get(row.itemHash) || '',
       reference: row.text,
     }
+    if (parsed.prompt && parsed.reference && holdoutPromptIsGenerative(parsed.prompt)) throw new Error(`mass_distilled_evaluation_holdout_not_exam_ready:${row.itemHash.slice(0,16)}`)
     if (!parsed.prompt || !parsed.reference) {
       // Production 2026-09-20 01:25-01:29: this error repeated every two minutes, each attempt consuming a
       // rolling approval, and named nothing about the row that caused it - so the shape could not be told

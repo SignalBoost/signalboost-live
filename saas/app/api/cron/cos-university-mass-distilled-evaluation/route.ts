@@ -864,8 +864,7 @@ export async function GET(req: NextRequest) {
     // is indistinguishable from a provider failure without the throw site. Record the first frames of our own
     // stack, and nothing else from the error: no provider bodies, prompts, answers or credentials.
     const frames = error instanceof Error
-      ? String(error.stack || '').split('
-').filter(line => line.trim().startsWith('at ')).slice(0, 4)
+      ? String(error.stack || '').split('\n').filter(line => line.trim().startsWith('at ')).slice(0, 4)
         .map(line => clean(line.replace(/^\s*at\s+/, ''), 160)).filter(Boolean)
       : []
     // A holdout is pinned to an immutable commit, so a failure that is a property of that frozen data can

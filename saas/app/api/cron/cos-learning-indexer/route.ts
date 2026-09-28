@@ -46,8 +46,8 @@ export async function GET(req: NextRequest) {
 
   // Drain a bounded backlog window per invocation instead of only 16 rows. At the previous
   // four-runs/hour cadence, a large retained corpus could remain semantically unavailable for weeks.
-  // Three 32-row batches keep the 300s route bounded while making historical learning reusable by COS.
-  const MAX_BATCHES = 3
+  // Eight 32-row batches keep each run bounded while continuously draining the retained-knowledge backlog without owner clicks.
+  const MAX_BATCHES = 8
   let attempted = 0
   let embedded = 0
   let failed = 0

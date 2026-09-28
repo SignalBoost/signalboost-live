@@ -50,6 +50,8 @@ const ROUTE_RESERVE_MS = 25_000
 // wake a short trigger; waitReady() owns the bounded cold-start wait and continuously retriggers /ping.
 const RUNTIME_WAKE_TIMEOUT_MS = 15_000
 const MIN_BALANCE_USD = 1
+// How many of the approval policy's next picks get their Holdout exam questions prepared ahead of time.
+const HOLDOUT_EXAM_LOOKAHEAD = 6
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
 const ROLLING_CANDIDATE_CHUNK_SIZE = 75
@@ -543,22 +545,35 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       && item.artifactHash === row.artifactHash))
     : rows
   if (!undisposed.length) return { issued: false, reason: 'no_mass_artifact_pending', disposed: disposed.length }
-  // Holdout is asked as real exam questions (owner decision 2026-09-27). Only approve artifacts whose questions are
-  // already written; request the rest so cron/cos-university-holdout-exam-items prepares them. No GPU is woken for an
-  // artifact that could not be examined properly yet.
-  const remaining = await holdoutExamReadyArtifacts(db, undisposed, now)
-  if (!remaining.length) return { issued: false, reason: 'no_mass_artifact_with_holdout_exam_ready', disposed: disposed.length }
-  const decision = decideRollingMassEvaluationApproval({
-    enabled: process.env.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false',
-    artifacts: remaining,
-    events: all,
-    now,
-    frontierProofCompletions,
-    builderV2ProofCompletions,
-    remediationReplayProofCompletions,
-    inFlightCount,
-  })
-  if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }
+  // Holdout is asked as real exam questions (owner decision 2026-09-27). The approval policy picks FIRST, in its own
+  // priority order; questions are then requested only for the next few artifacts it would actually examine, and the
+  // first of those whose questions are written is approved. Production 2026-09-28: requesting questions for every
+  // pending artifact at once left 33 random artifacts ready, none of them eligible, and the lane examined nobody
+  // for over two hours. No GPU is woken for an artifact that could not be examined properly yet.
+  const picks: Array<Extract<ReturnType<typeof decideRollingMassEvaluationApproval>, { artifact: unknown }>> = []
+  let remaining = undisposed
+  for (let index = 0; index < HOLDOUT_EXAM_LOOKAHEAD; index += 1) {
+    const pick = decideRollingMassEvaluationApproval({
+      enabled: process.env.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false',
+      artifacts: remaining,
+      events: all,
+      now,
+      frontierProofCompletions,
+      builderV2ProofCompletions,
+      remediationReplayProofCompletions,
+      inFlightCount,
+    })
+    if ('reason' in pick) {
+      if (!picks.length) return { issued: false, reason: pick.reason, disposed: disposed.length }
+      break
+    }
+    picks.push(pick)
+    remaining = remaining.filter(row => !(row.candidateId === pick.artifact.candidateId && row.artifactHash === pick.artifact.artifactHash))
+  }
+  const examReady = await holdoutExamReadyArtifacts(db, picks.map(pick => pick.artifact), now)
+  const decision = picks.find(pick => examReady.some(row => row.candidateId === pick.artifact.candidateId
+    && row.artifactHash === pick.artifact.artifactHash))
+  if (!decision) return { issued: false, reason: 'no_mass_artifact_with_holdout_exam_ready', disposed: disposed.length }
   const inserted = await db.from('cos_university_learning_assurance_events').insert({
     event_key: hash(['mass-rolling-evaluation-approval', decision.artifact.candidateId, decision.artifact.artifactHash, now.toISOString()]),
     event_type: 'fine_tune',

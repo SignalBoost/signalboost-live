@@ -1,0 +1,56 @@
+# .github/workflows/vercel-promote-main.yml
+#
+# Owner direction 2026-09-28: production stayed on 87fd626 for ~19 hours while 23 merges landed on main. This makes
+# production follow main without a dashboard click: on every push to main (and on demand) it promotes the newest
+# successful Vercel build of main, and builds + deploys the checkout directly only when Vercel produced no build.
+# It uses the existing VERCEL_TOKEN secret (already used by the cron watchdog) and prints no secret values.
+name: Vercel Promote Main to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-promote-main
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.repository == 'SignalBoost/signalboost-live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: prj_QElaxvA1fbFjhVraIzamxRha78Du
+      VERCEL_TEAM_ID: team_jgndR6Eo6QyP2Fen9UbHy2Q5
+      VERCEL_ORG_ID: team_jgndR6Eo6QyP2Fen9UbHy2Q5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate script syntax
+        run: node --check .github/scripts/vercel-promote-main.mjs
+
+      - name: Promote newest successful main build to production
+        id: promote
+        env:
+          MAIN_SHA: ${{ github.sha }}
+          HEAD_WAIT_MS: '900000'
+        run: node .github/scripts/vercel-promote-main.mjs
+
+      - name: Build and deploy main directly (only when Vercel produced no build)
+        if: steps.promote.outputs.fallback == 'deploy'
+        run: |
+          url=$(npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN")
+          echo "Deployed $url"
+          npx --yes vercel@latest promote "$url" --yes --token "$VERCEL_TOKEN"
+          echo "- Built and promoted the checkout directly: $url" >> "$GITHUB_STEP_SUMMARY"

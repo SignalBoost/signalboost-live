@@ -19,6 +19,7 @@ import {
 } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { learnedRoutingOverride } from '@/lib/ai/cos/reasoningOutcomeLearning'
 import { recordReasoningWorkerMetric } from '@/lib/ai/cos/reasoningWorkerMetrics'
+import { graduateServingErrorOutcome, recordGraduateServingAttempt } from '@/lib/ai/cos/graduateServingAttempts'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { COS_GENERAL_REASONING_DISCIPLINE } from '@/lib/ai/cos/cosGeneralReasoningDiscipline'
 import { fitGraduateCall } from '@/lib/ai/cos/graduateContextFit'
@@ -260,8 +261,25 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
         maxTokens: effective.maxTokens,
       })
       const turnId = randomUUID()
+      const attemptId = randomUUID()
       const startedAt = Date.now()
       const graduateTimeoutMs = interactiveGraduateAttemptTimeout(request, effective.timeoutMs)
+      const attemptBase = {
+        attemptId,
+        correlationId: request.usageContext?.correlationId,
+        registryId: runtime.registryId,
+        candidateId: runtime.candidateId,
+        trainedArtifactHash: runtime.trainedArtifactHash,
+        subjectId: runtime.subjectId,
+        problemClass: runtime.problemClass,
+        workerRole: role,
+        runtimeProvider: runtime.runtimeProvider,
+        runtimeModelId: runtime.runtimeModelId,
+        runtimeBaseUrl: runtime.inference.baseUrl,
+        timeoutMs: graduateTimeoutMs,
+      } as const
+      recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_started', outcome: 'pending', latencyMs: 0 })
+      let failureOutcome: 'timeout' | 'error' | null = null
       const text = await callLocalModel({
         ...effective,
         ...(fitted.systemPrompt === undefined ? {} : { systemPrompt: fitted.systemPrompt }),
@@ -273,10 +291,32 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
           correlationId: request.usageContext?.correlationId,
         },
       }, runtime.inference).catch(error => {
+        const latencyMs = Date.now() - startedAt
+        failureOutcome = graduateServingErrorOutcome(error, graduateTimeoutMs, latencyMs)
+        recordGraduateServingAttempt({
+          ...attemptBase,
+          phase: 'attempt_failed',
+          outcome: failureOutcome,
+          latencyMs,
+          errorClass: error instanceof Error ? error.name || 'Error' : 'Error',
+        })
         console.warn('[cos-graduate-worker] inference failed; base worker may take over', error instanceof Error ? error.message : String(error))
         return null
       })
-      if (!text?.trim()) return null
+      if (!text?.trim()) {
+        const latencyMs = Date.now() - startedAt
+        if (!failureOutcome) {
+          recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_failed', outcome: 'empty', latencyMs })
+        }
+        recordGraduateServingAttempt({ ...attemptBase, phase: 'fallback', outcome: 'fallback', latencyMs })
+        return null
+      }
+      recordGraduateServingAttempt({
+        ...attemptBase,
+        phase: 'attempt_succeeded',
+        outcome: 'success',
+        latencyMs: Date.now() - startedAt,
+      })
 
       recordReasoningWorkerMetric({
         turnId,

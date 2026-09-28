@@ -17,3 +17,23 @@ test('non-interactive University and evaluation calls keep their inherited runti
   const workers = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
   assert.match(workers, /if \(!INTERACTIVE_GRADUATE_FEATURES\.has\(feature\)\) return inheritedTimeoutMs/)
 })
+
+
+test('graduate serving attempts persist lifecycle evidence without contaminating success metrics', () => {
+  const workers = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
+  const attempts = readFileSync(new URL('../lib/ai/cos/graduateServingAttempts.ts', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../supabase/migrations/20260928004500_graduate_serving_attempt_observability.sql', import.meta.url), 'utf8')
+
+  assert.match(workers, /phase: 'attempt_started', outcome: 'pending'/)
+  assert.match(workers, /phase: 'attempt_failed'/)
+  assert.match(workers, /phase: 'fallback', outcome: 'fallback'/)
+  assert.match(workers, /phase: 'attempt_succeeded'/)
+  assert.match(workers, /graduateServingErrorOutcome\(error, graduateTimeoutMs, latencyMs\)/)
+  assert.match(attempts, /cos_university_graduate_serving_attempts/)
+  assert.match(attempts, /safeRuntimeBaseUrl/)
+  assert.doesNotMatch(attempts, /prompt:/)
+  assert.doesNotMatch(attempts, /response:/)
+  assert.match(migration, /phase text not null check/)
+  assert.match(migration, /'timeout'/)
+  assert.match(migration, /revoke all .* from anon, authenticated/)
+})

@@ -107,8 +107,9 @@ test('the judge scores baseline and candidate independently rather than choosing
   assert.match(prompt, /one wrong case cannot lower another case/)
 })
 
-test('an all-zero fixed suite fails as evaluator infrastructure instead of quarantining the artifact', () => {
-  assert.match(SOURCE, /mass_distilled_evaluation_judge_zero_collapse:\$\{input\.name\}/)
-  assert.match(SOURCE, /input\.name!==['"]holdout['"]&&zeroCollapse/)
+test('an all-zero suite, including holdout, fails as evaluator infrastructure instead of quarantining the artifact', () => {
+  assert.match(SOURCE, /if\(zeroCollapse\)throw new Error\(`mass_distilled_evaluation_judge_zero_collapse:\$\{input\.name\}`\)/)
+  assert.doesNotMatch(SOURCE, /input\.name!==['"]holdout['"]&&zeroCollapse/)
+  assert.match(SOURCE, /const deadCaseDiagnostic=deadCases\.length\?deadCaseEvidence/)
   assert.match(SOURCE, /cos-mass-distilled-exact-artifact-evaluator-v2/)
 })

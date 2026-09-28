@@ -206,6 +206,9 @@ type RollingOutcome = Readonly<{
   candidateId?: string
   artifactHash?: string
   disposed?: number
+  // Observation only: how many artifacts the approval rules looked at and why each was passed over.
+  considered?: number
+  skipped?: Readonly<Record<string, number>>
 }>
 
 function isBuilderV2Receipt(intendedUse: unknown): boolean {
@@ -564,7 +567,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       inFlightCount,
     })
     if ('reason' in pick) {
-      if (!picks.length) return { issued: false, reason: pick.reason, disposed: disposed.length }
+      if (!picks.length) return { issued: false, reason: pick.reason, disposed: disposed.length, considered: pick.considered, skipped: pick.skipped }
       break
     }
     picks.push(pick)
@@ -789,6 +792,7 @@ export async function GET(req: NextRequest) {
         skipped: true,
         status: 'not_claimed',
         reason: rolling.reason,
+        ...(rolling.skipped ? { approvalConsidered: rolling.considered, approvalSkipped: rolling.skipped } : {}),
       }).catch(() => undefined)
       return NextResponse.json({ ok: true, skipped: true, reason: rolling.reason })
     }
@@ -800,6 +804,7 @@ export async function GET(req: NextRequest) {
         status: 'not_claimed',
         reason: 'no_atomically_claimable_mass_distilled_evaluation',
         approvalReason: rolling.reason,
+        ...(rolling.skipped ? { approvalConsidered: rolling.considered, approvalSkipped: rolling.skipped } : {}),
       }).catch(() => undefined)
       return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
     }

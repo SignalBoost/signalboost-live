@@ -1,3 +1,4 @@
+// saas/lib/supervisor/provider-circuit.ts
 import { createHash } from 'node:crypto'
 
 export const PROVIDER_CIRCUIT_PROFILE = 'self-healing-provider-circuit-v1' as const
@@ -33,7 +34,17 @@ const RULES: ReadonlyArray<readonly [RegExp, ProviderFailureClassification]> = [
     { failureClass: 'authentication_failed', disposition: 'open_circuit', deterministic: true, costBearingRetryAllowed: false, reason: 'provider_authentication_failed' }],
   [/permission denied|forbidden|not authorized|authorization failed|\b403\b/i,
     { failureClass: 'authorization_failed', disposition: 'open_circuit', deterministic: true, costBearingRetryAllowed: false, reason: 'provider_authorization_failed' }],
-  [/\/tmp\/itmounts_hf_worker\.py[\s\S]*?(?:KeyError:|NameError:|RuntimeError:\s*worker_)/i,
+  // OUR OWN WORKER'S FAULT, NOT THE PROVIDER'S (widened 2026-09-28).
+  // The caller refuses to open a provider circuit when reason === 'worker_contract_invalid', which is
+  // correct: a defect in a script we wrote and serve says nothing about the provider's health. The rule
+  // was too narrow to reach that branch. It required /tmp/itmounts_hf_worker.py AND one of three
+  // exception names, so a ValueError raised inside itmounts_hf_worker_base.py fell through to 'unknown'
+  // and opened a permanent cost-blocking breaker against HuggingFace. Production 2026-09-20 to 09-28:
+  // prepare_dataset pushed a DatasetDict whose splits had mismatched features; every preparation job
+  // exited 1, the breaker blamed the provider, and the University produced one graduate in nine days.
+  // The worker emits a stable 'itmounts_hf_worker_error:<Type>:' prefix and both worker files appear in
+  // its traceback; either is sufficient proof the failure is ours.
+  [/itmounts_hf_worker_error:|\/tmp\/itmounts_hf_worker(?:_base)?\.py/i,
     { failureClass: 'configuration_invalid', disposition: 'protected_halt', deterministic: true, costBearingRetryAllowed: false, reason: 'worker_contract_invalid' }],
   [/rate.?limit|too many requests|\b429\b/i,
     { failureClass: 'rate_limited', disposition: 'backoff', deterministic: false, costBearingRetryAllowed: false, reason: 'provider_rate_limited' }],
@@ -102,6 +113,42 @@ export async function openProviderCircuit(input: {
   return { opened: true as const, providerId, capability, classification: input.classification }
 }
 
+/**
+ * An UNCLASSIFIED failure expires on its own.
+ *
+ * classifyProviderFailure() returns 'unknown' when no rule matches, and openProviderCircuit() opens a
+ * cost-blocking breaker on it anyway. But an unrecognised error is evidence that the CLASSIFIER has a
+ * gap, not that the provider is unhealthy — and the only recovery probe that exists arms solely for
+ * capacity_exhausted/provider_storage_capacity_exhausted, so every other class, 'unknown' included, had
+ * no path back to closed. Production 2026-09-28: a breaker opened at 02:57 on an unclassified failure
+ * and was still blocking the whole University pipeline hours later, surviving two manual closes.
+ *
+ * A classified failure still halts indefinitely — when we know the provider is out of credit or the
+ * token is invalid, retrying costs money and cannot succeed. An unclassified one now becomes a DELAY:
+ * it stops being honoured after the TTL and the next tick re-probes for real. Deliberately implemented
+ * as read-time expiry rather than a new 'half_open' state, because the table's CHECK constraint permits
+ * only 'open' and 'closed' — the existing half_open_probe_armed write cannot persist against it.
+ */
+const UNCLASSIFIED_CIRCUIT_TTL_MS = 30 * 60 * 1000
+
+function unclassifiedCircuitTtlMs(): number {
+  const parsed = Number(process.env.PROVIDER_CIRCUIT_UNCLASSIFIED_TTL_MS)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : UNCLASSIFIED_CIRCUIT_TTL_MS
+}
+
+/** True once an 'unknown' circuit has outlived its TTL and must no longer block work. */
+export function unclassifiedCircuitExpired(
+  row: { failure_class?: unknown; reason?: unknown; opened_at?: unknown },
+  now: number = Date.now(),
+): boolean {
+  const failureClass = String(row.failure_class || '').trim().toLowerCase()
+  const reason = String(row.reason || '').trim().toLowerCase()
+  if (failureClass !== 'unknown' && reason !== 'provider_failure_unclassified') return false
+  const openedAt = Date.parse(String(row.opened_at || ''))
+  if (!Number.isFinite(openedAt)) return false
+  return now - openedAt >= unclassifiedCircuitTtlMs()
+}
+
 export async function readProviderCircuit(input: { db: any; providerId: string; capability: string }) {
   const result = await input.db.from('self_healing_provider_circuits')
     .select('state,failure_class,reason,cost_bearing_retry_allowed,opened_at,last_observed_at')
@@ -110,6 +157,15 @@ export async function readProviderCircuit(input: { db: any; providerId: string; 
     .maybeSingle()
   if (result.error) throw result.error
   if (!result.data || result.data.state !== 'open') return { open: false as const }
+  if (unclassifiedCircuitExpired(result.data)) {
+    console.warn('[provider_circuit_unclassified_expired]', JSON.stringify({
+      providerId: String(input.providerId || '').trim().toLowerCase(),
+      capability: String(input.capability || '').trim().toLowerCase(),
+      openedAt: String(result.data.opened_at || ''),
+      ttlMs: unclassifiedCircuitTtlMs(),
+    }))
+    return { open: false as const }
+  }
   return {
     open: true as const,
     failureClass: String(result.data.failure_class || 'unknown'),

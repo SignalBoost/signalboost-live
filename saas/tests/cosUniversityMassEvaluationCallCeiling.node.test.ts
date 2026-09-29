@@ -15,9 +15,11 @@ const cron = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled
 // time on identical cases (28.4s vs 16.9s against a 35.2-40.4s gateway cutoff), can use smaller requests while
 // preserving every holdout case, the fixed suites, and bounded recovery headroom.
 
-test('the ceiling is 18 and is defined exactly once', () => {
-  // 14 -> 18: the four extra calls pay for one request per fixed suite per model.
-  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 18)
+test('the ceiling is 25 and is defined exactly once', () => {
+  // 14 -> 18: the four extra calls paid for one request per fixed suite per model.
+  // 18 -> 25: the seven extra calls buy the BASELINE the same nine holdout requests the candidate already had,
+  // so both models answer with the same output-token room on the comparison holdout_improved grades.
+  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 25)
   assert.equal(MASS_EVALUATION_JUDGE_CALLS, 4)
 })
 
@@ -31,22 +33,28 @@ test('all three enforcement points read the shared constant, so the approval sha
   }
 })
 
-test('the slower candidate uses the largest budget-derived grouping that leaves fixed-suite and recovery capacity', () => {
+test('both models get the same budget-derived grouping, leaving fixed-suite and recovery capacity', () => {
   assert.match(evaluator, /const fixedEndpointCalls=6;const recoveryReserve=1/)
-  assert.match(evaluator, /const baselineGroupCount=planMassEvaluationGroups\(holdoutCases,batchPrompt,2\)\.length/)
-  assert.match(evaluator, /const candidateGroupTarget=Math\.min\(holdoutCases\.length,ENDPOINT_CALLS-baselineGroupCount-fixedEndpointCalls-recoveryReserve\)/)
+  // The holdout budget is split evenly so the baseline is no longer pinned at 2 groups while the candidate takes
+  // the remainder. Unequal requests meant unequal output-token room per answer on the exact comparison
+  // holdout_improved grades (Production 2026-09-28: candidate 9 requests, baseline 2, on a 13-case holdout).
+  assert.match(evaluator, /const holdoutGroupTarget=Math\.min\(holdoutCases\.length,Math\.floor\(\(ENDPOINT_CALLS-fixedEndpointCalls-recoveryReserve\)\/2\)\)/)
+  assert.match(evaluator, /const baselineGroupCount=holdoutGroupTarget/)
+  assert.match(evaluator, /const candidateGroupTarget=holdoutGroupTarget/)
   assert.match(evaluator, /maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls/)
+  assert.match(evaluator, /minGroups:baselineGroupCount,feature:'mass_distilled_eval_holdout_baseline'/)
 })
 
 test('the observed 13-case / two-baseline-group shape fits exactly with a dedicated retry reserve', () => {
   const holdoutCases = 13
-  const baselineGroups = 2
   // Six: one request per fixed suite per model.
   const fixedEndpointCalls = 6
   const recoveryReserve = 1
-  const candidateGroups = Math.min(holdoutCases, MASS_EVALUATION_ENDPOINT_CALLS - baselineGroups - fixedEndpointCalls - recoveryReserve)
-  assert.equal(candidateGroups, 9)
-  assert.equal(baselineGroups + candidateGroups + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)
+  const groupsPerModel = Math.min(holdoutCases, Math.floor((MASS_EVALUATION_ENDPOINT_CALLS - fixedEndpointCalls - recoveryReserve) / 2))
+  // The candidate keeps the nine requests Production proved it needs at the gateway's ~40s cut-off, and the
+  // baseline now gets the same nine instead of two.
+  assert.equal(groupsPerModel, 9)
+  assert.equal(groupsPerModel * 2 + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)
 })
 
 test('raising the CALL ceiling leaves every SPEND and promotion gate untouched', () => {

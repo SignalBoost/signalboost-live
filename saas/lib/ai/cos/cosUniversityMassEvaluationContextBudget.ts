@@ -75,7 +75,19 @@ import { ESTIMATED_CHARACTERS_PER_TOKEN, RUNPOD_CONTEXT_WINDOW_TOKENS, estimateC
 // scoring thresholds, exact-artifact binding, promotion gates and the Production-traffic prohibition are
 // unchanged. The claim SQL asserts the same number and must be migrated in step - a TS-only change is
 // rejected by the database and every tick reports no_atomically_claimable.
-export const MASS_EVALUATION_ENDPOINT_CALLS = 18
+// 2026-09-28: raised 18 -> 25 to make the two models answer under the SAME conditions. At 18 the baseline was
+// capped at 2 groups while the candidate took the rest, so a 13-case holdout gave the candidate 9 requests
+// (~1.4 cases each) and the baseline 2 (~6.5 cases each, about 85 output tokens per answer). holdout_improved is a
+// direct comparison of their scores, so unequal answer room is a defect in the measurement itself. Equal shares
+// inside 18 would have left only 5 groups each - precisely the "9 groups to 5" regression the note above warns
+// about for the slower candidate - so the ceiling had to move. 25 is the minimum that keeps the candidate's proven
+// 9 groups AND gives the baseline the same nine: 9 + 9 + 6 fixed + 1 recovery = 25.
+//
+// This remains a CALL ceiling, not a SPEND ceiling: the $0.20 wake ceiling, the one-runtime-wake limit, scoring
+// thresholds, exact-artifact binding, promotion gates and the Production-traffic prohibition are unchanged. The
+// claim SQL asserts the same number and is migrated in step - a TS-only change is rejected by the database and
+// every tick reports no_atomically_claimable.
+export const MASS_EVALUATION_ENDPOINT_CALLS = 25
 export const MASS_EVALUATION_JUDGE_CALLS = 4
 
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = RUNPOD_CONTEXT_WINDOW_TOKENS

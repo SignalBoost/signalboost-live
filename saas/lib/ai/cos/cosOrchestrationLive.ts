@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/cosOrchestrationLive.ts
-import * as base from './cosOrchestrationEnterprise'
-import {describeReasoner,reasonerProvenanceLine} from './reasonerHostingDisclosure'
+import * as base from './cosOrchestrationEnterprise.ts'
+import {describeReasoner,reasonerProvenanceLine} from './reasonerHostingDisclosure.ts'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled

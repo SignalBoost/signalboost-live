@@ -35,6 +35,8 @@ test('retained learning is applied end to end, not merely embedded or retrieved'
       learnedItemsCited: 1,
     },
   }, { invoked: false })
+  // Public-shape counters are accepted at the compatibility boundary; this is the shape
+  // emitted by newer provenance callers and must not silently collapse to zero.
   assert.deepEqual(provenance.learned_corpus, {
     used: true,
     retrieved_count: 4,

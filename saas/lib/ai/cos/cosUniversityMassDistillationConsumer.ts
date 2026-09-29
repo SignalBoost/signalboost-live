@@ -239,7 +239,8 @@ async function recordAssurance(input: {
   evidence: Record<string, unknown>
   verifier: 'host_controller' | 'training_executor'
 }) {
-  const db = cosServiceDb()  if (!db) throw new Error('service_database_unavailable')
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
   const evidence = {
     profile: COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
     claim: input.claim,

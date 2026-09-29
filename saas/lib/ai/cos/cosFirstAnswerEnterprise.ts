@@ -827,38 +827,6 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
               learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
             }
           }
-        })).values()]
-          const candidates = [...rows, ...universityRows].map(row => ({ item:row, text:corpusCandidateText(row) }))
-          // This branch exists because semantic corpus retrieval already missed its interactive budget.
-          // Do not wake the embedding runtime and attempt a second semantic ranking here: production
-          // 2026-09-29 showed that doing so can consume the entire fallback budget and leave COS with
-          // learnedItemsUsed=0 even when a retained row has exact lexical anchors. Domain compatibility
-          // plus two meaningful anchors is the conservative bounded fallback.
-          const queryAnchors = relevanceTerms(prompt)
-          const minimumOverlap = Math.min(2, Math.max(1, queryAnchors.length))
-          const lexicalRelevant = candidates
-            .filter(candidate => domainCompatibleContext(prompt, candidate.text))
-            .map(candidate => {
-              const candidateTerms = new Set(relevanceTerms(candidate.text))
-              const overlap = queryAnchors.filter(term => candidateTerms.has(term)).length
-              return { ...candidate, similarity: queryAnchors.length ? overlap / queryAnchors.length : 0, overlap }
-            })
-            .filter(candidate => candidate.overlap >= minimumOverlap)
-            .sort((a, b) => b.overlap - a.overlap || b.similarity - a.similarity)
-          const rankedWithSummary = lexicalRelevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
-          const selected = selectLearnedCorpusRows<(typeof rankedWithSummary)[number]>(rankedWithSummary, 6)
-          return () => {
-            funnel.learnedCorpus.retrieved = rows.length + universityRows.length
-            funnel.learnedCorpus.relevant = lexicalRelevant.length
-            funnel.learnedCorpus.selected = selected.length
-            if (rows.length) kgSystems.push('Continuous Learning bounded lexical retrieval')
-            if (universityRows.length) kgSystems.push('COS University governed training material retrieval')
-            for (const candidate of selected) {
-              const row = candidate.item
-              const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''
-              learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
-            }
-          }
         }))
       }
       await Promise.all(fallbacks)

@@ -175,6 +175,7 @@ const tests = [
   'tests/cosReasonerQuality.node.test.ts',
   'tests/honestRefusalReply.node.test.ts',
   'tests/learnedEvidencePolicy.node.test.ts',
+  'tests/cosRetainedLearningEndToEnd.node.test.ts',
   'tests/textTransformationInput.node.test.ts',
   'tests/cosEditIntentFidelity.node.test.ts',
   'tests/writingElementFollowup.node.test.ts',

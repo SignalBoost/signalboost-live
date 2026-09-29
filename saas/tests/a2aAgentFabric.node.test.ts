@@ -276,8 +276,8 @@ test('Phase 2 preserves advisory execution and denies unauthorized skill without
   assert.equal(transports, 1)
 })
 
-test('specialist catalog defines Context Engineer, Software, marketing, sales, and separated self-healing roles with explicit risk', () => {
-  assert.equal(A2A_SPECIALIST_FAMILIES.length, 7)
+test('specialist catalog defines Context Engineer, Software, security, marketing, sales, and separated self-healing roles with explicit risk', () => {
+  assert.equal(A2A_SPECIALIST_FAMILIES.length, 8)
   const contextEngineer = getA2ASpecialistFamily('context-engineering')
   assert.equal(contextEngineer.skills.every(skill => skill.risk === 'advisory'), true)
   const software = getA2ASpecialistFamily('software')
@@ -289,6 +289,10 @@ test('specialist catalog defines Context Engineer, Software, marketing, sales, a
   assert.equal(software.skills.find(skill => skill.skillId === 'software.verify')?.risk, 'advisory')
   assert.equal(getA2ASpecialistFamily('marketing').skills.find(skill => skill.skillId === 'marketing.campaign-mutate')?.risk, 'consequential')
   assert.equal(getA2ASpecialistFamily('sales').skills.find(skill => skill.skillId === 'sales.crm-write')?.risk, 'write')
+  const security = getA2ASpecialistFamily('security')
+  assert.equal(security.skills.every(skill => skill.risk === 'advisory'), true)
+  assert.equal(security.skills.some(skill => skill.skillId === 'security.investigate'), true)
+  assert.equal(security.skills.some(skill => skill.skillId === 'security.verify-ai-content'), true)
   assert.equal(getA2ASpecialistFamily('self-healing-diagnostic').skills.every(skill => skill.risk === 'advisory'), true)
   assert.equal(getA2ASpecialistFamily('self-healing-remediation').skills.every(skill => skill.risk === 'consequential'), true)
   assert.equal(getA2ASpecialistFamily('self-healing-verification').skills.every(skill => skill.risk === 'advisory'), true)

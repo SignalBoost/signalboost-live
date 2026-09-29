@@ -1,5 +1,3 @@
-// saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
-// saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
 import { persistDistillationAssetVault, tryReadDistillationAssetsBySourceRef } from './cosUniversityDistillationAssetVault.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -128,6 +126,11 @@ function durableTrainingReceipt(profileValue: unknown, recipeValue: unknown) {
     failureDerivedReplayGradientAccumulationSteps: integer('failureDerivedReplayGradientAccumulationSteps', 0, 100_000),
     failureDerivedReplayTrainer: clean(raw.failureDerivedReplayTrainer, 80) || null,
     failureDerivedReplayTrainableFp32TensorCount: integer('failureDerivedReplayTrainableFp32TensorCount', 0, 1_000_000),
+    generalReasoningBallastItems: integer('generalReasoningBallastItems', 0, 100_000),
+    generalReasoningBallastEpochs: number('generalReasoningBallastEpochs', 0, 10),
+    generalReasoningBallastLearningRate: number('generalReasoningBallastLearningRate', 0, 1),
+    generalReasoningBallastTrainer: clean(raw.generalReasoningBallastTrainer, 80) || null,
+    generalReasoningBallastTrainableFp32TensorCount: integer('generalReasoningBallastTrainableFp32TensorCount', 0, 1_000_000),
     beta: number('beta', 0, 1),
     temperature: number('temperature', 0.01, 4),
     maxNewTokens: integer('maxNewTokens', 1, 8192),
@@ -236,8 +239,7 @@ async function recordAssurance(input: {
   evidence: Record<string, unknown>
   verifier: 'host_controller' | 'training_executor'
 }) {
-  const db = cosServiceDb()
-  if (!db) throw new Error('service_database_unavailable')
+  const db = cosServiceDb()  if (!db) throw new Error('service_database_unavailable')
   const evidence = {
     profile: COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
     claim: input.claim,
@@ -1236,8 +1238,7 @@ export async function runMassDistillationCampaignConsumer(input: {
   }
 
   // A remediated open circuit may receive exactly one half-open paid verification attempt.
-  // The probe authorization is consumed atomically only after a claim exists, so an empty queue
-  // does not waste the one-shot recovery permission and a later cron cannot fan out more retries.
+  // The probe authorization is consumed atomically only after a claim exists, so an empty queue  // does not waste the one-shot recovery permission and a later cron cannot fan out more retries.
   const recoveryProbeArmed = providerCircuit.open && providerCircuit.costBearingRetryAllowed === true
   const maxDispatches = recoveryProbeArmed
     ? 1

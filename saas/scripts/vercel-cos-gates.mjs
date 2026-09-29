@@ -298,5 +298,3 @@ if (result.error) {
   console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
   process.exit(1)
 }
-
-process.exit(result.status ?? 1)

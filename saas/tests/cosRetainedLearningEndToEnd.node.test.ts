@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { captureSelectedLearnedRows, captureEvidenceSourceUseTurnId, captureLearnedCitationIndices, consumeDetailedEvidenceSourceUseTurn } from '../lib/ai/cos/evidenceSourceUseTurnContext.ts'
-import { authoritativeProvenance } from '../lib/ai/cos/cosOrchestrationEnterprise.ts'
+import { authoritativeProvenance } from '../lib/ai/cos/cosOrchestration.ts'
 
 test('retained learning is applied end to end, not merely embedded or retrieved', async () => {
   const enterprise = await readFile(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')

@@ -791,14 +791,45 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         }
       } else if (terms.length) {
         fallbacks.push(boundedContextFallback('learned_lexical', async () => {
-          const learnedResult = await db.from('cos_continuous_learning')
-            .select('subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error')
-            .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
-            .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(128)
-          if (learnedResult.error) return null
+          const [learnedResult, universityResult] = await Promise.all([
+            db.from('cos_continuous_learning')
+              .select('content_hash,subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error')
+              .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
+              .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(128),
+            // University training material is a separate durable vault, not cos_continuous_learning.
+            // Production acceptance on 2026-09-29 proved that Bullwhip existed in 29 governed
+            // distillation assets while the learned corpus contained zero Bullwhip rows. Search the
+            // actual training material here so COS and public Concierge can apply what University
+            // taught. The public boundary is structural: only model-neutral rows explicitly marked
+            // as containing no private production data and carrying governed teacher-output rights
+            // can enter this context.
+            db.from('cos_university_distillation_assets')
+              .select('asset_key,portable_content_hash,subject_id,response_text,teacher_provider,source_ref,training_rights,model_neutral,contains_private_production_data,created_at')
+              .eq('model_neutral', true)
+              .eq('contains_private_production_data', false)
+              .eq('training_rights', 'governed_hosted_teacher_output')
+              .or(terms.flatMap(term => [`response_text.ilike.%${term}%`, `subject_id.ilike.%${term}%`]).join(','))
+              .order('created_at', { ascending:false })
+              .limit(64),
+          ])
+          if (learnedResult.error && universityResult.error) return null
           const unfilteredRows = (learnedResult.data ?? []).filter(row => !rejectedLearningRow(row))
           const rows = publicAudience ? filterPublicCorpusRows(unfilteredRows) : unfilteredRows
-          const candidates = rows.map(row => ({ item:row, text:corpusCandidateText(row) }))
+          const universityRows = universityResult.error ? [] : [...new Map((universityResult.data ?? []).map(row => {
+            const contentHash = String(row.portable_content_hash || row.asset_key || '')
+            return [contentHash, {
+              content_hash: contentHash,
+              subject: String(row.subject_id || 'University curriculum'),
+              summary: String(row.response_text || ''),
+              facts: [],
+              confidence: 0.85,
+              source_kind: 'university_distillation_asset',
+              source_uri: `itmounts://cos-university/distillation-asset/${String(row.asset_key || '')}`,
+              observed_at: String(row.created_at || ''),
+              fact_extraction_error: null,
+            }]
+          })).values()]
+          const candidates = [...rows, ...universityRows].map(row => ({ item:row, text:corpusCandidateText(row) }))
           // This branch exists because semantic corpus retrieval already missed its interactive budget.
           // Do not wake the embedding runtime and attempt a second semantic ranking here: production
           // 2026-09-29 showed that doing so can consume the entire fallback budget and leave COS with
@@ -818,10 +849,11 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
           const rankedWithSummary = lexicalRelevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
           const selected = selectLearnedCorpusRows<(typeof rankedWithSummary)[number]>(rankedWithSummary, 6)
           return () => {
-            funnel.learnedCorpus.retrieved = rows.length
+            funnel.learnedCorpus.retrieved = rows.length + universityRows.length
             funnel.learnedCorpus.relevant = lexicalRelevant.length
             funnel.learnedCorpus.selected = selected.length
             if (rows.length) kgSystems.push('Continuous Learning bounded lexical retrieval')
+            if (universityRows.length) kgSystems.push('COS University governed training material retrieval')
             for (const candidate of selected) {
               const row = candidate.item
               const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''

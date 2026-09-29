@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts
 import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
@@ -23,9 +22,13 @@ import {
   signIndependentEvaluatorPayload,
   type IndependentEvaluatorClaim,
 } from './cosUniversityIndependentEvaluator.ts'
+import { MASS_RETENTION_DELAY_MS } from './cosUniversityMassRetentionDelay.ts'
 
 export const COS_MASS_DISTILLED_EVALUATOR_VERSION = 'cos-mass-distilled-exact-artifact-evaluator-v2' as const
-export const MASS_DISTILLED_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
+// Test phase (owner 2026-09-28): 10 minutes, the same value approval, canary ordering and the SQL claim use.
+// Keep this an import: a hard-coded 12h here (reverted once by #3480) admits a student at 10 minutes and then
+// rejects it inside the evaluator. The retention questions and pass rule are unchanged. See cosUniversityMassRetentionDelay.ts.
+export const MASS_DISTILLED_RETENTION_DELAY_MS = MASS_RETENTION_DELAY_MS
 const BASE_MODEL_ID = CURRENT_UNIVERSITY_STUDENT_PROFILE.modelId
 const HEX40 = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i
@@ -720,3 +723,4 @@ export async function runMassDistilledArtifactEvaluation(
     runId: `mass-eval-${input.claim.candidateId}`,
   }, () => runMassDistilledArtifactEvaluationInsideHarness(input))
 }
+-----------------------------------------------------------

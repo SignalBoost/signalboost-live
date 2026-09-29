@@ -1,0 +1,343 @@
+-- saas/supabase/migrations/20260929024000_mass_evaluation_claim_25_symmetric_holdout.sql
+-- Raise the asserted evaluation call ceiling 18 -> 25 so the BASELINE gets the same nine holdout requests the
+-- candidate already had.
+--
+-- Production 2026-09-28: the evaluator capped the baseline at 2 holdout groups and gave the candidate the
+-- remainder, so a 13-case holdout asked the candidate in nine requests (~1.4 cases each) and the baseline in two
+-- (~6.5 cases each, about 85 output tokens per answer under the 1024-token cap). holdout_improved is a direct
+-- comparison of those two scores, so unequal answer room was a defect in the measurement itself, not in either
+-- model. Splitting the holdout budget evenly inside 18 would have left five groups each - the exact regression the
+-- 14 -> 18 note warns about for the slower candidate at the gateway's ~40s cut-off - so the ceiling moves instead.
+-- 25 is the minimum that keeps nine and gives nine: 9 + 9 + 6 fixed (three suites x two models) + 1 recovery.
+--
+-- This is a CALL ceiling, not a SPEND ceiling. Unchanged: the <= $0.20 estimated wake cost, the single runtime
+-- wake, four judge calls, the 12-hour retention delay, four-way claim concurrency, exact-artifact identity and
+-- canary requirements, residency gating for Computer Science, retry limits, promotion gates, rollback rules and
+-- the Production-traffic prohibition. Only the integer the approval must carry changes, and it must change here in
+-- step with MASS_EVALUATION_ENDPOINT_CALLS in saas/lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts: a
+-- TS-only change is rejected by this function and every cron tick reports no_atomically_claimable.
+
+create or replace function public.claim_next_mass_distilled_evaluation()
+returns table (
+  candidate_id text,
+  subject_id text,
+  artifact_id text,
+  artifact_hash text,
+  revision_key text,
+  dataset_hash text,
+  endpoint_id text,
+  approval_observed_at timestamptz,
+  max_endpoint_calls integer,
+  max_judge_calls integer,
+  max_runtime_wake_attempts integer,
+  max_estimated_runtime_wake_cost_usd numeric,
+  reservation_event_key text
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_active_reservations integer := 0;
+  v_frontier_completions integer := 0;
+  v_builder_v2_completions integer := 0;
+  v_artifact public.cos_local_distillation_artifacts%rowtype;
+  v_control public.cos_university_learning_assurance_events%rowtype;
+  v_canary public.cos_university_learning_assurance_events%rowtype;
+  v_evidence jsonb;
+  v_now timestamptz := clock_timestamp();
+  v_max_endpoint integer;
+  v_max_judge integer;
+  v_max_wake integer;
+  v_max_cost numeric;
+  v_event_key text;
+  v_evidence_hash text;
+  v_reservation jsonb;
+begin
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('mass-distilled-independent-evaluation-global', 0)
+  );
+
+  select count(*)::integer into v_active_reservations
+  from public.cos_university_learning_assurance_events s
+  where s.event_type='fine_tune'
+    and s.candidate_id like 'mass:%'
+    and s.evidence->>'profile'='cos_mass_distilled_independent_evaluation_runtime_v1'
+    and s.evidence->>'claim'='mass_distilled_independent_evaluation_started'
+    and s.evidence->>'reservationOnly'='true'
+    and s.observed_at > v_now - interval '12 minutes'
+    and not exists (
+      select 1
+      from public.cos_university_learning_assurance_events t
+      where t.event_type='fine_tune'
+        and t.candidate_id=s.candidate_id
+        and t.evidence->>'profile'='cos_mass_distilled_independent_evaluation_runtime_v1'
+        and t.evidence->>'artifactHash'=s.evidence->>'artifactHash'
+        and t.evidence->>'claim' in (
+          'mass_distilled_independent_evaluation_completed',
+          'mass_distilled_independent_evaluation_failed'
+        )
+        and t.observed_at >= s.observed_at
+    );
+
+  if v_active_reservations >= 4 then return; end if;
+
+  select count(distinct r.candidate_id)::integer into v_builder_v2_completions
+  from public.cos_university_distilled_evaluation_runs r
+  join public.cos_local_distillation_artifacts a
+    on a.candidate_id=r.candidate_id
+  where r.candidate_id like 'mass:%'
+    and a.subject_id='Computer Science & Coding'
+    and a.intended_use #>> '{trainingReceipt,optimizer}'='frontier_response_anchor_then_stable_on_policy_distillation'
+    and a.intended_use #>> '{trainingReceipt,frontierResponseAnchorRequired}'='true'
+    and case
+      when jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorEpochs}')='number'
+      then (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorEpochs}')::numeric
+      else 0
+    end=1
+    and case
+      when jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorItems}')='number'
+      then (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorItems}')::numeric
+      else 0
+    end>0;
+
+  select count(distinct r.candidate_id)::integer into v_frontier_completions
+  from public.cos_university_distilled_evaluation_runs r
+  join public.cos_local_distillation_artifacts a
+    on a.candidate_id=r.candidate_id
+  where r.candidate_id like 'mass:%'
+    and a.intended_use #>> '{trainingReceipt,profile}'='cos_university_frontier_gkd_v1';
+
+  for v_artifact in
+    select a.*
+    from public.cos_local_distillation_artifacts a
+    where a.status='evaluation_pending'
+      and a.candidate_id like 'mass:%'
+      and (
+        a.subject_id <> 'Computer Science & Coding'
+        or exists (
+          select 1
+          from public.cos_university_residency_enrollments r
+          where r.candidate_id=a.candidate_id
+            and r.trained_artifact_hash=a.trained_artifact_hash
+            and r.standing='residency_complete'
+            and r.completed_at is not null
+            and r.authority_expanded=false
+        )
+      )
+      and a.created_at <= v_now - interval '12 hours'
+      and a.trained_artifact_hash ~ '^[a-f0-9]{64}$'
+      and a.revision_key ~ '^[a-f0-9]{64}$'
+      and a.dataset_hash ~ '^[a-f0-9]{64}$'
+    order by
+      case
+        when v_builder_v2_completions < 2
+          and a.subject_id='Computer Science & Coding'
+          and a.intended_use #>> '{trainingReceipt,optimizer}'='frontier_response_anchor_then_stable_on_policy_distillation'
+          and a.intended_use #>> '{trainingReceipt,frontierResponseAnchorRequired}'='true'
+          and case
+            when jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorEpochs}')='number'
+            then (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorEpochs}')::numeric
+            else 0
+          end=1
+          and case
+            when jsonb_typeof(a.intended_use #> '{trainingReceipt,frontierResponseAnchorItems}')='number'
+            then (a.intended_use #>> '{trainingReceipt,frontierResponseAnchorItems}')::numeric
+            else 0
+          end>0
+        then 0 else 1
+      end,
+      case
+        when v_frontier_completions < 4
+          and a.intended_use #>> '{trainingReceipt,profile}'='cos_university_frontier_gkd_v1'
+        then 0 else 1
+      end,
+      case
+        when a.intended_use #>> '{trainingReceipt,failureDerivedReplayRequired}'='true'
+          and case
+            when jsonb_typeof(a.intended_use #> '{trainingReceipt,failureDerivedReplayItems}')='number'
+            then (a.intended_use #>> '{trainingReceipt,failureDerivedReplayItems}')::integer
+            else 0
+          end > 0
+        then 0 else 1
+      end,
+      case
+        when a.intended_use #>> '{trainingReceipt,failureDerivedReplayRequired}'='true'
+          and case
+            when jsonb_typeof(a.intended_use #> '{trainingReceipt,failureDerivedReplayItems}')='number'
+            then (a.intended_use #>> '{trainingReceipt,failureDerivedReplayItems}')::integer
+            else 0
+          end > 0
+        then a.created_at
+      end desc,
+      a.created_at asc,
+      a.candidate_id asc
+  loop
+    select e.* into v_control
+    from public.cos_university_learning_assurance_events e
+    where e.event_type='fine_tune'
+      and e.candidate_id=v_artifact.candidate_id
+      and e.verifier='host_controller'
+      and e.evidence->>'profile'='cos_distilled_independent_evaluation_authorization_v1'
+      and e.evidence->>'artifactHash'=v_artifact.trained_artifact_hash
+      and e.evidence->>'claim' in (
+        'distilled_independent_evaluation_approved',
+        'distilled_independent_evaluation_suspended'
+      )
+    order by e.observed_at desc, e.event_key desc
+    limit 1
+    for update;
+
+    if not found then continue; end if;
+
+    v_evidence:=v_control.evidence;
+    if v_evidence->>'claim'<>'distilled_independent_evaluation_approved' then continue; end if;
+    if jsonb_typeof(v_evidence->'evaluationAuthorized')<>'boolean'
+      or jsonb_typeof(v_evidence->'productionTrafficAuthorized')<>'boolean'
+      or jsonb_typeof(v_evidence->'authorityExpanded')<>'boolean'
+      or jsonb_typeof(v_evidence->'maxEndpointCalls')<>'number'
+      or jsonb_typeof(v_evidence->'maxJudgeCalls')<>'number'
+      or jsonb_typeof(v_evidence->'maxRuntimeWakeAttempts')<>'number'
+      or jsonb_typeof(v_evidence->'maxEstimatedRuntimeWakeCostUsd')<>'number'
+    then continue; end if;
+
+    if (v_evidence->>'evaluationAuthorized')::boolean<>true
+      or (v_evidence->>'productionTrafficAuthorized')::boolean<>false
+      or (v_evidence->>'authorityExpanded')::boolean<>false
+    then continue; end if;
+
+    if v_control.observed_at>v_now
+      or v_control.expires_at is null
+      or v_control.expires_at<=v_now
+    then continue; end if;
+
+    v_max_endpoint:=(v_evidence->>'maxEndpointCalls')::integer;
+    v_max_judge:=(v_evidence->>'maxJudgeCalls')::integer;
+    v_max_wake:=(v_evidence->>'maxRuntimeWakeAttempts')::integer;
+    v_max_cost:=(v_evidence->>'maxEstimatedRuntimeWakeCostUsd')::numeric;
+
+    if v_max_endpoint<>25
+      or v_max_judge<>4
+      or v_max_wake<>1
+      or v_max_cost<=0
+      or v_max_cost>0.200000
+    then continue; end if;
+
+    select e.* into v_canary
+    from public.cos_university_learning_assurance_events e
+    where e.event_type='fine_tune'
+      and e.candidate_id=v_artifact.candidate_id
+      and e.verifier='host_production_verifier'
+      and e.evidence->>'profile'='cos_university_fine_tune_evidence_v1'
+      and e.evidence->>'claim'='production_canary_healthy'
+      and e.evidence->>'trainedArtifactId'=v_artifact.trained_artifact_id
+      and e.evidence->>'artifactHash'=v_artifact.trained_artifact_hash
+      and e.evidence->>'revisionKey'=v_artifact.revision_key
+      and e.evidence->>'exactArtifact'='true'
+      and e.evidence->>'internalVllmReady'='true'
+      and e.evidence->>'productionTrafficAuthorized'='false'
+      and e.evidence->>'authorityExpanded'='false'
+      and length(btrim(coalesce(e.evidence->>'endpointId','')))>0
+      and (
+        v_artifact.subject_id <> 'Computer Science & Coding'
+        or e.observed_at >= (
+          select max(r.completed_at)
+          from public.cos_university_residency_enrollments r
+          where r.candidate_id=v_artifact.candidate_id
+            and r.trained_artifact_hash=v_artifact.trained_artifact_hash
+            and r.standing='residency_complete'
+            and r.completed_at is not null
+            and r.authority_expanded=false
+        )
+      )
+    order by e.observed_at desc
+    limit 1;
+
+    if not found then continue; end if;
+
+    if exists (
+      select 1
+      from public.cos_university_learning_assurance_events e
+      where e.event_type='fine_tune'
+        and e.candidate_id=v_artifact.candidate_id
+        and e.evidence->>'profile'='cos_mass_distilled_independent_evaluation_runtime_v1'
+        and e.evidence->>'claim'='mass_distilled_independent_evaluation_started'
+        and e.evidence->>'artifactHash'=v_artifact.trained_artifact_hash
+        and e.observed_at>=v_control.observed_at
+    ) then continue; end if;
+
+    v_reservation:=jsonb_build_object(
+      'profile','cos_mass_distilled_independent_evaluation_runtime_v1',
+      'claim','mass_distilled_independent_evaluation_started',
+      'candidateId',v_artifact.candidate_id,
+      'artifactHash',v_artifact.trained_artifact_hash,
+      'revisionKey',v_artifact.revision_key,
+      'endpointId',v_canary.evidence->>'endpointId',
+      'authorizationObservedAt',v_control.observed_at,
+      'maxEndpointCalls',v_max_endpoint,
+      'maxJudgeCalls',v_max_judge,
+      'maxRuntimeWakeAttempts',v_max_wake,
+      'maxEstimatedRuntimeWakeCostUsd',round(v_max_cost,6),
+      'reservationOnly',true,
+      'productionTrafficAuthorized',false,
+      'authorityExpanded',false
+    );
+
+    v_evidence_hash:=encode(
+      extensions.digest(convert_to(v_reservation::text,'UTF8'),'sha256'),
+      'hex'
+    );
+    v_event_key:=encode(
+      extensions.digest(
+        convert_to(
+          'mass-distilled-evaluation-reservation:'
+          ||v_artifact.candidate_id||':'
+          ||v_artifact.trained_artifact_hash||':'
+          ||v_control.observed_at::text,
+          'UTF8'
+        ),
+        'sha256'
+      ),
+      'hex'
+    );
+
+    insert into public.cos_university_learning_assurance_events(
+      event_key,event_type,subject_id,candidate_id,evidence_hash,evidence,verifier,observed_at,expires_at
+    ) values (
+      v_event_key,
+      'fine_tune',
+      v_artifact.subject_id,
+      v_artifact.candidate_id,
+      v_evidence_hash,
+      v_reservation,
+      'host_controller',
+      v_now,
+      v_now+interval '12 minutes'
+    )
+    on conflict(event_key) do nothing;
+
+    if not found then return; end if;
+
+    return query select
+      v_artifact.candidate_id,
+      v_artifact.subject_id,
+      v_artifact.trained_artifact_id,
+      v_artifact.trained_artifact_hash,
+      v_artifact.revision_key,
+      v_artifact.dataset_hash,
+      v_canary.evidence->>'endpointId',
+      v_control.observed_at,
+      v_max_endpoint,
+      v_max_judge,
+      v_max_wake,
+      round(v_max_cost,6),
+      v_event_key;
+    return;
+  end loop;
+end;
+$$;
+
+revoke all on function public.claim_next_mass_distilled_evaluation()
+  from public, anon, authenticated;
+grant execute on function public.claim_next_mass_distilled_evaluation()
+  to service_role;

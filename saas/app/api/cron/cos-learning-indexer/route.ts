@@ -5,10 +5,18 @@ import {
 } from '@/lib/ai/cos/learnedCorpusIndexing.ts'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease.ts'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference.ts'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase.ts'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+async function recordIndexerTelemetry(values: Record<string, unknown>) {
+  const db = cosServiceDb()
+  if (!db) return
+  const result = await db.from('cos_learning_indexer_telemetry').upsert({ id: 'continuous_indexer', ...values, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+  if (result.error) console.warn('cos-learning-indexer telemetry write failed:', result.error.message)
+}
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -17,14 +25,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const startedAt = Date.now()
+  const startedIso = new Date(startedAt).toISOString()
+
   // Do not record activity or wake embedding compute for an empty maintenance cycle. Otherwise a
   // 15-minute cron can indefinitely postpone idle-stop simply by touching the lease when no work
   // exists. The count is database-only and includes both missing vectors and stale-model vectors.
   const pending = await countPendingLearnedCorpusIndexing()
   if (pending === null) {
+    await recordIndexerTelemetry({ last_started_at: startedIso, last_completed_at: new Date().toISOString(), status: 'error', error: 'indexing_state_unavailable', duration_ms: Date.now() - startedAt })
     return NextResponse.json({ ok: false, error: 'COS learned-corpus indexing state is unavailable.' }, { status: 503 })
   }
   if (pending === 0) {
+    await recordIndexerTelemetry({ last_started_at: startedIso, last_completed_at: new Date().toISOString(), status: 'skipped', attempted: 0, embedded: 0, failed: 0, pending_before: 0, pending_after: 0, duration_ms: Date.now() - startedAt, error: null })
     return NextResponse.json({
       ok: true,
       status: 'skipped',
@@ -66,6 +79,14 @@ export async function GET(req: NextRequest) {
     if (batch.attempted === 0 || batch.embedded === 0) break
   }
   const ok = failed === 0 || embedded > 0
+  await recordIndexerTelemetry({
+    last_started_at: startedIso,
+    last_completed_at: new Date().toISOString(),
+    status: ok ? 'healthy' : 'error', attempted, embedded, failed,
+    pending_before: pending, pending_after: remainingEligiblePending,
+    duration_ms: Date.now() - startedAt,
+    error: errors.length ? [...new Set(errors)].join(' | ').slice(0, 1500) : null,
+  })
   return NextResponse.json({
     ok,
     status: 'indexed',

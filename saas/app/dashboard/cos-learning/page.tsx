@@ -12,6 +12,7 @@ type LearningResult = { ok?: boolean; curriculumQuestions?: number; sourceAdapte
 type EmbeddingResult = { ok?: boolean; completed?: boolean; attempted?: number; embedded?: number; failed?: number; remaining?: number | null; total?: number | null; rejected?: number | null; eligible?: number | null; eligibleEmbedded?: number | null; batches?: number; batchSize?: number; durationMs?: number; authRequired?: boolean; error?: string }
 type ApplicationProgress = { sources?: number; queued?: number; candidates?: number; validated?: number; rejected?: number; reinforcements?: number }
 type SpecialistResult = { applicationProgress?: ApplicationProgress | null; authRequired?: boolean; error?: string }
+type LearningObservability = { automaticIndexer?: { status?: string; lastStartedAt?: string; lastCompletedAt?: string; attempted?: number; embedded?: number; failed?: number; pendingBefore?: number | null; pendingAfter?: number | null; durationMs?: number; cadenceMinutes?: number; error?: string | null } | null; learnedEvidenceUse?: { turns?: number; totalInjected?: number; totalCited?: number; zeroCitationTurns?: number; overallCitedRate?: number | null; summary?: string; university?: { injected?: number; cited?: number; citedRate?: number; verdict?: string } | null } | null }
 
 const CANONICAL_HOST = new URL(PUBLIC_BRAND.siteUrl).hostname.toLowerCase()
 const CANONICAL_URL = `${PUBLIC_BRAND.siteUrl}/dashboard/cos-learning`
@@ -40,6 +41,7 @@ export default function CosLearningPage() {
   const [embeddingStatus, setEmbeddingStatus] = useState<EmbeddingResult | null>(null)
   const [embeddingRun, setEmbeddingRun] = useState<EmbeddingResult | null>(null)
   const [applicationProgress, setApplicationProgress] = useState<ApplicationProgress | null>(null)
+  const [observability, setObservability] = useState<LearningObservability | null>(null)
   const [busy, setBusy] = useState(false)
   const [embeddingBusy, setEmbeddingBusy] = useState(false)
   const [hostMismatch, setHostMismatch] = useState(false)
@@ -65,18 +67,21 @@ export default function CosLearningPage() {
     setHostMismatch(false)
     setAuthRequired(false)
     try {
-      const [learningResponse, embeddingResponse, specialistResponse] = await Promise.all([
+      const [learningResponse, embeddingResponse, specialistResponse, observabilityResponse] = await Promise.all([
         fetch('/api/admin/cos-learning/foundational', { cache: 'no-store', credentials: 'include' }),
         fetch('/api/admin/cos-learning/backfill-embeddings', { cache: 'no-store', credentials: 'include' }),
         fetch('/api/admin/cos-specialist-learning', { cache: 'no-store', credentials: 'include' }),
+        fetch('/api/admin/cos-learning/observability', { cache: 'no-store', credentials: 'include' }),
       ])
-      const [learningBody, embeddingBody, specialistBody] = await Promise.all([readResponse(learningResponse), readResponse(embeddingResponse), readResponse(specialistResponse)])
+      const [learningBody, embeddingBody, specialistBody, observabilityBody] = await Promise.all([readResponse(learningResponse), readResponse(embeddingResponse), readResponse(specialistResponse), readResponse(observabilityResponse)])
       setStatus(learningBody)
       setEmbeddingStatus(embeddingBody)
       setApplicationProgress((specialistBody as SpecialistResult).applicationProgress ?? null)
+      setObservability(observabilityBody as LearningObservability)
       if (!learningResponse.ok) throw responseError(learningResponse, learningBody, copy.requestFailed)
       if (!embeddingResponse.ok) throw responseError(embeddingResponse, embeddingBody, copy.embeddingBackfillFailed)
       if (!specialistResponse.ok) throw responseError(specialistResponse, specialistBody, copy.requestFailed)
+      if (!observabilityResponse.ok) throw responseError(observabilityResponse, observabilityBody, copy.requestFailed)
     } catch (e) {
       setError(e instanceof Error ? e.message : copy.requestFailed)
     }
@@ -151,6 +156,34 @@ export default function CosLearningPage() {
     </div>
     <p className="text-xs text-text-muted">{copy.embeddingScope}</p>
     <section className="rounded-md border border-border bg-surface p-4">
+      <h2 className="text-base font-semibold">Automatic embedding telemetry</h2>
+      <p className="mt-1 text-xs text-text-muted">The indexer runs automatically every 5 minutes. The manual button below is optional acceleration, not the normal workflow.</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <Card label="Indexer status" value={String(observability?.automaticIndexer?.status ?? '—').toUpperCase()} />
+        <Card label="Last automatic run" value={observability?.automaticIndexer?.lastCompletedAt ? new Date(observability.automaticIndexer.lastCompletedAt).toLocaleTimeString() : '—'} />
+        <Card label="Embedded last run" value={String(observability?.automaticIndexer?.embedded ?? '—')} />
+        <Card label="Failed last run" value={String(observability?.automaticIndexer?.failed ?? '—')} />
+        <Card label="Pending before" value={String(observability?.automaticIndexer?.pendingBefore ?? '—')} />
+        <Card label="Pending after" value={String(observability?.automaticIndexer?.pendingAfter ?? '—')} />
+        <Card label="Run duration" value={observability?.automaticIndexer?.durationMs != null ? `${(observability.automaticIndexer.durationMs / 1000).toFixed(1)}s` : '—'} />
+        <Card label="Cadence" value={`${observability?.automaticIndexer?.cadenceMinutes ?? 5} min`} />
+      </div>
+      {observability?.automaticIndexer?.error && <p className="mt-3 text-xs text-danger">{observability.automaticIndexer.error}</p>}
+    </section>
+    <section className="rounded-md border border-border bg-surface p-4">
+      <h2 className="text-base font-semibold">COS learned-evidence application telemetry</h2>
+      <p className="mt-1 text-xs text-text-muted">Injection is not counted as learning use. Only evidence actually cited by the recorded answer is material use.</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <Card label="Measured turns" value={String(observability?.learnedEvidenceUse?.turns ?? '—')} />
+        <Card label="Evidence injected" value={String(observability?.learnedEvidenceUse?.totalInjected ?? '—')} />
+        <Card label="Evidence cited/used" value={String(observability?.learnedEvidenceUse?.totalCited ?? '—')} />
+        <Card label="Zero-citation turns" value={String(observability?.learnedEvidenceUse?.zeroCitationTurns ?? '—')} />
+        <Card label="University injected" value={String(observability?.learnedEvidenceUse?.university?.injected ?? '—')} />
+        <Card label="University cited/used" value={String(observability?.learnedEvidenceUse?.university?.cited ?? '—')} />
+      </div>
+      {observability?.learnedEvidenceUse?.summary && <p className="mt-3 text-xs text-text-muted">{observability.learnedEvidenceUse.summary}</p>}
+    </section>
+    <section className="rounded-md border border-border bg-surface p-4">
       <h2 className="text-base font-semibold">{copy.softwareApplicationTitle}</h2>
       <p className="mt-1 text-xs text-text-muted">{copy.softwareApplicationExplanation}</p>
       <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -166,7 +199,7 @@ export default function CosLearningPage() {
       <button onClick={run} disabled={busy || embeddingBusy || hostMismatch || authRequired || !status?.enabled} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">{busy ? copy.running : copy.run}</button>
       {embeddingsComplete
         ? <div role="status" className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold text-text">{copy.embeddingComplete}</div>
-        : <button onClick={embedAll} disabled={busy || embeddingBusy || hostMismatch || authRequired || embeddingStatus?.remaining == null} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">{embeddingBusy ? copy.embedding : copy.embedAll}</button>}
+        : <button onClick={embedAll} disabled={busy || embeddingBusy || hostMismatch || authRequired || embeddingStatus?.remaining == null} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">{embeddingBusy ? copy.embedding : `Optional accelerator: ${copy.embedAll}`}</button>}
       <button onClick={load} disabled={busy || embeddingBusy} className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-semibold">{copy.refresh}</button>
     </div>
     {embeddingRun && <section className="rounded-md border border-border bg-surface p-4"><div className="grid gap-3 md:grid-cols-3"><Card label={copy.embeddingsCompleted} value={String(embeddingRun.embedded ?? 0)} /><Card label={copy.embeddingsRemaining} value={String(embeddingRun.remaining ?? '—')} /><Card label={copy.embeddingsFailed} value={String(embeddingRun.failed ?? 0)} /></div></section>}

@@ -634,4 +634,3 @@ export function decideRollingMassEvaluationApproval(input: {
   }
   return { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation', considered: ordered.length, skipped: Object.freeze(skipped) }
 }
------------------------------------------------------------------------------------

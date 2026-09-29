@@ -194,6 +194,18 @@ test('lexical context fallbacks run concurrently under their own budget and neve
   assert.doesNotMatch(learnedWork, /learned\.push\(/)
 })
 
+test('learned-corpus timeout fallback stays lexical so retained material can reach COS inside budget', () => {
+  const stageAt = enterprise.indexOf("boundedContextFallback('learned_lexical'")
+  const stageEnd = enterprise.indexOf('await Promise.all(fallbacks)', stageAt)
+  const learnedFallback = enterprise.slice(stageAt, stageEnd)
+  assert.ok(stageAt > 0 && stageEnd > stageAt)
+  assert.match(learnedFallback, /const queryAnchors = relevanceTerms\(prompt\)/)
+  assert.match(learnedFallback, /domainCompatibleContext\(prompt, candidate\.text\)/)
+  assert.match(learnedFallback, /minimumOverlap/)
+  assert.doesNotMatch(learnedFallback, /rankContextCandidates\(prompt/)
+  assert.match(learnedFallback, /Continuous Learning bounded lexical retrieval/)
+})
+
 test('cos-primary records each step between ingress and the COS answer', () => {
   // Production 2026-09-27 13:42 ET: 18s passed between the semantic-intent call and the first COS context
   // read with no recorded step. Every await in that span now writes a cos-latency-stage row.

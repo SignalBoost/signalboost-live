@@ -176,7 +176,7 @@ test('every chat stage in front of the answer records its duration for the owner
 test('lexical context fallbacks run concurrently under their own budget and never commit late', () => {
   // Production 2026-09-27 13:30 ET: retrieval:knowledgeStage took 9,428ms while every other source took <=558ms;
   // the semantic lookups were already capped at 1.5s, so the uncapped lexical fallbacks held the rest.
-  assert.match(enterprise, /process\.env\.COS_CONTEXT_FALLBACK_BUDGET_MS \|\| '2500'/)
+  assert.match(enterprise, /process\.env\.COS_CONTEXT_FALLBACK_BUDGET_MS \|\| '900'/)
   const helperAt = enterprise.indexOf('async function boundedContextFallback(')
   const helper = enterprise.slice(helperAt, enterprise.indexOf('\n}\n', helperAt))
   assert.ok(helperAt > 0)

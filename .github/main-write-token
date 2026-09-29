@@ -1,2 +1,2 @@
-base_sha=9bd3338cad3eb83017eb9145a5fc48c83d41270d
-branch=fix/cos-learning-observability-20260929
+base_sha=7391b300344bb925a313d441c90c9a19b888706b
+branch=fix/shared-cos-evidence-use-latency-20260929

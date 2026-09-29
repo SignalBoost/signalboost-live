@@ -1,14 +1,16 @@
+// saas/tests/massRetentionDelayTestPhase.node.test.ts
 //
 // Owner direction 2026-09-28 (test phase): the wait before a mass student's exam is 10 minutes, not 12 hours.
 // One TypeScript value drives approval, the evaluator's guard and canary ordering; the SQL claim must match it.
 // Only the wait changed - the retention questions and pass rule are untouched.
 // Gated in scripts/vercel-cos-gates.mjs since 2026-09-29: #3480 silently put the evaluator back to 12 hours.
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import test from 'node:test'
 import { MASS_RETENTION_DELAY_MS, MASS_RETENTION_DELAY_SQL_INTERVAL } from '../lib/ai/cos/cosUniversityMassRetentionDelay.ts'
 import { MASS_EVALUATION_RETENTION_DELAY_MS, MASS_EVALUATION_ROLLING_AUTHORIZATION_REF, decideExhaustedMassEvaluationArtifacts, decideRollingMassEvaluationApproval } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
 import { MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS } from '../lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts'
+import { MASS_EVALUATION_ENDPOINT_CALLS } from '../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
@@ -64,4 +66,25 @@ test('an evaluator age refusal is our own gate disagreement and never fails a st
   assert.equal(decideExhaustedMassEvaluationArtifacts({ artifacts: [student], events: [approval, ...refusals], now: new Date('2026-09-29T03:00:00.000Z') }).length, 0)
   const canary = read('../lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts')
   assert.match(canary, /error === 'mass_distilled_evaluation_retention_delay_not_met'/)
+})
+
+// 2026-09-29: #3480 raised the TypeScript call ceiling to 25 while the live SQL claim still demanded 18, so every
+// approval was refused and no exam ran. Its follow-up migration re-created the claim from the 2026-09-25 text, which
+// would also have put the wait back to 12 hours. The claim must carry the TypeScript ceiling, and no later migration
+// may re-create it with the 12-hour wait while the test phase is on.
+test('the SQL claim carries the TypeScript call ceiling and keeps the 10-minute wait', () => {
+  const ceiling = read('../supabase/migrations/20260929024000_mass_evaluation_claim_25_symmetric_holdout.sql')
+  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 25)
+  assert.match(ceiling, new RegExp(`replace\\(definition, 'v_max_endpoint<>18', 'v_max_endpoint<>${MASS_EVALUATION_ENDPOINT_CALLS}'\\)`))
+  assert.match(ceiling, /replace\(updated, 'interval ''12 hours''', 'interval ''10 minutes'''\)/)
+  assert.doesNotMatch(ceiling, /create or replace function public\.claim_next_mass_distilled_evaluation/i)
+
+  const dir = new URL('../supabase/migrations/', import.meta.url)
+  const later = readdirSync(dir).filter(name => name.endsWith('.sql') && name > '20260929021500')
+  for (const name of later) {
+    const sql = readFileSync(new URL(name, dir), 'utf8')
+    if (!/create or replace function public\.claim_next_mass_distilled_evaluation/i.test(sql)) continue
+    assert.doesNotMatch(sql, /interval '12 hours'/, `${name} re-creates the exam claim with the 12-hour wait`)
+    assert.match(sql, new RegExp(`v_max_endpoint<>${MASS_EVALUATION_ENDPOINT_CALLS}\\b`), `${name} re-creates the exam claim with a stale call ceiling`)
+  }
 })

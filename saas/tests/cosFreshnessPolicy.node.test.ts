@@ -354,3 +354,18 @@ test('platform-concept questions are not public-web lookups while real-world one
     'What is the tuition at Stanford University this year?',
   ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })
+
+test('findings of a published study are learned-corpus questions, not live current facts', () => {
+  const productionRefusal = 'What did the systematic analysis of the global burden of bacterial antimicrobial resistance from 1990 to 2021 find, and what does it forecast for 2050?'
+  assert.equal(requiresFreshExternalEvidence(productionRefusal), false)
+  assert.equal(requiresFreshExternalEvidence('What did the Lancet study on antimicrobial resistance find?'), false)
+  assert.equal(requiresFreshExternalEvidence('What does the meta-analysis conclude about statins and dementia?'), false)
+  assert.equal(requiresFreshExternalEvidence('Which methods did the paper on electricity price forecasting review, and what did it conclude?'), false)
+  // Currency markers keep the conservative live path.
+  assert.equal(requiresFreshExternalEvidence('What did the latest study on antimicrobial resistance find?'), true)
+  assert.equal(requiresFreshExternalEvidence('What did the new paper on quantum error correction show?'), true)
+  // A real weather forecast still goes to the structured live weather provider.
+  assert.equal(structuredLiveDataKind('What is the forecast for tomorrow in Paris?'), 'weather')
+  assert.equal(structuredLiveDataKind(productionRefusal), null)
+  assert.equal(requiresFreshExternalEvidence('What did the study published today find?'), true)
+})

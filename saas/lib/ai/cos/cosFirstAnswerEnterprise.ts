@@ -657,7 +657,7 @@ export function cosAudience(privileged:boolean):CosAudience {
 }
 
 function contextFallbackBudgetMs():number {
-  const value = Number(process.env.COS_CONTEXT_FALLBACK_BUDGET_MS || '2500')
+  const value = Number(process.env.COS_CONTEXT_FALLBACK_BUDGET_MS || '900')
   return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 900
 }
 

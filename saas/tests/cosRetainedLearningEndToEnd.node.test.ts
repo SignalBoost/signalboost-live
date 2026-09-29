@@ -87,3 +87,23 @@ test('ordinary evergreen questions cannot fall through merely because rescue ret
   assert.match(route, /runCompletionFirstRescue\(input,language,cosAudience\(isPrivileged\)\)/)
   assert.match(route, /buildHonestRefusalReply\(\{prompt:input,language\}\)/)
 })
+
+
+test('interactive retained-learning path is bounded and does not turn semantic misses into wide backlog scans', async () => {
+  const enterprise = await readFile(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  assert.match(enterprise, /COS_CONTEXT_FALLBACK_BUDGET_MS \|\| '900'/)
+  assert.match(enterprise, /COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS \|\| '900'/)
+  const semanticLearned = enterprise.slice(enterprise.indexOf('async function semanticLearnedCorpus'), enterprise.indexOf('function emptyRetrieval'))
+  assert.doesNotMatch(semanticLearned, /countPendingLearnedCorpusEmbeddings/)
+  assert.match(semanticLearned, /return rows/)
+})
+
+test('completion rescue is deterministic and latency bounded', async () => {
+  const route = await readFile(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  const start = route.indexOf('async function runCompletionFirstRescue')
+  const end = route.indexOf('function completionFirstResponse', start)
+  const rescue = route.slice(start, end)
+  assert.match(rescue, /temperature:0/)
+  assert.match(rescue, /maxTokens:1400/)
+  assert.match(rescue, /timeoutMs:9_000/)
+})

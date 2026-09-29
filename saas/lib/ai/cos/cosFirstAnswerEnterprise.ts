@@ -189,8 +189,8 @@ function enterpriseMemorySimilarityThreshold():number {
   return Number.isFinite(value) ? Math.max(.30, Math.min(.95, value)) : .52
 }
 function knowledgeFactRetrievalBudgetMs():number {
-  const value = Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS || '1500')
-  return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 1500
+  const value = Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS || '900')
+  return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 900
 }
 
 function interactiveReasonerMaxTokens():number {
@@ -623,11 +623,9 @@ async function semanticLearnedCorpus(prompt:string) {
       Number(row.similarity || 0) >= learnedContextSimilarityThreshold() && domainCompatibleContext(prompt, corpusCandidateText(row)),
     )
     if (hasRelevant) return rows
-    const pending = await countPendingLearnedCorpusEmbeddings()
-    if (Number(pending ?? 0) > 0) {
-      console.warn('cosFirstAnswer: relevant semantic corpus coverage incomplete; lexical fallback remains active', { pending })
-      return null
-    }
+    // A semantic miss is not a request-path failure. The background indexer owns incomplete
+    // embedding coverage; do not add a count query + wide lexical scan to every interactive miss.
+    // This keeps learned retrieval additive and bounded while the corpus continues indexing.
     return rows
   })().catch(error => {
     console.warn('cosFirstAnswer: semantic corpus retrieval unavailable; lexical fallback will be used', error)
@@ -659,8 +657,8 @@ export function cosAudience(privileged:boolean):CosAudience {
 }
 
 function contextFallbackBudgetMs():number {
-  const value = Number(process.env.COS_CONTEXT_FALLBACK_BUDGET_MS || '2500')
-  return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 2500
+  const value = Number(process.env.COS_CONTEXT_FALLBACK_BUDGET_MS || '900')
+  return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 900
 }
 
 /**

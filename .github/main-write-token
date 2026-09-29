@@ -1,2 +1,2 @@
-base_sha=ba98c9f06ea75911ef1c2360a851a96a80c0615b
-branch=fix/mass-distilled-evaluator-20260929
+base_sha=5df58bdf8e1de3160867d5edb6909575faa33475
+branch=fix/cos-learning-use-latency-20260929

@@ -1,3 +1,4 @@
+// saas/scripts/vercel-cos-gates.mjs
 // Full production regression gate restored after 2026-09-23 diagnostic isolation.
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -298,3 +299,6 @@ if (result.error) {
   console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
   process.exit(1)
 }
+
+process.exit(result.status ?? 1)
+// end of saas/scripts/vercel-cos-gates.mjs (if this line is missing, the paste was cut short)

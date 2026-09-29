@@ -85,7 +85,6 @@ export type COSProvenance = {
   userMemoriesUsed:number
   cognitiveSkillsUsed:number
   creativeMemoriesUsed?:number
-  universityLearnedEvidenceUsed?:boolean
   enterpriseMemoryStatus:string
   enterpriseMemoryOrganizationId:string|null
   evidenceFunnel:COSEvidenceFunnel
@@ -793,44 +792,42 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         }
       } else if (terms.length) {
         fallbacks.push(boundedContextFallback('learned_lexical', async () => {
-          const [learnedResult, universityResult] = await Promise.all([
-            db.from('cos_continuous_learning')
-              .select('content_hash,subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error')
-              .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
-              .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(128),
-            // University training material is a separate durable vault, not cos_continuous_learning.
-            // Production acceptance on 2026-09-29 proved that Bullwhip existed in 29 governed
-            // distillation assets while the learned corpus contained zero Bullwhip rows. Search the
-            // actual training material here so COS and public Concierge can apply what University
-            // taught. The public boundary is structural: only model-neutral rows explicitly marked
-            // as containing no private production data and carrying governed teacher-output rights
-            // can enter this context.
-            db.from('cos_university_distillation_assets')
-              .select('asset_key,portable_content_hash,subject_id,response_text,teacher_provider,source_ref,training_rights,model_neutral,contains_private_production_data,created_at')
-              .eq('model_neutral', true)
-              .eq('contains_private_production_data', false)
-              .eq('training_rights', 'governed_hosted_teacher_output')
-              .or(terms.flatMap(term => [`response_text.ilike.%${term}%`, `subject_id.ilike.%${term}%`]).join(','))
-              .order('created_at', { ascending:false })
-              .limit(64),
-          ])
-          if (learnedResult.error && universityResult.error) return null
+          const learnedResult = await db.from('cos_continuous_learning')
+            .select('content_hash,subject,summary,facts,confidence,source_kind,source_uri,observed_at,fact_extraction_error')
+            .or(terms.flatMap(term => [`subject.ilike.%${term}%`, `summary.ilike.%${term}%`]).join(','))
+            .order('confidence', { ascending:false }).order('observed_at', { ascending:false }).order('source_uri', { ascending:true }).limit(192)
+          if (learnedResult.error) return null
           const unfilteredRows = (learnedResult.data ?? []).filter(row => !rejectedLearningRow(row))
           const rows = publicAudience ? filterPublicCorpusRows(unfilteredRows) : unfilteredRows
-          const universityRows = universityResult.error ? [] : [...new Map((universityResult.data ?? []).map(row => {
-            const contentHash = String(row.portable_content_hash || row.asset_key || '')
-            return [contentHash, {
-              content_hash: contentHash,
-              subject: String(row.subject_id || 'University curriculum'),
-              summary: String(row.response_text || ''),
-              facts: [],
-              confidence: 0.85,
-              source_kind: 'university_distillation_asset',
-              source_uri: `itmounts://cos-university/distillation-asset/${String(row.asset_key || '')}`,
-              observed_at: String(row.created_at || ''),
-              fact_extraction_error: null,
-            }]
-          })).values()]
+          const candidates = rows.map(row => ({ item:row, text:corpusCandidateText(row) }))
+          // The bounded fallback is intentionally ONLY the long-running Continuous Learning Corpus.
+          // University/student distillation assets are downstream training artifacts, not COS's
+          // foundational education source and must never substitute for missing retained learning.
+          const queryAnchors = relevanceTerms(prompt)
+          const minimumOverlap = Math.min(2, Math.max(1, queryAnchors.length))
+          const lexicalRelevant = candidates
+            .filter(candidate => domainCompatibleContext(prompt, candidate.text))
+            .map(candidate => {
+              const candidateTerms = new Set(relevanceTerms(candidate.text))
+              const overlap = queryAnchors.filter(term => candidateTerms.has(term)).length
+              return { ...candidate, similarity: queryAnchors.length ? overlap / queryAnchors.length : 0, overlap }
+            })
+            .filter(candidate => candidate.overlap >= minimumOverlap)
+            .sort((a, b) => b.overlap - a.overlap || b.similarity - a.similarity)
+          const rankedWithSummary = lexicalRelevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
+          const selected = selectLearnedCorpusRows<(typeof rankedWithSummary)[number]>(rankedWithSummary, 6)
+          return () => {
+            funnel.learnedCorpus.retrieved = rows.length
+            funnel.learnedCorpus.relevant = lexicalRelevant.length
+            funnel.learnedCorpus.selected = selected.length
+            if (rows.length) kgSystems.push('Continuous Learning bounded lexical retrieval')
+            for (const candidate of selected) {
+              const row = candidate.item
+              const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''
+              learned.push(`[CL${learned.length + 1}] ${safeText(row.subject,180)}: ${safeText(row.summary,800)}${evidenceFacts ? ` Facts: ${evidenceFacts}` : ''} [${learnedEvidenceLabel(classifyLearnedEvidence(row))}; confidence ${Number(row.confidence || 0).toFixed(2)}; relevance ${candidate.similarity.toFixed(2)}; ${safeText(row.source_kind,80)} ${safeText(row.source_uri,280)}]`)
+            }
+          }
+        })).values()]
           const candidates = [...rows, ...universityRows].map(row => ({ item:row, text:corpusCandidateText(row) }))
           // This branch exists because semantic corpus retrieval already missed its interactive budget.
           // Do not wake the embedding runtime and attempt a second semantic ranking here: production
@@ -1227,11 +1224,8 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const cited = citedEvidence(parsed.answer)
   const enterpriseCited = organizationMemoryCitationCount(parsed.answer)
   const canonicalSelfKnowledgeUsed = canonicalSelfKnowledgeContribution(parsed.answer)
-  const citedUniversityLearnedEvidence = citedIndexedValues(parsed.answer, 'CL', context.learned)
-    .some(line => /university_distillation_asset|itmounts:\/\/cos-university\/distillation-asset/i.test(String(line)))
   const citedProvenance = {
     ...reasoningProvenance,
-    universityLearnedEvidenceUsed:citedUniversityLearnedEvidence,
     knowledgeFactsCited:cited.kg,
     learnedItemsCited:cited.cl,
     enterpriseMemoriesCited:enterpriseCited,

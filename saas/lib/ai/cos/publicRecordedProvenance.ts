@@ -18,7 +18,7 @@ export type PublicRecordedProvenance = {
   localReasoning: { invoked: boolean; model: string | null }
   externalAi: { invoked: boolean; provider: string | null; model: string | null }
   deterministicUtility: { used: boolean; utility: string | null }
-  learnedCorpus: { used: boolean; cited: number; injected: number; universityUsed: boolean }
+  learnedCorpus: { used: boolean; cited: number; injected: number }
   toolsUsed: string[]
 }
 
@@ -65,7 +65,7 @@ export function extractPublicRecordedProvenance(provenance: any): PublicRecorded
       localReasoning: { invoked: false, model: null },
       externalAi: { invoked: false, provider: null, model: null },
       deterministicUtility: { used: false, utility: null },
-      learnedCorpus: { used: false, cited: 0, injected: 0, universityUsed: false },
+      learnedCorpus: { used: false, cited: 0, injected: 0 },
       toolsUsed: [],
     }
   }
@@ -113,7 +113,6 @@ export function extractPublicRecordedProvenance(provenance: any): PublicRecorded
   const learnedFunnel = provenance?.evidence_funnel?.learned_corpus ?? provenance?.evidenceFunnel?.learnedCorpus ?? {}
   const learnedCited = Math.max(0, Number(learned?.evidence_count ?? learned?.cited ?? provenance?.learnedItemsCited ?? learnedFunnel?.cited ?? 0) || 0)
   const learnedInjected = Math.max(0, Number(learned?.injected_count ?? learned?.injected ?? learnedFunnel?.injected ?? provenance?.learnedItemsUsed ?? 0) || 0)
-  const universityUsed = Boolean(learned?.university_used ?? learned?.universityUsed ?? provenance?.university_learned_evidence_used ?? provenance?.universityLearnedEvidenceUsed)
 
   return {
     recordAvailable: true,
@@ -140,7 +139,7 @@ export function extractPublicRecordedProvenance(provenance: any): PublicRecorded
       used: Boolean(provenance?.deterministic_utility?.used || provenance?.deterministicFreshFactUsed),
       utility: cleanText(provenance?.deterministic_utility?.utility, 160),
     },
-    learnedCorpus: { used: learnedCited > 0 || Boolean(learned?.used), cited: learnedCited, injected: learnedInjected, universityUsed },
+    learnedCorpus: { used: learnedCited > 0 || Boolean(learned?.used), cited: learnedCited, injected: learnedInjected },
     toolsUsed: recordedToolNames(provenance),
   }
 }
@@ -157,7 +156,7 @@ function publicOriginLine(facts: PublicRecordedProvenance, lang: string): string
     if (lang === 'es') return `Origen registrado: COS usó conocimiento aprendido retenido (${facts.learnedCorpus.cited} evidencia(s) citada(s)) y el razonador sintetizó la respuesta.`
     if (lang === 'pl') return `Zarejestrowane pochodzenie: COS użył zachowanej wiedzy wyuczonej (${facts.learnedCorpus.cited} cytowanych dowodów), a model rozumujący zsyntetyzował odpowiedź.`
     if (lang === 'ru') return `Зафиксированное происхождение: COS использовал сохранённые изученные знания (${facts.learnedCorpus.cited} цитированных свидетельств), а модель рассуждения синтезировала ответ.`
-    return `Recorded origin: COS used retained learned knowledge (${facts.learnedCorpus.cited} cited evidence item${facts.learnedCorpus.cited === 1 ? '' : 's'}) and the reasoner synthesized the answer.${facts.learnedCorpus.universityUsed ? ' University material contributed.' : ''}`
+    return `Recorded origin: COS used retained learned knowledge (${facts.learnedCorpus.cited} cited evidence item${facts.learnedCorpus.cited === 1 ? '' : 's'}) and the reasoner synthesized the answer.`
   }
   if (facts.externalAi.invoked) {
     if (lang === 'pt') return 'Origem registrada: um provedor externo de IA participou desta resposta.'

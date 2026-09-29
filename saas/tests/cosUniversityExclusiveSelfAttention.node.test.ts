@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityExclusiveSelfAttention.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -7,10 +8,13 @@ const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'u
 test('XSA starts fail-closed until training and inference share one runtime', () => {
   const worker = source('../scripts/cos-university-hf-worker.py')
   assert.match(worker, /XSA_PROFILE = "exclusive_self_attention_v1"/)
-  assert.match(worker, /XSA_ROLLOUT_PERCENT = 100/)
+  // 2026-09-29: paused. XSA answers took 37-44s against 4.0s for standard students and hit the exam's 50s
+  // per-answer limit, so no XSA student could finish an exam. Re-enable only as a bounded cohort, never 100%.
+  assert.match(worker, /XSA_ROLLOUT_PERCENT = 0\n/)
   assert.match(worker, /XSA_INFERENCE_SYMMETRY_REQUIRED = True/)
   assert.match(worker, /ITMOUNTS_UNIVERSITY_STANDARD_ATTENTION_CONTROL/)
-  assert.match(worker, /worker_xsa_selected_without_symmetric_runtime/)
+  // The pre-symmetry guard (worker_xsa_selected_without_symmetric_runtime) was replaced by this installation proof.
+  assert.match(worker, /worker_xsa_training_runtime_installation_unproven/)
   assert.match(worker, /"attentionArchitecture": "standard_attention"/)
   assert.match(worker, /"xsaReason": "explicit_standard_attention_control"/)
 })

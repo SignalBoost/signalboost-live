@@ -1,2 +1,2 @@
-base_sha=5df58bdf8e1de3160867d5edb6909575faa33475
-branch=fix/cos-learning-use-latency-20260929
+base_sha=b3fb068ac0cc1e385d51f57ab98a4ca1cdb4a651
+branch=fix/cos-latency-gate-followup-20260929

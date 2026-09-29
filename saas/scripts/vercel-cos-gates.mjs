@@ -292,6 +292,11 @@ const tests = [
   // 2026-09-29: XSA students are neither canaried nor examined until the XSA runtime answers inside the exam limit.
   'tests/xsaExamPause.node.test.ts',
   'tests/staleGatewayXsaInfrastructure.node.test.ts',
+  // 2026-09-29: 220 independent evaluations showed distillation teaching base-rate reasoning (0.000 -> 0.927, 204
+  // helped / 0 hurt) while ERASING survivorship (1.000 -> 0.382, 0 helped / 136 hurt) and regression to the mean
+  // (0.455 -> 0.127). The worker now replays a fixed rehearsal ballast after GKD. Gate it so the ballast cannot
+  // quietly start reusing the evaluator's own questions, lose a damaged skill, or stop running last.
+  'tests/generalReasoningBallast.node.test.ts',
 
 ]
 

@@ -297,6 +297,11 @@ const tests = [
   // (0.455 -> 0.127). The worker now replays a fixed rehearsal ballast after GKD. Gate it so the ballast cannot
   // quietly start reusing the evaluator's own questions, lose a damaged skill, or stop running last.
   'tests/generalReasoningBallast.node.test.ts',
+  // 2026-09-29 19:13-21:23 UTC: every exam wake died at 10/10 RunPod workers and no exam completed after 17:21
+  // while 44 examinable artifacts waited. Reclaim required min === 0, so a SUPERSEDED-generation endpoint pinned
+  // always-on held quota forever. Gate the widened reclaim and the quota inventory so neither the protections
+  // nor the infrastructure classification of the quota error can regress.
+  'tests/runpodWorkerQuotaReclaim.node.test.ts',
 
 ]
 

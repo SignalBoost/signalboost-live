@@ -6,6 +6,7 @@
 // (1 invocation, <= $0.20). It never touches the claim, the canary, the evaluator, promotion or Production traffic.
 
 import { MASS_RETENTION_DELAY_MS } from './cosUniversityMassRetentionDelay.ts'
+import { xsaExamPaused } from './cosUniversityXsaExamPause.ts'
 
 export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-17_mass_canary_without_manual_intervention' as const
 export const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1' as const
@@ -333,8 +334,7 @@ export function decideMassCanaryRollingApproval(input: {
       const aBuilder = builderProofArtifact(a)
       const bBuilder = builderProofArtifact(b)
       if (aBuilder !== bBuilder) return aBuilder ? -1 : 1
-    }
-    // Once Builder proof is satisfied, give the first two post-GKD remediation-replay artifacts a
+    }    // Once Builder proof is satisfied, give the first two post-GKD remediation-replay artifacts a
     // bounded proof lane ahead of the legacy backlog. The 6/hour canary cap and all other authority remain unchanged.
     if (replayProofNeeded) {
       const aReplay = replayProofArtifact(a)
@@ -401,6 +401,9 @@ export function decideMassCanaryRollingApproval(input: {
   // single canary in flight.
 
   for (const artifact of valid) {
+    // No canary for a student whose exam is paused (XSA, see cosUniversityXsaExamPause.ts): it could not be examined,
+    // so the endpoint would be paid for and never used. In-flight XSA canaries still count in the semaphore above.
+    if (xsaExamPaused(artifact)) continue
     const own = forArtifact(input.events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
     // An artifact that already owns one of the bounded slots must not receive another approval.
     if (armedApproval(own, nowMs) || canaryInvocationInFlight(own, nowMs)) continue

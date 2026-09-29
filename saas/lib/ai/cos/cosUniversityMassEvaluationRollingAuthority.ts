@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts
 // Owner direction (2026-09-16): mass-distilled evaluations must complete without manual intervention.
 // Hand-inserted approvals were the dominant failure class. This pure policy decides, once per cron tick,
 // whether to issue ONE bounded evaluation approval in exactly the shape the atomic claim accepts
@@ -6,6 +7,7 @@
 
 import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationContextBudget.ts'
 import { MASS_RETENTION_DELAY_MS } from './cosUniversityMassRetentionDelay.ts'
+import { xsaExamPaused } from './cosUniversityXsaExamPause.ts'
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
@@ -137,6 +139,8 @@ export type RollingArtifact = Readonly<{
   frontierRecipe?: boolean
   builderV2?: boolean
   remediationReplay?: boolean
+  /** Durable training receipt says the adapter was trained with Exclusive Self Attention. */
+  xsa?: boolean
   /** Earliest exact-canary timestamp accepted by the atomic claim (post-Residency for Builder artifacts). */
   minimumCanaryObservedAt?: string
 }>
@@ -465,6 +469,9 @@ export function decideRollingMassEvaluationApproval(input: {
   for (const artifact of ordered) {
     if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) { skip('not_mass_or_bad_hash'); continue }
     if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) { skip('younger_than_retention_delay'); continue }
+    // XSA students cannot finish an exam inside the per-answer limit yet (see cosUniversityXsaExamPause.ts). They stay
+    // PENDING: no approval, no wake, no attempt charged.
+    if (xsaExamPaused(artifact)) { skip('xsa_exam_paused'); continue }
     const hash = artifact.artifactHash.toLowerCase()
     const history = artifactHistory(artifact, input.events, nowMs)
     const mine = history.mine

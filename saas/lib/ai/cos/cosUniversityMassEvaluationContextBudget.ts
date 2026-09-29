@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts
 import { ESTIMATED_CHARACTERS_PER_TOKEN, RUNPOD_CONTEXT_WINDOW_TOKENS, estimateContextTokens } from '../context-window-manager.ts'
 
 // saas/lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts
@@ -81,6 +82,18 @@ export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = RUNPOD_CONTEXT_WINDOW_TOKENS
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = ESTIMATED_CHARACTERS_PER_TOKEN
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought. /no_think'
 export const MASS_EVALUATION_MAX_OUTPUT_TOKENS = 1024
+// Production 2026-09-28: the same positional decay the fixed suites were split to cure is still live on HOLDOUT.
+// The planner below minimizes CALLS, so above seven cases it starts at ONE group and only splits when a prompt
+// stops fitting the context window - never because answers ran out of room. Measured against real exam prompts:
+// 4 cases -> 384 output tokens per answer, 8 -> 128, 16 -> 64, while the 18-call budget sat almost unused (4 cases
+// spends 2). 64-128 tokens cannot hold a graded exam answer, so the tail truncates and is scored wrong rather than
+// broken, which is the answer_missing:<hash>:finish=length family and a plausible share of the both-zero holdouts.
+// The floor is not a new number: massEvaluationOutputTokens already computes caseCount*192 as its DESIRED budget
+// and then silently clamps it to 1024, so a big group asks for room the cap cannot give. The planner now simply
+// honors the per-case budget this module already declares, spending calls that are already authorized. This changes only
+// how cases are grouped across already-approved calls: the call ceiling, the $0.20 wake ceiling, case order and
+// content, references, judge behavior, scoring thresholds and every promotion gate are untouched.
+export const MASS_EVALUATION_MIN_ANSWER_TOKENS = 192
 export function massEvaluationOutputTokens(caseCount: number, userPrompt: string): number {
   const estimatedPromptTokens=estimateContextTokens(MASS_EVALUATION_SYSTEM_PROMPT + userPrompt)+128
   const desired=caseCount===1
@@ -121,12 +134,24 @@ export function planMassEvaluationGroups<T>(items: readonly T[], promptFor: (gro
     : 1
   const transportGroups = Math.min(desiredTransportGroups, limit)
   const startGroups = Math.max(floor, items.length === 2 && limit >= 2 ? 2 : transportGroups)
+  // Two passes in one sweep. `smallestFitting` reproduces the historical answer exactly - the fewest groups whose
+  // prompts fit the window - and is returned unchanged when no split inside `maxGroups` can give each answer
+  // MASS_EVALUATION_MIN_ANSWER_TOKENS of output room. So nothing that plans today can become infeasible; a roomier
+  // plan is preferred only when the already-authorized call budget can pay for it.
+  let smallestFitting: T[][] | null = null
   for (let groups = startGroups; groups <= limit; groups++) {
     const planned = splitEvenly(items, groups)
-    const fits = planned.every(group => {
-      try { massEvaluationOutputTokens(group.length, promptFor(group)); return true } catch { return false }
-    })
-    if (fits) return planned
+    let fits = true
+    let roomy = true
+    for (const group of planned) {
+      let tokens = 0
+      try { tokens = massEvaluationOutputTokens(group.length, promptFor(group)) } catch { fits = false; break }
+      if (tokens < group.length * MASS_EVALUATION_MIN_ANSWER_TOKENS) roomy = false
+    }
+    if (!fits) continue
+    if (!smallestFitting) smallestFitting = planned
+    if (roomy) return planned
   }
+  if (smallestFitting) return smallestFitting
   throw new Error(`mass_distilled_evaluation_context_budget_insufficient:cases=${items.length}:maxGroups=${limit}`)
 }

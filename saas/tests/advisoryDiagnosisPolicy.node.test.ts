@@ -1,3 +1,4 @@
+// saas/tests/advisoryDiagnosisPolicy.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
@@ -169,4 +170,14 @@ test('published diagnosis lookup is enterprise-primary policy, not a Concierge d
   assert.match(reasoner, /const advisoryDiagnosis = enterprisePrimary && isAdvisoryDiagnosisPrompt/)
   const concierge = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(concierge, /advisoryDiagnosisPublishedLookup|PublishedDiagnosticReference/)
+})
+
+test('a causal question about a concept is not an incident diagnosis', () => {
+  const bullwhip = 'What is the bullwhip effect in supply-chain management, what causes it, and what practical steps can a retailer take to reduce it?'
+  assert.equal(isAdvisoryDiagnosisPrompt(bullwhip), false)
+  assert.equal(isAdvisoryDiagnosisPrompt('What causes inflation?'), false)
+  // The same clause with incident evidence is still a diagnosis request.
+  assert.equal(isAdvisoryDiagnosisPrompt('What caused the API failure last night?'), true)
+  assert.equal(isAdvisoryDiagnosisPrompt('What is causing the latency degradation on the checkout service?'), true)
+  assert.equal(isAdvisoryDiagnosisPrompt('What causes the alarm on rack 12 to trigger?'), true)
 })

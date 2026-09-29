@@ -85,6 +85,7 @@ export type COSProvenance = {
   userMemoriesUsed:number
   cognitiveSkillsUsed:number
   creativeMemoriesUsed?:number
+  universityLearnedEvidenceUsed?:boolean
   enterpriseMemoryStatus:string
   enterpriseMemoryOrganizationId:string|null
   evidenceFunnel:COSEvidenceFunnel
@@ -1226,8 +1227,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const cited = citedEvidence(parsed.answer)
   const enterpriseCited = organizationMemoryCitationCount(parsed.answer)
   const canonicalSelfKnowledgeUsed = canonicalSelfKnowledgeContribution(parsed.answer)
+  const citedUniversityLearnedEvidence = citedIndexedValues(parsed.answer, 'CL', context.learned)
+    .some(line => /university_distillation_asset|itmounts:\/\/cos-university\/distillation-asset/i.test(String(line)))
   const citedProvenance = {
     ...reasoningProvenance,
+    universityLearnedEvidenceUsed:citedUniversityLearnedEvidence,
     knowledgeFactsCited:cited.kg,
     learnedItemsCited:cited.cl,
     enterpriseMemoriesCited:enterpriseCited,

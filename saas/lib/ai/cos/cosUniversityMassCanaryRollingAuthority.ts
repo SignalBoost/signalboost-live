@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts
 // Owner direction (2026-09-17): mass-distilled artifacts must reach independent evaluation without a hand-inserted
 // canary approval each. On 2026-09-17 all 30 evaluation_pending mass artifacts had no canary, so the automatic
 // evaluator (which requires a passed canary) had nothing it could run. This pure policy decides, once per cron tick,
@@ -168,6 +167,9 @@ function evaluationInfrastructureFailure(event: CanaryEvent): boolean {
       && error.includes('does not exist'))
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
     || staleGatewayModelMismatch(error)
+    // Raised by the evaluator's age guard before any question is asked; only possible when our gates disagree
+    // about the wait. Same classification as the evaluation authority.
+    || error === 'mass_distilled_evaluation_retention_delay_not_met'
 }
 
 function evaluationEndpointLifecycleFailure(event: CanaryEvent): boolean {
@@ -517,4 +519,3 @@ export function decideMassCanaryRollingApproval(input: {
     }
   }
   return { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_canary' }
-}

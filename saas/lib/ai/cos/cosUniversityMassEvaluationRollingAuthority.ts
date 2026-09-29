@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts
 // Owner direction (2026-09-16): mass-distilled evaluations must complete without manual intervention.
 // Hand-inserted approvals were the dominant failure class. This pure policy decides, once per cron tick,
 // whether to issue ONE bounded evaluation approval in exactly the shape the atomic claim accepts
@@ -186,6 +185,10 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // mass_distilled_runtime_endpoint_id_missing: provisioning never returned an endpoint id, so nothing was
     // ever served. Prefix-matched because the recovery path appends :recovery_from=<id>.
     || error.startsWith('mass_distilled_evaluation_served_model_unproven')
+    // retention_delay_not_met: the evaluator's own age guard refused the student before any question was asked.
+    // It only fires when our gates disagree about the wait (2026-09-29: #3480 put the evaluator back to 12h while
+    // approval and the SQL claim use 10 minutes). Our disagreement is never evidence about the student.
+    || error === 'mass_distilled_evaluation_retention_delay_not_met'
     || error.startsWith('deepinfra_harness_cost_reservation_required')
     || error.startsWith('mass_distilled_runtime_endpoint_id_missing')
     // A missing judge result after the inference provider rejects/overloads the request is evaluator infrastructure,

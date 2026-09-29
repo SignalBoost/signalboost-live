@@ -1,4 +1,3 @@
-// saas/scripts/vercel-cos-gates.mjs
 // Full production regression gate restored after 2026-09-23 diagnostic isolation.
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -282,6 +281,10 @@ const tests = [
   'tests/dashboardPromptOnePipeline.node.test.ts',
   'tests/cosChatPathCallLabels.node.test.ts',
   'tests/graduateWarmGate.node.test.ts',
+  // 2026-09-29: #3480 replaced the evaluator with a copy that hard-coded the 12h wait while approval and the SQL
+  // claim used 10 minutes, so admitted students were refused inside the evaluator. This test was red on main and
+  // nothing stopped the deploy. Gate it so the next divergent copy fails its own preview build.
+  'tests/massRetentionDelayTestPhase.node.test.ts',
 
 ]
 
@@ -295,5 +298,3 @@ if (result.error) {
   console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
   process.exit(1)
 }
-
-process.exit(result.status ?? 1)

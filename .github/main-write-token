@@ -1,2 +1,2 @@
-base_sha=79a82c7e501231e2d034ca54031ed44908de6fba
-branch=fix-learned-provenance-truth
+base_sha=9d08dd4fd85d4bd8d9298012bd8f7f68d93b7a96
+branch=fix-continuous-learning-cos-application

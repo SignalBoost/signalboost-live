@@ -11,6 +11,9 @@ test('retained learning is applied end to end, not merely embedded or retrieved'
   assert.match(enterprise, /context\.learned\.join\('\\n'\)/)
   assert.match(enterprise, /Retrieval alone is not learning application/)
   assert.match(enterprise, /selected \[CL#\] material must affect the answer when relevant/)
+  assert.match(enterprise, /LEARNED-EVIDENCE RELEASE CONTRACT/)
+  assert.match(enterprise, /put its exact \[CL#\] label immediately after that claim/)
+  assert.match(enterprise, /Do not answer the same claim only from pretrained knowledge/)
   // Production acceptance regression: after semantic retrieval times out, retained knowledge must
   // still have a bounded path into CL evidence instead of spending the fallback budget embedding again.
   const learnedFallbackAt = enterprise.indexOf("boundedContextFallback('learned_lexical'")

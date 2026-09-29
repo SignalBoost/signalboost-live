@@ -126,6 +126,19 @@ function configuredReasonerLabel(): string {
     : `independent-local:${config.model}`
 }
 
+export function stableKnowledgeQuestionNeedsNoPlanner(prompt: string, previousAssistant?: string | null): boolean {
+  const text = String(prompt || '').trim().toLowerCase()
+  if (!text || String(previousAssistant || '').trim()) return false
+  // Deterministic fast lane for ordinary evergreen explanatory questions. The planner exists to
+  // request capabilities, not to spend a model turn rediscovering that definitions/mechanisms do
+  // not need live tools. Mutable/current, action, repository and personal-history language stays
+  // on the planner path.
+  const questionShape = /^(?:what|why|how|explain|define|describe|compare|when|where)\b/.test(text)
+  if (!questionShape) return false
+  if (/\b(?:today|current|currently|latest|live|now|this (?:week|month|year)|price|weather|schedule|availability|near me|my (?:account|email|calendar|files?|repo|repository|project)|deploy|commit|merge|pull request|pr\b|fix|change|create|send|book|buy|cancel|delete|update)\b/.test(text)) return false
+  return true
+}
+
 export async function decideCosAgentTurn(input: {
   prompt: string
   previousAssistant?: string | null

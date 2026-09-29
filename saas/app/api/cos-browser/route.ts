@@ -33,7 +33,7 @@ import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { decideCosAgentTurn, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
+import { decideCosAgentTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
@@ -417,7 +417,7 @@ async function executeBrowserTurn(req: NextRequest) {
   // "a digital mount management system".
   const asksAboutThisService = isSignalBoostSpecificPublicRequest(prompt)
     || (browserSurface !== 'concierge' && authenticatedOwner && mentionsPlatformConcept(prompt))
-  if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt) && !asksAboutThisService) {
+  if (!operationalEvidence && !hasSourceAttachment && !explicitOperationalRepair && !isPlatformSelfKnowledgePrompt(prompt) && !asksAboutThisService && !stableKnowledgeQuestionNeedsNoPlanner(prompt, priorAnswer)) {
     const plannerStartedAt = Date.now()
     agentDecision = await decideCosAgentTurn({
       prompt,

@@ -92,7 +92,7 @@ test('interactive COS answers and authoring bypass RunPod primary and use bounde
   assert.match(firstAnswer, /'cos_interactive_authoring'/)
   assert.match(firstAnswer, /purpose:'user_facing_response'/)
   assert.match(firstAnswer, /COS_INTERACTIVE_REASONER_MAX_TOKENS/)
-  assert.match(firstAnswer, /COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS \|\| '1500'/)
+  assert.match(firstAnswer, /COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS \|\| '900'/)
 })
 
 test('University independent assessments never acquire RunPod primary routing', () => {

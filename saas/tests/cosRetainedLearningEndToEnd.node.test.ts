@@ -56,3 +56,17 @@ test('retained learning is applied end to end, not merely embedded or retrieved'
   assert.ok(orchestration.includes('injected_count:lc.injected'))
   assert.ok(orchestration.includes('evidence_count:lc.cited'))
 })
+
+
+test('production answer path binds the control-plane turn id before learned evidence flush', async () => {
+  const source = await readFile(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  assert.match(source, /if \(reasoned\?\.turnId\) captureEvidenceSourceUseTurnId\(reasoned\.turnId\)/)
+  assert.match(source, /universityLearnedEvidenceUsed:citedUniversityLearnedEvidence/)
+})
+
+test('public provenance reports learned-corpus contribution instead of reasoner-only origin', async () => {
+  const source = await readFile(new URL('../lib/ai/cos/publicRecordedProvenance.ts', import.meta.url), 'utf8')
+  assert.match(source, /learnedCorpus: \{ used: boolean; cited: number; injected: number; universityUsed: boolean \}/)
+  assert.match(source, /Recorded origin: COS used retained learned knowledge/)
+  assert.match(source, /University material contributed/)
+})

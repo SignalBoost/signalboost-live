@@ -337,6 +337,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       frontierRecipe: isBuilderV2Receipt(row.intended_use),
       builderV2: isBuilder && isBuilderV2Receipt(row.intended_use),
       remediationReplay: isRemediationReplayReceipt(row.intended_use),
+      xsa: receipt.xsaTrainingApplied === true,
       ...(minimumCanaryObservedAt ? { minimumCanaryObservedAt } : {}),
     }
   })
@@ -804,8 +805,7 @@ export async function GET(req: NextRequest) {
         status: 'not_claimed',
         reason: 'no_atomically_claimable_mass_distilled_evaluation',
         approvalReason: rolling.reason,
-        ...(rolling.skipped ? { approvalConsidered: rolling.considered, approvalSkipped: rolling.skipped } : {}),
-      }).catch(() => undefined)
+        ...(rolling.skipped ? { approvalConsidered: rolling.considered, approvalSkipped: rolling.skipped } : {}),      }).catch(() => undefined)
       return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
     }
 

@@ -289,6 +289,9 @@ const tests = [
   // 2026-09-29: XSA at 100% made every new student un-examinable (answers 37-44s vs 4.0s standard, 50s limit).
   // Gated so the rollout cannot silently go back up.
   'tests/cosUniversityExclusiveSelfAttention.node.test.ts',
+  // 2026-09-29: XSA students are neither canaried nor examined until the XSA runtime answers inside the exam limit.
+  'tests/xsaExamPause.node.test.ts',
+  'tests/staleGatewayXsaInfrastructure.node.test.ts',
 
 ]
 

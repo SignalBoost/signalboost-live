@@ -37,7 +37,7 @@ test('every skip point in the approval loop is labelled, and the route records t
   const rules = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts', import.meta.url), 'utf8')
   const loop = rules.slice(rules.indexOf('for (const artifact of ordered) {'), rules.indexOf("reason: 'no_mass_artifact_eligible_for_rolling_evaluation'"))
   assert.equal((loop.match(/\bcontinue\b/g) || []).length, (loop.match(/skip\('/g) || []).length)
-  assert.equal((loop.match(/skip\('/g) || []).length, 15)
+  assert.equal((loop.match(/skip\('/g) || []).length, 16)
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.match(route, /approvalReason: rolling\.reason,/)
   assert.match(route, /approvalConsidered: rolling\.considered, approvalSkipped: rolling\.skipped/)

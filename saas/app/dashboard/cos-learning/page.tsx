@@ -67,7 +67,7 @@ export default function CosLearningPage() {
     setHostMismatch(false)
     setAuthRequired(false)
     try {
-      const [learningResponse, embeddingResponse, specialistResponse] = await Promise.all([
+      const [learningResponse, embeddingResponse, specialistResponse, observabilityResponse] = await Promise.all([
         fetch('/api/admin/cos-learning/foundational', { cache: 'no-store', credentials: 'include' }),
         fetch('/api/admin/cos-learning/backfill-embeddings', { cache: 'no-store', credentials: 'include' }),
         fetch('/api/admin/cos-specialist-learning', { cache: 'no-store', credentials: 'include' }),

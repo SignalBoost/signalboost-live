@@ -151,6 +151,16 @@ const evaluationStarted = (event: RollingEvent) => event.evidence?.claim === 'ma
 const evaluationTerminal = (event: RollingEvent) => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
   || event.evidence?.claim === 'mass_distilled_independent_evaluation_completed'
 
+/**
+ * Baseline HTTP 409 from either exact-artifact gateway means the endpoint container predates the gateway repair.
+ * No baseline answer exists, so this is infrastructure evidence and must never consume a student's attempt.
+ */
+export function staleGatewayModelMismatch(error: unknown): boolean {
+  const normalized = String(error || '').trim().toLowerCase()
+  return normalized.startsWith('mass_distilled_evaluation_runpod_http_409:baseline:')
+    && (normalized.includes('distilled_exact_model_mismatch') || normalized.includes('xsa_exact_model_mismatch'))
+}
+
 function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
   const error = String(event.evidence?.error || '').trim().toLowerCase()
   if (!error) return false
@@ -164,8 +174,7 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
     // The exact-artifact gateway rejecting BASE_ID is serving-contract/runtime drift: no baseline answer exists,
     // so it is infrastructure evidence, never evidence about candidate quality.
-    || (error.startsWith('mass_distilled_evaluation_runpod_http_409:baseline:')
-      && error.includes('distilled_exact_model_mismatch'))
+    || staleGatewayModelMismatch(error)
     // A missing judge result after the inference provider rejects/overloads the request is evaluator infrastructure,
     // not model quality. Release it from both the artifact retry budget and the 24h rolling approval window.
     || error === 'mass_distilled_evaluation_judge_unavailable'
@@ -490,6 +499,16 @@ export function decideRollingMassEvaluationApproval(input: {
     if (newestRuntimeTerminal
       && at(newestRuntimeTerminal.observedAt) > newestHealthyAt
       && newestRuntimeTerminal.evidence?.claim !== 'local_distilled_runtime_canary_passed') { skip('newer_canary_failed'); continue }
+
+    // A stale gateway cannot run the pinned baseline. Do not wake the same stale endpoint again; the canary lane
+    // re-canaries this artifact onto a fresh endpoint, and a newer healthy canary lifts this skip.
+    const newestFailureSinceCanary = mine
+      .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+        && at(event.observedAt) > newestHealthyAt)
+      .sort((a, b) => at(b.observedAt) - at(a.observedAt))[0]
+    if (newestFailureSinceCanary && staleGatewayModelMismatch(newestFailureSinceCanary.evidence?.error)) {
+      skip('stale_gateway_awaiting_fresh_canary'); continue
+    }
 
     // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.
     // Do not mint another approval while this exact artifact already has a live started reservation.

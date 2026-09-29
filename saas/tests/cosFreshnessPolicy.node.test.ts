@@ -312,6 +312,14 @@ test('definitional concept questions answer locally while mutable lookups stay l
   ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })
 
+test('multi-part evergreen concept questions stay on COS reasoning and retained-learning path', () => {
+  const productionAcceptance = 'What is the bullwhip effect in supply-chain management, what causes it, and what practical steps can a retailer take to reduce it?'
+  assert.equal(requiresFreshExternalEvidence(productionAcceptance), false)
+
+  // Mutable wording must still win over the evergreen conceptual escape.
+  assert.equal(requiresFreshExternalEvidence('What is the current inflation rate, what causes it, and how can a retailer respond?'), true)
+})
+
 test('questions about the service itself are never sent to the public web', () => {
   // Production 2026-09-26: "Is COS an artifact?" was refused as an unverifiable current fact.
   for (const prompt of [

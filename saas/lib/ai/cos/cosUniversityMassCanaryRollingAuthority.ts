@@ -519,4 +519,3 @@ export function decideMassCanaryRollingApproval(input: {
     }
   }
   return { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_canary' }
-}

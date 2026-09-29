@@ -23,7 +23,7 @@ export function graduateRunpodEndpointId(scope: unknown): string | null {
 
 // Must equal MASS_DISTILLED_EXACT_ENDPOINT_GENERATION in runpodMassDistilledProvisionV2.ts. Kept as a
 // literal to avoid an import cycle (V2 imports this module); the gated Residency test locks them together.
-export const RESIDENCY_RUNPOD_ENDPOINT_GENERATION = 'v4' as const
+export const RESIDENCY_RUNPOD_ENDPOINT_GENERATION = 'v5' as const
 
 /**
  * The one Residency runtime key. The immutable exact-artifact image digest is part of the key, so a new

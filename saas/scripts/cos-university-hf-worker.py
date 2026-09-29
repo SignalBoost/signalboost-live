@@ -50,11 +50,17 @@ MUON_ADJUST_LR_FN = "match_rms_adamw"
 
 # Exclusive Self Attention (XSA) changes the model forward architecture rather than merely the
 # optimizer. An XSA-trained LoRA adapter must therefore be evaluated and later served with the same
-# XSA forward path. Training/evaluation/serving symmetry is now implemented and fail-closed.
-# Future University students default to XSA. Standard attention remains an explicit control/fallback
-# only when the governed HF job sets ITMOUNTS_UNIVERSITY_STANDARD_ATTENTION_CONTROL=true.
+# XSA forward path. Training/evaluation/serving symmetry is implemented and fail-closed.
+#
+# 2026-09-29: XSA training is PAUSED (0%). ONBOARD's XSA invariant requires acceptable runtime overhead and a
+# standard-attention control cohort; at 100% there was no control, and production measured the overhead:
+# exam answers from standard students averaged 4.0s (0 of 42 hit the 50s per-answer limit), from XSA students
+# 37-44s (24 of 48 hit it between 13:15 and 14:40 UTC). Every student trained since 2026-09-27 15:00 was XSA, so
+# no exam could finish and no student could graduate. The XSA code stays in place and inert at 0%. Re-enable
+# only as a bounded cohort once the XSA serving runtime answers inside the exam's per-answer limit.
+# ITMOUNTS_UNIVERSITY_STANDARD_ATTENTION_CONTROL=true still forces standard attention for a job.
 XSA_PROFILE = "exclusive_self_attention_v1"
-XSA_ROLLOUT_PERCENT = 100
+XSA_ROLLOUT_PERCENT = 0
 XSA_STANDARD_CONTROL_ENV = "ITMOUNTS_UNIVERSITY_STANDARD_ATTENTION_CONTROL"
 XSA_INFERENCE_SYMMETRY_REQUIRED = True
 

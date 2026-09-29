@@ -1,4 +1,3 @@
-# saas/scripts/cos-university-hf-worker.py
 #!/usr/bin/env python3
 """Governed iTMounts Hugging Face Jobs worker wrapper.
 
@@ -78,6 +77,67 @@ FAILURE_DERIVED_REPLAY_MAX_ITEMS = 32
 FAILURE_DERIVED_REPLAY_EPOCHS = 3.0
 FAILURE_DERIVED_REPLAY_LEARNING_RATE = 5e-5
 FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION = 1
+
+# Catastrophic-forgetting ballast (Production evidence 2026-09-29, 220 independent evaluations).
+# Per-case transfer scores showed distillation TEACHING one reasoning skill and ERASING two others:
+#   transfer-base-rate-quantified  0.000 -> 0.927   helped 204 / hurt   0
+#   transfer-survivorship          1.000 -> 0.382   helped   0 / hurt 136
+#   transfer-regression-mean       0.455 -> 0.127   helped   2 / hurt  74
+# Each artifact trains on ~25 items drawn from ONE subject, so the adapter drifts every reasoning
+# skill the subject never exercises. Survivorship reasoning was PERFECT in the base model and the
+# adapter destroyed it. These rows are a tiny fixed rehearsal set replayed after GKD, exercising only
+# the two skills the evidence shows being lost.
+#
+# These are NOT the evaluator's questions. The evaluator asks about services/frameworks/outages and
+# about the ten worst regions; every scenario here is from a different domain, and
+# tests/generalReasoningBallast.node.test.ts fails the build if any ballast text overlaps an
+# evaluator case. Teaching a skill with different material is rehearsal; reusing the exam is not.
+GENERAL_REASONING_BALLAST: list[dict[str, str]] = [
+    {
+        "skill": "survivorship",
+        "prompt": "A fund manager's brochure reports that the funds it currently offers have averaged 9% a year over the last decade, and argues this proves its selection process works. One or two sentences: name the bias and say what data would test the claim.",
+        "response": "Survivorship bias: funds that performed badly were closed or merged away, so they are missing from that average. Test it against every fund the firm launched at the start of the decade, including the ones it shut down.",
+    },
+    {
+        "skill": "survivorship",
+        "prompt": "Someone observes that houses built in 1900 and still standing are sturdier than new construction, and concludes older building methods were better. One or two sentences: name the bias and the data needed to test it.",
+        "response": "Survivorship bias: the poorly built houses from 1900 were demolished long ago and are not in the comparison. Test it with every house built in 1900, including those since demolished, against every house built recently.",
+    },
+    {
+        "skill": "survivorship",
+        "prompt": "A satisfaction survey sent to current subscribers reports that 92% would recommend the product. One or two sentences: name the bias and what would make the figure meaningful.",
+        "response": "Survivorship bias: everyone who disliked the product already cancelled and never received the survey. Survey the people who cancelled over the same period as well to get a meaningful figure.",
+    },
+    {
+        "skill": "survivorship",
+        "prompt": "Bombers returning from missions are inspected, and armour is proposed for the sections showing the most bullet holes. One or two sentences: name the bias and say where the armour should actually go.",
+        "response": "Survivorship bias: aircraft hit in the other sections did not come back to be inspected. Armour the sections that show no holes on the returning aircraft.",
+    },
+    {
+        "skill": "regression-to-the-mean",
+        "prompt": "A striker has his worst goalscoring month in three seasons. The club changes his training and he returns to his usual rate. One or two sentences: name the effect and the comparison that settles whether the training helped.",
+        "response": "Regression to the mean: an unusually bad month is mostly followed by an ordinary one whatever is changed. Settle it against comparable strikers who had a similarly bad month and did not change their training.",
+    },
+    {
+        "skill": "regression-to-the-mean",
+        "prompt": "The lowest scorers on a mock exam are given tutoring and score higher on the retake. One or two sentences: name the effect and what would actually show the tutoring worked.",
+        "response": "Regression to the mean: extreme low scores carry bad luck that does not repeat on a retake. Show it by assigning tutoring at random among the low scorers and comparing tutored against untutored.",
+    },
+    {
+        "skill": "regression-to-the-mean",
+        "prompt": "A production line records its highest defect count ever in one week. A new inspection checklist is introduced and defects fall the next week. One or two sentences: name the effect and the comparison that settles it.",
+        "response": "Regression to the mean: a record-bad week is nearly always followed by a better one on its own. Compare against other lines that had a similarly bad week and did not get the checklist.",
+    },
+    {
+        "skill": "regression-to-the-mean",
+        "prompt": "A manager praises an agent after an unusually good call and sees worse performance next time, criticises after a bad call and sees better, and concludes criticism works and praise backfires. One or two sentences: name the effect and why the conclusion is unsafe.",
+        "response": "Regression to the mean: extreme performances are followed by more typical ones regardless of what is said. The conclusion is unsafe because the same swing would have happened with no feedback at all.",
+    },
+]
+GENERAL_REASONING_BALLAST_MAX_ITEMS = 8
+GENERAL_REASONING_BALLAST_EPOCHS = 3.0
+GENERAL_REASONING_BALLAST_LEARNING_RATE = 5e-5
+GENERAL_REASONING_BALLAST_GRADIENT_ACCUMULATION = 1
 
 BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"
 BASE_WORKER_PATH = Path("/tmp/itmounts_hf_worker_base.py")
@@ -621,7 +681,6 @@ def _frontier_distillation_plan(base, envelope: dict[str, Any], base_model: str)
         raise RuntimeError("worker_frontier_distillation_temperature_invalid")
     if not 64 <= max_new_tokens <= 512:
         raise RuntimeError("worker_frontier_distillation_max_new_tokens_invalid")
-
     return {
         "profile": FRONTIER_TRAINING_PROFILE,
         "optimizer": "gkd_on_policy",
@@ -903,6 +962,19 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         if not prompts:
             raise RuntimeError("worker_training_dataset_empty")
 
+        # Fixed rehearsal rows, independent of this run's subject. Rendered with the same chat
+        # contract as every other training row so the ballast pass cannot introduce a format skew.
+        general_ballast_training: list[dict[str, str]] = []
+        for ballast_row in GENERAL_REASONING_BALLAST[:GENERAL_REASONING_BALLAST_MAX_ITEMS]:
+            ballast_text, ballast_structured = _student_training_text(
+                base, tokenizer, {"prompt": ballast_row["prompt"], "response": ballast_row["response"]}
+            )
+            if not ballast_structured:
+                raise RuntimeError("worker_general_reasoning_ballast_structured_row_required")
+            general_ballast_training.append({"training_text": ballast_text})
+        if len(general_ballast_training) != len(GENERAL_REASONING_BALLAST[:GENERAL_REASONING_BALLAST_MAX_ITEMS]):
+            raise RuntimeError("worker_general_reasoning_ballast_incomplete")
+
         # P2 guard: teacher/student tokenizer compatibility is a prerequisite for the entire anchored
         # GKD recipe, so validate it before any anchor training consumes paid GPU time.
         teacher_tokenizer = AutoTokenizer.from_pretrained(
@@ -998,6 +1070,11 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             "failureDerivedReplayGradientAccumulationSteps": FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION if failure_derived_replay_training else 0,
             "failureDerivedReplayTrainer": "SFTTrainer" if failure_derived_replay_training else None,
             "failureDerivedReplayTrainableFp32TensorCount": 0,
+            "generalReasoningBallastItems": len(general_ballast_training),
+            "generalReasoningBallastEpochs": GENERAL_REASONING_BALLAST_EPOCHS if general_ballast_training else 0,
+            "generalReasoningBallastLearningRate": GENERAL_REASONING_BALLAST_LEARNING_RATE if general_ballast_training else 0,
+            "generalReasoningBallastTrainer": "SFTTrainer" if general_ballast_training else None,
+            "generalReasoningBallastTrainableFp32TensorCount": 0,
             "beta": frontier_plan["beta"],
             "temperature": frontier_plan["temperature"],
             "maxNewTokens": frontier_plan["maxNewTokens"],
@@ -1229,6 +1306,64 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         recipe["failureDerivedReplayTrainableFp32TensorCount"] = replay_fp32_tensors
         print(
             f"itmounts_failure_derived_replay:{json.dumps({'items':len(failure_derived_replay_training),'epochs':FAILURE_DERIVED_REPLAY_EPOCHS,'learningRate':FAILURE_DERIVED_REPLAY_LEARNING_RATE,'authorityExpanded':False}, ensure_ascii=True, separators=(',', ':'))}",
+            flush=True,
+        )
+
+    # Rehearsal pass. GKD optimises toward a general-purpose dense teacher on ~25 same-subject
+    # prompts; anything the subject never exercises drifts. Production 2026-09-29 measured that drift
+    # directly: survivorship reasoning fell 1.000 -> 0.382 across 220 evaluations with zero runs
+    # improved. This replays the fixed rehearsal rows last, at the same bounded epochs and learning
+    # rate as the failure-derived replay, so the skills the adapter is known to lose survive training.
+    # Evaluator cases still never enter training and the training-stage spend/runtime ceiling is unchanged.
+    if frontier_plan is not None and general_ballast_training:
+        ballast_model = trainer.model
+        if hasattr(trainer, "teacher_model"):
+            trainer.teacher_model = None
+        del trainer
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        ballast_recipe = {
+            "trainingItems": len(general_ballast_training),
+            "epochs": GENERAL_REASONING_BALLAST_EPOCHS,
+            "perDeviceTrainBatchSize": 1,
+            "gradientAccumulationSteps": GENERAL_REASONING_BALLAST_GRADIENT_ACCUMULATION,
+            "learningRate": GENERAL_REASONING_BALLAST_LEARNING_RATE,
+            "warmupRatio": 0.0,
+            "lrSchedulerType": TRAINING_LR_SCHEDULER,
+            "maxGradNorm": TRAINING_MAX_GRAD_NORM,
+            "maxLength": FRONTIER_GKD_MAX_LENGTH,
+        }
+        ballast_args = SFTConfig(
+            output_dir=str(output_dir / "general-reasoning-ballast"),
+            num_train_epochs=ballast_recipe["epochs"],
+            per_device_train_batch_size=ballast_recipe["perDeviceTrainBatchSize"],
+            gradient_accumulation_steps=ballast_recipe["gradientAccumulationSteps"],
+            learning_rate=ballast_recipe["learningRate"],
+            **_warmup_arguments(SFTConfig, ballast_recipe),
+            lr_scheduler_type=ballast_recipe["lrSchedulerType"],
+            max_grad_norm=ballast_recipe["maxGradNorm"],
+            logging_steps=10,
+            save_strategy="no",
+            report_to="none",
+            bf16=False,
+            fp16=False,
+            gradient_checkpointing=True,
+            dataset_text_field="training_text",
+            max_length=ballast_recipe["maxLength"],
+        )
+        ballast_trainer = SFTTrainer(
+            model=ballast_model,
+            args=ballast_args,
+            train_dataset=Dataset.from_list(general_ballast_training),
+            processing_class=tokenizer,
+        )
+        ballast_fp32_tensors = _force_trainable_fp32(ballast_trainer.model)
+        ballast_trainer.train()
+        trainer = ballast_trainer
+        recipe["generalReasoningBallastTrainableFp32TensorCount"] = ballast_fp32_tensors
+        print(
+            f"itmounts_general_reasoning_ballast:{json.dumps({'items':len(general_ballast_training),'epochs':GENERAL_REASONING_BALLAST_EPOCHS,'learningRate':GENERAL_REASONING_BALLAST_LEARNING_RATE,'skills':sorted({row['skill'] for row in GENERAL_REASONING_BALLAST[:GENERAL_REASONING_BALLAST_MAX_ITEMS]}),'authorityExpanded':False}, ensure_ascii=True, separators=(',', ':'))}",
             flush=True,
         )
 

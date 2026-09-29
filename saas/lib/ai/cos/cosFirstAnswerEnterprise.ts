@@ -1086,7 +1086,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     disableThinking:true,
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:interactiveReasonerMaxTokens(),
-    systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience }),
+    systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience }) + '\n\nBASELINE KNOWLEDGE FALLBACK: Retrieved learning material is optional enrichment, never a prerequisite for answering. If no relevant external or retained learning context is provided, answer the user\'s self-contained question completely from your underlying baseline knowledge. Do not ask the user to narrow the question and do not refuse merely because retrieved documents are absent.',
     // COMPANY KNOWLEDGE BLOCK (2026-09-26). Every audience gets the owner-approved company identity and
     // public catalog directly in the prompt for questions about iTMounts. When the identity was only one
     // line among the system-prompt definitions, the owner channel answered "iTMounts is not a recognized

@@ -39,6 +39,16 @@ test('the stable public Concierge endpoint enters public scope around the same C
 })
 
 
+test('public Concierge shares the governed University learned-evidence path with COS', () => {
+  const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
+  const enterprise = readFileSync(join(process.cwd(), 'lib/ai/cos/cosFirstAnswerEnterprise.ts'), 'utf8')
+  assert.match(browser, /cosPrimaryPost\(routedRequest\)/)
+  assert.match(enterprise, /cos_university_distillation_assets/)
+  assert.match(enterprise, /contains_private_production_data', false/)
+  assert.match(enterprise, /source_kind: 'university_distillation_asset'/)
+  assert.match(enterprise, /CONTINUOUS LEARNING CORPUS:/)
+})
+
 test('the public Concierge browser ingress routes explicit artifacts before normal COS', () => {
   const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
   assert.match(browser, /isConciergeArtifactObjective\(prompt\)/)

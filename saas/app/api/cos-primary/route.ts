@@ -228,9 +228,10 @@ function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;
 async function runCompletionFirstRescue(input:string,language:string,audience:CosAudience):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
   // ONE BRAIN: the rescue lane carries the same COS identity and company knowledge as the main pipeline.
   const result=await callCosReasoner({
-    temperature:.2,
-    maxTokens:2200,
+    temperature:0,
+    maxTokens:1400,
     disableThinking:true,
+    timeoutMs:9_000,
     usageContext:{feature:'cos_interactive_answer',purpose:'completion_rescue'},
     systemPrompt:[
       cosIdentityPreamble(audience),

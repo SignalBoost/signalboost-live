@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts
 // Owner direction (2026-09-17): mass-distilled artifacts must reach independent evaluation without a hand-inserted
 // canary approval each. On 2026-09-17 all 30 evaluation_pending mass artifacts had no canary, so the automatic
 // evaluator (which requires a passed canary) had nothing it could run. This pure policy decides, once per cron tick,
@@ -519,3 +520,5 @@ export function decideMassCanaryRollingApproval(input: {
     }
   }
   return { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_canary' }
+}
+// end of saas/lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts (if this line is missing, the paste was cut short)

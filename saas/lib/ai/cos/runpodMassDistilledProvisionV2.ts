@@ -270,7 +270,7 @@ async function withWorkerQuotaRecovery<T>(activeEndpointId: string, operation: (
       if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 750 * (attempt + 1)))
     }
   }
-  throw lastError instanceof Error ? lastError : new Error('mass_distilled_runtime_worker_quota_full')
+  throw await withQuotaInventory(lastError, activeEndpointId)
 }
 
 const RUNPOD_PRIMARY_ENDPOINT_NAMES = new Set(['itmounts-distilled-reasoning-primary'])
@@ -286,13 +286,29 @@ async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
   // graduates, evaluations, canaries, the active endpoint, and live Residency leases are never
   // reclaimed. Every other scale-to-zero reservation is stale/reclaimable capacity, including
   // XSA and legacy distilled lanes.
-  const reclaimable = (listed.endpoints || []).filter(endpoint =>
+  const unprotected = (listed.endpoints || []).filter(endpoint =>
     clean(endpoint.id, 160) !== activeEndpointId
     && !protectedEndpointIds.has(clean(endpoint.id, 160).toLowerCase())
     && !protectedResidencyEndpointNames.has(clean(endpoint.name, 240))
     && !RUNPOD_PRIMARY_ENDPOINT_NAMES.has(clean(endpoint.name, 240).toLowerCase())
-    && Number(endpoint.workers?.min ?? 0) === 0
     && Number(endpoint.workers?.max ?? 0) > 0)
+  // Production 2026-09-29 19:13-21:23 UTC: every exam wake died at 10/10 workers AFTER this reclaim had run
+  // four times and after the caller surrendered its own max=1 reservation. The filter below required
+  // min === 0, so an endpoint pinned always-on was untouchable - including endpoints from a SUPERSEDED
+  // naming generation. The v4 -> v5 bump earlier the same day orphaned a whole generation, and any of those
+  // still pinned min>=1 held quota no live lane could ever use and no reclaim could ever free.
+  //
+  // A stale-generation endpoint cannot be the active exam endpoint (the active one is built with the current
+  // generation in its name), cannot be an active graduate/evaluation/canary (those are protected by id above),
+  // and cannot hold a live Residency lease (protected by name above). Reclaiming it is therefore safe even
+  // when pinned. Current-generation endpoints keep the original min === 0 requirement.
+  const staleGeneration = (endpoint: Endpoint) => {
+    const name = clean(endpoint.name, 240).toLowerCase()
+    if (!name.startsWith('itmounts-mass-distilled-')) return false
+    return !name.endsWith(`-${MASS_DISTILLED_EXACT_ENDPOINT_GENERATION}`)
+  }
+  const reclaimable = unprotected.filter(endpoint =>
+    Number(endpoint.workers?.min ?? 0) === 0 || staleGeneration(endpoint))
   for (const endpoint of reclaimable) {
     if (!endpoint.id) continue
     const idleTimeout = Math.min(Number(endpoint.workers?.idleTimeout ?? IDLE_TIMEOUT_SECONDS), IDLE_TIMEOUT_SECONDS)
@@ -302,6 +318,65 @@ async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
     })
   }
   return reclaimable.length
+}
+
+// The list that answers "what is holding the ten workers?" was fetched above and thrown away, so the only way
+// to answer it was to open the RunPod dashboard by hand. Record it on the error instead: the existing failure
+// event already stores evidence.error, so one SQL query reads it. Diagnostic only - reclaims nothing.
+const QUOTA_INVENTORY_MAX_ENDPOINTS = 12
+const QUOTA_INVENTORY_MAX_CHARS = 700
+
+/** Compact, bounded description of which endpoints hold the account-wide worker quota, and why each survived. */
+export async function runpodWorkerQuotaInventory(activeEndpointId = ''): Promise<string> {
+  try {
+    const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+    const [protectedEndpointIds, protectedResidencyEndpointNames] = await Promise.all([
+      protectedRunpodEndpointIds(),
+      activeResidencyRunpodEndpointNames(),
+    ])
+    const active = clean(activeEndpointId, 160).toLowerCase()
+    const holders = (listed.endpoints || [])
+      .filter(endpoint => Math.floor(Number(endpoint.workers?.max ?? 0)) > 0)
+      .sort((a, b) => Math.floor(Number(b.workers?.max ?? 0)) - Math.floor(Number(a.workers?.max ?? 0)))
+    const reserved = holders.reduce((total, endpoint) =>
+      total + Math.max(0, Math.floor(Number(endpoint.workers?.max ?? 0))), 0)
+    const rows = holders.slice(0, QUOTA_INVENTORY_MAX_ENDPOINTS).map(endpoint => {
+      const id = clean(endpoint.id, 160)
+      const name = clean(endpoint.name, 240)
+      const min = Math.max(0, Math.floor(Number(endpoint.workers?.min ?? 0)))
+      const max = Math.max(0, Math.floor(Number(endpoint.workers?.max ?? 0)))
+      // Exactly the reasons releaseOtherMassEndpointCapacity skips an endpoint.
+      const reason = id.toLowerCase() === active ? 'active'
+        : protectedEndpointIds.has(id.toLowerCase()) ? 'protected'
+        : protectedResidencyEndpointNames.has(name) ? 'residency'
+        : RUNPOD_PRIMARY_ENDPOINT_NAMES.has(name.toLowerCase()) ? 'primary'
+        : min > 0 ? 'pinned'
+        : 'reclaimable'
+      return `${(name || id).slice(-30)}(${min}/${max},${reason})`
+    })
+    return `holders=${holders.length}:reserved=${reserved}:${rows.join(',')}`.slice(0, QUOTA_INVENTORY_MAX_CHARS)
+  } catch (error) {
+    return `inventory_unavailable:${(error instanceof Error ? error.message : 'unknown').slice(0, 80)}`
+  }
+}
+
+/**
+ * Append the inventory WITHOUT disturbing the original message.
+ *
+ * evaluatorInfrastructureFailure classifies this failure by matching the literal RunPod text
+ * 'max workers across all endpoints must not exceed your workers quota'. Replacing or reformatting that
+ * string would reclassify a quota outage as model quality and charge a student one of its three attempts.
+ */
+export function appendQuotaInventory(base: string, inventory: string): string {
+  const message = clean(base, 4000) || 'mass_distilled_runtime_worker_quota_full'
+  if (message.includes('quota_inventory=')) return message
+  return `${message} quota_inventory=${clean(inventory, QUOTA_INVENTORY_MAX_CHARS)}`
+}
+
+async function withQuotaInventory(error: unknown, activeEndpointId: string): Promise<Error> {
+  const base = error instanceof Error ? error.message : String(error || '')
+  if (base.includes('quota_inventory=')) return error instanceof Error ? error : new Error(base)
+  return new Error(appendQuotaInventory(base, await runpodWorkerQuotaInventory(activeEndpointId)))
 }
 
 async function resolveEndpointControlPlane(endpointId: string, endpointName = ''): Promise<Endpoint> {
@@ -468,7 +543,12 @@ export async function activateMassDistilledEvaluationWorker(endpointId: string) 
     if (!drained?.id || Number(drained.workers?.max ?? Number.NaN) !== 0) {
       throw new Error('mass_distilled_evaluation_quota_self_drain_rejected')
     }
-    activated = await activate()
+    try {
+      activated = await activate()
+    } catch (retryError) {
+      if (!runpodWorkerQuotaError(retryError)) throw retryError
+      throw await withQuotaInventory(retryError, String(endpoint.id))
+    }
   }
   if (!activated?.id
     || Number(activated.workers?.min ?? Number.NaN) !== 1

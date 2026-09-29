@@ -246,7 +246,11 @@ async function runCompletionFirstRescue(input:string,language:string,audience:Co
     prompt:`${companyKnowledgeBlock(input)}${input}`,
   }).catch(()=>null)
   const parsed=result?.text?parseLocalResult(result.text):null
-  const reply=parsed?.answer?.trim()||''
+  // Rescue is a reliability lane, not a JSON-parser lottery. callCosReasoner may return a safe
+  // completed prose answer when a provider ignores the strict JSON instruction. Preserve that
+  // answer instead of falling through to the generic clarification/refusal path.
+  const raw=String(result?.text??' ').trim()
+  const reply=(parsed?.answer?.trim()||(!raw.startsWith('{')?raw:' ')).trim()
   if(!reply||hasUnsafePublicModelOutput(reply))return null
   const resolved=resolveCosReasoner()
   return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}

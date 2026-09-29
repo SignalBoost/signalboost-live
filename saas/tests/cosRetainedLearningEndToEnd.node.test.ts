@@ -78,3 +78,12 @@ test('public provenance attributes material retained-learning use without Univer
   assert.match(source, /Recorded origin: COS used retained learned knowledge/)
   assert.doesNotMatch(source, /University material contributed/)
 })
+
+
+test('ordinary evergreen questions cannot fall through merely because rescue returned safe prose', async () => {
+  const route = await readFile(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /const raw=String\(result\?\.text\?\?' '\)\.trim\(\)/)
+  assert.match(route, /!raw\.startsWith\('\{'\)\?raw:' '/)
+  assert.match(route, /runCompletionFirstRescue\(input,language,cosAudience\(isPrivileged\)\)/)
+  assert.match(route, /buildHonestRefusalReply\(\{prompt:input,language\}\)/)
+})

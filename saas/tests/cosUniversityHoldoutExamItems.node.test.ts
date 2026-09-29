@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   HOLDOUT_EXAM_ITEMS_MISSING_ERROR,
+  HOLDOUT_EXAM_ITEM_PROFILE,
   fillRequestedHoldoutExamSets,
   holdoutExamReadyArtifacts,
   holdoutExamWriterRequest,
@@ -101,7 +102,7 @@ test('a requested set becomes ready only when every withheld essay has a valid e
   }
   const db = fakeDb({
     sets: [{ candidate_id: 'mass:q', trained_artifact_hash: H('c'), status: 'requested', attempts: 0 }],
-    items: [{ item_hash: H('1'), question: 'Reused question that already exists for this item?', answer_key: 'Reused key.' }],
+    items: [{ item_hash: H('1'), profile: HOLDOUT_EXAM_ITEM_PROFILE, question: 'Reused question that already exists for this item?', answer_key: 'Reused key.' }],
     runs: [run],
   })
   const rows = [
@@ -117,7 +118,7 @@ test('a requested set becomes ready only when every withheld essay has a valid e
   }
   const fetchImpl = (async () => new Response(JSON.stringify({
     id: 'req-1', model: 'teacher-model',
-    choices: [{ message: { content: 'QUESTION: A retailer sells 20 units/day with a 5-day lead time and holds 40 units of safety stock. What is the reorder point?\nANSWER KEY: 140 units (100 lead-time demand + 40 safety stock).' } }],
+    choices: [{ message: { content: 'QUESTION: A team sets its reorder point from average demand alone and ignores how much demand varies week to week. What failure does this invite, and which element is missing?\nANSWER KEY: Stockouts whenever demand runs above average; safety stock is the missing element.' } }],
     usage: { prompt_tokens: 10, completion_tokens: 20 },
   }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch
   const result = await fillRequestedHoldoutExamSets({ db, env, fetchImpl, readRows: (async () => rows) as any })
@@ -128,8 +129,9 @@ test('a requested set becomes ready only when every withheld essay has a valid e
   assert.equal(result.itemsReused, 1)
   assert.equal(result.itemsWritten, 1)
   const written = db.tables.cos_university_holdout_exam_items.find(r => r.item_hash === H('2'))
-  assert.match(written.answer_key, /140 units/)
+  assert.match(written.answer_key, /safety stock is the missing element/)
   assert.match(written.question, /reorder point/)
+  assert.equal(written.profile, HOLDOUT_EXAM_ITEM_PROFILE, 'written items carry the current generation')
 })
 
 test('a set with no usable teacher fails visibly and is retried a bounded number of times', async () => {

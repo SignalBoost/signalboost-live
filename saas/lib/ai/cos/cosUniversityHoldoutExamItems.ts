@@ -23,7 +23,11 @@ import { readPinnedHfParquetRows, type PinnedParquetRow } from './hfPinnedParque
 import { universityTeacherPoolStatus, type UniversityTeacherDefinition, type UniversityTeacherTransport } from './cosUniversityTeacherPool.ts'
 import { generateWithUniversityTeacher } from './cosUniversityTeacherAdapters.ts'
 
-export const HOLDOUT_EXAM_ITEM_PROFILE = 'cos_university_holdout_exam_item_v1' as const
+// v1 -> v2 (2026-09-28): v1 items were written under an instruction that invited multi-step arithmetic, and
+// 1,543 distinct v1 questions scored 0 for both the trained student and its own base. v2 items are written and
+// validated for single-step answerability. The reader below accepts ONLY the current profile, so a v1 row is
+// treated as absent and the writer replaces it on the next pass; nothing is deleted.
+export const HOLDOUT_EXAM_ITEM_PROFILE = 'cos_university_holdout_exam_item_v2' as const
 export const HOLDOUT_EXAM_ITEMS_TABLE = 'cos_university_holdout_exam_items' as const
 export const HOLDOUT_EXAM_SETS_TABLE = 'cos_university_holdout_exam_sets' as const
 export const HOLDOUT_EXAM_ITEMS_MISSING_ERROR = 'mass_distilled_evaluation_holdout_exam_items_missing' as const
@@ -59,7 +63,10 @@ export function holdoutExamWriterRequest(input: { subjectId: string; referenceEs
       'You write university exam items from withheld teaching material.',
       'Write exactly ONE exam question and ONE short answer key that test the central concept of the material.',
       'The question must be fully self-contained: include every number, condition, and scenario detail a student needs, and never refer to "the text", "the example", "above", or "the material".',
-      'The answer must be objectively checkable: a number with units, a named concept, a direction of change, or a specific decision with its reason.',
+      'The answer must be objectively checkable: a named concept or effect, a direction of change, the specific error to avoid, the evidence that would settle the question, or a decision with its reason.',
+      'The student answers in one or two sentences with NO working shown, so the question must be answerable in a single step of reasoning.',
+      'Do NOT ask for multi-step arithmetic, formula evaluation, or more than one quantity. Never ask the student to calculate, compute or derive several results. One approximate quantity is acceptable only when a knowledgeable person could state it without writing out a calculation.',
+      'Prefer the shape "what effect is this, and what settles it" over "work out the number".',
       'Never write a yes/no question and never write an opinion, essay, or "explain in general" question.',
       'The answer key must be 1-2 sentences containing the exact expected result.',
       'Return exactly two lines and nothing else:',
@@ -76,6 +83,37 @@ export function holdoutExamWriterRequest(input: { subjectId: string; referenceEs
 
 const QUESTION_LINE = /QUESTION\s*:\s*([\s\S]*?)\s*ANSWER\s*KEY\s*:\s*([\s\S]*)$/i
 const YES_NO_ONLY = /^(yes|no)\b[.!]?\s*$/i
+// Production 2026-09-28: 1,643 of 2,726 graded Holdout cases scored 0 for BOTH the trained student and its own
+// untrained base, across 1,543 DISTINCT questions. The questions were not malformed - they were good, and too hard
+// for the asking conditions. The student is Qwen3-4B, answers with thinking disabled (/no_think in the evaluator
+// system prompt and enable_thinking=False at the gateway), and has a few hundred output tokens. Asked to "state the
+// EOQ, safety stock and reorder point" it cannot chain three computations in one forward pass, and neither can its
+// base, so the case discriminates nothing and silently caps every student. The qualitative fixed suites prove the
+// contrast: Transfer, which asks "name the bias and the data needed to test it", is both-zero on only 15% of cases
+// and is the one suite where training helps more often than it hurts.
+// Multi-step arithmetic is therefore refused at write time. A SINGLE approximate quantity stays allowed, because
+// transfer-base-rate-quantified ("state the approximate probability", answer "about 16%") is one of the cases that
+// does discriminate. This changes which questions get written, never how answers are scored.
+const COMPUTATION_ASK = /\b(calculat\w*|comput\w*|deriv\w*|work out|solve for|evaluate the (?:formula|expression|integral))\b/i
+// An arithmetic expression in the ANSWER means the student had to evaluate it. LaTeX may sit between the equals sign
+// and the first digit (\(-100 + 115/1.10 = \$4.55\)), so allow it rather than requiring a digit immediately.
+const FORMULA_SHAPE = /\\sqrt|\\frac|\\times\s*10\^|\bsqrt\s*\(|=[^.]{0,40}?\d[\d,.]*\s*[-+*/]\s*\d/i
+const NUMERIC_TOKEN = /-?\d[\d,]*(?:\.\d+)?/g
+/**
+ * Quantities the ANSWER introduces that the QUESTION did not supply. One is a single-step result a knowledgeable
+ * person can state ("about 16%"); several mean the student had to chain computations ("EOQ 707, safety stock 22,
+ * reorder point 222"). Figures restated from the question are not results, which is why transfer-base-rate-quantified
+ * ("95% sensitive ... about 16%") stays acceptable while the EOQ item does not.
+ */
+function newQuantitiesInAnswer(question: string, answerKey: string): number {
+  const given = new Set((question.match(NUMERIC_TOKEN) || []).map(value => value.replace(/,/g, '')))
+  const introduced = new Set<string>()
+  for (const value of answerKey.match(NUMERIC_TOKEN) || []) {
+    const normalized = value.replace(/,/g, '')
+    if (!given.has(normalized)) introduced.add(normalized)
+  }
+  return introduced.size
+}
 const SELF_REFERENCE = /\b(the (text|passage|material|example|essay) (above|provided|given)|as (described|shown) above|in the (text|passage|material|essay))\b/i
 
 /** Parse and validate the writer's reply. Returns null for anything that would make a weak or ungradable item. */
@@ -86,7 +124,10 @@ export function parseHoldoutExamItem(raw: unknown): HoldoutExamItem | null {
   const question = clean(match[1], 1200)
   const answerKey = clean(match[2], 800)
   if (question.length < 20 || answerKey.length < 1) return null
-  if (!/\?\s*$/.test(question) && !/\b(state|name|calculate|compute|determine|identify|which|what|how|why)\b/i.test(question)) return null
+  if (!/\?\s*$/.test(question) && !/\b(state|name|determine|identify|which|what|how|why)\b/i.test(question)) return null
+  if (COMPUTATION_ASK.test(question)) return null
+  if (FORMULA_SHAPE.test(answerKey)) return null
+  if (newQuantitiesInAnswer(question, answerKey) > 1) return null
   if (YES_NO_ONLY.test(answerKey)) return null
   if (/^(is|are|does|do|can|should|will|was|were|has|have)\b/i.test(question) && /^(yes|no)\b/i.test(answerKey)) return null
   if (SELF_REFERENCE.test(question)) return null
@@ -120,7 +161,10 @@ export async function readReadyHoldoutExamItems(db: any, itemHashes: readonly st
   const hashes = [...new Set(itemHashes.map(item => clean(item, 64).toLowerCase()).filter(item => HEX64.test(item)))]
   const out = new Map<string, HoldoutExamItem>()
   if (!hashes.length) return out
-  const result = await db.from(HOLDOUT_EXAM_ITEMS_TABLE).select('item_hash,question,answer_key').in('item_hash', hashes)
+  const result = await db.from(HOLDOUT_EXAM_ITEMS_TABLE)
+    .select('item_hash,question,answer_key')
+    .eq('profile', HOLDOUT_EXAM_ITEM_PROFILE)
+    .in('item_hash', hashes)
   if (result.error) throw result.error
   for (const row of result.data || []) {
     const hash = clean(row.item_hash, 64).toLowerCase()
@@ -298,7 +342,7 @@ export async function fillRequestedHoldoutExamSets(input: {
               source_hash: sha256(reference),
               writer_provider: clean(result.provider, 80) || teacher.provider,
               writer_model: clean(result.model, 240) || teacher.model,
-            }, { onConflict: 'item_hash', ignoreDuplicates: true })
+            }, { onConflict: 'item_hash', ignoreDuplicates: false })
             if (stored.error) throw stored.error
             itemsWritten += 1
             written = true

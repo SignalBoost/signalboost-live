@@ -1,7 +1,12 @@
+// saas/lib/ai/cos/cosUniversityHybridDistillation.ts
 import { createHash } from 'node:crypto'
 
 export const HYBRID_DISTILLATION_PROFILE = 'cos-university-hybrid-distillation-v1' as const
-export const FAILURE_DERIVED_REMEDIATION_PROFILE = 'cos-university-failure-derived-remediation-v3' as const
+// v4 (2026-09-28): transfer/retention remediation teaches the specific general-reasoning skills the independent
+// per-question evidence shows students LOSING, plus a rotating general-reasoning refresher, instead of one generic
+// "generalize from first principles" sentence set in unrelated software contexts. A new profile lets failures that
+// were already remediated under v3 receive the targeted material once.
+export const FAILURE_DERIVED_REMEDIATION_PROFILE = 'cos-university-failure-derived-remediation-v4' as const
 export const HYBRID_REAL_SOURCE_TARGET = 0.50
 export const HYBRID_FAILURE_DERIVED_TARGET = 0.30
 export const HYBRID_TEACHER_SYNTHETIC_TARGET = 0.20
@@ -94,8 +99,195 @@ export function failedEvaluationRemediationGates(input: {
   return Object.freeze(gates)
 }
 
+/**
+ * General-reasoning skills that the fixed transfer/retention questions probe. Production 2026-09-28, 474 exams in 7
+ * days: students LOST survivorship-bias reasoning in 197 exams (base 1.00 -> student 0.58), regression to the mean in
+ * 188 (0.53 -> 0.13) and the coverage denominator in 123 (1.00 -> 0.74), while GAINING base-rate reasoning in 418
+ * (0.00 -> 0.88). Training was trading general reasoning for subject knowledge, and that alone failed Transfer and
+ * Retention for most students. Remediation now teaches the lost SKILL in new, self-contained situations.
+ *
+ * Only the case id -> skill mapping is known here. No exam prompt, wording, number or reference answer is copied;
+ * the lessons below are written independently and use different situations from the exam.
+ */
+export type ReasoningSkill =
+  | 'survivorship_bias'
+  | 'regression_to_mean'
+  | 'coverage_denominator'
+  | 'base_rates'
+  | 'confounding'
+  | 'small_samples'
+  | 'missing_baseline'
+  | 'bayesian_updating'
+
+export const REASONING_SKILL_BY_EVALUATION_CASE: Readonly<Record<string, ReasoningSkill>> = Object.freeze({
+  'transfer-survivorship': 'survivorship_bias',
+  'transfer-regression-mean': 'regression_to_mean',
+  'transfer-base-rate-quantified': 'base_rates',
+  'transfer-simpson': 'confounding',
+  'retention-coverage-denominator': 'coverage_denominator',
+  'retention-small-sample': 'small_samples',
+  'retention-missing-baseline': 'missing_baseline',
+  'retention-confounder-named': 'confounding',
+  'retention-update-direction': 'bayesian_updating',
+})
+
+/** Every general-reasoning skill, in the order the refresher rotates through them. */
+export const REASONING_REFRESHER_SKILLS: readonly ReasoningSkill[] = Object.freeze([
+  'survivorship_bias',
+  'regression_to_mean',
+  'coverage_denominator',
+  'base_rates',
+  'confounding',
+  'small_samples',
+  'missing_baseline',
+  'bayesian_updating',
+])
+
+type ReasoningSkillLesson = Readonly<{
+  principle: string
+  contexts: readonly string[]
+  verificationModes: readonly string[]
+  difficultyTwists: readonly string[]
+}>
+
+const REASONING_SKILL_LESSONS: Readonly<Record<ReasoningSkill, ReasoningSkillLesson>> = Object.freeze({
+  survivorship_bias: Object.freeze({
+    principle: 'Check for survivorship bias: when only the cases that survived, stayed, or were kept are visible, the ones that failed, left, or were removed are missing, so a trait common among survivors is not evidence that it caused survival. Ask for the missing cases before crediting the trait.',
+    contexts: Object.freeze([
+      'judging an investment strategy only from funds that are still open',
+      'learning why customers are loyal from a survey sent only to current customers',
+      'deciding where to add armour from damage seen on vehicles that returned',
+      'crediting a study habit because it is common among people who finished a course',
+    ]),
+    verificationModes: Object.freeze([
+      'name the group that is missing from the data and say what it would need to show',
+      'state what comparison between survivors and non-survivors would test the claim',
+    ]),
+    difficultyTwists: Object.freeze([
+      'the surviving examples look impressive and the missing ones are never mentioned',
+      'the trait really is common among survivors, which makes the wrong conclusion tempting',
+    ]),
+  }),
+  regression_to_mean: Object.freeze({
+    principle: 'Expect regression to the mean: units chosen because they were extreme on one measurement tend to be less extreme on the next one with no intervention at all. Credit a change only against a comparable group that was selected the same way but not treated.',
+    contexts: Object.freeze([
+      'tutoring given to the students with the lowest scores on one test',
+      'a new manager sent to the stores that had their worst month',
+      'a treatment started for patients enrolled when their symptoms peaked',
+      'a coaching change made after a team\'s worst losing streak',
+    ]),
+    verificationModes: Object.freeze([
+      'name the effect and describe the untreated comparison group that would settle it',
+      'explain what would be expected to happen with no intervention at all',
+    ]),
+    difficultyTwists: Object.freeze([
+      'the improvement after the intervention is large and real on paper',
+      'everyone involved is convinced the intervention worked',
+    ]),
+  }),
+  coverage_denominator: Object.freeze({
+    principle: 'Respect the coverage denominator: seeing no failures, errors or cases only covers what was actually observed. State what share of time, traffic or population was covered before generalizing, because an absence inside a small window says little about the whole.',
+    contexts: Object.freeze([
+      'a security scan that found nothing but only covered public endpoints',
+      'a survey with no complaints that only reached weekday daytime users',
+      'testing that found no defects but ran on a single browser and device',
+      'an audit that found no errors in the handful of records it sampled',
+    ]),
+    verificationModes: Object.freeze([
+      'state exactly what was covered and what claim that coverage can support',
+      'say what additional observation would be needed to support the broader claim',
+    ]),
+    difficultyTwists: Object.freeze([
+      'the report headline says "zero problems found"',
+      'the uncovered part is where problems would be most likely',
+    ]),
+  }),
+  base_rates: Object.freeze({
+    principle: 'Use base rates: when the condition being tested for is rare, most positive results can be false even from an accurate test. Combine how common the condition is with the test\'s error rates before judging what a positive result means.',
+    contexts: Object.freeze([
+      'a fraud alert raised on one transaction out of millions',
+      'a screening result for a rare condition',
+      'a spam filter flagging one message from a trusted sender',
+    ]),
+    verificationModes: Object.freeze([
+      'estimate the probability with rough numbers and name the error to avoid',
+    ]),
+    difficultyTwists: Object.freeze([
+      'the test is described as highly accurate',
+    ]),
+  }),
+  confounding: Object.freeze({
+    principle: 'Watch for confounding: when another factor changed at the same time or differs between groups, an overall comparison can mislead or even reverse. Compare like with like, within comparable groups, before claiming a cause.',
+    contexts: Object.freeze([
+      'hospital readmissions falling after a new discharge checklist, in the same season a community clinic opened',
+      'two teams compared overall although they handle very different kinds of work',
+      'a new tool adopted mostly by the most experienced staff',
+    ]),
+    verificationModes: Object.freeze([
+      'name the other factor and the within-group comparison that separates it',
+    ]),
+    difficultyTwists: Object.freeze([
+      'the overall numbers point one way while the fair comparison points the other',
+    ]),
+  }),
+  small_samples: Object.freeze({
+    principle: 'Distrust small samples: a result from a handful of observations can easily be chance. Say how much data would be needed and compare it with the larger established figure before declaring a difference.',
+    contexts: Object.freeze([
+      'a new treatment that helped two of the first three patients who tried it',
+      'a new hire judged the best on the team after their first two projects',
+    ]),
+    verificationModes: Object.freeze([
+      'say why the sample is too small and what test or amount of data would settle it',
+    ]),
+    difficultyTwists: Object.freeze([
+      'the small sample shows a much higher rate than the established one',
+    ]),
+  }),
+  missing_baseline: Object.freeze({
+    principle: 'Ask for the baseline: a single number means little without what it was before, what it would have been anyway, or what comparable cases show. Name the missing comparison before accepting a claim of improvement.',
+    contexts: Object.freeze([
+      'a training programme credited with a team\'s current error rate',
+      'a diet credited with a patient\'s current weight with no earlier measurements',
+    ]),
+    verificationModes: Object.freeze([
+      'name the baseline or comparison that is missing and why it matters',
+    ]),
+    difficultyTwists: Object.freeze([
+      'the reported number sounds good on its own',
+    ]),
+  }),
+  bayesian_updating: Object.freeze({
+    principle: 'Update beliefs in the direction the evidence points and by a proportionate amount: evidence more likely if a hypothesis is false should lower confidence in it. Start from the prior and adjust with the strength of the evidence.',
+    contexts: Object.freeze([
+      'a weather forecast revised after a new satellite reading',
+      'a doctor\'s estimate revised after a second specialist\'s opinion',
+    ]),
+    verificationModes: Object.freeze([
+      'explain how and why the estimate should change, using rough numbers',
+    ]),
+    difficultyTwists: Object.freeze([
+      'the new evidence is reliable but points against the favored explanation',
+    ]),
+  }),
+})
+
+/** Distinct skills lost on the fixed transfer/retention questions, in first-seen order; unknown case ids are ignored. */
+export function reasoningSkillsForLostCases(caseIds: readonly string[]): readonly ReasoningSkill[] {
+  const skills: ReasoningSkill[] = []
+  for (const caseId of caseIds) {
+    const skill = REASONING_SKILL_BY_EVALUATION_CASE[String(caseId || '').trim()]
+    if (skill && !skills.includes(skill)) skills.push(skill)
+  }
+  return Object.freeze(skills)
+}
+
+export function reasoningSkillPrinciple(skill: ReasoningSkill): string {
+  return REASONING_SKILL_LESSONS[skill].principle
+}
+
 export function failureDerivedRemediationPrinciples(
   gates: readonly FailureDerivedRemediationGate[],
+  lostSkills: readonly ReasoningSkill[] = [],
 ): readonly string[] {
   const principles: string[] = []
   const add = (value: string) => {
@@ -116,6 +308,12 @@ export function failureDerivedRemediationPrinciples(
   if (gates.includes('delayed_retention')) {
     add('Retain the corrected behavior across later contexts: do not trade away prior safety, authorization, calibration, or core subject knowledge while learning a new example.')
   }
+  // The skills the independent per-question evidence shows this student lost, then a standing reminder that subject
+  // training must not wear away general reasoning.
+  for (const skill of lostSkills) add(reasoningSkillPrinciple(skill))
+  if (gates.includes('unseen_transfer') || gates.includes('delayed_retention')) {
+    add('Keep general reasoning intact while learning the subject: check for missing or selected data, extreme-value selection, coverage, base rates, confounders, small samples and missing baselines before drawing a conclusion.')
+  }
 
   return Object.freeze(principles)
 }
@@ -125,6 +323,7 @@ export type FailureDerivedRemediationFocus =
   | 'authority_boundary'
   | 'causal_attribution'
   | 'credential_containment'
+  | 'reasoning_skill'
   | 'general'
 
 export type FailureDerivedPracticeVariant = Readonly<{
@@ -133,6 +332,10 @@ export type FailureDerivedPracticeVariant = Readonly<{
   verificationMode: string
   difficultyTwist: string
   remediationRequirements: readonly string[]
+  /** Present when focus is 'reasoning_skill': the general-reasoning skill this example teaches. */
+  reasoningSkill?: ReasoningSkill
+  /** True when the skill comes from the rotating refresher rather than from this student's own lost questions. */
+  reasoningRefresher?: boolean
 }>
 
 export function failureDerivedPracticeVariant(input: {
@@ -140,6 +343,7 @@ export function failureDerivedPracticeVariant(input: {
   candidateId: string
   ordinal: number
   gates: readonly FailureDerivedRemediationGate[]
+  lostSkills?: readonly ReasoningSkill[]
 }): FailureDerivedPracticeVariant {
   const genericContexts = Object.freeze([
     'code review for a small but consequential change',
@@ -227,6 +431,40 @@ export function failureDerivedPracticeVariant(input: {
   ])
 
   const safetyTargeted = input.gates.includes('safety')
+  const lostSkills = input.lostSkills || []
+  // Transfer/retention failures (without a safety failure) practise general-reasoning SKILLS, not software chores.
+  // Three of every four examples teach one of this student's lost skills (round-robin); every fourth is a
+  // refresher that rotates through all general-reasoning skills so training does not erode the others either.
+  // With no per-question evidence available every example is a refresher.
+  const reasoningTargeted = !safetyTargeted
+    && (input.gates.includes('unseen_transfer') || input.gates.includes('delayed_retention'))
+  if (reasoningTargeted) {
+    const refresher = lostSkills.length === 0 || input.ordinal % 4 === 3
+    // Offset the refresher rotation per student so a subject's cohorts together cover every skill.
+    const refresherOffset = Number.parseInt(hash(['reasoning-refresher', input.candidateId]).slice(0, 8), 16) % REASONING_REFRESHER_SKILLS.length
+    const skill: ReasoningSkill = refresher
+      ? REASONING_REFRESHER_SKILLS[(Math.floor(input.ordinal / (lostSkills.length ? 4 : 1)) + refresherOffset) % REASONING_REFRESHER_SKILLS.length]!
+      : lostSkills[(input.ordinal - Math.floor(input.ordinal / 4)) % lostSkills.length]!
+    const lesson = REASONING_SKILL_LESSONS[skill]
+    const skillDigest = hash([input.subjectId, input.candidateId, input.ordinal, [...input.gates].sort(), skill])
+    const pickFrom = (values: readonly string[], offset: number) =>
+      values[Number.parseInt(skillDigest.slice(offset, offset + 8), 16) % values.length] || values[0]!
+    const requirements: string[] = []
+    if (input.gates.includes('holdout_improvement')) {
+      requirements.push('Solve the underlying problem rather than matching surface wording, and make the final answer independently checkable.')
+    }
+    requirements.push(`Teach this general-reasoning skill through a new, self-contained example set in ${input.subjectId} where it naturally applies: ${lesson.principle}`)
+    requirements.push('Name the reasoning error explicitly, show the correct conclusion, and state what evidence or comparison would settle the question. Keep the final answer brief.')
+    return Object.freeze({
+      focus: 'reasoning_skill' as const,
+      context: pickFrom(lesson.contexts, 0),
+      verificationMode: pickFrom(lesson.verificationModes, 8),
+      difficultyTwist: pickFrom(lesson.difficultyTwists, 16),
+      remediationRequirements: Object.freeze(requirements),
+      reasoningSkill: skill,
+      reasoningRefresher: refresher,
+    })
+  }
   const safetyFocusCycle: readonly FailureDerivedRemediationFocus[] = Object.freeze([
     'authority_boundary',
     'causal_attribution',

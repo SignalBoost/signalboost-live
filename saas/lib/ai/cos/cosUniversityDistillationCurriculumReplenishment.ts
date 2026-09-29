@@ -22,8 +22,10 @@ import {
   failureDerivedPracticeVariant,
   failureDerivedRemediationPrinciples,
   failureDerivedSourceHash,
+  reasoningSkillsForLostCases,
   teacherSyntheticSourceHash,
   type FailureDerivedRemediationGate,
+  type ReasoningSkill,
 } from './cosUniversityHybridDistillation.ts'
 
 const DISTILLATION_OPENALEX_RESULTS_PER_QUERY = 10
@@ -37,6 +39,18 @@ const HYBRID_SYNTHETIC_MAX_PER_SUBJECT = 20
 // ceiling, not a required mix or a weakened quality gate.
 const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = 20
 const VERIFIED_FAILURE_LOOKBACK_DAYS = 30
+// Per-question evidence is read in bounded chunks of evaluation runs (PostgREST encodes .in() in the URL).
+const LOST_CASE_RUN_KEY_CHUNK = 75
+// A question counts as LOST when the untrained base model answered it and the student did not.
+const LOST_CASE_BASELINE_MIN = 0.5
+const LOST_CASE_CANDIDATE_MAX = 0.5
+
+type VerifiedFailure = {
+  candidateId: string
+  runKey: string
+  gates: readonly FailureDerivedRemediationGate[]
+  lostSkills: readonly ReasoningSkill[]
+}
 
 function rightsClearedPolicy(maxCandidatesPerCycle: number): ContinuousLearningPolicy {
   return {
@@ -194,14 +208,14 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   const since = new Date(input.now.getTime() - VERIFIED_FAILURE_LOOKBACK_DAYS * 86_400_000).toISOString()
 
   const rows = await input.db.from('cos_university_distilled_evaluation_runs')
-    .select('candidate_id,subject_id,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
+    .select('run_key,candidate_id,subject_id,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
     .limit(500)
   if (rows.error) throw rows.error
 
   const titleById = new Map(COS_UNIVERSITY_SUBJECTS.map(subject => [subject.id, subject.title] as const))
-  const failuresByTitle = new Map<string, Array<{ candidateId: string; gates: readonly FailureDerivedRemediationGate[] }>>()
+  const failuresByTitle = new Map<string, VerifiedFailure[]>()
   for (const row of (rows.data || []) as any[]) {
     const rawSubject = String(row.subject_id || '').trim()
     const subject = titleById.get(rawSubject as any) || rawSubject
@@ -215,8 +229,33 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
     const candidateId = String(row.candidate_id || '').trim()
     if (!candidateId) continue
     const failures = failuresByTitle.get(subject) || []
-    failures.push({ candidateId, gates })
+    failures.push({ candidateId, runKey: String(row.run_key || '').trim(), gates, lostSkills: [] })
     failuresByTitle.set(subject, failures)
+  }
+
+  // Which general-reasoning questions did each transfer/retention failure actually LOSE? Only case ids and scores are
+  // read (never prompts, answers or references), and only to choose which skill the new practice teaches.
+  const reasoningFailures = [...failuresByTitle.values()].flat()
+    .filter(failure => failure.runKey
+      && (failure.gates.includes('unseen_transfer') || failure.gates.includes('delayed_retention')))
+  const lostCasesByRunKey = new Map<string, string[]>()
+  const reasoningRunKeys = [...new Set(reasoningFailures.map(failure => failure.runKey))]
+  for (let offset = 0; offset < reasoningRunKeys.length; offset += LOST_CASE_RUN_KEY_CHUNK) {
+    const cases = await input.db.from('cos_university_distilled_evaluation_cases')
+      .select('run_key,case_id,baseline_score,candidate_score')
+      .in('run_key', reasoningRunKeys.slice(offset, offset + LOST_CASE_RUN_KEY_CHUNK))
+      .in('suite', ['transfer', 'retention'])
+    if (cases.error) throw cases.error
+    for (const row of (cases.data || []) as any[]) {
+      if (!(Number(row.baseline_score) >= LOST_CASE_BASELINE_MIN && Number(row.candidate_score) < LOST_CASE_CANDIDATE_MAX)) continue
+      const runKey = String(row.run_key || '').trim()
+      const lost = lostCasesByRunKey.get(runKey) || []
+      lost.push(String(row.case_id || '').trim())
+      lostCasesByRunKey.set(runKey, lost)
+    }
+  }
+  for (const failure of reasoningFailures) {
+    failure.lostSkills = reasoningSkillsForLostCases(lostCasesByRunKey.get(failure.runKey) || [])
   }
 
   // Prioritize failures that have not already produced corrective curriculum. Ranking by total historical
@@ -235,11 +274,14 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
     if (persistedSubject) persistedRemediationSubjects.add(persistedSubject)
     const evidence = Array.isArray(row?.evidence) ? row.evidence : []
     for (const item of evidence) {
+      // Only the CURRENT remediation profile counts as remediated: a failure covered by an older profile (v3's
+      // generic transfer/retention material) receives the skill-targeted v4 cohort once.
+      if (String(item?.remediationProfile || '') !== FAILURE_DERIVED_REMEDIATION_PROFILE) continue
       const candidateId = String(item?.sourceEvaluationCandidateId || '').trim()
       if (candidateId) remediatedCandidates.add(candidateId)
     }
   }
-  const unremediatedFailuresByTitle = new Map<string, Array<{ candidateId: string; gates: readonly FailureDerivedRemediationGate[] }>>()
+  const unremediatedFailuresByTitle = new Map<string, VerifiedFailure[]>()
   for (const [subject, failures] of failuresByTitle) {
     const pending = failures.filter(failure => !remediatedCandidates.has(failure.candidateId))
     if (pending.length) unremediatedFailuresByTitle.set(subject, pending)
@@ -287,12 +329,13 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
       // Re-running the same evidence is idempotent; a newly failed artifact produces fresh curriculum.
       const remediationKey = `${FAILURE_DERIVED_REMEDIATION_PROFILE}:${failure.candidateId}:${failure.gates.join(',')}`
       const contentHash = failureDerivedSourceHash(target.subject, ordinal, remediationKey)
-      const remediationPrinciples = failureDerivedRemediationPrinciples(failure.gates)
+      const remediationPrinciples = failureDerivedRemediationPrinciples(failure.gates, failure.lostSkills)
       const remediationVariant = failureDerivedPracticeVariant({
         subjectId: target.subject,
         candidateId: failure.candidateId,
         ordinal,
         gates: failure.gates,
+        lostSkills: failure.lostSkills,
       })
       const row = {
         content_hash: contentHash,
@@ -305,6 +348,9 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
           `Independent evaluation shows a remediation need in ${target.subject} for graduation gate classes: ${failure.gates.join(', ')}.`,
           'Generate a distinct self-contained expert teaching example that targets the relevant failure class while preserving correct, safe, transferable, and retainable behavior.',
           `Remediation focus: ${remediationVariant.focus}. Practice context: ${remediationVariant.context}. Verification mode: ${remediationVariant.verificationMode}. Difficulty twist: ${remediationVariant.difficultyTwist}.`,
+          ...(remediationVariant.reasoningSkill
+            ? [`General-reasoning skill taught by this example: ${remediationVariant.reasoningSkill.replaceAll('_', ' ')}${remediationVariant.reasoningRefresher ? ' (refresher)' : ' (lost on the independent exam)'}.`]
+            : []),
           `Variant-specific remediation requirements: ${remediationVariant.remediationRequirements.join(' ')}`,
           `General remediation principles: ${remediationPrinciples.join(' ')}`,
           'Use those general principles without recreating any hidden evaluation case. Do not reproduce training examples, raw conversations, private holdouts, hidden exams, evaluator output, user data, or private evidence.',
@@ -316,6 +362,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
             remediationProfile: FAILURE_DERIVED_REMEDIATION_PROFILE,
             ordinal,
             remediationGates: failure.gates,
+            lostReasoningSkills: failure.lostSkills,
             remediationPrinciples,
             remediationVariant,
           },
@@ -329,6 +376,7 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
           origin: 'failure_derived',
           independentEvaluationFailure: true,
           remediationGates: failure.gates,
+          lostReasoningSkills: failure.lostSkills,
           sourceEvaluationCandidateId: failure.candidateId,
           sourceDetailsCopied: false,
           authorityExpanded: false,

@@ -59,6 +59,7 @@ import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
 import { correctCompoundingArithmetic } from '@/lib/ai/cos/compoundingArithmeticCheck'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
+import { captureEvidenceSourceUseTurnId } from './evidenceSourceUseTurnContext.ts'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
 export type COSEvidenceFunnel = {
@@ -84,6 +85,7 @@ export type COSProvenance = {
   userMemoriesUsed:number
   cognitiveSkillsUsed:number
   creativeMemoriesUsed?:number
+  universityLearnedEvidenceUsed?:boolean
   enterpriseMemoryStatus:string
   enterpriseMemoryOrganizationId:string|null
   evidenceFunnel:COSEvidenceFunnel
@@ -1140,6 +1142,10 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     return null
   })
 
+  // The control-plane wrapper does not publish its turn id through recordTurnExperience(). Bind it
+  // synchronously here, before citedEvidence() and learnFromTurn() consume the request-local record.
+  if (reasoned?.turnId) captureEvidenceSourceUseTurnId(reasoned.turnId)
+
   const reasoningProvenance = {
     ...base,
     localModelInvoked:true,
@@ -1221,8 +1227,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const cited = citedEvidence(parsed.answer)
   const enterpriseCited = organizationMemoryCitationCount(parsed.answer)
   const canonicalSelfKnowledgeUsed = canonicalSelfKnowledgeContribution(parsed.answer)
+  const citedUniversityLearnedEvidence = citedIndexedValues(parsed.answer, 'CL', context.learned)
+    .some(line => /university_distillation_asset|itmounts:\/\/cos-university\/distillation-asset/i.test(String(line)))
   const citedProvenance = {
     ...reasoningProvenance,
+    universityLearnedEvidenceUsed:citedUniversityLearnedEvidence,
     knowledgeFactsCited:cited.kg,
     learnedItemsCited:cited.cl,
     enterpriseMemoriesCited:enterpriseCited,

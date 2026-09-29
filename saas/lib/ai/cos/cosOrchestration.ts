@@ -33,6 +33,11 @@ export function authoritativeProvenance(
     company_identity_definition: Boolean(canonical?.companyIdentityDefinition),
   }
 
+  const learnedStage = provenance?.learned_corpus ?? null
+  provenance.university_learned_evidence_used = Boolean(
+    learnedStage?.used && current?.universityLearnedEvidenceUsed === true,
+  )
+
   const premises = current?.userSuppliedPremises ?? null
   provenance.user_supplied_premises = {
     used: Boolean(premises?.present),

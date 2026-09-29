@@ -55,3 +55,22 @@ test('Vercel schedules frequent indexing and hourly current-world refresh', () =
   assert.equal(indexer?.schedule, '*/5 * * * *')
   assert.equal(currentWorld?.schedule, '14 * * * *')
 })
+
+
+test('foundational learning exposes durable automatic-indexer and evidence-use proof', () => {
+  const cron = read('../app/api/cron/cos-learning-indexer/route.ts')
+  const api = read('../app/api/admin/cos-learning/observability/route.ts')
+  const page = read('../app/dashboard/cos-learning/page.tsx')
+  const migration = read('../supabase/migrations/20260929102000_cos_learning_indexer_telemetry.sql')
+
+  assert.match(migration, /cos_learning_indexer_telemetry/)
+  assert.match(cron, /recordIndexerTelemetry/)
+  assert.match(cron, /pending_before: pending/)
+  assert.match(cron, /pending_after: remainingEligiblePending/)
+  assert.match(api, /readEvidenceSourceUse\(250\)/)
+  assert.match(api, /university_distillation_asset/)
+  assert.match(page, /Automatic embedding telemetry/)
+  assert.match(page, /COS learned-evidence application telemetry/)
+  assert.match(page, /University cited\/used/)
+  assert.match(page, /Optional accelerator:/)
+})

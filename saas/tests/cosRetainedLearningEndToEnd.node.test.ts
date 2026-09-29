@@ -19,6 +19,16 @@ test('retained learning is applied end to end, not merely embedded or retrieved'
   assert.match(learnedFallback, /domainCompatibleContext\(prompt, candidate\.text\)/)
   assert.match(learnedFallback, /queryAnchors = relevanceTerms\(prompt\)/)
   assert.doesNotMatch(learnedFallback, /rankContextCandidates\(prompt/)
+  // University material must be reachable by the same learned-evidence path. The 2026-09-29
+  // production Bullwhip acceptance found the concept in governed distillation assets but not in
+  // cos_continuous_learning, so a corpus-only gate would certify a path that cannot use training.
+  assert.match(learnedFallback, /cos_university_distillation_assets/)
+  assert.match(learnedFallback, /response_text\.ilike/)
+  assert.match(learnedFallback, /\.eq\('model_neutral', true\)/)
+  assert.match(learnedFallback, /\.eq\('contains_private_production_data', false\)/)
+  assert.match(learnedFallback, /\.eq\('training_rights', 'governed_hosted_teacher_output'\)/)
+  assert.match(learnedFallback, /source_kind: 'university_distillation_asset'/)
+  assert.match(learnedFallback, /COS University governed training material retrieval/)
 
   captureSelectedLearnedRows([{
     source_kind: 'official_documentation',

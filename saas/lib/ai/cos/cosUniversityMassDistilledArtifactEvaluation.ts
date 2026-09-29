@@ -723,4 +723,3 @@ export async function runMassDistilledArtifactEvaluation(
     runId: `mass-eval-${input.claim.candidateId}`,
   }, () => runMassDistilledArtifactEvaluationInsideHarness(input))
 }
------------------------------------------------------------

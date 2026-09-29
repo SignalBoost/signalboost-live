@@ -211,6 +211,15 @@ const DEFINITIONAL_CONCEPT = /^\s*(?:what\s+is\s+an?\s+|what\s+(?:is|are)\s+(?:t
 // incorrectly promoted to host_freshness_guard and refused before retained learning could be used.
 // Mutable-state rules above still win, and explicit volatility/ranking/price language is excluded here.
 const MULTIPART_CONCEPT_EXPLANATION = /^\s*(?:what\s+(?:is|are)|explain|describe|define)\b(?![\s\S]*\b(?:current(?:ly)?|latest|today|tonight|now|recent|price|prices|cost|costs|rate|rates|score|scores|ranking|best|top|near\s+me|open)\b)[^?\n]{1,180}(?:[?,;]\s*|\s+and\s+)(?:what|why|how)\b[\s\S]{1,320}$/i
+// What a PUBLISHED study found is fixed at publication. Production 2026-09-29: "What did the systematic
+// analysis of the global burden of bacterial antimicrobial resistance from 1990 to 2021 find, and what does
+// it forecast for 2050?" was refused as an unverifiable current fact: bare "forecast" matched WEATHER_STATE and
+// the question was routed to the live weather provider (shorter variants fell to the LOOKUP_INTENT catch-all) — while the paper sat embedded in the retained learning corpus
+// (scientific_journal) that exists to educate COS. Scholarly works only: news, jobs/earnings "reports" and
+// surveys stay on the conservative path, and any currency marker (latest/new/recent/current/today) excludes it.
+// It also excludes the structured live-data classes (weather/financial/sports) so a paper's forecast is never
+// sent to a weather or market provider. In requiresFreshExternalEvidence it runs after every mutable-state rule.
+const PUBLISHED_WORK_FINDINGS = /^\s*(?:what|which|how)\b(?![\s\S]*\b(?:current(?:ly)?|latest|newest|new|recent(?:ly)?|today|tonight|now|this\s+(?:week|month|year))\b)[\s\S]{0,240}\b(?:study|studies|paper|papers|analysis|analyses|meta[-\s]?analysis|(?:systematic|literature|scoping)\s+review|trial|trials|publication|journal\s+article)\b[\s\S]{0,240}\b(?:find|finds|found|findings|show|shows|showed|shown|conclude|concludes|concluded|conclusion|report|reports|reported|estimate|estimates|estimated|forecast|forecasts|forecasted|project|projects|projected|predict|predicts|predicted|say|says|said|suggest|suggests|suggested)\b/i
 // A question whose subject is this service itself ("Is COS an artifact?", "What is iTMounts?", "Are you an
 // agent?") is answered from COS's own knowledge, never from the public web: the web cannot verify what COS is,
 // and Production 2026-09-26 refused "Is COS an artifact?" as an unverifiable current fact. Like
@@ -284,7 +293,7 @@ export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
  */
 export function structuredLiveDataKind(input: string): StructuredLiveDataKind | null {
   const text = normalizedText(input)
-  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text) || looksLikeInternalOperationalState(text) || isLocalDeterministicUtility(text)) return null
+  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text) || looksLikeInternalOperationalState(text) || isLocalDeterministicUtility(text) || PUBLISHED_WORK_FINDINGS.test(text)) return null
 
   if (isDirectOrTerseLookup(text, WEATHER_STATE)) return 'weather'
   if (isDirectOrTerseLookup(text, FINANCIAL_STATE) || TICKER_PRICE.test(text) || isDirectOrTerseLookup(text, CRYPTO_PRICE)) return 'financial'
@@ -409,6 +418,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
 
   if (DEFINITIONAL_CONCEPT.test(text)) return false
   if (MULTIPART_CONCEPT_EXPLANATION.test(text)) return false
+  if (PUBLISHED_WORK_FINDINGS.test(text)) return false
   if (SERVICE_SELF_SUBJECT.test(text)) return false
   if (PLATFORM_CONCEPT_QUESTION.test(text)) return false
 

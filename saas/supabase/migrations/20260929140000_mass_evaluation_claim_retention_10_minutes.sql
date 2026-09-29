@@ -8,10 +8,10 @@
 --
 -- Defect this repairs: 20260929024000_mass_evaluation_claim_25_symmetric_holdout.sql was generated from the body
 -- of 20260925220000_mass_evaluation_newest_corrective_first.sql, which PREDATES the 2026-09-28 change to 10
--- minutes. It carried `interval '12 hours'` forward. Applying it on 2026-09-29 ~13:15 UTC fixed the 18 vs 25
+-- minutes. It carried the obsolete twelve-hour retention predicate forward. Applying it on 2026-09-29 ~13:15 UTC fixed the 18 vs 25
 -- ceiling - the exam step had reported "no exam could be claimed" 259 times from 02:00 to 13:15 UTC and exams
--- resumed immediately - but it also reinstated the 12-hour wait. Result: the TypeScript approves a student after
--- 10 minutes and this function then refuses to hand out its exam until the artifact is 12 hours old, so only
+-- resumed immediately - but it also reinstated the obsolete twelve-hour wait. Result: the TypeScript approves a student after
+-- 10 minutes and this function then refuses to hand out its exam until the artifact is twelve hours old, so only
 -- students older than 12 hours are examined. This migration changes that one predicate and nothing else.
 --
 -- Unchanged from the applied version, verified by diff: the 25 call ceiling (v_max_endpoint<>25), the <= $0.20

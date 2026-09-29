@@ -144,6 +144,13 @@ function canaryInfrastructureFailure(error: unknown): boolean {
     || canaryTransientGatewayFailure(normalized)
 }
 
+/** HTTP 409 on the baseline half means the endpoint gateway is stale, not that the student failed. */
+function staleGatewayModelMismatch(error: unknown): boolean {
+  const normalized = String(error || '').trim().toLowerCase()
+  return normalized.startsWith('mass_distilled_evaluation_runpod_http_409:baseline:')
+    && (normalized.includes('distilled_exact_model_mismatch') || normalized.includes('xsa_exact_model_mismatch'))
+}
+
 function evaluationInfrastructureFailure(event: CanaryEvent): boolean {
   const error = String(event.evidence?.error || '').trim().toLowerCase()
   if (!error) return false
@@ -158,11 +165,13 @@ function evaluationInfrastructureFailure(event: CanaryEvent): boolean {
       && error.includes('the model `itmounts-mass-distilled-')
       && error.includes('does not exist'))
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
+    || staleGatewayModelMismatch(error)
 }
 
 function evaluationEndpointLifecycleFailure(event: CanaryEvent): boolean {
   const error = String(event.evidence?.error || '').trim().toLowerCase()
-  return error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
+  return staleGatewayModelMismatch(error)
+    || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)
       && error.includes('the model `itmounts-mass-distilled-')
       && error.includes('does not exist'))
@@ -176,6 +185,8 @@ function endpointRefreshRequired(events: readonly CanaryEvent[], artifact: Canar
     .filter(event => at(event.observedAt) >= at(passed.observedAt)
       && claim(event) === 'mass_distilled_independent_evaluation_failed')
     .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+  // A stale gateway cannot fix itself: re-canary onto a fresh endpoint after the first such 409.
+  if (failures[0] && staleGatewayModelMismatch(failures[0].evidence?.error)) return true
   let consecutive = 0
   for (const failure of failures) {
     if (!evaluationEndpointLifecycleFailure(failure)) break

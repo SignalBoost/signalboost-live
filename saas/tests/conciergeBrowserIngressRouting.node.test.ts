@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationIntent.ts'
 import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
+import { stableKnowledgeQuestionNeedsNoPlanner } from '../lib/ai/cos/cosAgentDecision.ts'
 
 test('the live Dwight edit shape is transformation work, never fresh web lookup', () => {
   const prompt = 'edit Dwight, thank you for let me know and for your ocncern - if you are thinking about cancelling it because of me, do not worry. At the end of the day, this is at the moment a one-person post. If I do not do it, you will have to do it. We do what we have to do and whatever is needed to support the mission.'
@@ -72,4 +73,14 @@ test('mutable travel planning remains model-first with host freshness as a post-
   assert.doesNotMatch(browser, /const deterministicTravelPlan = requiresLiveTravelPlanningEvidence\(prompt\)/)
   assert.match(browser, /capabilities: \['live_web'\]/)
   assert.match(browser, /reason: 'host_freshness_guard'/)
+})
+
+
+test('evergreen concept questions skip the expensive capability planner on both shared surfaces', () => {
+  const bullwhip = 'What is the bullwhip effect in supply-chain management, what causes it, and what practical steps can a retailer take to reduce it?'
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner(bullwhip), true)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('What is the weather in Warsaw today?'), false)
+  assert.equal(stableKnowledgeQuestionNeedsNoPlanner('How do I fix PR 3486 in my repository?'), false)
+  const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
+  assert.match(browser, /!stableKnowledgeQuestionNeedsNoPlanner\(prompt, priorAnswer\)/)
 })

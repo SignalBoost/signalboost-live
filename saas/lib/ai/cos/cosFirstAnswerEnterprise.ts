@@ -799,15 +799,29 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
           const unfilteredRows = (learnedResult.data ?? []).filter(row => !rejectedLearningRow(row))
           const rows = publicAudience ? filterPublicCorpusRows(unfilteredRows) : unfilteredRows
           const candidates = rows.map(row => ({ item:row, text:corpusCandidateText(row) }))
-          const ranked = await rankContextCandidates(prompt, candidates, { threshold:learnedContextSimilarityThreshold(), limit:candidates.length })
-          // Same substance preference on the backfill-window path: candidates wrap the row in `item`.
-          const rankedWithSummary = ranked.relevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
+          // This branch exists because semantic corpus retrieval already missed its interactive budget.
+          // Do not wake the embedding runtime and attempt a second semantic ranking here: production
+          // 2026-09-29 showed that doing so can consume the entire fallback budget and leave COS with
+          // learnedItemsUsed=0 even when a retained row has exact lexical anchors. Domain compatibility
+          // plus two meaningful anchors is the conservative bounded fallback.
+          const queryAnchors = relevanceTerms(prompt)
+          const minimumOverlap = Math.min(2, Math.max(1, queryAnchors.length))
+          const lexicalRelevant = candidates
+            .filter(candidate => domainCompatibleContext(prompt, candidate.text))
+            .map(candidate => {
+              const candidateTerms = new Set(relevanceTerms(candidate.text))
+              const overlap = queryAnchors.filter(term => candidateTerms.has(term)).length
+              return { ...candidate, similarity: queryAnchors.length ? overlap / queryAnchors.length : 0, overlap }
+            })
+            .filter(candidate => candidate.overlap >= minimumOverlap)
+            .sort((a, b) => b.overlap - a.overlap || b.similarity - a.similarity)
+          const rankedWithSummary = lexicalRelevant.map(candidate => ({ ...candidate, summary: String((candidate.item as { summary?: unknown })?.summary ?? '') }))
           const selected = selectLearnedCorpusRows<(typeof rankedWithSummary)[number]>(rankedWithSummary, 6)
           return () => {
             funnel.learnedCorpus.retrieved = rows.length
-            funnel.learnedCorpus.relevant = ranked.relevant.length
+            funnel.learnedCorpus.relevant = lexicalRelevant.length
             funnel.learnedCorpus.selected = selected.length
-            if (ranked.mode === 'semantic' && rows.length) kgSystems.push('Continuous Learning semantic relevance')
+            if (rows.length) kgSystems.push('Continuous Learning bounded lexical retrieval')
             for (const candidate of selected) {
               const row = candidate.item
               const evidenceFacts = Array.isArray(row.facts) ? row.facts.slice(0, 4).map((fact:unknown) => safeText(fact,300)).join('; ') : ''

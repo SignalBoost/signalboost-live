@@ -1,2 +1,2 @@
-base_sha=d876082a548bcc79304b0bec302385a1497b5d3a
-branch=fix/cos-evergreen-retained-learning-live-20260929
+base_sha=fcabcd337e4e9c73f69d14a4df884a9ee9eeda80
+branch=fix/cos-retained-learning-timeout-application-20260929

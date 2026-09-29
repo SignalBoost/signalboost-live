@@ -650,6 +650,7 @@ function stage(counts:RetrievalCounts, injected:boolean, cited=0):EvidenceFunnel
 // question — owner, signed-in user, or public visitor — is reasoned by this one pipeline. WHO IS ASKING
 // changes what COS may know and say (retrieval scope, knowledge blocks, release rules), never which
 // pipeline answers.
+// saas/lib/ai/cos/cosFirstAnswerEnterprise.ts (part 2 of 2 — paste directly below part 1)
 export type CosAudience = 'owner' | 'user' | 'public'
 export function cosAudience(privileged:boolean):CosAudience {
   if (isPublicDeliveryScope()) return 'public'
@@ -1123,7 +1124,10 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     const capacity = reasonerFailureMessage ? classifyRunpodFailure(reasonerFailureMessage) : null
     const reason = capacity?.capacityUnavailable
       ? runpodCapacityUnavailableReason({ podId: configuredRunpodPodId(), originalMessage: reasonerFailureMessage! })
-      : 'Independent COS inference did not return an answer.'
+      : `Independent COS inference did not return an answer. Recorded cause after ${Date.now() - startedAt}ms: ${reasonerFailureMessage ? safeText(reasonerFailureMessage, 400) : 'reasoner returned empty text (no error raised)'}.`
+    // The prefix above is load-bearing: escalationReason() maps /did not return an answer/ to
+    // local_reasoner_no_answer. The appended cause makes the real failure visible in cos_learning_gaps,
+    // where the owner can read it with one SQL query, instead of only in Vercel logs.
     void recordKnowledgeGap(input.prompt, 0, reason)
     return { handled:false, confidence:0, reason, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
   }

@@ -54,11 +54,12 @@ test('metadata-only learned context never requires citation, for any prompt', ()
   assert.equal(learnedEvidenceUseRequired('edit - this email please', []), false)
 })
 
-// Regression guard: retained learning is not complete at embedding/retrieval. The COS prompt must
-// require materially relevant selected learned content to affect reasoning and the resulting answer.
+// Regression guard: retained learning is not complete at embedding/retrieval. Keep this
+// source-level because cosFirstAnswerEnterprise uses Next's @/ alias, which bare node --test
+// intentionally does not resolve in the Vercel gate.
 test('COS inference contract requires selected retained learning to affect the answer', async () => {
-  const { COS_REASONER_SYSTEM_PROMPT } = await import('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
-  const system = COS_REASONER_SYSTEM_PROMPT('English', { privileged: true, audience: 'owner' })
-  assert.match(system, /Retrieval alone is not learning application/)
-  assert.match(system, /selected \[CL#\] material must affect the answer when relevant/)
+  const { readFile } = await import('node:fs/promises')
+  const source = await readFile(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  assert.match(source, /Retrieval alone is not learning application/)
+  assert.match(source, /selected \[CL#\] material must affect the answer when relevant/)
 })

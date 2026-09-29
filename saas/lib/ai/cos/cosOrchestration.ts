@@ -21,6 +21,26 @@ export function authoritativeProvenance(
   const current = cos?.provenance ?? null
   const turnId = typeof current?.turnId === 'string' ? current.turnId.trim() : ''
   if (turnId) provenance.turnId = turnId
+  // Compatibility: newer callers persist evidence-funnel counters in public provenance shape
+  // (retrieved_count, relevant_count, ...), while the base normalizer consumes the compact
+  // persisted shape (retrieved, relevant, ...). Normalize only the supplied funnel before
+  // authoritative projection so retained-learning evidence cannot disappear at this boundary.
+  if (current?.evidenceFunnel && typeof current.evidenceFunnel === 'object') {
+    const normalizeStage = (value: any) => value && typeof value === 'object' ? {
+      retrieved: value.retrieved ?? value.retrieved_count,
+      relevant: value.relevant ?? value.relevant_count,
+      selected: value.selected ?? value.selected_count,
+      injected: value.injected ?? value.injected_count,
+      cited: value.cited ?? value.evidence_count,
+    } : value
+    current.evidenceFunnel = {
+      ...current.evidenceFunnel,
+      knowledgeGraph: normalizeStage(current.evidenceFunnel.knowledgeGraph),
+      learnedCorpus: normalizeStage(current.evidenceFunnel.learnedCorpus),
+      enterpriseMemory: normalizeStage(current.evidenceFunnel.enterpriseMemory),
+      userMemory: normalizeStage(current.evidenceFunnel.userMemory),
+    }
+  }
   const live = current?.liveExternalEvidence
   const sources = Array.isArray(live?.sources) ? live.sources : []
   const semanticCacheReplay = current?.responseSource === 'semantic_cache' || current?.responseSource === 'semantic_similarity'

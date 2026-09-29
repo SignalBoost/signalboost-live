@@ -6,6 +6,7 @@
 // the scorer or promotion, and it never re-rolls an artifact that already has a verdict.
 
 import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationContextBudget.ts'
+import { MASS_RETENTION_DELAY_MS } from './cosUniversityMassRetentionDelay.ts'
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
@@ -116,7 +117,8 @@ const MASS_EVALUATION_MODEL_READY_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_MODE
 export const MASS_EVALUATION_PING_200_REPAIR_AT = '2026-09-26T15:02:09.154Z' as const
 const MASS_EVALUATION_PING_200_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_PING_200_REPAIR_AT)
 const RUNTIME_NOT_READY_FAILURE_PREFIX = 'mass_distilled_evaluation_runtime_not_ready:' as const
-export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
+// Test phase (owner 2026-09-28): 10 minutes, shared with the evaluator and canary ordering. See cosUniversityMassRetentionDelay.ts.
+export const MASS_EVALUATION_RETENTION_DELAY_MS = MASS_RETENTION_DELAY_MS
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 // Standard gateway generation that accepts both the pinned base model and exact adapter alias.
 // A pre-repair canary proves the artifact but not this serving contract, so it cannot arm evaluation.
@@ -459,7 +461,7 @@ export function decideRollingMassEvaluationApproval(input: {
   const skip = (reason: string) => { skipped[reason] = (skipped[reason] || 0) + 1 }
   for (const artifact of ordered) {
     if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) { skip('not_mass_or_bad_hash'); continue }
-    if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) { skip('younger_than_12h'); continue }
+    if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) { skip('younger_than_retention_delay'); continue }
     const hash = artifact.artifactHash.toLowerCase()
     const history = artifactHistory(artifact, input.events, nowMs)
     const mine = history.mine

@@ -5,6 +5,8 @@
 // whether to issue ONE canary approval in exactly the shape claim_next_mass_distilled_runtime_canary accepts
 // (1 invocation, <= $0.20). It never touches the claim, the canary, the evaluator, promotion or Production traffic.
 
+import { MASS_RETENTION_DELAY_MS } from './cosUniversityMassRetentionDelay.ts'
+
 export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-17_mass_canary_without_manual_intervention' as const
 export const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1' as const
 export const MASS_CANARY_APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved' as const
@@ -48,10 +50,10 @@ export const MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_DAY = 3
 export const MASS_CANARY_MAX_INVOCATIONS_PER_ARTIFACT_PER_ROLLING_WINDOW = 2
 export const MASS_CANARY_ARTIFACT_INVOCATION_WINDOW_MS = 24 * 60 * 60 * 1000
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
-// Keep canary scheduling aligned with the independent evaluator's unchanged 12-hour retention gate.
-// This does not shorten evaluation eligibility; it only avoids spending scarce canary slots on fresh
-// artifacts while equally valid current-recipe artifacts are already old enough to enter evaluation.
-export const MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS = 12 * 60 * 60 * 1000
+// Keep canary scheduling aligned with the independent evaluator's retention wait (one shared value, 10 minutes in
+// the owner's 2026-09-28 test phase). Ordering only: it avoids spending canary slots on artifacts that are not yet
+// old enough to enter evaluation while others already are.
+export const MASS_CANARY_EVALUATION_ELIGIBILITY_DELAY_MS = MASS_RETENTION_DELAY_MS
 export const MASS_CANARY_IN_FLIGHT_TTL_MS = 10 * 60 * 1000
 // Owner apprenticeship proof lane (2026-09-21): the first CONFIRMED response-anchor v2
 // Computer Science artifacts must not sit behind the legacy canary backlog once they are ready to prove

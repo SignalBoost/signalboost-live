@@ -18,7 +18,7 @@ const artifact = (id: string, ageHours: number) => ({
 test('an all-skipped tick reports how many artifacts it considered and why each was passed over', () => {
   const decision = decideRollingMassEvaluationApproval({
     enabled: true,
-    artifacts: [artifact('a', 2), artifact('b', 30), artifact('c', 40)],
+    artifacts: [artifact('a', 0.05), artifact('b', 30), artifact('c', 40)], // 'a' is 3 minutes old: inside the 10-minute test-phase wait
     events: [],
     now,
     frontierProofCompletions: 99,
@@ -30,7 +30,7 @@ test('an all-skipped tick reports how many artifacts it considered and why each 
   assert.ok(!decision.issue)
   assert.equal(decision.reason, 'no_mass_artifact_eligible_for_rolling_evaluation')
   assert.equal(decision.considered, 3)
-  assert.deepEqual({ ...decision.skipped }, { younger_than_12h: 1, no_exact_healthy_canary: 2 })
+  assert.deepEqual({ ...decision.skipped }, { younger_than_retention_delay: 1, no_exact_healthy_canary: 2 })
 })
 
 test('every skip point in the approval loop is labelled, and the route records the counts', () => {

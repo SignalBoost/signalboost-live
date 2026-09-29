@@ -23,9 +23,11 @@ import {
   signIndependentEvaluatorPayload,
   type IndependentEvaluatorClaim,
 } from './cosUniversityIndependentEvaluator.ts'
+import { MASS_RETENTION_DELAY_MS } from './cosUniversityMassRetentionDelay.ts'
 
 export const COS_MASS_DISTILLED_EVALUATOR_VERSION = 'cos-mass-distilled-exact-artifact-evaluator-v2' as const
-export const MASS_DISTILLED_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
+// Test phase (owner 2026-09-28): 10 minutes. The retention questions and pass rule are unchanged. See cosUniversityMassRetentionDelay.ts.
+export const MASS_DISTILLED_RETENTION_DELAY_MS = MASS_RETENTION_DELAY_MS
 const BASE_MODEL_ID = CURRENT_UNIVERSITY_STUDENT_PROFILE.modelId
 const HEX40 = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i

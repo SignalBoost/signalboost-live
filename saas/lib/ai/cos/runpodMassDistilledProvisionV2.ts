@@ -47,7 +47,13 @@ const REQUEST_TIMEOUT_MS = 8_000
 // stale endpoint kept the pre-baseline gateway and returned distilled_exact_model_mismatch for BASE_ID.
 // Bump the endpoint generation whenever that materialized container contract changes; create the new
 // exact endpoint through POST and leave PATCH for bounded worker/GPU policy only.
-export const MASS_DISTILLED_EXACT_ENDPOINT_GENERATION = 'v4' as const
+// Production 2026-09-28: the v4 XSA endpoints were materialized before the gateway accepted BASE_ID, so all 21
+// of them kept rejecting the baseline with HTTP 409 xsa_exact_model_mismatch (63 failures / 21 artifacts in six
+// hours) even after the repaired gateway source shipped. The gateway is baked in at POST time and the endpoint
+// name carries the generation, so a restored artifact is handed its own stale v4 endpoint back. Bump to v5 so
+// every exact endpoint is created fresh from the repaired gateway. Container/args/env contract is otherwise
+// unchanged, and PATCH remains limited to bounded worker/GPU policy.
+export const MASS_DISTILLED_EXACT_ENDPOINT_GENERATION = 'v5' as const
 // Independent evaluation needs deterministic 24 GB VRAM headroom. The short exact-artifact canary,
 // however, only proves boot + exact binding and historically succeeds on 16 GB. Keep evaluator/graduate
 // policy 24 GB-only while allowing the canary to use RunPod's ordered 24 -> 16 GB availability fallback.

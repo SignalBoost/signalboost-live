@@ -204,6 +204,13 @@ const STABLE_REFERENCE_LOOKUP = /(?:^\s*(?:what|which)\b[^?!.]{0,80}\bcapital\s+
 // temporal markers) has already had its chance to require live evidence, and it excludes evaluative, price and
 // "near me" phrasings. Answer-side freshness self-reflection still guards any mutable claim in the reply.
 const DEFINITIONAL_CONCEPT = /^\s*(?:what\s+is\s+an?\s+|what\s+(?:is|are)\s+(?:the\s+)?(?:meaning|definition)s?\s+of\s+|what\s+is\s+meant\s+by\s+|what\s+does\s+)(?![^?!.]*\b(?:good|best|better|top|cheap(?:est)?|affordable|fair|typical|average|normal|safe(?:st)?|popular|recommended|current(?:ly)?|latest|today|tonight|now|price|prices|cost|costs|worth|salary|salaries|fee|fees|rent|rate|rates|score|scores|ranking|near\s+me|open)\b)[^?!.\n]{1,60}(?<=\S)(?:\s+mean)?\s*[?.!]*\s*$/i
+
+// Multi-part evergreen concept questions remain reasoning/learned-corpus tasks even when they ask
+// for causes and practical mitigation in the same turn. Production 2026-09-29 proved the single-clause
+// DEFINITIONAL_CONCEPT shape was too narrow: a bullwhip-effect definition + causes + mitigation was
+// incorrectly promoted to host_freshness_guard and refused before retained learning could be used.
+// Mutable-state rules above still win, and explicit volatility/ranking/price language is excluded here.
+const MULTIPART_CONCEPT_EXPLANATION = /^\s*(?:what\s+(?:is|are)|explain|describe|define)\b(?![\s\S]*\b(?:current(?:ly)?|latest|today|tonight|now|recent|price|prices|cost|costs|rate|rates|score|scores|ranking|best|top|near\s+me|open)\b)[^?\n]{1,180}(?:[?,;]\s*|\s+and\s+)(?:what|why|how)\b[\s\S]{1,320}$/i
 // A question whose subject is this service itself ("Is COS an artifact?", "What is iTMounts?", "Are you an
 // agent?") is answered from COS's own knowledge, never from the public web: the web cannot verify what COS is,
 // and Production 2026-09-26 refused "Is COS an artifact?" as an unverifiable current fact. Like
@@ -401,6 +408,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (STABLE_TECHNICAL_REFERENCE.test(text)) return false
 
   if (DEFINITIONAL_CONCEPT.test(text)) return false
+  if (MULTIPART_CONCEPT_EXPLANATION.test(text)) return false
   if (SERVICE_SELF_SUBJECT.test(text)) return false
   if (PLATFORM_CONCEPT_QUESTION.test(text)) return false
 

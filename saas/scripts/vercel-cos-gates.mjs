@@ -175,10 +175,7 @@ const tests = [
   'tests/cosReasonerQuality.node.test.ts',
   'tests/honestRefusalReply.node.test.ts',
   'tests/learnedEvidencePolicy.node.test.ts',
-  // tests/cosRetainedLearningEndToEnd.node.test.ts is NOT gated yet: it imports the whole live COS reasoner graph
-  // (59 extensionless/alias imports plus a TypeScript parameter property), which plain `node --test` cannot load
-  // (ERR_MODULE_NOT_FOUND ./cosOrchestrationEnterprise). Registering it (#3470) failed every Vercel build of main from
-  // 2026-09-29 00:40 UTC and froze Production. Re-register it once it runs green under `node --test`.
+  'tests/cosRetainedLearningEndToEnd.node.test.ts',
   'tests/textTransformationInput.node.test.ts',
   'tests/cosEditIntentFidelity.node.test.ts',
   'tests/writingElementFollowup.node.test.ts',

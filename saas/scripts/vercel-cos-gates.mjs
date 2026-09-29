@@ -286,6 +286,9 @@ const tests = [
   // claim used 10 minutes, so admitted students were refused inside the evaluator. This test was red on main and
   // nothing stopped the deploy. Gate it so the next divergent copy fails its own preview build.
   'tests/massRetentionDelayTestPhase.node.test.ts',
+  // 2026-09-29: XSA at 100% made every new student un-examinable (answers 37-44s vs 4.0s standard, 50s limit).
+  // Gated so the rollout cannot silently go back up.
+  'tests/cosUniversityExclusiveSelfAttention.node.test.ts',
 
 ]
 

@@ -1,2 +1,2 @@
-base_sha=7391b300344bb925a313d441c90c9a19b888706b
-branch=fix/shared-cos-evidence-use-latency-20260929
+base_sha=79a82c7e501231e2d034ca54031ed44908de6fba
+branch=fix-learned-provenance-truth

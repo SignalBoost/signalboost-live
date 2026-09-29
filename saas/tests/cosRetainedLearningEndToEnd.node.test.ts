@@ -87,3 +87,13 @@ test('ordinary evergreen questions cannot fall through merely because rescue ret
   assert.match(route, /runCompletionFirstRescue\(input,language,cosAudience\(isPrivileged\)\)/)
   assert.match(route, /buildHonestRefusalReply\(\{prompt:input,language\}\)/)
 })
+
+
+test('empty retained-learning retrieval is optional enrichment, not a refusal trigger', async () => {
+  const enterprise = await readFile(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(enterprise, /No matching durable internal evidence was retrieved for this input/)
+  assert.match(enterprise, /internalContext \? `\$\{internalContext\}\\n\\n` : ''/)
+  assert.match(enterprise, /Retrieved learning material is optional enrichment, never a prerequisite for answering/)
+  assert.match(enterprise, /Do not ask the user to narrow the question and do not refuse merely because retrieved documents are absent/)
+  assert.match(enterprise, /temperature:Number\(process\.env\.COS_REASONER_TEMPERATURE \?\? '0'\)/)
+})

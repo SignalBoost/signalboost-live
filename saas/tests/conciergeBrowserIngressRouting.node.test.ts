@@ -84,3 +84,13 @@ test('evergreen concept questions skip the expensive capability planner on both 
   const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
   assert.match(browser, /!stableKnowledgeQuestionNeedsNoPlanner\(prompt, priorAnswer\)/)
 })
+
+
+test('stable knowledge questions bypass the expensive capability planner for both surfaces', () => {
+  const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
+  const decision = readFileSync(join(process.cwd(), 'lib/ai/cos/cosAgentDecision.ts'), 'utf8')
+  assert.match(browser, /stableKnowledgeQuestionNeedsNoPlanner\(prompt, priorAnswer\)/)
+  assert.match(decision, /stableKnowledgeQuestionNeedsNoPlanner/)
+  assert.match(decision, /questionShape/)
+  assert.match(decision, /today\|current\|currently\|latest\|live\|now/)
+})

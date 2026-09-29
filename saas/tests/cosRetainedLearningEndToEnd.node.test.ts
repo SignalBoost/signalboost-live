@@ -22,16 +22,13 @@ test('retained learning is applied end to end, not merely embedded or retrieved'
   assert.match(learnedFallback, /domainCompatibleContext\(prompt, candidate\.text\)/)
   assert.match(learnedFallback, /queryAnchors = relevanceTerms\(prompt\)/)
   assert.doesNotMatch(learnedFallback, /rankContextCandidates\(prompt/)
-  // University material must be reachable by the same learned-evidence path. The 2026-09-29
-  // production Bullwhip acceptance found the concept in governed distillation assets but not in
-  // cos_continuous_learning, so a corpus-only gate would certify a path that cannot use training.
-  assert.match(learnedFallback, /cos_university_distillation_assets/)
-  assert.match(learnedFallback, /response_text\.ilike/)
-  assert.match(learnedFallback, /\.eq\('model_neutral', true\)/)
-  assert.match(learnedFallback, /\.eq\('contains_private_production_data', false\)/)
-  assert.match(learnedFallback, /\.eq\('training_rights', 'governed_hosted_teacher_output'\)/)
-  assert.match(learnedFallback, /source_kind: 'university_distillation_asset'/)
-  assert.match(learnedFallback, /COS University governed training material retrieval/)
+  // Foundational COS education comes from the retained Continuous Learning Corpus.
+  // University distillation assets are downstream training artifacts and are intentionally not
+  // queried directly by the answer-time retrieval path.
+  assert.match(learnedFallback, /cos_continuous_learning/)
+  assert.match(learnedFallback, /Continuous Learning bounded lexical retrieval/)
+  assert.doesNotMatch(learnedFallback, /cos_university_distillation_assets/)
+
 
   captureSelectedLearnedRows([{
     source_kind: 'official_documentation',
@@ -61,7 +58,7 @@ test('retained learning is applied end to end, not merely embedded or retrieved'
 test('production answer path binds the control-plane turn id before learned evidence flush', async () => {
   const source = await readFile(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
   assert.match(source, /if \(reasoned\?\.turnId\) captureEvidenceSourceUseTurnId\(reasoned\.turnId\)/)
-  assert.match(source, /universityLearnedEvidenceUsed:citedUniversityLearnedEvidence/)
+  assert.doesNotMatch(source, /universityLearnedEvidenceUsed:citedUniversityLearnedEvidence/)
 })
 
 

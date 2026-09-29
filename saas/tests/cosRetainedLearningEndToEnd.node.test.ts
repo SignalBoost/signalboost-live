@@ -64,9 +64,20 @@ test('production answer path binds the control-plane turn id before learned evid
   assert.match(source, /universityLearnedEvidenceUsed:citedUniversityLearnedEvidence/)
 })
 
-test('public provenance reports learned-corpus contribution instead of reasoner-only origin', async () => {
+
+
+test('COS foundational education is sourced from continuous learning, not University distillation assets', async () => {
+  const source = await readFile(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  const retrieval = source.slice(source.indexOf('async function retrieveInternalContext'), source.indexOf('const enterpriseStage'))
+  assert.match(retrieval, /cos_continuous_learning/)
+  assert.doesNotMatch(retrieval, /cos_university_distillation_assets/)
+  assert.doesNotMatch(retrieval, /university_distillation_asset/)
+  assert.match(retrieval, /Continuous Learning bounded lexical retrieval/)
+})
+
+test('public provenance attributes material retained-learning use without University coupling', async () => {
   const source = await readFile(new URL('../lib/ai/cos/publicRecordedProvenance.ts', import.meta.url), 'utf8')
-  assert.match(source, /learnedCorpus: \{ used: boolean; cited: number; injected: number; universityUsed: boolean \}/)
+  assert.match(source, /learnedCorpus: \{ used: boolean; cited: number; injected: number \}/)
   assert.match(source, /Recorded origin: COS used retained learned knowledge/)
-  assert.match(source, /University material contributed/)
+  assert.doesNotMatch(source, /University material contributed/)
 })

@@ -175,6 +175,17 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // The exact-artifact gateway rejecting BASE_ID is serving-contract/runtime drift: no baseline answer exists,
     // so it is infrastructure evidence, never evidence about candidate quality.
     || staleGatewayModelMismatch(error)
+    // Production 2026-09-28 audit of every error string this lane has recorded: three more shapes were still
+    // charged to model quality even though each is raised BEFORE any model answers a question. 75 events in
+    // seven days, three attempts each, so up to 25 artifacts quarantined for our own failures.
+    // served_model_unproven: the evaluator could not prove which model the endpoint serves (no proven canary
+    // event, or it was invalidated) and stops before the first prompt.
+    // deepinfra_harness_cost_reservation_required: our own spend guard declines the call; no judge runs.
+    // mass_distilled_runtime_endpoint_id_missing: provisioning never returned an endpoint id, so nothing was
+    // ever served. Prefix-matched because the recovery path appends :recovery_from=<id>.
+    || error.startsWith('mass_distilled_evaluation_served_model_unproven')
+    || error.startsWith('deepinfra_harness_cost_reservation_required')
+    || error.startsWith('mass_distilled_runtime_endpoint_id_missing')
     // A missing judge result after the inference provider rejects/overloads the request is evaluator infrastructure,
     // not model quality. Release it from both the artifact retry budget and the 24h rolling approval window.
     || error === 'mass_distilled_evaluation_judge_unavailable'

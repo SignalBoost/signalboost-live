@@ -102,21 +102,36 @@ export async function activeResidencyRunpodEndpointNames(now = new Date()): Prom
   return names
 }
 
-export async function activeGraduateRunpodEndpointIds(): Promise<ReadonlySet<string>> {
+export async function activeGraduateRunpodEndpointIds(now = new Date()): Promise<ReadonlySet<string>> {
   const db = cosServiceDb()
   if (!db) throw new Error('graduate_endpoint_protection_database_unavailable')
-  const rows = await db.from('cos_university_graduate_model_registry')
+
+  // A diploma is not a compute lease. Production 2026-09-30 had seven active graduates, and protecting
+  // every graduate endpoint permanently consumed seven of the account-wide ten RunPod max-worker
+  // reservations even though Workforce serving selects only one graduate under the durable 24-hour lease.
+  // Protect only the graduate that can actually serve under the current lease. Every other graduate keeps
+  // its exact endpoint/materialized identity, but quota recovery may park that endpoint at max=0 until a
+  // later authorized lease/activation path re-arms it.
+  const lease = await db.from('cos_university_graduate_rotation_leases')
+    .select('candidate_id,trained_artifact_hash')
+    .lte('lease_started_at', now.toISOString())
+    .gt('lease_expires_at', now.toISOString())
+    .order('lease_started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (lease.error) throw lease.error
+  if (!lease.data) return new Set<string>()
+
+  const row = await db.from('cos_university_graduate_model_registry')
     .select('platform_scope')
     .eq('status', 'active')
     .eq('runtime_provider', 'runpod')
-    .limit(200)
-  if (rows.error) throw rows.error
-  const ids = new Set<string>()
-  for (const row of rows.data || []) {
-    const endpointId = graduateRunpodEndpointId((row as { platform_scope?: unknown }).platform_scope)
-    if (endpointId) ids.add(endpointId)
-  }
-  return ids
+    .eq('candidate_id', lease.data.candidate_id)
+    .eq('trained_artifact_hash', String(lease.data.trained_artifact_hash || '').toLowerCase())
+    .maybeSingle()
+  if (row.error) throw row.error
+  const endpointId = graduateRunpodEndpointId(row.data?.platform_scope)
+  return endpointId ? new Set([endpointId]) : new Set<string>()
 }
 
 

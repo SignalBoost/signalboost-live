@@ -63,25 +63,33 @@ export function estimateContextTokens(value: unknown): number {
 }
 
 /**
- * Qwen-family token estimate (2026-09-29). The flat 3-characters-per-token estimate above overstates English
- * prose by ~60% for the Qwen tokenizer (measured 4.8-5.1 characters per token on the COS answer prompt) and
- * understates digits, identifiers, JSON and non-Latin text (Qwen spends one token per digit). On the RunPod
- * reasoner that overstatement refused a ~9K-token chat prompt as if it were ~15K. This estimate counts every
- * character of a digit-bearing word as a token, two tokens per non-ASCII character, and 3.6 characters per
- * token for the remaining ASCII. Checked against the Qwen3 tokenizer on English prompts, code, JSON, UUID/hex,
- * digit runs, Spanish, Polish, Russian and Chinese: never below the real count.
+ * Qwen-family token estimate (2026-09-29, recalibrated 2026-09-30).
+ *
+ * The flat 3-characters-per-token estimate above overstates English prose by ~60% for the Qwen tokenizer
+ * (4.8-5.1 characters per token on the COS answer prompt) and understates digits, identifiers, JSON and
+ * non-Latin text (Qwen spends one token per digit). A first character-based Qwen estimate still overstated
+ * English by ~45%: production 2026-09-30 01:37 UTC refused a chat request on the 16K RunPod reasoner
+ * (context_window_would_truncate_input) that DeepInfra measured at 12,059 real prompt tokens.
+ *
+ * This estimate counts like the tokenizer does: one token per Latin word (plus one per extra six letters of a
+ * long word), one per character of any digit-bearing word, one per two characters of a punctuation run, and
+ * two per non-ASCII character, then adds a 15% margin. Checked against the Qwen3 tokenizer on the full and
+ * scoped COS prompts, 40 source files, JSON, UUID/hex, digit runs, URLs, base64, Spanish, Portuguese, Polish,
+ * Russian and Chinese: never below the real count (closest: Polish 1.01x, Spanish 1.02x).
  */
 export function estimateQwenContextTokens(value: unknown): number {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? '')
   let numeric = 0
-  const rest = text.replace(/[A-Za-z0-9]*\d[A-Za-z0-9]*/g, match => { numeric += match.length + 1; return '' })
+  const withoutNumeric = text.replace(/[A-Za-z0-9]*\d[A-Za-z0-9]*/g, match => { numeric += match.length + 1; return ' ' })
+  let words = 0
+  let wordCharacters = 0
+  const withoutWords = withoutNumeric.replace(/[A-Za-z]+/g, match => { words += 1; wordCharacters += match.length; return ' ' })
+  const wordTokens = words + Math.floor(Math.max(0, wordCharacters - words * 6) / 6)
   let nonAscii = 0
-  let other = 0
-  for (const character of rest) {
-    if (character.charCodeAt(0) < 128) other += 1
-    else nonAscii += 1
-  }
-  return Math.max(1, numeric + nonAscii * 2 + Math.ceil(other / 3.6))
+  for (const character of withoutWords) if (character.charCodeAt(0) >= 128) nonAscii += 1
+  let symbols = 0
+  for (const run of withoutWords.replace(/[^\x00-\x7f]/g, ' ').match(/[^ ]+/g) ?? []) symbols += Math.ceil(run.length / 2)
+  return Math.max(1, Math.ceil((numeric + wordTokens + symbols + nonAscii * 2) * 1.15))
 }
 
 export type ContextTokenEstimator = (value: unknown) => number

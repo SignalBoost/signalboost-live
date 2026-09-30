@@ -302,6 +302,9 @@ const tests = [
   'tests/universityQuarantineLedger.node.test.ts',
   // 2026-09-30 quarantine resolution: proven FAILs leave the University, our-fault students return to the exam.
   'tests/universityQuarantineResolution.node.test.ts',
+  // 2026-09-30 Residency lanes: one parallel lane per admitted resident, warm workers reused, remediation first.
+  'tests/residencyLanes.node.test.ts',
+  'tests/builderResidencyCron.node.test.ts',
   'tests/staleGatewayXsaInfrastructure.node.test.ts',
   // 2026-09-29: 220 independent evaluations showed distillation teaching base-rate reasoning (0.000 -> 0.927, 204
   // helped / 0 hurt) while ERASING survivorship (1.000 -> 0.382, 0 helped / 136 hurt) and regression to the mean
@@ -328,4 +331,3 @@ if (result.error) {
 }
 
 process.exit(result.status ?? 1)
-// end of saas/scripts/vercel-cos-gates.mjs (if this line is missing, the paste was cut short)

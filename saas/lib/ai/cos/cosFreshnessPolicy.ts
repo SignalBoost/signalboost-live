@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosFreshnessPolicy.ts
 // Policy for deciding when pretrained/local knowledge is not sufficient because
 // the answer can change without a code or model update.
 //
@@ -231,6 +230,15 @@ const SERVICE_SELF_SUBJECT = /(?:\b(?:cos|itmounts|signalboost)\b|^\s*(?:(?:are|
 // and explicit platform names so ordinary questions about real universities or medical specialists still follow
 // the rules above.
 const PLATFORM_CONCEPT_QUESTION = /(?:\b(?:cos\s+university|builder\s+residency)\b|^\s*(?:what|who)\s+(?:is|are)\s+(?:the\s+|a\s+|an\s+|our\s+|your\s+)?(?:university|specialists?|graduates?|residency|residents?|concierge|chief\s+of\s+staff)\s*[?.!]*\s*$)/i
+// Comparison, usage and purpose questions about a concept are reasoning tasks, not lookups of present-day
+// world state. Production 2026-09-30: "What is the difference between a liveness probe and a startup probe in
+// Kubernetes, and when would you use each?" fell through to the conservative LOOKUP_INTENT catch-all, was
+// routed as a live-evidence request, and was answered by the contextual lane that is forbidden to read the
+// learned pool: no retrieval, no citations. Anything that names a mutable quantity, a ranking, or a temporal
+// marker stays on the live path.
+const MUTABLE_OR_TEMPORAL_QUALIFIER = /\b(?:current(?:ly)?|latest|newest|today|tonight|now|recent(?:ly)?|this\s+(?:week|month|year)|price|prices|pricing|cost|costs|fee|fees|rate|rates|salary|salaries|score|scores|ranking|rankings|rank|best|top|cheapest|near\s+me|open|stock|release\s+date|version|versions)\b/i
+const CONCEPT_COMPARISON_OR_USAGE = /^\s*(?:what\s+(?:is|are)\s+(?:the\s+)?(?:main\s+|key\s+|real\s+|practical\s+)?(?:differences?|distinctions?|relationship|trade-?offs?)\s+between\b|when\s+(?:would|should|do|does|can|could|might)\s+(?:you|i|we|one|someone|a\s+team|teams|engineers?)\s+(?:use|choose|prefer|pick|need)\b|(?:what|which)\s+(?:is|are)\s+(?:the\s+)?(?:purpose|role|roles|use\s+cases?|uses|advantages?|disadvantages?|benefits?|drawbacks?|limitations?|pros\s+and\s+cons)\s+of\b)/i
+
 const STABLE_TECHNICAL_REFERENCE = /\b(?:rank\s+of\s+(?:(?:this|the|a)\s+)?matrix|top[-\s]?level\s+domain|(?:best|worst|average)[-\s]?case\s+time\s+complexity)\b/i
 
 function normalizedText(input: string): string {
@@ -421,6 +429,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (PUBLISHED_WORK_FINDINGS.test(text)) return false
   if (SERVICE_SELF_SUBJECT.test(text)) return false
   if (PLATFORM_CONCEPT_QUESTION.test(text)) return false
+  if (CONCEPT_COMPARISON_OR_USAGE.test(text) && !MUTABLE_OR_TEMPORAL_QUALIFIER.test(text)) return false
 
   // Conservative stale-world protection for any direct lookup not proven stable above.
   if (LOOKUP_INTENT.test(text)) return true

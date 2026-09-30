@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer, recoverStoppedSoloWrappedAnswer, recoverStoppedSoloForeignEndAnswer } from '../lib/ai/cos/cosUniversityMassEvaluationAnswerRecovery.ts'
+import { recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer, recoverStoppedSoloWrappedAnswer, recoverStoppedSoloForeignEndAnswer, recoverStoppedSoloCorrectOpenForeignEndAnswer } from '../lib/ai/cos/cosUniversityMassEvaluationAnswerRecovery.ts'
 
 const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
@@ -90,4 +90,14 @@ test('solo normal-stop answer with exactly one foreign END marker is recovered w
   assert.equal(recoverStoppedSoloForeignEndAnswer('A\n<<<END:x>>>','length'),null)
   assert.equal(recoverStoppedSoloForeignEndAnswer('<think>x</think>A\n<<<END:y>>>','stop'),null)
   assert.match(source, /cases\.length===1 \? recoverStoppedSoloForeignEndAnswer\(text,finish\) : null/)
+})
+
+
+test('solo normal-stop correct ANSWER opener with one foreign END marker is recovered narrowly', () => {
+  const id='0ba8dfd777f3cd71'
+  assert.equal(recoverStoppedSoloCorrectOpenForeignEndAnswer(`<<<ANSWER:${id}>>>\nThe result is 16%.\n<<<END:foreign-id>>>`,id,'stop'),'The result is 16%.')
+  assert.equal(recoverStoppedSoloCorrectOpenForeignEndAnswer(`<<<ANSWER:${id}>>>\nA\n<<<END:x>>>\n<<<END:y>>>`,id,'stop'),null)
+  assert.equal(recoverStoppedSoloCorrectOpenForeignEndAnswer(`<<<ANSWER:${id}>>>\nA\n<<<END:foreign-id>>>`,id,'length'),null)
+  assert.equal(recoverStoppedSoloCorrectOpenForeignEndAnswer(`<<<ANSWER:${id}>>>\n<think>x</think>A\n<<<END:foreign-id>>>`,id,'stop'),null)
+  assert.match(source, /cases\.length===1 \? recoverStoppedSoloCorrectOpenForeignEndAnswer\(text,item\.id,finish\) : null/)
 })

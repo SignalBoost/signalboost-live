@@ -149,3 +149,32 @@ export function recoverStoppedSoloForeignEndAnswer(text: string, finish: string)
   if (!answer || /<<<(?:ANSWER|END):/i.test(answer)) return null
   return answer
 }
+
+/**
+ * A solo normal-stop retry can contain the correct ANSWER opener but close with exactly one
+ * foreign END marker. Production 2026-09-30 exposed this as open=1/close=0 after the grouped
+ * retry had already narrowed the request to one case. With exactly one requested case, one
+ * correct opener and one terminal END marker, the body is unambiguous. Thinking, truncation,
+ * multiple markers, empty bodies and trailing protocol text remain fail-closed.
+ */
+export function recoverStoppedSoloCorrectOpenForeignEndAnswer(text: string, caseId: string, finish: string): string | null {
+  if (finish !== 'stop' || /<\/?think>/i.test(text)) return null
+  const open = `<<<ANSWER:${caseId}>>>`
+  const openAt = text.indexOf(open)
+  if (openAt < 0 || text.indexOf(open, openAt + open.length) >= 0) return null
+  if ((text.match(/<<<ANSWER:/gi) || []).length !== 1) return null
+
+  const afterOpen = text.slice(openAt + open.length)
+  const ends = [...afterOpen.matchAll(/<<<END:([^>\r\n]{1,120})>>>/gi)]
+  if (ends.length !== 1) return null
+  const end = ends[0]
+  const endAt = end.index ?? -1
+  if (endAt < 0 || String(end[1]).toLowerCase() === caseId.toLowerCase()) return null
+
+  const before = text.slice(0, openAt).trim()
+  const answer = afterOpen.slice(0, endAt).trim()
+  const trailing = afterOpen.slice(endAt + end[0].length).trim()
+  if (/<<<(?:ANSWER|END):/i.test(before) || /<<<(?:ANSWER|END):/i.test(trailing)) return null
+  if (!answer || /<<<(?:ANSWER|END):/i.test(answer)) return null
+  return answer
+}

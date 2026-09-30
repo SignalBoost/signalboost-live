@@ -407,6 +407,41 @@ export function decideExhaustedMassEvaluationArtifacts(input: {
   return Object.freeze(exhausted)
 }
 
+export type WronglyExhaustedMassEvaluationArtifact = Readonly<{
+  candidateId: string
+  subjectId: string
+  artifactHash: string
+  substantiveFailures: number
+  lastError: string
+}>
+
+// Re-evaluate only artifacts previously disposed by the caller. If the current failure classifier
+// now says the historical attempts were infrastructure rather than substantive, the prior exhausted
+// disposition is stale. This helper grants no approval or runtime authority; it only reports that
+// the substantive-attempt threshold is no longer met.
+export function decideWronglyExhaustedMassEvaluationArtifacts(input: {
+  artifacts: readonly RollingArtifact[]
+  events: readonly RollingEvent[]
+  now: Date
+}): readonly WronglyExhaustedMassEvaluationArtifact[] {
+  const nowMs = input.now.getTime()
+  const reopen: WronglyExhaustedMassEvaluationArtifact[] = []
+  for (const artifact of input.artifacts) {
+    if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
+    const history = artifactHistory(artifact, input.events, nowMs)
+    if (history.hasVerdict || history.liveStart) continue
+    if (history.substantiveFailures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
+    reopen.push(Object.freeze({
+      candidateId: artifact.candidateId,
+      subjectId: artifact.subjectId,
+      artifactHash: artifact.artifactHash.toLowerCase(),
+      substantiveFailures: history.substantiveFailures,
+      lastError: history.lastError.slice(0, 500),
+    }))
+  }
+  return Object.freeze(reopen)
+}
+
 export function decideRollingMassEvaluationApproval(input: {
   enabled: boolean
   artifacts: readonly RollingArtifact[]

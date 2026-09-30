@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosReasoner.ts
 //
 // COS'S OWN REASONER — strict independence boundary.
 //
@@ -13,6 +12,7 @@
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
+import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
 import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair, recordQualityRepairDecision, assessReasonerDraft } from '@/lib/ai/cos/reasonerQuality'
@@ -432,6 +432,9 @@ export async function callRawCosReasoner(
       skipped: experience.skipped,
     }))
     recordTurnExperience(experience)
+    // TURN TIMING (2026-09-30): the reasoner's own phases (draft, quality repair, council…) join the per-stage
+    // timings shown in the provenance reply, so time spent around the model call is visible, not only the call.
+    for (const phase of experience.phases) recordCosLatencyStage(`reasoner:${phase.phase}`, phase.ms)
   }
 }
 
@@ -483,4 +486,3 @@ export async function callCosReasoner(
     },
     turnId: execution.result.turnId || randomUUID(),
   }
-}

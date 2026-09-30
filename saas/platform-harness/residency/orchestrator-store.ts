@@ -1,3 +1,4 @@
+// saas/platform-harness/residency/orchestrator-store.ts
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ResidencyEvidenceForAssessment, ResidencyStanding } from '../../lib/ai/cos/cosUniversityResidency.ts'
@@ -14,6 +15,9 @@ import { isRetiredBuilderResidencyVariant } from '../cases/builder-residency.ts'
 export const BUILDER_RESIDENCY_WARM_RETRY_WINDOW_MS=15*60_000
 export const BUILDER_RESIDENCY_FINAL_DISPOSITION_PROFILE='cos_builder_residency_final_disposition_v1' as const
 export const BUILDER_RESIDENCY_FAILED_CLAIM='builder_residency_failed' as const
+export const BUILDER_RESIDENCY_WITHDRAWN_CLAIM='builder_residency_withdrawn' as const
+/** Terminal, not a verdict: the student left the University while in Residency (its artifact is no longer pending). */
+export const BUILDER_RESIDENCY_WITHDRAWN_STANDING='withdrawn' as const
 const ACTIVE_RESIDENCY_STANDINGS=['resident','senior_resident','remediation_required'] as const
 const RESIDENCY_FAILURE_SWEEP_LIMIT=200
 const ENROLLMENT_COLUMNS='id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,standing,updated_at'
@@ -27,8 +31,16 @@ export type BuilderResidencyFailureSweep=Readonly<{
   errors:readonly string[]
 }>
 
+export type BuilderResidencyWithdrawalSweep=Readonly<{
+  checked:number
+  withdrawnResidencyIds:readonly string[]
+  errors:readonly string[]
+}>
+
 export type SupabaseBuilderResidencyOrchestratorStore=BuilderResidencyOrchestratorStore&Readonly<{
   closeUnrecoverableResidencies():Promise<BuilderResidencyFailureSweep>
+  /** Closes active enrollments whose student already left the University (see withdrawDepartedResidencies). */
+  withdrawDepartedResidencies():Promise<BuilderResidencyWithdrawalSweep>
   /** Up to `laneCount` distinct active residents for this tick, one lane each (see selectBuilderResidencyLanes). */
   planLanes(laneCount:number):Promise<readonly BuilderResidencyEnrollment[]>
   /** The same store, but every case turn goes to this one resident while it is still active. */
@@ -259,6 +271,31 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
   }
 
   // Active residents and their recent case history: the single source both schedulers read.
+  /**
+   * Residency practises on the exact artifact of a student still waiting for its final exam. Production 2026-09-30:
+   * all 10 active residents' artifacts were `retired` (a newer student of the identical training lineage had already
+   * passed its exam, so the backlog compactor retired them) while their enrollments stayed active. Every case then
+   * stopped on residency_exact_artifact_registry_mismatch: 24 case turns in one hour, 0 passes. Returns the keys
+   * (candidateId:hash) of the given enrollments whose student is still evaluation_pending.
+   */
+  async function stillWaitingStudents(enrollments:readonly any[]):Promise<Set<string>>{
+    const waiting=new Set<string>()
+    const candidateIds=[...new Set(enrollments.map(row=>String(row.candidate_id??'')).filter(Boolean))]
+    for(let offset=0;offset<candidateIds.length;offset+=75){
+      const artifacts=await input.db
+        .from('cos_local_distillation_artifacts')
+        .select('candidate_id,trained_artifact_hash,status')
+        .in('candidate_id',candidateIds.slice(offset,offset+75))
+        .eq('status','evaluation_pending')
+      if(artifacts.error) throw artifacts.error
+      for(const row of artifacts.data??[]){
+        waiting.add(`${String((row as any).candidate_id)}:${String((row as any).trained_artifact_hash).toLowerCase()}`)
+      }
+    }
+    return waiting
+  }
+  const enrollmentKey=(row:any)=>`${String(row.candidate_id)}:${String(row.trained_artifact_hash).toLowerCase()}`
+
   async function readSchedulingState(){
     const active=await input.db
       .from('cos_university_residency_enrollments')
@@ -267,7 +304,10 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
       .order('updated_at',{ascending:true})
       .limit(32)
     if(active.error) throw active.error
-    const enrollments=(active.data??[]) as any[]
+    const listed=(active.data??[]) as any[]
+    // A resident whose student already left gets no case turn, even before its enrollment is closed.
+    const waiting=listed.length?await stillWaitingStudents(listed):new Set<string>()
+    const enrollments=listed.filter(row=>waiting.has(enrollmentKey(row)))
     if(!enrollments.length) return {enrollments,recentCases:[] as ResidencySchedulerCaseRow[]}
     const residencyIds=enrollments.map(row=>String(row.id))
     // Full recent history (not only the warm window): consecutive failures must be countable.
@@ -292,6 +332,83 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
      * residents whose result is already certain leave the queue at once instead of one per case turn.
      * A failure on one resident is reported and never blocks the others or the rest of the tick.
      */
+    /**
+     * Close every active enrollment whose student is no longer waiting for its exam: standing `withdrawn`, with a
+     * durable record of why. Not a Residency FAIL and not a pass; the seat is freed for a student that can practise.
+     * The record is written first (idempotent key), the standing change is conditional on still being active, and a
+     * failure on one resident never blocks the others.
+     */
+    async withdrawDepartedResidencies():Promise<BuilderResidencyWithdrawalSweep>{
+      const active=await input.db
+        .from('cos_university_residency_enrollments')
+        .select(ENROLLMENT_COLUMNS)
+        .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
+        .limit(RESIDENCY_FAILURE_SWEEP_LIMIT)
+      if(active.error) throw active.error
+      const rows=(active.data??[]) as any[]
+      if(!rows.length) return Object.freeze({checked:0,withdrawnResidencyIds:Object.freeze([]),errors:Object.freeze([])})
+      const waiting=await stillWaitingStudents(rows)
+      const withdrawnResidencyIds:string[]=[]
+      const errors:string[]=[]
+      for(const row of rows){
+        if(waiting.has(enrollmentKey(row))) continue
+        const enrollment=toEnrollment(row)
+        try{
+          const current=await input.db
+            .from('cos_local_distillation_artifacts')
+            .select('status')
+            .eq('candidate_id',enrollment.candidateId)
+            .eq('trained_artifact_hash',enrollment.artifactHash)
+            .maybeSingle()
+          if(current.error) throw current.error
+          const artifactStatus=current.data?String((current.data as any).status):'missing'
+          if(artifactStatus==='evaluation_pending') continue
+          const now=new Date().toISOString()
+          const body={
+            profile:BUILDER_RESIDENCY_FINAL_DISPOSITION_PROFILE,
+            claim:BUILDER_RESIDENCY_WITHDRAWN_CLAIM,
+            residencyId:enrollment.residencyId,
+            candidateId:enrollment.candidateId,
+            artifactHash:enrollment.artifactHash,
+            previousStanding:enrollment.standing,
+            artifactStatus,
+            reason:'student_left_university',
+            nextStanding:BUILDER_RESIDENCY_WITHDRAWN_STANDING,
+            terminalDisposition:true,
+            evaluationPassed:false,
+            productionTrafficAuthorized:false,
+            authorityExpanded:false,
+          }
+          const event=await input.db.from('cos_university_learning_assurance_events').upsert({
+            event_key:sha256([BUILDER_RESIDENCY_FINAL_DISPOSITION_PROFILE,BUILDER_RESIDENCY_WITHDRAWN_CLAIM,enrollment.residencyId]),
+            event_type:'fine_tune',
+            subject_id:enrollment.subjectId||null,
+            candidate_id:enrollment.candidateId,
+            evidence_hash:sha256(body),
+            evidence:body,
+            verifier:'host_controller',
+            observed_at:now,
+          },{onConflict:'event_key',ignoreDuplicates:true})
+          if(event.error) throw event.error
+          const standing=await input.db.from('cos_university_residency_enrollments')
+            .update({standing:BUILDER_RESIDENCY_WITHDRAWN_STANDING,updated_at:now})
+            .eq('id',enrollment.residencyId)
+            .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
+            .select('id')
+          if(standing.error) throw standing.error
+          if((standing.data??[]).length) withdrawnResidencyIds.push(enrollment.residencyId)
+        }catch(error){
+          const message=error instanceof Error?error.message:String((error as any)?.message??error)
+          errors.push(`${enrollment.residencyId.slice(0,8)}:${message.slice(0,200)}`)
+        }
+      }
+      return Object.freeze({
+        checked:rows.length,
+        withdrawnResidencyIds:Object.freeze(withdrawnResidencyIds),
+        errors:Object.freeze(errors),
+      })
+    },
+
     async closeUnrecoverableResidencies():Promise<BuilderResidencyFailureSweep>{
       const active=await input.db
         .from('cos_university_residency_enrollments')

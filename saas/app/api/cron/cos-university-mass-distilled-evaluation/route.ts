@@ -26,6 +26,7 @@ import {
   MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS,
   MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE,
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+  massEvaluationCapacityAwareInFlightLimit,
   decideExhaustedMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
   type ExhaustedMassEvaluationArtifact,
@@ -405,6 +406,11 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   }))
   const now = new Date()
   const inFlightCount = (await activeEvaluationRunpodEndpointIds(now)).size
+  // The old fixed ceiling of two protected RunPod quota, but turned a 2-minute cron into a
+  // low-throughput queue whenever evaluations ran for several minutes. Admit extra evaluators only
+  // from live account-wide reservation headroom, preserving one worker for canary/graduate work.
+  const workerCapacity = await massDistilledServerlessWorkerCapacity()
+  const maxInFlight = massEvaluationCapacityAwareInFlightLimit(workerCapacity.availableWorkers)
 
   // The strengthened post-GKD remediation replay repair also needs a bounded proof cohort. Count durable
   // independent evaluation rows only from artifacts carrying the current 3-epoch/5e-5 replay receipt; once two exist,
@@ -566,6 +572,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       builderV2ProofCompletions,
       remediationReplayProofCompletions,
       inFlightCount,
+      maxInFlight,
     })
     if ('reason' in pick) {
       if (!picks.length) return { issued: false, reason: pick.reason, disposed: disposed.length, considered: pick.considered, skipped: pick.skipped }

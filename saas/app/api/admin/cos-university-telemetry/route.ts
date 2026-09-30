@@ -1,3 +1,4 @@
+// saas/app/api/admin/cos-university-telemetry/route.ts
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -18,6 +19,7 @@ const PROVIDER_JOBS = 'cos_university_mass_distillation_provider_jobs'
 const ARTIFACTS = 'cos_local_distillation_artifacts'
 const EVALUATIONS = 'cos_university_distilled_evaluation_runs'
 const GRADUATES = 'cos_university_graduate_model_registry'
+const WORKFORCE = 'cos_workforce_roster'
 const LEARNING = 'cos_continuous_learning'
 const RESIDENCY_ENROLLMENTS = 'cos_university_residency_enrollments'
 const RESIDENCY_CASES = 'cos_university_residency_case_runs'
@@ -195,6 +197,14 @@ export async function GET() {
     ]) {
       if (result.error) throw result.error
     }
+
+    // WORKFORCE (owner direction 2026-09-29): graduates leave the University at graduation and are hired into the
+    // Workforce. Read on its own and best-effort: the roster is not a University table and must never break this page.
+    const workforceResult = await db.from(WORKFORCE)
+      .select('candidate_id,specialty,job_roles,status,hired_at,retired_at')
+      .order('hired_at', { ascending: false })
+      .limit(200)
+    const workforceRows: any[] = workforceResult.error ? [] : (workforceResult.data || [])
 
     const openSources = new Map<string, {
       id: string
@@ -585,8 +595,7 @@ export async function GET() {
         // upstream lifecycle prerequisites before the retention clock so telemetry never implies
         // that age alone will make a non-resident artifact evaluable.
         if (text(artifact.subject_id, 240) === 'Computer Science & Coding'
-          && residencyState?.standing !== 'residency_complete') claimability = residencyState
-            ? 'residency_incomplete'
+          && residencyState?.standing !== 'residency_complete') claimability = residencyState            ? 'residency_incomplete'
             : 'waiting_for_residency_admission'
         else if (!canary) claimability = 'missing_exact_canary'
         else if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
@@ -761,6 +770,17 @@ export async function GET() {
         evaluationPending: artifacts.filter((row: any) => row.status === 'evaluation_pending').length,
         quarantined: artifacts.filter((row: any) => row.status === 'quarantined').length,
       },
+      workforce: {
+        available: !workforceResult.error,
+        onCall: workforceRows.filter((row: any) => row.status === 'on_call').length,
+        retired: workforceRows.filter((row: any) => row.status === 'retired').length,
+        workers: workforceRows.filter((row: any) => row.status === 'on_call').slice(0, 50).map((row: any) => ({
+          candidateId: text(row.candidate_id, 240),
+          specialty: text(row.specialty, 160),
+          jobRoles: Array.isArray(row.job_roles) ? row.job_roles.map((role: unknown) => text(role, 40)).filter(Boolean).slice(0, 6) : [],
+          hiredAt: iso(row.hired_at),
+        })),
+      },
       artifacts,
       campaigns: (campaignsResult.data || []).map((campaign: any) => ({
         id: text(campaign.id, 80),
@@ -781,3 +801,4 @@ export async function GET() {
     )
   }
 }
+// end of saas/app/api/admin/cos-university-telemetry/route.ts (if this line is missing, the paste was cut short)

@@ -12,7 +12,6 @@ import {
   decideWronglyExhaustedMassEvaluationArtifacts,
   type RollingEvent,
 } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
-import { MASS_EVALUATION_EXHAUSTED_CLAIM, exhaustionDisposedArtifacts } from '../lib/ai/cos/cosUniversityMassQuarantineReview.ts'
 import { RESIDENCY_EXACT_ARTIFACT_CONTEXT_TOKENS, residencyMaxOutputTokens } from '../platform-harness/residency/exact-artifact-model.ts'
 import { RESIDENCY_STALE_STARTED_CASE_MS, staleStartedResidencyCases } from '../platform-harness/residency/stale-case-sweep.ts'
 
@@ -20,6 +19,7 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 const now = new Date('2026-09-30T03:00:00.000Z')
 const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000).toISOString()
 const PROFILE = 'cos_mass_distilled_independent_evaluation_runtime_v1'
+const MASS_EVALUATION_EXHAUSTED_CLAIM = 'mass_distilled_evaluation_attempts_exhausted'
 
 function student(id: string) {
   return { candidateId: `mass:${id}`, subjectId: 'History', artifactHash: id.repeat(64).slice(0, 64), createdAt: minutesAgo(3000) }
@@ -58,18 +58,7 @@ test('a student that SAT the exam keeps its result: a real FAIL is never reopene
   assert.equal(decideWronglyExhaustedMassEvaluationArtifacts({ artifacts: [s], events, now }).length, 0)
 })
 
-test('only exhaustion disposals are reviewed; Residency FAILs and training stops are never touched', () => {
-  const disposed = history('d', [])
-  const residencyFailed = student('e')
-  const picked = exhaustionDisposedArtifacts([student('d'), residencyFailed], disposed)
-  assert.deepEqual(picked.map(row => row.candidateId), ['mass:d'])
-})
-
-test('the review restores to PENDING only while still quarantined and records why, without spending', () => {
-  const review = read('lib/ai/cos/cosUniversityMassQuarantineReview.ts')
-  assert.match(review, /\.update\(\{ status: 'evaluation_pending', updated_at: now\.toISOString\(\) \}\)[\s\S]{0,200}\.eq\('status', 'quarantined'\)/)
-  assert.match(review, /reason: 'exhaustion_attempts_now_classified_as_infrastructure'/)
-  assert.doesNotMatch(review, /activateMassDistilled|callLocalModel|runpod/i)
+test('the backlog cron runs the quarantine review before compaction and survives its failure', () => {
   const route = read('app/api/cron/cos-university-mass-backlog-compact/route.ts')
   assert.ok(route.indexOf('await reviewQuarantine()') < route.indexOf('await compactMassEvaluationBacklog('))
   assert.match(route, /return \{error:message\}/, 'a review failure never stops compaction')

@@ -1,3 +1,4 @@
+// saas/app/api/cron/cos-university-residency/route.ts
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import {
@@ -11,6 +12,7 @@ import { createSupabaseBuilderResidencyOrchestratorStore } from '@/platform-harn
 import { createSupervisorAuditHarnessEvidenceSink } from '@/platform-harness/evidence/supervisor-audit-sink'
 import { actuateBuilderResidencyRuntimeRecovery } from '@/self-healing-host/builder-residency-runtime-recovery'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { closeStaleStartedResidencyCases } from '@/platform-harness/residency/stale-case-sweep'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -21,6 +23,14 @@ const RESIDENCY_PORTABLE = 'builder-residency'
 const RESIDENCY_AGENT = 'builder-resident'
 const RESIDENCY_SANDBOX = 'builder-residency-sandbox-v1'
 const RESIDENCY_CASES_PER_TICK = 4
+// TIME BUDGET (2026-09-29). One case can take a 360s exact-artifact cold start plus a 240s harness deadline, which
+// is the entire 600s invocation, yet up to four cases were started with no clock check. A case still running when
+// Vercel kills the invocation is never recorded (no evidence, a stale 'started' row) and its resident is scheduled
+// again. Start a case only when its harness deadline plus proof/recording fits in what is left of THIS invocation,
+// and hand it only the remaining time for its cold start.
+const RESIDENCY_INVOCATION_BUDGET_MS = 570_000
+const RESIDENCY_CASE_EXECUTION_RESERVE_MS = 300_000
+const RESIDENCY_MIN_READY_MS = 60_000
 
 function authorized(req: Request): boolean {
   const secret = process.env.CRON_SECRET
@@ -128,6 +138,7 @@ export async function GET(req: Request) {
     return NextResponse.json(body)
   }
 
+  const tickStartedAt = Date.now()
   const db = getAdminSupabase()
   const store = createSupabaseBuilderResidencyOrchestratorStore({
     db,
@@ -136,11 +147,18 @@ export async function GET(req: Request) {
     agentId: RESIDENCY_AGENT,
     sandboxEnvironmentId: RESIDENCY_SANDBOX,
   })
-  const executor = createLiveBuilderResidencyExecutor({ db })
   const harnessEvidenceSink =
     createSupervisorAuditHarnessEvidenceSink(db as any)
 
   try {
+    // Cases abandoned by a killed invocation are closed as harness failures (no evidence either way) so they stop
+    // pinning their resident to the front of the queue. Best effort: a sweep failure never blocks the tick.
+    const staleCases = await closeStaleStartedResidencyCases(db as any).catch((error: unknown) => ({
+      closed: 0,
+      residencyIds: [] as string[],
+      errors: [error instanceof Error ? error.message.slice(0, 160) : 'stale_case_sweep_failed'],
+    }))
+
     // Final results first. A resident that can no longer clear a remediation competency (too few untried
     // variants left for two distinct later passes) gets its Residency FAIL now, so it stops taking case
     // turns and never sits in PENDING. Production 2026-09-28: 26 of 37 active residents were in that state.
@@ -156,7 +174,14 @@ export async function GET(req: Request) {
     // re-selects an enrollment and crosses the same authority/evidence boundaries.
     // Execution remains sequential to avoid multiplying RunPod worker pressure.
     const results:any[] = []
+    let stoppedForTimeBudget = false
     for (let attempt = 0; attempt < RESIDENCY_CASES_PER_TICK; attempt += 1) {
+      const readyBudgetMs = RESIDENCY_INVOCATION_BUDGET_MS - (Date.now() - tickStartedAt) - RESIDENCY_CASE_EXECUTION_RESERVE_MS
+      if (readyBudgetMs < RESIDENCY_MIN_READY_MS) {
+        stoppedForTimeBudget = true
+        break
+      }
+      const executor = createLiveBuilderResidencyExecutor({ db, readyTimeoutMs: Math.min(360_000, readyBudgetMs) })
       const result = await runBuilderResidencyOrchestrator({
         store,
         executor,
@@ -186,12 +211,32 @@ export async function GET(req: Request) {
       }
     }
 
+    if (!results.length) {
+      const body = {
+        ok: true,
+        state: 'no_time_for_a_case',
+        staleCases,
+        residencyFailures: {
+          checked: residencyFailures.checked,
+          closed: residencyFailures.closedResidencyIds.length,
+          residencyIds: residencyFailures.closedResidencyIds,
+          quarantinedArtifacts: residencyFailures.quarantinedArtifacts,
+          errors: residencyFailures.errors,
+        },
+        automaticFinalGateEnable: false,
+        promotionAuthorized: false,
+        productionTrafficAuthorized: false,
+      }
+      await recordResidencyProductionPath(true, { runnerInvoked: false, status: 'no_time_for_a_case', ...body })
+      return NextResponse.json(body)
+    }
     const result = results[results.length - 1]
     const invocationSucceeded = results.every(item =>
       item.ok === true || item.state === 'waiting_for_residency_cases',
     )
     const body = {
       ...publicResult(result, admission),
+      staleCases,
       residencyFailures: {
         checked: residencyFailures.checked,
         closed: residencyFailures.closedResidencyIds.length,
@@ -211,6 +256,8 @@ export async function GET(req: Request) {
           .map(item => item.residencyId)
           .filter((value): value is string => typeof value === 'string' && value.length > 0))],
         maxCasesPerTick: RESIDENCY_CASES_PER_TICK,
+        stoppedForTimeBudget,
+        elapsedMs: Date.now() - tickStartedAt,
         parallelExecution: false,
       },
     }
@@ -221,6 +268,7 @@ export async function GET(req: Request) {
       coverage: result.coverage ?? null,
       admission: body.admission ?? null,
       residencyFailures: body.residencyFailures,
+      staleCases: body.staleCases,
       selfHealing: body.selfHealing ?? null,
       batch: body.batch,
       automaticFinalGateEnable: false,
@@ -256,3 +304,4 @@ export async function GET(req: Request) {
     )
   }
 }
+// end of saas/app/api/cron/cos-university-residency/route.ts (if this line is missing, the paste was cut short)

@@ -129,6 +129,25 @@ async function resolveResidencyArtifact(
   })
 }
 
+/**
+ * The exact-artifact runtime serves an 8,192-token window (runpod/exact-artifact/mass_gateway.py --max-model-len
+ * 8192), shared by the prompt AND the requested output. The Builder loop asks for up to 4,096 output tokens on a
+ * prompt that grows every round, and vLLM rejects prompt + max_tokens above the window with HTTP 400 ("maximum
+ * context length is 8192 tokens"), which the exam lane already classifies as infrastructure. In Residency that
+ * rejection turned a whole case into infrastructure_failure with no evidence. Reserve only what fits.
+ * Estimate is deliberately conservative (3 characters per token, code-dense prompts). It never raises the request
+ * and never drops below a floor: at worst the call is sent exactly as before.
+ */
+export const RESIDENCY_EXACT_ARTIFACT_CONTEXT_TOKENS=8192
+const RESIDENCY_CONTEXT_SAFETY_TOKENS=256
+const RESIDENCY_MIN_OUTPUT_TOKENS=256
+export function residencyMaxOutputTokens(system:unknown,user:unknown,requested?:number):number{
+  const wanted=Math.max(1,Math.min(Number.isFinite(Number(requested))?Math.floor(Number(requested)):2048,4096))
+  const promptTokens=Math.ceil((String(system??'').length+String(user??'').length)/3)+32
+  const available=RESIDENCY_EXACT_ARTIFACT_CONTEXT_TOKENS-promptTokens-RESIDENCY_CONTEXT_SAFETY_TOKENS
+  return Math.max(Math.min(wanted,RESIDENCY_MIN_OUTPUT_TOKENS),Math.min(wanted,available))
+}
+
 async function defaultSleep(ms:number){await new Promise(resolve=>setTimeout(resolve,ms))}
 
 /**
@@ -355,7 +374,7 @@ export function createRunpodBuilderResidencyModelPort(input:{
         body:JSON.stringify({
           model:runtime.modelId,
           temperature:0,
-          max_tokens:Math.max(1,Math.min(request.maxTokens??2048,4096)),
+          max_tokens:residencyMaxOutputTokens(request.system,request.user,request.maxTokens),
           chat_template_kwargs:{enable_thinking:false},
           messages:[
             {role:'system',content:request.system},
@@ -381,3 +400,4 @@ export function createRunpodBuilderResidencyModelPort(input:{
     },
   })
 }
+// end of saas/platform-harness/residency/exact-artifact-model.ts (if this line is missing, the paste was cut short)

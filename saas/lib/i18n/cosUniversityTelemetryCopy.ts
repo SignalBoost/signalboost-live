@@ -1,5 +1,4 @@
 // saas/lib/i18n/cosUniversityTelemetryCopy.ts
-// saas/lib/i18n/cosUniversityTelemetryCopy.ts
 export type CosUniversityTelemetryLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 type Copy = Readonly<{
@@ -72,6 +71,14 @@ type Copy = Readonly<{
   pending: string
   notGraduated: string
   noArtifacts: string
+  pipelineResidencyFailed: string
+  workforceTitle: string
+  workforceExplanation: string
+  workforceOnCall: string
+  workforceRetired: string
+  workforceHired: string
+  workforceNone: string
+  workforceUnavailable: string
 }>
 
 export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguage, Copy> = {
@@ -145,6 +152,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     pending: 'Pending',
     notGraduated: 'Not graduated',
     noArtifacts: 'No distilled artifacts found.',
+    pipelineResidencyFailed: 'Residency failed',
+    workforceTitle: 'Workforce — graduates hired out of the University',
+    workforceExplanation: 'Graduates leave the University at graduation. COS hires them from here; the University keeps only their diploma record.',
+    workforceOnCall: 'On call',
+    workforceRetired: 'Retired',
+    workforceHired: 'Hired',
+    workforceNone: 'No graduates hired yet.',
+    workforceUnavailable: 'Workforce roster not available yet (migration pending).',
   },
   es: {
     title: 'COS University — Telemetría de destilación',
@@ -187,8 +202,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     output: 'Salida',
     latest: 'Última',
     noTeacherCalls: 'No hubo llamadas docentes alojadas en esta ventana.',
-    runsTitle: 'Ejecuciones recientes de destilación',
-    runsExplanation: 'La actividad de Producción más reciente aparece primero.',
+    runsTitle: 'Ejecuciones recientes de destilación',    runsExplanation: 'La actividad de Producción más reciente aparece primero.',
     subject: 'Materia',
     stage: 'Etapa',
     teacherMix: 'Mezcla docente',
@@ -216,6 +230,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     pending: 'Pendiente',
     notGraduated: 'No graduado',
     noArtifacts: 'No se encontraron artefactos destilados.',
+    pipelineResidencyFailed: 'Residencia reprobada',
+    workforceTitle: 'Plantilla — graduados contratados fuera de la Universidad',
+    workforceExplanation: 'Los graduados salen de la Universidad al graduarse. COS los contrata desde aquí; la Universidad solo conserva su registro de diploma.',
+    workforceOnCall: 'De guardia',
+    workforceRetired: 'Retirados',
+    workforceHired: 'Contratado',
+    workforceNone: 'Aún no hay graduados contratados.',
+    workforceUnavailable: 'La plantilla aún no está disponible (migración pendiente).',
   },
   pt: {
     title: 'COS University — Telemetria de destilação',
@@ -287,6 +309,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     pending: 'Pendente',
     notGraduated: 'Não graduado',
     noArtifacts: 'Nenhum artefato destilado encontrado.',
+    pipelineResidencyFailed: 'Residência reprovada',
+    workforceTitle: 'Força de trabalho — graduados contratados fora da Universidade',
+    workforceExplanation: 'Os graduados saem da Universidade na formatura. O COS os contrata daqui; a Universidade guarda apenas o registro do diploma.',
+    workforceOnCall: 'De plantão',
+    workforceRetired: 'Aposentados',
+    workforceHired: 'Contratado',
+    workforceNone: 'Nenhum graduado contratado ainda.',
+    workforceUnavailable: 'Quadro de pessoal ainda indisponível (migração pendente).',
   },
   pl: {
     title: 'COS University — Telemetria destylacji',
@@ -358,6 +388,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     pending: 'Oczekuje',
     notGraduated: 'Nieukończony',
     noArtifacts: 'Nie znaleziono artefaktów destylowanych.',
+    pipelineResidencyFailed: 'Rezydentura niezaliczona',
+    workforceTitle: 'Zespół — absolwenci zatrudnieni poza Uniwersytetem',
+    workforceExplanation: 'Absolwenci opuszczają Uniwersytet w dniu ukończenia studiów. COS zatrudnia ich stąd; Uniwersytet zachowuje tylko zapis dyplomu.',
+    workforceOnCall: 'W gotowości',
+    workforceRetired: 'Wycofani',
+    workforceHired: 'Zatrudniony',
+    workforceNone: 'Brak zatrudnionych absolwentów.',
+    workforceUnavailable: 'Lista zespołu jeszcze niedostępna (oczekuje migracja).',
   },
   ru: {
     title: 'COS University — Телеметрия дистилляции',
@@ -429,5 +467,14 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     pending: 'Ожидает',
     notGraduated: 'Не выпущен',
     noArtifacts: 'Дистиллированные артефакты не найдены.',
+    pipelineResidencyFailed: 'Ординатура не пройдена',
+    workforceTitle: 'Штат — выпускники, нанятые вне Университета',
+    workforceExplanation: 'Выпускники покидают Университет при выпуске. COS нанимает их отсюда; Университет хранит только запись о дипломе.',
+    workforceOnCall: 'На вызове',
+    workforceRetired: 'Выведены',
+    workforceHired: 'Нанят',
+    workforceNone: 'Нанятых выпускников пока нет.',
+    workforceUnavailable: 'Штат пока недоступен (ожидается миграция).',
   },
 }
+// end of saas/lib/i18n/cosUniversityTelemetryCopy.ts (if this line is missing, the paste was cut short)

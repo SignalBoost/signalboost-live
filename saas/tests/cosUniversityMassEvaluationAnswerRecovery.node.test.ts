@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer, recoverStoppedSoloWrappedAnswer } from '../lib/ai/cos/cosUniversityMassEvaluationAnswerRecovery.ts'
+import { recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer, recoverStoppedSoloWrappedAnswer, recoverStoppedSoloForeignEndAnswer } from '../lib/ai/cos/cosUniversityMassEvaluationAnswerRecovery.ts'
 
 const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
@@ -80,4 +80,14 @@ test('solo normal-stop wrapper prose around one exact answer block is recovered 
   assert.equal(recoverStoppedSoloWrappedAnswer(`<<<ANSWER:${id}>>>16%<<<END:${id}>>>`,id,'length'),null)
   assert.equal(recoverStoppedSoloWrappedAnswer(`<think>x</think><<<ANSWER:${id}>>>16%<<<END:${id}>>>`,id,'stop'),null)
   assert.match(source, /cases\.length===1 \? recoverStoppedSoloWrappedAnswer\(text,item\.id,finish\) : null/)
+})
+
+
+test('solo normal-stop answer with exactly one foreign END marker is recovered without accepting ambiguity', () => {
+  assert.equal(recoverStoppedSoloForeignEndAnswer('The result is 16%.\n<<<END:foreign-id>>>','stop'),'The result is 16%.')
+  assert.equal(recoverStoppedSoloForeignEndAnswer('A\n<<<END:x>>>\n<<<END:y>>>','stop'),null)
+  assert.equal(recoverStoppedSoloForeignEndAnswer('<<<ANSWER:x>>>A\n<<<END:y>>>','stop'),null)
+  assert.equal(recoverStoppedSoloForeignEndAnswer('A\n<<<END:x>>>','length'),null)
+  assert.equal(recoverStoppedSoloForeignEndAnswer('<think>x</think>A\n<<<END:y>>>','stop'),null)
+  assert.match(source, /cases\.length===1 \? recoverStoppedSoloForeignEndAnswer\(text,finish\) : null/)
 })

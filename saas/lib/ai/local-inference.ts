@@ -377,7 +377,7 @@ export function transportFailureTag(error: unknown): string {
     .replace(/[^A-Za-z0-9 _.:/-]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 48)
+    .slice(0, 64)
   const name = String(err.name || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 20)
   return ['error', name, message, causeCode].filter(Boolean).join(':').slice(0, 80)
 }
@@ -500,8 +500,11 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       systemPrompt,
       messages: rawMessages,
       requestedOutputTokens: requestedMaxTokens,
-      minimumOutputTokens: Math.min(256, requestedMaxTokens),
+      minimumOutputTokens: config.refuseInputCompaction === true ? Math.min(600, requestedMaxTokens) : Math.min(256, requestedMaxTokens),
       ...(config.tokenEstimator === 'qwen' ? { estimateTokens: estimateQwenContextTokens } : {}),
+      // Never answer from cut evidence: shorten the reply budget instead (chat answers run ~300-500 tokens),
+      // and refuse only when even a 600-token reply would not fit, so the larger-window backup takes it whole.
+      ...(config.refuseInputCompaction === true ? { compactInput: false } : {}),
     })
     if (config.refuseInputCompaction === true && (contextPlan.droppedMessages > 0 || contextPlan.truncatedCharacters > 0)) {
       throw new Error(`context_window_would_truncate_input:model=${model}:window=${contextPlan.contextWindowTokens}:prompt=${contextPlan.estimatedPromptTokens}:droppedMessages=${contextPlan.droppedMessages}:truncatedCharacters=${contextPlan.truncatedCharacters}`)
@@ -827,3 +830,4 @@ export async function checkLocalInferenceHealth(config = localInferenceConfigFro
     clearTimeout(timeout)
   }
 }
+---------------------------------------------------------------

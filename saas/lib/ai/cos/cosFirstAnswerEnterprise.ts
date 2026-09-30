@@ -992,6 +992,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const startedAt = Date.now()
   const audience = cosAudience(input.privileged === true)
   const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged), audience)
+  recordCosLatencyStage('enterprise:retrieval_total', Date.now() - startedAt)
   const userSuppliedPremises = detectUserSuppliedPremises(input.prompt)
   const base = {
     userSuppliedPremises,
@@ -1077,6 +1078,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   // exhaustion from every other way a reasoner call can fail, instead of collapsing all of them
   // into one generic "did not return an answer" message with the real cause visible only in logs.
   let reasonerFailureMessage: string | null = null
+  const reasonerStartedAt = Date.now()
   const reasoned = await callCosReasoner({
     usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_response' },
     // INTERACTIVE SPEED (2026-09-27). This call runs under the 20s interactive model timeout
@@ -1106,7 +1108,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       errorName: error instanceof Error ? error.name : null,
     }))
     return null
-  })
+  }).finally(() => recordCosLatencyStage('enterprise:reasoner', Date.now() - reasonerStartedAt))
 
   // The control-plane wrapper does not publish its turn id through recordTurnExperience(). Bind it
   // synchronously here, before citedEvidence() and learnFromTurn() consume the request-local record.

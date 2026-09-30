@@ -130,3 +130,22 @@ export function recoverStoppedSoloWrappedAnswer(text: string, caseId: string, fi
   if (!answer || /<<<(?:ANSWER|END):/i.test(answer)) return null
   return answer
 }
+
+
+/**
+ * A solo normal-stop retry can return the answer followed by exactly one END marker carrying a foreign id.
+ * With one requested case there is no answer-to-case ambiguity. Recover only the non-empty body before that
+ * sole closer; thinking, truncation, ANSWER markers, multiple END markers, embedded protocol and empty bodies
+ * remain fail-closed.
+ */
+export function recoverStoppedSoloForeignEndAnswer(text: string, finish: string): string | null {
+  if (finish !== 'stop' || /<\/?think>/i.test(text) || /<<<ANSWER:/i.test(text)) return null
+  const matches = [...text.matchAll(/<<<END:([^>\r\n]{1,120})>>>/gi)]
+  if (matches.length !== 1) return null
+  const marker = matches[0][0]
+  const at = matches[0].index ?? -1
+  if (at < 0 || /<<<(?:ANSWER|END):/i.test(text.slice(at + marker.length))) return null
+  const answer = text.slice(0, at).trim()
+  if (!answer || /<<<(?:ANSWER|END):/i.test(answer)) return null
+  return answer
+}

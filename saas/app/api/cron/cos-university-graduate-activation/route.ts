@@ -298,6 +298,50 @@ async function registerNextMassGraduate() {
     .limit(3000)
   if (events.error) throw events.error
 
+  // Recovery for the pre-2026-09-30 evidence-idempotency defect: a reopened evaluation could
+  // complete PASS and move the artifact to runtime_pending while its fresh independent verdict was
+  // suppressed as a duplicate. Never graduate from that stale verdict. If the latest successful
+  // completion's holdout scores have no matching independent-scorer verdict for the same artifact,
+  // reopen evaluation once under the repaired run-specific evidence identity.
+  for (const artifact of (artifacts.data || [])) {
+    const candidateId = String(artifact.candidate_id)
+    const artifactHash = String(artifact.trained_artifact_hash || '').toLowerCase()
+    if (already.has(`${candidateId}:${artifactHash}`)) continue
+    const mine = (events.data || []).filter((row: any) => String(row.candidate_id) === candidateId
+      && String(row.evidence?.artifactHash || '').toLowerCase() === artifactHash)
+    const completion = mine.find((row: any) => row.verifier === 'host_controller'
+      && row.evidence?.claim === 'mass_distilled_independent_evaluation_completed'
+      && row.evidence?.evaluationPassed === true)
+    if (!completion) continue
+    const baseline = Number(completion.evidence?.holdout?.baselineScore)
+    const trained = Number(completion.evidence?.holdout?.trainedArtifactScore)
+    if (!Number.isFinite(baseline) || !Number.isFinite(trained) || !(trained > baseline)) continue
+    const freshVerdict = mine.some((row: any) => row.verifier === 'independent_scorer'
+      && row.evidence?.claim === 'independent_evaluation'
+      && Number(row.evidence?.baselineScore) === baseline
+      && Number(row.evidence?.trainedArtifactScore) === trained)
+    if (freshVerdict) continue
+
+    const now = new Date().toISOString()
+    const repairRef = 'mass_graduate_stale_reopened_verdict_recovery_2026-09-30'
+    const reopened = await db.from('cos_local_distillation_artifacts')
+      .update({ status: 'evaluation_pending', updated_at: now })
+      .eq('candidate_id', candidateId)
+      .eq('trained_artifact_hash', artifactHash)
+      .eq('status', 'runtime_pending')
+    if (reopened.error) throw reopened.error
+    const evidence = { claim: 'mass_distilled_independent_evaluation_reopened', repairRef, candidateId, artifactHash,
+      previousStatus: 'runtime_pending', nextStatus: 'evaluation_pending', authorityExpanded: false, productionTrafficAuthorized: false }
+    const evidenceHash = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
+    const recorded = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: createHash('sha256').update(JSON.stringify([repairRef, candidateId, artifactHash])).digest('hex'),
+      event_type: 'fine_tune', subject_id: String(artifact.subject_id || ''), candidate_id: candidateId,
+      evidence_hash: evidenceHash, evidence, verifier: 'host_controller', observed_at: now,
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (recorded.error) throw recorded.error
+    return { registered: false as const, reason: 'stale_reopened_verdict_requeued', candidateId, artifactHash }
+  }
+
   const decision = decideMassGraduateRegistration({
     enabled: String(process.env.COS_MASS_GRADUATE_REGISTRATION || '').trim() !== 'false',
     artifacts: (artifacts.data || [])

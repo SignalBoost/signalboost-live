@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
 import { estimateQwenContextTokens, planContextWindow } from './context-window-manager.ts'
@@ -405,6 +406,19 @@ function eligibleForRunpodPrimary(args: LocalModelCallArgs, config: LocalInferen
   if (config.fallbackFromOwned === true) return false
   if (protectedIndependentEvaluation(args)) return false
   return true
+}
+
+export type ServedInference = Readonly<{ provider: string; model: string }>
+const servedInferenceScope = new AsyncLocalStorage<{ served: ServedInference[] }>()
+
+export async function captureServedInference<T>(work: () => Promise<T>): Promise<{ result: T; served: readonly ServedInference[] }> {
+  const store: { served: ServedInference[] } = { served: [] }
+  const result = await servedInferenceScope.run(store, work)
+  return { result, served: Object.freeze([...store.served]) }
+}
+
+function noteServedInference(provider: string, model: string): void {
+  servedInferenceScope.getStore()?.served.push(Object.freeze({ provider, model }))
 }
 
 async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {

@@ -5,6 +5,7 @@ import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriev
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { independentReasonerHealth, externalFallbackEnabled } from '@/lib/ai/cos/cosOrchestrationEnterprise'
 import { autonomousLearningReadiness } from '@/lib/cos/dailyAutonomousLearning'
+import { formatChatInferenceTrail, type ChatInferenceCall } from '@/lib/ai/cos/chatInferenceTrail.ts'
 import { autonomousLearningRunFresh, readAutonomousLearningHealth, type AutonomousLearningRunHealth } from '@/lib/ai/cos/autonomousLearningHealth.ts'
 
 export type CosLiveSystemState = {
@@ -29,7 +30,33 @@ export type CosLiveSystemState = {
   cache:{semanticRecords:number|null;exactRecords:number|null}
   userMemory:{available:boolean;records:number|null}
   lastTurnRecord:{source:string|null;updatedAt:string|null}|null
+  /** Every chat-answer model call around the last answered turn, oldest first: which provider was tried, how it ended. */
+  chatInference?:ChatInferenceCall[]|null
 }
+
+// CHAT PROVIDER TRAIL (2026-09-30, owner: "TRACK THE PIPELINE"). Why an answer came from DeepInfra instead of the
+// owned RunPod reasoner was only visible by running SQL against provider_inference_usage. The provenance reply now
+// reads those rows itself for the answered turn: each provider tried, in order, with its outcome and recorded reason.
+async function readChatInferenceTrail(db:any,lastTurnAt:string|null):Promise<ChatInferenceCall[]|null>{
+  try{
+    let query=db.from('provider_inference_usage')
+      .select('created_at,provider,feature,success,latency_ms,prompt_tokens,completion_tokens,finish_reason')
+      .eq('purpose','user_facing_response')
+    const anchor=lastTurnAt?Date.parse(lastTurnAt):NaN
+    if(Number.isFinite(anchor)){
+      query=query.gte('created_at',new Date(anchor-180_000).toISOString()).lte('created_at',new Date(anchor+30_000).toISOString()).order('created_at',{ascending:true}).limit(12)
+    }else{
+      query=query.order('created_at',{ascending:false}).limit(6)
+    }
+    const {data,error}=await query
+    if(error||!Array.isArray(data))return null
+    const rows=Number.isFinite(anchor)?data:[...data].reverse()
+    const num=(v:unknown)=>{const x=Number(v);return v==null||!Number.isFinite(x)?null:x}
+    return rows.map((row:any)=>({at:String(row.created_at||''),provider:String(row.provider||'unknown'),feature:s(row.feature),success:row.success===true,latencyMs:num(row.latency_ms),promptTokens:num(row.prompt_tokens),completionTokens:num(row.completion_tokens),finishReason:s(row.finish_reason)}))
+  }catch{return null}
+}
+
+
 
 function n(result:any):number|null{return !result?.error&&typeof result?.count==='number'?result.count:null}
 function s(value:unknown):string|null{const v=String(value??'').trim();return v||null}
@@ -44,6 +71,7 @@ export async function buildCosLiveSystemState(args:{userId?:string|null;privileg
   let cognitiveSkills:CosLiveSystemState['cognitiveSkills']={validated:null,latestUpdatedAt:null}
   let cache:CosLiveSystemState['cache']={semanticRecords:null,exactRecords:null}
   let lastTurnRecord:CosLiveSystemState['lastTurnRecord']=null
+  let chatInference:ChatInferenceCall[]|null=null
   if(db){
     const [kgTotal,kgQ,kgLatest,clTotal,clRejected,clRows,clLatest,skills,skillLatest,semantic,exact,lastTurn]=await Promise.all([
       db.from('cos_knowledge_facts').select('id',{count:'exact',head:true}),
@@ -67,6 +95,7 @@ export async function buildCosLiveSystemState(args:{userId?:string|null;privileg
     cognitiveSkills={validated:n(skills),latestUpdatedAt:skillLatest.error?null:s(skillLatest.data?.updated_at)}
     cache={semanticRecords:n(semantic),exactRecords:n(exact)}
     if(!lastTurn.error&&lastTurn.data)lastTurnRecord={source:s(lastTurn.data.source),updatedAt:s(lastTurn.data.updated_at)}
+    chatInference=await readChatInferenceTrail(db,lastTurnRecord?.updatedAt??null)
   }
   let enterpriseMemory:CosLiveSystemState['enterpriseMemory']={status:args.privileged?'scope_lookup_pending':'not_authorized',organizationId:null,organizationRows:null,intelligenceSnapshots:null,repositorySnapshots:null,campaignMemories:null,confidenceHistory:null,retrievableItems:null,kinds:{}}
   if(args.privileged){
@@ -97,7 +126,7 @@ export async function buildCosLiveSystemState(args:{userId?:string|null;privileg
     currentWorld:{run:runHealth.currentWorld,fresh:autonomousLearningRunFresh('current_world',runHealth.currentWorld)},
     daily:{run:runHealth.daily,fresh:autonomousLearningRunFresh('daily',runHealth.daily)},
   }
-  return{generatedAt,deployment:{commitSha:s(process.env.VERCEL_GIT_COMMIT_SHA),environment:s(process.env.VERCEL_ENV)},localReasoner:await reasonerPromise,externalFallbackEnabled:externalFallbackEnabled(),autonomousLearning,enterpriseMemory,knowledgeGraph,learnedCorpus,cognitiveSkills,cache,userMemory:{available:Boolean(args.userId),records:args.userId?memories.length:null},lastTurnRecord}
+  return{generatedAt,deployment:{commitSha:s(process.env.VERCEL_GIT_COMMIT_SHA),environment:s(process.env.VERCEL_ENV)},localReasoner:await reasonerPromise,externalFallbackEnabled:externalFallbackEnabled(),autonomousLearning,enterpriseMemory,knowledgeGraph,learnedCorpus,cognitiveSkills,cache,userMemory:{available:Boolean(args.userId),records:args.userId?memories.length:null},lastTurnRecord,chatInference}
 }
 
 function automaticRunLine(label:string,item:{run:AutonomousLearningRunHealth|null;fresh:boolean|null}):string{
@@ -113,5 +142,5 @@ export function formatCosLiveSystemState(state:CosLiveSystemState):string{
   const sources=Object.entries(state.learnedCorpus.bySourceKind).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k} ${v}`).join(', ')||'none'
   const emKinds=Object.entries(state.enterpriseMemory.kinds).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k} ${v}`).join(', ')||'none'
   const autoWarnings=state.autonomousLearning.warnings.length?`; warnings ${state.autonomousLearning.warnings.join(' | ')}`:''
-  return['LIVE SYSTEM STATE — queried now; independent of prior-answer provenance',`Generated              : ${state.generatedAt}`,`Deployment             : ${state.deployment.environment||'unknown'} @ ${state.deployment.commitSha||'unknown commit'}`,`Local Reasoner         : ${state.localReasoner.healthy?'HEALTHY':state.localReasoner.configured?'UNHEALTHY':'NOT CONFIGURED'}${state.localReasoner.model?` — ${state.localReasoner.model}`:''}${state.localReasoner.error?`; ${state.localReasoner.error}`:''}`,`Automatic Learning     : ${state.autonomousLearning.ready?'READY':state.autonomousLearning.enabled?'NOT READY':'DISABLED'} — live sources ${state.autonomousLearning.liveSourcesEnabled?'enabled':'disabled'}; adapters ${state.autonomousLearning.liveAdapters}; approved URLs ${state.autonomousLearning.approvedUrls}${autoWarnings}`,automaticRunLine('Auto Current-World',state.autonomousLearning.currentWorld),automaticRunLine('Auto Daily Learning',state.autonomousLearning.daily),`Enterprise Memory      : ${state.enterpriseMemory.status} — org ${state.enterpriseMemory.organizationId||'none'}; organization ${state.enterpriseMemory.organizationRows??'unknown'}, intelligence ${state.enterpriseMemory.intelligenceSnapshots??'unknown'}, repository ${state.enterpriseMemory.repositorySnapshots??'unknown'}, campaign ${state.enterpriseMemory.campaignMemories??'unknown'}, confidence ${state.enterpriseMemory.confidenceHistory??'unknown'}; retrievable ${state.enterpriseMemory.retrievableItems??'unknown'} (${emKinds})`,`Knowledge Graph        : ${state.knowledgeGraph.activeFacts??'unknown'} active; ${state.knowledgeGraph.quarantinedFacts??'unknown'} quarantined; latest ${state.knowledgeGraph.latestUpdatedAt||'unknown'}`,`Learned Corpus         : ${state.learnedCorpus.total??'unknown'} total; ${state.learnedCorpus.relevanceRejected??'unknown'} relevance-rejected; sources ${sources}; latest observed ${state.learnedCorpus.latestObservedAt||'unknown'}`,`Cognitive Skills       : ${state.cognitiveSkills.validated??'unknown'} validated; latest ${state.cognitiveSkills.latestUpdatedAt||'unknown'}`,`Cache                  : ${state.cache.semanticRecords??'unknown'} semantic records; ${state.cache.exactRecords??'unknown'} exact records`,`User Memory            : ${state.userMemory.available?`${state.userMemory.records??'unknown'} records`:'no authenticated user scope'}`,`Last Provenance Record : ${state.lastTurnRecord?.updatedAt||'none'}${state.lastTurnRecord?.source?` — ${state.lastTurnRecord.source}`:''}`].join('\n')
+  return['LIVE SYSTEM STATE — queried now; independent of prior-answer provenance',`Generated              : ${state.generatedAt}`,`Deployment             : ${state.deployment.environment||'unknown'} @ ${state.deployment.commitSha||'unknown commit'}`,`Local Reasoner         : ${state.localReasoner.healthy?'HEALTHY':state.localReasoner.configured?'UNHEALTHY':'NOT CONFIGURED'}${state.localReasoner.model?` — ${state.localReasoner.model}`:''}${state.localReasoner.error?`; ${state.localReasoner.error}`:''}`,`Automatic Learning     : ${state.autonomousLearning.ready?'READY':state.autonomousLearning.enabled?'NOT READY':'DISABLED'} — live sources ${state.autonomousLearning.liveSourcesEnabled?'enabled':'disabled'}; adapters ${state.autonomousLearning.liveAdapters}; approved URLs ${state.autonomousLearning.approvedUrls}${autoWarnings}`,automaticRunLine('Auto Current-World',state.autonomousLearning.currentWorld),automaticRunLine('Auto Daily Learning',state.autonomousLearning.daily),`Enterprise Memory      : ${state.enterpriseMemory.status} — org ${state.enterpriseMemory.organizationId||'none'}; organization ${state.enterpriseMemory.organizationRows??'unknown'}, intelligence ${state.enterpriseMemory.intelligenceSnapshots??'unknown'}, repository ${state.enterpriseMemory.repositorySnapshots??'unknown'}, campaign ${state.enterpriseMemory.campaignMemories??'unknown'}, confidence ${state.enterpriseMemory.confidenceHistory??'unknown'}; retrievable ${state.enterpriseMemory.retrievableItems??'unknown'} (${emKinds})`,`Knowledge Graph        : ${state.knowledgeGraph.activeFacts??'unknown'} active; ${state.knowledgeGraph.quarantinedFacts??'unknown'} quarantined; latest ${state.knowledgeGraph.latestUpdatedAt||'unknown'}`,`Learned Corpus         : ${state.learnedCorpus.total??'unknown'} total; ${state.learnedCorpus.relevanceRejected??'unknown'} relevance-rejected; sources ${sources}; latest observed ${state.learnedCorpus.latestObservedAt||'unknown'}`,`Cognitive Skills       : ${state.cognitiveSkills.validated??'unknown'} validated; latest ${state.cognitiveSkills.latestUpdatedAt||'unknown'}`,`Cache                  : ${state.cache.semanticRecords??'unknown'} semantic records; ${state.cache.exactRecords??'unknown'} exact records`,`User Memory            : ${state.userMemory.available?`${state.userMemory.records??'unknown'} records`:'no authenticated user scope'}`,`Last Provenance Record : ${state.lastTurnRecord?.updatedAt||'none'}${state.lastTurnRecord?.source?` — ${state.lastTurnRecord.source}`:''}`,`Chat Inference Calls   : ${formatChatInferenceTrail(state.chatInference)}`].join('\n')
 }

@@ -63,21 +63,26 @@ test('Residency cron auto-admits a bounded Builder cohort before practical execu
 })
 
 
-test('Residency cron drains a bounded sequential cohort without widening active admission capacity', async () => {
+// Owner direction 2026-09-30: Residency runs one lane per resident in parallel (never more lanes than the admitted
+// cohort), and each resident keeps its lane so its exact-artifact worker stays warm between ticks.
+test('Residency cron runs one bounded lane per admitted resident without widening active admission capacity', async () => {
   const source = await readFile(routeUrl, 'utf8')
-  assert.match(source, /RESIDENCY_CASES_PER_TICK\s*=\s*4/)
-  assert.match(source, /attempt\s*<\s*RESIDENCY_CASES_PER_TICK/)
+  assert.match(source, /RESIDENCY_PARALLEL_LANES = 4/)
+  assert.match(source, /RESIDENCY_CASES_PER_LANE = 4/)
+  assert.match(source, /attempt\s*<\s*RESIDENCY_CASES_PER_LANE/)
+  assert.match(source, /await store\.planLanes\(RESIDENCY_PARALLEL_LANES\)/)
+  assert.match(source, /store\.pinnedTo\(enrollment\)/)
+  assert.match(source, /Promise\.all\(laneStores\.map\(laneStore => runLane\(laneStore\)\)\)/)
   assert.match(source, /await runBuilderResidencyOrchestrator/)
-  assert.match(source, /parallelExecution:\s*false/)
+  assert.match(source, /parallelExecution: lanes\.length > 1/)
   assert.match(source, /activeLimit:\s*4/)
-  assert.doesNotMatch(source, /Promise\.all\([^)]*runBuilderResidencyOrchestrator/)
 })
 
 
 test('Residency cron circuit-breaks educational attempts when infrastructure recovery is not completed', async () => {
   const source = await readFile(routeUrl, 'utf8')
   assert.match(source, /result\.state === 'case_not_completed'/)
-  assert.match(source, /result\.execution\?\.result\?\.outcome\?\.status === 'infrastructure_failure'/)
-  assert.match(source, /result\.selfHealing\?\.completed !== true/)
+  assert.match(source, /execution\.result\?\.outcome\?\.status === 'infrastructure_failure'/)
+  assert.match(source, /selfHealing\?\.completed !== true/)
   assert.match(source, /\) break/)
 })

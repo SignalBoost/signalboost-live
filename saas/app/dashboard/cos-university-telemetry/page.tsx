@@ -1,4 +1,3 @@
-// saas/app/dashboard/cos-university-telemetry/page.tsx
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -138,6 +137,13 @@ type Telemetry = {
     byReason?: Partial<Record<'exam_failed'|'residency_failed'|'exhausted_real_failures'|'exhausted_our_errors'|'exam_data_defect'|'no_recorded_reason', number>>
     returnedToExam?: { total?:number; waitingForExam?:number; passedExam?:number; quarantinedAgain?:number; other?:number }
     review?: { available?:boolean; ran?:boolean; outcome?:string|null; reason?:string|null; observedAt?:string|null; checked?:number; restored?:number; error?:string|null }
+    resolution?: { available?:boolean; ran?:boolean; outcome?:string|null; observedAt?:string|null; dismissed?:number; returnedToExam?:number; heldForInvestigation?:number; error?:string|null }
+    leftUniversity?: { total?:number; byReason?: Partial<Record<'exam_failed'|'residency_failed'|'exhausted_real_failures'|'exhausted_our_errors'|'exam_data_defect'|'no_recorded_reason', number>> }
+    why?: {
+      examGates?: Partial<Record<'holdout'|'safety'|'transfer'|'retention', number>>
+      residencyCompetencies?: Array<{ competency:string; count:number }>
+      topErrors?: Array<{ error:string; count:number }>
+    }
   }
 }
 
@@ -289,6 +295,13 @@ export default function CosUniversityTelemetryPage() {
   const quarantineReasons = quarantine.byReason || {}
   const quarantineReturned = quarantine.returnedToExam || {}
   const quarantineReview = quarantine.review || {}
+  const quarantineResolution = quarantine.resolution || {}
+  const leftUniversity = quarantine.leftUniversity || {}
+  const leftReasons = leftUniversity.byReason || {}
+  const why = quarantine.why || {}
+  const whyGates = why.examGates || {}
+  // Residency FAILs are results: they leave the University with the quarantine resolution and are counted there.
+  const residencyInUniversity = residency.filter(row => row.standing !== 'residency_failed')
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
@@ -514,6 +527,56 @@ export default function CosUniversityTelemetryPage() {
               ? `${copy.quarantineReviewFailed} · ${when(quarantineReview.observedAt)} · ${quarantineReview.error || quarantineReview.reason || ''}`
               : `${copy.quarantineReviewLast} ${when(quarantineReview.observedAt)} · ${quarantineReview.restored ?? 0} ${copy.quarantineReviewRestored}`}
         </p>
+        <p className="mt-1 text-xs opacity-75">
+          {!quarantineResolution.ran
+            ? copy.resolutionNever
+            : quarantineResolution.outcome === 'failed'
+              ? `${copy.resolutionFailed} · ${when(quarantineResolution.observedAt)} · ${quarantineResolution.error || ''}`
+              : `${copy.resolutionLast} ${when(quarantineResolution.observedAt)} · ${quarantineResolution.dismissed ?? 0} ${copy.resolutionDismissed} · ${quarantineResolution.returnedToExam ?? 0} ${copy.resolutionReturned} · ${quarantineResolution.heldForInvestigation ?? 0} ${copy.resolutionHeld}`}
+        </p>
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <h2 className="font-semibold">{copy.whyTitle}</h2>
+        <h3 className="mt-3 text-xs font-medium uppercase opacity-60">{copy.whyExamGates}</h3>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Card label={copy.whyHoldout} value={String(whyGates.holdout ?? 0)} />
+          <Card label={copy.whySafety} value={String(whyGates.safety ?? 0)} />
+          <Card label={copy.whyTransfer} value={String(whyGates.transfer ?? 0)} />
+          <Card label={copy.whyRetention} value={String(whyGates.retention ?? 0)} />
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <h3 className="text-xs font-medium uppercase opacity-60">{copy.whyResidency}</h3>
+            <ul className="mt-2 space-y-1 text-sm">
+              {(why.residencyCompetencies || []).map(item => (
+                <li key={item.competency} className="flex justify-between gap-3"><span>{gateLabel(item.competency)}</span><span className="font-mono">{item.count}</span></li>
+              ))}
+              {!(why.residencyCompetencies || []).length ? <li className="opacity-60">{copy.whyNone}</li> : null}
+            </ul>
+          </div>
+          <div>
+            <h3 className="text-xs font-medium uppercase opacity-60">{copy.whyErrors}</h3>
+            <ul className="mt-2 space-y-1 text-sm">
+              {(why.topErrors || []).map(item => (
+                <li key={item.error} className="flex justify-between gap-3"><span className="break-all font-mono text-xs">{item.error}</span><span className="font-mono">{item.count}</span></li>
+              ))}
+              {!(why.topErrors || []).length ? <li className="opacity-60">{copy.whyNone}</li> : null}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <h2 className="font-semibold">{copy.leftTitle}</h2>
+        <p className="mt-1 text-xs opacity-65">{copy.leftExplanation}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <Card label={copy.leftTotal} value={String(leftUniversity.total ?? 0)} />
+          <Card label={copy.quarantineExamFailed} value={String(leftReasons.exam_failed ?? 0)} />
+          <Card label={copy.quarantineResidencyFailed} value={String(leftReasons.residency_failed ?? 0)} />
+          <Card label={copy.quarantineExhaustedReal} value={String(leftReasons.exhausted_real_failures ?? 0)} />
+          <Card label={copy.leftUnexaminable} value={String(leftReasons.exam_data_defect ?? 0)} />
+        </div>
       </section>
 
       <section className="rounded-lg border p-4">
@@ -545,7 +608,7 @@ export default function CosUniversityTelemetryPage() {
       <section className="rounded-lg border p-4">
         <h2 className="font-semibold">Builder Residency — live cohort</h2>
         <p className="mt-1 text-xs opacity-65">Every enrolled Computer Science artifact and its durable progress.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">{residency.map(row => <div key={row.residencyId} className="rounded-lg border p-3 text-xs"><div className="font-semibold">{gateLabel(row.standing)} · {row.demonstratedCompetencies}/{row.totalCompetencies} competencies</div><div className="mt-1 font-mono opacity-60">{short(row.candidateId,28)}</div><div className="mt-2">{row.completedCases} cases · {row.realOutcomes} real outcomes · {row.infrastructureFailures} infrastructure failures</div><div className="mt-1">Latest: {row.latestCase ? gateLabel(row.latestCase.outcome || row.latestCase.status) : 'no case yet'}</div><div className="mt-1 font-medium">Next: {row.standing === 'residency_complete' ? 'fresh exact-artifact canary' : row.standing === 'residency_failed' ? 'none — Residency FAIL (final)' : row.standing === 'remediation_required' ? 'remediation case' : 'continue competency cases'}</div></div>)}</div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">{residencyInUniversity.map(row => <div key={row.residencyId} className="rounded-lg border p-3 text-xs"><div className="font-semibold">{gateLabel(row.standing)} · {row.demonstratedCompetencies}/{row.totalCompetencies} competencies</div><div className="mt-1 font-mono opacity-60">{short(row.candidateId,28)}</div><div className="mt-2">{row.completedCases} cases · {row.realOutcomes} real outcomes · {row.infrastructureFailures} infrastructure failures</div><div className="mt-1">Latest: {row.latestCase ? gateLabel(row.latestCase.outcome || row.latestCase.status) : 'no case yet'}</div><div className="mt-1 font-medium">Next: {row.standing === 'residency_complete' ? 'fresh exact-artifact canary' : row.standing === 'residency_failed' ? 'none — Residency FAIL (final)' : row.standing === 'remediation_required' ? 'remediation case' : 'continue competency cases'}</div></div>)}</div>
       </section>
 
       <section className="rounded-lg border p-4">

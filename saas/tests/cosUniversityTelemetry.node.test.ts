@@ -11,6 +11,8 @@ test('University telemetry is owner-only, read-only and never exposes teacher re
   const route = source('app/api/admin/cos-university-telemetry/route.ts')
   assert.match(route, /await requireOwner\(\)/)
   assert.match(route, /export async function GET\(\)/)
+  assert.match(route, /retentionEligibleAt: createdAt \? new Date\(Date\.parse\(createdAt\) \+ 10 \* 60 \* 1000\)/)
+  assert.doesNotMatch(route, /retentionEligibleAt:[^\n]*12 \* 60 \* 60 \* 1000/)
   assert.doesNotMatch(route, /export async function POST/)
   assert.doesNotMatch(route, /response_text/)
   assert.match(route, /readOnly:\s*true/)
@@ -104,7 +106,7 @@ test('University telemetry hot-path migration matches the Production sort/filter
 
 test('University telemetry exposes read-only evaluator claim blockers without changing authority', () => {
   const route = source('app/api/admin/cos-university-telemetry/route.ts')
-  assert.match(route, /claimability = 'waiting_12h'/)
+  assert.match(route, /claimability = 'waiting_10m_retention'/)
   assert.match(route, /claimability = residencyState[\s\S]*'residency_incomplete'[\s\S]*'waiting_for_residency_admission'/)
   assert.match(route, /claimability = 'missing_approval'/)
   assert.match(route, /claimability = 'approval_expired'/)
@@ -114,7 +116,7 @@ test('University telemetry exposes read-only evaluator claim blockers without ch
   assert.match(route, /claimability = 'claimable'/)
   assert.ok(route.indexOf("else if (!canary) claimability = 'missing_exact_canary'") < route.indexOf("else if (!approval) claimability = 'missing_approval'"), 'exact canary must be reported before the approval it gates')
   assert.ok(route.indexOf("residencyState?.standing !== 'residency_complete'") < route.indexOf("else if (!canary) claimability = 'missing_exact_canary'"), 'Computer Science Residency must be reported before exact canary')
-  assert.ok(route.indexOf("else if (!canary) claimability = 'missing_exact_canary'") < route.indexOf("else if (nowMs < eligibleAtMs) claimability = 'waiting_12h'"), 'exact canary must be reported before the retention clock')
+  assert.ok(route.indexOf("else if (!canary) claimability = 'missing_exact_canary'") < route.indexOf("else if (nowMs < eligibleAtMs) claimability = 'waiting_10m_retention'"), 'exact canary must be reported before the retention clock')
   assert.doesNotMatch(route, /export async function POST/)
 })
 

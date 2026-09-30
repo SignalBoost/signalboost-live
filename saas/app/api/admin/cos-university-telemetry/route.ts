@@ -704,7 +704,7 @@ export async function GET() {
         artifactHash: artifactHash || null,
         revisionKey: text(artifact.revision_key, 240) || null,
         ageSeconds,
-        retentionEligibleAt: createdAt ? new Date(Date.parse(createdAt) + 12 * 60 * 60 * 1000).toISOString() : null,
+        retentionEligibleAt: createdAt ? new Date(Date.parse(createdAt) + 10 * 60 * 1000).toISOString() : null,
         claimability,
         evaluationGeneration: reopen ? 'reopened' : 'original',
         historicalEvaluationFailure: events.some((row: any) => row.evidence?.claim === 'mass_distilled_independent_evaluation_failed'

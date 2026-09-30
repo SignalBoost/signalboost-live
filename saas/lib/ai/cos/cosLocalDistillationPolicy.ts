@@ -30,7 +30,9 @@ export function decideLocalDistillationLifecycle(
   const graduateStatus = clean(graduateStatusInput)
   const existingStatus = clean(existingStatusInput)
   let status: LocalDistillationStatus = rollbackReady ? 'evaluation_pending' : 'trained_pending_rollback'
-  if (existingStatus === 'quarantined' || existingStatus === 'runtime_pending') {
+  // A terminal decision is never undone by a later reconcile: a retired student (removed from the University for a
+  // proven result, or superseded) stays retired exactly like a quarantined one stays quarantined.
+  if (existingStatus === 'quarantined' || existingStatus === 'runtime_pending' || existingStatus === 'retired') {
     status = existingStatus
   }
   if (graduateStatus === 'pending_runtime' || graduateStatus === 'canary') status = 'runtime_pending'

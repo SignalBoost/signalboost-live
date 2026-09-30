@@ -1,6 +1,6 @@
-// saas/lib/ai/cos/cosOrchestrationLive.ts
 import * as base from './cosOrchestrationEnterprise'
 import {describeReasoner,reasonerProvenanceLine} from './reasonerHostingDisclosure'
+import {formatChatInferenceTrail} from './chatInferenceTrail'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled
@@ -30,6 +30,7 @@ function formatLive(state:any):string{
     `Cache                  : ${value(cache.semanticRecords)} semantic records; ${value(cache.exactRecords)} exact records`,
     `User Memory            : ${user.available?`${value(user.records)} records`:'no authenticated user scope'}`,
     `Last Provenance Record : ${last?`${value(last.updatedAt)}${last.source?` — ${last.source}`:''}`:'none'}`,
+    `Chat Inference Calls   : ${formatChatInferenceTrail(state?.chatInference)}`,
   ].join('\n')
 }
 

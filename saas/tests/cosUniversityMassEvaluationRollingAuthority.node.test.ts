@@ -12,6 +12,8 @@ import {
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   MASS_EVALUATION_MAX_IN_FLIGHT,
+  MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT,
+  massEvaluationCapacityAwareInFlightLimit,
   MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
   MASS_EVALUATION_REOPEN_CLAIM,
   MASS_EVALUATION_OWNER_FULL_RETEST_REF,
@@ -39,26 +41,34 @@ test('rolling throughput ceiling matches the owner-approved backlog-drain budget
 })
 
 
-test('provider worker quota reserves one worker of canary headroom by capping evaluator admission at two active leases', () => {
+test('provider worker quota keeps two as the safe floor and expands only from proven spare capacity', () => {
   assert.equal(MASS_EVALUATION_MAX_IN_FLIGHT, 2)
-  const full = decideRollingMassEvaluationApproval({
-    enabled: true,
-    artifacts: [artifactA],
-    events: [canary(artifactA)],
-    now,
-    inFlightCount: MASS_EVALUATION_MAX_IN_FLIGHT,
-  })
-  assert.equal(full.issue, false)
-  assert.equal(!full.issue && full.reason, 'mass_evaluation_concurrency_full')
+  assert.equal(MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT, 4)
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(0), 2)
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(1), 2)
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(2), 3)
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(3), 4)
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(20), 4)
 
-  const available = decideRollingMassEvaluationApproval({
-    enabled: true,
-    artifacts: [artifactA],
-    events: [canary(artifactA)],
-    now,
-    inFlightCount: MASS_EVALUATION_MAX_IN_FLIGHT - 1,
+  const fixedFloorFull = decideRollingMassEvaluationApproval({
+    enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now,
+    inFlightCount: 2, maxInFlight: 2,
   })
-  assert.equal(available.issue, true)
+  assert.equal(fixedFloorFull.issue, false)
+  assert.equal(!fixedFloorFull.issue && fixedFloorFull.reason, 'mass_evaluation_concurrency_full')
+
+  const capacityAllowsThird = decideRollingMassEvaluationApproval({
+    enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now,
+    inFlightCount: 2, maxInFlight: 3,
+  })
+  assert.equal(capacityAllowsThird.issue, true)
+
+  const dynamicCeilingFull = decideRollingMassEvaluationApproval({
+    enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now,
+    inFlightCount: 4, maxInFlight: 4,
+  })
+  assert.equal(dynamicCeilingFull.issue, false)
+  assert.equal(!dynamicCeilingFull.issue && dynamicCeilingFull.reason, 'mass_evaluation_concurrency_full')
 })
 
 test('frontier proof sampling is bounded and then returns to oldest-first order', () => {

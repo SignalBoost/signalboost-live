@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosAgentDecision.ts
 //
 // MODEL-FIRST COS AGENT SEAM.
 //
@@ -126,9 +125,16 @@ function configuredReasonerLabel(): string {
     : `independent-local:${config.model}`
 }
 
+const REFERS_TO_PRIOR_TURN = /\b(?:it|its|it's|that|this|these|those|they|them|their|above|previous(?:ly)?|earlier|same|again|more|also|else|instead|then|former|latter|last one|first one|second one|you said|you mentioned|your answer|the answer)\b/
+
 export function stableKnowledgeQuestionNeedsNoPlanner(prompt: string, previousAssistant?: string | null): boolean {
   const text = String(prompt || '').trim().toLowerCase()
-  if (!text || String(previousAssistant || '').trim()) return false
+  if (!text) return false
+  // A previous answer only matters when this question points back at it. Production 2026-09-30 05:32 UTC: the
+  // second question of a conversation ("What is the difference between an Ingress and a Service in Kubernetes?")
+  // ran the planner (20.4 s) purely because a previous answer existed. Self-contained questions skip it; a
+  // follow-up that refers back ("it", "that", "those", "the above", "more", "again", ...) still gets the planner.
+  if (String(previousAssistant || '').trim() && REFERS_TO_PRIOR_TURN.test(text)) return false
   // Deterministic fast lane for ordinary evergreen explanatory questions. The planner exists to
   // request capabilities, not to spend a model turn rediscovering that definitions/mechanisms do
   // not need live tools. Mutable/current, action, repository and personal-history language stays

@@ -13,7 +13,7 @@
 // same exact-host allow-list + API-key controls as any other remote LOCAL_AI_* endpoint.
 
 import { randomUUID } from 'node:crypto'
-import { callLocalModel, localInferenceConfigFromEnv, type LocalModelCallArgs } from '@/lib/ai/local-inference'
+import { callLocalModel, captureServedInference, localInferenceConfigFromEnv, type LocalModelCallArgs, type ServedInference } from '@/lib/ai/local-inference'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { buildDiagnosticRepairPrompt, preferRepairedDraft, reasonerDraftNeedsRepair, recordQualityRepairDecision, assessReasonerDraft } from '@/lib/ai/cos/reasonerQuality'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
@@ -435,14 +435,25 @@ export async function callRawCosReasoner(
   }
 }
 
+/**
+ * The base worker is labelled with the CONFIGURED managed reasoner, but chat asks RunPod first and uses the managed
+ * host only as backup. Name the provider that actually served the first completion of this reasoning call.
+ * Graduate and local workers keep their own labels.
+ */
+export function servedReasonerLabel(workerLabel: string, served: readonly ServedInference[]): string {
+  const first = served[0]
+  if (!first || !String(workerLabel || '').toLowerCase().startsWith('managed-open-model:')) return workerLabel
+  return `managed-open-model:${first.provider}:${first.model}`
+}
+
 export async function callCosReasoner(
   args: LocalModelCallArgs,
 ): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
   const { reasonThroughCosControlPlane } = await import('./cosReasoningWorkers.ts')
-  const execution = await reasonThroughCosControlPlane(args, {
+  const { result: execution, served } = await captureServedInference(() => reasonThroughCosControlPlane(args, {
     requestedRole: 'primary',
     allowExternalEscalation: false,
-  })
+  }))
   if (!execution?.result.text?.trim()) return null
 
   const resolved = resolveCosReasoner()
@@ -468,7 +479,7 @@ export async function callCosReasoner(
     text: execution.result.text,
     reasoner: {
       kind,
-      label: execution.worker.label,
+      label: servedReasonerLabel(execution.worker.label, served),
     },
     turnId: execution.result.turnId || randomUUID(),
   }

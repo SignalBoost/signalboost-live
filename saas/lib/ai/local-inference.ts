@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
 import { estimateQwenContextTokens, planContextWindow } from './context-window-manager.ts'
@@ -407,6 +408,19 @@ function eligibleForRunpodPrimary(args: LocalModelCallArgs, config: LocalInferen
   return true
 }
 
+export type ServedInference = Readonly<{ provider: string; model: string }>
+const servedInferenceScope = new AsyncLocalStorage<{ served: ServedInference[] }>()
+
+export async function captureServedInference<T>(work: () => Promise<T>): Promise<{ result: T; served: readonly ServedInference[] }> {
+  const store: { served: ServedInference[] } = { served: [] }
+  const result = await servedInferenceScope.run(store, work)
+  return { result, served: Object.freeze([...store.served]) }
+}
+
+function noteServedInference(provider: string, model: string): void {
+  servedInferenceScope.getStore()?.served.push(Object.freeze({ provider, model }))
+}
+
 async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
   const startedAt = Date.now()
   const requestId = randomUUID()
@@ -647,7 +661,9 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
         completionTokens,
         contentLength: text.length,
       }))
-      return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
+      noteServedInference(provider, model)
+      noteServedInference(provider, model)
+  return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
     }
     const error = new Error(LOCAL_MODEL_OUTPUT_TRUNCATED) as Error & { emptyContent?: boolean }
     error.emptyContent = !text

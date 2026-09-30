@@ -30,6 +30,7 @@ const tests = [
   'tests/modelPortabilitySaleAcceptance.node.test.ts',
   'tests/cosUniversityMassHostedTeacherStage.node.test.ts',
   'tests/cosUniversityTelemetry.node.test.ts',
+  'tests/universityArtifactEvidenceArchive.node.test.ts',
   'tests/cosLaneStatus.node.test.ts',
   'tests/cosWorkingDistillationDispatch.node.test.ts',
   'tests/cosUniversityHuggingFaceJobs.node.test.ts',

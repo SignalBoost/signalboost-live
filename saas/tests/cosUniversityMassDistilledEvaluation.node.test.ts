@@ -123,7 +123,6 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.match(runner, /runpodServerlessRootUrl\(endpointId\)\}\/ping/)
   assert.match(runner, /if\(response\.status===200\)/)
   assert.doesNotMatch(runner, /if\(response\.ok\)\{/)
-  assert.match(runner, /if\(response\.ok\)\{[\s\S]*?return/)
   assert.doesNotMatch(runner, /payload\?\.modelReady===true/)
   assert.doesNotMatch(runner, /gatewayStatus==='ready'\|\|gatewayStatus==='accepting_requests'/)
   assert.doesNotMatch(runner, /health\.workers\.ready>0\|\|health\.workers\.running>0/)

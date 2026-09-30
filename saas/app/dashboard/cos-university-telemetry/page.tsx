@@ -138,7 +138,7 @@ type Telemetry = {
     returnedToExam?: { total?:number; waitingForExam?:number; passedExam?:number; quarantinedAgain?:number; other?:number }
     review?: { available?:boolean; ran?:boolean; outcome?:string|null; reason?:string|null; observedAt?:string|null; checked?:number; restored?:number; error?:string|null }
     resolution?: { available?:boolean; ran?:boolean; outcome?:string|null; observedAt?:string|null; dismissed?:number; returnedToExam?:number; heldForInvestigation?:number; error?:string|null }
-    leftUniversity?: { total?:number; byReason?: Partial<Record<'exam_failed'|'residency_failed'|'exhausted_real_failures'|'exhausted_our_errors'|'exam_data_defect'|'no_recorded_reason', number>> }
+    leftUniversity?: { total?:number; byReason?: Partial<Record<'exam_failed'|'residency_failed'|'exhausted_real_failures'|'exhausted_our_errors'|'exam_data_defect'|'no_recorded_reason'|'xsa_not_examinable', number>> }
     why?: {
       examGates?: Partial<Record<'holdout'|'safety'|'transfer'|'retention', number>>
       residencyCompetencies?: Array<{ competency:string; count:number }>
@@ -575,7 +575,7 @@ export default function CosUniversityTelemetryPage() {
           <Card label={copy.quarantineExamFailed} value={String(leftReasons.exam_failed ?? 0)} />
           <Card label={copy.quarantineResidencyFailed} value={String(leftReasons.residency_failed ?? 0)} />
           <Card label={copy.quarantineExhaustedReal} value={String(leftReasons.exhausted_real_failures ?? 0)} />
-          <Card label={copy.leftUnexaminable} value={String(leftReasons.exam_data_defect ?? 0)} />
+          <Card label={copy.leftUnexaminable} value={String((leftReasons.exam_data_defect ?? 0) + (leftReasons.xsa_not_examinable ?? 0))} />
         </div>
       </section>
 

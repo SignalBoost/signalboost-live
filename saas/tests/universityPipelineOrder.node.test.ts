@@ -12,10 +12,10 @@ test('the pipeline row runs left to right and ends at graduation before the ways
   const page = read('app/dashboard/cos-university-telemetry/page.tsx')
   const row = page.slice(page.indexOf('{copy.pipelineExplanation}'), page.indexOf('</section>', page.indexOf('{copy.pipelineExplanation}')))
   const order = [
-    'label="Residency residents"',
-    'label="Residency remediation"',
-    'label="Residency complete"',
-    'label="Evaluation pending"',
+    'label="CS Residency residents"',
+    'label="CS Residency remediation"',
+    'label="CS Residency complete"',
+    'label="Evaluation pending — both branches"',
     'label={copy.pipelinePassedGraduating}',
     'label={copy.pipelineGraduated}',
     'label={copy.pipelineResidencyFailed}',

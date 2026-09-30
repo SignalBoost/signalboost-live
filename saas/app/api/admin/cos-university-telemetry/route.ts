@@ -7,6 +7,14 @@ import { selectWorkingCosBalancedBundleFromVault } from '@/lib/ai/cos/cosWorking
 import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
 import { runpodPrimaryConfig, runpodPrimaryEnabled, runpodPrimaryModel } from '@/lib/ai/cos/runpodPrimaryInference'
 import { queryWorkingCosRuntimeIdentity, workingCosRuntimeBindingFromEnv } from '@/lib/ai/cos/cosWorkingRuntimeBinding'
+import {
+  QUARANTINE_REVIEW_LANE,
+  quarantineNextAction,
+  studentKey,
+  summarizeQuarantine,
+  type QuarantineStudent,
+} from '@/lib/ai/cos/cosUniversityQuarantineReasons'
+import type { RollingEvent } from '@/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -205,6 +213,13 @@ export async function GET() {
       .order('hired_at', { ascending: false })
       .limit(200)
     const workforceRows: any[] = workforceResult.error ? [] : (workforceResult.data || [])
+
+    // QUARANTINE REVIEW (owner direction 2026-09-30): its last run, so the owner sees whether students held back by
+    // our own errors are being returned to the exam without running a query. Operational status, best-effort.
+    const quarantineReviewLane = await db.from('cos_lane_status')
+      .select('outcome,reason,detail,consecutive_count,observed_at')
+      .eq('lane', QUARANTINE_REVIEW_LANE)
+      .maybeSingle()
 
     const openSources = new Map<string, {
       id: string
@@ -546,6 +561,45 @@ export async function GET() {
       const key = text(row.candidate_id, 240) + ':' + text(row.trained_artifact_hash, 80)
       if (!graduateByArtifact.has(key)) graduateByArtifact.set(key, row)
     }
+
+    // QUARANTINE (owner direction 2026-09-30): name why every quarantined student is there, from the same durable
+    // events the evaluator, the exhaustion sweep and the quarantine review use. Read-only; nothing is reopened here.
+    const rollingEventsByCandidate = new Map<string, RollingEvent[]>()
+    const rollingEventsFor = (candidateId: string): RollingEvent[] => {
+      const cached = rollingEventsByCandidate.get(candidateId)
+      if (cached) return cached
+      const mapped = (assuranceByCandidate.get(candidateId) || []).map((row: any) => ({
+        candidateId: text(row.candidate_id, 240),
+        observedAt: String(row.observed_at || ''),
+        expiresAt: row.expires_at == null ? null : String(row.expires_at),
+        verifier: String(row.verifier || ''),
+        evidence: row.evidence && typeof row.evidence === 'object' && !Array.isArray(row.evidence) ? row.evidence : null,
+      }))
+      rollingEventsByCandidate.set(candidateId, mapped)
+      return mapped
+    }
+    const quarantineStudents: QuarantineStudent[] = telemetryArtifactRows.map((artifact: any) => {
+      const candidateId = text(artifact.candidate_id, 240)
+      const artifactHash = text(artifact.trained_artifact_hash, 80)
+      const evaluation = latestEvaluationByArtifact.get(candidateId + ':' + artifactHash) || null
+      return {
+        candidateId,
+        subjectId: text(artifact.subject_id, 240),
+        artifactHash,
+        createdAt: String(artifact.created_at || ''),
+        status: text(artifact.status, 80),
+        residencyStanding: residencyByArtifact.get(candidateId + ':' + artifactHash)?.standing || null,
+        evaluation: evaluation ? {
+          passed: evaluation.holdout_improved === true && evaluation.safety_passed === true
+            && evaluation.unseen_transfer_passed === true && evaluation.delayed_retention_passed === true,
+          observedAt: iso(evaluation.created_at),
+        } : null,
+      }
+    })
+    const quarantine = summarizeQuarantine({ students: quarantineStudents, eventsFor: rollingEventsFor, now: new Date() })
+    const reviewLaneRow: any = quarantineReviewLane.error ? null : quarantineReviewLane.data
+    const reviewLaneDetail = reviewLaneRow?.detail && typeof reviewLaneRow.detail === 'object' ? reviewLaneRow.detail : {}
+
     const artifacts = telemetryArtifactRows.map((artifact: any) => {
       const candidateId = text(artifact.candidate_id, 240)
       const artifactHash = text(artifact.trained_artifact_hash, 80)
@@ -595,7 +649,8 @@ export async function GET() {
         // upstream lifecycle prerequisites before the retention clock so telemetry never implies
         // that age alone will make a non-resident artifact evaluable.
         if (text(artifact.subject_id, 240) === 'Computer Science & Coding'
-          && residencyState?.standing !== 'residency_complete') claimability = residencyState            ? 'residency_incomplete'
+          && residencyState?.standing !== 'residency_complete') claimability = residencyState
+            ? 'residency_incomplete'
             : 'waiting_for_residency_admission'
         else if (!canary) claimability = 'missing_exact_canary'
         else if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
@@ -611,15 +666,20 @@ export async function GET() {
       let currentStage = 'Evaluation'
       let blocker = claimability
       let nextAction = 'Satisfy evaluation prerequisites'
+      const quarantineReason = artifact.status === 'quarantined'
+        ? quarantine.reasons.get(studentKey(candidateId, artifactHash)) || null
+        : null
       if (graduate?.status === 'active') { currentStage = 'Active specialist'; blocker = 'none'; nextAction = 'Serving' }
       else if (graduate) { currentStage = 'Runtime activation'; blocker = text(graduate.status, 80); nextAction = 'Activate exact graduated runtime' }
+      // Quarantine comes before every in-progress stage: a student that finished Residency and then failed its exam is a
+      // result, not an artifact waiting for a canary. The reason is named, never the generic "evaluation failed".
+      else if (artifact.status === 'quarantined') { currentStage = 'Quarantine'; blocker = quarantineReason?.reason || 'no_recorded_reason'; nextAction = quarantineNextAction(quarantineReason?.reason || 'no_recorded_reason') }
       // Terminal Residency FAIL: a remediation competency could no longer be cleared. It is a result, not work in progress.
-      else if (residencyState?.standing === 'residency_failed') { currentStage = 'Builder Residency'; blocker = 'residency_failed'; nextAction = 'Retrain on the failed Residency competencies' }
+      else if (residencyState?.standing === 'residency_failed') { currentStage = 'Builder Residency'; blocker = 'residency_failed'; nextAction = 'None — Residency FAIL (final result)' }
       else if (residencyState && residencyState.standing !== 'residency_complete') { currentStage = 'Builder Residency'; blocker = residencyState.standing; nextAction = residencyState.standing === 'remediation_required' ? 'Run remediation case' : 'Continue competency cases' }
       else if (residencyState?.standing === 'residency_complete') { currentStage = 'Exact canary'; blocker = canary ? 'none' : 'fresh_exact_canary_required'; nextAction = canary ? 'Run independent final evaluation' : 'Run fresh exact-artifact canary' }
       else if (text(artifact.subject_id, 240) === 'Computer Science & Coding' && artifact.status === 'evaluation_pending') { currentStage = 'Builder Residency'; blocker = 'waiting_for_residency_admission'; nextAction = 'Admit when Residency cohort capacity opens' }
       else if (evaluationPassed) { currentStage = 'Graduation'; blocker = 'awaiting_graduation'; nextAction = 'Graduate and register exact runtime' }
-      else if (artifact.status === 'quarantined') { currentStage = 'Evaluation remediation'; blocker = 'evaluation_failed'; nextAction = 'Review failed gates and remediation evidence' }
       return {
         candidateId,
         subject: text(artifact.subject_id, 240),
@@ -637,6 +697,7 @@ export async function GET() {
         currentStage,
         blocker,
         nextAction,
+        quarantine: quarantineReason,
         residency: residencyState,
         evaluation: evaluation ? {
           evaluatedAt: iso(evaluation.created_at),
@@ -769,6 +830,20 @@ export async function GET() {
         activeGraduates: (graduatesResult.data || []).filter((row: any) => row.status === 'active').length,
         evaluationPending: artifacts.filter((row: any) => row.status === 'evaluation_pending').length,
         quarantined: artifacts.filter((row: any) => row.status === 'quarantined').length,
+      },
+      quarantine: {
+        ...quarantine.summary,
+        review: {
+          available: !quarantineReviewLane.error,
+          ran: Boolean(reviewLaneRow),
+          outcome: reviewLaneRow ? text(reviewLaneRow.outcome, 40) : null,
+          reason: reviewLaneRow ? text(reviewLaneRow.reason, 200) : null,
+          observedAt: reviewLaneRow ? iso(reviewLaneRow.observed_at) : null,
+          consecutiveCount: reviewLaneRow ? n(reviewLaneRow.consecutive_count) : 0,
+          checked: n(reviewLaneDetail.checked),
+          restored: n(reviewLaneDetail.restored),
+          error: text(reviewLaneDetail.error, 300) || null,
+        },
       },
       workforce: {
         available: !workforceResult.error,

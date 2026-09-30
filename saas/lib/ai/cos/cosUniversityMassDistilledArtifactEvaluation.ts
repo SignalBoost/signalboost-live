@@ -494,6 +494,14 @@ function answerFailureFingerprint(text:string,item:EvalCase,finish:string,cap:nu
 function candidateSoloOutputExhaustion(error:string){
   return /^mass_distilled_evaluation_answer_missing:[^:]+:finish=length:think=0:open=1:close=0:other=0:cap=1024$/.test(error)
 }
+// A candidate that twice returns the exact requested open/close markers with an empty body under
+// finish_reason=stop has completed the protocol but supplied no answer. After the bounded solo retry,
+// this is artifact behavior, not evaluator transport failure. Treat it like candidate output exhaustion
+// so the substantive-attempt budget can eventually disposition the artifact instead of retrying forever.
+// Baseline empty answers and every non-exact shape remain infrastructure failures.
+function candidateSoloEmptyAnswer(error:string){
+  return /^mass_distilled_evaluation_answer_empty:[^:]+:finish=stop:think=0:open=1:close=1:other=0:cap=1024$/.test(error)
+}
 function parseAnswersPartial(text:string,cases:readonly EvalCase[],finish:string,cap:number){
   const answers=new Map<string,string>();const missing:string[]=[];const errors:Record<string,string>={}
   for(const item of cases){
@@ -570,6 +578,7 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
         if(solo.missing.length){
           const failure=solo.errors[id]
           if(input.candidate&&candidateSoloOutputExhaustion(failure))throw new Error(failure.replace('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_output_exhausted:'))
+          if(input.candidate&&candidateSoloEmptyAnswer(failure))throw new Error(failure.replace('mass_distilled_evaluation_answer_empty:','mass_distilled_evaluation_candidate_answer_empty:'))
           throw new Error(failure)
         }
         for(const [key,answer] of solo.answers)recovered.set(key,answer);parts.push(solo.responseHash);rawExcerpts.push(solo.rawExcerpt);if(solo.rawExcerpt)excerpts.push(solo.rawExcerpt)

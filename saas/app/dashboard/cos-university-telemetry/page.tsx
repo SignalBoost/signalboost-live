@@ -490,13 +490,17 @@ export default function CosUniversityTelemetryPage() {
 
       <section className="rounded-lg border p-4">
         <h2 className="font-semibold">University pipeline — live state</h2>
-        <p className="mt-1 text-xs opacity-65">Training → Residency → exact canary → evaluation → graduation. Graduates leave the University for the Workforce.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <p className="mt-1 text-xs opacity-65">{copy.pipelineExplanation}</p>
+        {/* Owner review 2026-09-30: the row reads left to right in pipeline order and ends at graduation, then the two
+            ways out without graduating. Passed = exam PASS, now graduating (runtime_pending); Graduated = in the Workforce. */}
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
           <Card label="Residency residents" value={String(pipeline.residencyResidents ?? 0)} />
           <Card label="Residency remediation" value={String(pipeline.residencyRemediation ?? 0)} />
           <Card label="Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
-          <Card label={copy.pipelineResidencyFailed} value={String(pipeline.residencyFailed ?? 0)} />
           <Card label="Evaluation pending" value={String(pipeline.evaluationPending ?? 0)} />
+          <Card label={copy.pipelinePassedGraduating} value={String(artifacts.filter(artifact => artifact.status === 'runtime_pending').length)} />
+          <Card label={copy.pipelineGraduated} value={String(workforce.onCall ?? pipeline.activeGraduates ?? 0)} />
+          <Card label={copy.pipelineResidencyFailed} value={String(pipeline.residencyFailed ?? 0)} />
           <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
         </div>
       </section>
@@ -684,4 +688,3 @@ function JobCell({ job }: { job: Job | null }) {
     </div>
   )
 }
-// end of saas/app/dashboard/cos-university-telemetry/page.tsx (if this line is missing, the paste was cut short)

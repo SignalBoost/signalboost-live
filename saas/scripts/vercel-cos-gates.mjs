@@ -304,6 +304,8 @@ const tests = [
   'tests/universityQuarantineResolution.node.test.ts',
   // 2026-09-30 owner direction "remove them": paused XSA students leave as OUR failure, never a FAIL.
   'tests/universityXsaRemoval.node.test.ts',
+  // 2026-09-30 pipeline row: left to right, ending at graduation.
+  'tests/universityPipelineOrder.node.test.ts',
   // 2026-09-30 Residency lanes: one parallel lane per admitted resident, warm workers reused, remediation first.
   'tests/residencyLanes.node.test.ts',
   'tests/builderResidencyCron.node.test.ts',

@@ -173,6 +173,7 @@ const tests = [
   'tests/cosProvenanceParaphraseContinuity.node.test.ts',
   'tests/cosCreativeConstraintFidelity.node.test.ts',
   'tests/cosReasonerQuality.node.test.ts',
+  'tests/cosReasonerPromptScope.node.test.ts',
   'tests/honestRefusalReply.node.test.ts',
   'tests/learnedEvidencePolicy.node.test.ts',
   'tests/cosRetainedLearningEndToEnd.node.test.ts',

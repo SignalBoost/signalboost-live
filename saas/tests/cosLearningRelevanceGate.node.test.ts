@@ -1,3 +1,4 @@
+// saas/tests/cosLearningRelevanceGate.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ContinuousLearningDirector, DEFAULT_CONTINUOUS_LEARNING_POLICY, type ContinuousLearningStore, type KnowledgeGap, type LearningCandidate } from '../lib/cos-core/layers/learning/index'
@@ -140,4 +141,20 @@ test('metadata confidence is honest — never raised to meet its own admission f
   assert.equal(stored, groundedConfidence(score.coverage, substanceOf((doc as { text: string }).text)), 'stored confidence must equal honest grounding')
   const floor = admissionFloorFor(doc)
   assert.ok(floor !== null && floor < 0.72, 'metadata admits on a LOWER bar, not an inflated number')
+})
+
+test('a source re-fetched with changed surrounding text is retained once, not once per fetch', async () => {
+  // Production 2026-09-29: one journal paper was stored 18 times with an identical retained summary because
+  // the fetched record changed between fetches, and one answer spent all 6 learned slots on its copies.
+  const store = new MemoryStore()
+  const director = new ContinuousLearningDirector(store, DEFAULT_CONTINUOUS_LEARNING_POLICY)
+  const fetchWith = (volatileTail: string): LearningSourceDocument => ({
+    ...REAL_POSTGRES_DOC,
+    text: `${REAL_POSTGRES_DOC.text} ${' Archive metadata follows.'.repeat(60)} ${volatileTail}`,
+  })
+  const first = await new ContinuousLearningCycle(director, [adapterOf([fetchWith('Cited by 17.')])]).run([POSTGRES_GAP], 0)
+  const second = await new ContinuousLearningCycle(director, [adapterOf([fetchWith('Cited by 18.')])]).run([POSTGRES_GAP], 0)
+  assert.equal(first.accepted, 1)
+  assert.equal(second.accepted, 0)
+  assert.equal(store.records.size, 1)
 })

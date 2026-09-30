@@ -196,6 +196,15 @@ export class ContinuousLearningCycle{
     return result
   }
 
-  private toCandidate(document:LearningSourceDocument,terms:string[],score:RelevanceScore,admission?:import('@/lib/ai/cos/tieredLearningAdmission').TieredAdmission):LearningCandidate{const normalized=document.text.replace(/\s+/g,' ').trim(),evidence=document.evidence?.filter(Boolean)??[],summary=relevantExcerpt(normalized,terms,1200);if(!evidence.length&&summary)evidence.push(summary.slice(0,500));const confidence=normalized?calibratedConfidence(document,score,normalized):0;return{contentHash:createHash('sha256').update(`${document.sourceUri}\n${normalized}`).digest('hex'),sourceKind:document.sourceKind,sourceUri:document.sourceUri,sourceTitle:document.sourceTitle,observedAt:document.observedAt??new Date().toISOString(),subject:document.subject,summary,facts:summary?[{predicate:'source_excerpt',object:summary,confidence}]:[],confidence,license:document.license,evidence,admission}}
+  private toCandidate(document:LearningSourceDocument,terms:string[],score:RelevanceScore,admission?:import('@/lib/ai/cos/tieredLearningAdmission').TieredAdmission):LearningCandidate{const normalized=document.text.replace(/\s+/g,' ').trim(),evidence=document.evidence?.filter(Boolean)??[],summary=relevantExcerpt(normalized,terms,1200);if(!evidence.length&&summary)evidence.push(summary.slice(0,500));const confidence=normalized?calibratedConfidence(document,score,normalized):0;return{contentHash:retainedContentHash(document.sourceUri,summary),sourceKind:document.sourceKind,sourceUri:document.sourceUri,sourceTitle:document.sourceTitle,observedAt:document.observedAt??new Date().toISOString(),subject:document.subject,summary,facts:summary?[{predicate:'source_excerpt',object:summary,confidence}]:[],confidence,license:document.license,evidence,admission}}
   private recordDecision(result:LearningCycleResult,decision:ContinuousLearningDecision,diagnostic:LearningGapDiagnostic|null=null){if(decision.accepted){result.accepted+=1;if(diagnostic)diagnostic.accepted+=1;return}if('deferred' in decision&&decision.deferred){result.probationary+=1;if(diagnostic)diagnostic.probationary+=1;return}incrementDiagnosticCount(result.rejected,decision.reason);if(diagnostic)incrementDiagnosticCount(diagnostic.rejected,decision.reason)}
 }
+
+// RETAINED-CONTENT IDENTITY (2026-09-29). The hash used to cover the FULL fetched source text, but what COS
+// retains is the source URI plus the summary excerpt. The fetched text differed between fetches while the retained
+// summary did not, so the same paper produced a new hash almost daily:
+// Production held the Lancet antimicrobial-resistance paper (doi:10.1016/s0140-6736(24)01867-1) 18 times with an
+// identical 1,191-character summary, and one COS answer spent all 6 learned-evidence slots on copies of it.
+// Identity is now what is actually stored, matching retentionBenchmark.ts. A genuinely different excerpt of the
+// same source is different knowledge and is still retained.
+export function retainedContentHash(sourceUri:string,summary:string):string{return createHash('sha256').update(`${sourceUri}\n${summary}`).digest('hex')}

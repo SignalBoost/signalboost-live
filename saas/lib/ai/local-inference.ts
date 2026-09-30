@@ -654,6 +654,60 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
  * the configured LOCAL_AI/DeepInfra transport only as a bounded fallback. Independent University
  * evaluation is intentionally excluded so the learner cannot silently change its evaluator runtime.
  */
+// INTERACTIVE PROVIDER ORDER (2026-09-29, owner direction: "RunPod primary, DeepInfra backup").
+// Chat answers used to go ONLY to the configured managed transport (DeepInfra), with no second provider:
+// every DeepInfra stall ended in the generic "narrow the question" reply while the iTMounts RunPod reasoner
+// sat ready. Chat answers now go to the owned RunPod reasoner first. The paid managed transport is called
+// only when RunPod is not ready, fails, returns nothing, or has not answered within
+// COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS (default 20s); the first useful answer wins.
+// COS_INTERACTIVE_RUNPOD_FIRST=false restores managed-only chat. See interactiveProviderHedge.ts.
+function interactiveRunpodFirstEligible(args: LocalModelCallArgs, config: LocalInferenceConfig): boolean {
+  if (process.env.COS_INTERACTIVE_RUNPOD_FIRST?.trim().toLowerCase() === 'false') return false
+  if (process.env.RUNPOD_PRIMARY_ENABLED?.trim().toLowerCase() === 'false') return false
+  if (!interactiveUserResponse(args)) return false
+  if (providerFor(config) === 'runpod') return false
+  if (config.fallbackFromOwned === true) return false
+  if (protectedIndependentEvaluation(args)) return false
+  return true
+}
+
+function interactiveManagedBackupAfterMs(): number {
+  const value = Number(process.env.COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS || '20000')
+  return Number.isFinite(value) ? Math.max(1000, Math.min(60000, value)) : 20000
+}
+
+function usefulTurn(turn: LocalModelTurnResult | null): boolean {
+  return Boolean(turn && (turn.content?.trim() || turn.toolCalls.length))
+}
+
+async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
+  const { firstUsefulWithHedge } = await import('./interactiveProviderHedge.ts')
+  let managedError: unknown = null
+  const outcome = await firstUsefulWithHedge<LocalModelTurnResult>({
+    primary: async () => {
+      const runpod = await import('./cos/runpodPrimaryInference.ts')
+      if (!runpod.runpodPrimaryEnabled()) return null
+      const runpodConfig = await runpod.resolveReadyRunpodPrimaryConfig('reasoner')
+      if (!runpodConfig) return null
+      // A truncated owned answer throws (-> null) so the managed backup still gets its chance.
+      return callConfiguredModelTurn(args, runpodConfig)
+    },
+    backup: () => callConfiguredModelTurn(args, { ...config, fallbackFromOwned: true }).catch(error => { managedError = error; return null }),
+    hedgeAfterMs: interactiveManagedBackupAfterMs(),
+    isUseful: usefulTurn,
+  })
+  console.info('[cos-interactive-provider-order]', JSON.stringify({
+    feature: args.usageContext?.feature || 'unattributed_local_inference',
+    purpose: args.usageContext?.purpose || null,
+    winner: outcome.winner === 'primary' ? 'runpod' : outcome.winner === 'backup' ? 'managed_backup' : 'none',
+    managedBackupStarted: outcome.backupStarted,
+  }))
+  // Nothing usable from either provider: surface the managed error exactly as the managed-only path did
+  // (truncation, cost-governance), so callers keep their existing handling.
+  if (!usefulTurn(outcome.result) && managedError) throw managedError
+  return outcome.result
+}
+
 export async function callLocalModelTurn(args: LocalModelCallArgs, config?: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   if (config === undefined && !protectedIndependentEvaluation(args) && !feature.startsWith('university_')) {
@@ -662,7 +716,10 @@ export async function callLocalModelTurn(args: LocalModelCallArgs, config?: Loca
   }
 
   const effectiveConfig = config ?? localInferenceConfigFromEnv()
-  if (!eligibleForRunpodPrimary(args, effectiveConfig)) return callConfiguredModelTurn(args, effectiveConfig)
+  if (!eligibleForRunpodPrimary(args, effectiveConfig)) {
+    if (interactiveRunpodFirstEligible(args, effectiveConfig)) return runpodFirstInteractiveTurn(args, effectiveConfig)
+    return callConfiguredModelTurn(args, effectiveConfig)
+  }
 
   let ownedAttempted = false
   try {

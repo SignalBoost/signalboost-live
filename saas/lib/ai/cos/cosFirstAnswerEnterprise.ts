@@ -33,6 +33,7 @@ import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
 import { loadUserMemories } from '@/lib/ai/tools/userMemory'
 import { cosServiceDb, SupabaseAIROIMetricsSink, SupabaseKnowledgeStore } from '@/lib/cos-core/storage/supabase'
 import { recordCosLatencyStage } from '@/lib/ai/cos/cosLatencyStages'
+import { rerankLearnedRowsForQuestion } from '@/lib/ai/cos/learnedEvidenceRerank'
 import { SupabaseExactCacheStore } from '@/lib/cos-core/storage/exactSupabase'
 import { createExactCacheKey } from '@/lib/cos-core/layers/exact-cache'
 import { KnowledgeLayer } from '@/lib/cos-core/layers/knowledge'
@@ -782,7 +783,8 @@ async function retrieveInternalContext(prompt:string, userId?:string|null, privi
         )
         funnel.learnedCorpus.relevant = relevant.length
         // Substantive rows take the limited injection slots first; metadata pointers fill leftovers.
-        const selected = selectLearnedCorpusRows<(typeof relevant)[number]>(relevant, 6)
+        const ranked = rerankLearnedRowsForQuestion<(typeof relevant)[number]>(relevanceTerms(prompt), relevant, row => corpusCandidateText(row), row => Number(row.similarity || 0))
+        const selected = selectLearnedCorpusRows<(typeof relevant)[number]>(ranked, 6)
         funnel.learnedCorpus.selected = selected.length
         if (semanticLearned.length) kgSystems.push('Continuous Learning semantic retrieval')
         for (const row of selected) {

@@ -71,6 +71,9 @@ type Copy = Readonly<{
   notGraduated: string
   noArtifacts: string
   pipelineResidencyFailed: string
+  pipelineExplanation: string
+  pipelinePassedGraduating: string
+  pipelineGraduated: string
   workforceTitle: string
   workforceExplanation: string
   workforceOnCall: string
@@ -189,6 +192,9 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     notGraduated: 'Not graduated',
     noArtifacts: 'No distilled artifacts found.',
     pipelineResidencyFailed: 'Residency failed',
+    pipelineExplanation: 'Left to right: Residency (Computer Science only) → final exam → graduation → Workforce. A FAIL leaves through quarantine.',
+    pipelinePassedGraduating: 'Passed exam — graduating',
+    pipelineGraduated: 'Graduated — in the Workforce',
     workforceTitle: 'Workforce — graduates hired out of the University',
     workforceExplanation: 'Graduates leave the University at graduation. COS hires them from here; the University keeps only their diploma record.',
     workforceOnCall: 'On call',
@@ -305,6 +311,9 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     notGraduated: 'No graduado',
     noArtifacts: 'No se encontraron artefactos destilados.',
     pipelineResidencyFailed: 'Residencia reprobada',
+    pipelineExplanation: 'De izquierda a derecha: Residencia (solo Informática) → examen final → graduación → Plantilla. Un reprobado sale por cuarentena.',
+    pipelinePassedGraduating: 'Aprobó el examen — graduándose',
+    pipelineGraduated: 'Graduados — en la Plantilla',
     workforceTitle: 'Plantilla — graduados contratados fuera de la Universidad',
     workforceExplanation: 'Los graduados salen de la Universidad al graduarse. COS los contrata desde aquí; la Universidad solo conserva su registro de diploma.',
     workforceOnCall: 'De guardia',
@@ -421,6 +430,9 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     notGraduated: 'Não graduado',
     noArtifacts: 'Nenhum artefato destilado encontrado.',
     pipelineResidencyFailed: 'Residência reprovada',
+    pipelineExplanation: 'Da esquerda para a direita: Residência (só Computação) → exame final → formatura → Força de trabalho. Uma reprovação sai pela quarentena.',
+    pipelinePassedGraduating: 'Aprovado no exame — formando-se',
+    pipelineGraduated: 'Formados — na Força de trabalho',
     workforceTitle: 'Força de trabalho — graduados contratados fora da Universidade',
     workforceExplanation: 'Os graduados saem da Universidade na formatura. O COS os contrata daqui; a Universidade guarda apenas o registro do diploma.',
     workforceOnCall: 'De plantão',
@@ -537,6 +549,9 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     notGraduated: 'Nieukończony',
     noArtifacts: 'Nie znaleziono artefaktów destylowanych.',
     pipelineResidencyFailed: 'Rezydentura niezaliczona',
+    pipelineExplanation: 'Od lewej do prawej: Rezydentura (tylko informatyka) → egzamin końcowy → dyplom → Zespół. Niezaliczenie wychodzi przez kwarantannę.',
+    pipelinePassedGraduating: 'Zdał egzamin — kończy studia',
+    pipelineGraduated: 'Absolwenci — w Zespole',
     workforceTitle: 'Zespół — absolwenci zatrudnieni poza Uniwersytetem',
     workforceExplanation: 'Absolwenci opuszczają Uniwersytet w dniu ukończenia studiów. COS zatrudnia ich stąd; Uniwersytet zachowuje tylko zapis dyplomu.',
     workforceOnCall: 'W gotowości',
@@ -653,6 +668,9 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     notGraduated: 'Не выпущен',
     noArtifacts: 'Дистиллированные артефакты не найдены.',
     pipelineResidencyFailed: 'Ординатура не пройдена',
+    pipelineExplanation: 'Слева направо: ординатура (только информатика) → итоговый экзамен → выпуск → Штат. Незачёт уходит через карантин.',
+    pipelinePassedGraduating: 'Сдал экзамен — выпускается',
+    pipelineGraduated: 'Выпускники — в Штате',
     workforceTitle: 'Штат — выпускники, нанятые вне Университета',
     workforceExplanation: 'Выпускники покидают Университет при выпуске. COS нанимает их отсюда; Университет хранит только запись о дипломе.',
     workforceOnCall: 'На вызове',
@@ -699,4 +717,3 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     resolutionHeld: 'задержано для расследования',
   },
 }
-// end of saas/lib/i18n/cosUniversityTelemetryCopy.ts (if this line is missing, the paste was cut short)

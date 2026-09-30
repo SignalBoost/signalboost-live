@@ -62,9 +62,33 @@ export function estimateContextTokens(value: unknown): number {
   return Math.max(1, Math.ceil(text.length / ESTIMATED_CHARACTERS_PER_TOKEN))
 }
 
-function messageTokens(message: ContextMessage): number {
+/**
+ * Qwen-family token estimate (2026-09-29). The flat 3-characters-per-token estimate above overstates English
+ * prose by ~60% for the Qwen tokenizer (measured 4.8-5.1 characters per token on the COS answer prompt) and
+ * understates digits, identifiers, JSON and non-Latin text (Qwen spends one token per digit). On the RunPod
+ * reasoner that overstatement refused a ~9K-token chat prompt as if it were ~15K. This estimate counts every
+ * character of a digit-bearing word as a token, two tokens per non-ASCII character, and 3.6 characters per
+ * token for the remaining ASCII. Checked against the Qwen3 tokenizer on English prompts, code, JSON, UUID/hex,
+ * digit runs, Spanish, Polish, Russian and Chinese: never below the real count.
+ */
+export function estimateQwenContextTokens(value: unknown): number {
+  const text = typeof value === 'string' ? value : JSON.stringify(value ?? '')
+  let numeric = 0
+  const rest = text.replace(/[A-Za-z0-9]*\d[A-Za-z0-9]*/g, match => { numeric += match.length + 1; return '' })
+  let nonAscii = 0
+  let other = 0
+  for (const character of rest) {
+    if (character.charCodeAt(0) < 128) other += 1
+    else nonAscii += 1
+  }
+  return Math.max(1, numeric + nonAscii * 2 + Math.ceil(other / 3.6))
+}
+
+export type ContextTokenEstimator = (value: unknown) => number
+
+function messageTokens(message: ContextMessage, estimate: ContextTokenEstimator = estimateContextTokens): number {
   // Include structural overhead for role/tool-call framing, not only visible text.
-  return estimateContextTokens(message) + 12
+  return estimate(message) + 12
 }
 
 function truncateMiddle(text: string, maxChars: number): string {
@@ -77,10 +101,14 @@ function truncateMiddle(text: string, maxChars: number): string {
   return `${text.slice(0, head)}${marker}${text.slice(text.length - tail)}`
 }
 
-function trimMessage<T extends ContextMessage>(message: T, targetTokens: number): { message: T; chars: number } {
+function trimMessage<T extends ContextMessage>(message: T, targetTokens: number, estimate: ContextTokenEstimator = estimateContextTokens): { message: T; chars: number } {
   const content = typeof message.content === 'string' ? message.content : ''
   if (!content) return { message, chars: 0 }
-  const targetChars = Math.max(0, targetTokens * ESTIMATED_CHARACTERS_PER_TOKEN)
+  // Characters per estimated token for THIS content, so a non-default estimator trims to its own budget.
+  const charactersPerToken = estimate === estimateContextTokens
+    ? ESTIMATED_CHARACTERS_PER_TOKEN
+    : Math.max(0.25, content.length / Math.max(1, estimate(content)))
+  const targetChars = Math.max(0, Math.floor(targetTokens * charactersPerToken))
   const trimmed = truncateMiddle(content, targetChars)
   if (trimmed === content) return { message, chars: 0 }
   return {
@@ -109,7 +137,10 @@ export function planContextWindow<T extends ContextMessage>(input: {
   minimumOutputTokens?: number
   safetyTokens?: number
   env?: NodeJS.ProcessEnv
+  /** Token estimator for this model family. Defaults to the flat character estimate. */
+  estimateTokens?: ContextTokenEstimator
 }): ContextWindowPlan<T> {
+  const estimate = input.estimateTokens ?? estimateContextTokens
   const contextWindowTokens = resolveContextWindowTokens({
     model: input.model,
     provider: input.provider,
@@ -122,11 +153,11 @@ export function planContextWindow<T extends ContextMessage>(input: {
     requestedOutputTokens,
     boundedInteger(input.minimumOutputTokens, 1, contextWindowTokens) ?? Math.min(256, requestedOutputTokens),
   )
-  const systemTokens = estimateContextTokens(input.systemPrompt || '') + 16
+  const systemTokens = estimate(input.systemPrompt || '') + 16
   const maxPromptForRequested = Math.max(1, contextWindowTokens - requestedOutputTokens - safetyTokens)
 
   let messages = [...input.messages]
-  let estimatedPromptTokens = systemTokens + messages.reduce((sum, message) => sum + messageTokens(message), 0)
+  let estimatedPromptTokens = systemTokens + messages.reduce((sum, message) => sum + messageTokens(message, estimate), 0)
   let droppedMessages = 0
   let truncatedCharacters = 0
 
@@ -141,7 +172,7 @@ export function planContextWindow<T extends ContextMessage>(input: {
     // Never remove every message: preserve the newest turn even when the oldest group spans the list.
     removeCount = Math.min(removeCount, messages.length - 1)
     const removed = messages.splice(0, removeCount)
-    estimatedPromptTokens -= removed.reduce((sum, message) => sum + messageTokens(message), 0)
+    estimatedPromptTokens -= removed.reduce((sum, message) => sum + messageTokens(message, estimate), 0)
     droppedMessages += removed.length
   }
 
@@ -149,10 +180,10 @@ export function planContextWindow<T extends ContextMessage>(input: {
   if (estimatedPromptTokens > maxPromptForRequested && messages.length === 1) {
     const overhead = systemTokens + 12
     const availableForMessage = Math.max(1, maxPromptForRequested - overhead)
-    const trimmed = trimMessage(messages[0], availableForMessage)
+    const trimmed = trimMessage(messages[0], availableForMessage, estimate)
     messages[0] = trimmed.message
     truncatedCharacters += trimmed.chars
-    estimatedPromptTokens = systemTokens + messageTokens(messages[0])
+    estimatedPromptTokens = systemTokens + messageTokens(messages[0], estimate)
   }
 
   const availableOutput = Math.max(0, contextWindowTokens - estimatedPromptTokens - safetyTokens)

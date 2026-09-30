@@ -432,7 +432,7 @@ async function waitReady(endpointId:string,deadlineMs:number){
         signal:AbortSignal.timeout(timeoutMs),
       })
       status=response.status
-      if(response.ok){
+      if(response.status===200){
         // Keep evaluator readiness aligned with the exact-artifact canary contract: on the
         // authenticated RunPod load-balancer path, HTTP 200 from /ping is the gateway-ready
         // signal. The v4 gateway itself returns 204 until internal vLLM is ready, and the

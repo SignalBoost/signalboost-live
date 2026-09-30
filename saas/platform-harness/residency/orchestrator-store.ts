@@ -16,6 +16,7 @@ export const BUILDER_RESIDENCY_FINAL_DISPOSITION_PROFILE='cos_builder_residency_
 export const BUILDER_RESIDENCY_FAILED_CLAIM='builder_residency_failed' as const
 const ACTIVE_RESIDENCY_STANDINGS=['resident','senior_resident','remediation_required'] as const
 const RESIDENCY_FAILURE_SWEEP_LIMIT=200
+const ENROLLMENT_COLUMNS='id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,standing,updated_at'
 
 const sha256=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
@@ -28,6 +29,10 @@ export type BuilderResidencyFailureSweep=Readonly<{
 
 export type SupabaseBuilderResidencyOrchestratorStore=BuilderResidencyOrchestratorStore&Readonly<{
   closeUnrecoverableResidencies():Promise<BuilderResidencyFailureSweep>
+  /** Up to `laneCount` distinct active residents for this tick, one lane each (see selectBuilderResidencyLanes). */
+  planLanes(laneCount:number):Promise<readonly BuilderResidencyEnrollment[]>
+  /** The same store, but every case turn goes to this one resident while it is still active. */
+  pinnedTo(enrollment:BuilderResidencyEnrollment):BuilderResidencyOrchestratorStore
 }>
 
 type ResidencySchedulerCaseRow=Readonly<{
@@ -87,6 +92,67 @@ export function selectBuilderResidencyEnrollmentForTick<T extends {id:unknown}>(
     return input.enrollments.find(row=>String(row.id)===residencyId)??fallback
   }
   return input.enrollments.find(row=>String(row.id)!==residencyId)??fallback
+}
+
+/**
+ * A worker that finished a case this recently is still up: the exact-artifact runtime idles 12 minutes before it
+ * scales to zero and the Residency tick runs every 10 minutes.
+ */
+export const BUILDER_RESIDENCY_LANE_WARM_WINDOW_MS=11*60_000
+
+/**
+ * Residency lanes (owner direction 2026-09-30, pipeline worked backwards: Residency remediation, then residents).
+ *
+ * Production before this: ONE case per tick for the whole cohort, each turn given to the resident with the oldest
+ * update, so consecutive cases went to different residents and every case paid a cold start of a different exact
+ * artifact, then left that worker idle (and billed) for 12 minutes. A resident needs at least 26 passing cases.
+ *
+ * Now each tick runs one lane per resident, in parallel, and a resident keeps its lane tick after tick. Its worker is
+ * reused while warm, so it pays one cold start for its Residency instead of one per case. Order: remediation first,
+ * then residents whose worker is still warm, then brand-new admissions, then everyone else oldest-first; a resident
+ * whose last two cases were infrastructure failures goes last. Scheduling only: every case still crosses the same
+ * authority, harness and evidence boundaries, and the standard is unchanged.
+ */
+export function selectBuilderResidencyLanes<T extends {id:unknown;standing?:unknown}>(input:{
+  enrollments:readonly T[]
+  recentCases:readonly ResidencySchedulerCaseRow[]
+  laneCount:number
+  now?:Date
+}):T[]{
+  const nowMs=(input.now??new Date()).getTime()
+  const casesByResident=new Map<string,ResidencySchedulerCaseRow[]>()
+  for(const row of input.recentCases){
+    const id=String(row.residency_id??'')
+    if(!id) continue
+    const list=casesByResident.get(id)??[]
+    list.push(row)
+    casesByResident.set(id,list)
+  }
+  const ranked=input.enrollments.map((row,index)=>{
+    // recentCases arrive newest first.
+    const cases=casesByResident.get(String(row.id))??[]
+    const latestMs=Date.parse(String(cases[0]?.completed_at??''))
+    const warm=Number.isFinite(latestMs)&&nowMs-latestMs<=BUILDER_RESIDENCY_LANE_WARM_WINDOW_MS
+    let infrastructureStreak=0
+    for(const item of cases){
+      if(String(item.harness_outcome)!=='infrastructure_failure') break
+      infrastructureStreak+=1
+    }
+    const key=[
+      infrastructureStreak>=2?1:0,
+      String(row.standing)==='remediation_required'?0:1,
+      warm?0:1,
+      cases.length===0?0:1,
+      index,
+    ]
+    return {row,key}
+  })
+  ranked.sort((a,b)=>{
+    for(let i=0;i<a.key.length;i+=1) if(a.key[i]!==b.key[i]) return a.key[i]-b.key[i]
+    return 0
+  })
+  const lanes=Math.max(1,Math.floor(Number(input.laneCount)||1))
+  return ranked.slice(0,lanes).map(item=>item.row)
 }
 
 export function createSupabaseBuilderResidencyOrchestratorStore(input:{
@@ -192,7 +258,31 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
     return {closed:(standing.data??[]).length>0,artifactQuarantined:(artifact.data??[]).length>0}
   }
 
-  return Object.freeze({
+  // Active residents and their recent case history: the single source both schedulers read.
+  async function readSchedulingState(){
+    const active=await input.db
+      .from('cos_university_residency_enrollments')
+      .select(ENROLLMENT_COLUMNS)
+      .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
+      .order('updated_at',{ascending:true})
+      .limit(32)
+    if(active.error) throw active.error
+    const enrollments=(active.data??[]) as any[]
+    if(!enrollments.length) return {enrollments,recentCases:[] as ResidencySchedulerCaseRow[]}
+    const residencyIds=enrollments.map(row=>String(row.id))
+    // Full recent history (not only the warm window): consecutive failures must be countable.
+    const recent=await input.db
+      .from('cos_university_residency_case_runs')
+      .select('residency_id,harness_outcome,completed_at')
+      .in('residency_id',residencyIds)
+      .not('completed_at','is',null)
+      .order('completed_at',{ascending:false})
+      .limit(64)
+    if(recent.error) throw recent.error
+    return {enrollments,recentCases:(recent.data??[]) as ResidencySchedulerCaseRow[]}
+  }
+
+  const base={
     ...evidenceStore,
 
     closeFailedResidency,
@@ -235,30 +325,11 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
     },
 
     async nextEnrollment():Promise<BuilderResidencyEnrollment|null>{
-      const active=await input.db
-        .from('cos_university_residency_enrollments')
-        .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,standing,updated_at')
-        .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
-        .order('updated_at',{ascending:true})
-        .limit(32)
-      if(active.error) throw active.error
-      const enrollments=active.data??[]
+      const {enrollments,recentCases}=await readSchedulingState()
       if(!enrollments.length) return null
-
-      const residencyIds=enrollments.map(row=>String(row.id))
-      // Full recent history (not only the warm window): consecutive failures must be countable.
-      const recent=await input.db
-        .from('cos_university_residency_case_runs')
-        .select('residency_id,harness_outcome,completed_at')
-        .in('residency_id',residencyIds)
-        .not('completed_at','is',null)
-        .order('completed_at',{ascending:false})
-        .limit(64)
-      if(recent.error) throw recent.error
-
       const data=selectBuilderResidencyEnrollmentForTick({
         enrollments,
-        recentCases:recent.data??[],
+        recentCases,
         now:new Date(),
       })
       if(!data) return null
@@ -271,6 +342,33 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
       return refreshBuilderResidencyAssessment({
         db:input.db,
         residencyId,
+      })
+    },
+  }
+
+  return Object.freeze({
+    ...base,
+
+    async planLanes(laneCount:number):Promise<readonly BuilderResidencyEnrollment[]>{
+      const {enrollments,recentCases}=await readSchedulingState()
+      if(!enrollments.length) return Object.freeze([])
+      return Object.freeze(selectBuilderResidencyLanes({enrollments,recentCases,laneCount,now:new Date()}).map(toEnrollment))
+    },
+
+    pinnedTo(enrollment:BuilderResidencyEnrollment):BuilderResidencyOrchestratorStore{
+      return Object.freeze({
+        ...base,
+        // Re-read on every turn: a resident that completed, failed or was closed mid-tick gets no further case.
+        async nextEnrollment():Promise<BuilderResidencyEnrollment|null>{
+          const current=await input.db
+            .from('cos_university_residency_enrollments')
+            .select(ENROLLMENT_COLUMNS)
+            .eq('id',enrollment.residencyId)
+            .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
+            .maybeSingle()
+          if(current.error) throw current.error
+          return current.data?toEnrollment(current.data):null
+        },
       })
     },
   })

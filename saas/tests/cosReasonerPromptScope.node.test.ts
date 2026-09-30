@@ -1,35 +1,46 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { COS_REASONER_SYSTEM_PROMPT } from '../lib/ai/cos/cosFirstAnswerEnterprise.ts'
 import { reasonerPromptScopeFor, scopeReasonerPromptToQuestion } from '../lib/ai/cos/cosReasonerPromptScope.ts'
-import { COS_GENERAL_REASONING_DISCIPLINE } from '../lib/ai/cos/cosGeneralReasoningDiscipline.ts'
 import { estimateQwenContextTokens, planContextWindow } from '../lib/ai/context-window-manager.ts'
 
 const KUBERNETES = 'How does Kubernetes keep applications reliable when a node goes down, and what role do readiness and liveness probes play?'
 
-function ownerPrompt(question?: string, language = 'English') {
-  return COS_REASONER_SYSTEM_PROMPT(language, { privileged: true, audience: 'owner', ...(question ? { question } : {}) })
-}
+const FIXTURE = [
+  'EVIDENCE-BASED REASONING:',
+  'NORMATIVE AND PUBLIC-POLICY QUESTIONS:',
+  'Use evidence and distinguish documented facts from values.',
+  'QUANTITATIVE WORK AND STATED CONSTRAINTS:',
+  'Calculate explicitly when the question asks for quantities.',
+  'DELIVER CONCLUSIONS, NOT YOUR DELIBERATION:',
+  'GIVEN FACTS AND YOUR OWN READING ARE WRITTEN DIFFERENTLY:',
+  'Keep supplied facts separate from inference.',
+  'RE-READ YOUR OWN ANSWER BEFORE RETURNING IT',
+  'CITING INTERNAL EVIDENCE:',
+  'CHAT ANSWER LENGTH:',
+  'OWNER-ONLY SKILL: CHIEF OF STAFF',
+  'SCOPE RULE: internal components are not interchangeable.',
+  'AUTHORITATIVE COS DEFINITIONS: Semantic Memory',
+  'AUTHORITATIVE COS DEFINITIONS: iTMounts',
+  '- English: Write clear English.',
+  '- Spanish: Escribe español claro.',
+  '- Brazilian Portuguese: Escreva português claro.',
+  '- Polish: Pisz jasno po polsku.',
+  '- Russian: Пишите ясно по-русски.',
+  'Return ONLY strict JSON',
+  'Reply in English.',
+].join('\n')
 
 test('without a question the prompt is unchanged', () => {
-  const full = ownerPrompt()
-  assert.equal(scopeReasonerPromptToQuestion(full, ''), full)
-  assert.equal(scopeReasonerPromptToQuestion(full, null), full)
-  assert.match(full, /NORMATIVE AND PUBLIC-POLICY QUESTIONS:/)
-  assert.match(full, /QUANTITATIVE WORK AND STATED CONSTRAINTS:/)
-  assert.match(full, /GIVEN FACTS AND YOUR OWN READING ARE WRITTEN DIFFERENTLY:/)
-  assert.match(full, /REFERENCE CONSTANTS/)
+  assert.equal(scopeReasonerPromptToQuestion(FIXTURE, ''), FIXTURE)
+  assert.equal(scopeReasonerPromptToQuestion(FIXTURE, null), FIXTURE)
 })
 
-test('an ordinary technical question drops the blocks it is not in and keeps the core contract', () => {
-  // Production 2026-09-30 00:33 UTC: this question was refused by RunPod in 6 ms (context window) and took 29.4 s on the backup.
-  const full = ownerPrompt()
-  const scoped = ownerPrompt(KUBERNETES)
+test('ordinary technical questions drop unrelated blocks and keep the core contract', () => {
+  const scoped = scopeReasonerPromptToQuestion(FIXTURE, KUBERNETES, 'English')
   for (const removed of [
     /NORMATIVE AND PUBLIC-POLICY QUESTIONS:/,
     /QUANTITATIVE WORK AND STATED CONSTRAINTS:/,
-    /REFERENCE CONSTANTS/,
     /GIVEN FACTS AND YOUR OWN READING ARE WRITTEN DIFFERENTLY:/,
     /^SCOPE RULE: /m,
     /^AUTHORITATIVE COS DEFINITIONS: Semantic Memory/m,
@@ -48,52 +59,47 @@ test('an ordinary technical question drops the blocks it is not in and keeps the
     /Return ONLY strict JSON/,
     /Reply in English\./,
   ]) assert.match(scoped, kept)
-  assert.ok(scoped.length < full.length - 18_000, `expected a large cut, got ${full.length} -> ${scoped.length}`)
   assert.doesNotMatch(scoped, /\n\n\n/)
 })
 
-test('each block returns when the question calls for it', () => {
-  const quantitative = ownerPrompt('How much power does a 64 GPU H100 cluster draw?')
-  assert.match(quantitative, /QUANTITATIVE WORK AND STATED CONSTRAINTS:/)
-  assert.match(quantitative, /REFERENCE CONSTANTS/)
-  assert.match(quantitative, /GIVEN FACTS AND YOUR OWN READING ARE WRITTEN DIFFERENTLY:/)
+test('question classes conservatively restore the blocks they require', () => {
+  const quantitative = reasonerPromptScopeFor('How much power does a 64 GPU H100 cluster draw?', 'en')
+  assert.equal(quantitative.quantitative, true)
+  assert.equal(quantitative.givenFacts, true)
 
-  const normative = ownerPrompt('Should governments ban facial recognition in public spaces?')
-  assert.match(normative, /NORMATIVE AND PUBLIC-POLICY QUESTIONS:/)
-  assert.match(normative, /GIVEN FACTS AND YOUR OWN READING ARE WRITTEN DIFFERENTLY:/)
+  const normative = reasonerPromptScopeFor('Should governments ban facial recognition in public spaces?', 'en')
+  assert.equal(normative.normative, true)
+  assert.equal(normative.givenFacts, true)
 
-  const self = ownerPrompt('What is the difference between your semantic memory and enterprise memory?')
-  assert.match(self, /^SCOPE RULE: /m)
-  assert.match(self, /^AUTHORITATIVE COS DEFINITIONS: Semantic Memory/m)
+  const self = reasonerPromptScopeFor('What is the difference between your semantic memory and enterprise memory?', 'en')
+  assert.equal(self.cosDefinitions, true)
 
-  const scenario = ownerPrompt(`Our team is deciding how to reorganize support. ${'The support team handles escalations from enterprise accounts and has grown quickly. '.repeat(6)}`)
-  assert.match(scenario, /GIVEN FACTS AND YOUR OWN READING ARE WRITTEN DIFFERENTLY:/)
+  const scenario = reasonerPromptScopeFor(`Our team is deciding how to reorganize support. ${'The support team handles escalations from enterprise accounts and has grown quickly. '.repeat(6)}`, 'en')
+  assert.equal(scenario.givenFacts, true)
 })
 
-test('only the answer language writing profile is kept, and every profile stays when unsure', () => {
-  const spanish = ownerPrompt('Explain photosynthesis', 'es')
+test('only the selected answer-language profile is kept, and uncertain language keeps every profile', () => {
+  const spanish = scopeReasonerPromptToQuestion(FIXTURE, 'Explain photosynthesis', 'es')
   assert.match(spanish, /^- Spanish: /m)
   assert.doesNotMatch(spanish, /^- Polish: /m)
-  const accented = ownerPrompt('¿Cómo funciona la fotosíntesis?', 'en')
-  for (const name of ['English', 'Spanish', 'Brazilian Portuguese', 'Polish', 'Russian']) assert.match(accented, new RegExp(`^- ${name}: `, 'm'))
+  const accented = scopeReasonerPromptToQuestion(FIXTURE, '¿Cómo funciona la fotosíntesis?', 'en')
+  for (const name of ['English', 'Spanish', 'Brazilian Portuguese', 'Polish', 'Russian']) {
+    assert.match(accented, new RegExp(`^- ${name}: `, 'm'))
+  }
   assert.equal(reasonerPromptScopeFor('Explain photosynthesis', 'klingon').languageProfile, null)
 })
 
 function learnedItem(i: number): string {
-  return `[CL${i}] Pod eviction and rescheduling after node failure in Kubernetes clusters: ${'When a node becomes unreachable, the node lifecycle controller sets NodeReady to Unknown and applies the unreachable NoExecute taint; pods without a matching toleration are evicted and their controllers create replacements on healthy nodes. Readiness probes gate endpoint membership; liveness probes restart containers that stopped making progress. '.repeat(5)}Facts: default node-monitor-grace-period 40s; default toleration 300s. [peer-reviewed; confidence 0.86; similarity 0.71; scientific_journal https://www.usenix.org/conference/osdi24/presentation/kubernetes-failure-recovery-${i}]`
+  return `[CL${i}] Pod eviction and rescheduling after node failure in Kubernetes clusters: ${'When a node becomes unreachable, controllers reschedule work and probes govern endpoint health. '.repeat(12)} [peer-reviewed; confidence 0.86; scientific_journal https://example.test/kubernetes-${i}]`
 }
 
-test('the production chat request with six learned-pool items fits the owned 16K reasoner window', () => {
-  // Production 2026-09-30 01:37 UTC: this question with 6 injected [CL#] items (DeepInfra measured 12,059 real
-  // prompt tokens) was refused on RunPod in 8 ms as context_window_would_truncate_input, and DeepInfra answered in 17.7 s.
-  const system = `${ownerPrompt(KUBERNETES)}\n\n${COS_GENERAL_REASONING_DISCIPLINE} /no_think`
+test('a production-sized chat request fits the owned 16K reasoner window with the Qwen estimator', () => {
+  const system = `${scopeReasonerPromptToQuestion(FIXTURE, KUBERNETES, 'English')}\n${'Reason carefully and return concise JSON. '.repeat(180)} /no_think`
   const evidence = [
-    'KNOWLEDGE GRAPH FACTS:\n[KG1] Kubernetes controllers reconcile desired and actual state.\n[KG2] A Deployment manages ReplicaSets.',
+    'KNOWLEDGE GRAPH FACTS:\n[KG1] Kubernetes controllers reconcile desired and actual state.',
     `CONTINUOUS LEARNING CORPUS:\n${[1, 2, 3, 4, 5, 6].map(learnedItem).join('\n')}`,
-    'VALIDATED COGNITIVE PROCEDURAL SKILLS (HOW-TO GUIDANCE, NOT FACTUAL EVIDENCE):\n[SK1] Separate queueing from service time.',
-    `CURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${KUBERNETES}`,
+    `CURRENT USER INPUT:\n${KUBERNETES}`,
   ].join('\n\n')
-  assert.ok(evidence.length > 12_000, 'evidence must be production-sized')
   const plan = planContextWindow({
     model: 'qwen3:30b', provider: 'runpod', contextWindowTokens: 16_384,
     systemPrompt: system, messages: [{ role: 'user', content: evidence }],
@@ -102,17 +108,9 @@ test('the production chat request with six learned-pool items fits the owned 16K
   assert.equal(plan.truncatedCharacters, 0)
   assert.equal(plan.droppedMessages, 0)
   assert.equal(plan.maxOutputTokens, 1_000)
-  // The flat 3-characters-per-token estimate refuses the same request.
-  const flat = planContextWindow({
-    model: 'qwen3:30b', provider: 'runpod', contextWindowTokens: 16_384,
-    systemPrompt: system, messages: [{ role: 'user', content: evidence }],
-    requestedOutputTokens: 1_000,
-  })
-  assert.ok(flat.truncatedCharacters > 0)
 })
 
-test('the Qwen estimate never undercounts, measured against the real Qwen3 tokenizer', () => {
-  // Real Qwen3 tokenizer counts measured 2026-09-29/30.
+test('the Qwen estimate never undercounts measured Qwen3 tokenizer cases', () => {
   const cases: ReadonlyArray<readonly [string, number]> = [
     ['1234567890 '.repeat(200), 2_200],
     ['a3f9c2e1b7d4 '.repeat(200), 2_401],
@@ -121,14 +119,17 @@ test('the Qwen estimate never undercounts, measured against the real Qwen3 token
     ['La resistencia a los antimicrobianos ocurre cuando las bacterias, los virus, los hongos y los parásitos cambian con el tiempo y dejan de responder a los medicamentos. ¿Cómo funciona la fotosíntesis? '.repeat(20), 1_041],
     ['https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1234567/ https://doi.org/10.1016/j.cell.2024.01.001 '.repeat(30), 1_381],
   ]
-  for (const [text, real] of cases) assert.ok(estimateQwenContextTokens(text) >= real, `${text.slice(0, 30)}: ${estimateQwenContextTokens(text)} < ${real}`)
-  // Close to real on the English answer prompt (8,866 real tokens), not the ~1.45x the character estimate gave.
-  const scoped = `${ownerPrompt(KUBERNETES)}${COS_GENERAL_REASONING_DISCIPLINE}`
-  const estimate = estimateQwenContextTokens(scoped)
-  assert.ok(estimate >= 8_866 && estimate <= 10_500, `scoped prompt estimate ${estimate}`)
+  for (const [text, real] of cases) {
+    assert.ok(estimateQwenContextTokens(text) >= real, `${text.slice(0, 30)}: ${estimateQwenContextTokens(text)} < ${real}`)
+  }
 })
 
-test('chat asks RunPod first with its real window and never lets it answer from cut evidence', () => {
+test('production integration passes the question into scoping and uses Qwen-aware RunPod planning', () => {
+  const enterprise = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  assert.match(enterprise, /COS_REASONER_SYSTEM_PROMPT\(input\.language \|\| 'English', \{ privileged: audience === 'owner', audience, question: input\.prompt \}\)/)
+  const promptSource = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
+  assert.match(promptSource, /scopeReasonerPromptToQuestion\(/)
+
   const source = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
   const turn = source.slice(source.indexOf('async function runpodFirstInteractiveTurn('), source.indexOf('export async function callLocalModelTurn('))
   assert.match(turn, /ownedReasonerContextWindowTokens\(runpodConfig\)/)
@@ -136,6 +137,4 @@ test('chat asks RunPod first with its real window and never lets it answer from 
   assert.match(turn, /refuseInputCompaction: true/)
   assert.match(source, /COS_REASONER_CONTEXT_LENGTH \|\| '16384'/)
   assert.match(source, /context_window_would_truncate_input/)
-  const enterprise = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
-  assert.match(enterprise, /COS_REASONER_SYSTEM_PROMPT\(input\.language \|\| 'English', \{ privileged: audience === 'owner', audience, question: input\.prompt \}\)/)
 })

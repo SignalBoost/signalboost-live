@@ -22,7 +22,7 @@ test('both live-state renderers print the trail, read from provider_inference_us
   assert.match(live, /`Chat Inference Calls   : \$\{formatChatInferenceTrail\(state\?\.chatInference\)\}`/)
   const state = readFileSync(new URL('../lib/ai/cos/cosLiveSystemState.ts', import.meta.url), 'utf8')
   assert.match(state, /from\('provider_inference_usage'\)/)
-  assert.match(state, /\.eq\('purpose','user_facing_response'\)/)
+  assert.match(state, /\.in\('purpose',CHAT_TURN_PURPOSES as unknown as string\[\]\)/)
   assert.match(state, /chatInference=await readChatInferenceTrail\(db,lastTurnRecord\?\.updatedAt\?\?null\)/)
   assert.match(state, /Chat Inference Calls   : \$\{formatChatInferenceTrail\(state\.chatInference\)\}/)
 })
@@ -63,4 +63,14 @@ test('a citation marker between two sentences is dropped, not rendered as "the r
   assert.equal(cleaned, 'Liveness probes restart the container, ensuring the container remains healthy. Kubernetes has become the de facto standard for container orchestration. Kubernetes facilitates deployment of microservices.')
   // A marker that IS the subject still reads correctly.
   assert.equal(stripInternalEvidenceIds('Revenue grew. [OEM1] shows that churn fell while [KG2] indicates growth.'), 'Revenue grew. The retrieved evidence shows that churn fell while the retrieved evidence indicates growth.')
+})
+
+test('the trail covers every chat lane and names the lane that answered', async () => {
+  // Production 2026-09-30 03:35 UTC: the contextual-interpretation lane answered, and the trail said "no call recorded".
+  const { CHAT_TURN_PURPOSES } = await import('../lib/ai/cos/chatInferenceTrail.ts')
+  for (const purpose of ['user_facing_response', 'contextual_interpretation', 'completion_rescue', 'fresh_grounded_task']) assert.ok(CHAT_TURN_PURPOSES.includes(purpose as never), purpose)
+  const line = formatChatInferenceTrail([
+    { at: '2026-09-30T03:35:50.000Z', provider: 'deepinfra', feature: 'cos_interactive_answer', purpose: 'contextual_interpretation', success: true, latencyMs: 5200, promptTokens: 900, completionTokens: 80, finishReason: 'stop' },
+  ])
+  assert.equal(line, '03:35:50 deepinfra [contextual_interpretation] OK 5.2 s, 900 in / 80 out')
 })

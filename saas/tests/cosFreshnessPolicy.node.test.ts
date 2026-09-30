@@ -1,4 +1,3 @@
-// saas/tests/cosFreshnessPolicy.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence, structuredLiveDataKind } from '../lib/ai/cos/cosFreshnessPolicy.ts'
@@ -368,4 +367,17 @@ test('findings of a published study are learned-corpus questions, not live curre
   assert.equal(structuredLiveDataKind('What is the forecast for tomorrow in Paris?'), 'weather')
   assert.equal(structuredLiveDataKind(productionRefusal), null)
   assert.equal(requiresFreshExternalEvidence('What did the study published today find?'), true)
+})
+
+test('comparison, usage and purpose questions about a concept reason from COS knowledge, not live search', () => {
+  // Production 2026-09-30 03:35 UTC: this question was routed as a live lookup and answered without the learned pool.
+  assert.equal(requiresFreshExternalEvidence('What is the difference between a liveness probe and a startup probe in Kubernetes, and when would you use each?'), false)
+  assert.equal(requiresFreshExternalEvidence('When would you use a liveness probe?'), false)
+  assert.equal(requiresFreshExternalEvidence('What are the advantages of event sourcing?'), false)
+  assert.equal(requiresFreshExternalEvidence('What is the purpose of a readiness probe?'), false)
+  // Mutable quantities, rankings and temporal markers keep the live path.
+  assert.equal(requiresFreshExternalEvidence('What is the difference between the current Fed rate and the ECB rate?'), true)
+  assert.equal(requiresFreshExternalEvidence('What is the difference between iPhone 16 and iPhone 17 prices?'), true)
+  assert.equal(requiresFreshExternalEvidence('What are the pros and cons of the best laptops today?'), true)
+  assert.equal(requiresFreshExternalEvidence('What is the latest version of Kubernetes?'), true)
 })

@@ -5,10 +5,32 @@
 //
 // Zero imports.
 
+/**
+ * Every lane a chat turn can answer through (2026-09-30). The first version read only user_facing_response and
+ * showed "no chat-answer model call recorded" for a question the contextual-interpretation lane answered.
+ */
+export const CHAT_TURN_PURPOSES = Object.freeze([
+  'user_facing_response',
+  'user_facing_release_repair',
+  'contextual_interpretation',
+  'completion_rescue',
+  'fresh_grounded_task',
+  'live_fact_synthesis',
+  'travel_plan_grounded',
+  'travel_plan_grounded_retry',
+  'owner_self_knowledge_fallback',
+  'native_language_review',
+  'answer_freshness_reflection',
+  'public_scope_repair',
+  'public_disclosure_redaction',
+] as const)
+
 export type ChatInferenceCall = {
   at: string
   provider: string
   feature: string | null
+  /** Which answer lane made the call (user_facing_response = the main pool-grounded path). */
+  purpose?: string | null
   success: boolean
   latencyMs: number | null
   promptTokens: number | null
@@ -25,6 +47,7 @@ export function formatChatInferenceTrail(calls: ChatInferenceCall[] | null | und
     const took=call.latencyMs==null?'':call.latencyMs>=1000?` ${(call.latencyMs/1000).toFixed(1)} s`:` ${call.latencyMs} ms`
     const tokens=call.success&&(call.promptTokens!=null||call.completionTokens!=null)?`, ${call.promptTokens??'?'} in / ${call.completionTokens??'?'} out`:''
     const reason=call.success?(call.finishReason&&call.finishReason!=='stop'?` (${call.finishReason})`:''):` — ${call.finishReason||'no reason recorded'}`
-    return `${time} ${call.provider} ${call.success?'OK':'FAILED'}${took}${tokens}${reason}`
+    const lane=call.purpose?` [${call.purpose}]`:''
+    return `${time} ${call.provider}${lane} ${call.success?'OK':'FAILED'}${took}${tokens}${reason}`
   }).join(' → ')
 }

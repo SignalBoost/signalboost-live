@@ -5,7 +5,7 @@ import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriev
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { independentReasonerHealth, externalFallbackEnabled } from '@/lib/ai/cos/cosOrchestrationEnterprise'
 import { autonomousLearningReadiness } from '@/lib/cos/dailyAutonomousLearning'
-import { formatChatInferenceTrail, type ChatInferenceCall } from '@/lib/ai/cos/chatInferenceTrail.ts'
+import { CHAT_TURN_PURPOSES, formatChatInferenceTrail, type ChatInferenceCall } from '@/lib/ai/cos/chatInferenceTrail.ts'
 import { autonomousLearningRunFresh, readAutonomousLearningHealth, type AutonomousLearningRunHealth } from '@/lib/ai/cos/autonomousLearningHealth.ts'
 
 export type CosLiveSystemState = {
@@ -40,8 +40,8 @@ export type CosLiveSystemState = {
 async function readChatInferenceTrail(db:any,lastTurnAt:string|null):Promise<ChatInferenceCall[]|null>{
   try{
     let query=db.from('provider_inference_usage')
-      .select('created_at,provider,feature,success,latency_ms,prompt_tokens,completion_tokens,finish_reason')
-      .eq('purpose','user_facing_response')
+      .select('created_at,provider,feature,purpose,success,latency_ms,prompt_tokens,completion_tokens,finish_reason')
+      .in('purpose',CHAT_TURN_PURPOSES as unknown as string[])
     const anchor=lastTurnAt?Date.parse(lastTurnAt):NaN
     if(Number.isFinite(anchor)){
       query=query.gte('created_at',new Date(anchor-180_000).toISOString()).lte('created_at',new Date(anchor+30_000).toISOString()).order('created_at',{ascending:true}).limit(12)
@@ -52,7 +52,7 @@ async function readChatInferenceTrail(db:any,lastTurnAt:string|null):Promise<Cha
     if(error||!Array.isArray(data))return null
     const rows=Number.isFinite(anchor)?data:[...data].reverse()
     const num=(v:unknown)=>{const x=Number(v);return v==null||!Number.isFinite(x)?null:x}
-    return rows.map((row:any)=>({at:String(row.created_at||''),provider:String(row.provider||'unknown'),feature:s(row.feature),success:row.success===true,latencyMs:num(row.latency_ms),promptTokens:num(row.prompt_tokens),completionTokens:num(row.completion_tokens),finishReason:s(row.finish_reason)}))
+    return rows.map((row:any)=>({at:String(row.created_at||''),provider:String(row.provider||'unknown'),feature:s(row.feature),purpose:s(row.purpose),success:row.success===true,latencyMs:num(row.latency_ms),promptTokens:num(row.prompt_tokens),completionTokens:num(row.completion_tokens),finishReason:s(row.finish_reason)}))
   }catch{return null}
 }
 

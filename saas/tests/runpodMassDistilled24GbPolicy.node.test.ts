@@ -170,3 +170,17 @@ test('canary quota recovery can self-drain only the exact mass endpoint before r
   assert.match(source, /mass_distilled_runtime_quota_self_drain_rejected/)
   assert.match(source, /workers: \{ min: 1, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
 })
+
+test('graduate quota protection follows the current Workforce rotation lease instead of every diploma', () => {
+  const protection = readFileSync(new URL('../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts', import.meta.url), 'utf8')
+  const graduateFn = protection.slice(
+    protection.indexOf('export async function activeGraduateRunpodEndpointIds'),
+    protection.indexOf('const MASS_CANARY_PROFILE'),
+  )
+  assert.match(graduateFn, /cos_university_graduate_rotation_leases/)
+  assert.match(graduateFn, /lease_started_at/)
+  assert.match(graduateFn, /lease_expires_at/)
+  assert.match(graduateFn, /candidate_id.*lease\.data\.candidate_id/s)
+  assert.match(graduateFn, /trained_artifact_hash.*lease\.data\.trained_artifact_hash/s)
+  assert.doesNotMatch(graduateFn, /\.eq\('status', 'active'\)[\s\S]*\.limit\(200\)/)
+})

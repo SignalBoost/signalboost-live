@@ -291,6 +291,8 @@ const tests = [
   'tests/cosUniversityExclusiveSelfAttention.node.test.ts',
   // 2026-09-29: XSA students are neither canaried nor examined until the XSA runtime answers inside the exam limit.
   'tests/xsaExamPause.node.test.ts',
+  // 2026-09-29: always-on RunPod workers left behind by killed exam/canary runs are released every 5 minutes.
+  'tests/runpodPinnedWorkerSweeper.node.test.ts',
   'tests/staleGatewayXsaInfrastructure.node.test.ts',
   // 2026-09-29: 220 independent evaluations showed distillation teaching base-rate reasoning (0.000 -> 0.927, 204
   // helped / 0 hurt) while ERASING survivorship (1.000 -> 0.382, 0 helped / 136 hurt) and regression to the mean

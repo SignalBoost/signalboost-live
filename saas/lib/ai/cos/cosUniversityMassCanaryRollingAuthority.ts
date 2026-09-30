@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts
 // Owner direction (2026-09-17): mass-distilled artifacts must reach independent evaluation without a hand-inserted
 // canary approval each. On 2026-09-17 all 30 evaluation_pending mass artifacts had no canary, so the automatic
 // evaluator (which requires a passed canary) had nothing it could run. This pure policy decides, once per cron tick,
@@ -183,16 +182,37 @@ function evaluationEndpointLifecycleFailure(event: CanaryEvent): boolean {
       && error.includes('does not exist'))
 }
 
+/**
+ * The exam could not find the student's endpoint at all (it was deleted). Production 2026-09-30 05:21-05:27 UTC:
+ * 4 of the last 8 exam runs ended on this error. A deleted endpoint never comes back, and this error was not an
+ * endpoint-lifecycle failure, so the student was never re-canaried: it was retried forever and took exam turns
+ * from students that could sit the exam.
+ */
+export function evaluationEndpointMissing(error: unknown): boolean {
+  return String(error ?? '').trim().toLowerCase().startsWith('mass_distilled_runtime_endpoint_id_missing')
+}
+
+/** True when our terminal-endpoint cleanup recorded deleting exactly this endpoint. */
+export function canaryEndpointRetired(events: readonly CanaryEvent[], endpointId: unknown): boolean {
+  const id = String(endpointId ?? '').trim().toLowerCase()
+  if (!id) return false
+  return events.some(event => event.evidence?.claim === 'local_distilled_runtime_endpoint_retired'
+    && String(event.evidence?.endpointId ?? '').trim().toLowerCase() === id)
+}
+
 function endpointRefreshRequired(events: readonly CanaryEvent[], artifact: CanaryArtifact): boolean {
   const own = allForArtifact(events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
   const passed = [...own].reverse().find(event => claim(event) === 'local_distilled_runtime_canary_passed')
   if (!passed) return false
+  // The passed canary's endpoint was deleted (a student returned from quarantine loses its endpoint to the
+  // terminal-endpoint cleanup while it waits there): re-canary before the exam wastes a turn on it.
+  if (canaryEndpointRetired(own, passed.evidence?.endpointId)) return true
   const failures = own
     .filter(event => at(event.observedAt) >= at(passed.observedAt)
       && claim(event) === 'mass_distilled_independent_evaluation_failed')
     .sort((a, b) => at(b.observedAt) - at(a.observedAt))
-  // A stale gateway cannot fix itself: re-canary onto a fresh endpoint after the first such 409.
-  if (failures[0] && staleGatewayModelMismatch(failures[0].evidence?.error)) return true
+  // A stale gateway or a deleted endpoint cannot fix itself: re-canary onto a fresh endpoint after the first one.
+  if (failures[0] && (staleGatewayModelMismatch(failures[0].evidence?.error) || evaluationEndpointMissing(failures[0].evidence?.error))) return true
   let consecutive = 0
   for (const failure of failures) {
     if (!evaluationEndpointLifecycleFailure(failure)) break

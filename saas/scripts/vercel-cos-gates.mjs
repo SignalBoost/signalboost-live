@@ -1,4 +1,3 @@
-// saas/scripts/vercel-cos-gates.mjs
 // Full production regression gate restored after 2026-09-23 diagnostic isolation.
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -301,6 +300,8 @@ const tests = [
   'tests/universityBackwardsPass.node.test.ts',
   // 2026-09-30 quarantine: every quarantined student's reason is named; the review reads in bounded chunks.
   'tests/universityQuarantineLedger.node.test.ts',
+  // 2026-09-30 quarantine resolution: proven FAILs leave the University, our-fault students return to the exam.
+  'tests/universityQuarantineResolution.node.test.ts',
   'tests/staleGatewayXsaInfrastructure.node.test.ts',
   // 2026-09-29: 220 independent evaluations showed distillation teaching base-rate reasoning (0.000 -> 0.927, 204
   // helped / 0 hurt) while ERASING survivorship (1.000 -> 0.382, 0 helped / 136 hurt) and regression to the mean

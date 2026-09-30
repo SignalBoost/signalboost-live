@@ -1,4 +1,3 @@
-// saas/lib/i18n/cosUniversityTelemetryCopy.ts
 export type CosUniversityTelemetryLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 type Copy = Readonly<{
@@ -97,6 +96,25 @@ type Copy = Readonly<{
   quarantineReviewNever: string
   quarantineReviewRestored: string
   quarantineReviewFailed: string
+  leftTitle: string
+  leftExplanation: string
+  leftTotal: string
+  leftUnexaminable: string
+  whyTitle: string
+  whyExamGates: string
+  whyHoldout: string
+  whySafety: string
+  whyTransfer: string
+  whyRetention: string
+  whyResidency: string
+  whyErrors: string
+  whyNone: string
+  resolutionLast: string
+  resolutionNever: string
+  resolutionFailed: string
+  resolutionDismissed: string
+  resolutionReturned: string
+  resolutionHeld: string
 }>
 
 export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguage, Copy> = {
@@ -196,6 +214,25 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     quarantineReviewNever: 'The quarantine review has not reported a run yet.',
     quarantineReviewRestored: 'returned to the exam',
     quarantineReviewFailed: 'Quarantine review failed',
+    leftTitle: 'Left the University without graduating',
+    leftExplanation: 'Students with a proven FAIL are removed from the University automatically and their RunPod endpoints are deleted. Their weights and exam records are kept as proof.',
+    leftTotal: 'Removed',
+    leftUnexaminable: 'Not examinable — our exam data (not a FAIL)',
+    whyTitle: 'Why students fail — what to fix in training',
+    whyExamGates: 'Exam tests failed',
+    whyHoldout: 'Holdout (subject knowledge)',
+    whySafety: 'Safety',
+    whyTransfer: 'Transfer (unseen questions)',
+    whyRetention: 'Retention (after 12 hours)',
+    whyResidency: 'Residency skills not cleared',
+    whyErrors: 'Most common errors',
+    whyNone: 'Nothing recorded yet.',
+    resolutionLast: 'Quarantine resolution — last run',
+    resolutionNever: 'The quarantine resolution has not run yet.',
+    resolutionFailed: 'Quarantine resolution failed',
+    resolutionDismissed: 'removed',
+    resolutionReturned: 'returned to the exam',
+    resolutionHeld: 'held for investigation',
   },
   es: {
     title: 'COS University — Telemetría de destilación',
@@ -293,6 +330,25 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     quarantineReviewNever: 'La revisión de cuarentena aún no ha reportado una ejecución.',
     quarantineReviewRestored: 'devueltos al examen',
     quarantineReviewFailed: 'La revisión de cuarentena falló',
+    leftTitle: 'Salieron de la Universidad sin graduarse',
+    leftExplanation: 'Los estudiantes con un REPROBADO comprobado salen de la Universidad automáticamente y se eliminan sus endpoints de RunPod. Sus pesos y registros de examen se conservan como prueba.',
+    leftTotal: 'Retirados',
+    leftUnexaminable: 'No examinables — datos de examen nuestros (no es reprobado)',
+    whyTitle: 'Por qué reprueban — qué corregir en el entrenamiento',
+    whyExamGates: 'Pruebas del examen reprobadas',
+    whyHoldout: 'Holdout (conocimiento de la materia)',
+    whySafety: 'Seguridad',
+    whyTransfer: 'Transferencia (preguntas nuevas)',
+    whyRetention: 'Retención (después de 12 horas)',
+    whyResidency: 'Habilidades de Residencia no superadas',
+    whyErrors: 'Errores más frecuentes',
+    whyNone: 'Aún no hay registros.',
+    resolutionLast: 'Resolución de cuarentena — última ejecución',
+    resolutionNever: 'La resolución de cuarentena aún no se ha ejecutado.',
+    resolutionFailed: 'La resolución de cuarentena falló',
+    resolutionDismissed: 'retirados',
+    resolutionReturned: 'devueltos al examen',
+    resolutionHeld: 'retenidos para investigar',
   },
   pt: {
     title: 'COS University — Telemetria de destilação',
@@ -390,6 +446,25 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     quarantineReviewNever: 'A revisão da quarentena ainda não registrou uma execução.',
     quarantineReviewRestored: 'devolvidos ao exame',
     quarantineReviewFailed: 'A revisão da quarentena falhou',
+    leftTitle: 'Saíram da Universidade sem se formar',
+    leftExplanation: 'Estudantes com REPROVAÇÃO comprovada saem da Universidade automaticamente e seus endpoints do RunPod são excluídos. Pesos e registros de exame são mantidos como prova.',
+    leftTotal: 'Removidos',
+    leftUnexaminable: 'Não examináveis — dados de exame nossos (não é reprovação)',
+    whyTitle: 'Por que reprovam — o que corrigir no treinamento',
+    whyExamGates: 'Testes do exame reprovados',
+    whyHoldout: 'Holdout (conhecimento da matéria)',
+    whySafety: 'Segurança',
+    whyTransfer: 'Transferência (perguntas novas)',
+    whyRetention: 'Retenção (após 12 horas)',
+    whyResidency: 'Habilidades da Residência não concluídas',
+    whyErrors: 'Erros mais comuns',
+    whyNone: 'Nada registrado ainda.',
+    resolutionLast: 'Resolução da quarentena — última execução',
+    resolutionNever: 'A resolução da quarentena ainda não foi executada.',
+    resolutionFailed: 'A resolução da quarentena falhou',
+    resolutionDismissed: 'removidos',
+    resolutionReturned: 'devolvidos ao exame',
+    resolutionHeld: 'retidos para investigação',
   },
   pl: {
     title: 'COS University — Telemetria destylacji',
@@ -487,6 +562,25 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     quarantineReviewNever: 'Przegląd kwarantanny nie zgłosił jeszcze uruchomienia.',
     quarantineReviewRestored: 'przywróconych do egzaminu',
     quarantineReviewFailed: 'Przegląd kwarantanny nie powiódł się',
+    leftTitle: 'Opuścili Uniwersytet bez dyplomu',
+    leftExplanation: 'Studenci z potwierdzonym NIEZALICZENIEM są automatycznie usuwani z Uniwersytetu, a ich endpointy RunPod są kasowane. Wagi i zapisy egzaminów zostają jako dowód.',
+    leftTotal: 'Usunięci',
+    leftUnexaminable: 'Nie do egzaminowania — nasze dane egzaminu (to nie niezaliczenie)',
+    whyTitle: 'Dlaczego studenci nie zdają — co poprawić w treningu',
+    whyExamGates: 'Niezaliczone testy egzaminu',
+    whyHoldout: 'Holdout (wiedza z przedmiotu)',
+    whySafety: 'Bezpieczeństwo',
+    whyTransfer: 'Transfer (nowe pytania)',
+    whyRetention: 'Retencja (po 12 godzinach)',
+    whyResidency: 'Niezaliczone umiejętności Rezydentury',
+    whyErrors: 'Najczęstsze błędy',
+    whyNone: 'Brak zapisów.',
+    resolutionLast: 'Rozstrzygnięcie kwarantanny — ostatnie uruchomienie',
+    resolutionNever: 'Rozstrzygnięcie kwarantanny jeszcze się nie uruchomiło.',
+    resolutionFailed: 'Rozstrzygnięcie kwarantanny nie powiodło się',
+    resolutionDismissed: 'usuniętych',
+    resolutionReturned: 'przywróconych do egzaminu',
+    resolutionHeld: 'zatrzymanych do zbadania',
   },
   ru: {
     title: 'COS University — Телеметрия дистилляции',
@@ -584,6 +678,25 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     quarantineReviewNever: 'Проверка карантина ещё не сообщила о запуске.',
     quarantineReviewRestored: 'возвращено к экзамену',
     quarantineReviewFailed: 'Проверка карантина завершилась ошибкой',
+    leftTitle: 'Покинули Университет без выпуска',
+    leftExplanation: 'Студенты с подтверждённым НЕЗАЧЁТОМ автоматически удаляются из Университета, их эндпоинты RunPod удаляются. Веса и записи экзаменов сохраняются как доказательство.',
+    leftTotal: 'Удалено',
+    leftUnexaminable: 'Нельзя экзаменовать — наши данные экзамена (не незачёт)',
+    whyTitle: 'Почему студенты не сдают — что исправить в обучении',
+    whyExamGates: 'Проваленные тесты экзамена',
+    whyHoldout: 'Holdout (знание предмета)',
+    whySafety: 'Безопасность',
+    whyTransfer: 'Перенос (новые вопросы)',
+    whyRetention: 'Удержание (через 12 часов)',
+    whyResidency: 'Не пройденные навыки ординатуры',
+    whyErrors: 'Самые частые ошибки',
+    whyNone: 'Пока ничего не записано.',
+    resolutionLast: 'Разрешение карантина — последний запуск',
+    resolutionNever: 'Разрешение карантина ещё не запускалось.',
+    resolutionFailed: 'Разрешение карантина завершилось ошибкой',
+    resolutionDismissed: 'удалено',
+    resolutionReturned: 'возвращено к экзамену',
+    resolutionHeld: 'задержано для расследования',
   },
 }
 // end of saas/lib/i18n/cosUniversityTelemetryCopy.ts (if this line is missing, the paste was cut short)

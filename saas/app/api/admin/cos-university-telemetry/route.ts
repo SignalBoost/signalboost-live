@@ -1,4 +1,3 @@
-// saas/app/api/admin/cos-university-telemetry/route.ts
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -8,7 +7,9 @@ import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
 import { runpodPrimaryConfig, runpodPrimaryEnabled, runpodPrimaryModel } from '@/lib/ai/cos/runpodPrimaryInference'
 import { queryWorkingCosRuntimeIdentity, workingCosRuntimeBindingFromEnv } from '@/lib/ai/cos/cosWorkingRuntimeBinding'
 import {
+  QUARANTINE_RESOLUTION_LANE,
   QUARANTINE_REVIEW_LANE,
+  dismissalOf,
   quarantineNextAction,
   studentKey,
   summarizeQuarantine,
@@ -219,6 +220,10 @@ export async function GET() {
     const quarantineReviewLane = await db.from('cos_lane_status')
       .select('outcome,reason,detail,consecutive_count,observed_at')
       .eq('lane', QUARANTINE_REVIEW_LANE)
+      .maybeSingle()
+    const quarantineResolutionLane = await db.from('cos_lane_status')
+      .select('outcome,reason,detail,consecutive_count,observed_at')
+      .eq('lane', QUARANTINE_RESOLUTION_LANE)
       .maybeSingle()
 
     const openSources = new Map<string, {
@@ -593,11 +598,19 @@ export async function GET() {
           passed: evaluation.holdout_improved === true && evaluation.safety_passed === true
             && evaluation.unseen_transfer_passed === true && evaluation.delayed_retention_passed === true,
           observedAt: iso(evaluation.created_at),
+          failedGates: [
+            ...(evaluation.holdout_improved === true ? [] : ['holdout' as const]),
+            ...(evaluation.safety_passed === true ? [] : ['safety' as const]),
+            ...(evaluation.unseen_transfer_passed === true ? [] : ['transfer' as const]),
+            ...(evaluation.delayed_retention_passed === true ? [] : ['retention' as const]),
+          ],
         } : null,
       }
     })
     const quarantine = summarizeQuarantine({ students: quarantineStudents, eventsFor: rollingEventsFor, now: new Date() })
     const reviewLaneRow: any = quarantineReviewLane.error ? null : quarantineReviewLane.data
+    const resolutionLaneRow: any = quarantineResolutionLane.error ? null : quarantineResolutionLane.data
+    const resolutionLaneDetail = resolutionLaneRow?.detail && typeof resolutionLaneRow.detail === 'object' ? resolutionLaneRow.detail : {}
     const reviewLaneDetail = reviewLaneRow?.detail && typeof reviewLaneRow.detail === 'object' ? reviewLaneRow.detail : {}
 
     const artifacts = telemetryArtifactRows.map((artifact: any) => {
@@ -674,6 +687,8 @@ export async function GET() {
       // Quarantine comes before every in-progress stage: a student that finished Residency and then failed its exam is a
       // result, not an artifact waiting for a canary. The reason is named, never the generic "evaluation failed".
       else if (artifact.status === 'quarantined') { currentStage = 'Quarantine'; blocker = quarantineReason?.reason || 'no_recorded_reason'; nextAction = quarantineNextAction(quarantineReason?.reason || 'no_recorded_reason') }
+      // Removed from the University by the quarantine resolution (a proven result), or superseded by a newer student.
+      else if (artifact.status === 'retired') { const dismissal = dismissalOf({ candidateId, artifactHash }, rollingEventsFor(candidateId)); currentStage = 'Left the University'; blocker = dismissal?.reason || 'superseded'; nextAction = 'None' }
       // Terminal Residency FAIL: a remediation competency could no longer be cleared. It is a result, not work in progress.
       else if (residencyState?.standing === 'residency_failed') { currentStage = 'Builder Residency'; blocker = 'residency_failed'; nextAction = 'None — Residency FAIL (final result)' }
       else if (residencyState && residencyState.standing !== 'residency_complete') { currentStage = 'Builder Residency'; blocker = residencyState.standing; nextAction = residencyState.standing === 'remediation_required' ? 'Run remediation case' : 'Continue competency cases' }
@@ -826,7 +841,9 @@ export async function GET() {
         residencyResidents: residency.filter((row: any) => ['resident','senior_resident'].includes(row.standing)).length,
         residencyRemediation: residency.filter((row: any) => row.standing === 'remediation_required').length,
         residencyComplete: residency.filter((row: any) => row.standing === 'residency_complete').length,
-        residencyFailed: residency.filter((row: any) => row.standing === 'residency_failed').length,
+        // Only Residency FAILs still inside the University; the quarantine resolution moves them out within 15 minutes.
+        residencyFailed: residency.filter((row: any) => row.standing === 'residency_failed'
+          && artifactRowsByKey.get(row.candidateId + ':' + row.artifactHash)?.status === 'quarantined').length,
         activeGraduates: (graduatesResult.data || []).filter((row: any) => row.status === 'active').length,
         evaluationPending: artifacts.filter((row: any) => row.status === 'evaluation_pending').length,
         quarantined: artifacts.filter((row: any) => row.status === 'quarantined').length,
@@ -843,6 +860,16 @@ export async function GET() {
           checked: n(reviewLaneDetail.checked),
           restored: n(reviewLaneDetail.restored),
           error: text(reviewLaneDetail.error, 300) || null,
+        },
+        resolution: {
+          available: !quarantineResolutionLane.error,
+          ran: Boolean(resolutionLaneRow),
+          outcome: resolutionLaneRow ? text(resolutionLaneRow.outcome, 40) : null,
+          observedAt: resolutionLaneRow ? iso(resolutionLaneRow.observed_at) : null,
+          dismissed: n(resolutionLaneDetail.dismissed),
+          returnedToExam: n(resolutionLaneDetail.returnedToExam),
+          heldForInvestigation: n(resolutionLaneDetail.heldForInvestigation),
+          error: text(resolutionLaneDetail.error, 300) || null,
         },
       },
       workforce: {

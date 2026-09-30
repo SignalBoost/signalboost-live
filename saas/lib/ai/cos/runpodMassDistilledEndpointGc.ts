@@ -8,6 +8,7 @@ import { deleteTerminalMassDistilledRunpodEndpoint } from './runpodMassDistilled
 
 const PROFILE = 'cos_local_distilled_runtime_deploy_v1'
 const MAX_DELETIONS_PER_RUN = 20
+export const TERMINAL_ARTIFACT_STATUSES = ['quarantined', 'retired']
 const PAGE_SIZE = 500
 const clean = (value: unknown, max = 300) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 
@@ -17,11 +18,13 @@ export async function garbageCollectTerminalMassDistilledEndpoints(input: { dryR
 
   // DB-first by design. The incident we repair is the account-wide RunPod /serverless list failing
   // under endpoint accumulation, so GC must not require that list in order to make progress.
+  // Terminal = quarantined or retired. Owner direction 2026-09-30: students removed from the University for a proven
+  // FAIL are retired, and a retired student must not keep an endpoint (cost and RunPod worker quota) either.
   const terminalArtifacts: Array<{ candidate_id: string; trained_artifact_hash: string }> = []
   for (let from = 0; ; from += PAGE_SIZE) {
     const rows = await db.from('cos_local_distillation_artifacts')
       .select('candidate_id,trained_artifact_hash')
-      .eq('status', 'quarantined')
+      .in('status', TERMINAL_ARTIFACT_STATUSES)
       .like('candidate_id', 'mass:%')
       .order('updated_at', { ascending: true })
       .range(from, from + PAGE_SIZE - 1)

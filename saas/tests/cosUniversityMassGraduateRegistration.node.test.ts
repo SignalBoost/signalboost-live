@@ -64,3 +64,19 @@ test('registration runs before the activation flag, spends nothing and authorize
   assert.match(route, /COS_MASS_GRADUATE_REGISTRATION/)
   assert.doesNotMatch(route, /status: 'active'/)
 })
+
+
+test('graduate cron requeues a passed reopened artifact when its independent verdict is stale', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-graduate-activation/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /mass_graduate_stale_reopened_verdict_recovery_2026-09-30/)
+  assert.match(route, /row\.evidence\?\.claim === 'mass_distilled_independent_evaluation_completed'/)
+  assert.match(route, /row\.evidence\?\.evaluationPassed === true/)
+  assert.match(route, /row\.evidence\?\.claim === 'independent_evaluation'/)
+  assert.match(route, /Number\(row\.evidence\?\.baselineScore\) === baseline/)
+  assert.match(route, /Number\(row\.evidence\?\.trainedArtifactScore\) === trained/)
+  assert.match(route, /update\(\{ status: 'evaluation_pending', updated_at: now \}\)/)
+  assert.match(route, /\.eq\('status', 'runtime_pending'\)/)
+  assert.match(route, /claim: 'mass_distilled_independent_evaluation_reopened'/)
+  assert.match(route, /authorityExpanded: false, productionTrafficAuthorized: false/)
+  assert.match(route, /reason: 'stale_reopened_verdict_requeued'/)
+})

@@ -661,7 +661,9 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
         completionTokens,
         contentLength: text.length,
       }))
-      return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
+      noteServedInference(provider, model)
+      noteServedInference(provider, model)
+  return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
     }
     const error = new Error(LOCAL_MODEL_OUTPUT_TRUNCATED) as Error & { emptyContent?: boolean }
     error.emptyContent = !text

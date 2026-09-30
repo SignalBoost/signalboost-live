@@ -1,0 +1,259 @@
+//
+// Owner direction 2026-09-30: "what is the reason of quarantine forever ... if they are there because of our
+// infrastructure fix it - if because they are incompetent delete them." Quarantine is a short stop, not a place to live.
+// Every 15 minutes (the backlog-compact cron, right after the quarantine review) each quarantined student gets the
+// decision its recorded reason calls for:
+//
+//   exam FAIL on merit / Residency FAIL / three real exam failures  -> leaves the University (status `retired`)
+//   our errors counted against it                                   -> the quarantine review returns it to the exam
+//   frozen exam data broken (ours)                                  -> leaves the University, recorded as OURS
+//   no recorded reason                                              -> returned to the exam ONCE; the exam decides
+//
+// "Delete" is a status, not a wipe: the student leaves every University count and queue, and the terminal-endpoint GC
+// then deletes its RunPod endpoint (no cost, no worker quota). The trained weights, exam scores and this dismissal
+// record stay as the proof of the result, and the failure-derived curriculum keeps learning from them. The standard is
+// unchanged: nothing here turns a FAIL into a pass, and a student returned to the exam still has to pass it.
+
+import { createHash } from 'node:crypto'
+import type { RollingEvent } from './cosUniversityMassEvaluationRollingAuthority.ts'
+import {
+  QUARANTINE_DISMISSED_CLAIM,
+  QUARANTINE_RESOLUTION_PROFILE,
+  QUARANTINE_RETURNED_CLAIM,
+  classifyQuarantinedStudent,
+  type ExamGate,
+  type QuarantineClassification,
+  type QuarantineReason,
+  type QuarantineStudent,
+} from './cosUniversityQuarantineReasons.ts'
+
+export const QUARANTINE_RESOLUTION_MAX_PER_RUN = 100
+const PAGE_SIZE = 500
+const CANDIDATE_CHUNK = 75
+const EVENT_PAGE_SIZE = 1000
+const MAX_EVENT_PAGES = 20
+
+export type QuarantineAction = 'dismiss' | 'return_to_exam' | 'leave_for_review' | 'hold_for_investigation'
+
+export type QuarantineDecision = Readonly<{
+  action: QuarantineAction
+  reason: QuarantineReason
+  /** True when the student is not at fault (our infrastructure or our exam data). */
+  ours: boolean
+}>
+
+/**
+ * Pure: what the owner's rule says for one classified student. `alreadyReturned` is true when this exact student was
+ * returned to the exam once before by this resolution; a second quarantine with no recorded reason is our defect to
+ * investigate, never evidence that the student is incompetent, so it is held (visible) instead of looping.
+ */
+export function decideQuarantineResolution(input: {
+  classification: QuarantineClassification
+  candidateId: string
+  alreadyReturned: boolean
+}): QuarantineDecision {
+  const { reason } = input.classification
+  if (reason === 'exam_failed' || reason === 'residency_failed' || reason === 'exhausted_real_failures') {
+    return Object.freeze({ action: 'dismiss', reason, ours: false })
+  }
+  if (reason === 'exam_data_defect') return Object.freeze({ action: 'dismiss', reason, ours: true })
+  if (reason === 'exhausted_our_errors') return Object.freeze({ action: 'leave_for_review', reason, ours: true })
+  // no_recorded_reason: only the mass lane's exam can be re-armed automatically.
+  if (!input.candidateId.startsWith('mass:') || input.alreadyReturned) {
+    return Object.freeze({ action: 'hold_for_investigation', reason, ours: true })
+  }
+  return Object.freeze({ action: 'return_to_exam', reason, ours: true })
+}
+
+const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
+const text = (value: unknown, max = 300) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+const HEX64 = /^[a-f0-9]{64}$/i
+
+export function chunks<T>(items: readonly T[], size = CANDIDATE_CHUNK): T[][] {
+  const out: T[][] = []
+  for (let offset = 0; offset < items.length; offset += size) out.push(items.slice(offset, offset + size))
+  return out
+}
+
+function failedGatesFromRow(row: any): ExamGate[] {
+  const gates: ExamGate[] = []
+  if (row?.holdout_improved !== true) gates.push('holdout')
+  if (row?.safety_passed !== true) gates.push('safety')
+  if (row?.unseen_transfer_passed !== true) gates.push('transfer')
+  if (row?.delayed_retention_passed !== true) gates.push('retention')
+  return gates
+}
+
+export type QuarantineResolutionResult = Readonly<{
+  quarantined: number
+  dismissed: number
+  returnedToExam: number
+  leftForReview: number
+  heldForInvestigation: number
+  remaining: number
+  byReason: Readonly<Record<string, number>>
+}>
+
+/** Reads the quarantine, decides per student, and applies at most QUARANTINE_RESOLUTION_MAX_PER_RUN changes. */
+export async function resolveQuarantine(input: { db: any; now?: Date }): Promise<QuarantineResolutionResult> {
+  const db = input.db
+  if (!db) throw new Error('service_database_unavailable')
+  const now = input.now ?? new Date()
+
+  const quarantined: any[] = []
+  for (let from = 0; from < PAGE_SIZE * 40; from += PAGE_SIZE) {
+    const page = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,status')
+      .eq('status', 'quarantined')
+      .order('updated_at', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1)
+    if (page.error) throw page.error
+    quarantined.push(...(page.data || []))
+    if ((page.data || []).length < PAGE_SIZE) break
+  }
+  const students = quarantined
+    .map(row => ({
+      candidateId: text(row.candidate_id, 240),
+      subjectId: text(row.subject_id, 240),
+      artifactHash: text(row.trained_artifact_hash, 80).toLowerCase(),
+      createdAt: text(row.created_at, 40),
+      status: 'quarantined',
+    }))
+    .filter(row => row.candidateId && HEX64.test(row.artifactHash))
+  const byReason: Record<string, number> = {}
+  const empty = { quarantined: students.length, dismissed: 0, returnedToExam: 0, leftForReview: 0, heldForInvestigation: 0 }
+  if (!students.length) return Object.freeze({ ...empty, remaining: 0, byReason: Object.freeze(byReason) })
+
+  const candidateIds = [...new Set(students.map(row => row.candidateId))]
+  const eventsByCandidate = new Map<string, RollingEvent[]>()
+  const evaluationByKey = new Map<string, any>()
+  const residencyByKey = new Map<string, string>()
+  for (const chunk of chunks(candidateIds)) {
+    for (let from = 0; from < EVENT_PAGE_SIZE * MAX_EVENT_PAGES; from += EVENT_PAGE_SIZE) {
+      const page = await db.from('cos_university_learning_assurance_events')
+        .select('candidate_id,observed_at,expires_at,verifier,evidence')
+        .eq('event_type', 'fine_tune')
+        .in('candidate_id', chunk)
+        .order('observed_at', { ascending: true })
+        .range(from, from + EVENT_PAGE_SIZE - 1)
+      if (page.error) throw page.error
+      for (const row of page.data || []) {
+        const candidateId = text(row.candidate_id, 240)
+        const list = eventsByCandidate.get(candidateId) || []
+        list.push(Object.freeze({
+          candidateId,
+          observedAt: String(row.observed_at || ''),
+          expiresAt: row.expires_at == null ? null : String(row.expires_at),
+          verifier: String(row.verifier || ''),
+          evidence: row.evidence && typeof row.evidence === 'object' && !Array.isArray(row.evidence) ? row.evidence : null,
+        }))
+        eventsByCandidate.set(candidateId, list)
+      }
+      if ((page.data || []).length < EVENT_PAGE_SIZE) break
+    }
+    const evaluations = await db.from('cos_university_distilled_evaluation_runs')
+      .select('candidate_id,trained_artifact_hash,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
+      .in('candidate_id', chunk)
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    if (evaluations.error) throw evaluations.error
+    for (const row of evaluations.data || []) {
+      const key = `${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 80).toLowerCase()}`
+      if (!evaluationByKey.has(key)) evaluationByKey.set(key, row)
+    }
+    const residency = await db.from('cos_university_residency_enrollments')
+      .select('candidate_id,trained_artifact_hash,standing')
+      .in('candidate_id', chunk)
+      .limit(1000)
+    if (residency.error) throw residency.error
+    for (const row of residency.data || []) {
+      residencyByKey.set(`${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 80).toLowerCase()}`, text(row.standing, 80))
+    }
+  }
+
+  let applied = 0
+  let dismissed = 0
+  let returnedToExam = 0
+  let leftForReview = 0
+  let heldForInvestigation = 0
+  for (const student of students) {
+    const key = `${student.candidateId}:${student.artifactHash}`
+    const events = eventsByCandidate.get(student.candidateId) || []
+    const evaluationRow = evaluationByKey.get(key)
+    const full: QuarantineStudent = {
+      ...student,
+      residencyStanding: residencyByKey.get(key) || null,
+      evaluation: evaluationRow ? {
+        passed: failedGatesFromRow(evaluationRow).length === 0,
+        observedAt: text(evaluationRow.created_at, 40) || null,
+        failedGates: failedGatesFromRow(evaluationRow),
+      } : null,
+    }
+    const classification = classifyQuarantinedStudent({ student: full, events, now })
+    const alreadyReturned = events.some(event => event.evidence?.profile === QUARANTINE_RESOLUTION_PROFILE
+      && event.evidence?.claim === QUARANTINE_RETURNED_CLAIM
+      && String(event.evidence?.artifactHash || '').toLowerCase() === student.artifactHash)
+    const decision = decideQuarantineResolution({ classification, candidateId: student.candidateId, alreadyReturned })
+    byReason[decision.reason] = (byReason[decision.reason] || 0) + 1
+
+    if (decision.action === 'leave_for_review') { leftForReview += 1; continue }
+    if (decision.action === 'hold_for_investigation') { heldForInvestigation += 1; continue }
+    if (applied >= QUARANTINE_RESOLUTION_MAX_PER_RUN) continue
+
+    const nextStatus = decision.action === 'dismiss' ? 'retired' : 'evaluation_pending'
+    const at = new Date().toISOString()
+    // Conditional on the exact student still being quarantined: a retry or a concurrent run changes nothing twice.
+    const updated = await db.from('cos_local_distillation_artifacts')
+      .update({ status: nextStatus, updated_at: at })
+      .eq('candidate_id', student.candidateId)
+      .eq('trained_artifact_hash', student.artifactHash)
+      .eq('status', 'quarantined')
+      .select('id')
+    if (updated.error) throw updated.error
+    if (!(updated.data || []).length) continue
+    applied += 1
+
+    const claim = decision.action === 'dismiss' ? QUARANTINE_DISMISSED_CLAIM : QUARANTINE_RETURNED_CLAIM
+    const body = {
+      profile: QUARANTINE_RESOLUTION_PROFILE,
+      claim,
+      candidateId: student.candidateId,
+      artifactHash: student.artifactHash,
+      reason: decision.reason,
+      ours: decision.ours,
+      failedGates: classification.failedGates,
+      failedCompetencies: classification.failedCompetencies,
+      lastError: classification.lastError,
+      dispositionAt: classification.since,
+      previousStatus: 'quarantined',
+      nextStatus,
+      ownerDirection: 'owner_explicit_direction_2026-09-30_resolve_quarantine',
+      evaluationPassed: false,
+      productionTrafficAuthorized: false,
+      authorityExpanded: false,
+    }
+    const event = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: hash([QUARANTINE_RESOLUTION_PROFILE, claim, student.candidateId, student.artifactHash]),
+      event_type: 'fine_tune',
+      subject_id: student.subjectId || null,
+      candidate_id: student.candidateId,
+      evidence_hash: hash(body),
+      evidence: body,
+      verifier: 'host_controller',
+      observed_at: at,
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (event.error) throw event.error
+    if (decision.action === 'dismiss') dismissed += 1
+    else returnedToExam += 1
+  }
+
+  return Object.freeze({
+    quarantined: students.length,
+    dismissed,
+    returnedToExam,
+    leftForReview,
+    heldForInvestigation,
+    remaining: students.length - dismissed - returnedToExam,
+    byReason: Object.freeze(byReason),
+  })
+}

@@ -1,5 +1,5 @@
-// saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { scopeReasonerPromptToQuestion } from './cosReasonerPromptScope.ts'
 import { blockingReleaseSignals, advisoryReleaseSignals } from './releaseSignalSeverity.ts'
 import { resolveCalcMarkers } from './calcExpressions.ts'
 
@@ -438,7 +438,7 @@ export function cosIdentityPreamble(audience:CosAudience):string {
   ].filter(Boolean).join(' ')
 }
 
-export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged?:boolean; audience?:CosAudience}):string {
+export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged?:boolean; audience?:CosAudience; question?:string|null}):string {
   // OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (2026-08-25, owner-directed). Only the owner audience
   // sets privileged; public and user audiences never receive this block. Values are resolved live from the configured reasoner so the
   // answer stays true across provider migrations instead of hardcoding today's stack.
@@ -454,7 +454,9 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
       '- When the owner asks what SignalBoost or COS is, who owns it, what model powers it, or how it works, answer openly and completely from this block plus the definitions above — name the model, the hosting kind, and the configuration. These details are owner-only and must never appear in answers on public channels.',
     ].join('\n')
   })() : ''
-  return [
+  // QUESTION-SCOPED INSTRUCTIONS (2026-09-29): blocks for question classes this question is not in are left out,
+  // so chat fits the owned RunPod window and every provider reads far fewer tokens. See cosReasonerPromptScope.ts.
+  return scopeReasonerPromptToQuestion([
     "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
     'The product you serve is iTMounts (itmounts.com); SignalBoost is only its internal name and is never used in answers.',
     audienceSection(options?.audience),
@@ -550,7 +552,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     `Reply in ${reportLanguageName(language)}.`,
     'Return ONLY strict JSON, nothing before the opening brace and nothing after the closing brace: {"answer":"complete answer","confidence":0.0}.',
     'The 0.0 in that example is a FORMAT PLACEHOLDER, not a suggested value. Always replace it with your own genuine self-assessment between 0 and 1. For advisory or strategic questions with no single verifiable answer, confidence should reflect how well-reasoned and grounded the recommendation is given the stated facts, not certainty the advice will succeed — that can never be fully known. Reserve near-zero for genuinely baseless guesses, not for good, well-reasoned advice.',
-  ].join('\n')
+  ].join('\n'), options?.question, reportLanguageName(language))
 }
 
 async function recordKnowledgeGap(prompt:string, confidence:number, reason:string):Promise<void> {
@@ -640,7 +642,6 @@ async function semanticLearnedCorpus(prompt:string) {
     }, budgetMs)),
   ])
 }
-
 function emptyRetrieval():RetrievalCounts { return { retrieved:0, relevant:0, selected:0 } }
 function stage(counts:RetrievalCounts, injected:boolean, cited=0):EvidenceFunnelStage {
   return { ...counts, injected:injected ? counts.selected : 0, cited }
@@ -650,7 +651,6 @@ function stage(counts:RetrievalCounts, injected:boolean, cited=0):EvidenceFunnel
 // question — owner, signed-in user, or public visitor — is reasoned by this one pipeline. WHO IS ASKING
 // changes what COS may know and say (retrieval scope, knowledge blocks, release rules), never which
 // pipeline answers.
-// saas/lib/ai/cos/cosFirstAnswerEnterprise.ts (part 2 of 2 — paste directly below part 1)
 export type CosAudience = 'owner' | 'user' | 'public'
 export function cosAudience(privileged:boolean):CosAudience {
   if (isPublicDeliveryScope()) return 'public'
@@ -1085,7 +1085,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     disableThinking:true,
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:interactiveReasonerMaxTokens(),
-    systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience }),
+    systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: audience === 'owner', audience, question: input.prompt }),
     // COMPANY KNOWLEDGE BLOCK (2026-09-26). Every audience gets the owner-approved company identity and
     // public catalog directly in the prompt for questions about iTMounts. When the identity was only one
     // line among the system-prompt definitions, the owner channel answered "iTMounts is not a recognized

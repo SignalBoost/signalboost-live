@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityPracticeStudyMaterial.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import fs from 'node:fs'
@@ -171,15 +172,19 @@ test('actual acquisition cycle records only successfully admitted hashes, never 
     documentMatchesTargetLanguage)
   const documents = ['accepted', 'duplicate', 'probationary', 'storage'].map(kind => ({ sourceKind: 'scientific_journal',
     sourceUri: `https://example.org/${kind}`, sourceTitle: 'Historical evidence and culture', subject: 'History', text: 'Historical evidence and culture. '.repeat(80) }))
-  const director = { prioritizeGaps: (gaps: unknown[]) => gaps, admit: async (candidate: { sourceUri: string }) => {
+  let acceptedCandidate: { sourceUri: string; summary: string } | null = null
+  const director = { prioritizeGaps: (gaps: unknown[]) => gaps, admit: async (candidate: { sourceUri: string; summary: string }) => {
     if (candidate.sourceUri.endsWith('/storage')) throw new Error('injected_storage_failure')
-    if (candidate.sourceUri.endsWith('/accepted')) return { accepted: true }
+    if (candidate.sourceUri.endsWith('/accepted')) { acceptedCandidate = candidate; return { accepted: true } }
     return { accepted: false, reason: candidate.sourceUri.endsWith('/duplicate') ? 'duplicate' : 'probationary', deferred: candidate.sourceUri.endsWith('/probationary') }
   } }
   const result = await new Cycle(director, [{ kind: 'scientific_journal', acquire: async () => documents }]).run([{ id: 'gap', subject: 'History', question: 'Historical evidence and culture' }])
   assert.equal(result.accepted, 1); assert.equal(result.probationary, 1); assert.equal(result.sourceErrors.storage, 1)
+  // Retained-content identity (2026-09-29): URI + the retained summary, not the full fetched text, so a
+  // re-fetched source whose surrounding text changed is recognised as the same knowledge.
+  assert.ok(acceptedCandidate)
   assert.deepEqual(result.gapDiagnostics.gap.acceptedContentHashes,
-    [hash(documents[0].sourceUri + '\n' + documents[0].text.replace(/\s+/g, ' ').trim())])
+    [hash(acceptedCandidate!.sourceUri + '\n' + acceptedCandidate!.summary)])
 })
 
 test('runtime wires practice-only material and performs bounded same-agent reads without academic writes', () => {

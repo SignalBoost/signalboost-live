@@ -10,6 +10,7 @@ import { ensureRunpodReasonerStarted } from './runpodLifecycle.ts'
 import { resolveRunpodPrimaryPodId } from './runpodPodResolver.ts'
 import { acquireRunpodInferenceLease, releaseRunpodInferenceLease } from './runpodInferenceLease.ts'
 import { runpodGatewayKey } from '../../hub/runpodTelemetry.ts'
+import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 
 export type RunpodPrimaryWorkload = 'reasoner' | 'builder'
 export type RunpodPrimaryAttempt = Readonly<{
@@ -80,6 +81,7 @@ async function proveReady(workload: RunpodPrimaryWorkload, podId: string): Promi
         readyPodId = podId
         readyModel = config.model
         readyUntil = Date.now() + READY_TTL_MS
+        void writeSharedReadiness(podId, config.model)
         return true
       }
       lastHealthError = health.error || `model_mismatch:${health.model}`
@@ -99,6 +101,87 @@ async function proveReady(workload: RunpodPrimaryWorkload, podId: string): Promi
     return await readinessPromise
   } finally {
     readinessPromise = null
+  }
+}
+
+// SHARED READINESS (2026-09-30). The readiness proof (pod lookup + wake check + /models health) cost live chat 1.6 s
+// on every question because each serverless instance keeps its own 60 s cache. Any instance that proves readiness,
+// or completes a chat answer on the pod, records it for all instances. Chat trusts a recent record and skips the proof.
+const SHARED_READY_MISSION_ID = '__cos_runpod_primary_ready__'
+const SHARED_READY_TTL_MS = 5 * 60_000
+
+async function writeSharedReadiness(podId: string, model: string): Promise<void> {
+  try {
+    const db = cosServiceDb()
+    if (!db) return
+    const now = new Date().toISOString()
+    await db.from('cos_autonomy_state').upsert({
+      mission_id: SHARED_READY_MISSION_ID,
+      state: { kind: 'runpod_primary_ready', podId, model, provenAt: now },
+      updated_at: now,
+    }, { onConflict: 'mission_id' })
+  } catch (error) {
+    console.warn('[runpod-primary-shared-readiness-write]', error instanceof Error ? error.message : String(error))
+  }
+}
+
+export function sharedReadinessPodId(state: unknown, model: string, now: number): string | null {
+  if (!state || typeof state !== 'object') return null
+  const record = state as Record<string, unknown>
+  const provenAt = typeof record.provenAt === 'string' ? Date.parse(record.provenAt) : Number.NaN
+  if (!Number.isFinite(provenAt) || now - provenAt > SHARED_READY_TTL_MS || provenAt - now > 60_000) return null
+  if (record.model !== model || typeof record.podId !== 'string' || !record.podId.trim()) return null
+  return record.podId.trim()
+}
+
+async function readSharedReadiness(model: string): Promise<string | null> {
+  try {
+    const db = cosServiceDb()
+    if (!db) return null
+    const { data, error } = await db.from('cos_autonomy_state').select('state').eq('mission_id', SHARED_READY_MISSION_ID).maybeSingle()
+    if (error) return null
+    return sharedReadinessPodId(data?.state, model, Date.now())
+  } catch {
+    return null
+  }
+}
+
+export async function noteRunpodPrimaryServed(workload: RunpodPrimaryWorkload): Promise<void> {
+  const model = runpodPrimaryModel(workload)
+  if (!readyPodId || readyModel !== model) return
+  readyUntil = Date.now() + READY_TTL_MS
+  await writeSharedReadiness(readyPodId, model)
+}
+
+export async function invalidateRunpodPrimaryReadiness(): Promise<void> {
+  readyUntil = 0
+  try {
+    const db = cosServiceDb()
+    if (!db) return
+    await db.from('cos_autonomy_state').delete().eq('mission_id', SHARED_READY_MISSION_ID)
+  } catch (error) {
+    console.warn('[runpod-primary-shared-readiness-clear]', error instanceof Error ? error.message : String(error))
+  }
+}
+
+export async function resolveRunpodPrimaryConfigForChat(
+  workload: RunpodPrimaryWorkload,
+): Promise<LocalInferenceConfig | null> {
+  if (!runpodPrimaryEnabled()) return null
+  const model = runpodPrimaryModel(workload)
+  try {
+    if (readyPodId && readyModel === model && readyUntil > Date.now()) return runpodPrimaryConfig(workload, readyPodId)
+    const sharedPodId = await readSharedReadiness(model)
+    if (sharedPodId) {
+      readyPodId = sharedPodId
+      readyModel = model
+      readyUntil = Date.now() + READY_TTL_MS
+      return runpodPrimaryConfig(workload, sharedPodId)
+    }
+    return resolveReadyRunpodPrimaryConfig(workload)
+  } catch (error) {
+    console.warn('[runpod-primary-chat-resolution]', error instanceof Error ? error.message : String(error))
+    return resolveReadyRunpodPrimaryConfig(workload)
   }
 }
 

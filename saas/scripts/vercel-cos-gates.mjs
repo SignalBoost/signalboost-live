@@ -34,6 +34,7 @@ const tests = [
   'tests/cosLaneStatus.node.test.ts',
   'tests/cosWorkingDistillationDispatch.node.test.ts',
   'tests/cosWorkingDistillationEvaluationAdmission.node.test.ts',
+  'tests/cosWorkingDistillationEvaluatorRuntime.node.test.ts',
   'tests/cosUniversityHuggingFaceJobs.node.test.ts',
   'tests/platformHarnessFullEnforcement.node.test.ts',
   'tests/deepInfraHarnessSpendGuard.node.test.ts',

@@ -769,6 +769,8 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       // do not queue: record the skip and let the managed backup start now. While chat runs it holds the slot,
       // so background work waits for chat instead of the other way round.
       const leases = await import('./cos/runpodInferenceLease.ts')
+      // Every chat attempt claims priority: background Builder work stops taking the slot for the next few minutes.
+      void leases.markChatRunpodDemand()
       let slot: Awaited<ReturnType<typeof leases.tryAcquireRunpodInferenceLeaseNow>> | undefined
       const slotStartedAt = Date.now()
       try {

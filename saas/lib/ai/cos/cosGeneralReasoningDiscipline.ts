@@ -1,8 +1,6 @@
-// saas/lib/ai/cos/cosGeneralReasoningDiscipline.ts
-import { COS_BEHAVIORAL_CONTRACT } from './cosBehavioralContract.ts'
+import { COS_BEHAVIORAL_CONTRACT, COS_BEHAVIORAL_CONTRACT_LINES } from './cosBehavioralContract.ts'
 
-export const COS_GENERAL_REASONING_DISCIPLINE = [
-  COS_BEHAVIORAL_CONTRACT,
+const REASONING_INVARIANT_LINES: readonly string[] = Object.freeze([
   'COS GENERAL REASONING SAFETY INVARIANTS.',
   'Do not invent missing context, evidence, tool results, identities, dates, quantities, or user preferences.',
   'Distinguish supplied facts and evidence from inference, judgment, prediction, and preference.',
@@ -21,4 +19,36 @@ export const COS_GENERAL_REASONING_DISCIPLINE = [
   'Do not apply a candidate procedural lesson merely because it exists in memory; learned procedural guidance may influence a live answer only when the caller supplies it through the validated cognitive-skill path.',
   'Do the reasoning internally. Do not expose hidden scratchpad or chain-of-thought; provide only the answer and the concise rationale or evidence the user needs.',
   'Preserve every caller output contract, including strict JSON or other machine-readable formats.',
+])
+
+export const COS_GENERAL_REASONING_DISCIPLINE = [COS_BEHAVIORAL_CONTRACT, ...REASONING_INVARIANT_LINES].join(' ')
+
+// GENERAL EXPLANATORY QUESTIONS (2026-09-30, owner goal: chat answers in under 10 seconds).
+// A question that only asks what something is or how it works involves no task, decision, approval, finance,
+// incident, legal duty or deliverable, so the contract and invariant lines governing those are left out; every
+// line kept is verbatim. RunPod reads ~1,300 fewer tokens per such answer. Every other request keeps the full text.
+const EXPLANATORY_CONTRACT_PREFIXES = Object.freeze([
+  'COS BEHAVIORAL CONTRACT',
+  'Decision priority is strict',
+  'Do not blindly agree',
+  'Communicate directly and concisely',
+  'Resolve material ambiguity',
+  'Before asserting current or uncertain facts',
+  'When uncertainty remains',
+  'When sources conflict',
+])
+const EXPLANATORY_INVARIANT_PREFIXES = Object.freeze([
+  'COS GENERAL REASONING SAFETY INVARIANTS',
+  'Do not invent missing context',
+  'Distinguish supplied facts',
+  'Before finalizing',
+  'Do not apply a candidate procedural lesson',
+  'Do the reasoning internally',
+  'Preserve every caller output contract',
+])
+const keep = (lines: readonly string[], prefixes: readonly string[]) => lines.filter(line => prefixes.some(prefix => line.startsWith(prefix)))
+
+export const COS_EXPLANATORY_REASONING_DISCIPLINE = [
+  ...keep(COS_BEHAVIORAL_CONTRACT_LINES, EXPLANATORY_CONTRACT_PREFIXES),
+  ...keep(REASONING_INVARIANT_LINES, EXPLANATORY_INVARIANT_PREFIXES),
 ].join(' ')

@@ -24,6 +24,28 @@ const QUANTITATIVE_SIGNAL = /\d|[%$€£¥]|\b(?:calculat\w*|comput\w*|estimat\w
 
 const COS_SELF_SIGNAL = /\b(?:cos|itmounts|signalboost|you|your|yours|yourself|memory|memories|cache|cached|knowledge\s+graph|corpus|skills?|learn\w*|train\w*|model|models|platform|provenance|citation\w*|reasoner|brain)\b/i
 
+// GENERAL EXPLANATORY QUESTIONS (2026-09-30). Production 06:06 UTC, "What does a Kubernetes ClusterIP Service do?":
+// RunPod read 11,880 prompt tokens and the turn took 18.6 s. About 20,000 of the ~46,000 characters of instructions
+// govern owner tasks, decisions, approvals, deliverables, recommendations, figures, dates, code, statements to assess,
+// pasted text to interpret, and incident diagnosis — none of which a question that only asks what something is or how
+// it works involves. For such a question those blocks are left out (text of every kept line unchanged), and the
+// prompt is identical from one such question to the next, so the RunPod server can reuse its cached prefix.
+// Conservative: anything that looks like a task, a first-person situation, an incident, quoted text, a figure, a
+// recommendation, a COS/platform term or a non-English question keeps the full prompt.
+const EXPLANATORY_OPENING = /^(?:what|how|why|when|where|which|who|is|are|does|do|can|explain|describe|define|compare|contrast)\b/i
+
+const NOT_EXPLANATORY_SIGNAL = /\b(?:i|me|my|mine|we|us|our|ours|you|your|should|must|need|needs|want|recommend\w*|advise|advice|decide|decision|approve\w*|choose|pick|best|create|write|draft|build|make|generate|fix|repair|send|email|post|publish|schedule|deploy|deploying|redeploy\w*|merge|commit|implement|script|design|review|audit|analy[sz]e|summari[sz]e|translate|rewrite|edit|plan|planning|prepare|help|give|show|list|run|execute|check|verify|test|debug\w*|troubleshoot\w*|diagnos\w*|investigat\w*|incident\w*|outage\w*|errors?|fail\w*|broken|bug|bugs|crash\w*|cause[sd]?|oom\w*|killed|evict\w*|slow\w*|timeouts?|leak\w*|stuck|hang\w*|alert\w*|customer\w*|client\w*|campaign\w*|sales|marketing|legal|law|laws|regulat\w*|complian\w*|gdpr|privacy|contract\w*|invoice\w*|hire|hiring|staff\w*|concierge|university|specialist\w*|artifact\w*|graduate\w*|residency|chief)\b/i
+
+// "When would you use X?" addresses a generic practitioner, not COS or the owner's situation.
+const GENERIC_PRACTITIONER_YOU = /\b(?:would|do|should|could|can|might|will) you (?:use|choose|pick|need|want|prefer|apply|configure|set up)\b/gi
+
+const PROTECTED_LITERAL_SIGNAL = /\b(?:keep|kept|preserv\w*|exact\w*|unchanged|verbatim|literal\w*|conserv\w*)\b/i
+
+const CODE_SIGNAL = /[`{}]|=>|\b(?:yaml|json|sql|regex|snippet|example|syntax|command|commands|cli|kubectl|manifest|code|function|program)\b/i
+
+/** Placed in a prompt scoped for a general explanatory question; the reasoning workers read it to pick their compact discipline. */
+export const EXPLANATORY_QUESTION_SCOPE_LINE = 'QUESTION SCOPE: a general explanatory question. Explain the concept directly and accurately; no task, decision, approval or deliverable is requested.'
+
 const LANGUAGE_PROFILE_LINE = /^- (English|Spanish|Brazilian Portuguese|Polish|Russian): /
 
 const LANGUAGE_BY_CODE: Readonly<Record<string, string>> = {
@@ -40,6 +62,9 @@ export type ReasonerPromptScope = Readonly<{
   givenFacts: boolean
   cosDefinitions: boolean
   languageProfile: string | null
+  explanatory: boolean
+  code: boolean
+  protectedLiteral: boolean
 }>
 
 function selectedLanguageProfile(language: string | null | undefined): string | null {
@@ -64,12 +89,26 @@ export function reasonerPromptScopeFor(question: string, language?: string | nul
   const quantitative = QUANTITATIVE_SIGNAL.test(text) || QUANTITATIVE_SIGNAL.test(normalized)
   // Non-ASCII questions may be written in a language the profile selector did not pick; keep every profile.
   const nonLatinOrAccented = /[^\u0000-\u007f]/.test(text)
+  const givenFacts = quantitative || normative || text.length > 400
+  const withoutGenericYou = text.replace(GENERIC_PRACTITIONER_YOU, ' ')
+  const cosDefinitions = COS_SELF_SIGNAL.test(withoutGenericYou) || COS_SELF_SIGNAL.test(normalized.replace(GENERIC_PRACTITIONER_YOU, ' '))
+  const languageProfile = nonLatinOrAccented ? null : selectedLanguageProfile(language)
+  const explanatory = languageProfile === 'English'
+    && !normative && !quantitative && !givenFacts && !cosDefinitions
+    && text.length <= 300
+    && (text.match(/\?/g) ?? []).length <= 1
+    && EXPLANATORY_OPENING.test(text)
+    && !NOT_EXPLANATORY_SIGNAL.test(withoutGenericYou)
+    && !/["«»\u201c\u201d]|https?:\/\//.test(text)
   return Object.freeze({
     normative,
     quantitative,
-    givenFacts: quantitative || normative || text.length > 400,
-    cosDefinitions: COS_SELF_SIGNAL.test(text) || COS_SELF_SIGNAL.test(normalized),
-    languageProfile: nonLatinOrAccented ? null : selectedLanguageProfile(language),
+    givenFacts,
+    cosDefinitions,
+    languageProfile,
+    explanatory,
+    code: CODE_SIGNAL.test(text),
+    protectedLiteral: PROTECTED_LITERAL_SIGNAL.test(text),
   })
 }
 
@@ -88,6 +127,68 @@ function dropBlock(lines: string[], startHeader: string, endHeader: string): str
   while (end < lines.length && !lines[end].startsWith(endHeader)) end += 1
   if (end >= lines.length) return lines
   return [...lines.slice(0, start), ...lines.slice(end)]
+}
+
+/** Remove the lines from the first line starting with `startPrefix` up to (not including) the first later line starting with `endPrefix`. */
+function dropBlockFrom(lines: string[], startPrefix: string, endPrefix: string): string[] {
+  const start = lines.findIndex(line => line.startsWith(startPrefix))
+  if (start < 0) return lines
+  let end = start + 1
+  while (end < lines.length && !lines[end].startsWith(endPrefix)) end += 1
+  if (end >= lines.length) return lines
+  return [...lines.slice(0, start), ...lines.slice(end)]
+}
+
+// Lines inside otherwise-kept blocks that govern only incident diagnosis, statistical or social evidence, owner
+// work completion, text interpretation, protected literals and non-English wording.
+const NON_EXPLANATORY_LINE_PREFIXES = Object.freeze([
+  '- For diagnostic or troubleshooting questions',
+  '- Before writing a diagnosis',
+  '- Illustrative "why it fits"',
+  '- When asked to rank',
+  '- Three causes named precisely',
+  '- Naming a monitoring product',
+  '- Before combining evidence',
+  '- Keep materially different measurements',
+  '- Distinguish observation from explanation',
+  '- Weigh evidence by directness',
+  '- Open with yes or no only when',
+  '- For diagnosis and troubleshooting',
+  '- Do not use evidence about an adjacent mechanism',
+  '- Work end to end.',
+  '- Completion means the whole cycle',
+  '- Evidence discipline must not erase ordinary language understanding',
+  '- A speaker does not need to state a conclusion',
+  '- Infer the communicative task from meaning',
+  '- For language or conversation interpretation',
+  '- When the user explicitly says that a literal identifier',
+  '- For non-English answers',
+  'OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE',
+  '- Primary reasoner:',
+  '- Response token ceiling:',
+  '- When the owner asks what SignalBoost or COS is',
+])
+
+function scopeToExplanatoryQuestion(input: string[], code: boolean, protectedLiteral: boolean): string[] {
+  let lines = input
+  // Owner Chief-of-Staff operations: work completion, strategy, authority, release audit (ROLE and COMMUNICATION stay).
+  lines = dropBlockFrom(lines, 'WORK COMPLETION', 'COMMUNICATION')
+  // Owner platform glossary (COS/platform terms keep it: those questions are never explanatory-scoped).
+  const glossary = lines.findIndex(line => line.startsWith('OWNER-APPROVED PLATFORM GLOSSARY'))
+  if (glossary >= 0) {
+    const last = lines.findIndex((line, index) => index > glossary && line.startsWith('- When the owner asks about any of these terms'))
+    if (last > glossary) lines = [...lines.slice(0, glossary), ...lines.slice(last + 1)]
+  }
+  // Self-improvement boundaries, business ideas, and how to engage with statements or pasted passages.
+  lines = dropBlockFrom(lines, 'SELF-KNOWLEDGE AND IMPROVEMENT BOUNDARIES:', 'PROGRESSIVE PROACTIVE HELP:')
+  lines = dropBlockFrom(lines, 'DECISION RIGHTS:', 'HOW YOU COMMUNICATE:')
+  // Recommendations, figures, dates, and deliverables to produce.
+  lines = dropBlockFrom(lines, 'RE-READ YOUR OWN ANSWER BEFORE RETURNING IT', code ? 'CODE YOU GENERATE MUST ACTUALLY RUN:' : 'AN UNSPECIFIED TASK SHAPE')
+  lines = dropBlockFrom(lines, 'AN UNSPECIFIED TASK SHAPE', 'Reply in ')
+  const protectedLine = '- When the user explicitly says that a literal identifier'
+  lines = lines.filter(line => (protectedLiteral && line.startsWith(protectedLine)) || !NON_EXPLANATORY_LINE_PREFIXES.some(prefix => line.startsWith(prefix)))
+  const reply = lines.findIndex(line => line.startsWith('Reply in '))
+  return reply < 0 ? [...lines, EXPLANATORY_QUESTION_SCOPE_LINE] : [...lines.slice(0, reply), EXPLANATORY_QUESTION_SCOPE_LINE, ...lines.slice(reply)]
 }
 
 /**
@@ -120,6 +221,8 @@ export function scopeReasonerPromptToQuestion(prompt: string, question?: string 
       return !match || match[1] === scope.languageProfile
     })
   }
+
+  if (scope.explanatory) lines = scopeToExplanatoryQuestion(lines, scope.code, scope.protectedLiteral)
 
   // Collapse runs of blank lines left behind by removed blocks.
   const out: string[] = []

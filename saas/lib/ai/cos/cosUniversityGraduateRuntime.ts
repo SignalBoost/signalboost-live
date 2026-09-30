@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityGraduateRuntime.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
@@ -345,18 +344,44 @@ function scopeArray(scope: unknown, key: string): string[] {
   return Array.isArray(value) ? uniqueStrings(value, 160) : []
 }
 
-/** Read only graduates that are already active and whose host-recorded scope matches this request. A governed COS-primary graduate may use the explicit '*' generalist scope. */
+/**
+ * WORKFORCE (owner direction 2026-09-29: "they cannot be in the university"). COS hires its workers from the
+ * Workforce roster, not from the University. The roster names who is on call; every serving gate (active status,
+ * health and activation evidence, exact runtime binding) is still re-checked on the graduate's University diploma
+ * record below, so a roster row alone can never make a model callable. An unreadable roster fails closed.
+ */
+export const COS_WORKFORCE_ROSTER_TABLE = 'cos_workforce_roster' as const
+
+async function onCallWorkforceRegistryIds(db: NonNullable<ReturnType<typeof cosServiceDb>>): Promise<string[] | null> {
+  const roster = await db.from(COS_WORKFORCE_ROSTER_TABLE)
+    .select('registry_id')
+    .eq('status', 'on_call')
+    .eq('authority_expanded', false)
+    .limit(200)
+  if (roster.error) {
+    console.warn('[cos-workforce] roster read failed closed', roster.error)
+    return null
+  }
+  return [...new Set((roster.data || [])
+    .map(row => clean((row as { registry_id?: unknown }).registry_id, 100))
+    .filter(Boolean))]
+}
+
+/** Read only on-call Workforce graduates whose University diploma is still active and whose host-recorded scope matches this request. A governed COS-primary graduate may use the explicit '*' generalist scope. */
 export async function activeGraduateRuntimesForRole(
   role: CosReasoningWorkerRole,
   objective: string,
 ): Promise<ActiveGraduateRuntime[]> {
   const db = cosServiceDb()
   if (!db) return []
+  const onCall = await onCallWorkforceRegistryIds(db)
+  if (!onCall || !onCall.length) return []
   const problemClass = classifyProblemClass(objective)
   const universitySubjects = classifyCosUniversitySubjects(objective)
   const rows = await db.from('cos_university_graduate_model_registry')
     .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,status,runtime_profile,runtime_provider,runtime_model_id,runtime_health_evidence_hash,activation_evidence_hash,platform_scope,updated_at')
     .eq('status', 'active')
+    .in('id', onCall)
     .order('updated_at', { ascending: false })
     .limit(20)
   if (rows.error) {
@@ -436,3 +461,4 @@ export async function activeGraduateRuntimesForRole(
   const rotation = selectGraduateFor24HourLease(result, new Date())
   return rotation.selected ? [rotation.selected] : []
 }
+// end of saas/lib/ai/cos/cosUniversityGraduateRuntime.ts (if this line is missing, the paste was cut short)

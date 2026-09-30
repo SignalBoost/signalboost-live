@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/answerEvidenceIdHygiene.ts
 //
 // INTERNAL EVIDENCE IDS ARE PROMPT SCAFFOLDING, NOT ANSWER CONTENT.
 //
@@ -37,6 +38,33 @@ const EVIDENCE_MARKER = new RegExp(`\\[\\s*${MARKER_FAMILY}\\s*\\d+(?:\\s*[–�
 const SCAFFOLDING_SENTENCE = /(?:^|[.!?]\s+)[^.!?]*\b(?:provided|supplied|available|given)?\s*evidence\s+corpus\b[^.!?]*[.!?]/gi
 const SCAFFOLDING_SENTENCE_ALT = /(?:^|[.!?]\s+)[^.!?]*\b(?:the\s+)?(?:supplied|provided|given)\s+context\b[^.!?]*\b(?:does\s+not|lacks?|contains?\s+no)\b[^.!?]*[.!?]/gi
 
+/**
+ * Sentences that narrate the model's own retrieved-evidence block. Production 2026-09-30 (Kubernetes answer):
+ * "The selected learned corpus (–) discusses microservice dynamics… However, it does not provide specific details
+ * on Kubernetes' native health-checking mechanisms… Therefore, I have answered based on standard Kubernetes
+ * operational principles rather than the provided learning material." The reader never sees that block.
+ * Deliberately narrow: only phrasing that names the evidence block itself, never ordinary uses of "learning".
+ */
+const EVIDENCE_BLOCK_NARRATION = /\b(?:(?:selected|provided|supplied|retrieved|injected|available|given)\s+(?:learned|learning|continuous[- ]learning)\s+(?:corpus|material|materials|evidence|items?|sources?|content)|(?:learned|continuous[- ]learning)\s+corpus|(?:provided|supplied|selected|retrieved|injected)\s+(?:evidence|sources|material|materials|context)\b[^.!?]*\b(?:does\s+not|doesn't|do\s+not|don't|lacks?|contains?\s+no|not\s+(?:cover|address|provide|include)))/i
+/** A sentence that only continues a removed narration sentence ("However, it does not provide…"). */
+const NARRATION_CONTINUATION = /^(?:however,?\s+|but\s+|also,?\s+|unfortunately,?\s+)?(?:it|this|these|they|that|none\s+of\s+(?:it|them|these))\b/i
+
+function removeEvidenceBlockNarration(text: string): string {
+  return text.split('\n').map(line => {
+    const sentences = line.match(/[^.!?]+(?:[.!?]+|$)\s*/g)
+    if (!sentences) return line
+    let previousRemoved = false
+    const kept: string[] = []
+    for (const sentence of sentences) {
+      const trimmed = sentence.trim()
+      const remove = EVIDENCE_BLOCK_NARRATION.test(trimmed) || (previousRemoved && NARRATION_CONTINUATION.test(trimmed))
+      previousRemoved = remove
+      if (!remove) kept.push(sentence)
+    }
+    return kept.join('').trimEnd()
+  }).join('\n')
+}
+
 function hasFollowableSource(text: string): boolean {
   return /https?:\/\/\S+/i.test(text)
 }
@@ -51,7 +79,7 @@ export function stripInternalEvidenceIds(answer: string): string {
   if (!original.trim()) return original
   if (hasFollowableSource(original)) return original
 
-  let cleaned = original.replace(SCAFFOLDING_SENTENCE, ' ').replace(SCAFFOLDING_SENTENCE_ALT, ' ')
+  let cleaned = removeEvidenceBlockNarration(original).replace(SCAFFOLDING_SENTENCE, ' ').replace(SCAFFOLDING_SENTENCE_ALT, ' ')
 
   // Parenthetical groups that are nothing but markers go entirely: "Memory ([OEM1], [OEM2])
   // contains…" must not become "Memory (, ) contains…".
@@ -109,7 +137,7 @@ export function stripInternalEvidenceIds(answer: string): string {
     .replace(/\s+(?:and|or|y|e|i|и|oraz)\s*([.;,!?])/gi, '$1')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\s+([.,;:!?])/g, '$1')
-    .replace(/\(\s*\)/g, '')
+    .replace(/\(\s*[–—,;-]*\s*\)/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 

@@ -699,6 +699,13 @@ function interactiveRunpodFirstEligible(args: LocalModelCallArgs, config: LocalI
   if (providerFor(config) === 'runpod') return false
   if (config.fallbackFromOwned === true) return false
   if (protectedIndependentEvaluation(args)) return false
+  // ANSWERS ONLY (2026-09-30). The first-turn capability planner (tool-choice call, purpose
+  // agent_native_tool_choice, 10 s budget) also carries feature cos_interactive_answer. Sending it RunPod-first
+  // made it hold the single RunPod slot and wait for the 20 s backup: production 05:32 UTC "assistant:planner
+  // 20.4 s", and the real answer then found RunPod "busy" (held by the planner) and took 26.4 s on the backup.
+  // Tool-choice and planner calls go straight to the configured transport with their own timeout, as before.
+  if (args.tools?.length) return false
+  if (String(args.usageContext?.purpose || '').trim().toLowerCase() === 'agent_native_tool_choice') return false
   return true
 }
 

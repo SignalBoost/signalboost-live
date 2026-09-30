@@ -51,3 +51,13 @@ export function formatChatInferenceTrail(calls: ChatInferenceCall[] | null | und
     return `${time} ${call.provider}${lane} ${call.success?'OK':'FAILED'}${took}${tokens}${reason}`
   }).join(' → ')
 }
+
+export type TurnStage = { at: string; stage: string; latencyMs: number }
+
+/** Where the answered turn spent its time, longest stage first. */
+export function formatTurnStages(stages: TurnStage[] | null | undefined, limit = 8): string {
+  if (stages == null) return 'unavailable'
+  if (!stages.length) return 'no stage timings recorded for the last answered turn'
+  const duration = (ms:number) => ms >= 1000 ? `${(ms/1000).toFixed(1)} s` : `${ms} ms`
+  return [...stages].sort((a,b)=>b.latencyMs-a.latencyMs).slice(0,limit).map(stage=>`${stage.stage} ${duration(stage.latencyMs)}`).join(' · ')
+}

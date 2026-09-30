@@ -481,7 +481,14 @@ export function decideRollingMassEvaluationApproval(input: {
   const builderV2ProofNeeded = builderV2Completions < MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE
   const replayCompletions = Math.max(0, Math.floor(Number(input.remediationReplayProofCompletions ?? MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE)))
   const remediationReplayProofNeeded = replayCompletions < MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE
+  const reopenedCandidates = new Set(input.events.filter(event => isEvaluationReopen(event)).map(event => event.candidateId))
   const ordered = [...input.artifacts].sort((a, b) => {
+    // A reopened artifact already reached a downstream verdict boundary and was explicitly returned for a fresh
+    // generation. Do not let a continuous stream of new frontier artifacts starve that recovery forever.
+    // This is scheduling only: every retention, canary, scoring, retry, spend and promotion gate still applies.
+    const aReopened = reopenedCandidates.has(a.candidateId)
+    const bReopened = reopenedCandidates.has(b.candidateId)
+    if (aReopened !== bReopened) return aReopened ? -1 : 1
     // Builder apprenticeship proof lane: until two confirmed response-anchor v2 Computer Science artifacts
     // have durable independent evaluation results, keep those exact artifacts ahead of the legacy backlog.
     // This changes scheduling only; the full 12-hour retention delay, exact canary, scoring, retry, spend,

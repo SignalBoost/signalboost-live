@@ -752,7 +752,7 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       if (!runpod.runpodPrimaryEnabled()) return null
       const { recordCosLatencyStage } = await import('./cos/cosLatencyStages.ts')
       const readyStartedAt = Date.now()
-      const runpodConfig = await runpod.resolveReadyRunpodPrimaryConfig('reasoner')
+      const runpodConfig = await runpod.resolveRunpodPrimaryConfigForChat('reasoner')
       recordCosLatencyStage('runpod:ready_check', Date.now() - readyStartedAt)
       if (!runpodConfig) return null
       // A truncated owned answer throws (-> null) so the managed backup still gets its chance. A request that
@@ -777,7 +777,7 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       }
       const contextWindowTokens = ownedReasonerContextWindowTokens(runpodConfig)
       try {
-        return await callConfiguredModelTurn(
+        const turn = await callConfiguredModelTurn(
           { ...args, maxTokens: interactiveRunpodMaxTokens(args.maxTokens) },
           {
             ...runpodConfig,
@@ -786,6 +786,13 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
             refuseInputCompaction: true,
           },
         )
+        // A pod answer refreshes the shared readiness record; no answer clears it so the next chat re-proves.
+        if (usefulTurn(turn)) void runpod.noteRunpodPrimaryServed('reasoner')
+        else void runpod.invalidateRunpodPrimaryReadiness()
+        return turn
+      } catch (error) {
+        void runpod.invalidateRunpodPrimaryReadiness()
+        throw error
       } finally {
         if (slot) await leases.releaseRunpodInferenceLease(slot).catch(error => {
           console.warn('[cos-interactive-runpod-slot-release]', error instanceof Error ? error.message : String(error))

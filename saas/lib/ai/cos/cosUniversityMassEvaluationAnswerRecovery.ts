@@ -106,3 +106,27 @@ export function recoverStoppedSoloPlainAnswer(text: string, finish: string): str
   if (!answer || /<<<(?:ANSWER|END):[^>\r\n]+>>>/.test(answer)) return null
   return answer
 }
+
+
+/**
+ * A solo normal-stop response may contain harmless prose around one complete, correctly identified
+ * ANSWER/END block. Production evaluator retries have already reduced the request to exactly one case,
+ * so the block is unambiguous. Recover only when there is exactly one opener and one closer, both use
+ * the requested id, generation stopped normally, and neither the answer nor surrounding text contains
+ * thinking or any additional protocol marker. Truncation and multi-block output remain fail-closed.
+ */
+export function recoverStoppedSoloWrappedAnswer(text: string, caseId: string, finish: string): string | null {
+  if (finish !== 'stop' || /<\/?think>/i.test(text)) return null
+  const open = `<<<ANSWER:${caseId}>>>`
+  const close = `<<<END:${caseId}>>>`
+  const openAt = text.indexOf(open)
+  const closeAt = text.indexOf(close, openAt + open.length)
+  if (openAt < 0 || closeAt < 0) return null
+  if (text.indexOf(open, openAt + open.length) >= 0 || text.indexOf(close, closeAt + close.length) >= 0) return null
+  const before = text.slice(0, openAt)
+  const after = text.slice(closeAt + close.length)
+  if (/<<<(?:ANSWER|END):/i.test(before) || /<<<(?:ANSWER|END):/i.test(after)) return null
+  const answer = text.slice(openAt + open.length, closeAt).trim()
+  if (!answer || /<<<(?:ANSWER|END):/i.test(answer)) return null
+  return answer
+}

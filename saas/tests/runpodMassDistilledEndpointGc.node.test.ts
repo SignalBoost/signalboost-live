@@ -7,9 +7,10 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const source = (p: string) => fs.readFileSync(path.join(root, p), 'utf8')
 
-test('terminal endpoint GC is DB-first, quarantined-only, protected and bounded', () => {
+test('terminal endpoint GC is DB-first, terminal-only (quarantined or retired), protected and bounded', () => {
   const gc = source('lib/ai/cos/runpodMassDistilledEndpointGc.ts')
-  assert.ok(gc.includes(".eq('status', 'quarantined')"))
+  assert.ok(gc.includes("TERMINAL_ARTIFACT_STATUSES = ['quarantined', 'retired']"))
+  assert.ok(gc.includes(".in('status', TERMINAL_ARTIFACT_STATUSES)"))
   assert.ok(gc.includes('MAX_DELETIONS_PER_RUN = 20'))
   assert.ok(gc.includes(".contains('evidence', { profile: PROFILE })"))
   assert.ok(gc.includes(".in('candidate_id', chunk)"))

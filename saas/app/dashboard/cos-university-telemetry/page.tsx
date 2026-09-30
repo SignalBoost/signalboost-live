@@ -131,7 +131,8 @@ type Telemetry = {
   runs?: Run[]
   artifacts?: Artifact[]
   residency?: Residency[]
-  pipeline?: { residencyTotal?:number; residencyResidents?:number; residencyRemediation?:number; residencyComplete?:number; activeGraduates?:number; evaluationPending?:number; quarantined?:number }
+  pipeline?: { residencyTotal?:number; residencyResidents?:number; residencyRemediation?:number; residencyComplete?:number; residencyFailed?:number; activeGraduates?:number; evaluationPending?:number; quarantined?:number }
+  workforce?: { available?:boolean; onCall?:number; retired?:number; workers?:Array<{ candidateId:string; specialty:string; jobRoles:string[]; hiredAt:string|null }> }
 }
 
 const REFRESH_MS = 60_000
@@ -277,6 +278,7 @@ export default function CosUniversityTelemetryPage() {
   const artifacts = data?.artifacts || []
   const residency = data?.residency || []
   const pipeline = data?.pipeline || {}
+  const workforce = data?.workforce || {}
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
@@ -465,21 +467,47 @@ export default function CosUniversityTelemetryPage() {
 
       <section className="rounded-lg border p-4">
         <h2 className="font-semibold">University pipeline — live state</h2>
-        <p className="mt-1 text-xs opacity-65">Training → Residency → exact canary → evaluation → graduation → active runtime.</p>
+        <p className="mt-1 text-xs opacity-65">Training → Residency → exact canary → evaluation → graduation. Graduates leave the University for the Workforce.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <Card label="Residency residents" value={String(pipeline.residencyResidents ?? 0)} />
           <Card label="Residency remediation" value={String(pipeline.residencyRemediation ?? 0)} />
           <Card label="Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
+          <Card label={copy.pipelineResidencyFailed} value={String(pipeline.residencyFailed ?? 0)} />
           <Card label="Evaluation pending" value={String(pipeline.evaluationPending ?? 0)} />
           <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
-          <Card label="Active graduates" value={String(pipeline.activeGraduates ?? 0)} />
         </div>
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <h2 className="font-semibold">{copy.workforceTitle}</h2>
+        <p className="mt-1 text-xs opacity-65">{copy.workforceExplanation}</p>
+        {workforce.available === false ? (
+          <p className="mt-4 text-sm opacity-65">{copy.workforceUnavailable}</p>
+        ) : (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Card label={copy.workforceOnCall} value={String(workforce.onCall ?? 0)} />
+              <Card label={copy.workforceRetired} value={String(workforce.retired ?? 0)} />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {(workforce.workers || []).map(worker => (
+                <div key={worker.candidateId} className="rounded-lg border p-3 text-xs">
+                  <div className="font-semibold">{worker.specialty}</div>
+                  <div className="mt-1 font-mono opacity-60">{short(worker.candidateId, 28)}</div>
+                  <div className="mt-2">{worker.jobRoles.join(' · ') || '—'}</div>
+                  <div className="mt-1 opacity-70">{copy.workforceHired} {when(worker.hiredAt)}</div>
+                </div>
+              ))}
+              {!(workforce.workers || []).length ? <p className="text-sm opacity-60">{copy.workforceNone}</p> : null}
+            </div>
+          </>
+        )}
       </section>
 
       <section className="rounded-lg border p-4">
         <h2 className="font-semibold">Builder Residency — live cohort</h2>
         <p className="mt-1 text-xs opacity-65">Every enrolled Computer Science artifact and its durable progress.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">{residency.map(row => <div key={row.residencyId} className="rounded-lg border p-3 text-xs"><div className="font-semibold">{gateLabel(row.standing)} · {row.demonstratedCompetencies}/{row.totalCompetencies} competencies</div><div className="mt-1 font-mono opacity-60">{short(row.candidateId,28)}</div><div className="mt-2">{row.completedCases} cases · {row.realOutcomes} real outcomes · {row.infrastructureFailures} infrastructure failures</div><div className="mt-1">Latest: {row.latestCase ? gateLabel(row.latestCase.outcome || row.latestCase.status) : 'no case yet'}</div><div className="mt-1 font-medium">Next: {row.standing === 'residency_complete' ? 'fresh exact-artifact canary' : row.standing === 'remediation_required' ? 'remediation case' : 'continue competency cases'}</div></div>)}</div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">{residency.map(row => <div key={row.residencyId} className="rounded-lg border p-3 text-xs"><div className="font-semibold">{gateLabel(row.standing)} · {row.demonstratedCompetencies}/{row.totalCompetencies} competencies</div><div className="mt-1 font-mono opacity-60">{short(row.candidateId,28)}</div><div className="mt-2">{row.completedCases} cases · {row.realOutcomes} real outcomes · {row.infrastructureFailures} infrastructure failures</div><div className="mt-1">Latest: {row.latestCase ? gateLabel(row.latestCase.outcome || row.latestCase.status) : 'no case yet'}</div><div className="mt-1 font-medium">Next: {row.standing === 'residency_complete' ? 'fresh exact-artifact canary' : row.standing === 'residency_failed' ? 'none — Residency FAIL (final)' : row.standing === 'remediation_required' ? 'remediation case' : 'continue competency cases'}</div></div>)}</div>
       </section>
 
       <section className="rounded-lg border p-4">
@@ -555,3 +583,4 @@ function JobCell({ job }: { job: Job | null }) {
     </div>
   )
 }
+// end of saas/app/dashboard/cos-university-telemetry/page.tsx (if this line is missing, the paste was cut short)

@@ -1,4 +1,3 @@
-// saas/tests/massEvaluationApprovalSkipReasons.node.test.ts
 //
 // Production 2026-09-28 04:55..20:39 UTC: 470 consecutive exam ticks ended "no_mass_artifact_eligible_for_rolling_
 // evaluation" with ~1,300 artifacts pending and nothing recorded WHICH rule passed each one over. The approval rules
@@ -37,7 +36,8 @@ test('every skip point in the approval loop is labelled, and the route records t
   const rules = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts', import.meta.url), 'utf8')
   const loop = rules.slice(rules.indexOf('for (const artifact of ordered) {'), rules.indexOf("reason: 'no_mass_artifact_eligible_for_rolling_evaluation'"))
   assert.equal((loop.match(/\bcontinue\b/g) || []).length, (loop.match(/skip\('/g) || []).length)
-  assert.equal((loop.match(/skip\('/g) || []).length, 16)
+  // 17 since 2026-09-30: endpoint_gone_awaiting_fresh_canary (a deleted endpoint waits for a fresh canary).
+  assert.equal((loop.match(/skip\('/g) || []).length, 17)
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.match(route, /approvalReason: rolling\.reason,/)
   assert.match(route, /approvalConsidered: rolling\.considered, approvalSkipped: rolling\.skipped/)

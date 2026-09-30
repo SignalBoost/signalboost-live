@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosReasoningWorkers.ts
 import { randomUUID } from 'node:crypto'
 import { callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { callLocalModel, type LocalInferenceConfig, type LocalModelCallArgs } from '@/lib/ai/local-inference'
@@ -21,7 +20,8 @@ import { learnedRoutingOverride } from '@/lib/ai/cos/reasoningOutcomeLearning'
 import { recordReasoningWorkerMetric } from '@/lib/ai/cos/reasoningWorkerMetrics'
 import { graduateServingErrorOutcome, recordGraduateServingAttempt } from '@/lib/ai/cos/graduateServingAttempts'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
-import { COS_GENERAL_REASONING_DISCIPLINE } from '@/lib/ai/cos/cosGeneralReasoningDiscipline'
+import { COS_EXPLANATORY_REASONING_DISCIPLINE, COS_GENERAL_REASONING_DISCIPLINE } from '@/lib/ai/cos/cosGeneralReasoningDiscipline'
+import { EXPLANATORY_QUESTION_SCOPE_LINE } from '@/lib/ai/cos/cosReasonerPromptScope'
 import { fitGraduateCall } from '@/lib/ai/cos/graduateContextFit'
 import { runpodGraduateEndpointWarm } from '@/lib/ai/cos/graduateWarmGate'
 import {
@@ -91,6 +91,10 @@ const ROLE_GUIDANCE: Readonly<Record<Exclude<CosSpecialistRole, 'primary'>, stri
 
 function roleSystemPrompt(request: CosReasoningRequest, role: CosSpecialistRole): string | undefined {
   const roleGuidance = role === 'primary' ? null : ROLE_GUIDANCE[role]
+  // A prompt the answer path scoped as a general explanatory question gets the matching compact discipline.
+  if (String(request.systemPrompt ?? '').includes(EXPLANATORY_QUESTION_SCOPE_LINE)) {
+    return [request.systemPrompt, COS_EXPLANATORY_REASONING_DISCIPLINE, roleGuidance].filter(Boolean).join('\n\n')
+  }
   return [request.systemPrompt, COS_GENERAL_REASONING_DISCIPLINE, roleGuidance].filter(Boolean).join('\n\n')
 }
 

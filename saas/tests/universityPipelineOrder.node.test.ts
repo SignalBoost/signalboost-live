@@ -23,7 +23,7 @@ test('the pipeline row runs left to right and ends at graduation before the ways
   ].map(marker => row.indexOf(marker))
   assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `order ${order.join(',')}`)
   assert.match(row, /artifacts\.filter\(artifact => artifact\.status === 'runtime_pending'\)\.length/, 'passed = exam PASS, now graduating')
-  assert.match(row, /workforce\.onCall \?\? pipeline\.activeGraduates \?\? 0/, 'graduated = hired into the Workforce')
+  assert.match(row, /pipeline\.activeGraduates \?\? workforce\.onCall \?\? 0/, 'graduated = authoritative active graduate registry, with Workforce projection fallback')
 })
 
 test('the pipeline explanation and the two graduation cards exist in all five languages', () => {

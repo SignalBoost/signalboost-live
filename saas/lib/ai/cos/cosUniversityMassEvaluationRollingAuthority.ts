@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts
 // Owner direction (2026-09-16): mass-distilled evaluations must complete without manual intervention.
 // Hand-inserted approvals were the dominant failure class. This pure policy decides, once per cron tick,
 // whether to issue ONE bounded evaluation approval in exactly the shape the atomic claim accepts
@@ -567,6 +566,15 @@ export function decideRollingMassEvaluationApproval(input: {
     if (newestFailureSinceCanary && staleGatewayModelMismatch(newestFailureSinceCanary.evidence?.error)) {
       skip('stale_gateway_awaiting_fresh_canary'); continue
     }
+    // Same for an endpoint that no longer exists (deleted by the terminal-endpoint cleanup while the student sat in
+    // quarantine, or reported missing by the exam itself). Production 2026-09-30: 4 of the last 8 exam runs were spent
+    // on this. Hold the student until the canary lane gives it a fresh endpoint; the exam slot goes to someone else.
+    const newestCanaryEndpoint = String(healthyCanaries[0].evidence?.endpointId || '').trim().toLowerCase()
+    const canaryEndpointDeleted = mine.some(event => event.evidence?.claim === 'local_distilled_runtime_endpoint_retired'
+      && String(event.evidence?.endpointId || '').trim().toLowerCase() === newestCanaryEndpoint)
+    const endpointMissing = Boolean(newestFailureSinceCanary)
+      && String(newestFailureSinceCanary?.evidence?.error || '').trim().toLowerCase().startsWith('mass_distilled_runtime_endpoint_id_missing')
+    if (canaryEndpointDeleted || endpointMissing) { skip('endpoint_gone_awaiting_fresh_canary'); continue }
 
     // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.
     // Do not mint another approval while this exact artifact already has a live started reservation.

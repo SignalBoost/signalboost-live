@@ -1,3 +1,4 @@
+// saas/app/api/cron/cos-university-residency/route.ts
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import {
@@ -163,6 +164,15 @@ export async function GET(req: Request) {
       errors: [error instanceof Error ? error.message.slice(0, 160) : 'stale_case_sweep_failed'],
     }))
 
+    // Residents whose student already left the University (its artifact is no longer waiting for the exam) are
+    // withdrawn and free their seat. Production 2026-09-30: all 10 "residents" had left; every case stopped before it
+    // started. Best effort: a sweep failure never blocks the tick (the lanes skip such residents regardless).
+    const withdrawals = await store.withdrawDepartedResidencies().catch((error: unknown) => ({
+      checked: 0,
+      withdrawnResidencyIds: [] as string[],
+      errors: [error instanceof Error ? error.message.slice(0, 160) : 'residency_withdrawal_sweep_failed'],
+    }))
+
     // Final results first. A resident that can no longer clear a remediation competency (too few untried
     // variants left for two distinct later passes) gets its Residency FAIL now, so it stops taking case
     // turns and never sits in PENDING. Production 2026-09-28: 26 of 37 active residents were in that state.
@@ -227,6 +237,7 @@ export async function GET(req: Request) {
         ok: true,
         state: 'no_time_for_a_case',
         staleCases,
+        withdrawals: { checked: withdrawals.checked, withdrawn: withdrawals.withdrawnResidencyIds.length, errors: withdrawals.errors },
         residencyFailures: {
           checked: residencyFailures.checked,
           closed: residencyFailures.closedResidencyIds.length,
@@ -248,6 +259,7 @@ export async function GET(req: Request) {
     const body = {
       ...publicResult(result, admission),
       staleCases,
+      withdrawals: { checked: withdrawals.checked, withdrawn: withdrawals.withdrawnResidencyIds.length, errors: withdrawals.errors },
       residencyFailures: {
         checked: residencyFailures.checked,
         closed: residencyFailures.closedResidencyIds.length,
@@ -282,6 +294,7 @@ export async function GET(req: Request) {
       admission: body.admission ?? null,
       residencyFailures: body.residencyFailures,
       staleCases: body.staleCases,
+      withdrawals: body.withdrawals,
       selfHealing: body.selfHealing ?? null,
       batch: body.batch,
       automaticFinalGateEnable: false,

@@ -1,6 +1,6 @@
 import * as base from './cosOrchestrationEnterprise'
 import {describeReasoner,reasonerProvenanceLine} from './reasonerHostingDisclosure'
-import {formatChatInferenceTrail} from './chatInferenceTrail'
+import {formatChatInferenceTrail,formatTurnStages} from './chatInferenceTrail'
 
 export const confidenceThreshold=base.confidenceThreshold
 export const externalFallbackEnabled=base.externalFallbackEnabled
@@ -31,6 +31,7 @@ function formatLive(state:any):string{
     `User Memory            : ${user.available?`${value(user.records)} records`:'no authenticated user scope'}`,
     `Last Provenance Record : ${last?`${value(last.updatedAt)}${last.source?` — ${last.source}`:''}`:'none'}`,
     `Chat Inference Calls   : ${formatChatInferenceTrail(state?.chatInference)}`,
+    `Turn Timing            : ${formatTurnStages(state?.turnStages)}`,
   ].join('\n')
 }
 

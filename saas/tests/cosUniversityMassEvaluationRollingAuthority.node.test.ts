@@ -15,6 +15,7 @@ import {
   MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF,
   MASS_EVALUATION_REOPEN_CLAIM,
   MASS_EVALUATION_OWNER_FULL_RETEST_REF,
+  MASS_EVALUATION_STALE_GRADUATE_VERDICT_REPAIR_REF,
   MASS_EVALUATION_ROLLING_MAX_APPROVALS,
   MASS_EVALUATION_RUNPOD_QUOTA_REPAIR_AT,
   MASS_EVALUATION_MODEL_READY_REPAIR_AT,
@@ -841,6 +842,27 @@ test('owner full-quarantine retest marker starts a clean evaluation generation w
     artifacts: [artifactA],
     events: [canary(artifactA), oldVerdict, reopened],
     now,
+  })
+  assert.equal(decision.issue, true)
+})
+
+test('stale graduate-verdict recovery starts a clean evaluator generation instead of being blocked by the preserved old verdict', () => {
+  const oldVerdict = ev(artifactA.candidateId, 'independent_scorer', {
+    claim: 'independent_evaluation', artifactHash: hashA,
+  }, '2026-09-30T09:04:35Z')
+  const oldCompleted = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_completed', artifactHash: hashA,
+  }, '2026-09-30T09:04:37Z')
+  const reopened = ev(artifactA.candidateId, 'host_controller', {
+    claim: MASS_EVALUATION_REOPEN_CLAIM,
+    artifactHash: hashA,
+    repairRef: MASS_EVALUATION_STALE_GRADUATE_VERDICT_REPAIR_REF,
+  }, '2026-09-30T13:47:42Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA), oldVerdict, oldCompleted, reopened],
+    now: new Date('2026-09-30T14:00:00Z'),
   })
   assert.equal(decision.issue, true)
 })

@@ -90,10 +90,12 @@ export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_judge_
 export const MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF = 'mass_evaluation_absolute_per_answer_judge_v2' as const
 export const MASS_EVALUATION_REOPEN_CLAIM = 'mass_distilled_independent_evaluation_reopened' as const
 export const MASS_EVALUATION_OWNER_FULL_RETEST_REF = 'owner_explicit_direction_2026-09-26_retest_all_quarantined' as const
+export const MASS_EVALUATION_STALE_GRADUATE_VERDICT_REPAIR_REF = 'mass_graduate_stale_reopened_verdict_recovery_2026-09-30' as const
 const isEvaluationReopen = (event: RollingEvent) => event.verifier === 'host_controller'
   && event.evidence?.claim === MASS_EVALUATION_REOPEN_CLAIM
   && (event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF
-    || event.evidence?.repairRef === MASS_EVALUATION_OWNER_FULL_RETEST_REF)
+    || event.evidence?.repairRef === MASS_EVALUATION_OWNER_FULL_RETEST_REF
+    || event.evidence?.repairRef === MASS_EVALUATION_STALE_GRADUATE_VERDICT_REPAIR_REF)
 export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-18T01:48:45.894Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 // Production 2026-09-24: the Residency endpoint lease repair released idle resident maxWorkers

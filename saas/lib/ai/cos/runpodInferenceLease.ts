@@ -91,6 +91,14 @@ export async function acquireRunpodInferenceLease(inferenceTimeoutMs: number): P
   return null
 }
 
+/**
+ * One attempt, no waiting. Live chat must never queue behind background work on the single RunPod reasoner.
+ * null = the slot is held by other work right now.
+ */
+export async function tryAcquireRunpodInferenceLeaseNow(inferenceTimeoutMs: number): Promise<RunpodInferenceLease | null> {
+  return tryAcquire(randomUUID(), inferenceTimeoutMs)
+}
+
 export async function releaseRunpodInferenceLease(lease: RunpodInferenceLease): Promise<void> {
   const db = cosServiceDb()
   if (!db) return

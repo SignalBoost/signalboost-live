@@ -147,6 +147,11 @@ export function planContextWindow<T extends ContextMessage>(input: {
   env?: NodeJS.ProcessEnv
   /** Token estimator for this model family. Defaults to the flat character estimate. */
   estimateTokens?: ContextTokenEstimator
+  /**
+   * false = never drop or cut the caller's messages; shorten the completion instead, down to minimumOutputTokens,
+   * and throw context_window_too_large when even that does not fit. For callers with a larger-window backup.
+   */
+  compactInput?: boolean
 }): ContextWindowPlan<T> {
   const estimate = input.estimateTokens ?? estimateContextTokens
   const contextWindowTokens = resolveContextWindowTokens({
@@ -168,6 +173,24 @@ export function planContextWindow<T extends ContextMessage>(input: {
   let estimatedPromptTokens = systemTokens + messages.reduce((sum, message) => sum + messageTokens(message, estimate), 0)
   let droppedMessages = 0
   let truncatedCharacters = 0
+
+  if (input.compactInput === false) {
+    const availableOutput = Math.max(0, contextWindowTokens - estimatedPromptTokens - safetyTokens)
+    const maxOutputTokens = Math.min(requestedOutputTokens, availableOutput)
+    if (maxOutputTokens < minimumOutputTokens) {
+      // Short on purpose: provider telemetry keeps only ~64 characters of a failure reason.
+      throw new Error(`context_window_too_large est:${estimatedPromptTokens} win:${contextWindowTokens} out:${minimumOutputTokens}`)
+    }
+    return Object.freeze({
+      contextWindowTokens,
+      estimatedPromptTokens,
+      maxOutputTokens,
+      messages: Object.freeze(messages),
+      compacted: maxOutputTokens < requestedOutputTokens,
+      droppedMessages: 0,
+      truncatedCharacters: 0,
+    })
+  }
 
   // Drop oldest coherent conversation groups first. An assistant tool-call and its following
   // tool results are one atomic group so compaction never creates an invalid orphan tool message.

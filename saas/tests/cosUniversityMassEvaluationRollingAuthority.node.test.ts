@@ -367,6 +367,23 @@ test('evaluator infrastructure failures do not exhaust the artifact retry budget
   if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
 })
 
+test('judge protocol failures are infrastructure and never consume a student substantive attempt', () => {
+  const rollingApproval = ev(artifactA.candidateId, 'host_controller', { claim: 'distilled_independent_evaluation_approved', artifactHash: hashA, authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF }, '2026-09-16T09:00:00Z', '2026-09-16T11:00:00Z')
+  const protocolErrors = [
+    'mass_distilled_evaluation_judge_json_invalid',
+    'mass_distilled_evaluation_judge_case_count_invalid',
+    'mass_distilled_evaluation_judge_case_invalid',
+    'mass_distilled_evaluation_judge_identity_invalid',
+    'mass_distilled_evaluation_judge_baseline_answer_missing:holdout:case-a',
+    'mass_distilled_evaluation_judge_candidate_answer_missing:retention:case-b',
+  ]
+  const failures = protocolErrors.map((error, i) =>
+    ev(artifactA.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashA, error }, `2026-09-16T1${i}:00:00Z`))
+  const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), rollingApproval, ...failures], now })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
+})
+
 test('failures of earlier hand-approved attempts do not use up the automatic retry budget', () => {
   const handFailures = Array.from({ length: 3 }, (_, i) =>
     ev(artifactA.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashA }, `2026-09-16T1${i}:43:00Z`))

@@ -1,4 +1,3 @@
-// saas/lib/cos/aiPort.ts
 // Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
 // existing Portables gain durable reuse and single-flight protection without owning provider logic.
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
@@ -8,6 +7,7 @@ import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { activeGraduateRuntimesForRole } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { tryRunpodPrimaryInference } from '@/lib/ai/cos/runpodPrimaryInference'
+import { chatHasRunpodPriority } from '@/lib/ai/cos/runpodInferenceLease'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
 import { deepInfraMaxCallUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
@@ -111,11 +111,19 @@ export function createPlatformAiPort(): CosAiPort {
  * A busy RunPod is capacity contention, not provider failure. Builder waits behind the governed
  * single-GPU queue instead of converting that contention into paid DeepInfra traffic.
  */
-export function createBuilderCodingAiPort(): CosAiPort {
+export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {}): CosAiPort {
   return {
     generate: async (input) => {
       const graduate = await tryActiveGraduate('coder', input, { coding: true })
       if (graduate.text) return graduate.text
+
+      // CHAT PRIORITY (2026-09-30). Background self-healing work yields the single RunPod slot while someone is
+      // chatting; it is deferred and resumes later (see runpodInferenceLease.ts). Owner-started Builder jobs never
+      // yield, so a Builder run you start yourself is not refused because you were just chatting.
+      if (options.yieldToChat === true && await chatHasRunpodPriority()) {
+        console.info('[builder-yields-runpod-to-chat]', JSON.stringify({ at: new Date().toISOString() }))
+        throw new Error('builder_runpod_primary_busy')
+      }
 
       const runpod = currentReasoningEvaluationContext()
         ? { text: null, attempted: false, reason: 'reasoning_evaluation_context' }

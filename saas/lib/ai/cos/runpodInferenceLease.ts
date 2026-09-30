@@ -124,3 +124,51 @@ export async function releaseRunpodInferenceLease(lease: RunpodInferenceLease): 
   }).eq('mission_id', LEASE_MISSION_ID)
     .eq('updated_at', read.data.updated_at)
 }
+
+// CHAT PRIORITY (2026-09-30). A background Builder generation can hold the single RunPod slot for ~100 s. When a
+// chat question lands during that time it is answered by the managed backup, which production showed can take
+// 26-29 s (05:32 and 05:48 UTC) instead of ~6-12 s on RunPod. While someone is chatting, Builder work waits:
+// every chat attempt marks demand, and Builder does not take the slot within the priority window after it.
+// Builder already treats a busy slot as a deferral (no paid fallback), so this costs nothing.
+const CHAT_PRIORITY_MISSION_ID = '__cos_runpod_chat_priority__'
+const DEFAULT_CHAT_PRIORITY_MS = 180_000
+
+export function chatPriorityWindowMs(): number {
+  const configured = Number(process.env.COS_CHAT_RUNPOD_PRIORITY_MS || String(DEFAULT_CHAT_PRIORITY_MS))
+  if (!Number.isFinite(configured)) return DEFAULT_CHAT_PRIORITY_MS
+  return Math.max(0, Math.min(15 * 60_000, Math.round(configured)))
+}
+
+/** True while the last chat demand for RunPod is inside the priority window. */
+export function chatDemandIsRecent(lastDemandAt: unknown, now: number, windowMs = chatPriorityWindowMs()): boolean {
+  if (windowMs <= 0 || typeof lastDemandAt !== 'string') return false
+  const at = Date.parse(lastDemandAt)
+  return Number.isFinite(at) && now - at >= -60_000 && now - at < windowMs
+}
+
+export async function markChatRunpodDemand(): Promise<void> {
+  try {
+    const db = cosServiceDb()
+    if (!db) return
+    const at = new Date().toISOString()
+    await db.from('cos_autonomy_state').upsert({
+      mission_id: CHAT_PRIORITY_MISSION_ID,
+      state: { kind: 'runpod_chat_priority', lastDemandAt: at },
+      updated_at: at,
+    }, { onConflict: 'mission_id' })
+  } catch (error) {
+    console.warn('[runpod-chat-priority-mark]', error instanceof Error ? error.message : String(error))
+  }
+}
+
+export async function chatHasRunpodPriority(): Promise<boolean> {
+  try {
+    const db = cosServiceDb()
+    if (!db) return false
+    const { data, error } = await db.from('cos_autonomy_state').select('state').eq('mission_id', CHAT_PRIORITY_MISSION_ID).maybeSingle()
+    if (error || !data?.state || typeof data.state !== 'object') return false
+    return chatDemandIsRecent((data.state as Record<string, unknown>).lastDemandAt, Date.now())
+  } catch {
+    return false
+  }
+}

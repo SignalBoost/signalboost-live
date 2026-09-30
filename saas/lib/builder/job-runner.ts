@@ -1,4 +1,3 @@
-// saas/lib/builder/job-runner.ts
 import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
 import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
@@ -452,7 +451,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
 
     const sliceStartedAtMs = Date.now()
     const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS
-    const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), {
+    const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort({ yieldToChat: selfHealingCapacityJob(job) }), {
       deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
     })
     const runner = new VercelSandboxBuilderRunner()

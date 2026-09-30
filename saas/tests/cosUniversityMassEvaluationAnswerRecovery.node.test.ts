@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer } from '../lib/ai/cos/cosUniversityMassEvaluationAnswerRecovery.ts'
+import { recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer, recoverStoppedSoloWrappedAnswer } from '../lib/ai/cos/cosUniversityMassEvaluationAnswerRecovery.ts'
 
 const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
@@ -70,4 +70,14 @@ test('solo missing-open recovery treats the correct closer as the answer boundar
   const id='0ba8dfd777f3cd71'
   assert.equal(recoverStoppedSoloMissingOpenAnswer(`The result is 16%.\n<<<END:${id}>>>\nDone.`,id,'stop'),'The result is 16%.')
   assert.equal(recoverStoppedSoloMissingOpenAnswer(`The result is 16%.\n<<<END:${id}>>>\n<<<ANSWER:other>>>x`,id,'stop'),null)
+})
+
+
+test('solo normal-stop wrapper prose around one exact answer block is recovered without accepting ambiguity', () => {
+  const id='0ba8dfd777f3cd71'
+  assert.equal(recoverStoppedSoloWrappedAnswer(`Final answer:\n<<<ANSWER:${id}>>>\n16%\n<<<END:${id}>>>\nDone.`,id,'stop'),'16%')
+  assert.equal(recoverStoppedSoloWrappedAnswer(`<<<ANSWER:${id}>>>16%<<<END:${id}>>><<<ANSWER:other>>>x<<<END:other>>>`,id,'stop'),null)
+  assert.equal(recoverStoppedSoloWrappedAnswer(`<<<ANSWER:${id}>>>16%<<<END:${id}>>>`,id,'length'),null)
+  assert.equal(recoverStoppedSoloWrappedAnswer(`<think>x</think><<<ANSWER:${id}>>>16%<<<END:${id}>>>`,id,'stop'),null)
+  assert.match(source, /cases\.length===1 \? recoverStoppedSoloWrappedAnswer\(text,item\.id,finish\) : null/)
 })

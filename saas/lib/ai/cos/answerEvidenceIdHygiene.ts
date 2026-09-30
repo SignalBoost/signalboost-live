@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/answerEvidenceIdHygiene.ts
 //
 // INTERNAL EVIDENCE IDS ARE PROMPT SCAFFOLDING, NOT ANSWER CONTENT.
 //
@@ -75,7 +74,14 @@ export function stripInternalEvidenceIds(answer: string): string {
     // phrase.
     const before = text.slice(Math.max(0, offset - 40), offset)
     const markerIsSubject = /(?:^|[.!?:;]\s*|\n\s*|\b(?:while|because|since|although|though|whereas|and|but|or|as|if|when|per|according\s+to|from|in|of|by|that)\s+)$/iu.test(before)
-    return markerIsSubject ? 'the retrieved evidence' : ''
+    if (!markerIsSubject) return ''
+    // A marker between two sentences cites the sentence BEFORE it when the next word starts a new sentence
+    // (capital letter). Production 2026-09-30: "…remains healthy. [CL1] Kubernetes has become…" was rendered
+    // "…remains healthy. the retrieved evidence Kubernetes has become…". Only a lowercase continuation
+    // ("[OEM1] shows that…") makes the marker the subject.
+    const atSentenceStart = /(?:^|[.!?]\s*|\n\s*)$/u.test(before)
+    if (atSentenceStart && /^\s*\p{Lu}/u.test(after)) return ''
+    return atSentenceStart ? 'The retrieved evidence' : 'the retrieved evidence'
   })
   // A removed marker can also strand the ATTRIBUTION PHRASE that introduced it. Observed in
   // production 2026-08-26: "inclusive of CPUs, DRAM, NVSwitch, NICs, fans, and PSU losses as per

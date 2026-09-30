@@ -199,6 +199,16 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'mass_distilled_evaluation_judge_unavailable'
     || error.startsWith('mass_distilled_evaluation_judge_timeout:')
     || error.startsWith('mass_distilled_evaluation_judge_zero_collapse:')
+    // Malformed scorer protocol is OUR evaluator failure, not a student's exam result. Production 2026-09-30
+    // recorded judge_case_invalid while the artifact was still evaluation_pending. The scorer rejected its own
+    // JSON before a valid per-case verdict existed, so charging this against the three substantive attempts can
+    // quarantine an unexamined student. Keep every judge transport/protocol shape fail-closed and retryable.
+    || error === 'mass_distilled_evaluation_judge_json_invalid'
+    || error === 'mass_distilled_evaluation_judge_case_count_invalid'
+    || error === 'mass_distilled_evaluation_judge_case_invalid'
+    || error === 'mass_distilled_evaluation_judge_identity_invalid'
+    || error.startsWith('mass_distilled_evaluation_judge_baseline_answer_missing:')
+    || error.startsWith('mass_distilled_evaluation_judge_candidate_answer_missing:')
     // Evaluator protocol/output-budget defects are not evidence of model quality. They must fail closed, but they may retry
     // after the evaluator is repaired without consuming the model's substantive-attempt budget or the rolling approval window.
     || error.startsWith('mass_distilled_evaluation_answer_missing:')

@@ -6,7 +6,7 @@ import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.
 import { deepInfraMaxCallUsd, massEvaluationHarnessMaxCostUsd } from './deepInfraSpendPolicy.ts'
 import { MASS_EVALUATION_ENDPOINT_CALLS, MASS_EVALUATION_JUDGE_CALLS, MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from './cosUniversityMassEvaluationContextBudget.ts'
 import { persistDistilledEvaluationCaseScores } from './cosUniversityDistilledEvaluationCaseScores.ts'
-import { recoverStoppedOpenAnswer, recoverStoppedSoloMismatchedMarkerAnswer, recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer, recoverStoppedSoloPlainAnswer } from './cosUniversityMassEvaluationAnswerRecovery.ts'
+import { recoverStoppedOpenAnswer, recoverStoppedSoloMismatchedMarkerAnswer, recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer, recoverStoppedSoloPlainAnswer, recoverStoppedSoloWrappedAnswer } from './cosUniversityMassEvaluationAnswerRecovery.ts'
 import { servedCandidateModelFromCanary } from './cosUniversityMassEvaluationServedModel.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { readPinnedHfParquetRows } from './hfPinnedParquetRows.ts'
@@ -504,6 +504,7 @@ function parseAnswersPartial(text:string,cases:readonly EvalCase[],finish:string
         || (cases.length===1 ? recoverStoppedSoloForeignOpenCorrectCloseAnswer(text,item.id,finish) : null)
         || (cases.length===1 ? recoverStoppedSoloMissingOpenAnswer(text,item.id,finish) : null)
         || (cases.length===1 ? recoverStoppedSoloPlainAnswer(text,finish) : null)
+        || (cases.length===1 ? recoverStoppedSoloWrappedAnswer(text,item.id,finish) : null)
       if(recovered){answers.set(item.id,recovered);continue}
       missing.push(item.id);errors[item.id]=`${error instanceof Error?error.message:String(error)}:${answerFailureFingerprint(text,item,finish,cap)}`
     }

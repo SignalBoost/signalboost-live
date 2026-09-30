@@ -302,6 +302,8 @@ const tests = [
   'tests/universityQuarantineLedger.node.test.ts',
   // 2026-09-30 quarantine resolution: proven FAILs leave the University, our-fault students return to the exam.
   'tests/universityQuarantineResolution.node.test.ts',
+  // 2026-09-30 owner direction "remove them": paused XSA students leave as OUR failure, never a FAIL.
+  'tests/universityXsaRemoval.node.test.ts',
   // 2026-09-30 Residency lanes: one parallel lane per admitted resident, warm workers reused, remediation first.
   'tests/residencyLanes.node.test.ts',
   'tests/builderResidencyCron.node.test.ts',

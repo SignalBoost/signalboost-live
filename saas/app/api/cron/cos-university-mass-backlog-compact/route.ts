@@ -2,7 +2,7 @@ import { NextRequest,NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { compactMassEvaluationBacklog } from '@/lib/ai/cos/cosUniversityMassBacklogCompactor'
 import { reviewMassQuarantine } from '@/lib/ai/cos/cosUniversityMassQuarantineReview'
-import { resolveQuarantine } from '@/lib/ai/cos/cosUniversityQuarantineResolution'
+import { resolveQuarantine, retireUnexaminableXsaStudents } from '@/lib/ai/cos/cosUniversityQuarantineResolution'
 import { QUARANTINE_RESOLUTION_LANE } from '@/lib/ai/cos/cosUniversityQuarantineReasons'
 import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -47,7 +47,10 @@ async function reviewQuarantine(){
  */
 async function resolveQuarantineStep(){
   try{
-    const resolution=await resolveQuarantine({db:cosServiceDb()})
+    const quarantine=await resolveQuarantine({db:cosServiceDb()})
+    // Owner direction 2026-09-30 ("remove them"): XSA students our server cannot examine leave as OUR failure.
+    const xsa=await retireUnexaminableXsaStudents({db:cosServiceDb()})
+    const resolution={...quarantine,dismissed:quarantine.dismissed+xsa.removed,xsaRemoved:xsa.removed,xsaChecked:xsa.checked,xsaKeptInResidency:xsa.keptInResidency}
     const changed=resolution.dismissed+resolution.returnedToExam
     await recordCosLaneStatus({
       db:cosServiceDb(),

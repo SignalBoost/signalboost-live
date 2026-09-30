@@ -79,6 +79,24 @@ type Copy = Readonly<{
   workforceHired: string
   workforceNone: string
   workforceUnavailable: string
+  quarantineTitle: string
+  quarantineExplanation: string
+  quarantineFinal: string
+  quarantinePending: string
+  quarantineExamFailed: string
+  quarantineResidencyFailed: string
+  quarantineExhaustedReal: string
+  quarantineExhaustedOurs: string
+  quarantineDataDefect: string
+  quarantineNoReason: string
+  quarantineReturned: string
+  quarantineReturnedWaiting: string
+  quarantineReturnedPassed: string
+  quarantineReturnedAgain: string
+  quarantineReviewLast: string
+  quarantineReviewNever: string
+  quarantineReviewRestored: string
+  quarantineReviewFailed: string
 }>
 
 export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguage, Copy> = {
@@ -160,6 +178,24 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Hired',
     workforceNone: 'No graduates hired yet.',
     workforceUnavailable: 'Workforce roster not available yet (migration pending).',
+    quarantineTitle: 'Quarantine — why each student is there',
+    quarantineExplanation: 'A FAIL is a valid result and stays final; the standard is never lowered. Students held back only by our own errors go back to the exam automatically.',
+    quarantineFinal: 'Final results (did not graduate)',
+    quarantinePending: 'Held by us — needs a correction',
+    quarantineExamFailed: 'Exam FAIL (final)',
+    quarantineResidencyFailed: 'Residency FAIL (final)',
+    quarantineExhaustedReal: 'Three real exam failures (final)',
+    quarantineExhaustedOurs: 'Our errors — back to the exam',
+    quarantineDataDefect: 'Broken exam data (ours)',
+    quarantineNoReason: 'No recorded reason',
+    quarantineReturned: 'Returned to the exam by the review',
+    quarantineReturnedWaiting: 'waiting for exam',
+    quarantineReturnedPassed: 'passed',
+    quarantineReturnedAgain: 'failed again',
+    quarantineReviewLast: 'Quarantine review — last run',
+    quarantineReviewNever: 'The quarantine review has not reported a run yet.',
+    quarantineReviewRestored: 'returned to the exam',
+    quarantineReviewFailed: 'Quarantine review failed',
   },
   es: {
     title: 'COS University — Telemetría de destilación',
@@ -202,7 +238,8 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     output: 'Salida',
     latest: 'Última',
     noTeacherCalls: 'No hubo llamadas docentes alojadas en esta ventana.',
-    runsTitle: 'Ejecuciones recientes de destilación',    runsExplanation: 'La actividad de Producción más reciente aparece primero.',
+    runsTitle: 'Ejecuciones recientes de destilación',
+    runsExplanation: 'La actividad de Producción más reciente aparece primero.',
     subject: 'Materia',
     stage: 'Etapa',
     teacherMix: 'Mezcla docente',
@@ -238,6 +275,24 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Contratado',
     workforceNone: 'Aún no hay graduados contratados.',
     workforceUnavailable: 'La plantilla aún no está disponible (migración pendiente).',
+    quarantineTitle: 'Cuarentena — por qué está cada estudiante',
+    quarantineExplanation: 'Un REPROBADO es un resultado válido y es definitivo; el estándar nunca se rebaja. Los estudiantes detenidos solo por errores nuestros vuelven al examen automáticamente.',
+    quarantineFinal: 'Resultados finales (no se graduaron)',
+    quarantinePending: 'Retenidos por nosotros — requieren corrección',
+    quarantineExamFailed: 'Examen reprobado (final)',
+    quarantineResidencyFailed: 'Residencia reprobada (final)',
+    quarantineExhaustedReal: 'Tres fallos reales de examen (final)',
+    quarantineExhaustedOurs: 'Errores nuestros — vuelven al examen',
+    quarantineDataDefect: 'Datos de examen dañados (nuestros)',
+    quarantineNoReason: 'Sin motivo registrado',
+    quarantineReturned: 'Devueltos al examen por la revisión',
+    quarantineReturnedWaiting: 'esperando examen',
+    quarantineReturnedPassed: 'aprobados',
+    quarantineReturnedAgain: 'reprobaron de nuevo',
+    quarantineReviewLast: 'Revisión de cuarentena — última ejecución',
+    quarantineReviewNever: 'La revisión de cuarentena aún no ha reportado una ejecución.',
+    quarantineReviewRestored: 'devueltos al examen',
+    quarantineReviewFailed: 'La revisión de cuarentena falló',
   },
   pt: {
     title: 'COS University — Telemetria de destilação',
@@ -317,6 +372,24 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Contratado',
     workforceNone: 'Nenhum graduado contratado ainda.',
     workforceUnavailable: 'Quadro de pessoal ainda indisponível (migração pendente).',
+    quarantineTitle: 'Quarentena — por que cada estudante está aqui',
+    quarantineExplanation: 'Uma REPROVAÇÃO é um resultado válido e é definitiva; o padrão nunca é rebaixado. Estudantes retidos apenas por erros nossos voltam ao exame automaticamente.',
+    quarantineFinal: 'Resultados finais (não se formaram)',
+    quarantinePending: 'Retidos por nós — precisam de correção',
+    quarantineExamFailed: 'Exame reprovado (final)',
+    quarantineResidencyFailed: 'Residência reprovada (final)',
+    quarantineExhaustedReal: 'Três falhas reais no exame (final)',
+    quarantineExhaustedOurs: 'Erros nossos — voltam ao exame',
+    quarantineDataDefect: 'Dados do exame corrompidos (nossos)',
+    quarantineNoReason: 'Sem motivo registrado',
+    quarantineReturned: 'Devolvidos ao exame pela revisão',
+    quarantineReturnedWaiting: 'aguardando exame',
+    quarantineReturnedPassed: 'aprovados',
+    quarantineReturnedAgain: 'reprovados de novo',
+    quarantineReviewLast: 'Revisão da quarentena — última execução',
+    quarantineReviewNever: 'A revisão da quarentena ainda não registrou uma execução.',
+    quarantineReviewRestored: 'devolvidos ao exame',
+    quarantineReviewFailed: 'A revisão da quarentena falhou',
   },
   pl: {
     title: 'COS University — Telemetria destylacji',
@@ -396,6 +469,24 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Zatrudniony',
     workforceNone: 'Brak zatrudnionych absolwentów.',
     workforceUnavailable: 'Lista zespołu jeszcze niedostępna (oczekuje migracja).',
+    quarantineTitle: 'Kwarantanna — dlaczego każdy student tu jest',
+    quarantineExplanation: 'NIEZALICZENIE jest ważnym wynikiem i jest ostateczne; standard nigdy nie jest obniżany. Studenci zatrzymani wyłącznie przez nasze błędy automatycznie wracają do egzaminu.',
+    quarantineFinal: 'Wyniki ostateczne (bez dyplomu)',
+    quarantinePending: 'Zatrzymani przez nas — wymagają korekty',
+    quarantineExamFailed: 'Egzamin niezaliczony (ostatecznie)',
+    quarantineResidencyFailed: 'Rezydentura niezaliczona (ostatecznie)',
+    quarantineExhaustedReal: 'Trzy rzeczywiste porażki egzaminu (ostatecznie)',
+    quarantineExhaustedOurs: 'Nasze błędy — powrót do egzaminu',
+    quarantineDataDefect: 'Uszkodzone dane egzaminu (nasze)',
+    quarantineNoReason: 'Brak zapisanego powodu',
+    quarantineReturned: 'Przywróceni do egzaminu przez przegląd',
+    quarantineReturnedWaiting: 'czekają na egzamin',
+    quarantineReturnedPassed: 'zaliczyli',
+    quarantineReturnedAgain: 'ponownie niezaliczeni',
+    quarantineReviewLast: 'Przegląd kwarantanny — ostatnie uruchomienie',
+    quarantineReviewNever: 'Przegląd kwarantanny nie zgłosił jeszcze uruchomienia.',
+    quarantineReviewRestored: 'przywróconych do egzaminu',
+    quarantineReviewFailed: 'Przegląd kwarantanny nie powiódł się',
   },
   ru: {
     title: 'COS University — Телеметрия дистилляции',
@@ -475,6 +566,24 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Нанят',
     workforceNone: 'Нанятых выпускников пока нет.',
     workforceUnavailable: 'Штат пока недоступен (ожидается миграция).',
+    quarantineTitle: 'Карантин — почему здесь каждый студент',
+    quarantineExplanation: 'НЕЗАЧЁТ — это действительный результат, и он окончателен; стандарт никогда не снижается. Студенты, задержанные только нашими ошибками, автоматически возвращаются к экзамену.',
+    quarantineFinal: 'Окончательные результаты (без выпуска)',
+    quarantinePending: 'Задержаны нами — требуется исправление',
+    quarantineExamFailed: 'Экзамен не сдан (окончательно)',
+    quarantineResidencyFailed: 'Ординатура не пройдена (окончательно)',
+    quarantineExhaustedReal: 'Три реальных провала экзамена (окончательно)',
+    quarantineExhaustedOurs: 'Наши ошибки — возврат к экзамену',
+    quarantineDataDefect: 'Повреждённые данные экзамена (наши)',
+    quarantineNoReason: 'Причина не записана',
+    quarantineReturned: 'Возвращены к экзамену проверкой',
+    quarantineReturnedWaiting: 'ждут экзамена',
+    quarantineReturnedPassed: 'сдали',
+    quarantineReturnedAgain: 'снова не сдали',
+    quarantineReviewLast: 'Проверка карантина — последний запуск',
+    quarantineReviewNever: 'Проверка карантина ещё не сообщила о запуске.',
+    quarantineReviewRestored: 'возвращено к экзамену',
+    quarantineReviewFailed: 'Проверка карантина завершилась ошибкой',
   },
 }
 // end of saas/lib/i18n/cosUniversityTelemetryCopy.ts (if this line is missing, the paste was cut short)

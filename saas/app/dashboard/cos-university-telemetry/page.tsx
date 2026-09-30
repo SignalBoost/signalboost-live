@@ -133,6 +133,12 @@ type Telemetry = {
   residency?: Residency[]
   pipeline?: { residencyTotal?:number; residencyResidents?:number; residencyRemediation?:number; residencyComplete?:number; residencyFailed?:number; activeGraduates?:number; evaluationPending?:number; quarantined?:number }
   workforce?: { available?:boolean; onCall?:number; retired?:number; workers?:Array<{ candidateId:string; specialty:string; jobRoles:string[]; hiredAt:string|null }> }
+  quarantine?: {
+    total?:number; finalResults?:number; pendingCorrection?:number
+    byReason?: Partial<Record<'exam_failed'|'residency_failed'|'exhausted_real_failures'|'exhausted_our_errors'|'exam_data_defect'|'no_recorded_reason', number>>
+    returnedToExam?: { total?:number; waitingForExam?:number; passedExam?:number; quarantinedAgain?:number; other?:number }
+    review?: { available?:boolean; ran?:boolean; outcome?:string|null; reason?:string|null; observedAt?:string|null; checked?:number; restored?:number; error?:string|null }
+  }
 }
 
 const REFRESH_MS = 60_000
@@ -279,6 +285,10 @@ export default function CosUniversityTelemetryPage() {
   const residency = data?.residency || []
   const pipeline = data?.pipeline || {}
   const workforce = data?.workforce || {}
+  const quarantine = data?.quarantine || {}
+  const quarantineReasons = quarantine.byReason || {}
+  const quarantineReturned = quarantine.returnedToExam || {}
+  const quarantineReview = quarantine.review || {}
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
@@ -476,6 +486,34 @@ export default function CosUniversityTelemetryPage() {
           <Card label="Evaluation pending" value={String(pipeline.evaluationPending ?? 0)} />
           <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
         </div>
+      </section>
+
+      <section className="rounded-lg border p-4">
+        <h2 className="font-semibold">{copy.quarantineTitle}</h2>
+        <p className="mt-1 text-xs opacity-65">{copy.quarantineExplanation}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Card label={copy.quarantineFinal} value={String(quarantine.finalResults ?? 0)} />
+          <Card label={copy.quarantinePending} value={String(quarantine.pendingCorrection ?? 0)} />
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <Card label={copy.quarantineExamFailed} value={String(quarantineReasons.exam_failed ?? 0)} />
+          <Card label={copy.quarantineResidencyFailed} value={String(quarantineReasons.residency_failed ?? 0)} />
+          <Card label={copy.quarantineExhaustedReal} value={String(quarantineReasons.exhausted_real_failures ?? 0)} />
+          <Card label={copy.quarantineExhaustedOurs} value={String(quarantineReasons.exhausted_our_errors ?? 0)} />
+          <Card label={copy.quarantineDataDefect} value={String(quarantineReasons.exam_data_defect ?? 0)} />
+          <Card label={copy.quarantineNoReason} value={String(quarantineReasons.no_recorded_reason ?? 0)} />
+        </div>
+        <p className="mt-4 text-sm">
+          <span className="font-medium">{copy.quarantineReturned}: {quarantineReturned.total ?? 0}</span>
+          <span className="opacity-70"> · {copy.quarantineReturnedWaiting} {quarantineReturned.waitingForExam ?? 0} · {copy.quarantineReturnedPassed} {quarantineReturned.passedExam ?? 0} · {copy.quarantineReturnedAgain} {quarantineReturned.quarantinedAgain ?? 0}</span>
+        </p>
+        <p className="mt-2 text-xs opacity-75">
+          {!quarantineReview.ran
+            ? copy.quarantineReviewNever
+            : quarantineReview.outcome === 'failed'
+              ? `${copy.quarantineReviewFailed} · ${when(quarantineReview.observedAt)} · ${quarantineReview.error || quarantineReview.reason || ''}`
+              : `${copy.quarantineReviewLast} ${when(quarantineReview.observedAt)} · ${quarantineReview.restored ?? 0} ${copy.quarantineReviewRestored}`}
+        </p>
       </section>
 
       <section className="rounded-lg border p-4">

@@ -623,7 +623,7 @@ export async function GET() {
       const createdAt = iso(artifact.created_at)
       const events = assuranceByCandidate.get(candidateId) || []
       const nowMs = Date.now()
-      const eligibleAtMs = createdAt ? Date.parse(createdAt) + 12 * 60 * 60 * 1000 : Number.POSITIVE_INFINITY
+      const eligibleAtMs = createdAt ? Date.parse(createdAt) + 10 * 60 * 1000 : Number.POSITIVE_INFINITY
       const approval = events.find((row: any) => row.verifier === 'host_controller'
         && row.evidence?.profile === 'cos_distilled_independent_evaluation_authorization_v1'
         && row.evidence?.artifactHash === artifactHash
@@ -667,7 +667,7 @@ export async function GET() {
             ? 'residency_incomplete'
             : 'waiting_for_residency_admission'
         else if (!canary) claimability = 'missing_exact_canary'
-        else if (nowMs < eligibleAtMs) claimability = 'waiting_12h'
+        else if (nowMs < eligibleAtMs) claimability = 'waiting_10m_retention'
         else if (!approval) claimability = 'missing_approval'
         else if (approval.evidence?.claim !== 'distilled_independent_evaluation_approved') claimability = 'approval_suspended'
         else if (!approvalExpiresMs || approvalExpiresMs <= nowMs) claimability = 'approval_expired'

@@ -490,17 +490,27 @@ export default function CosUniversityTelemetryPage() {
 
       <section className="rounded-lg border p-4">
         <h2 className="font-semibold">University pipeline — live state</h2>
-        <p className="mt-1 text-xs opacity-65">{copy.pipelineExplanation}</p>
-        {/* Owner review 2026-09-30: the row reads left to right in pipeline order and ends at graduation, then the two
-            ways out without graduating. Passed = exam PASS, now graduating (runtime_pending); Graduated = in the Workforce. */}
+        <p className="mt-1 text-xs opacity-65">
+          Training / distillation → artifact produced. Computer Science artifacts branch through Builder Residency;
+          every other subject goes directly to independent evaluation. Both branches then converge on runtime verification,
+          graduation and the Workforce.
+        </p>
+        <div className="mt-4 rounded-lg border p-3 text-xs">
+          <div className="font-medium">Computer Science branch</div>
+          <div className="mt-1 opacity-70">Artifact → Builder Residency → remediation when required → Residency complete → Evaluation</div>
+          <div className="mt-3 font-medium">All other subjects</div>
+          <div className="mt-1 opacity-70">Artifact → Evaluation</div>
+          <div className="mt-3 font-medium">Shared downstream path</div>
+          <div className="mt-1 opacity-70">Evaluation PASS → runtime verification → Graduation → Workforce</div>
+        </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          <Card label="Residency residents" value={String(pipeline.residencyResidents ?? 0)} />
-          <Card label="Residency remediation" value={String(pipeline.residencyRemediation ?? 0)} />
-          <Card label="Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
-          <Card label="Evaluation pending" value={String(pipeline.evaluationPending ?? 0)} />
+          <Card label="CS Residency residents" value={String(pipeline.residencyResidents ?? 0)} />
+          <Card label="CS Residency remediation" value={String(pipeline.residencyRemediation ?? 0)} />
+          <Card label="CS Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
+          <Card label="Evaluation pending — both branches" value={String(pipeline.evaluationPending ?? 0)} />
           <Card label={copy.pipelinePassedGraduating} value={String(artifacts.filter(artifact => artifact.status === 'runtime_pending').length)} />
           <Card label={copy.pipelineGraduated} value={String(pipeline.activeGraduates ?? workforce.onCall ?? 0)} />
-          <Card label={copy.pipelineResidencyFailed} value={String(pipeline.residencyFailed ?? 0)} />
+          <Card label="CS Residency failed" value={String(pipeline.residencyFailed ?? 0)} />
           <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
         </div>
       </section>

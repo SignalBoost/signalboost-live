@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
 import { scopeReasonerPromptToQuestion } from './cosReasonerPromptScope.ts'
 import { blockingReleaseSignals, advisoryReleaseSignals } from './releaseSignalSeverity.ts'
@@ -502,7 +503,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     '- [KG#] = Knowledge Graph fact; [CL#] = learned-corpus evidence; [OEM#] = organization-scoped Enterprise Memory; [EM#] = saved per-user memory; [SK#] = validated procedural skill. Cite a label inline only when it genuinely informed the answer.',
     '- [OEM#], [KG#], and [CL#] may ground factual claims. [EM#] is user context, not independent factual corroboration. [SK#] is HOW-to-reason guidance, not factual corroboration.',
     '- [CM#] is validated creative/strategic guidance about HOW to solve or present a task. It is never factual evidence, never raises factual grounding confidence, and must never be cited to the user as proof of a real-world claim.',
-    '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge. Selected full-content [CL#] evidence is mandatory: treat it as durable learned knowledge available to COS for this turn, make it materially support the reasoning and resulting claim and cite it, or state that it does not answer the question; never silently ignore it. Retrieval alone is not learning application: selected [CL#] material must affect the answer when relevant.',
+    '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge. Selected full-content [CL#] evidence is mandatory: treat it as durable learned knowledge available to COS for this turn, make it materially support the reasoning and resulting claim and cite it. When a selected item does not support anything you say, leave it out entirely: never tell the reader that supplied, selected, learned or corpus material was or was not relevant, and never describe what it covers. Retrieval alone is not learning application: selected [CL#] material must affect the answer when relevant.',
     '- NEVER cite an item that did not change what you wrote. Related-but-not-supporting evidence must remain uncited. An honest answer with zero factual citations is correct when supplied factual evidence was not useful.',
     '',
     // ONE ANSWER POLICY (2026-08-26). Shared verbatim with the public stateless prompt so the
@@ -646,7 +647,6 @@ function emptyRetrieval():RetrievalCounts { return { retrieved:0, relevant:0, se
 function stage(counts:RetrievalCounts, injected:boolean, cited=0):EvidenceFunnelStage {
   return { ...counts, injected:injected ? counts.selected : 0, cited }
 }
-
 // ONE COS PIPELINE (owner decision 2026-09-26): COS is the brain and Concierge is the mouth. Every
 // question — owner, signed-in user, or public visitor — is reasoned by this one pipeline. WHO IS ASKING
 // changes what COS may know and say (retrieval scope, knowledge blocks, release rules), never which
@@ -1090,7 +1090,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     // public catalog directly in the prompt for questions about iTMounts. When the identity was only one
     // line among the system-prompt definitions, the owner channel answered "iTMounts is not a recognized
     // product" while the separate public pipeline, which had this block, answered correctly.
-    prompt:`${companyKnowledgeBlock(input.prompt)}${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,6000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}${context.learned.length ? `\n\nLEARNED-EVIDENCE RELEASE CONTRACT: ${context.learned.length} relevant [CL#] items were selected for this turn. If any selected item supports a factual claim in your answer, materially use it and put its exact [CL#] label immediately after that claim. Do not answer the same claim only from pretrained knowledge. If none supports the answer, explicitly say the selected learned material does not answer the question. Return the required strict JSON with these [CL#] labels preserved inside the answer string.` : ''}`,
+    prompt:`${companyKnowledgeBlock(input.prompt)}${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,6000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}${context.learned.length ? `\n\nLEARNED-EVIDENCE RELEASE CONTRACT: ${context.learned.length} relevant [CL#] items were selected for this turn. If any selected item supports a factual claim in your answer, materially use it and put its exact [CL#] label immediately after that claim. Do not answer the same claim only from pretrained knowledge. If none supports the answer, answer without them and do not mention them: the reader never sees this evidence block, so any sentence about it is noise. Return the required strict JSON with these [CL#] labels preserved inside the answer string.` : ''}`,
   }).catch(error => {
     // Previously swallowed entirely (`.catch(() => null)`), so a wake-and-reason turn that failed
     // for ANY reason — cold-start timeout, aborted fetch, HTTP error from the endpoint, wake permission

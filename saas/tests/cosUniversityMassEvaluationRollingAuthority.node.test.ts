@@ -867,6 +867,24 @@ test('stale graduate-verdict recovery starts a clean evaluator generation instea
   assert.equal(decision.issue, true)
 })
 
+test('a reopened evaluation generation cannot be starved by a continuous stream of newer frontier artifacts', () => {
+  const recovered = { ...artifactA, createdAt: '2026-09-20T00:00:00Z', frontierRecipe: false }
+  const frontier = { ...artifactB, createdAt: '2026-09-30T12:00:00Z', frontierRecipe: true }
+  const reopened = ev(recovered.candidateId, 'host_controller', {
+    claim: MASS_EVALUATION_REOPEN_CLAIM,
+    artifactHash: recovered.artifactHash,
+    repairRef: MASS_EVALUATION_STALE_GRADUATE_VERDICT_REPAIR_REF,
+  }, '2026-09-30T13:47:42Z')
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [frontier, recovered],
+    events: [canary(frontier), canary(recovered), reopened],
+    now: new Date('2026-09-30T14:50:00Z'),
+  })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.artifact.candidateId, recovered.candidateId)
+})
+
 test('zero-collapse judge failures are evaluator infrastructure, not model-quality attempts', () => {
   const approval = ev(artifactA.candidateId, 'host_controller', {
     claim: 'distilled_independent_evaluation_approved',

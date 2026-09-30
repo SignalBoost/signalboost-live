@@ -662,14 +662,16 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
         contentLength: text.length,
       }))
       noteServedInference(provider, model)
-      noteServedInference(provider, model)
-  return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
+      return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
     }
     const error = new Error(LOCAL_MODEL_OUTPUT_TRUNCATED) as Error & { emptyContent?: boolean }
     error.emptyContent = !text
     throw error
   }
   if (errorText !== null || (text === null && toolCalls.length === 0)) return null
+  // Record who served every successful completion (production 2026-09-30 04:53 UTC: RunPod answered, provenance
+  // said deepinfra, because this normal return did not record it).
+  noteServedInference(provider, model)
   return Object.freeze({ content: text, toolCalls, finishReason, provider, model })
 }
 
@@ -748,7 +750,10 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
     primary: async () => {
       const runpod = await import('./cos/runpodPrimaryInference.ts')
       if (!runpod.runpodPrimaryEnabled()) return null
+      const { recordCosLatencyStage } = await import('./cos/cosLatencyStages.ts')
+      const readyStartedAt = Date.now()
       const runpodConfig = await runpod.resolveReadyRunpodPrimaryConfig('reasoner')
+      recordCosLatencyStage('runpod:ready_check', Date.now() - readyStartedAt)
       if (!runpodConfig) return null
       // A truncated owned answer throws (-> null) so the managed backup still gets its chance. A request that
       // would only fit by cutting the caller's evidence is refused in-process, so the backup starts at once
@@ -758,8 +763,10 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       // so background work waits for chat instead of the other way round.
       const leases = await import('./cos/runpodInferenceLease.ts')
       let slot: Awaited<ReturnType<typeof leases.tryAcquireRunpodInferenceLeaseNow>> | undefined
+      const slotStartedAt = Date.now()
       try {
         slot = await leases.tryAcquireRunpodInferenceLeaseNow(runpodConfig.timeoutMs)
+        recordCosLatencyStage('runpod:slot', Date.now() - slotStartedAt)
       } catch (error) {
         console.warn('[cos-interactive-runpod-slot-unavailable]', error instanceof Error ? error.message : String(error))
         slot = undefined

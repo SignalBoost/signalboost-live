@@ -305,6 +305,8 @@ const tests = [
   // 2026-09-30 Residency lanes: one parallel lane per admitted resident, warm workers reused, remediation first.
   'tests/residencyLanes.node.test.ts',
   'tests/builderResidencyCron.node.test.ts',
+  // 2026-09-30 exam lane: a student whose endpoint is gone is re-canaried instead of retried forever.
+  'tests/examEndpointRefresh.node.test.ts',
   'tests/staleGatewayXsaInfrastructure.node.test.ts',
   // 2026-09-29: 220 independent evaluations showed distillation teaching base-rate reasoning (0.000 -> 0.927, 204
   // helped / 0 hurt) while ERASING survivorship (1.000 -> 0.382, 0 helped / 136 hurt) and regression to the mean

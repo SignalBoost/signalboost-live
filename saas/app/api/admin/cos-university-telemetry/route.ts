@@ -1,3 +1,4 @@
+// saas/app/api/admin/cos-university-telemetry/route.ts
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -835,7 +836,8 @@ export async function GET() {
       providers: Array.from(providers.values())
         .sort((a, b) => b.calls - a.calls || a.id.localeCompare(b.id)),
       runs: recentRuns,
-      residency,
+      // Withdrawn residents (the student left the University mid-Residency) are not part of the live cohort.
+      residency: residency.filter((row: any) => row.standing !== 'withdrawn'),
       pipeline: {
         residencyTotal: residency.length,
         residencyResidents: residency.filter((row: any) => ['resident','senior_resident'].includes(row.standing)).length,

@@ -15,6 +15,7 @@ import {
   MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT,
   MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
   decideExhaustedMassEvaluationArtifacts,
+  decideWronglyExhaustedMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
   type RollingEvent,
 } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
@@ -80,6 +81,20 @@ test('an artifact that spent its substantive budget is named, with the reason an
 
   // The two decisions must agree: the approval policy refuses exactly what the sweep disposes.
   assert.equal(decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifact], events, now }).issue, false)
+})
+
+test('quarantine review identifies a stale exhausted disposition after infrastructure reclassification', () => {
+  const events = [canary, approval, ...failed(INFRASTRUCTURE, MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT)]
+  const reopen = decideWronglyExhaustedMassEvaluationArtifacts({ artifacts: [artifact], events, now })
+  assert.equal(reopen.length, 1)
+  assert.equal(reopen[0].candidateId, artifact.candidateId)
+  assert.equal(reopen[0].substantiveFailures, 0)
+  assert.equal(reopen[0].lastError, INFRASTRUCTURE)
+})
+
+test('quarantine review never reopens an artifact that still exhausted substantive attempts', () => {
+  const events = [canary, approval, ...failed(SUBSTANTIVE, MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT)]
+  assert.equal(decideWronglyExhaustedMassEvaluationArtifacts({ artifacts: [artifact], events, now }).length, 0)
 })
 
 test('an artifact still inside its budget is left alone', () => {

@@ -1,8 +1,7 @@
-// saas/lib/ai/local-inference.ts
 import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 import { turnDeadlineRemainingMs } from './cos/cosTurnBudget.ts'
-import { planContextWindow } from './context-window-manager.ts'
+import { estimateQwenContextTokens, planContextWindow } from './context-window-manager.ts'
 import { modelCapabilityProfileForId, requireModelCapability, type ModelTransportProtocol } from './modelCapabilityRegistry.ts'
 import { tryAssignedPlatformModelTurn } from './modelRuntimeAssignment.ts'
 import {
@@ -105,6 +104,13 @@ export interface LocalInferenceConfig {
   fallbackFromOwned?: boolean
   /** Physical serving-window override for this exact deployed model/runtime. */
   contextWindowTokens?: number
+  /** Token estimator matching the served model's tokenizer family; default is the flat character estimate. */
+  tokenEstimator?: 'qwen'
+  /**
+   * Refuse the call (recorded as context_window_would_truncate_input) instead of dropping or cutting the
+   * caller's messages to fit. Used where another provider with a larger window can take the full request.
+   */
+  refuseInputCompaction?: boolean
   /** Optional platform registry identity for the configured runtime model. */
   modelProfileKey?: string | null
   /** Canonical transport actually used by this inference seam. */
@@ -495,7 +501,11 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       messages: rawMessages,
       requestedOutputTokens: requestedMaxTokens,
       minimumOutputTokens: Math.min(256, requestedMaxTokens),
+      ...(config.tokenEstimator === 'qwen' ? { estimateTokens: estimateQwenContextTokens } : {}),
     })
+    if (config.refuseInputCompaction === true && (contextPlan.droppedMessages > 0 || contextPlan.truncatedCharacters > 0)) {
+      throw new Error(`context_window_would_truncate_input:model=${model}:window=${contextPlan.contextWindowTokens}:prompt=${contextPlan.estimatedPromptTokens}:droppedMessages=${contextPlan.droppedMessages}:truncatedCharacters=${contextPlan.truncatedCharacters}`)
+    }
     if (contextPlan.compacted) {
       console.info('[context-window-plan]', JSON.stringify({
         feature: usageContext.feature,
@@ -676,6 +686,26 @@ function interactiveManagedBackupAfterMs(): number {
   return Number.isFinite(value) ? Math.max(1000, Math.min(60000, value)) : 20000
 }
 
+// OWNED REASONER WINDOW (2026-09-29). The RunPod reasoner is Ollama started by scripts/runpod-cos-reasoner.sh
+// (and the repair script) with OLLAMA_CONTEXT_LENGTH = COS_REASONER_CONTEXT_LENGTH, default 16384. The planner
+// assumed 8192 for every RunPod model, so chat was refused in ~6 ms before reaching the pod
+// (provider_inference_usage 2026-09-30 00:33 UTC: context_window_budget_insufficient). An explicit
+// LOCAL_AI_CONTEXT_WINDOW_<MODEL>_TOKENS or LOCAL_AI_CONTEXT_WINDOW_TOKENS still wins.
+function ownedReasonerContextWindowTokens(config: LocalInferenceConfig): number | undefined {
+  if (config.contextWindowTokens) return config.contextWindowTokens
+  const modelKey = `LOCAL_AI_CONTEXT_WINDOW_${String(config.model || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_TOKENS`
+  if (Number(process.env[modelKey]) > 0 || Number(process.env.LOCAL_AI_CONTEXT_WINDOW_TOKENS) > 0) return undefined
+  const configured = Number(process.env.COS_REASONER_CONTEXT_LENGTH || '16384')
+  return Number.isFinite(configured) && configured >= 1024 ? Math.floor(configured) : 16384
+}
+
+/** Chat answers are short; this cap keeps a runaway owned answer from holding the chat for a minute. */
+function interactiveRunpodMaxTokens(requested: number | undefined): number {
+  const configured = Number(process.env.COS_INTERACTIVE_RUNPOD_MAX_TOKENS || '1200')
+  const cap = Number.isFinite(configured) ? Math.max(512, Math.min(4000, Math.floor(configured))) : 1200
+  return Math.min(requested ?? cap, cap)
+}
+
 function usefulTurn(turn: LocalModelTurnResult | null): boolean {
   return Boolean(turn && (turn.content?.trim() || turn.toolCalls.length))
 }
@@ -689,8 +719,19 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       if (!runpod.runpodPrimaryEnabled()) return null
       const runpodConfig = await runpod.resolveReadyRunpodPrimaryConfig('reasoner')
       if (!runpodConfig) return null
-      // A truncated owned answer throws (-> null) so the managed backup still gets its chance.
-      return callConfiguredModelTurn(args, runpodConfig)
+      // A truncated owned answer throws (-> null) so the managed backup still gets its chance. A request that
+      // would only fit by cutting the caller's evidence is refused in-process, so the backup starts at once
+      // with the full request instead of RunPod answering from a truncated one.
+      const contextWindowTokens = ownedReasonerContextWindowTokens(runpodConfig)
+      return callConfiguredModelTurn(
+        { ...args, maxTokens: interactiveRunpodMaxTokens(args.maxTokens) },
+        {
+          ...runpodConfig,
+          ...(contextWindowTokens ? { contextWindowTokens } : {}),
+          tokenEstimator: /qwen/i.test(runpodConfig.model) ? 'qwen' : undefined,
+          refuseInputCompaction: true,
+        },
+      )
     },
     backup: () => callConfiguredModelTurn(args, { ...config, fallbackFromOwned: true }).catch(error => { managedError = error; return null }),
     hedgeAfterMs: interactiveManagedBackupAfterMs(),

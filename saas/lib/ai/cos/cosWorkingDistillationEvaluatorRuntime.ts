@@ -24,10 +24,9 @@ export type WorkingCosEvaluatorRuntimeBinding=Readonly<{
  */
 export async function workingCosEvaluatorRuntimeBinding(input:{candidateId:string;artifactHash:string;db?:any}):Promise<WorkingCosEvaluatorRuntimeBinding>{
   const admission=await readWorkingCosEvaluationAdmission(input)
-  const evidenceRef=clean(admission.artifactId,500)
-  const match=/^([^@]+)@([a-f0-9]{40})$/i.exec(evidenceRef)
-  if(!match)throw new Error('working_cos_evaluator_adapter_revision_missing')
-  const [,adapterModelId,adapterRevision]=match
+  const adapterModelId=clean(admission.artifactId,500)
+  const adapterRevision=clean(admission.artifactRevision,40).toLowerCase()
+  if(!adapterModelId||!/^[a-f0-9]{40}$/i.test(adapterRevision))throw new Error('working_cos_evaluator_adapter_revision_missing')
   if(!admission.baseModelId||!admission.baseModelRevision||!HEX64.test(admission.artifactHash))throw new Error('working_cos_evaluator_runtime_identity_invalid')
   return Object.freeze({
     profile:WORKING_COS_EVALUATOR_RUNTIME_PROFILE,

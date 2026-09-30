@@ -147,6 +147,13 @@ test('mass evaluator runs exactly four suites with shared endpoint and four judg
   assert.match(runner, /retentionPassed=retention\.candidateScore>=retention\.baselineScore;/)
 })
 
+test('reopened mass evaluations persist a fresh independent verdict per evaluation run', () => {
+  // A reopened artifact can reuse the same artifact and suite hashes. The evidenceRef identifies the
+  // current evaluation run, so it must participate in idempotency or the evidence endpoint will
+  // ignore the fresh verdict and graduation will read the stale pre-reopen score.
+  assert.match(runner, /const idempotencyKey=sha256\(\[COS_MASS_DISTILLED_EVALUATOR_VERSION,input\.claim,input\.artifactHash,input\.suiteHash,input\.evidenceRef\]\)/)
+})
+
 test('evaluation lifecycle never authorizes Production traffic and only advances after all gates', () => {
   assert.match(runner, /evaluationPassed=holdoutImproved&&safetyPassed&&transferPassed&&retentionPassed/)
   assert.match(runner, /status:evaluationPassed\?'runtime_pending':'quarantined'/)

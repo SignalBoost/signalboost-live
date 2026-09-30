@@ -1,4 +1,3 @@
-//
 // Owner direction 2026-09-30: "what is the reason of quarantine forever ... if they are there because of our
 // infrastructure fix it - if because they are incompetent delete them." Quarantine is a short stop, not a place to live.
 // Every 15 minutes (the backlog-compact cron, right after the quarantine review) each quarantined student gets the
@@ -16,6 +15,7 @@
 
 import { createHash } from 'node:crypto'
 import type { RollingEvent } from './cosUniversityMassEvaluationRollingAuthority.ts'
+import { MASS_XSA_EXAMS_PAUSED, xsaExamPaused } from './cosUniversityXsaExamPause.ts'
 import {
   QUARANTINE_DISMISSED_CLAIM,
   QUARANTINE_RESOLUTION_PROFILE,
@@ -256,4 +256,107 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
     remaining: students.length - dismissed - returnedToExam,
     byReason: Object.freeze(byReason),
   })
+}
+
+const ACTIVE_RESIDENCY_STANDINGS = ['resident', 'senior_resident', 'remediation_required']
+
+export type XsaRemovalResult = Readonly<{ paused: boolean; checked: number; removed: number; keptInResidency: number }>
+
+/**
+ * Owner direction 2026-09-30 ("remove them"): students trained with Exclusive Self Attention (XSA) cannot be examined
+ * while their exams are paused (our XSA server answers in 37-44s, the exam limit is 50s, and XSA training is stopped).
+ * They leave the University as OUR failure, never as a FAIL: status `retired` with a dismissal record that says so.
+ * The weights stay as the record if XSA is ever tested again on a fast server. Runs only while the pause is on, so
+ * unpausing XSA exams stops it; a student still inside an active Residency is left alone.
+ */
+export async function retireUnexaminableXsaStudents(input: { db: any; now?: Date }): Promise<XsaRemovalResult> {
+  const db = input.db
+  if (!db) throw new Error('service_database_unavailable')
+  if (!MASS_XSA_EXAMS_PAUSED) return Object.freeze({ paused: false, checked: 0, removed: 0, keptInResidency: 0 })
+
+  const pending: any[] = []
+  for (let from = 0; from < PAGE_SIZE * 40; from += PAGE_SIZE) {
+    const page = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,intended_use,status')
+      .eq('status', 'evaluation_pending')
+      .order('updated_at', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1)
+    if (page.error) throw page.error
+    pending.push(...(page.data || []))
+    if ((page.data || []).length < PAGE_SIZE) break
+  }
+  const xsa = pending
+    .filter(row => text(row.candidate_id, 240).startsWith('mass:'))
+    .filter(row => {
+      const receipt = row?.intended_use?.trainingReceipt
+      return xsaExamPaused({ xsa: Boolean(receipt && typeof receipt === 'object' && receipt.xsaTrainingApplied === true) })
+    })
+    .map(row => ({
+      candidateId: text(row.candidate_id, 240),
+      subjectId: text(row.subject_id, 240),
+      artifactHash: text(row.trained_artifact_hash, 80).toLowerCase(),
+    }))
+    .filter(row => HEX64.test(row.artifactHash))
+  if (!xsa.length) return Object.freeze({ paused: true, checked: 0, removed: 0, keptInResidency: 0 })
+
+  const inResidency = new Set<string>()
+  for (const chunk of chunks([...new Set(xsa.map(row => row.candidateId))])) {
+    const residency = await db.from('cos_university_residency_enrollments')
+      .select('candidate_id,trained_artifact_hash,standing')
+      .in('candidate_id', chunk)
+      .limit(1000)
+    if (residency.error) throw residency.error
+    for (const row of residency.data || []) {
+      if (ACTIVE_RESIDENCY_STANDINGS.includes(text(row.standing, 80))) {
+        inResidency.add(`${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 80).toLowerCase()}`)
+      }
+    }
+  }
+
+  let removed = 0
+  let keptInResidency = 0
+  for (const student of xsa) {
+    if (inResidency.has(`${student.candidateId}:${student.artifactHash}`)) { keptInResidency += 1; continue }
+    if (removed >= QUARANTINE_RESOLUTION_MAX_PER_RUN) break
+    const at = new Date().toISOString()
+    // Conditional on the exact student still waiting for its exam: a retry or a concurrent run changes nothing twice.
+    const updated = await db.from('cos_local_distillation_artifacts')
+      .update({ status: 'retired', updated_at: at })
+      .eq('candidate_id', student.candidateId)
+      .eq('trained_artifact_hash', student.artifactHash)
+      .eq('status', 'evaluation_pending')
+      .select('id')
+    if (updated.error) throw updated.error
+    if (!(updated.data || []).length) continue
+    const body = {
+      profile: QUARANTINE_RESOLUTION_PROFILE,
+      claim: QUARANTINE_DISMISSED_CLAIM,
+      candidateId: student.candidateId,
+      artifactHash: student.artifactHash,
+      reason: 'xsa_not_examinable',
+      ours: true,
+      failedGates: [],
+      failedCompetencies: [],
+      lastError: 'xsa_exam_paused: our XSA server answers too slowly for the exam per-answer limit',
+      previousStatus: 'evaluation_pending',
+      nextStatus: 'retired',
+      ownerDirection: 'owner_explicit_direction_2026-09-30_remove_xsa_students',
+      evaluationPassed: false,
+      productionTrafficAuthorized: false,
+      authorityExpanded: false,
+    }
+    const event = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: hash([QUARANTINE_RESOLUTION_PROFILE, QUARANTINE_DISMISSED_CLAIM, 'xsa', student.candidateId, student.artifactHash]),
+      event_type: 'fine_tune',
+      subject_id: student.subjectId || null,
+      candidate_id: student.candidateId,
+      evidence_hash: hash(body),
+      evidence: body,
+      verifier: 'host_controller',
+      observed_at: at,
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (event.error) throw event.error
+    removed += 1
+  }
+  return Object.freeze({ paused: true, checked: xsa.length, removed, keptInResidency })
 }

@@ -1,3 +1,4 @@
+// saas/platform-harness/residency/live-builder-executor.ts
 // @ts-nocheck
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -284,8 +285,7 @@ function residencyGovernancePolicy():GovernancePolicy{
         rollback:'discard ephemeral Residency workspace/sandbox',
       })),
     ),
-    environment:'sandbox',
-  })
+    environment:'sandbox',  })
 }
 
 async function allFiles(
@@ -453,7 +453,15 @@ export function createLiveBuilderResidencyExecutor(input:{
   db:SupabaseClient
   sandboxRunner?:BuilderRunnerPort
   modelPortFactory?:()=>BuilderResidencyModelPort
+  /**
+   * Bounded exact-artifact readiness wait for THIS case. The cron passes what is left of its own invocation after
+   * reserving the harness deadline, so a cold start can never outlive the function and leave the case unrecorded.
+   */
+  readyTimeoutMs?:number
 }):BuilderResidencyExactArtifactExecutor{
+  const readyTimeoutMs=Number.isFinite(Number(input.readyTimeoutMs))&&Number(input.readyTimeoutMs)>0
+    ?Math.min(360_000,Math.max(30_000,Math.floor(Number(input.readyTimeoutMs))))
+    :360_000
   return Object.freeze({
     async run(call){
       const decision=resolveHarnessManifest(call.request,call.authority)
@@ -522,7 +530,7 @@ export function createLiveBuilderResidencyExecutor(input:{
           db:input.db,
           apiKey:apiKey!,
           timeoutMs:BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS,
-          readyTimeoutMs:360_000,
+          readyTimeoutMs,
         })
 
       const modelIdentity={
@@ -677,3 +685,4 @@ export function createLiveBuilderResidencyExecutor(input:{
     },
   })
 }
+// end of saas/platform-harness/residency/live-builder-executor.ts (if this line is missing, the paste was cut short)

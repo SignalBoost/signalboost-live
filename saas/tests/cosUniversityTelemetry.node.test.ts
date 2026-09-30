@@ -224,5 +224,6 @@ test('University telemetry scopes evaluator failure to the current reopen genera
   assert.match(route, /inCurrentEvaluationGeneration\(row\)[\s\S]*mass_distilled_independent_evaluation_completed/)
   assert.match(route, /historicalEvaluationFailure/)
   assert.match(route, /evaluationGeneration: reopen \? 'reopened' : 'original'/)
-  assert.match(route, /artifact\.status === 'quarantined'[\s\S]*currentStage = 'Evaluation remediation'/)
+  // Owner direction 2026-09-30: a quarantined student shows WHY it is quarantined (see cosUniversityQuarantineReasons).
+  assert.match(route, /artifact\.status === 'quarantined'\) \{ currentStage = 'Quarantine'; blocker = quarantineReason\?\.reason/)
 })

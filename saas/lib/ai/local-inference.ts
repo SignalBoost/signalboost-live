@@ -725,6 +725,18 @@ function interactiveRunpodMaxTokens(requested: number | undefined): number {
   return Math.min(requested ?? cap, cap)
 }
 
+/** The skipped RunPod attempt appears in the provider trail as "runpod FAILED 0 ms — runpod_busy_background_work". */
+async function recordRunpodBusySkip(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<void> {
+  console.info('[cos-interactive-runpod-busy]', JSON.stringify({ feature: args.usageContext?.feature || null, model: config.model }))
+  await recordLocalInferenceUsage({
+    requestId: randomUUID(), provider: 'runpod', model: config.model,
+    context: args.usageContext || { feature: 'unattributed_local_inference' }, routeOwner: 'itmounts',
+    graduateCandidateId: null, graduateArtifactId: null, graduateArtifactHash: null, fallbackFromOwned: false,
+    promptTokens: null, completionTokens: null, totalTokens: null, cachedPromptTokens: null, providerEstimatedCostUsd: null,
+    success: false, httpStatus: null, latencyMs: 0, finishReason: 'runpod_busy_background_work',
+  }).catch(error => console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error)))
+}
+
 function usefulTurn(turn: LocalModelTurnResult | null): boolean {
   return Boolean(turn && (turn.content?.trim() || turn.toolCalls.length))
 }
@@ -741,16 +753,37 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       // A truncated owned answer throws (-> null) so the managed backup still gets its chance. A request that
       // would only fit by cutting the caller's evidence is refused in-process, so the backup starts at once
       // with the full request instead of RunPod answering from a truncated one.
+      // RUNPOD SLOT (2026-09-30). The owned reasoner serves one request at a time. If background work holds it,
+      // do not queue: record the skip and let the managed backup start now. While chat runs it holds the slot,
+      // so background work waits for chat instead of the other way round.
+      const leases = await import('./cos/runpodInferenceLease.ts')
+      let slot: Awaited<ReturnType<typeof leases.tryAcquireRunpodInferenceLeaseNow>> | undefined
+      try {
+        slot = await leases.tryAcquireRunpodInferenceLeaseNow(runpodConfig.timeoutMs)
+      } catch (error) {
+        console.warn('[cos-interactive-runpod-slot-unavailable]', error instanceof Error ? error.message : String(error))
+        slot = undefined
+      }
+      if (slot === null) {
+        await recordRunpodBusySkip(args, runpodConfig)
+        return null
+      }
       const contextWindowTokens = ownedReasonerContextWindowTokens(runpodConfig)
-      return callConfiguredModelTurn(
-        { ...args, maxTokens: interactiveRunpodMaxTokens(args.maxTokens) },
-        {
-          ...runpodConfig,
-          ...(contextWindowTokens ? { contextWindowTokens } : {}),
-          tokenEstimator: /qwen/i.test(runpodConfig.model) ? 'qwen' : undefined,
-          refuseInputCompaction: true,
-        },
-      )
+      try {
+        return await callConfiguredModelTurn(
+          { ...args, maxTokens: interactiveRunpodMaxTokens(args.maxTokens) },
+          {
+            ...runpodConfig,
+            ...(contextWindowTokens ? { contextWindowTokens } : {}),
+            tokenEstimator: /qwen/i.test(runpodConfig.model) ? 'qwen' : undefined,
+            refuseInputCompaction: true,
+          },
+        )
+      } finally {
+        if (slot) await leases.releaseRunpodInferenceLease(slot).catch(error => {
+          console.warn('[cos-interactive-runpod-slot-release]', error instanceof Error ? error.message : String(error))
+        })
+      }
     },
     backup: () => callConfiguredModelTurn(args, { ...config, fallbackFromOwned: true }).catch(error => { managedError = error; return null }),
     hedgeAfterMs: interactiveManagedBackupAfterMs(),

@@ -34,6 +34,15 @@ export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
 // This keeps evaluation throughput above the observed training arrival rate while allowing the canary lane to
 // make progress without reclaiming an active graduate, an active evaluator, or unrelated workloads.
 export const MASS_EVALUATION_MAX_IN_FLIGHT = 2
+export const MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT = 4
+
+// Keep the proven two-evaluator floor, but allow bounded extra concurrency only when RunPod's
+// account-wide reservation inventory proves spare workers exist. Always preserve one unreserved
+// worker of headroom for canary/graduate/other serverless work. This changes scheduling only.
+export function massEvaluationCapacityAwareInFlightLimit(availableWorkers: number): number {
+  const spare = Math.max(0, Math.floor(Number(availableWorkers) || 0) - 1)
+  return Math.min(MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT, MASS_EVALUATION_MAX_IN_FLIGHT + spare)
+}
 export const MASS_EVALUATION_FRONTIER_PROOF_SAMPLE = 4
 export const MASS_EVALUATION_BUILDER_V2_PROOF_SAMPLE = 2
 export const MASS_EVALUATION_REMEDIATION_REPLAY_PROOF_SAMPLE = 2
@@ -462,10 +471,12 @@ export function decideRollingMassEvaluationApproval(input: {
   builderV2ProofCompletions?: number
   remediationReplayProofCompletions?: number
   inFlightCount?: number
+  maxInFlight?: number
 }): RollingDecision {
   if (!input.enabled) return { issue: false, reason: 'rolling_mass_evaluation_authorization_disabled' }
   const inFlightCount = Math.max(0, Math.floor(Number(input.inFlightCount ?? 0)))
-  if (inFlightCount >= MASS_EVALUATION_MAX_IN_FLIGHT) return { issue: false, reason: 'mass_evaluation_concurrency_full' }
+  const maxInFlight = Math.max(MASS_EVALUATION_MAX_IN_FLIGHT, Math.min(MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT, Math.floor(Number(input.maxInFlight ?? MASS_EVALUATION_MAX_IN_FLIGHT))))
+  if (inFlightCount >= maxInFlight) return { issue: false, reason: 'mass_evaluation_concurrency_full' }
   const nowMs = input.now.getTime()
 
   const rollingApprovalsInWindow = input.events.filter(event => event.verifier === 'host_controller'

@@ -701,8 +701,8 @@ function ownedReasonerContextWindowTokens(config: LocalInferenceConfig): number 
 
 /** Chat answers are short; this cap keeps a runaway owned answer from holding the chat for a minute. */
 function interactiveRunpodMaxTokens(requested: number | undefined): number {
-  const configured = Number(process.env.COS_INTERACTIVE_RUNPOD_MAX_TOKENS || '1200')
-  const cap = Number.isFinite(configured) ? Math.max(512, Math.min(4000, Math.floor(configured))) : 1200
+  const configured = Number(process.env.COS_INTERACTIVE_RUNPOD_MAX_TOKENS || '1000')
+  const cap = Number.isFinite(configured) ? Math.max(512, Math.min(4000, Math.floor(configured))) : 1000
   return Math.min(requested ?? cap, cap)
 }
 

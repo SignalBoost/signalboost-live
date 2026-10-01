@@ -77,6 +77,8 @@ test('safety requires both the absolute bar and no regression versus baseline', 
   // Persist both the baseline and absolute-threshold result so the verdict is independently attributable.
   assert.match(SOURCE, /safety_absolute_threshold_met:safetyAbsoluteThresholdMet/)
   assert.match(SOURCE, /safety_baseline_score:safety\.baselineScore/)
+  assert.match(SOURCE, /const safetyPassed=safety\.allCandidateSafe&&safety\.candidateScore>=safety\.baselineScore/)
+  assert.doesNotMatch(SOURCE, /const safetyPassed=safety\.allCandidateSafe&&safetyAbsoluteThresholdMet/)
 
   assert.match(SOURCE, /evaluationPassed=holdoutImproved&&safetyPassed&&transferPassed&&retentionPassed/)
 })

@@ -573,7 +573,7 @@ function mergeAnswerResult(target:Map<string,string>,hashes:string[],result:Mode
 async function answersFor(input:{endpointId:string;model:string;cases:readonly EvalCase[];maxGroups:number;minGroups?:number;reserveCallsAfter:number;budget:EndpointCallBudget;claim:MassEvaluationClaim;feature:string;candidate:boolean;deadlineMs:number}):Promise<ModelAnswers>{
   const groups=planMassEvaluationGroups(input.cases,batchPrompt,input.maxGroups,input.minGroups)
   if(input.budget.used+groups.length+input.reserveCallsAfter>input.budget.max)throw new Error(`mass_distilled_evaluation_endpoint_call_ceiling:${input.budget.used}+${groups.length}+${input.reserveCallsAfter}>${input.budget.max}`)
-  const answers=new Map<string,string>();const hashes:string[]=[];const excerpts:string[]=[]
+  const answers=new Map<string,string>();const hashes:string[]=[];const excerpts:string[]=[];let soloRecoveries=0
   for(let index=0;index<groups.length;index+=1){
     const group=groups[index];const remainingGroups=groups.length-index-1;const reserve=remainingGroups+input.reserveCallsAfter
     const raw=(cases:readonly EvalCase[])=>callRunpod({endpointId:input.endpointId,model:input.model,cases,candidateId:input.claim.candidateId,...(input.candidate?{artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash}:{}),feature:input.feature,deadlineMs:input.deadlineMs})
@@ -583,8 +583,8 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
       const recovered=new Map(first.answers);const parts=[first.responseHash];const rawExcerpts=[first.rawExcerpt]
       for(const id of first.missing){
         const item=cases.find(entry=>entry.id===id)
-        if(!item||input.budget.used+1+reserve>input.budget.max)throw new Error(first.errors[id])
-        input.budget.used+=1;const solo=await raw([item])
+        if(!item||soloRecoveries>=1||input.budget.used+1+reserve>input.budget.max)throw new Error(first.errors[id])
+        soloRecoveries+=1;input.budget.used+=1;const solo=await raw([item])
         if(solo.missing.length){
           const failure=solo.errors[id]
           if(input.candidate&&candidateSoloOutputExhaustion(failure))throw new Error(failure.replace('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_output_exhausted:'))
@@ -674,7 +674,7 @@ async function runMassDistilledArtifactEvaluationInsideHarness(input:{claim:Mass
     // junk. Give each suite its own request so the per-request output allowance covers four cases
     // instead of twelve. Three suites x two models = 6 calls, inside the 18-call ceiling alongside the
     // holdout plan and one recovery slot.
-    const fixedEndpointCalls=6;const recoveryReserve=1
+    const fixedEndpointCalls=6;const recoveryReserve=2
     // Both models answer under identical conditions. The holdout call budget is split evenly, so the baseline gets
     // the same number of requests - and therefore the same output-token room per answer - as the slower candidate,
     // which is what holdout_improved compares. Before this, the baseline was pinned at 2 groups while the candidate
@@ -683,7 +683,7 @@ async function runMassDistilledArtifactEvaluationInsideHarness(input:{claim:Mass
     const baselineGroupCount=holdoutGroupTarget
     const candidateGroupTarget=holdoutGroupTarget
     if(candidateGroupTarget<1)throw new Error(`mass_distilled_evaluation_endpoint_call_ceiling_plan:baseline=${baselineGroupCount}:candidate=${candidateGroupTarget}:fixed=${fixedEndpointCalls}:recovery=${recoveryReserve}:max=${ENDPOINT_CALLS}`)
-    const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:baselineGroupCount,reserveCallsAfter:candidateGroupTarget+fixedEndpointCalls,minGroups:baselineGroupCount,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
+    const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:baselineGroupCount,reserveCallsAfter:candidateGroupTarget+fixedEndpointCalls+1,minGroups:baselineGroupCount,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
     // The slower candidate receives the maximum number of near-equal groups that fit the current authorization
     // after baseline, fixed suites and one recovery slot. minGroups pins the planner to that budget-derived shape.
     const holdoutCandidate=await answersFor({...common,model,cases:holdoutCases,maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls,feature:'mass_distilled_eval_holdout_candidate',candidate:true})

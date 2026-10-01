@@ -110,3 +110,12 @@ test('solo normal-stop correct ANSWER opener with one foreign END marker is reco
   assert.match(source, /finish=stop:think=0:open=0:close=0:other=0:cap=1024/)
   assert.match(source, /mass_distilled_evaluation_candidate_answer_missing:/)
 }
+
+
+test('holdout budgeting preserves one bounded solo recovery for baseline and one for candidate disposition', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
+  assert.match(source, /const fixedEndpointCalls=6;const recoveryReserve=2/)
+  assert.match(source, /reserveCallsAfter:candidateGroupTarget\+fixedEndpointCalls\+1/)
+  assert.match(source, /let soloRecoveries=0/)
+  assert.match(source, /soloRecoveries>=1/)
+})

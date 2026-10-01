@@ -57,7 +57,7 @@ test('the requested cap is computed once and used for both the request and the f
 })
 
 test('this evaluator repair advances the infrastructure repair epoch', () => {
-  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_judge_timeout_headroom'/)
+  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_terminal_recovery_headroom_v2'/)
   assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-18T01:48:45\.894Z'/)
   assert.match(authority, /MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4/)
 })

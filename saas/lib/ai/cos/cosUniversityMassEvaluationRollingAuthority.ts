@@ -95,7 +95,7 @@ export function identicalInfrastructureFailureCooldownMs(identical: number): num
 // #2457 repaired the baseline seven-case transport regression introduced while preserving retry headroom.
 // Failures from before that Production generation must not permanently suppress the artifact; only failures observed
 // after the repaired baseline split is live count toward the identical-infrastructure circuit breaker.
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_judge_timeout_headroom' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_terminal_recovery_headroom_v2' as const
 export const MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF = 'mass_evaluation_absolute_per_answer_judge_v2' as const
 export const MASS_EVALUATION_REOPEN_CLAIM = 'mass_distilled_independent_evaluation_reopened' as const
 export const MASS_EVALUATION_OWNER_FULL_RETEST_REF = 'owner_explicit_direction_2026-09-26_retest_all_quarantined' as const
@@ -105,7 +105,7 @@ const isEvaluationReopen = (event: RollingEvent) => event.verifier === 'host_con
   && (event.evidence?.repairRef === MASS_EVALUATION_JUDGE_ABSOLUTE_REPAIR_REF
     || event.evidence?.repairRef === MASS_EVALUATION_OWNER_FULL_RETEST_REF
     || event.evidence?.repairRef === MASS_EVALUATION_STALE_GRADUATE_VERDICT_REPAIR_REF)
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-18T01:48:45.894Z' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-10-01T22:10:31.137Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 // Production 2026-09-24: the Residency endpoint lease repair released idle resident maxWorkers
 // reservations and stopped the account-wide RunPod quota failures. Failures from the broken quota

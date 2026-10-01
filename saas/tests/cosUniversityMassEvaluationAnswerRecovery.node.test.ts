@@ -112,10 +112,10 @@ test('solo normal-stop correct ANSWER opener with one foreign END marker is reco
 }
 
 
-test('holdout budgeting preserves one bounded solo recovery for baseline and one for candidate disposition', () => {
+test('holdout budgeting reserves bounded recovery headroom without raising the endpoint ceiling', () => {
   const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
-  assert.match(source, /const fixedEndpointCalls=6;const recoveryReserve=2/)
-  assert.match(source, /reserveCallsAfter:candidateGroupTarget\+fixedEndpointCalls\+1/)
-  assert.match(source, /let soloRecoveries=0/)
-  assert.match(source, /soloRecoveries>=1/)
+  assert.match(source, /const fixedEndpointCalls=6;const recoveryReserve=5/)
+  assert.match(source, /reserveCallsAfter:candidateGroupTarget\+fixedEndpointCalls\+3,maxSoloRecoveries:2/)
+  assert.match(source, /reserveCallsAfter:fixedEndpointCalls,maxSoloRecoveries:3/)
+  assert.match(source, /soloRecoveries>=\(input\.maxSoloRecoveries\?\?1\)/)
 })

@@ -241,13 +241,13 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const [oldestArtifacts, currentRecipeArtifacts, builderV2Artifacts, replayArtifacts] = await Promise.all([
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
-      .eq('status', 'evaluation_pending')
+      .in('status', ['evaluation_ready', 'evaluation_pending'])
       .like('candidate_id', 'mass:%')
       .order('created_at', { ascending: true })
       .limit(500),
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
-      .eq('status', 'evaluation_pending')
+      .in('status', ['evaluation_ready', 'evaluation_pending'])
       .like('candidate_id', 'mass:%')
       // Avoid nested JSON containment here: the Production gate intentionally validates the full
       // receipt in application code. Sampling newest pending artifacts keeps the current recipe
@@ -263,7 +263,7 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
       .limit(500),
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
-      .eq('status', 'evaluation_pending')
+      .in('status', ['evaluation_ready', 'evaluation_pending'])
       .like('candidate_id', 'mass:%')
       .contains('intended_use', { trainingReceipt: { failureDerivedReplayRequired: true } })
       .order('created_at', { ascending: true })
@@ -597,6 +597,16 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
     expires_at: new Date(now.getTime() + MASS_EVALUATION_APPROVAL_TTL_MS).toISOString(),
   })
   if (inserted.error) throw inserted.error
+
+  // Admission is the boundary: qualified work stays evaluation_ready until this exact,
+  // live approval exists. Only then may it enter evaluation_pending for the atomic claim.
+  const admitted = await db.from('cos_local_distillation_artifacts')
+    .update({ status: 'evaluation_pending', updated_at: now.toISOString() })
+    .eq('candidate_id', decision.artifact.candidateId)
+    .eq('trained_artifact_hash', decision.artifact.artifactHash)
+    .eq('status', 'evaluation_ready')
+  if (admitted.error) throw admitted.error
+
   return { issued: true, candidateId: decision.artifact.candidateId, artifactHash: decision.artifact.artifactHash, disposed: disposed.length }
 }
 

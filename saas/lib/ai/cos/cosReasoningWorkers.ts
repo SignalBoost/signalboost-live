@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { after } from 'next/server'
 import { callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { callLocalModel, type LocalInferenceConfig, type LocalModelCallArgs } from '@/lib/ai/local-inference'
 import { currentAssignedModelDescriptor, tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
@@ -562,9 +563,16 @@ export async function reasonThroughCosControlPlane(
   if (!execution) return null
   // Real Production apprenticeship is advisory only: run after the authoritative answer exists and do not await it.
   // It cannot alter the answer, authority, routing verdict, or fallback behavior.
-  void runWorkforceApprenticeShadow(args, decision.objective).catch(error => {
+  const apprentice = () => runWorkforceApprenticeShadow(args, decision.objective).catch(error => {
     console.warn('[cos-workforce-apprentice] shadow attempt failed closed', error instanceof Error ? error.message : String(error))
   })
+  try {
+    after(apprentice)
+  } catch {
+    // Non-request contexts (tests, background University work) have no Next request lifecycle.
+    // Preserve fail-closed advisory behavior there without changing the authoritative answer.
+    void apprentice()
+  }
   const evaluation = currentReasoningEvaluationContext()
   const metadata: Record<string, unknown> = {
     ...(execution.result.metadata ?? {}),

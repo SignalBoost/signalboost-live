@@ -188,5 +188,5 @@ test('mass artifact evidence durably records the executed frontier training reci
   assert.match(consumer, /trainingReceipt = durableTrainingReceipt\(body\.trainingProfile, body\.trainingRecipe\)/)
   assert.match(consumer, /trainingMode: 'distillation', trainingReceipt/)
   assert.match(consumer, /\|\| !trainingReceipt\)/)
-  assert.match(consumer, /teacherModel: run\.teacher_model_id \|\| null,[\s\S]*trainingReceipt,[\s\S]*nextGate: 'independent_evaluation'/)
+  assert.match(consumer, /teacherModel: run\.teacher_model_id \|\| null,[\s\S]*trainingReceipt,[\s\S]*nextGate: 'evaluation_admission'/)
 })

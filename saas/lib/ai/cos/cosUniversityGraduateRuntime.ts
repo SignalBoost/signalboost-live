@@ -466,7 +466,7 @@ export async function activeGraduateRuntimesForRole(
     }
   }
   return result
-
+}
 
 /**
  * Workforce proving lane: select one graduate for advisory/shadow work on a genuine Production objective.
@@ -483,7 +483,5 @@ export async function activeGraduateApprenticeForObjective(
     if (eligible.length) return eligible[0]
   }
   return null
-}
-
 }
 // end of saas/lib/ai/cos/cosUniversityGraduateRuntime.ts (if this line is missing, the paste was cut short)

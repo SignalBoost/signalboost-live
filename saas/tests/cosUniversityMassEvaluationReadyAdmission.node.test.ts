@@ -13,7 +13,7 @@ test('training completion stages qualified mass artifacts outside pending',()=>{
 
 test('rolling evaluator considers ready work and promotes only after approval',()=>{
   assert.match(route,/\.in\('status', \['evaluation_ready', 'evaluation_pending'\]\)/)
-  const approval=route.indexOf("claim: 'mass_distilled_independent_evaluation_approved'")
+  const approval=route.indexOf("claim: 'distilled_independent_evaluation_approved'")
   const admission=route.indexOf(".update({ status: 'evaluation_pending'")
   assert.ok(approval>=0)
   assert.ok(admission>approval)
@@ -21,7 +21,7 @@ test('rolling evaluator considers ready work and promotes only after approval',(
 })
 
 test('database pending boundary requires a live exact evaluator approval',()=>{
-  assert.match(migration,/mass_distilled_independent_evaluation_approved/)
+  assert.match(migration,/distilled_independent_evaluation_approved/)
   assert.match(migration,/lower\(coalesce\(e\.evidence->>'artifactHash',''\)\) = lower\(new\.trained_artifact_hash\)/)
   assert.match(migration,/e\.expires_at > now\(\)/)
   assert.match(migration,/mass_artifact_evaluation_admission_approval_missing/)

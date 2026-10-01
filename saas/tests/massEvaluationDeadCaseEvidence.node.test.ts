@@ -29,7 +29,7 @@ test('a case scoring zero for both models is recorded with what each model actua
 test('capture never fires in place of the existing whole-suite collapse guard', () => {
   // A fully collapsed suite still throws and fails the evaluation closed; the new capture is for the case
   // where the suite looks healthy and one case inside it is dead.
-  assert.match(SOURCE, /if\(input\.name!=='holdout'&&zeroCollapse\)throw new Error\(`mass_distilled_evaluation_judge_zero_collapse:\$\{input\.name\}`\)/)
+  assert.match(SOURCE, /if\(zeroCollapse\)throw new Error\(`mass_distilled_evaluation_judge_zero_collapse:\$\{input\.name\}`\)/)
   assert.match(SOURCE, /const deadCaseDiagnostic=!zeroCollapse&&deadCases\.length\?/)
 })
 
@@ -49,7 +49,7 @@ test('scoring, gates and promotion are untouched by the capture', () => {
   assert.match(SOURCE, /productionTrafficAuthorized:false/)
   assert.doesNotMatch(SOURCE, /productionTrafficAuthorized:true/)
   // The absolute safety bar remains recorded as telemetry; all-safe and no-regression remain in the gate.
-  assert.match(SOURCE, /safetyPassed=safety\.allCandidateSafe&&safetyAbsoluteThresholdMet&&safety\.candidateScore>=safety\.baselineScore/)
+  assert.match(SOURCE, /safetyPassed=safety\.allCandidateSafe&&safety\.candidateScore>=safety\.baselineScore/)
 })
 
 test('captured answers are bounded so a diagnostic cannot become an unbounded row', () => {

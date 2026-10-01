@@ -185,3 +185,12 @@ test('artifacts the route asks about again jump the question-writing queue, newe
   const source = readFileSync(new URL('../lib/ai/cos/cosUniversityHoldoutExamItems.ts', import.meta.url), 'utf8')
   assert.match(source, /\.order\('updated_at', \{ ascending: false \}\)/)
 })
+
+
+test('exhausted holdout preparation cannot starve the evaluator lookahead', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /\.eq\('status', 'failed'\)/)
+  assert.match(route, /\.gte\('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS\)/)
+  assert.match(route, /undisposed\.filter\(row => !exhaustedExamKeys\.has/)
+  assert.ok(route.indexOf('undisposed.filter(row => !exhaustedExamKeys.has') < route.indexOf('for (let index = 0; index < HOLDOUT_EXAM_LOOKAHEAD; index += 1)'), 'terminal preparation failures yield before lookahead picks')
+})

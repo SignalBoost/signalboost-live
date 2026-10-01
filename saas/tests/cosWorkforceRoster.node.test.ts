@@ -42,3 +42,14 @@ test('COS hires only on-call Workforce graduates and still re-checks every gate 
   assert.match(read, /HEX64\.test\(clean\(row\.runtime_health_evidence_hash, 64\)\)/)
   assert.match(read, /HEX64\.test\(clean\(row\.activation_evidence_hash, 64\)\)/)
 })
+
+
+test('Workforce dispatch gives genuine Production demand to unproven and least-recently-served graduates first', () => {
+  const runtime = read('lib/ai/cos/cosUniversityGraduateRuntime.ts')
+  const dispatch = runtime.slice(runtime.indexOf('export async function activeGraduateRuntimesForRole'))
+  assert.match(dispatch, /cos_university_graduate_serving_attempts/)
+  assert.match(dispatch, /\.select\('registry_id,recorded_at'\)/)
+  assert.match(dispatch, /lastServed\.has\(id\)/)
+  assert.match(dispatch, /result\.sort\(\(a, b\) => \(lastServed\.get\(a\.registryId\) \?\? -1\) - \(lastServed\.get\(b\.registryId\) \?\? -1\)\)/)
+  assert.doesNotMatch(dispatch, /synthetic.*task/i)
+})

@@ -38,7 +38,7 @@ begin
       where e.candidate_id = new.candidate_id
         and e.event_type = 'fine_tune'
         and e.verifier = 'host_controller'
-        and e.evidence->>'claim' = 'mass_distilled_independent_evaluation_approved'
+        and e.evidence->>'claim' = 'distilled_independent_evaluation_approved'
         and lower(coalesce(e.evidence->>'artifactHash','')) = lower(new.trained_artifact_hash)
         and e.expires_at > now()
     ) then

@@ -26,6 +26,7 @@ import { fitGraduateCall } from '@/lib/ai/cos/graduateContextFit'
 import { runpodGraduateEndpointWarm } from '@/lib/ai/cos/graduateWarmGate'
 import {
   activeGraduateRuntimesForRole,
+  activeGraduateApprenticeForObjective,
   type ActiveGraduateRuntime,
 } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { workingAgentKnowledgeBlock, type WorkingAgentKnowledgeRole } from '@/lib/ai/cos/workingAgentKnowledge'
@@ -416,6 +417,80 @@ async function createGraduateAwareCosReasoningEngine(
   ])
 }
 
+const WORKFORCE_APPRENTICE_TIMEOUT_MS = 45_000
+
+async function runWorkforceApprenticeShadow(
+  args: LocalModelCallArgs,
+  objective: string,
+): Promise<void> {
+  if (currentReasoningEvaluationContext()) return
+  const runtime = await activeGraduateApprenticeForObjective(objective).catch(() => null)
+  if (!runtime) return
+  const effective = toLocalModelCallArgs({
+    ...args,
+    usageContext: {
+      ...(args.usageContext || {}),
+      feature: 'cos_workforce_apprentice_shadow',
+      purpose: `${runtime.subjectId}:${runtime.workerRole}:real_production_shadow`,
+    },
+  }, runtime.workerRole as CosSpecialistRole)
+  const fitted = fitGraduateCall({
+    model: runtime.runtimeModelId,
+    provider: runtime.inference.provider,
+    contextWindowTokens: runtime.inference.contextWindowTokens,
+    systemPrompt: effective.systemPrompt,
+    prompt: effective.prompt,
+    maxTokens: effective.maxTokens,
+  })
+  const attemptId = randomUUID()
+  const startedAt = Date.now()
+  const timeoutMs = Math.min(Number(effective.timeoutMs || WORKFORCE_APPRENTICE_TIMEOUT_MS), WORKFORCE_APPRENTICE_TIMEOUT_MS)
+  const attemptBase = {
+    attemptId,
+    correlationId: args.usageContext?.correlationId,
+    registryId: runtime.registryId,
+    candidateId: runtime.candidateId,
+    trainedArtifactHash: runtime.trainedArtifactHash,
+    subjectId: runtime.subjectId,
+    problemClass: runtime.problemClass,
+    workerRole: runtime.workerRole,
+    runtimeProvider: runtime.runtimeProvider,
+    runtimeModelId: runtime.runtimeModelId,
+    runtimeBaseUrl: runtime.inference.baseUrl,
+    timeoutMs,
+  } as const
+  recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_started', outcome: 'pending', latencyMs: 0 })
+  try {
+    const text = await callLocalModel({
+      ...effective,
+      ...(fitted.systemPrompt === undefined ? {} : { systemPrompt: fitted.systemPrompt }),
+      maxTokens: fitted.maxTokens,
+      timeoutMs,
+      usageContext: {
+        feature: 'cos_workforce_apprentice_shadow',
+        purpose: `${runtime.subjectId}:${runtime.workerRole}:real_production_shadow`,
+        correlationId: args.usageContext?.correlationId,
+      },
+    }, runtime.inference)
+    const latencyMs = Date.now() - startedAt
+    if (!text?.trim()) {
+      recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_failed', outcome: 'empty', latencyMs, errorClass: 'empty_response' })
+      return
+    }
+    recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_succeeded', outcome: 'success', latencyMs })
+  } catch (error) {
+    const latencyMs = Date.now() - startedAt
+    const outcome = graduateServingErrorOutcome(error, timeoutMs, latencyMs)
+    recordGraduateServingAttempt({
+      ...attemptBase,
+      phase: 'attempt_failed',
+      outcome,
+      latencyMs,
+      errorClass: error instanceof Error ? error.name || 'Error' : 'Error',
+    })
+  }
+}
+
 async function routingDecision(args: LocalModelCallArgs, options: {
   requestedRole?: CosReasoningWorkerRole
   forcePrimary?: boolean
@@ -485,6 +560,11 @@ export async function reasonThroughCosControlPlane(
     allowExternalEscalation: options.allowExternalEscalation,
   })
   if (!execution) return null
+  // Real Production apprenticeship is advisory only: run after the authoritative answer exists and do not await it.
+  // It cannot alter the answer, authority, routing verdict, or fallback behavior.
+  void runWorkforceApprenticeShadow(args, decision.objective).catch(error => {
+    console.warn('[cos-workforce-apprentice] shadow attempt failed closed', error instanceof Error ? error.message : String(error))
+  })
   const evaluation = currentReasoningEvaluationContext()
   const metadata: Record<string, unknown> = {
     ...(execution.result.metadata ?? {}),

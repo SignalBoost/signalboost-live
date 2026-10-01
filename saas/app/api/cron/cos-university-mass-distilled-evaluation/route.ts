@@ -4,7 +4,7 @@ import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniver
 import { isTerminalHoldoutDataDefect } from '@/lib/ai/cos/cosUniversityMassEvaluationTerminalDefect'
 import { REQUIRED_EVALUATION_RUN_COLUMNS, isMissingColumnError, missingColumnsFromError } from '@/lib/ai/cos/cosUniversityEvaluationSchemaPreflight'
 import { NextRequest, NextResponse } from 'next/server'
-import { holdoutExamReadyArtifacts } from '@/lib/ai/cos/cosUniversityHoldoutExamItems'
+import { HOLDOUT_EXAM_MAX_SET_ATTEMPTS, holdoutExamReadyArtifacts } from '@/lib/ai/cos/cosUniversityHoldoutExamItems'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
@@ -561,7 +561,20 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   // pending artifact at once left 33 random artifacts ready, none of them eligible, and the lane examined nobody
   // for over two hours. No GPU is woken for an artifact that could not be examined properly yet.
   const picks: Array<Extract<ReturnType<typeof decideRollingMassEvaluationApproval>, { artifact: unknown }>> = []
-  let remaining = undisposed
+
+  // A holdout set that exhausted its governed preparation attempts cannot become exam-ready without repair.
+  // Do not let terminal preparation failures occupy every lookahead slot forever: they remain unevaluated
+  // (no gate is weakened), but yield this scheduler pass so later qualified artifacts can have their exam
+  // sets requested/prepared. Production 2026-10-01: exactly six exhausted sets filled all six lookahead
+  // slots, producing no_mass_artifact_with_holdout_exam_ready on every evaluator tick.
+  const exhaustedExamSets = await db.from('cos_university_holdout_exam_sets')
+    .select('candidate_id,trained_artifact_hash')
+    .eq('status', 'failed')
+    .gte('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS)
+  if (exhaustedExamSets.error) throw exhaustedExamSets.error
+  const exhaustedExamKeys = new Set((exhaustedExamSets.data || []).map((row: any) =>
+    `${String(row.candidate_id || '')}:${String(row.trained_artifact_hash || '').toLowerCase()}`))
+  let remaining = undisposed.filter(row => !exhaustedExamKeys.has(`${row.candidateId}:${row.artifactHash.toLowerCase()}`))
   for (let index = 0; index < HOLDOUT_EXAM_LOOKAHEAD; index += 1) {
     const pick = decideRollingMassEvaluationApproval({
       enabled: process.env.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false',

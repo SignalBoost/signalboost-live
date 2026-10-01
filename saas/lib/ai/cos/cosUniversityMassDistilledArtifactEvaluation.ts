@@ -502,6 +502,16 @@ function candidateSoloOutputExhaustion(error:string){
 function candidateSoloEmptyAnswer(error:string){
   return /^mass_distilled_evaluation_answer_empty:[^:]+:finish=stop:think=0:open=1:close=1:other=0:cap=1024$/.test(error)
 }
+// Production 2026-10-01: reopened artifacts reproduced the exact same markerless normal-stop
+// candidate response 9 and 15 times respectively after the bounded solo retry:
+// finish=stop, no thinking, no requested/foreign markers, full 1,024-token solo allowance.
+// The evaluator already recovers any non-empty markerless solo body as a plain answer, so reaching
+// this fingerprint means the provider returned no recoverable answer at all. Repeating it forever is
+// not an evaluator transport ambiguity. Candidate-only classification lets the existing substantive
+// attempt budget disposition it; baseline and every other shape remain fail-closed infrastructure.
+function candidateSoloMarkerlessNoAnswer(error:string){
+  return /^mass_distilled_evaluation_answer_missing:[^:]+:finish=stop:think=0:open=0:close=0:other=0:cap=1024$/.test(error)
+}
 function parseAnswersPartial(text:string,cases:readonly EvalCase[],finish:string,cap:number){
   const answers=new Map<string,string>();const missing:string[]=[];const errors:Record<string,string>={}
   for(const item of cases){
@@ -579,6 +589,7 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
           const failure=solo.errors[id]
           if(input.candidate&&candidateSoloOutputExhaustion(failure))throw new Error(failure.replace('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_output_exhausted:'))
           if(input.candidate&&candidateSoloEmptyAnswer(failure))throw new Error(failure.replace('mass_distilled_evaluation_answer_empty:','mass_distilled_evaluation_candidate_answer_empty:'))
+          if(input.candidate&&candidateSoloMarkerlessNoAnswer(failure))throw new Error(failure.replace('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_answer_missing:'))
           throw new Error(failure)
         }
         for(const [key,answer] of solo.answers)recovered.set(key,answer);parts.push(solo.responseHash);rawExcerpts.push(solo.rawExcerpt);if(solo.rawExcerpt)excerpts.push(solo.rawExcerpt)

@@ -74,11 +74,20 @@ test('the health read is cached per endpoint for a short window', async () => {
   assert.equal(f.calls.length, 2)
 })
 
-test('the graduate worker applies the warm gate only to live-chat requests', () => {
+test('the graduate worker warm gate protects only primary/coder while specialist Workforce roles can wake on real demand', () => {
   const workers = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
   assert.match(workers, /import \{ runpodGraduateEndpointWarm \} from '@\/lib\/ai\/cos\/graduateWarmGate'/)
   const at = workers.indexOf('function createGraduateWorker(')
   const execute = workers.slice(workers.indexOf('async execute(request) {', at), workers.indexOf('const effective = toLocalModelCallArgs(request, role)', at))
+  assert.match(execute, /role === 'primary' \|\| role === 'coder'/)
   assert.match(execute, /INTERACTIVE_GRADUATE_FEATURES\.has\(/)
   assert.match(execute, /!\(await runpodGraduateEndpointWarm\(runtime\.inference\.baseUrl\)\)\) return null/)
+})
+
+test('null responses at the configured deadline are classified as infrastructure timeouts', () => {
+  const workers = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
+  const at = workers.indexOf('function createGraduateWorker(')
+  const execute = workers.slice(at, workers.indexOf('function baseOpenModelWorkers()', at))
+  assert.match(execute, /runtime_deadline_exceeded/)
+  assert.match(execute, /outcome: nullOutcome === 'timeout' \? 'timeout' : 'empty'/)
 })

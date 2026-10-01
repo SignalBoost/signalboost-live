@@ -11,7 +11,6 @@ import { classifyInferenceHost } from '@/lib/ai/cos/reasonerHostingDisclosure'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import type { CosReasonerConfig } from '@/lib/ai/cos/cosReasoner'
 import type { CosReasoningWorkerRole } from '@/lib/ai/cos/cosReasoningControlPlane'
-import { selectGraduateFor24HourLease } from '@/lib/ai/cos/cosUniversityGraduateRotation'
 
 export const COS_UNIVERSITY_GRADUATE_RUNTIME_VERSION = 'cos-university-graduate-runtime-v1' as const
 
@@ -441,24 +440,10 @@ export async function activeGraduateRuntimesForRole(
       console.warn('[cos-graduate-runtime] active binding no longer resolves; fail closed', error instanceof Error ? error.message : String(error))
     }
   }
-  // Prefer the durable controller lease. If the controller has not established today's lease yet,
-  // fail over to the same deterministic selector so serving remains bounded to the identical eligible pool.
-  const lease = await db.from('cos_university_graduate_rotation_leases')
-    .select('candidate_id,trained_artifact_hash,lease_number,lease_started_at,lease_expires_at')
-    .lte('lease_started_at', new Date().toISOString())
-    .gt('lease_expires_at', new Date().toISOString())
-    .order('lease_started_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (!lease.error && lease.data) {
-    const leased = result.find(item =>
-      item.candidateId === lease.data.candidate_id &&
-      item.trainedArtifactHash === lease.data.trained_artifact_hash
-    )
-    if (leased) return [leased]
-    console.warn('[cos-graduate-24h-rotation] durable lease no longer eligible; failing closed to eligible selector')
-  }
-  const rotation = selectGraduateFor24HourLease(result, new Date())
-  return rotation.selected ? [rotation.selected] : []
+  // Workforce dispatch is request-scoped: every eligible on-call graduate remains available to the
+  // reasoning engine for genuine matching Production demand. Do not serialize employment behind a
+  // time-based rotation lease; worker ordering/fallback remains bounded by the control plane.
+  return result
+
 }
 // end of saas/lib/ai/cos/cosUniversityGraduateRuntime.ts (if this line is missing, the paste was cut short)

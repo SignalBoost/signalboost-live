@@ -440,9 +440,31 @@ export async function activeGraduateRuntimesForRole(
       console.warn('[cos-graduate-runtime] active binding no longer resolves; fail closed', error instanceof Error ? error.message : String(error))
     }
   }
-  // Workforce dispatch is request-scoped: every eligible on-call graduate remains available to the
-  // reasoning engine for genuine matching Production demand. Do not serialize employment behind a
-  // time-based rotation lease; worker ordering/fallback remains bounded by the control plane.
+  // Production proving is real-work-first: never fabricate apprenticeship tasks. Instead, distribute
+  // genuine matching COS demand fairly so a recently activated worker cannot monopolize every request.
+  // Never-tried graduates go first; afterwards the least-recently-served graduate gets the next chance.
+  // Serving history changes scheduling only. It never widens role/problem scope or bypasses diploma gates.
+  if (result.length > 1) {
+    const ids = result.map(runtime => runtime.registryId)
+    const attempts = await db.from('cos_university_graduate_serving_attempts')
+      .select('registry_id,recorded_at')
+      .in('registry_id', ids)
+      .order('recorded_at', { ascending: false })
+      .limit(1000)
+    if (!attempts.error) {
+      const lastServed = new Map<string, number>()
+      for (const raw of attempts.data || []) {
+        const row = raw as { registry_id?: unknown; recorded_at?: unknown }
+        const id = clean(row.registry_id, 100)
+        if (!id || lastServed.has(id)) continue
+        const at = Date.parse(clean(row.recorded_at, 80))
+        lastServed.set(id, Number.isFinite(at) ? at : 0)
+      }
+      result.sort((a, b) => (lastServed.get(a.registryId) ?? -1) - (lastServed.get(b.registryId) ?? -1))
+    } else {
+      console.warn('[cos-workforce] serving-history read failed; preserve deterministic registry order', attempts.error)
+    }
+  }
   return result
 
 }

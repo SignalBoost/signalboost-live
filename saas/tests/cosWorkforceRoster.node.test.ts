@@ -53,3 +53,17 @@ test('Workforce dispatch gives genuine Production demand to unproven and least-r
   assert.match(dispatch, /result\.sort\(\(a, b\) => \(lastServed\.get\(a\.registryId\) \?\? -1\) - \(lastServed\.get\(b\.registryId\) \?\? -1\)\)/)
   assert.doesNotMatch(dispatch, /synthetic.*task/i)
 })
+
+
+test('Workforce apprenticeship uses genuine Production demand without widening authority or replacing the answer', () => {
+  const runtime = read('lib/ai/cos/cosUniversityGraduateRuntime.ts')
+  const workers = read('lib/ai/cos/cosReasoningWorkers.ts')
+  assert.match(runtime, /activeGraduateApprenticeForObjective/)
+  assert.match(runtime, /activeGraduateRuntimesForRole\(role, objective\)/)
+  assert.match(workers, /feature: 'cos_workforce_apprentice_shadow'/)
+  assert.match(workers, /void runWorkforceApprenticeShadow\(args, decision\.objective\)/)
+  assert.ok(workers.indexOf('if (!execution) return null') < workers.indexOf('void runWorkforceApprenticeShadow(args, decision.objective)'))
+  assert.match(workers, /phase: 'attempt_started', outcome: 'pending'/)
+  assert.match(workers, /phase: 'attempt_succeeded', outcome: 'success'/)
+  assert.doesNotMatch(workers, /authorityExpanded:\s*true/)
+})

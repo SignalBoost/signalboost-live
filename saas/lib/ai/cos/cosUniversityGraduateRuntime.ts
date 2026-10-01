@@ -467,5 +467,23 @@ export async function activeGraduateRuntimesForRole(
   }
   return result
 
+
+/**
+ * Workforce proving lane: select one graduate for advisory/shadow work on a genuine Production objective.
+ * This reuses the exact diploma/roster/scope gates above but may choose any recorded specialist role that
+ * matches the real task. It never adds a role, widens problem scope, or authorizes the shadow result to
+ * replace the user-visible Production answer.
+ */
+export async function activeGraduateApprenticeForObjective(
+  objective: string,
+): Promise<ActiveGraduateRuntime | null> {
+  const roles: readonly CosReasoningWorkerRole[] = ['critic', 'verifier', 'researcher', 'context_engineer', 'coder']
+  for (const role of roles) {
+    const eligible = await activeGraduateRuntimesForRole(role, objective)
+    if (eligible.length) return eligible[0]
+  }
+  return null
+}
+
 }
 // end of saas/lib/ai/cos/cosUniversityGraduateRuntime.ts (if this line is missing, the paste was cut short)

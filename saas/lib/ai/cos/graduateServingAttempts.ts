@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { after } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import type { CosReasoningWorkerRole } from '@/lib/ai/cos/cosReasoningControlPlane'
@@ -73,6 +74,39 @@ async function persistGraduateServingAttempt(input: GraduateServingAttemptInput)
       recorded_at: new Date().toISOString(),
     })
     if (result.error) throw result.error
+    const lifecycleType = input.phase === 'attempt_started'
+      ? 'serving_started'
+      : input.phase === 'attempt_succeeded'
+        ? 'serving_succeeded'
+        : input.phase === 'attempt_failed'
+          ? 'serving_failed'
+          : null
+    if (lifecycleType) {
+      const evidence = {
+        phase: input.phase,
+        outcome: input.outcome,
+        problemClass: clean(input.problemClass || 'general reasoning', 500),
+        workerRole: input.workerRole,
+        runtimeProvider: clean(input.runtimeProvider, 120),
+        runtimeModelId: clean(input.runtimeModelId, 500),
+        timeoutMs: Number.isFinite(input.timeoutMs) ? Math.max(0, Math.round(Number(input.timeoutMs))) : null,
+        latencyMs: Math.max(0, Math.round(Number(input.latencyMs) || 0)),
+        errorClass: clean(input.errorClass, 120) || null,
+        authorityExpanded: false,
+      }
+      const evidenceHash = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
+      const lifecycle = await db.rpc('append_cos_graduate_lifecycle_event', {
+        p_registry_id: clean(input.registryId, 80),
+        p_candidate_id: clean(input.candidateId, 500),
+        p_trained_artifact_hash: clean(input.trainedArtifactHash, 80),
+        p_event_type: lifecycleType,
+        p_correlation_id: clean(input.correlationId || input.attemptId, 200),
+        p_evidence_hash: evidenceHash,
+        p_evidence: evidence,
+        p_observed_at: new Date().toISOString(),
+      })
+      if (lifecycle.error) throw lifecycle.error
+    }
   } catch (error) {
     console.warn('[cos-graduate-serving-attempt] persistence failed (non-fatal):', error instanceof Error ? error.message : String(error))
   }

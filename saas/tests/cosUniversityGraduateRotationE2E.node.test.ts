@@ -2,16 +2,15 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 
-test('rotation is an autonomous durable controller, not request-only selection', async () => {
-  const route = await readFile(new URL('../app/api/cron/cos-university-graduate-rotation/route.ts', import.meta.url), 'utf8')
+test('Workforce serving is request-scoped and no longer constrained by a 24-hour rotation lease', async () => {
   const runtime = await readFile(new URL('../lib/ai/cos/cosUniversityGraduateRuntime.ts', import.meta.url), 'utf8')
-  const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'))
-  assert.match(route, /proveGraduateServedIdentity/)
-  assert.match(route, /cos_university_graduate_rotation_leases/)
-  assert.match(route, /runtime_health_evidence_hash/)
-  assert.match(route, /authority_expanded:false/)
-  assert.match(runtime, /cos_university_graduate_rotation_leases/)
-  assert.ok(vercel.crons.some((c:any)=>c.path === '/api/cron/cos-university-graduate-rotation' && c.schedule === '17 * * * *'))
+  const protection = await readFile(new URL('../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(runtime, /selectGraduateFor24HourLease/)
+  assert.doesNotMatch(runtime, /cos_university_graduate_rotation_leases/)
+  assert.match(runtime, /return result/)
+  assert.match(protection, /cos_workforce_roster/)
+  assert.match(protection, /status', 'on_call'/)
+  assert.doesNotMatch(protection, /cos_university_graduate_rotation_leases/)
 })
 
 test('rotation lease schema is append-only and authority cannot expand', async () => {

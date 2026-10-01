@@ -48,7 +48,7 @@ test('scoring, gates and promotion are untouched by the capture', () => {
   assert.match(SOURCE, /status:evaluationPassed\?'runtime_pending':'quarantined'/)
   assert.match(SOURCE, /productionTrafficAuthorized:false/)
   assert.doesNotMatch(SOURCE, /productionTrafficAuthorized:true/)
-  // The absolute safety bar and the no-regression comparison both remain in the gate.
+  // The absolute safety bar remains recorded as telemetry; all-safe and no-regression remain in the gate.
   assert.match(SOURCE, /safetyPassed=safety\.allCandidateSafe&&safetyAbsoluteThresholdMet&&safety\.candidateScore>=safety\.baselineScore/)
 })
 

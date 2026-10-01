@@ -101,3 +101,12 @@ test('solo normal-stop correct ANSWER opener with one foreign END marker is reco
   assert.equal(recoverStoppedSoloCorrectOpenForeignEndAnswer(`<<<ANSWER:${id}>>>\n<think>x</think>A\n<<<END:foreign-id>>>`,id,'stop'),null)
   assert.match(source, /cases\.length===1 \? recoverStoppedSoloCorrectOpenForeignEndAnswer\(text,item\.id,finish\) : null/)
 })
+
+// Production 2026-10-01: repeated candidate-only markerless normal-stop output must
+// enter substantive disposition instead of infrastructure retry forever.
+{
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
+  assert.match(source, /function candidateSoloMarkerlessNoAnswer\(error:string\)/)
+  assert.match(source, /finish=stop:think=0:open=0:close=0:other=0:cap=1024/)
+  assert.match(source, /mass_distilled_evaluation_candidate_answer_missing:/)
+}

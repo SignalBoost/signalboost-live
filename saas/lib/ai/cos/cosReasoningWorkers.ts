@@ -256,7 +256,12 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
     async execute(request) {
       // WARM-ONLY IN LIVE CHAT (2026-09-27): graduates run on RunPod serverless scaled 0/1. A cold endpoint cannot
       // answer inside the 8s chat budget (0/59 successes this week), so live chat skips it and the base worker answers.
-      if (INTERACTIVE_GRADUATE_FEATURES.has(String(request.usageContext?.feature || '').trim().toLowerCase())
+      // Primary/coder remain latency-protected, but specialist Workforce roles must be allowed to
+      // answer genuine matching Production demand. Applying the warm-only gate to every role created
+      // a deadlock: a scale-to-zero critic/verifier/researcher/context worker was skipped forever and
+      // therefore could never receive the real request that wakes its exact endpoint.
+      if ((role === 'primary' || role === 'coder')
+        && INTERACTIVE_GRADUATE_FEATURES.has(String(request.usageContext?.feature || '').trim().toLowerCase())
         && !(await runpodGraduateEndpointWarm(runtime.inference.baseUrl))) return null
       const effective = toLocalModelCallArgs(request, role)
       // The graduate serves an 8k window; COS worker requests are sized for the managed reasoner. Fit them first
@@ -315,7 +320,20 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
       if (!text?.trim()) {
         const latencyMs = Date.now() - startedAt
         if (!failureOutcome) {
-          recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_failed', outcome: 'empty', latencyMs })
+          // callLocalModel() may fail closed with null rather than throw when its deadline expires.
+          // Do not turn an infrastructure deadline into false evidence of graduate incompetence.
+          const nullOutcome = graduateServingErrorOutcome(
+            new Error(latencyMs >= Number(graduateTimeoutMs || Number.POSITIVE_INFINITY) - 50 ? 'timeout' : 'empty_response'),
+            graduateTimeoutMs,
+            latencyMs,
+          )
+          recordGraduateServingAttempt({
+            ...attemptBase,
+            phase: 'attempt_failed',
+            outcome: nullOutcome === 'timeout' ? 'timeout' : 'empty',
+            latencyMs,
+            ...(nullOutcome === 'timeout' ? { errorClass: 'runtime_deadline_exceeded' } : {}),
+          })
         }
         recordGraduateServingAttempt({ ...attemptBase, phase: 'fallback', outcome: 'fallback', latencyMs })
         return null

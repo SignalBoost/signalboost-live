@@ -5,7 +5,7 @@ import { MASS_EVALUATION_MAX_INFRASTRUCTURE_FAILURES_PER_GENERATION, decideInfra
 const candidateId='mass:11111111-1111-4111-8111-111111111111:abcdef0123456789'
 const artifactHash='a'.repeat(64)
 const artifact={candidateId,subjectId:'Economics & Finance',artifactHash,createdAt:'2026-09-29T00:00:00Z'}
-const event=(i:number,error='mass_distilled_evaluation_answer_missing:x:finish=stop:think=0:open=0:close=0:other=0:cap=1024')=>({candidateId,observedAt:new Date(Date.parse('2026-10-01T00:00:00Z')+i*60000).toISOString(),expiresAt:null,verifier:'host_controller',evidence:{claim:'mass_distilled_independent_evaluation_failed',artifactHash,error,authorizationRef:'owner_explicit_direction_2026-09-17_mass_evaluation_without_manual_intervention'}})
+const event=(i:number,error='mass_distilled_evaluation_answer_missing:x:finish=stop:think=0:open=0:close=0:other=0:cap=1024')=>({candidateId,observedAt:new Date(Date.parse('2026-10-01T00:00:00Z')+i*60000).toISOString(),expiresAt:null,verifier:'host_controller',evidence:{claim:'mass_distilled_independent_evaluation_failed',artifactHash,error,authorizationRef:'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention'}})
 
 test('persistent evaluator infrastructure cannot park a student forever',()=>{
  const events=Array.from({length:MASS_EVALUATION_MAX_INFRASTRUCTURE_FAILURES_PER_GENERATION},(_,i)=>event(i))

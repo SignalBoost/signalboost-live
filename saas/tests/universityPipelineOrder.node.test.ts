@@ -1,3 +1,4 @@
+// saas/tests/universityPipelineOrder.node.test.ts
 //
 // Owner review 2026-09-30: "does the pipeline go from the left to the right?" and "this has no path to graduation, it is
 // quarantine or fail". The pipeline row now reads left to right in pipeline order, ends at graduation (exam PASS, then
@@ -23,7 +24,9 @@ test('the pipeline row runs left to right and ends at graduation before the ways
   ].map(marker => row.indexOf(marker))
   assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `order ${order.join(',')}`)
   assert.match(row, /artifacts\.filter\(artifact => artifact\.status === 'runtime_pending'\)\.length/, 'passed = exam PASS, now graduating')
-  assert.match(row, /pipeline\.activeGraduates \?\? workforce\.onCall \?\? 0/, 'graduated = authoritative active graduate registry, with Workforce projection fallback')
+  // Owner 2026-09-29/10-02: hired graduates leave the University; the card counts only graduates awaiting hire.
+  assert.match(row, /label=\{copy\.pipelineGraduated\} value=\{String\(graduatedAwaitingHire\)\}/)
+  assert.match(page, /Math\.max\(0, \(pipeline\.activeGraduates \?\? 0\) - \(workforce\.onCall \?\? 0\)\)/, 'active diplomas minus hired workers')
 })
 
 test('the pipeline explanation and the two graduation cards exist in all five languages', () => {
@@ -32,3 +35,4 @@ test('the pipeline explanation and the two graduation cards exist in all five la
     assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 5, `${key} in en, es, pt, pl, ru`)
   }
 })
+// end of saas/tests/universityPipelineOrder.node.test.ts (if this line is missing, the paste was cut short)

@@ -186,11 +186,11 @@ async function issueRollingCanaryApproval(now:Date){
   const [oldestArtifacts,currentRecipeArtifacts,v2BuilderArtifacts,replayArtifacts,xsaArtifacts]=await Promise.all([
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
-      .eq('status','evaluation_pending').like('candidate_id','mass:%')
+      .in('status',['evaluation_ready','evaluation_pending']).like('candidate_id','mass:%')
       .order('created_at',{ascending:true}).limit(200),
     db.from('cos_local_distillation_artifacts')
       .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
-      .eq('status','evaluation_pending')
+      .in('status',['evaluation_ready','evaluation_pending'])
       .like('candidate_id','mass:%')
       .contains('intended_use',{trainingReceipt:{
         optimizer:MASS_CANARY_BUILDER_V2_OPTIMIZER,

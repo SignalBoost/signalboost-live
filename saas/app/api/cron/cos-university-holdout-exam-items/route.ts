@@ -1,4 +1,3 @@
-// saas/app/api/cron/cos-university-holdout-exam-items/route.ts
 //
 // Writes real Holdout exam questions (one question + short answer key per withheld teaching essay) for the
 // artifacts the mass evaluation route has requested. A few artifacts per tick; each costs a handful of small
@@ -20,7 +19,10 @@ export async function GET(request: NextRequest) {
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok: false, error: 'service_database_unavailable' }, { status: 503 })
   try {
-    const result = await fillRequestedHoldoutExamSets({ db, limit: 3 })
+    // 975 exams requested against 157 ready: at 3 sets per tick the writer never catches up with training output, so
+    // students keep arriving in a queue that grows faster than it drains. 10 is the function's own built-in ceiling
+    // (Math.min(10, ...)), not a new maximum.
+    const result = await fillRequestedHoldoutExamSets({ db, limit: 10 })
     if (result.errors.length) console.warn('[cos-holdout-exam-items]', JSON.stringify(result))
     await recordCosUniversityProductionPath({
       path: 'holdout_exam_preparation',

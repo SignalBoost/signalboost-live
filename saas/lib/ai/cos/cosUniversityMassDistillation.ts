@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 // actually needs a client loads it lazily below, where Next resolves the alias normally.
 import type { cosServiceDb as CosServiceDbFactory } from '@/lib/cos-core/storage/supabase'
 import { classifyCosUniversitySubjects, cosUniversitySubjectById, type CosUniversitySubjectId } from './cosUniversity.ts'
-import { HYBRID_INDEPENDENT_HOLDOUT_MIN, planHybridDistillationMix, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
+import { HYBRID_INDEPENDENT_HOLDOUT_MIN, HYBRID_REAL_SOURCE_TARGET, planHybridDistillationMix, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
 import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from '../modelCapabilityRegistry.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const

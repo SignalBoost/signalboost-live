@@ -616,6 +616,8 @@ const tests = [
 
   'tests/cosWorkforceProductionVerification.node.test.ts',
 
+  'tests/cosWorkforceStageDashboard.node.test.ts',
+
   // 2026-09-29 backwards pass: Workforce dashboard, quarantine rule, Residency time budget and context fit.
 
   'tests/universityBackwardsPass.node.test.ts',

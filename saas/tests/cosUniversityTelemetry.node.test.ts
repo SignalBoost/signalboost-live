@@ -150,6 +150,10 @@ test('University telemetry 24-hour summaries are not derived from capped display
   const route = source('app/api/admin/cos-university-telemetry/route.ts')
   assert.match(route, /select\('id', \{ count: 'exact', head: true \}\)/)
   assert.match(route, /const totalRuns24h = n\(totalRunCountResult\.count\)/)
+  assert.match(route, /select\('id,candidate_id,trained_artifact_hash,status,runtime_provider,runtime_model_id,promoted_at,activated_at,updated_at'\)/)
+  assert.match(route, /workforceStageByRegistry\.get\(text\(graduate\.id, 80\)\)/)
+  assert.match(route, /currentStage = 'Workforce — ' \+ workforceStage/)
+
   assert.match(route, /const inFlightRuns24h = Math\.max\(0, totalRuns24h - completedRuns24h - failedRuns24h\)/)
   assert.match(route, /collectPages<any>/)
   assert.match(route, /\.range\(from, to\)/)

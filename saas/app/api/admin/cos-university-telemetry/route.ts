@@ -186,7 +186,7 @@ export async function GET() {
         .order('created_at', { ascending: false })
         .limit(200),
       db.from(GRADUATES)
-        .select('candidate_id,trained_artifact_hash,status,runtime_provider,runtime_model_id,promoted_at,activated_at,updated_at')
+        .select('id,candidate_id,trained_artifact_hash,status,runtime_provider,runtime_model_id,promoted_at,activated_at,updated_at')
         .order('updated_at', { ascending: false })
         .limit(100),
       collectPages<any>((from, to) => db.from(LEARNING)
@@ -693,7 +693,18 @@ export async function GET() {
       const quarantineReason = artifact.status === 'quarantined'
         ? quarantine.reasons.get(studentKey(candidateId, artifactHash)) || null
         : null
-      if (graduate?.status === 'active') { currentStage = 'Active specialist'; blocker = 'none'; nextAction = 'Serving' }
+      if (graduate?.status === 'active') {
+        const workforceStage = workforceStageByRegistry.get(text(graduate.id, 80)) || 'WORKFORCE_AVAILABLE'
+        currentStage = 'Workforce — ' + workforceStage
+        blocker = workforceStage === 'RUNTIME_RECOVERY' || workforceStage === 'REMEDIATION' ? workforceStage.toLowerCase() : 'none'
+        nextAction = workforceStage === 'PRODUCTION_VERIFIED'
+          ? 'Continue Production service'
+          : workforceStage === 'RUNTIME_RECOVERY'
+            ? 'Recover runtime and retry eligible Production work'
+            : workforceStage === 'REMEDIATION'
+              ? 'Complete governed remediation'
+              : 'Advance through Workforce Production work'
+      }
       else if (graduate) { currentStage = 'Runtime activation'; blocker = text(graduate.status, 80); nextAction = 'Activate exact graduated runtime' }
       // Quarantine comes before every in-progress stage: a student that finished Residency and then failed its exam is a
       // result, not an artifact waiting for a canary. The reason is named, never the generic "evaluation failed".

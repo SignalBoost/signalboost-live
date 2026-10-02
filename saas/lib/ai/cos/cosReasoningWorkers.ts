@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosReasoningWorkers.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { after } from 'next/server'
@@ -21,6 +22,7 @@ import {
 import { learnedRoutingOverride } from '@/lib/ai/cos/reasoningOutcomeLearning'
 import { recordReasoningWorkerMetric } from '@/lib/ai/cos/reasoningWorkerMetrics'
 import { graduateServingErrorOutcome, recordGraduateServingAttempt } from '@/lib/ai/cos/graduateServingAttempts'
+import { recordGraduateProductionServed } from '@/lib/ai/cos/cosWorkforceAssignments'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { COS_EXPLANATORY_REASONING_DISCIPLINE, COS_GENERAL_REASONING_DISCIPLINE } from '@/lib/ai/cos/cosGeneralReasoningDiscipline'
 import { EXPLANATORY_QUESTION_SCOPE_LINE } from '@/lib/ai/cos/cosReasonerPromptScope'
@@ -347,6 +349,18 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
         outcome: 'success',
         latencyMs: Date.now() - startedAt,
       })
+      // WORKFORCE (2026-10-02): this graduate delivered the answer for this exact Production turn. Enter it into the
+      // Workforce lifecycle as 'served'; the Workforce cron verifies it against the turn's governed Production outcome.
+      recordGraduateProductionServed({
+        registryId: runtime.registryId,
+        candidateId: runtime.candidateId,
+        trainedArtifactHash: runtime.trainedArtifactHash,
+        subjectId: runtime.subjectId,
+        turnId,
+        objective: request.prompt,
+        servingAttemptId: attemptId,
+        latencyMs: Date.now() - startedAt,
+      })
 
       recordReasoningWorkerMetric({
         turnId,
@@ -500,15 +514,27 @@ export async function runWorkforceApprenticeShadow(
     }, runtime.inference)
     const latencyMs = Date.now() - startedAt
     if (!text?.trim()) {
-      recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_failed', outcome: 'empty', latencyMs, errorClass: 'empty_response' })
+      // WORKFORCE (2026-10-02): this path used to return without closing the assignment, leaving it 'working' forever.
+      // No text is a runtime fact (callLocalModel returns null for timeouts, HTTP and transport failures too), so it
+      // closes as runtime_failed - never remediation, which is reserved for verified competence failures.
+      const failureReason = latencyMs >= timeoutMs - 50 ? 'runtime_deadline_exceeded' : 'runtime_no_text'
+      if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'runtime_failed', completed_at: new Date().toISOString(), failure_reason: failureReason, updated_at: new Date().toISOString() }).eq('id', assignmentId)
+      recordGraduateServingAttempt({
+        ...attemptBase,
+        phase: 'attempt_failed',
+        outcome: failureReason === 'runtime_deadline_exceeded' ? 'timeout' : 'empty',
+        latencyMs,
+        errorClass: failureReason,
+      })
       return
     }
     recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_succeeded', outcome: 'success', latencyMs })
-    if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'completed', completed_at: new Date().toISOString(), outcome_evidence_hash: createHash('sha256').update(`${attemptId}:success:${latencyMs}`).digest('hex'), updated_at: new Date().toISOString() }).eq('id', assignmentId)
+    // Shadow output was never delivered to anyone, so no Production outcome can verify it: it ends at 'served'.
+    if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'served', completed_at: new Date().toISOString(), outcome_evidence_hash: createHash('sha256').update(`${attemptId}:success:${latencyMs}`).digest('hex'), updated_at: new Date().toISOString() }).eq('id', assignmentId)
   } catch (error) {
     const latencyMs = Date.now() - startedAt
     const outcome = graduateServingErrorOutcome(error, timeoutMs, latencyMs)
-    if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'remediation', completed_at: new Date().toISOString(), failure_reason: error instanceof Error ? error.name || 'Error' : 'Error', updated_at: new Date().toISOString() }).eq('id', assignmentId)
+    if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'runtime_failed', completed_at: new Date().toISOString(), failure_reason: error instanceof Error ? error.name || 'Error' : 'Error', updated_at: new Date().toISOString() }).eq('id', assignmentId)
     recordGraduateServingAttempt({
       ...attemptBase,
       phase: 'attempt_failed',
@@ -620,3 +646,4 @@ export async function reasonThroughCosControlPlane(
     },
   }
 }
+// end of saas/lib/ai/cos/cosReasoningWorkers.ts (if this line is missing, the paste was cut short)

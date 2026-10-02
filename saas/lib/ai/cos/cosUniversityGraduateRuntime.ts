@@ -498,6 +498,7 @@ export async function activeGraduateRuntimesForRole(
  */
 export async function activeGraduateApprenticeForObjective(
   objective: string,
+  excludedRegistryIds: ReadonlySet<string> = new Set(),
 ): Promise<ActiveGraduateRuntime | null> {
   const roles: readonly CosReasoningWorkerRole[] = ['critic', 'verifier', 'researcher', 'context_engineer', 'coder']
   // Build one pool across every specialist role before choosing. Returning from the first role with
@@ -508,7 +509,7 @@ export async function activeGraduateApprenticeForObjective(
   const byRegistry = new Map<string, ActiveGraduateRuntime>()
   for (const role of roles) {
     const eligible = await activeGraduateRuntimesForRole(role, objective)
-    for (const runtime of eligible) if (!byRegistry.has(runtime.registryId)) byRegistry.set(runtime.registryId, runtime)
+    for (const runtime of eligible) if (!excludedRegistryIds.has(runtime.registryId) && !byRegistry.has(runtime.registryId)) byRegistry.set(runtime.registryId, runtime)
   }
   const candidates = [...byRegistry.values()]
   if (!candidates.length) return null

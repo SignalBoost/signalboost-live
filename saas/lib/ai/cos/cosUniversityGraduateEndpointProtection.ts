@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityGraduateEndpointProtection.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/service-db.ts'
 import { exactArtifactContainerImageFromEnv } from './runpodExactArtifactContainerImage.ts'
@@ -221,11 +220,74 @@ export async function activeEvaluationRunpodEndpointIds(now = new Date()): Promi
   return new Set([...active.values()].map(value => value.endpointId))
 }
 
+const PENDING_GRADUATE_CANARY_CLAIM = 'local_distilled_runtime_canary_passed'
+const PENDING_GRADUATE_ARTIFACT_LIMIT = 200
+
+/**
+ * Artifacts that PASSED every gate and are waiting to be registered and activated.
+ *
+ * Production 2026-10-02: mass:9c350ca1fac4 sat at `runtime_pending` for days with its proven canary endpoint
+ * (itmounts-mass-distilled-9c350ca1fac4-db505a42e0-v3) the only mass-distilled endpoint in the account still holding
+ * a worker. That pin was the ONLY thing keeping the endpoint alive: it is on no Workforce roster and holds no active
+ * registry row, so activeGraduateRunpodEndpointIds excludes it, and the 10-minute canary and 12-minute evaluation
+ * windows expired long ago.
+ *
+ * Widening reclaim to stale endpoint GENERATIONS removed that accident. Every one of the 393 live mass-distilled
+ * endpoints is a superseded generation (391 '-v3', 2 '-v2', zero '-v5'), so a waiting artifact's endpoint became
+ * reclaimable, drains to 0/0, and deleteTerminalMassDistilledRunpodEndpoint deletes exactly an endpoint at 0/0 whose
+ * name carries that prefix. Activation binds a graduate to the EXACT endpoint id its canary proved and never
+ * recreates one, so the delete is unrecoverable.
+ *
+ * Protected by the endpoint id recorded on the artifact's own passing exact-artifact canary, so this grants nothing an
+ * artifact did not already earn. Bounded, read-only, and unrelated to spend: it stops a reclaim, it never raises
+ * capacity or sets minWorkers above zero.
+ */
+export async function pendingGraduateRunpodEndpointIds(): Promise<ReadonlySet<string>> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('pending_graduate_endpoint_protection_database_unavailable')
+  const artifacts = await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,trained_artifact_hash')
+    .eq('status', 'runtime_pending')
+    .like('candidate_id', 'mass:%')
+    .order('created_at', { ascending: true })
+    .limit(PENDING_GRADUATE_ARTIFACT_LIMIT)
+  if (artifacts.error) throw artifacts.error
+
+  const wanted = new Map<string, string>()
+  for (const row of artifacts.data || []) {
+    const candidateId = String((row as { candidate_id?: unknown }).candidate_id || '').trim()
+    const artifactHash = String((row as { trained_artifact_hash?: unknown }).trained_artifact_hash || '')
+      .trim().toLowerCase()
+    if (candidateId && /^[a-f0-9]{64}$/.test(artifactHash)) wanted.set(candidateId, artifactHash)
+  }
+  if (!wanted.size) return new Set<string>()
+
+  const events = await db.from('cos_university_learning_assurance_events')
+    .select('candidate_id,evidence')
+    .eq('event_type', 'fine_tune')
+    .in('candidate_id', [...wanted.keys()])
+    .contains('evidence', { claim: PENDING_GRADUATE_CANARY_CLAIM, exactArtifact: true })
+    .limit(2000)
+  if (events.error) throw events.error
+
+  const ids = new Set<string>()
+  for (const row of events.data || []) {
+    const evidence = (row as { evidence?: Record<string, unknown> }).evidence || {}
+    const candidateId = String((row as { candidate_id?: unknown }).candidate_id || '').trim()
+    // Protected only for the exact artifact hash still sitting at runtime_pending.
+    if (wanted.get(candidateId) !== String(evidence.artifactHash || '').trim().toLowerCase()) continue
+    const endpointId = String(evidence.endpointId || '').trim().toLowerCase()
+    if (ENDPOINT_ID.test(endpointId)) ids.add(endpointId)
+  }
+  return ids
+}
+
 export async function protectedRunpodEndpointIds(now = new Date()): Promise<ReadonlySet<string>> {
-  const [graduates, evaluations, canaries] = await Promise.all([
+  const [graduates, pendingGraduates, evaluations, canaries] = await Promise.all([
     activeGraduateRunpodEndpointIds(),
+    pendingGraduateRunpodEndpointIds(),
     activeEvaluationRunpodEndpointIds(now),
     activeCanaryRunpodEndpointIds(now),
   ])
-  return new Set([...graduates, ...evaluations, ...canaries])
+  return new Set([...graduates, ...pendingGraduates, ...evaluations, ...canaries])
 }

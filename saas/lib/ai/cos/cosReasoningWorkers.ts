@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { after } from 'next/server'
 import { callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { callLocalModel, type LocalInferenceConfig, type LocalModelCallArgs } from '@/lib/ai/local-inference'
@@ -445,6 +446,30 @@ export async function runWorkforceApprenticeShadow(
   })
   const attemptId = randomUUID()
   const startedAt = Date.now()
+  const db = cosServiceDb()
+  const sourceRef = String(args.usageContext?.correlationId || attemptId)
+  const objectiveHash = createHash('sha256').update(objective).digest('hex')
+  let assignmentId: string | null = null
+  if (db) {
+    const roster = await db.from('cos_workforce_roster').select('id').eq('registry_id', runtime.registryId).eq('status', 'on_call').maybeSingle()
+    const birth = await db.from('cos_university_artifact_birth_certificates').select('permanent_artifact_id').eq('candidate_id', runtime.candidateId).eq('trained_artifact_hash', runtime.trainedArtifactHash).maybeSingle()
+    if (!roster.error && roster.data?.id && !birth.error && birth.data?.permanent_artifact_id) {
+      const assignment = await db.from('cos_workforce_assignments').upsert({
+        registry_id: runtime.registryId,
+        workforce_roster_id: roster.data.id,
+        permanent_artifact_id: birth.data.permanent_artifact_id,
+        source_kind: 'production_shadow',
+        source_ref: sourceRef,
+        objective_hash: objectiveHash,
+        specialty: runtime.subjectId,
+        status: 'assigned',
+        authority_expanded: false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'registry_id,source_kind,source_ref' }).select('id').maybeSingle()
+      assignmentId = assignment.data?.id ? String(assignment.data.id) : null
+      if (assignmentId) await db.from('cos_workforce_assignments').update({ status: 'working', started_at: new Date().toISOString(), serving_attempt_id: attemptId, updated_at: new Date().toISOString() }).eq('id', assignmentId)
+    }
+  }
   const timeoutMs = Math.min(Number(effective.timeoutMs || WORKFORCE_APPRENTICE_TIMEOUT_MS), WORKFORCE_APPRENTICE_TIMEOUT_MS)
   const attemptBase = {
     attemptId,
@@ -479,9 +504,11 @@ export async function runWorkforceApprenticeShadow(
       return
     }
     recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_succeeded', outcome: 'success', latencyMs })
+    if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'completed', completed_at: new Date().toISOString(), outcome_evidence_hash: createHash('sha256').update(`${attemptId}:success:${latencyMs}`).digest('hex'), updated_at: new Date().toISOString() }).eq('id', assignmentId)
   } catch (error) {
     const latencyMs = Date.now() - startedAt
     const outcome = graduateServingErrorOutcome(error, timeoutMs, latencyMs)
+    if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'remediation', completed_at: new Date().toISOString(), failure_reason: error instanceof Error ? error.name || 'Error' : 'Error', updated_at: new Date().toISOString() }).eq('id', assignmentId)
     recordGraduateServingAttempt({
       ...attemptBase,
       phase: 'attempt_failed',

@@ -3,14 +3,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { drainGraduateServingEvidence } from '@/lib/ai/cos/graduateServingAttempts'
 import { runWorkforceApprenticeShadow } from '@/lib/ai/cos/cosReasoningWorkers'
+import { activeGraduateApprenticeForObjective, proveGraduateServedIdentity } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { closeAbandonedWorkforceAssignments, verifyServedWorkforceAssignments } from '@/lib/ai/cos/cosWorkforceAssignments'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 60
-const RUN_BUDGET_MS = 50_000
-const SHADOW_MAX_MS = 15_000
-const SHADOW_CLOSE_MARGIN_MS = 6_000
+export const maxDuration = 300
+const RUN_BUDGET_MS = 285_000
+const RUNTIME_READY_MAX_MS = 240_000
+const SHADOW_MAX_MS = 40_000
+const SHADOW_CLOSE_MARGIN_MS = 10_000
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
@@ -21,8 +23,8 @@ async function run(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok: false, error: 'cos_service_db_unavailable' }, { status: 503 })
-  // This route is killed at maxDuration (60s). Work it starts must finish before then, or the assignment it opened is
-  // left 'working' with no terminal record. Stop starting new graduate calls once the budget is spent.
+  // One recovery run may spend the governed cold-start window proving the exact graduate runtime ready.
+  // No assignment is opened until readiness succeeds, and only one graduate is executed per cron invocation.
   const deadline = Date.now() + RUN_BUDGET_MS
 
   // First close work that can never finish (opened, then the process ended), so it stops showing as WORKING.
@@ -88,10 +90,18 @@ async function run(req: NextRequest) {
       .limit(24)
     if (!demand.error) {
       for (const row of demand.data || []) {
-        if (recoveryAttempts >= Math.min(3, eligibleRecoveryTargets.length)) break
+        if (recoveryAttempts >= 1) break
         const objective = String(row.content || '').trim()
         if (!objective) continue
-        // Leave room to write the terminal status before the route deadline.
+        // Select an exact non-circuit-broken worker first, then prove its exact served identity while it wakes.
+        // Crucially, no assignment exists yet: cold-start time is infrastructure readiness, not graduate work.
+        const selected = await activeGraduateApprenticeForObjective(objective, runtimeBlocked).catch(() => null)
+        if (!selected) continue
+        const readyBudgetMs = Math.min(RUNTIME_READY_MAX_MS, deadline - Date.now() - SHADOW_MAX_MS - SHADOW_CLOSE_MARGIN_MS)
+        if (readyBudgetMs < 5_000) break
+        const ready = await proveGraduateServedIdentity(selected.inference, selected.runtimeModelId, { waitMs: readyBudgetMs })
+        if (!ready.ok) continue
+        // Fair selection is unchanged because readiness creates no serving attempt; the same ready worker remains first.
         const shadowTimeoutMs = Math.min(SHADOW_MAX_MS, deadline - Date.now() - SHADOW_CLOSE_MARGIN_MS)
         if (shadowTimeoutMs < 5_000) break
         await runWorkforceApprenticeShadow({
@@ -99,7 +109,7 @@ async function run(req: NextRequest) {
           maxTokens: 512,
           timeoutMs: shadowTimeoutMs,
           usageContext: { feature: 'cos_workforce_recovery', purpose: 'genuine_production_replay', correlationId: `workforce-recovery:${row.id}` },
-        }, objective)
+        }, objective, runtimeBlocked)
         recoveryAttempts += 1
       }
     } else {

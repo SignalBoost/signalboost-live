@@ -1,4 +1,3 @@
-// saas/app/api/cron/cos-university-graduate-activation/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { activateGraduateRuntime } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -273,9 +272,26 @@ async function reconcileGraduateArtifactLifecycle() {
   return { synced: synced.length, candidates: synced.slice(0, 20) }
 }
 
+/**
+ * Evidence is read PER ARTIFACT. The previous read was one bulk query -
+ *   .in('candidate_id', <up to 50 ids>).order('observed_at', desc).limit(3000)
+ * - while decideMassGraduateRegistration walks the artifacts created_at ASCENDING, oldest first. A newest-first cap
+ * truncates from the OLDEST end, so the artifact checked FIRST is precisely the one whose `independent_evaluation`
+ * verdict is most likely to sit outside the window. It was skipped as `independent_verdict_missing` every tick while
+ * newer artifacts registered straight past it, and the single `reason` variable the decision overwrites per artifact
+ * named the LAST artifact checked, never the held one. Production 2026-10-02: mass:9c350ca1fac4 had waited days.
+ *
+ * One bounded read per artifact removes the starvation; a per-candidate `skipped` list makes a held artifact name
+ * itself. The stale-reopened-verdict recovery below and the pure decision function are both unchanged in behaviour -
+ * they now simply run against that artifact's own evidence.
+ */
+const MASS_GRADUATE_REGISTRATION_SCAN_LIMIT = 10
+const MASS_GRADUATE_EVIDENCE_ROW_LIMIT = 400
+
 async function registerNextMassGraduate() {
   const db = cosServiceDb()
   if (!db) return { registered: false as const, reason: 'service_database_unavailable' }
+  const enabled = String(process.env.COS_MASS_GRADUATE_REGISTRATION || '').trim() !== 'false'
   const artifacts = await db.from('cos_local_distillation_artifacts')
     .select('candidate_id,subject_id,student_model_id,trained_artifact_id,trained_artifact_hash,rollback_artifact_ref,status,created_at')
     .eq('status', 'runtime_pending')
@@ -290,95 +306,119 @@ async function registerNextMassGraduate() {
   if (tracked.error) throw tracked.error
   const already = new Set((tracked.data || []).map((row: any) => `${row.candidate_id}:${String(row.trained_artifact_hash).toLowerCase()}`))
 
-  const events = await db.from('cos_university_learning_assurance_events')
-    .select('candidate_id,verifier,evidence')
-    .eq('event_type', 'fine_tune')
-    .in('candidate_id', candidateIds)
-    .order('observed_at', { ascending: false })
-    .limit(3000)
-  if (events.error) throw events.error
+  // Registry-filtered BEFORE any evidence is read: an artifact that already holds a graduate row must not consume
+  // the evidence budget of one still waiting for it.
+  const waiting = (artifacts.data || [])
+    .filter((row: any) => !already.has(`${row.candidate_id}:${String(row.trained_artifact_hash).toLowerCase()}`))
+  if (!waiting.length) return { registered: false as const, reason: 'every_runtime_pending_mass_artifact_registered', waiting: 0 }
 
-  // Recovery for the pre-2026-09-30 evidence-idempotency defect: a reopened evaluation could
-  // complete PASS and move the artifact to runtime_pending while its fresh independent verdict was
-  // suppressed as a duplicate. Never graduate from that stale verdict. If the latest successful
-  // completion's holdout scores have no matching independent-scorer verdict for the same artifact,
-  // reopen evaluation once under the repaired run-specific evidence identity.
-  for (const artifact of (artifacts.data || [])) {
-    const candidateId = String(artifact.candidate_id)
-    const artifactHash = String(artifact.trained_artifact_hash || '').toLowerCase()
-    if (already.has(`${candidateId}:${artifactHash}`)) continue
-    const mine = (events.data || []).filter((row: any) => String(row.candidate_id) === candidateId
-      && String(row.evidence?.artifactHash || '').toLowerCase() === artifactHash)
+  const skipped: Array<{ candidateId: string; reason: string }> = []
+  for (const pending of waiting.slice(0, MASS_GRADUATE_REGISTRATION_SCAN_LIMIT)) {
+    const artifact: MassGraduateArtifact = {
+      candidateId: String(pending.candidate_id), subjectId: String(pending.subject_id || ''), studentModelId: String(pending.student_model_id || ''),
+      trainedArtifactId: String(pending.trained_artifact_id || ''), trainedArtifactHash: String(pending.trained_artifact_hash || ''),
+      rollbackArtifactRef: pending.rollback_artifact_ref ? String(pending.rollback_artifact_ref) : null,
+      status: String(pending.status || ''), createdAt: String(pending.created_at || ''),
+    }
+    const candidateId = artifact.candidateId
+    const artifactHash = artifact.trainedArtifactHash.toLowerCase()
+
+    const events = await db.from('cos_university_learning_assurance_events')
+      .select('candidate_id,verifier,evidence')
+      .eq('event_type', 'fine_tune')
+      .eq('candidate_id', artifact.candidateId)
+      .order('observed_at', { ascending: false })
+      .limit(MASS_GRADUATE_EVIDENCE_ROW_LIMIT)
+    if (events.error) throw events.error
+    const mine = (events.data || []).filter((row: any) =>
+      String(row.evidence?.artifactHash || '').toLowerCase() === artifactHash)
+
+    // Recovery for the pre-2026-09-30 evidence-idempotency defect: a reopened evaluation could complete PASS and
+    // move the artifact to runtime_pending while its fresh independent verdict was suppressed as a duplicate. Never
+    // graduate from that stale verdict. If the latest successful completion's holdout scores have no matching
+    // independent-scorer verdict for the same artifact, reopen evaluation once under the repaired run-specific
+    // evidence identity.
     const completion = mine.find((row: any) => row.verifier === 'host_controller'
       && row.evidence?.claim === 'mass_distilled_independent_evaluation_completed'
       && row.evidence?.evaluationPassed === true)
-    if (!completion) continue
-    const baseline = Number(completion.evidence?.holdout?.baselineScore)
-    const trained = Number(completion.evidence?.holdout?.trainedArtifactScore)
-    if (!Number.isFinite(baseline) || !Number.isFinite(trained) || !(trained > baseline)) continue
-    const freshVerdict = mine.some((row: any) => row.verifier === 'independent_scorer'
-      && row.evidence?.claim === 'independent_evaluation'
-      && Number(row.evidence?.baselineScore) === baseline
-      && Number(row.evidence?.trainedArtifactScore) === trained)
-    if (freshVerdict) continue
+    const baseline = Number(completion?.evidence?.holdout?.baselineScore)
+    const trained = Number(completion?.evidence?.holdout?.trainedArtifactScore)
+    if (completion && Number.isFinite(baseline) && Number.isFinite(trained) && trained > baseline) {
+      const freshVerdict = mine.some((row: any) => row.verifier === 'independent_scorer'
+        && row.evidence?.claim === 'independent_evaluation'
+        && Number(row.evidence?.baselineScore) === baseline
+        && Number(row.evidence?.trainedArtifactScore) === trained)
+      if (!freshVerdict) {
+        const now = new Date().toISOString()
+        const repairRef = 'mass_graduate_stale_reopened_verdict_recovery_2026-09-30'
+        const reopened = await db.from('cos_local_distillation_artifacts')
+          .update({ status: 'evaluation_pending', updated_at: now })
+          .eq('candidate_id', candidateId)
+          .eq('trained_artifact_hash', artifactHash)
+          .eq('status', 'runtime_pending')
+        if (reopened.error) throw reopened.error
+        const evidence = { claim: 'mass_distilled_independent_evaluation_reopened', repairRef, candidateId, artifactHash,
+          previousStatus: 'runtime_pending', nextStatus: 'evaluation_pending', authorityExpanded: false, productionTrafficAuthorized: false }
+        const evidenceHash = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
+        const recorded = await db.from('cos_university_learning_assurance_events').upsert({
+          event_key: createHash('sha256').update(JSON.stringify([repairRef, candidateId, artifactHash])).digest('hex'),
+          event_type: 'fine_tune', subject_id: String(pending.subject_id || ''), candidate_id: candidateId,
+          evidence_hash: evidenceHash, evidence, verifier: 'host_controller', observed_at: now,
+        }, { onConflict: 'event_key', ignoreDuplicates: true })
+        if (recorded.error) throw recorded.error
+        return { registered: false as const, reason: 'stale_reopened_verdict_requeued', candidateId, artifactHash, skipped }
+      }
+    }
 
-    const now = new Date().toISOString()
-    const repairRef = 'mass_graduate_stale_reopened_verdict_recovery_2026-09-30'
-    const reopened = await db.from('cos_local_distillation_artifacts')
-      .update({ status: 'evaluation_pending', updated_at: now })
-      .eq('candidate_id', candidateId)
-      .eq('trained_artifact_hash', artifactHash)
-      .eq('status', 'runtime_pending')
-    if (reopened.error) throw reopened.error
-    const evidence = { claim: 'mass_distilled_independent_evaluation_reopened', repairRef, candidateId, artifactHash,
-      previousStatus: 'runtime_pending', nextStatus: 'evaluation_pending', authorityExpanded: false, productionTrafficAuthorized: false }
-    const evidenceHash = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
-    const recorded = await db.from('cos_university_learning_assurance_events').upsert({
-      event_key: createHash('sha256').update(JSON.stringify([repairRef, candidateId, artifactHash])).digest('hex'),
-      event_type: 'fine_tune', subject_id: String(artifact.subject_id || ''), candidate_id: candidateId,
-      evidence_hash: evidenceHash, evidence, verifier: 'host_controller', observed_at: now,
-    }, { onConflict: 'event_key', ignoreDuplicates: true })
-    if (recorded.error) throw recorded.error
-    return { registered: false as const, reason: 'stale_reopened_verdict_requeued', candidateId, artifactHash }
+    const decision = decideMassGraduateRegistration({
+      enabled,
+      artifacts: [artifact],
+      events: (events.data || []).map((row: any): MassGraduateEvent => ({
+        candidateId: String(row.candidate_id), verifier: String(row.verifier || ''),
+        evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
+      })),
+    })
+    if (!('artifact' in decision)) {
+      skipped.push({ candidateId: artifact.candidateId, reason: decision.reason })
+      // The owner switch is not a property of any one artifact; stop rather than reporting it ten times.
+      if (decision.reason === 'mass_graduate_registration_disabled') break
+      continue
+    }
+
+    const registration = await registerPromotedGraduateModel({
+      candidateId: decision.artifact.candidateId,
+      subjectId: decision.artifact.subjectId,
+      studentModelId: decision.artifact.studentModelId,
+      trainedArtifactId: decision.artifact.trainedArtifactId,
+      trainedArtifactHash: decision.artifact.trainedArtifactHash,
+      rollbackArtifactRef: decision.artifact.rollbackArtifactRef,
+      eligibleForPromotion: true,
+      authorityExpanded: false,
+      promotedAt: new Date(),
+    })
+    if (skipped.length) console.info('[cos-mass-graduate-registration-skipped]', JSON.stringify({ skipped }))
+    return {
+      registered: registration.tracked === true,
+      candidateId: decision.artifact.candidateId,
+      artifactHash: decision.artifact.trainedArtifactHash,
+      baselineScore: decision.baselineScore,
+      trainedArtifactScore: decision.trainedArtifactScore,
+      status: registration.status,
+      blockers: registration.blockers,
+      waiting: waiting.length,
+      skipped,
+      productionTrafficAuthorized: false,
+    }
   }
 
-  const decision = decideMassGraduateRegistration({
-    enabled: String(process.env.COS_MASS_GRADUATE_REGISTRATION || '').trim() !== 'false',
-    artifacts: (artifacts.data || [])
-      .filter((row: any) => !already.has(`${row.candidate_id}:${String(row.trained_artifact_hash).toLowerCase()}`))
-      .map((row: any) => ({
-        candidateId: String(row.candidate_id), subjectId: String(row.subject_id || ''), studentModelId: String(row.student_model_id || ''),
-        trainedArtifactId: String(row.trained_artifact_id || ''), trainedArtifactHash: String(row.trained_artifact_hash || ''),
-        rollbackArtifactRef: row.rollback_artifact_ref ? String(row.rollback_artifact_ref) : null,
-        status: String(row.status || ''), createdAt: String(row.created_at || ''),
-      })),
-    events: (events.data || []).map((row: any): MassGraduateEvent => ({
-      candidateId: String(row.candidate_id), verifier: String(row.verifier || ''),
-      evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
-    })),
-  })
-  if (!('artifact' in decision)) return { registered: false as const, reason: decision.reason }
-
-  const registration = await registerPromotedGraduateModel({
-    candidateId: decision.artifact.candidateId,
-    subjectId: decision.artifact.subjectId,
-    studentModelId: decision.artifact.studentModelId,
-    trainedArtifactId: decision.artifact.trainedArtifactId,
-    trainedArtifactHash: decision.artifact.trainedArtifactHash,
-    rollbackArtifactRef: decision.artifact.rollbackArtifactRef,
-    eligibleForPromotion: true,
-    authorityExpanded: false,
-    promotedAt: new Date(),
-  })
+  if (skipped.length) console.info('[cos-mass-graduate-registration-skipped]', JSON.stringify({ skipped }))
   return {
-    registered: registration.tracked === true,
-    candidateId: decision.artifact.candidateId,
-    artifactHash: decision.artifact.trainedArtifactHash,
-    baselineScore: decision.baselineScore,
-    trainedArtifactScore: decision.trainedArtifactScore,
-    status: registration.status,
-    blockers: registration.blockers,
-    productionTrafficAuthorized: false,
+    // The OLDEST held artifact, which is the one a queue that never advances is waiting on.
+    registered: false as const,
+    reason: skipped[0]?.reason || 'no_mass_artifact_eligible_for_graduation',
+    heldCandidateId: skipped[0]?.candidateId || null,
+    waiting: waiting.length,
+    skipped,
   }
 }
 

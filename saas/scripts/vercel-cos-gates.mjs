@@ -416,7 +416,7 @@ const tests = [
 
   'tests/freshEvidenceLocalSynthesis.node.test.ts',
 
-  'tests/freshEvidenceNeuralReview\.node.test.ts',
+  'tests/freshEvidenceNeuralReview.node.test.ts',
 
   'tests/freshEvidencePredicateAmbiguity.node.test.ts',
 

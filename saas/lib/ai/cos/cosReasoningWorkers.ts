@@ -420,7 +420,7 @@ async function createGraduateAwareCosReasoningEngine(
 
 const WORKFORCE_APPRENTICE_TIMEOUT_MS = 45_000
 
-async function runWorkforceApprenticeShadow(
+export async function runWorkforceApprenticeShadow(
   args: LocalModelCallArgs,
   objective: string,
 ): Promise<void> {

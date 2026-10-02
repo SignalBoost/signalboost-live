@@ -65,7 +65,41 @@ export async function runpodGraduateEndpointWarm(
   return warm
 }
 
+/**
+ * Diagnostic only (2026-10-02). Production: 37 of 38 graduate calls ended at the ~15s deadline, and nothing recorded
+ * whether the endpoint was still booting or was warm and slow. When a call times out, read the endpoint's worker state
+ * once (uncached, bounded) so the failure record says which it was. Never gates or wakes anything; no GPU cost.
+ */
+export type GraduateEndpointWorkerState = 'warm' | 'initializing' | 'cold' | 'not_runpod' | 'unknown'
+
+export async function runpodGraduateEndpointWorkerState(
+  baseUrl: unknown,
+  deps: { fetchImpl?: typeof fetch; apiKey?: string | null } = {},
+): Promise<GraduateEndpointWorkerState> {
+  const endpointId = runpodServerlessEndpointIdFromBaseUrl(baseUrl)
+  if (!endpointId) return 'not_runpod'
+  try {
+    const key = deps.apiKey === undefined ? configuredRunpodApiKey() : deps.apiKey
+    if (!key) return 'unknown'
+    const response = await (deps.fetchImpl ?? fetch)(`${SERVERLESS_API}/${endpointId}/health`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(GRADUATE_WARM_CHECK_TIMEOUT_MS),
+    })
+    if (!response.ok) return 'unknown'
+    const payload = await response.json().catch(() => null) as { workers?: { idle?: unknown; running?: unknown; initializing?: unknown } } | null
+    const idle = Number(payload?.workers?.idle) || 0
+    const running = Number(payload?.workers?.running) || 0
+    const initializing = Number(payload?.workers?.initializing) || 0
+    if (idle + running > 0) return 'warm'
+    if (initializing > 0) return 'initializing'
+    return 'cold'
+  } catch {
+    return 'unknown'
+  }
+}
+
 /** Test seam. */
 export function resetGraduateWarmCache(): void {
   cache.clear()
 }
+// end of saas/lib/ai/cos/graduateWarmGate.ts (if this line is missing, the paste was cut short)

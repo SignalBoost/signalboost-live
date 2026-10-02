@@ -224,6 +224,10 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // after the evaluator is repaired without consuming the model's substantive-attempt budget or the rolling approval window.
     || error.startsWith('mass_distilled_evaluation_answer_missing:')
     || error.startsWith('mass_distilled_evaluation_answer_empty:')
+    // Candidate-only failures are emitted only after the evaluator's bounded solo retry reproduces an exact
+    // normal-stop/empty-or-missing response from the trained artifact. That is substantive artifact behavior,
+    // not evaluator infrastructure, so these deliberately fall through to the three-attempt disposition budget.
+    // Do not add mass_distilled_evaluation_candidate_* prefixes to this infrastructure list.
     // Prepared holdouts may preserve immutable source text in a legacy shape while carrying the
     // canonical prompt/response as structured columns. Rejecting that transport shape is an
     // evaluator compatibility defect, not evidence about model quality.

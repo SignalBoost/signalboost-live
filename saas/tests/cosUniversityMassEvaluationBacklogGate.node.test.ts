@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   MASS_EVALUATION_BACKLOG_DEFAULT_LIMIT,
+  MASS_EVALUATION_BACKLOG_WAITING_STATUSES,
   MASS_EVALUATION_BACKLOG_MAX_LIMIT,
   MASS_EVALUATION_BACKLOG_XSA_RECEIPT_PATH,
   massEvaluationBacklogDecision,
@@ -29,6 +30,10 @@ function fakeDb(...results: Result[]) {
   const query = (): any => ({
     eq(column: string, value: string) {
       calls.push(`eq:${column}=${value}`)
+      return query()
+    },
+    in(column: string, values: readonly string[]) {
+      calls.push(`in:${column}=${values.join(',')}`)
       return query()
     },
     like(column: string, pattern: string) {
@@ -90,7 +95,7 @@ test('the live read counts only mass artifacts waiting for independent evaluatio
   assert.deepEqual(input.calls.slice(0, 4), [
     'from:cos_local_distillation_artifacts',
     'select:candidate_id:exact:true',
-    'eq:status=evaluation_pending',
+    'in:status=evaluation_ready,evaluation_pending',
     'like:candidate_id=mass:%',
   ])
 })
@@ -110,7 +115,7 @@ test('students the exam lane is forbidden to take do not hold training closed', 
   // The exclusion must be read with the same receipt path the evaluator uses to identify an XSA student,
   // and must still be scoped to waiting mass artifacts.
   assert.ok(input.calls.includes(`eq:${MASS_EVALUATION_BACKLOG_XSA_RECEIPT_PATH}=true`))
-  assert.equal(input.calls.filter(entry => entry === 'eq:status=evaluation_pending').length, 2)
+  assert.equal(input.calls.filter(entry => entry === 'in:status=evaluation_ready,evaluation_pending').length, 2)
   assert.equal(input.calls.filter(entry => entry === 'like:candidate_id=mass:%').length, 2)
 })
 
@@ -148,6 +153,26 @@ test('the exclusion can never invent capacity beyond the queue itself', async ()
   assert.equal(gate.pendingEvaluation, 0)
   assert.equal(gate.examPausedExcluded, 5)
   assert.equal(massEvaluationBacklogDecision({ pendingEvaluation: 3, limit: 48, examPausedExcluded: -7 }).examPausedExcluded, 0)
+})
+
+// Production 2026-10-02: training was switched back on and the gate could not close. It counted only
+// `evaluation_pending`, but a newly trained artifact is written as `evaluation_ready` and is admitted one at a time
+// under a live approval with in-flight capped at 2, so `evaluation_pending` never exceeds a couple of rows however
+// much training produces. The 48-artifact limit was unreachable and the spend gate was effectively disabled - which
+// is exactly the 316-artifacts-in-24h runaway this gate exists to stop.
+test('the backlog counts trained work waiting to be judged in BOTH statuses', async () => {
+  assert.deepEqual([...MASS_EVALUATION_BACKLOG_WAITING_STATUSES], ['evaluation_ready', 'evaluation_pending'])
+  const input = fakeDb({ count: 60, error: null }, { count: 0, error: null })
+  const gate = await readMassEvaluationBacklogGate({ db: input.db as any, env: {} })
+  assert.equal(gate.pendingEvaluation, 60)
+  assert.equal(gate.open, false, '60 waiting is over the limit and must close the gate')
+
+  // One status read would make the gate blind to everything queued ahead of admission.
+  assert.ok(input.calls.includes('in:status=evaluation_ready,evaluation_pending'))
+  assert.ok(!input.calls.some(entry => entry === 'eq:status=evaluation_pending'),
+    'counting evaluation_pending alone is what disabled the gate')
+  // The exam-paused exclusion must read the SAME queue, or it could subtract students the gate never counted.
+  assert.equal(input.calls.filter(entry => entry === 'in:status=evaluation_ready,evaluation_pending').length, 2)
 })
 
 test('the limit is owner-tunable, bounded, and invalid values fall back to the default', () => {

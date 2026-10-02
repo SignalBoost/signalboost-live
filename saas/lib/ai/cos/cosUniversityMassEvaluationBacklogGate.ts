@@ -46,10 +46,10 @@ export type MassEvaluationBacklogGate = Readonly<{
 }>
 
 type CountResult = { count?: number | null; error?: { message?: string } | null }
-type BacklogQuery = {
+type BacklogQuery = PromiseLike<CountResult> & {
   eq(column: string, value: string): BacklogQuery
   in(column: string, values: readonly string[]): BacklogQuery
-  like(column: string, pattern: string): PromiseLike<CountResult>
+  like(column: string, pattern: string): BacklogQuery
 }
 type BacklogDb = {
   from(table: string): {

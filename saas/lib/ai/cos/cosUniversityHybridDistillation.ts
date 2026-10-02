@@ -6,7 +6,7 @@ export const HYBRID_DISTILLATION_PROFILE = 'cos-university-hybrid-distillation-v
 // per-question evidence shows students LOSING, plus a rotating general-reasoning refresher, instead of one generic
 // "generalize from first principles" sentence set in unrelated software contexts. A new profile lets failures that
 // were already remediated under v3 receive the targeted material once.
-export const FAILURE_DERIVED_REMEDIATION_PROFILE = 'cos-university-failure-derived-remediation-v4' as const
+export const FAILURE_DERIVED_REMEDIATION_PROFILE = 'cos-university-failure-derived-remediation-v5' as const
 export const HYBRID_REAL_SOURCE_TARGET = 0.50
 export const HYBRID_FAILURE_DERIVED_TARGET = 0.30
 export const HYBRID_TEACHER_SYNTHETIC_TARGET = 0.20

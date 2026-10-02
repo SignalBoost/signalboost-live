@@ -211,10 +211,20 @@ export async function GET() {
     // WORKFORCE (owner direction 2026-09-29): graduates leave the University at graduation and are hired into the
     // Workforce. Read on its own and best-effort: the roster is not a University table and must never break this page.
     const workforceResult = await db.from(WORKFORCE)
-      .select('candidate_id,specialty,job_roles,status,hired_at,retired_at')
+      .select('registry_id,candidate_id,specialty,job_roles,status,hired_at,retired_at')
       .order('hired_at', { ascending: false })
       .limit(200)
     const workforceRows: any[] = workforceResult.error ? [] : (workforceResult.data || [])
+    // WORKFORCE STAGES (owner 2026-10-02: "the 16 are still there"). The Graduated card counts active diplomas, which
+    // stay active the whole time a graduate is employed, so it can never show movement. The employment stage of each
+    // on-call graduate comes from cos_workforce_stage (evidence-derived). Best-effort: absence never breaks this page.
+    const workforceStageResult = await db.from('cos_workforce_stage')
+      .select('registry_id,subject_id,workforce_status,workforce_stage,source_kind,assigned_at')
+      .eq('workforce_status', 'on_call')
+      .limit(200)
+    const workforceStageRows: any[] = workforceStageResult.error ? [] : (workforceStageResult.data || [])
+    const workforceStageByRegistry = new Map<string, string>(workforceStageRows
+      .map((row: any): [string, string] => [text(row.registry_id, 80), text(row.workforce_stage, 60)]))
 
     // QUARANTINE REVIEW (owner direction 2026-09-30): its last run, so the owner sees whether students held back by
     // our own errors are being returned to the exam without running a query. Operational status, best-effort.
@@ -883,7 +893,14 @@ export async function GET() {
           specialty: text(row.specialty, 160),
           jobRoles: Array.isArray(row.job_roles) ? row.job_roles.map((role: unknown) => text(role, 40)).filter(Boolean).slice(0, 6) : [],
           hiredAt: iso(row.hired_at),
+          stage: workforceStageByRegistry.get(text(row.registry_id, 80)) || null,
         })),
+        stagesAvailable: !workforceStageResult.error,
+        stages: workforceStageRows.reduce((acc: Record<string, number>, row: any) => {
+          const stage = text(row.workforce_stage, 60) || 'UNKNOWN'
+          acc[stage] = (acc[stage] || 0) + 1
+          return acc
+        }, {}),
       },
       artifacts,
       campaigns: (campaignsResult.data || []).map((campaign: any) => ({

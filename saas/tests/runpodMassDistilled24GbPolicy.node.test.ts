@@ -1,4 +1,3 @@
-// saas/tests/runpodMassDistilled24GbPolicy.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -117,7 +116,13 @@ test('capacity reclamation never disables active graduate, evaluator, or Residen
   assert.match(endpointProtection, /mass_distilled_independent_evaluation_failed/)
   assert.match(endpointProtection, /MASS_EVALUATION_ACTIVE_MS = 12 \* 60 \* 1000/)
   assert.match(endpointProtection, /evaluation_endpoint_protection_database_unavailable/)
-  assert.match(endpointProtection, /new Set\(\[\.\.\.graduates, \.\.\.evaluations, \.\.\.canaries\]\)/)
+  // 2026-10-02: a fourth protected source was added - artifacts that passed every gate and are waiting to graduate,
+  // whose proven canary endpoint reclaim would otherwise drain and the GC then delete. Additive: all three original
+  // sources must still be in the set, and the composition must still be exactly these four.
+  assert.match(endpointProtection, /new Set\(\[\.\.\.graduates, \.\.\.pendingGraduates, \.\.\.evaluations, \.\.\.canaries\]\)/)
+  for (const source of ['activeGraduateRunpodEndpointIds()', 'activeEvaluationRunpodEndpointIds(now)', 'activeCanaryRunpodEndpointIds(now)', 'pendingGraduateRunpodEndpointIds()']) {
+    assert.ok(endpointProtection.includes(source), `protectedRunpodEndpointIds lost a source: ${source}`)
+  }
 })
 
 

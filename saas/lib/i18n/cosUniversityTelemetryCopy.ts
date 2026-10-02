@@ -1,3 +1,4 @@
+// saas/lib/i18n/cosUniversityTelemetryCopy.ts
 export type CosUniversityTelemetryLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 type Copy = Readonly<{
@@ -81,6 +82,8 @@ type Copy = Readonly<{
   workforceHired: string
   workforceNone: string
   workforceUnavailable: string
+  workforceStagesExplanation: string
+  workforceStageLabels: Readonly<Record<'WORKFORCE_AVAILABLE' | 'ASSIGNED' | 'WORKING' | 'AWAITING_PRODUCTION_VERIFICATION' | 'PRODUCTION_VERIFIED' | 'SHADOW_SERVED' | 'RUNTIME_RECOVERY' | 'REMEDIATION', string>>
   quarantineTitle: string
   quarantineExplanation: string
   quarantineFinal: string
@@ -202,6 +205,17 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Hired',
     workforceNone: 'No graduates hired yet.',
     workforceUnavailable: 'Workforce roster not available yet (migration pending).',
+    workforceStagesExplanation: 'Where each on-call graduate is now. Graduation is counted once; this shows the work after it. Production verified needs a governed Production outcome on a real answer the graduate gave.',
+    workforceStageLabels: {
+      WORKFORCE_AVAILABLE: 'Available — no work yet',
+      ASSIGNED: 'Assigned',
+      WORKING: 'Working',
+      AWAITING_PRODUCTION_VERIFICATION: 'Answered — awaiting verification',
+      PRODUCTION_VERIFIED: 'Production verified',
+      SHADOW_SERVED: 'Practice only (not delivered)',
+      RUNTIME_RECOVERY: 'Runtime recovery (infrastructure)',
+      REMEDIATION: 'Remediation',
+    },
     quarantineTitle: 'Quarantine — why each student is there',
     quarantineExplanation: 'A FAIL is a valid result and stays final; the standard is never lowered. Students held back only by our own errors go back to the exam automatically.',
     quarantineFinal: 'Final results (did not graduate)',
@@ -321,6 +335,17 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Contratado',
     workforceNone: 'Aún no hay graduados contratados.',
     workforceUnavailable: 'La plantilla aún no está disponible (migración pendiente).',
+    workforceStagesExplanation: 'Dónde está ahora cada graduado de guardia. La graduación se cuenta una vez; esto muestra el trabajo posterior. Verificado en Producción exige un resultado de Producción gobernado sobre una respuesta real del graduado.',
+    workforceStageLabels: {
+      WORKFORCE_AVAILABLE: 'Disponible — sin trabajo aún',
+      ASSIGNED: 'Asignado',
+      WORKING: 'Trabajando',
+      AWAITING_PRODUCTION_VERIFICATION: 'Respondió — pendiente de verificación',
+      PRODUCTION_VERIFIED: 'Verificado en Producción',
+      SHADOW_SERVED: 'Solo práctica (no entregada)',
+      RUNTIME_RECOVERY: 'Recuperación de runtime (infraestructura)',
+      REMEDIATION: 'Remediación',
+    },
     quarantineTitle: 'Cuarentena — por qué está cada estudiante',
     quarantineExplanation: 'Un REPROBADO es un resultado válido y es definitivo; el estándar nunca se rebaja. Los estudiantes detenidos solo por errores nuestros vuelven al examen automáticamente.',
     quarantineFinal: 'Resultados finales (no se graduaron)',
@@ -440,6 +465,17 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Contratado',
     workforceNone: 'Nenhum graduado contratado ainda.',
     workforceUnavailable: 'Quadro de pessoal ainda indisponível (migração pendente).',
+    workforceStagesExplanation: 'Onde cada graduado de plantão está agora. A formatura é contada uma vez; isto mostra o trabalho depois dela. Verificado em Produção exige um resultado de Produção governado sobre uma resposta real do graduado.',
+    workforceStageLabels: {
+      WORKFORCE_AVAILABLE: 'Disponível — sem trabalho ainda',
+      ASSIGNED: 'Atribuído',
+      WORKING: 'Trabalhando',
+      AWAITING_PRODUCTION_VERIFICATION: 'Respondeu — aguardando verificação',
+      PRODUCTION_VERIFIED: 'Verificado em Produção',
+      SHADOW_SERVED: 'Somente prática (não entregue)',
+      RUNTIME_RECOVERY: 'Recuperação de runtime (infraestrutura)',
+      REMEDIATION: 'Remediação',
+    },
     quarantineTitle: 'Quarentena — por que cada estudante está aqui',
     quarantineExplanation: 'Uma REPROVAÇÃO é um resultado válido e é definitiva; o padrão nunca é rebaixado. Estudantes retidos apenas por erros nossos voltam ao exame automaticamente.',
     quarantineFinal: 'Resultados finais (não se formaram)',
@@ -559,6 +595,17 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Zatrudniony',
     workforceNone: 'Brak zatrudnionych absolwentów.',
     workforceUnavailable: 'Lista zespołu jeszcze niedostępna (oczekuje migracja).',
+    workforceStagesExplanation: 'Gdzie teraz jest każdy absolwent w gotowości. Ukończenie liczy się raz; tu widać pracę po nim. Weryfikacja produkcyjna wymaga zarządzanego wyniku produkcyjnego dla prawdziwej odpowiedzi absolwenta.',
+    workforceStageLabels: {
+      WORKFORCE_AVAILABLE: 'Dostępny — brak pracy',
+      ASSIGNED: 'Przydzielony',
+      WORKING: 'Pracuje',
+      AWAITING_PRODUCTION_VERIFICATION: 'Odpowiedział — czeka na weryfikację',
+      PRODUCTION_VERIFIED: 'Zweryfikowany produkcyjnie',
+      SHADOW_SERVED: 'Tylko ćwiczenie (niedostarczone)',
+      RUNTIME_RECOVERY: 'Naprawa środowiska (infrastruktura)',
+      REMEDIATION: 'Remediacja',
+    },
     quarantineTitle: 'Kwarantanna — dlaczego każdy student tu jest',
     quarantineExplanation: 'NIEZALICZENIE jest ważnym wynikiem i jest ostateczne; standard nigdy nie jest obniżany. Studenci zatrzymani wyłącznie przez nasze błędy automatycznie wracają do egzaminu.',
     quarantineFinal: 'Wyniki ostateczne (bez dyplomu)',
@@ -678,6 +725,17 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     workforceHired: 'Нанят',
     workforceNone: 'Нанятых выпускников пока нет.',
     workforceUnavailable: 'Штат пока недоступен (ожидается миграция).',
+    workforceStagesExplanation: 'Где сейчас каждый выпускник на вызове. Выпуск считается один раз; здесь видна работа после него. Проверка в Production требует управляемого результата Production по реальному ответу выпускника.',
+    workforceStageLabels: {
+      WORKFORCE_AVAILABLE: 'Доступен — работы пока нет',
+      ASSIGNED: 'Назначен',
+      WORKING: 'Работает',
+      AWAITING_PRODUCTION_VERIFICATION: 'Ответил — ожидает проверки',
+      PRODUCTION_VERIFIED: 'Проверен в Production',
+      SHADOW_SERVED: 'Только практика (не доставлено)',
+      RUNTIME_RECOVERY: 'Восстановление среды (инфраструктура)',
+      REMEDIATION: 'Исправление',
+    },
     quarantineTitle: 'Карантин — почему здесь каждый студент',
     quarantineExplanation: 'НЕЗАЧЁТ — это действительный результат, и он окончателен; стандарт никогда не снижается. Студенты, задержанные только нашими ошибками, автоматически возвращаются к экзамену.',
     quarantineFinal: 'Окончательные результаты (без выпуска)',

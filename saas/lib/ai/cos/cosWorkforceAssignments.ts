@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto'
 import { after } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
+  decideAssignmentTerminal,
   decideWorkforceVerification,
   WORKFORCE_PRODUCTION_OUTCOME_NAMESPACE,
   type WorkforceTurnOutcome,
@@ -193,37 +194,87 @@ export async function verifyServedWorkforceAssignments(limit = WORKFORCE_VERIFIC
   return result
 }
 /**
- * ABANDONED WORK (owner 2026-10-02: 12 of 16 graduates shown WORKING). An assignment is set 'working' before the
- * graduate runtime is called and closed after it answers. If the process ends in between - Vercel kills the function
- * at maxDuration while a cold RunPod endpoint is still booting, or a row written before the 2026-10-02 empty-path fix -
- * the closing write never runs and the graduate shows WORKING forever, receiving no credit and no retry.
- * No graduate call can legitimately stay open longer than WORKFORCE_ASSIGNMENT_MAX_OPEN_MS (the longest runtime
- * timeout is 45s). Anything older never finished: close it as runtime_failed (infrastructure, never a competence
- * verdict). Only open shadow/assigned rows are touched; served/verified/remediation rows are never changed.
+ * TERMINAL RECONCILIATION (2026-10-02). An assignment is opened 'working' before the graduate is called and closed after.
+ * Production trace: of 39 assignments that never got a terminal state, 38 had the call's real result in the
+ * serving-attempt log - the closing write had been rejected by the old status rule and the rejection ignored. So the
+ * terminal state is derived from that log (decideAssignmentTerminal): a recorded success closes 'served', a recorded
+ * failure closes 'runtime_failed' with its real reason. Only a call with no result past WORKFORCE_ASSIGNMENT_MAX_OPEN_MS
+ * (longest runtime timeout is 45s) closes as process_ended_mid_call / no_serving_record. Rows previously closed
+ * blindly as 'no_terminal_recorded' are re-derived the same way. Served/verified/remediation rows are never touched.
  */
 export const WORKFORCE_ASSIGNMENT_MAX_OPEN_MS = 10 * 60_000
+export const WORKFORCE_RECONCILE_BATCH = 200
+const LEGACY_BLIND_CLOSE_REASON = 'no_terminal_recorded'
 
 export async function closeAbandonedWorkforceAssignments(now = new Date()) {
   const db = cosServiceDb()
   if (!db) return Object.freeze({ ok: false as const, error: 'cos_service_db_unavailable', closed: 0 })
-  const cutoff = new Date(now.getTime() - WORKFORCE_ASSIGNMENT_MAX_OPEN_MS).toISOString()
-  const closedAt = now.toISOString()
-  // started_at is set when the runtime call begins; an 'assigned' row may have none, so fall back to assigned_at.
-  const started = await db.from('cos_workforce_assignments')
-    .update({ status: 'runtime_failed', failure_reason: 'no_terminal_recorded', completed_at: closedAt, updated_at: closedAt })
-    .in('status', ['assigned', 'working'])
-    .lt('started_at', cutoff)
-    .select('id')
-  if (started.error) return Object.freeze({ ok: false as const, error: 'abandoned_close_failed', closed: 0 })
-  const neverStarted = await db.from('cos_workforce_assignments')
-    .update({ status: 'runtime_failed', failure_reason: 'no_terminal_recorded', completed_at: closedAt, updated_at: closedAt })
-    .in('status', ['assigned', 'working'])
-    .is('started_at', null)
-    .lt('assigned_at', cutoff)
-    .select('id')
-  if (neverStarted.error) return Object.freeze({ ok: false as const, error: 'abandoned_close_failed', closed: (started.data || []).length })
-  const closed = (started.data || []).length + (neverStarted.data || []).length
-  if (closed) console.warn('[cos-workforce-abandoned]', JSON.stringify({ closed, cutoff }))
-  return Object.freeze({ ok: true as const, closed, authorityExpanded: false as const })
+  const [open, legacy] = await Promise.all([
+    db.from('cos_workforce_assignments')
+      .select('id,status,serving_attempt_id,assigned_at,started_at')
+      .in('status', ['assigned', 'working'])
+      .order('assigned_at', { ascending: true })
+      .limit(WORKFORCE_RECONCILE_BATCH),
+    db.from('cos_workforce_assignments')
+      .select('id,status,serving_attempt_id,assigned_at,started_at')
+      .eq('status', 'runtime_failed')
+      .eq('failure_reason', LEGACY_BLIND_CLOSE_REASON)
+      .limit(WORKFORCE_RECONCILE_BATCH),
+  ])
+  if (open.error || legacy.error) return Object.freeze({ ok: false as const, error: 'assignments_unreadable', closed: 0 })
+  const rows = [...(open.data || []), ...(legacy.data || [])] as Array<{
+    id: string; status: string; serving_attempt_id: string | null; assigned_at: string | null; started_at: string | null
+  }>
+  if (!rows.length) return Object.freeze({ ok: true as const, closed: 0, served: 0, failures: Object.freeze([] as string[]), authorityExpanded: false as const })
+
+  const attemptIds = [...new Set(rows.map(row => clean(row.serving_attempt_id, 80)).filter(id => UUID.test(id)))]
+  const evidence = attemptIds.length
+    ? await db.from('cos_university_graduate_serving_attempts')
+      .select('attempt_id,phase,outcome,error_class,latency_ms')
+      .in('attempt_id', attemptIds)
+    : { data: [], error: null } as any
+  if (evidence.error) return Object.freeze({ ok: false as const, error: 'serving_attempts_unreadable', closed: 0 })
+  const byAttempt = new Map<string, any[]>()
+  for (const row of evidence.data || []) {
+    const id = clean((row as any).attempt_id, 80)
+    if (!byAttempt.has(id)) byAttempt.set(id, [])
+    byAttempt.get(id)!.push(row)
+  }
+
+  const nowMs = now.getTime()
+  const at = now.toISOString()
+  let closed = 0
+  let served = 0
+  const failures: string[] = []
+  for (const row of rows) {
+    const decision = decideAssignmentTerminal({
+      evidence: byAttempt.get(clean(row.serving_attempt_id, 80)) || [],
+      openedAtMs: Date.parse(String(row.started_at || row.assigned_at || '')),
+      nowMs,
+      maxOpenMs: WORKFORCE_ASSIGNMENT_MAX_OPEN_MS,
+    })
+    if (!decision.close) continue
+    // A legacy blind close with no better evidence keeps its row unchanged rather than churning.
+    if (row.status === 'runtime_failed' && decision.status === 'runtime_failed'
+      && (decision.failureReason === 'process_ended_mid_call' || decision.failureReason === 'no_serving_record')) continue
+    const update = await db.from('cos_workforce_assignments')
+      .update({
+        status: decision.status,
+        failure_reason: decision.failureReason,
+        // A re-derived legacy close keeps its original completion time: the runtime circuit breaker counts recent
+        // completions, and re-stamping old failures as "now" would block every graduate for an hour.
+        ...(row.status === 'runtime_failed' ? {} : { completed_at: at }),
+        updated_at: at,
+        ...(decision.status === 'served' ? { outcome_evidence_hash: sha256({ attemptId: row.serving_attempt_id, reconciled: true }) } : {}),
+      })
+      .eq('id', row.id)
+      .eq('status', row.status)
+    if (update.error) { failures.push(`${row.id}:${clean(update.error.message, 120)}`); continue }
+    closed += 1
+    if (decision.status === 'served') served += 1
+  }
+  const result = Object.freeze({ ok: failures.length === 0, closed, served, failures: Object.freeze(failures.slice(0, 10)), authorityExpanded: false as const })
+  if (closed || failures.length) console.warn('[cos-workforce-terminal-reconcile]', JSON.stringify(result))
+  return result
 }
 // end of saas/lib/ai/cos/cosWorkforceAssignments.ts (if this line is missing, the paste was cut short)

@@ -305,6 +305,10 @@ export default function CosUniversityTelemetryPage() {
   const residency = data?.residency || []
   const pipeline = data?.pipeline || {}
   const workforce = data?.workforce || {}
+  // Graduates not yet in the Workforce. If the roster is unreadable, fall back to all active graduates.
+  const graduatedAwaitingHire = workforce.available === false
+    ? (pipeline.activeGraduates ?? 0)
+    : Math.max(0, (pipeline.activeGraduates ?? 0) - (workforce.onCall ?? 0))
   const quarantine = data?.quarantine || {}
   const quarantineReasons = quarantine.byReason || {}
   const quarantineReturned = quarantine.returnedToExam || {}
@@ -519,7 +523,9 @@ export default function CosUniversityTelemetryPage() {
           <Card label="CS Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
           <Card label="Evaluation pending — both branches" value={String(pipeline.evaluationPending ?? 0)} />
           <Card label={copy.pipelinePassedGraduating} value={String(artifacts.filter(artifact => artifact.status === 'runtime_pending').length)} />
-          <Card label={copy.pipelineGraduated} value={String(pipeline.activeGraduates ?? workforce.onCall ?? 0)} />
+          {/* Owner 2026-09-29: graduates LEAVE the University when hired into the Workforce. This card counts only
+              graduates still waiting to be hired; hired graduates are shown in the Workforce section below. */}
+          <Card label={copy.pipelineGraduated} value={String(graduatedAwaitingHire)} />
           <Card label={copy.pipelineResidencyFailed} value={String(pipeline.residencyFailed ?? 0)} />
           <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
         </div>

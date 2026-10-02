@@ -195,3 +195,11 @@ test('corrective mass batches preserve five independent non-failure holdout sour
   assert.match(migration, />= 5/)
   assert.match(migration, /set status = 'quarantined'/)
 })
+
+
+test('open-source maintenance uses the owner throughput profile instead of starving real-source diversity', () => {
+  assert.match(workflow, /maxSubjects: Math\.max\(6, throughput\.targetSubjectsPerReplenishment\)/)
+  assert.match(workflow, /queriesPerSubject: throughput\.queriesPerSubject/)
+  assert.match(workflow, /maxCandidatesPerCycle: throughput\.acquisitionCandidatesPerCycle/)
+  assert.doesNotMatch(workflow, /queriesPerSubject: 1,[\s\S]{0,120}maxCandidatesPerCycle: Math\.min\(20/)
+})

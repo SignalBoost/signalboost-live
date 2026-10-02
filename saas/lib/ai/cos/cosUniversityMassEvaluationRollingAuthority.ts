@@ -51,6 +51,10 @@ export const MASS_EVALUATION_REMEDIATION_REPLAY_MIN_EPOCHS = 3
 export const MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE = 5e-5
 export const MASS_EVALUATION_BUILDER_V2_OPTIMIZER = 'frontier_response_anchor_then_stable_on_policy_distillation' as const
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
+// Owner lifecycle rule: infrastructure may retry, but it may not park a student in Evaluation forever.
+// After this many evaluator-infrastructure failures in one evaluation generation, route the artifact through
+// governed quarantine/remediation as OUR failure. A reopen starts a fresh generation and resets this counter.
+export const MASS_EVALUATION_MAX_INFRASTRUCTURE_FAILURES_PER_GENERATION = 12
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
 // resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case
 // (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
@@ -338,6 +342,7 @@ type ArtifactHistory = Readonly<{
   hasVerdict: boolean
   liveStart: boolean
   substantiveFailures: number
+  infrastructureFailures: number
   lastError: string
 }>
 
@@ -378,12 +383,17 @@ function artifactHistory(artifact: RollingArtifact, events: readonly RollingEven
     && at(event.observedAt) >= firstRolling
     && !evaluatorInfrastructureFailure(event)).length
 
+  const infrastructureFailures = firstRolling === undefined ? 0 : mine.filter(event => inCurrentGeneration(event)
+    && event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+    && at(event.observedAt) >= firstRolling
+    && evaluatorInfrastructureFailure(event)).length
+
   const lastError = mine
     .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed')
     .sort((a, b) => at(b.observedAt) - at(a.observedAt))
     .map(event => String(event.evidence?.error || '').trim())[0] || ''
 
-  return Object.freeze({ mine, inCurrentGeneration, hasVerdict, liveStart, substantiveFailures, lastError })
+  return Object.freeze({ mine, inCurrentGeneration, hasVerdict, liveStart, substantiveFailures, infrastructureFailures, lastError })
 }
 
 export type ExhaustedMassEvaluationArtifact = Readonly<{
@@ -429,6 +439,30 @@ export function decideExhaustedMassEvaluationArtifacts(input: {
     }))
   }
   return Object.freeze(exhausted)
+}
+
+export function decideInfrastructureStalledMassEvaluationArtifacts(input: {
+  artifacts: readonly RollingArtifact[]
+  events: readonly RollingEvent[]
+  now: Date
+}): readonly ExhaustedMassEvaluationArtifact[] {
+  const nowMs = input.now.getTime()
+  const stalled: ExhaustedMassEvaluationArtifact[] = []
+  for (const artifact of input.artifacts) {
+    if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
+    const history = artifactHistory(artifact, input.events, nowMs)
+    if (history.hasVerdict || history.liveStart) continue
+    if (history.infrastructureFailures < MASS_EVALUATION_MAX_INFRASTRUCTURE_FAILURES_PER_GENERATION) continue
+    stalled.push(Object.freeze({
+      candidateId: artifact.candidateId,
+      subjectId: artifact.subjectId,
+      artifactHash: artifact.artifactHash.toLowerCase(),
+      reason: MASS_EVALUATION_EXHAUSTED_REASON,
+      failedAttempts: history.infrastructureFailures,
+      lastError: history.lastError.slice(0, 500),
+    }))
+  }
+  return Object.freeze(stalled)
 }
 
 export type WronglyExhaustedMassEvaluationArtifact = Readonly<{

@@ -2549,3 +2549,21 @@ iTMounts uses one metadata-only correlation contract for AI-agent execution evid
 - Observability does not expand execution authority. SHS may diagnose/remediate only through its existing governed capabilities, approval boundaries, and signed continuations.
 - Evaluation and remediation must remain distinguishable: a failed evaluator result is evidence; an SHS repair is a separate trace span/event; verification is a subsequent outcome.
 - Completion claims require traceable production evidence, not merely successful code deployment.
+
+
+## iTMounts AI artifact permanent identity and birth-certificate direction — 2026-10-01
+
+Every University-created AI artifact must receive a durable identity at creation, before training/evaluation/graduation can make it commercially or operationally meaningful. This is a current provenance requirement; the broader portable AI-passport/certification concept below is a future product/standards direction.
+
+Current invariant:
+
+- **Permanent artifact identity at birth.** Creation assigns an immutable iTMounts artifact ID plus the cryptographic fingerprint of the exact born artifact. A database row ID, candidate ID, graduate registry ID, model/provider ID, or mutable display name is not a substitute for the permanent artifact identity.
+- **Birth certificate.** The first immutable provenance record binds the permanent artifact ID to creation time, creator/issuing system, training/build run where applicable, parent/base lineage, exact artifact hash, governed environment/revision references, and signed/hashed evidence sufficient to establish origin without persisting secrets, raw prompts, private chain-of-thought, or unnecessary customer data.
+- **Identity is not version.** The permanent AI/artifact identity survives custody/ownership changes. Materially changed or retrained artifacts receive a new exact artifact fingerprint and, when they constitute a descendant artifact, a new artifact identity linked to the parent. Running copies may additionally receive instance IDs.
+- **No anonymous lifecycle.** Evaluation, graduation, activation, serving, verified outcomes, health/drift, remediation, retraining, rollback, transfer/custody, and retirement evidence must remain attributable to the permanent artifact identity and exact artifact fingerprint involved.
+- **Existing artifacts require provenance-preserving backfill.** Historical artifacts may receive permanent IDs from authoritative existing records, with an explicit backfill/legacy issuance marker. Never invent missing creation facts or fabricate historical Production performance.
+- **Transfer never rewrites origin.** Future sale, license, gift, custody change, or deployment by another organization may append signed custody/transfer records but must not rewrite creator, birth provenance, lineage, or historical evidence.
+
+Future iTMounts direction (not a claim of a universal standard today): develop a portable **AI identity/passport** concept analogous to a VIN plus birth certificate, provenance/lineage record, CV/education and certification record, chain of custody, Production/incident/remediation history, and independently verifiable cryptographic credentials. iTMounts may later define a branded/certification-mark program around demonstrated standards and performance. Identity and certification remain separate: an artifact keeps its identity even after failure or certification suspension. The identity/provenance layer records facts and evidence; transaction, policy, regulatory, or trust decisions belong to the relying party.
+
+The long-term portability goal is that an authorized recipient can verify who/what created an AI artifact, its origin and lineage, which exact version is presented, its historical credentials and operational record, and custody changes without trusting an AI's self-reported memory or requiring disclosure of proprietary weights, secrets, or customer content. Stripping the passport must not create a clean identity; it makes provenance unverifiable.

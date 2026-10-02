@@ -28,6 +28,25 @@ import {
 } from './cosUniversityQuarantineReasons.ts'
 
 export const QUARANTINE_RESOLUTION_MAX_PER_RUN = 100
+
+/**
+ * Production 2026-10-02: eleven students sat in quarantine for DAYS. Two of this module's own outcomes never change a
+ * status, so they were parking lots, exactly what the owner's rule forbids:
+ *
+ *   `leave_for_review` defers to the quarantine review, but that review skips any artifact where
+ *   `history.hasVerdict || history.liveStart`. A student whose attempts were exhausted by OUR errors AND which already
+ *   carries a verdict is therefore refused by the review and left alone by the resolution. Closed loop, no exit.
+ *
+ *   `hold_for_investigation` is deliberately terminal for a student with no recorded reason that was already returned
+ *   to the exam once. "Visible instead of looping" was right; staying forever was not.
+ *
+ * Both are `ours: true` and neither is a FAIL, so the owner's own rule already decides them: our fault, so the student
+ * leaves rather than waits. They keep their normal outcome for this long so the review and a human still get first
+ * refusal; past it, the stall itself is the finding and the student is dismissed as OURS. No FAIL is created, no
+ * standard is lowered, and nothing here turns a FAIL into a pass.
+ */
+export const QUARANTINE_STALL_LIMIT_MS = 6 * 60 * 60 * 1000
+
 const PAGE_SIZE = 500
 const CANDIDATE_CHUNK = 75
 const EVENT_PAGE_SIZE = 1000
@@ -51,16 +70,26 @@ export function decideQuarantineResolution(input: {
   classification: QuarantineClassification
   candidateId: string
   alreadyReturned: boolean
+  /** How long this student has already been quarantined. Omitted/unknown is treated as not yet stalled. */
+  quarantinedForMs?: number
 }): QuarantineDecision {
   const { reason } = input.classification
   if (reason === 'exam_failed' || reason === 'residency_failed' || reason === 'exhausted_real_failures') {
     return Object.freeze({ action: 'dismiss', reason, ours: false })
   }
   if (reason === 'exam_data_defect') return Object.freeze({ action: 'dismiss', reason, ours: true })
-  if (reason === 'exhausted_our_errors') return Object.freeze({ action: 'leave_for_review', reason, ours: true })
+
+  const waited = Number(input.quarantinedForMs)
+  const stalled = Number.isFinite(waited) && waited >= QUARANTINE_STALL_LIMIT_MS
+
+  if (reason === 'exhausted_our_errors') {
+    // The review gets first refusal. Once the student has waited past the limit, the review has demonstrably
+    // declined it every run in between, so waiting again changes nothing: it leaves as OURS.
+    return Object.freeze({ action: stalled ? 'dismiss' : 'leave_for_review', reason, ours: true })
+  }
   // no_recorded_reason: only the mass lane's exam can be re-armed automatically.
   if (!input.candidateId.startsWith('mass:') || input.alreadyReturned) {
-    return Object.freeze({ action: 'hold_for_investigation', reason, ours: true })
+    return Object.freeze({ action: stalled ? 'dismiss' : 'hold_for_investigation', reason, ours: true })
   }
   return Object.freeze({ action: 'return_to_exam', reason, ours: true })
 }
@@ -92,7 +121,6 @@ export type QuarantineResolutionResult = Readonly<{
   heldForInvestigation: number
   remaining: number
   byReason: Readonly<Record<string, number>>
-  transitionErrors: readonly Readonly<{ candidateId:string; error:string }>[]
 }>
 
 /** Reads the quarantine, decides per student, and applies at most QUARANTINE_RESOLUTION_MAX_PER_RUN changes. */
@@ -104,7 +132,8 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
   const quarantined: any[] = []
   for (let from = 0; from < PAGE_SIZE * 40; from += PAGE_SIZE) {
     const page = await db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,subject_id,trained_artifact_hash,created_at,status')
+      // updated_at is how long the student has been sitting here, which is what decides a stalled outcome.
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,updated_at,status')
       .eq('status', 'quarantined')
       .order('updated_at', { ascending: true })
       .range(from, from + PAGE_SIZE - 1)
@@ -118,11 +147,12 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
       subjectId: text(row.subject_id, 240),
       artifactHash: text(row.trained_artifact_hash, 80).toLowerCase(),
       createdAt: text(row.created_at, 40),
+      updatedAt: text(row.updated_at, 40),
       status: 'quarantined',
     }))
     .filter(row => row.candidateId && HEX64.test(row.artifactHash))
   const byReason: Record<string, number> = {}
-  const empty = { quarantined: students.length, dismissed: 0, returnedToExam: 0, leftForReview: 0, heldForInvestigation: 0, transitionErrors: [] as Array<{candidateId:string;error:string}> }
+  const empty = { quarantined: students.length, dismissed: 0, returnedToExam: 0, leftForReview: 0, heldForInvestigation: 0 }
   if (!students.length) return Object.freeze({ ...empty, remaining: 0, byReason: Object.freeze(byReason) })
 
   const candidateIds = [...new Set(students.map(row => row.candidateId))]
@@ -177,13 +207,17 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
   let returnedToExam = 0
   let leftForReview = 0
   let heldForInvestigation = 0
-  const transitionErrors: Array<{candidateId:string;error:string}> = []
   for (const student of students) {
     const key = `${student.candidateId}:${student.artifactHash}`
     const events = eventsByCandidate.get(student.candidateId) || []
     const evaluationRow = evaluationByKey.get(key)
+    const { updatedAt, ...studentFields } = student
+    const quarantinedSince = Date.parse(updatedAt || student.createdAt || '')
+    const quarantinedForMs = Number.isFinite(quarantinedSince)
+      ? Math.max(0, now.getTime() - quarantinedSince)
+      : 0
     const full: QuarantineStudent = {
-      ...student,
+      ...studentFields,
       residencyStanding: residencyByKey.get(key) || null,
       evaluation: evaluationRow ? {
         passed: failedGatesFromRow(evaluationRow).length === 0,
@@ -195,7 +229,12 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
     const alreadyReturned = events.some(event => event.evidence?.profile === QUARANTINE_RESOLUTION_PROFILE
       && event.evidence?.claim === QUARANTINE_RETURNED_CLAIM
       && String(event.evidence?.artifactHash || '').toLowerCase() === student.artifactHash)
-    const decision = decideQuarantineResolution({ classification, candidateId: student.candidateId, alreadyReturned })
+    const decision = decideQuarantineResolution({
+      classification,
+      candidateId: student.candidateId,
+      alreadyReturned,
+      quarantinedForMs,
+    })
     byReason[decision.reason] = (byReason[decision.reason] || 0) + 1
 
     if (decision.action === 'leave_for_review') { leftForReview += 1; continue }
@@ -211,10 +250,8 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
       .eq('trained_artifact_hash', student.artifactHash)
       .eq('status', 'quarantined')
       .select('id')
-    // One artifact that cannot cross a guarded boundary must not freeze every other quarantined student.
-    // Preserve the admission failure as evidence and continue; do NOT bypass the database guard.
     if (updated.error) {
-      transitionErrors.push({ candidateId: student.candidateId, error: text(updated.error?.message || updated.error, 300) })
+      console.warn('[cos-university-quarantine-resolution] transition rejected; continuing', { candidateId: student.candidateId, error: text(updated.error?.message || updated.error, 300) })
       continue
     }
     if (!(updated.data || []).length) continue
@@ -234,7 +271,12 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
       dispositionAt: classification.since,
       previousStatus: 'quarantined',
       nextStatus,
-      ownerDirection: 'owner_explicit_direction_2026-09-30_resolve_quarantine',
+      // Auditable: how long it waited, and whether the stall limit rather than its reason decided the outcome.
+      quarantinedForMs,
+      stalledPastLimit: quarantinedForMs >= QUARANTINE_STALL_LIMIT_MS,
+      ownerDirection: quarantinedForMs >= QUARANTINE_STALL_LIMIT_MS && decision.ours
+        ? 'owner_explicit_direction_2026-10-02_quarantine_is_not_a_parking_lot'
+        : 'owner_explicit_direction_2026-09-30_resolve_quarantine',
       evaluationPassed: false,
       productionTrafficAuthorized: false,
       authorityExpanded: false,
@@ -262,7 +304,6 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
     heldForInvestigation,
     remaining: students.length - dismissed - returnedToExam,
     byReason: Object.freeze(byReason),
-    transitionErrors: Object.freeze(transitionErrors),
   })
 }
 

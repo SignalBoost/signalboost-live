@@ -4,7 +4,7 @@ import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityPro
 import { servedCandidateModelFromCanary, type CanaryEventRow } from '@/lib/ai/cos/cosUniversityMassEvaluationServedModel'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduateModelRegistry'
-import { decideMassGraduateRegistration, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
+import { decideMassGraduateRegistration, type MassGraduateArtifact, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
 import { decideGraduateArtifactLifecycleSync } from '@/lib/ai/cos/cosUniversityGraduateArtifactSync'
 import { GRADUATE_ROLLBACK_PROOF_CLAIM, GRADUATE_ROLLBACK_PROOF_PROFILE, proveGraduateRollbackReference } from '@/lib/ai/cos/cosUniversityGraduateRollbackProof'
 import { COS_UNIVERSITY_SUBJECTS } from '@/lib/ai/cos/cosUniversity'

@@ -1,7 +1,9 @@
+// saas/app/api/cron/cos-workforce-pipeline/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { drainGraduateServingEvidence } from '@/lib/ai/cos/graduateServingAttempts'
 import { runWorkforceApprenticeShadow } from '@/lib/ai/cos/cosReasoningWorkers'
+import { verifyServedWorkforceAssignments } from '@/lib/ai/cos/cosWorkforceAssignments'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -18,6 +20,12 @@ async function run(req: NextRequest) {
   if (!db) return NextResponse.json({ ok: false, error: 'cos_service_db_unavailable' }, { status: 503 })
 
   const evidence = await drainGraduateServingEvidence(200)
+  // WORKING -> PRODUCTION_VERIFIED / REMEDIATION: close delivered Production work against its governed outcome and
+  // write the result to the graduate's permanent lifecycle ledger (the résumé is derived from it).
+  const verification = await verifyServedWorkforceAssignments().catch(error => ({
+    ok: false as const,
+    error: error instanceof Error ? error.message.slice(0, 160) : 'workforce_verification_failed',
+  }))
   const pipeline = await db.from('cos_workforce_post_graduation_pipeline')
     .select('registry_id,ai_id,subject_id,graduated_at,activated_at,hired_at,workforce_status,first_attempt_at,last_attempt_at,serving_attempts,successful_attempts,failed_attempts,fallback_attempts,verified_outcomes,remediation_events,pipeline_stage')
     .eq('workforce_status', 'on_call')
@@ -57,7 +65,7 @@ async function run(req: NextRequest) {
         await runWorkforceApprenticeShadow({
           prompt: objective,
           maxTokens: 512,
-          timeoutMs: 45_000,
+          timeoutMs: 15_000,
           usageContext: { feature: 'cos_workforce_recovery', purpose: 'genuine_production_replay', correlationId: `workforce-recovery:${row.id}` },
         }, objective)
         recoveryAttempts += 1
@@ -67,7 +75,7 @@ async function run(req: NextRequest) {
     }
   }
   return NextResponse.json({
-    ok: evidence.blocked === 0,
+    ok: evidence.blocked === 0 && verification.ok === true,
     at: new Date().toISOString(),
     workforce: workers.length,
     stages: workers.reduce<Record<string, number>>((acc, row) => {
@@ -75,6 +83,7 @@ async function run(req: NextRequest) {
       acc[key] = (acc[key] || 0) + 1
       return acc
     }, {}),
+    verification,
     selfHealing: {
       evidenceDelivered: evidence.delivered,
       evidenceBlocked: evidence.blocked,
@@ -88,3 +97,4 @@ async function run(req: NextRequest) {
 
 export async function GET(req: NextRequest) { return run(req) }
 export async function POST(req: NextRequest) { return run(req) }
+// end of saas/app/api/cron/cos-workforce-pipeline/route.ts (if this line is missing, the paste was cut short)

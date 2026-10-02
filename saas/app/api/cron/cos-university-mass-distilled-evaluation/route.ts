@@ -1,4 +1,3 @@
-// saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
 import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
 import { isTerminalHoldoutDataDefect } from '@/lib/ai/cos/cosUniversityMassEvaluationTerminalDefect'
@@ -52,7 +51,12 @@ const ROUTE_RESERVE_MS = 25_000
 const RUNTIME_WAKE_TIMEOUT_MS = 15_000
 const MIN_BALANCE_USD = 1
 // How many of the approval policy's next picks get their Holdout exam questions prepared ahead of time.
-const HOLDOUT_EXAM_LOOKAHEAD = 6
+// Production 2026-09-29 22:37-22:56 UTC: the lane reported no_mass_artifact_with_holdout_exam_ready while 6 of 44
+// eligible artifacts already held a finished exam. The lane picks candidates createdAt ASCENDING (oldest first) and
+// the exam writer fills sets updated_at DESCENDING (newest first), so the artifacts the lane looks at are
+// systematically the least likely to have an exam yet and the overlap can be empty for hours. Widening the window is
+// scheduling only: the same gates, the same one approval per tick, the same in-flight ceiling.
+const HOLDOUT_EXAM_LOOKAHEAD = 24
 const ROLLING_EVENT_PAGE_SIZE = 1000
 const ROLLING_EVENT_MAX_PAGES = 10
 const ROLLING_CANDIDATE_CHUNK_SIZE = 75

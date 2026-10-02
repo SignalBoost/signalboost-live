@@ -632,6 +632,20 @@ const tests = [
 
   'tests/universityQuarantineResolution.node.test.ts',
 
+  // 2026-10-02: the anti-stall pipeline repairs. All five of these were gated once and the entries were lost in a
+  // later merge while the test files stayed, which is how main ended up carrying a RED quarantineStallDrain against
+  // the shipped loop fix with nothing in CI to catch it.
+  //  - evaluation lane picks oldest-first while the exam writer fills newest-first (lookahead 24, writer 10)
+  //  - quarantine resolution had two outcomes that never changed a status, and its stall clock could be rewound by
+  //    the quarantine -> exam -> quarantine lap
+  //  - registration read all candidates' evidence in one newest-first 3000-row query while walking oldest-first
+  //  - an artifact waiting to graduate had its proven canary endpoint unprotected from reclaim
+  'tests/holdoutExamReadyThroughput.node.test.ts',
+  'tests/quarantineStallDrain.node.test.ts',
+  'tests/massGraduateRegistrationStarvation.node.test.ts',
+  'tests/cosUniversityMassGraduateRegistration.node.test.ts',
+  'tests/pendingGraduateEndpointProtection.node.test.ts',
+
   // 2026-09-30 owner direction "remove them": paused XSA students leave as OUR failure, never a FAIL.
 
   'tests/universityXsaRemoval.node.test.ts',

@@ -50,6 +50,20 @@ export function graduateServingErrorOutcome(error: unknown, timeoutMs?: number, 
   return classifyError(error, timeoutMs, latencyMs)
 }
 
+async function enqueueGraduateServingEvidence(input: GraduateServingAttemptInput): Promise<void> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('cos_service_db_unavailable')
+  const eventKey = `serving:${clean(input.attemptId, 80)}:${input.phase}`
+  const result = await db.from('cos_workforce_evidence_outbox').upsert({
+    event_key: eventKey,
+    event_kind: 'serving_attempt',
+    payload: input,
+    status: 'pending',
+    next_attempt_at: new Date().toISOString(),
+  }, { onConflict: 'event_key', ignoreDuplicates: true })
+  if (result.error) throw result.error
+}
+
 async function persistGraduateServingAttempt(input: GraduateServingAttemptInput): Promise<void> {
   try {
     const db = cosServiceDb()
@@ -108,14 +122,75 @@ async function persistGraduateServingAttempt(input: GraduateServingAttemptInput)
       if (lifecycle.error) throw lifecycle.error
     }
   } catch (error) {
-    console.warn('[cos-graduate-serving-attempt] persistence failed (non-fatal):', error instanceof Error ? error.message : String(error))
+    throw error
   }
 }
 
 export function recordGraduateServingAttempt(input: GraduateServingAttemptInput): void {
-  try {
-    after(() => persistGraduateServingAttempt(input))
-  } catch {
-    void persistGraduateServingAttempt(input)
+  const persist = async () => {
+    // Evidence enters a durable outbox before best-effort immediate materialization. The Workforce
+    // recovery cron drains pending rows, so a transient lifecycle/table failure cannot silently erase work history.
+    let queued = false
+    for (let attempt = 0; attempt < 3 && !queued; attempt += 1) {
+      try {
+        await enqueueGraduateServingEvidence(input)
+        queued = true
+      } catch (error) {
+        if (attempt === 2) console.error('[cos-workforce-evidence] outbox enqueue failed after retries:', error instanceof Error ? error.message : String(error))
+        else await new Promise(resolve => setTimeout(resolve, 50 * (attempt + 1)))
+      }
+    }
+    if (queued) {
+      try {
+        await persistGraduateServingAttempt(input)
+      } catch (error) {
+        // The outbox is authoritative; the recovery cron will retry without blocking the user-facing answer.
+        console.warn('[cos-graduate-serving-attempt] immediate materialization deferred to outbox:', error instanceof Error ? error.message : String(error))
+      }
+    }
   }
+  try {
+    after(persist)
+  } catch {
+    void persist()
+  }
+}
+
+/** Governed outbox drain used by the Workforce recovery cron. Idempotent by event_key. */
+export async function drainGraduateServingEvidence(limit = 100): Promise<{ delivered: number; blocked: number }> {
+  const db = cosServiceDb()
+  if (!db) return { delivered: 0, blocked: 0 }
+  const rows = await db.from('cos_workforce_evidence_outbox')
+    .select('id,payload,attempts')
+    .eq('event_kind', 'serving_attempt')
+    .in('status', ['pending','processing'])
+    .lte('next_attempt_at', new Date().toISOString())
+    .order('created_at', { ascending: true })
+    .limit(Math.max(1, Math.min(limit, 500)))
+  if (rows.error) throw rows.error
+  let delivered = 0
+  let blocked = 0
+  for (const raw of rows.data || []) {
+    const row = raw as { id: string; payload: GraduateServingAttemptInput; attempts?: number }
+    const attempts = Math.max(0, Number(row.attempts) || 0) + 1
+    try {
+      await persistGraduateServingAttempt(row.payload)
+      const done = await db.from('cos_workforce_evidence_outbox').update({
+        status: 'delivered', attempts, delivered_at: new Date().toISOString(), last_error: null,
+      }).eq('id', row.id)
+      if (done.error) throw done.error
+      delivered += 1
+    } catch (error) {
+      const terminal = attempts >= 12
+      const retryAt = new Date(Date.now() + Math.min(60 * 60_000, 2 ** Math.min(attempts, 10) * 1_000)).toISOString()
+      await db.from('cos_workforce_evidence_outbox').update({
+        status: terminal ? 'blocked' : 'pending',
+        attempts,
+        next_attempt_at: retryAt,
+        last_error: clean(error instanceof Error ? error.message : String(error), 1000),
+      }).eq('id', row.id)
+      if (terminal) blocked += 1
+    }
+  }
+  return { delivered, blocked }
 }

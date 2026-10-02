@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityQuarantineResolution.ts
 // Owner direction 2026-09-30: "what is the reason of quarantine forever ... if they are there because of our
 // infrastructure fix it - if because they are incompetent delete them." Quarantine is a short stop, not a place to live.
 // Every 15 minutes (the backlog-compact cron, right after the quarantine review) each quarantined student gets the
@@ -78,6 +79,10 @@ export function decideQuarantineResolution(input: {
     return Object.freeze({ action: 'dismiss', reason, ours: false })
   }
   if (reason === 'exam_data_defect') return Object.freeze({ action: 'dismiss', reason, ours: true })
+
+  // One governed retry is the investigation. If the same artifact returns to quarantine again, do not
+  // wait on updated_at: the quarantine -> exam -> quarantine lap rewinds that clock and would park it forever.
+  if (input.alreadyReturned) return Object.freeze({ action: 'dismiss', reason, ours: true })
 
   const waited = Number(input.quarantinedForMs)
   const stalled = Number.isFinite(waited) && waited >= QUARANTINE_STALL_LIMIT_MS

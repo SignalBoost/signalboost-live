@@ -144,7 +144,7 @@ type Telemetry = {
   runs?: Run[]
   artifacts?: Artifact[]
   residency?: Residency[]
-  pipeline?: { residencyTotal?:number; residencyResidents?:number; residencyRemediation?:number; residencyComplete?:number; residencyFailed?:number; activeGraduates?:number; evaluationPending?:number; quarantined?:number }
+  pipeline?: { residencyTotal?:number; residencyResidents?:number; residencyRemediation?:number; residencyComplete?:number; residencyFailed?:number; activeGraduates?:number; evaluationReady?:number; evaluationPending?:number; quarantined?:number }
   workforce?: { available?:boolean; onCall?:number; retired?:number; stagesAvailable?:boolean; stages?:Record<string, number>; workers?:Array<{ candidateId:string; specialty:string; jobRoles:string[]; hiredAt:string|null; stage?:string|null }> }
   quarantine?: {
     total?:number; finalResults?:number; pendingCorrection?:number
@@ -517,10 +517,11 @@ export default function CosUniversityTelemetryPage() {
           <div className="mt-3 font-medium">Shared downstream path</div>
           <div className="mt-1 opacity-70">Evaluation PASS → runtime verification → Graduation → Workforce</div>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-9">
           <Card label="CS Residency residents" value={String(pipeline.residencyResidents ?? 0)} />
           <Card label="CS Residency remediation" value={String(pipeline.residencyRemediation ?? 0)} />
           <Card label="CS Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
+          <Card label="Evaluation ready — exact canary" value={String(pipeline.evaluationReady ?? 0)} />
           <Card label="Evaluation pending — both branches" value={String(pipeline.evaluationPending ?? 0)} />
           <Card label={copy.pipelinePassedGraduating} value={String(artifacts.filter(artifact => artifact.status === 'runtime_pending').length)} />
           {/* Owner 2026-09-29: graduates LEAVE the University when hired into the Workforce. This card counts only

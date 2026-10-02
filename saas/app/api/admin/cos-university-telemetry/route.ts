@@ -716,6 +716,8 @@ export async function GET() {
       else if (residencyState && residencyState.standing !== 'residency_complete') { currentStage = 'Builder Residency'; blocker = residencyState.standing; nextAction = residencyState.standing === 'remediation_required' ? 'Run remediation case' : 'Continue competency cases' }
       else if (residencyState?.standing === 'residency_complete') { currentStage = 'Exact canary'; blocker = canary ? 'none' : 'fresh_exact_canary_required'; nextAction = canary ? 'Run independent final evaluation' : 'Run fresh exact-artifact canary' }
       else if (text(artifact.subject_id, 240) === 'Computer Science & Coding' && artifact.status === 'evaluation_pending') { currentStage = 'Builder Residency'; blocker = 'waiting_for_residency_admission'; nextAction = 'Admit when Residency cohort capacity opens' }
+      else if (artifact.status === 'evaluation_ready') { currentStage = 'Exact canary'; blocker = canary ? 'canary_passed_waiting_admission' : 'waiting_for_exact_canary'; nextAction = canary ? 'Admit to independent evaluation' : 'Run exact-artifact canary' }
+      else if (artifact.status === 'evaluation_pending') { currentStage = 'Independent evaluation'; blocker = claimability; nextAction = claimability === 'claimable' ? 'Run independent evaluation' : 'Satisfy evaluation prerequisites' }
       else if (evaluationPassed) { currentStage = 'Graduation'; blocker = 'awaiting_graduation'; nextAction = 'Graduate and register exact runtime' }
       return {
         candidateId,
@@ -868,6 +870,7 @@ export async function GET() {
         residencyFailed: residency.filter((row: any) => row.standing === 'residency_failed'
           && artifactRowsByKey.get(row.candidateId + ':' + row.artifactHash)?.status === 'quarantined').length,
         activeGraduates: (graduatesResult.data || []).filter((row: any) => row.status === 'active').length,
+        evaluationReady: artifacts.filter((row: any) => row.status === 'evaluation_ready').length,
         evaluationPending: artifacts.filter((row: any) => row.status === 'evaluation_pending').length,
         quarantined: artifacts.filter((row: any) => row.status === 'quarantined').length,
       },

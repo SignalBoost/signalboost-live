@@ -19,7 +19,7 @@ begin
         'source','registry_backfill',
         'authorityExpanded',false
       );
-      v_hash := encode(digest(v_evidence::text,'sha256'),'hex');
+      v_hash := encode(extensions.digest(v_evidence::text,'sha256'),'hex');
       perform public.append_cos_graduate_lifecycle_event(r.id,r.candidate_id,r.trained_artifact_hash,'graduated',
         r.promotion_evidence_hash,v_hash,v_evidence,v_time);
     end if;
@@ -33,7 +33,7 @@ begin
         'source','registry_backfill',
         'authorityExpanded',false
       );
-      v_hash := encode(digest(v_evidence::text,'sha256'),'hex');
+      v_hash := encode(extensions.digest(v_evidence::text,'sha256'),'hex');
       perform public.append_cos_graduate_lifecycle_event(r.id,r.candidate_id,r.trained_artifact_hash,'activated',
         r.activation_evidence_hash,v_hash,v_evidence,r.activated_at);
     end if;

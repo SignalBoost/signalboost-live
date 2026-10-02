@@ -6,6 +6,7 @@ const bypassAudit = spawnSync(process.execPath, ['scripts/check-platform-harness
 if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 const tests = [
+  'tests/cosArtifactBirthCertificate.node.test.ts',
   'tests/cosUniversityMassQuarantineReview.node.test.ts',
   'tests/cosUniversityLaneExpectation.node.test.ts',
   'tests/cosUniversityLaneFaultRecorder.node.test.ts',

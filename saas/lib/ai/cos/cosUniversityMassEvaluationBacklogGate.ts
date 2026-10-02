@@ -18,6 +18,12 @@
 // it converted a deliberate exam pause into a permanent training freeze. Excluded here for that reason only.
 // Every other waiting student still counts, the limit is unchanged, and if the exclusion cannot be read the
 // gate keeps the full count and stays closed for new spend.
+//
+// Production 2026-10-02: the gate counted ONLY `evaluation_pending`, but a newly trained artifact is written as
+// `evaluation_ready` and stays there until the lane admits it one at a time under a live approval, with in-flight
+// capped at 2. So `evaluation_pending` can essentially never exceed a couple of rows however much training produces,
+// the count never approached the limit of 48, and the spend gate could not close - which is precisely the runaway it
+// was built for. Both statuses are the same queue: work that is trained and still waiting to be judged.
 import { MASS_XSA_EXAMS_PAUSED } from './cosUniversityXsaExamPause.ts'
 
 export const MASS_EVALUATION_BACKLOG_LIMIT_ENV = 'COS_UNIVERSITY_MASS_EVALUATION_BACKLOG_LIMIT' as const
@@ -42,6 +48,7 @@ export type MassEvaluationBacklogGate = Readonly<{
 type CountResult = { count?: number | null; error?: { message?: string } | null }
 type BacklogQuery = {
   eq(column: string, value: string): BacklogQuery
+  in(column: string, values: readonly string[]): BacklogQuery
   like(column: string, pattern: string): PromiseLike<CountResult>
 }
 type BacklogDb = {
@@ -93,10 +100,13 @@ export function massEvaluationBacklogDecision(input: {
   })
 }
 
+/** Trained and still waiting to be judged: admitted or not, it is downstream load the evaluator has to absorb. */
+export const MASS_EVALUATION_BACKLOG_WAITING_STATUSES = ['evaluation_ready', 'evaluation_pending'] as const
+
 function waitingMassArtifacts(db: BacklogDb): BacklogQuery {
   return db.from('cos_local_distillation_artifacts')
     .select('candidate_id', { count: 'exact', head: true })
-    .eq('status', 'evaluation_pending')
+    .in('status', [...MASS_EVALUATION_BACKLOG_WAITING_STATUSES])
 }
 
 /**

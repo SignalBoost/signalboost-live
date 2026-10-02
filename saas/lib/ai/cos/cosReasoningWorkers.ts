@@ -438,9 +438,10 @@ const WORKFORCE_APPRENTICE_TIMEOUT_MS = 45_000
 export async function runWorkforceApprenticeShadow(
   args: LocalModelCallArgs,
   objective: string,
+  excludedRegistryIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
   if (currentReasoningEvaluationContext()) return
-  const runtime = await activeGraduateApprenticeForObjective(objective).catch(() => null)
+  const runtime = await activeGraduateApprenticeForObjective(objective, excludedRegistryIds).catch(() => null)
   if (!runtime) return
   const effective = toLocalModelCallArgs({
     ...args,

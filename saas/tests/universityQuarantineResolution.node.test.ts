@@ -170,7 +170,7 @@ test('the resolution acts on every quarantined student and records why, conditio
   assert.equal(result.heldForInvestigation, 1)
   const status = (id: string) => tables.cos_local_distillation_artifacts.find(item => item.id === id)?.status
   assert.equal(status('1'), 'retired', 'the exam FAIL leaves the University')
-  assert.equal(status('2'), 'evaluation_pending', 'no recorded reason: the exam decides')
+  assert.equal(status('2'), 'evaluation_ready', 'mass quarantine returns to governed evaluator admission')
   assert.equal(status('3'), 'quarantined', 'already returned once: held for investigation, not looped')
   assert.equal(status('4'), 'evaluation_pending', 'students outside quarantine are never touched')
   const dismissal = tables.cos_university_learning_assurance_events.find(item => item.evidence?.claim === QUARANTINE_DISMISSED_CLAIM)
@@ -217,5 +217,6 @@ test('the dashboard shows the resolution, WHY students fail, and who left the Un
 
 
 test('mass quarantine returns through governed evaluation admission', () => {
-  assert.match(resolver, /student\\.candidateId\\.startsWith\\('mass:'\\) \\? 'evaluation_ready' : 'evaluation_pending'/)
+  const resolver = read('lib/ai/cos/cosUniversityQuarantineResolution.ts')
+  assert.match(resolver, /student\.candidateId\.startsWith\('mass:'\) \? 'evaluation_ready' : 'evaluation_pending'/)
 })

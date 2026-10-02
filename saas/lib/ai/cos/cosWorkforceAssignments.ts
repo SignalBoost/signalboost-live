@@ -192,4 +192,38 @@ export async function verifyServedWorkforceAssignments(limit = WORKFORCE_VERIFIC
   console.info('[cos-workforce-verification]', JSON.stringify(result))
   return result
 }
+/**
+ * ABANDONED WORK (owner 2026-10-02: 12 of 16 graduates shown WORKING). An assignment is set 'working' before the
+ * graduate runtime is called and closed after it answers. If the process ends in between - Vercel kills the function
+ * at maxDuration while a cold RunPod endpoint is still booting, or a row written before the 2026-10-02 empty-path fix -
+ * the closing write never runs and the graduate shows WORKING forever, receiving no credit and no retry.
+ * No graduate call can legitimately stay open longer than WORKFORCE_ASSIGNMENT_MAX_OPEN_MS (the longest runtime
+ * timeout is 45s). Anything older never finished: close it as runtime_failed (infrastructure, never a competence
+ * verdict). Only open shadow/assigned rows are touched; served/verified/remediation rows are never changed.
+ */
+export const WORKFORCE_ASSIGNMENT_MAX_OPEN_MS = 10 * 60_000
+
+export async function closeAbandonedWorkforceAssignments(now = new Date()) {
+  const db = cosServiceDb()
+  if (!db) return Object.freeze({ ok: false as const, error: 'cos_service_db_unavailable', closed: 0 })
+  const cutoff = new Date(now.getTime() - WORKFORCE_ASSIGNMENT_MAX_OPEN_MS).toISOString()
+  const closedAt = now.toISOString()
+  // started_at is set when the runtime call begins; an 'assigned' row may have none, so fall back to assigned_at.
+  const started = await db.from('cos_workforce_assignments')
+    .update({ status: 'runtime_failed', failure_reason: 'no_terminal_recorded', completed_at: closedAt, updated_at: closedAt })
+    .in('status', ['assigned', 'working'])
+    .lt('started_at', cutoff)
+    .select('id')
+  if (started.error) return Object.freeze({ ok: false as const, error: 'abandoned_close_failed', closed: 0 })
+  const neverStarted = await db.from('cos_workforce_assignments')
+    .update({ status: 'runtime_failed', failure_reason: 'no_terminal_recorded', completed_at: closedAt, updated_at: closedAt })
+    .in('status', ['assigned', 'working'])
+    .is('started_at', null)
+    .lt('assigned_at', cutoff)
+    .select('id')
+  if (neverStarted.error) return Object.freeze({ ok: false as const, error: 'abandoned_close_failed', closed: (started.data || []).length })
+  const closed = (started.data || []).length + (neverStarted.data || []).length
+  if (closed) console.warn('[cos-workforce-abandoned]', JSON.stringify({ closed, cutoff }))
+  return Object.freeze({ ok: true as const, closed, authorityExpanded: false as const })
+}
 // end of saas/lib/ai/cos/cosWorkforceAssignments.ts (if this line is missing, the paste was cut short)

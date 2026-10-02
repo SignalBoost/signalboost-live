@@ -303,6 +303,7 @@ const tests = [
   'tests/runpodPinnedWorkerSweeper.node.test.ts',
   // 2026-09-29: graduates leave the University and COS hires them from the Workforce roster.
   'tests/cosWorkforceRoster.node.test.ts',
+  'tests/cosWorkforcePostGraduationPipeline.node.test.ts',
   // 2026-09-29 backwards pass: Workforce dashboard, quarantine rule, Residency time budget and context fit.
   'tests/universityBackwardsPass.node.test.ts',
   // 2026-09-30 quarantine: every quarantined student's reason is named; the review reads in bounded chunks.

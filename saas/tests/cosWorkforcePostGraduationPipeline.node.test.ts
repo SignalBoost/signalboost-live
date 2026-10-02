@@ -1,3 +1,4 @@
+// saas/tests/cosWorkforcePostGraduationPipeline.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -40,12 +41,12 @@ test('governed recovery watches stranded and repeatedly failing Workforce member
   assert.match(recovery, /count >= 2/)
   assert.match(recovery, /runtimeBlocked/)
   assert.match(recovery, /eligibleRecoveryTargets/)
-  assert.match(recovery, /activeGraduateApprenticeForObjective\(objective, runtimeBlocked\)/)
-  assert.match(recovery, /proveGraduateServedIdentity/)
-  assert.match(recovery, /if \(!ready\.ok\) continue/)
-  assert.match(recovery, /recoveryAttempts >= 1/)
+  // Owner 2026-10-02: no paid wake-ups. Recovery never boots or waits for a graduate endpoint (#3588 reverted).
+  assert.doesNotMatch(recovery, /proveGraduateServedIdentity|RUNTIME_READY_MAX_MS/)
+  assert.match(recovery, /recoveryAttempts >= Math\.min\(3, eligibleRecoveryTargets\.length\)/)
   assert.match(recovery, /runWorkforceApprenticeShadow[\s\S]*runtimeBlocked/)
   assert.match(recovery, /runtimeBlockedWorkers/)
   assert.match(recovery, /authorityExpanded: false/)
   assert.match(vercel, /\/api\/cron\/cos-workforce-pipeline/)
 })
+// end of saas/tests/cosWorkforcePostGraduationPipeline.node.test.ts (if this line is missing, the paste was cut short)

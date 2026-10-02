@@ -28,6 +28,7 @@ import { COS_EXPLANATORY_REASONING_DISCIPLINE, COS_GENERAL_REASONING_DISCIPLINE 
 import { EXPLANATORY_QUESTION_SCOPE_LINE } from '@/lib/ai/cos/cosReasonerPromptScope'
 import { fitGraduateCall } from '@/lib/ai/cos/graduateContextFit'
 import { runpodGraduateEndpointWarm } from '@/lib/ai/cos/graduateWarmGate'
+import { runpodGraduateEndpointWorkerState } from '@/lib/ai/cos/graduateWarmGate'
 import {
   activeGraduateRuntimesForRole,
   activeGraduateApprenticeForObjective,
@@ -435,6 +436,22 @@ async function createGraduateAwareCosReasoningEngine(
 
 const WORKFORCE_APPRENTICE_TIMEOUT_MS = 45_000
 
+/** A rejected status write used to be ignored (Production 2026-10-02: 38 results lost that way). Surface it. */
+async function closeWorkforceAssignment(
+  db: NonNullable<ReturnType<typeof cosServiceDb>>,
+  assignmentId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const result = await db.from('cos_workforce_assignments').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', assignmentId)
+  if (result.error) {
+    console.error('[cos-workforce-assignment] terminal write rejected; serving-attempt evidence will reconcile it', JSON.stringify({
+      assignmentId,
+      status: patch.status,
+      error: String(result.error.message || result.error).slice(0, 200),
+    }))
+  }
+}
+
 export async function runWorkforceApprenticeShadow(
   args: LocalModelCallArgs,
   objective: string,
@@ -443,6 +460,10 @@ export async function runWorkforceApprenticeShadow(
   if (currentReasoningEvaluationContext()) return
   const runtime = await activeGraduateApprenticeForObjective(objective, excludedRegistryIds).catch(() => null)
   if (!runtime) return
+  // NO PAID WAKE-UPS (owner 2026-10-02). Practice (shadow) work is advisory and nobody waits for it, so it must never boot
+  // a powered-off graduate endpoint: RunPod bills the cold boot even when the call gives up. A free status read decides;
+  // a graduate whose endpoint is off simply gets no practice task this time (no assignment is opened).
+  if (!(await runpodGraduateEndpointWarm(runtime.inference.baseUrl))) return
   const effective = toLocalModelCallArgs({
     ...args,
     usageContext: {
@@ -518,12 +539,17 @@ export async function runWorkforceApprenticeShadow(
       // WORKFORCE (2026-10-02): this path used to return without closing the assignment, leaving it 'working' forever.
       // No text is a runtime fact (callLocalModel returns null for timeouts, HTTP and transport failures too), so it
       // closes as runtime_failed - never remediation, which is reserved for verified competence failures.
-      const failureReason = latencyMs >= timeoutMs - 50 ? 'runtime_deadline_exceeded' : 'runtime_no_text'
-      if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'runtime_failed', completed_at: new Date().toISOString(), failure_reason: failureReason, updated_at: new Date().toISOString() }).eq('id', assignmentId)
+      const deadline = latencyMs >= timeoutMs - 50
+      // At the deadline, record whether the endpoint was cold, still booting or warm, so cold start is proven or
+      // ruled out by evidence rather than assumed.
+      const failureReason = deadline
+        ? `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}`
+        : 'runtime_no_text'
+      if (db && assignmentId) await closeWorkforceAssignment(db, assignmentId, { status: 'runtime_failed', completed_at: new Date().toISOString(), failure_reason: failureReason })
       recordGraduateServingAttempt({
         ...attemptBase,
         phase: 'attempt_failed',
-        outcome: failureReason === 'runtime_deadline_exceeded' ? 'timeout' : 'empty',
+        outcome: deadline ? 'timeout' : 'empty',
         latencyMs,
         errorClass: failureReason,
       })
@@ -531,11 +557,11 @@ export async function runWorkforceApprenticeShadow(
     }
     recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_succeeded', outcome: 'success', latencyMs })
     // Shadow output was never delivered to anyone, so no Production outcome can verify it: it ends at 'served'.
-    if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'served', completed_at: new Date().toISOString(), outcome_evidence_hash: createHash('sha256').update(`${attemptId}:success:${latencyMs}`).digest('hex'), updated_at: new Date().toISOString() }).eq('id', assignmentId)
+    if (db && assignmentId) await closeWorkforceAssignment(db, assignmentId, { status: 'served', completed_at: new Date().toISOString(), outcome_evidence_hash: createHash('sha256').update(`${attemptId}:success:${latencyMs}`).digest('hex') })
   } catch (error) {
     const latencyMs = Date.now() - startedAt
     const outcome = graduateServingErrorOutcome(error, timeoutMs, latencyMs)
-    if (db && assignmentId) await db.from('cos_workforce_assignments').update({ status: 'runtime_failed', completed_at: new Date().toISOString(), failure_reason: error instanceof Error ? error.name || 'Error' : 'Error', updated_at: new Date().toISOString() }).eq('id', assignmentId)
+    if (db && assignmentId) await closeWorkforceAssignment(db, assignmentId, { status: 'runtime_failed', completed_at: new Date().toISOString(), failure_reason: error instanceof Error ? error.name || 'Error' : 'Error' })
     recordGraduateServingAttempt({
       ...attemptBase,
       phase: 'attempt_failed',

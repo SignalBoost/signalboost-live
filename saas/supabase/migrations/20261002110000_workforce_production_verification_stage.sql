@@ -32,7 +32,7 @@ select
     when a.id is null then 'WORKFORCE_AVAILABLE'
     when a.status = 'assigned' then 'ASSIGNED'
     when a.status = 'working' then 'WORKING'
-    when a.status = 'verified' then 'PRODUCTION_VERIFIED'
+    when coalesce(c.verified,0) > 0 then 'PRODUCTION_VERIFIED'
     when a.status = 'served' and a.source_kind = 'production_request' then 'AWAITING_PRODUCTION_VERIFICATION'
     when a.status = 'served' and a.source_kind = 'production_shadow' then 'SHADOW_SERVED'
     when a.status = 'runtime_failed' then 'RUNTIME_RECOVERY'
@@ -43,6 +43,11 @@ from public.cos_university_graduate_model_registry g
 join public.cos_university_artifact_birth_certificates b
   on b.candidate_id=g.candidate_id and b.trained_artifact_hash=g.trained_artifact_hash
 left join public.cos_workforce_roster w on w.registry_id=g.id
+left join lateral (
+  select count(*)::int verified
+  from public.cos_university_graduate_lifecycle_events e
+  where e.registry_id=g.id and e.event_type='verified_outcome'
+) c on true
 left join lateral (
   select x.* from public.cos_workforce_assignments x
   where x.registry_id=g.id

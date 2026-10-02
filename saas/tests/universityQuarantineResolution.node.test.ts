@@ -214,3 +214,8 @@ test('the dashboard shows the resolution, WHY students fail, and who left the Un
     assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 5, `${key} in en, es, pt, pl, ru`)
   }
 })
+
+
+test('mass quarantine returns through governed evaluation admission', () => {
+  assert.match(resolver, /student\\.candidateId\\.startsWith\\('mass:'\\) \\? 'evaluation_ready' : 'evaluation_pending'/)
+})

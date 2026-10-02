@@ -202,7 +202,7 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
     if (decision.action === 'hold_for_investigation') { heldForInvestigation += 1; continue }
     if (applied >= QUARANTINE_RESOLUTION_MAX_PER_RUN) continue
 
-    const nextStatus = decision.action === 'dismiss' ? 'retired' : 'evaluation_pending'
+    const nextStatus = decision.action === 'dismiss' ? 'retired' : (student.candidateId.startsWith('mass:') ? 'evaluation_ready' : 'evaluation_pending')
     const at = new Date().toISOString()
     // Conditional on the exact student still being quarantined: a retry or a concurrent run changes nothing twice.
     const updated = await db.from('cos_local_distillation_artifacts')

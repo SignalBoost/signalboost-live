@@ -1,3 +1,4 @@
+// saas/app/dashboard/cos-university-telemetry/page.tsx
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -6,6 +7,19 @@ import {
   COS_UNIVERSITY_TELEMETRY_COPY,
   type CosUniversityTelemetryLanguage,
 } from '@/lib/i18n/cosUniversityTelemetryCopy'
+
+// Post-graduation employment stages in pipeline order (cos_workforce_stage).
+const WORKFORCE_STAGE_ORDER = [
+  'WORKFORCE_AVAILABLE',
+  'ASSIGNED',
+  'WORKING',
+  'AWAITING_PRODUCTION_VERIFICATION',
+  'PRODUCTION_VERIFIED',
+  'SHADOW_SERVED',
+  'RUNTIME_RECOVERY',
+  'REMEDIATION',
+] as const
+type WorkforceStage = typeof WORKFORCE_STAGE_ORDER[number]
 
 type Provider = {
   id: string
@@ -131,7 +145,7 @@ type Telemetry = {
   artifacts?: Artifact[]
   residency?: Residency[]
   pipeline?: { residencyTotal?:number; residencyResidents?:number; residencyRemediation?:number; residencyComplete?:number; residencyFailed?:number; activeGraduates?:number; evaluationPending?:number; quarantined?:number }
-  workforce?: { available?:boolean; onCall?:number; retired?:number; workers?:Array<{ candidateId:string; specialty:string; jobRoles:string[]; hiredAt:string|null }> }
+  workforce?: { available?:boolean; onCall?:number; retired?:number; stagesAvailable?:boolean; stages?:Record<string, number>; workers?:Array<{ candidateId:string; specialty:string; jobRoles:string[]; hiredAt:string|null; stage?:string|null }> }
   quarantine?: {
     total?:number; finalResults?:number; pendingCorrection?:number
     byReason?: Partial<Record<'exam_failed'|'residency_failed'|'exhausted_real_failures'|'exhausted_our_errors'|'exam_data_defect'|'no_recorded_reason', number>>
@@ -600,6 +614,16 @@ export default function CosUniversityTelemetryPage() {
               <Card label={copy.workforceOnCall} value={String(workforce.onCall ?? 0)} />
               <Card label={copy.workforceRetired} value={String(workforce.retired ?? 0)} />
             </div>
+            {workforce.stagesAvailable ? (
+              <>
+                <p className="mt-4 text-xs opacity-65">{copy.workforceStagesExplanation}</p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {WORKFORCE_STAGE_ORDER.map(stage => (
+                    <Card key={stage} label={copy.workforceStageLabels[stage]} value={String(workforce.stages?.[stage] ?? 0)} />
+                  ))}
+                </div>
+              </>
+            ) : null}
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {(workforce.workers || []).map(worker => (
                 <div key={worker.candidateId} className="rounded-lg border p-3 text-xs">
@@ -607,6 +631,9 @@ export default function CosUniversityTelemetryPage() {
                   <div className="mt-1 font-mono opacity-60">{short(worker.candidateId, 28)}</div>
                   <div className="mt-2">{worker.jobRoles.join(' · ') || '—'}</div>
                   <div className="mt-1 opacity-70">{copy.workforceHired} {when(worker.hiredAt)}</div>
+                  {worker.stage && worker.stage in copy.workforceStageLabels ? (
+                    <div className="mt-1 font-medium">{copy.workforceStageLabels[worker.stage as WorkforceStage]}</div>
+                  ) : null}
                 </div>
               ))}
               {!(workforce.workers || []).length ? <p className="text-sm opacity-60">{copy.workforceNone}</p> : null}
@@ -694,3 +721,4 @@ function JobCell({ job }: { job: Job | null }) {
     </div>
   )
 }
+// end of saas/app/dashboard/cos-university-telemetry/page.tsx (if this line is missing, the paste was cut short)

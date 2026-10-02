@@ -59,13 +59,13 @@ async function run(req: NextRequest) {
       .limit(24)
     if (!demand.error) {
       for (const row of demand.data || []) {
-        if (recoveryAttempts >= Math.min(3, recoveryTargets)) break
+        // One cold-capable recovery per cron keeps the 45s model window inside Vercel's 60s route budget.\n        if (recoveryAttempts >= Math.min(1, recoveryTargets)) break
         const objective = String(row.content || '').trim()
         if (!objective) continue
         await runWorkforceApprenticeShadow({
           prompt: objective,
           maxTokens: 512,
-          timeoutMs: 15_000,
+          timeoutMs: 45_000,
           usageContext: { feature: 'cos_workforce_recovery', purpose: 'genuine_production_replay', correlationId: `workforce-recovery:${row.id}` },
         }, objective)
         recoveryAttempts += 1

@@ -92,6 +92,7 @@ export type QuarantineResolutionResult = Readonly<{
   heldForInvestigation: number
   remaining: number
   byReason: Readonly<Record<string, number>>
+  transitionErrors: readonly Readonly<{ candidateId:string; error:string }>[]
 }>
 
 /** Reads the quarantine, decides per student, and applies at most QUARANTINE_RESOLUTION_MAX_PER_RUN changes. */
@@ -121,7 +122,7 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
     }))
     .filter(row => row.candidateId && HEX64.test(row.artifactHash))
   const byReason: Record<string, number> = {}
-  const empty = { quarantined: students.length, dismissed: 0, returnedToExam: 0, leftForReview: 0, heldForInvestigation: 0 }
+  const empty = { quarantined: students.length, dismissed: 0, returnedToExam: 0, leftForReview: 0, heldForInvestigation: 0, transitionErrors: [] as Array<{candidateId:string;error:string}> }
   if (!students.length) return Object.freeze({ ...empty, remaining: 0, byReason: Object.freeze(byReason) })
 
   const candidateIds = [...new Set(students.map(row => row.candidateId))]
@@ -176,6 +177,7 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
   let returnedToExam = 0
   let leftForReview = 0
   let heldForInvestigation = 0
+  const transitionErrors: Array<{candidateId:string;error:string}> = []
   for (const student of students) {
     const key = `${student.candidateId}:${student.artifactHash}`
     const events = eventsByCandidate.get(student.candidateId) || []
@@ -209,7 +211,12 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
       .eq('trained_artifact_hash', student.artifactHash)
       .eq('status', 'quarantined')
       .select('id')
-    if (updated.error) throw updated.error
+    // One artifact that cannot cross a guarded boundary must not freeze every other quarantined student.
+    // Preserve the admission failure as evidence and continue; do NOT bypass the database guard.
+    if (updated.error) {
+      transitionErrors.push({ candidateId: student.candidateId, error: text(updated.error?.message || updated.error, 300) })
+      continue
+    }
     if (!(updated.data || []).length) continue
     applied += 1
 
@@ -255,6 +262,7 @@ export async function resolveQuarantine(input: { db: any; now?: Date }): Promise
     heldForInvestigation,
     remaining: students.length - dismissed - returnedToExam,
     byReason: Object.freeze(byReason),
+    transitionErrors: Object.freeze(transitionErrors),
   })
 }
 

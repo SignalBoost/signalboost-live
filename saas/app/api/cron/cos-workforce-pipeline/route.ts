@@ -61,8 +61,25 @@ async function run(req: NextRequest) {
   // advisory shadow work; the normal Workforce selector still enforces diploma, roster, role and
   // problem-scope gates. Replays never replace a user-visible answer or expand authority.
   const recoveryTargets = stranded.length + failing.length
+  // Infrastructure circuit breaker: do not manufacture more assignments for a worker whose recent
+  // attempts already prove the runtime is unhealthy. Runtime failure is not graduate remediation.
+  const recentRuntimeFailures = await db.from('cos_workforce_assignments')
+    .select('registry_id,failure_reason,completed_at')
+    .eq('status', 'runtime_failed')
+    .gte('completed_at', new Date(Date.now() - 60 * 60_000).toISOString())
+    .order('completed_at', { ascending: false })
+    .limit(200)
+  const runtimeFailureCounts = new Map<string, number>()
+  for (const row of recentRuntimeFailures.data || []) {
+    const id = String(row.registry_id || '')
+    if (id) runtimeFailureCounts.set(id, (runtimeFailureCounts.get(id) || 0) + 1)
+  }
+  const runtimeBlocked = new Set([...runtimeFailureCounts.entries()].filter(([, count]) => count >= 2).map(([id]) => id))
+  const eligibleRecoveryTargets = workers.filter(row =>
+    (row.stranded || row.repeatedFailure) && !runtimeBlocked.has(String(row.registry_id)),
+  )
   let recoveryAttempts = 0
-  if (recoveryTargets > 0) {
+  if (eligibleRecoveryTargets.length > 0) {
     const demand = await db.from('assistant_messages')
       .select('id,content,created_at')
       .eq('role', 'user')
@@ -71,7 +88,7 @@ async function run(req: NextRequest) {
       .limit(24)
     if (!demand.error) {
       for (const row of demand.data || []) {
-        if (recoveryAttempts >= Math.min(3, recoveryTargets)) break
+        if (recoveryAttempts >= Math.min(3, eligibleRecoveryTargets.length)) break
         const objective = String(row.content || '').trim()
         if (!objective) continue
         // Leave room to write the terminal status before the route deadline.
@@ -106,6 +123,7 @@ async function run(req: NextRequest) {
       recoveryAttempts,
       strandedWorkers: stranded.map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id })),
       repeatedlyFailingWorkers: failing.map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id })),
+      runtimeBlockedWorkers: workers.filter(row => runtimeBlocked.has(String(row.registry_id))).map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id, recentRuntimeFailures: runtimeFailureCounts.get(String(row.registry_id)) || 0 })),
       authorityExpanded: false,
     },
   })

@@ -18,7 +18,7 @@ const tests = [
 
   'tests/cosArtifactBirthCertificate.node.test.ts',
 
-  'tests/cosUniversityMassQuarantineReview\.node.test.ts',
+  'tests/cosUniversityMassQuarantineReview.node.test.ts',
 
   'tests/cosUniversityLaneExpectation.node.test.ts',
 

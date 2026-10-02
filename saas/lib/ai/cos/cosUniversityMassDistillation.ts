@@ -254,6 +254,13 @@ function selectHybridDistillationChunk(rows: readonly NormalizedIdentity[]): Nor
     realSourceAvailable: real.length,
     failureDerivedAvailable: failure.length,
   })
+  // The 50% real-source target is a quality invariant, not a preference. Production showed
+  // remediation batches with zero real-source rows (synthetic + failure-derived only), which kept
+  // consuming training compute while repeatedly failing independent holdout/safety evaluation.
+  // Do not manufacture another artifact until the source-maintenance lane has replenished enough
+  // independent rights-cleared material to satisfy the declared hybrid recipe.
+  const minimumRealSource = Math.ceil(targetSize * HYBRID_REAL_SOURCE_TARGET)
+  if (mix.realSource < minimumRealSource) return []
   const selected = [
     ...real.slice(0, mix.realSource),
     ...failure.slice(0, mix.failureDerived),

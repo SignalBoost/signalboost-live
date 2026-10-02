@@ -27,6 +27,7 @@ import {
   MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   massEvaluationCapacityAwareInFlightLimit,
   decideExhaustedMassEvaluationArtifacts,
+  decideInfrastructureStalledMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
   type ExhaustedMassEvaluationArtifact,
   type RollingArtifact,
@@ -547,7 +548,10 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   // Clear artifacts the approval policy has already refused permanently before choosing this tick's work, so
   // the selection window holds only artifacts that can still be evaluated.
   const exhausted = decideExhaustedMassEvaluationArtifacts({ artifacts: rows, events: all, now })
-  const disposed = exhausted.length ? await disposeExhaustedArtifacts(exhausted, now) : []
+  const infrastructureStalled = decideInfrastructureStalledMassEvaluationArtifacts({ artifacts: rows, events: all, now })
+    .filter(item => !exhausted.some(spent => spent.candidateId === item.candidateId && spent.artifactHash === item.artifactHash))
+  const dispositionQueue = [...exhausted, ...infrastructureStalled]
+  const disposed = dispositionQueue.length ? await disposeExhaustedArtifacts(dispositionQueue, now) : []
   if (disposed.length) {
     console.info('[cos-mass-distilled-exhausted-disposition]', JSON.stringify({
       disposed: disposed.length,

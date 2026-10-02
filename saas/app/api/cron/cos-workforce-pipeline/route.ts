@@ -57,7 +57,7 @@ async function run(req: NextRequest) {
         await runWorkforceApprenticeShadow({
           prompt: objective,
           maxTokens: 512,
-          timeoutMs: 15_000,
+          timeoutMs: 45_000,
           usageContext: { feature: 'cos_workforce_recovery', purpose: 'genuine_production_replay', correlationId: `workforce-recovery:${row.id}` },
         }, objective)
         recoveryAttempts += 1

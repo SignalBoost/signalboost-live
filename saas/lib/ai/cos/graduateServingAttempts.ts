@@ -122,7 +122,7 @@ async function persistGraduateServingAttempt(input: GraduateServingAttemptInput)
       if (lifecycle.error) throw lifecycle.error
     }
   } catch (error) {
-    console.warn('[cos-graduate-serving-attempt] persistence failed (non-fatal):', error instanceof Error ? error.message : String(error))
+    throw error
   }
 }
 
@@ -140,7 +140,14 @@ export function recordGraduateServingAttempt(input: GraduateServingAttemptInput)
         else await new Promise(resolve => setTimeout(resolve, 50 * (attempt + 1)))
       }
     }
-    if (queued) await persistGraduateServingAttempt(input)
+    if (queued) {
+      try {
+        await persistGraduateServingAttempt(input)
+      } catch (error) {
+        // The outbox is authoritative; the recovery cron will retry without blocking the user-facing answer.
+        console.warn('[cos-graduate-serving-attempt] immediate materialization deferred to outbox:', error instanceof Error ? error.message : String(error))
+      }
+    }
   }
   try {
     after(persist)

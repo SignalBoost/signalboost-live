@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { drainGraduateServingEvidence } from '@/lib/ai/cos/graduateServingAttempts'
+import { runWorkforceApprenticeShadow } from '@/lib/ai/cos/cosReasoningWorkers'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -35,6 +36,36 @@ async function run(req: NextRequest) {
 
   const stranded = workers.filter(row => row.stranded)
   const failing = workers.filter(row => row.repeatedFailure)
+
+  // Recovery must do work, not merely report it. Reuse recent genuine Production user demand as
+  // advisory shadow work; the normal Workforce selector still enforces diploma, roster, role and
+  // problem-scope gates. Replays never replace a user-visible answer or expand authority.
+  const recoveryTargets = stranded.length + failing.length
+  let recoveryAttempts = 0
+  if (recoveryTargets > 0) {
+    const demand = await db.from('assistant_messages')
+      .select('id,content,created_at')
+      .eq('role', 'user')
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60_000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(24)
+    if (!demand.error) {
+      for (const row of demand.data || []) {
+        if (recoveryAttempts >= Math.min(3, recoveryTargets)) break
+        const objective = String(row.content || '').trim()
+        if (!objective) continue
+        await runWorkforceApprenticeShadow({
+          prompt: objective,
+          maxTokens: 512,
+          timeoutMs: 15_000,
+          usageContext: { feature: 'cos_workforce_recovery', purpose: 'genuine_production_replay', correlationId: `workforce-recovery:${row.id}` },
+        }, objective)
+        recoveryAttempts += 1
+      }
+    } else {
+      console.warn('[cos-workforce] recovery demand read failed closed', demand.error)
+    }
+  }
   return NextResponse.json({
     ok: evidence.blocked === 0,
     at: new Date().toISOString(),
@@ -47,6 +78,7 @@ async function run(req: NextRequest) {
     selfHealing: {
       evidenceDelivered: evidence.delivered,
       evidenceBlocked: evidence.blocked,
+      recoveryAttempts,
       strandedWorkers: stranded.map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id })),
       repeatedlyFailingWorkers: failing.map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id })),
       authorityExpanded: false,

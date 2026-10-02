@@ -1,3 +1,4 @@
+-- saas/supabase/migrations/20261002110000_workforce_production_verification_stage.sql
 -- Close the Workforce verification stage honestly: served Production work awaits a governed outcome.
 alter table public.cos_workforce_assignments
   drop constraint if exists cos_workforce_assignments_status_check;

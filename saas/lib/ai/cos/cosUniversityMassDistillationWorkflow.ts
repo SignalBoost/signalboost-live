@@ -262,9 +262,9 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       openSourceMaintenance = await isolatedStep('open_source_maintenance', () =>
         maintainUniversityRightsClearedOpenSourceCorpus({
           now,
-          maxSubjects: throughput.targetSubjectsPerReplenishment,
-          queriesPerSubject: 1,
-          maxCandidatesPerCycle: Math.min(20, throughput.acquisitionCandidatesPerCycle),
+          maxSubjects: Math.max(6, throughput.targetSubjectsPerReplenishment),
+          queriesPerSubject: throughput.queriesPerSubject,
+          maxCandidatesPerCycle: throughput.acquisitionCandidatesPerCycle,
         }))
       const failureDerived = await installVerifiedFailureDerivedCurriculum({
         db: cosServiceDb()!,

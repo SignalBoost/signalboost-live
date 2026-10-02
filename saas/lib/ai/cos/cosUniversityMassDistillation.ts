@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 // actually needs a client loads it lazily below, where Next resolves the alias normally.
 import type { cosServiceDb as CosServiceDbFactory } from '@/lib/cos-core/storage/supabase'
 import { classifyCosUniversitySubjects, cosUniversitySubjectById, type CosUniversitySubjectId } from './cosUniversity.ts'
-import { HYBRID_INDEPENDENT_HOLDOUT_MIN, planHybridDistillationMix, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
+import { HYBRID_INDEPENDENT_HOLDOUT_MIN, HYBRID_REAL_SOURCE_TARGET, planHybridDistillationMix, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
 import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from '../modelCapabilityRegistry.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const
@@ -254,6 +254,13 @@ function selectHybridDistillationChunk(rows: readonly NormalizedIdentity[]): Nor
     realSourceAvailable: real.length,
     failureDerivedAvailable: failure.length,
   })
+  // The 50% real-source target is a quality invariant, not a preference. Production showed
+  // remediation batches with zero real-source rows (synthetic + failure-derived only), which kept
+  // consuming training compute while repeatedly failing independent holdout/safety evaluation.
+  // Do not manufacture another artifact until the source-maintenance lane has replenished enough
+  // independent rights-cleared material to satisfy the declared hybrid recipe.
+  const minimumRealSource = Math.ceil(targetSize * HYBRID_REAL_SOURCE_TARGET)
+  if (mix.realSource < minimumRealSource) return []
   const selected = [
     ...real.slice(0, mix.realSource),
     ...failure.slice(0, mix.failureDerived),

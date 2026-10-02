@@ -1,3 +1,4 @@
+// saas/tests/cosWorkforceAssignmentStage.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -17,7 +18,11 @@ test('real production shadow creates and advances durable assignments',()=>{
  assert.match(workers,/cos_workforce_assignments/)
  assert.match(workers,/status: 'assigned'/)
  assert.match(workers,/status: 'working'/)
- assert.match(workers,/status: 'completed'/)
- assert.match(workers,/status: 'remediation'/)
+ // 2026-10-02: shadow work no one received ends 'served' (never verified); runtime failure ends 'runtime_failed'
+ // (infrastructure), never 'remediation', which only a governed Production outcome may assign.
+ assert.match(workers,/status: 'served'/)
+ assert.match(workers,/status: 'runtime_failed'/)
+ assert.doesNotMatch(workers,/status: 'completed'/)
  assert.match(workers,/source_kind: 'production_shadow'/)
 })
+// end of saas/tests/cosWorkforceAssignmentStage.node.test.ts (if this line is missing, the paste was cut short)

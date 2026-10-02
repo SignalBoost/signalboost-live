@@ -48,8 +48,9 @@ test('the owner rule: incompetent leaves, ours goes back to the exam, nothing lo
   assert.equal(decideQuarantineResolution({ classification: classification('exhausted_our_errors'), candidateId: 'mass:a', alreadyReturned: false }).action,
     'leave_for_review', 'the quarantine review returns it to the exam')
   assert.equal(decideQuarantineResolution({ classification: classification('no_recorded_reason'), candidateId: 'mass:a', alreadyReturned: false }).action, 'return_to_exam')
-  assert.equal(decideQuarantineResolution({ classification: classification('no_recorded_reason'), candidateId: 'mass:a', alreadyReturned: true }).action,
-    'hold_for_investigation', 'a second unexplained quarantine is our defect to find, never a loop and never a dismissal')
+  assert.deepEqual({ ...decideQuarantineResolution({ classification: classification('no_recorded_reason'), candidateId: 'mass:a', alreadyReturned: true }) },
+    { action: 'dismiss', reason: 'no_recorded_reason', ours: true },
+    'a second unexplained quarantine is our defect: leave as OURS instead of looping or parking forever')
   assert.equal(decideQuarantineResolution({ classification: classification('no_recorded_reason'), candidateId: 'legacy:a', alreadyReturned: false }).action,
     'hold_for_investigation')
 })
@@ -165,13 +166,13 @@ test('the resolution acts on every quarantined student and records why, conditio
   })
   const result = await resolveQuarantine({ db, now })
   assert.equal(result.quarantined, 3)
-  assert.equal(result.dismissed, 1)
+  assert.equal(result.dismissed, 2)
   assert.equal(result.returnedToExam, 1)
-  assert.equal(result.heldForInvestigation, 1)
+  assert.equal(result.heldForInvestigation, 0)
   const status = (id: string) => tables.cos_local_distillation_artifacts.find(item => item.id === id)?.status
   assert.equal(status('1'), 'retired', 'the exam FAIL leaves the University')
   assert.equal(status('2'), 'evaluation_ready', 'mass quarantine returns to governed evaluator admission')
-  assert.equal(status('3'), 'quarantined', 'already returned once: held for investigation, not looped')
+  assert.equal(status('3'), 'retired', 'already returned once: leaves as OURS instead of looping or parking forever')
   assert.equal(status('4'), 'evaluation_pending', 'students outside quarantine are never touched')
   const dismissal = tables.cos_university_learning_assurance_events.find(item => item.evidence?.claim === QUARANTINE_DISMISSED_CLAIM)
   assert.equal(dismissal.evidence.reason, 'exam_failed')

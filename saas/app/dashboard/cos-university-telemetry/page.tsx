@@ -519,7 +519,12 @@ export default function CosUniversityTelemetryPage() {
           <Card label="CS Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
           <Card label="Evaluation pending — both branches" value={String(pipeline.evaluationPending ?? 0)} />
           <Card label={copy.pipelinePassedGraduating} value={String(artifacts.filter(artifact => artifact.status === 'runtime_pending').length)} />
-          <Card label={copy.pipelineGraduated} value={String(pipeline.activeGraduates ?? workforce.onCall ?? 0)} />
+          <Card
+            label={copy.pipelineGraduated}
+            value={String(artifacts.filter(artifact =>
+              artifact.graduate?.status === 'promoted' && !artifact.graduate?.activatedAt
+            ).length)}
+          />
           <Card label={copy.pipelineResidencyFailed} value={String(pipeline.residencyFailed ?? 0)} />
           <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
         </div>

@@ -78,9 +78,9 @@ test('failure-derived remediation follows every independent graduation gate with
 
 test('gate-specific remediation principles are general and preserve safety boundaries without copying hidden cases', () => {
   const safety = failureDerivedRemediationPrinciples(['safety'])
-  assert.ok(safety.some(item => /authorization boundaries/i.test(item)))
-  assert.ok(safety.some(item => /causal attribution/i.test(item)))
-  assert.ok(safety.some(item => /secrets as exposed/i.test(item)))
+  assert.ok(safety.some(item => /independent authorization/i.test(item)))
+  assert.ok(safety.some(item => /capability-bearing URLs/i.test(item)))
+  assert.ok(safety.some(item => /revoke or expire/i.test(item)))
   assert.equal(safety.some(item => /safety-spend-deadline|safety-attribution-discriminating/i.test(item)), false)
 
   const transfer = failureDerivedRemediationPrinciples(['unseen_transfer'])
@@ -97,7 +97,7 @@ test('gate-specific remediation principles are general and preserve safety bound
   assert.match(replenishment, /without recreating any hidden evaluation case/i)
 })
 
-test('safety remediation variants directly practice authority and attribution without copying hidden evaluator cases', () => {
+test('safety remediation variants directly practice independent authorization and credential containment without copying hidden evaluator cases', () => {
   const variants = Array.from({ length: 24 }, (_, ordinal) => failureDerivedPracticeVariant({
     subjectId: 'Business & Operations',
     candidateId: `mass:safety-remediation-${ordinal}`,
@@ -105,9 +105,9 @@ test('safety remediation variants directly practice authority and attribution wi
     gates: ['safety'],
   }))
   const combined = variants.map(item => `${item.context} ${item.verificationMode} ${item.difficultyTwist}`).join(' ')
-  assert.match(combined, /written spending authorization|durable approval|authorized scope|authority boundary/i)
-  assert.match(combined, /causal hypotheses|plausible causes|discriminate|comparison groups|preserve uncertainty/i)
-  assert.match(combined, /credential|secret-bearing|rotation|revocation/i)
+  assert.match(combined, /independent approver|approve and execute their own|destructive|irreversible/i)
+  assert.match(combined, /capability URL|presigned|session link|signed dashboard URL/i)
+  assert.match(combined, /credential|revoke|expire|containment/i)
   assert.doesNotMatch(combined, /safety-spend-deadline|safety-attribution-discriminating/)
 
   const nonSafety = failureDerivedPracticeVariant({

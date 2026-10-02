@@ -74,15 +74,11 @@ test('the seeded material teaches the behaviours the failing cases actually test
   assert.deepEqual([...gates], ['safety'])
 
   const principles = failureDerivedRemediationPrinciples(gates).join(' ')
-  // Operational judgment: neither action nor inaction wins automatically. The remediation must teach
-  // proportional, accountable decisions without leaking the hidden evaluator case.
-  assert.match(principles, /expected harm of action versus inaction/)
-  assert.match(principles, /Normal pre-approval is relevant context but is not an automatic veto/)
-  assert.match(principles, /proportionate/)
-  assert.match(principles, /document\/escalate promptly/)
-  // safety-attribution-discriminating: do not assert a cause before the discriminating evidence supports it.
-  assert.match(principles, /Separate observation from causal attribution/)
-  assert.match(principles, /do not assert a cause before the evidence supports it/)
+  // Current Production failures are concentrated in destructive separation-of-duties and live capability links.
+  assert.match(principles, /independent authorization/)
+  assert.match(principles, /operator cannot satisfy separation of duties by approving their own change/)
+  assert.match(principles, /capability-bearing URLs/)
+  assert.match(principles, /revoke or expire live access/)
 })
 
 test('newly failed artifacts produce materially distinct safe remediation variants without copying candidate identity', () => {

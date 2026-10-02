@@ -1,4 +1,4 @@
-//
+// saas/tests/quarantineStallDrain.node.test.ts
 // Production 2026-10-02: 11 students sat in quarantine for DAYS. The resolution runs every 15 minutes and had no bug
 // in its reasoning - two of its own outcomes simply never change a status, so they were parking lots:
 //
@@ -56,19 +56,28 @@ test('a student exhausted by OUR errors leaves once the review has demonstrably 
   }
 })
 
-test('a student held for investigation leaves rather than waiting forever', () => {
+test('a student that already had its retry leaves immediately, whatever the clock says', () => {
+  // Production 2026-10-02: quarantine fell 11 -> 7 and stopped there. quarantinedForMs is measured from the artifact
+  // row's updated_at, and a quarantine -> exam -> quarantine lap REWRITES updated_at, so a cycling student rewinds its
+  // own stall timer every lap and can never reach the limit. The retry is a durable assurance event, so no lap resets
+  // it. This must hold at every wait, including zero.
+  for (const reason of ['no_recorded_reason', 'exhausted_our_errors'] as QuarantineReason[]) {
+    for (const waited of [0, FRESH, STALLED, DAYS]) {
+      const decision = decideQuarantineResolution({ classification: classify(reason), candidateId: 'mass:bbbb2222', alreadyReturned: true, quarantinedForMs: waited })
+      assert.equal(decision.action, 'dismiss', `${reason} already retried must not wait on a resettable clock, waited ${waited}`)
+      assert.equal(decision.ours, true, 'it leaves as OURS, never as a FAIL')
+      assert.equal(decision.reason, reason, 'the recorded reason is unchanged')
+    }
+  }
+})
+
+test('a non-mass student, which has no automatic retry at all, keeps the bounded hold', () => {
   const reason: QuarantineReason = 'no_recorded_reason'
-  // Returned to the exam once already, so it cannot be re-armed again.
-  const fresh = decideQuarantineResolution({ classification: classify(reason), candidateId: 'mass:bbbb2222', alreadyReturned: true, quarantinedForMs: FRESH })
+  const fresh = decideQuarantineResolution({ classification: classify(reason), candidateId: 'single:cccc3333', alreadyReturned: false, quarantinedForMs: FRESH })
   assert.equal(fresh.action, 'hold_for_investigation')
-  const stalled = decideQuarantineResolution({ classification: classify(reason), candidateId: 'mass:bbbb2222', alreadyReturned: true, quarantinedForMs: DAYS })
+  const stalled = decideQuarantineResolution({ classification: classify(reason), candidateId: 'single:cccc3333', alreadyReturned: false, quarantinedForMs: DAYS })
   assert.equal(stalled.action, 'dismiss')
   assert.equal(stalled.ours, true)
-
-  // A non-mass candidate cannot be re-armed automatically either, and must not sit forever on that account.
-  const nonMass = decideQuarantineResolution({ classification: classify(reason), candidateId: 'single:cccc3333', alreadyReturned: false, quarantinedForMs: DAYS })
-  assert.equal(nonMass.action, 'dismiss')
-  assert.equal(nonMass.ours, true)
 })
 
 test('a first-time mass student with no recorded reason still gets its exam back, however long it waited', () => {

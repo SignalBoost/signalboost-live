@@ -3,11 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { drainGraduateServingEvidence } from '@/lib/ai/cos/graduateServingAttempts'
 import { runWorkforceApprenticeShadow } from '@/lib/ai/cos/cosReasoningWorkers'
-import { verifyServedWorkforceAssignments } from '@/lib/ai/cos/cosWorkforceAssignments'
+import { closeAbandonedWorkforceAssignments, verifyServedWorkforceAssignments } from '@/lib/ai/cos/cosWorkforceAssignments'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
+const RUN_BUDGET_MS = 50_000
+const SHADOW_MAX_MS = 15_000
+const SHADOW_CLOSE_MARGIN_MS = 6_000
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
@@ -18,7 +21,16 @@ async function run(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok: false, error: 'cos_service_db_unavailable' }, { status: 503 })
+  // This route is killed at maxDuration (60s). Work it starts must finish before then, or the assignment it opened is
+  // left 'working' with no terminal record. Stop starting new graduate calls once the budget is spent.
+  const deadline = Date.now() + RUN_BUDGET_MS
 
+  // First close work that can never finish (opened, then the process ended), so it stops showing as WORKING.
+  const abandoned = await closeAbandonedWorkforceAssignments().catch(error => ({
+    ok: false as const,
+    error: error instanceof Error ? error.message.slice(0, 160) : 'workforce_abandoned_close_failed',
+    closed: 0,
+  }))
   const evidence = await drainGraduateServingEvidence(200)
   // WORKING -> PRODUCTION_VERIFIED / REMEDIATION: close delivered Production work against its governed outcome and
   // write the result to the graduate's permanent lifecycle ledger (the résumé is derived from it).
@@ -62,10 +74,13 @@ async function run(req: NextRequest) {
         if (recoveryAttempts >= Math.min(3, recoveryTargets)) break
         const objective = String(row.content || '').trim()
         if (!objective) continue
+        // Leave room to write the terminal status before the route deadline.
+        const shadowTimeoutMs = Math.min(SHADOW_MAX_MS, deadline - Date.now() - SHADOW_CLOSE_MARGIN_MS)
+        if (shadowTimeoutMs < 5_000) break
         await runWorkforceApprenticeShadow({
           prompt: objective,
           maxTokens: 512,
-          timeoutMs: 15_000,
+          timeoutMs: shadowTimeoutMs,
           usageContext: { feature: 'cos_workforce_recovery', purpose: 'genuine_production_replay', correlationId: `workforce-recovery:${row.id}` },
         }, objective)
         recoveryAttempts += 1
@@ -75,7 +90,7 @@ async function run(req: NextRequest) {
     }
   }
   return NextResponse.json({
-    ok: evidence.blocked === 0 && verification.ok === true,
+    ok: evidence.blocked === 0 && verification.ok === true && abandoned.ok === true,
     at: new Date().toISOString(),
     workforce: workers.length,
     stages: workers.reduce<Record<string, number>>((acc, row) => {
@@ -85,6 +100,7 @@ async function run(req: NextRequest) {
     }, {}),
     verification,
     selfHealing: {
+      abandonedAssignmentsClosed: abandoned.closed,
       evidenceDelivered: evidence.delivered,
       evidenceBlocked: evidence.blocked,
       recoveryAttempts,

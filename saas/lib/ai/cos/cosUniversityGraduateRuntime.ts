@@ -323,6 +323,28 @@ export async function activateGraduateRuntime(input: GraduateRuntimeBindingInput
   if (updated.error) throw updated.error
   if (!updated.data) throw new Error('graduate_runtime_activation_not_persisted')
 
+  const lifecycleEvidence = {
+    runtimeProfile: input.runtimeProfile,
+    runtimeProvider: runtime.provider,
+    runtimeModelId: decision.runtimeModelId,
+    healthEvidenceHash,
+    activationEvidenceHash,
+    workerRoles: decision.workerRoles,
+    problemClasses: decision.problemClasses,
+    authorityExpanded: false,
+  }
+  const lifecycle = await db.rpc('append_cos_graduate_lifecycle_event', {
+    p_registry_id: String(row.id),
+    p_candidate_id: String(row.candidate_id || input.candidateId),
+    p_trained_artifact_hash: decision.trainedArtifactHash,
+    p_event_type: 'activated',
+    p_correlation_id: activationEvidenceHash,
+    p_evidence_hash: hash(lifecycleEvidence),
+    p_evidence: lifecycleEvidence,
+    p_observed_at: input.now.toISOString(),
+  })
+  if (lifecycle.error) throw lifecycle.error
+
   return {
     ...decision,
     activated: true as const,

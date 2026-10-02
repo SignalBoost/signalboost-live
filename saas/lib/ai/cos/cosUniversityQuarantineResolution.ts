@@ -64,8 +64,10 @@ export type QuarantineDecision = Readonly<{
 
 /**
  * Pure: what the owner's rule says for one classified student. `alreadyReturned` is true when this exact student was
- * returned to the exam once before by this resolution; a second quarantine with no recorded reason is our defect to
- * investigate, never evidence that the student is incompetent, so it is held (visible) instead of looping.
+ * returned to the exam once before by this resolution. That one governed retry IS the investigation, so a student
+ * that comes back leaves as OURS rather than being held: it is never evidence that the student is incompetent, and
+ * the dismissal record keeps the defect visible. It is decided without consulting the clock, because a
+ * quarantine -> exam -> quarantine lap rewrites the artifact's updated_at and would rewind any timer forever.
  */
 export function decideQuarantineResolution(input: {
   classification: QuarantineClassification
@@ -92,8 +94,10 @@ export function decideQuarantineResolution(input: {
     // declined it every run in between, so waiting again changes nothing: it leaves as OURS.
     return Object.freeze({ action: stalled ? 'dismiss' : 'leave_for_review', reason, ours: true })
   }
-  // no_recorded_reason: only the mass lane's exam can be re-armed automatically.
-  if (!input.candidateId.startsWith('mass:') || input.alreadyReturned) {
+  // no_recorded_reason: only the mass lane's exam can be re-armed automatically, so a non-mass student gets the
+  // bounded hold instead. `alreadyReturned` is deliberately not repeated here - it already returned above, and
+  // leaving it in this condition made it look like a student could reach the clock-based branch when it cannot.
+  if (!input.candidateId.startsWith('mass:')) {
     return Object.freeze({ action: stalled ? 'dismiss' : 'hold_for_investigation', reason, ours: true })
   }
   return Object.freeze({ action: 'return_to_exam', reason, ours: true })

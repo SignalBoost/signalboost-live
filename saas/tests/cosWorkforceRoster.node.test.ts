@@ -68,3 +68,14 @@ test('Workforce apprenticeship uses genuine Production demand without widening a
   assert.match(workers, /phase: 'attempt_succeeded', outcome: 'success'/)
   assert.doesNotMatch(workers, /authorityExpanded:\s*true/)
 })
+
+
+test('Workforce apprenticeship pools all authorized specialist roles before fair selection', () => {
+  const runtime = read('lib/ai/cos/cosUniversityGraduateRuntime.ts')
+  assert.match(runtime, /const byRegistry = new Map<string, ActiveGraduateRuntime>/)
+  assert.match(runtime, /for \(const role of roles\)/)
+  assert.match(runtime, /for \(const runtime of eligible\) if \(!byRegistry\.has\(runtime\.registryId\)\)/)
+  assert.match(runtime, /cos_university_graduate_serving_attempts/)
+  assert.match(runtime, /candidates\.sort/)
+  assert.doesNotMatch(runtime, /if \(eligible\.length\) return eligible\[0\]/)
+})

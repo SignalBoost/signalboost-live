@@ -500,10 +500,37 @@ export async function activeGraduateApprenticeForObjective(
   objective: string,
 ): Promise<ActiveGraduateRuntime | null> {
   const roles: readonly CosReasoningWorkerRole[] = ['critic', 'verifier', 'researcher', 'context_engineer', 'coder']
+  // Build one pool across every specialist role before choosing. Returning from the first role with
+  // any match starved graduates whose only admitted roles were later in this list. Deduplicate by
+  // registry and prefer a worker that has never received a serving attempt, then the least recently
+  // attempted worker. Scope is still enforced by activeGraduateRuntimesForRole; this changes only
+  // fair dispatch among already-authorized Workforce members.
+  const byRegistry = new Map<string, ActiveGraduateRuntime>()
   for (const role of roles) {
     const eligible = await activeGraduateRuntimesForRole(role, objective)
-    if (eligible.length) return eligible[0]
+    for (const runtime of eligible) if (!byRegistry.has(runtime.registryId)) byRegistry.set(runtime.registryId, runtime)
   }
-  return null
+  const candidates = [...byRegistry.values()]
+  if (!candidates.length) return null
+  if (candidates.length === 1) return candidates[0]
+
+  const db = cosServiceDb()
+  if (!db) return candidates[0]
+  const attempts = await db.from('cos_university_graduate_serving_attempts')
+    .select('registry_id,recorded_at')
+    .in('registry_id', candidates.map(runtime => runtime.registryId))
+    .order('recorded_at', { ascending: false })
+    .limit(2000)
+  if (attempts.error) return candidates[0]
+  const lastAttempt = new Map<string, number>()
+  for (const raw of attempts.data || []) {
+    const row = raw as { registry_id?: unknown; recorded_at?: unknown }
+    const id = clean(row.registry_id, 100)
+    if (!id || lastAttempt.has(id)) continue
+    const at = Date.parse(clean(row.recorded_at, 80))
+    lastAttempt.set(id, Number.isFinite(at) ? at : 0)
+  }
+  candidates.sort((a, b) => (lastAttempt.get(a.registryId) ?? -1) - (lastAttempt.get(b.registryId) ?? -1))
+  return candidates[0]
 }
 // end of saas/lib/ai/cos/cosUniversityGraduateRuntime.ts (if this line is missing, the paste was cut short)

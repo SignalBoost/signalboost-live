@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityAssemblyLine.ts
 //
 // Owner, 2026-10-02: "it should function like an assembly line style ... the individual stations should not own the
 // schedule. The line owns the flow."
@@ -8,6 +7,11 @@
 // before the line is declared stopped. It is pure, imports nothing, grades nothing and authorizes nothing. Every
 // number below was read out of the code or the cron schedule that actually governs that station, and the comment on
 // each one says where.
+//
+// Owner, 2026-10-03: "build a Ferrari not a Lada." Every concurrency below used to be a constant chosen to ration a
+// 10-worker RunPod account. They now come from `cosUniversityLineCapacity.ts`, which derives each station's width
+// from the ONE number a deployment declares: how many concurrent inference workers it has. A buyer with resources
+// gets a line sized to their infrastructure; a small test rig declares its real size and gets small numbers.
 //
 // It exists because the four rules the owner set cannot be enforced from inside the stations:
 //
@@ -21,6 +25,10 @@
 //
 // The distinction that makes this safe: a station SLA is a WATCHDOG, never a mover. Nothing here promotes, passes,
 // fails or dismisses a unit. The stations keep every quality, spend, admission and promotion authority they have.
+
+import { lineCapacity } from './cosUniversityLineCapacity.ts'
+
+const CAPACITY = lineCapacity()
 
 /** One station on the line. `TERMINAL` is the exit, not a station that works. */
 export type StationId =
@@ -88,7 +96,7 @@ export const UNIVERSITY_ASSEMBLY_LINE: readonly Station[] = Object.freeze([
     nextAction: 'run_exact_canary_and_admit_evaluation',
     workerPath: '/api/cron/runpod-mass-distilled-local-deploy',
     cadenceSeconds: 120,
-    concurrency: 1,
+    concurrency: CAPACITY.canary,
     batched: false,
     workSeconds: 10 * 60,
     stationSlaSeconds: 20 * 60,
@@ -101,7 +109,7 @@ export const UNIVERSITY_ASSEMBLY_LINE: readonly Station[] = Object.freeze([
     nextAction: 'complete_independent_evaluation',
     workerPath: '/api/cron/cos-university-mass-distilled-evaluation',
     cadenceSeconds: 120,
-    concurrency: 2,
+    concurrency: CAPACITY.evaluation,
     batched: false,
     workSeconds: 12 * 60,
     stationSlaSeconds: 25 * 60,
@@ -127,7 +135,7 @@ export const UNIVERSITY_ASSEMBLY_LINE: readonly Station[] = Object.freeze([
     nextAction: 'register_and_activate_graduate',
     workerPath: '/api/cron/cos-university-graduate-activation',
     cadenceSeconds: 600,
-    concurrency: 10,
+    concurrency: CAPACITY.registrationsPerTick,
     batched: true,
     workSeconds: 60,
     stationSlaSeconds: 25 * 60,
@@ -201,6 +209,23 @@ export function stationThroughputPerHour(station: Station): number {
   }
   if (station.workSeconds <= 0) return 0
   return (3600 / station.workSeconds) * Math.max(1, station.concurrency)
+}
+
+/**
+ * How long the slowest station holds one unit.
+ *
+ * This is the line's CYCLE time, as distinct from its takt. Widening the line raises throughput and shrinks the takt
+ * - at enterprise capacity the takt is seconds - but one unit still takes as long as the station's work. Anything
+ * that waits to observe a departure must wait at least this long, or it is sampling faster than the line can
+ * possibly produce and will read work-in-progress as a stoppage.
+ */
+export function lineCycleSeconds(stations: readonly Station[] = WORKING_STATIONS): number {
+  let longest = 0
+  for (const station of stations) {
+    if (station.terminal || !station.workerPath) continue
+    if (station.workSeconds > longest) longest = station.workSeconds
+  }
+  return longest
 }
 
 export type LineConstraint = Readonly<{
@@ -400,4 +425,3 @@ export function leaseIsLive(leaseUntil: string | null | undefined, now: Date): b
   if (!Number.isFinite(nowMs)) return false
   return until > nowMs
 }
-// end of saas/lib/ai/cos/cosUniversityAssemblyLine.ts (if this line is missing, the paste was cut short)

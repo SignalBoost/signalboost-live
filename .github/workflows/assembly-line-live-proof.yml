@@ -31,6 +31,10 @@ on:
       - 'saas/lib/ai/cos/cosUniversityAssemblyLine.ts'
       - 'saas/lib/ai/cos/cosUniversityAssemblyLineHandoff.ts'
       - 'saas/lib/ai/cos/cosUniversityLineMovementProof.ts'
+      - 'saas/lib/ai/cos/cosUniversityLineRepairPlan.ts'
+      - 'saas/agent-gateway-host/university-distillation-recovery.ts'
+      - 'saas/self-healing-host/university-distillation-monitoring.ts'
+      - 'saas/tests/cosUniversityDistillationSelfHealing.node.test.ts'
       - 'saas/lib/ai/cos/cosUniversityLifecycleOrchestrator.ts'
       - 'saas/lib/ai/cos/cosUniversityLifecycleStall.ts'
       - 'saas/app/api/cron/cos-university-lifecycle-orchestrator/route.ts'
@@ -71,6 +75,7 @@ jobs:
           tests/massGraduateRegistrationStarvation.node.test.ts
           tests/cosUniversityMassGraduateRegistration.node.test.ts
           tests/quarantineStallDrain.node.test.ts
+          tests/cosUniversityDistillationSelfHealing.node.test.ts
 
   line-live-proof:
     name: Line movement proof against production

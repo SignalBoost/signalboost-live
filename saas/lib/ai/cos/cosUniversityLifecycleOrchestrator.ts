@@ -134,4 +134,31 @@ export function lifecycleDeadlineAnchor(input: {
   const last = input.lastActionAt ? Date.parse(String(input.lastActionAt)) : Number.NaN
   return Number.isFinite(last) ? new Date(last) : input.enteredAt
 }
+/**
+ * The exact text a failed controller run logs.
+ *
+ * Production defect this fixes (2026-10-03, Vercel logs): the controller returned HTTP 500 every minute with
+ * `{"ok":false,"error":"[object Object]"}`. Every throw site in the route rethrows a PostgREST error - a plain object
+ * with message/code/details/hint, not a JavaScript Error - and `String(object)` discards all of it. The ledger stayed
+ * empty for a day while the one line that named the failing query was thrown away. A controller that cannot say why
+ * it stopped is not a controller; this makes the reason the log line.
+ */
+export function describeLifecycleFailure(error: unknown): string {
+  if (error instanceof Error) return compact(error.message || error.name)
+  if (error && typeof error === 'object') {
+    const record = error as Record<string, unknown>
+    const parts = [
+      record.message ? compact(record.message) : '',
+      record.code ? `code=${compact(record.code)}` : '',
+      record.details ? `details=${compact(record.details)}` : '',
+      record.hint ? `hint=${compact(record.hint)}` : '',
+    ].filter(Boolean)
+    if (parts.length) return parts.join(' ')
+    try { return compact(JSON.stringify(record)) } catch { return 'unserializable_error_object' }
+  }
+  return compact(error) || 'unknown_error'
+}
+
+const compact = (value: unknown): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 400)
+
 // end of saas/lib/ai/cos/cosUniversityLifecycleOrchestrator.ts (if this line is missing, the paste was cut short)

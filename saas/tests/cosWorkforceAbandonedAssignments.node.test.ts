@@ -67,7 +67,7 @@ test('the Workforce cron reconciles first and never starts a call it cannot fini
   const verify = route.indexOf('verifyServedWorkforceAssignments()')
   assert.ok(close > 0 && verify > close)
   // Owner 2026-10-02: no paid wake-ups - the cron never waits for a graduate endpoint to boot.
-  assert.match(route, /export const maxDuration = 60\nconst RUN_BUDGET_MS = 50_000\nconst SHADOW_MAX_MS = 15_000/)
+  assert.match(route, /export const maxDuration = 300\nconst RUN_BUDGET_MS = 290_000\nconst SHADOW_MAX_MS = 60_000/)
   assert.doesNotMatch(route, /proveGraduateServedIdentity/)
   assert.match(route, /const shadowTimeoutMs = Math\.min\(SHADOW_MAX_MS, deadline - Date\.now\(\) - SHADOW_CLOSE_MARGIN_MS\)\s+if \(shadowTimeoutMs < 5_000\) break/)
   assert.match(route, /timeoutMs: shadowTimeoutMs,/)

@@ -19,9 +19,9 @@ import {
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 60
-const RUN_BUDGET_MS = 50_000
-const SHADOW_MAX_MS = 15_000
+export const maxDuration = 300
+const RUN_BUDGET_MS = 290_000
+const SHADOW_MAX_MS = 60_000
 const SHADOW_CLOSE_MARGIN_MS = 6_000
 // The reservation reconcile gets the first part of the budget: a slot given back here is a slot the examiner can
 // use this same minute, and it must never be starved by the shadow work that follows it.
@@ -89,7 +89,7 @@ async function run(req: NextRequest) {
   if (!db) return NextResponse.json({ ok: false, error: 'cos_service_db_unavailable' }, { status: 503 })
   // NO PAID WAKE-UPS (owner 2026-10-02: "I do not want to pay $12-24 a day"). This job never boots a graduate endpoint
   // or waits for one. Practice work goes only to graduates whose endpoint is already running (runWorkforceApprenticeShadow
-  // checks that with a free status read). This route is killed at maxDuration (60s), so it stops starting calls it cannot
+  // checks that with a free status read). This route is killed at maxDuration (300s), so it stops starting calls it cannot
   // finish and close before then.
   const deadline = Date.now() + RUN_BUDGET_MS
 

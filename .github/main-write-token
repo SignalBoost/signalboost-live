@@ -1,2 +1,2 @@
-base_sha=34bd2d91e8e55957dcf75a7d80cd0de38c1969b4
-branch=fix/university-single-worker-capacity
+base_sha=27673b680c3085cd2f58b6599f1792902301c657
+branch=fix/workforce-measured-runtime-budget

@@ -23,7 +23,7 @@ import {
   WORKER_QUOTA_ENV,
   describeLineCapacity,
   lineCapacity,
-  resolveWorkerPool,
+  declaredInferenceWorkers,
 } from '../lib/ai/cos/cosUniversityLineCapacity.ts'
 
 const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
@@ -36,7 +36,7 @@ const PROVISIONERS = [
 // 1. Unset -> fallback = 10, telemetry = undeclared_fallback
 // ---------------------------------------------------------------------------------------------------------------
 test('unset: the pool falls back to 10 and telemetry says undeclared_fallback', () => {
-  const pool = resolveWorkerPool({})
+  const pool = declaredInferenceWorkers({})
   assert.equal(pool.workers, 10)
   assert.equal(pool.workers, UNDECLARED_WORKER_FALLBACK)
   assert.equal(pool.source, 'undeclared_fallback')
@@ -59,7 +59,7 @@ test('unset: the pool falls back to 10 and telemetry says undeclared_fallback', 
 // 2. Quota set -> telemetry = runpod_quota
 // ---------------------------------------------------------------------------------------------------------------
 test('quota set: the pool is the quota and telemetry says runpod_quota', () => {
-  const pool = resolveWorkerPool({ [WORKER_QUOTA_ENV]: '256' })
+  const pool = declaredInferenceWorkers({ [WORKER_QUOTA_ENV]: '256' })
   assert.equal(pool.workers, 256)
   assert.equal(pool.source, 'runpod_quota')
   assert.equal(pool.declared, true)
@@ -74,7 +74,7 @@ test('quota set: the pool is the quota and telemetry says runpod_quota', () => {
 // 3. Override set -> telemetry = university_override
 // ---------------------------------------------------------------------------------------------------------------
 test('override set: the pool is the override and telemetry says university_override', () => {
-  const pool = resolveWorkerPool({ [INFERENCE_WORKERS_ENV]: '64' })
+  const pool = declaredInferenceWorkers({ [INFERENCE_WORKERS_ENV]: '64' })
   assert.equal(pool.workers, 64)
   assert.equal(pool.source, 'university_override')
   assert.equal(pool.declared, true)
@@ -93,7 +93,7 @@ test('override set: the pool is the override and telemetry says university_overr
 test('contradiction: the override wins, and telemetry names what it overrode', () => {
   // This is the exact shape of the defect: both variables set, disagreeing. It must resolve one way, every time,
   // and say so - a silent winner is how 10 and 256 coexisted for a day.
-  const pool = resolveWorkerPool({ [INFERENCE_WORKERS_ENV]: '64', [WORKER_QUOTA_ENV]: '256' })
+  const pool = declaredInferenceWorkers({ [INFERENCE_WORKERS_ENV]: '64', [WORKER_QUOTA_ENV]: '256' })
   assert.equal(pool.workers, 64, 'the override must win')
   assert.equal(pool.source, 'university_override')
   assert.equal(pool.sourceEnv, INFERENCE_WORKERS_ENV)
@@ -104,23 +104,30 @@ test('contradiction: the override wins, and telemetry names what it overrode', (
   assert.doesNotMatch(telemetry, /workers=256/, 'the losing declaration must never appear as the pool')
 
   // The resolution order is total: the same inputs always produce the same winner, in either declaration order.
-  assert.equal(resolveWorkerPool({ [WORKER_QUOTA_ENV]: '256', [INFERENCE_WORKERS_ENV]: '64' }).workers, 64)
+  assert.equal(declaredInferenceWorkers({ [WORKER_QUOTA_ENV]: '256', [INFERENCE_WORKERS_ENV]: '64' }).workers, 64)
 })
 
 // ---------------------------------------------------------------------------------------------------------------
 // 5. Regression guard -> build fails if the fallback literal changes
 // ---------------------------------------------------------------------------------------------------------------
-test('regression guard: the fallback is pinned to the provisioner literal in both provisioners', () => {
-  // This is the guard that would have caught the original defect at build time. If either provisioner's fallback
-  // moves, UNDECLARED_WORKER_FALLBACK must move with it or the build stops here.
+test('regression guard: the fallback literal lives in one place and both provisioners consume it', () => {
+  // This is the guard that would have caught the original defect at build time. The literal `|| '10'` used to sit
+  // in the provisioners; main 6f04eb7 moved both provisioners onto declaredInferenceWorkers(), so the literal now
+  // lives in exactly one line of the capacity module. If that line changes, or a provisioner grows a fallback of
+  // its own again, the build stops here.
+  assert.equal(UNDECLARED_WORKER_FALLBACK, 10)
+  const capacity = read('../lib/ai/cos/cosUniversityLineCapacity.ts')
+  assert.equal((capacity.match(/^export const UNDECLARED_WORKER_FALLBACK = 10$/gm) || []).length, 1,
+    'the fallback literal must be declared exactly once, as 10')
   for (const provisioner of PROVISIONERS) {
     const source = read(provisioner)
-    assert.match(source, new RegExp(`process\\.env\\.${WORKER_QUOTA_ENV}`),
-      `${provisioner} must read the same variable the line is sized from`)
-    assert.match(source, new RegExp(`${WORKER_QUOTA_ENV}\\s*\\|\\|\\s*'${UNDECLARED_WORKER_FALLBACK}'`),
-      `${provisioner} fallback no longer matches UNDECLARED_WORKER_FALLBACK=${UNDECLARED_WORKER_FALLBACK}`)
+    assert.match(source, /import \{ declaredInferenceWorkers \} from '\.\/cosUniversityLineCapacity\.ts'/,
+      `${provisioner} must take its pool from the single resolution`)
+    assert.match(source, /declaredInferenceWorkers\(\)/, `${provisioner} imports the resolution but never calls it`)
+    assert.doesNotMatch(source, new RegExp(`process\\.env\\.${WORKER_QUOTA_ENV}`),
+      `${provisioner} reads the quota on its own again - that is the two-sources defect returning`)
+    assert.doesNotMatch(source, /\|\|\s*'10'|\|\|\s*10\b/, `${provisioner} carries a fallback of its own again`)
   }
-  assert.equal(UNDECLARED_WORKER_FALLBACK, 10)
 })
 
 test('regression guard: capacity reads exactly these two variables and nothing else', () => {
@@ -129,8 +136,8 @@ test('regression guard: capacity reads exactly these two variables and nothing e
   const envReads = [...source.matchAll(/env\[([A-Za-z_]+)\]/g)].map(match => match[1])
   assert.deepEqual([...new Set(envReads)].sort(), ['INFERENCE_WORKERS_ENV', 'WORKER_QUOTA_ENV'])
   // Only one function may resolve the pool, so there is one place a contradiction can be decided.
-  assert.equal((source.match(/export function resolveWorkerPool/g) || []).length, 1)
-  assert.match(source, /export function lineCapacity[\s\S]{0,200}?resolveWorkerPool\(env\)/,
+  assert.equal((source.match(/export function declaredInferenceWorkers/g) || []).length, 1)
+  assert.match(source, /export function lineCapacity[\s\S]{0,200}?declaredInferenceWorkers\(env\)/,
     'lineCapacity must size stations from the single resolution, not re-read the environment')
 })
 
@@ -161,13 +168,13 @@ test('a declared pool scales the whole line from that one change', () => {
 test('an unusable declaration degrades to the fallback instead of being guessed at', () => {
   for (const raw of ['0', '-5', '', '  ', 'lots', '3.5', 'NaN']) {
     for (const name of [WORKER_QUOTA_ENV, INFERENCE_WORKERS_ENV]) {
-      const pool = resolveWorkerPool({ [name]: raw })
+      const pool = declaredInferenceWorkers({ [name]: raw })
       assert.equal(pool.workers, UNDECLARED_WORKER_FALLBACK, `${name}=${raw} must fall back`)
       assert.equal(pool.source, 'undeclared_fallback')
     }
   }
-  assert.equal(resolveWorkerPool({ [WORKER_QUOTA_ENV]: '1' }).workers, MINIMUM_WORKER_POOL)
-  assert.equal(resolveWorkerPool({ [WORKER_QUOTA_ENV]: '99999999' }).workers, MAXIMUM_WORKER_POOL)
+  assert.equal(declaredInferenceWorkers({ [WORKER_QUOTA_ENV]: '1' }).workers, MINIMUM_WORKER_POOL)
+  assert.equal(declaredInferenceWorkers({ [WORKER_QUOTA_ENV]: '99999999' }).workers, MAXIMUM_WORKER_POOL)
 })
 
 test('telemetry matches the code exactly: every figure is read off the sized object', () => {

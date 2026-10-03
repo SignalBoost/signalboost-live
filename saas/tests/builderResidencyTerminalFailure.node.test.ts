@@ -228,7 +228,7 @@ test('the tick sweep fails only residents that can never finish, with evidence f
   assert.match(event.value.evidence_hash,/^[a-f0-9]{64}$/)
 
   assert.equal(artifact.value.status,'quarantined')
-  assert.ok(artifact.filters.some(item=>item[0]==='eq'&&item[1]==='status'&&item[2]==='evaluation_pending'))
+  assert.ok(artifact.filters.some(item=>item[0]==='eq'&&item[1]==='status'&&item[2]==='evaluation_ready'))
   assert.ok(artifact.filters.some(item=>item[0]==='eq'&&item[1]==='candidate_id'&&item[2]==='mass:dead0001'))
 
   assert.equal(enrollment.value.standing,'residency_failed')

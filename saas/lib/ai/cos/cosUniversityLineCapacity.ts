@@ -110,7 +110,7 @@ const positiveInt = (raw: unknown): number | null => {
  * An unusable value (zero, negative, fractional, non-numeric) is treated as not declared rather than guessed at, so
  * a typo degrades to the provisioner's fallback instead of silently resizing the line.
  */
-export function resolveWorkerPool(env: Record<string, string | undefined> = process.env): WorkerPoolResolution {
+export function declaredInferenceWorkers(env: Record<string, string | undefined> = process.env): WorkerPoolResolution {
   const clamp = (value: number) => Math.min(MAXIMUM_WORKER_POOL, Math.max(MINIMUM_WORKER_POOL, value))
   const override = positiveInt(env[INFERENCE_WORKERS_ENV])
   const quota = positiveInt(env[WORKER_QUOTA_ENV])
@@ -151,7 +151,7 @@ export function resolveWorkerPool(env: Record<string, string | undefined> = proc
  * hand ("preserve one unreserved worker of headroom"), and it is arithmetic now rather than a comment.
  */
 export function lineCapacity(env: Record<string, string | undefined> = process.env): LineCapacity {
-  const pool = resolveWorkerPool(env)
+  const pool = declaredInferenceWorkers(env)
   const workers = pool.workers
 
   // Leave at least three workers for the line itself, whatever the share arithmetic produces.

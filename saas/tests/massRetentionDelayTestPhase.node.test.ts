@@ -25,9 +25,11 @@ test('the production-line wait defaults to zero and every TypeScript gate uses t
 
 test('the SQL claim has a later in-place migration removing the artificial wait', () => {
   const migration = read('../supabase/migrations/20260929021500_mass_evaluation_test_phase_retention_delay.sql')
-  assert.equal(MASS_RETENTION_DELAY_SQL_INTERVAL, '10 minutes')
+  assert.equal(MASS_RETENTION_DELAY_SQL_INTERVAL, '0 minutes')
   assert.match(migration, /p\.proname = 'claim_next_mass_distilled_evaluation'/)
   assert.match(migration, /replace\(definition, 'interval ''12 hours''', 'interval ''10 minutes'''\)/)
+  const zeroDelayMigration = read('../supabase/migrations/20261003153000_mass_evaluation_claim_retention_zero.sql')
+  assert.match(zeroDelayMigration, /interval ''10 minutes''.*interval ''0 minutes''/s)
   assert.match(migration, /pg_get_functiondef/)
 })
 

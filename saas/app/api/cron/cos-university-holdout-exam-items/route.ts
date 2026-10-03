@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { fillRequestedHoldoutExamSets } from '@/lib/ai/cos/cosUniversityHoldoutExamItems'
+import { lineCapacity } from '@/lib/ai/cos/cosUniversityLineCapacity'
 import { describeExamSetPopulation } from '@/lib/ai/cos/cosUniversityHoldoutExamSetRecovery'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
@@ -29,7 +30,11 @@ export async function GET(request: NextRequest) {
     // 975 exams requested against 157 ready: at 3 sets per tick the writer never catches up with training output, so
     // students keep arriving in a queue that grows faster than it drains. 10 is the function's own built-in ceiling
     // (Math.min(10, ...)), not a new maximum.
-    const result = await fillRequestedHoldoutExamSets({ db, limit: 10 })
+    // Owner 2026-10-03, "build a Ferrari not a Lada": the batch is no longer a constant. It comes from the inference
+    // capacity this deployment declares and is kept AHEAD of the canary, because a canary waiting on an exam set is
+    // precisely this morning's line stop. Exam items cost small teacher calls and no inference worker, so there is no
+    // infrastructure reason to hold this station narrow.
+    const result = await fillRequestedHoldoutExamSets({ db, limit: lineCapacity().examSetsPerTick })
     const summary = result.population ? describeExamSetPopulation(result.population) : 'exam set population unreadable'
     if (result.errors.length || result.aborted) console.warn('[cos-holdout-exam-items]', JSON.stringify({ ...result, summary }))
     await recordCosUniversityProductionPath({

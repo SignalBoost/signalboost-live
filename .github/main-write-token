@@ -1,2 +1,2 @@
-base_sha=d989e0ce1e5797e8fd9fe61f1f71ba5074e4fd31
-branch=fix/builder-residency-evaluation-ready
+base_sha=2ffc352a45ad62f81347bfc83aa55970783e9a12
+branch=fix/residency-status-runtime-consistency-20261003

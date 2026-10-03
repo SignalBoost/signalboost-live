@@ -36,7 +36,7 @@ function artifactDb(){
                   trained_artifact_hash:identity.artifactHash,
                   revision_key:identity.revisionKey,
                   evidence_ref:`hf://models/cadomos/itmounts-student-test@${r40('c')}`,
-                  status:'evaluation_pending',
+                  status:'evaluation_ready',
                   authority_expanded:false,
                 },
                 error:null,
@@ -516,3 +516,4 @@ test('Residency runtime key is bound to the exact-artifact image so a new image 
     `itmounts-mass-distilled-${identity.artifactHash.slice(0,12)}-${expectedKey}-${provisioner.MASS_DISTILLED_EXACT_ENDPOINT_GENERATION}`,
   )
 })
+// end of saas/tests/builderResidencyExactArtifactModel.node.test.ts (if this line is missing, the paste was cut short)

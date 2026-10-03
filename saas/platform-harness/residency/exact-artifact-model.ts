@@ -2,6 +2,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { MASS_DISTILLED_RESIDENCY_IDLE_TIMEOUT_SECONDS } from '../../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
 import { builderResidencyRuntimeKey } from '../../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts'
+import { RESIDENCY_STUDENT_STATUS } from '../../lib/ai/cos/cosUniversityResidency.ts'
 export interface BuilderResidencyModelIdentity {
   candidateId:string
   artifactId:string
@@ -109,7 +110,7 @@ async function resolveResidencyArtifact(
   if(
     String(row.trained_artifact_id)!==artifactId||
     String(row.revision_key).toLowerCase()!==revisionKey||
-    String(row.status)!=='evaluation_pending'||
+    String(row.status)!==RESIDENCY_STUDENT_STATUS||
     row.authority_expanded===true
   ){
     throw new Error('residency_exact_artifact_registry_mismatch')

@@ -1,7 +1,7 @@
 // saas/platform-harness/residency/orchestrator-store.ts
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ResidencyEvidenceForAssessment, ResidencyStanding } from '../../lib/ai/cos/cosUniversityResidency.ts'
+import { RESIDENCY_STUDENT_STATUS, type ResidencyEvidenceForAssessment, type ResidencyStanding } from '../../lib/ai/cos/cosUniversityResidency.ts'
 import {
   unrecoverableBuilderResidencyCompetencies,
   type BuilderResidencyEnrollment,
@@ -209,7 +209,7 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
 
   /**
    * Record the terminal Residency FAIL: the evidence of WHY first (idempotent on a deterministic key), then
-   * the student's artifact verdict (quarantined, only from evaluation_pending), then the enrollment standing
+   * the student's artifact verdict (quarantined, only from RESIDENCY_STUDENT_STATUS), then the enrollment standing
    * (only from an active standing). Every step is conditional, so a retry after a partial failure repeats
    * nothing and completes the rest. This records an educational result; it never evaluates, scores,
    * promotes, spends or touches Production.
@@ -256,7 +256,7 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
       .update({status:'quarantined',updated_at:now})
       .eq('candidate_id',enrollment.candidateId)
       .eq('trained_artifact_hash',enrollment.artifactHash)
-      .eq('status','evaluation_pending')
+      .eq('status',RESIDENCY_STUDENT_STATUS)
       .select('id')
     if(artifact.error) throw artifact.error
 
@@ -276,7 +276,7 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
    * all 10 active residents' artifacts were `retired` (a newer student of the identical training lineage had already
    * passed its exam, so the backlog compactor retired them) while their enrollments stayed active. Every case then
    * stopped on residency_exact_artifact_registry_mismatch: 24 case turns in one hour, 0 passes. Returns the keys
-   * (candidateId:hash) of the given enrollments whose student is still evaluation_pending.
+   * (candidateId:hash) of the given enrollments whose student is still at RESIDENCY_STUDENT_STATUS.
    */
   async function stillWaitingStudents(enrollments:readonly any[]):Promise<Set<string>>{
     const waiting=new Set<string>()
@@ -286,7 +286,7 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
         .from('cos_local_distillation_artifacts')
         .select('candidate_id,trained_artifact_hash,status')
         .in('candidate_id',candidateIds.slice(offset,offset+75))
-        .eq('status','evaluation_pending')
+        .eq('status',RESIDENCY_STUDENT_STATUS)
       if(artifacts.error) throw artifacts.error
       for(const row of artifacts.data??[]){
         waiting.add(`${String((row as any).candidate_id)}:${String((row as any).trained_artifact_hash).toLowerCase()}`)
@@ -362,7 +362,7 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
             .maybeSingle()
           if(current.error) throw current.error
           const artifactStatus=current.data?String((current.data as any).status):'missing'
-          if(artifactStatus==='evaluation_pending') continue
+          if(artifactStatus===RESIDENCY_STUDENT_STATUS) continue
           const now=new Date().toISOString()
           const body={
             profile:BUILDER_RESIDENCY_FINAL_DISPOSITION_PROFILE,
@@ -490,3 +490,4 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
     },
   })
 }
+// end of saas/platform-harness/residency/orchestrator-store.ts (if this line is missing, the paste was cut short)

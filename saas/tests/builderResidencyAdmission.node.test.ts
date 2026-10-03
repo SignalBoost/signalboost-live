@@ -1,9 +1,10 @@
+// saas/tests/builderResidencyAdmission.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   admitNextBuilderResidency,
-  BUILDER_RESIDENCY_PROGRAM_ID,
 } from '../platform-harness/index.ts'
+import { BUILDER_RESIDENCY_PROGRAM_ID } from '../lib/ai/cos/cosUniversityResidency.ts'
 
 const hash=(char:string)=>char.repeat(64)
 
@@ -61,7 +62,7 @@ test('auto admission creates exactly one idempotent enrollment for the oldest el
     trained_artifact_id:'cadomos/itmounts-student-test',
     trained_artifact_hash:hash('a'),
     revision_key:hash('b'),
-    status:'evaluation_pending',
+    status:'evaluation_ready',
     authority_expanded:false,
   }
 
@@ -74,7 +75,7 @@ test('auto admission creates exactly one idempotent enrollment for the oldest el
               eq(){return this},
               like(){return this},
               order(){return this},
-              async limit(){
+              async range(){
                 return {data:[artifact],error:null}
               },
             }
@@ -144,7 +145,7 @@ test('auto admission skips an already-enrolled artifact and admits the next cand
       trained_artifact_id:'cadomos/itmounts-student-first',
       trained_artifact_hash:hash('c'),
       revision_key:hash('d'),
-      status:'evaluation_pending',
+      status:'evaluation_ready',
       authority_expanded:false,
     },
     {
@@ -154,7 +155,7 @@ test('auto admission skips an already-enrolled artifact and admits the next cand
       trained_artifact_id:'cadomos/itmounts-student-second',
       trained_artifact_hash:hash('e'),
       revision_key:hash('f'),
-      status:'evaluation_pending',
+      status:'evaluation_ready',
       authority_expanded:false,
     },
   ]
@@ -233,7 +234,7 @@ test('auto admission pages past an enrolled first window instead of starving an 
     trained_artifact_id:`cadomos/enrolled-${i}`,
     trained_artifact_hash:hash('a'),
     revision_key:hash('b'),
-    status:'evaluation_pending',
+    status:'evaluation_ready',
     authority_expanded:false,
   }))
   const aged={
@@ -243,7 +244,7 @@ test('auto admission pages past an enrolled first window instead of starving an 
     trained_artifact_id:'cadomos/aged-candidate',
     trained_artifact_hash:hash('c'),
     revision_key:hash('d'),
-    status:'evaluation_pending',
+    status:'evaluation_ready',
     authority_expanded:false,
   }
   const pages=[enrolled,[aged]]
@@ -285,3 +286,4 @@ test('auto admission pages past an enrolled first window instead of starving an 
   assert.equal(writes.length,1)
   assert.equal(writes[0].value.artifact_row_id,aged.id)
 })
+// end of saas/tests/builderResidencyAdmission.node.test.ts (if this line is missing, the paste was cut short)

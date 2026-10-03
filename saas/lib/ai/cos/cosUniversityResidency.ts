@@ -1,8 +1,22 @@
+// saas/lib/ai/cos/cosUniversityResidency.ts
 import { createHash } from 'node:crypto'
 
 export const COS_UNIVERSITY_RESIDENCY_VERSION = 'cos-university-residency-v2' as const
 export const BUILDER_RESIDENCY_PROGRAM_ID = 'builder-computer-science-v1' as const
 export const BUILDER_RESIDENCY_RETENTION_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The artifact-ledger status of a student WHILE it is in Residency.
+ *
+ * Production 2026-10-03: Residency admitted only `evaluation_pending`, but a Computer Science artifact reaches
+ * `evaluation_pending` through the exact canary, and the canary admits a Computer Science artifact only once it holds
+ * `residency_complete`. Each gate waited for the other; 7 trained coders sat at `evaluation_ready` with no way in, and
+ * every coding graduate the platform had ever produced came from an earlier status scheme. Residency starts from the
+ * TRAINED artifact - the state after training and before any canary - which is `evaluation_ready`. The order is:
+ * trained -> evaluation_ready -> Residency -> residency_complete -> exact canary -> evaluation_pending ->
+ * independent evaluation -> graduation. The final-evaluation gate is untouched.
+ */
+export const RESIDENCY_STUDENT_STATUS = 'evaluation_ready' as const
 
 export const RESIDENCY_LEVELS = ['student','candidate','resident','senior_resident','graduate_specialist','active_specialist'] as const
 export type ResidencyLevel = (typeof RESIDENCY_LEVELS)[number]
@@ -52,8 +66,9 @@ export type ResidencyAdmissionInput=Readonly<{
 
 /**
  * Residency is part of formal education. Admission therefore starts from a trained immutable student
- * artifact, before the final canary and independent final examination. evaluation_ready is the
- * current artifact-ledger state that proves training + rollback registration are durable and the student is ready for Residency.
+ * artifact, before the exact canary and the independent final examination. RESIDENCY_STUDENT_STATUS
+ * (`evaluation_ready`) is the artifact-ledger state that proves training + rollback registration are durable
+ * and that no canary has yet been attempted.
  */
 export function decideResidencyAdmission(input:ResidencyAdmissionInput){
   const blockers:string[]=[]
@@ -66,7 +81,7 @@ export function decideResidencyAdmission(input:ResidencyAdmissionInput){
   if(!clean(input.trainedArtifactId,500)) blockers.push('residency_trained_artifact_missing')
   if(!HEX64.test(artifactHash)) blockers.push('residency_artifact_hash_invalid')
   if(!HEX64.test(revisionKey)) blockers.push('residency_revision_key_invalid')
-  if(input.artifactStatus!=='evaluation_ready') blockers.push('residency_trained_artifact_not_ready')
+  if(input.artifactStatus!==RESIDENCY_STUDENT_STATUS) blockers.push('residency_trained_artifact_not_ready')
   if(input.authorityExpanded) blockers.push('residency_authority_expansion_forbidden')
 
   return Object.freeze({
@@ -233,3 +248,4 @@ export function finalEvaluationResidencyGate(input:{
     reason:!enforced||input.residencyComplete===true?null:'formal_residency_not_complete',
   })
 }
+// end of saas/lib/ai/cos/cosUniversityResidency.ts (if this line is missing, the paste was cut short)

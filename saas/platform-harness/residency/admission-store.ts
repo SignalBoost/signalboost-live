@@ -1,8 +1,10 @@
+// saas/platform-harness/residency/admission-store.ts
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   BUILDER_RESIDENCY_PROGRAM_ID,
   COS_UNIVERSITY_RESIDENCY_VERSION,
+  RESIDENCY_STUDENT_STATUS,
   decideResidencyAdmission,
   type ResidencyAdmissionInput,
 } from '../../lib/ai/cos/cosUniversityResidency.ts'
@@ -136,7 +138,7 @@ export async function admitNextBuilderResidency(input:{
     const artifacts=await input.db
       .from('cos_local_distillation_artifacts')
       .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,status,authority_expanded')
-      .eq('status','evaluation_ready')
+      .eq('status',RESIDENCY_STUDENT_STATUS)
       .eq('subject_id','Computer Science & Coding')
       .eq('authority_expanded',false)
       .like('candidate_id','mass:%')
@@ -194,3 +196,4 @@ export async function admitNextBuilderResidency(input:{
     productionTrafficAuthorized:false as const,
   })
 }
+// end of saas/platform-harness/residency/admission-store.ts (if this line is missing, the paste was cut short)

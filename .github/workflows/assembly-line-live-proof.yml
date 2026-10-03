@@ -1,4 +1,3 @@
-# .github/workflows/assembly-line-live-proof.yml
 #
 # Owner 2026-10-02: "PLAYWRIGHT WATCHDOG - independently proves the line."
 #
@@ -32,6 +31,11 @@ on:
       - 'saas/lib/ai/cos/cosUniversityAssemblyLineHandoff.ts'
       - 'saas/lib/ai/cos/cosUniversityLineMovementProof.ts'
       - 'saas/lib/ai/cos/cosUniversityLineRepairPlan.ts'
+      - 'saas/lib/ai/cos/cosUniversityHoldoutExamSetRecovery.ts'
+      - 'saas/lib/ai/cos/cosUniversityHoldoutExamItems.ts'
+      - 'saas/app/api/cron/cos-university-holdout-exam-items/route.ts'
+      - 'saas/tests/holdoutExamSetBurnout.node.test.ts'
+      - 'saas/tests/cosUniversityHoldoutExamItems.node.test.ts'
       - 'saas/agent-gateway-host/university-distillation-recovery.ts'
       - 'saas/self-healing-host/university-distillation-monitoring.ts'
       - 'saas/tests/cosUniversityDistillationSelfHealing.node.test.ts'
@@ -76,6 +80,9 @@ jobs:
           tests/cosUniversityMassGraduateRegistration.node.test.ts
           tests/quarantineStallDrain.node.test.ts
           tests/cosUniversityDistillationSelfHealing.node.test.ts
+          tests/holdoutExamSetBurnout.node.test.ts
+          tests/cosUniversityHoldoutExamItems.node.test.ts
+          tests/holdoutExamReadyThroughput.node.test.ts
 
   line-live-proof:
     name: Line movement proof against production
@@ -120,4 +127,3 @@ jobs:
           name: assembly-line-movement-proof-${{ github.run_id }}
           path: saas/playwright-report
           retention-days: 90
-# end of .github/workflows/assembly-line-live-proof.yml (if this line is missing, the paste was cut short)

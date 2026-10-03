@@ -52,8 +52,8 @@ export type ResidencyAdmissionInput=Readonly<{
 
 /**
  * Residency is part of formal education. Admission therefore starts from a trained immutable student
- * artifact, before the final canary and independent final examination. evaluation_pending is the
- * current artifact-ledger state that proves training + rollback registration are durable.
+ * artifact, before the final canary and independent final examination. evaluation_ready is the
+ * current artifact-ledger state that proves training + rollback registration are durable and the student is ready for Residency.
  */
 export function decideResidencyAdmission(input:ResidencyAdmissionInput){
   const blockers:string[]=[]
@@ -66,7 +66,7 @@ export function decideResidencyAdmission(input:ResidencyAdmissionInput){
   if(!clean(input.trainedArtifactId,500)) blockers.push('residency_trained_artifact_missing')
   if(!HEX64.test(artifactHash)) blockers.push('residency_artifact_hash_invalid')
   if(!HEX64.test(revisionKey)) blockers.push('residency_revision_key_invalid')
-  if(input.artifactStatus!=='evaluation_pending') blockers.push('residency_trained_artifact_not_ready')
+  if(input.artifactStatus!=='evaluation_ready') blockers.push('residency_trained_artifact_not_ready')
   if(input.authorityExpanded) blockers.push('residency_authority_expansion_forbidden')
 
   return Object.freeze({

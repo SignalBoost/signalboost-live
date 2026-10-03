@@ -40,12 +40,17 @@ describe('COS University Residency', () => {
       trainedArtifactId: 'cadomos/itmounts-student-test',
       trainedArtifactHash: h,
       revisionKey: r,
-      artifactStatus: 'evaluation_pending',
+      artifactStatus: 'evaluation_ready',
       authorityExpanded: false,
     })
     assert.equal(decision.eligible, true)
     assert.equal(decision.formalEducationStage, 'practical_residency')
     assert.equal(decision.promotionAuthorized, false)
+    assert.equal(decideResidencyAdmission({
+      artifactRowId: 'artifact-row-1', candidateId: base.candidateId, subjectId: 'Computer Science & Coding',
+      trainedArtifactId: 'cadomos/itmounts-student-test', trainedArtifactHash: h, revisionKey: r,
+      artifactStatus: 'evaluation_pending', authorityExpanded: false,
+    }).eligible, false)
   })
 
   it('records supervised practical evidence without requiring a final-exam pass', () => {

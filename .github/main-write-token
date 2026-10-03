@@ -1,2 +1,2 @@
-base_sha=27673b680c3085cd2f58b6599f1792902301c657
-branch=fix/workforce-measured-runtime-budget
+base_sha=d989e0ce1e5797e8fd9fe61f1f71ba5074e4fd31
+branch=fix/builder-residency-evaluation-ready

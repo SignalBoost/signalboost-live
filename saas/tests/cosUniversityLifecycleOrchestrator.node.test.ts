@@ -84,10 +84,18 @@ test('one status maps to exactly one station, and the line has no duplicate stat
   assert.equal(stationForStatus(''), null)
 })
 
-test('the controller reconciles exactly the statuses the line declares', () => {
+test('the controller reconciles every working station without terminal history starving live material', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
-  // A hand-maintained second list is how a status silently stops being reconciled.
-  assert.match(route, /\.in\('status', \[\.\.\.LINE_STATUSES\]\)/)
+  // Production regression, 2026-10-03: one oldest-first LIMIT 500 across all statuses returned 499 retired + 1 active
+  // while 245 evaluation_ready artifacts never reached the ledger. Working stations must own independent intake.
+  assert.match(route, /Promise\.all\(WORKING_STATIONS\.map\(station =>/)
+  assert.match(route, /\.eq\('status', station\.sourceStatus\)/)
+  assert.match(route, /stage: 'read_working_artifacts'/)
+  assert.match(route, /const terminalStatus = stationById\('TERMINAL'\)\?\.sourceStatus/)
+  assert.match(route, /\.eq\('status', terminalStatus\)/)
+  assert.match(route, /\.order\('updated_at', \{ ascending: false \}\)/)
+  assert.doesNotMatch(route, /\.in\('status', \[\.\.\.LINE_STATUSES\]\)[\s\S]{0,150}?\.limit\(MAX_ARTIFACTS\)/,
+    'terminal history must never share the live material intake limit')
   assert.doesNotMatch(route, /const ORCHESTRATED_STATUSES/)
 })
 

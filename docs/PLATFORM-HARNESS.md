@@ -181,7 +181,7 @@ navigation, TypeScript/Next.js repair, and cross-specialist escalation.
 
 ## Residency final-evaluation handoff
 
-For Builder / Computer Science artifacts, `evaluation_pending` means the artifact is trained and eligible
+For Builder / Computer Science artifacts, `evaluation_ready` means the artifact is trained and eligible
 for practical Residency, not yet eligible for final evaluation. The database claim boundary now requires
 the exact candidate + artifact hash to have a durable `residency_complete` enrollment before either the
 final runtime-canary or independent-evaluation lane may claim it.

@@ -50,7 +50,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const MAX_ARTIFACTS = 2500
+const MAX_ARTIFACTS = 500
 const RECONCILE_CHUNK = 200
 const ACTION_TIMEOUT_MS = 8_000
 const OVERDUE_REPORT_LIMIT = 50
@@ -255,7 +255,7 @@ async function run(req: NextRequest) {
     const fired = await Promise.all(Array.from({ length: lanes }, () => triggerStation({
       path: plan.workerPath,
       host: requestHost(req),
-      timeoutMs: ACTION_TIMEOUT_MS,
+      timeoutMs: 2_000,
     })))
     const woken = fired.filter(result => result.ok).length
     if (!woken) {

@@ -1,6 +1,13 @@
+// saas/self-healing-host/university-distillation-monitoring.ts
 import { createHash } from 'node:crypto'
 import type { Observer, ProviderObservationContext } from '../lib/supervisor/execution-contracts.ts'
 import { incidentSchema, type SupervisorIncident } from '../lib/supervisor/incident-schema.ts'
+import {
+  LIFECYCLE_STALL_REASONS,
+  decideUniversityLifecycleStalls,
+  type LifecycleStageReading,
+  type LifecycleStall,
+} from '../lib/ai/cos/cosUniversityLifecycleStall.ts'
 import { COS_UNIVERSITY_MASS_DISTILLATION_CRON_PATH } from '../lib/ai/cos/cosUniversityMassDistillationContract.ts'
 import { hostCronCadence } from './host-scheduler.ts'
 import type { NativeMonitoringCollector } from './native-monitoring-runtime.ts'
@@ -73,6 +80,12 @@ export type UniversityDistillationHealthReason =
   | 'curriculum_supply_waiting'
   | 'rolling_budget_exhausted'
   | 'rolling_authorization_disabled'
+  // 2026-10-02: the DOWNSTREAM half of the student lifecycle. Every reason above is upstream of the artifact
+  // existing, which is why four separate parkings ran for days behind a green heartbeat.
+  | 'lifecycle_exam_stalled'
+  | 'lifecycle_quarantine_stalled'
+  | 'lifecycle_registration_stalled'
+  | 'lifecycle_activation_stalled'
 
 export interface UniversityDistillationHealthSnapshot {
   checkedAt: string
@@ -89,6 +102,7 @@ export interface UniversityDistillationHealthSnapshot {
   receiptAgeSeconds: number | null
   workflowRuns: number
   claimableRuns: number
+  lifecycleStalls: readonly LifecycleStall[]
   stalledDispatchRuns: number
   workflowProgressAgeSeconds: number | null
   failedRuns: number
@@ -209,11 +223,16 @@ export function evaluateUniversityMassDistillationHealth(input: {
   providerJobs: readonly ProviderJobRow[]
   continuity?: RollingContinuityInput
   curriculumProgress?: CurriculumPackagingProgress
+  lifecycleStages?: readonly LifecycleStageReading[]
 }): UniversityDistillationHealthSnapshot {
   const nowMs = input.now.getTime()
   const expectedIntervalSeconds = Math.max(60, Math.min(3600, Math.floor(input.expectedIntervalSeconds)))
   const maximumHeartbeatAgeSeconds = Math.max(15 * 60, expectedIntervalSeconds * 3)
   const failedRunGraceSeconds = Math.max(20 * 60, expectedIntervalSeconds * 4)
+  // The downstream half of the lifecycle, decided by its own pure module. A stage with no work is silent, so this
+  // is empty whenever the pipeline is simply drained. It observes only: it cannot pass, fail or promote a student.
+  const lifecycleStalls = decideUniversityLifecycleStalls({ stages: input.lifecycleStages ?? [], now: input.now })
+  const lifecycleReasons = lifecycleStalls.map(stall => stall.reason)
   // A failed campaign with completed_at is terminal history, not live recovery work. Production
   // rolling authority already uses this lifecycle rule; the monitor must use the same rule or it
   // will page/repair forever until the old campaign's expires_at even after terminal evidence exists.
@@ -284,6 +303,9 @@ export function evaluateUniversityMassDistillationHealth(input: {
     if (invocationSucceeded === false) reasons.push('workflow_failed')
     if (input.providerJobs.length > 0) reasons.push('provider_job_unsettled')
     if (overdueProviderJobs.length > 0) reasons.push('provider_job_overdue')
+    // A parked downstream stage is a fault even with no campaign running: training being idle is exactly when a
+    // stalled exam or quarantine lane would otherwise look like a healthy, quiet system.
+    reasons.push(...lifecycleReasons)
     if (reasons.length > 0) {
       state = 'repair_required'
       automaticRecoveryAuthorized = true
@@ -311,7 +333,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
       checkedAt: input.now.toISOString(), state, reasons, expectedIntervalSeconds,
       maximumHeartbeatAgeSeconds, activeCampaigns: 0, failedCampaigns: 0, activeCampaignIds: [], latestReceiptAt: input.receipt?.observed_at ?? null,
       latestCommitSha: input.receipt?.commit_sha ?? null, latestInvocationSucceeded: invocationSucceeded,
-      receiptAgeSeconds, workflowRuns: 0, claimableRuns: 0, stalledDispatchRuns: 0,
+      receiptAgeSeconds, workflowRuns: 0, claimableRuns: 0, stalledDispatchRuns: 0, lifecycleStalls,
       workflowProgressAgeSeconds: null, failedRuns: 0, staleFailedRuns: 0,
       unsettledProviderJobs: input.providerJobs.length, overdueProviderJobs: overdueProviderJobs.length,
       authorizedCostUsd: 0, committedCostUsd: 0, remainingAuthorizedCostUsd: 0,
@@ -350,6 +372,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
   if (stalledDispatchRuns.length > 0) reasons.push('dispatch_claim_stalled')
   if (staleFailedRuns.length > 0) reasons.push('failed_stage_recovery_stalled')
   if (overdueProviderJobs.length > 0) reasons.push('provider_job_overdue')
+  reasons.push(...lifecycleReasons)
 
   const authorityIntact = campaigns.every(campaign => {
     const expiresAt = Date.parse(String(campaign.expires_at || ''))
@@ -373,6 +396,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
     latestCommitSha: input.receipt?.commit_sha ?? null,
     latestInvocationSucceeded: invocationSucceeded,
     receiptAgeSeconds,
+    lifecycleStalls,
     workflowRuns: workflowRuns.length,
     claimableRuns: claimableRuns.length,
     stalledDispatchRuns: stalledDispatchRuns.length,
@@ -407,6 +431,71 @@ export function evaluateUniversityMassDistillationHealth(input: {
     runpodMutationAuthorized: false,
     authorityExpanded: false,
   }
+}
+
+/**
+ * The downstream lifecycle, read as four stages. Each is "how many students are held here" plus "when did this stage
+ * last move one out". Bounded, read-only, and deliberately cheap: four head counts and four newest-row reads.
+ *
+ * Movement is measured by the row's own updated_at, because every transition in this pipeline writes it. A stage that
+ * has never moved anything falls back to its oldest waiting student, so a lane that was broken from birth is caught.
+ * If a read fails, that stage is omitted rather than guessed - the watcher stays quiet on missing evidence.
+ */
+export async function readUniversityLifecycleStages(db: any, now: Date): Promise<readonly LifecycleStageReading[]> {
+  if (!db) return []
+  const artifactStage = async (
+    stage: 'exam' | 'quarantine' | 'registration',
+    statuses: readonly string[],
+  ): Promise<LifecycleStageReading | null> => {
+    try {
+      const [held, oldest, moved] = await Promise.all([
+        db.from('cos_local_distillation_artifacts').select('candidate_id', { count: 'exact', head: true })
+          .in('status', [...statuses]).like('candidate_id', 'mass:%'),
+        db.from('cos_local_distillation_artifacts').select('updated_at')
+          .in('status', [...statuses]).like('candidate_id', 'mass:%')
+          .order('updated_at', { ascending: true }).limit(1).maybeSingle(),
+        // The newest row that has LEFT this stage is the stage's proof of movement.
+        db.from('cos_local_distillation_artifacts').select('updated_at')
+          .not('status', 'in', `(${statuses.join(',')})`).like('candidate_id', 'mass:%')
+          .order('updated_at', { ascending: false }).limit(1).maybeSingle(),
+      ])
+      if (held?.error) return null
+      return Object.freeze({
+        stage,
+        waiting: typeof held?.count === 'number' ? held.count : 0,
+        lastTransitionAt: moved?.error ? null : (moved?.data?.updated_at ?? null),
+        oldestWaitingSince: oldest?.error ? null : (oldest?.data?.updated_at ?? null),
+      })
+    } catch { return null }
+  }
+
+  const activationStage = async (): Promise<LifecycleStageReading | null> => {
+    try {
+      const [held, oldest, moved] = await Promise.all([
+        db.from('cos_university_graduate_model_registry').select('id', { count: 'exact', head: true })
+          .eq('status', 'pending_runtime'),
+        db.from('cos_university_graduate_model_registry').select('updated_at')
+          .eq('status', 'pending_runtime').order('updated_at', { ascending: true }).limit(1).maybeSingle(),
+        db.from('cos_university_graduate_model_registry').select('updated_at')
+          .eq('status', 'active').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
+      ])
+      if (held?.error) return null
+      return Object.freeze({
+        stage: 'activation' as const,
+        waiting: typeof held?.count === 'number' ? held.count : 0,
+        lastTransitionAt: moved?.error ? null : (moved?.data?.updated_at ?? null),
+        oldestWaitingSince: oldest?.error ? null : (oldest?.data?.updated_at ?? null),
+      })
+    } catch { return null }
+  }
+
+  const readings = await Promise.all([
+    artifactStage('exam', ['evaluation_ready', 'evaluation_pending']),
+    artifactStage('quarantine', ['quarantined']),
+    artifactStage('registration', ['runtime_pending']),
+    activationStage(),
+  ])
+  return Object.freeze(readings.filter((reading): reading is LifecycleStageReading => reading !== null))
 }
 
 export async function readUniversityMassDistillationHealth(input: {
@@ -509,6 +598,8 @@ export async function readUniversityMassDistillationHealth(input: {
   }
 
   const curriculumProgress = deriveCurriculumPackagingProgress((progressReceiptsResult.data || []) as ReceiptRow[])
+  // Read-only, bounded, and never fatal: a failed lifecycle read yields no stage, and the watcher stays quiet.
+  const lifecycleStages = await readUniversityLifecycleStages(input.db, now).catch(() => [])
 
   return evaluateUniversityMassDistillationHealth({
     now,
@@ -518,6 +609,7 @@ export async function readUniversityMassDistillationHealth(input: {
     workflowRuns,
     providerJobs,
     curriculumProgress,
+    lifecycleStages,
     continuity: {
       preparedBatches,
       rollingPolicyEnabled: policy?.enabled === true,
@@ -591,6 +683,9 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
     'heartbeat_missing', 'heartbeat_stale', 'workflow_failed', 'campaign_failed',
     'claimable_stage_stalled', 'dispatch_claim_stalled', 'provider_job_overdue',
     'curriculum_packaging_stalled',
+    // A downstream stage holding work and moving nobody is the pipeline not producing graduates, which is the
+    // whole point of the lane. It is never a warning.
+    ...LIFECYCLE_STALL_REASONS,
   ].includes(reason))
   return incidentSchema.parse({
     incidentId: `cos-university-distillation-${fingerprint}-${Math.floor(Date.parse(snapshot.checkedAt) / 300_000)}`,
@@ -619,6 +714,14 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
         evidenceId: `${fingerprint}:workflow`, type: 'university_distillation_workflow_state', capturedAt: snapshot.checkedAt,
         summary: `${snapshot.claimableRuns} claimable run(s); ${snapshot.stalledDispatchRuns} stalled dispatch claim(s); ${snapshot.staleFailedRuns} stale failed run(s); ${snapshot.overdueProviderJobs} overdue unsettled provider job(s).`,
         reference: COS_UNIVERSITY_MASS_DISTILLATION_CRON_PATH,
+      },
+      {
+        evidenceId: `${fingerprint}:lifecycle`, type: 'university_distillation_lifecycle_stall', capturedAt: snapshot.checkedAt,
+        summary: snapshot.lifecycleStalls.length === 0
+          ? 'No downstream lifecycle stage is holding work without moving it.'
+          : snapshot.lifecycleStalls
+            .map(stall => `${stall.stage}: ${stall.waiting} held, no transition for ${Math.floor(stall.idleSeconds / 60)}m (grace ${Math.floor(stall.graceSeconds / 60)}m)`)
+            .join('; '),
       },
       ...(snapshot.curriculumPackagingStalled ? [{
         evidenceId: `${fingerprint}:packaging`, type: 'university_distillation_packaging_progress', capturedAt: snapshot.checkedAt,

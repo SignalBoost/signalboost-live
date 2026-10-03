@@ -36,7 +36,7 @@ function artifactDb(){
                   trained_artifact_hash:identity.artifactHash,
                   revision_key:identity.revisionKey,
                   evidence_ref:`hf://models/cadomos/itmounts-student-test@${r40('c')}`,
-                  status:'evaluation_pending',
+                  status:'evaluation_ready',
                   authority_expanded:false,
                 },
                 error:null,

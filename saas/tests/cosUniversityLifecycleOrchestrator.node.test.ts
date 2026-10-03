@@ -40,6 +40,12 @@ import {
   unitDeadlineSeconds,
 } from '../lib/ai/cos/cosUniversityAssemblyLine.ts'
 import { handoffPlan } from '../lib/ai/cos/cosUniversityAssemblyLineHandoff.ts'
+import {
+  describeLineProof,
+  proveLineMovement,
+  sampleFromLineState,
+  type ObservedUnit,
+} from '../lib/ai/cos/cosUniversityLineMovementProof.ts'
 
 const NOW = new Date('2026-10-02T20:00:00.000Z')
 const NONTERMINAL = ['evaluation_ready', 'evaluation_pending', 'quarantined', 'runtime_pending', 'active']
@@ -416,5 +422,186 @@ test('migration persists stage ownership, deadline, queue position and lease', (
   assert.doesNotMatch(queue, /drop (table|column)/i)
   assert.match(queue, /grant select, insert, update on public\.cos_university_lifecycle_orchestration to service_role/)
   assert.doesNotMatch(queue, /to (anon|authenticated)\b/)
+})
+
+// ---------------------------------------------------------------------------------------------------------------
+// The independent prover: "PLAYWRIGHT WATCHDOG - independently proves the line"
+//
+// The controller reports what it DISPATCHED. The prover reports what MOVED. Every stall in this pipeline's history
+// looked identical from the dispatch side - a station woken every minute, reporting success, moving nothing - so the
+// only acceptable evidence of a working line is the same unit seen at two different stations at two different times.
+// These tests exist to stop the prover ever reporting a pass it did not earn.
+// ---------------------------------------------------------------------------------------------------------------
+
+const sampleAt = (secondsAgo: number) => new Date(NOW.getTime() - secondsAgo * 1000).toISOString()
+const TAKT = lineConstraint()!.taktSeconds
+
+const unit = (over: Partial<ObservedUnit> & { station: string }): ObservedUnit => ({
+  candidateId: 'mass:aaaa1111',
+  artifactHash: 'a'.repeat(64),
+  enteredAt: sampleAt(300),
+  ...over,
+})
+
+test('a unit seen at a different station is the only thing that proves the line works', () => {
+  const proof = proveLineMovement({
+    first: { at: sampleAt(TAKT + 120), units: [unit({ station: 'EXACT_CANARY' })] },
+    second: { at: sampleAt(0), units: [unit({ station: 'INDEPENDENT_EVALUATION' })] },
+  })
+  assert.equal(proof.verdict, 'proven_moving')
+  assert.equal(proof.provenMoving, true)
+  assert.equal(proof.movements.length, 1)
+  assert.equal(proof.movements[0].from, 'EXACT_CANARY')
+  assert.equal(proof.movements[0].to, 'INDEPENDENT_EVALUATION')
+  assert.match(describeLineProof(proof), /^PROVEN:/)
+})
+
+test('an idle line is NOT PROVEN, never a pass', () => {
+  // The whole reason this prover is worth running. A pipeline with nothing in it satisfies every liveness check ever
+  // written. Reporting that as success is how a dead line stays green.
+  const proof = proveLineMovement({
+    first: { at: sampleAt(TAKT + 600), units: [] },
+    second: { at: sampleAt(0), units: [] },
+  })
+  assert.equal(proof.verdict, 'inconclusive')
+  assert.equal(proof.provenMoving, false)
+  assert.equal(proof.reason, 'no_material_on_the_line')
+  assert.match(describeLineProof(proof), /^NOT PROVEN:/)
+})
+
+test('material waiting past a station SLA with nothing moving is a stopped line', () => {
+  const canary = stationById('EXACT_CANARY')!
+  const proof = proveLineMovement({
+    first: { at: sampleAt(TAKT + 120), units: [unit({ station: 'EXACT_CANARY', enteredAt: sampleAt(canary.stationSlaSeconds + 1800) })] },
+    second: { at: sampleAt(0), units: [unit({ station: 'EXACT_CANARY', enteredAt: sampleAt(canary.stationSlaSeconds + 1800) })] },
+  })
+  assert.equal(proof.verdict, 'line_stopped')
+  assert.equal(proof.provenMoving, false)
+  assert.equal(proof.stoppedStations.length, 1)
+  assert.equal(proof.stoppedStations[0].station, 'EXACT_CANARY')
+  assert.ok(proof.stoppedStations[0].oldestWaitSeconds > canary.stationSlaSeconds)
+  assert.match(describeLineProof(proof), /^STOPPED:/)
+})
+
+test('a sample shorter than the takt time cannot declare a stop', () => {
+  // Honesty about resolution: the line finishes a unit every takt, so a shorter window is simply not long enough to
+  // expect movement. Calling that a stop produces an alarm nobody can trust.
+  const canary = stationById('EXACT_CANARY')!
+  const proof = proveLineMovement({
+    first: { at: sampleAt(30), units: [unit({ station: 'EXACT_CANARY', enteredAt: sampleAt(canary.stationSlaSeconds + 1800) })] },
+    second: { at: sampleAt(0), units: [unit({ station: 'EXACT_CANARY', enteredAt: sampleAt(canary.stationSlaSeconds + 1800) })] },
+  })
+  assert.equal(proof.verdict, 'inconclusive')
+  assert.match(proof.reason, /^sample_shorter_than_takt_/)
+})
+
+test('material inside every station SLA is not a stop, even with nothing moving', () => {
+  const proof = proveLineMovement({
+    first: { at: sampleAt(TAKT + 120), units: [unit({ station: 'EXACT_CANARY', enteredAt: sampleAt(120) })] },
+    second: { at: sampleAt(0), units: [unit({ station: 'EXACT_CANARY', enteredAt: sampleAt(120) })] },
+  })
+  assert.equal(proof.verdict, 'inconclusive')
+  assert.equal(proof.reason, 'nothing_moved_but_every_station_is_inside_its_sla')
+})
+
+test('a retrained artifact is a new unit, not a movement', () => {
+  // Same candidate, different hash. Counting that as movement would let a retrain masquerade as throughput.
+  const proof = proveLineMovement({
+    first: { at: sampleAt(TAKT + 120), units: [unit({ station: 'GRADUATION', artifactHash: 'a'.repeat(64) })] },
+    second: { at: sampleAt(0), units: [unit({ station: 'EXACT_CANARY', artifactHash: 'b'.repeat(64) })] },
+  })
+  assert.notEqual(proof.verdict, 'proven_moving')
+  assert.equal(proof.movements.length, 0)
+})
+
+test('a unit that merely disappeared is not counted as having moved forward', () => {
+  // It may have been retired, or fallen outside a bounded read. "No longer where it was" is a different claim from
+  // "moved to the next station", and only the second one is proof.
+  const proof = proveLineMovement({
+    first: { at: sampleAt(TAKT + 120), units: [unit({ station: 'EXACT_CANARY' })] },
+    second: { at: sampleAt(0), units: [] },
+  })
+  assert.notEqual(proof.verdict, 'proven_moving')
+  assert.equal(proof.movements.length, 0)
+})
+
+test('unreadable or unordered samples prove nothing and claim nothing', () => {
+  for (const [first, second] of [
+    ['not-a-date', sampleAt(0)],
+    [sampleAt(0), 'not-a-date'],
+    ['', ''],
+    [sampleAt(0), sampleAt(600)],
+    [sampleAt(0), sampleAt(0)],
+  ] as Array<[string, string]>) {
+    const proof = proveLineMovement({
+      first: { at: first, units: [unit({ station: 'EXACT_CANARY' })] },
+      second: { at: second, units: [unit({ station: 'INDEPENDENT_EVALUATION' })] },
+    })
+    assert.equal(proof.verdict, 'inconclusive', `samples ${first} -> ${second} must prove nothing`)
+    assert.equal(proof.provenMoving, false)
+  }
+})
+
+test('provenMoving can never disagree with the verdict, whatever a caller passes in', () => {
+  const proof = proveLineMovement({
+    first: { at: sampleAt(TAKT + 120), units: [] },
+    second: { at: sampleAt(0), units: [] },
+  })
+  assert.equal(proof.provenMoving, proof.verdict === 'proven_moving')
+  assert.ok(Object.isFrozen(proof))
+  assert.equal(proof.authorityExpanded, false)
+})
+
+test('a sample drops any unit it cannot fully identify rather than guessing', () => {
+  const sample = sampleFromLineState({
+    at: sampleAt(0),
+    units: [
+      { candidateId: 'mass:aaaa1111', artifactHash: 'A'.repeat(64), station: 'EXACT_CANARY', enteredAt: sampleAt(60) },
+      { candidate_id: 'mass:bbbb2222', artifact_hash: 'b'.repeat(64), stage: 'GRADUATION', stage_entered_at: sampleAt(60) },
+      { candidateId: '', artifactHash: 'c'.repeat(64), station: 'EXACT_CANARY' },
+      { candidateId: 'mass:dddd4444', artifactHash: '', station: 'EXACT_CANARY' },
+      { candidateId: 'mass:eeee5555', artifactHash: 'e'.repeat(64), station: '' },
+      null,
+      'not-an-object',
+    ],
+  })
+  assert.equal(sample.units.length, 2)
+  assert.equal(sample.units[0].artifactHash, 'a'.repeat(64), 'the hash must be normalised for comparison')
+  assert.equal(sample.units[1].station, 'GRADUATION', 'snake_case rows from the ledger must still be read')
+})
+
+test('the prover is pure policy and reaches no database or network', () => {
+  const prover = readFileSync(new URL('../lib/ai/cos/cosUniversityLineMovementProof.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(prover, /fetch\(/)
+  assert.doesNotMatch(prover, /cosServiceDb/)
+  assert.doesNotMatch(prover, /Date\.now\(\)/, 'the prover must use the sample timestamps, never its own clock')
+  assert.match(prover, /authorityExpanded: false/)
+})
+
+test('the controller publishes per-unit placement so an outside prover can compute movement itself', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /const UNITS_REPORT_LIMIT = \d+/)
+  assert.match(route, /unitsReported: Math\.min\(rows\.length, UNITS_REPORT_LIMIT\)/)
+  for (const field of ['candidateId', 'artifactHash', 'station', 'sourceStatus', 'enteredAt']) {
+    assert.match(route, new RegExp(`${field}: row\\.`), `${field} is not published for the prover`)
+  }
+})
+
+test('the Playwright prover skips rather than passes when it cannot reach a deployment', () => {
+  // A prover that goes green because it could not run is worse than no prover at all.
+  const spec = readFileSync(new URL('./cosUniversityAssemblyLine.playwright.spec.ts', import.meta.url), 'utf8')
+  assert.match(spec, /test\.skip\(!BASE_URL,/)
+  assert.match(spec, /test\.skip\(!SECRET,/)
+  // It must wait at least one takt, or a no-movement result means nothing. A shorter interval is a REHEARSAL and
+  // must be opted into explicitly; the prover itself refuses to report a stop below the takt, so a short run can
+  // never manufacture a failure or a pass.
+  assert.match(spec, /Math\.max\(TAKT_SECONDS \+ 60, REQUESTED_INTERVAL\)/)
+  assert.match(spec, /const REHEARSAL = String\(process\.env\.LINE_PROOF_ALLOW_SHORT_INTERVAL \|\| ''\)\.trim\(\) === 'true'/)
+  assert.match(spec, /type: 'line-proof-rehearsal'/)
+  // It must compute movement itself, not read a verdict off the controller.
+  assert.match(spec, /proveLineMovement\(\{ first: first\.sample, second: second\.sample \}\)/)
+  assert.match(spec, /expect\(proof\.verdict, summary\)\.not\.toBe\('line_stopped'\)/)
+  // And it must leave a durable artifact behind, which is the point of running it.
+  assert.match(spec, /attach\('assembly-line-movement-proof\.json'/)
 })
 // end of saas/tests/cosUniversityLifecycleOrchestrator.node.test.ts (if this line is missing, the paste was cut short)

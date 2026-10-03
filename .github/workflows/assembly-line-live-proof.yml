@@ -1,0 +1,118 @@
+# .github/workflows/assembly-line-live-proof.yml
+#
+# Owner 2026-10-02: "PLAYWRIGHT WATCHDOG - independently proves the line."
+#
+# Two jobs, deliberately separate:
+#
+#   line-policy      Runs on every PR that touches the line. Proves the POLICY: one station per status, SLAs in
+#                    minutes, parallel capacity, batched registration, and that the prover cannot report a pass it
+#                    did not earn. Fast, no secrets, no deployment.
+#
+#   line-live-proof  Runs on a schedule against the live deployment. Proves the LINE: reads per-unit placement,
+#                    waits at least one takt time, reads again, and shows that a real unit changed station. The
+#                    uploaded report is the artifact worth showing a buyer - it carries the two samples, the delta
+#                    and the verdict, produced outside the deployment.
+#
+# Required repository secrets for the live job:
+#   PRODUCTION_BASE_URL   e.g. https://<production host>   (no trailing slash)
+#   CRON_SECRET           the same value the deployment uses
+#
+# If either is missing the live job FAILS rather than skipping. A watchdog that goes green because it could not run
+# is worse than no watchdog: it is a green light wired to nothing.
+
+name: Assembly Line Live Proof
+
+on:
+  schedule:
+    # Every six hours. Each run spends one takt time waiting, by design.
+    - cron: '41 */6 * * *'
+  pull_request:
+    paths:
+      - 'saas/lib/ai/cos/cosUniversityAssemblyLine.ts'
+      - 'saas/lib/ai/cos/cosUniversityAssemblyLineHandoff.ts'
+      - 'saas/lib/ai/cos/cosUniversityLineMovementProof.ts'
+      - 'saas/lib/ai/cos/cosUniversityLifecycleOrchestrator.ts'
+      - 'saas/lib/ai/cos/cosUniversityLifecycleStall.ts'
+      - 'saas/app/api/cron/cos-university-lifecycle-orchestrator/route.ts'
+      - 'saas/app/api/cron/cos-university-graduate-activation/route.ts'
+      - 'saas/tests/cosUniversityLifecycleOrchestrator.node.test.ts'
+      - 'saas/tests/cosUniversityLifecycleStall.node.test.ts'
+      - 'saas/tests/cosUniversityAssemblyLine.playwright.spec.ts'
+      - '.github/workflows/assembly-line-live-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  line-policy:
+    name: Line policy proof
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - name: Prove the four assembly-line rules and the prover's own honesty
+        run: >-
+          node --experimental-transform-types --import ./scripts/test-alias-loader.mjs --test
+          tests/cosUniversityLifecycleOrchestrator.node.test.ts
+          tests/cosUniversityLifecycleStall.node.test.ts
+          tests/massGraduateRegistrationStarvation.node.test.ts
+          tests/cosUniversityMassGraduateRegistration.node.test.ts
+          tests/quarantineStallDrain.node.test.ts
+
+  line-live-proof:
+    name: Line movement proof against production
+    # Never on a pull request: it takes a takt time and it reads the live deployment.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - name: Refuse to run blind
+        env:
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          missing=""
+          [ -n "$PRODUCTION_BASE_URL" ] || missing="$missing PRODUCTION_BASE_URL"
+          [ -n "$CRON_SECRET" ] || missing="$missing CRON_SECRET"
+          if [ -n "$missing" ]; then
+            echo "::error::Cannot prove the line without:$missing. Add them as repository secrets."
+            exit 1
+          fi
+          echo "Proving against $PRODUCTION_BASE_URL"
+      - run: npx playwright install --with-deps chromium
+      - name: Sample the line twice and prove a unit moved
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: npx playwright test tests/cosUniversityAssemblyLine.playwright.spec.ts --reporter=html,line
+      - name: Keep the proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assembly-line-movement-proof-${{ github.run_id }}
+          path: saas/playwright-report
+          retention-days: 90
+# end of .github/workflows/assembly-line-live-proof.yml (if this line is missing, the paste was cut short)

@@ -54,6 +54,11 @@ const MAX_ARTIFACTS = 2500
 const RECONCILE_CHUNK = 200
 const ACTION_TIMEOUT_MS = 8_000
 const OVERDUE_REPORT_LIMIT = 50
+// Per-unit placement, so an outside prover can take two samples and compute movement for itself instead of trusting
+// this controller's own `dispatches` report. A heartbeat is not output: the only honest evidence the line works is
+// the same unit observed at two different stations. Each row carries BOTH the station and the raw artifact status it
+// was derived from, so a prover can also catch the controller disagreeing with the artifact table.
+const UNITS_REPORT_LIMIT = 500
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
@@ -309,6 +314,20 @@ async function run(req: NextRequest) {
     constraint,
     lineStops,
     dispatches,
+    units: rows
+      .filter(row => row.terminal !== true)
+      .slice(0, UNITS_REPORT_LIMIT)
+      .map(row => ({
+        candidateId: row.candidate_id,
+        artifactHash: row.artifact_hash,
+        station: row.station,
+        sourceStatus: row.source_status,
+        enteredAt: row.stage_entered_at,
+        queuePosition: row.queue_position,
+        expectedStartAt: row.expected_start_at,
+        leaseUntil: row.lease_until,
+      })),
+    unitsReported: Math.min(rows.length, UNITS_REPORT_LIMIT),
     overdue: overdue.data || [],
     invariant: 'every_nonterminal_artifact_has_a_named_next_action_and_deadline',
     lineInvariant: 'the_line_owns_the_flow_stations_own_only_their_own_authority',

@@ -1,3 +1,4 @@
+// saas/app/api/cron/cos-university-graduate-activation/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { activateGraduateRuntime } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -313,6 +314,14 @@ async function registerNextMassGraduate() {
   if (!waiting.length) return { registered: false as const, reason: 'every_runtime_pending_mass_artifact_registered', waiting: 0 }
 
   const skipped: Array<{ candidateId: string; reason: string }> = []
+  // Owner 2026-10-02, assembly-line rule 3: "Registration/bookkeeping should be batched rather than artificially
+  // processing one every ten minutes." Registration writes one registry row, spends nothing and reserves no RunPod
+  // worker, so there was never a resource reason to stop after the first one. Returning after a single success
+  // capped this station at one unit per 10-minute tick - six per hour - while training produced roughly thirteen,
+  // which is a queue that can only grow. ACTIVATION, further down this same route, stays strictly serial on purpose:
+  // each activation pins one of the ten account-wide RunPod workers and genuinely cannot be parallelised.
+  const registrations: Array<Record<string, unknown>> = []
+  const requeued: Array<{ candidateId: string; artifactHash: string }> = []
   for (const pending of waiting.slice(0, MASS_GRADUATE_REGISTRATION_SCAN_LIMIT)) {
     const artifact: MassGraduateArtifact = {
       candidateId: String(pending.candidate_id), subjectId: String(pending.subject_id || ''), studentModelId: String(pending.student_model_id || ''),
@@ -366,7 +375,10 @@ async function registerNextMassGraduate() {
           evidence_hash: evidenceHash, evidence, verifier: 'host_controller', observed_at: now,
         }, { onConflict: 'event_key', ignoreDuplicates: true })
         if (recorded.error) throw recorded.error
-        return { registered: false as const, reason: 'stale_reopened_verdict_requeued', candidateId, artifactHash, skipped }
+        // Requeue this one and keep going. One artifact returning to evaluation is not a reason to stop registering
+        // the others; stopping here is what made a single recoverable artifact hold up the whole station.
+        requeued.push({ candidateId, artifactHash })
+        continue
       }
     }
 
@@ -396,22 +408,43 @@ async function registerNextMassGraduate() {
       authorityExpanded: false,
       promotedAt: new Date(),
     })
-    if (skipped.length) console.info('[cos-mass-graduate-registration-skipped]', JSON.stringify({ skipped }))
-    return {
-      registered: registration.tracked === true,
+    registrations.push({
       candidateId: decision.artifact.candidateId,
       artifactHash: decision.artifact.trainedArtifactHash,
       baselineScore: decision.baselineScore,
       trainedArtifactScore: decision.trainedArtifactScore,
+      tracked: registration.tracked === true,
       status: registration.status,
       blockers: registration.blockers,
+    })
+  }
+
+  if (skipped.length) console.info('[cos-mass-graduate-registration-skipped]', JSON.stringify({ skipped }))
+  if (registrations.length) {
+    console.info('[cos-mass-graduate-registration-batch]', JSON.stringify({ registered: registrations.length, requeued: requeued.length }))
+    return {
+      registered: registrations.some(entry => entry.tracked === true),
+      registeredCount: registrations.filter(entry => entry.tracked === true).length,
+      registrations,
+      // The first registration of the batch, kept at the top level so every existing reader of this result and every
+      // recorded production-path evidence row keeps the same shape it had when this station moved one unit per tick.
+      candidateId: registrations[0].candidateId,
+      artifactHash: registrations[0].artifactHash,
+      baselineScore: registrations[0].baselineScore,
+      trainedArtifactScore: registrations[0].trainedArtifactScore,
+      status: registrations[0].status,
+      blockers: registrations[0].blockers,
+      reopened: requeued,
       waiting: waiting.length,
       skipped,
       productionTrafficAuthorized: false,
     }
   }
 
-  if (skipped.length) console.info('[cos-mass-graduate-registration-skipped]', JSON.stringify({ skipped }))
+  if (requeued.length) {
+    return { registered: false as const, reason: 'stale_reopened_verdict_requeued', reopened: requeued, waiting: waiting.length, skipped }
+  }
+
   return {
     // The OLDEST held artifact, which is the one a queue that never advances is waiting on.
     registered: false as const,
@@ -665,3 +698,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }
+// end of saas/app/api/cron/cos-university-graduate-activation/route.ts (if this line is missing, the paste was cut short)

@@ -376,6 +376,10 @@
     {
       "path": "/api/cron/cos-workforce-pipeline",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cos-university-lifecycle-orchestrator",
+      "schedule": "* * * * *"
     }
   ]
 }

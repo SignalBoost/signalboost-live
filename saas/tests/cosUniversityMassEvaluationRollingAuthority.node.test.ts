@@ -25,6 +25,7 @@ import {
   type RollingEvent,
 } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
 import { MASS_EVALUATION_ENDPOINT_CALLS } from '../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
+import { lineCapacity } from '../lib/ai/cos/cosUniversityLineCapacity.ts'
 
 const now = new Date('2026-09-16T16:50:00Z')
 const hashA = '7f23dde5'.padEnd(64, 'a')
@@ -41,18 +42,24 @@ test('rolling throughput ceiling matches the owner-approved backlog-drain budget
 })
 
 
-test('provider worker quota keeps two as the safe floor and expands only from proven spare capacity', () => {
-  assert.equal(MASS_EVALUATION_MAX_IN_FLIGHT, 2)
-  assert.equal(MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT, 4)
-  assert.equal(massEvaluationCapacityAwareInFlightLimit(0), 2)
-  assert.equal(massEvaluationCapacityAwareInFlightLimit(1), 2)
-  assert.equal(massEvaluationCapacityAwareInFlightLimit(2), 3)
-  assert.equal(massEvaluationCapacityAwareInFlightLimit(3), 4)
-  assert.equal(massEvaluationCapacityAwareInFlightLimit(20), 4)
+test('the evaluator floor is the declared capacity and expands only from proven spare workers', () => {
+  const capacity = lineCapacity()
+  const floor = capacity.evaluation
+  const ceiling = capacity.evaluation + capacity.headroom
+  assert.equal(MASS_EVALUATION_MAX_IN_FLIGHT, floor)
+  assert.equal(MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT, ceiling)
+  assert.ok(floor >= 1 && ceiling > floor, 'the ceiling must leave room above the floor')
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(0), floor)
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(1), floor)
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(2), Math.min(ceiling, floor + 1))
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(3), Math.min(ceiling, floor + 2))
+  assert.equal(massEvaluationCapacityAwareInFlightLimit(100_000), ceiling)
+  const tiny = lineCapacity({ COS_UNIVERSITY_INFERENCE_WORKERS: '10' })
+  assert.ok(tiny.evaluation + tiny.canary + tiny.workforce < 10)
 
   const fixedFloorFull = decideRollingMassEvaluationApproval({
     enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now,
-    inFlightCount: 2, maxInFlight: 2,
+    inFlightCount: MASS_EVALUATION_MAX_IN_FLIGHT, maxInFlight: MASS_EVALUATION_MAX_IN_FLIGHT,
   })
   assert.equal(fixedFloorFull.issue, false)
   assert.equal(!fixedFloorFull.issue && fixedFloorFull.reason, 'mass_evaluation_concurrency_full')
@@ -65,7 +72,7 @@ test('provider worker quota keeps two as the safe floor and expands only from pr
 
   const dynamicCeilingFull = decideRollingMassEvaluationApproval({
     enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now,
-    inFlightCount: 4, maxInFlight: 4,
+    inFlightCount: MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT, maxInFlight: MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT,
   })
   assert.equal(dynamicCeilingFull.issue, false)
   assert.equal(!dynamicCeilingFull.issue && dynamicCeilingFull.reason, 'mass_evaluation_concurrency_full')

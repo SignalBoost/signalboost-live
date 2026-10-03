@@ -13,6 +13,7 @@
 // Both numbers here are scheduling only - no gate, ceiling, or approval rule changes - and these tests fail the build
 // if either is narrowed back to a value that cannot survive the opposed ordering.
 import assert from 'node:assert/strict'
+import { lineCapacity } from '../lib/ai/cos/cosUniversityLineCapacity.ts'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
@@ -29,12 +30,21 @@ test('the lane looks far enough ahead to reach an artifact whose exam is already
   assert.match(lane, /for \(let index = 0; index < HOLDOUT_EXAM_LOOKAHEAD; index \+= 1\) \{/)
 })
 
-test('the exam writer fills at its own ceiling so the queue can actually drain', () => {
-  const match = writer.match(/fillRequestedHoldoutExamSets\(\{ db, limit: (\d+) \}\)/)
-  assert.ok(match, 'the exam-items cron no longer calls fillRequestedHoldoutExamSets with a literal limit')
-  assert.equal(Number(match[1]), 10, 'the writer must request the function ceiling of 10 sets per tick')
-  // 10 is the function's OWN cap, so this raises no limit anywhere - it stops under-asking.
-  assert.match(writerLib, /Math\.max\(1, Math\.min\(10, Math\.floor\(Number\(input\.limit\) \|\| 3\)\)\)/)
+test('the exam writer fills at the declared capacity, not at a baked-in ceiling', () => {
+  // Owner 2026-10-03, "build a Ferrari not a Lada": the literal 10 pinned here was a rationing scheme for a
+  // 10-worker RunPod account. Writing exam items spends small teacher calls and NO inference worker, so this station
+  // never needed to be narrow, and a canary waiting on an exam set was that morning's line stop. The batch now comes
+  // from the capacity the deployment declares, and must stay AHEAD of the canary.
+  assert.match(writer, /fillRequestedHoldoutExamSets\(\{ db, limit: lineCapacity\(\)\.examSetsPerTick \}\)/,
+    'the exam-items cron must size its batch from declared capacity')
+  assert.doesNotMatch(writer, /fillRequestedHoldoutExamSets\(\{ db, limit: \d+ \}\)/,
+    'a literal batch size is back')
+  // The function's own bound is now only a runaway stop, not policy.
+  assert.match(writerLib, /Math\.min\(EXAM_SET_FILL_MAX_PER_RUN, Math\.floor\(Number\(input\.limit\) \|\| 3\)\)/)
+  const capacity = lineCapacity()
+  assert.ok(capacity.examSetsPerTick >= 10, 'capacity must never ask for fewer sets than the old fixed ceiling')
+  assert.ok(capacity.examSetsPerTick > capacity.canary,
+    'the exam writer must stay ahead of the canary, or admission starves')
 })
 
 test('the wider window is a wider SEARCH, never more approvals', () => {
@@ -66,4 +76,3 @@ test('the pick loop does not issue a database query per candidate', () => {
   // Readiness is read once for the whole batch, after the loop.
   assert.match(lane, /const examReady = await holdoutExamReadyArtifacts\(db, picks\.map\(pick => pick\.artifact\), now\)/)
 })
-// end of saas/tests/holdoutExamReadyThroughput.node.test.ts (if this line is missing, the paste was cut short)

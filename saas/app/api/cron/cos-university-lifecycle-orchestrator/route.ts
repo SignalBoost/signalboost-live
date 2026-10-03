@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   LINE_STATUSES,
+  UNIVERSITY_LINE_CAPACITY,
   WORKING_STATIONS,
   decideLineStops,
   decideStationDispatch,
@@ -44,6 +45,7 @@ import {
   stageChanged,
   type LifecycleArtifact,
 } from '@/lib/ai/cos/cosUniversityLifecycleOrchestrator'
+import { describeLineCapacity } from '@/lib/ai/cos/cosUniversityLineCapacity'
 import { triggerStation } from '@/lib/ai/cos/cosUniversityAssemblyLineHandoff'
 
 export const runtime = 'nodejs'
@@ -294,6 +296,8 @@ async function run(req: NextRequest) {
     ok: true,
     schemaVersion: 'cos-university-assembly-line-controller-v2',
     at: new Date().toISOString(),
+    capacity: UNIVERSITY_LINE_CAPACITY,
+    capacityDescription: describeLineCapacity(UNIVERSITY_LINE_CAPACITY),
     reconciled,
     transitions,
     line: WORKING_STATIONS.map(station => {

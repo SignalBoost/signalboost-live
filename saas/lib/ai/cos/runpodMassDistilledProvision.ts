@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/runpodMassDistilledProvision.ts
 // Dynamic exact-artifact RunPod canary support for mass-distilled students.
+import { declaredInferenceWorkers } from './cosUniversityLineCapacity.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { activeResidencyRunpodEndpointNames, protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
 import { CURRENT_UNIVERSITY_STUDENT_PROFILE, requireModelCapability } from '../modelCapabilityRegistry.ts'
@@ -271,11 +272,6 @@ function runpodWorkerQuotaError(error:unknown){
     .toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
 }
 
-function configuredServerlessWorkerQuota(){
-  const value=Number(process.env.RUNPOD_SERVERLESS_WORKER_QUOTA||'10')
-  return Number.isFinite(value)&&value>=1?Math.floor(value):10
-}
-
 function reservedServerlessWorkerSlots(endpoints:Endpoint[]){
   return endpoints.reduce((total,endpoint)=>total+Math.max(0,Math.floor(Number(endpoint.workers?.max??0))),0)
 }
@@ -407,7 +403,7 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
       endpoint=(refreshed.endpoints||[]).find(item=>item.name===ids.endpointName)
       if(endpoint) break
       const reserved=reservedServerlessWorkerSlots(refreshed.endpoints||[])
-      const quota=configuredServerlessWorkerQuota()
+      const {workers:quota}=declaredInferenceWorkers()
       if(reserved>=quota){
         quotaError=new Error(`mass_distilled_runtime_worker_quota_full:${reserved}/${quota}`)
         if(attempt<3) await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)))

@@ -1,38 +1,11 @@
-//
-// Owner, 2026-10-03: "MY PLATFORM IS A TEST ENVIRONMENT - WE ARE BUILDING THIS FOR COMPANIES WITH FINANCIAL
-// RESOURCES SO BUILD A FERRARI NOT A LADA."
-//
-// He is right, and the line had his test rig's limits welded into it. Every throughput number in the University
-// pipeline was a rationing scheme for ONE fact, recorded verbatim in the evaluation authority:
-//
-//     "RunPod's account-wide serverless worker quota is 10. With three live evaluators, one active graduate and
-//      other account serverless reservations, the exact-artifact canary lane reached 10/10 before provider
-//      invocation."
-//
-// Ten workers. That is why the canary allowed 12 approvals an hour, the evaluator ran 2 at a time, activation moved
-// one graduate per tick, and the exam writer prepared 10 sets per tick. None of those numbers describe the work; they
-// describe a small account. A buyer with resources runs hundreds of workers or their own GPU cluster, and would hit
-// that ceiling on their first afternoon - in a product whose whole premise is that the BUYER brings the infrastructure.
-//
-// So capacity stops being a constant and becomes a declared property of the deployment. There is ONE input - how many
-// concurrent inference workers this deployment can run - and every station's limit is derived from it. The default is
-// enterprise scale. A small test rig declares its real size and gets small numbers automatically.
-//
-// Nothing here grades, promotes or authorizes spend. It answers one question: how wide are the pipes on THIS
-// deployment's infrastructure.
-
+// Shared deployment capacity; no provider calls, spend or promotion authority.
 /** The one number a deployment declares. Everything else is arithmetic. */
 export const INFERENCE_WORKERS_ENV = 'COS_UNIVERSITY_INFERENCE_WORKERS' as const
 /** Optional override for how much of the pool is held for graduates serving production work. */
 export const WORKFORCE_RESERVE_ENV = 'COS_UNIVERSITY_WORKFORCE_RESERVE_WORKERS' as const
 
-/**
- * Enterprise default: a buyer who declares nothing gets a line built for a company with resources.
- *
- * This is deliberately NOT the safe-for-a-tiny-account number. A portable that ships throttled to its author's
- * hobby quota is the Lada. A deployment that really has ten workers says so, in one environment variable.
- */
-export const ENTERPRISE_INFERENCE_WORKERS = 256
+/** Used only when neither existing capacity setting contains a positive integer. */
+export const DEFAULT_INFERENCE_WORKERS = 10
 
 /** Below this nothing can run at all: one canary, one evaluator, one graduate, one slot of headroom. */
 export const MINIMUM_INFERENCE_WORKERS = 4
@@ -51,8 +24,8 @@ export const EVALUATION_CYCLE_SECONDS = 12 * 60
 export type LineCapacity = Readonly<{
   /** Total concurrent inference workers this deployment declares. */
   workers: number
-  /** True when the deployment declared its own size; false means the enterprise default is in force. */
-  declared: boolean
+  /** Which existing setting supplied the resolved worker pool. */
+  source: 'override' | 'quota' | 'fallback'
   /** Workers held for graduates serving real production work. Never zero. */
   workforce: number
   /** Concurrent exact-artifact canaries. */
@@ -83,17 +56,19 @@ const positiveInt = (raw: unknown): number | null => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 }
 
-/** How many concurrent inference workers this deployment declares, clamped to a sane range. */
+/** Single capacity resolver used by provisioning, scheduling and telemetry. */
 export function declaredInferenceWorkers(env: Record<string, string | undefined> = process.env): {
   workers: number
-  declared: boolean
+  source: LineCapacity['source']
 } {
-  const raw = positiveInt(env[INFERENCE_WORKERS_ENV])
-  if (raw === null) return { workers: ENTERPRISE_INFERENCE_WORKERS, declared: false }
-  return {
-    workers: Math.min(MAXIMUM_INFERENCE_WORKERS, Math.max(MINIMUM_INFERENCE_WORKERS, raw)),
-    declared: true,
+  const override = positiveInt(env[INFERENCE_WORKERS_ENV])
+  const quota = positiveInt(env.RUNPOD_SERVERLESS_WORKER_QUOTA)
+  const workers = override ?? quota ?? DEFAULT_INFERENCE_WORKERS
+  // Never invent workers to make the station arithmetic fit a smaller pool.
+  if (workers < MINIMUM_INFERENCE_WORKERS || workers > MAXIMUM_INFERENCE_WORKERS) {
+    throw new Error(`university_inference_worker_capacity_out_of_range:${workers}`)
   }
+  return { workers, source: override !== null ? 'override' : quota !== null ? 'quota' : 'fallback' }
 }
 
 /**
@@ -104,7 +79,7 @@ export function declaredInferenceWorkers(env: Record<string, string | undefined>
  * protecting by hand ("preserve one unreserved worker of headroom"), and it is now arithmetic rather than a comment.
  */
 export function lineCapacity(env: Record<string, string | undefined> = process.env): LineCapacity {
-  const { workers, declared } = declaredInferenceWorkers(env)
+  const { workers, source } = declaredInferenceWorkers(env)
 
   const reserveOverride = positiveInt(env[WORKFORCE_RESERVE_ENV])
   // Leave at least three workers for the line itself, whatever the override asks for.
@@ -125,7 +100,7 @@ export function lineCapacity(env: Record<string, string | undefined> = process.e
 
   return Object.freeze({
     workers,
-    declared,
+    source,
     workforce,
     canary,
     evaluation,
@@ -146,8 +121,7 @@ export function lineCapacity(env: Record<string, string | undefined> = process.e
 
 /** One line for a log or a dashboard: what this deployment's line can actually do. */
 export function describeLineCapacity(capacity: LineCapacity): string {
-  const source = capacity.declared ? 'declared' : `default (set ${INFERENCE_WORKERS_ENV} to declare)`
-  return `${capacity.workers} inference workers ${source}: `
+  return `${capacity.workers} inference workers (${capacity.source}): `
     + `${capacity.canary} canary, ${capacity.evaluation} evaluation, ${capacity.activation} activation, `
     + `${capacity.workforce} workforce, ${capacity.headroom} headroom `
     + `-> ~${capacity.artifactsPerHour} artifacts/hour`

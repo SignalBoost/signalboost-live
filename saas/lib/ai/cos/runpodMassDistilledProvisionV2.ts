@@ -2,6 +2,7 @@
 // RunPod REST v2 exact-artifact runtime for mass-distilled canaries.
 // Native v2 endpoints carry their complete container configuration inline, so this path must not
 // depend on the legacy v1 template index. Exact identity is verified from the materialized endpoint.
+import { declaredInferenceWorkers } from './cosUniversityLineCapacity.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { activeResidencyRunpodEndpointNames, protectedRunpodEndpointIds } from './cosUniversityGraduateEndpointProtection.ts'
 import {
@@ -126,11 +127,11 @@ export async function massDistilledServerlessWorkerCapacity() {
   const endpoints = listed.endpoints || []
   const reservedWorkers = endpoints.reduce((total, endpoint) =>
     total + Math.max(0, Math.floor(Number(endpoint.workers?.max ?? 0))), 0)
-  const configured = Number(process.env.RUNPOD_SERVERLESS_WORKER_QUOTA || '10')
-  const quota = Number.isFinite(configured) && configured >= 1 ? Math.floor(configured) : 10
+  const { workers: quota, source } = declaredInferenceWorkers()
   return Object.freeze({
     reservedWorkers,
     quota,
+    source,
     availableWorkers: Math.max(0, quota - reservedWorkers),
   })
 }
@@ -673,8 +674,7 @@ async function resolveExactEndpoint(
     // Preserve one account-wide worker slot before creating a new exact endpoint. This prevents
     // Residency from using the final reservation and turns quota cleanup into a preflight rather
     // than waiting for RunPod to reject POST /serverless first.
-    const configuredQuota = Number(process.env.RUNPOD_SERVERLESS_WORKER_QUOTA || '10')
-    const workerQuota = Number.isFinite(configuredQuota) && configuredQuota >= 1 ? Math.floor(configuredQuota) : 10
+    const { workers: workerQuota } = declaredInferenceWorkers()
     const reservedWorkers = (listed.endpoints || []).reduce((total, item) =>
       total + Math.max(0, Math.floor(Number(item.workers?.max ?? 0))), 0)
     if (workerQuota - reservedWorkers <= 1) await releaseOtherMassEndpointCapacity('')

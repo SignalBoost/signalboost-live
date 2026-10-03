@@ -1,4 +1,5 @@
 // saas/app/api/admin/cos-university-telemetry/route.ts
+import { UNIVERSITY_LINE_CAPACITY } from '@/lib/ai/cos/cosUniversityAssemblyLine'
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -812,6 +813,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       readOnly: true,
+      capacity: UNIVERSITY_LINE_CAPACITY,
       generatedAt: new Date().toISOString(),
       windowHours: WINDOW_HOURS,
       summary: {

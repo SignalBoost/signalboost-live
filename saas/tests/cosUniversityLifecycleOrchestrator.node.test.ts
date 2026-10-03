@@ -624,6 +624,22 @@ test('the controller publishes per-unit placement so an outside prover can compu
   }
 })
 
+
+test('the controller preserves Postgres diagnostics and identifies the failing database stage', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /function databaseError\(stage: string, error: unknown\)/)
+  for (const field of ['code', 'message', 'detail', 'hint', 'table', 'column', 'constraint']) {
+    assert.match(route, new RegExp(`${field}: clean\\(`), `database diagnostic ${field} is not preserved`)
+  }
+  for (const stage of ['read_artifacts', 'read_existing_ledger', 'write_ledger', 'lease_station_units', 'read_overdue_ledger']) {
+    assert.match(route, new RegExp(`throwDatabaseError\\('${stage}'`), `database stage ${stage} is not attributed`)
+  }
+  assert.doesNotMatch(route, /error instanceof Error \? clean\(error\.message\) : clean\(error\)/,
+    'object-valued Postgres errors must never collapse back to [object Object]')
+  assert.match(route, /JSON\.stringify\(\{ ok: false, error: failure \}\)/)
+  assert.match(route, /NextResponse\.json\(\{ ok: false, error: failure \}, \{ status: 500 \}\)/)
+})
+
 test('the Playwright prover skips rather than passes when it cannot reach a deployment', () => {
   // A prover that goes green because it could not run is worse than no prover at all.
   const spec = readFileSync(new URL('./cosUniversityAssemblyLine.playwright.spec.ts', import.meta.url), 'utf8')

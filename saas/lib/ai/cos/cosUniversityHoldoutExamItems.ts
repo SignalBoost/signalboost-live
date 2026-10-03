@@ -1,4 +1,4 @@
-//
+// saas/lib/ai/cos/cosUniversityHoldoutExamItems.ts
 // Real Holdout exam questions (owner decision 2026-09-27, "option 1").
 //
 // A mass-distillation holdout row is a withheld TEACHING ESSAY. Its `prompt` column is the instruction that was
@@ -260,7 +260,21 @@ export type HoldoutExamFillResult = Readonly<{
   revived: number
   /** The whole set population, so a stalled exam lane can say WHY instead of looking idle. */
   population: ExamSetPopulation | null
+  /** True when the run stopped starting new sets because its deadline arrived. The sets it did not reach are counted. */
+  deadlineReached: boolean
+  unreached: number
 }>
+
+/**
+ * How many of one set's items are written at the same time.
+ *
+ * Production 2026-10-03 (ledger + Vercel): the writer took 12 sets a tick and wrote their 4-6 items one teacher call at
+ * a time, each call allowed up to two minutes, inside a route Vercel kills at 300 seconds. 50-70 serial calls never
+ * fit: the function was cut off mid-run every tick, the sets after the cut were never reached, and 4 exam sets an hour
+ * became ready while the canary cleared 20 units an hour and the evaluator starved behind it. A set now costs about
+ * one teacher latency instead of four to six. Same teachers, same fallback order per item, same budget rules.
+ */
+export const HOLDOUT_EXAM_ITEM_CONCURRENCY = 4
 
 /** How far back a transiently-failed set is pushed so it sorts behind fresh requests instead of starving them. */
 export const TRANSIENT_BACKOFF_MS = 20 * 60 * 1000
@@ -355,6 +369,8 @@ export async function fillRequestedHoldoutExamSets(input: {
   limit?: number
   now?: Date
   readRows?: typeof readPinnedHfParquetRows
+  /** Epoch milliseconds after which no NEW set is started. The route derives it from its own execution limit. */
+  deadlineMs?: number
 }): Promise<HoldoutExamFillResult> {
   const env = input.env || process.env
   const now = input.now || new Date()
@@ -396,6 +412,7 @@ export async function fillRequestedHoldoutExamSets(input: {
     return Object.freeze({
       processed: 0, ready, failed, itemsWritten, itemsReused,
       errors: Object.freeze([abortReason]), aborted: abortReason, revived: 0, population,
+      deadlineReached: false, unreached: 0,
     })
   }
 
@@ -408,10 +425,24 @@ export async function fillRequestedHoldoutExamSets(input: {
     return Object.freeze({
       processed: 0, ready, failed, itemsWritten, itemsReused,
       errors: Object.freeze([]), aborted: null, revived, population,
+      deadlineReached: false, unreached: 0,
     })
   }
 
+  // A run that is killed by the platform mid-set records nothing for that set and reaches none after it. Stopping on
+  // our own terms, and saying how many sets were left, is the difference between a slow station and an invisible one.
+  const deadlineMs = Number.isFinite(input.deadlineMs) ? Number(input.deadlineMs) : null
+  let deadlineReached = false
+  let unreached = 0
+  let processed = 0
+
   for (const set of sets) {
+    if (deadlineMs !== null && Date.now() >= deadlineMs) {
+      deadlineReached = true
+      unreached = sets.length - processed
+      break
+    }
+    processed += 1
     const candidateId = clean(set.candidate_id, 240)
     const artifactHash = clean(set.trained_artifact_hash, 64).toLowerCase()
     const attempts = Number(set.attempts) || 0
@@ -448,14 +479,15 @@ export async function fillRequestedHoldoutExamSets(input: {
       if (hashes.some(hash => !HEX64.test(hash))) { await fail('holdout_item_hash_invalid'); continue }
       const existing = await readReadyHoldoutExamItems(db, hashes)
       const subjectId = clean(run.data.subject_id, 240)
-      let missing = 0
-      for (let index = 0; index < rows.length; index += 1) {
+
+      // One item: reuse it, or ask the teachers in order until one answers usably. Pure per item, so items can run
+      // side by side; the counters are updated from the returned outcome, never from inside the race.
+      const writeItem = async (index: number): Promise<'reused' | 'written' | 'missing'> => {
         const itemHash = hashes[index]
-        if (existing.has(itemHash)) { itemsReused += 1; continue }
+        if (existing.has(itemHash)) return 'reused'
         const reference = holdoutReference(rows[index])
-        if (!reference) { missing += 1; continue }
+        if (!reference) return 'missing'
         const request = holdoutExamWriterRequest({ subjectId, referenceEssay: reference })
-        let written = false
         for (const teacher of teachers) {
           try {
             const result = await generateWithUniversityTeacher({
@@ -477,14 +509,29 @@ export async function fillRequestedHoldoutExamSets(input: {
               writer_model: clean(result.model, 240) || teacher.model,
             }, { onConflict: 'item_hash', ignoreDuplicates: false })
             if (stored.error) throw stored.error
-            itemsWritten += 1
-            written = true
-            break
+            return 'written'
           } catch (error) {
             errors.push(`${candidateId}:${teacher.id}:${clean(error instanceof Error ? error.message : error, 160)}`)
           }
         }
-        if (!written) missing += 1
+        return 'missing'
+      }
+
+      // Bounded pool: at most HOLDOUT_EXAM_ITEM_CONCURRENCY teacher calls in flight for this set.
+      const outcomes: Array<'reused' | 'written' | 'missing'> = new Array(rows.length)
+      let cursor = 0
+      await Promise.all(Array.from({ length: Math.min(HOLDOUT_EXAM_ITEM_CONCURRENCY, rows.length) }, async () => {
+        while (cursor < rows.length) {
+          const index = cursor
+          cursor += 1
+          outcomes[index] = await writeItem(index)
+        }
+      }))
+      let missing = 0
+      for (const outcome of outcomes) {
+        if (outcome === 'reused') itemsReused += 1
+        else if (outcome === 'written') itemsWritten += 1
+        else missing += 1
       }
       if (missing > 0) { await fail(`exam_items_incomplete:${missing}/${rows.length}`); continue }
       const updated = await db.from(HOLDOUT_EXAM_SETS_TABLE).update({
@@ -503,7 +550,9 @@ export async function fillRequestedHoldoutExamSets(input: {
   }
   const population = await readExamSetPopulation(db)
   return Object.freeze({
-    processed: sets.length, ready, failed, itemsWritten, itemsReused,
+    processed, ready, failed, itemsWritten, itemsReused,
     errors: Object.freeze(errors.slice(0, 20)), aborted: null, revived, population,
+    deadlineReached, unreached,
   })
 }
+// end of saas/lib/ai/cos/cosUniversityHoldoutExamItems.ts (if this line is missing, the paste was cut short)

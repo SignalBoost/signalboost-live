@@ -71,6 +71,36 @@ function clean(value: unknown, max = 400): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
+type OrchestratorError = Readonly<{
+  stage: string
+  code: string | null
+  message: string
+  detail: string | null
+  hint: string | null
+  table: string | null
+  column: string | null
+  constraint: string | null
+}>
+
+function databaseError(stage: string, error: unknown): OrchestratorError {
+  const row = error && typeof error === 'object' ? error as Record<string, unknown> : {}
+  const message = error instanceof Error ? error.message : row.message
+  return Object.freeze({
+    stage: clean(stage, 80),
+    code: clean(row.code, 80) || null,
+    message: clean(message || error, 800) || 'unknown_database_error',
+    detail: clean(row.detail, 1200) || null,
+    hint: clean(row.hint, 800) || null,
+    table: clean(row.table, 160) || null,
+    column: clean(row.column, 160) || null,
+    constraint: clean(row.constraint, 240) || null,
+  })
+}
+
+function throwDatabaseError(stage: string, error: unknown): never {
+  throw databaseError(stage, error)
+}
+
 function requestHost(req: NextRequest): string {
   return String(process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || req.nextUrl.host)
 }
@@ -93,7 +123,7 @@ async function run(req: NextRequest) {
     .in('status', [...LINE_STATUSES])
     .order('updated_at', { ascending: true })
     .limit(MAX_ARTIFACTS)
-  if (source.error) throw source.error
+  if (source.error) throwDatabaseError('read_artifacts', source.error)
 
   const ids = (source.data || []).map((row: any) => String(row.candidate_id || '')).filter(Boolean)
   const existing = ids.length
@@ -101,7 +131,7 @@ async function run(req: NextRequest) {
       .select('candidate_id,artifact_hash,stage,station,stage_entered_at,stage_deadline_at,last_transition_at,last_action_at,orchestration_attempts,terminal,lease_until,lease_holder')
       .in('candidate_id', ids)
     : { data: [], error: null }
-  if (existing.error) throw existing.error
+  if (existing.error) throwDatabaseError('read_existing_ledger', existing.error)
   const byId = new Map((existing.data || []).map((row: any) => [String(row.candidate_id), row]))
 
   // Queue order per station: oldest arrival first, so position 0 is the unit the station is actually working on next.
@@ -186,7 +216,7 @@ async function run(req: NextRequest) {
   for (let offset = 0; offset < rows.length; offset += RECONCILE_CHUNK) {
     const chunk = rows.slice(offset, offset + RECONCILE_CHUNK)
     const write = await db.from('cos_university_lifecycle_orchestration').upsert(chunk, { onConflict: 'candidate_id' })
-    if (write.error) throw write.error
+    if (write.error) throwDatabaseError('write_ledger', write.error)
     reconciled += chunk.length
   }
 
@@ -251,7 +281,7 @@ async function run(req: NextRequest) {
       .eq('station', plan.station)
       .eq('terminal', false)
       .select('candidate_id')
-    if (leased.error) throw leased.error
+    if (leased.error) throwDatabaseError('lease_station_units', leased.error)
 
     const lanes = Math.max(1, Math.min(plan.freeCapacity, (leased.data || []).length || 1))
     const fired = await Promise.all(Array.from({ length: lanes }, () => triggerStation({
@@ -288,7 +318,7 @@ async function run(req: NextRequest) {
     .lte('stage_deadline_at', new Date().toISOString())
     .order('stage_deadline_at', { ascending: true })
     .limit(OVERDUE_REPORT_LIMIT)
-  if (overdue.error) throw overdue.error
+  if (overdue.error) throwDatabaseError('read_overdue_ledger', overdue.error)
 
   const constraint = lineConstraint()
 
@@ -343,9 +373,11 @@ async function run(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try { return await run(req) }
   catch (error) {
-    const message = error instanceof Error ? clean(error.message) : clean(error)
-    console.error('[cos-university-lifecycle-orchestrator]', JSON.stringify({ ok: false, error: message }))
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    const failure = error && typeof error === 'object' && 'stage' in error
+      ? error as OrchestratorError
+      : databaseError('unclassified', error)
+    console.error('[cos-university-lifecycle-orchestrator]', JSON.stringify({ ok: false, error: failure }))
+    return NextResponse.json({ ok: false, error: failure }, { status: 500 })
   }
 }
 export async function POST(req: NextRequest) { return GET(req) }

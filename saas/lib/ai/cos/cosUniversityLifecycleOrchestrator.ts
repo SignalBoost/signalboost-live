@@ -161,4 +161,20 @@ export function describeLifecycleFailure(error: unknown): string {
 
 const compact = (value: unknown): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 400)
 
+/**
+ * Which ledger rows to close out: units the ledger still holds open that are no longer on the line (retired, or gone).
+ *
+ * Only decided from a COMPLETE view. If the controller's read window was full, a live unit may simply be beyond it,
+ * and closing it would be the controller inventing a departure it never observed - so a full window closes nothing.
+ */
+export function decideLineCloseout(input: {
+  windowComplete: boolean
+  liveIds: readonly string[]
+  openLedgerIds: readonly string[]
+}): readonly string[] {
+  if (!input.windowComplete) return Object.freeze([])
+  const live = new Set(input.liveIds)
+  return Object.freeze([...new Set(input.openLedgerIds)].filter(id => id && !live.has(id)))
+}
+
 // end of saas/lib/ai/cos/cosUniversityLifecycleOrchestrator.ts (if this line is missing, the paste was cut short)

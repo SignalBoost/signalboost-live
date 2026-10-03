@@ -189,3 +189,14 @@ test('graduate quota protection follows the current Workforce rotation lease ins
   assert.match(graduateFn, /trained_artifact_hash.*lease\.data\.trained_artifact_hash/s)
   assert.doesNotMatch(graduateFn, /\.eq\('status', 'active'\)[\s\S]*\.limit\(200\)/)
 })
+
+test('quota-full evidence carries a measured provider capacity snapshot, not only a label', () => {
+  assert.match(provisionV2, /massDistilledServerlessWorkerCapacity\(\)\.catch/)
+  assert.match(provisionV2, /quota: capacity\.quota/)
+  assert.match(provisionV2, /reservedWorkers: capacity\.reservedWorkers/)
+  assert.match(provisionV2, /availableWorkers: capacity\.availableWorkers/)
+  assert.match(provisionV2, /source: capacity\.source/)
+  assert.match(provisionV2, /observedAt/)
+  assert.match(provisionV2, /measurement: 'runpod_serverless_endpoints'/)
+  assert.match(provisionV2, /measurement: 'unavailable'/)
+})

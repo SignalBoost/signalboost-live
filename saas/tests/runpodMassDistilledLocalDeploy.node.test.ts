@@ -8,6 +8,7 @@ const provisionV2 = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvi
 const route = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260915100500_mass_distilled_runtime_canary_claim.sql', import.meta.url), 'utf8')
 const boundedParallelMigration = readFileSync(new URL('../supabase/migrations/20260925143000_mass_canary_bounded_parallelism.sql', import.meta.url), 'utf8')
+const evaluationReadyClaimMigration = readFileSync(new URL('../supabase/migrations/20261003200000_mass_canary_claim_evaluation_ready.sql', import.meta.url), 'utf8')
 const endpointRefreshMigration = readFileSync(new URL('../supabase/migrations/20260921154000_mass_distilled_canary_endpoint_refresh_claim.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
@@ -160,6 +161,16 @@ test('latest database claim is a serialized two-slot semaphore, never a duplicat
   assert.match(boundedParallelMigration, /s\.evidence->>'artifactHash'=v_artifact\.trained_artifact_hash/)
   assert.match(boundedParallelMigration, /then continue; end if;/)
   assert.doesNotMatch(boundedParallelMigration, /v_active_reservations >= [3-9]/)
+})
+
+test('latest atomic claimant consumes the same evaluation-ready lifecycle state that rolling authorization approves', () => {
+  assert.match(evaluationReadyClaimMigration, /where a\.status in \('evaluation_ready','evaluation_pending'\)/)
+  assert.match(evaluationReadyClaimMigration, /local_distilled_runtime_deploy_approved/)
+  assert.match(evaluationReadyClaimMigration, /v_max_invocations <> 1/)
+  assert.match(evaluationReadyClaimMigration, /v_max_cost <= 0 or v_max_cost > 0\.200000/)
+  assert.match(evaluationReadyClaimMigration, /'reservationOnly',true/)
+  assert.match(evaluationReadyClaimMigration, /productionTrafficAuthorized/)
+  assert.doesNotMatch(evaluationReadyClaimMigration, /where a\.status='evaluation_pending'/)
 })
 
 test('route consumes the approval actual ceilings and never creates its own extra attempt', () => {

@@ -377,7 +377,22 @@ export function appendQuotaInventory(base: string, inventory: string): string {
 async function withQuotaInventory(error: unknown, activeEndpointId: string): Promise<Error> {
   const base = error instanceof Error ? error.message : String(error || '')
   if (base.includes('quota_inventory=')) return error instanceof Error ? error : new Error(base)
-  return new Error(appendQuotaInventory(base, await runpodWorkerQuotaInventory(activeEndpointId)))
+  const observedAt = new Date().toISOString()
+  const [inventory, capacity] = await Promise.all([
+    runpodWorkerQuotaInventory(activeEndpointId),
+    massDistilledServerlessWorkerCapacity().catch(() => null),
+  ])
+  const measured = capacity
+    ? ` quota_capacity=${JSON.stringify({
+        quota: capacity.quota,
+        reservedWorkers: capacity.reservedWorkers,
+        availableWorkers: capacity.availableWorkers,
+        source: capacity.source,
+        observedAt,
+        measurement: 'runpod_serverless_endpoints',
+      })}`
+    : ` quota_capacity=${JSON.stringify({ observedAt, measurement: 'unavailable' })}`
+  return new Error(`${appendQuotaInventory(base, inventory)}${measured}`)
 }
 
 async function resolveEndpointControlPlane(endpointId: string, endpointName = ''): Promise<Endpoint> {

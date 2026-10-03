@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityDistillationSelfHealing.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -11,6 +12,11 @@ import {
   createNativeRepairActionResolver,
   diagnoseRegisteredNativeRecovery,
 } from '../self-healing-host/native-repair-action-resolver.ts'
+import {
+  lineRepairPlan,
+  onlyDeferredLineReasonsRemain,
+  runLineStationRepair,
+} from '../lib/ai/cos/cosUniversityLineRepairPlan.ts'
 
 const now = new Date('2026-09-15T12:00:00.000Z')
 const campaign = {
@@ -431,7 +437,9 @@ test('Production wiring runs monitor, governed repair, shared workflow, and sepa
   assert.match(recovery, /university_distillation_recovery_verification_failed/)
   assert.match(workflow, /recoverStalledMassDistillationDispatchClaims/)
   assert.match(workflow, /prepareUniversityMassDistillationCurriculum/)
-  assert.match(workflow, /authorizeNextUniversityMassDistillationCampaign/)
+  // Renamed 2026-09 when campaign authorization became batched. Pinning the OLD name left this test red on
+  // main for days with nothing running it, which is why it is now gated in CI.
+  assert.match(workflow, /authorizeAvailableUniversityMassDistillationCampaigns/)
   assert.match(workflow, /workflowSource: input\.source/)
   assert.match(policy, /UNIVERSITY_DISTILLATION_RECOVERY_ALLOWLIST_ENTRY/)
   assert.match(host, /createUniversityDistillationRecoveryExecutor/)
@@ -443,3 +451,168 @@ test('Production wiring runs monitor, governed repair, shared workflow, and sepa
     schedule: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *',
   })
 })
+
+// ---------------------------------------------------------------------------------------------------------------
+// Repair what is actually stalled.
+//
+// Owner 2026-10-02: "self healing supervisor never proved that it works, and you want it to be responsible for the
+// whole thing?" He was right, and these tests exist because of a defect I introduced. Wiring the lifecycle stall
+// watcher into the monitor added four reasons to the snapshot without checking what the governed repair does with
+// one. Read in sequence, the live code ran the TRAINING workflow - entirely upstream of the artifact existing - at a
+// stalled quarantine, then re-read health, found the reason still there, and THREW
+// `university_distillation_recovery_verification_failed`. Every five minutes, forever: paid work that cannot fix the
+// fault, followed by a self-inflicted verification failure.
+//
+// The tests below prove the routing, and prove the one thing a supervisor must never fake: a woken station has not
+// finished working, so the repair is reported as DEFERRED and never as verified.
+// ---------------------------------------------------------------------------------------------------------------
+test('each lifecycle stall is routed to the station that can actually clear it', () => {
+  for (const [reason, station] of [
+    ['lifecycle_exam_stalled', 'INDEPENDENT_EVALUATION'],
+    ['lifecycle_quarantine_stalled', 'QUARANTINE_REMEDIATION'],
+    ['lifecycle_registration_stalled', 'GRADUATION'],
+    ['lifecycle_activation_stalled', 'GRADUATION'],
+  ] as Array<[string, string]>) {
+    const plan = lineRepairPlan({ reasons: [reason] })
+    assert.equal(plan.target, 'assembly_line', reason)
+    assert.equal(plan.stations.length, 1)
+    assert.equal(plan.stations[0].station, station)
+    assert.match(plan.stations[0].workerPath, /^\/api\/cron\//)
+    assert.ok(plan.stations[0].slaSeconds > 0)
+    // A woken station needs time. The plan must say so rather than inviting an instant verification.
+    assert.equal(plan.verificationDeferred, true)
+    assert.ok(plan.deferredForSeconds > 0)
+    assert.equal(plan.authorityExpanded, false)
+  }
+})
+
+test('two stalls on the same station wake it once, not twice', () => {
+  const plan = lineRepairPlan({ reasons: ['lifecycle_registration_stalled', 'lifecycle_activation_stalled'] })
+  assert.equal(plan.stations.length, 1)
+  assert.equal(plan.stations[0].station, 'GRADUATION')
+  assert.deepEqual([...plan.stations[0].reasons], ['lifecycle_registration_stalled', 'lifecycle_activation_stalled'])
+})
+
+test('an upstream reason still goes to the training workflow, and wakes no station', () => {
+  const plan = lineRepairPlan({ reasons: ['dispatch_claim_stalled', 'heartbeat_stale'] })
+  assert.equal(plan.target, 'training_workflow')
+  assert.deepEqual(plan.stations, [])
+  assert.equal(plan.verificationDeferred, false)
+  assert.equal(plan.deferredForSeconds, 0)
+})
+
+test('a mixed snapshot repairs the line AND the training workflow', () => {
+  const plan = lineRepairPlan({ reasons: ['lifecycle_quarantine_stalled', 'heartbeat_missing'] })
+  assert.equal(plan.target, 'both')
+  assert.equal(plan.stations.length, 1)
+  assert.deepEqual([...plan.upstreamReasons], ['heartbeat_missing'])
+})
+
+test('an unrecognised reason is treated as upstream, never dropped', () => {
+  // A reason this module has not heard of must still reach a repair that exists. Silently excluding it is how a
+  // fault becomes invisible.
+  const plan = lineRepairPlan({ reasons: ['some_future_reason'] })
+  assert.equal(plan.target, 'training_workflow')
+  assert.deepEqual([...plan.upstreamReasons], ['some_future_reason'])
+  assert.equal(lineRepairPlan({ reasons: [] }).target, 'none')
+  assert.equal(lineRepairPlan({ reasons: ['', '  '] }).target, 'none')
+})
+
+test('only an all-line reason set counts as a deferred wait', () => {
+  assert.equal(onlyDeferredLineReasonsRemain({ reasons: ['lifecycle_exam_stalled'] }), true)
+  assert.equal(onlyDeferredLineReasonsRemain({ reasons: ['lifecycle_exam_stalled', 'lifecycle_activation_stalled'] }), true)
+  assert.equal(onlyDeferredLineReasonsRemain({ reasons: ['lifecycle_exam_stalled', 'heartbeat_stale'] }), false)
+  // An empty set is not "waiting"; it is healthy, and that is the other branch's answer.
+  assert.equal(onlyDeferredLineReasonsRemain({ reasons: [] }), false)
+})
+
+test('a lifecycle stall wakes its station, spends nothing, and is reported as deferred rather than verified', async () => {
+  // The proof the owner asked for. A quarantine stall must wake the quarantine station, must leave nothing for the
+  // paid path to do, and must NOT be dressed up as a confirmed repair while that station is still working.
+  const woken: string[] = []
+  const outcome = await runLineStationRepair({
+    reasons: ['lifecycle_quarantine_stalled'],
+    wake: async ({ path }) => { woken.push(path); return { ok: true, status: 200, detail: 'woken' } },
+    // Health still carries the same line reason a moment later, because the station has not finished.
+    readHealth: async () => ({ state: 'repair_required', reasons: ['lifecycle_quarantine_stalled'] }),
+    recordReceipt: async () => 'receipt-ref',
+  })
+
+  assert.deepEqual(woken, ['/api/cron/cos-university-mass-backlog-compact'], 'the quarantine station must be woken')
+  assert.equal(outcome.attempted, true)
+  assert.equal(outcome.settled, false, 'a station woken a moment ago has not finished working')
+  assert.equal(outcome.verificationDeferred, true)
+  assert.ok(outcome.deferredForSeconds > 0)
+  assert.equal(outcome.paidDispatchSuppressed, true, 'paid training must have nothing to do at a line stall')
+  assert.equal(outcome.receiptRef, 'receipt-ref')
+  assert.equal(outcome.authorityExpanded, false)
+  assert.ok(Object.isFrozen(outcome))
+})
+
+test('a line stall that clears immediately IS reported as verified', async () => {
+  // The deferral must not become a blanket excuse. When health genuinely comes back clean, say so.
+  const outcome = await runLineStationRepair({
+    reasons: ['lifecycle_registration_stalled'],
+    wake: async () => ({ ok: true, status: 200, detail: 'woken' }),
+    readHealth: async () => ({ state: 'healthy', reasons: [] }),
+  })
+  assert.equal(outcome.settled, true)
+  assert.equal(outcome.verificationDeferred, false)
+  assert.equal(outcome.deferredForSeconds, 0)
+  assert.equal(outcome.paidDispatchSuppressed, true)
+  assert.equal(outcome.receiptRef, null, 'no receipt recorder was supplied, so none may be invented')
+})
+
+test('an upstream reason left over after a line repair still reaches the paid path', async () => {
+  // Mixed faults: the line is poked for free, and the training workflow must still get its turn.
+  const outcome = await runLineStationRepair({
+    reasons: ['lifecycle_exam_stalled', 'heartbeat_stale'],
+    wake: async () => ({ ok: true, status: 200, detail: 'woken' }),
+    readHealth: async () => ({ state: 'repair_required', reasons: ['heartbeat_stale'] }),
+  })
+  assert.equal(outcome.attempted, true)
+  assert.equal(outcome.paidDispatchSuppressed, false, 'an upstream fault must not be swallowed by the line repair')
+  assert.equal(outcome.verificationDeferred, false)
+})
+
+test('a station that refuses to wake is reported as not woken, and never throws', async () => {
+  // A supervisor that throws on a failed poke stops supervising. The honest outcome is a recorded failure.
+  const outcome = await runLineStationRepair({
+    reasons: ['lifecycle_activation_stalled'],
+    wake: async () => { throw new Error('connect ECONNREFUSED') },
+    readHealth: async () => ({ state: 'repair_required', reasons: ['lifecycle_activation_stalled'] }),
+  })
+  assert.equal(outcome.attempted, true)
+  assert.equal(outcome.stations.length, 1)
+  assert.equal(outcome.stations[0].woken, false)
+  assert.match(outcome.stations[0].detail, /ECONNREFUSED/)
+})
+
+test('a snapshot with no line reason wakes nothing at all', async () => {
+  let wakes = 0
+  const outcome = await runLineStationRepair({
+    reasons: ['dispatch_claim_stalled'],
+    wake: async () => { wakes += 1; return { ok: true } },
+    readHealth: async () => { throw new Error('health must not even be re-read') },
+  })
+  assert.equal(wakes, 0)
+  assert.equal(outcome.attempted, false)
+  assert.equal(outcome.paidDispatchSuppressed, false)
+  assert.equal(outcome.verificationDeferred, false)
+})
+
+test('the live repair wakes the line before anything paid, and never throws on a deferred wait', () => {
+  const recovery = readFileSync(new URL('../agent-gateway-host/university-distillation-recovery.ts', import.meta.url), 'utf8')
+  const lineAt = recovery.indexOf('const lineRepair = await runLineStationRepair(')
+  const paidAt = recovery.indexOf('const workerPreflight = await preflightWorker()')
+  assert.ok(lineAt > 0 && paidAt > lineAt, 'the zero-spend line repair must come before the paid path')
+  assert.match(recovery, /if \(lineRepair\.attempted && lineRepair\.paidDispatchSuppressed\) \{/)
+  assert.match(recovery, /onlyDeferredLineReasonsRemain\(\{ reasons: after\.reasons \}\)/)
+  assert.match(recovery, /if \(!verified && !deferred\) \{/)
+  assert.match(recovery, /verified: lineRepair\.settled,/, 'a woken station must never be reported as verified')
+  assert.match(recovery, /paidDispatchSuppressed: true/)
+  assert.match(recovery, /authorityExpanded: false/)
+  assert.doesNotMatch(recovery, /automaticPromotionAuthorized: true/)
+  assert.doesNotMatch(recovery, /runpodMutationAuthorized: true/)
+})
+// end of saas/tests/cosUniversityDistillationSelfHealing.node.test.ts (if this line is missing, the paste was cut short)

@@ -109,7 +109,7 @@ async function resolveResidencyArtifact(
   if(
     String(row.trained_artifact_id)!==artifactId||
     String(row.revision_key).toLowerCase()!==revisionKey||
-    String(row.status)!=='evaluation_pending'||
+    String(row.status)!=='evaluation_ready'||
     row.authority_expanded===true
   ){
     throw new Error('residency_exact_artifact_registry_mismatch')

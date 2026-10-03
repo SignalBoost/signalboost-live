@@ -122,6 +122,35 @@ export function massDistilledCanaryCatalogPriceSnapshot(
   return Object.freeze(prices)
 }
 
+export async function reconcileGraduateWorkerReservation(endpointIds: readonly string[], keepPinned: number) {
+  const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+  const wanted = new Set(endpointIds.map(id => clean(id, 160).toLowerCase()).filter(Boolean))
+  const graduates = (listed.endpoints || [])
+    .filter(endpoint => wanted.has(clean(endpoint.id, 160).toLowerCase()))
+    .sort((a, b) => clean(a.id, 160).localeCompare(clean(b.id, 160)))
+  const pinned = graduates.slice(0, Math.max(0, Math.floor(keepPinned)))
+  const excess = graduates.slice(pinned.length)
+  let scaledToZero = 0
+  for (const endpoint of excess) {
+    if (!endpoint.id || Number(endpoint.workers?.max ?? 0) <= 0) continue
+    await requestV2<Endpoint>(`/serverless/${encodeURIComponent(endpoint.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ workers: { min: 0, max: 0, idleTimeout: Math.min(Number(endpoint.workers?.idleTimeout ?? IDLE_TIMEOUT_SECONDS), IDLE_TIMEOUT_SECONDS) } }),
+    })
+    scaledToZero += 1
+  }
+  const { workers: quota, source } = declaredInferenceWorkers()
+  return Object.freeze({
+    workforceReservation: Math.max(0, Math.floor(keepPinned)),
+    graduates: graduates.length,
+    pinned: pinned.filter(endpoint => Number(endpoint.workers?.max ?? 0) > 0).length,
+    scaledToZero,
+    quota,
+    source,
+    observedAt: new Date().toISOString(),
+  })
+}
+
 export async function massDistilledServerlessWorkerCapacity() {
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
   const endpoints = listed.endpoints || []

@@ -1,4 +1,3 @@
-// saas/tests/cosUniversityLifecycleOrchestrator.node.test.ts
 //
 // Owner, 2026-10-02: "it should function like an assembly line style ... the individual stations should not own the
 // schedule. The line owns the flow." Four rules were set, and each one has tests below that fail the build if the
@@ -40,8 +39,10 @@ import {
   unitDeadlineSeconds,
 } from '../lib/ai/cos/cosUniversityAssemblyLine.ts'
 import { handoffPlan } from '../lib/ai/cos/cosUniversityAssemblyLineHandoff.ts'
+import { lineCapacity } from '../lib/ai/cos/cosUniversityLineCapacity.ts'
 import {
   describeLineProof,
+  lineProofMinimumIntervalSeconds,
   proveLineMovement,
   sampleFromLineState,
   type ObservedUnit,
@@ -129,18 +130,40 @@ test('the conveyor carries and cannot grade', () => {
 // ---------------------------------------------------------------------------------------------------------------
 
 test('a station with free lanes is dispatched up to its own concurrency, not once', () => {
+  // Pinning the NUMBER here was wrong: 2 rationed a 10-worker account, it was not a property of the evaluator.
+  // What must hold is that the dispatcher offers exactly as many lanes as the declared capacity gives it.
   const evaluation = stationById('INDEPENDENT_EVALUATION')!
-  assert.equal(evaluation.concurrency, 2, 'MASS_EVALUATION_MAX_IN_FLIGHT')
+  const capacity = lineCapacity()
+  assert.equal(evaluation.concurrency, capacity.evaluation, 'concurrency must come from declared capacity')
+  assert.ok(evaluation.concurrency >= 1)
   const [dispatch] = decideStationDispatch({
-    demand: [{ station: 'INDEPENDENT_EVALUATION', waiting: 40, inFlight: 0 }],
+    demand: [{ station: 'INDEPENDENT_EVALUATION', waiting: evaluation.concurrency + 10, inFlight: 0 }],
   })
   assert.ok(dispatch)
-  assert.equal(dispatch.freeCapacity, 2)
+  assert.equal(dispatch.freeCapacity, evaluation.concurrency)
   assert.equal(dispatch.workerPath, '/api/cron/cos-university-mass-distilled-evaluation')
 })
 
+test('every station is sized by declared inference capacity, never by a baked-in account quota', () => {
+  const capacity = lineCapacity()
+  assert.equal(stationById('EXACT_CANARY')!.concurrency, capacity.canary)
+  assert.equal(stationById('INDEPENDENT_EVALUATION')!.concurrency, capacity.evaluation)
+  assert.equal(stationById('GRADUATION')!.concurrency, capacity.registrationsPerTick)
+  // The headroom rule the old hand-written constants protected is now arithmetic: always a spare worker.
+  assert.ok(capacity.canary + capacity.evaluation + capacity.workforce < capacity.workers,
+    'the line must never reserve the whole worker pool')
+  assert.ok(capacity.headroom >= 1)
+  // A deployment declaring a small pool gets small numbers; declaring nothing gets enterprise scale.
+  const tiny = lineCapacity({ COS_UNIVERSITY_INFERENCE_WORKERS: '10' })
+  const big = lineCapacity({ COS_UNIVERSITY_INFERENCE_WORKERS: '256' })
+  assert.ok(tiny.canary < big.canary && tiny.evaluation < big.evaluation)
+  assert.ok(tiny.canary + tiny.evaluation + tiny.workforce < 10, 'a 10-worker rig must stay inside its quota')
+  assert.ok(big.artifactsPerHour > tiny.artifactsPerHour * 10, 'capacity must actually scale with the pool')
+})
+
 test('a station at capacity is left alone, and an empty station is never poked', () => {
-  assert.deepEqual(decideStationDispatch({ demand: [{ station: 'INDEPENDENT_EVALUATION', waiting: 40, inFlight: 2 }] }), [])
+  const full = stationById('INDEPENDENT_EVALUATION')!.concurrency
+  assert.deepEqual(decideStationDispatch({ demand: [{ station: 'INDEPENDENT_EVALUATION', waiting: full + 10, inFlight: full }] }), [])
   assert.deepEqual(decideStationDispatch({ demand: [{ station: 'EXACT_CANARY', waiting: 0, inFlight: 0 }] }), [])
   assert.deepEqual(decideStationDispatch({ demand: [{ station: 'TERMINAL', waiting: 9, inFlight: 0 }] }), [])
   assert.deepEqual(decideStationDispatch({ demand: [{ station: 'not_a_station' as never, waiting: 9, inFlight: 0 }] }), [])
@@ -322,23 +345,26 @@ test('a unit deep in a queue is charged for the queue ahead of it, not declared 
   // head-of-queue deadline fills the overdue list with units nothing is wrong with, and the real stall hides in it.
   const canary = stationById('EXACT_CANARY')!
   assert.equal(expectedStartSeconds(canary, 0), 0)
-  assert.equal(expectedStartSeconds(canary, 20), 20 * canary.workSeconds)
-  assert.ok(unitDeadlineSeconds(canary, 20) > unitDeadlineSeconds(canary, 0))
+  // Queue ahead is divided by the lanes actually running, so widening the station shortens the wait.
+  const ahead = canary.concurrency * 20
+  assert.equal(expectedStartSeconds(canary, ahead), Math.ceil(ahead / canary.concurrency) * canary.workSeconds)
+  assert.ok(unitDeadlineSeconds(canary, ahead) > unitDeadlineSeconds(canary, 0))
 
   const entered = new Date('2026-10-02T19:00:00Z')
   const head = lifecycleDeadlineInQueue({ enteredAt: entered, status: 'evaluation_ready', queueAhead: 0 })!
-  const deep = lifecycleDeadlineInQueue({ enteredAt: entered, status: 'evaluation_ready', queueAhead: 20 })!
+  const deep = lifecycleDeadlineInQueue({ enteredAt: entered, status: 'evaluation_ready', queueAhead: ahead })!
   assert.ok(deep.getTime() > head.getTime())
-  const start = lifecycleExpectedStart({ enteredAt: entered, status: 'evaluation_ready', queueAhead: 20 })!
+  const start = lifecycleExpectedStart({ enteredAt: entered, status: 'evaluation_ready', queueAhead: ahead })!
   assert.ok(start.getTime() > entered.getTime(), 'a queued unit must be able to say when it should start')
   assert.equal(lifecycleDeadlineInQueue({ enteredAt: entered, status: 'not_a_status', queueAhead: 0 }), null)
 })
 
 test('a batched station charges a queue by ticks, not by one unit at a time', () => {
   const graduation = stationById('GRADUATION')!
-  // Ten per tick: the first ten units are all in the next tick, so nine behind the head cost no extra wait.
-  assert.equal(expectedStartSeconds(graduation, 9), 0)
-  assert.equal(expectedStartSeconds(graduation, 10), graduation.cadenceSeconds)
+  const perTick = graduation.concurrency
+  // A whole tick's worth is handled together, so anything inside the first batch costs no extra wait.
+  assert.equal(expectedStartSeconds(graduation, perTick - 1), 0)
+  assert.equal(expectedStartSeconds(graduation, perTick), graduation.cadenceSeconds)
 })
 
 test('a working station re-arms from its last action, so it can never be permanently overdue', () => {
@@ -392,9 +418,18 @@ test('controller owns progress but cannot grade or widen authority', () => {
 
 test('the line definition is pure policy with no database or network reach', () => {
   const line = readFileSync(new URL('../lib/ai/cos/cosUniversityAssemblyLine.ts', import.meta.url), 'utf8')
-  assert.doesNotMatch(line, /^import /m, 'the line definition must stay dependency-free')
+  // It may import pure sibling policy (capacity is declared configuration, not a dependency) and nothing else.
+  // Asserting zero imports was the wrong rule; the real one is that it reaches no database, network or host.
+  for (const row of line.split('\n').filter(entry => entry.startsWith('import '))) {
+    assert.match(row, /from '\.\/cosUniversity[A-Za-z]+\.ts'$/, `unexpected dependency: ${row}`)
+  }
   assert.doesNotMatch(line, /fetch\(/)
   assert.doesNotMatch(line, /cosServiceDb/)
+  assert.doesNotMatch(line, /@\/lib/)
+  const capacity = readFileSync(new URL('../lib/ai/cos/cosUniversityLineCapacity.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(capacity, /^import /m, 'the capacity model itself must stay dependency-free')
+  assert.doesNotMatch(capacity, /fetch\(/)
+  assert.doesNotMatch(capacity, /cosServiceDb/)
 })
 
 test('the reconcile is batched, so its cost is chunks and not artifacts', () => {
@@ -434,7 +469,9 @@ test('migration persists stage ownership, deadline, queue position and lease', (
 // ---------------------------------------------------------------------------------------------------------------
 
 const sampleAt = (secondsAgo: number) => new Date(NOW.getTime() - secondsAgo * 1000).toISOString()
-const TAKT = lineConstraint()!.taktSeconds
+// The prover's own floor: the slowest station's cycle time, never the takt. Reading it from the prover keeps the
+// tests and the watchdog on one number, so widening the line cannot turn either into a false-alarm generator.
+const TAKT = lineProofMinimumIntervalSeconds()
 
 const unit = (over: Partial<ObservedUnit> & { station: string }): ObservedUnit => ({
   candidateId: 'mass:aaaa1111',
@@ -604,4 +641,3 @@ test('the Playwright prover skips rather than passes when it cannot reach a depl
   // And it must leave a durable artifact behind, which is the point of running it.
   assert.match(spec, /attach\('assembly-line-movement-proof\.json'/)
 })
-// end of saas/tests/cosUniversityLifecycleOrchestrator.node.test.ts (if this line is missing, the paste was cut short)

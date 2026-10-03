@@ -10,6 +10,7 @@ import {
   type CanaryArtifact,
   type CanaryEvent,
 } from '../lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts'
+import { lineCapacity } from '../lib/ai/cos/cosUniversityLineCapacity.ts'
 
 // Production 2026-09-24: 5 canary invocations started between 21:46 and 22:40 UTC against the former cap of 3 per
 // rolling hour. The route only loaded events for artifacts still queued, so invocations of artifacts that had
@@ -30,9 +31,11 @@ const invocation = (candidateId: string, observedAt: string): CanaryEvent => ({
 })
 
 test('invocations of artifacts no longer queued still consume the rolling hourly budget', () => {
-  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 12)
+  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, lineCapacity().canaryApprovalsPerHour)
+  assert.ok(MASS_CANARY_ROLLING_MAX_APPROVALS >= 1)
+  const spacingMinutes = 59 / Math.max(1, MASS_CANARY_ROLLING_MAX_APPROVALS)
   const events = Array.from({ length: MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) =>
-    invocation(`mass:already-passed-${index + 1}`, minutesAgo(59 - index * 4)),
+    invocation(`mass:already-passed-${index + 1}`, minutesAgo(59 - index * spacingMinutes)),
   )
   const decision = decideMassCanaryRollingApproval({ artifacts: [queued], events, now, enabled: true })
   assert.equal('artifact' in decision, false)

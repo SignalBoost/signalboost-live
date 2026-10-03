@@ -6,6 +6,7 @@
 
 import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationContextBudget.ts'
 import { MASS_RETENTION_DELAY_MS } from './cosUniversityMassRetentionDelay.ts'
+import { lineCapacity } from './cosUniversityLineCapacity.ts'
 import { xsaExamPaused } from './cosUniversityXsaExamPause.ts'
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
@@ -33,8 +34,8 @@ export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
 // before provider invocation. Reserve one worker of headroom by admitting at most two evaluators concurrently.
 // This keeps evaluation throughput above the observed training arrival rate while allowing the canary lane to
 // make progress without reclaiming an active graduate, an active evaluator, or unrelated workloads.
-export const MASS_EVALUATION_MAX_IN_FLIGHT = 2
-export const MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT = 4
+export const MASS_EVALUATION_MAX_IN_FLIGHT = lineCapacity().evaluation
+export const MASS_EVALUATION_MAX_CAPACITY_AWARE_IN_FLIGHT = lineCapacity().evaluation + lineCapacity().headroom
 
 // Keep the proven two-evaluator floor, but allow bounded extra concurrency only when RunPod's
 // account-wide reservation inventory proves spare workers exist. Always preserve one unreserved

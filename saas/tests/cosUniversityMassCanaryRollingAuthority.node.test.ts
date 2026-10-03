@@ -29,6 +29,7 @@ import {
   type CanaryArtifact,
   type CanaryEvent,
 } from '../lib/ai/cos/cosUniversityMassCanaryRollingAuthority.ts'
+import { lineCapacity } from '../lib/ai/cos/cosUniversityLineCapacity.ts'
 
 const now = new Date('2026-09-17T17:00:00.000Z')
 const h = (n: number) => n.toString(16).padStart(64, '0')
@@ -536,10 +537,18 @@ test('the same canary failure repeating stops that artifact instead of looping',
   assert.equal(decision.artifact.candidateId, 'mass:2', 'the stuck artifact is skipped and the queue moves on')
 })
 
-test('the hourly ceiling preserves the bounded 288-per-day nominal spend envelope without a long blackout', () => {
+test('the hourly ceiling is the declared capacity and the daily envelope follows it', () => {
+  // Owner 2026-10-03, "build a Ferrari not a Lada": 12/hour and the 288/day envelope rationed a 10-worker RunPod
+  // account. The envelope is still bounded and still derived from ONE hourly number - that number is now the
+  // capacity this deployment declares instead of its author's quota.
+  const capacity = lineCapacity()
   assert.equal(MASS_CANARY_ROLLING_WINDOW_HOURS, 1)
-  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 12)
-  assert.equal((24 / MASS_CANARY_ROLLING_WINDOW_HOURS) * MASS_CANARY_ROLLING_MAX_APPROVALS, 288)
+  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, capacity.canaryApprovalsPerHour)
+  assert.ok(MASS_CANARY_ROLLING_MAX_APPROVALS >= 1, 'the canary must always be able to run at least once an hour')
+  assert.equal((24 / MASS_CANARY_ROLLING_WINDOW_HOURS) * MASS_CANARY_ROLLING_MAX_APPROVALS,
+    24 * capacity.canaryApprovalsPerHour, 'the daily envelope stays a pure function of the hourly ceiling')
+  const tiny = lineCapacity({ COS_UNIVERSITY_INFERENCE_WORKERS: '10' })
+  assert.ok(tiny.canary + tiny.evaluation + tiny.workforce < 10)
   const a = artifact(1)
   const exhausted = Array.from({ length:MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) => {
     const other = artifact(100 + index)

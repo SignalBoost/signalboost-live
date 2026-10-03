@@ -5,6 +5,7 @@
 // (1 invocation, <= $0.20). It never touches the claim, the canary, the evaluator, promotion or Production traffic.
 
 import { MASS_RETENTION_DELAY_MS } from './cosUniversityMassRetentionDelay.ts'
+import { lineCapacity } from './cosUniversityLineCapacity.ts'
 import { xsaExamPaused } from './cosUniversityXsaExamPause.ts'
 
 export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-17_mass_canary_without_manual_intervention' as const
@@ -15,7 +16,7 @@ export const MASS_CANARY_APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approv
 // twelve started-or-armed canaries per rolling hour, with the unchanged <= $0.20 per-canary ceiling.
 // This caps nominal authority at 288 canaries/day and <= $57.60/day while preserving every artifact-local fence.
 export const MASS_CANARY_ROLLING_WINDOW_HOURS = 1
-export const MASS_CANARY_ROLLING_MAX_APPROVALS = 12
+export const MASS_CANARY_ROLLING_MAX_APPROVALS = lineCapacity().canaryApprovalsPerHour
 export const MASS_CANARY_MAX_CONCURRENT = 2
 export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // A cold-start timeout is the runtime never answering, not the artifact failing. It is retried without spending one

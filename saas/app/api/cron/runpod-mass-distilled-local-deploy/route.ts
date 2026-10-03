@@ -256,7 +256,7 @@ async function issueRollingCanaryApproval(now:Date){
       && Number(receipt.failureDerivedReplayLearningRate||0)>=MASS_CANARY_REMEDIATION_REPLAY_MIN_LEARNING_RATE
   })
   const pendingCurrentRecipeArtifacts=confirmedCurrentRecipeArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
-  const pendingBuilderArtifacts=confirmedBuilderArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
+  const pendingBuilderArtifacts=confirmedBuilderArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_ready')
   const pendingReplayArtifacts=confirmedReplayArtifacts.filter((row:any)=>String(row.status||'')==='evaluation_pending')
   const confirmedXsaArtifacts=(xsaArtifacts.data||[]).filter((row:any)=>{
     const receipt=row?.intended_use?.trainingReceipt

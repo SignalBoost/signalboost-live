@@ -23,7 +23,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
-  LINE_STATUSES,
   UNIVERSITY_LINE_CAPACITY,
   WORKING_STATIONS,
   decideLineStops,

@@ -97,7 +97,7 @@ const storeFor = (tables: Record<string, any[]>) =>
 test('a pinned lane gives its turns only to its own resident, and stops when that resident is no longer active', async () => {
   const tables: Record<string, any[]> = {
     cos_university_residency_enrollments: [residentRow('r1', '1', 'resident', 10), residentRow('r2', '2', 'remediation_required', 20)],
-    cos_local_distillation_artifacts: [studentRow('1', 'evaluation_pending'), studentRow('2', 'evaluation_pending')],
+    cos_local_distillation_artifacts: [studentRow('1', 'evaluation_ready'), studentRow('2', 'evaluation_ready')],
   }
   const store = storeFor(tables)
   const lanes = await store.planLanes(4)
@@ -113,7 +113,7 @@ test('a pinned lane gives its turns only to its own resident, and stops when tha
 test('a resident whose student already left gets no case turn, even before its enrollment is closed', async () => {
   const store = storeFor({
     cos_university_residency_enrollments: [residentRow('gone', '3', 'remediation_required', 30), residentRow('live', '4', 'resident', 10)],
-    cos_local_distillation_artifacts: [studentRow('3', 'retired'), studentRow('4', 'evaluation_pending')],
+    cos_local_distillation_artifacts: [studentRow('3', 'retired'), studentRow('4', 'evaluation_ready')],
   })
   assert.deepEqual((await store.planLanes(4)).map(lane => lane.residencyId), ['live'])
   assert.equal((await store.nextEnrollment())?.residencyId, 'live')
@@ -122,7 +122,7 @@ test('a resident whose student already left gets no case turn, even before its e
 test('departed residents are withdrawn with a durable record, never as a pass or a Residency FAIL', async () => {
   const tables: Record<string, any[]> = {
     cos_university_residency_enrollments: [residentRow('gone', '5', 'resident', 30), residentRow('live', '6', 'resident', 10)],
-    cos_local_distillation_artifacts: [studentRow('5', 'retired'), studentRow('6', 'evaluation_pending')],
+    cos_local_distillation_artifacts: [studentRow('5', 'retired'), studentRow('6', 'evaluation_ready')],
     cos_university_learning_assurance_events: [],
   }
   const store = storeFor(tables)

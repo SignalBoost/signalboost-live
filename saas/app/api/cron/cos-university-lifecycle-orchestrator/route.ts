@@ -55,6 +55,7 @@ export const maxDuration = 60
 
 const MAX_ARTIFACTS = 500
 const RECONCILE_CHUNK = 200
+const LEDGER_READ_CHUNK = 50
 const ACTION_TIMEOUT_MS = 8_000
 const OVERDUE_REPORT_LIMIT = 50
 // Per-unit placement, so an outside prover can take two samples and compute movement for itself instead of trusting
@@ -97,13 +98,23 @@ async function run(req: NextRequest) {
   if (source.error) throw source.error
 
   const ids = (source.data || []).map((row: any) => String(row.candidate_id || '')).filter(Boolean)
-  const existing = ids.length
-    ? await db.from('cos_university_lifecycle_orchestration')
+  const existingRows: any[] = []
+  for (let offset = 0; offset < ids.length; offset += LEDGER_READ_CHUNK) {
+    const idChunk = ids.slice(offset, offset + LEDGER_READ_CHUNK)
+    const existing = await db.from('cos_university_lifecycle_orchestration')
       .select('candidate_id,artifact_hash,stage,station,stage_entered_at,stage_deadline_at,last_transition_at,last_action_at,orchestration_attempts,terminal,lease_until,lease_holder')
-      .in('candidate_id', ids)
-    : { data: [], error: null }
-  if (existing.error) throw existing.error
-  const byId = new Map((existing.data || []).map((row: any) => [String(row.candidate_id), row]))
+      .in('candidate_id', idChunk)
+    if (existing.error) {
+      throw {
+        stage: 'read_existing_ledger',
+        chunkOffset: offset,
+        chunkSize: idChunk.length,
+        ...existing.error,
+      }
+    }
+    existingRows.push(...(existing.data || []))
+  }
+  const byId = new Map(existingRows.map((row: any) => [String(row.candidate_id), row]))
 
   // Queue order per station: oldest arrival first, so position 0 is the unit the station is actually working on next.
   const arrivals = new Map<string, Array<{ candidateId: string; enteredAt: Date }>>()

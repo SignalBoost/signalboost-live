@@ -4,6 +4,18 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { drainGraduateServingEvidence } from '@/lib/ai/cos/graduateServingAttempts'
 import { runWorkforceApprenticeShadow } from '@/lib/ai/cos/cosReasoningWorkers'
 import { closeAbandonedWorkforceAssignments, verifyServedWorkforceAssignments } from '@/lib/ai/cos/cosWorkforceAssignments'
+import { graduateRunpodEndpointId } from '@/lib/ai/cos/cosUniversityGraduateEndpointProtection'
+import {
+  deactivateMassDistilledEvaluationWorker,
+  ensureMassDistilledEndpoint24Gb,
+  listMassDistilledRunpodEndpoints,
+} from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
+import {
+  describeWorkforceReservation,
+  reconcileWorkforceReservation,
+  type WorkforceGraduate,
+  type WorkforceReservationReport,
+} from '@/lib/ai/cos/cosUniversityWorkforceReservation'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -11,6 +23,60 @@ export const maxDuration = 60
 const RUN_BUDGET_MS = 50_000
 const SHADOW_MAX_MS = 15_000
 const SHADOW_CLOSE_MARGIN_MS = 6_000
+// The reservation reconcile gets the first part of the budget: a slot given back here is a slot the examiner can
+// use this same minute, and it must never be starved by the shadow work that follows it.
+const RESERVATION_BUDGET_MS = 20_000
+
+/**
+ * The workforce's on-call graduates as the reservation policy sees them: registry id, RunPod endpoint, the slot that
+ * endpoint currently holds, and when the graduate last did anything. One roster read, one registry read, one RunPod
+ * listing - no per-graduate round trips.
+ */
+async function listOnCallGraduates(db: NonNullable<ReturnType<typeof cosServiceDb>>): Promise<readonly WorkforceGraduate[]> {
+  const roster = await db.from('cos_workforce_roster')
+    .select('registry_id')
+    .eq('status', 'on_call')
+    .eq('authority_expanded', false)
+    .limit(200)
+  if (roster.error) throw roster.error
+  const registryIds = [...new Set((roster.data || []).map((row: any) => String(row.registry_id || '').trim()).filter(Boolean))]
+  if (!registryIds.length) return Object.freeze([])
+
+  const [registry, pipeline, endpoints] = await Promise.all([
+    db.from('cos_university_graduate_model_registry')
+      .select('id,platform_scope')
+      .eq('status', 'active')
+      .eq('runtime_provider', 'runpod')
+      .eq('authority_expanded', false)
+      .in('id', registryIds)
+      .limit(200),
+    db.from('cos_workforce_post_graduation_pipeline')
+      .select('registry_id,last_attempt_at')
+      .in('registry_id', registryIds)
+      .limit(200),
+    listMassDistilledRunpodEndpoints(),
+  ])
+  if (registry.error) throw registry.error
+  if (pipeline.error) throw pipeline.error
+
+  const maxByEndpoint = new Map<string, number>()
+  for (const endpoint of endpoints) {
+    const id = String(endpoint.id || '').trim().toLowerCase()
+    if (id) maxByEndpoint.set(id, Math.max(0, Math.floor(Number(endpoint.workers?.max ?? 0))))
+  }
+  const lastAttempt = new Map<string, string | null>()
+  for (const row of pipeline.data || []) lastAttempt.set(String((row as any).registry_id || ''), (row as any).last_attempt_at ?? null)
+
+  return Object.freeze((registry.data || []).map((row: any) => {
+    const endpointId = graduateRunpodEndpointId(row.platform_scope)
+    return Object.freeze({
+      registryId: String(row.id),
+      endpointId,
+      workersMax: endpointId && maxByEndpoint.has(endpointId) ? (maxByEndpoint.get(endpointId) as number) : null,
+      lastAttemptAt: lastAttempt.get(String(row.id)) ?? null,
+    })
+  }))
+}
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
@@ -26,6 +92,25 @@ async function run(req: NextRequest) {
   // checks that with a free status read). This route is killed at maxDuration (60s), so it stops starting calls it cannot
   // finish and close before then.
   const deadline = Date.now() + RUN_BUDGET_MS
+
+  // Enforce the workforce reservation BEFORE anything else: the declared share of the worker pool is the most
+  // graduates that may hold a pinned slot (max=1); every other graduate's endpoint is released to max=0 so the canary
+  // and the examiner can get a worker. Production 2026-10-03: 17 graduates held all 10 slots and the examiner was
+  // told "at most 0" six times in ninety minutes. Pinning holds a slot and boots nothing (min stays 0).
+  const reservation: WorkforceReservationReport = await reconcileWorkforceReservation({
+    deadlineMs: Date.now() + RESERVATION_BUDGET_MS,
+    ports: {
+      listGraduates: () => listOnCallGraduates(db),
+      // Same transport the evaluator uses to give a slot back: PATCH workers min=0/max=0 under the approved pool policy.
+      releaseWorker: endpointId => deactivateMassDistilledEvaluationWorker(endpointId),
+      // Same transport activation uses to hold a slot: restore the scale-to-zero/max-1 envelope. Creates nothing.
+      pinWorker: endpointId => ensureMassDistilledEndpoint24Gb(endpointId),
+    },
+  }).catch(error => Object.freeze({
+    reserve: 0, onCall: 0, pinned: 0, released: 0, held: 0, idle: 0, unmanaged: 0, deadlineReached: false,
+    errors: Object.freeze([`reconcile:${error instanceof Error ? error.message.slice(0, 160) : 'workforce_reservation_failed'}`]),
+  }))
+  console.info('[cos-workforce-reservation]', describeWorkforceReservation(reservation))
 
   // First close work that can never finish (opened, then the process ended), so it stops showing as WORKING.
   const abandoned = await closeAbandonedWorkforceAssignments().catch(error => ({
@@ -118,6 +203,7 @@ async function run(req: NextRequest) {
       return acc
     }, {}),
     verification,
+    reservation: { ...reservation, summary: describeWorkforceReservation(reservation) },
     selfHealing: {
       abandonedAssignmentsClosed: abandoned.closed,
       evidenceDelivered: evidence.delivered,

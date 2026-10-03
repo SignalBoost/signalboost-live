@@ -1,4 +1,4 @@
-//
+// saas/tests/cosUniversityHoldoutExamItems.node.test.ts
 // 2026-09-27: 279 of 529 Holdout failures were both-zero. A holdout row is a withheld teaching essay whose prompt is
 // the teacher's generation instruction, so both models wrote their own example and neither could match the
 // teacher's specific essay. Holdout is now asked as one real exam question + short answer key per withheld essay.
@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs'
 import {
   HOLDOUT_EXAM_ITEMS_MISSING_ERROR,
   HOLDOUT_EXAM_ITEM_PROFILE,
+  HOLDOUT_EXAM_ITEM_CONCURRENCY,
   fillRequestedHoldoutExamSets,
   holdoutExamReadyArtifacts,
   holdoutExamWriterRequest,
@@ -208,3 +209,88 @@ test('exhausted holdout preparation cannot starve the evaluator lookahead', () =
   assert.match(route, /undisposed\.filter\(row => !exhaustedExamKeys\.has/)
   assert.ok(route.indexOf('undisposed.filter(row => !exhaustedExamKeys.has') < route.indexOf('for (let index = 0; index < HOLDOUT_EXAM_LOOKAHEAD; index += 1)'), 'terminal preparation failures yield before lookahead picks')
 })
+
+// ---------------------------------------------------------------------------------------------------------------
+// Throughput (Production 2026-10-03: 4 exam sets an hour became ready; the writer was killed at 300 s every tick)
+// ---------------------------------------------------------------------------------------------------------------
+const TEACHER_ENV = {
+  HF_TOKEN: 'x'.repeat(30),
+  COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENABLED: 'true',
+  COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ADAPTER_READY: 'true',
+  COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL: 'deepseek-chat',
+  DEEPSEEK_API_KEY: 'k'.repeat(30),
+}
+const TEACHER_REPLY = JSON.stringify({
+  id: 'req-1', model: 'teacher-model',
+  choices: [{ message: { content: 'QUESTION: A team sets its reorder point from average demand alone and ignores how much demand varies week to week. What failure does this invite, and which element is missing?\nANSWER KEY: Stockouts whenever demand runs above average; safety stock is the missing element.' } }],
+  usage: { prompt_tokens: 10, completion_tokens: 20 },
+})
+const slowTeacher = (latencyMs: number) => {
+  let inFlight = 0
+  let peak = 0
+  const fetchImpl = (async () => {
+    inFlight += 1
+    peak = Math.max(peak, inFlight)
+    await new Promise(resolve => setTimeout(resolve, latencyMs))
+    inFlight -= 1
+    return new Response(TEACHER_REPLY, { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  return { fetchImpl, peak: () => peak }
+}
+const essayRows = (n: number) => Array.from({ length: n }, (_, i) => ({
+  text: `essay ${i}`, item_hash: H(`e${i}`), prompt: 'Standalone rights-cleared learning case…', response: `Essay ${i} about bottlenecks and reorder points.`,
+}))
+const oneSetDb = () => fakeDb({
+  sets: [{ candidate_id: 'mass:t', trained_artifact_hash: H('t'), status: 'requested', attempts: 0 }],
+  runs: [{ candidate_id: 'mass:t', subject_id: 'Business & Operations', trained_artifact_hash: H('t'),
+    holdout_data_ref: `hf://datasets/cadomos/itmounts-training-x@${'a'.repeat(40)}#holdout`, holdout_manifest_hash: H('d') }],
+})
+
+test('a set of items costs about one teacher latency, not one per item, with a bounded number of calls in flight', async () => {
+  const latency = 120
+  const items = 8
+  const teacher = slowTeacher(latency)
+  const db = oneSetDb()
+  const started = Date.now()
+  const result = await fillRequestedHoldoutExamSets({ db, env: TEACHER_ENV, fetchImpl: teacher.fetchImpl, readRows: (async () => essayRows(items)) as any })
+  const elapsed = Date.now() - started
+  assert.equal(result.ready, 1, JSON.stringify(result))
+  assert.equal(result.itemsWritten, items)
+  assert.equal(teacher.peak(), HOLDOUT_EXAM_ITEM_CONCURRENCY, 'the pool must be full, and never over its bound')
+  // Serial would be items * latency = 960 ms. The pool is 4 wide, so two rounds: ~240 ms plus overhead.
+  assert.ok(elapsed < (items * latency) / 2, `took ${elapsed} ms; serial would be ${items * latency} ms`)
+  assert.ok(result.deadlineReached === false && result.unreached === 0)
+})
+
+test('the writer stops starting new sets at its deadline and counts the ones it did not reach', async () => {
+  const teacher = slowTeacher(60)
+  const db = fakeDb({
+    sets: ['a', 'b', 'c', 'd'].map(k => ({ candidate_id: `mass:${k}`, trained_artifact_hash: H(k), status: 'requested', attempts: 0 })),
+    runs: ['a', 'b', 'c', 'd'].map(k => ({ candidate_id: `mass:${k}`, subject_id: 'S', trained_artifact_hash: H(k),
+      holdout_data_ref: `hf://datasets/cadomos/itmounts-training-x@${'a'.repeat(40)}#holdout`, holdout_manifest_hash: H('d') })),
+  })
+  // Enough for the first set only: the second set may not start once the deadline has passed.
+  const result = await fillRequestedHoldoutExamSets({
+    db, env: TEACHER_ENV, fetchImpl: teacher.fetchImpl, readRows: (async () => essayRows(2)) as any, limit: 4, deadlineMs: Date.now() + 30,
+  })
+  assert.equal(result.deadlineReached, true)
+  assert.equal(result.processed + result.unreached, 4, 'every set is either processed or counted as unreached')
+  assert.ok(result.unreached >= 1 && result.processed >= 1, JSON.stringify(result))
+  // Untouched sets are exactly as they were: still requested, no attempt spent, no error written.
+  const untouched = db.tables.cos_university_holdout_exam_sets.filter(r => r.status === 'requested' && !r.last_error && (r.attempts ?? 0) === 0)
+  assert.equal(untouched.length, result.unreached)
+
+  // No deadline given: the whole batch runs.
+  const all = await fillRequestedHoldoutExamSets({ db: oneSetDb(), env: TEACHER_ENV, fetchImpl: teacher.fetchImpl, readRows: (async () => essayRows(2)) as any })
+  assert.equal(all.deadlineReached, false)
+  assert.equal(all.processed, 1)
+})
+
+test('the exam-items route derives the writer deadline from its own execution limit and reports the stop', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-holdout-exam-items/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /export const maxDuration = 300/)
+  assert.match(route, /const ROUTE_RESERVE_MS = 45_000/)
+  assert.match(route, /deadlineMs: startedAt \+ maxDuration \* 1000 - ROUTE_RESERVE_MS/)
+  assert.match(route, /deadlineReached: result\.deadlineReached,\s*unreached: result\.unreached,/)
+})
+// end of saas/tests/cosUniversityHoldoutExamItems.node.test.ts (if this line is missing, the paste was cut short)

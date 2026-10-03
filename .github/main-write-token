@@ -1,2 +1,2 @@
-base_sha=34bd2d91e8e55957dcf75a7d80cd0de38c1969b4
-branch=fix/university-single-worker-capacity
+base_sha=b3b92d604310b779939d86904d68c8a96dee0e00
+branch=fix/real-worker-capacity-telemetry

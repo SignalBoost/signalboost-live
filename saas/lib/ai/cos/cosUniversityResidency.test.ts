@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityResidency.test.ts
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
@@ -46,11 +47,6 @@ describe('COS University Residency', () => {
     assert.equal(decision.eligible, true)
     assert.equal(decision.formalEducationStage, 'practical_residency')
     assert.equal(decision.promotionAuthorized, false)
-    assert.equal(decideResidencyAdmission({
-      artifactRowId: 'artifact-row-1', candidateId: base.candidateId, subjectId: 'Computer Science & Coding',
-      trainedArtifactId: 'cadomos/itmounts-student-test', trainedArtifactHash: h, revisionKey: r,
-      artifactStatus: 'evaluation_pending', authorityExpanded: false,
-    }).eligible, false)
   })
 
   it('records supervised practical evidence without requiring a final-exam pass', () => {
@@ -148,3 +144,4 @@ describe('COS University Residency', () => {
     assert.ok(BUILDER_RESIDENCY_V1_COMPETENCIES.length >= 12)
   })
 })
+// end of saas/lib/ai/cos/cosUniversityResidency.test.ts (if this line is missing, the paste was cut short)

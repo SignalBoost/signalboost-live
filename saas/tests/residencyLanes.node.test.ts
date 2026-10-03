@@ -97,7 +97,7 @@ const storeFor = (tables: Record<string, any[]>) =>
 test('a pinned lane gives its turns only to its own resident, and stops when that resident is no longer active', async () => {
   const tables: Record<string, any[]> = {
     cos_university_residency_enrollments: [residentRow('r1', '1', 'resident', 10), residentRow('r2', '2', 'remediation_required', 20)],
-    cos_local_distillation_artifacts: [studentRow('1', 'evaluation_pending'), studentRow('2', 'evaluation_pending')],
+    cos_local_distillation_artifacts: [studentRow('1', 'evaluation_ready'), studentRow('2', 'evaluation_ready')],
   }
   const store = storeFor(tables)
   const lanes = await store.planLanes(4)
@@ -113,7 +113,7 @@ test('a pinned lane gives its turns only to its own resident, and stops when tha
 test('a resident whose student already left gets no case turn, even before its enrollment is closed', async () => {
   const store = storeFor({
     cos_university_residency_enrollments: [residentRow('gone', '3', 'remediation_required', 30), residentRow('live', '4', 'resident', 10)],
-    cos_local_distillation_artifacts: [studentRow('3', 'retired'), studentRow('4', 'evaluation_pending')],
+    cos_local_distillation_artifacts: [studentRow('3', 'retired'), studentRow('4', 'evaluation_ready')],
   })
   assert.deepEqual((await store.planLanes(4)).map(lane => lane.residencyId), ['live'])
   assert.equal((await store.nextEnrollment())?.residencyId, 'live')
@@ -122,7 +122,7 @@ test('a resident whose student already left gets no case turn, even before its e
 test('departed residents are withdrawn with a durable record, never as a pass or a Residency FAIL', async () => {
   const tables: Record<string, any[]> = {
     cos_university_residency_enrollments: [residentRow('gone', '5', 'resident', 30), residentRow('live', '6', 'resident', 10)],
-    cos_local_distillation_artifacts: [studentRow('5', 'retired'), studentRow('6', 'evaluation_pending')],
+    cos_local_distillation_artifacts: [studentRow('5', 'retired'), studentRow('6', 'evaluation_ready')],
     cos_university_learning_assurance_events: [],
   }
   const store = storeFor(tables)
@@ -155,3 +155,29 @@ test('the cron runs lanes in parallel after sweeps and admission, never more lan
   assert.match(route, /automaticFinalGateEnable: false/)
   assert.match(route, /productionTrafficAuthorized: false/)
 })
+
+// ---------------------------------------------------------------------------------------------------------------
+// The two coding gates must never wait on each other again (Production 2026-10-03: 7 trained coders stuck at
+// evaluation_ready, Residency admitting only evaluation_pending, the canary admitting coders only after Residency).
+// ---------------------------------------------------------------------------------------------------------------
+test('Residency admits the TRAINED coder (evaluation_ready), before the canary that the canary gates on Residency', () => {
+  const residency = readFileSync(new URL('../lib/ai/cos/cosUniversityResidency.ts', import.meta.url), 'utf8')
+  assert.match(residency, /export const RESIDENCY_STUDENT_STATUS = 'evaluation_ready' as const/)
+  // The canary still requires residency_complete for Computer Science: that gate is NOT weakened.
+  const canary = readFileSync(new URL('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
+  assert.match(canary, /\.eq\('standing','residency_complete'\)/)
+  // Every place that asks "is this student still in Residency?" asks the same constant - no literal may drift back.
+  for (const relative of [
+    '../platform-harness/residency/admission-store.ts',
+    '../platform-harness/residency/exact-artifact-model.ts',
+    '../platform-harness/residency/orchestrator-store.ts',
+    '../agent-gateway-host/builder-residency-runtime-recovery.ts',
+    '../lib/ai/cos/cosUniversityResidency.ts',
+  ]) {
+    const source = readFileSync(new URL(relative, import.meta.url), 'utf8')
+    assert.match(source, /RESIDENCY_STUDENT_STATUS/, `${relative} must use the shared student status`)
+    assert.doesNotMatch(source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, ''), /'evaluation_pending'/,
+      `${relative} carries a literal evaluation_pending - the circular gate returning`)
+  }
+})
+// end of saas/tests/residencyLanes.node.test.ts (if this line is missing, the paste was cut short)

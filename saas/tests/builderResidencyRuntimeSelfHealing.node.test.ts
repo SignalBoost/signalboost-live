@@ -1,3 +1,4 @@
+// saas/tests/builderResidencyRuntimeSelfHealing.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { AgentRequest } from '../agent-gateway/index.ts'
@@ -74,7 +75,7 @@ test('recovery re-reads exact artifact identity and reconciles existing provider
               trained_artifact_hash:h('a'),
               revision_key:h('b'),
               evidence_ref:`hf://models/cadomos/itmounts-student-test@${r('c')}`,
-              status:'evaluation_pending',
+              status:'evaluation_ready',
               authority_expanded:false,
             },
             error:null,
@@ -147,7 +148,7 @@ test('recovery refuses missing exact provider resources rather than creating the
               trained_artifact_hash:h('a'),
               revision_key:h('b'),
               evidence_ref:`hf://models/cadomos/itmounts-student-test@${r('c')}`,
-              status:'evaluation_pending',
+              status:'evaluation_ready',
               authority_expanded:false,
             },
             error:null,
@@ -223,3 +224,4 @@ test('registered executor accepts only the exact governed repair target',async()
   })
   assert.equal(declined.handled,false)
 })
+// end of saas/tests/builderResidencyRuntimeSelfHealing.node.test.ts (if this line is missing, the paste was cut short)

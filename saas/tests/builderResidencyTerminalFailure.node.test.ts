@@ -1,4 +1,4 @@
-//
+// saas/tests/builderResidencyTerminalFailure.node.test.ts
 // Production 2026-09-28: 26 of 37 active Builder residents could never finish. Each competency has three
 // active variants, each attempted once, and after a failure a competency needs two distinct later passes,
 // so fail -> pass -> fail (or pass -> fail) on one competency can never be cleared. Those residents stayed
@@ -228,7 +228,7 @@ test('the tick sweep fails only residents that can never finish, with evidence f
   assert.match(event.value.evidence_hash,/^[a-f0-9]{64}$/)
 
   assert.equal(artifact.value.status,'quarantined')
-  assert.ok(artifact.filters.some(item=>item[0]==='eq'&&item[1]==='status'&&item[2]==='evaluation_pending'))
+  assert.ok(artifact.filters.some(item=>item[0]==='eq'&&item[1]==='status'&&item[2]==='evaluation_ready'))
   assert.ok(artifact.filters.some(item=>item[0]==='eq'&&item[1]==='candidate_id'&&item[2]==='mass:dead0001'))
 
   assert.equal(enrollment.value.standing,'residency_failed')
@@ -258,3 +258,4 @@ test('owner telemetry shows a failed Residency as a result, not as work to conti
   assert.ok(failed>0)
   assert.ok(failed<route.indexOf("else if (residencyState && residencyState.standing !== 'residency_complete') { currentStage = 'Builder Residency'"))
 })
+// end of saas/tests/builderResidencyTerminalFailure.node.test.ts (if this line is missing, the paste was cut short)

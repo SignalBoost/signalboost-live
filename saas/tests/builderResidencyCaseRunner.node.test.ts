@@ -1,3 +1,4 @@
+// saas/tests/builderResidencyCaseRunner.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -251,10 +252,10 @@ test('Builder Residency live executor uses shared Harness and preserves exact ar
 })
 
 
-test('Builder Residency admission persists only eligible evaluation_pending exact artifact',async()=>{
+test('Builder Residency admission persists only eligible evaluation_ready exact artifact',async()=>{
   const writes:any[]=[]
   const db:any={from(table:string){return{upsert(value:any){writes.push({table,value});return{select(){return{async maybeSingle(){return{data:{id:'residency-1',standing:'resident'},error:null}}}}}},select(){return{eq(){return this},async maybeSingle(){return{data:null,error:null}}}}}}}
-  const out=await admitBuilderResidency({db,admission:{artifactRowId:'artifact-row-1',candidateId:base.candidateId,subjectId:'computer_science_coding',trainedArtifactId:base.artifactId,trainedArtifactHash:hash('a'),revisionKey:hash('b'),artifactStatus:'evaluation_pending',authorityExpanded:false},admissionEvidenceHash:hash('c')})
+  const out=await admitBuilderResidency({db,admission:{artifactRowId:'artifact-row-1',candidateId:base.candidateId,subjectId:'computer_science_coding',trainedArtifactId:base.artifactId,trainedArtifactHash:hash('a'),revisionKey:hash('b'),artifactStatus:'evaluation_ready',authorityExpanded:false},admissionEvidenceHash:hash('c')})
   assert.equal(out.ok,true)
   assert.equal(writes.length,1)
   assert.equal(writes[0].table,'cos_university_residency_enrollments')
@@ -340,3 +341,4 @@ test('Residency assessment persists remediation standing from durable competency
   assert.equal(out.promotionAuthorized, false)
   assert.equal(out.productionTrafficAuthorized, false)
 })
+// end of saas/tests/builderResidencyCaseRunner.node.test.ts (if this line is missing, the paste was cut short)

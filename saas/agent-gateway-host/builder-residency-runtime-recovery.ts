@@ -8,6 +8,7 @@ import {
   type MassDistilledRuntimeArtifact,
 } from '../lib/ai/cos/runpodMassDistilledProvisionV2.ts'
 import { builderResidencyRuntimeKey } from '../lib/ai/cos/cosUniversityGraduateEndpointProtection.ts'
+import { RESIDENCY_STUDENT_STATUS } from '../lib/ai/cos/cosUniversityResidency.ts'
 
 export const BUILDER_RESIDENCY_RUNTIME_RECOVERY_KIND='supervisor_repair'
 export const BUILDER_RESIDENCY_RUNTIME_RECOVERY_TARGET='university.repair_builder_residency_runtime'
@@ -122,7 +123,7 @@ export async function recoverBuilderResidencyRuntime(input:{
   const artifactRevision=hfRevision(row.evidence_ref)
   if(
     String(row.subject_id)!=='Computer Science & Coding'
-    || String(row.status)!=='evaluation_pending'
+    || String(row.status)!==RESIDENCY_STUDENT_STATUS
     || row.authority_expanded===true
     || String(row.candidate_id)!==candidateId
     || String(row.trained_artifact_hash).toLowerCase()!==artifactHash
@@ -209,3 +210,4 @@ export function createBuilderResidencyRuntimeRecoveryExecutor(input:{
     },
   }
 }
+// end of saas/agent-gateway-host/builder-residency-runtime-recovery.ts (if this line is missing, the paste was cut short)

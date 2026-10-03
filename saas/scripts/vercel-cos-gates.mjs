@@ -15,6 +15,10 @@ if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 
 const tests = [
+  // Residency status, runtime recovery, and terminal-failure contracts.
+  'tests/builderResidencyAdmission.node.test.ts',
+  'tests/builderResidencyRuntimeSelfHealing.node.test.ts',
+  'tests/builderResidencyTerminalFailure.node.test.ts',
   'tests/cosUniversityEvaluationInfrastructureNoParking.node.test.ts',
 
   'tests/cosArtifactBirthCertificate.node.test.ts',

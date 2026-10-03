@@ -1,5 +1,6 @@
 // saas/app/api/admin/cos-university-telemetry/route.ts
 import { UNIVERSITY_LINE_CAPACITY } from '@/lib/ai/cos/cosUniversityAssemblyLine'
+import { RESIDENCY_STUDENT_STATUS } from '@/lib/ai/cos/cosUniversityResidency'
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -716,7 +717,8 @@ export async function GET() {
       else if (residencyState?.standing === 'residency_failed') { currentStage = 'Builder Residency'; blocker = 'residency_failed'; nextAction = 'None — Residency FAIL (final result)' }
       else if (residencyState && residencyState.standing !== 'residency_complete') { currentStage = 'Builder Residency'; blocker = residencyState.standing; nextAction = residencyState.standing === 'remediation_required' ? 'Run remediation case' : 'Continue competency cases' }
       else if (residencyState?.standing === 'residency_complete') { currentStage = 'Exact canary'; blocker = canary ? 'none' : 'fresh_exact_canary_required'; nextAction = canary ? 'Run independent final evaluation' : 'Run fresh exact-artifact canary' }
-      else if (text(artifact.subject_id, 240) === 'Computer Science & Coding' && artifact.status === 'evaluation_pending') { currentStage = 'Builder Residency'; blocker = 'waiting_for_residency_admission'; nextAction = 'Admit when Residency cohort capacity opens' }
+      // A trained coder waits for Residency BEFORE its canary: Residency admits from RESIDENCY_STUDENT_STATUS (evaluation_ready).
+      else if (text(artifact.subject_id, 240) === 'Computer Science & Coding' && artifact.status === RESIDENCY_STUDENT_STATUS) { currentStage = 'Builder Residency'; blocker = 'waiting_for_residency_admission'; nextAction = 'Admit when Residency cohort capacity opens' }
       else if (artifact.status === 'evaluation_ready') { currentStage = 'Exact canary'; blocker = canary ? 'canary_passed_waiting_admission' : 'waiting_for_exact_canary'; nextAction = canary ? 'Admit to independent evaluation' : 'Run exact-artifact canary' }
       else if (artifact.status === 'evaluation_pending') { currentStage = 'Independent evaluation'; blocker = claimability; nextAction = claimability === 'claimable' ? 'Run independent evaluation' : 'Satisfy evaluation prerequisites' }
       else if (evaluationPassed) { currentStage = 'Graduation'; blocker = 'awaiting_graduation'; nextAction = 'Graduate and register exact runtime' }

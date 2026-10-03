@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityHoldoutExamItems.ts
 //
 // Real Holdout exam questions (owner decision 2026-09-27, "option 1").
 //
@@ -22,6 +21,13 @@ import { createHash } from 'node:crypto'
 import { readPinnedHfParquetRows, type PinnedParquetRow } from './hfPinnedParquetRows.ts'
 import { universityTeacherPoolStatus, type UniversityTeacherDefinition, type UniversityTeacherTransport } from './cosUniversityTeacherPool.ts'
 import { generateWithUniversityTeacher } from './cosUniversityTeacherAdapters.ts'
+import {
+  EXAM_SET_RECOVERY_MAX_PER_RUN,
+  decideExamSetRecovery,
+  shouldChargeAttempt,
+  type ExamSetPopulation,
+  type ExamSetRecoveryCandidate,
+} from './cosUniversityHoldoutExamSetRecovery.ts'
 
 // v1 -> v2 (2026-09-28): v1 items were written under an instruction that invited multi-step arithmetic, and
 // 1,543 distinct v1 questions scored 0 for both the trained student and its own base. v2 items are written and
@@ -246,7 +252,95 @@ export type HoldoutExamFillResult = Readonly<{
   itemsWritten: number
   itemsReused: number
   errors: readonly string[]
+  /** Set to a global precondition when the run stopped before examining any set. Null on a normal run. */
+  aborted: string | null
+  /** Exhausted sets given a fresh attempt budget by the governed sweep this run. */
+  revived: number
+  /** The whole set population, so a stalled exam lane can say WHY instead of looking idle. */
+  population: ExamSetPopulation | null
 }>
+
+/** How far back a transiently-failed set is pushed so it sorts behind fresh requests instead of starving them. */
+export const TRANSIENT_BACKOFF_MS = 20 * 60 * 1000
+
+/**
+ * The exam-set population, counted cheaply with head reads.
+ *
+ * Reported on every run because `no_mass_artifact_with_holdout_exam_ready` is indistinguishable from "nothing to do"
+ * without it. Production 2026-10-03: 237 artifacts waiting at `evaluation_ready`, zero admitted in 24 hours, and the
+ * lane's own reason gave no hint that every candidate had been permanently disqualified by the attempt ceiling.
+ */
+export async function readExamSetPopulation(db: any): Promise<ExamSetPopulation | null> {
+  try {
+    const count = async (build: (query: any) => any): Promise<number> => {
+      const result = await build(db.from(HOLDOUT_EXAM_SETS_TABLE).select('candidate_id', { count: 'exact', head: true }))
+      if (result?.error) throw result.error
+      return typeof result?.count === 'number' && result.count >= 0 ? result.count : 0
+    }
+    const [requested, failed, ready, exhausted] = await Promise.all([
+      count(query => query.eq('status', 'requested')),
+      count(query => query.eq('status', 'failed')),
+      count(query => query.eq('status', 'ready')),
+      count(query => query.gte('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS).neq('status', 'ready')),
+    ])
+    return Object.freeze({ requested, failed, ready, exhausted })
+  } catch {
+    // An unreadable population is a reason to look, never a reason to stop writing exams.
+    return null
+  }
+}
+
+/**
+ * Give exhausted sets their attempt budget back, bounded and after a cool-off.
+ *
+ * Only sets whose recorded failure was NOT structural are revived: a set whose pinned holdout is malformed cannot
+ * succeed however many times it is retried, so reviving it would spend teacher calls on nothing. Those stay exhausted
+ * and are counted in the population instead, which is the honest treatment - visible rather than silently removed.
+ */
+export async function reviveExhaustedExamSets(input: { db: any; now: Date; maxPerRun?: number }): Promise<number> {
+  const db = input.db
+  try {
+    const stale = await db.from(HOLDOUT_EXAM_SETS_TABLE)
+      .select('candidate_id,trained_artifact_hash,attempts,last_error,updated_at')
+      .gte('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS)
+      .neq('status', 'ready')
+      .order('updated_at', { ascending: true })
+      .limit(Math.max(1, Math.min(200, (input.maxPerRun ?? EXAM_SET_RECOVERY_MAX_PER_RUN) * 4)))
+    if (stale.error) return 0
+
+    const candidates: ExamSetRecoveryCandidate[] = (stale.data || []).map((row: any) => ({
+      candidateId: clean(row.candidate_id, 240),
+      artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(),
+      attempts: Number(row.attempts) || 0,
+      lastError: row.last_error == null ? null : clean(row.last_error, 500),
+      updatedAt: row.updated_at == null ? null : String(row.updated_at),
+    }))
+
+    const decisions = decideExamSetRecovery({
+      sets: candidates,
+      now: input.now,
+      maxAttempts: HOLDOUT_EXAM_MAX_SET_ATTEMPTS,
+      maxPerRun: input.maxPerRun,
+    })
+    let revived = 0
+    for (const decision of decisions) {
+      const reset = await db.from(HOLDOUT_EXAM_SETS_TABLE).update({
+        status: 'requested',
+        attempts: 0,
+        last_error: `revived:${decision.reason}:after_${decision.previousAttempts}_attempts`,
+        updated_at: input.now.toISOString(),
+      })
+        .eq('candidate_id', decision.candidateId)
+        .eq('trained_artifact_hash', decision.artifactHash)
+        // Conditional on it still being exhausted, so a concurrent run cannot revive the same set twice.
+        .gte('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS)
+      if (!reset.error) revived += 1
+    }
+    return revived
+  } catch {
+    return 0
+  }
+}
 
 /**
  * Prepare up to `limit` requested artifacts: read each artifact's pinned holdout, write one exam item per withheld
@@ -280,26 +374,60 @@ export async function fillRequestedHoldoutExamSets(input: {
     .limit(limit)
   if (pending.error) throw pending.error
   const sets = pending.data || []
-  if (!sets.length) return Object.freeze({ processed: 0, ready, failed, itemsWritten, itemsReused, errors: Object.freeze([]) })
 
+  // Global preconditions are properties of the DEPLOYMENT, read once per run and true for every set in the batch.
+  // Marking individual sets failed for either one is a category error with permanent consequences: at 10 sets a tick
+  // and 6 ticks an hour, a brief outage burns the whole requested population past the attempt ceiling and the exam
+  // lane can never admit anyone again. Abort the run instead and let the next tick try.
   const teachers = massEligibleTeachers(env)
   const token = clean(env.HF_TOKEN, 4096)
+  const abortReason = !teachers.length
+    ? 'no_active_mass_teacher'
+    : token.length < 20
+      ? 'hf_token_missing'
+      : null
+  if (abortReason) {
+    const population = await readExamSetPopulation(db)
+    return Object.freeze({
+      processed: 0, ready, failed, itemsWritten, itemsReused,
+      errors: Object.freeze([abortReason]), aborted: abortReason, revived: 0, population,
+    })
+  }
+
+  // Give exhausted sets their budget back when their recorded failure was not structural. Without this, a population
+  // burned out by an earlier outage stays invisible to this writer forever and the line never restarts.
+  const revived = await reviveExhaustedExamSets({ db, now })
+
+  if (!sets.length) {
+    const population = await readExamSetPopulation(db)
+    return Object.freeze({
+      processed: 0, ready, failed, itemsWritten, itemsReused,
+      errors: Object.freeze([]), aborted: null, revived, population,
+    })
+  }
 
   for (const set of sets) {
     const candidateId = clean(set.candidate_id, 240)
     const artifactHash = clean(set.trained_artifact_hash, 64).toLowerCase()
     const attempts = Number(set.attempts) || 0
+    // Only a STRUCTURAL failure spends this set's attempt budget. A provider error, a timeout, a rate limit or an
+    // unparseable reply is our fault and passing, so the set goes back to `requested` with its budget intact and a
+    // recorded reason. Its `updated_at` is pushed into the past so it sorts behind fresh requests - a backoff that
+    // needs no extra column - and the evaluation route still pulls it forward when it is the artifact it wants next.
     const fail = async (reason: string) => {
       failed += 1
       errors.push(`${candidateId}:${reason}`.slice(0, 300))
+      const charged = shouldChargeAttempt(reason)
       const updated = await db.from(HOLDOUT_EXAM_SETS_TABLE).update({
-        status: 'failed', attempts: attempts + 1, last_error: reason.slice(0, 500), updated_at: now.toISOString(),
+        status: charged ? 'failed' : 'requested',
+        attempts: charged ? attempts + 1 : attempts,
+        last_error: reason.slice(0, 500),
+        updated_at: charged ? now.toISOString() : new Date(now.getTime() - TRANSIENT_BACKOFF_MS).toISOString(),
       }).eq('candidate_id', candidateId).eq('trained_artifact_hash', artifactHash)
       if (updated.error) throw updated.error
     }
     try {
-      if (!teachers.length) { await fail('no_active_mass_teacher'); continue }
-      if (token.length < 20) { await fail('hf_token_missing'); continue }
+      // Both global preconditions were checked before the loop and abort the whole run, so no set is charged for them.
       const run = await db.from('cos_university_mass_distillation_batch_runs')
         .select('candidate_id,subject_id,holdout_data_ref,holdout_manifest_hash,trained_artifact_hash')
         .eq('candidate_id', candidateId)
@@ -368,5 +496,9 @@ export async function fillRequestedHoldoutExamSets(input: {
       await fail(clean(error instanceof Error ? error.message : error, 300) || 'unknown_error').catch(() => undefined)
     }
   }
-  return Object.freeze({ processed: sets.length, ready, failed, itemsWritten, itemsReused, errors: Object.freeze(errors.slice(0, 20)) })
+  const population = await readExamSetPopulation(db)
+  return Object.freeze({
+    processed: sets.length, ready, failed, itemsWritten, itemsReused,
+    errors: Object.freeze(errors.slice(0, 20)), aborted: null, revived, population,
+  })
 }

@@ -643,6 +643,10 @@ const tests = [
   //  - an artifact waiting to graduate had its proven canary endpoint unprotected from reclaim
   'tests/holdoutExamReadyThroughput.node.test.ts',
   'tests/quarantineStallDrain.node.test.ts',
+  // 2026-10-02: the supervisor runs every 5 minutes and remediates, but every reason it could raise was UPSTREAM of
+  // the artifact existing, so four downstream parkings ran for days behind a green heartbeat. This watches the other
+  // half - a stage holding work and moving nobody - and an empty stage must stay silent, or the alarm gets ignored.
+  'tests/cosUniversityLifecycleStall.node.test.ts',
   'tests/massGraduateRegistrationStarvation.node.test.ts',
   'tests/cosUniversityMassGraduateRegistration.node.test.ts',
   'tests/pendingGraduateEndpointProtection.node.test.ts',

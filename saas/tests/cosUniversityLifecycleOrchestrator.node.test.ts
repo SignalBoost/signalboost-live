@@ -16,6 +16,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
   UNIVERSITY_LIFECYCLE_PLAN,
+  decideLineCloseout,
   describeLifecycleFailure,
   lifecycleDeadline,
   lifecycleDeadlineAnchor,
@@ -27,6 +28,7 @@ import {
 } from '../lib/ai/cos/cosUniversityLifecycleOrchestrator.ts'
 import {
   LINE_STATUSES,
+  LIVE_STATUSES,
   UNIVERSITY_ASSEMBLY_LINE,
   WORKING_STATIONS,
   decideLineStops,
@@ -84,18 +86,11 @@ test('one status maps to exactly one station, and the line has no duplicate stat
   assert.equal(stationForStatus(''), null)
 })
 
-test('the controller reconciles every working station without terminal history starving live material', () => {
+test('the controller reconciles exactly the statuses the line declares', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
-  // Production regression, 2026-10-03: one oldest-first LIMIT 500 across all statuses returned 499 retired + 1 active
-  // while 245 evaluation_ready artifacts never reached the ledger. Working stations must own independent intake.
-  assert.match(route, /Promise\.all\(WORKING_STATIONS\.map\(station =>/)
-  assert.match(route, /\.eq\('status', station\.sourceStatus\)/)
-  assert.match(route, /stage: 'read_working_artifacts'/)
-  assert.match(route, /const terminalStatus = stationById\('TERMINAL'\)\?\.sourceStatus/)
-  assert.match(route, /\.eq\('status', terminalStatus\)/)
-  assert.match(route, /\.order\('updated_at', \{ ascending: false \}\)/)
-  assert.doesNotMatch(route, /\.in\('status', \[\.\.\.LINE_STATUSES\]\)[\s\S]{0,150}?\.limit\(MAX_ARTIFACTS\)/,
-    'terminal history must never share the live material intake limit')
+  // A hand-maintained second list is how a status silently stops being reconciled.
+  assert.match(route, /\.in\('status', \[\.\.\.LIVE_STATUSES\]\)/)
+  assert.doesNotMatch(route, /\.in\('status', \[\.\.\.LINE_STATUSES\]\)/)
   assert.doesNotMatch(route, /const ORCHESTRATED_STATUSES/)
 })
 
@@ -688,5 +683,38 @@ test('the controller route logs failures through describeLifecycleFailure and no
   const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
   assert.match(route, /catch \(error\) \{[\s\S]{0,200}?const message = describeLifecycleFailure\(error\)/)
   assert.doesNotMatch(route, /error instanceof Error \? clean\(error\.message\) : clean\(error\)/)
+})
+// ---------------------------------------------------------------------------------------------------------------
+// The read window belongs to live units (ledger, 2026-10-03 18:55 UTC: 499 TERMINAL + 1 WORKFORCE = the whole window,
+// 244 units waiting at admission never read)
+// ---------------------------------------------------------------------------------------------------------------
+test('the controller reads only live statuses, so retired units can never fill its window', () => {
+  assert.deepEqual([...LIVE_STATUSES].sort(), ['active', 'evaluation_pending', 'evaluation_ready', 'quarantined', 'runtime_pending'])
+  assert.ok(!LIVE_STATUSES.includes('retired'))
+  assert.ok(LINE_STATUSES.includes('retired'), 'retired is still a line status for the plan, just not a read target')
+  // The production shape: 1,657 retired units older than 262 live ones, window of 500.
+  const retired = Array.from({ length: 1657 }, (_, i) => ({ status: 'retired', updatedAt: i }))
+  const live = Array.from({ length: 262 }, (_, i) => ({ status: i < 244 ? 'evaluation_ready' : 'active', updatedAt: 10_000 + i }))
+  const window = [...retired, ...live].filter(u => LIVE_STATUSES.includes(u.status)).sort((a, b) => a.updatedAt - b.updatedAt).slice(0, 500)
+  assert.equal(window.length, 262, 'every live unit is inside the window')
+  assert.equal(window.filter(u => u.status === 'evaluation_ready').length, 244)
+})
+
+test('a unit that left the line is closed out, and only from a complete view', () => {
+  const closed = decideLineCloseout({ windowComplete: true, liveIds: ['a', 'b'], openLedgerIds: ['a', 'b', 'c', 'c', ''] })
+  assert.deepEqual([...closed], ['c'], 'exactly the departed unit, once, never the blank id')
+  assert.deepEqual([...decideLineCloseout({ windowComplete: true, liveIds: ['a'], openLedgerIds: ['a'] })], [])
+  // A full window proves nothing about units beyond it, so it must close nothing.
+  assert.deepEqual([...decideLineCloseout({ windowComplete: false, liveIds: ['a'], openLedgerIds: ['a', 'c'] })], [])
+})
+
+test('the controller route closes out departed units in bounded batches and reports it', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /const windowComplete = \(source\.data \|\| \[\]\)\.length < MAX_ARTIFACTS/)
+  assert.match(route, /decideLineCloseout\(\{[\s\S]{0,120}?windowComplete,/)
+  assert.match(route, /\.eq\('terminal', false\)[\s\S]{0,40}?\.limit\(MAX_ARTIFACTS\)/)
+  assert.match(route, /offset < departed\.length; offset \+= LEDGER_READ_CHUNK/)
+  assert.match(route, /terminal: true,[\s\S]{0,40}?next_action: 'none'/)
+  assert.match(route, /closedOut,\s*windowComplete,/)
 })
 // end of saas/tests/cosUniversityLifecycleOrchestrator.node.test.ts (if this line is missing, the paste was cut short)

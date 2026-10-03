@@ -2340,15 +2340,7 @@ University education is separate from runtime authority. Context Engineer has th
 
 ## Mass-distillation evaluation backlog controls (2026-09-25)
 
-The mass-distilled exact-artifact canary lane uses a **two-slot database-backed semaphore** and admits at
-most **12 started-or-armed canaries per rolling hour**. The cron runs every two minutes so long-running
-canaries may overlap safely across separate Vercel invocations; the atomic claim transaction serializes
-reservation creation, prevents duplicate claims for the same exact artifact, and refuses a third active
-reservation. The hard per-canary ceiling remains **$0.20**, so the nominal canary authorization envelope is
-at most **288/day** and **$57.60/day**. Active canary endpoints are protected from sibling RunPod capacity
-reclamation until terminal pass/fail evidence or the bounded lease expires. This throughput increase does
-not change exact-artifact binding, per-artifact retry limits, evaluator independence, promotion rules, or
-Production-traffic authority.
+The mass-distilled exact-artifact canary lane derives its concurrency and rolling-hour admission ceiling from the shared worker capacity (`cosUniversityLineCapacity.ts`). The cron runs every two minutes; atomic reservations prevent duplicate exact-artifact claims and enforce the resolved lane ceiling. The hard per-canary ceiling remains **$0.20**. Active canary endpoints remain protected from sibling capacity reclamation until terminal evidence or lease expiry. This replaces the historical fixed two-slot / 12-per-hour limits without changing exact-artifact identity, retry limits, evaluator independence or promotion authority.
 
 Backlog cleanup is conservative and evidence-based. The scheduled
 `/api/cron/cos-university-mass-backlog-compact` lane may retire an older `evaluation_pending` mass artifact
@@ -2593,3 +2585,10 @@ Operational invariants:
 Acceptance evidence for this downstream path is **not** “CI green,” “PR merged,” “16 graduated,” or “16 on-call.” Completion requires live Production evidence that eligible existing graduates are fairly receiving genuine work, serving successfully where capable, producing durable/verified outcome evidence, updating their résumé/lifecycle, and recovering or surfacing a governed blocked state when they cannot serve.
 
 When the dashboard shows graduates sitting for days, start with the existing graduates and this downstream trace. Only return to curriculum/training/evaluation when that trace proves the blocker is upstream.
+
+
+## University worker capacity — 2026-10-03
+
+`saas/lib/ai/cos/cosUniversityLineCapacity.ts` is the single worker-capacity resolver. A valid existing `COS_UNIVERSITY_INFERENCE_WORKERS` override takes precedence over valid `RUNPOD_SERVERLESS_WORKER_QUOTA`; otherwise the fallback is 10. Provisioning, station scheduling and telemetry consume the same resolved capacity. No separate enterprise default exists. The assembly-line controller reports the capacity and its `override` / `quota` / `fallback` source; provider-capacity telemetry also reports that source alongside observed reservations and available workers. Invalid non-integer settings are ignored; positive integers outside the supported 4–100,000 worker range stop with an explicit configuration error rather than inventing capacity.
+
+Station widths scale with the declared infrastructure. They do not authorize spend, weaken evaluations or certify actual artifact output. The existing handoff/controller loop continues while enabled and permitted; live movement evidence remains required to prove continuous production. `tests/cosUniversityLineCapacity.node.test.ts` is mandatory in the production regression gate.

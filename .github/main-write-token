@@ -1,2 +1,2 @@
-base_sha=c9a531971f33499526dcf126aa7b4d76d4447e98
-branch=fix/txt17-university-backwards-pass-20260930
+base_sha=34bd2d91e8e55957dcf75a7d80cd0de38c1969b4
+branch=fix/university-single-worker-capacity

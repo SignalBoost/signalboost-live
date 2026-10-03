@@ -28,7 +28,7 @@
 
 import { lineCapacity } from './cosUniversityLineCapacity.ts'
 
-const CAPACITY = lineCapacity()
+export const UNIVERSITY_LINE_CAPACITY = lineCapacity()
 
 /** One station on the line. `TERMINAL` is the exit, not a station that works. */
 export type StationId =
@@ -69,26 +69,7 @@ export type Station = Readonly<{
   recurring: boolean
 }>
 
-/**
- * The line, in order. Every figure is sourced.
- *
- *   EXACT_CANARY            cron `*​/2` = 120s (vercel.json). `readInFlightCanary` returns the single in-flight
- *                           canary and the route exits early when one exists, so concurrency is 1, and
- *                           MASS_CANARY_IN_FLIGHT_TTL_MS = 10min is how long a unit holds the station.
- *                           Ceiling: MASS_CANARY_ROLLING_MAX_APPROVALS = 12 per rolling hour.
- *   INDEPENDENT_EVALUATION  cron every odd minute = 120s. MASS_EVALUATION_MAX_IN_FLIGHT = 2 (4 when capacity-aware),
- *                           MASS_EVALUATION_ACTIVE_MS = 12min per unit.
-QUARANTINE_REMEDIATION  the rework station, not a warehouse: a unit enters, is repaired and rejoins the line, or
- *                           receives a documented terminal disposition and leaves it. Cron :13/:28/:43/:58 = 900s.
- *                           QUARANTINE_RESOLUTION_MAX_PER_RUN = 100, batched: one tick disposes of the whole queue,
- *                           so this station is never the constraint.
- *   GRADUATION              cron :07..:57 = 600s. Registration is a registry write with no spend and no RunPod
- *                           reservation, so it is batched up to MASS_GRADUATE_REGISTRATION_SCAN_LIMIT. Activation
- *                           inside the same route stays serial on purpose: each activation pins one of the ten
- *                           account-wide RunPod workers.
- *   WORKFORCE               cron :07..:57 = 600s. An active graduate is working, not queueing, so this station
- *                           recurs rather than expiring.
- */
+/** Station widths come from UNIVERSITY_LINE_CAPACITY; cadences and SLAs belong to each station. */
 export const UNIVERSITY_ASSEMBLY_LINE: readonly Station[] = Object.freeze([
   Object.freeze({
     id: 'EXACT_CANARY' as StationId,
@@ -96,7 +77,7 @@ export const UNIVERSITY_ASSEMBLY_LINE: readonly Station[] = Object.freeze([
     nextAction: 'run_exact_canary_and_admit_evaluation',
     workerPath: '/api/cron/runpod-mass-distilled-local-deploy',
     cadenceSeconds: 120,
-    concurrency: CAPACITY.canary,
+    concurrency: UNIVERSITY_LINE_CAPACITY.canary,
     batched: false,
     workSeconds: 10 * 60,
     stationSlaSeconds: 20 * 60,
@@ -109,7 +90,7 @@ export const UNIVERSITY_ASSEMBLY_LINE: readonly Station[] = Object.freeze([
     nextAction: 'complete_independent_evaluation',
     workerPath: '/api/cron/cos-university-mass-distilled-evaluation',
     cadenceSeconds: 120,
-    concurrency: CAPACITY.evaluation,
+    concurrency: UNIVERSITY_LINE_CAPACITY.evaluation,
     batched: false,
     workSeconds: 12 * 60,
     stationSlaSeconds: 25 * 60,
@@ -135,7 +116,7 @@ export const UNIVERSITY_ASSEMBLY_LINE: readonly Station[] = Object.freeze([
     nextAction: 'register_and_activate_graduate',
     workerPath: '/api/cron/cos-university-graduate-activation',
     cadenceSeconds: 600,
-    concurrency: CAPACITY.registrationsPerTick,
+    concurrency: UNIVERSITY_LINE_CAPACITY.registrationsPerTick,
     batched: true,
     workSeconds: 60,
     stationSlaSeconds: 25 * 60,

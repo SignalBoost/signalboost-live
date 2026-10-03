@@ -309,7 +309,7 @@ test('cron reserves replay canary headroom only while durable replay proof is in
   assert.match(provision, /if \(!retryable \|\| attempt === maxAttempts\) throw error/)
 
   assert.match(provision, /availableWorkers/)
-  assert.match(provision, /RUNPOD_SERVERLESS_WORKER_QUOTA \|\| '10'/)
+  assert.match(provision, /const \{ workers: quota, source \} = declaredInferenceWorkers\(\)/)
 })
 
 test('issues exactly the claim-compatible shape for a canary-proven artifact past the 12h retention delay', () => {

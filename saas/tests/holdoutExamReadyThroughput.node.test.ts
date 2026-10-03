@@ -1,3 +1,4 @@
+// saas/tests/holdoutExamReadyThroughput.node.test.ts
 //
 // Production 2026-09-29 22:37-22:56 UTC: the evaluation lane reported `no_mass_artifact_with_holdout_exam_ready` on
 // every tick while 6 of its 44 eligible artifacts already held a finished holdout exam. 157 exams were ready against
@@ -35,8 +36,8 @@ test('the exam writer fills at the declared capacity, not at a baked-in ceiling'
   // 10-worker RunPod account. Writing exam items spends small teacher calls and NO inference worker, so this station
   // never needed to be narrow, and a canary waiting on an exam set was that morning's line stop. The batch now comes
   // from the capacity the deployment declares, and must stay AHEAD of the canary.
-  assert.match(writer, /fillRequestedHoldoutExamSets\(\{ db, limit: lineCapacity\(\)\.examSetsPerTick \}\)/,
-    'the exam-items cron must size its batch from declared capacity')
+  assert.match(writer, /fillRequestedHoldoutExamSets\(\{\s*db,\s*limit: lineCapacity\(\)\.examSetsPerTick,\s*deadlineMs: startedAt \+ maxDuration \* 1000 - ROUTE_RESERVE_MS,\s*\}\)/,
+    'the exam-items cron must size its batch from declared capacity and hand the writer its own deadline')
   assert.doesNotMatch(writer, /fillRequestedHoldoutExamSets\(\{ db, limit: \d+ \}\)/,
     'a literal batch size is back')
   // The function's own bound is now only a runaway stop, not policy.
@@ -76,3 +77,4 @@ test('the pick loop does not issue a database query per candidate', () => {
   // Readiness is read once for the whole batch, after the loop.
   assert.match(lane, /const examReady = await holdoutExamReadyArtifacts\(db, picks\.map\(pick => pick\.artifact\), now\)/)
 })
+// end of saas/tests/holdoutExamReadyThroughput.node.test.ts (if this line is missing, the paste was cut short)

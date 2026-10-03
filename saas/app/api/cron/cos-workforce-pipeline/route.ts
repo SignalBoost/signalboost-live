@@ -4,6 +4,9 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { drainGraduateServingEvidence } from '@/lib/ai/cos/graduateServingAttempts'
 import { runWorkforceApprenticeShadow } from '@/lib/ai/cos/cosReasoningWorkers'
 import { closeAbandonedWorkforceAssignments, verifyServedWorkforceAssignments } from '@/lib/ai/cos/cosWorkforceAssignments'
+import { activeGraduateRunpodEndpointIds } from '@/lib/ai/cos/cosUniversityGraduateEndpointProtection'
+import { lineCapacity } from '@/lib/ai/cos/cosUniversityLineCapacity'
+import { reconcileGraduateWorkerReservation } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -46,6 +49,13 @@ async function run(req: NextRequest) {
     .order('graduated_at', { ascending: true })
     .limit(100)
   if (pipeline.error) throw pipeline.error
+
+  // Physical RunPod capacity is bounded independently of logical employment. All graduates remain active/on-call,
+  // but only the Workforce share may retain a worker reservation; excess endpoints scale to zero and wake on demand.
+  const graduateEndpointIds = [...await activeGraduateRunpodEndpointIds()]
+  const capacity = lineCapacity()
+  const workerReservation = await reconcileGraduateWorkerReservation(graduateEndpointIds, capacity.workforce)
+  console.info('[cos-workforce-worker-reservation]', JSON.stringify(workerReservation))
 
   const now = Date.now()
   const workers = (pipeline.data || []).map(row => {
@@ -112,6 +122,7 @@ async function run(req: NextRequest) {
     ok: evidence.blocked === 0 && verification.ok === true && abandoned.ok === true,
     at: new Date().toISOString(),
     workforce: workers.length,
+    workerReservation,
     stages: workers.reduce<Record<string, number>>((acc, row) => {
       const key = String(row.pipeline_stage || 'unknown')
       acc[key] = (acc[key] || 0) + 1

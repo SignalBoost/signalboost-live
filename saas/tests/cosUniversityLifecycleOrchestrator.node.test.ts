@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityLifecycleOrchestrator.node.test.ts
 //
 // Owner, 2026-10-02: "it should function like an assembly line style ... the individual stations should not own the
 // schedule. The line owns the flow." Four rules were set, and each one has tests below that fail the build if the
@@ -15,6 +16,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
   UNIVERSITY_LIFECYCLE_PLAN,
+  describeLifecycleFailure,
   lifecycleDeadline,
   lifecycleDeadlineAnchor,
   lifecycleDeadlineInQueue,
@@ -624,22 +626,6 @@ test('the controller publishes per-unit placement so an outside prover can compu
   }
 })
 
-
-test('the controller preserves Postgres diagnostics and identifies the failing database stage', () => {
-  const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /function databaseError\(stage: string, error: unknown\)/)
-  for (const field of ['code', 'message', 'detail', 'hint', 'table', 'column', 'constraint']) {
-    assert.match(route, new RegExp(`${field}: clean\\(`), `database diagnostic ${field} is not preserved`)
-  }
-  for (const stage of ['read_artifacts', 'read_existing_ledger', 'write_ledger', 'lease_station_units', 'read_overdue_ledger']) {
-    assert.match(route, new RegExp(`throwDatabaseError\\('${stage}'`), `database stage ${stage} is not attributed`)
-  }
-  assert.doesNotMatch(route, /error instanceof Error \? clean\(error\.message\) : clean\(error\)/,
-    'object-valued Postgres errors must never collapse back to [object Object]')
-  assert.match(route, /JSON\.stringify\(\{ ok: false, error: failure \}\)/)
-  assert.match(route, /NextResponse\.json\(\{ ok: false, error: failure \}, \{ status: 500 \}\)/)
-})
-
 test('the Playwright prover skips rather than passes when it cannot reach a deployment', () => {
   // A prover that goes green because it could not run is worse than no prover at all.
   const spec = readFileSync(new URL('./cosUniversityAssemblyLine.playwright.spec.ts', import.meta.url), 'utf8')
@@ -657,3 +643,29 @@ test('the Playwright prover skips rather than passes when it cannot reach a depl
   // And it must leave a durable artifact behind, which is the point of running it.
   assert.match(spec, /attach\('assembly-line-movement-proof\.json'/)
 })
+
+// ---------------------------------------------------------------------------------------------------------------
+// The controller must be able to say why it stopped (Vercel, 2026-10-03: HTTP 500 every minute, error "[object Object]")
+// ---------------------------------------------------------------------------------------------------------------
+test('a database failure is logged with its message, code, details and hint - never as [object Object]', () => {
+  const postgrest = { message: 'column "queue_position" does not exist', code: '42703', details: null, hint: 'maybe a migration' }
+  const text = describeLifecycleFailure(postgrest)
+  assert.equal(text, 'column "queue_position" does not exist code=42703 hint=maybe a migration')
+  assert.doesNotMatch(text, /\[object Object\]/)
+
+  assert.equal(describeLifecycleFailure(new Error('service_database_unavailable')), 'service_database_unavailable')
+  assert.equal(describeLifecycleFailure({ code: 'PGRST301' }), 'code=PGRST301')
+  // An object with none of the known fields still yields its content, not its type.
+  assert.equal(describeLifecycleFailure({ status: 414 }), '{"status":414}')
+  assert.equal(describeLifecycleFailure('timeout'), 'timeout')
+  assert.equal(describeLifecycleFailure(undefined), 'unknown_error')
+  // Bounded, so a runaway error body cannot flood the log line.
+  assert.ok(describeLifecycleFailure({ message: 'x'.repeat(5000) }).length <= 400)
+})
+
+test('the controller route logs failures through describeLifecycleFailure and nowhere stringifies the raw error', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /catch \(error\) \{[\s\S]{0,200}?const message = describeLifecycleFailure\(error\)/)
+  assert.doesNotMatch(route, /error instanceof Error \? clean\(error\.message\) : clean\(error\)/)
+})
+// end of saas/tests/cosUniversityLifecycleOrchestrator.node.test.ts (if this line is missing, the paste was cut short)

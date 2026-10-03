@@ -122,7 +122,7 @@ export async function recoverBuilderResidencyRuntime(input:{
   const artifactRevision=hfRevision(row.evidence_ref)
   if(
     String(row.subject_id)!=='Computer Science & Coding'
-    || String(row.status)!=='evaluation_pending'
+    || String(row.status)!=='evaluation_ready'
     || row.authority_expanded===true
     || String(row.candidate_id)!==candidateId
     || String(row.trained_artifact_hash).toLowerCase()!==artifactHash

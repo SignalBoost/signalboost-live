@@ -75,7 +75,7 @@ test('auto admission creates exactly one idempotent enrollment for the oldest el
               eq(){return this},
               like(){return this},
               order(){return this},
-              async limit(){
+              async range(){
                 return {data:[artifact],error:null}
               },
             }

@@ -61,7 +61,7 @@ test('auto admission creates exactly one idempotent enrollment for the oldest el
     trained_artifact_id:'cadomos/itmounts-student-test',
     trained_artifact_hash:hash('a'),
     revision_key:hash('b'),
-    status:'evaluation_pending',
+    status:'evaluation_ready',
     authority_expanded:false,
   }
 
@@ -144,7 +144,7 @@ test('auto admission skips an already-enrolled artifact and admits the next cand
       trained_artifact_id:'cadomos/itmounts-student-first',
       trained_artifact_hash:hash('c'),
       revision_key:hash('d'),
-      status:'evaluation_pending',
+      status:'evaluation_ready',
       authority_expanded:false,
     },
     {
@@ -154,7 +154,7 @@ test('auto admission skips an already-enrolled artifact and admits the next cand
       trained_artifact_id:'cadomos/itmounts-student-second',
       trained_artifact_hash:hash('e'),
       revision_key:hash('f'),
-      status:'evaluation_pending',
+      status:'evaluation_ready',
       authority_expanded:false,
     },
   ]
@@ -233,7 +233,7 @@ test('auto admission pages past an enrolled first window instead of starving an 
     trained_artifact_id:`cadomos/enrolled-${i}`,
     trained_artifact_hash:hash('a'),
     revision_key:hash('b'),
-    status:'evaluation_pending',
+    status:'evaluation_ready',
     authority_expanded:false,
   }))
   const aged={
@@ -243,7 +243,7 @@ test('auto admission pages past an enrolled first window instead of starving an 
     trained_artifact_id:'cadomos/aged-candidate',
     trained_artifact_hash:hash('c'),
     revision_key:hash('d'),
-    status:'evaluation_pending',
+    status:'evaluation_ready',
     authority_expanded:false,
   }
   const pages=[enrolled,[aged]]

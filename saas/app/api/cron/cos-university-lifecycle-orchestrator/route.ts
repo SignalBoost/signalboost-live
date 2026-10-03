@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
+  LIVE_STATUSES,
   UNIVERSITY_LINE_CAPACITY,
   WORKING_STATIONS,
   decideLineStops,
@@ -36,6 +37,7 @@ import {
   type StationReading,
 } from '@/lib/ai/cos/cosUniversityAssemblyLine'
 import {
+  decideLineCloseout,
   describeLifecycleFailure,
   lifecycleDeadlineAnchor,
   lifecycleDeadlineInQueue,
@@ -89,38 +91,16 @@ async function run(req: NextRequest) {
   // ---------------------------------------------------------------------------------------------------------------
   // 1. Reconcile: one station, one next action, one queue position per unit.
   // ---------------------------------------------------------------------------------------------------------------
-  // Read working material before terminal history. A single oldest-first query across LINE_STATUSES let retired
-  // history consume MAX_ARTIFACTS and made live evaluation_ready material invisible to the controller.
-  // Each working station gets its own bounded intake so backlog at one station cannot starve another.
-  const workingSources = await Promise.all(WORKING_STATIONS.map(station =>
-    db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,subject_id,trained_artifact_hash,status,updated_at')
-      .eq('status', station.sourceStatus)
-      .order('updated_at', { ascending: true })
-      .limit(MAX_ARTIFACTS)
-  ))
-  const sourceRows: any[] = []
-  for (let index = 0; index < workingSources.length; index += 1) {
-    const result = workingSources[index]
-    if (result.error) throw { stage: 'read_working_artifacts', station: WORKING_STATIONS[index]?.id, ...result.error }
-    sourceRows.push(...(result.data || []))
-  }
+  // Live units only. Retired units are not read: they need nothing, and 1,657 of them once filled this whole window
+  // while 244 units waited at admission unseen (2026-10-03).
+  const source = await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,subject_id,trained_artifact_hash,status,updated_at')
+    .in('status', [...LIVE_STATUSES])
+    .order('updated_at', { ascending: true })
+    .limit(MAX_ARTIFACTS)
+  if (source.error) throw source.error
 
-  // Terminal rows are bookkeeping, not work. Keep only the newest bounded slice so a recent retirement can close an
-  // existing ledger entry without allowing years of terminal history to occupy the live conveyor's intake.
-  const terminalStatus = stationById('TERMINAL')?.sourceStatus
-  if (terminalStatus) {
-    const terminalSource = await db.from('cos_local_distillation_artifacts')
-      .select('candidate_id,subject_id,trained_artifact_hash,status,updated_at')
-      .eq('status', terminalStatus)
-      .order('updated_at', { ascending: false })
-      .limit(MAX_ARTIFACTS)
-    if (terminalSource.error) throw { stage: 'read_terminal_artifacts', ...terminalSource.error }
-    sourceRows.push(...(terminalSource.data || []))
-  }
-
-  const source = { data: sourceRows }
-  const ids = sourceRows.map((row: any) => String(row.candidate_id || '')).filter(Boolean)
+  const ids = (source.data || []).map((row: any) => String(row.candidate_id || '')).filter(Boolean)
   const existingRows: any[] = []
   for (let offset = 0; offset < ids.length; offset += LEDGER_READ_CHUNK) {
     const idChunk = ids.slice(offset, offset + LEDGER_READ_CHUNK)
@@ -223,6 +203,45 @@ async function run(req: NextRequest) {
     const write = await db.from('cos_university_lifecycle_orchestration').upsert(chunk, { onConflict: 'candidate_id' })
     if (write.error) throw write.error
     reconciled += chunk.length
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // 1b. Closeout: a unit the ledger still holds open that is no longer on the line has left it (retired or removed).
+  //     Decided only from a complete view - a full window closes nothing, because a live unit may lie beyond it.
+  // ---------------------------------------------------------------------------------------------------------------
+  const windowComplete = (source.data || []).length < MAX_ARTIFACTS
+  let closedOut = 0
+  if (windowComplete) {
+    const open = await db.from('cos_university_lifecycle_orchestration')
+      .select('candidate_id')
+      .eq('terminal', false)
+      .limit(MAX_ARTIFACTS)
+    if (open.error) throw open.error
+    const departed = decideLineCloseout({
+      windowComplete,
+      liveIds: ids,
+      openLedgerIds: (open.data || []).map((row: any) => String(row.candidate_id || '')),
+    })
+    for (let offset = 0; offset < departed.length; offset += LEDGER_READ_CHUNK) {
+      const chunk = departed.slice(offset, offset + LEDGER_READ_CHUNK)
+      const close = await db.from('cos_university_lifecycle_orchestration')
+        .update({
+          stage: 'TERMINAL',
+          station: 'TERMINAL',
+          terminal: true,
+          next_action: 'none',
+          queue_position: null,
+          expected_start_at: null,
+          lease_until: null,
+          lease_holder: null,
+          last_observed_at: nowIso,
+          last_transition_at: nowIso,
+          updated_at: nowIso,
+        })
+        .in('candidate_id', chunk)
+      if (close.error) throw close.error
+      closedOut += chunk.length
+    }
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -334,6 +353,8 @@ async function run(req: NextRequest) {
     capacity: UNIVERSITY_LINE_CAPACITY,
     capacityDescription: describeLineCapacity(UNIVERSITY_LINE_CAPACITY),
     reconciled,
+    closedOut,
+    windowComplete,
     transitions,
     line: WORKING_STATIONS.map(station => {
       const reading = readings.find(entry => entry.station === station.id)

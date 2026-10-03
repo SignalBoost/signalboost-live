@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   admitNextBuilderResidency,
-  BUILDER_RESIDENCY_PROGRAM_ID,
 } from '../platform-harness/index.ts'
+import { BUILDER_RESIDENCY_PROGRAM_ID } from '../lib/ai/cos/cosUniversityResidency.ts'
 
 const hash=(char:string)=>char.repeat(64)
 

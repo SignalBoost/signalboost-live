@@ -617,6 +617,19 @@ test('the prover is pure policy and reaches no database or network', () => {
   assert.match(prover, /authorityExpanded: false/)
 })
 
+test('the controller bounds PostgREST ledger-read URLs instead of sending the whole candidate set in one .in filter', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /const LEDGER_READ_CHUNK = 50/)
+  assert.match(route, /offset < ids\.length; offset \+= LEDGER_READ_CHUNK/)
+  assert.match(route, /const idChunk = ids\.slice\(offset, offset \+ LEDGER_READ_CHUNK\)/)
+  assert.match(route, /\.in\('candidate_id', idChunk\)/)
+  assert.doesNotMatch(route, /\.in\('candidate_id', ids\)/,
+    'the full candidate set must never be encoded into one PostgREST URL')
+  assert.match(route, /stage: 'read_existing_ledger'/)
+  assert.match(route, /chunkOffset: offset/)
+  assert.match(route, /chunkSize: idChunk\.length/)
+})
+
 test('the controller publishes per-unit placement so an outside prover can compute movement itself', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const UNITS_REPORT_LIMIT = \d+/)

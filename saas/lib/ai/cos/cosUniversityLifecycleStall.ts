@@ -19,6 +19,10 @@
 // raise it like any other incident.
 //
 // A stage with no work is silent, never "stalled": an empty queue is the pipeline working, not a fault.
+//
+// Owner, 2026-10-02: the graces below are now the assembly line's own station SLAs rather than numbers chosen here,
+// so the watcher and the controller can never disagree about when a station has stopped.
+import { stationById } from './cosUniversityAssemblyLine.ts'
 
 /** One downstream stage of the student lifecycle, measured by its own cadence. */
 export type LifecycleStageId =
@@ -53,20 +57,35 @@ export type LifecycleStallReason =
   | 'lifecycle_activation_stalled'
 
 /**
- * Grace per stage, derived from the cron that drives it, with room for a slow tick and a cold start.
+ * Grace per stage: material present and NOTHING moved for this long.
  *
- *   exam         evaluation lane runs every odd minute; the writer fills at :04/:14/... Ten exam-writer
- *                cycles is ample for at least one student to move.
- *   quarantine   resolution runs at :13/:28/:43/:58. The 6h stall limit inside the resolution is a DIFFERENT
- *                clock (how long one student may wait); this is "the stage moved nobody at all".
- *   registration graduate-activation cron runs at :07/:17/... and registers one per tick.
- *   activation   same cron, and activation is gated by its own owner flag, so it gets the longest grace.
+ * Owner, 2026-10-02, rule 4: "If material is waiting but a station produces no output, orchestration detects that in
+ * minutes and acts. It doesn't wait until a 30/45/60-minute artifact timeout before noticing the line stopped."
+ *
+ * These were 100-180 minutes, chosen as "several of the stage's own cron cycles". That was the wrong unit: it is a
+ * LINE-STOP alarm, so it should fire roughly one unit of work plus two of the station's own ticks after the station
+ * last produced anything. Each value below is now the matching station's `stationSlaSeconds` from the line
+ * definition, which is the single place those cadences and work windows live.
+ *
+ *   exam          INDEPENDENT_EVALUATION. Lane runs every odd minute, 12 minutes of work per unit.
+ *   quarantine    QUARANTINE_REMEDIATION. Batched at :13/:28/:43/:58, so two missed ticks is already a stop. The 6h
+ *                 stall limit inside the resolution is a DIFFERENT clock - how long ONE student may wait - and is
+ *                 unaffected by this.
+ *   registration  GRADUATION. Registry writes, batched, cron every 10 minutes.
+ *   activation    GRADUATION's station SLA plus the serial RunPod wait each activation really costs
+ *                 (GRADUATE_RUNTIME_READY_WAIT_MS of 4 minutes plus the 10-minute canary-active window), because one
+ *                 activation pins one of the ten account-wide workers and genuinely cannot be parallelised.
  */
+const stationSla = (id: string, fallbackSeconds: number): number => {
+  const station = stationById(id)
+  return station && station.stationSlaSeconds > 0 ? station.stationSlaSeconds : fallbackSeconds
+}
+
 export const LIFECYCLE_STAGE_GRACE_SECONDS: Readonly<Record<LifecycleStageId, number>> = Object.freeze({
-  exam: 100 * 60,
-  quarantine: 90 * 60,
-  registration: 90 * 60,
-  activation: 180 * 60,
+  exam: stationSla('INDEPENDENT_EVALUATION', 25 * 60),
+  quarantine: stationSla('QUARANTINE_REMEDIATION', 35 * 60),
+  registration: stationSla('GRADUATION', 25 * 60),
+  activation: stationSla('GRADUATION', 25 * 60) + 14 * 60,
 })
 
 const STAGE_REASON: Readonly<Record<LifecycleStageId, LifecycleStallReason>> = Object.freeze({

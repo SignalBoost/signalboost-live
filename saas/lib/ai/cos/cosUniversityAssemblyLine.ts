@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityAssemblyLine.ts
 //
 // Owner, 2026-10-02: "it should function like an assembly line style ... the individual stations should not own the
 // schedule. The line owns the flow."
@@ -174,6 +175,18 @@ export const WORKING_STATIONS: readonly Station[] = Object.freeze(
 
 export const LINE_STATUSES: readonly string[] = Object.freeze(
   UNIVERSITY_ASSEMBLY_LINE.map(station => station.sourceStatus),
+)
+
+/**
+ * Statuses of units still ON the line. The controller reads only these.
+ *
+ * Production defect this fixes (2026-10-03 18:55 UTC, ledger query): the controller read every line status, oldest
+ * first, 500 at a time - and the deployment held 1,657 retired units older than anything waiting. The window filled
+ * with 499 TERMINAL rows and one graduate; the 244 units waiting at admission were never read, so nothing was ever
+ * dispatched. A retired unit needs no action and must not consume the read window.
+ */
+export const LIVE_STATUSES: readonly string[] = Object.freeze(
+  UNIVERSITY_ASSEMBLY_LINE.filter(station => !station.terminal).map(station => station.sourceStatus),
 )
 
 /**
@@ -406,3 +419,4 @@ export function leaseIsLive(leaseUntil: string | null | undefined, now: Date): b
   if (!Number.isFinite(nowMs)) return false
   return until > nowMs
 }
+// end of saas/lib/ai/cos/cosUniversityAssemblyLine.ts (if this line is missing, the paste was cut short)

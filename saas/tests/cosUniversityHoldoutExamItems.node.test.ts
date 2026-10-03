@@ -1,4 +1,3 @@
-// saas/tests/cosUniversityHoldoutExamItems.node.test.ts
 //
 // 2026-09-27: 279 of 529 Holdout failures were both-zero. A holdout row is a withheld teaching essay whose prompt is
 // the teacher's generation instruction, so both models wrote their own example and neither could match the
@@ -134,14 +133,28 @@ test('a requested set becomes ready only when every withheld essay has a valid e
   assert.equal(written.profile, HOLDOUT_EXAM_ITEM_PROFILE, 'written items carry the current generation')
 })
 
-test('a set with no usable teacher fails visibly and is retried a bounded number of times', async () => {
+test('no usable teacher aborts the run and charges no set at all', async () => {
+  // Production 2026-10-03: this used to mark the set `failed` with `attempts: 1`. `no_active_mass_teacher` is read
+  // once per run and true for every set in the batch, so at 10 sets a tick and 6 ticks an hour a brief outage burned
+  // the whole requested population past the attempt ceiling - and a set at the ceiling is invisible to the writer
+  // forever, so its artifact could never be admitted to evaluation. 237 artifacts sat at `evaluation_ready` with zero
+  // admitted in 24 hours. A deployment-wide precondition must stop the run, not disqualify the students.
   const db = fakeDb({ sets: [{ candidate_id: 'mass:z', trained_artifact_hash: H('e'), status: 'requested', attempts: 0 }] })
   const result = await fillRequestedHoldoutExamSets({ db, env: { HF_TOKEN: 'x'.repeat(30) }, readRows: (async () => []) as any })
-  assert.equal(result.failed, 1)
+  assert.equal(result.aborted, 'no_active_mass_teacher')
+  assert.equal(result.failed, 0)
+  assert.equal(result.processed, 0)
   const set = db.tables.cos_university_holdout_exam_sets[0]
-  assert.equal(set.status, 'failed')
-  assert.equal(set.attempts, 1)
-  assert.equal(set.last_error, 'no_active_mass_teacher')
+  assert.equal(set.status, 'requested', 'the set must be left exactly as it was')
+  assert.equal(Number(set.attempts) || 0, 0, 'no attempt may be charged for a deployment-wide fault')
+})
+
+test('a missing HF token aborts the run too, for the same reason', async () => {
+  const db = fakeDb({ sets: [{ candidate_id: 'mass:y', trained_artifact_hash: H('d'), status: 'requested', attempts: 0 }] })
+  const result = await fillRequestedHoldoutExamSets({ db, env: { HF_TOKEN: '' }, readRows: (async () => []) as any })
+  assert.ok(result.aborted, 'a missing credential is not the set\'s fault')
+  assert.equal(result.failed, 0)
+  assert.equal(Number(db.tables.cos_university_holdout_exam_sets[0].attempts) || 0, 0)
 })
 
 test('the evaluator asks the exam question, grades against the key, and stops before inference if items are missing', () => {
@@ -157,7 +170,8 @@ test('the evaluation route only approves exam-ready artifacts, and a missing-ite
   // Production 2026-09-28: questions requested for every pending artifact at once left 33 random artifacts ready and
   // none eligible; the lane examined nobody for two hours. The approval policy now picks first, and questions are
   // prepared only for its next few picks.
-  assert.match(route, /const HOLDOUT_EXAM_LOOKAHEAD = 6/)
+  // Raised 6 -> 24 on 2026-10-02 so the approval policy considers enough candidates to find one that is exam-ready.
+  assert.match(route, /const HOLDOUT_EXAM_LOOKAHEAD = 24/)
   assert.match(route, /artifacts: remaining,/)
   assert.match(route, /const examReady = await holdoutExamReadyArtifacts\(db, picks\.map\(pick => pick\.artifact\), now\)/)
   assert.doesNotMatch(route, /holdoutExamReadyArtifacts\(db, undisposed, now\)/)

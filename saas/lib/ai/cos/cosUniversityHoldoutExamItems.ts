@@ -38,6 +38,8 @@ export const HOLDOUT_EXAM_ITEMS_TABLE = 'cos_university_holdout_exam_items' as c
 export const HOLDOUT_EXAM_SETS_TABLE = 'cos_university_holdout_exam_sets' as const
 export const HOLDOUT_EXAM_ITEMS_MISSING_ERROR = 'mass_distilled_evaluation_holdout_exam_items_missing' as const
 export const HOLDOUT_EXAM_MAX_SET_ATTEMPTS = 3
+/** Runaway bound only. The real batch size is the deployment's declared capacity, passed in by the caller. */
+export const EXAM_SET_FILL_MAX_PER_RUN = 500
 export const HOLDOUT_EXAM_WRITER_MAX_OUTPUT_TOKENS = 320
 
 const HEX64 = /^[a-f0-9]{64}$/
@@ -356,7 +358,10 @@ export async function fillRequestedHoldoutExamSets(input: {
 }): Promise<HoldoutExamFillResult> {
   const env = input.env || process.env
   const now = input.now || new Date()
-  const limit = Math.max(1, Math.min(10, Math.floor(Number(input.limit) || 3)))
+  // Owner 2026-10-03, "build a Ferrari not a Lada": the ceiling was 10 because the whole line rationed a 10-worker
+  // RunPod account. Writing exam items spends small teacher calls and NO inference worker, so this station never
+  // needed to be narrow. The caller passes the batch its declared capacity allows; this bound only stops a runaway.
+  const limit = Math.max(1, Math.min(EXAM_SET_FILL_MAX_PER_RUN, Math.floor(Number(input.limit) || 3)))
   const readRows = input.readRows || readPinnedHfParquetRows
   const db = input.db
   const errors: string[] = []

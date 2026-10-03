@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityLineMovementProof.ts
 //
 // Owner, 2026-10-02: "PLAYWRIGHT WATCHDOG - independently proves the line."
 //
@@ -27,6 +26,7 @@
 // Pure, no imports beyond the line definition, no database, no network, no clock of its own.
 import {
   lineConstraint,
+  lineCycleSeconds,
   stationById,
   type StationId,
 } from './cosUniversityAssemblyLine.ts'
@@ -80,6 +80,16 @@ export type LineMovementProof = Readonly<{
   authorityExpanded: false
 }>
 
+/**
+ * The shortest sample interval from which a no-movement result means anything.
+ *
+ * Exported so nothing has to re-derive it: the prover, the Playwright watchdog and the tests all read the same
+ * number, and widening the line cannot silently turn the watchdog into a false-alarm generator.
+ */
+export function lineProofMinimumIntervalSeconds(): number {
+  return Math.max(lineConstraint()?.taktSeconds ?? 0, lineCycleSeconds())
+}
+
 const parsedMs = (value: string | null | undefined): number | null => {
   if (!value) return null
   const at = Date.parse(String(value))
@@ -123,7 +133,10 @@ export function proveLineMovement(input: {
 }): LineMovementProof {
   const firstAt = parsedMs(input.first?.at)
   const secondAt = parsedMs(input.second?.at)
-  const takt = lineConstraint()?.taktSeconds ?? 0
+  // The floor for a no-movement verdict is the slowest station's CYCLE time, not the line's takt. Widening the line
+  // shrinks the takt to seconds, but a unit still takes as long as the station's work, so a sample shorter than one
+  // cycle cannot distinguish "nothing moved" from "everything is mid-work".
+  const takt = lineProofMinimumIntervalSeconds()
   const base = {
     firstSampleAt: String(input.first?.at || ''),
     secondSampleAt: String(input.second?.at || ''),
@@ -277,4 +290,3 @@ export function describeLineProof(proof: LineMovementProof): string {
   }
   return `NOT PROVEN: ${proof.reason} after ${proof.elapsedSeconds}s. This is not evidence the line works.`
 }
-// end of saas/lib/ai/cos/cosUniversityLineMovementProof.ts (if this line is missing, the paste was cut short)

@@ -1,4 +1,3 @@
-// saas/tests/cosUniversityAssemblyLine.playwright.spec.ts
 //
 // Owner, 2026-10-02: "PLAYWRIGHT WATCHDOG - independently proves the line."
 //
@@ -26,12 +25,15 @@ import {
   sampleFromLineState,
   type LineSample,
 } from '../lib/ai/cos/cosUniversityLineMovementProof.ts'
-import { lineConstraint, stationForStatus } from '../lib/ai/cos/cosUniversityAssemblyLine.ts'
+import { lineProofMinimumIntervalSeconds } from '../lib/ai/cos/cosUniversityLineMovementProof.ts'
+import { stationForStatus } from '../lib/ai/cos/cosUniversityAssemblyLine.ts'
 
 const LINE_STATE_PATH = '/api/cron/cos-university-lifecycle-orchestrator'
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || ''
 const SECRET = process.env.CRON_SECRET || ''
-const TAKT_SECONDS = lineConstraint()?.taktSeconds ?? 600
+// The slowest station's cycle time, not the line's takt. Widening the line shrinks the takt to seconds while one
+// unit still takes as long as the station's work, so sampling on the takt would read work-in-progress as a stoppage.
+const TAKT_SECONDS = lineProofMinimumIntervalSeconds()
 const REQUESTED_INTERVAL = Number.parseInt(String(process.env.LINE_PROOF_INTERVAL_SECONDS || ''), 10) || 0
 // A scheduled proof run must wait at least one takt, or a no-movement result means nothing. A SHORTER interval is
 // allowed only for a rehearsal, and it is safe by construction rather than by trust: `proveLineMovement` refuses to
@@ -168,4 +170,3 @@ test.describe('COS University assembly line, proved from outside', () => {
     expect(stops, `the controller reports stopped stations: ${JSON.stringify(stops)}`).toEqual([])
   })
 })
-// end of saas/tests/cosUniversityAssemblyLine.playwright.spec.ts (if this line is missing, the paste was cut short)

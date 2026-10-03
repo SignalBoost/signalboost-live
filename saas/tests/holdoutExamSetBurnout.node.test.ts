@@ -140,3 +140,76 @@ test('a set still inside its budget is left alone, and a set inside its cool-off
       now: NOW,
       maxAttempts: HOLDOUT_EXAM_MAX_SET_ATTEMPTS,
     }), [], `a set quiet for ${quiet}ms is still cooling off`)
+  }
+})
+
+test('an unreadable clock revives nothing rather than reviving everything', () => {
+  for (const updatedAt of [null, '', 'not-a-date']) {
+    assert.deepEqual(decideExamSetRecovery({
+      sets: [candidate({ updatedAt })],
+      now: NOW,
+      maxAttempts: HOLDOUT_EXAM_MAX_SET_ATTEMPTS,
+    }), [], `clock ${String(updatedAt)} must not trigger a revival`)
+  }
+  assert.deepEqual(decideExamSetRecovery({
+    sets: [candidate()],
+    now: new Date('nope'),
+    maxAttempts: HOLDOUT_EXAM_MAX_SET_ATTEMPTS,
+  }), [])
+})
+
+test('a revival is bounded, so a recovery can never become a stampede', () => {
+  const many = Array.from({ length: EXAM_SET_RECOVERY_MAX_PER_RUN * 3 }, (_unused, index) =>
+    candidate({ candidateId: `mass:cccc${index}` }))
+  assert.equal(decideExamSetRecovery({ sets: many, now: NOW, maxAttempts: HOLDOUT_EXAM_MAX_SET_ATTEMPTS }).length,
+    EXAM_SET_RECOVERY_MAX_PER_RUN)
+  assert.equal(decideExamSetRecovery({ sets: many, now: NOW, maxAttempts: HOLDOUT_EXAM_MAX_SET_ATTEMPTS, maxPerRun: 5 }).length, 5)
+})
+
+test('a set with no identity is skipped rather than guessed at', () => {
+  assert.deepEqual(decideExamSetRecovery({
+    sets: [candidate({ candidateId: '' }), candidate({ artifactHash: '' })],
+    now: NOW,
+    maxAttempts: HOLDOUT_EXAM_MAX_SET_ATTEMPTS,
+  }), [])
+})
+
+test('a stalled exam lane says it is a line stop, not an idle queue', () => {
+  // `no_mass_artifact_with_holdout_exam_ready` reads like "nothing to do". With 237 artifacts waiting and every
+  // candidate disqualified, that reading cost a day.
+  assert.match(describeExamSetPopulation({ requested: 0, failed: 0, ready: 0, exhausted: 237 }), /^LINE STOP:/)
+  assert.match(describeExamSetPopulation({ requested: 12, failed: 3, ready: 0, exhausted: 0 }), /no exam set ready yet/)
+  assert.match(describeExamSetPopulation({ requested: 5, failed: 0, ready: 9, exhausted: 2 }), /ready=9/)
+  assert.match(describeExamSetPopulation({ requested: 0, failed: 0, ready: 0, exhausted: 0 }), /no exam sets exist yet/)
+})
+
+test('the live writer aborts on a precondition instead of charging the batch', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityHoldoutExamItems.ts', import.meta.url), 'utf8')
+  // The precondition is decided ONCE, before the per-set loop, and returns.
+  assert.match(source, /const abortReason = !teachers\.length/)
+  assert.match(source, /aborted: abortReason/)
+  // The dead per-set guards that charged the whole batch must not come back.
+  assert.doesNotMatch(source, /await fail\('no_active_mass_teacher'\)/)
+  assert.doesNotMatch(source, /await fail\('hf_token_missing'\)/)
+  // Only a structural failure spends the budget, and a transient one is backed off instead of starving the queue.
+  assert.match(source, /const charged = shouldChargeAttempt\(reason\)/)
+  assert.match(source, /attempts: charged \? attempts \+ 1 : attempts,/)
+  assert.match(source, /status: charged \? 'failed' : 'requested',/)
+  assert.match(source, /TRANSIENT_BACKOFF_MS/)
+  // The exhausted population is revived and reported on every run.
+  assert.match(source, /const revived = await reviveExhaustedExamSets\(\{ db, now \}\)/)
+  assert.match(source, /\.gte\('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS\)/)
+  // The writer still only ever prepares exams; it must not grade, admit or promote anything.
+  assert.doesNotMatch(source, /status: 'evaluation_pending'/)
+  assert.doesNotMatch(source, /productionTrafficAuthorized: true/)
+})
+
+test('the writer cron makes a dead head-of-line station loud instead of answering ok', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-holdout-exam-items/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /if \(result\.aborted\) \{/)
+  assert.match(route, /\{ status: 503 \}/)
+  assert.match(route, /invocationSucceeded: !result\.aborted/)
+  assert.match(route, /describeExamSetPopulation/)
+  assert.match(route, /population: result\.population/)
+  assert.match(route, /revived: result\.revived/)
+})

@@ -1,7 +1,14 @@
+// saas/agent-gateway-host/university-distillation-recovery.ts
 import { createHash } from 'node:crypto'
 import type { AgentRequest, AllowlistEntry } from '../agent-gateway/index.ts'
 import type { ChainAttempt, ChainExecutor } from './execution-chain.ts'
 import { runCosUniversityMassDistillationWorkflow } from '../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'
+import { triggerStation } from '../lib/ai/cos/cosUniversityAssemblyLineHandoff.ts'
+import {
+  LINE_REPAIR_AUTHORIZATION_REF,
+  onlyDeferredLineReasonsRemain,
+  runLineStationRepair,
+} from '../lib/ai/cos/cosUniversityLineRepairPlan.ts'
 import { preflightHfWorkerDelivery } from '../lib/ai/cos/cosUniversityHfWorkerDelivery.ts'
 import { recordCosUniversityProductionPath } from '../lib/ai/cos/cosUniversityProductionAssurance.ts'
 import { RECOVERY_DRILL_PROFILE } from '../lib/ai/cos/cosUniversityRecoveryDrill.ts'
@@ -26,6 +33,12 @@ export interface UniversityDistillationRecoveryResult {
   invocationSucceeded: boolean
   skipped: boolean
   verified: boolean
+  /**
+   * A station was woken and its work takes minutes, so the fault could not be confirmed gone in this request.
+   * `verified` stays FALSE and nothing throws: the repair happened, the confirmation waits for the station's SLA.
+   * Reporting a deferred repair as verified is the dishonesty this field exists to prevent.
+   */
+  verificationDeferred?: boolean
   before: UniversityDistillationHealthSnapshot
   after: UniversityDistillationHealthSnapshot
   response: Record<string, unknown>
@@ -38,6 +51,7 @@ type WorkflowRunner = typeof runCosUniversityMassDistillationWorkflow
 type ReceiptRecorder = typeof recordCosUniversityProductionPath
 type HealthReader = typeof readUniversityMassDistillationHealth
 type WorkerPreflight = typeof preflightHfWorkerDelivery
+type StationWaker = typeof triggerStation
 
 
 const MASS_RUNS = 'cos_university_mass_distillation_batch_runs'
@@ -183,12 +197,14 @@ export async function recoverUniversityMassDistillation(input: {
   recordReceipt?: ReceiptRecorder
   readHealth?: HealthReader
   preflightWorker?: WorkerPreflight
+  wakeStation?: StationWaker
 }): Promise<UniversityDistillationRecoveryResult> {
   const now = input.now ?? (() => new Date())
   const runWorkflow = input.runWorkflow ?? runCosUniversityMassDistillationWorkflow
   const recordReceipt = input.recordReceipt ?? recordCosUniversityProductionPath
   const readHealth = input.readHealth ?? readUniversityMassDistillationHealth
   const preflightWorker = input.preflightWorker ?? preflightHfWorkerDelivery
+  const wakeStation = input.wakeStation ?? triggerStation
   const startedAt = now()
   const before = await readHealth({ db: input.db, now: startedAt })
   // The offset monitor can race a successful scheduled worker. Treat any independently observed
@@ -248,6 +264,77 @@ export async function recoverUniversityMassDistillation(input: {
     }
   }
 
+  // Repair what is actually stalled. A `lifecycle_*_stalled` reason belongs to a STATION on the assembly line, not
+  // to training, so it is repaired by waking that station - before any paid path is considered, because waking a
+  // worker costs nothing. If the snapshot also carries upstream reasons, this falls through to the paid recovery
+  // below with the line already poked.
+  let afterLine: UniversityDistillationHealthSnapshot = before
+  const lineRepair = await runLineStationRepair({
+    reasons: before.reasons,
+    wake: args => wakeStation({ path: args.path, timeoutMs: 8_000 }),
+    readHealth: async () => {
+      afterLine = await readHealth({ db: input.db, now: now() })
+      return afterLine
+    },
+    recordReceipt: async ({ stations, plan }) => recordReceipt({
+      path: 'mass_distillation_supervision',
+      invocationSucceeded: stations.some(entry => entry.woken),
+      evidence: {
+        supervisorRecovery: true,
+        assemblyLineRepair: true,
+        authorizationRef: LINE_REPAIR_AUTHORIZATION_REF,
+        repairTarget: plan.target,
+        lineReasons: plan.lineReasons,
+        stations,
+        // Stated on the receipt so no later reader can mistake a dispatched repair for a confirmed one.
+        verificationDeferred: true,
+        deferredForSeconds: plan.deferredForSeconds,
+        paidDispatchSuppressed: plan.target === 'assembly_line',
+        automaticPromotionAuthorized: false,
+        runpodMutationAuthorized: false,
+        authorityExpanded: false,
+      },
+      now: now(),
+    }),
+  })
+
+  // Either the line cleared immediately, or all that remains is a station woken a moment ago. In both cases this
+  // tick is finished: there is nothing left that the paid training path could repair.
+  if (lineRepair.attempted && lineRepair.paidDispatchSuppressed) {
+    const finishedAt = now()
+    return {
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      receiptRef: lineRepair.receiptRef,
+      invocationSucceeded: lineRepair.stations.some(entry => entry.woken),
+      skipped: false,
+      // A woken station has not finished working yet. Claiming `verified` here would be a claim about elapsed
+      // time, not about the pipeline.
+      verified: lineRepair.settled,
+      verificationDeferred: lineRepair.verificationDeferred,
+      before,
+      after: afterLine,
+      response: {
+        ok: true,
+        supervisorRecovery: true,
+        assemblyLineRepair: true,
+        repairTarget: lineRepair.plan.target,
+        repairReason: lineRepair.plan.reason,
+        lineReasons: lineRepair.plan.lineReasons,
+        stations: lineRepair.stations,
+        verificationDeferred: lineRepair.verificationDeferred,
+        deferredForSeconds: lineRepair.deferredForSeconds,
+        paidDispatchSuppressed: true,
+        automaticPromotionAuthorized: false,
+        runpodMutationAuthorized: false,
+        authorityExpanded: false,
+      },
+      automaticPromotionAuthorized: false,
+      runpodMutationAuthorized: false,
+      authorityExpanded: false,
+    }
+  }
+
   const workerPreflight = await preflightWorker()
   if (!workerPreflight.ok) {
     await recordReceipt({
@@ -296,7 +383,15 @@ export async function recoverUniversityMassDistillation(input: {
   const finishedAt = now()
   const after = await readHealth({ db: input.db, now: finishedAt })
   const verified = workflow.invocationSucceeded && after.state !== 'repair_required'
-  if (!verified) {
+  // A station woken earlier in this tick is still working. If everything that remains is one of those line stalls,
+  // the repair was dispatched and the confirmation belongs to a later tick - so this is deferred, not failed.
+  // Without this, a single quarantined student made the supervisor throw its own verification error every five
+  // minutes while the repair it needed was already on its way.
+  const deferred = !verified
+    && workflow.invocationSucceeded
+    && lineRepair.attempted
+    && onlyDeferredLineReasonsRemain({ reasons: after.reasons })
+  if (!verified && !deferred) {
     throw new Error(`university_distillation_recovery_verification_failed:${after.reasons.join(',') || 'workflow_failed'}`)
   }
 
@@ -307,9 +402,20 @@ export async function recoverUniversityMassDistillation(input: {
     invocationSucceeded: workflow.invocationSucceeded,
     skipped: workflow.skipped,
     verified,
+    ...(deferred ? { verificationDeferred: true } : {}),
     before,
     after,
-    response: workflow.response,
+    response: lineRepair.attempted
+      ? {
+        ...workflow.response,
+        assemblyLineRepair: true,
+        repairTarget: lineRepair.plan.target,
+        lineReasons: lineRepair.plan.lineReasons,
+        stations: lineRepair.stations,
+        verificationDeferred: deferred,
+        deferredForSeconds: deferred ? lineRepair.plan.deferredForSeconds : 0,
+      }
+      : workflow.response,
     automaticPromotionAuthorized: false,
     runpodMutationAuthorized: false,
     authorityExpanded: false,
@@ -344,3 +450,4 @@ export function createUniversityDistillationRecoveryExecutor(input: {
     },
   }
 }
+// end of saas/agent-gateway-host/university-distillation-recovery.ts (if this line is missing, the paste was cut short)

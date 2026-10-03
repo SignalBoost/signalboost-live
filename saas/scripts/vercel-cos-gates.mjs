@@ -648,6 +648,7 @@ const tests = [
   // half - a stage holding work and moving nobody - and an empty stage must stay silent, or the alarm gets ignored.
   'tests/cosUniversityLifecycleStall.node.test.ts',
   'tests/cosUniversityLineCapacity.node.test.ts',
+  'tests/cosUniversityWorkforceReservation.node.test.ts',
   'tests/cosUniversityLifecycleOrchestrator.node.test.ts',
   'tests/massGraduateRegistrationStarvation.node.test.ts',
   'tests/cosUniversityMassGraduateRegistration.node.test.ts',

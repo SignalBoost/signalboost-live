@@ -1,3 +1,4 @@
+// saas/app/api/cron/cos-university-holdout-exam-items/route.ts
 //
 // Writes real Holdout exam questions (one question + short answer key per withheld teaching essay) for the
 // artifacts the mass evaluation route has requested. A few artifacts per tick; each costs a handful of small
@@ -18,8 +19,12 @@ import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityPro
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+// The writer stops starting new sets this long before Vercel would kill the function, so every set it touches is
+// either finished or honestly recorded, and the sets it did not reach are counted instead of silently dropped.
+const ROUTE_RESERVE_MS = 45_000
 
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now()
   const secret = process.env.CRON_SECRET
   if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
@@ -34,9 +39,13 @@ export async function GET(request: NextRequest) {
     // capacity this deployment declares and is kept AHEAD of the canary, because a canary waiting on an exam set is
     // precisely this morning's line stop. Exam items cost small teacher calls and no inference worker, so there is no
     // infrastructure reason to hold this station narrow.
-    const result = await fillRequestedHoldoutExamSets({ db, limit: lineCapacity().examSetsPerTick })
+    const result = await fillRequestedHoldoutExamSets({
+      db,
+      limit: lineCapacity().examSetsPerTick,
+      deadlineMs: startedAt + maxDuration * 1000 - ROUTE_RESERVE_MS,
+    })
     const summary = result.population ? describeExamSetPopulation(result.population) : 'exam set population unreadable'
-    if (result.errors.length || result.aborted) console.warn('[cos-holdout-exam-items]', JSON.stringify({ ...result, summary }))
+    if (result.errors.length || result.aborted || result.deadlineReached) console.warn('[cos-holdout-exam-items]', JSON.stringify({ ...result, summary }))
     await recordCosUniversityProductionPath({
       path: 'holdout_exam_preparation',
       invocationSucceeded: !result.aborted,
@@ -51,6 +60,9 @@ export async function GET(request: NextRequest) {
         aborted: result.aborted,
         // Exhausted sets given a fresh attempt budget this run, so a line restart is auditable.
         revived: result.revived,
+        // The run stopped on its own deadline; these sets were not reached this tick and are still requested.
+        deadlineReached: result.deadlineReached,
+        unreached: result.unreached,
         population: result.population,
         summary,
         authorityExpanded: false,
@@ -74,3 +86,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: message.slice(0, 300) }, { status: 500 })
   }
 }
+// end of saas/app/api/cron/cos-university-holdout-exam-items/route.ts (if this line is missing, the paste was cut short)

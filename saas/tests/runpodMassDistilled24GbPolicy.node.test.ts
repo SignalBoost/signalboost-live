@@ -200,3 +200,11 @@ test('quota-full evidence carries a measured provider capacity snapshot, not onl
   assert.match(provisionV2, /measurement: 'runpod_serverless_endpoints'/)
   assert.match(provisionV2, /measurement: 'unavailable'/)
 })
+
+
+test('workforce reservation reconciliation is wired to provider capacity', () => {
+  assert.ok(provisionV2.includes('reconcileGraduateWorkerReservation'))
+  assert.ok(provisionV2.includes('workforceReservation'))
+  assert.ok(provisionV2.includes('scaledToZero'))
+  assert.ok(provisionV2.includes("source"))
+})

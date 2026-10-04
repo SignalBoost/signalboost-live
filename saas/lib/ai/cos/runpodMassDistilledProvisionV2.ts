@@ -585,6 +585,35 @@ export async function activateMassDistilledEvaluationWorker(endpointId: string) 
   })
 }
 
+/**
+ * Put a warm graduate back to scale-to-zero while KEEPING its slot: min=0, max=1.
+ *
+ * The workforce warm window (owner 2026-10-03, option 3: "prove the software works as designed") runs the reserved
+ * graduates at min=1 for a declared period each day and returns them to this envelope afterwards. It is the inverse of
+ * activateMassDistilledEvaluationWorker's min=1/max=1 and differs from deactivate* (max=0): the slot stays held, so the
+ * graduate can be warmed again tomorrow without competing for quota. Creates nothing, deletes nothing.
+ */
+export async function coolMassDistilledWorker(endpointId: string) {
+  const endpoint = await resolveEndpointControlPlane(clean(endpointId, 160))
+  assertEndpointSafetyPolicy(endpoint, IDLE_TIMEOUT_SECONDS, APPROVED_POOLS)
+  const cooled = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+  })
+  if (!cooled?.id
+    || Number(cooled.workers?.min ?? Number.NaN) !== 0
+    || Number(cooled.workers?.max ?? Number.NaN) !== 1) {
+    throw new Error('mass_distilled_worker_cool_rejected')
+  }
+  return Object.freeze({
+    endpointId: String(cooled.id),
+    workersMin: 0 as const,
+    workersMax: 1 as const,
+    idleTimeout: Number(cooled.workers?.idleTimeout),
+    authorityExpanded: false as const,
+  })
+}
+
 /** Retire a terminal evaluator's worker reservation immediately. The exact endpoint remains materialized
  * for audit/rollback identity and restoreRetiredEndpointCapacity can re-arm max=1 later when an authorized
  * rollback/residency path actually needs it. This releases quota without deleting evidence or widening authority. */
@@ -976,3 +1005,4 @@ export async function deleteTerminalMassDistilledRunpodEndpoint(endpointId: stri
   await requestV1<Record<string, unknown>>(`/endpoints/${encodeURIComponent(id)}`, { method: 'DELETE' })
   return Object.freeze({ endpointId: id, endpointName: name, deleted: true as const, authorityExpanded: false as const })
 }
+// end of saas/lib/ai/cos/runpodMassDistilledProvisionV2.ts (if this line is missing, the paste was cut short)

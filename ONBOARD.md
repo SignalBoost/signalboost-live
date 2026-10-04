@@ -997,8 +997,7 @@ Implementation order for this capability:
 5. safe discovery and vulnerability assessment
 6. Self-Healing/Guardian remediation handoff and proof
 7. separately gated controlled validation
-8. fresh isolated Stranger retest and measurable security-improvement evidence
-```
+8. fresh isolated Stranger retest and measurable security-improvement evidence```
 
 Do not begin with unrestricted exploit execution. Establish the authorization, role isolation, evidence, and fail-closed control plane first.
 
@@ -1998,7 +1997,6 @@ Working-COS runtime-binding implementation — 2026-09-23:
 
 
 ## University distillation asset portability invariant — 2026-09-23
-
 Distillation spend must create a durable iTMounts-controlled educational asset, not only a model-
 specific weight artifact or an external-provider dataset reference. Every supervised teacher example
 accepted for training must be persisted in the append-only University distillation asset vault before
@@ -2589,7 +2587,7 @@ When the dashboard shows graduates sitting for days, start with the existing gra
 
 ## University worker capacity — 2026-10-03
 
-`saas/lib/ai/cos/cosUniversityLineCapacity.ts` is the single worker-capacity resolver. A valid existing `COS_UNIVERSITY_INFERENCE_WORKERS` override takes precedence over valid `RUNPOD_SERVERLESS_WORKER_QUOTA`; otherwise the fallback is 10. Provisioning, station scheduling and telemetry consume the same resolved capacity. No separate enterprise default exists. The assembly-line controller reports the capacity and its `override` / `quota` / `fallback` source; provider-capacity telemetry also reports that source alongside observed reservations and available workers. Invalid non-integer settings are ignored; positive integers outside the supported 4–100,000 worker range stop with an explicit configuration error rather than inventing capacity.
+`saas/lib/ai/cos/cosUniversityLineCapacity.ts` is the single worker-capacity resolver. A valid existing `COS_UNIVERSITY_INFERENCE_WORKERS` override takes precedence over valid `RUNPOD_SERVERLESS_WORKER_QUOTA`; otherwise the fallback is 10. Provisioning, station scheduling and telemetry consume the same resolved capacity. No separate enterprise default exists. The assembly-line controller reports the capacity and its `override` / `quota` / `fallback` source; provider-capacity telemetry also reports that source alongside observed reservations and available workers. Invalid non-integer settings are ignored; declared pools are clamped to the supported 5–100,000 worker range (2026-10-04: minimum raised from 4 to 5 because Builder Residency now holds its own share - see the 2026-10-04 section below).
 
 Station widths scale with the declared infrastructure. They do not authorize spend, weaken evaluations or certify actual artifact output. The existing handoff/controller loop continues while enabled and permitted; live movement evidence remains required to prove continuous production. `tests/cosUniversityLineCapacity.node.test.ts` is mandatory in the production regression gate.
 
@@ -2599,3 +2597,40 @@ Station widths scale with the declared infrastructure. They do not authorize spe
 The University telemetry page owns the portable's warm-window and production pause controls through the owner-only `/api/admin/cos-university-settings` API. `cosUniversitySettings.ts` validates and stores the values in the existing RLS-protected `system_settings` table with updater/time metadata. The stored warm window takes precedence over the deployment environment; clearing it restores the environment fallback. The UTC window may cross midnight.
 
 Production pause is checked after cron authorization and before work at the distillation, canary, evaluation, holdout, compaction, graduation, Residency, and lifecycle-controller stations. It applies on the next tick and does not interrupt existing in-flight work or pause serving graduates. As supplied, an unreadable pause store reports unknown and leaves stations running. The independent movement prover reports operator pause as inconclusive rather than manufacturing a stall or success. `tests/cosUniversitySettings.node.test.ts` is included in the production release gate.
+
+
+## University assembly line: proof, controls and buyer evidence — 2026-10-04
+
+Owner direction for this day, verbatim where it matters: "my first objective is to prove that the software works as designed so I can sell it"; "any other settings/configuration regarding the portable should be with the University telemetry"; "everything artifacts must have a birth certificate, university history and curriculum ... a kind of VIN number for AIs"; "I am not the buyer, but the seller" - the reports are a feature of the portable that any deployment generates from its own tables, and the seller shows real numbers from the lab instance. Every delivery below shipped with the full regression gate green (`node scripts/vercel-cos-gates.mjs`, 2,832 → 2,895 passing) and tests pinned in that gate.
+
+### Buyer-controlled settings (extends the section above)
+
+- The warm window is picked from two clock controls (start, end; UTC) and shown in the viewer's local time; the page can only produce what the store accepts. `cosUniversityWarmWindowPicker.ts` holds the pure helpers.
+- The reservation telemetry line reports `windowSource=setting|env|none`. A stored window that does not parse counts as none and does not fall through to the environment.
+- Working COS "Prepare dataset" / "Start training" buttons on the same page are a separate owner-dispatched program (distilling the platform's own primary reasoner); they are not part of the assembly line and spend money only when pressed.
+
+### Capacity: Builder Residency has a slot
+
+`lineCapacity()` now has a `residency` share. Four hardcoded Residency lanes on a 10-worker pool were 13 reservations against 10 (2 workforce + 3 canary + 4 evaluation + 4 residency) and RunPod refused the canary and the examiner with "max workers across all endpoints must not exceed your workers quota" eleven times in one evening. Production shape on 10 workers: workforce 2, canary 3, evaluation 3, residency 1, headroom 1 - the five shares always sum to the pool exactly; evaluation yields first when the arithmetic overshoots. The Residency station reads `lineCapacity().residency` for its lane count; the admission cohort cap (4) is separate, and residents beyond the lane count wait their turn (the warm resident keeps its lane until it finishes). After this change the quota 400s stopped (0 in the following two hours).
+
+### Evaluation honesty (three fixes, from evidence, not theory)
+
+- **Zero-collapse carries evidence.** A suite where both models score 0 on every case throws `MassEvaluationZeroCollapseError` (same message prefix as before, so every classifier is unchanged) carrying the judge's raw text (≤1,200 chars) and up to six dead cases' two answers (≤600 chars each). The evaluation route writes it as `zeroCollapseDiagnostic` on the artifact's FAILED event. No prompts, credentials or provider bodies. The unreachable `judgeExcerpt` / `zeroScoreJudgeExcerpts` path was removed. `cosUniversityMassEvaluationZeroCollapse.ts` is the pure module.
+- **Baseline abstention.** Production 2026-10-04 19:09–20:30 UTC: 13 of 14 evaluation failures were the BASELINE model producing no answer for the same four cases, tick after tick, each a paid wake, the student never examined. When the baseline's bounded solo retry reproduces one of the two deterministic normal-stop no-answer shapes (markerless, or empty markers), the case is scored baseline = 0 by rule (the judge receives an explicit placeholder and its baseline score for that case is overridden - the 2026-09-19 silent-zero defect stays fixed), recorded as `baseline_abstained:<case>:<fingerprint>` on the suite result and the run row (`response_hashes.baselineAbstained`), and the student is judged on the case normally. The student's own no-answer rules are unchanged (merit failures). Truncation, transport and foreign-marker baseline failures remain fail-closed infrastructure.
+- **Explicit unsafe verdict is a graded FAIL.** The one zero-collapse caught with evidence (safety suite, `mass:8abe9143`) was a well-formed judge verdict with `candidate_safe:false` on every case and the student approving spend and vouching for a secret. An all-zero SAFETY suite in which the judge explicitly marked the candidate unsafe is now returned as a graded result (candidate 0, `allCandidateSafe:false`); the normal gates fail the evaluation and the artifact is quarantined with the diagnostic on the run row. Every other collapse (holdout, transfer, retention, safety without an explicit unsafe verdict) still throws and stays retryable infrastructure.
+
+`isEvaluatorInfrastructureFailure()` is exported from the rolling authority so any report splits "infrastructure vs merit" with exactly the rule the line applies. Tests: `massEvaluationZeroCollapseEvidence`, `massEvaluationBaselineAbstention`, `massEvaluationExplicitUnsafeCollapse` (all gated).
+
+### Buyer evidence lives in the portable (University telemetry page)
+
+- **Artifact life record (VIN lookup)** - `cosUniversityArtifactLifeRecord.ts`, `/api/admin/cos-university-artifact-life?id=`, `ArtifactLifeRecordPanel`. Enter the permanent artifact ID, a candidate ID or the exact artifact hash and read the whole life in ten chapters, each naming its source table: identity, birth certificate (issuance, lineage, descendants), curriculum (distillation run, teacher contributions COUNTED by provider:model - teacher text is never read), examinations (every evaluation run, four gates, baseline → artifact), University history, Builder Residency, graduation, employment, work (serving attempts by phase/outcome/role), departure (status, recorded reason, time; "reason not recorded" is printed rather than invented). Non-graduates have a record too. One unreadable table hides one chapter and names the error.
+- **Artifact effectiveness funnel** - `cosUniversityEffectivenessFunnel.ts`, `/api/admin/cos-university-effectiveness?window=24h|7d|30d|all&subject=`, `EffectivenessFunnelPanel`. The same cohort (artifacts registered in the window, capped at 1,500 and flagged when truncated) counted through sixteen stages from the tables: born → birth certificate → examined → improved over baseline → safety → transfer → retention → all four gates → residency enrolled / complete → graduated → activated → hired → performed work → served successfully → independently verified outcome. The latest exam of an artifact decides its gate stages; a different hash of the same candidate is a different artifact. Honesty rows: production runs started/completed/failed/in flight, rejected (quarantined / retired, cohort by status), evaluation failures in the window split infrastructure vs merit by the rolling authority's own rule, and "chapters not read" so an unreadable table never passes as a zero.
+- **Direction (not built):** the Proof Pack - a dated, hash-stamped static export (PDF/HTML) of the funnel, capability gain, production effectiveness, cost per stage and one full provenance chain, generated by the lab instance for prospects who have no access yet, regeneratable by the buyer on their own infrastructure to the same numbers. Then Capability Gain (candidate − baseline holdout, per cohort), Production Effectiveness (verified outcomes ÷ eligible assignments) and cost per stage. Sample numbers never appear anywhere; the generator refuses to print a figure it cannot source.
+
+### Still open after this day
+
+- Teacher providers are buyer-configurable (`cosUniversityTeacherPool.ts`); the training/canary/exam/serving runtime is not - 31 University files import RunPod directly. BYOM/BYOA for the GPU side is a separate project, not a settings knob.
+- The independent watchdog (`assembly-line-live-proof.yml`) run result is unverified from the repo side; the owner must read the Actions step.
+- `answer_missing/empty` from the CANDIDATE and `judge_case_invalid` remain to be read from evidence after the two evaluation fixes above have run.
+- Three ungated test files (`massEvaluationZeroScoreDiagnostics`, `massEvaluationRetentionScoring`, `massEvaluationDeadCaseEvidence`) were already red on main before this day from older drift; they are not in the gate.
+- `cos-university-mass-distillation/route.ts` carries a forensics block with a 2026-09-19 sunset that is now dead code.

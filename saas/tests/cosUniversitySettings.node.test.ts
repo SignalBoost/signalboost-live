@@ -16,9 +16,10 @@ import {
   writeLinePauseSetting,
   writeWorkforceWarmWindowSetting,
 } from '../lib/ai/cos/cosUniversitySettings.ts'
-import { WORKFORCE_WARM_WINDOW_ENV } from '../lib/ai/cos/cosUniversityWorkforceReservation.ts'
+import { WORKFORCE_WARM_WINDOW_ENV, parseWarmWindow } from '../lib/ai/cos/cosUniversityWorkforceReservation.ts'
 import { proveLineMovement, sampleFromLineState } from '../lib/ai/cos/cosUniversityLineMovementProof.ts'
 import { COS_UNIVERSITY_SETTINGS_COPY } from '../lib/i18n/cosUniversitySettingsCopy.ts'
+import { joinWarmWindow, localWarmWindowRange, splitWarmWindow, utcToLocalClock } from '../lib/ai/cos/cosUniversityWarmWindowPicker.ts'
 
 const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
 
@@ -192,6 +193,32 @@ test('the settings API is owner-gated, validates through the module, and the pan
   assert.match(panel, /method: 'PATCH'/)
   // No English literal in the panel's visible text: every string comes from copy.
   assert.doesNotMatch(panel, />[A-Z][a-z]+ [a-z]+</)
+})
+
+test('the window is picked from two clocks, never typed: pickers in, HH:MM-HH:MM out, local time shown', () => {
+  const panel = read('../app/dashboard/cos-university-telemetry/UniversitySettingsPanel.tsx')
+  assert.equal((panel.match(/type="time"/g) || []).length, 2, 'a start clock and an end clock')
+  assert.doesNotMatch(panel, /type="text"|warmWindowPlaceholder/, 'no free-text window field')
+  assert.match(panel, /save\(\{ warmWindow: picked \}\)/)
+  assert.match(panel, /disabled=\{saving \|\| !picked \|\| pickedInvalid\}/, 'Save waits for both clocks and refuses start = end')
+  assert.match(panel, /copy\.warmWindowLocal\}: \{localRange\(picked\)/)
+
+  assert.deepEqual(splitWarmWindow('14:00-16:00'), { start: '14:00', end: '16:00' })
+  assert.deepEqual(splitWarmWindow(null), { start: '', end: '' })
+  assert.deepEqual(splitWarmWindow('always'), { start: '', end: '' })
+  assert.equal(joinWarmWindow('14:00', '16:00'), '14:00-16:00')
+  assert.equal(joinWarmWindow('14:00', ''), null)
+  assert.equal(joinWarmWindow('14:00', '16:00:30'), null)
+  // What the pickers produce is exactly what the store accepts, so the clocks cannot create a value the store refuses
+  // except start = end, which the panel blocks before the round trip.
+  assert.equal(parseWarmWindow(joinWarmWindow('22:00', '02:00')!)?.declared, '22:00-02:00')
+
+  const noon = new Date('2026-10-04T12:00:00Z')
+  assert.equal(utcToLocalClock('14:00', noon, 'en-GB', 'America/Asuncion'), '11:00')
+  assert.equal(utcToLocalClock('02:00', noon, 'en-GB', 'Europe/Warsaw'), '04:00')
+  assert.equal(utcToLocalClock('bad', noon, 'en-GB', 'UTC'), '—')
+  assert.equal(localWarmWindowRange('14:00-16:00', noon, 'en-GB', 'America/Asuncion'), '11:00–13:00')
+  assert.equal(localWarmWindowRange(null, noon, 'en-GB', 'UTC'), null)
 })
 
 test('the settings copy has the same keys in all five languages and no empty string', () => {

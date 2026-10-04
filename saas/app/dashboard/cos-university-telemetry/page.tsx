@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import UniversitySettingsPanel from './UniversitySettingsPanel.tsx'
 import { COS_UNIVERSITY_SETTINGS_COPY } from '@/lib/i18n/cosUniversitySettingsCopy'
+import ArtifactLifeRecordPanel from './ArtifactLifeRecordPanel.tsx'
+import { COS_UNIVERSITY_LIFE_RECORD_COPY } from '@/lib/i18n/cosUniversityLifeRecordCopy'
 import {
   COS_UNIVERSITY_TELEMETRY_COPY,
   type CosUniversityTelemetryLanguage,
@@ -222,6 +224,9 @@ export default function CosUniversityTelemetryPage() {
   const settingsCopy = COS_UNIVERSITY_SETTINGS_COPY[
     (lang in COS_UNIVERSITY_SETTINGS_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
   ]
+  const lifeRecordCopy = COS_UNIVERSITY_LIFE_RECORD_COPY[
+    (lang in COS_UNIVERSITY_LIFE_RECORD_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
+  ]
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [workingCosAction, setWorkingCosAction] = useState<'prepare_dataset' | 'train' | null>(null)
@@ -347,6 +352,8 @@ export default function CosUniversityTelemetryPage() {
       </header>
 
       <UniversitySettingsPanel copy={settingsCopy} />
+
+      <ArtifactLifeRecordPanel copy={lifeRecordCopy} />
 
       {data?.authRequired ? (
         <div className="rounded-lg border border-amber-500/40 p-4 text-sm">{copy.ownerRequired}</div>

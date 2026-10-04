@@ -109,6 +109,7 @@ export type LearningPathId =
   | 'mass_backlog_compaction'
   | 'holdout_exam_preparation'
   | 'builder_residency'
+  | 'lifecycle_controller'
 
 export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId, string>> = Object.freeze({
   registered_agent_cycle: 'COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED',
@@ -137,6 +138,8 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   mass_backlog_compaction: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
   holdout_exam_preparation: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
   builder_residency: 'COS_UNIVERSITY_RESIDENCY_ENABLED',
+  // The controller is scheduled and cron-authorized, with no separate environment feature flag.
+  lifecycle_controller: '',
 })
 
 export type ProductionPathReceipt = Readonly<{

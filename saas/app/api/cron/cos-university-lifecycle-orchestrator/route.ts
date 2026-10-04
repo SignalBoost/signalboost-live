@@ -50,6 +50,7 @@ import {
 } from '@/lib/ai/cos/cosUniversityLifecycleOrchestrator'
 import { describeLineCapacity } from '@/lib/ai/cos/cosUniversityLineCapacity'
 import { triggerStation } from '@/lib/ai/cos/cosUniversityAssemblyLineHandoff'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -352,6 +353,13 @@ async function run(req: NextRequest) {
 
   const constraint = lineConstraint()
 
+  await recordCosUniversityProductionPath({
+    path: 'lifecycle_controller',
+    invocationSucceeded: true,
+    evidence: { runnerInvoked: true, reconciled, closedOut, transitions, windowComplete,
+      dispatches, lineStops, semantics: 'controller_execution_not_artifact_movement', authorityExpanded: false },
+  })
+
   return NextResponse.json({
     ok: true,
     schemaVersion: 'cos-university-assembly-line-controller-v2',
@@ -407,6 +415,10 @@ export async function GET(req: NextRequest) {
   catch (error) {
     // A PostgREST failure is a plain object; stringifying it logged "[object Object]" every minute for a day.
     const message = describeLifecycleFailure(error)
+    if (authorized(req)) await recordCosUniversityProductionPath({
+      path: 'lifecycle_controller', invocationSucceeded: false,
+      evidence: { runnerInvoked: true, error: message, authorityExpanded: false },
+    }).catch(() => null)
     console.error('[cos-university-lifecycle-orchestrator]', JSON.stringify({ ok: false, error: message }))
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

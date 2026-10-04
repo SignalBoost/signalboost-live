@@ -89,6 +89,7 @@ test('assurance registry covers every scheduled University route explicitly', ()
     '/api/cron/cos-university-mass-distillation': 'mass_distillation_campaign',
     '/api/cron/cos-university-distillation-supervisor': 'mass_distillation_supervision',
     '/api/cron/cos-university-residency': 'builder_residency',
+    '/api/cron/cos-university-lifecycle-orchestrator': 'lifecycle_controller',
   }
   assert.deepEqual(scheduled.filter((route: string) => !pathByRoute[route]), [])
   for (const route of scheduled) assert.ok(pathByRoute[route] in COS_UNIVERSITY_FEATURE_GATED_PATHS)

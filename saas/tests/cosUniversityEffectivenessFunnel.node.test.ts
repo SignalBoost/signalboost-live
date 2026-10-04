@@ -71,11 +71,11 @@ const week = () => ({
   ],
   cos_university_distilled_evaluation_runs: [
     // a: failed first, passed later -> the LATEST run decides.
-    { candidate_id: 'a', trained_artifact_hash: H('a'), created_at: '2026-10-04T12:00:00Z', holdout_improved: false, safety_passed: true, unseen_transfer_passed: true, delayed_retention_passed: true },
-    { candidate_id: 'a', trained_artifact_hash: H('a'), created_at: '2026-10-04T13:00:00Z', holdout_improved: true, safety_passed: true, unseen_transfer_passed: true, delayed_retention_passed: true },
-    { candidate_id: 'c', trained_artifact_hash: H('c'), created_at: '2026-10-03T12:00:00Z', holdout_improved: true, safety_passed: false, unseen_transfer_passed: true, delayed_retention_passed: true },
+    { candidate_id: 'a', trained_artifact_hash: H('a'), created_at: '2026-10-04T12:00:00Z', baseline_score: 0.4, trained_artifact_score: 0.3, holdout_improved: false, safety_passed: true, unseen_transfer_passed: true, delayed_retention_passed: true },
+    { candidate_id: 'a', trained_artifact_hash: H('a'), created_at: '2026-10-04T13:00:00Z', baseline_score: 0.4, trained_artifact_score: 0.7, holdout_improved: true, safety_passed: true, unseen_transfer_passed: true, delayed_retention_passed: true },
+    { candidate_id: 'c', trained_artifact_hash: H('c'), created_at: '2026-10-03T12:00:00Z', baseline_score: 0.5, trained_artifact_score: 0.6, holdout_improved: true, safety_passed: false, unseen_transfer_passed: true, delayed_retention_passed: true },
     // a different hash of candidate b: not this cohort's artifact.
-    { candidate_id: 'b', trained_artifact_hash: H('9'), created_at: '2026-10-04T12:00:00Z', holdout_improved: true, safety_passed: true, unseen_transfer_passed: true, delayed_retention_passed: true },
+    { candidate_id: 'b', trained_artifact_hash: H('9'), created_at: '2026-10-04T12:00:00Z', baseline_score: 0.2, trained_artifact_score: 0.9, holdout_improved: true, safety_passed: true, unseen_transfer_passed: true, delayed_retention_passed: true },
   ],
   cos_university_residency_enrollments: [{ candidate_id: 'a', trained_artifact_hash: H('a'), standing: 'residency_complete' }],
   cos_university_graduate_model_registry: [{ candidate_id: 'a', trained_artifact_hash: H('a'), promoted_at: '2026-10-04T14:00:00Z', activated_at: '2026-10-04T14:30:00Z' }],
@@ -113,8 +113,19 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
   assert.ok(f.stages.every(s => s.source.startsWith('cos_')), 'every stage names its table')
   assert.deepEqual(f.rejected, { quarantined: 1, retired: 1, byStatus: { active: 1, evaluation_pending: 1, quarantined: 1, retired: 1 }, source: 'cos_local_distillation_artifacts' })
   assert.ok(f.production.available && f.production.runsStarted === 4 && f.production.runsCompleted === 2 && f.production.runsFailed === 1 && f.production.runsInFlight === 1)
+  assert.ok(f.capabilityGain.available)
+  if (f.capabilityGain.available) {
+    assert.equal(f.capabilityGain.sampleSize, 2)
+    assert.equal(f.capabilityGain.improved, 2)
+    assert.equal(f.capabilityGain.regressed, 0)
+    assert.equal(f.capabilityGain.meanBaseline, 0.45)
+    assert.ok(Math.abs((f.capabilityGain.meanTrained ?? 0) - 0.65) < 1e-12)
+    assert.ok(Math.abs((f.capabilityGain.meanAbsoluteGain ?? 0) - 0.2) < 1e-12)
+    assert.ok(Math.abs((f.capabilityGain.medianAbsoluteGain ?? 0) - 0.2) < 1e-12)
+    assert.equal(f.capabilityGain.positiveGainRate, 1)
+  }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
 })
 
 test('evaluation failures in the window are split by the rolling authority\'s own rule, and only terminal FAILED claims count', async () => {

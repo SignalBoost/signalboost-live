@@ -75,6 +75,19 @@ export type EffectivenessFunnel = Readonly<{
   /** Which chapters could not be read. A missing chapter zeroes its stages; the names here say which, so nothing passes as a real zero. */
   unavailable: Readonly<Record<string, string>>
   rejected: Readonly<{ quarantined: number; retired: number; byStatus: Readonly<Record<string, number>>; source: string }>
+  capabilityGain: Chapter<{
+    sampleSize: number
+    improved: number
+    unchanged: number
+    regressed: number
+    meanBaseline: number | null
+    meanTrained: number | null
+    meanAbsoluteGain: number | null
+    medianAbsoluteGain: number | null
+    positiveGainRate: number | null
+    source: string
+    methodology: string
+  }>
   evaluationFailures: Chapter<{
     total: number
     infrastructure: number
@@ -109,7 +122,7 @@ export function composeFunnel(input: {
   truncated: boolean
   production: Chapter<{ runsStarted: number; runsCompleted: number; runsFailed: number }>
   certified: Chapter<{ candidates: ReadonlySet<string> }>
-  examined: Chapter<{ latestByKey: ReadonlyMap<string, { improved: boolean; safety: boolean; transfer: boolean; retention: boolean }> }>
+  examined: Chapter<{ latestByKey: ReadonlyMap<string, { improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null }> }>
   residency: Chapter<{ enrolled: ReadonlySet<string>; complete: ReadonlySet<string> }>
   graduation: Chapter<{ promoted: ReadonlySet<string>; activated: ReadonlySet<string> }>
   hired: Chapter<{ candidates: ReadonlySet<string> }>
@@ -126,8 +139,8 @@ export function composeFunnel(input: {
   }
   const keyOf = (a: { candidateId: string; hash: string }) => `${a.candidateId}:${a.hash}`
   const inSet = (set: ReadonlySet<string>, by: 'candidate' | 'key') => input.cohort.filter(a => set.has(by === 'key' ? keyOf(a) : a.candidateId)).length
-  const latest = (pick: (r: { improved: boolean; safety: boolean; transfer: boolean; retention: boolean }) => boolean) =>
-    (c: { latestByKey: ReadonlyMap<string, { improved: boolean; safety: boolean; transfer: boolean; retention: boolean }> }) =>
+  const latest = (pick: (r: { improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null }) => boolean) =>
+    (c: { latestByKey: ReadonlyMap<string, { improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null }> }) =>
       input.cohort.filter(a => { const r = c.latestByKey.get(keyOf(a)); return Boolean(r && pick(r)) }).length
 
   const stage = (id: string, n: number, source: string): FunnelStage => Object.freeze({ id, count: n, share: share(n), source })
@@ -152,6 +165,37 @@ export function composeFunnel(input: {
 
   const byStatus: Record<string, number> = {}
   for (const a of input.cohort) byStatus[a.status || 'unknown'] = (byStatus[a.status || 'unknown'] || 0) + 1
+
+  let capabilityGain: EffectivenessFunnel['capabilityGain']
+  if (input.examined.available) {
+    const examined = input.examined
+    const points = input.cohort.flatMap(a => {
+      const r = examined.latestByKey.get(keyOf(a))
+      return r && r.baseline !== null && r.trained !== null ? [{ baseline: r.baseline, trained: r.trained, gain: r.trained - r.baseline }] : []
+    })
+    const mean = (values: readonly number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+    const median = (values: readonly number[]) => {
+      if (!values.length) return null
+      const sorted = [...values].sort((a, b) => a - b)
+      const middle = Math.floor(sorted.length / 2)
+      return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+    }
+    const gains = points.map(p => p.gain)
+    const improved = gains.filter(g => g > 0).length
+    capabilityGain = Object.freeze({ available: true as const, error: null,
+      sampleSize: points.length,
+      improved,
+      unchanged: gains.filter(g => g === 0).length,
+      regressed: gains.filter(g => g < 0).length,
+      meanBaseline: mean(points.map(p => p.baseline)),
+      meanTrained: mean(points.map(p => p.trained)),
+      meanAbsoluteGain: mean(gains),
+      medianAbsoluteGain: median(gains),
+      positiveGainRate: points.length ? improved / points.length : null,
+      source: SOURCE.evaluations,
+      methodology: 'latest independent evaluation per exact cohort artifact; trained_artifact_score - baseline_score on holdout',
+    })
+  } else capabilityGain = Object.freeze({ available: false as const, error: input.examined.error })
 
   const production: EffectivenessFunnel['production'] = input.production.available
     ? Object.freeze({ available: true as const, error: null, runsStarted: input.production.runsStarted, runsCompleted: input.production.runsCompleted, runsFailed: input.production.runsFailed, runsInFlight: Math.max(0, input.production.runsStarted - input.production.runsCompleted - input.production.runsFailed), source: SOURCE.runs })
@@ -187,6 +231,7 @@ export function composeFunnel(input: {
     subjectId: input.subjectId,
     cohort: Object.freeze({ size, truncated: input.truncated, source: SOURCE.artifacts }),
     production,
+    capabilityGain,
     stages: Object.freeze(stages),
     unavailable: Object.freeze(unavailable),
     rejected: Object.freeze({ quarantined: byStatus.quarantined || 0, retired: byStatus.retired || 0, byStatus: Object.freeze(byStatus), source: SOURCE.artifacts }),
@@ -249,15 +294,15 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
     chapter(async () => ({ candidates: new Set((await forCohort('cos_university_artifact_birth_certificates', 'candidate_id')).map((r: any) => text(r.candidate_id, 240))) })),
     chapter(async () => {
-      const list = await forCohort('cos_university_distilled_evaluation_runs', 'candidate_id,trained_artifact_hash,created_at,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed', FUNNEL_ROWS_PER_CHUNK)
+      const list = await forCohort('cos_university_distilled_evaluation_runs', 'candidate_id,trained_artifact_hash,created_at,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed', FUNNEL_ROWS_PER_CHUNK)
       // Latest run per exact artifact decides the stage; an earlier failure that a later run cleared is not a failure.
-      const latestByKey = new Map<string, { at: number; improved: boolean; safety: boolean; transfer: boolean; retention: boolean }>()
+      const latestByKey = new Map<string, { at: number; improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null }>()
       for (const row of list) {
         const k = key(row)
         const at = new Date(String(row.created_at || 0)).getTime() || 0
         const current = latestByKey.get(k)
         if (current && current.at > at) continue
-        latestByKey.set(k, { at, improved: row.holdout_improved === true, safety: row.safety_passed === true, transfer: row.unseen_transfer_passed === true, retention: row.delayed_retention_passed === true })
+        latestByKey.set(k, { at, improved: row.holdout_improved === true, safety: row.safety_passed === true, transfer: row.unseen_transfer_passed === true, retention: row.delayed_retention_passed === true, baseline: Number.isFinite(Number(row.baseline_score)) ? Number(row.baseline_score) : null, trained: Number.isFinite(Number(row.trained_artifact_score)) ? Number(row.trained_artifact_score) : null })
       }
       return { latestByKey }
     }),
@@ -304,6 +349,7 @@ export function describeFunnel(funnel: EffectivenessFunnel): string {
   return `funnel window=${funnel.window}${funnel.subjectId ? ` subject=${funnel.subjectId}` : ''} born=${funnel.cohort.size}${funnel.cohort.truncated ? '+' : ''} `
     + `examined=${get('examined')} (${pct('examined')}) passed_all=${get('passed_all_gates')} (${pct('passed_all_gates')}) graduated=${get('graduated')} (${pct('graduated')}) `
     + `hired=${get('hired')} worked=${get('performed_work')} verified=${get('verified_outcome')} (${pct('verified_outcome')}) `
+    + (funnel.capabilityGain.available ? `| gain n=${funnel.capabilityGain.sampleSize} mean=${funnel.capabilityGain.meanAbsoluteGain === null ? 'n/a' : funnel.capabilityGain.meanAbsoluteGain.toFixed(4)} positive=${funnel.capabilityGain.positiveGainRate === null ? 'n/a' : Math.round(funnel.capabilityGain.positiveGainRate * 100) + '%'} ` : '| gain unavailable ')
     + `| rejected quarantined=${funnel.rejected.quarantined} retired=${funnel.rejected.retired}`
     + (funnel.evaluationFailures.available ? ` | eval failures=${funnel.evaluationFailures.total} infra=${funnel.evaluationFailures.infrastructure} merit=${funnel.evaluationFailures.merit}` : ' | eval failures unavailable')
     + (Object.keys(funnel.unavailable).length ? ` | unavailable=${Object.keys(funnel.unavailable).join(',')}` : '')

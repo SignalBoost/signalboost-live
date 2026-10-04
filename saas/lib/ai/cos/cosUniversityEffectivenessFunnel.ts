@@ -168,8 +168,9 @@ export function composeFunnel(input: {
 
   let capabilityGain: EffectivenessFunnel['capabilityGain']
   if (input.examined.available) {
+    const examined = input.examined
     const points = input.cohort.flatMap(a => {
-      const r = input.examined.latestByKey.get(keyOf(a))
+      const r = examined.latestByKey.get(keyOf(a))
       return r && r.baseline !== null && r.trained !== null ? [{ baseline: r.baseline, trained: r.trained, gain: r.trained - r.baseline }] : []
     })
     const mean = (values: readonly number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null

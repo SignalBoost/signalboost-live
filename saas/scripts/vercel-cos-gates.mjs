@@ -107,6 +107,7 @@ const tests = [
   'tests/cosLearningContinuityPagination.node.test.ts',
 
   'tests/massEvaluationJudgeSpendReservation.node.test.ts',
+  'tests/massEvaluationZeroCollapseEvidence.node.test.ts',
 
   'tests/cosUniversityMassBacklogCompactor.node.test.ts',
 
@@ -730,3 +731,4 @@ if (result.error) {
 
 
 process.exit(result.status ?? 1)
+// end of saas/scripts/vercel-cos-gates.mjs (if this line is missing, the paste was cut short)

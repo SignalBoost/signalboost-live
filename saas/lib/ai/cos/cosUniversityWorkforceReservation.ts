@@ -29,6 +29,8 @@ export type WorkforceGraduate = Readonly<{
   endpointId: string | null
   /** The endpoint's current max-worker reservation as RunPod reports it; null when the endpoint was not found. */
   workersMax: number | null
+  /** The endpoint's current min workers: 1 means a worker is kept running (warm), 0 means scale-to-zero. */
+  workersMin: number | null
   /** When this graduate last served or attempted real work. Null means never. */
   lastAttemptAt: string | null
 }>
@@ -97,6 +99,42 @@ export function decideWorkforceReservation(input: {
   })
 }
 
+/**
+ * The daily window in which the reserved graduates are kept WARM (min=1), declared as `HH:MM-HH:MM` in UTC.
+ *
+ * Owner 2026-10-03, choosing among "keep the reserve warm always", "never pay to wake", and "scheduled warm windows":
+ * "my first objective is to prove that the software works as designed so I can sell it - option 3". A graduate only
+ * does work while its worker is running, and the standing NO PAID WAKE-UPS rule forbids booting one for a task, so on a
+ * test rig with no users the workforce produced nothing (20 attempts in 7 hours, all timeouts). Inside the window the
+ * reserved graduates run; practice work flows; served -> verified outcomes land in each graduate's permanent ledger.
+ * Outside it they return to scale-to-zero with their slot kept. Unset means no window: today's behavior, no spend.
+ * A window may cross midnight ("22:00-02:00"). Anything unparseable is treated as unset and reported.
+ */
+export const WORKFORCE_WARM_WINDOW_ENV = 'COS_UNIVERSITY_WORKFORCE_WARM_WINDOW' as const
+
+export type WarmWindow = Readonly<{ startMinute: number; endMinute: number; declared: string }>
+
+const WINDOW_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/
+
+/** Parse `HH:MM-HH:MM` (UTC). Null when unset or unusable; a zero-length window is unusable. */
+export function parseWarmWindow(raw: unknown): WarmWindow | null {
+  const value = String(raw ?? '').trim()
+  const match = WINDOW_PATTERN.exec(value)
+  if (!match) return null
+  const startMinute = Number(match[1]) * 60 + Number(match[2])
+  const endMinute = Number(match[3]) * 60 + Number(match[4])
+  if (startMinute === endMinute) return null
+  return Object.freeze({ startMinute, endMinute, declared: value })
+}
+
+/** True when `now` (UTC) falls inside the window; a window that crosses midnight wraps. */
+export function inWarmWindow(window: WarmWindow, now: Date): boolean {
+  const minute = now.getUTCHours() * 60 + now.getUTCMinutes()
+  return window.startMinute < window.endMinute
+    ? minute >= window.startMinute && minute < window.endMinute
+    : minute >= window.startMinute || minute < window.endMinute
+}
+
 export type WorkforceReservationReport = Readonly<{
   reserve: number
   onCall: number
@@ -114,6 +152,14 @@ export type WorkforceReservationReport = Readonly<{
   excludedFromWork: readonly string[]
   /** False when the reconcile itself failed, so the station knows nothing about who holds a slot and gives out no work. */
   eligibilityKnown: boolean
+  /** The declared warm window, or null when none is declared (or the declaration was unusable). */
+  window: string | null
+  /** Whether this tick fell inside the window. Null when no window is declared. */
+  inWindow: boolean | null
+  /** Reserved graduates set to min=1 this tick. */
+  warmed: number
+  /** Reserved graduates returned to min=0 this tick. */
+  cooled: number
 }>
 
 /** Transport the station needs. Injected so the policy is testable without RunPod or a database. */
@@ -121,6 +167,10 @@ export type WorkforceReservationPorts = Readonly<{
   listGraduates: () => Promise<readonly WorkforceGraduate[]>
   releaseWorker: (endpointId: string) => Promise<unknown>
   pinWorker: (endpointId: string) => Promise<unknown>
+  /** min=1/max=1: keep one worker running. Only ever applied to a graduate inside the reserve, inside the window. */
+  warmWorker: (endpointId: string) => Promise<unknown>
+  /** min=0/max=1: back to scale-to-zero, slot kept. */
+  coolWorker: (endpointId: string) => Promise<unknown>
 }>
 
 /** One line for a log or a dashboard: what the workforce holds and what the line got back. */
@@ -128,6 +178,9 @@ export function describeWorkforceReservation(report: WorkforceReservationReport)
   return `workforce reserve=${report.reserve} onCall=${report.onCall} | pinned=${report.pinned} held=${report.held} `
     + `released=${report.released} idle=${report.idle} unmanaged=${report.unmanaged}`
     + ` | eligibleForWork=${report.eligibilityKnown ? report.eligibleForWork.length : 'unknown'}`
+    + (report.window
+      ? ` | window=${report.window} inWindow=${report.inWindow} warmed=${report.warmed} cooled=${report.cooled}`
+      : ' | window=none')
     + (report.errors.length ? ` | refused=${report.errors.length}` : '')
     + (report.deadlineReached ? ' | deadline_reached' : '')
 }
@@ -140,6 +193,8 @@ export async function reconcileWorkforceReservation(input: {
   ports: WorkforceReservationPorts
   deadlineMs?: number
   env?: Record<string, string | undefined>
+  /** The clock the window is judged by. Injected for tests; the station passes nothing and gets the real time. */
+  now?: Date
 }): Promise<WorkforceReservationReport> {
   const reserve = lineCapacity(input.env || process.env).workforce
   const graduates = await input.ports.listGraduates()
@@ -162,6 +217,22 @@ export async function reconcileWorkforceReservation(input: {
   released = await apply(decision.release, input.ports.releaseWorker, 'release')
   pinned = await apply(decision.pin, input.ports.pinWorker, 'pin')
 
+  // Warm window: only the graduates inside the reserve, only while the window is open. Everyone else was released above
+  // and never reaches this step, so a warm worker can only ever belong to a reserved graduate.
+  const window = parseWarmWindow((input.env || process.env)[WORKFORCE_WARM_WINDOW_ENV])
+  const now = input.now ?? new Date()
+  const inWindow = window ? inWarmWindow(window, now) : null
+  let warmed = 0
+  let cooled = 0
+  if (window) {
+    const reserved = graduates.filter(g => decision.eligibleForWork.includes(g.registryId) && g.endpointId)
+    if (inWindow) {
+      warmed = await apply(reserved.filter(g => (g.workersMin ?? 0) < 1).map(g => g.endpointId as string), input.ports.warmWorker, 'warm')
+    } else {
+      cooled = await apply(reserved.filter(g => (g.workersMin ?? 0) >= 1).map(g => g.endpointId as string), input.ports.coolWorker, 'cool')
+    }
+  }
+
   return Object.freeze({
     reserve,
     onCall: graduates.length,
@@ -175,6 +246,10 @@ export async function reconcileWorkforceReservation(input: {
     eligibleForWork: decision.eligibleForWork,
     excludedFromWork: decision.excludedFromWork,
     eligibilityKnown: true,
+    window: window ? window.declared : null,
+    inWindow,
+    warmed,
+    cooled,
   })
 }
 
@@ -186,6 +261,10 @@ export function unknownWorkforceReservation(error: unknown): WorkforceReservatio
     eligibleForWork: Object.freeze([]),
     excludedFromWork: Object.freeze([]),
     eligibilityKnown: false,
+    window: null,
+    inWindow: null,
+    warmed: 0,
+    cooled: 0,
   })
 }
 // end of saas/lib/ai/cos/cosUniversityWorkforceReservation.ts (if this line is missing, the paste was cut short)

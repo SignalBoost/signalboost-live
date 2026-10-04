@@ -114,7 +114,7 @@ test('browser MCP profiles are pinned, stdio, and deny dangerous tools by defaul
 })
 
 
-test('stateful MCP stdio transport completes initialize notification before tool discovery', async () => {
+test('stateful MCP stdio transport completes initialize notification before tool discovery', async (t) => {
   const mockServer = String.raw`
     let buffer = ''
     let initialized = false
@@ -122,7 +122,7 @@ test('stateful MCP stdio transport completes initialize notification before tool
     process.stdin.on('data', chunk => {
       buffer += chunk
       for (;;) {
-        const i = buffer.indexOf('\\n')
+        const i = buffer.indexOf('\n')
         if (i < 0) break
         const line = buffer.slice(0, i).trim()
         buffer = buffer.slice(i + 1)
@@ -137,7 +137,7 @@ test('stateful MCP stdio transport completes initialize notification before tool
           result = { protocolVersion: req.params.protocolVersion, serverInfo: { name: 'mock-browser-mcp', version: '1.0.0' } }
         } else if (req.method === 'tools/list') {
           if (!initialized) {
-            process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, error: { code: -32000, message: 'not initialized' } }) + '\\n')
+            process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, error: { code: -32000, message: 'not initialized' } }) + '\n')
             continue
           }
           result = { tools: [{ name: 'list_pages', description: 'safe', inputSchema: { type: 'object' } }] }
@@ -146,7 +146,7 @@ test('stateful MCP stdio transport completes initialize notification before tool
         } else {
           result = {}
         }
-        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, result }) + '\\n')
+        process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: req.id, result }) + '\n')
       }
     })
   `
@@ -162,6 +162,8 @@ test('stateful MCP stdio transport completes initialize notification before tool
   const transport = factory.create({ serverId: 'mock-browser', transportRef: 'mock:stdio', scope })
   const client = createMcpOutboundClient({ serverId: 'mock-browser', scope, transport })
 
+  t.after(() => client.close())
+
   const initialized = await client.initialize()
   assert.equal(initialized.serverName, 'mock-browser-mcp')
   assert.equal(initialized.serverVersion, '1.0.0')
@@ -170,7 +172,6 @@ test('stateful MCP stdio transport completes initialize notification before tool
     content: [{ type: 'text', text: 'ok' }],
     isError: false,
   })
-  await client.close()
 })
 
 test('isolated browser MCP host uses explicit package-supported sandbox overrides', () => {

@@ -404,7 +404,7 @@ export function composeFunnel(input: {
     const total = rows.reduce((sum, row) => sum + row.observedCostUsd, 0)
     const graduated = stages.find(s => s.id === 'graduated')?.count || 0
     const verifiedOutcomes = stages.find(s => s.id === 'verified_outcome')?.count || 0
-    economics = Object.freeze({ available: true as const, error: null, settledProviderJobs: rows.length, observedProviderCostUsd: total, byOperationUsd: Object.freeze(byOperationUsd), costPerGraduatedArtifactUsd: graduated ? total / graduated : null, costPerVerifiedOutcomeUsd: verifiedOutcomes ? total / verifiedOutcomes : null, coverage: 'observed mass-distillation provider jobs only; not total platform TCO', source: 'cos_university_mass_distillation_provider_jobs', methodology: 'sum observed_cost_usd for settled provider jobs attributable to the exact cohort; denominators are cohort graduates and verified outcomes' })
+    economics = Object.freeze({ available: true as const, error: null, settledProviderJobs: rows.length, observedProviderCostUsd: total, byOperationUsd: Object.freeze(byOperationUsd), costPerGraduatedArtifactUsd: graduated ? total / graduated : null, costPerVerifiedOutcomeUsd: verifiedOutcomes ? total / verifiedOutcomes : null, coverage: 'observed mass-distillation provider jobs for cohort candidate IDs; provider ledger has no artifact hash, so this is not exact-artifact cost attribution or total platform TCO', source: 'cos_university_mass_distillation_provider_jobs', methodology: 'sum observed_cost_usd for settled provider jobs whose candidate_id is in the cohort; cost attribution is candidate-level because the provider ledger does not store trained_artifact_hash; denominators are cohort graduates and verified outcomes' })
   } else economics = Object.freeze({ available: false as const, error: input.providerCosts.error })
 
   let provenance: EffectivenessFunnel['provenance']
@@ -487,7 +487,6 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     status: text(row.status, 60),
   }))
   const candidateIds = Array.from(new Set(cohort.map(a => a.candidateId))).filter(Boolean)
-  const cohortKeys = new Set(cohort.map(a => `${a.candidateId}:${a.hash}`))
   const key = (row: any) => `${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 64).toLowerCase()}`
 
   /** Read one table for the whole cohort, chunked by candidate id. */
@@ -594,8 +593,8 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { rows: list.map((row: any) => ({ status: text(row.status, 40), sourceKind: text(row.source_kind, 40), permanentArtifactId: text(row.permanent_artifact_id, 80) })) }
     }),
     chapter(async () => {
-      const list = await forCohort('cos_university_mass_distillation_provider_jobs', 'candidate_id,trained_artifact_hash,operation,observed_cost_usd,settled_at', FUNNEL_ROWS_PER_CHUNK)
-      return { rows: list.filter((row: any) => cohortKeys.has(key(row)) && iso(row.settled_at) && Number.isFinite(Number(row.observed_cost_usd))).map((row: any) => ({ operation: text(row.operation, 40), observedCostUsd: Math.max(0, Number(row.observed_cost_usd)) })) }
+      const list = await forCohort('cos_university_mass_distillation_provider_jobs', 'candidate_id,operation,observed_cost_usd,settled_at', FUNNEL_ROWS_PER_CHUNK)
+      return { rows: list.filter((row: any) => iso(row.settled_at) && Number.isFinite(Number(row.observed_cost_usd))).map((row: any) => ({ operation: text(row.operation, 40), observedCostUsd: Math.max(0, Number(row.observed_cost_usd)) })) }
     }),
     chapter(async () => {
       const [certs, grads, resumes] = await Promise.all([

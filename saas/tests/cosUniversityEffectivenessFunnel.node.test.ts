@@ -206,7 +206,7 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.equal(f.provenance.birthCertificates, 3); assert.equal(f.provenance.graduates, 1); assert.equal(f.provenance.resumes, 1); assert.equal(f.provenance.workforceAssignmentsWithPermanentId, 4); assert.equal(f.provenance.traceableGraduates, 1); assert.equal(f.provenance.traceableGraduateRate, 1)
   }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.02/h recovered=2 | residency complete=1/1 cases=3 | workforce assignments=4 verified=1 remediation=1 runtime_failed=1 | observed_provider_cost=$2.90 settled_jobs=3 | provenance traceable_graduates=1/1 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.02/h recovered=2 | residency complete=1/1 cases=3 | workforce assignments=4 verified=1 remediation=1 runtime_failed=1 | observed_provider_cost=2.90 settled_jobs=3 | provenance traceable_graduates=1/1 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
 })
 
 

@@ -163,7 +163,7 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
   assert.ok(f.lineHistory.available)
   if (f.lineHistory.available) {
     assert.equal(f.lineHistory.transitions, 3)
-    assert.equal(f.lineHistory.throughputPerHour, 0.125)
+    assert.ok(Math.abs((f.lineHistory.throughputPerHour ?? 0) - (3 / (7 * 24))) < 1e-12, '7d throughput is transitions divided by the full 168-hour report window')
     assert.equal(f.lineHistory.recoveredOverdue, 2)
     assert.equal(f.lineHistory.meanRecoverySeconds, 2700)
     assert.equal(f.lineHistory.medianRecoverySeconds, 2400)
@@ -171,7 +171,7 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.deepEqual(f.lineHistory.byFromStation, { EXACT_CANARY: 2, INDEPENDENT_EVALUATION: 1 })
   }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.13/h recovered=2 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.02/h recovered=2 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
 })
 
 

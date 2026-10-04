@@ -90,7 +90,7 @@ const week = () => ({
   cos_university_graduate_lifecycle_events: [{ candidate_id: 'a', trained_artifact_hash: H('a'), event_type: 'verified_outcome' }],
   cos_university_lifecycle_orchestration: [
     { station: 'EXACT_CANARY', stage_entered_at: '2026-10-04T10:00:00Z', stage_deadline_at: '2026-10-04T10:30:00Z', lease_until: null, terminal: false },
-    { station: 'EXACT_CANARY', stage_entered_at: '2026-10-04T11:00:00Z', stage_deadline_at: '2026-10-04T11:30:00Z', lease_until: '2026-10-04T12:05:00Z', terminal: false },
+    { station: 'EXACT_CANARY', stage_entered_at: '2026-10-04T11:00:00Z', stage_deadline_at: '2026-10-04T11:30:00Z', lease_until: '2026-10-04T20:05:00Z', terminal: false },
     { station: 'INDEPENDENT_EVALUATION', stage_entered_at: '2026-10-04T11:50:00Z', stage_deadline_at: '2026-10-04T12:30:00Z', lease_until: null, terminal: false },
   ],
   cos_university_lifecycle_transition_history: [
@@ -154,10 +154,10 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
   if (f.lineHealth.available) {
     assert.equal(f.lineHealth.liveUnits, 3)
     assert.equal(f.lineHealth.overdueUnits, 3)
-    assert.equal(f.lineHealth.leasedUnits, 0)
+    assert.equal(f.lineHealth.leasedUnits, 1)
     assert.equal(f.lineHealth.oldestWaitingSeconds, 36000)
     assert.equal(f.lineHealth.bottleneckStation, 'EXACT_CANARY')
-    assert.deepEqual(f.lineHealth.byStation.EXACT_CANARY, { waiting: 2, overdue: 2, leased: 0, oldestWaitingSeconds: 36000 })
+    assert.deepEqual(f.lineHealth.byStation.EXACT_CANARY, { waiting: 2, overdue: 2, leased: 1, oldestWaitingSeconds: 36000 })
     assert.deepEqual(f.lineHealth.byStation.INDEPENDENT_EVALUATION, { waiting: 1, overdue: 1, leased: 0, oldestWaitingSeconds: 29400 })
   }
   assert.ok(f.lineHistory.available)
@@ -171,7 +171,23 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.deepEqual(f.lineHistory.byFromStation, { EXACT_CANARY: 2, INDEPENDENT_EVALUATION: 1 })
   }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=0 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.13/h recovered=2 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.13/h recovered=2 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+})
+
+
+test('line health counts only leases that are live at the report time', async () => {
+  const fixture = week()
+  fixture.cos_university_lifecycle_orchestration = [
+    { station: 'EXACT_CANARY', stage_entered_at: '2026-10-04T19:00:00Z', stage_deadline_at: '2026-10-04T19:30:00Z', lease_until: '2026-10-04T19:59:59Z', terminal: false },
+    { station: 'EXACT_CANARY', stage_entered_at: '2026-10-04T19:10:00Z', stage_deadline_at: '2026-10-04T19:40:00Z', lease_until: '2026-10-04T20:00:01Z', terminal: false },
+  ]
+  const f = await readEffectivenessFunnel({ db: fakeDb(fixture).db, window: '7d', now: NOW })
+  assert.ok(f.lineHealth.available)
+  if (!f.lineHealth.available) return
+  assert.equal(f.lineHealth.liveUnits, 2)
+  assert.equal(f.lineHealth.overdueUnits, 2, 'lease state does not hide an overdue unit')
+  assert.equal(f.lineHealth.leasedUnits, 1, 'an expired lease is not active; a future lease is active')
+  assert.deepEqual(f.lineHealth.byStation.EXACT_CANARY, { waiting: 2, overdue: 2, leased: 1, oldestWaitingSeconds: 3600 })
 })
 
 test('evaluation failures in the window are split by the rolling authority\'s own rule, and only terminal FAILED claims count', async () => {

@@ -14,6 +14,7 @@ import { createSupervisorAuditHarnessEvidenceSink } from '@/platform-harness/evi
 import { actuateBuilderResidencyRuntimeRecovery } from '@/self-healing-host/builder-residency-runtime-recovery'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { closeStaleStartedResidencyCases } from '@/platform-harness/residency/stale-case-sweep'
+import { lineCapacity } from '@/lib/ai/cos/cosUniversityLineCapacity'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -25,10 +26,12 @@ const RESIDENCY_AGENT = 'builder-resident'
 const RESIDENCY_SANDBOX = 'builder-residency-sandbox-v1'
 // RESIDENCY LANES (owner direction 2026-09-30). One lane per active resident, run in parallel, each resident kept
 // on its lane tick after tick so its exact-artifact worker stays warm (12-minute idle timeout, 10-minute tick).
-// Lanes never exceed the admission cap below, so no more workers run than the cohort the University admits.
-const RESIDENCY_PARALLEL_LANES = 4
+// Owner 2026-10-04: the lane count is the residency share of the declared worker pool (lineCapacity().residency),
+// not a constant. Four hardcoded lanes on a 10-worker pool made 13 reservations against 10 and RunPod refused the
+// canary and the examiner with "max workers across all endpoints must not exceed your workers quota". The admission
+// cap (how many residents are enrolled) stays separate: residents beyond the lane count wait their turn.
+const RESIDENCY_ACTIVE_LIMIT = 4
 const RESIDENCY_CASES_PER_LANE = 4
-const RESIDENCY_CASES_PER_TICK = RESIDENCY_PARALLEL_LANES * RESIDENCY_CASES_PER_LANE
 // TIME BUDGET (2026-09-29). One case can take a 360s exact-artifact cold start plus a 240s harness deadline, which
 // is the entire 600s invocation, yet up to four cases were started with no clock check. A case still running when
 // Vercel kills the invocation is never recorded (no evidence, a stale 'started' row) and its resident is scheduled
@@ -185,13 +188,14 @@ export async function GET(req: Request) {
     // Admission is bounded separately from practical execution. At most one new
     // exact artifact is admitted per tick, and no more than four residents may
     // remain active concurrently.
-    const admission = await admitNextBuilderResidency({ db, activeLimit: 4 })
+    const admission = await admitNextBuilderResidency({ db, activeLimit: RESIDENCY_ACTIVE_LIMIT })
 
     // One lane per resident, in parallel. Each lane gives consecutive case turns to ITS resident while the time
     // budget allows, so the resident's warm worker is reused instead of a different artifact cold-starting per case.
     // Every case still crosses the same authority, harness and evidence boundaries as before.
     let stoppedForTimeBudget = false
-    const lanes = await store.planLanes(RESIDENCY_PARALLEL_LANES)
+    const laneCapacity = lineCapacity().residency
+    const lanes = await store.planLanes(laneCapacity)
     const runLane = async (laneStore: typeof store | ReturnType<typeof store.pinnedTo>) => {
       const laneResults: any[] = []
       for (let attempt = 0; attempt < RESIDENCY_CASES_PER_LANE; attempt += 1) {
@@ -282,7 +286,8 @@ export async function GET(req: Request) {
         residencyIds: [...new Set(results
           .map(item => item.residencyId)
           .filter((value): value is string => typeof value === 'string' && value.length > 0))],
-        maxCasesPerTick: RESIDENCY_CASES_PER_TICK,
+        maxCasesPerTick: laneCapacity * RESIDENCY_CASES_PER_LANE,
+        laneCapacity,
         lanes: lanes.length,
         laneResidencyIds: lanes.map(enrollment => enrollment.residencyId),
         stoppedForTimeBudget,

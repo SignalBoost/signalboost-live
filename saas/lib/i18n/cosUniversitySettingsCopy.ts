@@ -17,7 +17,9 @@ export type CosUniversitySettingsCopy = Readonly<{
   resumeButton: string
   warmWindowTitle: string
   warmWindowExplanation: string
-  warmWindowPlaceholder: string
+  warmWindowStart: string
+  warmWindowEnd: string
+  warmWindowLocal: string
   warmWindowEffective: string
   warmWindowNone: string
   warmWindowSourceSetting: string
@@ -51,7 +53,9 @@ export const COS_UNIVERSITY_SETTINGS_COPY: Record<CosUniversityTelemetryLanguage
     resumeButton: 'Resume production',
     warmWindowTitle: 'Workforce warm window (UTC)',
     warmWindowExplanation: 'Daily window in which the reserved graduates keep one worker running so practice work reaches them. Format HH:MM-HH:MM, UTC; may cross midnight. Empty means no window: no paid worker, no practice.',
-    warmWindowPlaceholder: 'e.g. 14:00-16:00',
+    warmWindowStart: 'Start (UTC)',
+    warmWindowEnd: 'End (UTC)',
+    warmWindowLocal: 'In your local time',
     warmWindowEffective: 'Effective window',
     warmWindowNone: 'none',
     warmWindowSourceSetting: 'from this page',
@@ -83,7 +87,9 @@ export const COS_UNIVERSITY_SETTINGS_COPY: Record<CosUniversityTelemetryLanguage
     resumeButton: 'Reanudar producción',
     warmWindowTitle: 'Ventana caliente de la plantilla (UTC)',
     warmWindowExplanation: 'Ventana diaria en la que los graduados reservados mantienen un worker en marcha para que les llegue trabajo de práctica. Formato HH:MM-HH:MM, UTC; puede cruzar la medianoche. Vacío significa sin ventana: sin worker de pago, sin práctica.',
-    warmWindowPlaceholder: 'p. ej. 14:00-16:00',
+    warmWindowStart: 'Inicio (UTC)',
+    warmWindowEnd: 'Fin (UTC)',
+    warmWindowLocal: 'En su hora local',
     warmWindowEffective: 'Ventana efectiva',
     warmWindowNone: 'ninguna',
     warmWindowSourceSetting: 'desde esta página',
@@ -115,7 +121,9 @@ export const COS_UNIVERSITY_SETTINGS_COPY: Record<CosUniversityTelemetryLanguage
     resumeButton: 'Retomar produção',
     warmWindowTitle: 'Janela quente da força de trabalho (UTC)',
     warmWindowExplanation: 'Janela diária em que os graduados reservados mantêm um worker em execução para que o trabalho de prática chegue até eles. Formato HH:MM-HH:MM, UTC; pode cruzar a meia-noite. Vazio significa sem janela: sem worker pago, sem prática.',
-    warmWindowPlaceholder: 'ex.: 14:00-16:00',
+    warmWindowStart: 'Início (UTC)',
+    warmWindowEnd: 'Fim (UTC)',
+    warmWindowLocal: 'No seu horário local',
     warmWindowEffective: 'Janela efetiva',
     warmWindowNone: 'nenhuma',
     warmWindowSourceSetting: 'desta página',
@@ -147,7 +155,9 @@ export const COS_UNIVERSITY_SETTINGS_COPY: Record<CosUniversityTelemetryLanguage
     resumeButton: 'Wznów produkcję',
     warmWindowTitle: 'Ciepłe okno kadry (UTC)',
     warmWindowExplanation: 'Dzienne okno, w którym zarezerwowani absolwenci utrzymują jeden działający worker, aby trafiała do nich praca ćwiczeniowa. Format HH:MM-HH:MM, UTC; może przechodzić przez północ. Puste oznacza brak okna: brak płatnego workera, brak ćwiczeń.',
-    warmWindowPlaceholder: 'np. 14:00-16:00',
+    warmWindowStart: 'Początek (UTC)',
+    warmWindowEnd: 'Koniec (UTC)',
+    warmWindowLocal: 'W Twoim czasie lokalnym',
     warmWindowEffective: 'Obowiązujące okno',
     warmWindowNone: 'brak',
     warmWindowSourceSetting: 'z tej strony',
@@ -179,7 +189,9 @@ export const COS_UNIVERSITY_SETTINGS_COPY: Record<CosUniversityTelemetryLanguage
     resumeButton: 'Возобновить производство',
     warmWindowTitle: 'Тёплое окно рабочей силы (UTC)',
     warmWindowExplanation: 'Ежедневное окно, в течение которого зарезервированные выпускники держат один работающий worker, чтобы до них доходила практическая работа. Формат HH:MM-HH:MM, UTC; может переходить через полночь. Пусто означает отсутствие окна: ни платного worker, ни практики.',
-    warmWindowPlaceholder: 'напр. 14:00-16:00',
+    warmWindowStart: 'Начало (UTC)',
+    warmWindowEnd: 'Конец (UTC)',
+    warmWindowLocal: 'В вашем местном времени',
     warmWindowEffective: 'Действующее окно',
     warmWindowNone: 'нет',
     warmWindowSourceSetting: 'с этой страницы',

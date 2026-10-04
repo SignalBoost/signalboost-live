@@ -21,6 +21,21 @@ test('post-graduation pipeline preserves permanent identity and follows real wor
   assert.doesNotMatch(migration, /authority_expanded\s*=\s*true/i)
 })
 
+
+test('scheduled warm windows exercise healthy reserved graduates with bounded genuine-demand proof work', () => {
+  assert.match(recovery, /reservation\.inWindow === true/)
+  assert.match(recovery, /reservation\.eligibleForWork\.includes\(String\(row\.registry_id\)\)/)
+  assert.match(recovery, /!runtimeBlocked\.has\(String\(row\.registry_id\)\)/)
+  assert.match(recovery, /Date\.now\(\) - 15 \* 60_000/)
+  assert.match(recovery, /\.eq\('source_kind', 'production_shadow'\)/)
+  assert.match(recovery, /const validationLimit = validationDue \? Math\.min\(2, validationTargets\.length\) : 0/)
+  assert.match(recovery, /feature: validating \? 'cos_workforce_validation' : 'cos_workforce_recovery'/)
+  assert.match(recovery, /purpose: 'genuine_production_replay'/)
+  assert.match(recovery, /validationAttempts/)
+  assert.match(recovery, /validationTargets: validationTargets\.map/)
+  assert.doesNotMatch(recovery, /authorityExpanded:\s*true/)
+})
+
 test('serving evidence enters a durable retry outbox instead of disappearing', () => {
   assert.match(migration, /cos_workforce_evidence_outbox/)
   assert.match(evidence, /enqueueGraduateServingEvidence/)

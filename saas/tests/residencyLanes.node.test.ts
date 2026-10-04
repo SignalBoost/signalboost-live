@@ -13,6 +13,8 @@ import {
   selectBuilderResidencyLanes,
 } from '../platform-harness/residency/orchestrator-store.ts'
 
+import { lineCapacity, WORKER_QUOTA_ENV } from '../lib/ai/cos/cosUniversityLineCapacity.ts'
+
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 const now = new Date('2026-09-30T05:00:00.000Z')
 const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000).toISOString()
@@ -143,9 +145,15 @@ test('departed residents are withdrawn with a durable record, never as a pass or
 
 test('the cron runs lanes in parallel after sweeps and admission, never more lanes than the admitted cohort', () => {
   const route = read('app/api/cron/cos-university-residency/route.ts')
-  const lanes = Number(/RESIDENCY_PARALLEL_LANES = (\d+)/.exec(route)?.[1])
-  const cohort = Number(/admitNextBuilderResidency\(\{ db, activeLimit: (\d+) \}\)/.exec(route)?.[1])
-  assert.ok(lanes >= 1 && lanes <= cohort, 'lanes never exceed the University admission cap')
+  // Lanes come from the capacity model (residency share of the declared pool); the cohort cap is the route's own.
+  assert.match(route, /const laneCapacity = lineCapacity\(\)\.residency/)
+  const cohort = Number(/RESIDENCY_ACTIVE_LIMIT = (\d+)/.exec(route)?.[1])
+  for (const quota of ['5', '10', '16', '64']) {
+    const lanes = lineCapacity({ [WORKER_QUOTA_ENV]: quota }).residency
+    assert.ok(lanes >= 1, `pool ${quota} must give residency at least one lane`)
+    assert.ok(Math.min(lanes, cohort) <= cohort, 'lanes never exceed the University admission cap')
+  }
+  assert.equal(lineCapacity({ [WORKER_QUOTA_ENV]: '10' }).residency, 1, 'a 10-worker pool runs one residency lane')
   const order = ['closeStaleStartedResidencyCases(', 'store.withdrawDepartedResidencies()', 'store.closeUnrecoverableResidencies()', 'admitNextBuilderResidency(', 'store.planLanes(']
     .map(marker => route.indexOf(marker))
   assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])))

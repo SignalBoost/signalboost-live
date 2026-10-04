@@ -199,7 +199,7 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
   }
   assert.ok(f.economics.available)
   if (f.economics.available) {
-    assert.equal(f.economics.settledProviderJobs, 3); assert.ok(Math.abs(f.economics.observedProviderCostUsd - 2.9) < 1e-12); assert.deepEqual(f.economics.byOperationUsd, { teacher: 0.2, training: 2.7 }); assert.ok(Math.abs((f.economics.costPerGraduatedArtifactUsd ?? 0) - 2.9) < 1e-12); assert.equal(f.economics.coverage, 'observed mass-distillation provider jobs only; not total platform TCO')
+    assert.equal(f.economics.settledProviderJobs, 3); assert.ok(Math.abs(f.economics.observedProviderCostUsd - 2.9) < 1e-12); assert.deepEqual(f.economics.byOperationUsd, { teacher: 0.2, training: 2.7 }); assert.ok(Math.abs((f.economics.costPerGraduatedArtifactUsd ?? 0) - 2.9) < 1e-12); assert.equal(f.economics.coverage, 'observed mass-distillation provider jobs for cohort candidate IDs; provider ledger has no artifact hash, so this is not exact-artifact cost attribution or total platform TCO')
   }
   assert.ok(f.provenance.available)
   if (f.provenance.available) {

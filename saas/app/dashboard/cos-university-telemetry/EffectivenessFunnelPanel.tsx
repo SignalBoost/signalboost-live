@@ -167,6 +167,24 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
             ) : <p className="text-xs" role="alert">{f.lineHealth.error}</p>}
           </div>
 
+          <div className="rounded-lg border p-3" data-testid="throughput-recovery">
+            <div className="font-semibold">{copy.flowTitle}</div>
+            {f.lineHistory.available ? (
+              <>
+                <div className="mt-2 grid gap-2 sm:grid-cols-4 text-sm">
+                  <div><span className="opacity-60">{copy.flowTransitions}:</span> {f.lineHistory.transitions}</div>
+                  <div><span className="opacity-60">{copy.flowThroughput}:</span> {f.lineHistory.throughputPerHour === null ? '—' : f.lineHistory.throughputPerHour.toFixed(2) + '/h'}</div>
+                  <div><span className="opacity-60">{copy.flowRecovered}:</span> {f.lineHistory.recoveredOverdue}</div>
+                  <div><span className="opacity-60">{copy.flowMeanRecovery}:</span> {f.lineHistory.meanRecoverySeconds === null ? '—' : Math.round(f.lineHistory.meanRecoverySeconds / 60) + ' min'}</div>
+                  <div><span className="opacity-60">{copy.flowMedianRecovery}:</span> {f.lineHistory.medianRecoverySeconds === null ? '—' : Math.round(f.lineHistory.medianRecoverySeconds / 60) + ' min'}</div>
+                  <div><span className="opacity-60">{copy.flowP90Recovery}:</span> {f.lineHistory.p90RecoverySeconds === null ? '—' : Math.round(f.lineHistory.p90RecoverySeconds / 60) + ' min'}</div>
+                  <div className="sm:col-span-2"><span className="opacity-60">{copy.flowByStation}:</span> {counts(f.lineHistory.byFromStation)}</div>
+                </div>
+                <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.lineHistory.source} · {copy.methodology}: {f.lineHistory.methodology}</div>
+              </>
+            ) : <p className="text-xs" role="alert">{f.lineHistory.error}</p>}
+          </div>
+
           <div className="rounded-lg border p-3">
             <div className="font-semibold">{copy.stagesTitle}</div>
             <div className="mt-2 space-y-1">

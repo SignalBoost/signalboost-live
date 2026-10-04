@@ -185,6 +185,16 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
             ) : <p className="text-xs" role="alert">{f.lineHistory.error}</p>}
           </div>
 
+          <div className="rounded-lg border p-3" data-testid="buyer-assurance-scorecard">
+            <div className="font-semibold">{copy.assuranceTitle}</div>
+            <div className="mt-2 grid gap-3 lg:grid-cols-2 text-sm">
+              <div><b>{copy.assuranceResidency}</b>{f.residencyEffectiveness.available ? <><div>{copy.assuranceCompleted}: {f.residencyEffectiveness.completed} / {f.residencyEffectiveness.enrollments}</div><div>{copy.assuranceCases}: {f.residencyEffectiveness.casesPassed} / {f.residencyEffectiveness.caseRuns}</div><div>{copy.assuranceCasePassRate}: {f.residencyEffectiveness.casePassRate === null ? '—' : Math.round(f.residencyEffectiveness.casePassRate * 100) + '%'}</div><div>{copy.assuranceCompetencyEvidence}: {f.residencyEffectiveness.competencyEvidence}</div></> : <div role="alert">{f.residencyEffectiveness.error}</div>}</div>
+              <div><b>{copy.assuranceWorkforce}</b>{f.workforceEffectiveness.available ? <><div>{copy.assuranceAssignments}: {f.workforceEffectiveness.assignments}</div><div>{copy.assuranceVerified}: {f.workforceEffectiveness.verified} · {copy.assuranceRemediation}: {f.workforceEffectiveness.remediation}</div><div>{copy.assuranceRuntimeFailed}: {f.workforceEffectiveness.runtimeFailed} · {copy.assuranceAwaiting}: {f.workforceEffectiveness.servedAwaitingVerification}</div></> : <div role="alert">{f.workforceEffectiveness.error}</div>}</div>
+              <div><b>{copy.assuranceEconomics}</b>{f.economics.available ? <><div>{copy.assuranceObservedCost}: {'$' + f.economics.observedProviderCostUsd.toFixed(2)}</div><div>{copy.assuranceSettledJobs}: {f.economics.settledProviderJobs}</div><div>{copy.assuranceCostGraduate}: {f.economics.costPerGraduatedArtifactUsd === null ? '—' : '$' + f.economics.costPerGraduatedArtifactUsd.toFixed(2)}</div><div>{copy.assuranceCoverage}: {f.economics.coverage}</div></> : <div role="alert">{f.economics.error}</div>}</div>
+              <div><b>{copy.assuranceProvenance}</b>{f.provenance.available ? <><div>{copy.assuranceTraceable}: {f.provenance.traceableGraduates} / {f.provenance.graduates}</div><div>{copy.assurancePermanentAssignments}: {f.provenance.workforceAssignmentsWithPermanentId}</div></> : <div role="alert">{f.provenance.error}</div>}</div>
+            </div>
+          </div>
+
           <div className="rounded-lg border p-3">
             <div className="font-semibold">{copy.stagesTitle}</div>
             <div className="mt-2 space-y-1">

@@ -124,6 +124,54 @@ export type EffectivenessFunnel = Readonly<{
     source: string
     methodology: string
   }>
+  residencyEffectiveness: Chapter<{
+    enrollments: number
+    completed: number
+    remediationRequired: number
+    caseRuns: number
+    casesPassed: number
+    casesFailed: number
+    casesRejected: number
+    competencyEvidence: number
+    competencyPasses: number
+    competencyFailures: number
+    completionRate: number | null
+    casePassRate: number | null
+    source: string
+    methodology: string
+  }>
+  workforceEffectiveness: Chapter<{
+    assignments: number
+    verified: number
+    remediation: number
+    runtimeFailed: number
+    servedAwaitingVerification: number
+    productionRequests: number
+    productionShadows: number
+    verifiedRate: number | null
+    source: string
+    methodology: string
+  }>
+  economics: Chapter<{
+    settledProviderJobs: number
+    observedProviderCostUsd: number
+    byOperationUsd: Readonly<Record<string, number>>
+    costPerGraduatedArtifactUsd: number | null
+    costPerVerifiedOutcomeUsd: number | null
+    coverage: string
+    source: string
+    methodology: string
+  }>
+  provenance: Chapter<{
+    birthCertificates: number
+    graduates: number
+    resumes: number
+    workforceAssignmentsWithPermanentId: number
+    traceableGraduates: number
+    traceableGraduateRate: number | null
+    source: string
+    methodology: string
+  }>
   evaluationFailures: Chapter<{
     total: number
     infrastructure: number
@@ -169,6 +217,10 @@ export function composeFunnel(input: {
   serving: Chapter<{ terminalByAttempt: ReadonlyMap<string, { outcome: string; latencyMs: number; errorClass: string | null }> }>
   lineLedger: Chapter<{ rows: readonly Readonly<{ station: string; enteredAt: string | null; deadlineAt: string | null; leaseUntil: string | null; terminal: boolean }>[] }>
   transitionHistory: Chapter<{ rows: readonly Readonly<{ fromStation: string; transitionedAt: string | null; durationSeconds: number | null; wasOverdue: boolean }>[] }>
+  residencyEvidence: Chapter<{ enrollments: readonly Readonly<{ key: string; standing: string }>[]; caseStatuses: readonly string[]; competencyOutcomes: readonly string[] }>
+  workforceAssignments: Chapter<{ rows: readonly Readonly<{ status: string; sourceKind: string; permanentArtifactId: string }>[] }>
+  providerCosts: Chapter<{ rows: readonly Readonly<{ operation: string; observedCostUsd: number }>[] }>
+  provenanceEvidence: Chapter<{ certificates: ReadonlySet<string>; graduates: ReadonlySet<string>; resumes: ReadonlySet<string> }>
   evaluationFailures: Chapter<{ errors: readonly string[] }>
 }): EffectivenessFunnel {
   const size = input.cohort.length
@@ -321,6 +373,48 @@ export function composeFunnel(input: {
     })
   } else lineHistory = Object.freeze({ available: false as const, error: input.transitionHistory.error })
 
+  let residencyEffectiveness: EffectivenessFunnel['residencyEffectiveness']
+  if (input.residencyEvidence.available) {
+    const e = input.residencyEvidence
+    const completed = e.enrollments.filter(row => row.standing === 'residency_complete').length
+    const remediationRequired = e.enrollments.filter(row => row.standing === 'remediation_required').length
+    const casesPassed = e.caseStatuses.filter(x => x === 'passed').length
+    const casesFailed = e.caseStatuses.filter(x => x === 'failed').length
+    const casesRejected = e.caseStatuses.filter(x => x === 'rejected').length
+    const competencyPasses = e.competencyOutcomes.filter(x => x === 'pass').length
+    const competencyFailures = e.competencyOutcomes.filter(x => x === 'fail').length
+    const terminalCases = casesPassed + casesFailed + casesRejected
+    residencyEffectiveness = Object.freeze({ available: true as const, error: null, enrollments: e.enrollments.length, completed, remediationRequired, caseRuns: e.caseStatuses.length, casesPassed, casesFailed, casesRejected, competencyEvidence: e.competencyOutcomes.length, competencyPasses, competencyFailures, completionRate: e.enrollments.length ? completed / e.enrollments.length : null, casePassRate: terminalCases ? casesPassed / terminalCases : null, source: 'cos_university_residency_enrollments + cos_university_residency_case_runs + cos_university_residency_competency_evidence', methodology: 'exact cohort artifacts; completion comes only from durable residency standing; case and competency outcomes are counted from durable practical evidence' })
+  } else residencyEffectiveness = Object.freeze({ available: false as const, error: input.residencyEvidence.error })
+
+  let workforceEffectiveness: EffectivenessFunnel['workforceEffectiveness']
+  if (input.workforceAssignments.available) {
+    const rows = input.workforceAssignments.rows
+    const n = (status: string) => rows.filter(row => row.status === status).length
+    const verified = n('verified'), remediation = n('remediation'), runtimeFailed = n('runtime_failed'), servedAwaitingVerification = n('served')
+    const decided = verified + remediation
+    workforceEffectiveness = Object.freeze({ available: true as const, error: null, assignments: rows.length, verified, remediation, runtimeFailed, servedAwaitingVerification, productionRequests: rows.filter(row => row.sourceKind === 'production_request').length, productionShadows: rows.filter(row => row.sourceKind === 'production_shadow').length, verifiedRate: decided ? verified / decided : null, source: 'cos_workforce_assignments', methodology: 'exact cohort assignments; verified/remediation are governed Production outcomes, runtime_failed remains infrastructure and is excluded from competence verification rate' })
+  } else workforceEffectiveness = Object.freeze({ available: false as const, error: input.workforceAssignments.error })
+
+  let economics: EffectivenessFunnel['economics']
+  if (input.providerCosts.available) {
+    const rows = input.providerCosts.rows
+    const byOperationUsd: Record<string, number> = {}
+    for (const row of rows) byOperationUsd[row.operation] = (byOperationUsd[row.operation] || 0) + row.observedCostUsd
+    const total = rows.reduce((sum, row) => sum + row.observedCostUsd, 0)
+    const graduated = stages.find(s => s.id === 'graduated')?.count || 0
+    const verifiedOutcomes = stages.find(s => s.id === 'verified_outcome')?.count || 0
+    economics = Object.freeze({ available: true as const, error: null, settledProviderJobs: rows.length, observedProviderCostUsd: total, byOperationUsd: Object.freeze(byOperationUsd), costPerGraduatedArtifactUsd: graduated ? total / graduated : null, costPerVerifiedOutcomeUsd: verifiedOutcomes ? total / verifiedOutcomes : null, coverage: 'observed mass-distillation provider jobs for cohort candidate IDs; provider ledger has no artifact hash, so this is not exact-artifact cost attribution or total platform TCO', source: 'cos_university_mass_distillation_provider_jobs', methodology: 'sum observed_cost_usd for settled provider jobs whose candidate_id is in the cohort; cost attribution is candidate-level because the provider ledger does not store trained_artifact_hash; denominators are cohort graduates and verified outcomes' })
+  } else economics = Object.freeze({ available: false as const, error: input.providerCosts.error })
+
+  let provenance: EffectivenessFunnel['provenance']
+  if (input.provenanceEvidence.available && input.workforceAssignments.available) {
+    const p = input.provenanceEvidence
+    const graduates = input.cohort.filter(a => p.graduates.has(keyOf(a)))
+    const traceableGraduates = graduates.filter(a => p.certificates.has(keyOf(a)) && p.resumes.has(keyOf(a))).length
+    provenance = Object.freeze({ available: true as const, error: null, birthCertificates: input.cohort.filter(a => p.certificates.has(keyOf(a))).length, graduates: graduates.length, resumes: input.cohort.filter(a => p.resumes.has(keyOf(a))).length, workforceAssignmentsWithPermanentId: input.workforceAssignments.rows.filter(row => Boolean(row.permanentArtifactId)).length, traceableGraduates, traceableGraduateRate: graduates.length ? traceableGraduates / graduates.length : null, source: 'cos_university_artifact_birth_certificates + cos_university_graduate_model_registry + cos_university_graduate_resumes + cos_workforce_assignments', methodology: 'exact candidate+artifact hash across birth certificate, graduate registry and evidence-derived résumé; Workforce assignments must carry permanent_artifact_id' })
+  } else provenance = Object.freeze({ available: false as const, error: input.provenanceEvidence.available === false ? input.provenanceEvidence.error : input.workforceAssignments.available === false ? input.workforceAssignments.error : 'provenance_unavailable' })
+
   let evaluationFailures: EffectivenessFunnel['evaluationFailures']
   if (input.evaluationFailures.available) {
     const byReason: Record<string, number> = {}
@@ -355,6 +449,10 @@ export function composeFunnel(input: {
     reliability,
     lineHealth,
     lineHistory,
+    residencyEffectiveness,
+    workforceEffectiveness,
+    economics,
+    provenance,
     stages: Object.freeze(stages),
     unavailable: Object.freeze(unavailable),
     rejected: Object.freeze({ quarantined: byStatus.quarantined || 0, retired: byStatus.retired || 0, byStatus: Object.freeze(byStatus), source: SOURCE.artifacts }),
@@ -402,7 +500,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     return out
   }
 
-  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, evaluationFailures] = await Promise.all([
+  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, evaluationFailures] = await Promise.all([
     chapter(async () => {
       let q = db.from('cos_university_mass_distillation_batch_runs').select('stage')
       if (since) q = q.gte('created_at', since)
@@ -478,6 +576,35 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { rows: list.map((row: any) => Object.freeze({ fromStation: text(row.from_station, 80), transitionedAt: iso(row.transitioned_at), durationSeconds: Number.isFinite(Number(row.duration_seconds)) ? Math.max(0, Number(row.duration_seconds)) : null, wasOverdue: row.was_overdue === true })) }
     }),
     chapter(async () => {
+      const enrollments = await forCohort('cos_university_residency_enrollments', 'id,candidate_id,trained_artifact_hash,standing')
+      const residencyIds = enrollments.map((row: any) => text(row.id, 80)).filter(Boolean)
+      const caseRows: any[] = [], competencyRows: any[] = []
+      for (const chunk of chunks(residencyIds, FUNNEL_READ_CHUNK)) {
+        caseRows.push(...await rows(db.from('cos_university_residency_case_runs').select('residency_id,status').in('residency_id', chunk).limit(FUNNEL_ROWS_PER_CHUNK)))
+        competencyRows.push(...await rows(db.from('cos_university_residency_competency_evidence').select('residency_id,outcome').in('residency_id', chunk).limit(FUNNEL_ROWS_PER_CHUNK)))
+      }
+      return { enrollments: enrollments.map((row: any) => ({ key: key(row), standing: text(row.standing, 60) })), caseStatuses: caseRows.map((row: any) => text(row.status, 40)), competencyOutcomes: competencyRows.map((row: any) => text(row.outcome, 20)) }
+    }),
+    chapter(async () => {
+      const certs = await forCohort('cos_university_artifact_birth_certificates', 'candidate_id,trained_artifact_hash,permanent_artifact_id')
+      const permanentIds = certs.map((row: any) => text(row.permanent_artifact_id, 80)).filter(Boolean)
+      const list: any[] = []
+      for (const chunk of chunks(permanentIds, FUNNEL_READ_CHUNK)) list.push(...await rows(db.from('cos_workforce_assignments').select('registry_id,permanent_artifact_id,source_kind,status,assigned_at').in('permanent_artifact_id', chunk).limit(FUNNEL_ROWS_PER_CHUNK)))
+      return { rows: list.map((row: any) => ({ status: text(row.status, 40), sourceKind: text(row.source_kind, 40), permanentArtifactId: text(row.permanent_artifact_id, 80) })) }
+    }),
+    chapter(async () => {
+      const list = await forCohort('cos_university_mass_distillation_provider_jobs', 'candidate_id,operation,observed_cost_usd,settled_at', FUNNEL_ROWS_PER_CHUNK)
+      return { rows: list.filter((row: any) => iso(row.settled_at) && Number.isFinite(Number(row.observed_cost_usd))).map((row: any) => ({ operation: text(row.operation, 40), observedCostUsd: Math.max(0, Number(row.observed_cost_usd)) })) }
+    }),
+    chapter(async () => {
+      const [certs, grads, resumes] = await Promise.all([
+        forCohort('cos_university_artifact_birth_certificates', 'candidate_id,trained_artifact_hash'),
+        forCohort('cos_university_graduate_model_registry', 'candidate_id,trained_artifact_hash'),
+        forCohort('cos_university_graduate_resumes', 'candidate_id,trained_artifact_hash'),
+      ])
+      return { certificates: new Set(certs.map(key)), graduates: new Set(grads.map(key)), resumes: new Set(resumes.map(key)) }
+    }),
+    chapter(async () => {
       // Evaluation failures recorded IN THE WINDOW (an operations figure, not a cohort figure): every terminal FAILED
       // evaluation event (event_type fine_tune, claim ..._failed), its error classified by the rolling authority's rule.
       let q = db.from('cos_university_learning_assurance_events').select('evidence').eq('event_type', 'fine_tune')
@@ -487,7 +614,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
   ])
 
-  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, evaluationFailures })
+  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, evaluationFailures })
 }
 
 /** One line: the funnel's top, its bottom, and the honesty row. */
@@ -501,6 +628,10 @@ export function describeFunnel(funnel: EffectivenessFunnel): string {
     + (funnel.reliability.available ? `| reliability attempts=${funnel.reliability.attempts} success=${funnel.reliability.successRate === null ? 'n/a' : Math.round(funnel.reliability.successRate * 100) + '%'} p90=${funnel.reliability.p90LatencyMs === null ? 'n/a' : funnel.reliability.p90LatencyMs + 'ms'} ` : '| reliability unavailable ')
     + (funnel.lineHealth.available ? `| line live=${funnel.lineHealth.liveUnits} overdue=${funnel.lineHealth.overdueUnits} leased=${funnel.lineHealth.leasedUnits} bottleneck=${funnel.lineHealth.bottleneckStation || 'none'} ` : '| line unavailable ')
     + (funnel.lineHistory.available ? `| flow transitions=${funnel.lineHistory.transitions} throughput=${funnel.lineHistory.throughputPerHour === null ? 'n/a' : funnel.lineHistory.throughputPerHour.toFixed(2) + '/h'} recovered=${funnel.lineHistory.recoveredOverdue} ` : '| flow history unavailable ')
+    + (funnel.residencyEffectiveness.available ? `| residency complete=${funnel.residencyEffectiveness.completed}/${funnel.residencyEffectiveness.enrollments} cases=${funnel.residencyEffectiveness.caseRuns} ` : '| residency evidence unavailable ')
+    + (funnel.workforceEffectiveness.available ? `| workforce assignments=${funnel.workforceEffectiveness.assignments} verified=${funnel.workforceEffectiveness.verified} remediation=${funnel.workforceEffectiveness.remediation} runtime_failed=${funnel.workforceEffectiveness.runtimeFailed} ` : '| workforce evidence unavailable ')
+    + (funnel.economics.available ? `| observed_provider_cost=${funnel.economics.observedProviderCostUsd.toFixed(2)} settled_jobs=${funnel.economics.settledProviderJobs} ` : '| economics unavailable ')
+    + (funnel.provenance.available ? `| provenance traceable_graduates=${funnel.provenance.traceableGraduates}/${funnel.provenance.graduates} ` : '| provenance unavailable ')
     + `| rejected quarantined=${funnel.rejected.quarantined} retired=${funnel.rejected.retired}`
     + (funnel.evaluationFailures.available ? ` | eval failures=${funnel.evaluationFailures.total} infra=${funnel.evaluationFailures.infrastructure} merit=${funnel.evaluationFailures.merit}` : ' | eval failures unavailable')
     + (Object.keys(funnel.unavailable).length ? ` | unavailable=${Object.keys(funnel.unavailable).join(',')}` : '')

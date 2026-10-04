@@ -61,7 +61,7 @@ const week = () => ({
     { candidate_id: 'c', trained_artifact_hash: H('c'), status: 'quarantined', subject_id: 'law', created_at: '2026-10-03T11:00:00Z' },
     { candidate_id: 'd', trained_artifact_hash: H('d'), status: 'retired', subject_id: 'cs', created_at: '2026-09-30T11:00:00Z' },
   ],
-  cos_university_artifact_birth_certificates: [{ candidate_id: 'a' }, { candidate_id: 'b' }, { candidate_id: 'c' }],
+  cos_university_artifact_birth_certificates: [{ candidate_id: 'a', trained_artifact_hash: H('a'), permanent_artifact_id: 'ai-a' }, { candidate_id: 'b', trained_artifact_hash: H('b'), permanent_artifact_id: 'ai-b' }, { candidate_id: 'c', trained_artifact_hash: H('c'), permanent_artifact_id: 'ai-c' }],
   cos_university_mass_distillation_batch_runs: [
     { stage: 'complete', subject_id: 'cs', created_at: '2026-10-04T09:00:00Z' },
     { stage: 'complete', subject_id: 'law', created_at: '2026-10-04T09:30:00Z' },
@@ -77,9 +77,28 @@ const week = () => ({
     // a different hash of candidate b: not this cohort's artifact.
     { candidate_id: 'b', trained_artifact_hash: H('9'), created_at: '2026-10-04T12:00:00Z', baseline_score: 0.2, trained_artifact_score: 0.9, holdout_improved: true, safety_passed: true, unseen_transfer_passed: true, delayed_retention_passed: true },
   ],
-  cos_university_residency_enrollments: [{ candidate_id: 'a', trained_artifact_hash: H('a'), standing: 'residency_complete' }],
+  cos_university_residency_enrollments: [{ id: 'res-a', candidate_id: 'a', trained_artifact_hash: H('a'), standing: 'residency_complete' }],
+  cos_university_residency_case_runs: [
+    { residency_id: 'res-a', status: 'passed' }, { residency_id: 'res-a', status: 'passed' }, { residency_id: 'res-a', status: 'failed' },
+  ],
+  cos_university_residency_competency_evidence: [
+    { residency_id: 'res-a', outcome: 'pass' }, { residency_id: 'res-a', outcome: 'pass' }, { residency_id: 'res-a', outcome: 'fail' },
+  ],
   cos_university_graduate_model_registry: [{ candidate_id: 'a', trained_artifact_hash: H('a'), promoted_at: '2026-10-04T14:00:00Z', activated_at: '2026-10-04T14:30:00Z' }],
   cos_workforce_roster: [{ candidate_id: 'a', trained_artifact_hash: H('a') }],
+  cos_workforce_assignments: [
+    { permanent_artifact_id: 'ai-a', source_kind: 'production_request', status: 'verified', assigned_at: '2026-10-04T15:10:00Z' },
+    { permanent_artifact_id: 'ai-a', source_kind: 'production_request', status: 'remediation', assigned_at: '2026-10-04T15:20:00Z' },
+    { permanent_artifact_id: 'ai-a', source_kind: 'production_shadow', status: 'runtime_failed', assigned_at: '2026-10-04T15:30:00Z' },
+    { permanent_artifact_id: 'ai-a', source_kind: 'production_request', status: 'served', assigned_at: '2026-10-04T15:40:00Z' },
+  ],
+  cos_university_mass_distillation_provider_jobs: [
+    { candidate_id: 'a', trained_artifact_hash: H('a'), operation: 'teacher', observed_cost_usd: 0.2, settled_at: '2026-10-04T12:00:00Z' },
+    { candidate_id: 'a', trained_artifact_hash: H('a'), operation: 'training', observed_cost_usd: 1.5, settled_at: '2026-10-04T13:00:00Z' },
+    { candidate_id: 'b', trained_artifact_hash: H('b'), operation: 'training', observed_cost_usd: 1.2, settled_at: '2026-10-04T13:30:00Z' },
+    { candidate_id: 'c', trained_artifact_hash: H('c'), operation: 'training', observed_cost_usd: null, settled_at: null },
+  ],
+  cos_university_graduate_resumes: [{ candidate_id: 'a', trained_artifact_hash: H('a') }],
   cos_university_graduate_serving_attempts: [
     { attempt_id: '1', candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_started', outcome: 'pending', latency_ms: 0, recorded_at: '2026-10-04T15:00:00Z' },
     { attempt_id: '1', candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_succeeded', outcome: 'success', latency_ms: 9000, recorded_at: '2026-10-04T15:00:09Z' },
@@ -170,10 +189,35 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.equal(f.lineHistory.p90RecoverySeconds, 3000)
     assert.deepEqual(f.lineHistory.byFromStation, { EXACT_CANARY: 2, INDEPENDENT_EVALUATION: 1 })
   }
+  assert.ok(f.residencyEffectiveness.available)
+  if (f.residencyEffectiveness.available) {
+    assert.equal(f.residencyEffectiveness.enrollments, 1); assert.equal(f.residencyEffectiveness.completed, 1); assert.equal(f.residencyEffectiveness.caseRuns, 3); assert.equal(f.residencyEffectiveness.casesPassed, 2); assert.equal(f.residencyEffectiveness.casePassRate, 2 / 3); assert.equal(f.residencyEffectiveness.competencyEvidence, 3)
+  }
+  assert.ok(f.workforceEffectiveness.available)
+  if (f.workforceEffectiveness.available) {
+    assert.equal(f.workforceEffectiveness.assignments, 4); assert.equal(f.workforceEffectiveness.verified, 1); assert.equal(f.workforceEffectiveness.remediation, 1); assert.equal(f.workforceEffectiveness.runtimeFailed, 1); assert.equal(f.workforceEffectiveness.servedAwaitingVerification, 1); assert.equal(f.workforceEffectiveness.verifiedRate, 0.5)
+  }
+  assert.ok(f.economics.available)
+  if (f.economics.available) {
+    assert.equal(f.economics.settledProviderJobs, 3); assert.ok(Math.abs(f.economics.observedProviderCostUsd - 2.9) < 1e-12); assert.ok(Math.abs((f.economics.byOperationUsd.teacher ?? 0) - 0.2) < 1e-12); assert.ok(Math.abs((f.economics.byOperationUsd.training ?? 0) - 2.7) < 1e-12); assert.ok(Math.abs((f.economics.costPerGraduatedArtifactUsd ?? 0) - 2.9) < 1e-12); assert.equal(f.economics.coverage, 'observed mass-distillation provider jobs for cohort candidate IDs; provider ledger has no artifact hash, so this is not exact-artifact cost attribution or total platform TCO')
+  }
+  assert.ok(f.provenance.available)
+  if (f.provenance.available) {
+    assert.equal(f.provenance.birthCertificates, 3); assert.equal(f.provenance.graduates, 1); assert.equal(f.provenance.resumes, 1); assert.equal(f.provenance.workforceAssignmentsWithPermanentId, 4); assert.equal(f.provenance.traceableGraduates, 1); assert.equal(f.provenance.traceableGraduateRate, 1)
+  }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.02/h recovered=2 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.02/h recovered=2 | residency complete=1/1 cases=3 | workforce assignments=4 verified=1 remediation=1 runtime_failed=1 | observed_provider_cost=$2.90 settled_jobs=3 | provenance traceable_graduates=1/1 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
 })
 
+
+test('buyer assurance chapters fail closed when their evidence stores are unreadable', async () => {
+  const failing = new Set(['cos_university_residency_case_runs', 'cos_workforce_assignments', 'cos_university_mass_distillation_provider_jobs', 'cos_university_graduate_resumes'])
+  const f = await readEffectivenessFunnel({ db: fakeDb(week(), failing).db, window: '7d', now: NOW })
+  assert.equal(f.residencyEffectiveness.available, false)
+  assert.equal(f.workforceEffectiveness.available, false)
+  assert.equal(f.economics.available, false)
+  assert.equal(f.provenance.available, false)
+})
 
 test('line health counts only leases that are live at the report time', async () => {
   const fixture = week()
@@ -241,6 +285,10 @@ test('an empty cohort has no shares and no division by zero', () => {
     serving: empty({ terminalByAttempt: new Map() }),
     lineLedger: empty({ rows: [] }),
     transitionHistory: empty({ rows: [] }),
+    residencyEvidence: empty({ enrollments: [], caseStatuses: [], competencyOutcomes: [] }),
+    workforceAssignments: empty({ rows: [] }),
+    providerCosts: empty({ rows: [] }),
+    provenanceEvidence: empty({ certificates: new Set<string>(), graduates: new Set<string>(), resumes: new Set<string>() }),
     evaluationFailures: empty({ errors: [] }),
   })
   assert.ok(f.stages.every(s => s.count === 0 && s.share === null))
@@ -281,6 +329,11 @@ test('the API is owner-gated read-only, the panel is mounted after the settings 
   assert.match(panel, /f\.capabilityGain\.positiveGainRate/)
   assert.match(panel, /f\.capabilityGain\.source/)
   assert.match(panel, /f\.capabilityGain\.methodology/)
+  assert.match(panel, /data-testid="buyer-assurance-scorecard"/)
+  assert.match(panel, /f\.residencyEffectiveness\.completed/)
+  assert.match(panel, /f\.workforceEffectiveness\.verified/)
+  assert.match(panel, /f\.economics\.observedProviderCostUsd/)
+  assert.match(panel, /f\.provenance\.traceableGraduates/)
   assert.doesNotMatch(panel, />[A-Z][a-z]+ [a-z]+</, 'every visible string comes from copy')
   // Every stage id the module emits has a label in the copy.
   const source = read('../lib/ai/cos/cosUniversityEffectivenessFunnel.ts')

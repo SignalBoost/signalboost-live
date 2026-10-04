@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityAssemblyLine.playwright.spec.ts
 //
 // Owner, 2026-10-02: "PLAYWRIGHT WATCHDOG - independently proves the line."
 //
@@ -52,6 +53,7 @@ type LineState = {
   constraint?: Record<string, unknown> | null
   lineStops?: Array<Record<string, unknown>>
   units?: unknown
+  paused?: unknown
   unitsReported?: number
 }
 
@@ -75,7 +77,7 @@ test.describe('COS University assembly line, proved from outside', () => {
       const state = (await response.json()) as LineState
       expect(state.ok, 'the line controller reported a failure').toBe(true)
       expect(state.schemaVersion, 'the controller is not the assembly-line version').toBe('cos-university-assembly-line-controller-v2')
-      return { state, sample: sampleFromLineState({ at: String(state.at || ''), units: state.units }) }
+      return { state, sample: sampleFromLineState({ at: String(state.at || ''), units: state.units, paused: state.paused }) }
     }
 
     const first = await read()
@@ -170,3 +172,4 @@ test.describe('COS University assembly line, proved from outside', () => {
     expect(stops, `the controller reports stopped stations: ${JSON.stringify(stops)}`).toEqual([])
   })
 })
+// end of saas/tests/cosUniversityAssemblyLine.playwright.spec.ts (if this line is missing, the paste was cut short)

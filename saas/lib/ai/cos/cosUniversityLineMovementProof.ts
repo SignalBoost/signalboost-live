@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityLineMovementProof.ts
 //
 // Owner, 2026-10-02: "PLAYWRIGHT WATCHDOG - independently proves the line."
 //
@@ -46,6 +47,8 @@ export type LineSample = Readonly<{
   /** When this sample was taken, ISO-8601. */
   at: string
   units: readonly ObservedUnit[]
+  /** True when the controller answered `paused`: the operator switched production off. Absent = not paused. */
+  paused?: boolean
 }>
 
 export type UnitMovement = Readonly<{
@@ -183,6 +186,12 @@ export function proveLineMovement(input: {
     })
   }
 
+  // Nothing moved while the operator had production paused: that is the switch doing its job, not a line stop, and
+  // not evidence the line works either. Owner 2026-10-04: "an on/off button if users wants to stop/pause production".
+  if (input.first?.paused === true || input.second?.paused === true) {
+    return frozenProof({ ...base, verdict: 'inconclusive', reason: 'line_paused_by_operator', elapsedSeconds })
+  }
+
   // Nothing moved. Before that can be called a stop, the sample has to have been long enough to expect movement.
   const minimumInterval = Number.isFinite(input.minimumIntervalSeconds as number) && (input.minimumIntervalSeconds as number) > 0
     ? Math.floor(input.minimumIntervalSeconds as number)
@@ -255,7 +264,7 @@ export function proveLineMovement(input: {
  * hash or no station is dropped rather than guessed at, because a half-identified unit is what makes a prover report
  * movement that did not happen.
  */
-export function sampleFromLineState(input: { at: string; units: unknown }): LineSample {
+export function sampleFromLineState(input: { at: string; units: unknown; paused?: unknown }): LineSample {
   const rows = Array.isArray(input.units) ? input.units : []
   const units: ObservedUnit[] = []
   for (const row of rows) {
@@ -273,7 +282,7 @@ export function sampleFromLineState(input: { at: string; units: unknown }): Line
       enteredAt: enteredRaw === null || enteredRaw === undefined ? null : String(enteredRaw),
     }))
   }
-  return Object.freeze({ at: String(input.at || ''), units: Object.freeze(units) })
+  return Object.freeze({ at: String(input.at || ''), units: Object.freeze(units), paused: input.paused === true })
 }
 
 /** One line a human or a buyer can read off the proof without interpreting it. */
@@ -290,3 +299,4 @@ export function describeLineProof(proof: LineMovementProof): string {
   }
   return `NOT PROVEN: ${proof.reason} after ${proof.elapsedSeconds}s. This is not evidence the line works.`
 }
+// end of saas/lib/ai/cos/cosUniversityLineMovementProof.ts (if this line is missing, the paste was cut short)

@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
@@ -496,6 +497,9 @@ async function readInFlightCanary(now:Date){
 export async function GET(req:NextRequest){
   const secret=process.env.CRON_SECRET
   if(!secret||req.headers.get('authorization')!==`Bearer ${secret}`) return NextResponse.json({ok:false,error:'Unauthorized'},{status:401})
+  // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no canary wake.
+  const pause=await readLinePauseSetting(cosServiceDb())
+  if(pause.paused) return NextResponse.json(pausedStationResponse('runpod-mass-distilled-local-deploy'))
 
   let active:ActiveClaim|null=null
   let providerInvocationStarted=false
@@ -614,3 +618,4 @@ export async function GET(req:NextRequest){
     return NextResponse.json({ok:false,error:clean(message,300),providerInvocationStarted},{status:500})
   }
 }
+// end of saas/app/api/cron/runpod-mass-distilled-local-deploy/route.ts (if this line is missing, the paste was cut short)

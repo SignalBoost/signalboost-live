@@ -1,5 +1,7 @@
+// saas/app/api/cron/cos-university-mass-backlog-compact/route.ts
 import { NextRequest,NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import { compactMassEvaluationBacklog } from '@/lib/ai/cos/cosUniversityMassBacklogCompactor'
 import { reviewMassQuarantine } from '@/lib/ai/cos/cosUniversityMassQuarantineReview'
 import { resolveQuarantine, retireUnexaminableXsaStudents } from '@/lib/ai/cos/cosUniversityQuarantineResolution'
@@ -72,6 +74,9 @@ export async function GET(req:NextRequest){
   if(!secret||req.headers.get('authorization')!==`Bearer ${secret}`){
     return NextResponse.json({ok:false,error:'Unauthorized'},{status:401})
   }
+  // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no quarantine moves.
+  const pause=await readLinePauseSetting(cosServiceDb())
+  if(pause.paused) return NextResponse.json(pausedStationResponse('cos-university-mass-backlog-compact'))
   const quarantineReview=await reviewQuarantine()
   const quarantineResolution=await resolveQuarantineStep()
   try{
@@ -115,3 +120,4 @@ export async function GET(req:NextRequest){
     return NextResponse.json({ok:false,error:message,quarantineReview,quarantineResolution},{status:500})
   }
 }
+// end of saas/app/api/cron/cos-university-mass-backlog-compact/route.ts (if this line is missing, the paste was cut short)

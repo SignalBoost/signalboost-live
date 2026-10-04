@@ -11,6 +11,7 @@
 // returning a success that says only `ready: 0`.
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import { fillRequestedHoldoutExamSets } from '@/lib/ai/cos/cosUniversityHoldoutExamItems'
 import { lineCapacity } from '@/lib/ai/cos/cosUniversityLineCapacity'
 import { describeExamSetPopulation } from '@/lib/ai/cos/cosUniversityHoldoutExamSetRecovery'
@@ -31,6 +32,9 @@ export async function GET(request: NextRequest) {
   }
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok: false, error: 'service_database_unavailable' }, { status: 503 })
+  // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no teacher calls.
+  const pause = await readLinePauseSetting(db)
+  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-holdout-exam-items'))
   try {
     // 975 exams requested against 157 ready: at 3 sets per tick the writer never catches up with training output, so
     // students keep arriving in a queue that grows faster than it drains. 10 is the function's own built-in ceiling

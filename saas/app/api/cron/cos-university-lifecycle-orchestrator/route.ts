@@ -22,6 +22,7 @@
 // graduates occupied the head of the overdue list and the canary queue behind them was never reached.
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import {
   LIVE_STATUSES,
   UNIVERSITY_LINE_CAPACITY,
@@ -84,6 +85,11 @@ async function run(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok: false, error: 'service_database_unavailable' }, { status: 503 })
+  // Owner 2026-10-04: the production pause switch, set from the University telemetry page. While paused the controller
+  // reconciles nothing and wakes nobody; it answers `paused` with no units so an outside prover reads "paused by the
+  // operator", not "line stopped".
+  const pause = await readLinePauseSetting(db)
+  if (pause.paused) return NextResponse.json({ ...pausedStationResponse('cos-university-lifecycle-orchestrator'), at: new Date().toISOString(), units: [] })
 
   const now = new Date()
   const nowIso = now.toISOString()

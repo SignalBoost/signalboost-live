@@ -13,8 +13,10 @@ import {
   WORKFORCE_WARM_WINDOW_ENV,
   describeWorkforceReservation,
   inWarmWindow,
+  nextWarmWindowChange,
   parseWarmWindow,
   reconcileWorkforceReservation,
+  resolveWarmWindow,
   unknownWorkforceReservation,
   type WorkforceGraduate,
 } from '../lib/ai/cos/cosUniversityWorkforceReservation.ts'
@@ -96,7 +98,7 @@ test('reconcile releases before it pins, survives a refused change, and reports 
   assert.match(report.errors[0], /^release:ep2:RunPod PATCH HTTP 400: refused/)
   assert.ok(calls.indexOf('pin:ep3') > calls.indexOf('release:ep1'), 'releases run before pins so a rotation never asks for an extra slot')
   const line = describeWorkforceReservation(report)
-  assert.match(line, /^workforce reserve=1 onCall=3 \| pinned=1 held=0 released=1 idle=0 unmanaged=0 \| eligibleForWork=1 \| window=none \| refused=1$/)
+  assert.match(line, /^workforce reserve=1 onCall=3 \| pinned=1 held=0 released=1 idle=0 unmanaged=0 \| eligibleForWork=1 \| window=none windowSource=none \| refused=1$/)
 })
 
 test('reconcile stops at its deadline and says so', async () => {
@@ -119,7 +121,7 @@ test('reconcile stops at its deadline and says so', async () => {
 
 test('the workforce station enforces the reservation first, through the existing slot transports, and reports it', () => {
   const route = read('../app/api/cron/cos-workforce-pipeline/route.ts')
-  assert.match(route, /const reservation: WorkforceReservationReport = await reconcileWorkforceReservation\(/)
+  assert.match(route, /const reservation: WorkforceReservationReport = await readWorkforceWarmWindowSetting\(db\)\s*\.then\(setting => reconcileWorkforceReservation\(\{/)
   // Before any shadow work: the reconcile precedes the abandoned-assignment close that opens the rest of the tick.
   assert.ok(route.indexOf('reconcileWorkforceReservation({') < route.indexOf('closeAbandonedWorkforceAssignments()'))
   assert.match(route, /releaseWorker: endpointId => deactivateMassDistilledEvaluationWorker\(endpointId\)/)
@@ -219,7 +221,7 @@ test('inside the window only the reserved graduates are warmed; outside it only 
   assert.deepEqual(calls.filter(c => c.startsWith('warm')), ['warm:ep1'])
   assert.deepEqual(calls.filter(c => c.startsWith('release')), ['release:ep4'])
   assert.ok(calls.indexOf('release:ep4') < calls.indexOf('warm:ep1'), 'slots are given back before any worker is started')
-  assert.match(describeWorkforceReservation(inside), /window=17:00-19:00 inWindow=true warmed=1 cooled=0$/)
+  assert.match(describeWorkforceReservation(inside), /window=17:00-19:00 windowSource=env inWindow=true warmed=1 cooled=0$/)
 
   calls.length = 0
   const outside = await reconcileWorkforceReservation({ ports, env, now: new Date('2026-10-04T20:00:00Z') })
@@ -246,7 +248,7 @@ test('with no window declared nothing is warmed or cooled - today\'s behavior, n
   assert.equal(report.window, null)
   assert.equal(report.inWindow, null)
   assert.deepEqual(calls, [])
-  assert.match(describeWorkforceReservation(report), /window=none$/)
+  assert.match(describeWorkforceReservation(report), /window=none windowSource=none$/)
   // An unusable declaration is the same as none, never a guess.
   const bad = await reconcileWorkforceReservation({
     env: { [WORKER_QUOTA_ENV]: '10', [WORKFORCE_WARM_WINDOW_ENV]: 'always' },
@@ -255,11 +257,52 @@ test('with no window declared nothing is warmed or cooled - today\'s behavior, n
   assert.equal(bad.window, null)
 })
 
+test('precedence: the buyer\'s stored window beats the environment, an unusable stored window is none (not the env), nothing stored falls back to env', () => {
+  const env = { [WORKFORCE_WARM_WINDOW_ENV]: '14:00-16:00' }
+  assert.deepEqual(resolveWarmWindow({ setting: '17:00-19:00', env }), { window: parseWarmWindow('17:00-19:00'), source: 'setting' })
+  assert.deepEqual(resolveWarmWindow({ setting: 'always', env }), { window: null, source: 'setting' })
+  assert.deepEqual(resolveWarmWindow({ setting: null, env }), { window: parseWarmWindow('14:00-16:00'), source: 'env' })
+  assert.deepEqual(resolveWarmWindow({ setting: '   ', env }), { window: parseWarmWindow('14:00-16:00'), source: 'env' })
+  assert.deepEqual(resolveWarmWindow({ setting: undefined, env: {} }), { window: null, source: 'none' })
+})
+
+test('the reconcile applies the stored window over the environment and reports where it came from', async () => {
+  const calls: string[] = []
+  const ports = {
+    listGraduates: async () => [grad(1, 1, null, 'ep1', 0)],
+    releaseWorker: async () => undefined,
+    pinWorker: async () => undefined,
+    warmWorker: async (id: string) => { calls.push(`warm:${id}`) },
+    coolWorker: async (id: string) => { calls.push(`cool:${id}`) },
+  }
+  // Env says 14-16 (closed at 17:30); the buyer stored 17-19 (open). The buyer wins: ep1 is warmed.
+  const report = await reconcileWorkforceReservation({
+    ports,
+    env: { [WORKER_QUOTA_ENV]: '10', [WORKFORCE_WARM_WINDOW_ENV]: '14:00-16:00' },
+    warmWindowSetting: '17:00-19:00',
+    now: new Date('2026-10-04T17:30:00Z'),
+  })
+  assert.equal(report.window, '17:00-19:00')
+  assert.equal(report.windowSource, 'setting')
+  assert.deepEqual(calls, ['warm:ep1'])
+  assert.match(describeWorkforceReservation(report), /window=17:00-19:00 windowSource=setting inWindow=true warmed=1 cooled=0$/)
+  assert.equal(unknownWorkforceReservation(new Error('x')).windowSource, 'none')
+})
+
+test('the next window change is computed for the page: closes-at inside, opens-at outside, crossing midnight', () => {
+  const window = parseWarmWindow('22:00-02:00')!
+  assert.deepEqual(nextWarmWindowChange(window, new Date('2026-10-04T23:00:00Z')), { opensAt: null, closesAt: '2026-10-05T02:00:00.000Z' })
+  assert.deepEqual(nextWarmWindowChange(window, new Date('2026-10-04T10:00:00Z')), { opensAt: '2026-10-04T22:00:00.000Z', closesAt: null })
+  const day = parseWarmWindow('14:00-16:00')!
+  assert.deepEqual(nextWarmWindowChange(day, new Date('2026-10-04T17:00:00Z')), { opensAt: '2026-10-05T14:00:00.000Z', closesAt: null })
+})
+
 test('the cool transport returns a graduate to scale-to-zero with its slot kept, and the route reads min workers', () => {
   const v2 = read('../lib/ai/cos/runpodMassDistilledProvisionV2.ts')
   assert.match(v2, /export async function coolMassDistilledWorker\(endpointId: string\)[\s\S]{0,400}?workers: \{ min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \}/)
   assert.match(v2, /mass_distilled_worker_cool_rejected/)
   const route = read('../app/api/cron/cos-workforce-pipeline/route.ts')
+  assert.match(route, /readWorkforceWarmWindowSetting\(db\)\s*\.then\(setting => reconcileWorkforceReservation\(\{\s*warmWindowSetting: setting\.value,/)
   assert.match(route, /minByEndpoint\.set\(id, Math\.max\(0, Math\.floor\(Number\(endpoint\.workers\?\.min \?\? 0\)\)\)\)/)
   assert.match(route, /workersMin: endpointId && minByEndpoint\.has\(endpointId\)/)
 })

@@ -93,10 +93,10 @@ const week = () => ({
     { permanent_artifact_id: 'ai-a', source_kind: 'production_request', status: 'served', assigned_at: '2026-10-04T15:40:00Z' },
   ],
   cos_university_mass_distillation_provider_jobs: [
-    { candidate_id: 'a', operation: 'teacher', observed_cost_usd: 0.2, settled_at: '2026-10-04T12:00:00Z' },
-    { candidate_id: 'a', operation: 'training', observed_cost_usd: 1.5, settled_at: '2026-10-04T13:00:00Z' },
-    { candidate_id: 'b', operation: 'training', observed_cost_usd: 1.2, settled_at: '2026-10-04T13:30:00Z' },
-    { candidate_id: 'c', operation: 'training', observed_cost_usd: null, settled_at: null },
+    { candidate_id: 'a', trained_artifact_hash: H('a'), operation: 'teacher', observed_cost_usd: 0.2, settled_at: '2026-10-04T12:00:00Z' },
+    { candidate_id: 'a', trained_artifact_hash: H('a'), operation: 'training', observed_cost_usd: 1.5, settled_at: '2026-10-04T13:00:00Z' },
+    { candidate_id: 'b', trained_artifact_hash: H('b'), operation: 'training', observed_cost_usd: 1.2, settled_at: '2026-10-04T13:30:00Z' },
+    { candidate_id: 'c', trained_artifact_hash: H('c'), operation: 'training', observed_cost_usd: null, settled_at: null },
   ],
   cos_university_graduate_resumes: [{ candidate_id: 'a', trained_artifact_hash: H('a') }],
   cos_university_graduate_serving_attempts: [

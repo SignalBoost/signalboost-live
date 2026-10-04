@@ -94,6 +94,19 @@ test('the controller reconciles exactly the statuses the line declares', () => {
   assert.doesNotMatch(route, /const ORCHESTRATED_STATUSES/)
 })
 
+
+test('the controller persists every real station transition in an append-only buyer evidence ledger', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../supabase/migrations/20261004231500_university_lifecycle_transition_history.sql', import.meta.url), 'utf8')
+  assert.match(route, /cos_university_lifecycle_transition_history/)
+  assert.match(route, /duration_seconds/)
+  assert.match(route, /was_overdue/)
+  assert.match(route, /authority_expanded:\s*false/)
+  assert.match(migration, /create table if not exists public\.cos_university_lifecycle_transition_history/)
+  assert.match(migration, /grant select, insert .* service_role/)
+  assert.doesNotMatch(migration, /grant .*update.* service_role/i, 'history must remain append-only')
+})
+
 // ---------------------------------------------------------------------------------------------------------------
 // Rule 2: immediate handoff
 // ---------------------------------------------------------------------------------------------------------------

@@ -159,6 +159,7 @@ async function run(req: NextRequest) {
   }
 
   const rows: LedgerRow[] = []
+  const transitionHistory: LedgerRow[] = []
   let transitions = 0
   for (const entry of prepared) {
     const plan = lifecyclePlan(entry.artifact.status)
@@ -199,7 +200,31 @@ async function run(req: NextRequest) {
       lease_holder: leaseStillLive ? clean(entry.previous.lease_holder, 120) || null : null,
       updated_at: nowIso,
     })
-    if (entry.changed) transitions += 1
+    if (entry.changed) {
+      transitions += 1
+      const fromEnteredMs = Date.parse(String(entry.previous?.stage_entered_at || ''))
+      const deadlineMs = Date.parse(String(entry.previous?.stage_deadline_at || ''))
+      transitionHistory.push({
+        candidate_id: entry.artifact.candidateId,
+        artifact_hash: entry.artifact.artifactHash,
+        subject_id: entry.artifact.subjectId || null,
+        from_station: entry.previous?.station ? String(entry.previous.station) : null,
+        to_station: plan.stage,
+        from_status: entry.previous?.source_status ? String(entry.previous.source_status) : null,
+        to_status: entry.artifact.status,
+        entered_from_at: Number.isFinite(fromEnteredMs) ? new Date(fromEnteredMs).toISOString() : null,
+        transitioned_at: nowIso,
+        duration_seconds: Number.isFinite(fromEnteredMs) ? Math.max(0, Math.floor((now.getTime() - fromEnteredMs) / 1000)) : null,
+        was_overdue: Number.isFinite(deadlineMs) && deadlineMs <= now.getTime(),
+        last_error: entry.previous?.last_error ? clean(entry.previous.last_error, 400) : null,
+        authority_expanded: false,
+      })
+    }
+  }
+
+  if (transitionHistory.length) {
+    const historyWrite = await db.from('cos_university_lifecycle_transition_history').insert(transitionHistory)
+    if (historyWrite.error) throw historyWrite.error
   }
 
   // Batched, so the reconcile cost is the number of CHUNKS rather than the number of artifacts. One awaited round

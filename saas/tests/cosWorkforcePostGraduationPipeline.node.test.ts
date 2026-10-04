@@ -58,7 +58,8 @@ test('governed recovery watches stranded and repeatedly failing Workforce member
   assert.match(recovery, /eligibleRecoveryTargets/)
   // Owner 2026-10-02: no paid wake-ups. Recovery never boots or waits for a graduate endpoint (#3588 reverted).
   assert.doesNotMatch(recovery, /proveGraduateServedIdentity|RUNTIME_READY_MAX_MS/)
-  assert.match(recovery, /recoveryAttempts >= Math\.min\(3, eligibleRecoveryTargets\.length\)/)
+  assert.match(recovery, /const recoveryLimit = Math\.min\(3, eligibleRecoveryTargets\.length\)/)
+  assert.match(recovery, /recoveryAttempts >= recoveryLimit && validationAttempts >= validationLimit/)
   assert.match(recovery, /runWorkforceApprenticeShadow[\s\S]*runtimeBlocked/)
   assert.match(recovery, /runtimeBlockedWorkers/)
   assert.match(recovery, /authorityExpanded: false/)

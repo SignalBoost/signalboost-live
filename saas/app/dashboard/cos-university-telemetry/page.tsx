@@ -7,6 +7,8 @@ import UniversitySettingsPanel from './UniversitySettingsPanel.tsx'
 import { COS_UNIVERSITY_SETTINGS_COPY } from '@/lib/i18n/cosUniversitySettingsCopy'
 import ArtifactLifeRecordPanel from './ArtifactLifeRecordPanel.tsx'
 import { COS_UNIVERSITY_LIFE_RECORD_COPY } from '@/lib/i18n/cosUniversityLifeRecordCopy'
+import EffectivenessFunnelPanel from './EffectivenessFunnelPanel.tsx'
+import { COS_UNIVERSITY_FUNNEL_COPY } from '@/lib/i18n/cosUniversityFunnelCopy'
 import {
   COS_UNIVERSITY_TELEMETRY_COPY,
   type CosUniversityTelemetryLanguage,
@@ -227,6 +229,9 @@ export default function CosUniversityTelemetryPage() {
   const lifeRecordCopy = COS_UNIVERSITY_LIFE_RECORD_COPY[
     (lang in COS_UNIVERSITY_LIFE_RECORD_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
   ]
+  const funnelCopy = COS_UNIVERSITY_FUNNEL_COPY[
+    (lang in COS_UNIVERSITY_FUNNEL_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
+  ]
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [workingCosAction, setWorkingCosAction] = useState<'prepare_dataset' | 'train' | null>(null)
@@ -312,6 +317,7 @@ export default function CosUniversityTelemetryPage() {
   const workingCos = data?.workingCos || null
   const runs = data?.runs || []
   const artifacts = data?.artifacts || []
+  const funnelSubjects = Array.from(new Set(artifacts.map(artifact => artifact.subject).filter(Boolean))).sort()
   const residency = data?.residency || []
   const pipeline = data?.pipeline || {}
   const workforce = data?.workforce || {}
@@ -352,6 +358,8 @@ export default function CosUniversityTelemetryPage() {
       </header>
 
       <UniversitySettingsPanel copy={settingsCopy} />
+
+      <EffectivenessFunnelPanel copy={funnelCopy} subjects={funnelSubjects} />
 
       <ArtifactLifeRecordPanel copy={lifeRecordCopy} />
 

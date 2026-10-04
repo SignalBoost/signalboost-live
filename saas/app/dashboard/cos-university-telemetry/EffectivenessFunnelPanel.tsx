@@ -114,6 +114,25 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
             ) : <p className="text-xs" role="alert">{f.production.error}</p>}
           </div>
 
+          <div className="rounded-lg border p-3" data-testid="capability-gain">
+            <div className="font-semibold">{copy.capabilityTitle}</div>
+            {f.capabilityGain.available ? (
+              <>
+                <div className="mt-2 grid gap-2 sm:grid-cols-4 text-sm">
+                  <div><span className="opacity-60">{copy.capabilityComparable}:</span> {f.capabilityGain.sampleSize}</div>
+                  <div><span className="opacity-60">{copy.capabilityMeanBaseline}:</span> {f.capabilityGain.meanBaseline === null ? '—' : f.capabilityGain.meanBaseline.toFixed(3)}</div>
+                  <div><span className="opacity-60">{copy.capabilityMeanTrained}:</span> {f.capabilityGain.meanTrained === null ? '—' : f.capabilityGain.meanTrained.toFixed(3)}</div>
+                  <div><span className="opacity-60">{copy.capabilityMeanGain}:</span> {f.capabilityGain.meanAbsoluteGain === null ? '—' : (f.capabilityGain.meanAbsoluteGain >= 0 ? '+' : '') + f.capabilityGain.meanAbsoluteGain.toFixed(3)}</div>
+                  <div><span className="opacity-60">{copy.capabilityMedianGain}:</span> {f.capabilityGain.medianAbsoluteGain === null ? '—' : (f.capabilityGain.medianAbsoluteGain >= 0 ? '+' : '') + f.capabilityGain.medianAbsoluteGain.toFixed(3)}</div>
+                  <div><span className="opacity-60">{copy.capabilityImproved}:</span> {f.capabilityGain.improved}</div>
+                  <div><span className="opacity-60">{copy.capabilityUnchangedRegressed}:</span> {f.capabilityGain.unchanged} / {f.capabilityGain.regressed}</div>
+                  <div><span className="opacity-60">{copy.capabilityPositiveRate}:</span> {f.capabilityGain.positiveGainRate === null ? '—' : Math.round(f.capabilityGain.positiveGainRate * 100) + '%'}</div>
+                </div>
+                <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.capabilityGain.source} · {copy.methodology}: {f.capabilityGain.methodology}</div>
+              </>
+            ) : <p className="text-xs" role="alert">{f.capabilityGain.error}</p>}
+          </div>
+
           <div className="rounded-lg border p-3">
             <div className="font-semibold">{copy.stagesTitle}</div>
             <div className="mt-2 space-y-1">

@@ -45,14 +45,21 @@ export const WORKER_QUOTA_ENV = 'RUNPOD_SERVERLESS_WORKER_QUOTA' as const
  */
 export const UNDECLARED_WORKER_FALLBACK = 10
 
-/** Below this nothing can run: one canary, one evaluator, one graduate, one slot of headroom. */
-export const MINIMUM_WORKER_POOL = 4
+/** Below this nothing can run: one canary, one evaluator, one residency lane, one graduate, one slot of headroom. */
+export const MINIMUM_WORKER_POOL = 5
 export const MAXIMUM_WORKER_POOL = 100_000
 
 /** Shares of the pool. They sum to less than 1 on purpose: the remainder is headroom. */
 const WORKFORCE_SHARE = 0.25
 const CANARY_SHARE = 0.4
 const EVALUATION_SHARE = 0.5
+/**
+ * Builder Residency (owner 2026-10-04). Each residency lane runs one exact-artifact worker for its coding cases, and
+ * until today the station ran a hardcoded four lanes that the model counted nowhere: on a 10-worker pool that made
+ * 2 + 3 + 4 + 4 = 13 against 10, and RunPod answered "max workers across all endpoints must not exceed your workers
+ * quota" eleven times in one evening. The share comes out of the line's own pool; evaluation yields first.
+ */
+const RESIDENCY_SHARE = 0.15
 
 /** A canary occupies its worker for about this long end to end, including a cold start. */
 const CANARY_CYCLE_SECONDS = 10 * 60
@@ -80,6 +87,8 @@ export type LineCapacity = WorkerPoolResolution & Readonly<{
   canary: number
   /** Concurrent independent evaluations. */
   evaluation: number
+  /** Concurrent Builder Residency lanes, one exact-artifact worker each. Never zero. */
+  residency: number
   /** Concurrent graduate activations, bounded by the workforce reserve since each activation pins a worker. */
   activation: number
   /** Canary approvals per rolling hour, derived from concurrency and the canary's own cycle time. */
@@ -154,18 +163,22 @@ export function lineCapacity(env: Record<string, string | undefined> = process.e
   const pool = declaredInferenceWorkers(env)
   const workers = pool.workers
 
-  // Leave at least three workers for the line itself, whatever the share arithmetic produces.
-  const workforce = Math.max(1, Math.min(Math.floor(workers * WORKFORCE_SHARE), workers - 3))
+  // Leave at least four workers for the line itself (canary, evaluator, residency, headroom), whatever the share
+  // arithmetic produces.
+  const workforce = Math.max(1, Math.min(Math.floor(workers * WORKFORCE_SHARE), workers - 4))
 
   const forTheLine = workers - workforce
   let canary = Math.max(1, Math.floor(forTheLine * CANARY_SHARE))
   let evaluation = Math.max(1, Math.floor(forTheLine * EVALUATION_SHARE))
-  // Enforce the headroom invariant by arithmetic, not by hoping the shares add up.
-  while (canary + evaluation >= forTheLine && canary + evaluation > 2) {
-    if (evaluation > canary) evaluation -= 1
-    else canary -= 1
+  let residency = Math.max(1, Math.floor(forTheLine * RESIDENCY_SHARE))
+  // Enforce the headroom invariant by arithmetic, not by hoping the shares add up. The largest station yields first;
+  // on a tie evaluation yields before canary, canary before residency, so no station is ever reduced to zero.
+  while (canary + evaluation + residency >= forTheLine && canary + evaluation + residency > 3) {
+    if (evaluation >= canary && evaluation >= residency && evaluation > 1) evaluation -= 1
+    else if (canary >= residency && canary > 1) canary -= 1
+    else residency -= 1
   }
-  const headroom = Math.max(1, forTheLine - canary - evaluation)
+  const headroom = Math.max(1, forTheLine - canary - evaluation - residency)
 
   const canaryApprovalsPerHour = Math.max(1, Math.floor(canary * (3600 / CANARY_CYCLE_SECONDS)))
   const evaluationApprovalsPerHour = Math.max(1, Math.floor(evaluation * (3600 / EVALUATION_CYCLE_SECONDS)))
@@ -175,6 +188,7 @@ export function lineCapacity(env: Record<string, string | undefined> = process.e
     workforce,
     canary,
     evaluation,
+    residency,
     activation: Math.max(1, Math.floor(workforce / 2)),
     canaryApprovalsPerHour,
     evaluationApprovalsPerHour,
@@ -204,7 +218,7 @@ export function describeLineCapacity(capacity: LineCapacity): string {
       ? `source=runpod_quota (${WORKER_QUOTA_ENV})`
       : `source=undeclared_fallback (${UNDECLARED_WORKER_FALLBACK}, matching the provisioner; set ${WORKER_QUOTA_ENV} to declare)`
   return `workers=${capacity.workers} ${origin} | `
-    + `canary=${capacity.canary} evaluation=${capacity.evaluation} activation=${capacity.activation} `
+    + `canary=${capacity.canary} evaluation=${capacity.evaluation} residency=${capacity.residency} activation=${capacity.activation} `
     + `workforce=${capacity.workforce} headroom=${capacity.headroom} | `
     + `canaryApprovalsPerHour=${capacity.canaryApprovalsPerHour} examSetsPerTick=${capacity.examSetsPerTick} `
     + `artifactsPerHour=${capacity.artifactsPerHour}`

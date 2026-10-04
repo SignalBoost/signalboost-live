@@ -13,6 +13,7 @@ import {
 import {
   describeWorkforceReservation,
   reconcileWorkforceReservation,
+  unknownWorkforceReservation,
   type WorkforceGraduate,
   type WorkforceReservationReport,
 } from '@/lib/ai/cos/cosUniversityWorkforceReservation'
@@ -106,11 +107,12 @@ async function run(req: NextRequest) {
       // Same transport activation uses to hold a slot: restore the scale-to-zero/max-1 envelope. Creates nothing.
       pinWorker: endpointId => ensureMassDistilledEndpoint24Gb(endpointId),
     },
-  }).catch(error => Object.freeze({
-    reserve: 0, onCall: 0, pinned: 0, released: 0, held: 0, idle: 0, unmanaged: 0, deadlineReached: false,
-    errors: Object.freeze([`reconcile:${error instanceof Error ? error.message.slice(0, 160) : 'workforce_reservation_failed'}`]),
-  }))
+  }).catch(error => unknownWorkforceReservation(error))
   console.info('[cos-workforce-reservation]', describeWorkforceReservation(reservation))
+  // Work goes ONLY to graduates inside the reserve. A graduate the reconcile just released is off by decision, even
+  // while its worker still answers the health probe for a few seconds (2026-10-04: 14 paid 45-second timeouts on 7
+  // just-released graduates). If the reconcile failed, nobody holds a known slot and nobody gets work this tick.
+  const offReserve = new Set(reservation.eligibilityKnown ? reservation.excludedFromWork : [])
 
   // First close work that can never finish (opened, then the process ended), so it stops showing as WORKING.
   const abandoned = await closeAbandonedWorkforceAssignments().catch(error => ({
@@ -162,9 +164,10 @@ async function run(req: NextRequest) {
     if (id) runtimeFailureCounts.set(id, (runtimeFailureCounts.get(id) || 0) + 1)
   }
   const runtimeBlocked = new Set([...runtimeFailureCounts.entries()].filter(([, count]) => count >= 2).map(([id]) => id))
-  const eligibleRecoveryTargets = workers.filter(row =>
-    (row.stranded || row.repeatedFailure) && !runtimeBlocked.has(String(row.registry_id)),
-  )
+  const notEligibleForWork = new Set([...runtimeBlocked, ...offReserve])
+  const eligibleRecoveryTargets = reservation.eligibilityKnown
+    ? workers.filter(row => (row.stranded || row.repeatedFailure) && !notEligibleForWork.has(String(row.registry_id)))
+    : []
   let recoveryAttempts = 0
   if (eligibleRecoveryTargets.length > 0) {
     const demand = await db.from('assistant_messages')
@@ -186,7 +189,7 @@ async function run(req: NextRequest) {
           maxTokens: 512,
           timeoutMs: shadowTimeoutMs,
           usageContext: { feature: 'cos_workforce_recovery', purpose: 'genuine_production_replay', correlationId: `workforce-recovery:${row.id}` },
-        }, objective, runtimeBlocked)
+        }, objective, notEligibleForWork)
         recoveryAttempts += 1
       }
     } else {

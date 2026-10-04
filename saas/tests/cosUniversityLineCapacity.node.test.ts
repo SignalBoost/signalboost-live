@@ -47,8 +47,13 @@ test('unset: the pool falls back to 10 and telemetry says undeclared_fallback', 
   const capacity = lineCapacity({})
   assert.equal(capacity.workers, 10)
   assert.equal(capacity.source, 'undeclared_fallback')
-  // An undeclared deployment must stay inside the pool the provisioner believes in.
-  assert.ok(capacity.canary + capacity.evaluation + capacity.workforce < UNDECLARED_WORKER_FALLBACK)
+  // An undeclared deployment must stay inside the pool the provisioner believes in - residency included.
+  assert.ok(capacity.canary + capacity.evaluation + capacity.residency + capacity.workforce < UNDECLARED_WORKER_FALLBACK)
+  // The production shape (owner 2026-10-04): workforce 2, canary 3, evaluation 3, residency 1, headroom 1 = 10.
+  assert.deepEqual(
+    [capacity.workforce, capacity.canary, capacity.evaluation, capacity.residency, capacity.headroom],
+    [2, 3, 3, 1, 1],
+  )
 
   const telemetry = describeLineCapacity(capacity)
   assert.match(telemetry, /^workers=10 source=undeclared_fallback \(10, matching the provisioner;/)
@@ -147,10 +152,13 @@ test('regression guard: capacity reads exactly these two variables and nothing e
 test('every pool size keeps a spare worker and keeps the exam writer ahead of the canary', () => {
   for (const declared of ['4', '5', '7', '10', '16', '32', '64', '100', '256', '1000', '100000']) {
     const capacity = lineCapacity({ [WORKER_QUOTA_ENV]: declared })
-    assert.ok(capacity.canary >= 1 && capacity.evaluation >= 1 && capacity.workforce >= 1 && capacity.activation >= 1,
+    assert.ok(capacity.canary >= 1 && capacity.evaluation >= 1 && capacity.residency >= 1 && capacity.workforce >= 1 && capacity.activation >= 1,
       `pool ${declared} starved a station`)
-    assert.ok(capacity.canary + capacity.evaluation + capacity.workforce < capacity.workers,
+    assert.ok(capacity.canary + capacity.evaluation + capacity.residency + capacity.workforce < capacity.workers,
       `pool ${declared} reserved the whole worker pool`)
+    // Every worker is accounted for: the five shares sum to the pool exactly, so nothing is double-counted.
+    assert.equal(capacity.canary + capacity.evaluation + capacity.residency + capacity.workforce + capacity.headroom, capacity.workers,
+      `pool ${declared} does not add up`)
     assert.ok(capacity.headroom >= 1, `pool ${declared} left no headroom`)
     // A canary that outruns the exam writer is the line stop of 2026-10-03.
     assert.ok(capacity.examSetsPerTick > capacity.canary, `pool ${declared} lets the canary outrun the exam writer`)
@@ -183,7 +191,7 @@ test('telemetry matches the code exactly: every figure is read off the sized obj
     const capacity = lineCapacity(env)
     const telemetry = describeLineCapacity(capacity)
     for (const [label, value] of [
-      ['workers', capacity.workers], ['canary', capacity.canary], ['evaluation', capacity.evaluation],
+      ['workers', capacity.workers], ['canary', capacity.canary], ['evaluation', capacity.evaluation], ['residency', capacity.residency],
       ['activation', capacity.activation], ['workforce', capacity.workforce], ['headroom', capacity.headroom],
       ['canaryApprovalsPerHour', capacity.canaryApprovalsPerHour], ['examSetsPerTick', capacity.examSetsPerTick],
       ['artifactsPerHour', capacity.artifactsPerHour],

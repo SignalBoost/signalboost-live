@@ -46,6 +46,18 @@ export type WorkforceReservationDecision = Readonly<{
   idle: readonly string[]
   /** Graduates with no RunPod endpoint, or an endpoint RunPod did not list. Reported, never touched. */
   unmanaged: readonly string[]
+  /**
+   * Registry ids of the graduates ranked INSIDE the reserve - the only ones that may receive work this tick.
+   *
+   * Production 2026-10-04 00:15-02:15 UTC: 14 practice tasks on 7 freshly activated graduates all timed out at 45 s
+   * with the endpoint measured `cold` afterwards. The reconcile had just released those graduates to max=0 (never
+   * served, so ranked last); their workers, still warm from their own canary, reported idle for a few more seconds;
+   * the warm gate passed; RunPod then terminated the worker mid-request. A released graduate is OFF by decision and
+   * must never be handed a task, whatever its health endpoint says in the seconds after release.
+   */
+  eligibleForWork: readonly string[]
+  /** Every other on-call graduate: released, idle or unmanaged. Excluded from work this tick. */
+  excludedFromWork: readonly string[]
 }>
 
 const at = (value: string | null): number => {
@@ -71,9 +83,12 @@ export function decideWorkforceReservation(input: {
   const ranked = [...managed].sort((a, b) => at(b.lastAttemptAt) - at(a.lastAttemptAt) || a.registryId.localeCompare(b.registryId))
   const inside = ranked.slice(0, reserve)
   const outside = ranked.slice(reserve)
+  const eligible = new Set(inside.map(g => g.registryId))
 
   return Object.freeze({
     reserve,
+    eligibleForWork: Object.freeze(inside.map(g => g.registryId)),
+    excludedFromWork: Object.freeze([...new Set(input.graduates.map(g => g.registryId))].filter(id => !eligible.has(id)).sort()),
     pin: Object.freeze(inside.filter(g => (g.workersMax ?? 0) < 1).map(g => g.endpointId as string)),
     held: Object.freeze(inside.filter(g => (g.workersMax ?? 0) >= 1).map(g => g.endpointId as string)),
     release: Object.freeze(outside.filter(g => (g.workersMax ?? 0) >= 1).map(g => g.endpointId as string)),
@@ -93,6 +108,12 @@ export type WorkforceReservationReport = Readonly<{
   /** Slot changes RunPod refused, with the endpoint and the message. Reported, never retried inside the tick. */
   errors: readonly string[]
   deadlineReached: boolean
+  /** Registry ids that may receive work this tick: exactly the graduates ranked inside the reserve. */
+  eligibleForWork: readonly string[]
+  /** Registry ids that must not receive work this tick. */
+  excludedFromWork: readonly string[]
+  /** False when the reconcile itself failed, so the station knows nothing about who holds a slot and gives out no work. */
+  eligibilityKnown: boolean
 }>
 
 /** Transport the station needs. Injected so the policy is testable without RunPod or a database. */
@@ -106,6 +127,7 @@ export type WorkforceReservationPorts = Readonly<{
 export function describeWorkforceReservation(report: WorkforceReservationReport): string {
   return `workforce reserve=${report.reserve} onCall=${report.onCall} | pinned=${report.pinned} held=${report.held} `
     + `released=${report.released} idle=${report.idle} unmanaged=${report.unmanaged}`
+    + ` | eligibleForWork=${report.eligibilityKnown ? report.eligibleForWork.length : 'unknown'}`
     + (report.errors.length ? ` | refused=${report.errors.length}` : '')
     + (report.deadlineReached ? ' | deadline_reached' : '')
 }
@@ -150,6 +172,20 @@ export async function reconcileWorkforceReservation(input: {
     unmanaged: decision.unmanaged.length,
     errors: Object.freeze(errors.slice(0, 20)),
     deadlineReached,
+    eligibleForWork: decision.eligibleForWork,
+    excludedFromWork: decision.excludedFromWork,
+    eligibilityKnown: true,
+  })
+}
+
+/** The report when the reconcile itself could not run: nothing is known, so nobody is eligible for work. */
+export function unknownWorkforceReservation(error: unknown): WorkforceReservationReport {
+  return Object.freeze({
+    reserve: 0, onCall: 0, pinned: 0, released: 0, held: 0, idle: 0, unmanaged: 0, deadlineReached: false,
+    errors: Object.freeze([`reconcile:${String(error instanceof Error ? error.message : error).replace(/\s+/g, ' ').slice(0, 160)}`]),
+    eligibleForWork: Object.freeze([]),
+    excludedFromWork: Object.freeze([]),
+    eligibilityKnown: false,
   })
 }
 // end of saas/lib/ai/cos/cosUniversityWorkforceReservation.ts (if this line is missing, the paste was cut short)

@@ -88,6 +88,21 @@ export type EffectivenessFunnel = Readonly<{
     source: string
     methodology: string
   }>
+  reliability: Chapter<{
+    attempts: number
+    successes: number
+    failures: number
+    fallbacks: number
+    successRate: number | null
+    p50LatencyMs: number | null
+    p90LatencyMs: number | null
+    p99LatencyMs: number | null
+    over15s: number
+    byOutcome: Readonly<Record<string, number>>
+    byErrorClass: Readonly<Record<string, number>>
+    source: string
+    methodology: string
+  }>
   evaluationFailures: Chapter<{
     total: number
     infrastructure: number
@@ -128,6 +143,7 @@ export function composeFunnel(input: {
   hired: Chapter<{ candidates: ReadonlySet<string> }>
   work: Chapter<{ attempted: ReadonlySet<string>; succeeded: ReadonlySet<string> }>
   verified: Chapter<{ candidates: ReadonlySet<string> }>
+  serving: Chapter<{ terminalByAttempt: ReadonlyMap<string, { outcome: string; latencyMs: number; errorClass: string | null }> }>
   evaluationFailures: Chapter<{ errors: readonly string[] }>
 }): EffectivenessFunnel {
   const size = input.cohort.length
@@ -201,6 +217,35 @@ export function composeFunnel(input: {
     ? Object.freeze({ available: true as const, error: null, runsStarted: input.production.runsStarted, runsCompleted: input.production.runsCompleted, runsFailed: input.production.runsFailed, runsInFlight: Math.max(0, input.production.runsStarted - input.production.runsCompleted - input.production.runsFailed), source: SOURCE.runs })
     : Object.freeze({ available: false as const, error: input.production.error })
 
+  let reliability: EffectivenessFunnel['reliability']
+  if (input.serving.available) {
+    const terminal = [...input.serving.terminalByAttempt.values()]
+    const latencies = terminal.filter(row => row.outcome === 'success').map(row => row.latencyMs).sort((a, b) => a - b)
+    const percentile = (p: number): number | null => {
+      if (!latencies.length) return null
+      const index = Math.min(latencies.length - 1, Math.ceil(p * latencies.length) - 1)
+      return latencies[Math.max(0, index)]
+    }
+    const byOutcome: Record<string, number> = {}
+    const byErrorClass: Record<string, number> = {}
+    for (const row of terminal) {
+      byOutcome[row.outcome] = (byOutcome[row.outcome] || 0) + 1
+      if (row.errorClass) byErrorClass[row.errorClass] = (byErrorClass[row.errorClass] || 0) + 1
+    }
+    const successes = byOutcome.success || 0
+    const fallbacks = byOutcome.fallback || 0
+    const failures = terminal.length - successes - fallbacks
+    reliability = Object.freeze({ available: true as const, error: null,
+      attempts: terminal.length, successes, failures, fallbacks,
+      successRate: terminal.length ? successes / terminal.length : null,
+      p50LatencyMs: percentile(0.50), p90LatencyMs: percentile(0.90), p99LatencyMs: percentile(0.99),
+      over15s: latencies.filter(ms => ms > 15_000).length,
+      byOutcome: Object.freeze(byOutcome), byErrorClass: Object.freeze(byErrorClass),
+      source: SOURCE.attempts,
+      methodology: 'one latest terminal serving record per attempt_id in the selected window; latency percentiles use successful terminal attempts only',
+    })
+  } else reliability = Object.freeze({ available: false as const, error: input.serving.error })
+
   let evaluationFailures: EffectivenessFunnel['evaluationFailures']
   if (input.evaluationFailures.available) {
     const byReason: Record<string, number> = {}
@@ -232,6 +277,7 @@ export function composeFunnel(input: {
     cohort: Object.freeze({ size, truncated: input.truncated, source: SOURCE.artifacts }),
     production,
     capabilityGain,
+    reliability,
     stages: Object.freeze(stages),
     unavailable: Object.freeze(unavailable),
     rejected: Object.freeze({ quarantined: byStatus.quarantined || 0, retired: byStatus.retired || 0, byStatus: Object.freeze(byStatus), source: SOURCE.artifacts }),
@@ -279,7 +325,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     return out
   }
 
-  const [production, certified, examined, residency, graduation, hired, work, verified, evaluationFailures] = await Promise.all([
+  const [production, certified, examined, residency, graduation, hired, work, verified, serving, evaluationFailures] = await Promise.all([
     chapter(async () => {
       let q = db.from('cos_university_mass_distillation_batch_runs').select('stage')
       if (since) q = q.gte('created_at', since)
@@ -330,6 +376,18 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
     chapter(async () => ({ candidates: new Set((await forCohort('cos_university_graduate_lifecycle_events', 'candidate_id,trained_artifact_hash', FUNNEL_ROWS_PER_CHUNK, q => q.eq('event_type', 'verified_outcome'))).map(key)) })),
     chapter(async () => {
+      let q = db.from('cos_university_graduate_serving_attempts').select('attempt_id,phase,outcome,latency_ms,error_class,recorded_at')
+      if (since) q = q.gte('recorded_at', since)
+      const list = await rows(q.order('recorded_at', { ascending: false }).limit(FUNNEL_ROWS_PER_CHUNK))
+      const terminalByAttempt = new Map<string, { outcome: string; latencyMs: number; errorClass: string | null }>()
+      for (const row of list) {
+        const attemptId = text(row.attempt_id, 80)
+        if (!attemptId || terminalByAttempt.has(attemptId) || text(row.phase, 40) === 'attempt_started') continue
+        terminalByAttempt.set(attemptId, { outcome: text(row.outcome, 40), latencyMs: Math.max(0, Number(row.latency_ms) || 0), errorClass: text(row.error_class, 120) || null })
+      }
+      return { terminalByAttempt }
+    }),
+    chapter(async () => {
       // Evaluation failures recorded IN THE WINDOW (an operations figure, not a cohort figure): every terminal FAILED
       // evaluation event (event_type fine_tune, claim ..._failed), its error classified by the rolling authority's rule.
       let q = db.from('cos_university_learning_assurance_events').select('evidence').eq('event_type', 'fine_tune')
@@ -339,7 +397,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
   ])
 
-  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, evaluationFailures })
+  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, evaluationFailures })
 }
 
 /** One line: the funnel's top, its bottom, and the honesty row. */
@@ -350,6 +408,7 @@ export function describeFunnel(funnel: EffectivenessFunnel): string {
     + `examined=${get('examined')} (${pct('examined')}) passed_all=${get('passed_all_gates')} (${pct('passed_all_gates')}) graduated=${get('graduated')} (${pct('graduated')}) `
     + `hired=${get('hired')} worked=${get('performed_work')} verified=${get('verified_outcome')} (${pct('verified_outcome')}) `
     + (funnel.capabilityGain.available ? `| gain n=${funnel.capabilityGain.sampleSize} mean=${funnel.capabilityGain.meanAbsoluteGain === null ? 'n/a' : funnel.capabilityGain.meanAbsoluteGain.toFixed(4)} positive=${funnel.capabilityGain.positiveGainRate === null ? 'n/a' : Math.round(funnel.capabilityGain.positiveGainRate * 100) + '%'} ` : '| gain unavailable ')
+    + (funnel.reliability.available ? `| reliability attempts=${funnel.reliability.attempts} success=${funnel.reliability.successRate === null ? 'n/a' : Math.round(funnel.reliability.successRate * 100) + '%'} p90=${funnel.reliability.p90LatencyMs === null ? 'n/a' : funnel.reliability.p90LatencyMs + 'ms'} ` : '| reliability unavailable ')
     + `| rejected quarantined=${funnel.rejected.quarantined} retired=${funnel.rejected.retired}`
     + (funnel.evaluationFailures.available ? ` | eval failures=${funnel.evaluationFailures.total} infra=${funnel.evaluationFailures.infrastructure} merit=${funnel.evaluationFailures.merit}` : ' | eval failures unavailable')
     + (Object.keys(funnel.unavailable).length ? ` | unavailable=${Object.keys(funnel.unavailable).join(',')}` : '')

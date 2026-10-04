@@ -81,9 +81,11 @@ const week = () => ({
   cos_university_graduate_model_registry: [{ candidate_id: 'a', trained_artifact_hash: H('a'), promoted_at: '2026-10-04T14:00:00Z', activated_at: '2026-10-04T14:30:00Z' }],
   cos_workforce_roster: [{ candidate_id: 'a', trained_artifact_hash: H('a') }],
   cos_university_graduate_serving_attempts: [
-    { candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_started', outcome: 'pending' },
-    { candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_failed', outcome: 'timeout' },
-    { candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_succeeded', outcome: 'success' },
+    { attempt_id: '1', candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_started', outcome: 'pending', latency_ms: 0, recorded_at: '2026-10-04T15:00:00Z' },
+    { attempt_id: '1', candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_succeeded', outcome: 'success', latency_ms: 9000, recorded_at: '2026-10-04T15:00:09Z' },
+    { attempt_id: '2', candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_failed', outcome: 'timeout', latency_ms: 60000, error_class: 'runtime_deadline_exceeded', recorded_at: '2026-10-04T15:02:00Z' },
+    { attempt_id: '3', candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_succeeded', outcome: 'success', latency_ms: 18000, recorded_at: '2026-10-04T15:03:00Z' },
+    { attempt_id: '4', candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'fallback', outcome: 'fallback', latency_ms: 8100, error_class: 'runtime_unavailable', recorded_at: '2026-10-04T15:04:00Z' },
   ],
   cos_university_graduate_lifecycle_events: [{ candidate_id: 'a', trained_artifact_hash: H('a'), event_type: 'verified_outcome' }],
   cos_university_learning_assurance_events: [
@@ -124,8 +126,22 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.ok(Math.abs((f.capabilityGain.medianAbsoluteGain ?? 0) - 0.2) < 1e-12)
     assert.equal(f.capabilityGain.positiveGainRate, 1)
   }
+  assert.ok(f.reliability.available)
+  if (f.reliability.available) {
+    assert.equal(f.reliability.attempts, 4)
+    assert.equal(f.reliability.successes, 2)
+    assert.equal(f.reliability.failures, 1)
+    assert.equal(f.reliability.fallbacks, 1)
+    assert.equal(f.reliability.successRate, 0.5)
+    assert.equal(f.reliability.p50LatencyMs, 9000)
+    assert.equal(f.reliability.p90LatencyMs, 18000)
+    assert.equal(f.reliability.p99LatencyMs, 18000)
+    assert.equal(f.reliability.over15s, 1)
+    assert.deepEqual(f.reliability.byOutcome, { fallback: 1, success: 2, timeout: 1 })
+    assert.deepEqual(f.reliability.byErrorClass, { runtime_unavailable: 1, runtime_deadline_exceeded: 1 })
+  }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
 })
 
 test('evaluation failures in the window are split by the rolling authority\'s own rule, and only terminal FAILED claims count', async () => {
@@ -176,6 +192,7 @@ test('an empty cohort has no shares and no division by zero', () => {
     hired: empty({ candidates: new Set<string>() }),
     work: empty({ attempted: new Set<string>(), succeeded: new Set<string>() }),
     verified: empty({ candidates: new Set<string>() }),
+    serving: empty({ terminalByAttempt: new Map() }),
     evaluationFailures: empty({ errors: [] }),
   })
   assert.ok(f.stages.every(s => s.count === 0 && s.share === null))

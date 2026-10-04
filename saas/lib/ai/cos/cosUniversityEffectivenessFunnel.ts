@@ -582,7 +582,10 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { enrollments: enrollments.map((row: any) => ({ key: key(row), standing: text(row.standing, 60) })), caseStatuses: caseRows.map((row: any) => text(row.status, 40)), competencyOutcomes: competencyRows.map((row: any) => text(row.outcome, 20)) }
     }),
     chapter(async () => {
-      const list = await forCohort('cos_workforce_assignments', 'registry_id,permanent_artifact_id,source_kind,status,assigned_at', FUNNEL_ROWS_PER_CHUNK)
+      const certs = await forCohort('cos_university_artifact_birth_certificates', 'candidate_id,trained_artifact_hash,permanent_artifact_id')
+      const permanentIds = certs.map((row: any) => text(row.permanent_artifact_id, 80)).filter(Boolean)
+      const list: any[] = []
+      for (const chunk of chunks(permanentIds, FUNNEL_READ_CHUNK)) list.push(...await rows(db.from('cos_workforce_assignments').select('registry_id,permanent_artifact_id,source_kind,status,assigned_at').in('permanent_artifact_id', chunk).limit(FUNNEL_ROWS_PER_CHUNK)))
       return { rows: list.map((row: any) => ({ status: text(row.status, 40), sourceKind: text(row.source_kind, 40), permanentArtifactId: text(row.permanent_artifact_id, 80) })) }
     }),
     chapter(async () => {

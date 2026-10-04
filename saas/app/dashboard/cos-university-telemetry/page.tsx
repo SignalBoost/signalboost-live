@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
-import UniversitySettingsPanel from './UniversitySettingsPanel'
+import UniversitySettingsPanel from './UniversitySettingsPanel.tsx'
 import { COS_UNIVERSITY_SETTINGS_COPY } from '@/lib/i18n/cosUniversitySettingsCopy'
 import {
   COS_UNIVERSITY_TELEMETRY_COPY,

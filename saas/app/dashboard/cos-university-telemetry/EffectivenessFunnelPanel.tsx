@@ -133,6 +133,23 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
             ) : <p className="text-xs" role="alert">{f.capabilityGain.error}</p>}
           </div>
 
+          <div className="rounded-lg border p-3" data-testid="serving-reliability">
+            <div className="font-semibold">Serving reliability</div>
+            {f.reliability.available ? (
+              <>
+                <div className="mt-2 grid gap-2 sm:grid-cols-4 text-sm">
+                  <div><span className="opacity-60">Attempts:</span> {f.reliability.attempts}</div>
+                  <div><span className="opacity-60">Direct success:</span> {f.reliability.successRate === null ? '—' : Math.round(f.reliability.successRate * 100) + '%'}</div>
+                  <div><span className="opacity-60">Failures / fallbacks:</span> {f.reliability.failures} / {f.reliability.fallbacks}</div>
+                  <div><span className="opacity-60">p50 / p90 / p99:</span> {f.reliability.p50LatencyMs ?? '—'} / {f.reliability.p90LatencyMs ?? '—'} / {f.reliability.p99LatencyMs ?? '—'} ms</div>
+                  <div><span className="opacity-60">Successful responses &gt;15s:</span> {f.reliability.over15s}</div>
+                  <div className="sm:col-span-3 font-mono text-xs" style={{ overflowWrap: 'anywhere' }}><span className="opacity-60">Outcomes:</span> {counts(f.reliability.byOutcome)} · <span className="opacity-60">Errors:</span> {counts(f.reliability.byErrorClass)}</div>
+                </div>
+                <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.reliability.source} · {copy.methodology}: {f.reliability.methodology}</div>
+              </>
+            ) : <p className="text-xs" role="alert">{f.reliability.error}</p>}
+          </div>
+
           <div className="rounded-lg border p-3">
             <div className="font-semibold">{copy.stagesTitle}</div>
             <div className="mt-2 space-y-1">

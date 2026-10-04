@@ -113,6 +113,17 @@ export type EffectivenessFunnel = Readonly<{
     source: string
     methodology: string
   }>
+  lineHistory: Chapter<{
+    transitions: number
+    throughputPerHour: number | null
+    recoveredOverdue: number
+    meanRecoverySeconds: number | null
+    medianRecoverySeconds: number | null
+    p90RecoverySeconds: number | null
+    byFromStation: Readonly<Record<string, number>>
+    source: string
+    methodology: string
+  }>
   evaluationFailures: Chapter<{
     total: number
     infrastructure: number
@@ -136,6 +147,7 @@ const SOURCE = Object.freeze({
   lifecycle: 'cos_university_graduate_lifecycle_events',
   assurance: 'cos_university_learning_assurance_events',
   orchestration: 'cos_university_lifecycle_orchestration',
+  transitionHistory: 'cos_university_lifecycle_transition_history',
 })
 
 /** Pure: compose the funnel from the cohort and the per-table facts. Exported so the arithmetic is testable alone. */
@@ -156,6 +168,7 @@ export function composeFunnel(input: {
   verified: Chapter<{ candidates: ReadonlySet<string> }>
   serving: Chapter<{ terminalByAttempt: ReadonlyMap<string, { outcome: string; latencyMs: number; errorClass: string | null }> }>
   lineLedger: Chapter<{ rows: readonly Readonly<{ station: string; enteredAt: string | null; deadlineAt: string | null; leaseUntil: string | null; terminal: boolean }>[] }>
+  transitionHistory: Chapter<{ rows: readonly Readonly<{ fromStation: string; transitionedAt: string | null; durationSeconds: number | null; wasOverdue: boolean }>[] }>
   evaluationFailures: Chapter<{ errors: readonly string[] }>
 }): EffectivenessFunnel {
   const size = input.cohort.length
@@ -290,6 +303,24 @@ export function composeFunnel(input: {
     })
   } else lineHealth = Object.freeze({ available: false as const, error: input.lineLedger.error })
 
+  let lineHistory: EffectivenessFunnel['lineHistory']
+  if (input.transitionHistory.available) {
+    const transitions = input.transitionHistory.rows.filter(row => row.transitionedAt)
+    const recovery = transitions.filter(row => row.wasOverdue && row.durationSeconds !== null).map(row => row.durationSeconds as number).sort((a, b) => a - b)
+    const percentile = (values: readonly number[], p: number): number | null => values.length ? values[Math.max(0, Math.min(values.length - 1, Math.ceil(values.length * p) - 1))] : null
+    const byFromStation: Record<string, number> = {}
+    for (const row of transitions) if (row.fromStation) byFromStation[row.fromStation] = (byFromStation[row.fromStation] || 0) + 1
+    const windowSeconds = input.since ? Math.max(1, (input.now.getTime() - Date.parse(input.since)) / 1000) : null
+    lineHistory = Object.freeze({ available: true as const, error: null, transitions: transitions.length,
+      throughputPerHour: windowSeconds ? transitions.length / (windowSeconds / 3600) : null,
+      recoveredOverdue: recovery.length,
+      meanRecoverySeconds: recovery.length ? recovery.reduce((a, b) => a + b, 0) / recovery.length : null,
+      medianRecoverySeconds: percentile(recovery, 0.5), p90RecoverySeconds: percentile(recovery, 0.9),
+      byFromStation: Object.freeze(byFromStation), source: SOURCE.transitionHistory,
+      methodology: 'append-only station transitions observed in the selected event window; throughput is observed transitions per elapsed window hour; recovery duration is prior-station residence time for transitions whose prior deadline had expired',
+    })
+  } else lineHistory = Object.freeze({ available: false as const, error: input.transitionHistory.error })
+
   let evaluationFailures: EffectivenessFunnel['evaluationFailures']
   if (input.evaluationFailures.available) {
     const byReason: Record<string, number> = {}
@@ -323,6 +354,7 @@ export function composeFunnel(input: {
     capabilityGain,
     reliability,
     lineHealth,
+    lineHistory,
     stages: Object.freeze(stages),
     unavailable: Object.freeze(unavailable),
     rejected: Object.freeze({ quarantined: byStatus.quarantined || 0, retired: byStatus.retired || 0, byStatus: Object.freeze(byStatus), source: SOURCE.artifacts }),
@@ -370,7 +402,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     return out
   }
 
-  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, evaluationFailures] = await Promise.all([
+  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, evaluationFailures] = await Promise.all([
     chapter(async () => {
       let q = db.from('cos_university_mass_distillation_batch_runs').select('stage')
       if (since) q = q.gte('created_at', since)
@@ -439,6 +471,13 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { rows: list.map((row: any) => Object.freeze({ station: text(row.station, 80), enteredAt: iso(row.stage_entered_at), deadlineAt: iso(row.stage_deadline_at), leaseUntil: iso(row.lease_until), terminal: row.terminal === true })) }
     }),
     chapter(async () => {
+      let q = db.from('cos_university_lifecycle_transition_history').select('from_station,transitioned_at,duration_seconds,was_overdue')
+      if (since) q = q.gte('transitioned_at', since)
+      if (subjectId) q = q.eq('subject_id', subjectId)
+      const list = await rows(q.order('transitioned_at', { ascending: false }).limit(FUNNEL_ROWS_PER_CHUNK))
+      return { rows: list.map((row: any) => Object.freeze({ fromStation: text(row.from_station, 80), transitionedAt: iso(row.transitioned_at), durationSeconds: Number.isFinite(Number(row.duration_seconds)) ? Math.max(0, Number(row.duration_seconds)) : null, wasOverdue: row.was_overdue === true })) }
+    }),
+    chapter(async () => {
       // Evaluation failures recorded IN THE WINDOW (an operations figure, not a cohort figure): every terminal FAILED
       // evaluation event (event_type fine_tune, claim ..._failed), its error classified by the rolling authority's rule.
       let q = db.from('cos_university_learning_assurance_events').select('evidence').eq('event_type', 'fine_tune')
@@ -448,7 +487,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
   ])
 
-  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, evaluationFailures })
+  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, evaluationFailures })
 }
 
 /** One line: the funnel's top, its bottom, and the honesty row. */
@@ -461,6 +500,7 @@ export function describeFunnel(funnel: EffectivenessFunnel): string {
     + (funnel.capabilityGain.available ? `| gain n=${funnel.capabilityGain.sampleSize} mean=${funnel.capabilityGain.meanAbsoluteGain === null ? 'n/a' : funnel.capabilityGain.meanAbsoluteGain.toFixed(4)} positive=${funnel.capabilityGain.positiveGainRate === null ? 'n/a' : Math.round(funnel.capabilityGain.positiveGainRate * 100) + '%'} ` : '| gain unavailable ')
     + (funnel.reliability.available ? `| reliability attempts=${funnel.reliability.attempts} success=${funnel.reliability.successRate === null ? 'n/a' : Math.round(funnel.reliability.successRate * 100) + '%'} p90=${funnel.reliability.p90LatencyMs === null ? 'n/a' : funnel.reliability.p90LatencyMs + 'ms'} ` : '| reliability unavailable ')
     + (funnel.lineHealth.available ? `| line live=${funnel.lineHealth.liveUnits} overdue=${funnel.lineHealth.overdueUnits} leased=${funnel.lineHealth.leasedUnits} bottleneck=${funnel.lineHealth.bottleneckStation || 'none'} ` : '| line unavailable ')
+    + (funnel.lineHistory.available ? `| flow transitions=${funnel.lineHistory.transitions} throughput=${funnel.lineHistory.throughputPerHour === null ? 'n/a' : funnel.lineHistory.throughputPerHour.toFixed(2) + '/h'} recovered=${funnel.lineHistory.recoveredOverdue} ` : '| flow history unavailable ')
     + `| rejected quarantined=${funnel.rejected.quarantined} retired=${funnel.rejected.retired}`
     + (funnel.evaluationFailures.available ? ` | eval failures=${funnel.evaluationFailures.total} infra=${funnel.evaluationFailures.infrastructure} merit=${funnel.evaluationFailures.merit}` : ' | eval failures unavailable')
     + (Object.keys(funnel.unavailable).length ? ` | unavailable=${Object.keys(funnel.unavailable).join(',')}` : '')

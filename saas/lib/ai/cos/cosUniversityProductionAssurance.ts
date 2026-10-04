@@ -24,7 +24,7 @@ export async function recordCosUniversityProductionPath(input: {
   const deploymentId = process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_URL || ''
   const commitSha = process.env.VERCEL_GIT_COMMIT_SHA || ''
   const featureFlag = COS_UNIVERSITY_FEATURE_GATED_PATHS[input.path]
-  const featureEnabled = process.env[featureFlag] === 'true'
+  const featureEnabled = input.path === 'lifecycle_controller' || process.env[featureFlag] === 'true'
   if (!db || process.env.VERCEL_ENV !== 'production' || !deploymentId || !commitSha) return null
   const now = input.now || new Date()
   const suppliedEvidence = cleanEvidence(input.evidence)

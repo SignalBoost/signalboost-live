@@ -43,6 +43,7 @@ function fakeStore(rows: Record<string, { value: unknown; updated_at?: string; u
         },
         async upsert(row: any, options: any) {
           assert.deepEqual(options, { onConflict: 'key' })
+          assert.notEqual(row.value, null, 'system_settings.value is NOT NULL in the production schema')
           upserts.push(row)
           rows[row.key] = { value: row.value, updated_at: row.updated_at, updated_by: row.updated_by }
           return { error: failing ? new Error('store_down') : null }
@@ -184,7 +185,7 @@ test('the settings API is owner-gated, validates through the module, and the pan
   assert.match(api, /writeLinePauseSetting\(\{ db, paused: body\.linePaused === true, updatedBy \}\)/)
   assert.match(api, /line_paused_must_be_boolean/)
   const page = read('../app/dashboard/cos-university-telemetry/page.tsx')
-  assert.match(page, /import UniversitySettingsPanel from '\.\/UniversitySettingsPanel'/)
+  assert.match(page, /import UniversitySettingsPanel from '\.\/UniversitySettingsPanel\.tsx'/)
   assert.match(page, /<UniversitySettingsPanel copy=\{settingsCopy\} \/>/)
   const panel = read('../app/dashboard/cos-university-telemetry/UniversitySettingsPanel.tsx')
   assert.match(panel, /const SETTINGS_URL = '\/api\/admin\/cos-university-settings'/)

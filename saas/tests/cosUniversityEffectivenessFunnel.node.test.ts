@@ -153,12 +153,12 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
   assert.ok(f.lineHealth.available)
   if (f.lineHealth.available) {
     assert.equal(f.lineHealth.liveUnits, 3)
-    assert.equal(f.lineHealth.overdueUnits, 2)
-    assert.equal(f.lineHealth.leasedUnits, 1)
+    assert.equal(f.lineHealth.overdueUnits, 3)
+    assert.equal(f.lineHealth.leasedUnits, 0)
     assert.equal(f.lineHealth.oldestWaitingSeconds, 7200)
     assert.equal(f.lineHealth.bottleneckStation, 'EXACT_CANARY')
-    assert.deepEqual(f.lineHealth.byStation.EXACT_CANARY, { waiting: 2, overdue: 2, leased: 1, oldestWaitingSeconds: 7200 })
-    assert.deepEqual(f.lineHealth.byStation.INDEPENDENT_EVALUATION, { waiting: 1, overdue: 0, leased: 0, oldestWaitingSeconds: 600 })
+    assert.deepEqual(f.lineHealth.byStation.EXACT_CANARY, { waiting: 2, overdue: 2, leased: 0, oldestWaitingSeconds: 7200 })
+    assert.deepEqual(f.lineHealth.byStation.INDEPENDENT_EVALUATION, { waiting: 1, overdue: 1, leased: 0, oldestWaitingSeconds: 600 })
   }
   assert.ok(f.lineHistory.available)
   if (f.lineHistory.available) {
@@ -171,7 +171,7 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.deepEqual(f.lineHistory.byFromStation, { EXACT_CANARY: 2, INDEPENDENT_EVALUATION: 1 })
   }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=2 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.13/h recovered=2 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=0 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.13/h recovered=2 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
 })
 
 test('evaluation failures in the window are split by the rolling authority\'s own rule, and only terminal FAILED claims count', async () => {

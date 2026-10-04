@@ -186,8 +186,30 @@ async function run(req: NextRequest) {
   const eligibleRecoveryTargets = reservation.eligibilityKnown
     ? workers.filter(row => (row.stranded || row.repeatedFailure) && !notEligibleForWork.has(String(row.registry_id)))
     : []
+
+  // A scheduled warm window is an explicit validation period, not merely a heater. Healthy reserved graduates must
+  // receive bounded proof work too; otherwise the reservation ranks the most recently successful graduates into the
+  // two warm slots while the recovery-only selector refuses to exercise them because they are neither stranded nor
+  // failing. Reuse genuine recent Production demand, keep the normal diploma/roster/scope selector, and never include
+  // off-reserve or runtime-blocked workers. At most one validation batch is opened per 15 minutes, so a one-hour
+  // window proves repeated service without turning a test rig into an unbounded paid load generator.
+  const validationTargets = reservation.eligibilityKnown && reservation.inWindow === true
+    ? workers.filter(row => reservation.eligibleForWork.includes(String(row.registry_id)) && !runtimeBlocked.has(String(row.registry_id)))
+    : []
+  const validationSince = new Date(Date.now() - 15 * 60_000).toISOString()
+  const recentValidation = validationTargets.length
+    ? await db.from('cos_workforce_assignments')
+        .select('id')
+        .eq('source_kind', 'production_shadow')
+        .in('registry_id', validationTargets.map(row => row.registry_id))
+        .gte('assigned_at', validationSince)
+        .limit(1)
+    : { data: [], error: null }
+  const validationDue = validationTargets.length > 0 && !recentValidation.error && (recentValidation.data || []).length === 0
+
   let recoveryAttempts = 0
-  if (eligibleRecoveryTargets.length > 0) {
+  let validationAttempts = 0
+  if (eligibleRecoveryTargets.length > 0 || validationDue) {
     const demand = await db.from('assistant_messages')
       .select('id,content,created_at')
       .eq('role', 'user')
@@ -195,20 +217,28 @@ async function run(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(24)
     if (!demand.error) {
+      const recoveryLimit = Math.min(3, eligibleRecoveryTargets.length)
+      const validationLimit = validationDue ? Math.min(2, validationTargets.length) : 0
       for (const row of demand.data || []) {
-        if (recoveryAttempts >= Math.min(3, eligibleRecoveryTargets.length)) break
+        if (recoveryAttempts >= recoveryLimit && validationAttempts >= validationLimit) break
         const objective = String(row.content || '').trim()
         if (!objective) continue
         // Leave room to write the terminal status before the route deadline.
         const shadowTimeoutMs = Math.min(SHADOW_MAX_MS, deadline - Date.now() - SHADOW_CLOSE_MARGIN_MS)
         if (shadowTimeoutMs < 5_000) break
+        const validating = validationAttempts < validationLimit
         await runWorkforceApprenticeShadow({
           prompt: objective,
           maxTokens: 512,
           timeoutMs: shadowTimeoutMs,
-          usageContext: { feature: 'cos_workforce_recovery', purpose: 'genuine_production_replay', correlationId: `workforce-recovery:${row.id}` },
+          usageContext: {
+            feature: validating ? 'cos_workforce_validation' : 'cos_workforce_recovery',
+            purpose: 'genuine_production_replay',
+            correlationId: `${validating ? 'workforce-validation' : 'workforce-recovery'}:${row.id}`,
+          },
         }, objective, notEligibleForWork)
-        recoveryAttempts += 1
+        if (validating) validationAttempts += 1
+        else recoveryAttempts += 1
       }
     } else {
       console.warn('[cos-workforce] recovery demand read failed closed', demand.error)
@@ -230,6 +260,9 @@ async function run(req: NextRequest) {
       evidenceDelivered: evidence.delivered,
       evidenceBlocked: evidence.blocked,
       recoveryAttempts,
+      validationAttempts,
+      validationDue,
+      validationTargets: validationTargets.map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id })),
       strandedWorkers: stranded.map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id })),
       repeatedlyFailingWorkers: failing.map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id })),
       runtimeBlockedWorkers: workers.filter(row => runtimeBlocked.has(String(row.registry_id))).map(row => ({ registryId: row.registry_id, aiId: row.ai_id, subjectId: row.subject_id, recentRuntimeFailures: runtimeFailureCounts.get(String(row.registry_id)) || 0 })),

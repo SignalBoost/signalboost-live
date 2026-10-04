@@ -93,6 +93,11 @@ const week = () => ({
     { station: 'EXACT_CANARY', stage_entered_at: '2026-10-04T11:00:00Z', stage_deadline_at: '2026-10-04T11:30:00Z', lease_until: '2026-10-04T12:05:00Z', terminal: false },
     { station: 'INDEPENDENT_EVALUATION', stage_entered_at: '2026-10-04T11:50:00Z', stage_deadline_at: '2026-10-04T12:30:00Z', lease_until: null, terminal: false },
   ],
+  cos_university_lifecycle_transition_history: [
+    { from_station: 'EXACT_CANARY', transitioned_at: '2026-10-04T11:00:00Z', duration_seconds: 1800, was_overdue: false },
+    { from_station: 'EXACT_CANARY', transitioned_at: '2026-10-04T11:20:00Z', duration_seconds: 2400, was_overdue: true },
+    { from_station: 'INDEPENDENT_EVALUATION', transitioned_at: '2026-10-04T11:40:00Z', duration_seconds: 3000, was_overdue: true },
+  ],
   cos_university_learning_assurance_events: [
     { event_type: 'fine_tune', observed_at: '2026-10-04T12:05:00Z', evidence: { claim: EVALUATION_FAILED_CLAIM, error: 'mass_distilled_evaluation_judge_zero_collapse:safety' } },
     { event_type: 'fine_tune', observed_at: '2026-10-04T12:06:00Z', evidence: { claim: EVALUATION_FAILED_CLAIM, error: 'mass_distilled_evaluation_candidate_answer_empty:0666f0:finish=stop' } },
@@ -155,8 +160,18 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.deepEqual(f.lineHealth.byStation.EXACT_CANARY, { waiting: 2, overdue: 2, leased: 1, oldestWaitingSeconds: 7200 })
     assert.deepEqual(f.lineHealth.byStation.INDEPENDENT_EVALUATION, { waiting: 1, overdue: 0, leased: 0, oldestWaitingSeconds: 600 })
   }
+  assert.ok(f.lineHistory.available)
+  if (f.lineHistory.available) {
+    assert.equal(f.lineHistory.transitions, 3)
+    assert.equal(f.lineHistory.throughputPerHour, 0.125)
+    assert.equal(f.lineHistory.recoveredOverdue, 2)
+    assert.equal(f.lineHistory.meanRecoverySeconds, 2700)
+    assert.equal(f.lineHistory.medianRecoverySeconds, 2400)
+    assert.equal(f.lineHistory.p90RecoverySeconds, 3000)
+    assert.deepEqual(f.lineHistory.byFromStation, { EXACT_CANARY: 2, INDEPENDENT_EVALUATION: 1 })
+  }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=2 leased=1 bottleneck=EXACT_CANARY | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=2 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.13/h recovered=2 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
 })
 
 test('evaluation failures in the window are split by the rolling authority\'s own rule, and only terminal FAILED claims count', async () => {
@@ -209,6 +224,7 @@ test('an empty cohort has no shares and no division by zero', () => {
     verified: empty({ candidates: new Set<string>() }),
     serving: empty({ terminalByAttempt: new Map() }),
     lineLedger: empty({ rows: [] }),
+    transitionHistory: empty({ rows: [] }),
     evaluationFailures: empty({ errors: [] }),
   })
   assert.ok(f.stages.every(s => s.count === 0 && s.share === null))

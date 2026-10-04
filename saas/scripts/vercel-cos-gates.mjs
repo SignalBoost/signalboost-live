@@ -18,6 +18,7 @@ const tests = [
   // Buyer-owned settings and production pause contract.
   'tests/cosUniversitySettings.node.test.ts',
   'tests/cosUniversityArtifactLifeRecord.node.test.ts',
+  'tests/cosUniversityEffectivenessFunnel.node.test.ts',
 
   // Residency status, runtime recovery, and terminal-failure contracts.
   'tests/builderResidencyAdmission.node.test.ts',

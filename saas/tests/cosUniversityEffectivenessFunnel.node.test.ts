@@ -155,10 +155,10 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.equal(f.lineHealth.liveUnits, 3)
     assert.equal(f.lineHealth.overdueUnits, 3)
     assert.equal(f.lineHealth.leasedUnits, 0)
-    assert.equal(f.lineHealth.oldestWaitingSeconds, 7200)
+    assert.equal(f.lineHealth.oldestWaitingSeconds, 36000)
     assert.equal(f.lineHealth.bottleneckStation, 'EXACT_CANARY')
-    assert.deepEqual(f.lineHealth.byStation.EXACT_CANARY, { waiting: 2, overdue: 2, leased: 0, oldestWaitingSeconds: 7200 })
-    assert.deepEqual(f.lineHealth.byStation.INDEPENDENT_EVALUATION, { waiting: 1, overdue: 1, leased: 0, oldestWaitingSeconds: 600 })
+    assert.deepEqual(f.lineHealth.byStation.EXACT_CANARY, { waiting: 2, overdue: 2, leased: 0, oldestWaitingSeconds: 36000 })
+    assert.deepEqual(f.lineHealth.byStation.INDEPENDENT_EVALUATION, { waiting: 1, overdue: 1, leased: 0, oldestWaitingSeconds: 29400 })
   }
   assert.ok(f.lineHistory.available)
   if (f.lineHistory.available) {

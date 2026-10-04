@@ -210,6 +210,15 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
 })
 
 
+test('buyer assurance chapters fail closed when their evidence stores are unreadable', async () => {
+  const failing = new Set(['cos_university_residency_case_runs', 'cos_workforce_assignments', 'cos_university_mass_distillation_provider_jobs', 'cos_university_graduate_resumes'])
+  const f = await readEffectivenessFunnel({ db: fakeDb(week(), failing).db, window: '7d', now: NOW })
+  assert.equal(f.residencyEffectiveness.available, false)
+  assert.equal(f.workforceEffectiveness.available, false)
+  assert.equal(f.economics.available, false)
+  assert.equal(f.provenance.available, false)
+})
+
 test('line health counts only leases that are live at the report time', async () => {
   const fixture = week()
   fixture.cos_university_lifecycle_orchestration = [

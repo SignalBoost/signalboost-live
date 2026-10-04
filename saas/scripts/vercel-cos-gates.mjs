@@ -111,6 +111,7 @@ const tests = [
   'tests/massEvaluationJudgeSpendReservation.node.test.ts',
   'tests/massEvaluationZeroCollapseEvidence.node.test.ts',
   'tests/massEvaluationBaselineAbstention.node.test.ts',
+  'tests/massEvaluationExplicitUnsafeCollapse.node.test.ts',
 
   'tests/cosUniversityMassBacklogCompactor.node.test.ts',
 

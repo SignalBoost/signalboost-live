@@ -487,6 +487,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     status: text(row.status, 60),
   }))
   const candidateIds = Array.from(new Set(cohort.map(a => a.candidateId))).filter(Boolean)
+  const cohortKeys = new Set(cohort.map(a => `${a.candidateId}:${a.hash}`))
   const key = (row: any) => `${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 64).toLowerCase()}`
 
   /** Read one table for the whole cohort, chunked by candidate id. */
@@ -593,8 +594,8 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { rows: list.map((row: any) => ({ status: text(row.status, 40), sourceKind: text(row.source_kind, 40), permanentArtifactId: text(row.permanent_artifact_id, 80) })) }
     }),
     chapter(async () => {
-      const list = await forCohort('cos_university_mass_distillation_provider_jobs', 'candidate_id,operation,observed_cost_usd,settled_at', FUNNEL_ROWS_PER_CHUNK)
-      return { rows: list.filter((row: any) => iso(row.settled_at) && Number.isFinite(Number(row.observed_cost_usd))).map((row: any) => ({ operation: text(row.operation, 40), observedCostUsd: Math.max(0, Number(row.observed_cost_usd)) })) }
+      const list = await forCohort('cos_university_mass_distillation_provider_jobs', 'candidate_id,trained_artifact_hash,operation,observed_cost_usd,settled_at', FUNNEL_ROWS_PER_CHUNK)
+      return { rows: list.filter((row: any) => cohortKeys.has(key(row)) && iso(row.settled_at) && Number.isFinite(Number(row.observed_cost_usd))).map((row: any) => ({ operation: text(row.operation, 40), observedCostUsd: Math.max(0, Number(row.observed_cost_usd)) })) }
     }),
     chapter(async () => {
       const [certs, grads, resumes] = await Promise.all([

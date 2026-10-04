@@ -43,6 +43,7 @@ function fakeStore(rows: Record<string, { value: unknown; updated_at?: string; u
         },
         async upsert(row: any, options: any) {
           assert.deepEqual(options, { onConflict: 'key' })
+          assert.notEqual(row.value, null, 'system_settings.value is NOT NULL in the production schema')
           upserts.push(row)
           rows[row.key] = { value: row.value, updated_at: row.updated_at, updated_by: row.updated_by }
           return { error: failing ? new Error('store_down') : null }

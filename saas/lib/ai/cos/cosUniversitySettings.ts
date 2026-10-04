@@ -99,7 +99,9 @@ export async function writeWorkforceWarmWindowSetting(input: {
   const parsed = raw ? parseWarmWindow(raw) : null
   if (raw && !parsed) return Object.freeze({ ok: false, error: 'workforce_warm_window_invalid' as const })
   const value = parsed ? parsed.declared : null
-  await writeSetting({ db: input.db, key: WORKFORCE_WARM_WINDOW_SETTING_KEY, value, updatedBy: input.updatedBy, now: input.now })
+  // PostgREST maps a top-level null to SQL NULL; system_settings.value is NOT NULL.
+  // Its supported object form preserves an explicit clear without violating that column.
+  await writeSetting({ db: input.db, key: WORKFORCE_WARM_WINDOW_SETTING_KEY, value: value ?? { window: null }, updatedBy: input.updatedBy, now: input.now })
   return Object.freeze({ ok: true, value })
 }
 

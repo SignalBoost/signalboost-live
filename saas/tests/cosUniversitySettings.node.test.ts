@@ -184,7 +184,7 @@ test('the settings API is owner-gated, validates through the module, and the pan
   assert.match(api, /writeLinePauseSetting\(\{ db, paused: body\.linePaused === true, updatedBy \}\)/)
   assert.match(api, /line_paused_must_be_boolean/)
   const page = read('../app/dashboard/cos-university-telemetry/page.tsx')
-  assert.match(page, /import UniversitySettingsPanel from '\.\/UniversitySettingsPanel'/)
+  assert.match(page, /import UniversitySettingsPanel from '\.\/UniversitySettingsPanel\.tsx'/)
   assert.match(page, /<UniversitySettingsPanel copy=\{settingsCopy\} \/>/)
   const panel = read('../app/dashboard/cos-university-telemetry/UniversitySettingsPanel.tsx')
   assert.match(panel, /const SETTINGS_URL = '\/api\/admin\/cos-university-settings'/)

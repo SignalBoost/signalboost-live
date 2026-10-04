@@ -1,7 +1,7 @@
 // saas/lib/i18n/cosUniversitySettingsCopy.ts
 //
 // Copy for the University settings block on the University telemetry page. Five languages, same keys, same order.
-import type { CosUniversityTelemetryLanguage } from './cosUniversityTelemetryCopy'
+import type { CosUniversityTelemetryLanguage } from './cosUniversityTelemetryCopy.ts'
 
 export type CosUniversitySettingsCopy = Readonly<{
   title: string

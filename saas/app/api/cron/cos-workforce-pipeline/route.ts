@@ -6,6 +6,8 @@ import { runWorkforceApprenticeShadow } from '@/lib/ai/cos/cosReasoningWorkers'
 import { closeAbandonedWorkforceAssignments, verifyServedWorkforceAssignments } from '@/lib/ai/cos/cosWorkforceAssignments'
 import { graduateRunpodEndpointId } from '@/lib/ai/cos/cosUniversityGraduateEndpointProtection'
 import {
+  activateMassDistilledEvaluationWorker,
+  coolMassDistilledWorker,
   deactivateMassDistilledEvaluationWorker,
   ensureMassDistilledEndpoint24Gb,
   listMassDistilledRunpodEndpoints,
@@ -61,9 +63,12 @@ async function listOnCallGraduates(db: NonNullable<ReturnType<typeof cosServiceD
   if (pipeline.error) throw pipeline.error
 
   const maxByEndpoint = new Map<string, number>()
+  const minByEndpoint = new Map<string, number>()
   for (const endpoint of endpoints) {
     const id = String(endpoint.id || '').trim().toLowerCase()
-    if (id) maxByEndpoint.set(id, Math.max(0, Math.floor(Number(endpoint.workers?.max ?? 0))))
+    if (!id) continue
+    maxByEndpoint.set(id, Math.max(0, Math.floor(Number(endpoint.workers?.max ?? 0))))
+    minByEndpoint.set(id, Math.max(0, Math.floor(Number(endpoint.workers?.min ?? 0))))
   }
   const lastAttempt = new Map<string, string | null>()
   for (const row of pipeline.data || []) lastAttempt.set(String((row as any).registry_id || ''), (row as any).last_attempt_at ?? null)
@@ -74,6 +79,7 @@ async function listOnCallGraduates(db: NonNullable<ReturnType<typeof cosServiceD
       registryId: String(row.id),
       endpointId,
       workersMax: endpointId && maxByEndpoint.has(endpointId) ? (maxByEndpoint.get(endpointId) as number) : null,
+      workersMin: endpointId && minByEndpoint.has(endpointId) ? (minByEndpoint.get(endpointId) as number) : null,
       lastAttemptAt: lastAttempt.get(String(row.id)) ?? null,
     })
   }))
@@ -106,6 +112,11 @@ async function run(req: NextRequest) {
       releaseWorker: endpointId => deactivateMassDistilledEvaluationWorker(endpointId),
       // Same transport activation uses to hold a slot: restore the scale-to-zero/max-1 envelope. Creates nothing.
       pinWorker: endpointId => ensureMassDistilledEndpoint24Gb(endpointId),
+      // Warm window (owner 2026-10-03, option 3): the reserved graduates run at min=1 inside the declared daily window
+      // so practice work actually reaches them, and go back to min=0 (slot kept) when it closes. This is the ONE place
+      // the workforce pays to run a worker, and only for the graduates the reservation decided on.
+      warmWorker: endpointId => activateMassDistilledEvaluationWorker(endpointId),
+      coolWorker: endpointId => coolMassDistilledWorker(endpointId),
     },
   }).catch(error => unknownWorkforceReservation(error))
   console.info('[cos-workforce-reservation]', describeWorkforceReservation(reservation))

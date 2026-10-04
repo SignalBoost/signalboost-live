@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts
 // Owner direction (2026-09-16): mass-distilled evaluations must complete without manual intervention.
 // Hand-inserted approvals were the dominant failure class. This pure policy decides, once per cron tick,
 // whether to issue ONE bounded evaluation approval in exactly the shape the atomic claim accepts
@@ -179,6 +180,15 @@ export function staleGatewayModelMismatch(error: unknown): boolean {
   const normalized = String(error || '').trim().toLowerCase()
   return normalized.startsWith('mass_distilled_evaluation_runpod_http_409:baseline:')
     && (normalized.includes('distilled_exact_model_mismatch') || normalized.includes('xsa_exact_model_mismatch'))
+}
+
+/**
+ * The ONE classification of an evaluation error as evaluator infrastructure (retryable, never the student's fault).
+ * Exported so the effectiveness funnel reports "infrastructure failure vs merit failure" with exactly the same rule
+ * the rolling authority applies; two classifiers would disagree one day and the report would lie.
+ */
+export function isEvaluatorInfrastructureFailure(error: unknown): boolean {
+  return evaluatorInfrastructureFailure({ candidateId: '', observedAt: '', expiresAt: null, verifier: '', evidence: { error } })
 }
 
 function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
@@ -753,3 +763,4 @@ export function decideRollingMassEvaluationApproval(input: {
   }
   return { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation', considered: ordered.length, skipped: Object.freeze(skipped) }
 }
+// end of saas/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts (if this line is missing, the paste was cut short)

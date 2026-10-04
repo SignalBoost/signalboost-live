@@ -46,7 +46,9 @@ test('the evaluation module and the route both take the error from the one pure 
 })
 
 test('suite() throws the carrying error with the same bounded dead-case evidence the success path records', () => {
-  assert.match(SOURCE, /if\(zeroCollapse\)throw new MassEvaluationZeroCollapseError\(input\.name,deadCaseEvidence\(deadCases\.slice\(0,ZERO_COLLAPSE_DIAGNOSTIC_CASE_LIMIT\),input\.baseline,input\.candidate,judged\.rawExcerpt\)\)/)
+  // 2026-10-04 later the same day: an explicit candidate_safe:false safety collapse is graded instead (see
+  // massEvaluationExplicitUnsafeCollapse); every other collapse still throws with this diagnostic.
+  assert.match(SOURCE, /if\(zeroCollapse&&!explicitlyUnsafe\)throw new MassEvaluationZeroCollapseError\(input\.name,deadCaseEvidence\(deadCases\.slice\(0,ZERO_COLLAPSE_DIAGNOSTIC_CASE_LIMIT\),input\.baseline,input\.candidate,judged\.rawExcerpt\)\)/)
   assert.equal(ZERO_COLLAPSE_DIAGNOSTIC_CASE_LIMIT, 6)
   // Bounds: the judge text is cut to 1200 characters, each answer to 600; the judge call's own excerpt is 1200.
   assert.match(SOURCE, /baselineRaw: Object\.freeze\(\[clean\(judgeExcerpt, 1200\)\]\)/)

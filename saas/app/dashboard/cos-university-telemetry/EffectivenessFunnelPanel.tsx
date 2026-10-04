@@ -150,6 +150,23 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
             ) : <p className="text-xs" role="alert">{f.reliability.error}</p>}
           </div>
 
+          <div className="rounded-lg border p-3" data-testid="assembly-line-health">
+            <div className="font-semibold">{copy.lineHealthTitle}</div>
+            {f.lineHealth.available ? (
+              <>
+                <div className="mt-2 grid gap-2 sm:grid-cols-5 text-sm">
+                  <div><span className="opacity-60">{copy.lineLive}:</span> {f.lineHealth.liveUnits}</div>
+                  <div><span className="opacity-60">{copy.lineOverdue}:</span> {f.lineHealth.overdueUnits}</div>
+                  <div><span className="opacity-60">{copy.lineLeased}:</span> {f.lineHealth.leasedUnits}</div>
+                  <div><span className="opacity-60">{copy.lineOldestWait}:</span> {f.lineHealth.oldestWaitingSeconds === null ? '—' : Math.round(f.lineHealth.oldestWaitingSeconds / 60) + ' min'}</div>
+                  <div><span className="opacity-60">{copy.lineBottleneck}:</span> {f.lineHealth.bottleneckStation || '—'}</div>
+                </div>
+                <div className="mt-2 text-xs"><span className="opacity-60">{copy.lineStations}:</span> {Object.entries(f.lineHealth.byStation).sort((a, b) => b[1].waiting - a[1].waiting).map(([station, row]) => station + ' ' + row.waiting + ' (' + row.overdue + ' overdue, ' + row.leased + ' leased)').join(' · ') || '—'}</div>
+                <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.lineHealth.source} · {copy.methodology}: {f.lineHealth.methodology}</div>
+              </>
+            ) : <p className="text-xs" role="alert">{f.lineHealth.error}</p>}
+          </div>
+
           <div className="rounded-lg border p-3">
             <div className="font-semibold">{copy.stagesTitle}</div>
             <div className="mt-2 space-y-1">

@@ -12,6 +12,7 @@ import {
   decideWorkforceReservation,
   describeWorkforceReservation,
   reconcileWorkforceReservation,
+  unknownWorkforceReservation,
   type WorkforceGraduate,
 } from '../lib/ai/cos/cosUniversityWorkforceReservation.ts'
 import { lineCapacity, WORKER_QUOTA_ENV } from '../lib/ai/cos/cosUniversityLineCapacity.ts'
@@ -90,7 +91,7 @@ test('reconcile releases before it pins, survives a refused change, and reports 
   assert.match(report.errors[0], /^release:ep2:RunPod PATCH HTTP 400: refused/)
   assert.ok(calls.indexOf('pin:ep3') > calls.indexOf('release:ep1'), 'releases run before pins so a rotation never asks for an extra slot')
   const line = describeWorkforceReservation(report)
-  assert.match(line, /^workforce reserve=1 onCall=3 \| pinned=1 held=0 released=1 idle=0 unmanaged=0 \| refused=1$/)
+  assert.match(line, /^workforce reserve=1 onCall=3 \| pinned=1 held=0 released=1 idle=0 unmanaged=0 \| eligibleForWork=1 \| refused=1$/)
 })
 
 test('reconcile stops at its deadline and says so', async () => {
@@ -127,5 +128,39 @@ test('the reservation module is pure policy over an injected transport', () => {
   assert.doesNotMatch(source, /fetch\(|cosServiceDb|requestV2/)
   assert.match(source, /import \{ lineCapacity \} from '\.\/cosUniversityLineCapacity\.ts'/)
   assert.equal((source.match(/^import /gm) || []).length, 1)
+})
+// ---------------------------------------------------------------------------------------------------------------
+// Work goes only to graduates inside the reserve (Production 2026-10-04 00:15-02:15 UTC: 14 paid 45-second timeouts on
+// 7 graduates the reconcile had just released; their workers still answered the health probe for a few seconds)
+// ---------------------------------------------------------------------------------------------------------------
+test('eligibility for work is exactly the reserve: released, idle and unmanaged graduates are excluded', () => {
+  const graduates = [grad(1, 1, '2026-10-04T01:00:00Z'), grad(2, 0, '2026-10-04T02:00:00Z'), grad(3, 1, null), grad(4, 0, null), grad(5, null, null)]
+  const decision = decideWorkforceReservation({ graduates, reserve: 2 })
+  assert.deepEqual([...decision.eligibleForWork], ['reg02', 'reg01'], 'the two most recently useful, pinned or about to be')
+  assert.deepEqual([...decision.excludedFromWork].sort(), ['reg03', 'reg04', 'reg05'])
+  // Every on-call graduate is in exactly one of the two sets.
+  assert.equal(decision.eligibleForWork.length + decision.excludedFromWork.length, graduates.length)
+  // The production shape: 17 on call, reserve 2 -> 15 may never be handed a task this tick.
+  const prod = decideWorkforceReservation({ graduates: production(), reserve: 2 })
+  assert.equal(prod.eligibleForWork.length, 2)
+  assert.equal(prod.excludedFromWork.length, 15)
+})
+
+test('a failed reconcile knows nobody, so nobody is eligible - no paid wake-up on a guess', () => {
+  const report = unknownWorkforceReservation(new Error('RunPod GET /serverless HTTP 500'))
+  assert.equal(report.eligibilityKnown, false)
+  assert.deepEqual([...report.eligibleForWork], [])
+  assert.match(report.errors[0], /^reconcile:RunPod GET \/serverless HTTP 500$/)
+  assert.match(describeWorkforceReservation(report), /eligibleForWork=unknown/)
+})
+
+test('the workforce station hands practice work only to the reserve and gives out none when the reserve is unknown', () => {
+  const route = read('../app/api/cron/cos-workforce-pipeline/route.ts')
+  assert.match(route, /\.catch\(error => unknownWorkforceReservation\(error\)\)/)
+  assert.match(route, /const offReserve = new Set\(reservation\.eligibilityKnown \? reservation\.excludedFromWork : \[\]\)/)
+  assert.match(route, /const notEligibleForWork = new Set\(\[\.\.\.runtimeBlocked, \.\.\.offReserve\]\)/)
+  assert.match(route, /const eligibleRecoveryTargets = reservation\.eligibilityKnown\s*\?[\s\S]{0,160}?!notEligibleForWork\.has\(String\(row\.registry_id\)\)\)\s*: \[\]/)
+  assert.match(route, /\}, objective, notEligibleForWork\)/)
+  assert.doesNotMatch(route, /\}, objective, runtimeBlocked\)/, 'the old exclusion set alone let released graduates receive work')
 })
 // end of saas/tests/cosUniversityWorkforceReservation.node.test.ts (if this line is missing, the paste was cut short)

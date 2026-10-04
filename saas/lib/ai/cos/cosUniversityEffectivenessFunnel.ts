@@ -589,8 +589,8 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { rows: list.map((row: any) => ({ status: text(row.status, 40), sourceKind: text(row.source_kind, 40), permanentArtifactId: text(row.permanent_artifact_id, 80) })) }
     }),
     chapter(async () => {
-      const list = await forCohort('cos_university_mass_distillation_provider_jobs', 'candidate_id,operation,observed_cost_usd,settled_at', FUNNEL_ROWS_PER_CHUNK, q => q.not('settled_at', 'is', null))
-      return { rows: list.filter((row: any) => Number.isFinite(Number(row.observed_cost_usd))).map((row: any) => ({ operation: text(row.operation, 40), observedCostUsd: Math.max(0, Number(row.observed_cost_usd)) })) }
+      const list = await forCohort('cos_university_mass_distillation_provider_jobs', 'candidate_id,operation,observed_cost_usd,settled_at', FUNNEL_ROWS_PER_CHUNK)
+      return { rows: list.filter((row: any) => iso(row.settled_at) && Number.isFinite(Number(row.observed_cost_usd))).map((row: any) => ({ operation: text(row.operation, 40), observedCostUsd: Math.max(0, Number(row.observed_cost_usd)) })) }
     }),
     chapter(async () => {
       const [certs, grads, resumes] = await Promise.all([

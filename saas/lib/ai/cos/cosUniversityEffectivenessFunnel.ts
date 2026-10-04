@@ -103,6 +103,16 @@ export type EffectivenessFunnel = Readonly<{
     source: string
     methodology: string
   }>
+  lineHealth: Chapter<{
+    liveUnits: number
+    overdueUnits: number
+    leasedUnits: number
+    oldestWaitingSeconds: number | null
+    byStation: Readonly<Record<string, Readonly<{ waiting: number; overdue: number; leased: number; oldestWaitingSeconds: number | null }>>>
+    bottleneckStation: string | null
+    source: string
+    methodology: string
+  }>
   evaluationFailures: Chapter<{
     total: number
     infrastructure: number
@@ -125,6 +135,7 @@ const SOURCE = Object.freeze({
   attempts: 'cos_university_graduate_serving_attempts',
   lifecycle: 'cos_university_graduate_lifecycle_events',
   assurance: 'cos_university_learning_assurance_events',
+  orchestration: 'cos_university_lifecycle_orchestration',
 })
 
 /** Pure: compose the funnel from the cohort and the per-table facts. Exported so the arithmetic is testable alone. */
@@ -144,6 +155,7 @@ export function composeFunnel(input: {
   work: Chapter<{ attempted: ReadonlySet<string>; succeeded: ReadonlySet<string> }>
   verified: Chapter<{ candidates: ReadonlySet<string> }>
   serving: Chapter<{ terminalByAttempt: ReadonlyMap<string, { outcome: string; latencyMs: number; errorClass: string | null }> }>
+  lineLedger: Chapter<{ rows: readonly Readonly<{ station: string; enteredAt: string | null; deadlineAt: string | null; leaseUntil: string | null; terminal: boolean }>[] }>
   evaluationFailures: Chapter<{ errors: readonly string[] }>
 }): EffectivenessFunnel {
   const size = input.cohort.length
@@ -246,6 +258,38 @@ export function composeFunnel(input: {
     })
   } else reliability = Object.freeze({ available: false as const, error: input.serving.error })
 
+  let lineHealth: EffectivenessFunnel['lineHealth']
+  if (input.lineLedger.available) {
+    const nowMs = input.now.getTime()
+    const live = input.lineLedger.rows.filter(row => !row.terminal)
+    const stationMap: Record<string, { waiting: number; overdue: number; leased: number; oldestWaitingSeconds: number | null }> = {}
+    for (const row of live) {
+      const station = row.station || 'UNKNOWN'
+      const enteredMs = row.enteredAt ? Date.parse(row.enteredAt) : NaN
+      const deadlineMs = row.deadlineAt ? Date.parse(row.deadlineAt) : NaN
+      const leaseMs = row.leaseUntil ? Date.parse(row.leaseUntil) : NaN
+      const age = Number.isFinite(enteredMs) ? Math.max(0, Math.floor((nowMs - enteredMs) / 1000)) : null
+      const current = stationMap[station] || { waiting: 0, overdue: 0, leased: 0, oldestWaitingSeconds: null }
+      current.waiting += 1
+      if (Number.isFinite(deadlineMs) && deadlineMs <= nowMs) current.overdue += 1
+      if (Number.isFinite(leaseMs) && leaseMs > nowMs) current.leased += 1
+      if (age !== null && (current.oldestWaitingSeconds === null || age > current.oldestWaitingSeconds)) current.oldestWaitingSeconds = age
+      stationMap[station] = current
+    }
+    const stations = Object.entries(stationMap)
+    stations.sort((a, b) => b[1].waiting - a[1].waiting || b[1].overdue - a[1].overdue)
+    const oldest = live.map(row => row.enteredAt ? Date.parse(row.enteredAt) : NaN).filter(Number.isFinite).sort((a, b) => a - b)[0]
+    lineHealth = Object.freeze({ available: true as const, error: null, liveUnits: live.length,
+      overdueUnits: Object.values(stationMap).reduce((n, row) => n + row.overdue, 0),
+      leasedUnits: Object.values(stationMap).reduce((n, row) => n + row.leased, 0),
+      oldestWaitingSeconds: Number.isFinite(oldest) ? Math.max(0, Math.floor((nowMs - oldest) / 1000)) : null,
+      byStation: Object.freeze(Object.fromEntries(Object.entries(stationMap).map(([k, v]) => [k, Object.freeze(v)]))),
+      bottleneckStation: stations[0]?.[0] || null,
+      source: SOURCE.orchestration,
+      methodology: 'current nonterminal lifecycle ledger rows; overdue means stage_deadline_at <= report time; leased means lease_until > report time; bottleneck is the station with the largest live queue, then overdue count',
+    })
+  } else lineHealth = Object.freeze({ available: false as const, error: input.lineLedger.error })
+
   let evaluationFailures: EffectivenessFunnel['evaluationFailures']
   if (input.evaluationFailures.available) {
     const byReason: Record<string, number> = {}
@@ -278,6 +322,7 @@ export function composeFunnel(input: {
     production,
     capabilityGain,
     reliability,
+    lineHealth,
     stages: Object.freeze(stages),
     unavailable: Object.freeze(unavailable),
     rejected: Object.freeze({ quarantined: byStatus.quarantined || 0, retired: byStatus.retired || 0, byStatus: Object.freeze(byStatus), source: SOURCE.artifacts }),
@@ -325,7 +370,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     return out
   }
 
-  const [production, certified, examined, residency, graduation, hired, work, verified, serving, evaluationFailures] = await Promise.all([
+  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, evaluationFailures] = await Promise.all([
     chapter(async () => {
       let q = db.from('cos_university_mass_distillation_batch_runs').select('stage')
       if (since) q = q.gte('created_at', since)
@@ -388,6 +433,12 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { terminalByAttempt }
     }),
     chapter(async () => {
+      let q = db.from('cos_university_lifecycle_orchestration').select('station,stage_entered_at,stage_deadline_at,lease_until,terminal')
+      if (subjectId) q = q.eq('subject_id', subjectId)
+      const list = await rows(q.eq('terminal', false).limit(FUNNEL_ROWS_PER_CHUNK))
+      return { rows: list.map((row: any) => Object.freeze({ station: text(row.station, 80), enteredAt: iso(row.stage_entered_at), deadlineAt: iso(row.stage_deadline_at), leaseUntil: iso(row.lease_until), terminal: row.terminal === true })) }
+    }),
+    chapter(async () => {
       // Evaluation failures recorded IN THE WINDOW (an operations figure, not a cohort figure): every terminal FAILED
       // evaluation event (event_type fine_tune, claim ..._failed), its error classified by the rolling authority's rule.
       let q = db.from('cos_university_learning_assurance_events').select('evidence').eq('event_type', 'fine_tune')
@@ -397,7 +448,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
   ])
 
-  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, evaluationFailures })
+  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, evaluationFailures })
 }
 
 /** One line: the funnel's top, its bottom, and the honesty row. */
@@ -409,6 +460,7 @@ export function describeFunnel(funnel: EffectivenessFunnel): string {
     + `hired=${get('hired')} worked=${get('performed_work')} verified=${get('verified_outcome')} (${pct('verified_outcome')}) `
     + (funnel.capabilityGain.available ? `| gain n=${funnel.capabilityGain.sampleSize} mean=${funnel.capabilityGain.meanAbsoluteGain === null ? 'n/a' : funnel.capabilityGain.meanAbsoluteGain.toFixed(4)} positive=${funnel.capabilityGain.positiveGainRate === null ? 'n/a' : Math.round(funnel.capabilityGain.positiveGainRate * 100) + '%'} ` : '| gain unavailable ')
     + (funnel.reliability.available ? `| reliability attempts=${funnel.reliability.attempts} success=${funnel.reliability.successRate === null ? 'n/a' : Math.round(funnel.reliability.successRate * 100) + '%'} p90=${funnel.reliability.p90LatencyMs === null ? 'n/a' : funnel.reliability.p90LatencyMs + 'ms'} ` : '| reliability unavailable ')
+    + (funnel.lineHealth.available ? `| line live=${funnel.lineHealth.liveUnits} overdue=${funnel.lineHealth.overdueUnits} leased=${funnel.lineHealth.leasedUnits} bottleneck=${funnel.lineHealth.bottleneckStation || 'none'} ` : '| line unavailable ')
     + `| rejected quarantined=${funnel.rejected.quarantined} retired=${funnel.rejected.retired}`
     + (funnel.evaluationFailures.available ? ` | eval failures=${funnel.evaluationFailures.total} infra=${funnel.evaluationFailures.infrastructure} merit=${funnel.evaluationFailures.merit}` : ' | eval failures unavailable')
     + (Object.keys(funnel.unavailable).length ? ` | unavailable=${Object.keys(funnel.unavailable).join(',')}` : '')

@@ -1,6 +1,7 @@
 // saas/app/api/cron/cos-university-residency/route.ts
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import {
   BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
   createBuilderResidencyNativeAuthority,
@@ -125,6 +126,9 @@ export async function GET(req: Request) {
       { status: 401 },
     )
   }
+  // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no residency case.
+  const pause = await readLinePauseSetting(getAdminSupabase())
+  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-residency'))
 
   if (!enabled()) {
     const body = {
@@ -330,3 +334,4 @@ export async function GET(req: Request) {
     )
   }
 }
+// end of saas/app/api/cron/cos-university-residency/route.ts (if this line is missing, the paste was cut short)

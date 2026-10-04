@@ -3,6 +3,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
+import UniversitySettingsPanel from './UniversitySettingsPanel'
+import { COS_UNIVERSITY_SETTINGS_COPY } from '@/lib/i18n/cosUniversitySettingsCopy'
 import {
   COS_UNIVERSITY_TELEMETRY_COPY,
   type CosUniversityTelemetryLanguage,
@@ -217,6 +219,9 @@ export default function CosUniversityTelemetryPage() {
     (lang in COS_UNIVERSITY_TELEMETRY_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
   ]
   const [data, setData] = useState<Telemetry | null>(null)
+  const settingsCopy = COS_UNIVERSITY_SETTINGS_COPY[
+    (lang in COS_UNIVERSITY_SETTINGS_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
+  ]
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [workingCosAction, setWorkingCosAction] = useState<'prepare_dataset' | 'train' | null>(null)
@@ -340,6 +345,8 @@ export default function CosUniversityTelemetryPage() {
           </button>
         </div>
       </header>
+
+      <UniversitySettingsPanel copy={settingsCopy} />
 
       {data?.authRequired ? (
         <div className="rounded-lg border border-amber-500/40 p-4 text-sm">{copy.ownerRequired}</div>

@@ -4,6 +4,7 @@ import { activateGraduateRuntime } from '@/lib/ai/cos/cosUniversityGraduateRunti
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { servedCandidateModelFromCanary, type CanaryEventRow } from '@/lib/ai/cos/cosUniversityMassEvaluationServedModel'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduateModelRegistry'
 import { decideMassGraduateRegistration, type MassGraduateArtifact, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
 import { decideGraduateArtifactLifecycleSync } from '@/lib/ai/cos/cosUniversityGraduateArtifactSync'
@@ -516,6 +517,9 @@ export async function GET(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no graduation.
+  const pause = await readLinePauseSetting(cosServiceDb())
+  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-graduate-activation'))
   try {
     // Registration is a durable record, not a runtime: it writes one pending_runtime row and spends nothing, so it
     // runs before the activation flag. Activation itself stays behind that flag and its own evidence gates.

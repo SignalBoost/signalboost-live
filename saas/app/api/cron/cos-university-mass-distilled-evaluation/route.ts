@@ -1,3 +1,4 @@
+// saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
 import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
 import { isTerminalHoldoutDataDefect } from '@/lib/ai/cos/cosUniversityMassEvaluationTerminalDefect'
@@ -5,6 +6,7 @@ import { REQUIRED_EVALUATION_RUN_COLUMNS, isMissingColumnError, missingColumnsFr
 import { NextRequest, NextResponse } from 'next/server'
 import { HOLDOUT_EXAM_MAX_SET_ATTEMPTS, holdoutExamReadyArtifacts } from '@/lib/ai/cos/cosUniversityHoldoutExamItems'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -747,6 +749,9 @@ export async function GET(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
+  // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no exam, no wake.
+  const pause = await readLinePauseSetting(cosServiceDb())
+  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-mass-distilled-evaluation'))
 
   let claim: MassEvaluationClaim | null = null
   let evaluationWorkerActivated = false
@@ -964,3 +969,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: clean(message, 500) }, { status: 500 })
   }
 }
+// end of saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts (if this line is missing, the paste was cut short)

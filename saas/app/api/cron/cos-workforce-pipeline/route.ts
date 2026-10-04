@@ -12,6 +12,7 @@ import {
   ensureMassDistilledEndpoint24Gb,
   listMassDistilledRunpodEndpoints,
 } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
+import { readWorkforceWarmWindowSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import {
   describeWorkforceReservation,
   reconcileWorkforceReservation,
@@ -104,21 +105,27 @@ async function run(req: NextRequest) {
   // graduates that may hold a pinned slot (max=1); every other graduate's endpoint is released to max=0 so the canary
   // and the examiner can get a worker. Production 2026-10-03: 17 graduates held all 10 slots and the examiner was
   // told "at most 0" six times in ninety minutes. Pinning holds a slot and boots nothing (min stays 0).
-  const reservation: WorkforceReservationReport = await reconcileWorkforceReservation({
-    deadlineMs: Date.now() + RESERVATION_BUDGET_MS,
-    ports: {
-      listGraduates: () => listOnCallGraduates(db),
-      // Same transport the evaluator uses to give a slot back: PATCH workers min=0/max=0 under the approved pool policy.
-      releaseWorker: endpointId => deactivateMassDistilledEvaluationWorker(endpointId),
-      // Same transport activation uses to hold a slot: restore the scale-to-zero/max-1 envelope. Creates nothing.
-      pinWorker: endpointId => ensureMassDistilledEndpoint24Gb(endpointId),
-      // Warm window (owner 2026-10-03, option 3): the reserved graduates run at min=1 inside the declared daily window
-      // so practice work actually reaches them, and go back to min=0 (slot kept) when it closes. This is the ONE place
-      // the workforce pays to run a worker, and only for the graduates the reservation decided on.
-      warmWorker: endpointId => activateMassDistilledEvaluationWorker(endpointId),
-      coolWorker: endpointId => coolMassDistilledWorker(endpointId),
-    },
-  }).catch(error => unknownWorkforceReservation(error))
+  // The buyer's warm window, from the University settings store. An unreadable store is reported through the
+  // reconcile's own error path (nobody is warmed on a guess); a missing row means "none stored" and the env fallback
+  // applies.
+  const reservation: WorkforceReservationReport = await readWorkforceWarmWindowSetting(db)
+    .then(setting => reconcileWorkforceReservation({
+      warmWindowSetting: setting.value,
+      deadlineMs: Date.now() + RESERVATION_BUDGET_MS,
+      ports: {
+        listGraduates: () => listOnCallGraduates(db),
+        // Same transport the evaluator uses to give a slot back: PATCH workers min=0/max=0 under the approved pool policy.
+        releaseWorker: endpointId => deactivateMassDistilledEvaluationWorker(endpointId),
+        // Same transport activation uses to hold a slot: restore the scale-to-zero/max-1 envelope. Creates nothing.
+        pinWorker: endpointId => ensureMassDistilledEndpoint24Gb(endpointId),
+        // Warm window (owner 2026-10-03, option 3): the reserved graduates run at min=1 inside the declared daily window
+        // so practice work actually reaches them, and go back to min=0 (slot kept) when it closes. This is the ONE place
+        // the workforce pays to run a worker, and only for the graduates the reservation decided on.
+        warmWorker: endpointId => activateMassDistilledEvaluationWorker(endpointId),
+        coolWorker: endpointId => coolMassDistilledWorker(endpointId),
+      },
+    }))
+    .catch(error => unknownWorkforceReservation(error))
   console.info('[cos-workforce-reservation]', describeWorkforceReservation(reservation))
   // Work goes ONLY to graduates inside the reserve. A graduate the reconcile just released is off by decision, even
   // while its worker still answers the health probe for a few seconds (2026-10-04: 14 paid 45-second timeouts on 7

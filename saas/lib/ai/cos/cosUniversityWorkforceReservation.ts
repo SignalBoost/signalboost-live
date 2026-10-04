@@ -127,6 +127,42 @@ export function parseWarmWindow(raw: unknown): WarmWindow | null {
   return Object.freeze({ startMinute, endMinute, declared: value })
 }
 
+export type WarmWindowSource = 'setting' | 'env' | 'none'
+
+export type WarmWindowResolution = Readonly<{ window: WarmWindow | null; source: WarmWindowSource }>
+
+/**
+ * Which window applies: the buyer's stored setting first (owner 2026-10-04: "any other settings/configuration
+ * regarding the portable should be with the University telemetry"), the environment declaration as the fallback for
+ * a deployment that has stored nothing, otherwise none. A stored value that does not parse counts as none - it is
+ * reported, never guessed at - and does NOT fall through to the environment, because the buyer's last word was to
+ * set something, not to revert.
+ */
+export function resolveWarmWindow(input: {
+  setting: string | null | undefined
+  env: Record<string, string | undefined>
+}): WarmWindowResolution {
+  const stored = String(input.setting ?? '').trim()
+  if (stored) return Object.freeze({ window: parseWarmWindow(stored), source: 'setting' as const })
+  const fromEnv = parseWarmWindow(input.env[WORKFORCE_WARM_WINDOW_ENV])
+  return Object.freeze({ window: fromEnv, source: fromEnv ? 'env' as const : 'none' as const })
+}
+
+/** When the window next opens or closes after `now`, for an operations page that shows the schedule in local time. */
+export function nextWarmWindowChange(window: WarmWindow, now: Date): Readonly<{ opensAt: string | null; closesAt: string | null }> {
+  const at = (minute: number, dayOffset: number) => {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + dayOffset, Math.floor(minute / 60), minute % 60))
+    return d
+  }
+  const next = (minute: number) => {
+    const today = at(minute, 0)
+    return (today.getTime() > now.getTime() ? today : at(minute, 1)).toISOString()
+  }
+  return inWarmWindow(window, now)
+    ? Object.freeze({ opensAt: null, closesAt: next(window.endMinute) })
+    : Object.freeze({ opensAt: next(window.startMinute), closesAt: null })
+}
+
 /** True when `now` (UTC) falls inside the window; a window that crosses midnight wraps. */
 export function inWarmWindow(window: WarmWindow, now: Date): boolean {
   const minute = now.getUTCHours() * 60 + now.getUTCMinutes()
@@ -154,6 +190,8 @@ export type WorkforceReservationReport = Readonly<{
   eligibilityKnown: boolean
   /** The declared warm window, or null when none is declared (or the declaration was unusable). */
   window: string | null
+  /** Where the window came from: the buyer's stored setting, the environment fallback, or nowhere. */
+  windowSource: WarmWindowSource
   /** Whether this tick fell inside the window. Null when no window is declared. */
   inWindow: boolean | null
   /** Reserved graduates set to min=1 this tick. */
@@ -179,8 +217,8 @@ export function describeWorkforceReservation(report: WorkforceReservationReport)
     + `released=${report.released} idle=${report.idle} unmanaged=${report.unmanaged}`
     + ` | eligibleForWork=${report.eligibilityKnown ? report.eligibleForWork.length : 'unknown'}`
     + (report.window
-      ? ` | window=${report.window} inWindow=${report.inWindow} warmed=${report.warmed} cooled=${report.cooled}`
-      : ' | window=none')
+      ? ` | window=${report.window} windowSource=${report.windowSource} inWindow=${report.inWindow} warmed=${report.warmed} cooled=${report.cooled}`
+      : ` | window=none windowSource=${report.windowSource}`)
     + (report.errors.length ? ` | refused=${report.errors.length}` : '')
     + (report.deadlineReached ? ' | deadline_reached' : '')
 }
@@ -195,6 +233,8 @@ export async function reconcileWorkforceReservation(input: {
   env?: Record<string, string | undefined>
   /** The clock the window is judged by. Injected for tests; the station passes nothing and gets the real time. */
   now?: Date
+  /** The buyer's stored warm window (raw), read by the station through its settings adapter. Undefined = none stored. */
+  warmWindowSetting?: string | null
 }): Promise<WorkforceReservationReport> {
   const reserve = lineCapacity(input.env || process.env).workforce
   const graduates = await input.ports.listGraduates()
@@ -219,7 +259,8 @@ export async function reconcileWorkforceReservation(input: {
 
   // Warm window: only the graduates inside the reserve, only while the window is open. Everyone else was released above
   // and never reaches this step, so a warm worker can only ever belong to a reserved graduate.
-  const window = parseWarmWindow((input.env || process.env)[WORKFORCE_WARM_WINDOW_ENV])
+  const resolved = resolveWarmWindow({ setting: input.warmWindowSetting, env: input.env || process.env })
+  const window = resolved.window
   const now = input.now ?? new Date()
   const inWindow = window ? inWarmWindow(window, now) : null
   let warmed = 0
@@ -247,6 +288,7 @@ export async function reconcileWorkforceReservation(input: {
     excludedFromWork: decision.excludedFromWork,
     eligibilityKnown: true,
     window: window ? window.declared : null,
+    windowSource: resolved.source,
     inWindow,
     warmed,
     cooled,
@@ -262,6 +304,7 @@ export function unknownWorkforceReservation(error: unknown): WorkforceReservatio
     excludedFromWork: Object.freeze([]),
     eligibilityKnown: false,
     window: null,
+    windowSource: 'none',
     inWindow: null,
     warmed: 0,
     cooled: 0,

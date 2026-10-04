@@ -1,6 +1,9 @@
+// saas/app/api/cron/cos-university-mass-distillation/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityMassDistillationWorkflow } from '@/lib/ai/cos/cosUniversityMassDistillationWorkflow'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,6 +14,9 @@ export async function GET(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
+  // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no new campaign.
+  const pause = await readLinePauseSetting(cosServiceDb())
+  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-mass-distillation'))
 
   // Temporary Sep 18 control-plane forensics. Run concurrently so evidence capture cannot delay
   // the University workflow. Hard sunset prevents repeated historical queries if cleanup is delayed.
@@ -63,3 +69,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }
+// end of saas/app/api/cron/cos-university-mass-distillation/route.ts (if this line is missing, the paste was cut short)

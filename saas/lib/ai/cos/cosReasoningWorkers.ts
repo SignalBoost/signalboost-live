@@ -29,6 +29,7 @@ import { EXPLANATORY_QUESTION_SCOPE_LINE } from '@/lib/ai/cos/cosReasonerPromptS
 import { fitGraduateCall } from '@/lib/ai/cos/graduateContextFit'
 import { runpodGraduateEndpointWarm } from '@/lib/ai/cos/graduateWarmGate'
 import { runpodGraduateEndpointWorkerState } from '@/lib/ai/cos/graduateWarmGate'
+import { runpodGraduateWarmGateEvidence } from '@/lib/ai/cos/graduateWarmGate'
 import {
   activeGraduateRuntimesForRole,
   activeGraduateApprenticeForObjective,
@@ -267,8 +268,11 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
       // and each recorded against the graduate. The reason for that exception ("a skipped specialist could never receive
       // the request that wakes it") no longer holds: the buyer's warm window keeps the reserved graduates awake and the
       // workforce reservation decides who may hold a worker at all. Live chat now reaches only graduates that can answer.
-      if (INTERACTIVE_GRADUATE_FEATURES.has(String(request.usageContext?.feature || '').trim().toLowerCase())
-        && !(await runpodGraduateEndpointWarm(runtime.inference.baseUrl))) return null
+      const liveChat = INTERACTIVE_GRADUATE_FEATURES.has(String(request.usageContext?.feature || '').trim().toLowerCase())
+      if (liveChat && !(await runpodGraduateEndpointWarm(runtime.inference.baseUrl))) return null
+      // What the gate saw when it let this live attempt through, and how old that reading was (2026-10-05). Appended to a
+      // live timeout so a stale cached reading is told apart from an idle worker that was shutting down.
+      const gateEvidence = liveChat ? `:${runpodGraduateWarmGateEvidence(runtime.inference.baseUrl)}` : ''
       const effective = toLocalModelCallArgs(request, role)
       // The graduate serves an 8k window; COS worker requests are sized for the managed reasoner. Fit them first
       // or every call fails locally with context_window_budget_insufficient before reaching the endpoint.
@@ -321,7 +325,7 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
           // A live timeout says whether the endpoint was cold, still booting or warm-and-slow (2026-10-04), the same
           // evidence the Workforce shadow path already records. One bounded health read, no wake, no GPU cost.
           errorClass: failureOutcome === 'timeout'
-            ? `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}`
+            ? `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}${gateEvidence}`
             : error instanceof Error ? error.name || 'Error' : 'Error',
         })
         console.warn('[cos-graduate-worker] inference failed; base worker may take over', error instanceof Error ? error.message : String(error))
@@ -342,7 +346,7 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
             phase: 'attempt_failed',
             outcome: nullOutcome === 'timeout' ? 'timeout' : 'empty',
             latencyMs,
-            ...(nullOutcome === 'timeout' ? { errorClass: `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}` } : {}),
+            ...(nullOutcome === 'timeout' ? { errorClass: `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}${gateEvidence}` } : {}),
           })
         }
         recordGraduateServingAttempt({ ...attemptBase, phase: 'fallback', outcome: 'fallback', latencyMs })
@@ -468,6 +472,7 @@ export async function runWorkforceApprenticeShadow(
   // a powered-off graduate endpoint: RunPod bills the cold boot even when the call gives up. A free status read decides;
   // a graduate whose endpoint is off simply gets no practice task this time (no assignment is opened).
   if (!(await runpodGraduateEndpointWarm(runtime.inference.baseUrl))) return
+  const gateEvidence = runpodGraduateWarmGateEvidence(runtime.inference.baseUrl)
   const effective = toLocalModelCallArgs({
     ...args,
     usageContext: {
@@ -547,7 +552,7 @@ export async function runWorkforceApprenticeShadow(
       // At the deadline, record whether the endpoint was cold, still booting or warm, so cold start is proven or
       // ruled out by evidence rather than assumed.
       const failureReason = deadline
-        ? `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}`
+        ? `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}:${gateEvidence}`
         : 'runtime_no_text'
       if (db && assignmentId) await closeWorkforceAssignment(db, assignmentId, { status: 'runtime_failed', completed_at: new Date().toISOString(), failure_reason: failureReason })
       recordGraduateServingAttempt({

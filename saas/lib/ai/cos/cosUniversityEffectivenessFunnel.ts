@@ -663,6 +663,7 @@ export function composeFunnel(input: {
     economics,
     comparativeBenchmark,
     governanceAssurance,
+    operationalExplanation,
     provenance,
     stages: Object.freeze(stages),
     unavailable: Object.freeze(unavailable),

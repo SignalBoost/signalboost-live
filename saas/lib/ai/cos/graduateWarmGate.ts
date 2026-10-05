@@ -18,7 +18,9 @@ const RUNPOD_SERVERLESS_HOST = /^([a-z0-9]+)\.api\.runpod\.ai$/i
 export const GRADUATE_WARM_CHECK_TIMEOUT_MS = 1_500
 export const GRADUATE_WARM_CACHE_MS = 30_000
 
-type WarmEntry = { warm: boolean; checkedAt: number }
+/** What the gate's health read showed: a running worker, only an idle one, no worker, or no usable reading. */
+export type GraduateWarmGateSeen = 'running' | 'idle' | 'cold' | 'unreadable'
+type WarmEntry = { warm: boolean; seen: GraduateWarmGateSeen; checkedAt: number }
 const cache = new Map<string, WarmEntry>()
 
 /** Endpoint id for an exact RunPod serverless OpenAI base URL (https://<id>.api.runpod.ai/v1), otherwise null. */
@@ -43,7 +45,7 @@ export async function runpodGraduateEndpointWarm(
   const cached = cache.get(endpointId)
   if (cached && now() - cached.checkedAt < GRADUATE_WARM_CACHE_MS) return cached.warm
 
-  let warm = false
+  let seen: GraduateWarmGateSeen = 'unreadable'
   try {
     const key = deps.apiKey === undefined ? configuredRunpodApiKey() : deps.apiKey
     if (key) {
@@ -55,14 +57,30 @@ export async function runpodGraduateEndpointWarm(
         const payload = await response.json().catch(() => null) as { workers?: { idle?: unknown; running?: unknown } } | null
         const idle = Number(payload?.workers?.idle) || 0
         const running = Number(payload?.workers?.running) || 0
-        warm = idle + running > 0
+        seen = running > 0 ? 'running' : idle > 0 ? 'idle' : 'cold'
       }
     }
   } catch {
-    warm = false
+    seen = 'unreadable'
   }
-  cache.set(endpointId, { warm, checkedAt: now() })
+  const warm = seen === 'running' || seen === 'idle'
+  cache.set(endpointId, { warm, seen, checkedAt: now() })
   return warm
+}
+
+/**
+ * Diagnostic only (2026-10-05). Production 08:15 UTC: 8 live attempts on 3 graduates passed the gate, then timed out at the
+ * 8s budget and the endpoint read cold. Either the gate used a reading cached up to 30s earlier, or it saw an idle worker
+ * that was shutting down. Read at decision time, this names what the gate saw and how old that reading was, e.g.
+ * `gate=idle@24s`. No provider call; `gate=none` when no reading is cached, `gate=not_runpod` for other runtimes.
+ */
+export function runpodGraduateWarmGateEvidence(baseUrl: unknown, deps: { now?: () => number } = {}): string {
+  const endpointId = runpodServerlessEndpointIdFromBaseUrl(baseUrl)
+  if (!endpointId) return 'gate=not_runpod'
+  const entry = cache.get(endpointId)
+  if (!entry) return 'gate=none'
+  const ageSeconds = Math.max(0, Math.floor(((deps.now ?? Date.now)() - entry.checkedAt) / 1000))
+  return `gate=${entry.seen}@${ageSeconds}s`
 }
 
 /**

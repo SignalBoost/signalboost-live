@@ -401,9 +401,11 @@ async function pinnedHoldout(input:{
   })
 }
 
-async function waitReady(endpointId:string,deadlineMs:number){
+/** Waits for the exact artifact's gateway; returns the whole seconds the wait took (recorded on the completed exam). */
+async function waitReady(endpointId:string,deadlineMs:number):Promise<number>{
   const key=configuredRunpodApiKey()
   if(!key)throw new Error('mass_distilled_evaluation_runpod_key_missing')
+  const waitStartedAt=Date.now()
   const until=Math.min(Date.now()+READY_TIMEOUT_MS,deadlineMs-ROUTE_RESERVE_MS)
   let status:number|null=null
   let lastError:string|null=null
@@ -439,7 +441,7 @@ async function waitReady(endpointId:string,deadlineMs:number){
         // any score can be written. Some RunPod LB responses do not preserve the gateway JSON
         // body even when they preserve the 200 status; requiring modelReady/status here made a
         // canary-proven endpoint fail as runtime_not_ready:200 without ever reaching inference.
-        return
+        return Math.round((Date.now()-waitStartedAt)/1000)
       }else{
         lastError=`mass_distilled_gateway_ping_http_${response.status}`
       }
@@ -688,7 +690,7 @@ async function submitClaim(input:{claim:IndependentEvaluatorClaim;candidateId:st
 async function runMassDistilledArtifactEvaluationInsideHarness(input:{claim:MassEvaluationClaim;deadlineMs:number;now?:Date}){
   if(input.claim.maxEndpointCalls!==ENDPOINT_CALLS||input.claim.maxJudgeCalls!==JUDGE_CALLS||input.claim.maxRuntimeWakeAttempts!==1||input.claim.maxEstimatedRuntimeWakeCostUsd<=0||input.claim.maxEstimatedRuntimeWakeCostUsd>0.2)throw new Error('mass_distilled_evaluation_claim_ceiling_invalid')
   const now=input.now||new Date();const training=await massRun(input.claim,now);const age=now.getTime()-training.trainedAt;if(age<MASS_DISTILLED_RETENTION_DELAY_MS)throw new Error('mass_distilled_evaluation_retention_delay_not_met')
-  const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs,candidateId:input.claim.candidateId,legacyHosted:training.legacyHosted});const model=await servedCandidateModel({...input.claim,attentionArchitecture:training.attentionArchitecture,xsaProfile:training.xsaProfile});await waitReady(input.claim.endpointId,input.deadlineMs)
+  const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs,candidateId:input.claim.candidateId,legacyHosted:training.legacyHosted});const model=await servedCandidateModel({...input.claim,attentionArchitecture:training.attentionArchitecture,xsaProfile:training.xsaProfile});const readinessSeconds=await waitReady(input.claim.endpointId,input.deadlineMs)
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{
     const budget:EndpointCallBudget={used:0,max:ENDPOINT_CALLS};const common={endpointId:input.claim.endpointId,budget,claim:input.claim,deadlineMs:input.deadlineMs}
@@ -751,7 +753,7 @@ zeroScoreDiagnostics:Object.fromEntries(([['holdout',holdout],['safety',safety],
     await persistDistilledEvaluationCaseScores({db,runKey,candidateId:input.claim.candidateId,artifactHash:input.claim.artifactHash,evaluatorId,evaluatorVersion:COS_MASS_DISTILLED_EVALUATOR_VERSION,observedAt:now.toISOString(),suites:[{suite:'holdout',scored:holdout.scored},{suite:'safety',scored:safety.scored},{suite:'transfer',scored:transfer.scored},{suite:'retention',scored:retention.scored}]})
     await submitClaim({claim:'independent_evaluation',candidateId:input.claim.candidateId,revision:training.revision,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,evaluatorId,suiteHash:holdoutSuiteHash,evidenceRef,baselineScore:holdout.baselineScore,trainedArtifactScore:holdout.candidateScore,deadlineMs:input.deadlineMs});if(safetyPassed)await submitClaim({claim:'safety_regression_passed',candidateId:input.claim.candidateId,revision:training.revision,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,evaluatorId,suiteHash:safetySuiteHash,evidenceRef,deadlineMs:input.deadlineMs});if(transferPassed)await submitClaim({claim:'unseen_transfer_passed',candidateId:input.claim.candidateId,revision:training.revision,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,evaluatorId,suiteHash:transferSuiteHash,evidenceRef,deadlineMs:input.deadlineMs});if(retentionPassed)await submitClaim({claim:'delayed_retention_passed',candidateId:input.claim.candidateId,revision:training.revision,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,evaluatorId,suiteHash:retentionSuiteHash,evidenceRef,deadlineMs:input.deadlineMs})
     const lifecycle=await db.from('cos_local_distillation_artifacts').update({status:evaluationPassed?'runtime_pending':'quarantined',updated_at:now.toISOString()}).eq('candidate_id',input.claim.candidateId).eq('trained_artifact_hash',input.claim.artifactHash).eq('status','evaluation_pending');if(lifecycle.error)throw lifecycle.error
-    return Object.freeze({ok:true as const,candidateId:input.claim.candidateId,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,endpointId:input.claim.endpointId,model,evaluatorId,holdout:{baselineScore:holdout.baselineScore,trainedArtifactScore:holdout.candidateScore,improved:holdoutImproved,cases:holdoutCases.length},safety:{score:safety.candidateScore,baselineScore:safety.baselineScore,passed:safetyPassed,absoluteThresholdMet:safetyAbsoluteThresholdMet},transfer:{baselineScore:transfer.baselineScore,trainedArtifactScore:transfer.candidateScore,passed:transferPassed},retention:{baselineScore:retention.baselineScore,trainedArtifactScore:retention.candidateScore,passed:retentionPassed,artifactAgeSeconds:Math.floor(age/1000)},evaluationPassed,nextStatus:evaluationPassed?'runtime_pending':'quarantined',productionTrafficAuthorized:false,endpointCalls:budget.used,judgeCalls:JUDGE_CALLS})
+    return Object.freeze({ok:true as const,candidateId:input.claim.candidateId,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,endpointId:input.claim.endpointId,model,evaluatorId,holdout:{baselineScore:holdout.baselineScore,trainedArtifactScore:holdout.candidateScore,improved:holdoutImproved,cases:holdoutCases.length},safety:{score:safety.candidateScore,baselineScore:safety.baselineScore,passed:safetyPassed,absoluteThresholdMet:safetyAbsoluteThresholdMet},transfer:{baselineScore:transfer.baselineScore,trainedArtifactScore:transfer.candidateScore,passed:transferPassed},retention:{baselineScore:retention.baselineScore,trainedArtifactScore:retention.candidateScore,passed:retentionPassed,artifactAgeSeconds:Math.floor(age/1000)},evaluationPassed,nextStatus:evaluationPassed?'runtime_pending':'quarantined',productionTrafficAuthorized:false,endpointCalls:budget.used,judgeCalls:JUDGE_CALLS,readinessSeconds})
   }finally{if(keepalive)clearInterval(keepalive)}
 }
 

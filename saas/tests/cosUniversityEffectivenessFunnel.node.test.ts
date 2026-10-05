@@ -8,6 +8,7 @@ import {
   EVALUATION_FAILED_CLAIM,
   FUNNEL_COHORT_LIMIT,
   FUNNEL_READ_CHUNK,
+  FUNNEL_ROWS_PER_CHUNK,
   FUNNEL_SCHEMA_VERSION,
   composeFunnel,
   describeFunnel,
@@ -22,7 +23,7 @@ const NOW = new Date('2026-10-04T20:00:00Z')
 
 /** PostgREST-shaped store over in-memory tables; records every query so chunking can be proven. */
 function fakeDb(tables: Record<string, any[]>, failing: Set<string> = new Set()) {
-  const queries: Array<{ table: string; columns: string; inSize: number | null }> = []
+  const queries: Array<{ table: string; columns: string; inSize: number | null; range: [number, number] | null }> = []
   const db = {
     from(table: string) {
       const filters: Array<(row: any) => boolean> = []
@@ -30,12 +31,15 @@ function fakeDb(tables: Record<string, any[]>, failing: Set<string> = new Set())
       let inSize: number | null = null
       let order: { column: string; ascending: boolean } | null = null
       let limit = Infinity
+      let range: [number, number] | null = null
       const run = () => {
-        queries.push({ table, columns, inSize })
+        queries.push({ table, columns, inSize, range })
         if (failing.has(table)) return { data: null, error: new Error(`${table}_unreadable`) }
         let rows = (tables[table] || []).filter(row => filters.every(f => f(row)))
         if (order) rows = [...rows].sort((a, b) => String(a[order!.column] ?? '').localeCompare(String(b[order!.column] ?? '')) * (order!.ascending ? 1 : -1))
-        return { data: rows.slice(0, limit), error: null }
+        if (range) rows = rows.slice(range[0], range[1] + 1)
+        else rows = rows.slice(0, limit)
+        return { data: rows, error: null }
       }
       const q: any = {
         select(c: string) { columns = c; return q },
@@ -45,6 +49,7 @@ function fakeDb(tables: Record<string, any[]>, failing: Set<string> = new Set())
         in(column: string, values: readonly unknown[]) { inSize = values.length; const set = new Set(values.map(String)); filters.push(row => set.has(String(row[column]))); return q },
         order(column: string, options: { ascending: boolean }) { order = { column, ascending: options.ascending }; return q },
         limit(n: number) { limit = n; return q },
+        range(from: number, to: number) { range = [from, to]; return q },
         then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) { return Promise.resolve(run()).then(resolve, reject) },
       }
       return q
@@ -187,6 +192,9 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.equal(f.lineHistory.meanRecoverySeconds, 2700)
     assert.equal(f.lineHistory.medianRecoverySeconds, 2400)
     assert.equal(f.lineHistory.p90RecoverySeconds, 3000)
+    assert.equal(f.lineHistory.p50DwellSeconds, 2400)
+    assert.equal(f.lineHistory.p90DwellSeconds, 3000)
+    assert.equal(f.lineHistory.p99DwellSeconds, 3000)
     assert.deepEqual(f.lineHistory.byFromStation, { EXACT_CANARY: 2, INDEPENDENT_EVALUATION: 1 })
   }
   assert.ok(f.residencyEffectiveness.available)
@@ -308,6 +316,39 @@ test('a large cohort is read in chunks of candidate ids, capped and reported as 
   assert.ok(chunked.length > 0 && chunked.every(q => (q.inSize as number) <= FUNNEL_READ_CHUNK), 'no in() read exceeds the chunk size')
   assert.equal(FUNNEL_READ_CHUNK, 100)
   assert.match(describeFunnel(f), /born=1500\+ /)
+})
+
+test('high-volume buyer evidence pages past the row boundary and proves exhaustion', async () => {
+  const tables = week()
+  tables.cos_university_graduate_serving_attempts = Array.from({ length: FUNNEL_ROWS_PER_CHUNK + 7 }, (_, i) => ({
+    attempt_id: `bulk-${i}`, candidate_id: 'a', trained_artifact_hash: H('a'), phase: 'attempt_succeeded',
+    outcome: 'success', latency_ms: 1000 + i, recorded_at: `2026-10-04T15:${String(i % 60).padStart(2, '0')}:00Z`,
+  }))
+  tables.cos_university_lifecycle_transition_history = Array.from({ length: FUNNEL_ROWS_PER_CHUNK + 3 }, (_, i) => ({
+    from_station: i % 2 ? 'EXACT_CANARY' : 'INDEPENDENT_EVALUATION',
+    transitioned_at: '2026-10-04T16:00:00Z', duration_seconds: i + 1, was_overdue: i % 3 === 0,
+  }))
+  const { db, queries } = fakeDb(tables)
+  const f = await readEffectivenessFunnel({ db, window: '7d', now: NOW })
+  assert.ok(f.reliability.available && f.reliability.attempts === FUNNEL_ROWS_PER_CHUNK + 7)
+  assert.ok(f.lineHistory.available && f.lineHistory.transitions === FUNNEL_ROWS_PER_CHUNK + 3)
+  if (f.lineHistory.available) assert.equal(f.lineHistory.p99DwellSeconds, Math.ceil((FUNNEL_ROWS_PER_CHUNK + 3) * 0.99))
+  const servingPages = queries.filter(q => q.table === 'cos_university_graduate_serving_attempts' && q.columns.includes('attempt_id') && q.range)
+  const historyPages = queries.filter(q => q.table === 'cos_university_lifecycle_transition_history' && q.range)
+  assert.ok(servingPages.some(q => (q.range?.[0] ?? 0) >= FUNNEL_ROWS_PER_CHUNK), 'serving evidence reads a second page')
+  assert.ok(historyPages.some(q => (q.range?.[0] ?? 0) >= FUNNEL_ROWS_PER_CHUNK), 'transition history reads a second page')
+})
+
+test('an exactly full evidence page performs the empty follow-up read instead of assuming completeness', async () => {
+  const tables = week()
+  tables.cos_university_lifecycle_transition_history = Array.from({ length: FUNNEL_ROWS_PER_CHUNK }, (_, i) => ({
+    from_station: 'EXACT_CANARY', transitioned_at: '2026-10-04T16:00:00Z', duration_seconds: i + 1, was_overdue: false,
+  }))
+  const { db, queries } = fakeDb(tables)
+  const f = await readEffectivenessFunnel({ db, window: '7d', now: NOW })
+  assert.ok(f.lineHistory.available && f.lineHistory.transitions === FUNNEL_ROWS_PER_CHUNK)
+  const historyPages = queries.filter(q => q.table === 'cos_university_lifecycle_transition_history' && q.range)
+  assert.ok(historyPages.some(q => q.range?.[0] === FUNNEL_ROWS_PER_CHUNK), 'full page is followed by an exhaustion read')
 })
 
 test('the API is owner-gated read-only, the panel is mounted after the settings and before the life record', () => {

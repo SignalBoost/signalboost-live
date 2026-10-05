@@ -178,6 +178,7 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                   <div><span className="opacity-60">{copy.flowMeanRecovery}:</span> {f.lineHistory.meanRecoverySeconds === null ? '—' : Math.round(f.lineHistory.meanRecoverySeconds / 60) + ' min'}</div>
                   <div><span className="opacity-60">{copy.flowMedianRecovery}:</span> {f.lineHistory.medianRecoverySeconds === null ? '—' : Math.round(f.lineHistory.medianRecoverySeconds / 60) + ' min'}</div>
                   <div><span className="opacity-60">{copy.flowP90Recovery}:</span> {f.lineHistory.p90RecoverySeconds === null ? '—' : Math.round(f.lineHistory.p90RecoverySeconds / 60) + ' min'}</div>
+                  <div className="sm:col-span-2"><span className="opacity-60">{copy.flowDwell}:</span> {f.lineHistory.p50DwellSeconds === null ? '—' : [f.lineHistory.p50DwellSeconds, f.lineHistory.p90DwellSeconds, f.lineHistory.p99DwellSeconds].map(seconds => seconds === null ? '—' : Math.round(seconds / 60) + ' min').join(' / ')}</div>
                   <div className="sm:col-span-2"><span className="opacity-60">{copy.flowByStation}:</span> {counts(f.lineHistory.byFromStation)}</div>
                 </div>
                 <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.lineHistory.source} · {copy.methodology}: {f.lineHistory.methodology}</div>

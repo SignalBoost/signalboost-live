@@ -202,3 +202,20 @@ test('remediation RPC identifier remains inside PostgreSQL 63-byte identifier li
   assert.match(forward, /revoke all on function public\.authorize_next_cos_university_remediation_campaign\(\)/)
   assert.match(forward, /grant execute on function public\.authorize_next_cos_university_remediation_campaign\(\)[\s\S]*to service_role/)
 })
+
+
+test('subject-fair rolling authorization prevents deep FIFO queues from starving Residency supply', () => {
+  const sql = source('../supabase/migrations/20261005003000_mass_distillation_subject_fairness.sql')
+  assert.match(sql, /b\.source_count between 64 and 128/)
+  assert.match(sql, /failure_derived_curriculum[\s\S]*then 0 else 1 end/)
+  assert.match(sql, /select max\(r\.created_at\)[\s\S]*where r\.subject_id=b\.subject_id[\s\S]*asc nulls first/)
+  assert.match(sql, /b\.prepared_at asc/)
+  assert.match(sql, /for update skip locked/)
+  assert.match(sql, /v_active_campaigns >= v_policy\.max_concurrent_campaigns/)
+  assert.match(sql, /v_next_cost constant numeric\(10,6\) := 1\.825000/)
+  assert.match(sql, /automaticPromotionAuthorized',false/)
+  assert.match(sql, /runpodMutationAuthorized',false/)
+  assert.match(sql, /authorityExpanded',false/)
+  assert.doesNotMatch(sql, /subject_id\s*=\s*'Computer Science & Coding'/)
+  assert.doesNotMatch(sql, /max_concurrent_campaigns\s*:=|max_concurrent_campaigns\s*=\s*[5-9]/)
+})

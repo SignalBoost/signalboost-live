@@ -14,6 +14,7 @@
 //
 // The store is injected (PostgREST-shaped), so the composition is testable without a database.
 import { isEvaluatorInfrastructureFailure } from './cosUniversityMassEvaluationRollingAuthority.ts'
+import { readUniversityMassDistillationHealth, type UniversityDistillationHealthSnapshot } from '../../../self-healing-host/university-distillation-monitoring.ts'
 
 export const FUNNEL_SCHEMA_VERSION = 'cos-university-effectiveness-funnel-v1' as const
 /** How many artifacts one funnel follows. Beyond this the report says it is truncated instead of guessing. */
@@ -213,6 +214,21 @@ export type EffectivenessFunnel = Readonly<{
     source: string
     methodology: string
   }>
+  operationalExplanation: Chapter<{
+    state: UniversityDistillationHealthSnapshot['state']
+    reasons: readonly string[]
+    causeStatus: 'evidence_backed' | 'unresolved'
+    classification: 'healthy_progress' | 'expected_wait' | 'repair_required' | 'budget_pause' | 'authorization_required' | 'curriculum_wait' | 'unresolved'
+    cause: string
+    impact: string
+    systemResponse: string
+    buyerMeaning: string
+    activeCampaigns: number
+    unsettledProviderJobs: number
+    overdueProviderJobs: number
+    automaticRecoveryAuthorized: boolean
+    source: string
+  }>
   evaluationFailures: Chapter<{
     total: number
     infrastructure: number
@@ -274,6 +290,7 @@ export function composeFunnel(input: {
   provenanceEvidence: Chapter<{ certificates: ReadonlySet<string>; graduates: ReadonlySet<string>; resumes: ReadonlySet<string> }>
   governanceEvidence: Chapter<{ authorityExpansionObserved: number; assuranceEvents: number; repositoryEvidenceEntries: number; repositoryEvidenceChainValid: boolean | null }>
   evaluationFailures: Chapter<{ errors: readonly string[] }>
+  operationalHealth?: Chapter<{ snapshot: UniversityDistillationHealthSnapshot }>
 }): EffectivenessFunnel {
   const size = input.cohort.length
   const share = (count: number) => size ? Number((count / size).toFixed(4)) : null
@@ -555,6 +572,57 @@ export function composeFunnel(input: {
     }) as any
   }
 
+  let operationalExplanation: EffectivenessFunnel['operationalExplanation']
+  if (!input.operationalHealth) operationalExplanation = Object.freeze({ available: false as const, error: 'operational_health_not_supplied' })
+  else if (input.operationalHealth.available === false) operationalExplanation = Object.freeze({ available: false as const, error: input.operationalHealth.error })
+  else {
+    const h = input.operationalHealth.snapshot
+    const reasons = [...h.reasons]
+    const fullHealthyCapacity = h.state === 'healthy' && h.activeCampaigns > 0 && h.unsettledProviderJobs >= h.activeCampaigns && h.overdueProviderJobs === 0
+    const classification = h.state === 'repair_required' ? 'repair_required'
+      : h.state === 'budget_paused' ? 'budget_pause'
+      : h.state === 'authorization_required' ? 'authorization_required'
+      : h.state === 'waiting_for_curriculum' ? 'curriculum_wait'
+      : fullHealthyCapacity ? 'expected_wait'
+      : h.state === 'healthy' ? 'healthy_progress' : 'unresolved'
+    const narrative = classification === 'expected_wait' ? {
+      causeStatus: 'evidence_backed' as const,
+      cause: 'Training work is active and the observed provider jobs are still within their allowed runtime; available campaign capacity is therefore legitimately occupied.',
+      impact: 'A new campaign may wait for an existing training slot to settle; this is bounded queueing, not evidence that the production line is stalled.',
+      systemResponse: 'The control loop continues heartbeat, reconciliation and overdue-job checks and automatically admits more work when governed capacity becomes available.',
+      buyerMeaning: 'The platform distinguishes healthy capacity saturation from an outage and does not exceed configured concurrency merely to make the dashboard move.'
+    } : classification === 'repair_required' ? {
+      causeStatus: 'evidence_backed' as const,
+      cause: reasons.length ? `The canonical Self-Healing health model detected: ${reasons.join(', ')}.` : 'The canonical Self-Healing health model requires repair, but no more specific reason was recorded.',
+      impact: 'Expected production progress is impaired until the affected condition is recovered.',
+      systemResponse: h.automaticRecoveryAuthorized ? 'Bounded automatic recovery is authorized by the same health model; promotion and authority expansion remain disabled.' : 'The condition is fail-closed and is not represented as healthy progress.',
+      buyerMeaning: 'An abnormal wait is reported as a repair condition rather than being hidden behind a green heartbeat.'
+    } : classification === 'budget_pause' ? {
+      causeStatus: 'evidence_backed' as const,
+      cause: 'The rolling authorized training budget cannot currently fund another governed campaign.',
+      impact: 'New paid training dispatch pauses while already-authorized work may continue.',
+      systemResponse: 'The scheduler waits for the next governed budget release instead of exceeding the buyer-controlled spend boundary.',
+      buyerMeaning: 'A financial control pause is distinguished from a software failure.'
+    } : classification === 'authorization_required' ? {
+      causeStatus: 'evidence_backed' as const,
+      cause: 'Rolling campaign authorization is disabled.', impact: 'New training campaigns cannot be authorized.',
+      systemResponse: 'The line remains fail-closed and does not create paid training authority.', buyerMeaning: 'Governance boundaries take precedence over apparent throughput.'
+    } : classification === 'curriculum_wait' ? {
+      causeStatus: 'evidence_backed' as const,
+      cause: 'No prepared curriculum batch is currently available for a new campaign.', impact: 'Training waits upstream for rights-cleared curriculum packaging.',
+      systemResponse: 'The curriculum acquisition/packaging path continues independently; the scheduler does not manufacture an invalid batch.', buyerMeaning: 'The report identifies supply waiting separately from compute, evaluator, and student failures.'
+    } : classification === 'healthy_progress' ? {
+      causeStatus: 'evidence_backed' as const,
+      cause: 'The canonical Self-Healing health model reports no active fault.', impact: 'No material operational blockage is established by the current evidence.',
+      systemResponse: 'Normal governed production processing continues.', buyerMeaning: 'Healthy status is tied to the same operational model used for repair decisions.'
+    } : {
+      causeStatus: 'unresolved' as const,
+      cause: 'The available evidence does not establish a supported operational cause.', impact: 'The report cannot reliably explain the observed state.',
+      systemResponse: 'No causal explanation is invented; the state remains unresolved until authoritative evidence exists.', buyerMeaning: 'Unknown causality is disclosed instead of being converted into a reassuring but unsupported story.'
+    }
+    operationalExplanation = Object.freeze({ available: true as const, error: null, state: h.state, reasons: Object.freeze(reasons), classification, ...narrative, activeCampaigns: h.activeCampaigns, unsettledProviderJobs: h.unsettledProviderJobs, overdueProviderJobs: h.overdueProviderJobs, automaticRecoveryAuthorized: h.automaticRecoveryAuthorized, source: 'self-healing-host/university-distillation-monitoring.readUniversityMassDistillationHealth' })
+  }
+
   let evaluationFailures: EffectivenessFunnel['evaluationFailures']
   if (input.evaluationFailures.available) {
     const byReason: Record<string, number> = {}
@@ -648,7 +716,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
   const exhaust = async (build: () => any): Promise<any[]> =>
     allRows((from, to) => build().range(from, to))
 
-  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, evaluationFailures] = await Promise.all([
+  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, operationalHealth, evaluationFailures] = await Promise.all([
     chapter(async () => {
       let q = db.from('cos_university_mass_distillation_batch_runs').select('stage')
       if (since) q = q.gte('created_at', since)
@@ -775,6 +843,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       }
       return { authorityExpansionObserved: assuranceRows.filter((row: any) => row.authority_expanded === true).length, assuranceEvents: assuranceRows.length, repositoryEvidenceEntries: patrolRows.length, repositoryEvidenceChainValid: chainValid }
     }),
+    chapter(async () => ({ snapshot: await readUniversityMassDistillationHealth({ db, now }) })),
     chapter(async () => {
       // Evaluation failures recorded IN THE WINDOW (an operations figure, not a cohort figure): every terminal FAILED
       // evaluation event (event_type fine_tune, claim ..._failed), its error classified by the rolling authority's rule.
@@ -785,7 +854,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
   ])
 
-  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, evaluationFailures })
+  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, operationalHealth, evaluationFailures })
 }
 
 /** One line: the funnel's top, its bottom, and the honesty row. */

@@ -267,6 +267,18 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                   <div>{copy.failuresInfrastructure}: <span className="font-mono">{f.evaluationFailures.infrastructure}</span></div>
                   <div>{copy.failuresMerit}: <span className="font-mono">{f.evaluationFailures.merit}</span></div>
                   <div className="mt-1 font-mono" style={{ overflowWrap: 'anywhere' }}>{copy.failuresByReason}: {counts(f.evaluationFailures.byReason)}</div>
+                  <div className="mt-3 space-y-2" data-testid="evaluation-causal-explanations">
+                    {f.evaluationFailures.explanations.map(item => (
+                      <div key={item.reason} className="rounded border p-2">
+                        <div className="font-mono text-[10px]" style={{ overflowWrap: 'anywhere' }}>{item.reason} × {item.count}</div>
+                        <div className="mt-1"><b>Attribution:</b> {item.attribution} · <b>Cause:</b> {item.causeStatus}</div>
+                        <div><b>Why:</b> {item.cause}</div>
+                        <div><b>Impact:</b> {item.impact}</div>
+                        <div><b>System response:</b> {item.systemResponse}</div>
+                        <div><b>Buyer meaning:</b> {item.buyerMeaning}</div>
+                      </div>
+                    ))}
+                  </div>
                   <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.evaluationFailures.source} · {copy.failuresRule}: {f.evaluationFailures.rule}</div>
                 </>
               ) : <p role="alert">{f.evaluationFailures.error}</p>}

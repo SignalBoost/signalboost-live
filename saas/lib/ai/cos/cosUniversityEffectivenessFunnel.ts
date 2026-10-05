@@ -14,6 +14,7 @@
 //
 // The store is injected (PostgREST-shaped), so the composition is testable without a database.
 import { isEvaluatorInfrastructureFailure } from './cosUniversityMassEvaluationRollingAuthority.ts'
+import { errorText } from './cosUniversityErrorText.ts'
 import { readUniversityMassDistillationHealth, type UniversityDistillationHealthSnapshot } from '../../../self-healing-host/university-distillation-monitoring.ts'
 
 export const FUNNEL_SCHEMA_VERSION = 'cos-university-effectiveness-funnel-v1' as const
@@ -675,7 +676,7 @@ export function composeFunnel(input: {
 
 async function chapter<T>(read: () => Promise<T>): Promise<Chapter<T>> {
   try { return Object.freeze({ available: true as const, error: null, ...(await read()) }) }
-  catch (error) { return Object.freeze({ available: false as const, error: text(error instanceof Error ? error.message : error, 300) }) }
+  catch (error) { return Object.freeze({ available: false as const, error: errorText(error, 300) }) }
 }
 
 /** Read the funnel for a window (and optionally one subject) from the injected store. */

@@ -57,6 +57,38 @@ export class MassEvaluationJudgeCalibrationError extends Error {
   }
 }
 
+/**
+ * The judge's reply broke the scoring protocol (bad JSON, wrong case count, a case it could not score, a duplicate id).
+ * Production 2026-10-04 evening: judge_case_invalid was 3 of the 4 judge failures and recorded only its name. The
+ * MESSAGE is unchanged (the rolling authority matches these four strings exactly); the failure now carries the judge's
+ * raw reply and which rule it broke, so the cause is read from evidence instead of guessed.
+ */
+export type JudgeProtocolDiagnostic = Readonly<{
+  /** The judge's raw reply, bounded (1200 chars). Empty when the reply was empty. */
+  judgeRaw: string
+  /** Which rule broke: json_invalid | case_count | unknown_id | score_invalid | candidate_safe_missing | duplicate_id. */
+  rule: string
+  /** The case id involved, when one is (bounded). */
+  caseId: string | null
+  /** Cases the judge returned vs cases it was sent (control included). */
+  returned: number | null
+  expected: number
+}>
+
+export class MassEvaluationJudgeProtocolError extends Error {
+  readonly diagnostic: JudgeProtocolDiagnostic
+  constructor(message: string, diagnostic: JudgeProtocolDiagnostic) {
+    super(message)
+    this.name = 'MassEvaluationJudgeProtocolError'
+    this.diagnostic = diagnostic
+  }
+}
+
+/** The protocol diagnostic a judge-protocol failure carries, or null for any other error. */
+export function judgeProtocolDiagnosticOf(error: unknown): JudgeProtocolDiagnostic | null {
+  return error instanceof MassEvaluationJudgeProtocolError ? error.diagnostic : null
+}
+
 /** The calibration diagnostic a judge-calibration failure carries, or null for any other error. */
 export function judgeCalibrationDiagnosticOf(error: unknown): JudgeCalibrationDiagnostic | null {
   return error instanceof MassEvaluationJudgeCalibrationError ? error.diagnostic : null

@@ -529,25 +529,34 @@ async function readMassDistillationCorpus(
       !assignedHashes.has(clean(row?.content_hash, 64).toLowerCase())))
   }
 
-  // The newest-first window above can legitimately advance past corrective curriculum before enough
-  // same-subject material is available to package it. Read a second, tightly bounded remediation-only
-  // window so independently verified failures cannot be forgotten merely because general learning is busy.
-  // Assigned rows are skipped here because they already have a durable batch identity.
-  for (let offset = 0; offset < MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS; offset += MASS_DISTILLATION_CORPUS_PAGE_SIZE) {
-    const end = Math.min(offset + MASS_DISTILLATION_CORPUS_PAGE_SIZE, MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS) - 1
-    const expectedPageSize = end - offset + 1
+  // A single global remediation window can be monopolized by one high-volume subject. Production
+  // 2026-10-05 had >1,000 corrective rows while current Economics alone had 1,985; the global 1,000-row
+  // rescue therefore let later subjects disappear from packaging even though they had verified failures.
+  // Rescue a bounded slice PER remediation subject instead. This keeps the read bounded, preserves subject
+  // fairness, and lets selectHybridDistillationChunk enforce the full-size/50%-real/independent-holdout gates.
+  const remediationRescueSubjects = [...new Set(rows
+    .filter((row: any) => clean(row?.source_kind, 80) === 'failure_derived_curriculum'
+      && !assignedHashes.has(clean(row?.content_hash, 64).toLowerCase()))
+    .map((row: any) => clean(row?.subject, 240))
+    .filter(Boolean))]
+    .sort()
+  const remediationRowsPerSubject = Math.max(
+    MASS_DISTILLATION_QUALITY_MIN_BATCH,
+    Math.floor(MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS / Math.max(1, remediationRescueSubjects.length)),
+  )
+  for (const subject of remediationRescueSubjects) {
     const page = await db.from('cos_continuous_learning')
       .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
       .eq('source_kind', 'failure_derived_curriculum')
+      .eq('subject', subject)
       .gte('confidence', MASS_DISTILLATION_MIN_CONFIDENCE)
       .or(EFFECTIVE_CORPUS_FILTER)
       .order('created_at', { ascending: false })
       .order('content_hash', { ascending: true })
-      .range(offset, end)
+      .limit(remediationRowsPerSubject)
     if (page.error) throw page.error
-    const pageRows = page.data ?? []
-    retain(pageRows.filter((row: any) => !assignedHashes.has(clean(row?.content_hash, 64).toLowerCase())))
-    if (pageRows.length < expectedPageSize) break
+    retain((page.data ?? []).filter((row: any) =>
+      !assignedHashes.has(clean(row?.content_hash, 64).toLowerCase())))
   }
   return rows
 }

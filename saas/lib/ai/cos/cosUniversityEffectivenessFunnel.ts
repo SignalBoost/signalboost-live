@@ -669,7 +669,6 @@ export function composeFunnel(input: {
     unavailable: Object.freeze(unavailable),
     rejected: Object.freeze({ quarantined: byStatus.quarantined || 0, retired: byStatus.retired || 0, byStatus: Object.freeze(byStatus), source: SOURCE.artifacts }),
     evaluationFailures,
-    operationalExplanation,
     authorityExpanded: false as const,
   })
 }

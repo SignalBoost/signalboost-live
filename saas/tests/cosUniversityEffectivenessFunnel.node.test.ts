@@ -122,9 +122,13 @@ const week = () => ({
     { from_station: 'EXACT_CANARY', transitioned_at: '2026-10-04T11:20:00Z', duration_seconds: 2400, was_overdue: true },
     { from_station: 'INDEPENDENT_EVALUATION', transitioned_at: '2026-10-04T11:40:00Z', duration_seconds: 3000, was_overdue: true },
   ],
+  security_repository_patrol_evidence: [
+    { engagement_id: 'patrol', chain_index: 0, previous_hash: '0'.repeat(64), entry_hash: '1'.repeat(64), recorded_at: '2026-10-04T12:00:00Z' },
+    { engagement_id: 'patrol', chain_index: 1, previous_hash: '1'.repeat(64), entry_hash: '2'.repeat(64), recorded_at: '2026-10-04T12:01:00Z' },
+  ],
   cos_university_learning_assurance_events: [
-    { event_type: 'fine_tune', observed_at: '2026-10-04T12:05:00Z', evidence: { claim: EVALUATION_FAILED_CLAIM, error: 'mass_distilled_evaluation_judge_zero_collapse:safety' } },
-    { event_type: 'fine_tune', observed_at: '2026-10-04T12:06:00Z', evidence: { claim: EVALUATION_FAILED_CLAIM, error: 'mass_distilled_evaluation_candidate_answer_empty:0666f0:finish=stop' } },
+    { event_type: 'fine_tune', authority_expanded: false, observed_at: '2026-10-04T12:05:00Z', evidence: { claim: EVALUATION_FAILED_CLAIM, error: 'mass_distilled_evaluation_judge_zero_collapse:safety' } },
+    { event_type: 'fine_tune', authority_expanded: false, observed_at: '2026-10-04T12:06:00Z', evidence: { claim: EVALUATION_FAILED_CLAIM, error: 'mass_distilled_evaluation_candidate_answer_empty:0666f0:finish=stop' } },
     { event_type: 'fine_tune', observed_at: '2026-10-04T13:05:00Z', evidence: { claim: 'mass_distilled_independent_evaluation_completed' } },
     { event_type: 'fine_tune', observed_at: '2026-09-20T13:05:00Z', evidence: { claim: EVALUATION_FAILED_CLAIM, error: 'mass_distilled_evaluation_judge_timeout:holdout' } },
     { event_type: 'production_path', observed_at: '2026-10-04T12:05:00Z', evidence: { error: 'mass_distilled_evaluation_judge_zero_collapse:safety' } },
@@ -349,6 +353,44 @@ test('an exactly full evidence page performs the empty follow-up read instead of
   assert.ok(f.lineHistory.available && f.lineHistory.transitions === FUNNEL_ROWS_PER_CHUNK)
   const historyPages = queries.filter(q => q.table === 'cos_university_lifecycle_transition_history' && q.range)
   assert.ok(historyPages.some(q => q.range?.[0] === FUNNEL_ROWS_PER_CHUNK), 'full page is followed by an exhaustion read')
+})
+
+test('Fortune 500 comparative benchmark stays paired and does not claim a post-Residency retest', async () => {
+  const { db } = fakeDb(week())
+  const f = await readEffectivenessFunnel({ db, window: '7d', now: NOW })
+  assert.ok(f.comparativeBenchmark.available)
+  if (!f.comparativeBenchmark.available) return
+  assert.equal(f.comparativeBenchmark.comparableArtifacts, 2)
+  assert.equal(f.comparativeBenchmark.baselineMean, 0.45)
+  assert.equal(f.comparativeBenchmark.universityMean, 0.65)
+  assert.equal(f.comparativeBenchmark.absoluteGain, 0.2)
+  assert.equal(f.comparativeBenchmark.improved, 2)
+  assert.equal(f.comparativeBenchmark.residencyCompletedComparable, 1)
+  assert.equal(f.comparativeBenchmark.productionGraduatesComparable, 1)
+  assert.match(f.comparativeBenchmark.methodology, /not causal post-Residency re-tests/)
+})
+
+test('governance assurance reports durable evidence without manufacturing certification', async () => {
+  const { db } = fakeDb(week())
+  const f = await readEffectivenessFunnel({ db, window: '7d', now: NOW })
+  assert.ok(f.governanceAssurance.available)
+  if (!f.governanceAssurance.available) return
+  assert.equal(f.governanceAssurance.authorityExpansionObserved, 0)
+  assert.equal(f.governanceAssurance.repositoryEvidenceEntries, 2)
+  assert.equal(f.governanceAssurance.repositoryEvidenceChainValid, true)
+  assert.equal(f.governanceAssurance.killSwitchControl, 'implemented_not_live_attested')
+  assert.equal(f.governanceAssurance.signedScopeControl, 'implemented_not_live_attested')
+  assert.equal(f.governanceAssurance.thirdPartyPenetrationTest, 'not_evidenced')
+  assert.equal(f.governanceAssurance.certificationClaim, 'not_claimed')
+})
+
+test('broken durable repository evidence chain is disclosed, never passed', async () => {
+  const tables = week()
+  tables.security_repository_patrol_evidence[1] = { ...tables.security_repository_patrol_evidence[1], previous_hash: '9'.repeat(64) }
+  const { db } = fakeDb(tables)
+  const f = await readEffectivenessFunnel({ db, window: '7d', now: NOW })
+  assert.ok(f.governanceAssurance.available)
+  if (f.governanceAssurance.available) assert.equal(f.governanceAssurance.repositoryEvidenceChainValid, false)
 })
 
 test('the API is owner-gated read-only, the panel is mounted after the settings and before the life record', () => {

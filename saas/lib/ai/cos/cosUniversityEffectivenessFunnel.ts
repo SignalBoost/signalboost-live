@@ -213,7 +213,6 @@ export type EffectivenessFunnel = Readonly<{
     source: string
     methodology: string
   }>
-  governanceEvidence: Chapter<{ authorityExpansionObserved: number; assuranceEvents: number; repositoryEvidenceEntries: number; repositoryEvidenceChainValid: boolean | null }>
   evaluationFailures: Chapter<{
     total: number
     infrastructure: number

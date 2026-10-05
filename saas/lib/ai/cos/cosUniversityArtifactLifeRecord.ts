@@ -16,6 +16,8 @@
 //   - A chapter whose table could not be read says so (`available: false`) rather than showing an empty chapter as fact.
 //
 // The store is injected (PostgREST-shaped `from().select().eq()...`), so the composition is testable without a database.
+import { errorText } from './cosUniversityErrorText.ts'
+
 export const LIFE_RECORD_SCHEMA_VERSION = 'cos-university-artifact-life-record-v1' as const
 
 /** How much of a long history one record carries. The chapters stay readable; totals are counted in full. */
@@ -60,7 +62,7 @@ type Chapter<T> = Readonly<{ available: true; error: null } & T> | Readonly<{ av
 
 async function chapter<T>(read: () => Promise<T>): Promise<Chapter<T>> {
   try { return Object.freeze({ available: true as const, error: null, ...(await read()) }) }
-  catch (error) { return Object.freeze({ available: false as const, error: text(error instanceof Error ? error.message : error, 300) }) }
+  catch (error) { return Object.freeze({ available: false as const, error: errorText(error, 300) }) }
 }
 
 async function rows(query: any): Promise<any[]> {
@@ -235,7 +237,7 @@ export async function readArtifactLifeRecord(input: { db: Db; lookup: unknown; n
   if (!lookup) return Object.freeze({ ok: false as const, error: 'lookup_key_invalid' as const })
   let artifact: any
   try { artifact = await findArtifact(input.db, lookup) }
-  catch (error) { return Object.freeze({ ok: false as const, error: 'artifact_read_failed' as const, detail: text(error instanceof Error ? error.message : error, 300) }) }
+  catch (error) { return Object.freeze({ ok: false as const, error: 'artifact_read_failed' as const, detail: errorText(error, 300) }) }
   if (!artifact) return Object.freeze({ ok: false as const, error: 'artifact_not_found' as const })
 
   const db = input.db

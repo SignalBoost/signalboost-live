@@ -257,6 +257,25 @@ test('evaluation failures in the window are split by the rolling authority\'s ow
   assert.equal(f.evaluationFailures.rule, 'cosUniversityMassEvaluationRollingAuthority.isEvaluatorInfrastructureFailure')
   assert.equal(isEvaluatorInfrastructureFailure('mass_distilled_evaluation_judge_zero_collapse:safety'), true)
   assert.equal(isEvaluatorInfrastructureFailure('mass_distilled_evaluation_candidate_answer_empty:x'), false)
+  const infra = f.evaluationFailures.explanations.find(x => x.reason.startsWith('mass_distilled_evaluation_judge_zero_collapse:'))
+  const merit = f.evaluationFailures.explanations.find(x => x.reason.startsWith('mass_distilled_evaluation_candidate_answer_empty:'))
+  assert.equal(infra?.attribution, 'infrastructure')
+  assert.equal(infra?.causeStatus, 'evidence_backed')
+  assert.match(infra?.systemResponse || '', /fails closed/i)
+  assert.equal(merit?.attribution, 'competency')
+  assert.equal(merit?.causeStatus, 'evidence_backed')
+  assert.match(merit?.cause || '', /bounded candidate-only retry/i)
+})
+
+test('buyer causal explanations disclose unresolved causality instead of inventing a root cause', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityEffectivenessFunnel.ts', import.meta.url), 'utf8')
+  assert.match(source, /causeStatus: 'unresolved'/)
+  assert.match(source, /report does not invent a root cause/i)
+  assert.match(source, /same classifier used by production disposition/i)
+  const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx', import.meta.url), 'utf8')
+  assert.match(panel, /data-testid="evaluation-causal-explanations"/)
+  assert.match(panel, /System response:/)
+  assert.match(panel, /Buyer meaning:/)
 })
 
 test('window and subject narrow the cohort and the production counts', async () => {

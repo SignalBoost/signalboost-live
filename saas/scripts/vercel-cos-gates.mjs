@@ -112,6 +112,7 @@ const tests = [
   'tests/massEvaluationZeroCollapseEvidence.node.test.ts',
   'tests/massEvaluationBaselineAbstention.node.test.ts',
   'tests/massEvaluationExplicitUnsafeCollapse.node.test.ts',
+  'tests/massEvaluationJudgeCalibration.node.test.ts',
 
   'tests/cosUniversityMassBacklogCompactor.node.test.ts',
 

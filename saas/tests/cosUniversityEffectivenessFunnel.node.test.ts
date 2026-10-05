@@ -417,6 +417,10 @@ test('the API is owner-gated read-only, the panel is mounted after the settings 
   assert.match(panel, /f\.workforceEffectiveness\.verified/)
   assert.match(panel, /f\.economics\.observedProviderCostUsd/)
   assert.match(panel, /f\.provenance\.traceableGraduates/)
+  assert.match(panel, /data-testid="comparative-benchmark"/)
+  assert.match(panel, /f\.comparativeBenchmark\.baselineMean/)
+  assert.match(panel, /data-testid="governance-assurance"/)
+  assert.match(panel, /f\.governanceAssurance\.thirdPartyPenetrationTest/)
   assert.doesNotMatch(panel, />[A-Z][a-z]+ [a-z]+</, 'every visible string comes from copy')
   // Every stage id the module emits has a label in the copy.
   const source = read('../lib/ai/cos/cosUniversityEffectivenessFunnel.ts')

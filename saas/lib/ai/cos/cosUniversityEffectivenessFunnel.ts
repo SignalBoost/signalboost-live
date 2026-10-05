@@ -218,6 +218,16 @@ export type EffectivenessFunnel = Readonly<{
     infrastructure: number
     merit: number
     byReason: Readonly<Record<string, number>>
+    explanations: readonly Readonly<{
+      reason: string
+      count: number
+      attribution: 'infrastructure' | 'competency'
+      causeStatus: 'evidence_backed' | 'unresolved'
+      cause: string
+      impact: string
+      systemResponse: string
+      buyerMeaning: string
+    }>[]
     source: string
     rule: string
   }>
@@ -501,6 +511,50 @@ export function composeFunnel(input: {
     provenance = Object.freeze({ available: true as const, error: null, birthCertificates: input.cohort.filter(a => p.certificates.has(keyOf(a))).length, graduates: graduates.length, resumes: input.cohort.filter(a => p.resumes.has(keyOf(a))).length, workforceAssignmentsWithPermanentId: input.workforceAssignments.rows.filter(row => Boolean(row.permanentArtifactId)).length, traceableGraduates, traceableGraduateRate: graduates.length ? traceableGraduates / graduates.length : null, source: 'cos_university_artifact_birth_certificates + cos_university_graduate_model_registry + cos_university_graduate_resumes + cos_workforce_assignments', methodology: 'exact candidate+artifact hash across birth certificate, graduate registry and evidence-derived résumé; Workforce assignments must carry permanent_artifact_id' })
   } else provenance = Object.freeze({ available: false as const, error: input.provenanceEvidence.available === false ? input.provenanceEvidence.error : input.workforceAssignments.available === false ? input.workforceAssignments.error : 'provenance_unavailable' })
 
+  const explainEvaluationFailure = (reason: string, count: number): EffectivenessFunnel['evaluationFailures'] extends Chapter<infer T> ? T extends { explanations: readonly (infer E)[] } ? E : never : never => {
+    const infrastructure = isEvaluatorInfrastructureFailure(reason)
+    const lower = reason.toLowerCase()
+    const evidence = (cause: string, impact: string, systemResponse: string, buyerMeaning: string) => Object.freeze({ reason, count, attribution: 'infrastructure' as const, causeStatus: 'evidence_backed' as const, cause, impact, systemResponse, buyerMeaning })
+    if (lower.startsWith('mass_distilled_evaluation_judge_calibration_failed:')) return evidence(
+      'The independent judge failed its own hidden known-good/known-bad calibration control before a trustworthy student grade could be accepted.',
+      'No valid competency conclusion is attributed to the artifact from this attempt.',
+      'The evaluation fails closed and remains retryable as evaluator infrastructure; it does not consume the artifact as a merit failure.',
+      'The control detected an unreliable evaluator instead of allowing an unreliable score to influence graduation.'
+    ) as any
+    if (lower.includes('judge_case_invalid') || lower.includes('judge_json_invalid') || lower.includes('judge_case_count_invalid') || lower.includes('judge_identity_invalid')) return evidence(
+      'The evaluator rejected its own judge protocol/output as malformed or internally inconsistent before a valid verdict existed.',
+      'The attempt cannot support a student-quality conclusion.',
+      'The evaluator fails closed and classifies the event as infrastructure so the student is protected from an invalid merit charge.',
+      'Protocol validation prevented malformed scoring evidence from becoming a graduation decision.'
+    ) as any
+    if (lower.includes('runtime_not_ready') || lower.includes('gateway_ping_timeout') || lower.includes('runpod_timeout') || lower.includes('runtime_endpoint_id_missing')) return evidence(
+      'The exact-artifact runtime was unavailable or not proven ready within the bounded evaluation window.',
+      'The artifact was not fairly examinable during this attempt.',
+      'The attempt fails closed as infrastructure and may be retried without treating runtime availability as student competency.',
+      'Runtime readiness is separated from model quality, preserving the integrity of the evaluation.'
+    ) as any
+    if (lower.includes('candidate_answer_empty') || lower.includes('candidate_answer_missing')) return Object.freeze({
+      reason, count, attribution: 'competency' as const, causeStatus: 'evidence_backed' as const,
+      cause: 'The trained artifact reproduced a missing or empty answer under the evaluator\'s bounded candidate-only retry, so the behavior is attributable to the artifact rather than a missing judge result.',
+      impact: 'The affected exam case cannot be credited as a successful trained-artifact response.',
+      systemResponse: 'The event remains a substantive artifact outcome and is handled by the normal bounded merit/disposition policy.',
+      buyerMeaning: 'The report distinguishes reproducible artifact behavior from evaluator or runtime faults instead of masking it as infrastructure.'
+    }) as any
+    if (infrastructure) return evidence(
+      'The recorded reason matches the University\'s canonical evaluator-infrastructure classifier; the available evidence establishes that the evaluation mechanism, runtime, provider, budget, or protocol prevented a trustworthy competency result.',
+      'The event is excluded from student merit attribution.',
+      'The line fails closed and follows its governed infrastructure retry/recovery path.',
+      'The same classifier used by production disposition is used by this buyer report, preventing reporting logic from reinterpreting the failure.'
+    ) as any
+    return Object.freeze({
+      reason, count, attribution: 'competency' as const, causeStatus: 'unresolved' as const,
+      cause: 'The recorded evidence does not establish a more specific causal explanation beyond the fact that this reason is not classified as evaluator infrastructure.',
+      impact: 'The event remains in the artifact merit/disposition accounting unless later authoritative evidence changes its classification.',
+      systemResponse: 'The normal bounded evaluation/disposition policy applies; the report does not invent a root cause.',
+      buyerMeaning: 'Unknown causality is disclosed as unresolved rather than presented as a fabricated explanation.'
+    }) as any
+  }
+
   let evaluationFailures: EffectivenessFunnel['evaluationFailures']
   if (input.evaluationFailures.available) {
     const byReason: Record<string, number> = {}
@@ -516,6 +570,7 @@ export function composeFunnel(input: {
       infrastructure,
       merit: input.evaluationFailures.errors.length - infrastructure,
       byReason: Object.freeze(byReason),
+      explanations: Object.freeze(Object.entries(byReason).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([reason, count]) => explainEvaluationFailure(reason, count))),
       source: SOURCE.assurance,
       rule: 'cosUniversityMassEvaluationRollingAuthority.isEvaluatorInfrastructureFailure',
     })

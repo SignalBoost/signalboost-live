@@ -291,7 +291,7 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                         <div><b>Why:</b> {item.cause}</div>
                         <div><b>Impact:</b> {item.impact}</div>
                         <div><b>System response:</b> {item.systemResponse}</div>
-                        <div><b>Buyer meaning:</b> {item.buyerMeaning}</div>
+                        <div><b>{copy.operationalBuyerMeaning}:</b> {item.buyerMeaning}</div>
                       </div>
                     ))}
                   </div>

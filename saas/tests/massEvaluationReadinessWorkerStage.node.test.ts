@@ -57,4 +57,3 @@ test('every stage-suffixed readiness failure stays infrastructure, never a stude
   }
 })
 // end of saas/tests/massEvaluationReadinessWorkerStage.node.test.ts (if this line is missing, the paste was cut short)
-------------------------------------------------------------

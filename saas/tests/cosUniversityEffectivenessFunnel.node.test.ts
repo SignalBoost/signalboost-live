@@ -231,6 +231,21 @@ test('buyer assurance chapters fail closed when their evidence stores are unread
   assert.equal(f.provenance.available, false)
 })
 
+test('buyer operational explanation reuses Self-Healing health and never disguises abnormal waiting as healthy', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityEffectivenessFunnel.ts', import.meta.url), 'utf8')
+  assert.match(source, /readUniversityMassDistillationHealth/)
+  assert.match(source, /classification === 'expected_wait'/)
+  assert.match(source, /configured concurrency/i)
+  assert.match(source, /classification === 'repair_required'/)
+  assert.match(source, /canonical Self-Healing health model detected/)
+  assert.match(source, /causeStatus: 'unresolved'/)
+  assert.match(source, /No causal explanation is invented/)
+  const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx', import.meta.url), 'utf8')
+  assert.match(panel, /data-testid="operational-explanation"/)
+  assert.match(panel, /Buyer meaning:/)
+  assert.match(panel, /overdue provider jobs=/)
+})
+
 test('line health counts only leases that are live at the report time', async () => {
   const fixture = week()
   fixture.cos_university_lifecycle_orchestration = [

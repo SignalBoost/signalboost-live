@@ -20,8 +20,8 @@ export const FUNNEL_SCHEMA_VERSION = 'cos-university-effectiveness-funnel-v1' as
 export const FUNNEL_COHORT_LIMIT = 1500
 /** Ids per `in()` read. Candidate ids are short; this stays well inside a URL. */
 export const FUNNEL_READ_CHUNK = 100
-/** Rows read per chunk from the high-volume tables (attempts, events). Counted, never listed. */
-export const FUNNEL_ROWS_PER_CHUNK = 5000
+/** Page size for high-volume evidence reads. Every buyer-evidence chapter pages until exhausted. */
+export const FUNNEL_ROWS_PER_CHUNK = 1000
 
 /** The terminal claim the evaluation route writes on a failed exam (cos-university-mass-distilled-evaluation FAILED). */
 export const EVALUATION_FAILED_CLAIM = 'mass_distilled_independent_evaluation_failed' as const
@@ -43,6 +43,16 @@ async function rows(query: any): Promise<any[]> {
   const result = await query
   if (result?.error) throw result.error
   return Array.isArray(result?.data) ? result.data : []
+}
+
+/** Exhaustive PostgREST read. A buyer metric is never silently capped at the first page. */
+async function allRows(build: (from: number, to: number) => any, pageSize = FUNNEL_ROWS_PER_CHUNK): Promise<any[]> {
+  const out: any[] = []
+  for (let from = 0; ; from += pageSize) {
+    const page = await rows(build(from, from + pageSize - 1))
+    out.push(...page)
+    if (page.length < pageSize) return out
+  }
 }
 
 const chunks = <T,>(list: readonly T[], size: number): T[][] => {
@@ -120,6 +130,9 @@ export type EffectivenessFunnel = Readonly<{
     meanRecoverySeconds: number | null
     medianRecoverySeconds: number | null
     p90RecoverySeconds: number | null
+    p50DwellSeconds: number | null
+    p90DwellSeconds: number | null
+    p99DwellSeconds: number | null
     byFromStation: Readonly<Record<string, number>>
     source: string
     methodology: string
@@ -358,6 +371,7 @@ export function composeFunnel(input: {
   let lineHistory: EffectivenessFunnel['lineHistory']
   if (input.transitionHistory.available) {
     const transitions = input.transitionHistory.rows.filter(row => row.transitionedAt)
+    const dwell = transitions.filter(row => row.durationSeconds !== null).map(row => row.durationSeconds as number).sort((a, b) => a - b)
     const recovery = transitions.filter(row => row.wasOverdue && row.durationSeconds !== null).map(row => row.durationSeconds as number).sort((a, b) => a - b)
     const percentile = (values: readonly number[], p: number): number | null => values.length ? values[Math.max(0, Math.min(values.length - 1, Math.ceil(values.length * p) - 1))] : null
     const byFromStation: Record<string, number> = {}
@@ -368,8 +382,9 @@ export function composeFunnel(input: {
       recoveredOverdue: recovery.length,
       meanRecoverySeconds: recovery.length ? recovery.reduce((a, b) => a + b, 0) / recovery.length : null,
       medianRecoverySeconds: percentile(recovery, 0.5), p90RecoverySeconds: percentile(recovery, 0.9),
+      p50DwellSeconds: percentile(dwell, 0.5), p90DwellSeconds: percentile(dwell, 0.9), p99DwellSeconds: percentile(dwell, 0.99),
       byFromStation: Object.freeze(byFromStation), source: SOURCE.transitionHistory,
-      methodology: 'append-only station transitions observed in the selected event window; throughput is observed transitions per elapsed window hour; recovery duration is prior-station residence time for transitions whose prior deadline had expired',
+      methodology: 'exhaustively paged append-only station transitions in the selected event window; throughput is observed transitions per elapsed window hour; dwell percentiles use all prior-station residence durations; recovery duration uses transitions whose prior deadline had expired',
     })
   } else lineHistory = Object.freeze({ available: false as const, error: input.transitionHistory.error })
 
@@ -489,23 +504,28 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
   const candidateIds = Array.from(new Set(cohort.map(a => a.candidateId))).filter(Boolean)
   const key = (row: any) => `${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 64).toLowerCase()}`
 
-  /** Read one table for the whole cohort, chunked by candidate id. */
-  const forCohort = async (table: string, columns: string, limit = FUNNEL_READ_CHUNK * 10, refine?: (q: any) => any): Promise<any[]> => {
+  /** Read one table for the whole cohort, chunked by candidate id and exhaustively paged within each chunk. */
+  const forCohort = async (table: string, columns: string, _pageSize = FUNNEL_ROWS_PER_CHUNK, refine?: (q: any) => any): Promise<any[]> => {
     const out: any[] = []
     for (const chunk of chunks(candidateIds, FUNNEL_READ_CHUNK)) {
-      let q = db.from(table).select(columns).in('candidate_id', chunk)
-      if (refine) q = refine(q)
-      out.push(...await rows(q.limit(limit)))
+      out.push(...await allRows((from, to) => {
+        let q = db.from(table).select(columns).in('candidate_id', chunk)
+        if (refine) q = refine(q)
+        return q.range(from, to)
+      }))
     }
     return out
   }
+
+  const exhaust = async (build: () => any): Promise<any[]> =>
+    allRows((from, to) => build().range(from, to))
 
   const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, evaluationFailures] = await Promise.all([
     chapter(async () => {
       let q = db.from('cos_university_mass_distillation_batch_runs').select('stage')
       if (since) q = q.gte('created_at', since)
       if (subjectId) q = q.eq('subject_id', subjectId)
-      const list = await rows(q.limit(FUNNEL_ROWS_PER_CHUNK))
+      const list = await exhaust(() => q)
       const stageOf = (row: any) => text(row.stage, 60)
       return {
         runsStarted: list.length,
@@ -553,7 +573,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     chapter(async () => {
       let q = db.from('cos_university_graduate_serving_attempts').select('attempt_id,phase,outcome,latency_ms,error_class,recorded_at')
       if (since) q = q.gte('recorded_at', since)
-      const list = await rows(q.order('recorded_at', { ascending: false }).limit(FUNNEL_ROWS_PER_CHUNK))
+      const list = await exhaust(() => q.order('recorded_at', { ascending: false }))
       const terminalByAttempt = new Map<string, { outcome: string; latencyMs: number; errorClass: string | null }>()
       for (const row of list) {
         const attemptId = text(row.attempt_id, 80)
@@ -565,14 +585,14 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     chapter(async () => {
       let q = db.from('cos_university_lifecycle_orchestration').select('station,stage_entered_at,stage_deadline_at,lease_until,terminal')
       if (subjectId) q = q.eq('subject_id', subjectId)
-      const list = await rows(q.eq('terminal', false).limit(FUNNEL_ROWS_PER_CHUNK))
+      const list = await exhaust(() => q.eq('terminal', false))
       return { rows: list.map((row: any) => Object.freeze({ station: text(row.station, 80), enteredAt: iso(row.stage_entered_at), deadlineAt: iso(row.stage_deadline_at), leaseUntil: iso(row.lease_until), terminal: row.terminal === true })) }
     }),
     chapter(async () => {
       let q = db.from('cos_university_lifecycle_transition_history').select('from_station,transitioned_at,duration_seconds,was_overdue')
       if (since) q = q.gte('transitioned_at', since)
       if (subjectId) q = q.eq('subject_id', subjectId)
-      const list = await rows(q.order('transitioned_at', { ascending: false }).limit(FUNNEL_ROWS_PER_CHUNK))
+      const list = await exhaust(() => q.order('transitioned_at', { ascending: false }))
       return { rows: list.map((row: any) => Object.freeze({ fromStation: text(row.from_station, 80), transitionedAt: iso(row.transitioned_at), durationSeconds: Number.isFinite(Number(row.duration_seconds)) ? Math.max(0, Number(row.duration_seconds)) : null, wasOverdue: row.was_overdue === true })) }
     }),
     chapter(async () => {
@@ -580,8 +600,8 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       const residencyIds = enrollments.map((row: any) => text(row.id, 80)).filter(Boolean)
       const caseRows: any[] = [], competencyRows: any[] = []
       for (const chunk of chunks(residencyIds, FUNNEL_READ_CHUNK)) {
-        caseRows.push(...await rows(db.from('cos_university_residency_case_runs').select('residency_id,status').in('residency_id', chunk).limit(FUNNEL_ROWS_PER_CHUNK)))
-        competencyRows.push(...await rows(db.from('cos_university_residency_competency_evidence').select('residency_id,outcome').in('residency_id', chunk).limit(FUNNEL_ROWS_PER_CHUNK)))
+        caseRows.push(...await allRows((from, to) => db.from('cos_university_residency_case_runs').select('residency_id,status').in('residency_id', chunk).range(from, to)))
+        competencyRows.push(...await allRows((from, to) => db.from('cos_university_residency_competency_evidence').select('residency_id,outcome').in('residency_id', chunk).range(from, to)))
       }
       return { enrollments: enrollments.map((row: any) => ({ key: key(row), standing: text(row.standing, 60) })), caseStatuses: caseRows.map((row: any) => text(row.status, 40)), competencyOutcomes: competencyRows.map((row: any) => text(row.outcome, 20)) }
     }),
@@ -589,7 +609,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       const certs = await forCohort('cos_university_artifact_birth_certificates', 'candidate_id,trained_artifact_hash,permanent_artifact_id')
       const permanentIds = certs.map((row: any) => text(row.permanent_artifact_id, 80)).filter(Boolean)
       const list: any[] = []
-      for (const chunk of chunks(permanentIds, FUNNEL_READ_CHUNK)) list.push(...await rows(db.from('cos_workforce_assignments').select('registry_id,permanent_artifact_id,source_kind,status,assigned_at').in('permanent_artifact_id', chunk).limit(FUNNEL_ROWS_PER_CHUNK)))
+      for (const chunk of chunks(permanentIds, FUNNEL_READ_CHUNK)) list.push(...await allRows((from, to) => db.from('cos_workforce_assignments').select('registry_id,permanent_artifact_id,source_kind,status,assigned_at').in('permanent_artifact_id', chunk).range(from, to)))
       return { rows: list.map((row: any) => ({ status: text(row.status, 40), sourceKind: text(row.source_kind, 40), permanentArtifactId: text(row.permanent_artifact_id, 80) })) }
     }),
     chapter(async () => {
@@ -609,7 +629,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       // evaluation event (event_type fine_tune, claim ..._failed), its error classified by the rolling authority's rule.
       let q = db.from('cos_university_learning_assurance_events').select('evidence').eq('event_type', 'fine_tune')
       if (since) q = q.gte('observed_at', since)
-      const list = await rows(q.order('observed_at', { ascending: false }).limit(FUNNEL_ROWS_PER_CHUNK))
+      const list = await exhaust(() => q.order('observed_at', { ascending: false }))
       return { errors: list.filter((r: any) => r.evidence?.claim === EVALUATION_FAILED_CLAIM).map((r: any) => text(r.evidence?.error, 200)).filter(Boolean) }
     }),
   ])

@@ -716,7 +716,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
   const exhaust = async (build: () => any): Promise<any[]> =>
     allRows((from, to) => build().range(from, to))
 
-  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, evaluationFailures] = await Promise.all([
+  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, operationalHealth, evaluationFailures] = await Promise.all([
     chapter(async () => {
       let q = db.from('cos_university_mass_distillation_batch_runs').select('stage')
       if (since) q = q.gte('created_at', since)

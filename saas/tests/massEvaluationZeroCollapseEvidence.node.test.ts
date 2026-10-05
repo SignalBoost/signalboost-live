@@ -40,8 +40,9 @@ test('any other error carries no diagnostic', () => {
 })
 
 test('the evaluation module and the route both take the error from the one pure module', () => {
-  assert.match(SOURCE, /import \{ MassEvaluationZeroCollapseError, ZERO_COLLAPSE_DIAGNOSTIC_CASE_LIMIT, type ZeroScoreDiagnostic \} from '\.\/cosUniversityMassEvaluationZeroCollapse\.ts'/)
-  assert.match(ROUTE, /import \{ zeroCollapseDiagnosticOf \} from '@\/lib\/ai\/cos\/cosUniversityMassEvaluationZeroCollapse'/)
+  // 2026-10-04 (judge calibration control): the same pure module also carries the calibration error; names may be added.
+  assert.match(SOURCE, /import \{[^}]*\bMassEvaluationZeroCollapseError, ZERO_COLLAPSE_DIAGNOSTIC_CASE_LIMIT, type ZeroScoreDiagnostic \} from '\.\/cosUniversityMassEvaluationZeroCollapse\.ts'/)
+  assert.match(ROUTE, /import \{[^}]*\bzeroCollapseDiagnosticOf \} from '@\/lib\/ai\/cos\/cosUniversityMassEvaluationZeroCollapse'/)
   assert.doesNotMatch(SOURCE, /class MassEvaluationZeroCollapseError|type ZeroScoreDiagnostic = /)
 })
 

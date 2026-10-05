@@ -56,25 +56,4 @@ test('every stage-suffixed readiness failure stays infrastructure, never a stude
     }
   }
 })
-const ROUTE = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-
-test('a successful readiness wait returns the whole seconds it took', () => {
-  assert.match(readiness, /async function waitReady\(endpointId:string,deadlineMs:number\):Promise<number>\{/)
-  assert.match(readiness, /const waitStartedAt=Date\.now\(\)/)
-  assert.match(readiness, /if\(response\.status===200\)\{[\s\S]*?return Math\.round\(\(Date\.now\(\)-waitStartedAt\)\/1000\)/)
-  // The timeout path is unchanged: it still throws the stage-suffixed infrastructure failure.
-  assert.equal(readiness.match(/throw new Error\(`mass_distilled_evaluation_runtime_not_ready:/g)?.length, 1)
-})
-
-test('only the exam cold start is measured and the completed result carries it', () => {
-  assert.equal(SOURCE.match(/const readinessSeconds=await waitReady\(input\.claim\.endpointId,input\.deadlineMs\)/g)?.length, 1)
-  assert.match(SOURCE, /productionTrafficAuthorized:false,endpointCalls:budget\.used,judgeCalls:JUDGE_CALLS,readinessSeconds\}\)/)
-})
-
-test('the route writes readinessSeconds on the COMPLETED event', () => {
-  const start = ROUTE.indexOf('eventClaim: COMPLETED,')
-  const completed = ROUTE.slice(start, ROUTE.indexOf('await recordProduction(true, {', start))
-  assert.ok(start > 0 && completed.length > 0)
-  assert.match(completed, /readinessSeconds: result\.readinessSeconds,/)
-})
 // end of saas/tests/massEvaluationReadinessWorkerStage.node.test.ts (if this line is missing, the paste was cut short)

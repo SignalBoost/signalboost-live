@@ -296,7 +296,7 @@ test('buyer causal explanations disclose unresolved causality instead of inventi
   const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx', import.meta.url), 'utf8')
   assert.match(panel, /data-testid="evaluation-causal-explanations"/)
   assert.match(panel, /System response:/)
-  assert.match(panel, /Buyer meaning:/)
+  assert.match(panel, /copy\.operationalBuyerMeaning/)
 })
 
 test('window and subject narrow the cohort and the production counts', async () => {

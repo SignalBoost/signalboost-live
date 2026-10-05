@@ -74,20 +74,28 @@ test('the health read is cached per endpoint for a short window', async () => {
   assert.equal(f.calls.length, 2)
 })
 
-test('the graduate worker warm gate protects only primary/coder while specialist Workforce roles can wake on real demand', () => {
+test('live chat reaches only warm graduates, for EVERY role (2026-10-04: 82 live timeouts came from sleeping specialists)', () => {
   const workers = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
   assert.match(workers, /import \{ runpodGraduateEndpointWarm \} from '@\/lib\/ai\/cos\/graduateWarmGate'/)
   const at = workers.indexOf('function createGraduateWorker(')
   const execute = workers.slice(workers.indexOf('async execute(request) {', at), workers.indexOf('const effective = toLocalModelCallArgs(request, role)', at))
-  assert.match(execute, /role === 'primary' \|\| role === 'coder'/)
-  assert.match(execute, /INTERACTIVE_GRADUATE_FEATURES\.has\(/)
-  assert.match(execute, /!\(await runpodGraduateEndpointWarm\(runtime\.inference\.baseUrl\)\)\) return null/)
+  // No role exception remains: the gate applies to every live-chat request.
+  assert.doesNotMatch(execute, /role === 'primary' \|\| role === 'coder'/)
+  assert.match(execute, /if \(INTERACTIVE_GRADUATE_FEATURES\.has\(String\(request\.usageContext\?\.feature \|\| ''\)\.trim\(\)\.toLowerCase\(\)\)\s*&& !\(await runpodGraduateEndpointWarm\(runtime\.inference\.baseUrl\)\)\) return null/)
+  // The skip happens before any attempt is recorded, so a sleeping graduate is never charged a failure.
+  assert.ok(execute.indexOf('return null') < execute.length)
+  const recordAt = workers.indexOf("recordGraduateServingAttempt({ ...attemptBase, phase: 'attempt_started'", at)
+  assert.ok(workers.indexOf('runpodGraduateEndpointWarm(runtime.inference.baseUrl)', at) < recordAt)
 })
 
-test('null responses at the configured deadline are classified as infrastructure timeouts', () => {
+test('live timeouts record whether the endpoint was cold, booting or warm - both the thrown and the null path', () => {
   const workers = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
   const at = workers.indexOf('function createGraduateWorker(')
   const execute = workers.slice(at, workers.indexOf('function baseOpenModelWorkers()', at))
-  assert.match(execute, /runtime_deadline_exceeded/)
+  assert.match(execute, /errorClass: failureOutcome === 'timeout'\s*\? `runtime_deadline_exceeded:\$\{await runpodGraduateEndpointWorkerState\(runtime\.inference\.baseUrl\)\}`/)
+  assert.match(execute, /nullOutcome === 'timeout' \? \{ errorClass: `runtime_deadline_exceeded:\$\{await runpodGraduateEndpointWorkerState\(runtime\.inference\.baseUrl\)\}` \}/)
   assert.match(execute, /outcome: nullOutcome === 'timeout' \? 'timeout' : 'empty'/)
+  // No bare, state-less deadline class remains on the live path.
+  assert.doesNotMatch(execute, /'runtime_deadline_exceeded'/)
 })
+// end of saas/tests/graduateWarmGate.node.test.ts (if this line is missing, the paste was cut short)

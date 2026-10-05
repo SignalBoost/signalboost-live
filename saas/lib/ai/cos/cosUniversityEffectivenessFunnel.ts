@@ -263,6 +263,7 @@ export function composeFunnel(input: {
   workforceAssignments: Chapter<{ rows: readonly Readonly<{ status: string; sourceKind: string; permanentArtifactId: string }>[] }>
   providerCosts: Chapter<{ rows: readonly Readonly<{ operation: string; observedCostUsd: number }>[] }>
   provenanceEvidence: Chapter<{ certificates: ReadonlySet<string>; graduates: ReadonlySet<string>; resumes: ReadonlySet<string> }>
+  governanceEvidence: Chapter<{ authorityExpansionObserved: number; assuranceEvents: number; repositoryEvidenceEntries: number; repositoryEvidenceChainValid: boolean | null }>
   evaluationFailures: Chapter<{ errors: readonly string[] }>
 }): EffectivenessFunnel {
   const size = input.cohort.length
@@ -453,15 +454,18 @@ export function composeFunnel(input: {
 
   let comparativeBenchmark: EffectivenessFunnel['comparativeBenchmark']
   if (input.examined.available && input.residency.available && input.graduation.available) {
+    const examined = input.examined
+    const residency = input.residency
+    const graduation = input.graduation
     const points = input.cohort.flatMap(a => {
-      const r = input.examined.latestByKey.get(keyOf(a))
+      const r = examined.latestByKey.get(keyOf(a))
       return r && r.baseline !== null && r.trained !== null ? [{ key: keyOf(a), baseline: r.baseline, trained: r.trained, gain: r.trained - r.baseline }] : []
     })
     const mean = (values: readonly number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
     const baselineMean = mean(points.map(p => p.baseline))
     const universityMean = mean(points.map(p => p.trained))
-    const residencyPoints = points.filter(p => input.residency.complete.has(p.key))
-    const graduatePoints = points.filter(p => input.graduation.activated.has(p.key))
+    const residencyPoints = points.filter(p => residency.complete.has(p.key))
+    const graduatePoints = points.filter(p => graduation.activated.has(p.key))
     const absoluteGain = baselineMean === null || universityMean === null ? null : universityMean - baselineMean
     comparativeBenchmark = Object.freeze({ available: true as const, error: null,
       comparableArtifacts: points.length, baselineMean, universityMean, absoluteGain,

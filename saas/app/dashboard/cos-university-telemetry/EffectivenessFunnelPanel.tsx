@@ -253,16 +253,16 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
           </div>
 
           <div className="rounded-lg border p-3 text-xs" data-testid="operational-explanation">
-            <div className="font-semibold">Operational explanation</div>
+            <div className="font-semibold">{copy.operationalTitle}</div>
             {f.operationalExplanation.available ? (
               <div className="mt-2 space-y-1">
-                <div><b>State:</b> {f.operationalExplanation.state} · <b>Classification:</b> {f.operationalExplanation.classification} · <b>Cause:</b> {f.operationalExplanation.causeStatus}</div>
-                <div><b>Why:</b> {f.operationalExplanation.cause}</div>
-                <div><b>Impact:</b> {f.operationalExplanation.impact}</div>
-                <div><b>System response:</b> {f.operationalExplanation.systemResponse}</div>
-                <div><b>Buyer meaning:</b> {f.operationalExplanation.buyerMeaning}</div>
-                <div className="font-mono text-[10px]">active campaigns={f.operationalExplanation.activeCampaigns} · unsettled provider jobs={f.operationalExplanation.unsettledProviderJobs} · overdue provider jobs={f.operationalExplanation.overdueProviderJobs} · auto-recovery={String(f.operationalExplanation.automaticRecoveryAuthorized)}</div>
-                {f.operationalExplanation.reasons.length ? <div className="font-mono text-[10px]">reasons: {f.operationalExplanation.reasons.join(', ')}</div> : null}
+                <div><b>{copy.operationalState}:</b> {f.operationalExplanation.state} · <b>{copy.operationalClassification}:</b> {f.operationalExplanation.classification} · <b>{copy.operationalCauseStatus}:</b> {f.operationalExplanation.causeStatus}</div>
+                <div><b>{copy.operationalWhy}:</b> {f.operationalExplanation.cause}</div>
+                <div><b>{copy.operationalImpact}:</b> {f.operationalExplanation.impact}</div>
+                <div><b>{copy.operationalSystemResponse}:</b> {f.operationalExplanation.systemResponse}</div>
+                <div><b>{copy.operationalBuyerMeaning}:</b> {f.operationalExplanation.buyerMeaning}</div>
+                <div className="font-mono text-[10px]">{copy.operationalActiveCampaigns}={f.operationalExplanation.activeCampaigns} · {copy.operationalUnsettledJobs}={f.operationalExplanation.unsettledProviderJobs} · {copy.operationalOverdueJobs}={f.operationalExplanation.overdueProviderJobs} · {copy.operationalAutoRecovery}={String(f.operationalExplanation.automaticRecoveryAuthorized)}</div>
+                {f.operationalExplanation.reasons.length ? <div className="font-mono text-[10px]">{copy.operationalReasons}: {f.operationalExplanation.reasons.join(', ')}</div> : null}
                 <div className="text-[10px] opacity-50">{copy.source}: {f.operationalExplanation.source}</div>
               </div>
             ) : <p role="alert">{f.operationalExplanation.error}</p>}

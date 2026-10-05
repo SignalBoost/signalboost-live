@@ -18,7 +18,7 @@ import {
   runMassDistilledArtifactEvaluation,
   type MassEvaluationClaim,
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
-import { zeroCollapseDiagnosticOf } from '@/lib/ai/cos/cosUniversityMassEvaluationZeroCollapse'
+import { judgeCalibrationDiagnosticOf, zeroCollapseDiagnosticOf } from '@/lib/ai/cos/cosUniversityMassEvaluationZeroCollapse'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
   MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
@@ -924,6 +924,8 @@ export async function GET(req: NextRequest) {
     // Zero-collapse (both models 0 on every case of a suite) carries what the judge and the students actually said,
     // bounded; see MassEvaluationZeroCollapseError. Every other failure still records only the code and our frames.
     const zeroCollapseDiagnostic = zeroCollapseDiagnosticOf(error)
+    // The judge failed its own control (2026-10-04): the judge's text and the control's scores, nothing else.
+    const judgeCalibration = judgeCalibrationDiagnosticOf(error)
     const workerQuotaDeferred = Boolean(claim)
       && message.toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
     if (claim) {
@@ -938,6 +940,7 @@ export async function GET(req: NextRequest) {
           ...(terminalDataDefect ? { terminalDataDefect: true, nextStatus: 'quarantined' } : {}),
           ...(frames.length ? { errorFrames: frames } : {}),
           ...(zeroCollapseDiagnostic ? { zeroCollapseDiagnostic } : {}),
+          ...(judgeCalibration ? { judgeCalibration } : {}),
         },
       }).catch(() => undefined)
     }

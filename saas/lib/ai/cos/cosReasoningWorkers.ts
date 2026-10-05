@@ -261,13 +261,13 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
     priority: 200,
     async execute(request) {
       // WARM-ONLY IN LIVE CHAT (2026-09-27): graduates run on RunPod serverless scaled 0/1. A cold endpoint cannot
-      // answer inside the 8s chat budget (0/59 successes this week), so live chat skips it and the base worker answers.
-      // Primary/coder remain latency-protected, but specialist Workforce roles must be allowed to
-      // answer genuine matching Production demand. Applying the warm-only gate to every role created
-      // a deadlock: a scale-to-zero critic/verifier/researcher/context worker was skipped forever and
-      // therefore could never receive the real request that wakes its exact endpoint.
-      if ((role === 'primary' || role === 'coder')
-        && INTERACTIVE_GRADUATE_FEATURES.has(String(request.usageContext?.feature || '').trim().toLowerCase())
+      // answer inside the 8s chat budget (0/59 successes that week), so live chat skips it and the base worker answers.
+      // ALL ROLES (owner go, 2026-10-04): the gate used to cover only primary/coder, so a sleeping critic, verifier,
+      // researcher or context engineer was sent live questions anyway - 82 live timeouts in seven days, each a paid wake
+      // and each recorded against the graduate. The reason for that exception ("a skipped specialist could never receive
+      // the request that wakes it") no longer holds: the buyer's warm window keeps the reserved graduates awake and the
+      // workforce reservation decides who may hold a worker at all. Live chat now reaches only graduates that can answer.
+      if (INTERACTIVE_GRADUATE_FEATURES.has(String(request.usageContext?.feature || '').trim().toLowerCase())
         && !(await runpodGraduateEndpointWarm(runtime.inference.baseUrl))) return null
       const effective = toLocalModelCallArgs(request, role)
       // The graduate serves an 8k window; COS worker requests are sized for the managed reasoner. Fit them first
@@ -310,7 +310,7 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
           purpose: `${runtime.subjectId}:${role}`,
           correlationId: request.usageContext?.correlationId,
         },
-      }, runtime.inference).catch(error => {
+      }, runtime.inference).catch(async error => {
         const latencyMs = Date.now() - startedAt
         failureOutcome = graduateServingErrorOutcome(error, graduateTimeoutMs, latencyMs)
         recordGraduateServingAttempt({
@@ -318,7 +318,11 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
           phase: 'attempt_failed',
           outcome: failureOutcome,
           latencyMs,
-          errorClass: error instanceof Error ? error.name || 'Error' : 'Error',
+          // A live timeout says whether the endpoint was cold, still booting or warm-and-slow (2026-10-04), the same
+          // evidence the Workforce shadow path already records. One bounded health read, no wake, no GPU cost.
+          errorClass: failureOutcome === 'timeout'
+            ? `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}`
+            : error instanceof Error ? error.name || 'Error' : 'Error',
         })
         console.warn('[cos-graduate-worker] inference failed; base worker may take over', error instanceof Error ? error.message : String(error))
         return null
@@ -338,7 +342,7 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
             phase: 'attempt_failed',
             outcome: nullOutcome === 'timeout' ? 'timeout' : 'empty',
             latencyMs,
-            ...(nullOutcome === 'timeout' ? { errorClass: 'runtime_deadline_exceeded' } : {}),
+            ...(nullOutcome === 'timeout' ? { errorClass: `runtime_deadline_exceeded:${await runpodGraduateEndpointWorkerState(runtime.inference.baseUrl)}` } : {}),
           })
         }
         recordGraduateServingAttempt({ ...attemptBase, phase: 'fallback', outcome: 'fallback', latencyMs })

@@ -175,6 +175,34 @@ export type EffectivenessFunnel = Readonly<{
     source: string
     methodology: string
   }>
+  comparativeBenchmark: Chapter<{
+    comparableArtifacts: number
+    baselineMean: number | null
+    universityMean: number | null
+    absoluteGain: number | null
+    relativeGain: number | null
+    improved: number
+    unchanged: number
+    regressed: number
+    residencyCompletedComparable: number
+    residencyCompletedMean: number | null
+    productionGraduatesComparable: number
+    productionGraduatesMean: number | null
+    source: string
+    methodology: string
+  }>
+  governanceAssurance: Chapter<{
+    authorityExpansionObserved: number
+    assuranceEvents: number
+    repositoryEvidenceEntries: number
+    repositoryEvidenceChainValid: boolean | null
+    killSwitchControl: 'implemented_not_live_attested'
+    signedScopeControl: 'implemented_not_live_attested'
+    thirdPartyPenetrationTest: 'not_evidenced'
+    certificationClaim: 'not_claimed'
+    source: string
+    methodology: string
+  }>
   provenance: Chapter<{
     birthCertificates: number
     graduates: number
@@ -185,6 +213,7 @@ export type EffectivenessFunnel = Readonly<{
     source: string
     methodology: string
   }>
+  governanceEvidence: Chapter<{ authorityExpansionObserved: number; assuranceEvents: number; repositoryEvidenceEntries: number; repositoryEvidenceChainValid: boolean | null }>
   evaluationFailures: Chapter<{
     total: number
     infrastructure: number
@@ -422,6 +451,45 @@ export function composeFunnel(input: {
     economics = Object.freeze({ available: true as const, error: null, settledProviderJobs: rows.length, observedProviderCostUsd: total, byOperationUsd: Object.freeze(byOperationUsd), costPerGraduatedArtifactUsd: graduated ? total / graduated : null, costPerVerifiedOutcomeUsd: verifiedOutcomes ? total / verifiedOutcomes : null, coverage: 'observed mass-distillation provider jobs for cohort candidate IDs; provider ledger has no artifact hash, so this is not exact-artifact cost attribution or total platform TCO', source: 'cos_university_mass_distillation_provider_jobs', methodology: 'sum observed_cost_usd for settled provider jobs whose candidate_id is in the cohort; cost attribution is candidate-level because the provider ledger does not store trained_artifact_hash; denominators are cohort graduates and verified outcomes' })
   } else economics = Object.freeze({ available: false as const, error: input.providerCosts.error })
 
+  let comparativeBenchmark: EffectivenessFunnel['comparativeBenchmark']
+  if (input.examined.available && input.residency.available && input.graduation.available) {
+    const points = input.cohort.flatMap(a => {
+      const r = input.examined.latestByKey.get(keyOf(a))
+      return r && r.baseline !== null && r.trained !== null ? [{ key: keyOf(a), baseline: r.baseline, trained: r.trained, gain: r.trained - r.baseline }] : []
+    })
+    const mean = (values: readonly number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+    const baselineMean = mean(points.map(p => p.baseline))
+    const universityMean = mean(points.map(p => p.trained))
+    const residencyPoints = points.filter(p => input.residency.complete.has(p.key))
+    const graduatePoints = points.filter(p => input.graduation.activated.has(p.key))
+    const absoluteGain = baselineMean === null || universityMean === null ? null : universityMean - baselineMean
+    comparativeBenchmark = Object.freeze({ available: true as const, error: null,
+      comparableArtifacts: points.length, baselineMean, universityMean, absoluteGain,
+      relativeGain: absoluteGain === null || baselineMean === null || baselineMean === 0 ? null : absoluteGain / baselineMean,
+      improved: points.filter(p => p.gain > 0).length, unchanged: points.filter(p => p.gain === 0).length, regressed: points.filter(p => p.gain < 0).length,
+      residencyCompletedComparable: residencyPoints.length, residencyCompletedMean: mean(residencyPoints.map(p => p.trained)),
+      productionGraduatesComparable: graduatePoints.length, productionGraduatesMean: mean(graduatePoints.map(p => p.trained)),
+      source: 'cos_university_distilled_evaluation_runs + cos_university_residency_enrollments + cos_university_graduate_model_registry',
+      methodology: 'same exact-artifact independent holdout scores; baseline and trained are paired per artifact; Residency/production rows are labeled subsets, not causal post-Residency re-tests',
+    })
+  } else comparativeBenchmark = Object.freeze({ available: false as const, error: input.examined.available === false ? input.examined.error : input.residency.available === false ? input.residency.error : input.graduation.available === false ? input.graduation.error : 'comparative_benchmark_unavailable' })
+
+  let governanceAssurance: EffectivenessFunnel['governanceAssurance']
+  if (input.governanceEvidence.available) {
+    governanceAssurance = Object.freeze({ available: true as const, error: null,
+      authorityExpansionObserved: input.governanceEvidence.authorityExpansionObserved,
+      assuranceEvents: input.governanceEvidence.assuranceEvents,
+      repositoryEvidenceEntries: input.governanceEvidence.repositoryEvidenceEntries,
+      repositoryEvidenceChainValid: input.governanceEvidence.repositoryEvidenceChainValid,
+      killSwitchControl: 'implemented_not_live_attested' as const,
+      signedScopeControl: 'implemented_not_live_attested' as const,
+      thirdPartyPenetrationTest: 'not_evidenced' as const,
+      certificationClaim: 'not_claimed' as const,
+      source: 'cos_university_learning_assurance_events + security_repository_patrol_evidence + security-host/referee.ts',
+      methodology: 'runtime evidence is counted from durable tables; code-enforced Referee/kill-switch controls are disclosed as implemented but not converted into live attestations; no third-party penetration-test or certification claim without authoritative evidence',
+    })
+  } else governanceAssurance = Object.freeze({ available: false as const, error: input.governanceEvidence.error })
+
   let provenance: EffectivenessFunnel['provenance']
   if (input.provenanceEvidence.available && input.workforceAssignments.available) {
     const p = input.provenanceEvidence
@@ -467,6 +535,8 @@ export function composeFunnel(input: {
     residencyEffectiveness,
     workforceEffectiveness,
     economics,
+    comparativeBenchmark,
+    governanceAssurance,
     provenance,
     stages: Object.freeze(stages),
     unavailable: Object.freeze(unavailable),
@@ -520,7 +590,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
   const exhaust = async (build: () => any): Promise<any[]> =>
     allRows((from, to) => build().range(from, to))
 
-  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, evaluationFailures] = await Promise.all([
+  const [production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, evaluationFailures] = await Promise.all([
     chapter(async () => {
       let q = db.from('cos_university_mass_distillation_batch_runs').select('stage')
       if (since) q = q.gte('created_at', since)
@@ -625,6 +695,29 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { certificates: new Set(certs.map(key)), graduates: new Set(grads.map(key)), resumes: new Set(resumes.map(key)) }
     }),
     chapter(async () => {
+      let assuranceQuery = db.from('cos_university_learning_assurance_events').select('authority_expanded,observed_at')
+      if (since) assuranceQuery = assuranceQuery.gte('observed_at', since)
+      const assuranceRows = await exhaust(() => assuranceQuery.order('observed_at', { ascending: false }))
+      let patrolQuery = db.from('security_repository_patrol_evidence').select('engagement_id,chain_index,previous_hash,entry_hash,recorded_at')
+      if (since) patrolQuery = patrolQuery.gte('recorded_at', since)
+      const patrolRows = await exhaust(() => patrolQuery.order('recorded_at', { ascending: true }))
+      const byEngagement = new Map<string, any[]>()
+      for (const row of patrolRows) {
+        const id = text(row.engagement_id, 200)
+        const list = byEngagement.get(id) || []
+        list.push(row); byEngagement.set(id, list)
+      }
+      let chainValid: boolean | null = patrolRows.length ? true : null
+      for (const list of byEngagement.values()) {
+        list.sort((a, b) => Number(a.chain_index) - Number(b.chain_index))
+        for (let i = 0; i < list.length; i += 1) {
+          if (Number(list[i].chain_index) !== Number(list[0].chain_index) + i) chainValid = false
+          if (i > 0 && text(list[i].previous_hash, 64) !== text(list[i - 1].entry_hash, 64)) chainValid = false
+        }
+      }
+      return { authorityExpansionObserved: assuranceRows.filter((row: any) => row.authority_expanded === true).length, assuranceEvents: assuranceRows.length, repositoryEvidenceEntries: patrolRows.length, repositoryEvidenceChainValid: chainValid }
+    }),
+    chapter(async () => {
       // Evaluation failures recorded IN THE WINDOW (an operations figure, not a cohort figure): every terminal FAILED
       // evaluation event (event_type fine_tune, claim ..._failed), its error classified by the rolling authority's rule.
       let q = db.from('cos_university_learning_assurance_events').select('evidence').eq('event_type', 'fine_tune')
@@ -634,7 +727,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
   ])
 
-  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, evaluationFailures })
+  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, evaluationFailures })
 }
 
 /** One line: the funnel's top, its bottom, and the honesty row. */

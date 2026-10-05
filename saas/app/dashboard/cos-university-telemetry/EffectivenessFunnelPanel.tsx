@@ -133,6 +133,37 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
             ) : <p className="text-xs" role="alert">{f.capabilityGain.error}</p>}
           </div>
 
+          <div className="rounded-lg border p-3" data-testid="comparative-benchmark">
+            <div className="font-semibold">{copy.benchmarkTitle}</div>
+            {f.comparativeBenchmark.available ? (
+              <>
+                <div className="mt-2 grid gap-2 sm:grid-cols-4 text-sm">
+                  <div><span className="opacity-60">{copy.capabilityComparable}:</span> {f.comparativeBenchmark.comparableArtifacts}</div>
+                  <div><span className="opacity-60">{copy.benchmarkBaselineUniversity}:</span> {f.comparativeBenchmark.baselineMean === null ? '—' : f.comparativeBenchmark.baselineMean.toFixed(3)} / {f.comparativeBenchmark.universityMean === null ? '—' : f.comparativeBenchmark.universityMean.toFixed(3)}</div>
+                  <div><span className="opacity-60">{copy.benchmarkGain}:</span> {f.comparativeBenchmark.absoluteGain === null ? '—' : (f.comparativeBenchmark.absoluteGain >= 0 ? '+' : '') + f.comparativeBenchmark.absoluteGain.toFixed(3)}</div>
+                  <div><span className="opacity-60">{copy.benchmarkResidencySubset}:</span> {f.comparativeBenchmark.residencyCompletedComparable} / {f.comparativeBenchmark.residencyCompletedMean === null ? '—' : f.comparativeBenchmark.residencyCompletedMean.toFixed(3)}</div>
+                  <div><span className="opacity-60">{copy.benchmarkProductionSubset}:</span> {f.comparativeBenchmark.productionGraduatesComparable} / {f.comparativeBenchmark.productionGraduatesMean === null ? '—' : f.comparativeBenchmark.productionGraduatesMean.toFixed(3)}</div>
+                </div>
+                <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.comparativeBenchmark.source} · {copy.methodology}: {f.comparativeBenchmark.methodology}</div>
+              </>
+            ) : <p className="text-xs" role="alert">{f.comparativeBenchmark.error}</p>}
+          </div>
+
+          <div className="rounded-lg border p-3" data-testid="governance-assurance">
+            <div className="font-semibold">{copy.governanceTitle}</div>
+            {f.governanceAssurance.available ? (
+              <>
+                <div className="mt-2 grid gap-2 sm:grid-cols-4 text-sm">
+                  <div><span className="opacity-60">{copy.governanceAuthorityExpansion}:</span> {f.governanceAssurance.authorityExpansionObserved}</div>
+                  <div><span className="opacity-60">{copy.governanceEvidenceChain}:</span> {f.governanceAssurance.repositoryEvidenceEntries} / {f.governanceAssurance.repositoryEvidenceChainValid === null ? 'not evidenced' : f.governanceAssurance.repositoryEvidenceChainValid ? 'continuous' : 'BROKEN'}</div>
+                  <div><span className="opacity-60">{copy.governanceControls}:</span> implemented / not live-attested</div>
+                  <div><span className="opacity-60">{copy.governancePentest}:</span> {f.governanceAssurance.thirdPartyPenetrationTest}</div>
+                </div>
+                <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.governanceAssurance.source} · {copy.methodology}: {f.governanceAssurance.methodology}</div>
+              </>
+            ) : <p className="text-xs" role="alert">{f.governanceAssurance.error}</p>}
+          </div>
+
           <div className="rounded-lg border p-3" data-testid="serving-reliability">
             <div className="font-semibold">{copy.reliabilityTitle}</div>
             {f.reliability.available ? (

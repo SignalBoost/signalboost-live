@@ -215,7 +215,10 @@ async function run(req: NextRequest) {
       .eq('role', 'user')
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60_000).toISOString())
       .order('created_at', { ascending: false })
-      .limit(24)
+      // Search the full bounded 24-hour demand window. Production 2026-10-05 had 91 genuine user messages,
+      // but the newest 24 contained no scope match for the two reserved specialists, so both paid warm workers sat idle.
+      // This widens only discovery of already-genuine demand; execution remains capped below at 3 recovery / 2 validation attempts.
+      .limit(200)
     if (!demand.error) {
       const recoveryLimit = Math.min(3, eligibleRecoveryTargets.length)
       const validationLimit = validationDue ? Math.min(2, validationTargets.length) : 0

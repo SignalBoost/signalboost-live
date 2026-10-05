@@ -31,6 +31,8 @@ test('scheduled warm windows exercise healthy reserved graduates with bounded ge
   assert.match(recovery, /const validationLimit = validationDue \? Math\.min\(2, validationTargets\.length\) : 0/)
   assert.match(recovery, /feature: validating \? 'cos_workforce_validation' : 'cos_workforce_recovery'/)
   assert.match(recovery, /purpose: 'genuine_production_replay'/)
+  assert.match(recovery, /\.gte\('created_at', new Date\(Date\.now\(\) - 24 \* 60 \* 60_000\)\.toISOString\(\)\)[\s\S]{0,180}?\.limit\(200\)/, 'validation scans the full bounded genuine-demand window rather than starving specialists on the newest 24')
+  assert.doesNotMatch(recovery, /\.limit\(24\)/)
   assert.match(recovery, /validationAttempts/)
   assert.match(recovery, /validationTargets: validationTargets\.map/)
   assert.doesNotMatch(recovery, /authorityExpanded:\s*true/)

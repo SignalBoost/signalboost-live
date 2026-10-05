@@ -301,6 +301,7 @@ test('an empty cohort has no shares and no division by zero', () => {
     workforceAssignments: empty({ rows: [] }),
     providerCosts: empty({ rows: [] }),
     provenanceEvidence: empty({ certificates: new Set<string>(), graduates: new Set<string>(), resumes: new Set<string>() }),
+    governanceEvidence: empty({ authorityExpansionObserved: 0, assuranceEvents: 0, repositoryEvidenceEntries: 0, repositoryEvidenceChainValid: null }),
     evaluationFailures: empty({ errors: [] }),
   })
   assert.ok(f.stages.every(s => s.count === 0 && s.share === null))
@@ -362,8 +363,8 @@ test('Fortune 500 comparative benchmark stays paired and does not claim a post-R
   if (!f.comparativeBenchmark.available) return
   assert.equal(f.comparativeBenchmark.comparableArtifacts, 2)
   assert.equal(f.comparativeBenchmark.baselineMean, 0.45)
-  assert.equal(f.comparativeBenchmark.universityMean, 0.65)
-  assert.equal(f.comparativeBenchmark.absoluteGain, 0.2)
+  assert.ok(Math.abs((f.comparativeBenchmark.universityMean ?? 0) - 0.65) < Number.EPSILON * 4)
+  assert.ok(Math.abs((f.comparativeBenchmark.absoluteGain ?? 0) - 0.2) < Number.EPSILON * 4)
   assert.equal(f.comparativeBenchmark.improved, 2)
   assert.equal(f.comparativeBenchmark.residencyCompletedComparable, 1)
   assert.equal(f.comparativeBenchmark.productionGraduatesComparable, 1)

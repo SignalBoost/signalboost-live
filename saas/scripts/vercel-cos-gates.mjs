@@ -995,3 +995,487 @@ const tests = [
 
 
   'tests/cosUniversityEvidenceSupply.node.test.ts',
+
+
+
+  'tests/cosUniversityARange.node.test.ts',
+
+
+
+  'tests/cosUniversityLanguageAuthenticity.node.test.ts',
+
+
+
+  'tests/cosUniversityContinuousEducation.node.test.ts',
+
+
+
+  'tests/cosUniversityPostRemediationStudyProof.node.test.ts',
+
+
+
+  'tests/cosUniversityPracticeInferenceFence.node.test.ts',
+
+
+
+  'tests/cosUniversityDeliberatePractice.node.test.ts',
+
+
+
+  'tests/cosUniversityGraduation.node.test.ts',
+
+
+
+  'tests/cosUniversityPrograms.node.test.ts',
+
+
+
+  'tests/cosUniversityExamRemediation.node.test.ts',
+
+
+
+  'tests/cosUniversityMasters.node.test.ts',
+
+
+
+  'tests/cosUniversityPhd.node.test.ts',
+
+
+
+  'tests/cosUniversityPhdRuntime.node.test.ts',
+
+
+
+  'tests/cosUniversityPhdResearchExecution.node.test.ts',
+
+
+
+  'tests/cosUniversityPhdMethodologyExam.node.test.ts',
+
+
+
+  'tests/cosUniversityAdmission.node.test.ts',
+
+
+
+  'tests/cosUniversityAdmissionRunner.node.test.ts',
+
+
+
+  'tests/cosUniversityActiveAcademicLane.node.test.ts',
+
+
+
+  'tests/cosBehavioralRobustness.node.test.ts',
+
+
+
+  'tests/cosCognitiveSkillRetrievalEfficiency.node.test.ts',
+
+
+
+  'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
+
+
+
+  'tests/releaseSignalSeverity.node.test.ts',
+
+
+
+  'regression/powerStabilizationRelease.node.test.ts',
+
+
+
+  'tests/cosAnswerPolicyCore.node.test.ts',
+
+
+
+  'tests/cosNormativeAnswerPolicy.node.test.ts',
+
+
+
+  'tests/normativeFreshEvidenceFallback.node.test.ts',
+
+
+
+  'tests/cosNeuralEvidenceReasoning.node.test.ts',
+
+
+
+  'tests/cosPragmaticIntentCore.node.test.ts',
+
+
+
+  'tests/cosModelFirstAgentLoop.node.test.ts',
+
+
+
+  'tests/cosContextualInterpretationIsolation.node.test.ts',
+
+
+
+  'tests/cosOperatingCharter.node.test.ts',
+
+
+
+  'tests/publicRecordedProvenance.node.test.ts',
+
+
+
+  'tests/groundingConcepts.node.test.ts',
+
+
+
+  'tests/answerEvidenceAttributionRepair.node.test.ts',
+
+
+
+  'tests/conversationProvenanceIntent.node.test.ts',
+
+
+
+  'tests/localEmbeddingsWindowSafeTransport.node.test.ts',
+
+
+
+  'tests/publicCorpusEvidence.node.test.ts',
+
+
+
+  'tests/googleSheetsConnector.node.test.ts',
+
+
+
+  'tests/describeThrownValue.node.test.ts',
+
+
+
+  'tests/demoPricing.node.test.ts',
+
+
+
+  'tests/repositoryRepairAutoMerge.node.test.ts',
+
+
+
+  'tests/repositoryMergeWatch.node.test.ts',
+
+
+
+  'tests/cosHarnessIngress.node.test.ts',
+
+
+
+  'tests/cosSoftwareSpecialistProductionHarness.node.test.ts',
+
+
+
+  'tests/cosA2ASpecialistHarnessIngress.node.test.ts',
+
+
+
+  'tests/cosWorkingDistillationReadinessCron.node.test.ts',
+
+
+
+  'tests/builderResidencyLiveHost.node.test.ts',
+
+
+
+  'tests/builderResidencyFinalEvaluationGate.node.test.ts',
+
+
+
+  'tests/cosInteractiveModelHealthMonitoring.node.test.ts',
+
+
+
+  'tests/dashboardPromptOnePipeline.node.test.ts',
+
+
+
+  'tests/cosChatPathCallLabels.node.test.ts',
+
+
+
+  'tests/graduateWarmGate.node.test.ts',
+
+
+
+  // 2026-09-29: #3480 replaced the evaluator with a copy that hard-coded the 12h wait while approval and the SQL
+
+
+
+  // claim used 10 minutes, so admitted students were refused inside the evaluator. This test was red on main and
+
+
+
+  // nothing stopped the deploy. Gate it so the next divergent copy fails its own preview build.
+
+
+
+  'tests/massRetentionDelayTestPhase.node.test.ts',
+
+
+
+  // 2026-09-29: XSA at 100% made every new student un-examinable (answers 37-44s vs 4.0s standard, 50s limit).
+
+
+
+  // Gated so the rollout cannot silently go back up.
+
+
+
+  'tests/cosUniversityExclusiveSelfAttention.node.test.ts',
+
+
+
+  // 2026-09-29: XSA students are neither canaried nor examined until the XSA runtime answers inside the exam limit.
+
+
+
+  'tests/xsaExamPause.node.test.ts',
+
+
+
+  // 2026-09-29: always-on RunPod workers left behind by killed exam/canary runs are released every 5 minutes.
+
+
+
+  'tests/runpodPinnedWorkerSweeper.node.test.ts',
+
+
+
+  // 2026-09-29: graduates leave the University and COS hires them from the Workforce roster.
+
+
+
+  'tests/cosWorkforceRoster.node.test.ts',
+
+
+
+  'tests/cosWorkforcePostGraduationPipeline.node.test.ts',
+
+
+
+  'tests/cosWorkforceAssignmentStage.node.test.ts',
+
+
+
+  'tests/cosWorkforceProductionVerification.node.test.ts',
+
+
+
+  'tests/cosWorkforceStageDashboard.node.test.ts',
+
+
+
+  'tests/cosWorkforceAbandonedAssignments.node.test.ts',
+
+
+
+  // 2026-09-29 backwards pass: Workforce dashboard, quarantine rule, Residency time budget and context fit.
+
+
+
+  'tests/universityBackwardsPass.node.test.ts',
+
+
+
+  // 2026-09-30 quarantine: every quarantined student's reason is named; the review reads in bounded chunks.
+
+
+
+  'tests/universityQuarantineLedger.node.test.ts',
+
+
+
+  // 2026-09-30 quarantine resolution: proven FAILs leave the University, our-fault students return to the exam.
+
+
+
+  'tests/universityQuarantineResolution.node.test.ts',
+
+
+
+  // 2026-10-02: the anti-stall pipeline repairs. All five of these were gated once and the entries were lost in a
+
+  // later merge while the test files stayed, which is how main ended up carrying a RED quarantineStallDrain against
+
+  // the shipped loop fix with nothing in CI to catch it.
+
+  //  - evaluation lane picks oldest-first while the exam writer fills newest-first (lookahead 24, writer 10)
+
+  //  - quarantine resolution had two outcomes that never changed a status, and its stall clock could be rewound by
+
+  //    the quarantine -> exam -> quarantine lap
+
+  //  - registration read all candidates' evidence in one newest-first 3000-row query while walking oldest-first
+
+  //  - an artifact waiting to graduate had its proven canary endpoint unprotected from reclaim
+
+  'tests/holdoutExamReadyThroughput.node.test.ts',
+
+  'tests/quarantineStallDrain.node.test.ts',
+
+  // 2026-10-02: the supervisor runs every 5 minutes and remediates, but every reason it could raise was UPSTREAM of
+
+  // the artifact existing, so four downstream parkings ran for days behind a green heartbeat. This watches the other
+
+  // half - a stage holding work and moving nobody - and an empty stage must stay silent, or the alarm gets ignored.
+
+  'tests/cosUniversityLifecycleStall.node.test.ts',
+
+  'tests/cosUniversityLineCapacity.node.test.ts',
+
+  'tests/cosUniversityWorkforceReservation.node.test.ts',
+
+  'tests/cosUniversityLifecycleOrchestrator.node.test.ts',
+
+  'tests/massGraduateRegistrationStarvation.node.test.ts',
+
+  'tests/cosUniversityMassGraduateRegistration.node.test.ts',
+
+  'tests/pendingGraduateEndpointProtection.node.test.ts',
+
+
+
+  // 2026-09-30 owner direction "remove them": paused XSA students leave as OUR failure, never a FAIL.
+
+
+
+  'tests/universityXsaRemoval.node.test.ts',
+
+
+
+  // 2026-09-30 pipeline row: left to right, ending at graduation.
+
+
+
+  'tests/universityPipelineOrder.node.test.ts',
+
+
+
+  // 2026-09-30 Residency lanes: one parallel lane per admitted resident, warm workers reused, remediation first.
+
+
+
+  'tests/residencyLanes.node.test.ts',
+
+
+
+  'tests/builderResidencyCron.node.test.ts',
+
+
+
+  // 2026-09-30 exam lane: a student whose endpoint is gone is re-canaried instead of retried forever.
+
+
+
+  'tests/examEndpointRefresh.node.test.ts',
+
+
+
+  'tests/staleGatewayXsaInfrastructure.node.test.ts',
+
+
+
+  // 2026-09-29: 220 independent evaluations showed distillation teaching base-rate reasoning (0.000 -> 0.927, 204
+
+
+
+  // helped / 0 hurt) while ERASING survivorship (1.000 -> 0.382, 0 helped / 136 hurt) and regression to the mean
+
+
+
+  // (0.455 -> 0.127). The worker now replays a fixed rehearsal ballast after GKD. Gate it so the ballast cannot
+
+
+
+  // quietly start reusing the evaluator's own questions, lose a damaged skill, or stop running last.
+
+
+
+  'tests/generalReasoningBallast.node.test.ts',
+
+
+
+  // 2026-09-29 19:13-21:23 UTC: every exam wake died at 10/10 RunPod workers and no exam completed after 17:21
+
+
+
+  // while 44 examinable artifacts waited. Reclaim required min === 0, so a SUPERSEDED-generation endpoint pinned
+
+
+
+  // always-on held quota forever. Gate the widened reclaim and the quota inventory so neither the protections
+
+
+
+  // nor the infrastructure classification of the quota error can regress.
+
+
+
+  'tests/runpodWorkerQuotaReclaim.node.test.ts',
+
+
+
+
+
+
+
+]
+
+
+
+
+
+
+
+const result = spawnSync(process.execPath, ['--test', ...tests], {
+
+
+
+  cwd: process.cwd(),
+
+
+
+  env: process.env,
+
+
+
+  stdio: 'inherit',
+
+
+
+})
+
+
+
+
+
+
+
+if (result.error) {
+
+
+
+  console.error('[vercel-cos-gates] failed to launch test runner:', result.error.message)
+
+
+
+  process.exit(1)
+
+
+
+}
+
+
+
+
+
+
+
+process.exit(result.status ?? 1)
+
+// end of saas/scripts/vercel-cos-gates.mjs (if this line is missing, the paste was cut short)

@@ -58,7 +58,7 @@ const tests = [
 
 
 
-  'tests/cosUniversityMassQuarantineReview\.node.test.ts',
+  'tests/cosUniversityMassQuarantineReview.node.test.ts',
 
 
 

@@ -313,14 +313,20 @@ test('bounded corpus scan prioritizes fresh replenishment instead of starving ap
   assert.doesNotMatch(packager, /\.order\('created_at', \{ ascending: true \}\)/)
 })
 
-test('bounded corpus scan separately rescues older failure-derived remediation from freshness starvation', () => {
+test('bounded corpus scan rescues failure-derived remediation fairly per subject', () => {
   const packager = source('../lib/ai/cos/cosUniversityMassDistillation.ts')
   assert.match(packager, /MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS = 1000/)
-  assert.match(packager, /\.eq\('source_kind', 'failure_derived_curriculum'\)/)
+  assert.match(packager, /const remediationRescueSubjects = \[\.\.\.new Set\(rows/)
+  assert.match(packager, /const remediationRowsPerSubject = Math\.max\(/)
+  assert.match(packager, /MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS \/ Math\.max\(1, remediationRescueSubjects\.length\)/)
+  assert.match(packager, /for \(const subject of remediationRescueSubjects\)/)
+  assert.match(packager, /\.eq\('source_kind', 'failure_derived_curriculum'\)[\s\S]{0,200}\.eq\('subject', subject\)/)
+  assert.match(packager, /\.limit\(remediationRowsPerSubject\)/)
   assert.match(packager, /assignedHashes\.has\(clean\(row\?\.content_hash, 64\)\.toLowerCase\(\)\)/)
   assert.match(packager, /seenHashes\.has\(contentHash\)/)
   assert.match(packager, /readMassDistillationCorpus\(db, corpusScanRows, assigned\)/)
-  assert.doesNotMatch(packager, /MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS[\s\S]{0,1200}submitHuggingFaceJob/)
+  assert.doesNotMatch(packager, /for \(let offset = 0; offset < MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS/)
+  assert.doesNotMatch(packager, /MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS[\s\S]{0,1600}submitHuggingFaceJob/)
 })
 
 test('frequent University learning lane packages unique material without provider dispatch', () => {

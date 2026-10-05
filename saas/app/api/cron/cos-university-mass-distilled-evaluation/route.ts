@@ -881,6 +881,9 @@ export async function GET(req: NextRequest) {
         safety: result.safety,
         transfer: result.transfer,
         retention: result.retention,
+        // Seconds the exact artifact took to become ready on this exam's cold start (2026-10-05): separates a slow
+        // cold-start tail from a hung group behind the runtime_not_ready failures, which stop at the readiness window.
+        readinessSeconds: result.readinessSeconds,
       },
     })
     await recordProduction(true, {

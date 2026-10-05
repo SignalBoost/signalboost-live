@@ -2657,7 +2657,7 @@ Every failure is attributed to exactly one of:
 - **Customer/provider failure** - something the customer supplied failed or was unavailable. Policy-dependent; normally the experiment is preserved for the customer to repair and retry.
 - **iTMounts failure** - our orchestration, evaluator or platform failed. Retry, repair where possible, no penalty to the artifact, affected credits restored.
 
-Every disposition is one of: **good rejection** (genuine deficiency), **bad rejection** (a qualified artifact failed because something broke), **bad graduation** (a graduate cannot do the job it was certified for). Bad graduation is the most damaging outcome commercially and is tracked on its own.
+Every disposition is one of: **good rejection** (genuine deficiency), **bad rejection** (a qualified artifact failed because something broke), **bad graduation** (later evidence proves the credential was invalid when it was issued), or **post-graduation capability decay** (a correctly certified graduate later becomes unfit because capability, evidence freshness, subject requirements or the operating environment changed). Bad graduation is the most damaging certification defect commercially and is tracked on its own. Capability decay does **not** rewrite a historically valid credential; it weakens current standing and routes the artifact through the existing continuing-education / recertification contract.
 
 ### KPIs
 
@@ -2665,7 +2665,7 @@ All computed from the effectiveness funnel and the rolling authority's infrastru
 
 - **Selectivity** = genuine competency failures ÷ technically valid completed evaluations.
 - **Infrastructure failure rate** = iTMounts-caused failures ÷ evaluation attempts.
-- **Graduate Precision** = graduates that subsequently demonstrate the certified capability ÷ graduates tested in Production (needs independently verified outcomes).
+- **Graduate Precision** = graduates that subsequently demonstrate the certified capability ÷ graduates tested in Production (needs independently verified outcomes). It is never reported alone: pair it with **Eligible-Graduate Testing Coverage** = eligible graduates with valid Production tests ÷ all eligible graduates, so selective assignment or starvation cannot manufacture apparent quality.
 - **Training effectiveness** = the distribution of capability gain (candidate − baseline on unseen holdout), and the share of artifacts materially improved among those with valid comparable evaluations.
 - **Yield of qualified artifacts** = graduates ÷ candidates per experiment.
 - **Cost per qualified graduate**, and later **cost per Production-proven graduate**.

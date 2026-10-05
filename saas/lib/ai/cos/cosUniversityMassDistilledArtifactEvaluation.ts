@@ -16,6 +16,7 @@ import { buildTeacherPrompts } from './cosUniversityMassDistillationConsumer.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { runpodServerlessOpenAiBaseUrl, runpodServerlessRootUrl } from './runpodServerlessDistilledProvision.ts'
 import { massDistilledRuntimeHealth } from './runpodMassDistilledProvisionV2.ts'
+import { furthestReadinessWorkerStage, readinessWorkerStage, type ReadinessWorkerStage } from './cosUniversityMassEvaluationReadiness.ts'
 import { fineTuneRevisionKey, type FineTuneRevision } from './cosUniversityFineTuneEvidence.ts'
 import { CURRENT_UNIVERSITY_STUDENT_PROFILE } from '../modelCapabilityRegistry.ts'
 import {
@@ -406,6 +407,8 @@ async function waitReady(endpointId:string,deadlineMs:number){
   const until=Math.min(Date.now()+READY_TIMEOUT_MS,deadlineMs-ROUTE_RESERVE_MS)
   let status:number|null=null
   let lastError:string|null=null
+  // Furthest worker stage the control plane showed during the window; it names which of three causes a timeout was.
+  let workerStage:ReadinessWorkerStage='unknown'
   // Control-plane health is observational only. The worker-local /ping path is also the
   // scale-from-zero trigger, so keep issuing bounded /ping requests even while RunPod still
   // reports zero running/ready workers. Otherwise one timed-out wake can strand the endpoint cold.
@@ -413,6 +416,7 @@ async function waitReady(endpointId:string,deadlineMs:number){
     try{
       const health=await massDistilledRuntimeHealth(endpointId)
       status=health.httpStatus
+      if(health.ok)workerStage=furthestReadinessWorkerStage(workerStage,readinessWorkerStage(health.workers))
       if(!health.ok&&health.error)lastError=health.error
     }catch(error){
       lastError=error instanceof Error?clean(error.message,500):'mass_distilled_health_probe_failed'
@@ -448,7 +452,7 @@ async function waitReady(endpointId:string,deadlineMs:number){
 
     if(Date.now()<until)await new Promise(resolve=>setTimeout(resolve,Math.min(READY_POLL_MS,until-Date.now())))
   }
-  throw new Error(`mass_distilled_evaluation_runtime_not_ready:${lastError||status||'network'}`)
+  throw new Error(`mass_distilled_evaluation_runtime_not_ready:${lastError||status||'network'}:workers=${workerStage}`)
 }
 function batchPrompt(cases:readonly EvalCase[]){const input=cases.map(item=>`<<<CASE:${item.id}>>>\n${item.prompt}`).join('\n\n');const format=cases.map(item=>`<<<ANSWER:${item.id}>>>\nYOUR ANSWER\n<<<END:${item.id}>>>`).join('\n');return `Answer each independent case directly and concisely. Do not reveal hidden chain-of-thought or scratch work.\n\nCASES:\n${input}\n\nReturn every answer using exactly these markers and no extra sections:\n${format}`}
 function parseAnswers(text:string,cases:readonly EvalCase[]){const answers=new Map<string,string>();for(const item of cases){const s=`<<<ANSWER:${item.id}>>>`;const e=`<<<END:${item.id}>>>`;const start=text.indexOf(s);const end=start<0?-1:text.indexOf(e,start+s.length);if(start<0||end<0)throw new Error(`mass_distilled_evaluation_answer_missing:${item.id}`);const answer=text.slice(start+s.length,end).trim();if(!answer)throw new Error(`mass_distilled_evaluation_answer_empty:${item.id}`);answers.set(item.id,answer)}return answers}

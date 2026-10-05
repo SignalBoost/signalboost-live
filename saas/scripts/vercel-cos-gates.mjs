@@ -866,7 +866,7 @@ const tests = [
 
 
 
-  'tests/freshEvidenceNeuralReview\.node.test.ts',
+  'tests/freshEvidenceNeuralReview.node.test.ts',
 
 
 

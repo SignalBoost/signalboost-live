@@ -28,14 +28,14 @@ test('the control is one trivial deterministic case whose candidate answer IS th
 
 test('every judge call carries the control, counts it, verifies it, and strips it before any real case is scored', () => {
   assert.match(judge, /rows\.push\(\{id:JUDGE_CALIBRATION_CONTROL\.id,evaluationMode:JUDGE_CALIBRATION_CONTROL\.evaluationMode,prompt:JUDGE_CALIBRATION_CONTROL\.prompt,reference:JUDGE_CALIBRATION_CONTROL\.reference,baselineAnswer:JUDGE_CALIBRATION_CONTROL\.baselineAnswer,candidateAnswer:JUDGE_CALIBRATION_CONTROL\.candidateAnswer\}\)/)
-  assert.match(judge, /payload\.cases\.length!==input\.cases\.length\+1\)throw new Error\('mass_distilled_evaluation_judge_case_count_invalid'\)/)
+  assert.match(judge, /payload\.cases\.length!==input\.cases\.length\+1\)throw protocolFailure\('mass_distilled_evaluation_judge_case_count_invalid'/)
   assert.match(judge, /if\(!controlRow\|\|controlBaseline===null\|\|controlCandidate===null\|\|controlSafe!==true\|\|controlCandidate<JUDGE_CALIBRATION_MIN_CANDIDATE\|\|controlBaseline>JUDGE_CALIBRATION_MAX_BASELINE\)throw new MassEvaluationJudgeCalibrationError\(input\.suiteName,\{judgeRaw:clean\(result,1200\),controlId:JUDGE_CALIBRATION_CONTROL\.id,baselineScore:controlBaseline,candidateScore:controlCandidate,candidateSafe:controlSafe\}\)/)
   // Verification comes BEFORE any real case is parsed, and the control never reaches the scored list.
   assert.ok(judge.indexOf('throw new MassEvaluationJudgeCalibrationError') < judge.indexOf('const scored:ScoredCase[]'))
   assert.match(judge, /const scored:ScoredCase\[\]=payload\.cases\.filter\(\(row:any\)=>clean\(row\?\.id,100\)!==JUDGE_CALIBRATION_CONTROL\.id\)\.map/)
   // The existing per-case validation and identity check still apply to the real cases.
-  assert.match(judge, /throw new Error\('mass_distilled_evaluation_judge_case_invalid'\)/)
-  assert.match(judge, /throw new Error\('mass_distilled_evaluation_judge_identity_invalid'\)/)
+  assert.match(judge, /throw protocolFailure\('mass_distilled_evaluation_judge_case_invalid'/)
+  assert.match(judge, /throw protocolFailure\('mass_distilled_evaluation_judge_identity_invalid'/)
   assert.match(judge, /return \{scored,responseHash:sha256Raw\(result\),rawExcerpt:clean\(result,1200\),evaluatorId,calibration\}/)
 })
 

@@ -242,8 +242,10 @@ test('buyer operational explanation reuses Self-Healing health and never disguis
   assert.match(source, /No causal explanation is invented/)
   const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx', import.meta.url), 'utf8')
   assert.match(panel, /data-testid="operational-explanation"/)
-  assert.match(panel, /Buyer meaning:/)
-  assert.match(panel, /overdue provider jobs=/)
+  assert.match(panel, /copy\.operationalBuyerMeaning/)
+  assert.match(panel, /copy\.operationalOverdueJobs/)
+  assert.doesNotMatch(panel, />Operational explanation</)
+  assert.doesNotMatch(panel, />Buyer meaning:/)
 })
 
 test('line health counts only leases that are live at the report time', async () => {

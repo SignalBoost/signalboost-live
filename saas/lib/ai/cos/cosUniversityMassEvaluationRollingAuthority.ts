@@ -225,6 +225,8 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'mass_distilled_evaluation_judge_unavailable'
     || error.startsWith('mass_distilled_evaluation_judge_timeout:')
     || error.startsWith('mass_distilled_evaluation_judge_zero_collapse:')
+    // The judge failed its own calibration control (2026-10-04): nobody was graded, nothing is known about the student.
+    || error.startsWith('mass_distilled_evaluation_judge_calibration_failed:')
     // Malformed scorer protocol is OUR evaluator failure, not a student's exam result. Production 2026-09-30
     // recorded judge_case_invalid while the artifact was still evaluation_pending. The scorer rejected its own
     // JSON before a valid per-case verdict existed, so charging this against the three substantive attempts can

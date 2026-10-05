@@ -2634,3 +2634,115 @@ Owner direction for this day, verbatim where it matters: "my first objective is 
 - `answer_missing/empty` from the CANDIDATE and `judge_case_invalid` remain to be read from evidence after the two evaluation fixes above have run.
 - Three ungated test files (`massEvaluationZeroScoreDiagnostics`, `massEvaluationRetentionScoring`, `massEvaluationDeadCaseEvidence`) were already red on main before this day from older drift; they are not in the gate.
 - `cos-university-mass-distillation/route.ts` carries a forensics block with a 2026-09-19 sunset that is now dead code.
+
+## Strategic direction: iTMounts University Lab — 2026-10-05 (direction, not an implementation mandate)
+
+**Owner direction:** evolve the existing University into a governed, portable AI experimentation laboratory that may later be offered to external customers. This section records product direction and architectural constraints. It does **not** authorize Builder/COS to divert current work from completing and proving the existing University, nor does it authorize new paid provider spend.
+
+### Product definition and quality principle
+
+**iTMounts University Lab** is the same portable University software operated as a governed environment where customers may use prepaid platform credits and governed bring-your-own infrastructure to experiment with models, data, teachers, compute, APIs, MCP/tools and other permitted resources to create specialized AI artifacts. The Lab may train/distill candidates, independently evaluate them, reject candidates that do not meet the applicable standard, graduate only candidates that do, deploy authorized graduates, and continue measuring their Production record.
+
+Graduation is **not** the optimization target. **Trustworthy selection is the product.** A low graduation rate is acceptable when rejection is evidence-backed and graduates are genuinely qualified. Never weaken Holdout, Safety, Transfer, Retention, Builder Residency, exact-artifact, independent-evaluation, authorization or Production gates to improve graduation statistics.
+
+A training/distillation experiment is not guaranteed to improve every candidate. A regressed or unchanged artifact must never be represented as improved or graduate where improvement is required. The Lab's job is to discover and prove qualified artifacts, not manufacture diplomas.
+
+### Canonical outcome and KPI semantics
+
+Keep these outcomes distinct in telemetry, economics, remediation and future billing:
+
+- **Competency failure:** the artifact genuinely fails an applicable capability, safety, transfer, retention, Residency or other merit gate under a technically valid process.
+- **Customer/provider failure:** customer-supplied infrastructure, credentials, data, API, MCP/tool or provider fails or is unavailable.
+- **iTMounts infrastructure failure:** the Lab's orchestration, evaluator, judge, runtime, persistence or other platform machinery fails. This must not become a student failure.
+- **Bad graduation:** an artifact graduates but later cannot perform the work/capability for which it was certified. This is a first-class quality defect and must remain measurable.
+
+Primary quality metrics are evidence-derived, not marketing targets:
+
+- **University Selectivity** = legitimate competency failures / technically valid completed evaluations.
+- **Infrastructure Failure Rate** = iTMounts infrastructure-caused failures / applicable attempts.
+- **Graduate Precision** = graduates that subsequently demonstrate the required capability under independently verified Production evidence / graduates actually tested in Production.
+- **Training Effectiveness** = distribution and yield of materially improved artifacts among artifacts with valid comparable baseline-vs-trained evaluation.
+- **Cost per Qualified Graduate** and, once evidence exists, **Cost per Production-Proven Graduate**.
+
+Do not invent target percentages, latency limits, capability deltas, prices or example performance numbers and present them as requirements or proof. Read current evidence from the portable on the day it is used.
+
+### Experiment is the scientific and economic unit
+
+Future tenant hierarchy:
+
+`Organization → University → Project → Experiment → Cohort → Candidate/Artifact`
+
+Keep the existing `permanent_artifact_id`, birth certificate, artifact hash/fingerprint and lineage rules as the canonical artifact identity layer. Do not create a second artifact identity system merely for tenancy.
+
+An Experiment owns its objective, authorized budget/credit reservation, providers, data-use policy, graduation standard, telemetry policy, optimization objective and candidate set. Every expensive operation should eventually be attributable to an Experiment.
+
+The internal Lab instrumentation path should trace, where authoritative evidence exists:
+
+`experiment → candidate → curriculum/version → source/data provenance → teacher/model/version → training recipe/version → compute/provider/hardware → artifact identity/hash → evaluator/version → evaluation cases/version → Residency/version → disposition → deployment/runtime → Production assignments → verified outcomes → cost → incidents/remediation`
+
+This trace is an evidence graph, not permission to copy private customer content into a shared learning corpus.
+
+### Credits and bounded autonomy
+
+Credits are intended as the future economic unit of Lab work, not a cryptocurrency and not merely a GPU-minute. Do **not** assign public prices until actual stage cost and cost-per-qualified-graduate are measured.
+
+The future ledger must support immutable attribution and at least:
+
+`available → reserved → consumed → released/refunded`
+
+iTMounts infrastructure failures should restore/refund affected platform credits according to policy and must not penalize the student. Competency failures are legitimate experimental work. Customer/provider failures require an explicit policy rather than being silently attributed to iTMounts or the artifact.
+
+Autonomous retry, repair, redistillation or optimization may occur only inside the customer's explicit reservation/budget and existing Self-Healing/governance authority. The Lab may never turn an optimization loop into unbounded autonomous spending.
+
+Initial commercial direction remains **bring your own infrastructure**. A future managed-compute offering would make iTMounts financially responsible for customer compute and is a separate owner/commercial decision, not an implied engineering requirement.
+
+### BYOI is governed portability
+
+BYOI means **bring your infrastructure through a governed adapter**, not arbitrary customer code inside the trusted control plane.
+
+Provider abstraction should separate at least compute, teacher, inference, MCP/tool and data-source adapters. Customer-connected resources require explicit scopes, credentials/secrets handling, egress boundaries, budgets, audit evidence and Referee/governance enforcement. The University must not depend permanently on RunPod or any single provider.
+
+The hosted Lab and privately deployed enterprise University are offerings of the **same portable codebase**, not separate platform forks. Multi-tenancy, adapter contracts and evidence semantics belong in the portable so a private buyer can reproduce the same behavior and proof.
+
+### Privacy and cross-customer learning
+
+Privacy/data-use semantics must exist before the first external customer byte. At minimum design for:
+
+- **PRIVATE:** tenant content and derived private evidence do not cross the tenant boundary.
+- **AGGREGATE_METRICS:** only permitted anonymized/aggregated operational statistics may contribute to cross-customer optimization.
+- **RESEARCH_OPT_IN:** explicitly permitted information may be used to improve Lab methodology.
+
+The selected policy must propagate with derived artifacts/evidence rather than exist only as a UI checkbox. Enterprise deployments must be able to prohibit cross-customer learning.
+
+Operational telemetry may help the Lab learn which permitted combinations of curriculum, teachers, recipes, providers and evaluation methods work best, but customer private data and model contents never become shared training material automatically.
+
+### Rights and provenance gate
+
+Rights/data validation is a real gate. Before any future marketplace or cross-customer reuse, the system must preserve source/provider provenance and enforce the applicable rights policy for datasets, teacher outputs and derived artifacts. Do not assume a provider's generated output may be used to train, distill, redistribute or sell a competing model/artifact. Marketplace launch requires appropriate legal review and machine-enforceable rights/provenance evidence.
+
+### Commercial exposure sequence
+
+Commercial exposure is staged by evidence, not calendar dates:
+
+`Internal Lab → Design Partner → Private Beta → Paid Beta → GA → Enterprise/private deployment`
+
+Design-partner discovery may begin before self-service is complete so real customer requirements inform the adapter and Lab UX. Actual external workloads require the applicable tenant/privacy/security boundary and a measured reliability floor. Do not advertise mature Production capability while current evidence contradicts the claim.
+
+The marketplace is deliberately later: first prove `Lab → qualified artifact → Production proof`, then multi-tenant repeat usage, then consider a marketplace of artifacts with verifiable histories.
+
+### Execution order
+
+Unless live evidence changes the dependency order:
+
+1. Finish the current University end to end: infrastructure/evaluator/serving reliability and verified Production outcomes, without weakening academic or safety standards.
+2. Instrument the existing University as an **internal Lab**: Experiment IDs, end-to-end traces, cost attribution, failure attribution, recipe/version provenance and outcome measurement. No customer billing yet.
+3. Make the University learn from valid experiments: identify which permitted curriculum/teacher/training/evaluation combinations produce qualified artifacts and at what cost.
+4. Prove graduate quality through Graduate Precision and Production effectiveness, not graduation volume.
+5. Build governed provider abstraction/BYOI.
+6. Build tenant and privacy isolation around `Organization → University → Project → Experiment → Cohort → Artifact`.
+7. Introduce the credit ledger, initially shadow-priced from measured costs rather than invented prices.
+8. Run a tightly controlled Design Partner Lab.
+9. Progress to paid private Lab and broader self-service only as evidence supports it.
+10. Consider an artifact marketplace only after Production histories, rights/provenance and legal/commercial gates make the artifacts meaningfully trustworthy.
+
+**Architectural principle:** do not optimize the University to produce graduates. Optimize it to discover, produce and identify genuinely superior artifacts, reject unqualified artifacts fairly, and prove why qualified artifacts deserve to graduate.

@@ -329,6 +329,16 @@ test('bounded corpus scan rescues failure-derived remediation fairly per subject
   assert.doesNotMatch(packager, /MASS_DISTILLATION_REMEDIATION_SCAN_MAX_ROWS[\s\S]{0,1600}submitHuggingFaceJob/)
 })
 
+test('stale prepared curriculum cleanup releases only unspent undispatched reservations', () => {
+  const migration = source('../supabase/migrations/20261005210500_supersede_unspent_stale_mass_distillation_batches.sql')
+  assert.match(migration, /set status = 'superseded'/)
+  assert.match(migration, /b\.status = 'prepared'/)
+  assert.match(migration, /b\.dispatch_authorized = false/)
+  assert.match(migration, /b\.authority_expanded = false/)
+  assert.match(migration, /not exists \([\s\S]*cos_university_mass_distillation_batch_runs r[\s\S]*r\.batch_key = b\.batch_key/)
+  assert.doesNotMatch(migration, /status\s*=\s*'consumed'|delete from|truncate/)
+})
+
 test('frequent University learning lane packages unique material without provider dispatch', () => {
   const route = source('../app/api/cron/cos-university-learning/route.ts')
   const packager = source('../lib/ai/cos/cosUniversityMassDistillation.ts')

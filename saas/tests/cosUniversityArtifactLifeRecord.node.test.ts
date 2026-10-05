@@ -183,8 +183,10 @@ test('the history chapter is bounded and the record never carries prompts, answe
   assert.match(source, /\.limit\(LIFE_RECORD_EVENT_LIMIT\)/)
   const code = source.split('\n').filter(line => !line.trim().startsWith('//')).join('\n')
   assert.doesNotMatch(code, /response_text|prompt_text|system_prompt|api_key|Authorization/)
-  // Pure module: the store is injected; no database client, no network, no environment reads.
-  assert.doesNotMatch(source, /^import /m)
+  // Pure module: the store is injected; no database client, no network, no environment reads. Its one import is the
+  // pure error-text helper (2026-10-05), which itself imports nothing.
+  assert.deepEqual(source.match(/^import .*$/gm), ["import { errorText } from './cosUniversityErrorText.ts'"])
+  assert.doesNotMatch(read('../lib/ai/cos/cosUniversityErrorText.ts'), /^import |process\.env|fetch\(/m)
   assert.doesNotMatch(source, /process\.env|fetch\(/)
 })
 

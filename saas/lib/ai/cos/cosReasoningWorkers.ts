@@ -358,18 +358,26 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
         outcome: 'success',
         latencyMs: Date.now() - startedAt,
       })
-      // WORKFORCE (2026-10-02): this graduate delivered the answer for this exact Production turn. Enter it into the
-      // Workforce lifecycle as 'served'; the Workforce cron verifies it against the turn's governed Production outcome.
-      recordGraduateProductionServed({
-        registryId: runtime.registryId,
-        candidateId: runtime.candidateId,
-        trainedArtifactHash: runtime.trainedArtifactHash,
-        subjectId: runtime.subjectId,
-        turnId,
-        objective: request.prompt,
-        servingAttemptId: attemptId,
-        latencyMs: Date.now() - startedAt,
-      })
+      // WORKFORCE (2026-10-05): serving success is not automatically Production work. University exams/practice,
+      // controlled evaluation, workforce recovery/validation and unlabeled background calls can all execute this worker.
+      // Only an explicitly user-facing interactive request may create a production_request assignment. This fails closed:
+      // serving telemetry remains truthful for every successful execution, but internal traffic can never enter the
+      // governed Production-verification lifecycle merely because a graduate produced text.
+      const productionDelivery = INTERACTIVE_GRADUATE_FEATURES.has(
+        String(request.usageContext?.feature || '').trim().toLowerCase(),
+      )
+      if (productionDelivery) {
+        recordGraduateProductionServed({
+          registryId: runtime.registryId,
+          candidateId: runtime.candidateId,
+          trainedArtifactHash: runtime.trainedArtifactHash,
+          subjectId: runtime.subjectId,
+          turnId,
+          objective: request.prompt,
+          servingAttemptId: attemptId,
+          latencyMs: Date.now() - startedAt,
+        })
+      }
 
       recordReasoningWorkerMetric({
         turnId,

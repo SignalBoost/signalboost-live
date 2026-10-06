@@ -21,6 +21,7 @@ const tests = [
   'tests/cosUniversityEffectivenessFunnel.node.test.ts',
   // Read-only Step 1 evidence report and line observation (owner 2026-10-06).
   'tests/cosUniversityStep1Evidence.node.test.ts',
+  'tests/cosWorkforceVerificationTrace.node.test.ts',
 
   // Residency status, runtime recovery, and terminal-failure contracts.
   'tests/builderResidencyAdmission.node.test.ts',

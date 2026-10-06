@@ -2805,6 +2805,17 @@ All reads go through `readOnlyDb`, which throws on `insert`/`update`/`upsert`/`d
 
 647 artifacts born, 647 with a birth certificate; 555 examined, 103 passed all four gates and graduated; mean capability gain −0.011 (166 improved, 179 regressed); 1,394 evaluation failures, 1,234 (89%) infrastructure and 160 merit, 40 without an evidence-backed cause (RunPod "max workers across all endpoints" refusals and `candidate_output_exhausted`); Builder Residency 0 of 22 complete. Order of work inside Step 1: evaluation infrastructure failures, then training gain, then Residency, one at a time.
 
+### Evaluation infrastructure: readiness window 280 s -> 340 s — 2026-10-06
+
+Read-only evidence (`/api/cron/cos-university-evaluation-failure-trace`, printed in the "Step 1 evidence report" check run). Of 1,173 infrastructure evaluation failures in 7 days, the large families had stopped by 2026-10-04 or earlier: `GET /serverless` 500, missing endpoint id, judge timeout and unavailable, safety zero-collapse, `answer_empty`; `answer_missing` fell from 46-73 a day to 2. The remaining live cause was `runtime_not_ready:mass_distilled_gateway_ping_timeout`. Its recorded worker stage was warm 28, initializing 4, **cold 0**, so the cause was not RunPod quota or GPU supply.
+
+- Completed exams: readiness p50 139 s, p90 203 s, **max 275 s** against the 280 s window.
+- Failed runs stopped at about 284 s: cut off while loading, not hung.
+- The exam itself (claim reservation -> completed, minus readiness): p50 138 s, p90 153 s, **max 183 s**. Of the 545 s usable route budget (570 s - 25 s reserve), a window up to 362 s would cut no observed exam.
+- The canary for the same exact artifact already allows 380 s.
+
+`READY_TIMEOUT_MS` is now **340 s**. That leaves 205 s for the exam, and the route deadline still clamps the wait. Next check: re-read the trace after a day of exams. If timeouts persist at about 344 s with workers warm, the fix is a faster cold start (image or weights), not a longer window. Keeping a loading worker alive between attempts holds a GPU longer and needs owner approval of a spend cap.
+
 ### AI Lab specification corrections — 2026-10-06
 
 External drafts of the Lab specification circulated on 2026-10-06. Where they conflict with this file, this file wins:

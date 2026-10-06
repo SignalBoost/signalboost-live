@@ -20,7 +20,7 @@ export const EVALUATION_FAILURE_TRACE_ROW_LIMIT = 20000
 const EVALUATION_FAILED_CLAIM = 'mass_distilled_independent_evaluation_failed'
 const EVALUATION_COMPLETED_CLAIM = 'mass_distilled_independent_evaluation_completed'
 /** The evaluator's readiness window (cosUniversityMassDistilledArtifactEvaluation READY_TIMEOUT_MS). */
-export const EVALUATION_READY_WINDOW_SECONDS = 280
+export const EVALUATION_READY_WINDOW_SECONDS = 340
 const READINESS_BUCKETS: readonly number[] = Object.freeze([60, 120, 180, 240, EVALUATION_READY_WINDOW_SECONDS])
 /** The evaluation route's own budget (ROUTE_BUDGET_MS 570 s) minus its reserve (ROUTE_RESERVE_MS 25 s). */
 export const EVALUATION_ROUTE_USABLE_SECONDS = 545

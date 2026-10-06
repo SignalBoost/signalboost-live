@@ -42,7 +42,8 @@ export async function recordAuthenticatedLabFailureVerdict(input: {
     evidenceRef: verdict.evidenceRef, evidenceHash: verdict.evidenceHash,
     issuedAt: verdict.issuedAt, signatureBase64: verdict.signatureBase64,
     authorityExpanded: false, financialAdjustmentAuthorized: false }
-  // INSERT (not upsert): replay of the same signed claim with any transport key must fail.
+  // Atomic DB uniqueness prevents both replay and competing classifications for one job.
+  // Preflight reads alone cannot protect against concurrent submissions.
   const inserted = await db.from('cos_university_learning_assurance_events').insert({
     event_key: eventKey, event_type: 'lab_failure_verdict',
     subject_id: job.subject_id, candidate_id: job.candidate_id,
@@ -50,7 +51,7 @@ export async function recordAuthenticatedLabFailureVerdict(input: {
     observed_at: (input.now || new Date()).toISOString(),
   })
   if (inserted.error) {
-    if (inserted.error.code === '23505') throw new Error('lab_verdict_replay_rejected')
+    if (inserted.error.code === '23505') throw new Error('lab_verdict_duplicate_or_conflict_rejected')
     throw inserted.error
   }
   return { ok: true as const, eventKey, classification, financialAdjustmentAuthorized: false as const }

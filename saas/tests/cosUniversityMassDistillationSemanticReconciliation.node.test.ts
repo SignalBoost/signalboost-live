@@ -14,6 +14,7 @@ test('legacy labels may revalidate into one canonical Computer Science batch', (
     expectedSourceHashes: hashes,
     rows: hashes.map((contentHash, index) => ({
       contentHash,
+      sourceKind: 'scientific_journal',
       subject: index % 2 ? 'cos data center' : 'TypeScript and Next.js',
       summary: 'TypeScript Next.js API routes databases software testing production engineering.',
     })),
@@ -76,4 +77,22 @@ test('semantic reconciliation is non-spending, skips live batches, and runs befo
   const authorizeAt = workflow.indexOf('await authorizeNextUniversityMassDistillationCampaign')
   assert.ok(reconcileAt > 0 && packageAt > reconcileAt && authorizeAt > packageAt)
   assert.match(workflow, /&& semanticReconciliation\.ok === true/)
+})
+
+
+test('legacy prepared batch is quarantined when fewer than half of its sources are independent', () => {
+  const hashes = Array.from({ length: 20 }, (_, index) => h(index + 301))
+  const rows = hashes.map((contentHash, index) => ({
+    contentHash,
+    sourceKind: index < 9 ? 'scientific_journal' : 'teacher_synthetic_curriculum',
+    subject: 'Computer Science & Coding',
+    summary: 'TypeScript Next.js API routes databases software testing production engineering.',
+  }))
+  const blocked = decidePreparedBatchSemanticCohesion({ batchSubjectId: 'Computer Science & Coding', expectedSourceHashes: hashes, rows })
+  assert.equal(blocked.coherent, false)
+  assert.equal(blocked.independentCount, 9)
+  assert.equal(blocked.independentRequired, 10)
+  rows[9].sourceKind = 'public_dataset'
+  const accepted = decidePreparedBatchSemanticCohesion({ batchSubjectId: 'Computer Science & Coding', expectedSourceHashes: hashes, rows })
+  assert.equal(accepted.coherent, true)
 })

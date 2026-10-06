@@ -68,6 +68,7 @@ create table lab.reservations (
   created_at timestamptz not null default now(),
   foreign key (experiment_id, organization_id) references lab.experiments(id, organization_id),
   unique(organization_id, idempotency_key),
+  unique(id, organization_id),
   check (captured_microcredits + released_microcredits <= reserve_microcredits),
   check (refunded_microcredits <= captured_microcredits)
 );
@@ -82,7 +83,7 @@ create table lab.credit_events (
   measured_cost_ref text,
   failure_class text,
   created_at timestamptz not null default now(),
-  foreign key (reservation_id) references lab.reservations(id),
+  foreign key (reservation_id, organization_id) references lab.reservations(id, organization_id),
   unique(organization_id, idempotency_key),
   check ((operation = 'capture' and measured_cost_usd is not null and measured_cost_usd >= 0 and measured_cost_ref is not null and length(btrim(measured_cost_ref)) > 0)
       or (operation <> 'capture' and measured_cost_usd is null and measured_cost_ref is null)),
@@ -98,7 +99,7 @@ do $$ declare t text; begin
 end $$;
 revoke all on all tables in schema lab from service_role;
 revoke all on all sequences in schema lab from public, anon, authenticated;
--- Tenant authorization is checked against the transaction-scoped, trusted database assertion.
+-- This schema is private to server-side operators. The tenant binding must originate\n-- from a verified Harness authority envelope, never caller-controlled input.\n-- Tenant authorization is checked against the transaction-scoped, trusted database assertion.
 -- Never derive this value from request JSON, a query string or a client-controlled JWT claim.
 create function lab.apply_credit_event(
   p_organization_id uuid, p_experiment_id uuid, p_reservation_id uuid,
@@ -113,11 +114,12 @@ declare
   previous lab.credit_events%rowtype;
   event_id_out bigint;
 begin
-  if current_setting('lab.trusted_organization_id',true) is distinct from p_organization_id::text then
+  if session_user not in ('postgres','service_role') or
+     current_setting('lab.trusted_organization_id',true) is distinct from p_organization_id::text then
     raise exception 'lab_tenant_authority_denied';
   end if;
   if p_amount is null or p_amount <= 0 or coalesce(length(p_idempotency_key),0) not between 16 and 200 or
-    p_operation not in ('reserve','capture','release','refund') then
+    p_operation is null or p_operation not in ('reserve','capture','release','refund') then
     raise exception 'lab_invalid_credit_operation';
   end if;
   -- Lock the account BEFORE checking the idempotency key to serialize concurrent retries.
@@ -186,7 +188,8 @@ create function lab.reconcile_credit_account(p_organization_id uuid)
 returns jsonb language plpgsql security definer set search_path = pg_catalog, lab as $
 declare a lab.credit_accounts%rowtype; agg record; mismatch boolean;
 begin
-  if current_setting('lab.trusted_organization_id',true) is distinct from p_organization_id::text then
+  if session_user not in ('postgres','service_role') or
+     current_setting('lab.trusted_organization_id',true) is distinct from p_organization_id::text then
     raise exception 'lab_tenant_authority_denied';
   end if;
   select * into a from lab.credit_accounts where organization_id=p_organization_id;

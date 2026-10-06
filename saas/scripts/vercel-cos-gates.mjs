@@ -18,6 +18,7 @@ const tests = [
   // Buyer-owned settings and production pause contract.
   'tests/cosUniversitySettings.node.test.ts',
   'tests/cosUniversityArtifactLifeRecord.node.test.ts',
+  'tests/cosLabFailureAttribution.node.test.ts',
   'tests/cosUniversityEffectivenessFunnel.node.test.ts',
   // Read-only Step 1 evidence report and line observation (owner 2026-10-06).
   'tests/cosUniversityStep1Evidence.node.test.ts',

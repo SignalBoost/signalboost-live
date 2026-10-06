@@ -3,13 +3,15 @@
 # Owner direction 2026-09-28: production stayed on 87fd626 for ~19 hours while 23 merges landed on main. This makes
 # production follow main without a dashboard click: on every push to main (and on demand) it promotes the newest
 # successful Vercel build of main, and builds + deploys the checkout directly only when Vercel produced no build.
-# It uses the existing VERCEL_TOKEN secret (already used by the cron watchdog) and prints no secret values.
+# It requires a protected VERCEL_TOKEN for recovery, never prints its value, and reports a warning instead of failing every push when recovery is not configured.
 name: Vercel Promote Main to Production
 
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
+  schedule:
+    - cron: '17 * * * *'
 
 permissions:
   contents: read
@@ -40,7 +42,22 @@ jobs:
       - name: Validate script syntax
         run: node --check .github/scripts/vercel-promote-main.mjs
 
+      - name: Check recovery credential availability
+        id: credential
+        env:
+          RECOVERY_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -n "$RECOVERY_TOKEN" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::Vercel recovery credential is absent. Git integration remains responsible for production; automatic recovery is unavailable.'
+            echo '## Recovery not configured' >> "$GITHUB_STEP_SUMMARY"
+            echo 'VERCEL_TOKEN is absent. No promotion or direct deployment was attempted. Configure a protected, least-privilege token to enable automatic recovery.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Promote newest successful main build to production
+        if: steps.credential.outputs.available == 'true'
         id: promote
         env:
           MAIN_SHA: ${{ github.sha }}
@@ -48,9 +65,9 @@ jobs:
         run: node .github/scripts/vercel-promote-main.mjs
 
       - name: Build and deploy main directly (only when Vercel produced no build)
-        if: steps.promote.outputs.fallback == 'deploy'
+        if: steps.credential.outputs.available == 'true' && steps.promote.outputs.fallback == 'deploy'
         run: |
-          url=$(npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN")
+          url=$(npx --yes vercel@62.1.0 deploy --prod --yes)
           echo "Deployed $url"
-          npx --yes vercel@latest promote "$url" --yes --token "$VERCEL_TOKEN"
+          npx --yes vercel@62.1.0 promote "$url" --yes
           echo "- Built and promoted the checkout directly: $url" >> "$GITHUB_STEP_SUMMARY"

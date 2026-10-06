@@ -2723,4 +2723,18 @@ Staged exposure: Internal → Design Partner → Private Beta → Paid Beta → 
 
 Steps 1 and 2 are useful even if the Lab is never commercialized: they are how the current University gets rigorous answers to what works, what does not, why, what it cost and whether the failure was ours.
 
+## Step 1 exit criterion and read-only evidence report — 2026-10-06
+
+Owner direction, verbatim: "Step 1 is complete when the current University operates end-to-end autonomously—from artifact creation through qualification, graduation, Production serving and independently verified Production outcomes—with failures correctly attributed and the loop demonstrably continuing without manual intervention or weakened standards." One successful `production_verified:*` chain is a milestone, not completion: the line must be shown to operate repeatedly. The canonical roadmap remains the 10 steps above; the project is at Step 1. **The Step 1 declaration belongs to the owner.** The platform produces the evidence and may recommend; it never declares a phase complete or moves the roadmap forward.
+
+Evidence state found on 2026-10-06: the independent watchdog (`assembly-line-live-proof.yml`) had **never run against Production**. Every scheduled run failed at "Refuse to run blind" because the repository secrets `PRODUCTION_BASE_URL` and `CRON_SECRET` were not set. Its absence of findings was therefore no evidence either way.
+
+Read-only evidence path (all reads go through `readOnlyDb`, which throws on `insert`/`update`/`upsert`/`delete` and exposes no `rpc`):
+
+- `/api/cron/cos-university-step1-evidence?window=24h|7d|30d|all` (CRON_SECRET): the Artifact Effectiveness Funnel assessed by `cosUniversityStep1Evidence.ts` against the criterion above. Each criterion is `evidence_present`, `partial`, `no_evidence`, `unavailable` (unreadable chapter, never a zero) or `not_measured`. `repeated_operation`, `no_manual_intervention` and `standards_unweakened` cannot be established from one snapshot, so the report recommends only `NOT_READY` or `INSUFFICIENT_EVIDENCE_FOR_READY`, never `READY`. "Present" means non-zero sourced evidence; no threshold is invented. Repetition is shown by comparing dated runs.
+- `/api/cron/cos-university-line-observation` (CRON_SECRET): per-unit placement from the artifact table plus controller-ledger disagreement counts. The Playwright line prover now reads this route. It previously read `/api/cron/cos-university-lifecycle-orchestrator`, which **runs a full controller tick on every call** (ledger writes, leases, station wakes), so the prover was partly driving the line it measured.
+- `assembly-line-live-proof.yml` job `step1-evidence` prints the report for 24h, 7d and all-time into the Actions log and keeps the JSON for 90 days. A NOT_READY report is evidence, not a job failure.
+
+`tests/cosUniversityStep1Evidence.node.test.ts` is in the production regression gate.
+
 <!-- end of ONBOARD.md (if this line is missing, the paste was cut short) -->

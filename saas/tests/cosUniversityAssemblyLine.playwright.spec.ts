@@ -29,7 +29,10 @@ import {
 import { lineProofMinimumIntervalSeconds } from '../lib/ai/cos/cosUniversityLineMovementProof.ts'
 import { stationForStatus } from '../lib/ai/cos/cosUniversityAssemblyLine.ts'
 
-const LINE_STATE_PATH = '/api/cron/cos-university-lifecycle-orchestrator'
+// Owner 2026-10-06: the prover reads the READ-ONLY observation route. The controller route runs a tick (ledger writes,
+// leases, station wakes) on every call, so reading it would make the prover drive the line it is measuring.
+const LINE_STATE_PATH = '/api/cron/cos-university-line-observation'
+const LINE_STATE_SCHEMA = 'cos-university-assembly-line-observation-v1'
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || ''
 const SECRET = process.env.CRON_SECRET || ''
 // The slowest station's cycle time, not the line's takt. Widening the line shrinks the takt to seconds while one
@@ -76,7 +79,7 @@ test.describe('COS University assembly line, proved from outside', () => {
       expect(response.status(), 'the line controller must answer an authorized read').toBe(200)
       const state = (await response.json()) as LineState
       expect(state.ok, 'the line controller reported a failure').toBe(true)
-      expect(state.schemaVersion, 'the controller is not the assembly-line version').toBe('cos-university-assembly-line-controller-v2')
+      expect(state.schemaVersion, 'the line state is not the read-only observation').toBe(LINE_STATE_SCHEMA)
       return { state, sample: sampleFromLineState({ at: String(state.at || ''), units: state.units, paused: state.paused }) }
     }
 
@@ -127,10 +130,9 @@ test.describe('COS University assembly line, proved from outside', () => {
     }
   })
 
-  test('the controller agrees with the artifact table about where every unit is', async ({ request }) => {
-    // The prover reads placement FROM the controller, so the one way that read could lie is the controller's station
-    // disagreeing with the raw artifact status it was derived from. Checked here so the movement proof above rests on
-    // something, rather than on the controller's self-consistency.
+  test('every observed unit is placed by its artifact status, and controller-ledger lag is reported', async ({ request }) => {
+    // The observation places units from the raw artifact status, so this checks the observer's own derivation. The
+    // controller's ledger is reported alongside: units it places elsewhere (lag or defect) are annotated, not hidden.
     const response = await request.get(`${BASE_URL}${LINE_STATE_PATH}`, {
       headers: { authorization: `Bearer ${SECRET}` },
       timeout: 120_000,
@@ -138,6 +140,10 @@ test.describe('COS University assembly line, proved from outside', () => {
     expect(response.status()).toBe(200)
     const state = (await response.json()) as LineState
     const rows = Array.isArray(state.units) ? (state.units as Array<Record<string, unknown>>) : []
+    test.info().annotations.push({
+      type: 'controller-ledger-agreement',
+      description: `ledgerDisagreements=${(state as Record<string, unknown>).ledgerDisagreements ?? 'n/a'} ledgerMissing=${(state as Record<string, unknown>).ledgerMissing ?? 'n/a'} of ${rows.length} units`,
+    })
 
     const mismatched = rows.filter(row => {
       const expected = stationForStatus(String(row.sourceStatus ?? ''))
@@ -158,9 +164,10 @@ test.describe('COS University assembly line, proved from outside', () => {
     expect(incomplete, `units missing identity or placement: ${JSON.stringify(incomplete)}`).toEqual([])
   })
 
-  test('no station is reported stopped by the controller itself', async ({ request }) => {
-    // Independent of the movement proof: the controller's OWN line-stop detector should be quiet. When this fails and
-    // the movement proof passes, a station is limping rather than stopped - which is the case worth looking at.
+  test('no station is stopped by the line-stop rule', async ({ request }) => {
+    // Independent of the movement proof: the line-stop rule the controller uses (decideLineStops), applied to the
+    // observed line, should be quiet. When this fails and the movement proof passes, a station is limping rather than
+    // stopped - which is the case worth looking at.
     const response = await request.get(`${BASE_URL}${LINE_STATE_PATH}`, {
       headers: { authorization: `Bearer ${SECRET}` },
       timeout: 120_000,
@@ -169,7 +176,7 @@ test.describe('COS University assembly line, proved from outside', () => {
     const state = (await response.json()) as LineState
     const stops = Array.isArray(state.lineStops) ? state.lineStops : []
     test.info().annotations.push({ type: 'controller-line-stops', description: JSON.stringify(stops) })
-    expect(stops, `the controller reports stopped stations: ${JSON.stringify(stops)}`).toEqual([])
+    expect(stops, `stopped stations: ${JSON.stringify(stops)}`).toEqual([])
   })
 })
 // end of saas/tests/cosUniversityAssemblyLine.playwright.spec.ts (if this line is missing, the paste was cut short)

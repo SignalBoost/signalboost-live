@@ -10,7 +10,15 @@
 #   line-live-proof  Runs on a schedule against the live deployment. Proves the LINE: reads per-unit placement,
 #                    waits at least one takt time, reads again, and shows that a real unit changed station. The
 #                    uploaded report is the artifact worth showing a buyer - it carries the two samples, the delta
-#                    and the verdict, produced outside the deployment.
+#                    and the verdict, produced outside the deployment. It reads the READ-ONLY observation route
+#                    (/api/cron/cos-university-line-observation), never the controller, so it cannot drive the line
+#                    it measures (owner 2026-10-06).
+#
+#   step1-evidence   Runs on the same schedule. Prints the Step 1 evidence report (/api/cron/cos-university-step1-evidence)
+#                    for the 24h, 7d and all-time windows into this log and keeps the JSON. Read only: it starts no
+#                    work and spends nothing. It recommends NOT_READY or INSUFFICIENT_EVIDENCE_FOR_READY and never
+#                    READY; the Step 1 declaration is the owner's. A NOT_READY report is evidence, not a job failure:
+#                    the job fails only when the report cannot be produced.
 #
 # Required repository secrets for the live job:
 #   PRODUCTION_BASE_URL   e.g. https://<production host>   (no trailing slash)
@@ -46,6 +54,12 @@ on:
       - 'saas/tests/cosUniversityLifecycleOrchestrator.node.test.ts'
       - 'saas/tests/cosUniversityLifecycleStall.node.test.ts'
       - 'saas/tests/cosUniversityAssemblyLine.playwright.spec.ts'
+      - 'saas/lib/ai/cos/cosUniversityLineObservation.ts'
+      - 'saas/lib/ai/cos/cosUniversityReadOnlyDb.ts'
+      - 'saas/lib/ai/cos/cosUniversityStep1Evidence.ts'
+      - 'saas/app/api/cron/cos-university-line-observation/route.ts'
+      - 'saas/app/api/cron/cos-university-step1-evidence/route.ts'
+      - 'saas/tests/cosUniversityStep1Evidence.node.test.ts'
       - '.github/workflows/assembly-line-live-proof.yml'
   workflow_dispatch:
 
@@ -83,6 +97,7 @@ jobs:
           tests/holdoutExamSetBurnout.node.test.ts
           tests/cosUniversityHoldoutExamItems.node.test.ts
           tests/holdoutExamReadyThroughput.node.test.ts
+          tests/cosUniversityStep1Evidence.node.test.ts
 
   line-live-proof:
     name: Line movement proof against production
@@ -126,4 +141,57 @@ jobs:
         with:
           name: assembly-line-movement-proof-${{ github.run_id }}
           path: saas/playwright-report
+          retention-days: 90
+
+  step1-evidence:
+    name: Step 1 evidence report from production
+    # Never on a pull request: it reads the live deployment.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Refuse to run blind
+        env:
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          missing=""
+          [ -n "$PRODUCTION_BASE_URL" ] || missing="$missing PRODUCTION_BASE_URL"
+          [ -n "$CRON_SECRET" ] || missing="$missing CRON_SECRET"
+          if [ -n "$missing" ]; then
+            echo "::error::Cannot read Step 1 evidence without:$missing. Add them as repository secrets."
+            exit 1
+          fi
+      - name: Read the Step 1 evidence report (read only)
+        env:
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -u
+          mkdir -p step1-evidence
+          failed=0
+          for window in 24h 7d all; do
+            out="step1-evidence/step1-evidence-${window}.json"
+            status=$(curl -sS --max-time 90 -o "$out" -w '%{http_code}' \
+              -H "authorization: Bearer ${CRON_SECRET}" \
+              "${PRODUCTION_BASE_URL}/api/cron/cos-university-step1-evidence?window=${window}") || status=000
+            echo "::group::Step 1 evidence, window=${window} (HTTP ${status})"
+            if [ "$status" = "200" ] && [ "$(jq -r '.ok' "$out" 2>/dev/null)" = "true" ]; then
+              jq -r '.summary' "$out"
+              echo
+              jq -r '.funnelSummary' "$out"
+            else
+              echo "::error::Step 1 evidence for window=${window} could not be produced (HTTP ${status})."
+              head -c 2000 "$out" 2>/dev/null || true
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $failed
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: step1-evidence-${{ github.run_id }}
+          path: step1-evidence
           retention-days: 90

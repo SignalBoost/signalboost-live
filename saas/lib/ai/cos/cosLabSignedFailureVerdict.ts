@@ -13,6 +13,7 @@ export type SignedLabFailureVerdict = Readonly<{
 }>
 
 const SHA256 = /^[a-f0-9]{64}$/i
+export const LAB_FAILURE_VERDICT_MAX_AGE_MS = 5 * 60_000
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
 /** The trust store must be configured by the server, never supplied by the experiment submitter. */
@@ -21,11 +22,15 @@ export function verifySignedLabFailureVerdict(input: {
   expectedJobId: string
   expectedProviderStage: string
   trustedVerifierKeys: Readonly<Record<string, string>>
+  now?: Date
 }): LabFailureAttribution {
   const v = input.verdict
   if (!v || v.jobId !== input.expectedJobId || v.providerStage !== input.expectedProviderStage) return 'UNATTRIBUTED'
   if (!v.jobId || !v.verifierId || !v.evidenceRef || !SHA256.test(v.evidenceHash)) return 'UNATTRIBUTED'
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(v.issuedAt) || !Number.isFinite(Date.parse(v.issuedAt))) return 'UNATTRIBUTED'
+  const issuedAt = Date.parse(v.issuedAt)
+  const now = (input.now ?? new Date()).getTime()
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(v.issuedAt) || !Number.isFinite(issuedAt) || !Number.isFinite(now)) return 'UNATTRIBUTED'
+  if (issuedAt > now + 60_000 || now - issuedAt > LAB_FAILURE_VERDICT_MAX_AGE_MS) return 'UNATTRIBUTED'
   const keyPem = Object.hasOwn(input.trustedVerifierKeys, v.verifierId) ? input.trustedVerifierKeys[v.verifierId] : undefined
   if (!keyPem || !BASE64.test(v.signatureBase64)) return 'UNATTRIBUTED'
   try {

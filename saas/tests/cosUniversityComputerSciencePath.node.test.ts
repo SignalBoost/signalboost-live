@@ -16,14 +16,19 @@ const practiceReceipt = { trainingReceipt: { builderProtocolPracticeProfile: BUI
 
 /** A PostgREST-shaped fake: filters are applied, so a wrong filter in the module changes the numbers. */
 function fakeDb(tables: Record<string, Row[]>) {
-  const read = (row: Row, column: string) => column.includes('->>')
-    ? column.split('->>').reduce((value: any, key, index) => index === 0 ? value[key] : value?.[key], row)
-    : row[column]
+  const read = (row: Row, column: string) => column.split(/->>|->/).reduce((value: any, key) => value?.[key], row)
   return {
     from(table: string) {
       let list = [...(tables[table] || [])]
+      let head = false
       const builder: any = {
-        select: () => builder,
+        select: (_columns: string, options?: { head?: boolean }) => { head = options?.head === true; return builder },
+        gte: (column: string, value: number) => { list = list.filter(row => Number(read(row, column)) >= value); return builder },
+        not: (column: string, operator: string, value: unknown) => {
+          assert.equal(operator, 'is'); assert.equal(value, null)
+          list = list.filter(row => read(row, column) !== undefined && read(row, column) !== null)
+          return builder
+        },
         eq: (column: string, value: unknown) => { list = list.filter(row => read(row, column) === value); return builder },
         like: (column: string, pattern: string) => { list = list.filter(row => String(row[column]).startsWith(pattern.replace('%', ''))); return builder },
         in: (column: string, values: unknown[]) => { list = list.filter(row => values.includes(row[column])); return builder },
@@ -33,7 +38,7 @@ function fakeDb(tables: Record<string, Row[]>) {
         },
         limit: (count: number) => { list = list.slice(0, count); return builder },
         range: (from: number, to: number) => { list = list.slice(from, to + 1); return builder },
-        then: (resolve: (value: unknown) => void) => resolve({ data: list, error: null }),
+        then: (resolve: (value: unknown) => void) => resolve(head ? { count: list.length, error: null } : { data: list, error: null }),
       }
       return builder
     },
@@ -41,7 +46,31 @@ function fakeDb(tables: Record<string, Row[]>) {
 }
 
 const tables: Record<string, Row[]> = {
+  cos_continuous_learning: [
+    ...Array.from({ length: 30 }, (_, i) => ({ content_hash: `r${i}`, subject: CS, confidence: 0.9, source_kind: 'open_source_document' })),
+    ...Array.from({ length: 50 }, (_, i) => ({ content_hash: `f${i}`, subject: CS, confidence: 0.9, source_kind: 'failure_derived_curriculum' })),
+    ...Array.from({ length: 10 }, (_, i) => ({ content_hash: `t${i}`, subject: CS, confidence: 0.9, source_kind: 'teacher_hosted_curriculum' })),
+    // Not counted: below confidence, another subject.
+    { content_hash: 'low', subject: CS, confidence: 0.5, source_kind: 'open_source_document' },
+    { content_hash: 'math', subject: 'Mathematics', confidence: 0.9, source_kind: 'open_source_document' },
+  ],
+  cos_university_distillation_curriculum_batches: [
+    { subject_id: CS, status: 'consumed', prepared_at: '2026-10-05T19:00:00Z' },
+    { subject_id: CS, status: 'superseded', prepared_at: '2026-10-04T19:00:00Z' },
+    { subject_id: 'Mathematics', status: 'prepared', prepared_at: '2026-10-06T19:00:00Z' },
+  ],
   cos_university_learning_assurance_events: [
+    { event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-06T19:05:00Z', evidence: {
+      curriculum: { supply: { subjects: [
+        { subject: 'Mathematics', canonicalSubjectId: 'mathematics', uniqueBatchableItems: 400, shortfallToBatch: 0 },
+        { subject: CS, canonicalSubjectId: 'computer_science', uniqueBatchableItems: 41, shortfallToBatch: 23 },
+      ] } },
+      preparedBufferTarget: 12, preparedBeforeReplenishment: 12,
+      curriculumReplenishment: { ok: true, skipped: true, reason: 'prepared_buffer_satisfied' },
+    } },
+    // An older receipt and a receipt without a packaging pass are not the latest packaging evidence.
+    { event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-06T18:00:00Z', evidence: { curriculum: { supply: { subjects: [] } } } },
+    { event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-06T19:10:00Z', evidence: { curriculum: { ok: true, skipped: true } } },
     { subject_id: CS, observed_at: '2026-10-06T19:00:00Z', evidence: { claim: 'mass_distillation_pre_dispatch_validated', stage: 'training_dispatching', builderProtocolPractice: { profile: BUILDER_PROTOCOL_PRACTICE_PROFILE, taskIds: ['tsn-count-return-type', 'rwid-greeting-export'] } } },
     { subject_id: CS, observed_at: '2026-10-06T10:00:00Z', evidence: { claim: 'mass_distillation_pre_dispatch_validated', stage: 'training_dispatching', builderProtocolPractice: null } },
     // Not counted: another stage, another subject.
@@ -77,6 +106,12 @@ test('the snapshot follows the newest Computer Science artifact from dispatch to
     recent: 2, withPractice: 1, latestAt: '2026-10-06T19:00:00.000Z', latestWithPractice: true,
     latestPracticeTaskIds: ['tsn-count-return-type', 'rwid-greeting-export'],
   })
+  assert.deepEqual({ ...path.packaging, curriculumBatchesByStatus: { ...path.packaging.curriculumBatchesByStatus }, corpusRowsByOrigin: { ...path.packaging.corpusRowsByOrigin } }, {
+    receiptAt: '2026-10-06T19:05:00.000Z', supplyItems: 41, supplyShortfall: 23, batchMinimum: 64,
+    preparedBufferTarget: 12, preparedBefore: 12, replenishment: 'prepared_buffer_satisfied skipped',
+    curriculumBatchesByStatus: { consumed: 1, superseded: 1 }, latestCurriculumBatchAt: '2026-10-05T19:00:00.000Z',
+    corpusRowsByOrigin: { realSource: 30, failureDerived: 50, teacherSynthetic: 10 },
+  })
   assert.equal(path.trainingRuns.recent, 2)
   assert.equal(path.trainingRuns.latestStage, 'training_dispatched')
   assert.deepEqual({ ...path.trainedArtifacts.byStatus }, { evaluation_ready: 3, graduated: 1 }, 'mass artifacts only')
@@ -93,6 +128,7 @@ test('the snapshot follows the newest Computer Science artifact from dispatch to
   assert.match(text, /training dispatches :: recent=2 withProtocolPractice=1 .*latestWithPractice=yes latestTasks=tsn-count-return-type,rwid-greeting-export/)
   assert.match(text, /residency +:: awaitingAdmission=2 \(withPractice=1\) activeResidents=1 latestCaseStartedAt=2026-10-06T17:00:00.000Z/)
   assert.match(text, /recentFailed=2 recentFailedWithLoopStop=1/)
+  assert.match(text, /packaging +:: receiptAt=2026-10-06T19:05:00.000Z supply=41 batchable items \(needs 64; shortfall 23\) preparedBuffer=12\/12 replenishment=prepared_buffer_satisfied skipped curriculumBatches=consumed=1,superseded=1 .*real=30 failureDerived=50 teacherSynthetic=10/)
 })
 
 test('an empty path says none rather than inventing a state', async () => {
@@ -100,6 +136,16 @@ test('an empty path says none rather than inventing a state', async () => {
   assert.equal(path.trainingDispatches.latestWithPractice, null)
   assert.equal(path.residency.awaitingAdmission, 0)
   assert.match(describeComputerSciencePath(path), /latestAt=none latestWithPractice=n\/a/)
+  assert.match(describeComputerSciencePath(path), /supply=no packaging receipt/)
+})
+
+test('a packaging pass without Computer Science in its supply is reported as zero batchable items', async () => {
+  const path = await readComputerSciencePath({ db: readOnlyDb(fakeDb({
+    cos_university_learning_assurance_events: [{ event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-06T19:05:00Z', evidence: { curriculum: { supply: { subjects: [{ subject: 'Mathematics', canonicalSubjectId: 'mathematics', uniqueBatchableItems: 400, shortfallToBatch: 0 }] } } } }],
+  })), now: new Date('2026-10-06T21:30:00Z') })
+  assert.equal(path.packaging.supplyItems, null)
+  assert.equal(path.packaging.supplyShortfall, 64)
+  assert.match(describeComputerSciencePath(path), /supply=absent from supply \(0 batchable items; needs 64\)/)
 })
 
 test('the report route prints the path without letting it hide the Step 1 report', () => {

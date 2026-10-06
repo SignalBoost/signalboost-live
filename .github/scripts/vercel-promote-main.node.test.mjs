@@ -31,7 +31,7 @@ function run(scenario) {
           ...(scenario === 'failed' ? [deploy(sha, 'ERROR')] : scenario === 'pending' ? [deploy(sha, 'BUILDING')] : scenario === 'stale' ? [deploy(sha)] : [deploy(old)])
         ] }
       } else if (u.includes('/v9/projects/')) {
-        body = { targets: { production: { id: 'dpl_old', created: 50, meta: { githubCommitSha: old } } } }
+        body = { targets: scenario === 'unknown-production' ? {} : { production: { id: 'dpl_old', created: 50, meta: { githubCommitSha: old } } } }
       } else if (u.includes('/v13/deployments/')) {
         body = { errorCode: 'lint_or_type_error' }
       } else if (u.includes('/promote/')) {
@@ -80,4 +80,11 @@ test('missing build requests fallback only for verified main', () => {
   const r = run('missing')
   assert.equal(r.status, 0)
   assert.match(r.output, /fallback=deploy/)
+})
+
+test('unknown active production target fails closed, never guessing from READY builds', () => {
+  const r = run('unknown-production')
+  assert.equal(r.status, 1)
+  assert.match(r.logs, /Cannot verify active production target/)
+  assert.doesNotMatch(r.output, /fallback=deploy/)
 })

@@ -99,7 +99,9 @@ do $$ declare t text; begin
 end $$;
 revoke all on all tables in schema lab from service_role;
 revoke all on all sequences in schema lab from public, anon, authenticated;
--- This schema is private to server-side operators. The tenant binding must originate\n-- from a verified Harness authority envelope, never caller-controlled input.\n-- Tenant authorization is checked against the transaction-scoped, trusted database assertion.
+-- This schema is private to server-side operators. The tenant binding must originate
+-- from a verified Harness authority envelope, never caller-controlled input.
+-- Tenant authorization is checked against the transaction-scoped, trusted database assertion.
 -- Never derive this value from request JSON, a query string or a client-controlled JWT claim.
 create function lab.apply_credit_event(
   p_organization_id uuid, p_experiment_id uuid, p_reservation_id uuid,

@@ -152,6 +152,12 @@ export type EffectivenessFunnel = Readonly<{
     competencyFailures: number
     completionRate: number | null
     casePassRate: number | null
+    /** Finished case runs by the Harness verdict (agent_failure = skill, infrastructure_failure = platform, ...). */
+    caseOutcomes: Readonly<Record<string, number>>
+    /** Most frequent failure codes on finished, non-passing case runs. */
+    topFailureCodes: Readonly<Record<string, number>>
+    /** Residents by standing. */
+    standings: Readonly<Record<string, number>>
     source: string
     methodology: string
   }>
@@ -285,7 +291,7 @@ export function composeFunnel(input: {
   serving: Chapter<{ terminalByAttempt: ReadonlyMap<string, { outcome: string; latencyMs: number; errorClass: string | null }> }>
   lineLedger: Chapter<{ rows: readonly Readonly<{ station: string; enteredAt: string | null; deadlineAt: string | null; leaseUntil: string | null; terminal: boolean }>[] }>
   transitionHistory: Chapter<{ rows: readonly Readonly<{ fromStation: string; transitionedAt: string | null; durationSeconds: number | null; wasOverdue: boolean }>[] }>
-  residencyEvidence: Chapter<{ enrollments: readonly Readonly<{ key: string; standing: string }>[]; caseStatuses: readonly string[]; competencyOutcomes: readonly string[] }>
+  residencyEvidence: Chapter<{ enrollments: readonly Readonly<{ key: string; standing: string }>[]; caseStatuses: readonly string[]; competencyOutcomes: readonly string[]; caseRuns?: readonly Readonly<{ status: string; harnessOutcome: string; failureCode: string }>[] }>
   workforceAssignments: Chapter<{ rows: readonly Readonly<{ status: string; sourceKind: string; permanentArtifactId: string }>[] }>
   providerCosts: Chapter<{ rows: readonly Readonly<{ operation: string; observedCostUsd: number }>[] }>
   provenanceEvidence: Chapter<{ certificates: ReadonlySet<string>; graduates: ReadonlySet<string>; resumes: ReadonlySet<string> }>
@@ -456,7 +462,17 @@ export function composeFunnel(input: {
     const competencyPasses = e.competencyOutcomes.filter(x => x === 'pass').length
     const competencyFailures = e.competencyOutcomes.filter(x => x === 'fail').length
     const terminalCases = casesPassed + casesFailed + casesRejected
-    residencyEffectiveness = Object.freeze({ available: true as const, error: null, enrollments: e.enrollments.length, completed, remediationRequired, caseRuns: e.caseStatuses.length, casesPassed, casesFailed, casesRejected, competencyEvidence: e.competencyOutcomes.length, competencyPasses, competencyFailures, completionRate: e.enrollments.length ? completed / e.enrollments.length : null, casePassRate: terminalCases ? casesPassed / terminalCases : null, source: 'cos_university_residency_enrollments + cos_university_residency_case_runs + cos_university_residency_competency_evidence', methodology: 'exact cohort artifacts; completion comes only from durable residency standing; case and competency outcomes are counted from durable practical evidence' })
+    const tally = (values: readonly string[]) => {
+      const out: Record<string, number> = {}
+      for (const value of values) out[value] = (out[value] || 0) + 1
+      return out
+    }
+    const topOf = (map: Record<string, number>, n: number) => Object.freeze(Object.fromEntries(Object.entries(map).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n)))
+    const finished = (e.caseRuns || []).filter(row => row.status !== 'started')
+    const caseOutcomes = topOf(tally(finished.map(row => row.harnessOutcome || 'unrecorded')), 8)
+    const topFailureCodes = topOf(tally(finished.filter(row => row.status !== 'passed').map(row => row.failureCode || 'unrecorded')), 6)
+    const standings = topOf(tally(e.enrollments.map(row => row.standing || 'unrecorded')), 8)
+    residencyEffectiveness = Object.freeze({ available: true as const, error: null, enrollments: e.enrollments.length, completed, remediationRequired, caseRuns: e.caseStatuses.length, casesPassed, casesFailed, casesRejected, competencyEvidence: e.competencyOutcomes.length, competencyPasses, competencyFailures, completionRate: e.enrollments.length ? completed / e.enrollments.length : null, casePassRate: terminalCases ? casesPassed / terminalCases : null, caseOutcomes, topFailureCodes, standings, source: 'cos_university_residency_enrollments + cos_university_residency_case_runs + cos_university_residency_competency_evidence', methodology: 'exact cohort artifacts; completion comes only from durable residency standing; case and competency outcomes are counted from durable practical evidence' })
   } else residencyEffectiveness = Object.freeze({ available: false as const, error: input.residencyEvidence.error })
 
   let workforceEffectiveness: EffectivenessFunnel['workforceEffectiveness']
@@ -798,10 +814,15 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       const residencyIds = enrollments.map((row: any) => text(row.id, 80)).filter(Boolean)
       const caseRows: any[] = [], competencyRows: any[] = []
       for (const chunk of chunks(residencyIds, FUNNEL_READ_CHUNK)) {
-        caseRows.push(...await allRows((from, to) => db.from('cos_university_residency_case_runs').select('residency_id,status').in('residency_id', chunk).range(from, to)))
+        caseRows.push(...await allRows((from, to) => db.from('cos_university_residency_case_runs').select('residency_id,status,harness_outcome,failure_code').in('residency_id', chunk).range(from, to)))
         competencyRows.push(...await allRows((from, to) => db.from('cos_university_residency_competency_evidence').select('residency_id,outcome').in('residency_id', chunk).range(from, to)))
       }
-      return { enrollments: enrollments.map((row: any) => ({ key: key(row), standing: text(row.standing, 60) })), caseStatuses: caseRows.map((row: any) => text(row.status, 40)), competencyOutcomes: competencyRows.map((row: any) => text(row.outcome, 20)) }
+      return {
+        enrollments: enrollments.map((row: any) => ({ key: key(row), standing: text(row.standing, 60) })),
+        caseStatuses: caseRows.map((row: any) => text(row.status, 40)),
+        competencyOutcomes: competencyRows.map((row: any) => text(row.outcome, 20)),
+        caseRuns: caseRows.map((row: any) => ({ status: text(row.status, 40), harnessOutcome: text(row.harness_outcome, 60), failureCode: text(row.failure_code, 80) })),
+      }
     }),
     chapter(async () => {
       const certs = await forCohort('cos_university_artifact_birth_certificates', 'candidate_id,trained_artifact_hash,permanent_artifact_id')

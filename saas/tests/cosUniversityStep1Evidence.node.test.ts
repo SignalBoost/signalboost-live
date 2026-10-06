@@ -241,7 +241,38 @@ test('Builder Residency with residents but no completion blocks Step 1', () => {
   const report = assessStep1Evidence(funnel, NOW)
   assert.deepEqual([...report.blocking], ['builder_residency'])
   const residency = report.criteria.find(entry => entry.id === 'builder_residency')!
-  assert.deepEqual({ ...residency.observed }, { residency_enrolled: 3, residency_complete: 0 })
+  assert.equal(residency.observed.residency_enrolled, 3)
+  assert.equal(residency.observed.residency_complete, 0)
+})
+
+test('Residency case evidence is printed so skill failures are told apart from platform failures', () => {
+  const funnel = fullFunnel({
+    residencyEffectiveness: {
+      available: true, error: null, enrollments: 4, completed: 0, remediationRequired: 1,
+      caseRuns: 10, casesPassed: 3, casesFailed: 2, casesRejected: 5, competencyEvidence: 5, competencyPasses: 3, competencyFailures: 2,
+      completionRate: 0, casePassRate: 0.3,
+      caseOutcomes: { infrastructure_failure: 5, success: 3, agent_failure: 2 },
+      topFailureCodes: { runtime_not_ready: 5, assertion_failed: 2 },
+      standings: { resident: 3, remediation_required: 1 },
+      source: 's', methodology: 'm',
+    },
+  })
+  funnel.stages = funnel.stages.map((stage: any) => stage.id === 'residency_complete' ? { ...stage, count: 0 } : stage)
+  const report = assessStep1Evidence(funnel, NOW)
+  const residency = report.criteria.find(entry => entry.id === 'builder_residency')!
+  assert.equal(residency.status, 'no_evidence')
+  assert.equal(residency.observed.casePassRate, 0.3)
+  assert.equal(residency.observed.caseOutcomes, 'infrastructure_failure=5,success=3,agent_failure=2')
+  assert.equal(residency.observed.topFailureCodes, 'runtime_not_ready=5,assertion_failed=2')
+  assert.equal(residency.observed.standings, 'resident=3,remediation_required=1')
+  assert.match(describeStep1Evidence(report), /builder_residency :: .*caseOutcomes=infrastructure_failure=5,success=3,agent_failure=2/)
+})
+
+test('an unreadable Residency evidence chapter is said, never printed as zeros', () => {
+  const funnel = fullFunnel({ residencyEffectiveness: { available: false, error: 'boom' } })
+  const residency = assessStep1Evidence(funnel, NOW).criteria.find(entry => entry.id === 'builder_residency')!
+  assert.equal(residency.observed.residencyEvidence, 'unavailable')
+  assert.equal(residency.observed.casePassRate, undefined)
 })
 
 test('an unreadable Residency chapter is unavailable, never a zero', () => {

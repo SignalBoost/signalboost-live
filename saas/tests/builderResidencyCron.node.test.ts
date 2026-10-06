@@ -87,11 +87,11 @@ test('Residency cron runs one bounded lane per admitted resident without widenin
 })
 
 
-test('Residency cron circuit-breaks educational attempts when infrastructure recovery is not completed', async () => {
+test('Residency cron ends the lane after any infrastructure failure, including successful reconciliation', async () => {
   const source = await readFile(routeUrl, 'utf8')
   assert.match(source, /result\.state === 'case_not_completed'/)
-  assert.match(source, /execution\.result\?\.outcome\?\.status === 'infrastructure_failure'/)
-  assert.match(source, /selfHealing\?\.completed !== true/)
-  assert.match(source, /\) break/)
+  assert.match(source, /if \(execution\.result\?\.outcome\?\.status === 'infrastructure_failure'\) break/)
+  assert.doesNotMatch(source, /selfHealing\?\.completed !== true/, 'recovery does not imply readiness')
+  assert.match(source, /repairInfrastructure: actuateBuilderResidencyRuntimeRecovery/)
 })
 // end of saas/tests/builderResidencyCron.node.test.ts (if this line is missing, the paste was cut short)

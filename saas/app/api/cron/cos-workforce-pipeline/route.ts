@@ -183,6 +183,7 @@ async function run(req: NextRequest) {
   }
   const runtimeBlocked = new Set([...runtimeFailureCounts.entries()].filter(([, count]) => count >= 2).map(([id]) => id))
   const notEligibleForWork = new Set([...runtimeBlocked, ...offReserve])
+  const reservedForWork = new Set(reservation.eligibilityKnown ? reservation.eligibleForWork : [])
   const eligibleRecoveryTargets = reservation.eligibilityKnown
     ? workers.filter(row => (row.stranded || row.repeatedFailure) && !notEligibleForWork.has(String(row.registry_id)))
     : []
@@ -239,7 +240,7 @@ async function run(req: NextRequest) {
             purpose: 'genuine_production_replay',
             correlationId: `${validating ? 'workforce-validation' : 'workforce-recovery'}:${row.id}`,
           },
-        }, objective, notEligibleForWork)
+        }, objective, notEligibleForWork, reservedForWork)
         if (validating) validationAttempts += 1
         else recoveryAttempts += 1
       }

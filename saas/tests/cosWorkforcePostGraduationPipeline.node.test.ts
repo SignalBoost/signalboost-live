@@ -25,6 +25,8 @@ test('post-graduation pipeline preserves permanent identity and follows real wor
 test('scheduled warm windows exercise healthy reserved graduates with bounded genuine-demand proof work', () => {
   assert.match(recovery, /reservation\.inWindow === true/)
   assert.match(recovery, /reservation\.eligibleForWork\.includes\(String\(row\.registry_id\)\)/)
+  assert.match(recovery, /const reservedForWork = new Set\(reservation\.eligibilityKnown \? reservation\.eligibleForWork : \[\]\)/)
+  assert.match(recovery, /runWorkforceApprenticeShadow\([\s\S]*objective, notEligibleForWork, reservedForWork\)/)
   assert.match(recovery, /!runtimeBlocked\.has\(String\(row\.registry_id\)\)/)
   assert.match(recovery, /Date\.now\(\) - 15 \* 60_000/)
   assert.match(recovery, /\.eq\('source_kind', 'production_shadow'\)/)

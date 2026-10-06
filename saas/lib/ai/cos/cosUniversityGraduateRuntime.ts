@@ -392,19 +392,26 @@ async function onCallWorkforceRegistryIds(db: NonNullable<ReturnType<typeof cosS
 export async function activeGraduateRuntimesForRole(
   role: CosReasoningWorkerRole,
   objective: string,
+  allowedRegistryIds?: ReadonlySet<string>,
 ): Promise<ActiveGraduateRuntime[]> {
   const db = cosServiceDb()
   if (!db) return []
   const onCall = await onCallWorkforceRegistryIds(db)
   if (!onCall || !onCall.length) return []
+  // A caller with an explicit reservation must query that exact bounded Workforce set. Filtering only after
+  // the registry's newest-20 limit can omit every reserved worker once the roster grows beyond 20.
+  const dispatchIds = allowedRegistryIds
+    ? onCall.filter(id => allowedRegistryIds.has(id))
+    : onCall
+  if (!dispatchIds.length) return []
   const problemClass = classifyProblemClass(objective)
   const universitySubjects = classifyCosUniversitySubjects(objective)
   const rows = await db.from('cos_university_graduate_model_registry')
     .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,status,runtime_profile,runtime_provider,runtime_model_id,runtime_health_evidence_hash,activation_evidence_hash,platform_scope,updated_at')
     .eq('status', 'active')
-    .in('id', onCall)
+    .in('id', dispatchIds)
     .order('updated_at', { ascending: false })
-    .limit(20)
+    .limit(allowedRegistryIds ? Math.min(200, dispatchIds.length) : 20)
   if (rows.error) {
     console.warn('[cos-graduate-runtime] active registry read failed closed', rows.error)
     return []
@@ -499,6 +506,7 @@ export async function activeGraduateRuntimesForRole(
 export async function activeGraduateApprenticeForObjective(
   objective: string,
   excludedRegistryIds: ReadonlySet<string> = new Set(),
+  allowedRegistryIds?: ReadonlySet<string>,
 ): Promise<ActiveGraduateRuntime | null> {
   const roles: readonly CosReasoningWorkerRole[] = ['critic', 'verifier', 'researcher', 'context_engineer', 'coder']
   // Build one pool across every specialist role before choosing. Returning from the first role with
@@ -508,7 +516,7 @@ export async function activeGraduateApprenticeForObjective(
   // fair dispatch among already-authorized Workforce members.
   const byRegistry = new Map<string, ActiveGraduateRuntime>()
   for (const role of roles) {
-    const eligible = await activeGraduateRuntimesForRole(role, objective)
+    const eligible = await activeGraduateRuntimesForRole(role, objective, allowedRegistryIds)
     for (const runtime of eligible) if (!excludedRegistryIds.has(runtime.registryId) && !byRegistry.has(runtime.registryId)) byRegistry.set(runtime.registryId, runtime)
   }
   const candidates = [...byRegistry.values()]

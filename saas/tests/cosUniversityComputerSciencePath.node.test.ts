@@ -63,7 +63,7 @@ const tables: Record<string, Row[]> = {
     { event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-06T19:05:00Z', evidence: {
       curriculum: { supply: { subjects: [
         { subject: 'Mathematics', canonicalSubjectId: 'mathematics', uniqueBatchableItems: 400, shortfallToBatch: 0 },
-        { subject: CS, canonicalSubjectId: 'computer_science', uniqueBatchableItems: 41, shortfallToBatch: 23 },
+        { subject: CS, canonicalSubjectId: 'computer_science', uniqueBatchableItems: 41, shortfallToBatch: 23, realSourceItems: 12, realSourceNeeded: 32 },
       ] } },
       preparedBufferTarget: 12, preparedBeforeReplenishment: 12,
       curriculumReplenishment: { ok: true, skipped: true, reason: 'prepared_buffer_satisfied' },
@@ -107,7 +107,7 @@ test('the snapshot follows the newest Computer Science artifact from dispatch to
     latestPracticeTaskIds: ['tsn-count-return-type', 'rwid-greeting-export'],
   })
   assert.deepEqual({ ...path.packaging, curriculumBatchesByStatus: { ...path.packaging.curriculumBatchesByStatus }, corpusRowsByOrigin: { ...path.packaging.corpusRowsByOrigin } }, {
-    receiptAt: '2026-10-06T19:05:00.000Z', supplyItems: 41, supplyShortfall: 23, batchMinimum: 64,
+    receiptAt: '2026-10-06T19:05:00.000Z', supplyItems: 41, supplyShortfall: 23, realSourceItems: 12, realSourceNeeded: 32, batchMinimum: 64,
     preparedBufferTarget: 12, preparedBefore: 12, replenishment: 'prepared_buffer_satisfied skipped',
     curriculumBatchesByStatus: { consumed: 1, superseded: 1 }, latestCurriculumBatchAt: '2026-10-05T19:00:00.000Z',
     corpusRowsByOrigin: { realSource: 30, failureDerived: 50, teacherSynthetic: 10 },
@@ -128,7 +128,7 @@ test('the snapshot follows the newest Computer Science artifact from dispatch to
   assert.match(text, /training dispatches :: recent=2 withProtocolPractice=1 .*latestWithPractice=yes latestTasks=tsn-count-return-type,rwid-greeting-export/)
   assert.match(text, /residency +:: awaitingAdmission=2 \(withPractice=1\) activeResidents=1 latestCaseStartedAt=2026-10-06T17:00:00.000Z/)
   assert.match(text, /recentFailed=2 recentFailedWithLoopStop=1/)
-  assert.match(text, /packaging +:: receiptAt=2026-10-06T19:05:00.000Z supply=41 batchable items \(needs 64; shortfall 23\) preparedBuffer=12\/12 replenishment=prepared_buffer_satisfied skipped curriculumBatches=consumed=1,superseded=1 .*real=30 failureDerived=50 teacherSynthetic=10/)
+  assert.match(text, /packaging +:: receiptAt=2026-10-06T19:05:00.000Z supply=41 batchable items \(needs 64; shortfall 23\) realSource=12\/32 BLOCKED: too little real-source material preparedBuffer=12\/12 replenishment=prepared_buffer_satisfied skipped curriculumBatches=consumed=1,superseded=1 .*real=30 failureDerived=50 teacherSynthetic=10/)
 })
 
 test('an empty path says none rather than inventing a state', async () => {

@@ -63,6 +63,13 @@ export type MassDistillationSubjectSupply = Readonly<{
   canonicalSubjectId: CosUniversitySubjectId | null
   uniqueBatchableItems: number
   shortfallToBatch: number
+  /**
+   * Unique unassigned REAL-SOURCE items, counted like the packager counts them (2026-10-06). A batch is refused unless at
+   * least `realSourceNeeded` of its items are real-source (HYBRID_REAL_SOURCE_TARGET), so `uniqueBatchableItems` alone
+   * can show a subject as packable while remediation and generated rows make up its supply. Reported, not acted on.
+   */
+  realSourceItems?: number
+  realSourceNeeded?: number
 }>
 
 export type MassDistillationSupply = Readonly<{
@@ -306,6 +313,7 @@ export function analyzeMassDistillationSupply(
     assignedMaterialHashes: Set<string>
     unassignedContentHashes: Set<string>
     uniqueMaterialHashes: Set<string>
+    realSourceMaterialHashes: Set<string>
   }>()
 
   const groupFor = (row: NormalizedIdentity) => {
@@ -316,6 +324,7 @@ export function analyzeMassDistillationSupply(
       assignedMaterialHashes: new Set<string>(),
       unassignedContentHashes: new Set<string>(),
       uniqueMaterialHashes: new Set<string>(),
+      realSourceMaterialHashes: new Set<string>(),
     }
     groups.set(subject.key, group)
     return { subject, group }
@@ -334,6 +343,10 @@ export function analyzeMassDistillationSupply(
     if (group.unassignedContentHashes.has(row.contentHash)) continue
     group.unassignedContentHashes.add(row.contentHash)
     if (group.assignedMaterialHashes.has(row.materialHash)) continue
+    // Same first-seen rule as the packager: a material hash keeps the origin of the row that introduced it.
+    if (!group.uniqueMaterialHashes.has(row.materialHash) && massDistillationHybridOrigin(row.sourceKind) === 'real_source') {
+      group.realSourceMaterialHashes.add(row.materialHash)
+    }
     group.uniqueMaterialHashes.add(row.materialHash)
   }
 
@@ -346,6 +359,9 @@ export function analyzeMassDistillationSupply(
       shortfallToBatch: group.uniqueMaterialHashes.size >= MASS_DISTILLATION_QUALITY_MIN_BATCH
         ? 0
         : MASS_DISTILLATION_QUALITY_MIN_BATCH - group.uniqueMaterialHashes.size,
+      realSourceItems: group.realSourceMaterialHashes.size,
+      realSourceNeeded: Math.ceil(Math.max(MASS_DISTILLATION_QUALITY_MIN_BATCH,
+        Math.min(MASS_DISTILLATION_MAX_BATCH, group.uniqueMaterialHashes.size)) * HYBRID_REAL_SOURCE_TARGET),
     }))
     .filter(subject => subject.uniqueBatchableItems > 0)
     .sort((a, b) => b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))

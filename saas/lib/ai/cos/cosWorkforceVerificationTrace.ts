@@ -9,10 +9,11 @@
 //     (assistant_messages.provenance.turnId), because the owner verification page can only list turns found there;
 //   - whether any turn outcome, and any production_verified outcome, exists for those turns;
 //   - which serving-attempt failure classes dominate;
-//   - per serving PATH (owner go 2026-10-06): live chat, Workforce shadow, other graduate-worker callers, unlinked -
-//     how many attempts each made, how they ended, how fast the successful ones answered, which deadline each ran under
-//     and the endpoint state recorded at timeout. Only live chat can ever produce a verifiable Production outcome
-//     (shadow work closes at 'served' by design), so this is the split that decides the serving fix.
+//   - per serving PATH (owner go 2026-10-06), attributed only from table facts: live chat that was served, Workforce
+//     shadow, graduate-worker attempts that fell back without a recorded caller, unlinked - how many attempts each made,
+//     how they ended, how fast the successful ones answered, which deadline each ran under and the endpoint state
+//     recorded at timeout. Only live chat can ever produce a verifiable Production outcome (shadow work closes at
+//     'served' by design), so this is the split that decides the serving fix.
 //
 // Counts only. No user ids, prompts, replies or emails leave this module.
 import { WORKFORCE_PRODUCTION_OUTCOME_NAMESPACE } from './cosWorkforceVerificationPolicy.ts'
@@ -33,12 +34,7 @@ export type TurnOutcomeRow = Readonly<{ turn_id: unknown; outcome_source: unknow
 export type AttemptRow = Readonly<{ phase: unknown; outcome: unknown; error_class: unknown }>
 export type PathAttemptRow = Readonly<{ attempt_id: unknown; phase: unknown; outcome: unknown; error_class?: unknown; timeout_ms?: unknown; latency_ms?: unknown }>
 
-/**
- * Live chat gives a graduate at most 8s (INTERACTIVE_GRADUATE_ATTEMPT_MS in cosReasoningWorkers.ts). A graduate-worker
- * attempt that fell back under that ceiling came from live chat; one above it came from another caller.
- */
-export const LIVE_CHAT_GRADUATE_MAX_TIMEOUT_MS = 8_000
-export const SERVING_PATHS = ['live_chat', 'workforce_shadow', 'graduate_worker_other', 'unlinked'] as const
+export const SERVING_PATHS = ['live_chat_served', 'workforce_shadow', 'graduate_worker_unattributed', 'unlinked'] as const
 export type ServingPath = typeof SERVING_PATHS[number]
 
 export type ServingPathStats = Readonly<{
@@ -96,10 +92,12 @@ function percentile(sorted: readonly number[], p: number): number | null {
 }
 
 /**
- * Pure: assign every serving attempt to the path that made it, from facts the tables hold:
- *   - its attempt id is the serving_attempt_id of a production_shadow assignment      -> workforce_shadow
- *   - of a production_request assignment, or it fell back under the live-chat ceiling -> live_chat
- *   - it fell back above that ceiling (exams, recovery, background graduate-worker use) -> graduate_worker_other
+ * Pure: assign every serving attempt to a path using only facts the tables hold - never inferred from a deadline:
+ *   - its attempt id is the serving_attempt_id of a production_shadow assignment  -> workforce_shadow
+ *   - of a production_request assignment (live chat that a graduate served)       -> live_chat_served
+ *   - it fell back to the base worker but no caller is recorded                   -> graduate_worker_unattributed
+ *     (live chat, routing classifiers, exams and background callers all use this worker and all fall back alike;
+ *     its deadlineMs values are reported, its caller is not guessed)
  *   - none of the above (e.g. a non-chat graduate-worker success, a shadow with no assignment row) -> unlinked
  * Live chat that skipped a cold graduate writes no attempt row at all, so those skips are not in any count.
  */
@@ -144,8 +142,8 @@ export function composeServingPaths(input: {
 
   for (const [id, unit] of units) {
     const path: ServingPath = shadowIds.has(id) ? 'workforce_shadow'
-      : productionIds.has(id) || (unit.fallback && unit.timeoutMs !== null && unit.timeoutMs <= LIVE_CHAT_GRADUATE_MAX_TIMEOUT_MS) ? 'live_chat'
-        : unit.fallback ? 'graduate_worker_other'
+      : productionIds.has(id) ? 'live_chat_served'
+        : unit.fallback ? 'graduate_worker_unattributed'
           : 'unlinked'
     const a = acc[path]
     a.attempts += 1

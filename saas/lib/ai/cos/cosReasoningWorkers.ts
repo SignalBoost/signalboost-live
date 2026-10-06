@@ -36,6 +36,7 @@ import {
   type ActiveGraduateRuntime,
 } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { workingAgentKnowledgeBlock, type WorkingAgentKnowledgeRole } from '@/lib/ai/cos/workingAgentKnowledge'
+import { currentCosHarnessIngress } from '@/platform-harness/adapters/cos-ingress'
 
 /**
  * Canonical raw execution seam for an independently configured open-model evaluator.
@@ -376,6 +377,7 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
           objective: request.prompt,
           servingAttemptId: attemptId,
           latencyMs: Date.now() - startedAt,
+          harnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
         })
       }
 

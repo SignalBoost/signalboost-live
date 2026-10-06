@@ -190,6 +190,8 @@ test('a full prepared buffer still installs Residency remediation and rebuilds b
   assert.match(fullBuffer, /const remediationInserted = failureDerived\.inserted \+ residencyGapDerived\.inserted/)
   assert.match(fullBuffer, /skipped: remediationInserted === 0/)
   assert.match(fullBuffer, /if \(remediationInserted > 0\) \{\s*curriculum = \{ ok: true, \.\.\.\(await prepareUniversityMassDistillationCurriculum/)
+  assert.match(fullBuffer, /const remediationSubjects = new Set\(\[[\s\S]*residencyGapDerived\.inserted > 0 \? \[RESIDENCY_GAP_UNIVERSITY_SUBJECT\] : \[\][\s\S]*\]\)/, 'a subject seeded this tick joins the same-tick corrective pass (Codex on #3701)')
+  assert.match(fullBuffer, /const correctiveMaterialInserted = \[[^\]]*curriculumReplenishment\.residencyGapDerivedInserted/)
   const shortfall = workflow.slice(workflow.indexOf('shortfall_replenishment_active'))
   assert.match(shortfall, /const replenishmentMaterialInserted = \[[^\]]*curriculumReplenishment\.residencyGapDerivedInserted/)
   const replenishment = read('../lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts')

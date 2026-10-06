@@ -15,7 +15,7 @@ import {
   prepareUniversityMassDistillationCurriculum,
 } from './cosUniversityMassDistillation.ts'
 import { installVerifiedFailureDerivedCurriculum, maintainUniversityRightsClearedOpenSourceCorpus, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
-import { installResidencyGapDerivedCurriculum } from './cosUniversityResidencyGapCurriculum.ts'
+import { RESIDENCY_GAP_UNIVERSITY_SUBJECT, installResidencyGapDerivedCurriculum } from './cosUniversityResidencyGapCurriculum.ts'
 import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
 import { authorizeAvailableUniversityMassDistillationCampaigns, authorizeNextUniversityMassDistillationRemediationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs, recoverHuggingFaceStorageCapacityCircuit } from './cosUniversityHuggingFaceJobDiagnostics.ts'
@@ -310,6 +310,8 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       const remediationSubjects = new Set([
         ...failureDerived.persistedRemediationSubjects,
         ...failureDerived.bySubject.map(item => item.subject),
+        // Seeded this tick, so absent from persistedRemediationSubjects (read before the insert): Codex on #3701.
+        ...(residencyGapDerived.inserted > 0 ? [RESIDENCY_GAP_UNIVERSITY_SUBJECT] : []),
       ])
       const remediationSupplyBySubject = new Map(
         postRemediationSupply.map(subject => [String(subject?.subject || ''), subject] as const),
@@ -334,6 +336,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
         const correctiveMaterialInserted = [
           curriculumReplenishment.accepted,
           curriculumReplenishment.failureDerivedInserted,
+          curriculumReplenishment.residencyGapDerivedInserted,
           curriculumReplenishment.hostedTeacherInserted,
           curriculumReplenishment.syntheticInserted,
         ].reduce<number>((sum, value) => sum + Math.max(0, Number(value || 0)), 0)

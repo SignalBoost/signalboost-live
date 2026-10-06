@@ -25,7 +25,7 @@ export function verifySignedLabFailureVerdict(input: {
   const v = input.verdict
   if (!v || v.jobId !== input.expectedJobId || v.providerStage !== input.expectedProviderStage) return 'UNATTRIBUTED'
   if (!v.jobId || !v.verifierId || !v.evidenceRef || !SHA256.test(v.evidenceHash)) return 'UNATTRIBUTED'
-  if (!/^\\d{4}-\\d{2}-\\d{2}T/.test(v.issuedAt) || !Number.isFinite(Date.parse(v.issuedAt))) return 'UNATTRIBUTED'
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(v.issuedAt) || !Number.isFinite(Date.parse(v.issuedAt))) return 'UNATTRIBUTED'
   const keyPem = Object.hasOwn(input.trustedVerifierKeys, v.verifierId) ? input.trustedVerifierKeys[v.verifierId] : undefined
   if (!keyPem || !BASE64.test(v.signatureBase64)) return 'UNATTRIBUTED'
   try {

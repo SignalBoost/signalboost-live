@@ -7,6 +7,7 @@ import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillat
 import { installHostedTeacherCurriculum } from './cosUniversityHostedTeacherCurriculum.ts'
 import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import { installBuilderGapDerivedCurriculum } from './cosUniversityBuilderGapCurriculum.ts'
+import { installResidencyGapDerivedCurriculum } from './cosUniversityResidencyGapCurriculum.ts'
 import {
   buildMassDistillationOpenSourceMaintenanceGaps,
   buildMassDistillationReplenishmentGaps,
@@ -483,6 +484,8 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     // buffer and still repeatedly fail a graduation gate; that failure must remain able to seed bounded,
     // idempotent corrective curriculum even when OpenAlex/teacher replenishment has no shortage to fill.
     const builderGapDerived = await installBuilderGapDerivedCurriculum({ db, now, maxGaps: maxSubjects })
+    // Builder Residency skill failures become targeted Computer Science remediation (owner go, 2026-10-06).
+    const residencyGapDerived = await installResidencyGapDerivedCurriculum({ db, now })
     const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: input.supply, now, maxSubjects })
     const remediationTargets = failureDerived.bySubject.map(item => item.subject)
     return Object.freeze({
@@ -495,6 +498,8 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
           : 'verified_failure_remediation_already_current',
       targets: remediationTargets,
       builderGapDerivedInserted: builderGapDerived.inserted,
+      residencyGapDerivedInserted: residencyGapDerived.inserted,
+      residencyGapDerivedCompetencies: residencyGapDerived.competencies,
       failureDerivedInserted: failureDerived.inserted,
       failureDerivedBySubject: failureDerived.bySubject,
       externalCostUsd: 0,
@@ -574,6 +579,8 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     // parallel. The zero-cost placeholder fallback remains last so unavailable hosted providers can
     // never stop curriculum growth.
     const builderGapDerived = await installBuilderGapDerivedCurriculum({ db, now, maxGaps: maxSubjects })
+    // Builder Residency skill failures become targeted Computer Science remediation (owner go, 2026-10-06).
+    const residencyGapDerived = await installResidencyGapDerivedCurriculum({ db, now })
     const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: remediationSupply, now, maxSubjects })
     const hostedTeachers = await installHostedTeacherCurriculum({ db, supply: replenishmentSupply, now, maxSubjects })
     const synthetic = await installTeacherSyntheticFallback({ db, supply: replenishmentSupply, now, maxSubjects })
@@ -610,6 +617,8 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       rejected: result.rejected,
       sourceErrors: result.sourceErrors,
       builderGapDerivedInserted: builderGapDerived.inserted,
+      residencyGapDerivedInserted: residencyGapDerived.inserted,
+      residencyGapDerivedCompetencies: residencyGapDerived.competencies,
       failureDerivedInserted: failureDerived.inserted,
       failureDerivedBySubject: failureDerived.bySubject,
       hostedTeacherAttempted: hostedTeachers.attempted,

@@ -35,6 +35,8 @@ const tests = [
   'tests/builderResidencyTerminalFailure.node.test.ts',
   // Every active Residency case fails as seeded and passes after a correct repair (owner 2026-10-06).
   'tests/builderResidencyCaseSolvability.node.test.ts',
+  // Builder Residency skill failures feed targeted Computer Science remediation (owner go 2026-10-06).
+  'tests/cosUniversityResidencyGapCurriculum.node.test.ts',
   'tests/cosUniversityEvaluationInfrastructureNoParking.node.test.ts',
 
   'tests/cosArtifactBirthCertificate.node.test.ts',

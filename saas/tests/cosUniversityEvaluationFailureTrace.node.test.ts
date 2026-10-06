@@ -7,8 +7,11 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   EVALUATION_FAILURE_TRACE_SCHEMA_VERSION,
+  EVALUATION_READY_WINDOW_SECONDS,
   composeEvaluationFailureTrace,
+  composeReadinessWaits,
   describeEvaluationFailureTrace,
+  failureDetail,
   failureFamily,
   runtimeStage,
 } from '../lib/ai/cos/cosUniversityEvaluationFailureTrace.ts'
@@ -73,4 +76,42 @@ test('the route is read only by construction and cron-authorized, and the watchd
   assert.match(workflow, /cos-university-evaluation-failure-trace/)
   assert.match(workflow, /## Evaluation failure trace/)
 })
+test('each family keeps its most frequent full patterns, with case hashes blanked', () => {
+  const miss = (id: string, finish: string) => `mass_distilled_evaluation_answer_missing:${id}:finish=${finish}:think=0:open=1:close=0:other=0:cap=1024`
+  const trace = composeEvaluationFailureTrace({
+    now: NOW, truncated: false,
+    rows: [
+      { observed_at: '2026-10-06T11:00:00Z', error: miss('2ebc8bff9f2052e9', 'length') },
+      { observed_at: '2026-10-06T10:00:00Z', error: miss('11ac1c1ab6737974', 'length') },
+      { observed_at: '2026-10-05T10:00:00Z', error: miss('0dd3a06139d667e2', 'stop') },
+    ],
+  })
+  const family = trace.families.find(f => f.family === 'mass_distilled_evaluation_answer_missing:<case>')!
+  assert.deepEqual(family.details.map(d => [d.count, d.detail]), [
+    [2, 'mass_distilled_evaluation_answer_missing:<case>:finish=length:think=0:open=1:close=0:other=0:cap=1024'],
+    [1, 'mass_distilled_evaluation_answer_missing:<case>:finish=stop:think=0:open=1:close=0:other=0:cap=1024'],
+  ])
+  const text = describeEvaluationFailureTrace(trace)
+  assert.match(text, /2 x mass_distilled_evaluation_answer_missing:<case>:finish=length/)
+  assert.doesNotMatch(text, /2ebc8bff9f2052e9/)
+  assert.equal(failureDetail('RunPod PATCH /serverless/zp1tvf6v8cmhbu HTTP 400'), 'RunPod PATCH /serverless/zp1tvf6v8cmhbu HTTP 400', 'non-hex ids are kept')
+})
+
+test('completed-exam readiness waits are compared with the readiness window, and missing values are not zeros', () => {
+  const waits = composeReadinessWaits([
+    { observed_at: 'x', readiness_seconds: '45' },
+    { observed_at: 'x', readiness_seconds: '130' },
+    { observed_at: 'x', readiness_seconds: '250' },
+    { observed_at: 'x', readiness_seconds: null },
+  ])
+  assert.equal(waits.completed, 4)
+  assert.equal(waits.withReadiness, 3)
+  assert.equal(waits.p50, 130)
+  assert.equal(waits.max, 250)
+  assert.equal(waits.windowSeconds, EVALUATION_READY_WINDOW_SECONDS)
+  assert.deepEqual(waits.withinSeconds, { '60': 1, '120': 1, '180': 2, '240': 2, '280': 3 })
+  const trace = composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW, completed: null })
+  assert.match(describeEvaluationFailureTrace(trace), /completed-exam readiness wait: unavailable/)
+})
+
 // end of saas/tests/cosUniversityEvaluationFailureTrace.node.test.ts (if this line is missing, the paste was cut short)

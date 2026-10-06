@@ -245,6 +245,10 @@ jobs:
               fi
               echo
             done
+            f="step1-evidence/step1-evidence-24h.json"
+            echo "## Computer Science path (now)"
+            if [ "$(jq -r '.ok' "$f" 2>/dev/null)" = "true" ]; then jq -r '.computerSciencePathSummary // "Not produced in this run."' "$f"; else echo "Not produced in this run."; fi
+            echo
             f="step1-evidence/workforce-verification-trace.json"
             echo "## Workforce verification trace"
             if [ "$(jq -r '.ok' "$f" 2>/dev/null)" = "true" ]; then jq -r '.summary' "$f"; else echo "Not produced in this run."; fi

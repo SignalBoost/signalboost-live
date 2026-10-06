@@ -41,6 +41,8 @@ const tests = [
   // on a forced re-read of a file it already read (owner go 2026-10-06).
   'tests/cosUniversityBuilderProtocolPractice.node.test.ts',
   'tests/builderToolLoopForcedInspection.node.test.ts',
+  // Step 1 report: where the newest Computer Science artifact stands between training and Residency (read only).
+  'tests/cosUniversityComputerSciencePath.node.test.ts',
   'tests/cosUniversityEvaluationInfrastructureNoParking.node.test.ts',
 
   'tests/cosArtifactBirthCertificate.node.test.ts',

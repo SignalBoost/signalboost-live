@@ -269,6 +269,13 @@ export function createPortableConnectorRuntime(options: PortableConnectorRuntime
         connectionId: descriptor.connectionId,
         capabilityId,
         ...(result.provenance ?? {}),
+        // Connector-controlled metadata cannot overwrite the trusted invocation identity.
+        tenantId,
+        environmentId,
+        portableId,
+        providerId: descriptor.providerId,
+        connectionId: descriptor.connectionId,
+        capabilityId,
       }),
     })
   }

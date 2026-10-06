@@ -1,3 +1,4 @@
+// saas/tests/holdoutExamSetBurnout.node.test.ts
 //
 // Owner, 2026-10-03: "the pipeline still not working - the artifacts are not moving downstream and continuously."
 //
@@ -191,8 +192,10 @@ test('the live writer aborts on a precondition instead of charging the batch', (
   // The dead per-set guards that charged the whole batch must not come back.
   assert.doesNotMatch(source, /await fail\('no_active_mass_teacher'\)/)
   assert.doesNotMatch(source, /await fail\('hf_token_missing'\)/)
-  // Only a structural failure spends the budget, and a transient one is backed off instead of starving the queue.
-  assert.match(source, /const charged = shouldChargeAttempt\(reason\)/)
+  // Only a structural failure spends the budget, and a transient one is backed off instead of starving the queue. The one
+  // exception (2026-10-05): the SAME exam item missing on consecutive passes is charged, so it cannot hold the lookahead.
+  assert.match(source, /const charged = chargeRepeat \|\| shouldChargeAttempt\(reason\)/)
+  assert.match(source, /await fail\(reason, incompleteExamItemOf\(set\.last_error\) === item\)/)
   assert.match(source, /attempts: charged \? attempts \+ 1 : attempts,/)
   assert.match(source, /status: charged \? 'failed' : 'requested',/)
   assert.match(source, /TRANSIENT_BACKOFF_MS/)
@@ -213,3 +216,4 @@ test('the writer cron makes a dead head-of-line station loud instead of answerin
   assert.match(route, /population: result\.population/)
   assert.match(route, /revived: result\.revived/)
 })
+// end of saas/tests/holdoutExamSetBurnout.node.test.ts (if this line is missing, the paste was cut short)

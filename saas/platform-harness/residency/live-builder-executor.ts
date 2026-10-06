@@ -603,9 +603,20 @@ export function createLiveBuilderResidencyExecutor(input:{
           if(!result.ok&&result.error==='builder_model_round_timeout'){
             markInfrastructureFailure('residency_exact_artifact_inference_timeout')
           }
+          // How many seed files the resident actually changed or added (2026-10-05). With the loop's own outcome this
+          // tells a wrong fix (files changed, proof still fails) from a resident that never got to edit anything.
+          let filesChanged:number|null=null
+          try{
+            const seeds=new Map(call.practiceCase.seedFiles.map(file=>[file.path,file.content]))
+            filesChanged=(await allFiles(workspace,workspaceId))
+              .filter(file=>seeds.get(file.path)!==file.content).length
+          }catch{
+            filesChanged=null
+          }
           const observationData:Record<string,unknown>={
             builderOutcome:result.ok?'completed':'incomplete',
             traceSteps:result.trace.length,
+            filesChanged,
           }
           if('error' in result){
             observationData.failureCode=result.error

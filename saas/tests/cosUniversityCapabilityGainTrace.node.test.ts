@@ -53,6 +53,9 @@ test('gain is grouped by recipe and source mix, using only the latest exam per e
   assert.deepEqual(real, { '100%': 0.25, '0%': -0.25, unknown: 0.125 })
   assert.deepEqual(trace.dimensions.reasoningBallast.map(g => g.key).sort(), ['no', 'unknown', 'yes'])
   assert.equal(trace.holdoutCases['4'], 4)
+  const cross = Object.fromEntries(trace.dimensions.subjectXfailureReplay.map(g => [g.key, g.n]))
+  assert.deepEqual(cross, { 'law | replay=yes': 1, 'law | replay=no': 1, 'cs | replay=unknown': 1, 'unknown | replay=unknown': 1 })
+  assert.match(describeCapabilityGainTrace(trace), /by subjectXfailureReplay:\n    cs \| replay=unknown/)
 })
 
 test('the sign test only calls a regression when it is distinguishable from chance', () => {

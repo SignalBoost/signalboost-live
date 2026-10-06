@@ -1,2 +1,2 @@
-base_sha=fbfdb2bc7f46a20722dd386af7397882f9bde8f4
-branch=claude/step-1-completion-criteria-ror56w
+base_sha=9f3fbe61887876b2ecd7d4f794abd5562454eb40
+branch=fix/distillation-prefer-independent-material-20261006

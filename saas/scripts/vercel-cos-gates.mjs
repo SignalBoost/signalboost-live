@@ -238,6 +238,7 @@ const tests = [
   'tests/builderCertificationRunner.node.test.ts',
 
   'tests/builderResidencyCaseRunner.node.test.ts',
+  'tests/builderResidencyLoopEvidence.node.test.ts',
 
   'tests/builderResidencyOrchestrator.node.test.ts',
 

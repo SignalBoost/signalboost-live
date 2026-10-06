@@ -1,6 +1,13 @@
 import { createHash } from 'node:crypto'
 import { verifySignedLabFailureVerdict, type SignedLabFailureVerdict } from './cosLabSignedFailureVerdict.ts'
 
+/** Signed claim identity is stable across different HTTP idempotency keys. */
+export function labFailureVerdictEventKey(verdict: SignedLabFailureVerdict): string {
+  return createHash('sha256').update(JSON.stringify(['lab_failure_verdict_v1', verdict.jobId,
+    verdict.providerStage, verdict.verdict, verdict.verifierId, verdict.evidenceRef,
+    verdict.evidenceHash.toLowerCase(), verdict.issuedAt])).digest('hex')
+}
+
 /** Authenticated ingestion only; no settlement, refund or graduation authority. */
 export async function recordAuthenticatedLabFailureVerdict(input: {
   payload: unknown
@@ -29,9 +36,7 @@ export async function recordAuthenticatedLabFailureVerdict(input: {
   if (classification === 'UNATTRIBUTED') throw new Error('lab_verdict_unverified')
   const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
   // Canonical signed claim identity: changing the transport idempotency key cannot replay it.
-  const eventKey = hash(['lab_failure_verdict_v1', verdict.jobId, verdict.providerStage,
-    verdict.verdict, verdict.verifierId, verdict.evidenceRef, verdict.evidenceHash.toLowerCase(), verdict.issuedAt,
-    verdict.signatureBase64])
+  const eventKey = labFailureVerdictEventKey(verdict)
   const evidence = { profile: 'lab_failure_verdict_v1', jobId: verdict.jobId,
     providerStage: verdict.providerStage, classification, verifierId: verdict.verifierId,
     evidenceRef: verdict.evidenceRef, evidenceHash: verdict.evidenceHash,

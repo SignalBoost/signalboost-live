@@ -22,21 +22,31 @@ export class ReadOnlyDbViolation extends Error {
 
 type FromDb = { from: (table: string) => any }
 
-/** Wrap a PostgREST-shaped store so it can only read. Only `from()` is exposed; write methods throw. */
+/**
+ * Wrap a PostgREST-shaped store so it can only read. Only `from()` is exposed; write methods throw.
+ *
+ * Query builders return themselves (or a new builder) from every chained call, so the guard has to follow the chain:
+ * any object a builder method returns is wrapped again, otherwise `from(t).select().update(...)` would escape. A real
+ * Promise (what `then` produces) is returned as is, so awaiting a query still resolves to plain data.
+ */
 export function readOnlyDb(db: FromDb): FromDb {
   const forbidden = new Set(READ_ONLY_FORBIDDEN_METHODS)
+  const guard = (table: string, builder: any): any => new Proxy(builder, {
+    get(target, property, receiver) {
+      if (typeof property === 'string' && forbidden.has(property)) {
+        return () => { throw new ReadOnlyDbViolation(table, property) }
+      }
+      const value = Reflect.get(target, property, receiver)
+      if (typeof value !== 'function') return value
+      return (...args: unknown[]) => {
+        const result = value.apply(target, args)
+        return result !== null && typeof result === 'object' && !(result instanceof Promise) ? guard(table, result) : result
+      }
+    },
+  })
   return Object.freeze({
     from(table: string) {
-      const builder = db.from(table)
-      return new Proxy(builder, {
-        get(target, property, receiver) {
-          if (typeof property === 'string' && forbidden.has(property)) {
-            return () => { throw new ReadOnlyDbViolation(table, property) }
-          }
-          const value = Reflect.get(target, property, receiver)
-          return typeof value === 'function' ? value.bind(target) : value
-        },
-      })
+      return guard(table, db.from(table))
     },
   })
 }

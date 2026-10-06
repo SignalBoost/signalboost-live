@@ -229,4 +229,24 @@ test('the watchdog workflow prints the Step 1 evidence for every window', () => 
   assert.match(workflow, /cos-university-step1-evidence/)
   for (const window of ['24h', '7d', 'all']) assert.match(workflow, new RegExp(`\\b${window}\\b`))
 })
+
+
+test('a write chained after an allowed builder method is still refused (the proxy survives query chains)', () => {
+  const { db, writes } = fakeDb({ t: [{ id: 1 }] })
+  const ro = readOnlyDb(db) as any
+  for (const method of READ_ONLY_FORBIDDEN_METHODS) {
+    assert.throws(() => ro.from('t').select('id')[method]({ id: 2 }), ReadOnlyDbViolation)
+    assert.throws(() => ro.from('t').select('id').eq('id', 1).order('id', { ascending: true })[method]({ id: 2 }), ReadOnlyDbViolation)
+  }
+  assert.deepEqual(writes, [])
+})
+
+test('a window with zero evaluation failures has untested attribution, which blocks rather than counts as evidence', () => {
+  const funnel = fullFunnel({ evaluationFailures: { available: true, total: 0, infrastructure: 0, merit: 0, explanations: [], source: 'evals' } })
+  const report = assessStep1Evidence(funnel, NOW)
+  const attribution = report.criteria.find(entry => entry.id === 'failure_attribution')!
+  assert.equal(attribution.status, 'no_evidence')
+  assert.ok(report.blocking.includes('failure_attribution'))
+  assert.equal(report.recommendation, 'NOT_READY')
+})
 // end of saas/tests/cosUniversityStep1Evidence.node.test.ts (if this line is missing, the paste was cut short)

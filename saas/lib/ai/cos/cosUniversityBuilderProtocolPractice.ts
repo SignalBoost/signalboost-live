@@ -238,23 +238,43 @@ export type BuilderProtocolPracticeEnvelope = Readonly<{
 
 type PracticeDb = { from: (table: string) => any }
 
+/** Rows per page when reading Residency failure evidence (the database API caps a single read). */
+const EVIDENCE_PAGE_ROWS = 1_000
+
 /**
  * The practice set a training run carries in its worker envelope. Only Computer Science runs receive one, because only
  * Computer Science graduates enter Builder Residency. Priority comes from the competencies residents actually failed
- * (skill failures only: Residency writes `fail` evidence only for agent failures). The database is injected so this
- * module stays free of host storage imports.
+ * (skill failures only: Residency writes `fail` evidence only for agent failures).
+ *
+ * The selection is a fixed function of the run: only evidence recorded at or before `evidenceCutoff` (the run's own
+ * creation time) counts, read completely in a defined order. Every retry of the same training stage therefore rebuilds
+ * the identical rows and hash, so a recovered provider job can never carry a different practice set than the one the
+ * dispatch recorded. The database is injected so this module stays free of host storage imports.
  */
 export async function builderProtocolPracticeForRun(input: {
   subjectId: string
+  evidenceCutoff: string
   db: PracticeDb | null | undefined
-}): Promise<Readonly<{ envelope: BuilderProtocolPracticeEnvelope; taskIds: readonly string[]; priorityCompetencies: readonly string[] }> | null> {
+}): Promise<Readonly<{ envelope: BuilderProtocolPracticeEnvelope; taskIds: readonly string[]; priorityCompetencies: readonly string[]; evidenceRows: number }> | null> {
   if (String(input.subjectId || '').trim() !== RESIDENCY_GAP_UNIVERSITY_SUBJECT) return null
   if (!input.db) throw new Error('builder_protocol_practice_store_unavailable')
-  const evidence = await input.db.from('cos_university_residency_competency_evidence')
-    .select('competency_id,outcome')
-    .eq('outcome', 'fail')
-  if (evidence.error) throw evidence.error
-  const priorityCompetencies = failedResidencyCompetencies((evidence.data || []) as any[]).map(item => item.competencyId)
+  const cutoff = new Date(String(input.evidenceCutoff || ''))
+  if (Number.isNaN(cutoff.getTime())) throw new Error('builder_protocol_practice_evidence_cutoff_invalid')
+  const rows: Array<{ competency_id?: unknown; outcome?: unknown }> = []
+  for (let from = 0; ; from += EVIDENCE_PAGE_ROWS) {
+    const page = await input.db.from('cos_university_residency_competency_evidence')
+      .select('competency_id,outcome')
+      .eq('outcome', 'fail')
+      .lte('created_at', cutoff.toISOString())
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + EVIDENCE_PAGE_ROWS - 1)
+    if (page.error) throw page.error
+    const data = (page.data || []) as typeof rows
+    rows.push(...data)
+    if (data.length < EVIDENCE_PAGE_ROWS) break
+  }
+  const priorityCompetencies = failedResidencyCompetencies(rows).map(item => item.competencyId)
   const selection = await buildBuilderProtocolPracticeSelection({
     priorityCompetencies,
     maxTasks: BUILDER_PROTOCOL_PRACTICE_TASKS_PER_RUN,
@@ -263,6 +283,7 @@ export async function builderProtocolPracticeForRun(input: {
     envelope: Object.freeze({ profile: selection.profile, rows: selection.rows, rowsHash: selection.rowsHash }),
     taskIds: selection.taskIds,
     priorityCompetencies: selection.priorityCompetencies,
+    evidenceRows: rows.length,
   })
 }
 // end of saas/lib/ai/cos/cosUniversityBuilderProtocolPractice.ts (if this line is missing, the paste was cut short)

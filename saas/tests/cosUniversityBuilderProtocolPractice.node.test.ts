@@ -151,37 +151,88 @@ test('selection aims at failing competencies breadth first, then covers the rest
   assert.deepEqual([...new Set(none.map(item => item.competencyId))].sort(), [...BUILDER_RESIDENCY_V1_COMPETENCIES].sort())
 })
 
-test('only Computer Science runs carry practice, aimed at skill failures from Residency evidence', async () => {
-  assert.equal(await builderProtocolPracticeForRun({ subjectId: 'Mathematics', db: null }), null)
-  await assert.rejects(builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', db: null }), /builder_protocol_practice_store_unavailable/)
-  const reads: string[] = []
+function evidenceStore(rows: Array<{ competency_id: string; outcome: string; created_at: string }>, pageLimit = 1000) {
+  const reads: Array<Record<string, unknown>> = []
   const db = {
     from(table: string) {
-      reads.push(table)
-      return {
-        select: (columns: string) => ({
-          eq: async (column: string, value: string) => {
-            assert.equal(columns, 'competency_id,outcome')
-            assert.deepEqual([column, value], ['outcome', 'fail'])
-            return { data: [
-              { competency_id: 'chrome_devtools_evidence', outcome: 'fail' },
-              { competency_id: 'chrome_devtools_evidence', outcome: 'fail' },
-              { competency_id: 'rollback_judgment', outcome: 'fail' },
-            ], error: null }
-          },
-        }),
+      const query: Record<string, unknown> = { table, order: [] as string[] }
+      const builder = {
+        select(columns: string) { query.columns = columns; return builder },
+        eq(column: string, value: string) { query.eq = [column, value]; return builder },
+        lte(column: string, value: string) { query.lte = [column, value]; return builder },
+        order(column: string) { (query.order as string[]).push(column); return builder },
+        async range(from: number, to: number) {
+          reads.push({ ...query, from, to })
+          const matching = rows
+            .filter(row => row.outcome === 'fail' && row.created_at <= String((query.lte as string[])[1]))
+            .sort((a, b) => a.created_at.localeCompare(b.created_at))
+          // Simulate the database API's per-request cap: never more than pageLimit rows per call.
+          return { data: matching.slice(from, Math.min(to + 1, from + pageLimit)), error: null }
+        },
       }
+      return builder
     },
   }
-  const practice = await builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', db })
+  return { db, reads }
+}
+
+test('only Computer Science runs carry practice, aimed at skill failures recorded before the run', async () => {
+  assert.equal(await builderProtocolPracticeForRun({ subjectId: 'Mathematics', evidenceCutoff: '2026-10-06T00:00:00Z', db: null }), null)
+  await assert.rejects(builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', evidenceCutoff: '2026-10-06T00:00:00Z', db: null }), /builder_protocol_practice_store_unavailable/)
+  const { db, reads } = evidenceStore([
+    { competency_id: 'chrome_devtools_evidence', outcome: 'fail', created_at: '2026-10-05T10:00:00Z' },
+    { competency_id: 'chrome_devtools_evidence', outcome: 'fail', created_at: '2026-10-05T11:00:00Z' },
+    { competency_id: 'rollback_judgment', outcome: 'fail', created_at: '2026-10-05T12:00:00Z' },
+    { competency_id: 'root_cause_diagnosis', outcome: 'pass', created_at: '2026-10-05T12:30:00Z' },
+    // Recorded after the run was created: must not change this run's selection.
+    { competency_id: 'supabase_diagnosis', outcome: 'fail', created_at: '2026-10-06T09:00:00Z' },
+    { competency_id: 'supabase_diagnosis', outcome: 'fail', created_at: '2026-10-06T09:30:00Z' },
+    { competency_id: 'supabase_diagnosis', outcome: 'fail', created_at: '2026-10-06T09:45:00Z' },
+  ])
+  await assert.rejects(builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', evidenceCutoff: 'not a time', db }), /builder_protocol_practice_evidence_cutoff_invalid/)
+  const practice = await builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', evidenceCutoff: '2026-10-06T08:00:00Z', db })
   assert.ok(practice)
-  assert.deepEqual(reads, ['cos_university_residency_competency_evidence'])
+  assert.deepEqual(reads[0], {
+    table: 'cos_university_residency_competency_evidence', columns: 'competency_id,outcome', eq: ['outcome', 'fail'],
+    lte: ['created_at', '2026-10-06T08:00:00.000Z'], order: ['created_at', 'id'], from: 0, to: 999,
+  })
+  assert.equal(practice.evidenceRows, 3)
   assert.deepEqual(practice.priorityCompetencies, ['chrome_devtools_evidence', 'rollback_judgment'])
   assert.ok(practice.taskIds[0].startsWith('cde-') && practice.taskIds[1].startsWith('rj-'))
+  // A retry of the same run, after more failures were recorded, rebuilds the identical rows.
+  const retry = await builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', evidenceCutoff: '2026-10-06T08:00:00Z', db })
+  assert.equal(retry?.envelope.rowsHash, practice.envelope.rowsHash)
   const maxRows = Number(worker.match(/^BUILDER_PROTOCOL_PRACTICE_MAX_ROWS = (\d+)$/m)?.[1])
   assert.ok(practice.envelope.rows.length >= 1 && practice.envelope.rows.length <= maxRows, `rows ${practice.envelope.rows.length} must fit the worker limit ${maxRows}`)
   // The worker request is capped at 1.4 MB before compression.
   assert.ok(Buffer.byteLength(JSON.stringify(practice.envelope)) < 700_000)
+})
+
+test('failure evidence is read completely, page by page, before competencies are ranked', async () => {
+  // 2,500 failures: one page of the database API cannot hold them, and the minority competency sits in the last page.
+  const rows = Array.from({ length: 2_500 }, (_, index) => ({
+    competency_id: index < 1_400 ? 'supabase_diagnosis' : 'rollback_judgment',
+    outcome: 'fail',
+    created_at: new Date(Date.UTC(2026, 9, 1) + index * 1_000).toISOString(),
+  }))
+  const { db, reads } = evidenceStore(rows)
+  const practice = await builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', evidenceCutoff: '2026-10-06T00:00:00Z', db })
+  assert.equal(practice?.evidenceRows, 2_500)
+  assert.deepEqual(reads.map(read => [read.from, read.to]), [[0, 999], [1_000, 1_999], [2_000, 2_999]])
+  assert.deepEqual(practice?.priorityCompetencies, ['supabase_diagnosis', 'rollback_judgment'])
+})
+
+test('the dispatch pins practice to the run and binds its hash; the durable receipt keeps its provenance', () => {
+  const consumer = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts', import.meta.url), 'utf8')
+  assert.match(consumer, /evidenceCutoff: clean\(run\.created_at, 64\)/)
+  assert.match(consumer, /\.\.\.\(builderProtocolPractice \? \[builderProtocolPractice\.envelope\.profile, builderProtocolPractice\.envelope\.rowsHash\] : \[\]\)/)
+  for (const key of [
+    'builderProtocolPracticeProfile', 'builderProtocolPracticeRowsHash', 'builderProtocolPracticeTaskIds',
+    'builderProtocolPracticeItems', 'builderProtocolPracticeDroppedOverLength', 'builderProtocolPracticeTrainableFp32TensorCount',
+  ]) {
+    assert.ok(consumer.includes(`${key}:`), `durableTrainingReceipt keeps ${key}`)
+    assert.ok(worker.includes(`recipe["${key}"]`), `the worker reports ${key}`)
+  }
 })
 
 test('the worker validates, renders and trains the rows as the resident is served', () => {

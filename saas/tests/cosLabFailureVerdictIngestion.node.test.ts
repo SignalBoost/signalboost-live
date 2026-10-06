@@ -17,3 +17,8 @@ test('ledger binds settled job and rejects replay without granting financial aut
   assert.match(service, /financialAdjustmentAuthorized: false/)
   assert.doesNotMatch(service, /\.upsert\(/)
 })
+
+test('empty verifier trust store fails closed at configuration boundary', () => {
+  assert.match(route, /Object\.keys\(keys\)\.length === 0/)
+  assert.match(route, /lab_verifier_trust_store_not_configured/)
+})

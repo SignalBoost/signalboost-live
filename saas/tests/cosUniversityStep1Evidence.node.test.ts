@@ -254,6 +254,7 @@ test('the infrastructure share of evaluation failures is reported as a fact, wit
   const funnel = fullFunnel({ evaluationFailures: { available: true, total: 8, infrastructure: 7, merit: 1, explanations: [{ reason: 'r', count: 8, causeStatus: 'evidence_backed' }], source: 'evals' } })
   const attribution = assessStep1Evidence(funnel, NOW).criteria.find(entry => entry.id === 'failure_attribution')!
   assert.equal(attribution.observed.infrastructureShare, 0.875)
+  assert.equal(attribution.observed.topReasons, 'r=8', 'the largest failure reasons are printed so the dominant failure is visible')
   assert.equal(attribution.status, 'evidence_present', 'attribution is judged on causes, not on an unset infrastructure-rate target')
 })
 

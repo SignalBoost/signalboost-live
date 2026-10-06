@@ -34,6 +34,7 @@ import {
   runMassHostedTeacherStage,
 } from './cosUniversityMassHostedTeacherStage.ts'
 import { buildFrontierDistillationPlan } from './cosUniversityFrontierDistillation.ts'
+import { builderProtocolPracticeForRun } from './cosUniversityBuilderProtocolPractice.ts'
 import { CURRENT_UNIVERSITY_STUDENT_PROFILE, CURRENT_UNIVERSITY_TEACHER_PROFILE } from '../modelCapabilityRegistry.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
@@ -463,6 +464,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   let idempotencyKey: string
   let hardwareFlavor: string
   let preDispatch: Record<string, unknown> = {}
+  let builderProtocolPractice: Awaited<ReturnType<typeof builderProtocolPracticeForRun>> = null
   let distinctPrompts: number | null = null
   let promptSetHash: string | null = null
 
@@ -783,6 +785,10 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       frontierFaculty: actualFrontierFaculty,
     })
 
+    // Computer Science graduates enter Builder Residency, which drives them through the Builder tool loop. Their
+    // training run carries worked loop rounds aimed at the competencies residents currently fail (owner go 2026-10-06).
+    builderProtocolPractice = await builderProtocolPracticeForRun({ subjectId: run.subject_id, db: cosServiceDb() })
+
     idempotencyKey = hash([
       COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
       claim.campaign_id,
@@ -805,6 +811,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       trainingDataRef,
       holdoutDataRef,
       distillationPlan,
+      ...(builderProtocolPractice ? { builderProtocolPractice: builderProtocolPractice.envelope } : {}),
       distillation: {
         teacherModelId: denseTeacher.modelId,
         studentModelId: run.student_model_id,
@@ -873,6 +880,15 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       maxEstimatedCostUsd,
       reservedCostCeilingUsd: expectedCeiling,
       distillationPlan: (envelope as any).distillationPlan || null,
+      builderProtocolPractice: builderProtocolPractice
+        ? {
+            profile: builderProtocolPractice.envelope.profile,
+            rows: builderProtocolPractice.envelope.rows.length,
+            rowsHash: builderProtocolPractice.envelope.rowsHash,
+            taskIds: builderProtocolPractice.taskIds,
+            priorityCompetencies: builderProtocolPractice.priorityCompetencies,
+          }
+        : null,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
     },

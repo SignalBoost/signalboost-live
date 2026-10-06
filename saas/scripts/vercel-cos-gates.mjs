@@ -37,6 +37,10 @@ const tests = [
   'tests/builderResidencyCaseSolvability.node.test.ts',
   // Builder Residency skill failures feed targeted Computer Science remediation (owner go 2026-10-06).
   'tests/cosUniversityResidencyGapCurriculum.node.test.ts',
+  // Computer Science artifacts train on worked rounds of the real Builder loop; the loop no longer stalls a resident
+  // on a forced re-read of a file it already read (owner go 2026-10-06).
+  'tests/cosUniversityBuilderProtocolPractice.node.test.ts',
+  'tests/builderToolLoopForcedInspection.node.test.ts',
   'tests/cosUniversityEvaluationInfrastructureNoParking.node.test.ts',
 
   'tests/cosArtifactBirthCertificate.node.test.ts',

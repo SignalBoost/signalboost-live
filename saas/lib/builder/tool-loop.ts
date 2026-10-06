@@ -450,9 +450,14 @@ export class BuilderToolLoop {
       const inspectedRepairPaths = new Set(repairTraceAfterFailure
         .filter(item => item.ok && item.toolId === 'read_file')
         .map(item => toolPath(item.input)))
+      // Never force a read the inspection guard below would reject. Reproduced 2026-10-06 on Residency case
+      // v1-known-good-revision with real node execution: a resident read verify.js, ran it, and the failure stack trace
+      // named verify.js. Forcing that unchanged read again was rejected as a repeat every round, so the case ended
+      // builder_stalled_repeated_inspection after two model calls (tests/builderToolLoopForcedInspection.node.test.ts).
       const forcedRepairInspectionPath = repairObjective && latestFailedRunIndex >= 0
         && !repairMutationAfterFailure && repairInspectionsAfterFailure === 0
-        ? workspacePaths.find(path => failedRunOutput.includes(path) && !inspectedRepairPaths.has(path))
+        ? workspacePaths.find(path => failedRunOutput.includes(path) && !inspectedRepairPaths.has(path)
+          && !inspectedInCurrentWorkspaceState.has(`read_file:${checkpointDigest(JSON.stringify({ path }))}`))
         : undefined
       const repairMutationRequired = repairObjective && latestFailedRunIndex >= 0
         && !repairMutationAfterFailure

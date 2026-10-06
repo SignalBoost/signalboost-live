@@ -1,6 +1,13 @@
 import { createHash } from 'node:crypto'
 import { verifySignedLabFailureVerdict, type SignedLabFailureVerdict } from './cosLabSignedFailureVerdict.ts'
 
+/** Signed claim identity is stable across different HTTP idempotency keys. */
+export function labFailureVerdictEventKey(verdict: SignedLabFailureVerdict): string {
+  return createHash('sha256').update(JSON.stringify(['lab_failure_verdict_v1', verdict.jobId,
+    verdict.providerStage, verdict.verdict, verdict.verifierId, verdict.evidenceRef,
+    verdict.evidenceHash.toLowerCase(), verdict.issuedAt])).digest('hex')
+}
+
 /** Authenticated ingestion only; no settlement, refund or graduation authority. */
 export async function recordAuthenticatedLabFailureVerdict(input: {
   payload: unknown
@@ -28,13 +35,14 @@ export async function recordAuthenticatedLabFailureVerdict(input: {
   })
   if (classification === 'UNATTRIBUTED') throw new Error('lab_verdict_unverified')
   const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
-  const eventKey = hash(['lab_failure_verdict_v1', verdict.jobId, input.idempotencyKey])
+  // Canonical signed claim identity: changing the transport idempotency key cannot replay it.
+  const eventKey = labFailureVerdictEventKey(verdict)
   const evidence = { profile: 'lab_failure_verdict_v1', jobId: verdict.jobId,
     providerStage: verdict.providerStage, classification, verifierId: verdict.verifierId,
     evidenceRef: verdict.evidenceRef, evidenceHash: verdict.evidenceHash,
     issuedAt: verdict.issuedAt, signatureBase64: verdict.signatureBase64,
     authorityExpanded: false, financialAdjustmentAuthorized: false }
-  // INSERT (not upsert): replay of the same idempotency key must fail, not silently succeed.
+  // INSERT (not upsert): replay of the same signed claim with any transport key must fail.
   const inserted = await db.from('cos_university_learning_assurance_events').insert({
     event_key: eventKey, event_type: 'lab_failure_verdict',
     subject_id: job.subject_id, candidate_id: job.candidate_id,

@@ -1,3 +1,4 @@
+// saas/platform-harness/residency/supabase-store.ts
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { BuilderResidencyEvidenceStore } from './builder-case-runner.ts'
 
@@ -30,6 +31,7 @@ export function createSupabaseBuilderResidencyEvidenceStore(
         trajectory_hash:input.trajectoryHash??null,
         evidence_hash:input.evidenceHash??null,
         failure_code:input.failureCode??null,
+        ...(input.metadata?{metadata:input.metadata}:{}),
         completed_at:new Date().toISOString(),
       }).eq('id',input.caseRunId)
       if(error) throw error
@@ -56,3 +58,4 @@ export function createSupabaseBuilderResidencyEvidenceStore(
     },
   })
 }
+// end of saas/platform-harness/residency/supabase-store.ts (if this line is missing, the paste was cut short)

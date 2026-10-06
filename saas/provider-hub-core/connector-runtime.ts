@@ -262,12 +262,6 @@ export function createPortableConnectorRuntime(options: PortableConnectorRuntime
       ...result,
       references: result.references ? Object.freeze([...result.references]) : undefined,
       provenance: Object.freeze({
-        tenantId,
-        environmentId,
-        portableId,
-        providerId: descriptor.providerId,
-        connectionId: descriptor.connectionId,
-        capabilityId,
         ...(result.provenance ?? {}),
         // Connector-controlled metadata cannot overwrite the trusted invocation identity.
         tenantId,

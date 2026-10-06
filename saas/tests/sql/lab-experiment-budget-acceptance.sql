@@ -19,6 +19,7 @@ BEGIN
  IF NOT denied THEN RAISE EXCEPTION 'experiment budget bypassed'; END IF;
  PERFORM lab.apply_credit_event(o,e,r,'release',70,'budget-release-00001');
  -- A release frees the account hold, but must not erase experiment spending authorization history.
+ denied:=false;
  BEGIN
   PERFORM lab.apply_credit_event(o,e,gen_random_uuid(),'reserve',31,'budget-reuse-000001');
  EXCEPTION WHEN raise_exception THEN

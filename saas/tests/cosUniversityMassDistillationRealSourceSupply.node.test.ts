@@ -3,8 +3,9 @@
 // Production 2026-10-06: Computer Science showed 783 batchable items (minimum 64) yet no Computer Science batch had been
 // packaged since 2026-10-03, so no Computer Science artifact could be trained or reach Builder Residency. The packager
 // refuses a batch unless at least half of it is real-source material; the supply figure counted remediation and
-// generated rows too. Supply now also reports real-source items the way the packager counts them. These tests hold the
-// two to the same rule: the packager builds a subject's batch exactly when real-source items reach the stated need.
+// generated rows too. Supply now also reports real-source items the way the packager counts them, and the packager
+// sizes a batch to the real-source material (twice it, 64 to 128 items) instead of refusing it outright. These tests
+// hold the two to the same rule and pin the unchanged floors: at least 64 items, at least half real-source.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
@@ -42,14 +43,26 @@ function csSupply(identities: RetainedDistillationIdentity[], assigned: Readonly
 const csBatches = (identities: RetainedDistillationIdentity[], assigned: ReadonlySet<string> = new Set()) =>
   buildMassDistillationBatches(identities, assigned, 1).filter(batch => batch.subjectId === CS).length
 
-test('the Production shape: plenty of items, too little real-source material, no batch, and supply now says why', () => {
-  const identities = rows({ real: 40, failure: 400, teacher: 343 })
+test('the Production shape: 783 items, 51 real-source, no 128-item batch, so the packager builds a 102-item batch', () => {
+  const identities = rows({ real: 51, failure: 400, teacher: 332 })
   const supply = csSupply(identities)
   assert.equal(supply.uniqueBatchableItems, 783)
-  assert.equal(supply.shortfallToBatch, 0, 'the old figure reports no shortfall')
-  assert.equal(supply.realSourceItems, 40)
-  assert.equal(supply.realSourceNeeded, 64, 'a 128-item batch needs 64 real-source items')
-  assert.equal(csBatches(identities), 0, 'the packager refuses the batch')
+  assert.equal(supply.realSourceItems, 51)
+  assert.equal(supply.realSourceNeeded, 32, 'the smallest accepted batch (64 items) needs 32 real-source items')
+  const batches = buildMassDistillationBatches(identities, new Set(), 1).filter(batch => batch.subjectId === CS)
+  assert.equal(batches.length, 1, 'Computer Science is packaged again')
+  assert.equal(batches[0].sourceCount, 102, 'the batch is sized to the real-source material: twice 51')
+  const bySource = new Map(identities.map(row => [row.contentHash, row.sourceKind]))
+  const realInBatch = batches[0].sourceHashes.filter(hash => bySource.get(hash) === 'open_source_document').length
+  assert.equal(realInBatch, 51, 'half of the batch is real-source, as before')
+})
+
+test('the quality floors are unchanged: below 32 real-source items nothing is packaged, and plenty still makes 128', () => {
+  assert.equal(csBatches(rows({ real: 31, failure: 400, teacher: 400 })), 0, '31 real-source items cannot make a 64-item half-real batch')
+  const thirtyTwo = buildMassDistillationBatches(rows({ real: 32, failure: 400, teacher: 400 }), new Set(), 1).filter(batch => batch.subjectId === CS)
+  assert.deepEqual(thirtyTwo.map(batch => batch.sourceCount), [64], 'exactly the 64-item minimum')
+  const plenty = buildMassDistillationBatches(rows({ real: 300, failure: 400, teacher: 400 }), new Set(), 1).filter(batch => batch.subjectId === CS)
+  assert.deepEqual(plenty.map(batch => batch.sourceCount), [128], 'real-source-rich subjects keep full 128-item batches')
 })
 
 test('the packager builds a batch exactly when real-source items reach the stated need', () => {
@@ -70,7 +83,7 @@ test('the packager builds a batch exactly when real-source items reach the state
 })
 
 test('real-source items already assigned to a live batch are not counted again', () => {
-  const identities = rows({ real: 100, failure: 200, teacher: 0 })
+  const identities = rows({ real: 100, failure: 200, teacher: 100 })
   const assigned = new Set(identities.filter(row => row.sourceKind === 'open_source_document').slice(0, 50).map(row => row.contentHash))
   const supply = csSupply(identities, assigned)
   assert.equal(supply.realSourceItems, 50)

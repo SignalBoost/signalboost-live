@@ -64,9 +64,11 @@ export type MassDistillationSubjectSupply = Readonly<{
   uniqueBatchableItems: number
   shortfallToBatch: number
   /**
-   * Unique unassigned REAL-SOURCE items, counted like the packager counts them (2026-10-06). A batch is refused unless at
-   * least `realSourceNeeded` of its items are real-source (HYBRID_REAL_SOURCE_TARGET), so `uniqueBatchableItems` alone
-   * can show a subject as packable while remediation and generated rows make up its supply. Reported, not acted on.
+   * Unique unassigned REAL-SOURCE items, counted like the packager counts them (2026-10-06). Half of every batch must be
+   * real-source (HYBRID_REAL_SOURCE_TARGET) and a batch has at least 64 items, so no batch is possible below
+   * `realSourceNeeded` real-source items however large `uniqueBatchableItems` is. A necessary condition, not a
+   * guarantee: the mix planner's independent-holdout rule can still refuse a batch with no generated rows to fill it.
+   * Reported, not acted on.
    */
   realSourceItems?: number
   realSourceNeeded?: number
@@ -252,8 +254,13 @@ function selectHybridDistillationChunk(rows: readonly NormalizedIdentity[]): Nor
   // 188 holdout cases and quarantined, which generated more failure rows - a closed loop.
   // Remediation is not diluted here: planHybridDistillationMix reserves failure-derived rows a fixed
   // share (HYBRID_FAILURE_DERIVED_TARGET) of every batch and gives them any unused synthetic share.
-  const targetSize = Math.min(MASS_DISTILLATION_MAX_BATCH, ordered.length)
   const real = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'real_source')
+  // Size the batch to the real-source material that exists, never the other way round (2026-10-06). Production:
+  // Computer Science held 783 items but only 51 unused real-source items; a 128-item batch needs 64, so every
+  // Computer Science batch was refused and no Computer Science artifact was trained after 2026-10-05. The batch now
+  // shrinks to twice the real-source items (here 102) while it stays at or above the 64-item quality minimum, so the
+  // half-real-source invariant below is unchanged and still refuses anything that cannot meet it.
+  const targetSize = Math.min(MASS_DISTILLATION_MAX_BATCH, ordered.length, Math.max(MASS_DISTILLATION_QUALITY_MIN_BATCH, real.length * 2))
   const failure = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'failure_derived')
   const synthetic = ordered.filter(row => massDistillationHybridOrigin(row.sourceKind) === 'teacher_synthetic')
   const mix = planHybridDistillationMix({
@@ -360,8 +367,8 @@ export function analyzeMassDistillationSupply(
         ? 0
         : MASS_DISTILLATION_QUALITY_MIN_BATCH - group.uniqueMaterialHashes.size,
       realSourceItems: group.realSourceMaterialHashes.size,
-      realSourceNeeded: Math.ceil(Math.max(MASS_DISTILLATION_QUALITY_MIN_BATCH,
-        Math.min(MASS_DISTILLATION_MAX_BATCH, group.uniqueMaterialHashes.size)) * HYBRID_REAL_SOURCE_TARGET),
+      // The smallest batch the packager accepts (64 items) needs half of it real-source; batches grow from there.
+      realSourceNeeded: Math.ceil(MASS_DISTILLATION_QUALITY_MIN_BATCH * HYBRID_REAL_SOURCE_TARGET),
     }))
     .filter(subject => subject.uniqueBatchableItems > 0)
     .sort((a, b) => b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))

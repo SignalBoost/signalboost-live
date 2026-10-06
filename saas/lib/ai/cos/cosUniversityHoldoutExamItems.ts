@@ -124,22 +124,42 @@ function newQuantitiesInAnswer(question: string, answerKey: string): number {
 }
 const SELF_REFERENCE = /\b(the (text|passage|material|example|essay) (above|provided|given)|as (described|shown) above|in the (text|passage|material|essay))\b/i
 
-/** Parse and validate the writer's reply. Returns null for anything that would make a weak or ungradable item. */
-export function parseHoldoutExamItem(raw: unknown): HoldoutExamItem | null {
+/**
+ * Which quality rule a writer reply breaks, or null when it is a usable item. The rules are the ones the parser has
+ * always applied; naming them (2026-10-05) is what lets a set that keeps missing one question say why. Production that
+ * evening: 24 sets sat at `exam_items_incomplete:1/4` for hours with nothing recorded about the missing item.
+ */
+export function holdoutExamItemRejection(raw: unknown): string | null {
   const text = String(raw ?? '').replace(/\*\*/g, '').trim()
   const match = QUESTION_LINE.exec(text)
-  if (!match) return null
+  if (!match) return 'no_question_answer_key_lines'
   const question = clean(match[1], 1200)
   const answerKey = clean(match[2], 800)
-  if (question.length < 20 || answerKey.length < 1) return null
-  if (!/\?\s*$/.test(question) && !/\b(state|name|determine|identify|which|what|how|why)\b/i.test(question)) return null
-  if (COMPUTATION_ASK.test(question)) return null
-  if (FORMULA_SHAPE.test(answerKey)) return null
-  if (newQuantitiesInAnswer(question, answerKey) > 1) return null
-  if (YES_NO_ONLY.test(answerKey)) return null
-  if (/^(is|are|does|do|can|should|will|was|were|has|have)\b/i.test(question) && /^(yes|no)\b/i.test(answerKey)) return null
-  if (SELF_REFERENCE.test(question)) return null
-  return Object.freeze({ question, answerKey })
+  if (question.length < 20 || answerKey.length < 1) return 'too_short'
+  if (!/\?\s*$/.test(question) && !/\b(state|name|determine|identify|which|what|how|why)\b/i.test(question)) return 'not_a_question'
+  if (COMPUTATION_ASK.test(question)) return 'computation_ask'
+  if (FORMULA_SHAPE.test(answerKey)) return 'formula_answer'
+  if (newQuantitiesInAnswer(question, answerKey) > 1) return 'multiple_new_quantities'
+  if (YES_NO_ONLY.test(answerKey)) return 'yes_no_answer'
+  if (/^(is|are|does|do|can|should|will|was|were|has|have)\b/i.test(question) && /^(yes|no)\b/i.test(answerKey)) return 'yes_no_question'
+  if (SELF_REFERENCE.test(question)) return 'self_reference'
+  return null
+}
+
+/** Parse and validate the writer's reply. Returns null for anything that would make a weak or ungradable item. */
+export function parseHoldoutExamItem(raw: unknown): HoldoutExamItem | null {
+  if (holdoutExamItemRejection(raw) !== null) return null
+  const match = QUESTION_LINE.exec(String(raw ?? '').replace(/\*\*/g, '').trim())!
+  return Object.freeze({ question: clean(match[1], 1200), answerKey: clean(match[2], 800) })
+}
+
+/**
+ * The missing item a set's recorded incompleteness names (`exam_items_incomplete:1/4:item=<12 hex>:...`), or null.
+ * Two consecutive passes naming the same item mean the same question keeps failing, which retrying alone will not fix.
+ */
+export function incompleteExamItemOf(lastError: unknown): string | null {
+  const match = /^exam_items_incomplete:\d+\/\d+:item=([a-f0-9]{12})(?::|$)/.exec(String(lastError ?? '').trim())
+  return match ? match[1] : null
 }
 
 function massEligibleTeachers(env: Env): UniversityTeacherDefinition[] {
@@ -387,7 +407,7 @@ export async function fillRequestedHoldoutExamSets(input: {
   let itemsReused = 0
 
   const pending = await db.from(HOLDOUT_EXAM_SETS_TABLE)
-    .select('candidate_id,trained_artifact_hash,status,attempts')
+    .select('candidate_id,trained_artifact_hash,status,attempts,last_error')
     .in('status', ['requested', 'failed'])
     .lt('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS)
     // Newest request first: the evaluation route requests (or refreshes) exactly the artifacts it will examine next.
@@ -450,10 +470,10 @@ export async function fillRequestedHoldoutExamSets(input: {
     // unparseable reply is our fault and passing, so the set goes back to `requested` with its budget intact and a
     // recorded reason. Its `updated_at` is pushed into the past so it sorts behind fresh requests - a backoff that
     // needs no extra column - and the evaluation route still pulls it forward when it is the artifact it wants next.
-    const fail = async (reason: string) => {
+    const fail = async (reason: string, chargeRepeat = false) => {
       failed += 1
       errors.push(`${candidateId}:${reason}`.slice(0, 300))
-      const charged = shouldChargeAttempt(reason)
+      const charged = chargeRepeat || shouldChargeAttempt(reason)
       const updated = await db.from(HOLDOUT_EXAM_SETS_TABLE).update({
         status: charged ? 'failed' : 'requested',
         attempts: charged ? attempts + 1 : attempts,
@@ -482,11 +502,13 @@ export async function fillRequestedHoldoutExamSets(input: {
 
       // One item: reuse it, or ask the teachers in order until one answers usably. Pure per item, so items can run
       // side by side; the counters are updated from the returned outcome, never from inside the race.
+      // A missing item records why its last teacher could not produce one: the quality rule it broke, or the error.
+      const missingWhy: string[] = new Array(rows.length).fill('')
       const writeItem = async (index: number): Promise<'reused' | 'written' | 'missing'> => {
         const itemHash = hashes[index]
         if (existing.has(itemHash)) return 'reused'
         const reference = holdoutReference(rows[index])
-        if (!reference) return 'missing'
+        if (!reference) { missingWhy[index] = 'reference_missing'; return 'missing' }
         const request = holdoutExamWriterRequest({ subjectId, referenceEssay: reference })
         for (const teacher of teachers) {
           try {
@@ -497,7 +519,7 @@ export async function fillRequestedHoldoutExamSets(input: {
               request: { system: request.system, prompt: request.prompt, maxOutputTokens: HOLDOUT_EXAM_WRITER_MAX_OUTPUT_TOKENS, temperature: 0.1 },
             })
             const item = parseHoldoutExamItem(result.text)
-            if (!item) continue
+            if (!item) { missingWhy[index] = `${teacher.id}:rejected:${holdoutExamItemRejection(result.text)}`; continue }
             const stored = await db.from(HOLDOUT_EXAM_ITEMS_TABLE).upsert({
               item_hash: itemHash,
               profile: HOLDOUT_EXAM_ITEM_PROFILE,
@@ -511,7 +533,9 @@ export async function fillRequestedHoldoutExamSets(input: {
             if (stored.error) throw stored.error
             return 'written'
           } catch (error) {
-            errors.push(`${candidateId}:${teacher.id}:${clean(error instanceof Error ? error.message : error, 160)}`)
+            const message = clean(error instanceof Error ? error.message : error, 160)
+            missingWhy[index] = `${teacher.id}:error:${message}`
+            errors.push(`${candidateId}:${teacher.id}:${message}`)
           }
         }
         return 'missing'
@@ -533,7 +557,16 @@ export async function fillRequestedHoldoutExamSets(input: {
         else if (outcome === 'written') itemsWritten += 1
         else missing += 1
       }
-      if (missing > 0) { await fail(`exam_items_incomplete:${missing}/${rows.length}`); continue }
+      if (missing > 0) {
+        // Name the first missing item and why. When the previous pass named the SAME item, the same question is failing
+        // again: charge an attempt so that, like any exhausted set, it stops holding the evaluator's lookahead after the
+        // attempt ceiling, and the existing governed revival retries it after its cool-off. Nothing is graded.
+        const firstMissing = outcomes.findIndex(outcome => outcome === 'missing')
+        const item = hashes[firstMissing].slice(0, 12)
+        const reason = `exam_items_incomplete:${missing}/${rows.length}:item=${item}:${missingWhy[firstMissing] || 'no_teacher_reply'}`
+        await fail(reason, incompleteExamItemOf(set.last_error) === item)
+        continue
+      }
       const updated = await db.from(HOLDOUT_EXAM_SETS_TABLE).update({
         status: 'ready',
         holdout_manifest_hash: clean(run.data.holdout_manifest_hash, 64).toLowerCase() || null,

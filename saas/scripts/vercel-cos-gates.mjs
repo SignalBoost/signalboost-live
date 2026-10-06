@@ -32,6 +32,8 @@ const tests = [
   'tests/builderResidencyAdmission.node.test.ts',
   'tests/builderResidencyRuntimeSelfHealing.node.test.ts',
   'tests/builderResidencyTerminalFailure.node.test.ts',
+  // Every active Residency case fails as seeded and passes after a correct repair (owner 2026-10-06).
+  'tests/builderResidencyCaseSolvability.node.test.ts',
   'tests/cosUniversityEvaluationInfrastructureNoParking.node.test.ts',
 
   'tests/cosArtifactBirthCertificate.node.test.ts',

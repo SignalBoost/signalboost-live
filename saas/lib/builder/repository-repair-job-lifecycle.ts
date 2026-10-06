@@ -233,7 +233,7 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     baseBranch: input.baseBranch,
   })
   await recordBuilderUniversityProductionOutcome({
-    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt },
+    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt, metadata: record(row.metadata) },
     status: input.baseBranch === 'main' && input.mergeWatchOutcome === 'healthy'
       ? 'success' : input.mergeWatchOutcome === 'rolled_back' ? 'failure' : 'observed',
     verification: input.mergeWatchOutcome === 'healthy'
@@ -334,7 +334,7 @@ export async function failBuilderRepositoryRepairAfterSupersededBase(input: {
     error: 'builder_repository_target_superseded',
   })
   await recordBuilderUniversityProductionOutcome({
-    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt },
+    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt, metadata: record(row.metadata) },
     status: 'failure',
     verification: 'generation_fenced_repository_base_superseded',
     facts: { pullRequestNumber: input.pullRequestNumber, baseBranch: input.baseBranch, error: 'builder_repository_target_superseded' },
@@ -473,7 +473,7 @@ export async function failBuilderRepositoryRepairAfterMergedDeployment(input: {
     mergeCommitSha: input.mergeCommitSha, baseBranch: 'main', error: input.error,
   })
   await recordBuilderUniversityProductionOutcome({
-    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt },
+    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt, metadata: record(row.metadata) },
     status: 'failure',
     verification: input.error === 'builder_repository_production_rolled_back'
       ? 'generation_fenced_repository_merge_rolled_back'

@@ -22,6 +22,8 @@ const EVALUATION_COMPLETED_CLAIM = 'mass_distilled_independent_evaluation_comple
 /** The evaluator's readiness window (cosUniversityMassDistilledArtifactEvaluation READY_TIMEOUT_MS). */
 export const EVALUATION_READY_WINDOW_SECONDS = 280
 const READINESS_BUCKETS: readonly number[] = Object.freeze([60, 120, 180, 240, EVALUATION_READY_WINDOW_SECONDS])
+/** The evaluation route's own budget (ROUTE_BUDGET_MS 570 s) minus its reserve (ROUTE_RESERVE_MS 25 s). */
+export const EVALUATION_ROUTE_USABLE_SECONDS = 545
 const PAGE = 1000
 
 type Db = { from: (table: string) => any }
@@ -29,7 +31,28 @@ type Db = { from: (table: string) => any }
 const text = (value: unknown, max = 300): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 
 export type FailureRow = Readonly<{ observed_at: unknown; error: unknown }>
-export type CompletedRow = Readonly<{ observed_at: unknown; readiness_seconds: unknown }>
+export type CompletedRow = Readonly<{ observed_at: unknown; readiness_seconds: unknown; reservation_event_key?: unknown }>
+export type TerminalRow = Readonly<{ observed_at: unknown; reservation_event_key: unknown; error?: unknown }>
+export type ReservationRow = Readonly<{ event_key: unknown; observed_at: unknown }>
+
+type Spread = Readonly<{ count: number; p50: number | null; p90: number | null; max: number | null }>
+
+/**
+ * Run time per exam, from the claim (the reservation event written atomically when the exam is claimed) to its
+ * terminal event. Exam time = run time - readiness wait. The readiness window can only grow by what the exam leaves
+ * unused of the route's usable budget.
+ */
+export type RunDurations = Readonly<{
+  completedRun: Spread
+  completedExam: Spread
+  failedRuntimeNotReadyRun: Spread
+  unmatched: number
+  usableSeconds: number
+  /** usableSeconds - completedExam.max: the longest readiness window that would not have cut short any observed exam. */
+  readinessHeadroomAtExamMax: number | null
+  /** usableSeconds - completedExam.p90. */
+  readinessHeadroomAtExamP90: number | null
+}>
 
 /** How long COMPLETED exams waited for the exact artifact's runtime, against the window failed exams ran out of. */
 export type ReadinessWaits = Readonly<{
@@ -68,6 +91,7 @@ export type EvaluationFailureTrace = Readonly<{
   families: readonly FailureFamily[]
   runtimeNotReadyStages: Readonly<Record<RuntimeStage, number>>
   readiness: ReadinessWaits | null
+  durations: RunDurations | null
   readOnly: true
 }>
 
@@ -108,6 +132,64 @@ export function composeReadinessWaits(rows: readonly CompletedRow[]): ReadinessW
   })
 }
 
+function spread(values: readonly number[]): Spread {
+  const sorted = [...values].sort((a, b) => a - b)
+  const pick = (q: number) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))] : null
+  return Object.freeze({ count: sorted.length, p50: pick(0.5), p90: pick(0.9), max: sorted.length ? sorted[sorted.length - 1] : null })
+}
+
+const secondsBetween = (start: unknown, end: unknown): number | null => {
+  const a = Date.parse(String(start ?? ''))
+  const b = Date.parse(String(end ?? ''))
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null
+  return Math.round((b - a) / 1000)
+}
+
+const finiteOrNull = (value: unknown): number | null =>
+  value === null || value === undefined || String(value).trim() === '' || !Number.isFinite(Number(value)) ? null : Number(value)
+
+/** Pure: run and exam durations from claim to terminal event. */
+export function composeRunDurations(input: {
+  completed: readonly CompletedRow[]
+  failed: readonly TerminalRow[]
+  reservations: readonly ReservationRow[]
+}): RunDurations {
+  const claimedAt = new Map<string, unknown>()
+  for (const row of input.reservations) {
+    const key = text(row.event_key, 64)
+    if (key) claimedAt.set(key, row.observed_at)
+  }
+  let unmatched = 0
+  const completedRun: number[] = []
+  const completedExam: number[] = []
+  for (const row of input.completed) {
+    const start = claimedAt.get(text(row.reservation_event_key, 64))
+    const run = start === undefined ? null : secondsBetween(start, row.observed_at)
+    if (run === null) { unmatched += 1; continue }
+    completedRun.push(run)
+    const ready = finiteOrNull(row.readiness_seconds)
+    if (ready !== null && ready <= run) completedExam.push(run - ready)
+  }
+  const failedRun: number[] = []
+  for (const row of input.failed) {
+    if (!text(row.error, 600).includes('runtime_not_ready')) continue
+    const start = claimedAt.get(text(row.reservation_event_key, 64))
+    const run = start === undefined ? null : secondsBetween(start, row.observed_at)
+    if (run === null) { unmatched += 1; continue }
+    failedRun.push(run)
+  }
+  const exam = spread(completedExam)
+  return Object.freeze({
+    completedRun: spread(completedRun),
+    completedExam: exam,
+    failedRuntimeNotReadyRun: spread(failedRun),
+    unmatched,
+    usableSeconds: EVALUATION_ROUTE_USABLE_SECONDS,
+    readinessHeadroomAtExamMax: exam.max === null ? null : EVALUATION_ROUTE_USABLE_SECONDS - exam.max,
+    readinessHeadroomAtExamP90: exam.p90 === null ? null : EVALUATION_ROUTE_USABLE_SECONDS - exam.p90,
+  })
+}
+
 /** The worker stage a runtime_not_ready failure recorded, or `unrecorded` when it predates the suffix. */
 export function runtimeStage(error: unknown): RuntimeStage {
   const match = /:workers=(cold|initializing|warm|unknown)\b/.exec(text(error, 600))
@@ -116,7 +198,14 @@ export function runtimeStage(error: unknown): RuntimeStage {
 
 const dayOf = (iso: string) => iso.slice(0, 10)
 
-export function composeEvaluationFailureTrace(input: { rows: readonly FailureRow[]; truncated: boolean; now: Date; days?: number; completed?: readonly CompletedRow[] | null }): EvaluationFailureTrace {
+export function composeEvaluationFailureTrace(input: {
+  rows: readonly FailureRow[]
+  truncated: boolean
+  now: Date
+  days?: number
+  completed?: readonly CompletedRow[] | null
+  durations?: RunDurations | null
+}): EvaluationFailureTrace {
   const dayCount = input.days ?? EVALUATION_FAILURE_TRACE_DAYS
   const nowMs = input.now.getTime()
   const since = new Date(nowMs - dayCount * 86_400_000).toISOString()
@@ -182,6 +271,7 @@ export function composeEvaluationFailureTrace(input: { rows: readonly FailureRow
     families: Object.freeze(list),
     runtimeNotReadyStages: Object.freeze(stages),
     readiness: input.completed ? composeReadinessWaits(input.completed) : null,
+    durations: input.durations ?? null,
     readOnly: true as const,
   })
 }
@@ -200,7 +290,7 @@ export async function readEvaluationFailureTrace(input: { db: Db; now?: Date; da
   let truncated = true
   for (let from = 0; from < EVALUATION_FAILURE_TRACE_ROW_LIMIT; from += PAGE) {
     const page = await rows(input.db.from('cos_university_learning_assurance_events')
-      .select('observed_at,error:evidence->>error')
+      .select('observed_at,error:evidence->>error,reservation_event_key:evidence->>reservationEventKey')
       .eq('event_type', 'fine_tune')
       .eq('evidence->>claim', EVALUATION_FAILED_CLAIM)
       .gte('observed_at', since)
@@ -216,7 +306,7 @@ export async function readEvaluationFailureTrace(input: { db: Db; now?: Date; da
     completed = []
     for (let from = 0; from < EVALUATION_FAILURE_TRACE_ROW_LIMIT; from += PAGE) {
       const page = await rows(input.db.from('cos_university_learning_assurance_events')
-        .select('observed_at,readiness_seconds:evidence->>readinessSeconds')
+        .select('observed_at,readiness_seconds:evidence->>readinessSeconds,reservation_event_key:evidence->>reservationEventKey')
         .eq('event_type', 'fine_tune')
         .eq('evidence->>claim', EVALUATION_COMPLETED_CLAIM)
         .gte('observed_at', since)
@@ -228,7 +318,25 @@ export async function readEvaluationFailureTrace(input: { db: Db; now?: Date; da
   } catch {
     completed = null
   }
-  return composeEvaluationFailureTrace({ rows: out, truncated, now, days, completed })
+  // Claim times: the reservation events written atomically when each exam was claimed. Its own failure never hides
+  // the failure trace.
+  let durations: RunDurations | null = null
+  try {
+    const keys = [...new Set([...(completed || []), ...out]
+      .map((row: any) => text(row.reservation_event_key, 64))
+      .filter(key => /^[0-9a-f]{64}$/.test(key)))]
+    const reservations: any[] = []
+    for (let i = 0; i < keys.length; i += 100) {
+      reservations.push(...await rows(input.db.from('cos_university_learning_assurance_events')
+        .select('event_key,observed_at')
+        .in('event_key', keys.slice(i, i + 100))
+        .limit(PAGE)))
+    }
+    durations = composeRunDurations({ completed: completed || [], failed: out, reservations })
+  } catch {
+    durations = null
+  }
+  return composeEvaluationFailureTrace({ rows: out, truncated, now, days, completed, durations })
 }
 
 /** A block a human reads in a CI log or check run. */
@@ -248,6 +356,14 @@ export function describeEvaluationFailureTrace(trace: EvaluationFailureTrace, to
   lines.push(r
     ? `  completed-exam readiness wait (window ${r.windowSeconds}s): completed=${r.completed} withReadiness=${r.withReadiness} p50=${r.p50 ?? 'n/a'}s p90=${r.p90 ?? 'n/a'}s max=${r.max ?? 'n/a'}s within ${Object.entries(r.withinSeconds).map(([k, v]) => `${k}s=${v}`).join(' ')}`
     : '  completed-exam readiness wait: unavailable')
+  const d = trace.durations
+  const sp = (x: Spread) => `n=${x.count} p50=${x.p50 ?? 'n/a'}s p90=${x.p90 ?? 'n/a'}s max=${x.max ?? 'n/a'}s`
+  if (d) {
+    lines.push(`  run time from claim (usable route budget ${d.usableSeconds}s): completed run ${sp(d.completedRun)} | completed exam (run - readiness) ${sp(d.completedExam)} | failed runtime_not_ready run ${sp(d.failedRuntimeNotReadyRun)} | unmatched=${d.unmatched}`)
+    lines.push(`  readiness window that would not cut any observed exam: <= ${d.readinessHeadroomAtExamMax ?? 'n/a'}s (at exam p90: ${d.readinessHeadroomAtExamP90 ?? 'n/a'}s); current window ${EVALUATION_READY_WINDOW_SECONDS}s`)
+  } else {
+    lines.push('  run time from claim: unavailable')
+  }
   lines.push('  detail of families still firing in the last 24h, plus the top 5 overall:')
   const detailed = trace.families.filter((family, index) => family.last24h > 0 || index < 5)
   for (const family of detailed) {

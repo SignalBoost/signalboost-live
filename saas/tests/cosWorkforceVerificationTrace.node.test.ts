@@ -6,7 +6,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  LIVE_CHAT_GRADUATE_MAX_TIMEOUT_MS,
+  SERVING_PATHS,
   WORKFORCE_TRACE_SCHEMA_VERSION,
+  composeServingPaths,
   composeWorkforceTrace,
   describeWorkforceTrace,
   errorClassFamily,
@@ -103,6 +106,94 @@ test('a truncated serving-failure read is disclosed, not presented as the comple
   })
   assert.equal(trace.servingFailures.truncated, true)
   assert.match(describeWorkforceTrace(trace), /serving failures 7d: read=1\+ \(truncated\)/)
+})
+
+const A = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+
+test('every serving attempt is placed on the path that made it, from assignment links and the fallback phase', () => {
+  const paths = composeServingPaths({
+    assignments: [
+      { status: 'served', source_kind: 'production_shadow', source_ref: 'shadow:1', serving_attempt_id: A(1) },
+      { status: 'runtime_failed', source_kind: 'production_shadow', source_ref: 'shadow:2', serving_attempt_id: A(2) },
+      { status: 'served', source_kind: 'production_request', source_ref: T(3), serving_attempt_id: A(3) },
+    ],
+    attempts: [
+      // shadow success after 21s on a 45s deadline
+      { attempt_id: A(1), phase: 'attempt_started', outcome: 'pending', timeout_ms: 45000, latency_ms: 0 },
+      { attempt_id: A(1), phase: 'attempt_succeeded', outcome: 'success', timeout_ms: 45000, latency_ms: 21000 },
+      // shadow timeout on a 20s deadline with a warm endpoint
+      { attempt_id: A(2), phase: 'attempt_failed', outcome: 'timeout', error_class: 'runtime_deadline_exceeded:warm:gate', timeout_ms: 20000, latency_ms: 20000 },
+      // live chat success, linked by its production_request assignment
+      { attempt_id: A(3), phase: 'attempt_succeeded', outcome: 'success', timeout_ms: 8000, latency_ms: 4000 },
+      // live chat timeout: fell back under the 8s live ceiling
+      { attempt_id: A(4), phase: 'attempt_failed', outcome: 'timeout', error_class: 'runtime_deadline_exceeded:cold', timeout_ms: 8000, latency_ms: 8000 },
+      { attempt_id: A(4), phase: 'fallback', outcome: 'fallback', timeout_ms: 8000, latency_ms: 8000 },
+      // another graduate-worker caller (above the live ceiling) that came back empty
+      { attempt_id: A(5), phase: 'attempt_failed', outcome: 'empty', timeout_ms: 60000, latency_ms: 300 },
+      { attempt_id: A(5), phase: 'fallback', outcome: 'fallback', timeout_ms: 60000, latency_ms: 300 },
+      // a non-chat success with no assignment row, and an attempt that never recorded an end
+      { attempt_id: A(6), phase: 'attempt_succeeded', outcome: 'success', timeout_ms: 30000, latency_ms: 9000 },
+      { attempt_id: A(7), phase: 'attempt_started', outcome: 'pending', latency_ms: 0 },
+    ],
+  })
+  assert.deepEqual(SERVING_PATHS, ['live_chat', 'workforce_shadow', 'graduate_worker_other', 'unlinked'])
+  assert.deepEqual(
+    { a: paths.workforce_shadow.attempts, s: paths.workforce_shadow.success, t: paths.workforce_shadow.timeout },
+    { a: 2, s: 1, t: 1 },
+  )
+  assert.deepEqual(paths.workforce_shadow.stateAtTimeout, { warm: 1 })
+  assert.deepEqual(paths.workforce_shadow.timeoutMsValues, { 20000: 1, 45000: 1 })
+  assert.equal(paths.workforce_shadow.successLatencyP50Ms, 21000)
+  assert.deepEqual(
+    { a: paths.live_chat.attempts, s: paths.live_chat.success, t: paths.live_chat.timeout, p50: paths.live_chat.successLatencyP50Ms },
+    { a: 2, s: 1, t: 1, p50: 4000 },
+  )
+  assert.deepEqual(paths.live_chat.stateAtTimeout, { cold: 1 })
+  assert.deepEqual({ a: paths.graduate_worker_other.attempts, e: paths.graduate_worker_other.empty }, { a: 1, e: 1 })
+  assert.deepEqual(
+    { a: paths.unlinked.attempts, s: paths.unlinked.success, n: paths.unlinked.noTerminal },
+    { a: 2, s: 1, n: 1 },
+  )
+  assert.deepEqual(paths.unlinked.timeoutMsValues, { 30000: 1, unrecorded: 1 })
+})
+
+test('success latency percentiles are nearest-rank over successful attempts only', () => {
+  const attempts = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000].map((ms, i) => (
+    { attempt_id: A(100 + i), phase: 'attempt_succeeded', outcome: 'success', timeout_ms: 45000, latency_ms: ms }
+  ))
+  const assignments = attempts.map((row, i) => ({ status: 'served', source_kind: 'production_shadow', source_ref: `s:${i}`, serving_attempt_id: row.attempt_id }))
+  const paths = composeServingPaths({
+    assignments,
+    attempts: [...attempts, { attempt_id: A(200), phase: 'attempt_failed', outcome: 'timeout', timeout_ms: 45000, latency_ms: 45000 }],
+  })
+  assert.equal(paths.workforce_shadow.successLatencyP50Ms, 5000)
+  assert.equal(paths.workforce_shadow.successLatencyP90Ms, 9000)
+  assert.equal(paths.live_chat.successLatencyP50Ms, null, 'no successes reads n/a, never 0')
+  assert.deepEqual(paths.unlinked.stateAtTimeout, { unrecorded: 1 }, 'a timeout without a recorded endpoint state is not guessed')
+})
+
+test('the path split is printed, its gaps are disclosed, and a missing read is null rather than zeros', () => {
+  const base = { now: NOW, truncated: false, chatTurns: [], turnOutcomes: [], attempts: [], assignments: [] }
+  assert.equal(composeWorkforceTrace(base).servingPaths, null)
+  assert.doesNotMatch(describeWorkforceTrace(composeWorkforceTrace(base)), /serving paths 7d/)
+  const trace = composeWorkforceTrace({
+    ...base,
+    pathAttempts: [{ attempt_id: A(1), phase: 'attempt_succeeded', outcome: 'success', timeout_ms: 8000, latency_ms: 3000 }],
+    pathAttemptsTruncated: true,
+  })
+  const text = describeWorkforceTrace(trace)
+  assert.match(text, /serving paths 7d: attemptRows=1\+ \(truncated\) \(live chat that skipped a cold graduate writes no row and is not counted\)/)
+  assert.match(text, /unlinked: attempts=1 success=1 .* successP50=3000ms .* deadlineMs 8000=1/)
+  assert.match(text, /live_chat: attempts=0 .* successP50=n\/a/)
+})
+
+test('the trace reads attempt links and every attempt phase, and stays read only', () => {
+  const lib = read('../lib/ai/cos/cosWorkforceVerificationTrace.ts')
+  assert.match(lib, /select\('status,source_kind,source_ref,failure_reason,harness_run_id,serving_attempt_id'\)/)
+  assert.match(lib, /select\('attempt_id,phase,outcome,error_class,timeout_ms,latency_ms'\)/)
+  assert.equal(LIVE_CHAT_GRADUATE_MAX_TIMEOUT_MS, 8_000)
+  const workers = read('../lib/ai/cos/cosReasoningWorkers.ts')
+  assert.match(workers, /const INTERACTIVE_GRADUATE_ATTEMPT_MS = 8_000/, 'the live ceiling the trace classifies by must match the worker')
 })
 
 // end of saas/tests/cosWorkforceVerificationTrace.node.test.ts (if this line is missing, the paste was cut short)

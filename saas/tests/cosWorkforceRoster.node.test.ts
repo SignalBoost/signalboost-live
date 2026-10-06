@@ -38,7 +38,7 @@ test('COS hires only on-call Workforce graduates and still re-checks every gate 
   assert.match(runtime, /if \(!onCall \|\| !onCall\.length\) return \[\]/, 'an unreadable or empty roster fails closed')
   const read = runtime.slice(runtime.indexOf('export async function activeGraduateRuntimesForRole'))
   assert.ok(read.indexOf('onCallWorkforceRegistryIds(db)') < read.indexOf("from('cos_university_graduate_model_registry')"))
-  assert.match(read, /\.eq\('status', 'active'\)\s+\.in\('id', onCall\)/)
+  assert.match(read, /\.eq\('status', 'active'\)\s+\.in\('id', dispatchIds\)/)
   assert.match(read, /HEX64\.test\(clean\(row\.runtime_health_evidence_hash, 64\)\)/)
   assert.match(read, /HEX64\.test\(clean\(row\.activation_evidence_hash, 64\)\)/)
 })

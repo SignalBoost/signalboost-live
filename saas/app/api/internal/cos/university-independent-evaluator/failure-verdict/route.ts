@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { independentEvaluatorConfig, verifyIndependentEvaluatorPayload, COS_UNIVERSITY_INDEPENDENT_EVALUATOR_PROFILE } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordAuthenticatedLabFailureVerdict } from '@/lib/ai/cos/cosLabFailureVerdictIngestion'
+import { parseLabTrustedVerifierKeys } from '@/lib/ai/cos/cosLabTrustedVerifierKeys'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,12 +21,8 @@ export async function POST(request: Request) {
   let payload: unknown
   try { payload = JSON.parse(rawBody) } catch { return respond({ error: 'lab_verdict_payload_invalid' }, 400) }
   // Keys are server-owned and explicitly provisioned; fail closed without them.
-  let trustedVerifierKeys: Record<string, string>
-  try {
-    const keys = JSON.parse(process.env.COS_LAB_TRUSTED_FAILURE_VERIFIER_KEYS_JSON || '')
-    if (!keys || typeof keys !== 'object' || Array.isArray(keys) || Object.keys(keys).length === 0) throw new Error('invalid_keys')
-    trustedVerifierKeys = keys
-  } catch { return respond({ error: 'lab_verifier_trust_store_not_configured' }, 503) }
+  const trustedVerifierKeys = parseLabTrustedVerifierKeys(process.env.COS_LAB_TRUSTED_FAILURE_VERIFIER_KEYS_JSON)
+  if (!trustedVerifierKeys) return respond({ error: 'lab_verifier_trust_store_not_configured' }, 503)
   try {
     const recorded = await recordAuthenticatedLabFailureVerdict({ payload, idempotencyKey, trustedVerifierKeys })
     return respond(recorded)

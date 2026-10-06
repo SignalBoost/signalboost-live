@@ -13,7 +13,7 @@
 // until it owned the whole account and the line behind it - canary, examiner - was told "at most 0".
 //
 // This module makes the declared share real. Each tick the workforce station ranks its on-call graduates, keeps the
-// `workforce` most recently useful ones pinned (max=1: a held slot, still scale-to-zero, no standing spend), and
+// `workforce` least recently attempted ones pinned (max=1: a held slot, still scale-to-zero, no standing spend), and
 // releases every other graduate's reservation (max=0). A released graduate stays active and on the roster; it is
 // simply off until the reservation rotates it back in. That is consistent with the owner's standing rule of
 // 2026-10-02 - NO PAID WAKE-UPS - because a graduate whose endpoint is off is already skipped by the warm gate and
@@ -82,7 +82,7 @@ export function decideWorkforceReservation(input: {
   const managed = input.graduates.filter(g => g.endpointId && g.workersMax !== null)
   const unmanaged = input.graduates.filter(g => !g.endpointId || g.workersMax === null).map(g => g.registryId)
 
-  const ranked = [...managed].sort((a, b) => at(b.lastAttemptAt) - at(a.lastAttemptAt) || a.registryId.localeCompare(b.registryId))
+  const ranked = [...managed].sort((a, b) => at(a.lastAttemptAt) - at(b.lastAttemptAt) || a.registryId.localeCompare(b.registryId))
   const inside = ranked.slice(0, reserve)
   const outside = ranked.slice(reserve)
   const eligible = new Set(inside.map(g => g.registryId))

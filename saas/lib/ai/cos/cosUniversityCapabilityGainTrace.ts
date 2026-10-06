@@ -125,7 +125,9 @@ const flag = (value: unknown): string => {
   return raw === 'true' ? 'yes' : raw === 'false' ? 'no' : 'unknown'
 }
 
-const DIMENSIONS = ['subject', 'teacher', 'baseModel', 'profile', 'optimizer', 'trainingItems', 'realSourceShare', 'failureReplay', 'frontierAnchor', 'reasoningBallast', 'evaluatorVersion'] as const
+// subjectXfailureReplay compares replay against no replay WITHIN each subject, so a subject-mix difference (replay is
+// used for remediation of harder subjects) cannot pass for a recipe effect.
+const DIMENSIONS = ['subject', 'teacher', 'baseModel', 'profile', 'optimizer', 'trainingItems', 'realSourceShare', 'failureReplay', 'frontierAnchor', 'reasoningBallast', 'evaluatorVersion', 'subjectXfailureReplay'] as const
 
 export function composeCapabilityGainTrace(input: {
   evaluations: readonly EvaluationRow[]
@@ -178,6 +180,7 @@ export function composeCapabilityGainTrace(input: {
       frontierAnchor: flag(artifact?.anchor),
       reasoningBallast: num(artifact?.ballast) === null ? 'unknown' : (num(artifact?.ballast)! > 0 ? 'yes' : 'no'),
       evaluatorVersion: text(row.evaluator_version, 80) || 'unknown',
+      subjectXfailureReplay: `${text(artifact?.subject_id, 80) || 'unknown'} | replay=${flag(artifact?.replay)}`,
     }
     for (const dimension of DIMENSIONS) {
       const list = buckets[dimension].get(values[dimension]) || []
@@ -269,8 +272,10 @@ export function describeCapabilityGainTrace(trace: CapabilityGainTrace, perDimen
   ]
   for (const [dimension, groups] of Object.entries(trace.dimensions)) {
     lines.push(`  by ${dimension}:`)
-    for (const entry of groups.slice(0, perDimension)) lines.push(`    ${entry.key} | ${g(entry)}`)
-    if (groups.length > perDimension) lines.push(`    ... ${groups.length - perDimension} more`)
+    const limit = dimension === 'subjectXfailureReplay' ? 40 : perDimension
+    const shown = dimension === 'subjectXfailureReplay' ? [...groups].sort((a, b) => a.key.localeCompare(b.key)) : groups
+    for (const entry of shown.slice(0, limit)) lines.push(`    ${entry.key} | ${g(entry)}`)
+    if (groups.length > limit) lines.push(`    ... ${groups.length - limit} more`)
   }
   return lines.join('\n')
 }

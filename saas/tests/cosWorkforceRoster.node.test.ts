@@ -62,7 +62,7 @@ test('Workforce apprenticeship uses genuine Production demand without widening a
   assert.match(runtime, /activeGraduateRuntimesForRole\(role, objective, allowedRegistryIds\)/)
   assert.match(runtime, /const dispatchIds = allowedRegistryIds/)
   assert.match(runtime, /\.in\('id', dispatchIds\)/)
-  assert.match(runtime, /allowedRegistryIds \? Math\.min\(200, dispatchIds\.length\) : 20/)
+  assert.match(runtime, /\.limit\(Math\.min\(200, dispatchIds\.length\)\)/, 'interactive Production and reservation selectors must see the same on-call universe')
   assert.match(workers, /feature: 'cos_workforce_apprentice_shadow'/)
   assert.match(workers, /const apprentice = \(\) => runWorkforceApprenticeShadow\(args, decision\.objective\)/)
   assert.match(workers, /after\(apprentice\)/)

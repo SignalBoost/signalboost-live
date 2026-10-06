@@ -69,4 +69,24 @@ test('the stage view stops calling unverified work PRODUCTION_VERIFIED', () => {
   assert.match(migration, /set status = 'served', updated_at = now\(\)\s+where status = 'completed';/)
   assert.doesNotMatch(migration, /\bdelete\s+from\b/i, 'no evidence is deleted')
 })
+
+test('Harness correlation can only resolve an exact served Production assignment', () => {
+  const assignments = read('lib/ai/cos/cosWorkforceAssignments.ts')
+  const workers = read('lib/ai/cos/cosReasoningWorkers.ts')
+  const verified = read('lib/ai/cos/cognitiveVerifiedOutcome.ts')
+  const builder = read('lib/builder/university-outcome.ts')
+  const migration = read('supabase/migrations/20261006030000_workforce_harness_correlation.sql')
+
+  assert.match(assignments, /harness_run_id: clean\(input\.harnessRunId, 160\) \|\| null/)
+  assert.match(workers, /harnessRunId: currentCosHarnessIngress\(\)\?\.manifest\.runId \?\? null/)
+  assert.match(builder, /kind: 'cos_harness_run_id'/)
+  assert.match(verified, /\.eq\('source_kind', 'production_request'\)/)
+  assert.match(verified, /\.eq\('status', 'served'\)/)
+  assert.match(verified, /\.eq\('harness_run_id', correlationValue\)/)
+  assert.match(verified, /assignment\.data\?\.length !== 1/)
+  assert.match(migration, /harness_run_id text/)
+  assert.match(migration, /where source_kind = 'production_request' and status = 'served'/)
+  assert.doesNotMatch(migration, /update\s+public\.cos_workforce_assignments/i, 'historical exam/shadow rows are never backfilled')
+})
+
 // end of saas/tests/cosWorkforceProductionVerification.node.test.ts (if this line is missing, the paste was cut short)

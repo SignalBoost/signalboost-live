@@ -7,6 +7,7 @@ type BuilderUniversityOutcomeJob = Readonly<{
   id: string
   claimGeneration: number
   finishedAt?: string | null
+  metadata?: Record<string, unknown> | null
 }>
 
 /**
@@ -20,6 +21,7 @@ export async function recordBuilderUniversityProductionOutcome(input: {
   verification: string
   facts?: Record<string, unknown>
 }): Promise<void> {
+  const harnessRunId = String(input.job.metadata?.productionHarnessRunId || '').trim()
   await recordVerifiedCosProductionOutcome({
     sourceClass: 'production_outcome',
     sourceRef: `builder_job:${input.job.id}:${input.job.claimGeneration}`,
@@ -27,7 +29,9 @@ export async function recordBuilderUniversityProductionOutcome(input: {
     outcomeStatus: input.status,
     summary: `Software Specialist Builder terminal outcome: ${input.status}.`,
     problemClass: BUILDER_UNIVERSITY_SUBJECT_ID,
-    correlation: { kind: 'builder_job_id', value: input.job.id },
+    correlation: harnessRunId
+      ? { kind: 'cos_harness_run_id', value: harnessRunId }
+      : { kind: 'builder_job_id', value: input.job.id },
     idempotencyKey: `builder-university:${input.job.id}:${input.job.claimGeneration}`,
     occurredAt: input.job.finishedAt || undefined,
     facts: {

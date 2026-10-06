@@ -42,6 +42,9 @@ jobs:
       - name: Validate script syntax
         run: node --check .github/scripts/vercel-promote-main.mjs
 
+      - name: Test recovery failure paths
+        run: node --test .github/scripts/vercel-promote-main.node.test.mjs
+
       - name: Check recovery credential availability
         id: credential
         env:

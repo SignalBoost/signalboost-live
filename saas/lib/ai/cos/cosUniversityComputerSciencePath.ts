@@ -5,6 +5,7 @@
 // trained, admitted and given cases. The cohort report cannot show where that artifact is, so this snapshot reads the
 // path end to end from durable tables:
 //
+//   packaging             Computer Science supply in the latest packaging pass, curriculum batches, and teaching rows by origin
 //   training dispatches   latest Computer Science training dispatches and whether each carried Builder protocol practice
 //                         (pre-dispatch assurance evidence, cos_university_learning_assurance_events)
 //   training runs         latest Computer Science mass-distillation runs by stage (cos_university_mass_distillation_batch_runs)
@@ -26,6 +27,12 @@ const PRE_DISPATCH_CLAIM = 'mass_distillation_pre_dispatch_validated'
 const TRAINING_STAGE = 'training_dispatching'
 const ADMISSION_STATUS = 'evaluation_ready'
 const ACTIVE_STANDINGS = ['resident', 'senior_resident'] as const
+const WORKFLOW_PATH = 'mass_distillation_campaign'
+/** The packager's minimum batch (MASS_DISTILLATION_QUALITY_MIN_BATCH); repeated here to keep this reader light. */
+const BATCH_MINIMUM = 64
+const MIN_CONFIDENCE = 0.8
+const FAILURE_DERIVED_KINDS = ['failure_derived_curriculum']
+const TEACHER_SYNTHETIC_KINDS = ['teacher_synthetic_curriculum', 'teacher_hosted_curriculum']
 
 const text = (value: unknown, max = 120): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 const iso = (value: unknown): string | null => {
@@ -56,6 +63,21 @@ export type ComputerSciencePath = Readonly<{
     latestWithPractice: boolean | null
     latestPracticeTaskIds: readonly string[]
   }>
+  packaging: Readonly<{
+    /** The latest mass-distillation workflow receipt that recorded a packaging pass (supply is computed then only). */
+    receiptAt: string | null
+    /** Computer Science unique batchable items in that pass; null when the subject was absent (zero items). */
+    supplyItems: number | null
+    supplyShortfall: number | null
+    batchMinimum: number
+    preparedBufferTarget: number | null
+    preparedBefore: number | null
+    replenishment: string | null
+    curriculumBatchesByStatus: Readonly<Record<string, number>>
+    latestCurriculumBatchAt: string | null
+    /** Computer Science rows at mass-distillation confidence, by origin (the packager needs half real-source). */
+    corpusRowsByOrigin: Readonly<{ realSource: number; failureDerived: number; teacherSynthetic: number }>
+  }>
   trainingRuns: Readonly<{ recent: number; byStage: Readonly<Record<string, number>>; latestStage: string | null; latestAt: string | null }>
   trainedArtifacts: Readonly<{
     recent: number
@@ -82,6 +104,45 @@ export type ComputerSciencePath = Readonly<{
 export async function readComputerSciencePath(input: { db: Db; now?: Date }): Promise<ComputerSciencePath> {
   const db = input.db
   const now = input.now ?? new Date()
+
+  const count = async (query: PromiseLike<{ count?: number | null; error: unknown }>): Promise<number> => {
+    const result = await query
+    if (result.error) throw result.error
+    return Number(result.count ?? 0)
+  }
+  const corpus = () => db.from('cos_continuous_learning')
+    .select('content_hash', { count: 'exact', head: true })
+    .eq('subject', SUBJECT)
+    .gte('confidence', MIN_CONFIDENCE)
+
+  const [receiptRows, batchRows, corpusTotal, corpusFailure, corpusTeacher] = await Promise.all([
+    rows(db.from('cos_university_learning_assurance_events')
+      .select('observed_at,evidence')
+      .eq('event_type', 'production_path')
+      .eq('path_id', WORKFLOW_PATH)
+      .not('evidence->curriculum->supply', 'is', null)
+      .order('observed_at', { ascending: false })
+      .limit(1)),
+    rows(db.from('cos_university_distillation_curriculum_batches')
+      .select('status,prepared_at')
+      .eq('subject_id', SUBJECT)
+      .order('prepared_at', { ascending: false })
+      .limit(RECENT)),
+    count(corpus()),
+    count(corpus().in('source_kind', FAILURE_DERIVED_KINDS)),
+    count(corpus().in('source_kind', TEACHER_SYNTHETIC_KINDS)),
+  ])
+  const receipt = receiptRows[0]
+  const evidence = record(receipt?.evidence)
+  const supplySubjects = Array.isArray(record(record(evidence.curriculum).supply).subjects)
+    ? record(record(evidence.curriculum).supply).subjects as unknown[]
+    : []
+  const csSupply = record(supplySubjects.find(entry => {
+    const item = record(entry)
+    return item.canonicalSubjectId === 'computer_science' || text(item.subject, 240) === SUBJECT
+  }))
+  const replenishment = record(evidence.curriculumReplenishment)
+  const number = (value: unknown): number | null => Number.isFinite(Number(value)) && value !== null && value !== undefined ? Number(value) : null
 
   const [dispatchRows, runRows, artifactRows, activeRows, caseRows] = await Promise.all([
     rows(db.from('cos_university_learning_assurance_events')
@@ -163,6 +224,25 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
         ? (latestPractice!.taskIds as unknown[]).map(value => text(value, 80)).filter(Boolean).slice(0, 16)
         : []),
     }),
+    packaging: Object.freeze({
+      receiptAt: iso(receipt?.observed_at),
+      supplyItems: receipt ? number(csSupply.uniqueBatchableItems) : null,
+      supplyShortfall: receipt ? (number(csSupply.shortfallToBatch) ?? (Object.keys(csSupply).length ? null : BATCH_MINIMUM)) : null,
+      batchMinimum: BATCH_MINIMUM,
+      preparedBufferTarget: number(evidence.preparedBufferTarget),
+      preparedBefore: number(evidence.preparedBeforeReplenishment),
+      replenishment: receipt
+        ? [text(replenishment.reason, 120) || (replenishment.ok === false ? `error:${text(replenishment.error, 120)}` : ''), replenishment.skipped === true ? 'skipped' : '']
+          .filter(Boolean).join(' ') || null
+        : null,
+      curriculumBatchesByStatus: tally(batchRows.map(row => text(row.status, 40) || 'unrecorded')),
+      latestCurriculumBatchAt: iso(batchRows[0]?.prepared_at),
+      corpusRowsByOrigin: Object.freeze({
+        realSource: Math.max(0, corpusTotal - corpusFailure - corpusTeacher),
+        failureDerived: corpusFailure,
+        teacherSynthetic: corpusTeacher,
+      }),
+    }),
     trainingRuns: Object.freeze({
       recent: runRows.length,
       byStage: tally(runRows.map(row => text(row.stage, 60) || 'unrecorded')),
@@ -195,9 +275,13 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
 export function describeComputerSciencePath(path: ComputerSciencePath): string {
   const kv = (map: Readonly<Record<string, number>>) => Object.entries(map).map(([key, value]) => `${key}=${value}`).join(',') || 'none'
   const yes = (value: boolean | null) => value === null ? 'n/a' : value ? 'yes' : 'no'
-  const d = path.trainingDispatches, r = path.trainingRuns, a = path.trainedArtifacts, s = path.residency
+  const d = path.trainingDispatches, r = path.trainingRuns, a = path.trainedArtifacts, s = path.residency, p = path.packaging
+  const supply = p.receiptAt === null ? 'no packaging receipt'
+    : p.supplyItems === null ? `absent from supply (0 batchable items; needs ${p.batchMinimum})`
+      : `${p.supplyItems} batchable items (needs ${p.batchMinimum}; shortfall ${p.supplyShortfall ?? 'n/a'})`
   return [
     `COMPUTER SCIENCE PATH (now ${path.observedAt}; latest ${RECENT} of each)`,
+    `  packaging           :: receiptAt=${p.receiptAt ?? 'none'} supply=${supply} preparedBuffer=${p.preparedBefore ?? 'n/a'}/${p.preparedBufferTarget ?? 'n/a'} replenishment=${p.replenishment ?? 'n/a'} curriculumBatches=${kv(p.curriculumBatchesByStatus)} latestBatchAt=${p.latestCurriculumBatchAt ?? 'none'} corpusRows(conf>=${MIN_CONFIDENCE}) real=${p.corpusRowsByOrigin.realSource} failureDerived=${p.corpusRowsByOrigin.failureDerived} teacherSynthetic=${p.corpusRowsByOrigin.teacherSynthetic}`,
     `  training dispatches :: recent=${d.recent} withProtocolPractice=${d.withPractice} latestAt=${d.latestAt ?? 'none'} latestWithPractice=${yes(d.latestWithPractice)}${d.latestPracticeTaskIds.length ? ` latestTasks=${d.latestPracticeTaskIds.join(',')}` : ''}`,
     `  training runs       :: recent=${r.recent} latestStage=${r.latestStage ?? 'none'} latestAt=${r.latestAt ?? 'none'} byStage=${kv(r.byStage)}`,
     `  trained artifacts   :: recent=${a.recent} trainedWithProtocolPractice=${a.trainedWithPractice} latestAt=${a.latestAt ?? 'none'} latestStatus=${a.latestStatus ?? 'none'} latestWithPractice=${yes(a.latestWithPractice)} byStatus=${kv(a.byStatus)}`,

@@ -42,7 +42,11 @@ export async function GET(req: NextRequest) {
     let computerSciencePath: Awaited<ReturnType<typeof readComputerSciencePath>> | null = null
     let computerSciencePathSummary: string
     try {
-      computerSciencePath = await readComputerSciencePath({ db: readOnlyDb(service), now })
+      // Bounded so a slow read can never cost the whole report its 60-second function budget.
+      computerSciencePath = await Promise.race([
+        readComputerSciencePath({ db: readOnlyDb(service), now }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('computer_science_path_timeout_15s')), 15_000).unref?.()),
+      ])
       computerSciencePathSummary = describeComputerSciencePath(computerSciencePath)
     } catch (error) {
       const message = error instanceof Error ? error.message : JSON.stringify(error)

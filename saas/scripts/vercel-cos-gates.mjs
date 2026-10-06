@@ -28,6 +28,7 @@ const tests = [
   'tests/cosUniversityStep1Evidence.node.test.ts',
   'tests/cosWorkforceVerificationTrace.node.test.ts',
   'tests/cosUniversityEvaluationFailureTrace.node.test.ts',
+  'tests/cosUniversityCapabilityGainTrace.node.test.ts',
   'tests/builderTerminalHarnessProvenance.node.test.ts',
 
   // Residency status, runtime recovery, and terminal-failure contracts.

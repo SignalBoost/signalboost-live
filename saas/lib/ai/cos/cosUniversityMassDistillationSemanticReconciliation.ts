@@ -17,6 +17,7 @@ type RetainedRow = Readonly<{
   sourceTitle?: unknown
   summary?: unknown
   facts?: unknown
+  sourceKind?: unknown
 }>
 
 function clean(value: unknown, limit = 500): string {
@@ -58,9 +59,13 @@ export function decidePreparedBatchSemanticCohesion(input: {
   }
 
   const missingSourceHashes = [...expected].filter(value => !seen.has(value))
+  const independentCount = input.rows.filter(row => expected.has(clean(row.contentHash, 64).toLowerCase())
+    && !['teacher_synthetic_curriculum', 'teacher_hosted_curriculum', 'failure_derived_curriculum'].includes(clean(row.sourceKind, 80))).length
+  const independentRequired = Math.ceil(expected.size * 0.5)
   const coherent = expected.size >= MASS_DISTILLATION_MIN_BATCH
     && missingSourceHashes.length === 0
     && mismatches.length === 0
+    && independentCount >= independentRequired
 
   return Object.freeze({
     coherent,
@@ -70,6 +75,8 @@ export function decidePreparedBatchSemanticCohesion(input: {
     observedSourceCount: seen.size,
     missingSourceHashes: Object.freeze(missingSourceHashes),
     mismatches: Object.freeze(mismatches),
+    independentCount,
+    independentRequired,
   })
 }
 
@@ -142,7 +149,7 @@ export async function reconcilePreparedMassDistillationSemanticCohesion(input: {
   for (let offset = 0; offset < sourceHashes.length; offset += chunkSize) {
     const chunk = sourceHashes.slice(offset, offset + chunkSize)
     const found = await db.from('cos_continuous_learning')
-      .select('content_hash,subject,source_title,summary,facts')
+      .select('content_hash,subject,source_title,summary,facts,source_kind')
       .in('content_hash', chunk)
       .limit(chunk.length)
     if (found.error) throw found.error
@@ -170,6 +177,7 @@ export async function reconcilePreparedMassDistillationSemanticCohesion(input: {
           sourceTitle: source.source_title,
           summary: source.summary,
           facts: source.facts,
+          sourceKind: source.source_kind,
         })),
     })
     if (decision.coherent) continue
@@ -195,6 +203,8 @@ export async function reconcilePreparedMassDistillationSemanticCohesion(input: {
       observedSourceCount: decision.observedSourceCount,
       missingSourceCount: decision.missingSourceHashes.length,
       mismatchCount: decision.mismatches.length,
+      independentCount: decision.independentCount,
+      independentRequired: decision.independentRequired,
       resolvedMismatchSubjects: [...new Set(decision.mismatches.map(item => item.resolvedSubject))].slice(0, 12),
       providerDispatchAuthorized: false,
       externalCostUsd: 0,

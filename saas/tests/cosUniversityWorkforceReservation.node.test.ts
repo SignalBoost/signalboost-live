@@ -55,10 +55,10 @@ test('ranking: never-used then least-recently-attempted graduates rotate into th
     grad(4, 1, '2026-10-03T18:00:00Z'),
   ]
   const decision = decideWorkforceReservation({ graduates, reserve: 2 })
-  assert.deepEqual([...decision.pin], ['ep3'], 'the most recently useful graduate is pinned even though it was released')
-  assert.deepEqual([...decision.held], ['ep2'])
-  assert.deepEqual([...decision.release].sort(), ['ep1', 'ep4'])
-  assert.deepEqual([...decision.idle], [])
+  assert.deepEqual([...decision.pin], [], 'the never-used and least-recently-attempted graduates already hold their slots')
+  assert.deepEqual([...decision.held], ['ep1', 'ep4'])
+  assert.deepEqual([...decision.release], ['ep2'])
+  assert.deepEqual([...decision.idle], ['ep3'])
   // Deterministic: identical input, identical decision, in either order.
   const reversed = decideWorkforceReservation({ graduates: [...graduates].reverse(), reserve: 2 })
   assert.deepEqual(reversed, decision)
@@ -79,7 +79,7 @@ test('a graduate without a RunPod endpoint, or whose endpoint RunPod did not lis
 
 test('reconcile releases before it pins, survives a refused change, and reports exactly what happened', async () => {
   const calls: string[] = []
-  const graduates = [grad(1, 1, null), grad(2, 1, null), grad(3, 0, '2026-10-03T20:00:00Z')]
+  const graduates = [grad(1, 1, '2026-10-03T18:00:00Z'), grad(2, 1, '2026-10-03T19:00:00Z'), grad(3, 0, null)]
   const report = await reconcileWorkforceReservation({
     env: { [WORKER_QUOTA_ENV]: '4' }, // workforce share of a 4-worker pool is 1
     ports: {
@@ -149,8 +149,8 @@ test('the reservation module is pure policy over an injected transport', () => {
 test('eligibility for work is exactly the reserve: released, idle and unmanaged graduates are excluded', () => {
   const graduates = [grad(1, 1, '2026-10-04T01:00:00Z'), grad(2, 0, '2026-10-04T02:00:00Z'), grad(3, 1, null), grad(4, 0, null), grad(5, null, null)]
   const decision = decideWorkforceReservation({ graduates, reserve: 2 })
-  assert.deepEqual([...decision.eligibleForWork], ['reg02', 'reg01'], 'the two most recently useful, pinned or about to be')
-  assert.deepEqual([...decision.excludedFromWork].sort(), ['reg03', 'reg04', 'reg05'])
+  assert.deepEqual([...decision.eligibleForWork], ['reg03', 'reg04'], 'never-attempted graduates rotate in before graduates already exercised')
+  assert.deepEqual([...decision.excludedFromWork].sort(), ['reg01', 'reg02', 'reg05'])
   // Every on-call graduate is in exactly one of the two sets.
   assert.equal(decision.eligibleForWork.length + decision.excludedFromWork.length, graduates.length)
   // The production shape: 17 on call, reserve 2 -> 15 may never be handed a task this tick.
@@ -202,10 +202,10 @@ test('inside the window only the reserved graduates are warmed; outside it only 
   const calls: string[] = []
   const ports = {
     listGraduates: async () => [
-      grad(1, 1, '2026-10-04T10:00:00Z', 'ep1', 0),   // reserved, cold -> warm inside
-      grad(2, 1, '2026-10-04T09:00:00Z', 'ep2', 1),   // reserved, already warm -> untouched inside, cooled outside
-      grad(3, 0, null, 'ep3', 0),                      // outside the reserve: never warmed
-      grad(4, 1, null, 'ep4', 1),                      // outside the reserve and warm: RELEASED (max 0), never cooled
+      grad(1, 1, '2026-10-04T10:00:00Z', 'ep1', 0),   // already exercised: outside reserve and released
+      grad(2, 1, '2026-10-04T09:00:00Z', 'ep2', 1),   // already exercised: outside reserve and released
+      grad(3, 0, null, 'ep3', 0),                      // never attempted: rotates in, pins and warms
+      grad(4, 1, null, 'ep4', 1),                      // never attempted: reserved and already warm
     ],
     releaseWorker: async (id: string) => { calls.push(`release:${id}`) },
     pinWorker: async (id: string) => { calls.push(`pin:${id}`) },
@@ -219,9 +219,9 @@ test('inside the window only the reserved graduates are warmed; outside it only 
   assert.equal(inside.inWindow, true)
   assert.equal(inside.warmed, 1)
   assert.equal(inside.cooled, 0)
-  assert.deepEqual(calls.filter(c => c.startsWith('warm')), ['warm:ep1'])
-  assert.deepEqual(calls.filter(c => c.startsWith('release')), ['release:ep4'])
-  assert.ok(calls.indexOf('release:ep4') < calls.indexOf('warm:ep1'), 'slots are given back before any worker is started')
+  assert.deepEqual(calls.filter(c => c.startsWith('warm')), ['warm:ep3'])
+  assert.deepEqual(calls.filter(c => c.startsWith('release')).sort(), ['release:ep1', 'release:ep2'])
+  assert.ok(calls.indexOf('release:ep2') < calls.indexOf('warm:ep3'), 'slots are given back before any worker is started')
   assert.match(describeWorkforceReservation(inside), /window=17:00-19:00 windowSource=env inWindow=true warmed=1 cooled=0$/)
 
   calls.length = 0
@@ -229,7 +229,7 @@ test('inside the window only the reserved graduates are warmed; outside it only 
   assert.equal(outside.inWindow, false)
   assert.equal(outside.warmed, 0)
   assert.equal(outside.cooled, 1)
-  assert.deepEqual(calls.filter(c => c.startsWith('cool')), ['cool:ep2'])
+  assert.deepEqual(calls.filter(c => c.startsWith('cool')), ['cool:ep4'])
   assert.deepEqual(calls.filter(c => c.startsWith('warm')), [])
 })
 

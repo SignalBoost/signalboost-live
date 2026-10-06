@@ -112,12 +112,11 @@ declare
   r lab.reservations%rowtype;
   previous lab.credit_events%rowtype;
   event_id_out bigint;
-  actual_reservation_id uuid;
 begin
   if current_setting('lab.trusted_organization_id',true) is distinct from p_organization_id::text then
     raise exception 'lab_tenant_authority_denied';
   end if;
-  if p_amount is null or p_amount <= 0 or length(p_idempotency_key) not between 16 and 200 or
+  if p_amount is null or p_amount <= 0 or coalesce(length(p_idempotency_key),0) not between 16 and 200 or
     p_operation not in ('reserve','capture','release','refund') then
     raise exception 'lab_invalid_credit_operation';
   end if;
@@ -182,8 +181,35 @@ begin
 end $$;
 revoke all on function lab.apply_credit_event(uuid,uuid,uuid,text,bigint,text,numeric,text,text) from public, anon, authenticated;
 grant execute on function lab.apply_credit_event(uuid,uuid,uuid,text,bigint,text,numeric,text,text) to service_role;
--- An explicit server-side tenant binding must set the transaction-local GUC
--- from VERIFIED execution authority before calling this function.
+-- Operational reconciliation is computed from authoritative rows, not mutable billing estimates.
+create function lab.reconcile_credit_account(p_organization_id uuid)
+returns jsonb language plpgsql security definer set search_path = pg_catalog, lab as $
+declare a lab.credit_accounts%rowtype; agg record; mismatch boolean;
+begin
+  if current_setting('lab.trusted_organization_id',true) is distinct from p_organization_id::text then
+    raise exception 'lab_tenant_authority_denied';
+  end if;
+  select * into a from lab.credit_accounts where organization_id=p_organization_id;
+  if not found then raise exception 'lab_credit_account_missing'; end if;
+  select coalesce(sum(reserve_microcredits-captured_microcredits-released_microcredits),0)::bigint reserved,
+         coalesce(sum(captured_microcredits),0)::bigint captured,
+         coalesce(sum(refunded_microcredits),0)::bigint refunded
+    into agg from lab.reservations where organization_id=p_organization_id;
+  select (a.reserved_microcredits<>agg.reserved or a.captured_microcredits<>agg.captured
+          or a.refunded_microcredits<>agg.refunded) into mismatch;
+  return jsonb_build_object('pass',not mismatch,'stored_reserved',a.reserved_microcredits,
+    'computed_reserved',agg.reserved,'stored_captured',a.captured_microcredits,
+    'computed_captured',agg.captured,'stored_refunded',a.refunded_microcredits,
+    'computed_refunded',agg.refunded);
+end $;
+revoke all on function lab.reconcile_credit_account(uuid) from public, anon, authenticated;
+grant execute on function lab.reconcile_credit_account(uuid) to service_role;
+
+-- SECURITY: service_role credentials and lab.trusted_organization_id are trusted only
+-- inside a server-side, verified Harness authority envelope. The GUC is not a
+-- substitute for authentication. Never expose this RPC or transaction setting
+-- to unverified callers. No service_role execute privilege is granted to
+-- tenant/client roles.
 create function lab.prevent_credit_event_mutation() returns trigger language plpgsql
 set search_path = pg_catalog, lab as $$
 begin raise exception 'lab_credit_events_append_only'; end $$;

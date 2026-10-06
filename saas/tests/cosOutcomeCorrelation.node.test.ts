@@ -94,7 +94,13 @@ test('concierge dock exposes outcome feedback only for correlated COS replies', 
 test('verified production outcome keeps its evidence guard and supports only explicit turn correlation', () => {
   const source = file('../lib/ai/cos/cognitiveVerifiedOutcome.ts')
   assert.match(source, /\^\(\?:model\|council\|llm\|consensus\|frontier_teacher\):/)
-  assert.match(source, /kind !== 'cos_turn_id'/)
+  // Explicit correlation only: a COS turn id, or (2026-10-06, PR #3676) a Harness run id that resolves to exactly ONE
+  // served Production request assignment. Any other kind, or an ambiguous/unserved Harness run, attaches nothing.
+  assert.match(source, /let turnId = kind === 'cos_turn_id' \? clean\(correlationValue, 80\) : ''/)
+  assert.match(source, /if \(kind === 'cos_harness_run_id' && correlationValue\)/)
+  assert.match(source, /\.eq\('source_kind', 'production_request'\)\s*\.eq\('status', 'served'\)\s*\.eq\('harness_run_id', correlationValue\)/)
+  assert.match(source, /if \(assignment\.error \|\| assignment\.data\?\.length !== 1\) return/)
+  assert.match(source, /if \(!turnId\) return/)
   assert.match(source, /attachTurnOutcome\(turnId/)
 })
 

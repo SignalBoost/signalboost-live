@@ -1,0 +1,245 @@
+// saas/lib/ai/cos/cosUniversityStep1Evidence.ts
+//
+// Step 1 evidence report: the current University measured against the owner's Step 1 exit criterion.
+//
+// Owner, 2026-10-06: "Step 1 is complete when the current University operates end-to-end autonomously - from artifact
+// creation through qualification, graduation, Production serving and independently verified Production outcomes -
+// with failures correctly attributed and the loop demonstrably continuing without manual intervention or weakened
+// standards." And: "COS can recommend READY / NOT READY, but it should not silently declare the project phase
+// complete." The declaration belongs to the owner.
+//
+// This module is pure. It reads the Artifact Effectiveness Funnel (the tables' own record) and states, per criterion,
+// whether evidence is present, absent, unreadable, or not measurable from a single snapshot. It never sets a
+// threshold the owner has not set: "present" means the stage has non-zero sourced evidence, nothing more.
+//
+// It can never recommend READY. Three parts of the criterion (repeated operation, no manual intervention, standards
+// not weakened) cannot be established from one snapshot of the tables, so the strongest recommendation this report
+// can make is INSUFFICIENT_EVIDENCE_FOR_READY. Repetition is shown by comparing dated runs of this report.
+import type { EffectivenessFunnel } from './cosUniversityEffectivenessFunnel.ts'
+
+export const STEP1_EVIDENCE_SCHEMA_VERSION = 'cos-university-step1-evidence-v1' as const
+
+export type Step1CriterionStatus =
+  | 'evidence_present'
+  | 'partial'
+  | 'no_evidence'
+  | 'unavailable'
+  | 'not_measured'
+
+export type Step1Criterion = Readonly<{
+  id: string
+  question: string
+  status: Step1CriterionStatus
+  observed: Readonly<Record<string, number | string | boolean | null>>
+  source: string
+  note: string | null
+}>
+
+export type Step1Recommendation = 'NOT_READY' | 'INSUFFICIENT_EVIDENCE_FOR_READY'
+
+export type Step1EvidenceReport = Readonly<{
+  schemaVersion: typeof STEP1_EVIDENCE_SCHEMA_VERSION
+  generatedAt: string
+  window: EffectivenessFunnel['window']
+  since: string | null
+  cohort: EffectivenessFunnel['cohort']
+  criteria: readonly Step1Criterion[]
+  recommendation: Step1Recommendation
+  blocking: readonly string[]
+  declaration: 'owner_only'
+  readOnly: true
+  authorityExpanded: false
+}>
+
+const stageCount = (funnel: EffectivenessFunnel, id: string): number | null => {
+  const stage = funnel.stages.find(entry => entry.id === id)
+  return stage ? stage.count : null
+}
+
+const stageSource = (funnel: EffectivenessFunnel, id: string): string =>
+  funnel.stages.find(entry => entry.id === id)?.source || 'unknown'
+
+/** A stage whose chapter could not be read is unavailable, never a real zero. */
+function stageCriterion(funnel: EffectivenessFunnel, input: {
+  id: string
+  question: string
+  stages: readonly string[]
+  extra?: Readonly<Record<string, number | string | boolean | null>>
+  note?: string | null
+}): Step1Criterion {
+  const observed: Record<string, number | string | boolean | null> = {}
+  let missing = false
+  let allPresent = true
+  for (const id of input.stages) {
+    const count = stageCount(funnel, id)
+    observed[id] = count
+    if (count === null) missing = true
+    else if (count <= 0) allPresent = false
+  }
+  Object.assign(observed, input.extra || {})
+  const status: Step1CriterionStatus = missing || input.stages.some(id => unavailableFor(funnel, id))
+    ? 'unavailable'
+    : allPresent ? 'evidence_present' : 'no_evidence'
+  return Object.freeze({
+    id: input.id,
+    question: input.question,
+    status,
+    observed: Object.freeze(observed),
+    source: [...new Set(input.stages.map(id => stageSource(funnel, id)))].join(' + '),
+    note: input.note ?? null,
+  })
+}
+
+/** True when the chapter feeding this stage was unreadable (the funnel reports it by chapter name). */
+function unavailableFor(funnel: EffectivenessFunnel, stageId: string): boolean {
+  const chapterOf: Readonly<Record<string, string>> = {
+    birth_certificate: 'certified',
+    examined: 'examined',
+    passed_all_gates: 'examined',
+    graduated: 'graduation',
+    activated: 'graduation',
+    hired: 'hired',
+    performed_work: 'work',
+    served_successfully: 'work',
+    verified_outcome: 'verified',
+  }
+  const chapter = chapterOf[stageId]
+  return Boolean(chapter && Object.prototype.hasOwnProperty.call(funnel.unavailable || {}, chapter))
+}
+
+export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new Date()): Step1EvidenceReport {
+  const criteria: Step1Criterion[] = []
+
+  criteria.push(stageCriterion(funnel, {
+    id: 'artifact_creation',
+    question: 'Are artifacts being born with a birth certificate?',
+    stages: ['born', 'birth_certificate'],
+    extra: { cohortTruncated: funnel.cohort.truncated },
+  }))
+
+  criteria.push(stageCriterion(funnel, {
+    id: 'qualification',
+    question: 'Are artifacts independently examined, and do some pass all four gates?',
+    stages: ['examined', 'passed_all_gates'],
+    extra: funnel.capabilityGain.available
+      ? { gainSampleSize: funnel.capabilityGain.sampleSize, meanAbsoluteGain: funnel.capabilityGain.meanAbsoluteGain, improved: funnel.capabilityGain.improved, regressed: funnel.capabilityGain.regressed }
+      : { capabilityGain: 'unavailable' },
+  }))
+
+  {
+    const f = funnel.evaluationFailures
+    if (!f.available) {
+      criteria.push(Object.freeze({ id: 'failure_attribution', question: 'Is every evaluation failure attributed to infrastructure or merit with an evidence-backed cause?', status: 'unavailable' as const, observed: Object.freeze({ error: f.error }), source: 'cos_university_distilled_evaluation_runs', note: null }))
+    } else {
+      const unresolved = f.explanations.filter(entry => entry.causeStatus !== 'evidence_backed')
+      const unresolvedCount = unresolved.reduce((sum, entry) => sum + entry.count, 0)
+      criteria.push(Object.freeze({
+        id: 'failure_attribution',
+        question: 'Is every evaluation failure attributed to infrastructure or merit with an evidence-backed cause?',
+        status: unresolvedCount > 0 ? 'partial' as const : 'evidence_present' as const,
+        observed: Object.freeze({ total: f.total, infrastructure: f.infrastructure, merit: f.merit, unresolvedFailures: unresolvedCount, unresolvedReasons: unresolved.map(entry => entry.reason).slice(0, 10).join(',') || null }),
+        source: f.source,
+        note: f.total === 0 ? 'no evaluation failures in this window; attribution is untested rather than proven' : null,
+      }))
+    }
+  }
+
+  criteria.push(stageCriterion(funnel, {
+    id: 'graduation',
+    question: 'Do qualified artifacts graduate and get activated?',
+    stages: ['graduated', 'activated'],
+  }))
+
+  criteria.push(stageCriterion(funnel, {
+    id: 'production_serving',
+    question: 'Are graduates hired and serving real work successfully?',
+    stages: ['hired', 'performed_work', 'served_successfully'],
+    extra: funnel.reliability.available
+      ? { servingAttempts: funnel.reliability.attempts, servingSuccesses: funnel.reliability.successes, servingFailures: funnel.reliability.failures, servingFallbacks: funnel.reliability.fallbacks, p90LatencyMs: funnel.reliability.p90LatencyMs }
+      : { reliability: 'unavailable' },
+  }))
+
+  criteria.push(stageCriterion(funnel, {
+    id: 'verified_production_outcomes',
+    question: 'Do graduates produce independently verified Production outcomes?',
+    stages: ['verified_outcome'],
+    extra: funnel.workforceEffectiveness.available
+      ? { assignments: funnel.workforceEffectiveness.assignments, verifiedAssignments: funnel.workforceEffectiveness.verified, remediation: funnel.workforceEffectiveness.remediation, runtimeFailed: funnel.workforceEffectiveness.runtimeFailed, servedAwaitingVerification: funnel.workforceEffectiveness.servedAwaitingVerification }
+      : { workforceEffectiveness: 'unavailable' },
+  }))
+
+  {
+    const h = funnel.lineHistory
+    const health = funnel.lineHealth
+    criteria.push(Object.freeze({
+      id: 'line_flow',
+      question: 'Is the line moving units between stations in this window?',
+      status: !h.available ? 'unavailable' as const : h.transitions > 0 ? 'evidence_present' as const : 'no_evidence' as const,
+      observed: Object.freeze({
+        transitions: h.available ? h.transitions : null,
+        throughputPerHour: h.available ? h.throughputPerHour : null,
+        liveUnits: health.available ? health.liveUnits : null,
+        overdueUnits: health.available ? health.overdueUnits : null,
+        bottleneckStation: health.available ? health.bottleneckStation : null,
+      }),
+      source: 'cos_university_lifecycle_transition_history + cos_university_lifecycle_orchestration',
+      note: null,
+    }))
+  }
+
+  criteria.push(Object.freeze({
+    id: 'repeated_operation',
+    question: 'Does the whole line operate repeatedly, not once?',
+    status: 'not_measured' as const,
+    observed: Object.freeze({}),
+    source: 'dated runs of this report',
+    note: 'one snapshot cannot show repetition; compare this report across scheduled runs',
+  }))
+  criteria.push(Object.freeze({
+    id: 'no_manual_intervention',
+    question: 'Does the loop continue without manual intervention?',
+    status: 'not_measured' as const,
+    observed: Object.freeze({}),
+    source: 'none in the tables',
+    note: 'the tables do not record who unblocked a unit; requires an operator-action ledger or owner attestation',
+  }))
+  criteria.push(Object.freeze({
+    id: 'standards_unweakened',
+    question: 'Were graduation and evaluation standards kept unchanged?',
+    status: 'not_measured' as const,
+    observed: Object.freeze({}),
+    source: 'repository history of evaluator thresholds',
+    note: 'requires review of evaluator/graduation code and configuration history, not derivable from these tables',
+  }))
+
+  const blocking = criteria
+    .filter(entry => entry.status === 'no_evidence' || entry.status === 'unavailable' || entry.status === 'partial')
+    .map(entry => entry.id)
+  return Object.freeze({
+    schemaVersion: STEP1_EVIDENCE_SCHEMA_VERSION,
+    generatedAt: now.toISOString(),
+    window: funnel.window,
+    since: funnel.since,
+    cohort: funnel.cohort,
+    criteria: Object.freeze(criteria),
+    recommendation: blocking.length ? 'NOT_READY' : 'INSUFFICIENT_EVIDENCE_FOR_READY',
+    blocking: Object.freeze(blocking),
+    declaration: 'owner_only',
+    readOnly: true,
+    authorityExpanded: false,
+  })
+}
+
+/** One line per criterion, for a CI log a human reads. */
+export function describeStep1Evidence(report: Step1EvidenceReport): string {
+  const lines = [
+    `STEP 1 EVIDENCE window=${report.window} cohort=${report.cohort.size}${report.cohort.truncated ? '+ (truncated)' : ''} recommendation=${report.recommendation} declaration=owner_only`,
+  ]
+  for (const entry of report.criteria) {
+    const observed = Object.entries(entry.observed).map(([key, value]) => `${key}=${value === null ? 'n/a' : value}`).join(' ')
+    lines.push(`  [${entry.status}] ${entry.id}${observed ? ` :: ${observed}` : ''}${entry.note ? ` (${entry.note})` : ''}`)
+  }
+  if (report.blocking.length) lines.push(`  blocking: ${report.blocking.join(', ')}`)
+  return lines.join('\n')
+}
+// end of saas/lib/ai/cos/cosUniversityStep1Evidence.ts (if this line is missing, the paste was cut short)

@@ -89,7 +89,13 @@ test('verified Production supply has exactly one guarded application writer', ()
   assert.ok(writers[0]?.endsWith('saas/lib/ai/cos/cognitiveVerifiedOutcome.ts'))
 
   const writer = file('lib/ai/cos/cognitiveVerifiedOutcome.ts')
-  assert.match(writer, /kind !== 'cos_turn_id'/)
+  // Explicit correlation only: a COS turn id, or (2026-10-06, PR #3676) a Harness run id that resolves to exactly ONE
+  // served Production request assignment. Any other kind, or an ambiguous/unserved Harness run, attaches nothing.
+  assert.match(writer, /let turnId = kind === 'cos_turn_id' \? clean\(correlationValue, 80\) : ''/)
+  assert.match(writer, /if \(kind === 'cos_harness_run_id' && correlationValue\)/)
+  assert.match(writer, /\.eq\('source_kind', 'production_request'\)\s*\.eq\('status', 'served'\)\s*\.eq\('harness_run_id', correlationValue\)/)
+  assert.match(writer, /if \(assignment\.error \|\| assignment\.data\?\.length !== 1\) return/)
+  assert.match(writer, /if \(!turnId\) return/)
   assert.match(writer, /Model\/Council output cannot be a verified COS production outcome source/)
   assert.match(writer, /source: verifiedProductionTurnOutcomeSource\(decision\)/)
 })

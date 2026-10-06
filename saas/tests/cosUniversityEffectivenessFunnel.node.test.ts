@@ -82,10 +82,15 @@ const week = () => ({
     // a different hash of candidate b: not this cohort's artifact.
     { candidate_id: 'b', trained_artifact_hash: H('9'), created_at: '2026-10-04T12:00:00Z', baseline_score: 0.2, trained_artifact_score: 0.9, holdout_improved: true, safety_passed: true, unseen_transfer_passed: true, delayed_retention_passed: true },
   ],
-  cos_university_residency_enrollments: [{ id: 'res-a', candidate_id: 'a', trained_artifact_hash: H('a'), standing: 'residency_complete' }],
+  cos_university_residency_enrollments: [
+    { id: 'res-a', candidate_id: 'a', trained_artifact_hash: H('a'), standing: 'residency_complete' },
+    // An older artifact of the same candidate: its Residency evidence must not count for the cohort's artifact.
+    { id: 'res-a-old', candidate_id: 'a', trained_artifact_hash: H('9'), standing: 'residency_failed' },
+  ],
   cos_university_residency_case_runs: [
     { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'failed', harness_outcome: 'agent_failure', failure_code: 'assertion_failed' },
     { residency_id: 'res-a', status: 'started' },
+    { residency_id: 'res-a-old', status: 'failed', harness_outcome: 'infrastructure_failure', failure_code: 'old_artifact_failure' },
   ],
   cos_university_residency_competency_evidence: [
     { residency_id: 'res-a', outcome: 'pass' }, { residency_id: 'res-a', outcome: 'pass' }, { residency_id: 'res-a', outcome: 'fail' },

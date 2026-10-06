@@ -717,6 +717,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
   }))
   const candidateIds = Array.from(new Set(cohort.map(a => a.candidateId))).filter(Boolean)
   const key = (row: any) => `${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 64).toLowerCase()}`
+  const cohortKeys = new Set(cohort.map(a => `${a.candidateId}:${a.hash}`))
 
   /** Read one table for the whole cohort, chunked by candidate id and exhaustively paged within each chunk. */
   const forCohort = async (table: string, columns: string, _pageSize = FUNNEL_ROWS_PER_CHUNK, refine?: (q: any) => any): Promise<any[]> => {
@@ -810,7 +811,10 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { rows: list.map((row: any) => Object.freeze({ fromStation: text(row.from_station, 80), transitionedAt: iso(row.transitioned_at), durationSeconds: Number.isFinite(Number(row.duration_seconds)) ? Math.max(0, Number(row.duration_seconds)) : null, wasOverdue: row.was_overdue === true })) }
     }),
     chapter(async () => {
-      const enrollments = await forCohort('cos_university_residency_enrollments', 'id,candidate_id,trained_artifact_hash,standing')
+      // Exact artifact only: forCohort matches by candidate id, and an older artifact of the same candidate must not
+      // lend its Residency standings or case verdicts to the artifact in this cohort.
+      const enrollments = (await forCohort('cos_university_residency_enrollments', 'id,candidate_id,trained_artifact_hash,standing'))
+        .filter((row: any) => cohortKeys.has(key(row)))
       const residencyIds = enrollments.map((row: any) => text(row.id, 80)).filter(Boolean)
       const caseRows: any[] = [], competencyRows: any[] = []
       for (const chunk of chunks(residencyIds, FUNNEL_READ_CHUNK)) {

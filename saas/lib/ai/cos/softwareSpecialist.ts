@@ -181,6 +181,7 @@ async function tryCosSoftwareSpecialistLegacy(
           const queued = await enqueueBuilderJob({ jobId: proposal.id, userId, conversationId, workspaceId: job.workspaceId,
             objective: proposal.objective, jobKind: 'standard', ownerAuthorized: false,
             metadata: { approvedProposalFingerprint: proposal.fingerprint, proposalSourceJobId: job.id,
+              productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
               projectContext: { previousJobId: job.id, previousObjective: job.objective, previousStatus: job.status, previousCommands: [] } },
             runningReply: runningReply(proposal.id),
           })
@@ -325,12 +326,13 @@ async function tryCosSoftwareSpecialistLegacy(
       jobKind: debugPlan ? 'debug_file' : 'standard',
       metadata: debugPlan
         ? {
+            productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
             debugPath: debugPlan.path,
             debugCommand: debugPlan.command,
             debugRuntime: debugPlan.runtime,
             debugPaths: debugPlan.files,
           }
-        : { ...(project.context ? { projectContext: project.context } : {}) },
+        : { productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null, ...(project.context ? { projectContext: project.context } : {}) },
       ownerAuthorized: access?.isOwner === true,
       runningReply: reply,
     })

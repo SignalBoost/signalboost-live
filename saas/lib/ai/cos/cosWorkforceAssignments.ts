@@ -56,6 +56,7 @@ export function recordGraduateProductionServed(input: WorkforceRuntimeIdentity &
   objective: string
   servingAttemptId: string
   latencyMs: number
+  harnessRunId?: string | null
 }): void {
   const persist = async () => {
     try {
@@ -71,6 +72,7 @@ export function recordGraduateProductionServed(input: WorkforceRuntimeIdentity &
         permanent_artifact_id: identity.permanentArtifactId,
         source_kind: 'production_request',
         source_ref: clean(input.turnId, 80),
+        harness_run_id: clean(input.harnessRunId, 160) || null,
         objective_hash: sha256(input.objective),
         specialty: clean(input.subjectId, 240),
         status: 'served',

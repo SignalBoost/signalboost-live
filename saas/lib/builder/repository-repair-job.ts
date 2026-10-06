@@ -4,6 +4,7 @@ import { replanSupersededRepositoryRepair, type SupersededRepositoryRepairReplan
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
+import { currentCosHarnessIngress } from '@/platform-harness/adapters/cos-ingress'
 
 export function repositoryRepairRunningReply(jobId: string): string {
   return `Platform Engineer is running job ${jobId} under Software Specialist control. Progress and the final result are durable in History; the action will not be replayed.`
@@ -100,6 +101,7 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
     jobKind: 'standard',
     metadata: {
       platformRepair: true,
+      productionHarnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
       commitSha: target.fullCommitSha || target.commitSha,
       branch: target.branch,
       repairPreflight: stale ? 'superseded_replanned' : targetFreshness.status,

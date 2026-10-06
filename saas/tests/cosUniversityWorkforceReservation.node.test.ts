@@ -47,7 +47,7 @@ test('the production shape: 17 graduates on a 10-worker account end up with exac
   assert.ok(decision.release.length >= 8, `at least eight slots return to the line (got ${decision.release.length})`)
 })
 
-test('ranking: the most recently useful graduates keep their slots; never-used ones give theirs back first', () => {
+test('ranking: never-used then least-recently-attempted graduates rotate into the bounded reserve', () => {
   const graduates = [
     grad(1, 1, null),
     grad(2, 1, '2026-10-03T19:00:00Z'),

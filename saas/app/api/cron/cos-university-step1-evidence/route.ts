@@ -13,6 +13,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { describeFunnel, readEffectivenessFunnel } from '@/lib/ai/cos/cosUniversityEffectivenessFunnel'
 import { assessStep1Evidence, describeStep1Evidence } from '@/lib/ai/cos/cosUniversityStep1Evidence'
 import { readOnlyDb } from '@/lib/ai/cos/cosUniversityReadOnlyDb'
+import { describeComputerSciencePath, readComputerSciencePath } from '@/lib/ai/cos/cosUniversityComputerSciencePath'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -37,12 +38,24 @@ export async function GET(req: NextRequest) {
       now,
     })
     const report = assessStep1Evidence(funnel, now)
+    // Where the Computer Science path stands right now (window-independent). Its own failure never hides the report.
+    let computerSciencePath: Awaited<ReturnType<typeof readComputerSciencePath>> | null = null
+    let computerSciencePathSummary: string
+    try {
+      computerSciencePath = await readComputerSciencePath({ db: readOnlyDb(service), now })
+      computerSciencePathSummary = describeComputerSciencePath(computerSciencePath)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : JSON.stringify(error)
+      computerSciencePathSummary = `COMPUTER SCIENCE PATH unavailable: ${String(message).slice(0, 200)}`
+    }
     return NextResponse.json({
       ok: true,
       summary: describeStep1Evidence(report),
       funnelSummary: describeFunnel(funnel),
+      computerSciencePathSummary,
       report,
       funnel,
+      computerSciencePath,
     }, { headers: NO_STORE })
   } catch (error) {
     const message = error instanceof Error ? error.message : JSON.stringify(error)

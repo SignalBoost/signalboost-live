@@ -2816,6 +2816,18 @@ Read-only evidence (`/api/cron/cos-university-evaluation-failure-trace`, printed
 
 `READY_TIMEOUT_MS` is now **340 s**. That leaves 205 s for the exam, and the route deadline still clamps the wait. Next check: re-read the trace after a day of exams. If timeouts persist at about 344 s with workers warm, the fix is a faster cold start (image or weights), not a longer window. Keeping a loading worker alive between attempts holds a GPU longer and needs owner approval of a spend cap.
 
+### Training gain: no measurable effect yet, and a holdout too small to see one — 2026-10-06
+
+Read-only evidence (`/api/cron/cos-university-capability-gain-trace`, "Capability gain trace" in the Step 1 evidence check run). Latest exam per exact artifact over 7 days:
+
+- **Overall:** n=607, mean gain −0.0057 ± 0.0096. Improved 176, unchanged 248, regressed 183. Sign test z = −0.37, so the split is chance. Do not describe this as "training regresses artifacts"; the measured effect is zero.
+- **Holdout size:** 548 of 607 exams use **6 holdout cases** scored 0, 0.5 or 1. One case moves the score by ~0.08–0.17. "Improved over baseline" on 6 cases is close to a coin flip, so graduation by holdout improvement does not yet show real capability gain.
+- **No variation in recipe:** every artifact trained on **<50 items** with the same teacher pool, base model (Qwen/Qwen3-4B), profile (`cos_university_frontier_gkd_v1`) and optimizer.
+- **Failure-derived replay:** used −0.031 ± 0.013 (n=397), not used +0.043 ± 0.013 (n=210). The gap is about 4 SE, but replay targets remediation of harder subjects, so this may be confounded by subject. Check within each subject before acting on it.
+- **Real-source share of the batch:** 0% −> +0.027 ± 0.017 (n=192); 1–49% −> −0.024 ± 0.015 (n=228). There is no evidence that real-source-heavy batches gain more. The 50% real-source floor (`HYBRID_REAL_SOURCE_TARGET`) is currently what refuses batches (Computer Science: 51 unused real-source items out of 783 batchable on 2026-10-06), and only 4 artifacts were born in the 24 h before this reading.
+
+Holdout size, training-set size and the real-source floor are owner decisions: they touch evaluation standards and spend. The trace re-runs every six hours so any change is measured against this baseline.
+
 ### AI Lab specification corrections — 2026-10-06
 
 External drafts of the Lab specification circulated on 2026-10-06. Where they conflict with this file, this file wins:

@@ -42,7 +42,7 @@ export type WorkforceVerificationTrace = Readonly<{
     withProductionVerifiedOutcome: number
     turnNotFoundInChat: number
   }>
-  servingFailures: Readonly<{ attemptsRead: number; byOutcome: Record<string, number>; byErrorClass: Record<string, number> }>
+  servingFailures: Readonly<{ attemptsRead: number; truncated: boolean; byOutcome: Record<string, number>; byErrorClass: Record<string, number> }>
   /** Lookups that could not be read; their counts above are unknown, not zero. */
   unavailable: Readonly<Record<string, string>>
   readOnly: true
@@ -68,6 +68,7 @@ export function composeWorkforceTrace(input: {
   chatTurns: readonly ChatTurnRow[]
   turnOutcomes: readonly TurnOutcomeRow[]
   attempts: readonly AttemptRow[]
+  attemptsTruncated?: boolean
   now: Date
   unavailable?: Readonly<Record<string, string>>
 }): WorkforceVerificationTrace {
@@ -83,15 +84,17 @@ export function composeWorkforceTrace(input: {
     if (status === 'served' && text(row.source_kind, 40) === 'production_request') served.push(row)
   }
 
-  const chatTurnIds = new Set<string>()
-  const chatUsers = new Set<string>()
+  const chatUsersByTurn = new Map<string, Set<string>>()
   for (const row of input.chatTurns) {
     const turn = text(row.turn_id, 80)
     if (!turn) continue
-    chatTurnIds.add(turn)
+    const users = chatUsersByTurn.get(turn) || new Set<string>()
     const user = text(row.user_id, 80)
-    if (user) chatUsers.add(user)
+    if (user) users.add(user)
+    chatUsersByTurn.set(turn, users)
   }
+  // Only users of SERVED production turns: the reader fetches chat rows for every production status.
+  const chatUsers = new Set<string>()
   const anyOutcome = new Set<string>()
   const verifiedOutcome = new Set<string>()
   for (const row of input.turnOutcomes) {
@@ -108,7 +111,11 @@ export function composeWorkforceTrace(input: {
   for (const row of served) {
     const turn = text(row.source_ref, 80)
     if (text(row.harness_run_id, 160)) withHarness += 1
-    if (chatTurnIds.has(turn)) found += 1
+    const users = chatUsersByTurn.get(turn)
+    if (users) {
+      found += 1
+      for (const user of users) chatUsers.add(user)
+    }
     if (anyOutcome.has(turn)) withAny += 1
     if (verifiedOutcome.has(turn)) withVerified += 1
   }
@@ -137,6 +144,7 @@ export function composeWorkforceTrace(input: {
     }),
     servingFailures: Object.freeze({
       attemptsRead: input.attempts.length,
+      truncated: input.attemptsTruncated === true,
       byOutcome: top(byOutcome, 12),
       byErrorClass: top(byErrorClass, 12),
     }),
@@ -200,7 +208,7 @@ export async function readWorkforceVerificationTrace(input: { db: Db; now?: Date
     .order('recorded_at', { ascending: false })
     .range(from, to))
 
-  return composeWorkforceTrace({ assignments: assignments.data, truncated: assignments.truncated, chatTurns, turnOutcomes, attempts: attempts.data, now, unavailable })
+  return composeWorkforceTrace({ assignments: assignments.data, truncated: assignments.truncated, chatTurns, turnOutcomes, attempts: attempts.data, attemptsTruncated: attempts.truncated, now, unavailable })
 }
 
 /** One block a human reads in a CI log. */
@@ -211,7 +219,7 @@ export function describeWorkforceTrace(trace: WorkforceVerificationTrace): strin
     `WORKFORCE TRACE assignments=${trace.assignments.total}${trace.assignments.truncated ? '+ (truncated)' : ''} :: ${kv(trace.assignments.byStatus)} | source ${kv(trace.assignments.bySourceKind)}`,
     `  runtime_failed reasons: ${kv(trace.runtimeFailedReasons)}`,
     `  served production: total=${s.total} harnessRunId=${s.withHarnessRunId} turnFoundInChat=${s.turnFoundInChat} (distinctUsers=${s.distinctChatUsers}) turnNotFoundInChat=${s.turnNotFoundInChat} anyTurnOutcome=${s.withAnyTurnOutcome} productionVerified=${s.withProductionVerifiedOutcome}`,
-    `  serving failures 7d: read=${trace.servingFailures.attemptsRead} outcome ${kv(trace.servingFailures.byOutcome)}`,
+    `  serving failures 7d: read=${trace.servingFailures.attemptsRead}${trace.servingFailures.truncated ? '+ (truncated)' : ''} outcome ${kv(trace.servingFailures.byOutcome)}`,
     `  serving failure classes 7d: ${kv(trace.servingFailures.byErrorClass)}`,
     ...(Object.keys(trace.unavailable).length ? [`  UNAVAILABLE (counts above are unknown, not zero): ${Object.entries(trace.unavailable).map(([k, v]) => `${k}: ${v}`).join(' | ')}`] : []),
   ].join('\n')

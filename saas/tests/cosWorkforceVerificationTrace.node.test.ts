@@ -83,4 +83,26 @@ test('an unreadable lookup is reported as unavailable, never as a zero', () => {
   assert.equal(trace.unavailable.chatHistory, 'canceling statement due to statement timeout')
   assert.match(describeWorkforceTrace(trace), /UNAVAILABLE \(counts above are unknown, not zero\): chatHistory/)
 })
+test('distinct chat users counts only users of served production turns', () => {
+  const trace = composeWorkforceTrace({
+    now: NOW, truncated: false, turnOutcomes: [], attempts: [],
+    assignments: [
+      { status: 'served', source_kind: 'production_request', source_ref: T(1) },
+      { status: 'runtime_failed', source_kind: 'production_request', source_ref: T(2) },
+    ],
+    chatTurns: [{ user_id: 'u1', turn_id: T(1) }, { user_id: 'u2', turn_id: T(2) }],
+  })
+  assert.equal(trace.servedProduction.distinctChatUsers, 1)
+})
+
+test('a truncated serving-failure read is disclosed, not presented as the complete window', () => {
+  const trace = composeWorkforceTrace({
+    now: NOW, truncated: false, chatTurns: [], turnOutcomes: [], assignments: [],
+    attempts: [{ phase: 'attempt_failed', outcome: 'timeout', error_class: 'x' }],
+    attemptsTruncated: true,
+  })
+  assert.equal(trace.servingFailures.truncated, true)
+  assert.match(describeWorkforceTrace(trace), /serving failures 7d: read=1\+ \(truncated\)/)
+})
+
 // end of saas/tests/cosWorkforceVerificationTrace.node.test.ts (if this line is missing, the paste was cut short)

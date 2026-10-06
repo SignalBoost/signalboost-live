@@ -89,4 +89,23 @@ test('real-source items already assigned to a live batch are not counted again',
   assert.equal(supply.realSourceItems, 50)
   assert.equal(csBatches(identities, assigned) > 0, Number(supply.realSourceItems) >= Number(supply.realSourceNeeded))
 })
+
+test('independent provenance wins material deduplication even when synthetic copy is first', () => {
+  const independent = rows({ real: 32, failure: 0, teacher: 0, prefix: 'origin-' })
+  const duplicateSynthetic = independent.map((row, index) => ({
+    ...row,
+    contentHash: h('synthetic-duplicate-' + index),
+    sourceKind: 'teacher_hosted_curriculum',
+  }))
+  const additionalSynthetic = rows({ real: 0, failure: 0, teacher: 32, prefix: 'extra-' })
+  const identities = [...duplicateSynthetic, ...additionalSynthetic, ...independent]
+  const supply = csSupply(identities)
+  assert.equal(supply.uniqueBatchableItems, 64)
+  assert.equal(supply.realSourceItems, 32)
+  const batches = buildMassDistillationBatches(identities, new Set(), 1)
+  assert.equal(batches.length, 1)
+  assert.equal(batches[0].sourceCount, 64)
+  for (const item of independent) assert.ok(batches[0].sourceHashes.includes(item.contentHash))
+  for (const item of duplicateSynthetic) assert.ok(!batches[0].sourceHashes.includes(item.contentHash))
+})
 // end of saas/tests/cosUniversityMassDistillationRealSourceSupply.node.test.ts (if this line is missing, the paste was cut short)

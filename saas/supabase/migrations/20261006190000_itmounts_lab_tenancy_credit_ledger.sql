@@ -188,7 +188,7 @@ grant execute on function lab.apply_credit_event(uuid,uuid,uuid,text,bigint,text
 -- Operational reconciliation is computed from authoritative rows, not mutable billing estimates.
 create function lab.reconcile_credit_account(p_organization_id uuid)
 returns jsonb language plpgsql security definer set search_path = pg_catalog, lab as $$
-declare a lab.credit_accounts%rowtype; agg record; mismatch boolean;
+declare a lab.credit_accounts%rowtype; agg record; ev record; mismatch boolean;
 begin
   if session_user not in ('postgres','service_role') or
      current_setting('lab.trusted_organization_id',true) is distinct from p_organization_id::text then
@@ -200,12 +200,21 @@ begin
          coalesce(sum(captured_microcredits),0)::bigint captured,
          coalesce(sum(refunded_microcredits),0)::bigint refunded
     into agg from lab.reservations where organization_id=p_organization_id;
+  select coalesce(sum(amount_microcredits) filter (where operation='reserve'),0)::bigint as reserved_total,
+         coalesce(sum(amount_microcredits) filter (where operation='capture'),0)::bigint as captured_total,
+         coalesce(sum(amount_microcredits) filter (where operation='release'),0)::bigint as released_total,
+         coalesce(sum(amount_microcredits) filter (where operation='refund'),0)::bigint as refunded_total
+    into ev from lab.credit_events where organization_id=p_organization_id;
   select (a.reserved_microcredits<>agg.reserved or a.captured_microcredits<>agg.captured
-          or a.refunded_microcredits<>agg.refunded) into mismatch;
+          or a.refunded_microcredits<>agg.refunded
+          or ev.reserved_total-ev.captured_total-ev.released_total<>agg.reserved
+          or ev.captured_total<>agg.captured or ev.refunded_total<>agg.refunded) into mismatch;
   return jsonb_build_object('pass',not mismatch,'stored_reserved',a.reserved_microcredits,
     'computed_reserved',agg.reserved,'stored_captured',a.captured_microcredits,
     'computed_captured',agg.captured,'stored_refunded',a.refunded_microcredits,
-    'computed_refunded',agg.refunded);
+    'computed_refunded',agg.refunded,'event_reserved',ev.reserved_total,
+    'event_captured',ev.captured_total,'event_released',ev.released_total,
+    'event_refunded',ev.refunded_total);
 end $$;
 revoke all on function lab.reconcile_credit_account(uuid) from public, anon, authenticated;
 grant execute on function lab.reconcile_credit_account(uuid) to service_role;

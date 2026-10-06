@@ -22,6 +22,11 @@ BEGIN
  PERFORM lab.apply_credit_event(o,e,r,'release',350,'release-accept-00001');
  reconciliation:=lab.reconcile_credit_account(o);
  IF NOT (reconciliation->>'pass')::boolean THEN RAISE EXCEPTION 'ledger reconciliation failed: %',reconciliation; END IF;
+ IF (reconciliation->>'event_reserved')::bigint<>600 OR
+    (reconciliation->>'event_captured')::bigint<>250 OR
+    (reconciliation->>'event_released')::bigint<>350 OR
+    (reconciliation->>'event_refunded')::bigint<>0
+ THEN RAISE EXCEPTION 'credit event reconciliation mismatch: %',reconciliation; END IF;
  IF (SELECT reserved_microcredits FROM lab.credit_accounts WHERE organization_id=o)<>0
  OR (SELECT captured_microcredits FROM lab.credit_accounts WHERE organization_id=o)<>250
  THEN RAISE EXCEPTION 'incorrect account balances'; END IF;

@@ -31,6 +31,6 @@ export async function POST(request: Request) {
     return respond(recorded)
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'lab_verdict_rejected'
-    return respond({ error: reason.slice(0, 200) }, reason === 'lab_verdict_replay_rejected' ? 409 : 422)
+    return respond({ error: reason.slice(0, 200) }, reason === 'lab_verdict_duplicate_or_conflict_rejected' ? 409 : 422)
   }
 }

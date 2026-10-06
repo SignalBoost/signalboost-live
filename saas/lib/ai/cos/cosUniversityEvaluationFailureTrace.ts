@@ -18,6 +18,10 @@ export const EVALUATION_FAILURE_TRACE_SCHEMA_VERSION = 'cos-university-evaluatio
 export const EVALUATION_FAILURE_TRACE_DAYS = 7
 export const EVALUATION_FAILURE_TRACE_ROW_LIMIT = 20000
 const EVALUATION_FAILED_CLAIM = 'mass_distilled_independent_evaluation_failed'
+const EVALUATION_COMPLETED_CLAIM = 'mass_distilled_independent_evaluation_completed'
+/** The evaluator's readiness window (cosUniversityMassDistilledArtifactEvaluation READY_TIMEOUT_MS). */
+export const EVALUATION_READY_WINDOW_SECONDS = 280
+const READINESS_BUCKETS: readonly number[] = Object.freeze([60, 120, 180, 240, EVALUATION_READY_WINDOW_SECONDS])
 const PAGE = 1000
 
 type Db = { from: (table: string) => any }
@@ -25,6 +29,19 @@ type Db = { from: (table: string) => any }
 const text = (value: unknown, max = 300): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 
 export type FailureRow = Readonly<{ observed_at: unknown; error: unknown }>
+export type CompletedRow = Readonly<{ observed_at: unknown; readiness_seconds: unknown }>
+
+/** How long COMPLETED exams waited for the exact artifact's runtime, against the window failed exams ran out of. */
+export type ReadinessWaits = Readonly<{
+  completed: number
+  withReadiness: number
+  p50: number | null
+  p90: number | null
+  max: number | null
+  /** Cumulative: completed exams that became ready within N seconds. */
+  withinSeconds: Readonly<Record<string, number>>
+  windowSeconds: number
+}>
 export type RuntimeStage = 'cold' | 'initializing' | 'warm' | 'unknown' | 'unrecorded'
 
 export type FailureFamily = Readonly<{
@@ -34,6 +51,8 @@ export type FailureFamily = Readonly<{
   lastSeenAt: string | null
   perDay: Readonly<Record<string, number>>
   last24h: number
+  /** Most frequent full error patterns in the family (case hashes blanked), with counts. */
+  details: readonly Readonly<{ detail: string; count: number }>[]
 }>
 
 export type EvaluationFailureTrace = Readonly<{
@@ -48,6 +67,7 @@ export type EvaluationFailureTrace = Readonly<{
   perDay: Readonly<Record<string, Readonly<{ infrastructure: number; merit: number }>>>
   families: readonly FailureFamily[]
   runtimeNotReadyStages: Readonly<Record<RuntimeStage, number>>
+  readiness: ReadinessWaits | null
   readOnly: true
 }>
 
@@ -62,6 +82,32 @@ export function failureFamily(error: unknown): string {
   return `${first}:${/^[0-9a-f]{8,}$/i.test(second.trim()) ? '<case>' : second}`
 }
 
+/** The full error with per-case hashes blanked, so identical causes on different cases read as one pattern. */
+export function failureDetail(error: unknown): string {
+  return text(error, 600).replace(/\b[0-9a-f]{8,}\b/gi, '<case>').slice(0, 160)
+}
+
+/** Pure: completed-exam readiness waits. */
+export function composeReadinessWaits(rows: readonly CompletedRow[]): ReadinessWaits {
+  const waits = rows
+    // A missing value is unknown, never a zero-second wait (Number(null) is 0).
+    .map(row => row.readiness_seconds === null || row.readiness_seconds === undefined || String(row.readiness_seconds).trim() === '' ? Number.NaN : Number(row.readiness_seconds))
+    .filter(value => Number.isFinite(value) && value >= 0)
+    .sort((a, b) => a - b)
+  const pick = (q: number) => waits.length ? waits[Math.min(waits.length - 1, Math.max(0, Math.ceil(q * waits.length) - 1))] : null
+  const withinSeconds: Record<string, number> = {}
+  for (const bucket of READINESS_BUCKETS) withinSeconds[String(bucket)] = waits.filter(value => value <= bucket).length
+  return Object.freeze({
+    completed: rows.length,
+    withReadiness: waits.length,
+    p50: pick(0.5),
+    p90: pick(0.9),
+    max: waits.length ? waits[waits.length - 1] : null,
+    withinSeconds: Object.freeze(withinSeconds),
+    windowSeconds: EVALUATION_READY_WINDOW_SECONDS,
+  })
+}
+
 /** The worker stage a runtime_not_ready failure recorded, or `unrecorded` when it predates the suffix. */
 export function runtimeStage(error: unknown): RuntimeStage {
   const match = /:workers=(cold|initializing|warm|unknown)\b/.exec(text(error, 600))
@@ -70,7 +116,7 @@ export function runtimeStage(error: unknown): RuntimeStage {
 
 const dayOf = (iso: string) => iso.slice(0, 10)
 
-export function composeEvaluationFailureTrace(input: { rows: readonly FailureRow[]; truncated: boolean; now: Date; days?: number }): EvaluationFailureTrace {
+export function composeEvaluationFailureTrace(input: { rows: readonly FailureRow[]; truncated: boolean; now: Date; days?: number; completed?: readonly CompletedRow[] | null }): EvaluationFailureTrace {
   const dayCount = input.days ?? EVALUATION_FAILURE_TRACE_DAYS
   const nowMs = input.now.getTime()
   const since = new Date(nowMs - dayCount * 86_400_000).toISOString()
@@ -79,7 +125,7 @@ export function composeEvaluationFailureTrace(input: { rows: readonly FailureRow
   const perDay: Record<string, { infrastructure: number; merit: number }> = {}
   for (const day of days) perDay[day] = { infrastructure: 0, merit: 0 }
 
-  const families = new Map<string, { total: number; infra: number; last: string | null; perDay: Record<string, number>; last24h: number }>()
+  const families = new Map<string, { total: number; infra: number; last: string | null; perDay: Record<string, number>; last24h: number; details: Map<string, number> }>()
   const stages: Record<RuntimeStage, number> = { cold: 0, initializing: 0, warm: 0, unknown: 0, unrecorded: 0 }
   let infrastructure = 0
   let total = 0
@@ -95,7 +141,9 @@ export function composeEvaluationFailureTrace(input: { rows: readonly FailureRow
     const day = dayOf(at)
     if (perDay[day]) perDay[day][infra ? 'infrastructure' : 'merit'] += 1
     const key = failureFamily(error)
-    const entry = families.get(key) || { total: 0, infra: 0, last: null, perDay: {}, last24h: 0 }
+    const entry = families.get(key) || { total: 0, infra: 0, last: null, perDay: {}, last24h: 0, details: new Map<string, number>() }
+    const detail = failureDetail(error)
+    entry.details.set(detail, (entry.details.get(detail) || 0) + 1)
     entry.total += 1
     if (infra) entry.infra += 1
     if (!entry.last || at > entry.last) entry.last = at
@@ -114,6 +162,10 @@ export function composeEvaluationFailureTrace(input: { rows: readonly FailureRow
       lastSeenAt: e.last,
       perDay: Object.freeze({ ...e.perDay }),
       last24h: e.last24h,
+      details: Object.freeze([...e.details.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 5)
+        .map(([detail, count]) => Object.freeze({ detail, count }))),
     }))
     .sort((a, b) => b.total - a.total || a.family.localeCompare(b.family))
 
@@ -129,6 +181,7 @@ export function composeEvaluationFailureTrace(input: { rows: readonly FailureRow
     perDay: Object.freeze(perDay),
     families: Object.freeze(list),
     runtimeNotReadyStages: Object.freeze(stages),
+    readiness: input.completed ? composeReadinessWaits(input.completed) : null,
     readOnly: true as const,
   })
 }
@@ -156,7 +209,26 @@ export async function readEvaluationFailureTrace(input: { db: Db; now?: Date; da
     out.push(...page)
     if (page.length < PAGE) { truncated = false; break }
   }
-  return composeEvaluationFailureTrace({ rows: out, truncated, now, days })
+  // Completed exams in the same window, for their readiness wait. Recorded since 2026-10-05; older rows carry none.
+  // Its own failure never hides the failure trace.
+  let completed: any[] | null = null
+  try {
+    completed = []
+    for (let from = 0; from < EVALUATION_FAILURE_TRACE_ROW_LIMIT; from += PAGE) {
+      const page = await rows(input.db.from('cos_university_learning_assurance_events')
+        .select('observed_at,readiness_seconds:evidence->>readinessSeconds')
+        .eq('event_type', 'fine_tune')
+        .eq('evidence->>claim', EVALUATION_COMPLETED_CLAIM)
+        .gte('observed_at', since)
+        .order('observed_at', { ascending: false })
+        .range(from, from + PAGE - 1))
+      completed.push(...page)
+      if (page.length < PAGE) break
+    }
+  } catch {
+    completed = null
+  }
+  return composeEvaluationFailureTrace({ rows: out, truncated, now, days, completed })
 }
 
 /** A block a human reads in a CI log or check run. */
@@ -172,6 +244,16 @@ export function describeEvaluationFailureTrace(trace: EvaluationFailureTrace, to
     lines.push(`  ${family.family} | ${family.attribution} | ${family.total} | ${family.last24h} | ${family.lastSeenAt ? family.lastSeenAt.slice(0, 16) + 'Z' : 'n/a'} | ${trace.days.map(day => family.perDay[day] ?? 0).join(' ')}`)
   }
   if (trace.families.length > topFamilies) lines.push(`  ... ${trace.families.length - topFamilies} more families`)
+  const r = trace.readiness
+  lines.push(r
+    ? `  completed-exam readiness wait (window ${r.windowSeconds}s): completed=${r.completed} withReadiness=${r.withReadiness} p50=${r.p50 ?? 'n/a'}s p90=${r.p90 ?? 'n/a'}s max=${r.max ?? 'n/a'}s within ${Object.entries(r.withinSeconds).map(([k, v]) => `${k}s=${v}`).join(' ')}`
+    : '  completed-exam readiness wait: unavailable')
+  lines.push('  detail of families still firing in the last 24h, plus the top 5 overall:')
+  const detailed = trace.families.filter((family, index) => family.last24h > 0 || index < 5)
+  for (const family of detailed) {
+    lines.push(`    ${family.family}:`)
+    for (const entry of family.details) lines.push(`      ${entry.count} x ${entry.detail}`)
+  }
   return lines.join('\n')
 }
 // end of saas/lib/ai/cos/cosUniversityEvaluationFailureTrace.ts (if this line is missing, the paste was cut short)

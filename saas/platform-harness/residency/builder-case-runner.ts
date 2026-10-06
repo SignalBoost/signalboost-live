@@ -1,3 +1,4 @@
+// saas/platform-harness/residency/builder-case-runner.ts
 import { createHash } from 'node:crypto'
 import type { HarnessAuthorityEnvelope, HarnessRunResult } from '../core/types.ts'
 import { resolveHarnessManifest } from '../core/policy.ts'
@@ -7,6 +8,28 @@ import { completeHarnessRun } from '../runtime/completion.ts'
 import type { BuilderResidencyCase } from '../cases/builder-residency.ts'
 
 const hash=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex')
+
+/**
+ * The resident's own work loop, as the executor observed it (2026-10-05): did it finish, why it stopped, how many steps,
+ * how many seed files it changed. Production: 128 counted Residency failures were all `residency_proof_exit_1`, which
+ * cannot tell a wrong fix from a resident that ran out of time before editing. Recorded on the case run's existing
+ * metadata column; it changes no outcome, score or attribution.
+ */
+export function builderLoopMetadata(trajectory:unknown):Readonly<Record<string,unknown>>|undefined{
+  const events=Array.isArray(trajectory)?trajectory:[]
+  for(let index=events.length-1;index>=0;index-=1){
+    const data=(events[index] as {kind?:unknown;data?:Record<string,unknown>}|null)?.data
+    if((events[index] as {kind?:unknown})?.kind!=='observation'||!data||!('builderOutcome' in data)) continue
+    const count=(value:unknown)=>typeof value==='number'&&Number.isFinite(value)?value:null
+    return Object.freeze({builderLoop:Object.freeze({
+      outcome:String(data.builderOutcome),
+      failureCode:typeof data.failureCode==='string'?data.failureCode.slice(0,120):null,
+      traceSteps:count(data.traceSteps),
+      filesChanged:count(data.filesChanged),
+    })})
+  }
+  return undefined
+}
 
 export interface BuilderResidencyExactArtifactExecutor {
   run(input:{
@@ -35,6 +58,7 @@ export interface BuilderResidencyEvidenceStore {
     trajectoryHash?:string
     evidenceHash?:string
     failureCode?:string
+    metadata?:Readonly<Record<string,unknown>>
   }):Promise<void>
   recordCompetency(input:{
     residencyId:string
@@ -145,6 +169,7 @@ export async function runBuilderResidencyCase(input:{
 
   const trajectoryHash=hash(result.trajectory)
   const observedAt=now().toISOString()
+  const metadata=builderLoopMetadata(result.trajectory)
 
   if(completion.route.destination!=='university'){
     await input.store.finishCase({
@@ -154,6 +179,7 @@ export async function runBuilderResidencyCase(input:{
       verifierRef:result.outcome.verifierRef,
       trajectoryHash,
       failureCode:result.outcome.failureCode??`residency_routed_${completion.route.destination}`,
+      metadata,
     })
     return Object.freeze({
       ok:false,
@@ -172,6 +198,7 @@ export async function runBuilderResidencyCase(input:{
       verifierRef:result.outcome.verifierRef,
       trajectoryHash,
       failureCode:adapted.blockers[0]??result.outcome.failureCode??'residency_evidence_rejected',
+      metadata,
     })
     return Object.freeze({ok:false,reason:'residency_evidence_rejected',blockers:adapted.blockers,result})
   }
@@ -196,6 +223,7 @@ export async function runBuilderResidencyCase(input:{
     trajectoryHash,
     evidenceHash:adapted.evidenceHash,
     failureCode:result.outcome.failureCode,
+    metadata,
   })
 
   return Object.freeze({
@@ -209,3 +237,4 @@ export async function runBuilderResidencyCase(input:{
     result,
   })
 }
+// end of saas/platform-harness/residency/builder-case-runner.ts (if this line is missing, the paste was cut short)

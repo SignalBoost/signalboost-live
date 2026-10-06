@@ -398,8 +398,9 @@ export async function activeGraduateRuntimesForRole(
   if (!db) return []
   const onCall = await onCallWorkforceRegistryIds(db)
   if (!onCall || !onCall.length) return []
-  // A caller with an explicit reservation must query that exact bounded Workforce set. Filtering only after
-  // the registry's newest-20 limit can omit every reserved worker once the roster grows beyond 20.
+  // Production and reservation selectors must see the same on-call universe. The former newest-20 cap could
+  // hide both reserved/warm graduates once the roster exceeded 20, leaving genuine interactive traffic to
+  // fall through to COS while the workers reserved for Production were never offered the request.
   const dispatchIds = allowedRegistryIds
     ? onCall.filter(id => allowedRegistryIds.has(id))
     : onCall
@@ -411,7 +412,7 @@ export async function activeGraduateRuntimesForRole(
     .eq('status', 'active')
     .in('id', dispatchIds)
     .order('updated_at', { ascending: false })
-    .limit(allowedRegistryIds ? Math.min(200, dispatchIds.length) : 20)
+    .limit(Math.min(200, dispatchIds.length))
   if (rows.error) {
     console.warn('[cos-graduate-runtime] active registry read failed closed', rows.error)
     return []

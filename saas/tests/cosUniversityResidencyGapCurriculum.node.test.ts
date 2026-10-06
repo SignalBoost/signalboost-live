@@ -183,6 +183,21 @@ test('curriculum replenishment runs Residency remediation in both inventory stat
   assert.equal((replenishment.match(/residencyGapDerivedInserted: residencyGapDerived\.inserted/g) || []).length, 2)
 })
 
+test('a full prepared buffer still installs Residency remediation and rebuilds batches for it (Codex on #3700)', () => {
+  const workflow = read('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  const fullBuffer = workflow.slice(workflow.indexOf('if (preparedBeforeReplenishment >= preparedBufferTarget)'), workflow.indexOf('shortfall_replenishment_active'))
+  assert.match(fullBuffer, /installResidencyGapDerivedCurriculum\(\{ db: cosServiceDb\(\), now \}\)/)
+  assert.match(fullBuffer, /const remediationInserted = failureDerived\.inserted \+ residencyGapDerived\.inserted/)
+  assert.match(fullBuffer, /skipped: remediationInserted === 0/)
+  assert.match(fullBuffer, /if \(remediationInserted > 0\) \{\s*curriculum = \{ ok: true, \.\.\.\(await prepareUniversityMassDistillationCurriculum/)
+  assert.match(fullBuffer, /const remediationSubjects = new Set\(\[[\s\S]*residencyGapDerived\.inserted > 0 \? \[RESIDENCY_GAP_UNIVERSITY_SUBJECT\] : \[\][\s\S]*\]\)/, 'a subject seeded this tick joins the same-tick corrective pass (Codex on #3701)')
+  assert.match(fullBuffer, /const correctiveMaterialInserted = \[[^\]]*curriculumReplenishment\.residencyGapDerivedInserted/)
+  const shortfall = workflow.slice(workflow.indexOf('shortfall_replenishment_active'))
+  assert.match(shortfall, /const replenishmentMaterialInserted = \[[^\]]*curriculumReplenishment\.residencyGapDerivedInserted/)
+  const replenishment = read('../lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts')
+  assert.match(replenishment, /skipped: failureDerived\.inserted === 0 && residencyGapDerived\.inserted === 0/)
+})
+
 test('competency fail evidence is written only for a Harness agent_failure', () => {
   const adapter = read('../platform-harness/adapters/university.ts')
   assert.match(adapter, /if \(!\['success', 'agent_failure'\]\.includes\(result\.outcome\.status\)\)/)

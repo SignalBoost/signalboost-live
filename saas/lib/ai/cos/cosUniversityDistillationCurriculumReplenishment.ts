@@ -490,7 +490,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     const remediationTargets = failureDerived.bySubject.map(item => item.subject)
     return Object.freeze({
       ok: true,
-      skipped: failureDerived.inserted === 0,
+      skipped: failureDerived.inserted === 0 && residencyGapDerived.inserted === 0,
       reason: remediationTargets.length === 0
         ? 'no_targetable_subject_shortfall'
         : failureDerived.inserted > 0

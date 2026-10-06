@@ -15,6 +15,7 @@ import {
   prepareUniversityMassDistillationCurriculum,
 } from './cosUniversityMassDistillation.ts'
 import { installVerifiedFailureDerivedCurriculum, maintainUniversityRightsClearedOpenSourceCorpus, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
+import { RESIDENCY_GAP_UNIVERSITY_SUBJECT, installResidencyGapDerivedCurriculum } from './cosUniversityResidencyGapCurriculum.ts'
 import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
 import { authorizeAvailableUniversityMassDistillationCampaigns, authorizeNextUniversityMassDistillationRemediationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs, recoverHuggingFaceStorageCapacityCircuit } from './cosUniversityHuggingFaceJobDiagnostics.ts'
@@ -274,15 +275,21 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
         now,
         maxSubjects: throughput.targetSubjectsPerReplenishment,
       })
+      // Builder Residency skill failures are remediation too and must not wait for a buffer shortfall
+      // (Codex review on #3700): with a full buffer the replenisher below never runs.
+      const residencyGapDerived = await installResidencyGapDerivedCurriculum({ db: cosServiceDb(), now })
+      const remediationInserted = failureDerived.inserted + residencyGapDerived.inserted
       curriculumReplenishment = {
         ok: true,
-        skipped: failureDerived.inserted === 0,
-        reason: failureDerived.inserted > 0 ? 'failure_derived_remediation_seeded_with_prepared_buffer_satisfied' : 'prepared_buffer_satisfied',
+        skipped: remediationInserted === 0,
+        reason: remediationInserted > 0 ? 'failure_derived_remediation_seeded_with_prepared_buffer_satisfied' : 'prepared_buffer_satisfied',
         failureDerivedInserted: failureDerived.inserted,
         failureDerivedBySubject: failureDerived.bySubject,
+        residencyGapDerivedInserted: residencyGapDerived.inserted,
+        residencyGapDerivedCompetencies: residencyGapDerived.competencies,
         externalCostUsd: 0,
       }
-      if (failureDerived.inserted > 0) {
+      if (remediationInserted > 0) {
         curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
           corpusScanRows: throughput.corpusScanRows,
           maxBatchesPerSweep: throughput.maxBatchesPerSweep,
@@ -303,6 +310,8 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       const remediationSubjects = new Set([
         ...failureDerived.persistedRemediationSubjects,
         ...failureDerived.bySubject.map(item => item.subject),
+        // Seeded this tick, so absent from persistedRemediationSubjects (read before the insert): Codex on #3701.
+        ...(residencyGapDerived.inserted > 0 ? [RESIDENCY_GAP_UNIVERSITY_SUBJECT] : []),
       ])
       const remediationSupplyBySubject = new Map(
         postRemediationSupply.map(subject => [String(subject?.subject || ''), subject] as const),
@@ -327,6 +336,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
         const correctiveMaterialInserted = [
           curriculumReplenishment.accepted,
           curriculumReplenishment.failureDerivedInserted,
+          curriculumReplenishment.residencyGapDerivedInserted,
           curriculumReplenishment.hostedTeacherInserted,
           curriculumReplenishment.syntheticInserted,
         ].reduce<number>((sum, value) => sum + Math.max(0, Number(value || 0)), 0)
@@ -351,6 +361,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
       const replenishmentMaterialInserted = [
         curriculumReplenishment.accepted,
         curriculumReplenishment.failureDerivedInserted,
+        curriculumReplenishment.residencyGapDerivedInserted,
         curriculumReplenishment.hostedTeacherInserted,
         curriculumReplenishment.syntheticInserted,
       ].reduce<number>((sum, value) => sum + Math.max(0, Number(value || 0)), 0)

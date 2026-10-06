@@ -2562,6 +2562,8 @@ The long-term portability goal is that an authorized recipient can verify who/wh
 
 ## University → Workforce downstream completion contract — 2026-10-02
 
+> **Scope, owner 2026-10-06: this whole section is the NEXT project, not Step 1.** Step 1 is the University factory a buyer uses (see *Step 1 exit criterion* at the end of this file). Do not diagnose or repair Workforce dispatch, graduate serving, shadow work or Production-outcome verification as Step 1 work. The rules below stay valid for when that project starts.
+
 **Owner direction:** graduation is not the end of the University project. Do not diagnose a stable “Graduated / Workforce” count as a training, distillation, evaluation, or artifact-creation defect unless live evidence shows the blockage is actually upstream. First trace the artifacts that already graduated through the downstream Workforce lifecycle.
 
 Canonical completion path:
@@ -2708,7 +2710,7 @@ Several AI providers' terms restrict using their outputs to train competing mode
 
 One sequence; each step is earned on the lab instance before the next starts:
 
-1. **Finish the current University end-to-end.** Fix infrastructure, evaluator and serving defects and complete independently verified Production outcomes, without weakening graduation standards.
+1. **Finish the current University factory end-to-end.** A buyer can create, train, distil, independently examine, put Computer Science artifacts through Builder Residency, and graduate artifacts, reliably, with every failure correctly attributed and no graduation standard weakened. Graduates serving work and independently verified Production outcomes are the **next project**, not this step (owner, 2026-10-06; see *Step 1 exit criterion* below).
 2. **Instrument the University as a Lab internally.** Experiment IDs, complete traces, cost attribution, failure attribution, recipe/version provenance, outcome measurement. No customer billing.
 3. **Make the University learn from experiments.** Which curriculum/teacher/training/evaluation combinations produce qualified artifacts, at what cost.
 4. **Prove graduate quality.** High Graduate Precision and Production effectiveness, not a high graduation rate.
@@ -2725,16 +2727,57 @@ Steps 1 and 2 are useful even if the Lab is never commercialized: they are how t
 
 ## Step 1 exit criterion and read-only evidence report — 2026-10-06
 
-Owner direction, verbatim: "Step 1 is complete when the current University operates end-to-end autonomously—from artifact creation through qualification, graduation, Production serving and independently verified Production outcomes—with failures correctly attributed and the loop demonstrably continuing without manual intervention or weakened standards." One successful `production_verified:*` chain is a milestone, not completion: the line must be shown to operate repeatedly. The canonical roadmap remains the 10 steps above; the project is at Step 1. **The Step 1 declaration belongs to the owner.** The platform produces the evidence and may recommend; it never declares a phase complete or moves the roadmap forward.
+### Scope (owner, 2026-10-06 — supersedes the criterion first recorded here the same morning)
 
-Evidence state found on 2026-10-06: the independent watchdog (`assembly-line-live-proof.yml`) had **never run against Production**. Every scheduled run failed at "Refuse to run blind" because the repository secrets `PRODUCTION_BASE_URL` and `CRON_SECRET` were not set. Its absence of findings was therefore no evidence either way.
+Owner, verbatim: "the main goal is to commercialize my portable/software so users can create, train and distil not make the artifacts created to work on my platform, it will be the next project".
 
-Read-only evidence path (all reads go through `readOnlyDb`, which throws on `insert`/`update`/`upsert`/`delete` and exposes no `rpc`):
+**Step 1 is the factory a buyer uses**, not the lab platform using its own graduates. Step 1 is complete when the current University runs end to end on the lab instance:
 
-- `/api/cron/cos-university-step1-evidence?window=24h|7d|30d|all` (CRON_SECRET): the Artifact Effectiveness Funnel assessed by `cosUniversityStep1Evidence.ts` against the criterion above. Each criterion is `evidence_present`, `partial`, `no_evidence`, `unavailable` (unreadable chapter, never a zero) or `not_measured`. `repeated_operation`, `no_manual_intervention` and `standards_unweakened` cannot be established from one snapshot, so the report recommends only `NOT_READY` or `INSUFFICIENT_EVIDENCE_FOR_READY`, never `READY`. "Present" means non-zero sourced evidence; no threshold is invented. Repetition is shown by comparing dated runs.
-- `/api/cron/cos-university-line-observation` (CRON_SECRET): per-unit placement from the artifact table plus controller-ledger disagreement counts. The Playwright line prover now reads this route. It previously read `/api/cron/cos-university-lifecycle-orchestrator`, which **runs a full controller tick on every call** (ledger writes, leases, station wakes), so the prover was partly driving the line it measured.
-- `assembly-line-live-proof.yml` job `step1-evidence` prints the report for 24h, 7d and all-time into the Actions log and keeps the JSON for 90 days. A NOT_READY report is evidence, not a job failure.
+```text
+artifact born (permanent ID + birth certificate)
+-> curriculum / distillation -> training
+-> independent examination (improvement, safety, unseen transfer, delayed retention)
+-> Builder Residency for Computer Science artifacts
+-> graduation (or a legitimate rejection)
+```
+
+with every evaluation failure attributed to infrastructure or merit with an evidence-backed cause, the line repeatedly moving without manual intervention, and no evaluation or graduation standard weakened.
+
+**Next project, not Step 1:** Workforce hiring/dispatch, graduate serving (live chat or shadow), Production-outcome verification and post-graduation monitoring. Work on them only when the owner opens that project. An agent that finds itself diagnosing COS chat latency, Workforce dispatch or graduate serving while working Step 1 has drifted out of scope.
+
+The canonical roadmap remains the 10 steps above; the project is at Step 1. **The Step 1 declaration belongs to the owner.** The platform produces the evidence and may recommend; it never declares a phase complete or moves the roadmap forward.
+
+### Read-only evidence path
+
+All reads go through `readOnlyDb`, which throws on `insert`/`update`/`upsert`/`delete` and exposes no `rpc`.
+
+- `/api/cron/cos-university-step1-evidence?window=24h|7d|30d|all` (CRON_SECRET): the Artifact Effectiveness Funnel assessed by `cosUniversityStep1Evidence.ts` (schema `v2`). Every criterion carries a `scope`:
+  - `step1` (blocking): `artifact_creation`, `qualification` (with capability gain), `failure_attribution` (with `infrastructureShare`), `builder_residency`, `graduation`, `line_flow`, and the three `not_measured` criteria `repeated_operation`, `no_manual_intervention`, `standards_unweakened`.
+  - `next_project` (printed under its own heading, never blocking): `production_serving`, `verified_production_outcomes`.
+  Status is `evidence_present`, `partial`, `no_evidence`, `unavailable` (unreadable chapter, never a zero) or `not_measured`. The report recommends only `NOT_READY` or `INSUFFICIENT_EVIDENCE_FOR_READY`, never `READY`. "Present" means non-zero sourced evidence; no threshold is invented (the infrastructure share is reported as a fact, not judged against an unset target).
+- `/api/cron/cos-university-line-observation` (CRON_SECRET): per-unit placement from the artifact table plus controller-ledger disagreement counts. The Playwright line prover reads this route, never the lifecycle orchestrator (which runs a controller tick on every call).
+- `assembly-line-live-proof.yml` job `step1-evidence` runs every six hours and on dispatch. It prints the report for 24h, 7d and all-time, keeps the JSON for 90 days, and publishes the same text as a neutral **"Step 1 evidence report"** check run on the exact commit. Logs and artifacts live on external blob storage that API-only agents cannot reach; the check run's `output.summary` is readable through the GitHub REST API. A NOT_READY report is evidence, not a job failure. (The repository secrets `PRODUCTION_BASE_URL` and `CRON_SECRET` were added on 2026-10-06; before that every run failed at "Refuse to run blind".)
 
 `tests/cosUniversityStep1Evidence.node.test.ts` is in the production regression gate.
+
+### Factory evidence on 2026-10-06 (7-day window; re-read the report, never copy these numbers into a pitch)
+
+647 artifacts born, 647 with a birth certificate; 555 examined, 103 passed all four gates and graduated; mean capability gain −0.011 (166 improved, 179 regressed); 1,394 evaluation failures, 1,234 (89%) infrastructure and 160 merit, 40 without an evidence-backed cause (RunPod "max workers across all endpoints" refusals and `candidate_output_exhausted`); Builder Residency 0 of 22 complete. Order of work inside Step 1: evaluation infrastructure failures, then training gain, then Residency, one at a time.
+
+### AI Lab specification corrections — 2026-10-06
+
+External drafts of the Lab specification circulated on 2026-10-06. Where they conflict with this file, this file wins:
+
+1. **Birth certificate at creation, for every artifact**, including rejected ones; never issued at graduation. Examination, Residency and graduation evidence belong to the life record/résumé, not the birth certificate.
+2. **No second identity system.** Identity is `permanent_artifact_id` + the birth-certificate record + the exact artifact fingerprint. A VIN such as `ITM-…` is a human-readable label over them, never a new primary key, and never shortened to a few hash characters that can collide.
+3. **Signatures are public-key** (e.g. Ed25519/RSA) so a recipient can verify without trusting iTMounts. HMAC is not a certificate signature.
+4. **Teacher provenance records provider, model and version**, never customer endpoint URLs.
+5. **Data-use policy is per Experiment** and follows derived artifacts and telemetry; it is not a University-level setting. A policy tier is not GDPR/HIPAA compliance and must never be described as such.
+6. **The ledger is append-only reserve → capture/release** (an authorization-hold pattern); do not call it double-entry or two-phase commit. In BYOI mode the customer pays providers directly and credits pay for Lab work, so "the customer pays for compute" on a competency failure is wrong.
+7. **Provenance proves origin and lineage, not bit-exact reproducibility.** GPU training is not deterministic; never promise reproducible rebuilds.
+8. **Graduation means "beat its baseline on independent evaluation and never falsely graduated"**, not "production-ready". Production proof is the next project.
+9. The metric is **yield and cost of qualified artifacts**, never graduation rate.
+10. Buyer-facing material says **iTMounts**, never SignalBoost.
+11. Stages open on measured entry conditions, never calendar weeks, and "make the University learn from experiments" stays in the sequence.
 
 <!-- end of ONBOARD.md (if this line is missing, the paste was cut short) -->

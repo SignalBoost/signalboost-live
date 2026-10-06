@@ -5,6 +5,8 @@
 //   1. readOnlyDb refuses every write before it reaches the database.
 //   2. The line observation places units from the artifact table and reports controller-ledger disagreement.
 //   3. The Step 1 assessment never recommends READY and never turns an unreadable chapter into a zero.
+//   4. Owner scope (2026-10-06): Step 1 is the factory (create, train, distil, examine, Residency, graduate). Graduates
+//      serving work and verified Production outcomes are the NEXT project: reported, never blocking Step 1.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -163,8 +165,11 @@ test('an empty University is NOT_READY, with every missing stage named as blocki
   assert.equal(report.recommendation, 'NOT_READY')
   assert.equal(report.declaration, 'owner_only')
   assert.equal(report.readOnly, true)
-  for (const id of ['artifact_creation', 'qualification', 'graduation', 'production_serving', 'verified_production_outcomes', 'line_flow']) {
+  for (const id of ['artifact_creation', 'qualification', 'builder_residency', 'graduation', 'line_flow']) {
     assert.ok(report.blocking.includes(id), `${id} must block`)
+  }
+  for (const id of ['production_serving', 'verified_production_outcomes']) {
+    assert.ok(!report.blocking.includes(id), `${id} is the next project and never blocks Step 1`)
   }
   assert.match(describeStep1Evidence(report), /recommendation=NOT_READY declaration=owner_only/)
 })
@@ -194,18 +199,70 @@ test('even with evidence at every stage the report never recommends READY', () =
   assert.doesNotMatch(JSON.stringify(report), /"recommendation":"READY"/)
 })
 
-test('zero verified outcomes blocks Step 1 even when everything upstream works', () => {
+test('graduates not serving and zero verified outcomes do not block Step 1: they are the next project, still reported', () => {
   const funnel = fullFunnel()
-  funnel.stages = funnel.stages.map((stage: any) => stage.id === 'verified_outcome' ? { ...stage, count: 0 } : stage)
+  funnel.stages = funnel.stages.map((stage: any) => ['hired', 'performed_work', 'served_successfully', 'verified_outcome'].includes(stage.id) ? { ...stage, count: 0 } : stage)
   const report = assessStep1Evidence(funnel, NOW)
-  assert.equal(report.recommendation, 'NOT_READY')
-  assert.deepEqual([...report.blocking], ['verified_production_outcomes'])
+  assert.deepEqual([...report.blocking], [])
+  assert.equal(report.recommendation, 'INSUFFICIENT_EVIDENCE_FOR_READY')
+  const byId = new Map(report.criteria.map(entry => [entry.id, entry]))
+  assert.equal(byId.get('production_serving')!.scope, 'next_project')
+  assert.equal(byId.get('production_serving')!.status, 'no_evidence')
+  assert.equal(byId.get('verified_production_outcomes')!.scope, 'next_project')
+  assert.equal(byId.get('verified_production_outcomes')!.status, 'no_evidence')
+  const text = describeStep1Evidence(report)
+  const nextAt = text.indexOf('next project (graduates at work; reported only, not part of Step 1):')
+  assert.ok(nextAt > 0, 'the next-project section is printed')
+  assert.ok(text.indexOf('verified_production_outcomes') > nextAt, 'serving and outcomes print only under the next-project heading')
+  assert.ok(text.indexOf('builder_residency') < nextAt, 'factory criteria print above it')
+})
+
+test('every criterion is scoped, and only the factory is in Step 1', () => {
+  const report = assessStep1Evidence(fullFunnel(), NOW)
+  const scoped = Object.fromEntries(report.criteria.map(entry => [entry.id, entry.scope]))
+  assert.deepEqual(scoped, {
+    artifact_creation: 'step1',
+    qualification: 'step1',
+    failure_attribution: 'step1',
+    builder_residency: 'step1',
+    graduation: 'step1',
+    production_serving: 'next_project',
+    verified_production_outcomes: 'next_project',
+    line_flow: 'step1',
+    repeated_operation: 'step1',
+    no_manual_intervention: 'step1',
+    standards_unweakened: 'step1',
+  })
+})
+
+test('Builder Residency with residents but no completion blocks Step 1', () => {
+  const funnel = fullFunnel()
+  funnel.stages = funnel.stages.map((stage: any) => stage.id === 'residency_complete' ? { ...stage, count: 0 } : stage)
+  const report = assessStep1Evidence(funnel, NOW)
+  assert.deepEqual([...report.blocking], ['builder_residency'])
+  const residency = report.criteria.find(entry => entry.id === 'builder_residency')!
+  assert.deepEqual({ ...residency.observed }, { residency_enrolled: 3, residency_complete: 0 })
+})
+
+test('an unreadable Residency chapter is unavailable, never a zero', () => {
+  const funnel = fullFunnel({ unavailable: { residency: 'cos_university_residency_unreadable' } })
+  const residency = assessStep1Evidence(funnel, NOW).criteria.find(entry => entry.id === 'builder_residency')!
+  assert.equal(residency.status, 'unavailable')
+})
+
+test('the infrastructure share of evaluation failures is reported as a fact, with no invented threshold', () => {
+  const funnel = fullFunnel({ evaluationFailures: { available: true, total: 8, infrastructure: 7, merit: 1, explanations: [{ reason: 'r', count: 8, causeStatus: 'evidence_backed' }], source: 'evals' } })
+  const attribution = assessStep1Evidence(funnel, NOW).criteria.find(entry => entry.id === 'failure_attribution')!
+  assert.equal(attribution.observed.infrastructureShare, 0.875)
+  assert.equal(attribution.status, 'evidence_present', 'attribution is judged on causes, not on an unset infrastructure-rate target')
 })
 
 test('an unreadable chapter is reported as unavailable, never as a zero', () => {
   const funnel = fullFunnel({ unavailable: { verified: 'cos_university_graduate_lifecycle_events_unreadable' } })
-  const verified = assessStep1Evidence(funnel, NOW).criteria.find(entry => entry.id === 'verified_production_outcomes')!
+  const report = assessStep1Evidence(funnel, NOW)
+  const verified = report.criteria.find(entry => entry.id === 'verified_production_outcomes')!
   assert.equal(verified.status, 'unavailable')
+  assert.ok(!report.blocking.includes('verified_production_outcomes'), 'a next-project chapter never blocks Step 1')
 })
 
 test('failures with an unresolved cause make attribution partial and blocking', () => {

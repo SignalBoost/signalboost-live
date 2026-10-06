@@ -17,6 +17,8 @@ const token = String(process.env.VERCEL_TOKEN || '').trim()
 const projectId = String(process.env.VERCEL_PROJECT_ID || '').trim()
 const teamId = String(process.env.VERCEL_TEAM_ID || '').trim()
 const mainSha = String(process.env.MAIN_SHA || '').trim()
+const githubRepo = 'SignalBoost/signalboost-live'
+const githubToken = String(process.env.GITHUB_TOKEN || '').trim()
 const headWaitMs = Math.min(Math.max(Number(process.env.HEAD_WAIT_MS || 900000), 0), 1200000)
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
@@ -85,7 +87,21 @@ async function buildError(deployment) {
   }
 }
 
+async function assertCurrentMain() {
+  if (!mainSha || !githubToken) throw new Error('Cannot verify live main SHA; refusing production mutation')
+  const response = await fetch(`https://api.github.com/repos/${githubRepo}/commits/main`, {
+    headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${githubToken}`, 'User-Agent': 'signalboost-vercel-recovery' },
+  })
+  if (!response.ok) throw new Error(`Live main verification failed (HTTP ${response.status}); refusing production mutation`)
+  const data = await response.json()
+  if (data?.sha !== mainSha) throw new Error(`Stale recovery run: main is ${short(data?.sha)}, run is ${short(mainSha)}; refusing production mutation`)
+}
+
 async function promote(deployment, reason) {
+  await assertCurrentMain()
+  if (shaOf(deployment) !== mainSha || refOf(deployment) !== 'main' || stateOf(deployment) !== 'READY') {
+    throw new Error('Deployment is not a READY build of this run\'s main SHA; refusing promotion')
+  }
   summary(`- Promoting \`${short(shaOf(deployment))}\` (${idOf(deployment)}) to production: ${reason}`)
   await requestJson(withTeam(`/v10/projects/${encodeURIComponent(projectId)}/promote/${encodeURIComponent(idOf(deployment))}`), { method: 'POST' })
   const deadline = Date.now() + 300000
@@ -124,6 +140,7 @@ async function main() {
 
   if (!mainBuilds.length) {
     summary('- Vercel has no production build of main at all in its recent deployments; building the checkout directly.')
+    await assertCurrentMain()
     output('fallback', 'deploy')
     return
   }
@@ -131,7 +148,8 @@ async function main() {
   // 1. Newest READY build of main, if newer than what production serves.
   const newestReady = mainBuilds.find(d => stateOf(d) === 'READY')
   if (newestReady && idOf(newestReady) !== production?.id && createdOf(newestReady) > Number(production?.created || 0)) {
-    await promote(newestReady, 'newest successful build of main is newer than production')
+    if (shaOf(newestReady) === mainSha) await promote(newestReady, 'current main build is newer than production')
+    else summary(`- Skipping older READY build ${short(shaOf(newestReady))}; only current main may be promoted.`)
   } else if (newestReady) {
     summary(`- Newest successful main build \`${short(shaOf(newestReady))}\` is already production or older than it.`)
   } else {
@@ -158,6 +176,7 @@ async function main() {
     if (Date.now() >= deadline) {
       if (!head) {
         summary(`- Vercel never started a build for \`${short(mainSha)}\`; building the checkout directly.`)
+        await assertCurrentMain()
         output('fallback', 'deploy')
       } else {
         summary(`- The build of \`${short(mainSha)}\` is still ${state || 'pending'} after ${Math.round(headWaitMs / 60000)} minutes.`)

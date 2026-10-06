@@ -116,6 +116,7 @@ const tests = [
   'tests/massEvaluationJudgeProtocolEvidence.node.test.ts',
   'tests/massEvaluationReadinessWorkerStage.node.test.ts',
   'tests/massEvaluationHoldoutRubric.node.test.ts',
+  'tests/holdoutExamRepeatMiss.node.test.ts',
   'tests/cosUniversityErrorText.node.test.ts',
 
   'tests/cosUniversityMassBacklogCompactor.node.test.ts',

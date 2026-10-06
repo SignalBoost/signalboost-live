@@ -472,9 +472,10 @@ export async function runWorkforceApprenticeShadow(
   args: LocalModelCallArgs,
   objective: string,
   excludedRegistryIds: ReadonlySet<string> = new Set(),
+  allowedRegistryIds?: ReadonlySet<string>,
 ): Promise<void> {
   if (currentReasoningEvaluationContext()) return
-  const runtime = await activeGraduateApprenticeForObjective(objective, excludedRegistryIds).catch(() => null)
+  const runtime = await activeGraduateApprenticeForObjective(objective, excludedRegistryIds, allowedRegistryIds).catch(() => null)
   if (!runtime) return
   // NO PAID WAKE-UPS (owner 2026-10-02). Practice (shadow) work is advisory and nobody waits for it, so it must never boot
   // a powered-off graduate endpoint: RunPod bills the cold boot even when the call gives up. A free status read decides;

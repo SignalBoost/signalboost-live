@@ -102,7 +102,11 @@ const YES_NO_ONLY = /^(yes|no)\b[.!]?\s*$/i
 // Multi-step arithmetic is therefore refused at write time. A SINGLE approximate quantity stays allowed, because
 // transfer-base-rate-quantified ("state the approximate probability", answer "about 16%") is one of the cases that
 // does discriminate. This changes which questions get written, never how answers are scored.
-const COMPUTATION_ASK = /\b(calculat\w*|comput\w*|deriv\w*|work out|solve for|evaluate the (?:formula|expression|integral))\b/i
+// 2026-10-05: `comput\w*` and `deriv\w*` also matched the TOPIC words computing, computer, computational, derivative(s)
+// and derived. 18 of 23 artifacts blocked from their exam that night were Quantum Computing, where nearly every good
+// question says "computing"; every teacher's draft was refused and the exam line stopped. The rule now matches the
+// REQUEST to calculate (calculate, compute, derive, work out, solve for, evaluate the formula), never the topic noun.
+const COMPUTATION_ASK = /\b(calculat\w*|computes?|derives?|work out|solve for|evaluate the (?:formula|expression|integral))\b/i
 // An arithmetic expression in the ANSWER means the student had to evaluate it. LaTeX may sit between the equals sign
 // and the first digit (\(-100 + 115/1.10 = \$4.55\)), so allow it rather than requiring a digit immediately.
 const FORMULA_SHAPE = /\\sqrt|\\frac|\\times\s*10\^|\bsqrt\s*\(|=[^.]{0,40}?\d[\d,.]*\s*[-+*/]\s*\d/i

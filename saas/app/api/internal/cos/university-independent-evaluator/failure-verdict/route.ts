@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   let trustedVerifierKeys: Record<string, string>
   try {
     const keys = JSON.parse(process.env.COS_LAB_TRUSTED_FAILURE_VERIFIER_KEYS_JSON || '')
-    if (!keys || typeof keys !== 'object' || Array.isArray(keys)) throw new Error('invalid_keys')
+    if (!keys || typeof keys !== 'object' || Array.isArray(keys) || Object.keys(keys).length === 0) throw new Error('invalid_keys')
     trustedVerifierKeys = keys
   } catch { return respond({ error: 'lab_verifier_trust_store_not_configured' }, 503) }
   try {

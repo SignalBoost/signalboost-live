@@ -60,7 +60,7 @@ export function decidePreparedBatchSemanticCohesion(input: {
 
   const missingSourceHashes = [...expected].filter(value => !seen.has(value))
   const independentCount = input.rows.filter(row => expected.has(clean(row.contentHash, 64).toLowerCase())
-    && !['teacher_synthetic_curriculum', 'teacher_hosted_curriculum', 'failure_derived_curriculum'].includes(clean(row.sourceKind, 80))).length
+    && ['scientific_journal', 'public_dataset'].includes(clean(row.sourceKind, 80))).length
   const independentRequired = Math.ceil(expected.size * 0.5)
   const coherent = expected.size >= MASS_DISTILLATION_MIN_BATCH
     && missingSourceHashes.length === 0

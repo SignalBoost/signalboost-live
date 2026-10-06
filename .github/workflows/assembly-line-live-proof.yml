@@ -153,6 +153,10 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # checks: write only lets the last step publish the report text as a check run (see that step).
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Refuse to run blind
         env:
@@ -221,3 +225,34 @@ jobs:
           name: step1-evidence-${{ github.run_id }}
           path: step1-evidence
           retention-days: 90
+      # Job logs and artifacts are served from external blob storage, which API-only readers (agents working through
+      # the GitHub REST API) cannot reach. A check run's output lives on api.github.com, so the same report text is
+      # published as a neutral "Step 1 evidence report" check run on the exact commit. Read only; it gates nothing.
+      - name: Publish the report as a check run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          report() {
+            for window in 24h 7d all; do
+              f="step1-evidence/step1-evidence-${window}.json"
+              echo "## Step 1 evidence, window=${window}"
+              if [ "$(jq -r '.ok' "$f" 2>/dev/null)" = "true" ]; then
+                jq -r '.summary' "$f"; echo; jq -r '.funnelSummary' "$f"
+              else
+                echo "Not produced in this run."
+              fi
+              echo
+            done
+            f="step1-evidence/workforce-verification-trace.json"
+            echo "## Workforce verification trace"
+            if [ "$(jq -r '.ok' "$f" 2>/dev/null)" = "true" ]; then jq -r '.summary' "$f"; else echo "Not produced in this run."; fi
+          }
+          report > step1-report.md
+          cat step1-report.md >> "$GITHUB_STEP_SUMMARY"
+          # Check-run summaries are capped at 65,535 characters.
+          head -c 60000 step1-report.md > step1-report.trunc.md
+          jq -n --arg sha "$GITHUB_SHA" --arg title "Step 1 evidence, run ${GITHUB_RUN_ID}" --rawfile summary step1-report.trunc.md \
+            '{name: "Step 1 evidence report", head_sha: $sha, status: "completed", conclusion: "neutral", output: {title: $title, summary: $summary}}' \
+            | gh api -X POST "repos/${GITHUB_REPOSITORY}/check-runs" --input - --jq '"Published check run " + (.id|tostring)'

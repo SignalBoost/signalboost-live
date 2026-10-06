@@ -136,7 +136,8 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
       criteria.push(Object.freeze({
         id: 'failure_attribution',
         question: 'Is every evaluation failure attributed to infrastructure or merit with an evidence-backed cause?',
-        status: unresolvedCount > 0 ? 'partial' as const : 'evidence_present' as const,
+        // Zero failures means attribution was never exercised in this window: untested, not proven.
+        status: f.total === 0 ? 'no_evidence' as const : unresolvedCount > 0 ? 'partial' as const : 'evidence_present' as const,
         observed: Object.freeze({ total: f.total, infrastructure: f.infrastructure, merit: f.merit, unresolvedFailures: unresolvedCount, unresolvedReasons: unresolved.map(entry => entry.reason).slice(0, 10).join(',') || null }),
         source: f.source,
         note: f.total === 0 ? 'no evaluation failures in this window; attribution is untested rather than proven' : null,

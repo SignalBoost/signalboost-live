@@ -21,7 +21,8 @@ test('ledger binds settled job and rejects replay without granting financial aut
 })
 
 test('empty verifier trust store fails closed at configuration boundary', () => {
-  assert.match(route, /Object\.keys\(keys\)\.length === 0/)
+  assert.match(route, /parseLabTrustedVerifierKeys\(process\.env\.COS_LAB_TRUSTED_FAILURE_VERIFIER_KEYS_JSON\)/)
+  assert.equal(parseLabTrustedVerifierKeys('{}'), null)
   assert.match(route, /lab_verifier_trust_store_not_configured/)
 })
 

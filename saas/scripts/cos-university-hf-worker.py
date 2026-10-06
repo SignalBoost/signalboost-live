@@ -9,6 +9,7 @@ canary, retention, and promotion remain outside this worker.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -138,6 +139,22 @@ GENERAL_REASONING_BALLAST_MAX_ITEMS = 8
 GENERAL_REASONING_BALLAST_EPOCHS = 3.0
 GENERAL_REASONING_BALLAST_LEARNING_RATE = 5e-5
 GENERAL_REASONING_BALLAST_GRADIENT_ACCUMULATION = 1
+
+# Builder protocol practice (owner go 2026-10-06). Builder Residency drives a Computer Science graduate through the
+# Builder tool loop: every round it receives the loop's system prompt and round prompt and must return ONE JSON control
+# object. Distillation trained these artifacts on single-turn prose only, and Production residents passed 57% of cases.
+# For Computer Science runs the controller now sends worked rounds recorded from the REAL loop on practice tasks that
+# are not Residency cases (saas/lib/ai/cos/cosUniversityBuilderProtocolPractice.ts). They are trained exactly as the
+# resident is served: system + user rendered with the chat template, thinking disabled, loss on the reply only.
+# Rows that do not fit the length limit are dropped and counted, never truncated: a cut-off JSON reply would teach the
+# malformed control objects this pass exists to remove. The pass runs after the failure-derived replay and before the
+# reasoning ballast, which stays last.
+BUILDER_PROTOCOL_PRACTICE_PROFILE = "cos-university-builder-protocol-practice-v1"
+BUILDER_PROTOCOL_PRACTICE_MAX_ROWS = 64
+BUILDER_PROTOCOL_PRACTICE_MAX_LENGTH = 4096
+BUILDER_PROTOCOL_PRACTICE_EPOCHS = 2.0
+BUILDER_PROTOCOL_PRACTICE_LEARNING_RATE = 5e-5
+BUILDER_PROTOCOL_PRACTICE_GRADIENT_ACCUMULATION = 1
 
 BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"
 BASE_WORKER_PATH = Path("/tmp/itmounts_hf_worker_base.py")
@@ -637,6 +654,70 @@ def _student_training_text(base, tokenizer, row: dict[str, Any]) -> tuple[str, b
         raise RuntimeError("worker_training_text_missing")
     return fallback, False
 
+def _builder_protocol_practice(envelope: dict[str, Any]) -> dict[str, Any] | None:
+    """Validate the controller's Builder protocol practice rows. Absent means no pass; malformed fails closed."""
+    practice = envelope.get("builderProtocolPractice")
+    if practice is None:
+        return None
+    if not isinstance(practice, dict) or practice.get("profile") != BUILDER_PROTOCOL_PRACTICE_PROFILE:
+        raise RuntimeError("worker_builder_protocol_practice_profile_invalid")
+    rows = practice.get("rows")
+    if not isinstance(rows, list) or not 1 <= len(rows) <= BUILDER_PROTOCOL_PRACTICE_MAX_ROWS:
+        raise RuntimeError("worker_builder_protocol_practice_rows_invalid")
+    for row in rows:
+        if not isinstance(row, dict) or not all(isinstance(row.get(key), str) and row.get(key) for key in ("taskId", "competencyId", "system", "prompt", "response")):
+            raise RuntimeError("worker_builder_protocol_practice_row_invalid")
+        try:
+            control = json.loads(row["response"])
+        except ValueError as exc:
+            raise RuntimeError("worker_builder_protocol_practice_reply_not_json") from exc
+        if not isinstance(control, dict) or control.get("type") not in ("tool", "answer"):
+            raise RuntimeError("worker_builder_protocol_practice_reply_not_control")
+    # The controller hashes JSON.stringify(rows); identical compact JSON here proves the rows arrived unaltered.
+    observed = hashlib.sha256(json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
+    if observed != str(practice.get("rowsHash") or ""):
+        raise RuntimeError("worker_builder_protocol_practice_hash_mismatch")
+    return {"rows": rows, "rowsHash": observed, "taskIds": sorted({row["taskId"] for row in rows})}
+
+
+def _builder_protocol_training_examples(tokenizer, rows: list[dict[str, Any]], max_length: int) -> tuple[list[dict[str, str]], int]:
+    """Render each round exactly as the resident is served: system + user, generation prompt, thinking disabled.
+
+    The completion is the rendered assistant turn, so the loss falls only on the JSON control object and its end
+    marker. Rows longer than max_length are dropped and counted rather than truncated.
+    """
+    examples: list[dict[str, str]] = []
+    dropped = 0
+    for row in rows:
+        conversation = [{"role": "system", "content": row["system"]}, {"role": "user", "content": row["prompt"]}]
+        prompt = _render_chat(tokenizer, conversation)
+        try:
+            full = tokenizer.apply_chat_template(
+                conversation + [{"role": "assistant", "content": row["response"]}],
+                tokenize=False,
+                add_generation_prompt=False,
+                enable_thinking=False,
+            )
+        except TypeError:
+            full = tokenizer.apply_chat_template(
+                conversation + [{"role": "assistant", "content": row["response"]}],
+                tokenize=False,
+                add_generation_prompt=False,
+            )
+        full = str(full or "")
+        if not prompt or not full.startswith(prompt) or row["response"] not in full[len(prompt):]:
+            raise RuntimeError("worker_builder_protocol_chat_template_mismatch")
+        completion = full[len(prompt):].rstrip("\n")
+        eos = str(tokenizer.eos_token or "")
+        if eos and not completion.endswith(eos):
+            completion = completion + eos
+        if len(tokenizer(prompt + completion, add_special_tokens=False)["input_ids"]) > max_length:
+            dropped += 1
+            continue
+        examples.append({"prompt": prompt, "completion": completion})
+    return examples, dropped
+
+
 def _frontier_distillation_plan(base, envelope: dict[str, Any], base_model: str) -> dict[str, Any] | None:
     plan = envelope.get("distillationPlan")
     if not isinstance(plan, dict):
@@ -900,6 +981,9 @@ def train_student(base, envelope: dict[str, Any]) -> None:
 
     training_mode = base.clean(envelope.get("trainingMode"), 40)
     frontier_plan = _frontier_distillation_plan(base, envelope, base_model) if training_mode == "distillation" else None
+    builder_protocol = _builder_protocol_practice(envelope)
+    if builder_protocol is not None and frontier_plan is None:
+        raise RuntimeError("worker_builder_protocol_practice_requires_frontier_distillation")
     recipe = _training_recipe(len(training))
     recipe["holdoutItems"] = len(holdout)
     recipe["trainingMode"] = training_mode or "unknown"
@@ -974,6 +1058,20 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             general_ballast_training.append({"training_text": ballast_text})
         if len(general_ballast_training) != len(GENERAL_REASONING_BALLAST[:GENERAL_REASONING_BALLAST_MAX_ITEMS]):
             raise RuntimeError("worker_general_reasoning_ballast_incomplete")
+
+        # Builder protocol practice is validated and rendered before any paid GPU pass starts, so a malformed or
+        # altered practice set fails the job up front instead of after GKD.
+        builder_protocol_training: list[dict[str, str]] = []
+        builder_protocol_dropped = 0
+        if builder_protocol is not None:
+            builder_protocol_training, builder_protocol_dropped = _builder_protocol_training_examples(
+                tokenizer, builder_protocol["rows"], BUILDER_PROTOCOL_PRACTICE_MAX_LENGTH
+            )
+        recipe["builderProtocolPracticeProfile"] = BUILDER_PROTOCOL_PRACTICE_PROFILE if builder_protocol is not None else None
+        recipe["builderProtocolPracticeRowsHash"] = builder_protocol["rowsHash"] if builder_protocol is not None else None
+        recipe["builderProtocolPracticeTaskIds"] = builder_protocol["taskIds"] if builder_protocol is not None else []
+        recipe["builderProtocolPracticeItems"] = len(builder_protocol_training)
+        recipe["builderProtocolPracticeDroppedOverLength"] = builder_protocol_dropped
 
         # P2 guard: teacher/student tokenizer compatibility is a prerequisite for the entire anchored
         # GKD recipe, so validate it before any anchor training consumes paid GPU time.
@@ -1306,6 +1404,60 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         recipe["failureDerivedReplayTrainableFp32TensorCount"] = replay_fp32_tensors
         print(
             f"itmounts_failure_derived_replay:{json.dumps({'items':len(failure_derived_replay_training),'epochs':FAILURE_DERIVED_REPLAY_EPOCHS,'learningRate':FAILURE_DERIVED_REPLAY_LEARNING_RATE,'authorityExpanded':False}, ensure_ascii=True, separators=(',', ':'))}",
+            flush=True,
+        )
+
+    # Builder protocol practice pass (Computer Science runs only; see BUILDER_PROTOCOL_PRACTICE_PROFILE). Loss falls on the
+    # JSON control reply only (prompt/completion dataset, completion_only_loss), at the replay's learning rate.
+    if frontier_plan is not None and builder_protocol_training:
+        protocol_model = trainer.model
+        if hasattr(trainer, "teacher_model"):
+            trainer.teacher_model = None
+        del trainer
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        protocol_recipe = {
+            "trainingItems": len(builder_protocol_training),
+            "epochs": BUILDER_PROTOCOL_PRACTICE_EPOCHS,
+            "perDeviceTrainBatchSize": 1,
+            "gradientAccumulationSteps": BUILDER_PROTOCOL_PRACTICE_GRADIENT_ACCUMULATION,
+            "learningRate": BUILDER_PROTOCOL_PRACTICE_LEARNING_RATE,
+            "warmupRatio": 0.0,
+            "lrSchedulerType": TRAINING_LR_SCHEDULER,
+            "maxGradNorm": TRAINING_MAX_GRAD_NORM,
+            "maxLength": BUILDER_PROTOCOL_PRACTICE_MAX_LENGTH,
+        }
+        protocol_args = SFTConfig(
+            output_dir=str(output_dir / "builder-protocol-practice"),
+            num_train_epochs=protocol_recipe["epochs"],
+            per_device_train_batch_size=protocol_recipe["perDeviceTrainBatchSize"],
+            gradient_accumulation_steps=protocol_recipe["gradientAccumulationSteps"],
+            learning_rate=protocol_recipe["learningRate"],
+            **_warmup_arguments(SFTConfig, protocol_recipe),
+            lr_scheduler_type=protocol_recipe["lrSchedulerType"],
+            max_grad_norm=protocol_recipe["maxGradNorm"],
+            logging_steps=10,
+            save_strategy="no",
+            report_to="none",
+            bf16=False,
+            fp16=False,
+            gradient_checkpointing=True,
+            completion_only_loss=True,
+            max_length=protocol_recipe["maxLength"],
+        )
+        protocol_trainer = SFTTrainer(
+            model=protocol_model,
+            args=protocol_args,
+            train_dataset=Dataset.from_list(builder_protocol_training),
+            processing_class=tokenizer,
+        )
+        protocol_fp32_tensors = _force_trainable_fp32(protocol_trainer.model)
+        protocol_trainer.train()
+        trainer = protocol_trainer
+        recipe["builderProtocolPracticeTrainableFp32TensorCount"] = protocol_fp32_tensors
+        print(
+            f"itmounts_builder_protocol_practice:{json.dumps({'items':len(builder_protocol_training),'droppedOverLength':builder_protocol_dropped,'tasks':len(builder_protocol['taskIds']),'epochs':BUILDER_PROTOCOL_PRACTICE_EPOCHS,'learningRate':BUILDER_PROTOCOL_PRACTICE_LEARNING_RATE,'rowsHash':builder_protocol['rowsHash'],'authorityExpanded':False}, ensure_ascii=True, separators=(',', ':'))}",
             flush=True,
         )
 

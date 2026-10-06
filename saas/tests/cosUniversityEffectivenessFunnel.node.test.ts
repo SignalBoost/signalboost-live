@@ -88,12 +88,12 @@ const week = () => ({
     { id: 'res-a-old', candidate_id: 'a', trained_artifact_hash: H('9'), standing: 'residency_failed' },
   ],
   cos_university_residency_case_runs: [
-    { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'failed', harness_outcome: 'agent_failure', failure_code: 'assertion_failed' },
+    { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'failed', harness_outcome: 'agent_failure', failure_code: 'assertion_failed', metadata: { builderLoop: { outcome: 'incomplete', failureCode: 'builder_stalled_repeated_inspection', traceSteps: 19, filesChanged: 0 } } },
     { residency_id: 'res-a', status: 'started' },
     { residency_id: 'res-a-old', status: 'failed', harness_outcome: 'infrastructure_failure', failure_code: 'old_artifact_failure' },
   ],
   cos_university_residency_competency_evidence: [
-    { residency_id: 'res-a', outcome: 'pass' }, { residency_id: 'res-a', outcome: 'pass' }, { residency_id: 'res-a', outcome: 'fail' },
+    { residency_id: 'res-a', competency_id: 'root_cause_diagnosis', outcome: 'pass' }, { residency_id: 'res-a', competency_id: 'rollback_judgment', outcome: 'pass' }, { residency_id: 'res-a', competency_id: 'supabase_diagnosis', outcome: 'fail' },
   ],
   cos_university_graduate_model_registry: [{ candidate_id: 'a', trained_artifact_hash: H('a'), promoted_at: '2026-10-04T14:00:00Z', activated_at: '2026-10-04T14:30:00Z' }],
   cos_workforce_roster: [{ candidate_id: 'a', trained_artifact_hash: H('a') }],
@@ -213,6 +213,9 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.deepEqual({ ...f.residencyEffectiveness.caseOutcomes }, { success: 2, agent_failure: 1 }, 'finished cases by Harness verdict; a started case is not finished')
     assert.deepEqual({ ...f.residencyEffectiveness.topFailureCodes }, { assertion_failed: 1 }, 'failure codes only from non-passing finished cases')
     assert.deepEqual({ ...f.residencyEffectiveness.standings }, { residency_complete: 1 })
+    assert.deepEqual({ ...f.residencyEffectiveness.failedCaseLoopStops }, { builder_stalled_repeated_inspection: 1 }, 'why the resident\'s own loop stopped, failed cases only')
+    assert.equal(f.residencyEffectiveness.failedCasesWithNoFileChange, 1)
+    assert.deepEqual({ ...f.residencyEffectiveness.competencyFailuresById }, { supabase_diagnosis: 1 }, 'skill failures by competency, exact artifact only')
   }
   assert.ok(f.workforceEffectiveness.available)
   if (f.workforceEffectiveness.available) {

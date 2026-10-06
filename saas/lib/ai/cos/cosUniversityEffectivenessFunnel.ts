@@ -35,6 +35,16 @@ const WINDOW_HOURS: Readonly<Record<FunnelWindow, number | null>> = Object.freez
 type Db = { from: (table: string) => any }
 
 const text = (value: unknown, max = 200): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+/** The resident's own loop stop, from case-run metadata.builderLoop (platform-harness/residency/builder-case-runner.ts). */
+const builderLoopStop = (metadata: unknown): { loopStop: string; filesChanged: number | null } => {
+  const loop = metadata && typeof metadata === 'object' ? (metadata as { builderLoop?: Record<string, unknown> }).builderLoop : undefined
+  if (!loop || typeof loop !== 'object') return { loopStop: 'unrecorded', filesChanged: null }
+  const files = Number(loop.filesChanged)
+  return {
+    loopStop: text(loop.failureCode, 80) || (text(loop.outcome, 20) === 'completed' ? 'loop_completed' : 'unrecorded'),
+    filesChanged: loop.filesChanged === null || loop.filesChanged === undefined || !Number.isFinite(files) ? null : files,
+  }
+}
 const iso = (value: unknown): string | null => {
   if (!value) return null
   const at = new Date(String(value))
@@ -158,6 +168,16 @@ export type EffectivenessFunnel = Readonly<{
     topFailureCodes: Readonly<Record<string, number>>
     /** Residents by standing. */
     standings: Readonly<Record<string, number>>
+    /**
+     * Why the resident's own Builder loop stopped on each FAILED case (case-run metadata.builderLoop, recorded since
+     * 2026-10-05): a loop failure code such as builder_stalled_repeated_inspection or builder_model_control_malformed_json,
+     * loop_completed when the loop finished but the independent proof still failed, or unrecorded for older rows.
+     */
+    failedCaseLoopStops: Readonly<Record<string, number>>
+    /** Failed cases where the resident changed no seed file at all. */
+    failedCasesWithNoFileChange: number
+    /** Skill-failure competency evidence by competency. */
+    competencyFailuresById: Readonly<Record<string, number>>
     source: string
     methodology: string
   }>
@@ -291,7 +311,7 @@ export function composeFunnel(input: {
   serving: Chapter<{ terminalByAttempt: ReadonlyMap<string, { outcome: string; latencyMs: number; errorClass: string | null }> }>
   lineLedger: Chapter<{ rows: readonly Readonly<{ station: string; enteredAt: string | null; deadlineAt: string | null; leaseUntil: string | null; terminal: boolean }>[] }>
   transitionHistory: Chapter<{ rows: readonly Readonly<{ fromStation: string; transitionedAt: string | null; durationSeconds: number | null; wasOverdue: boolean }>[] }>
-  residencyEvidence: Chapter<{ enrollments: readonly Readonly<{ key: string; standing: string }>[]; caseStatuses: readonly string[]; competencyOutcomes: readonly string[]; caseRuns?: readonly Readonly<{ status: string; harnessOutcome: string; failureCode: string }>[] }>
+  residencyEvidence: Chapter<{ enrollments: readonly Readonly<{ key: string; standing: string }>[]; caseStatuses: readonly string[]; competencyOutcomes: readonly string[]; caseRuns?: readonly Readonly<{ status: string; harnessOutcome: string; failureCode: string; loopStop?: string; filesChanged?: number | null }>[]; competencyFailures?: readonly string[] }>
   workforceAssignments: Chapter<{ rows: readonly Readonly<{ status: string; sourceKind: string; permanentArtifactId: string }>[] }>
   providerCosts: Chapter<{ rows: readonly Readonly<{ operation: string; observedCostUsd: number }>[] }>
   provenanceEvidence: Chapter<{ certificates: ReadonlySet<string>; graduates: ReadonlySet<string>; resumes: ReadonlySet<string> }>
@@ -472,7 +492,11 @@ export function composeFunnel(input: {
     const caseOutcomes = topOf(tally(finished.map(row => row.harnessOutcome || 'unrecorded')), 8)
     const topFailureCodes = topOf(tally(finished.filter(row => row.status !== 'passed').map(row => row.failureCode || 'unrecorded')), 6)
     const standings = topOf(tally(e.enrollments.map(row => row.standing || 'unrecorded')), 8)
-    residencyEffectiveness = Object.freeze({ available: true as const, error: null, enrollments: e.enrollments.length, completed, remediationRequired, caseRuns: e.caseStatuses.length, casesPassed, casesFailed, casesRejected, competencyEvidence: e.competencyOutcomes.length, competencyPasses, competencyFailures, completionRate: e.enrollments.length ? completed / e.enrollments.length : null, casePassRate: terminalCases ? casesPassed / terminalCases : null, caseOutcomes, topFailureCodes, standings, source: 'cos_university_residency_enrollments + cos_university_residency_case_runs + cos_university_residency_competency_evidence', methodology: 'exact cohort artifacts; completion comes only from durable residency standing; case and competency outcomes are counted from durable practical evidence' })
+    const failedCases = finished.filter(row => row.status === 'failed')
+    const failedCaseLoopStops = topOf(tally(failedCases.map(row => row.loopStop || 'unrecorded')), 8)
+    const failedCasesWithNoFileChange = failedCases.filter(row => row.filesChanged === 0).length
+    const competencyFailuresById = topOf(tally(e.competencyFailures || []), 13)
+    residencyEffectiveness = Object.freeze({ available: true as const, error: null, enrollments: e.enrollments.length, completed, remediationRequired, caseRuns: e.caseStatuses.length, casesPassed, casesFailed, casesRejected, competencyEvidence: e.competencyOutcomes.length, competencyPasses, competencyFailures, completionRate: e.enrollments.length ? completed / e.enrollments.length : null, casePassRate: terminalCases ? casesPassed / terminalCases : null, caseOutcomes, topFailureCodes, standings, failedCaseLoopStops, failedCasesWithNoFileChange, competencyFailuresById, source: 'cos_university_residency_enrollments + cos_university_residency_case_runs + cos_university_residency_competency_evidence', methodology: 'exact cohort artifacts; completion comes only from durable residency standing; case and competency outcomes are counted from durable practical evidence' })
   } else residencyEffectiveness = Object.freeze({ available: false as const, error: input.residencyEvidence.error })
 
   let workforceEffectiveness: EffectivenessFunnel['workforceEffectiveness']
@@ -818,14 +842,15 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       const residencyIds = enrollments.map((row: any) => text(row.id, 80)).filter(Boolean)
       const caseRows: any[] = [], competencyRows: any[] = []
       for (const chunk of chunks(residencyIds, FUNNEL_READ_CHUNK)) {
-        caseRows.push(...await allRows((from, to) => db.from('cos_university_residency_case_runs').select('residency_id,status,harness_outcome,failure_code').in('residency_id', chunk).range(from, to)))
-        competencyRows.push(...await allRows((from, to) => db.from('cos_university_residency_competency_evidence').select('residency_id,outcome').in('residency_id', chunk).range(from, to)))
+        caseRows.push(...await allRows((from, to) => db.from('cos_university_residency_case_runs').select('residency_id,status,harness_outcome,failure_code,metadata').in('residency_id', chunk).range(from, to)))
+        competencyRows.push(...await allRows((from, to) => db.from('cos_university_residency_competency_evidence').select('residency_id,competency_id,outcome').in('residency_id', chunk).range(from, to)))
       }
       return {
         enrollments: enrollments.map((row: any) => ({ key: key(row), standing: text(row.standing, 60) })),
         caseStatuses: caseRows.map((row: any) => text(row.status, 40)),
         competencyOutcomes: competencyRows.map((row: any) => text(row.outcome, 20)),
-        caseRuns: caseRows.map((row: any) => ({ status: text(row.status, 40), harnessOutcome: text(row.harness_outcome, 60), failureCode: text(row.failure_code, 80) })),
+        caseRuns: caseRows.map((row: any) => ({ status: text(row.status, 40), harnessOutcome: text(row.harness_outcome, 60), failureCode: text(row.failure_code, 80), ...builderLoopStop(row.metadata) })),
+        competencyFailures: competencyRows.filter((row: any) => text(row.outcome, 20) === 'fail').map((row: any) => text(row.competency_id, 80) || 'unrecorded'),
       }
     }),
     chapter(async () => {

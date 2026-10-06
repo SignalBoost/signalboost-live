@@ -176,8 +176,11 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
             casePassRate: r.casePassRate === null ? null : Math.round(r.casePassRate * 1000) / 1000,
             caseOutcomes: kv(r.caseOutcomes),
             topFailureCodes: kv(r.topFailureCodes),
+            failedCaseLoopStops: kv(r.failedCaseLoopStops),
+            failedCasesWithNoFileChange: r.failedCasesWithNoFileChange,
             competencyPasses: r.competencyPasses,
             competencyFailures: r.competencyFailures,
+            competencyFailuresById: kv(r.competencyFailuresById),
           }
         : { residencyEvidence: 'unavailable' },
     }))

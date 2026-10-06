@@ -34,6 +34,7 @@ import {
   runMassHostedTeacherStage,
 } from './cosUniversityMassHostedTeacherStage.ts'
 import { buildFrontierDistillationPlan } from './cosUniversityFrontierDistillation.ts'
+import { builderProtocolPracticeForRun } from './cosUniversityBuilderProtocolPractice.ts'
 import { CURRENT_UNIVERSITY_STUDENT_PROFILE, CURRENT_UNIVERSITY_TEACHER_PROFILE } from '../modelCapabilityRegistry.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
@@ -173,6 +174,15 @@ function durableTrainingReceipt(profileValue: unknown, recipeValue: unknown) {
     xsaReason: clean(raw.xsaReason, 120) || null,
     structuredItems: integer('structuredItems', 0, 100_000),
     fallbackItems: integer('fallbackItems', 0, 100_000),
+    // Builder protocol practice provenance (Computer Science runs): which worked loop rounds shaped the weights.
+    builderProtocolPracticeProfile: clean(raw.builderProtocolPracticeProfile, 120) || null,
+    builderProtocolPracticeRowsHash: /^[a-f0-9]{64}$/.test(clean(raw.builderProtocolPracticeRowsHash, 64)) ? clean(raw.builderProtocolPracticeRowsHash, 64) : null,
+    builderProtocolPracticeTaskIds: Object.freeze(Array.isArray(raw.builderProtocolPracticeTaskIds)
+      ? [...new Set(raw.builderProtocolPracticeTaskIds.map(value => clean(value, 80)).filter(Boolean))].slice(0, 64)
+      : []),
+    builderProtocolPracticeItems: integer('builderProtocolPracticeItems', 0, 100_000),
+    builderProtocolPracticeDroppedOverLength: integer('builderProtocolPracticeDroppedOverLength', 0, 100_000),
+    builderProtocolPracticeTrainableFp32TensorCount: integer('builderProtocolPracticeTrainableFp32TensorCount', 0, 1_000_000),
   })
 }
 
@@ -463,6 +473,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   let idempotencyKey: string
   let hardwareFlavor: string
   let preDispatch: Record<string, unknown> = {}
+  let builderProtocolPractice: Awaited<ReturnType<typeof builderProtocolPracticeForRun>> = null
   let distinctPrompts: number | null = null
   let promptSetHash: string | null = null
 
@@ -783,6 +794,15 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       frontierFaculty: actualFrontierFaculty,
     })
 
+    // Computer Science graduates enter Builder Residency, which drives them through the Builder tool loop. Their
+    // training run carries worked loop rounds aimed at the competencies residents currently fail (owner go 2026-10-06).
+    // The selection is pinned to evidence recorded by the run's creation, so every retry rebuilds the same rows.
+    builderProtocolPractice = await builderProtocolPracticeForRun({
+      subjectId: run.subject_id,
+      evidenceCutoff: clean(run.created_at, 64),
+      db: cosServiceDb(),
+    })
+
     idempotencyKey = hash([
       COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
       claim.campaign_id,
@@ -793,6 +813,8 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       distillationPlan.denseTeacherRevision,
       distillationPlan.onPolicyFraction,
       distillationPlan.beta,
+      // Bind the exact practice payload: a recovered job must carry the rows this dispatch records.
+      ...(builderProtocolPractice ? [builderProtocolPractice.envelope.profile, builderProtocolPractice.envelope.rowsHash] : []),
     ])
     envelope = {
       profile: 'cos_university_training_executor_v1',
@@ -805,6 +827,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       trainingDataRef,
       holdoutDataRef,
       distillationPlan,
+      ...(builderProtocolPractice ? { builderProtocolPractice: builderProtocolPractice.envelope } : {}),
       distillation: {
         teacherModelId: denseTeacher.modelId,
         studentModelId: run.student_model_id,
@@ -873,6 +896,17 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       maxEstimatedCostUsd,
       reservedCostCeilingUsd: expectedCeiling,
       distillationPlan: (envelope as any).distillationPlan || null,
+      builderProtocolPractice: builderProtocolPractice
+        ? {
+            profile: builderProtocolPractice.envelope.profile,
+            rows: builderProtocolPractice.envelope.rows.length,
+            rowsHash: builderProtocolPractice.envelope.rowsHash,
+            taskIds: builderProtocolPractice.taskIds,
+            priorityCompetencies: builderProtocolPractice.priorityCompetencies,
+            evidenceCutoff: clean(run.created_at, 64),
+            evidenceRows: builderProtocolPractice.evidenceRows,
+          }
+        : null,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
     },

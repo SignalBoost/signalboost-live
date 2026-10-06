@@ -254,6 +254,9 @@ test('Residency case evidence is printed so skill failures are told apart from p
       caseOutcomes: { infrastructure_failure: 5, success: 3, agent_failure: 2 },
       topFailureCodes: { runtime_not_ready: 5, assertion_failed: 2 },
       standings: { resident: 3, remediation_required: 1 },
+      failedCaseLoopStops: { builder_stalled_repeated_inspection: 1, loop_completed: 1 },
+      failedCasesWithNoFileChange: 1,
+      competencyFailuresById: { rollback_judgment: 2 },
       source: 's', methodology: 'm',
     },
   })
@@ -265,6 +268,9 @@ test('Residency case evidence is printed so skill failures are told apart from p
   assert.equal(residency.observed.caseOutcomes, 'infrastructure_failure=5,success=3,agent_failure=2')
   assert.equal(residency.observed.topFailureCodes, 'runtime_not_ready=5,assertion_failed=2')
   assert.equal(residency.observed.standings, 'resident=3,remediation_required=1')
+  assert.equal(residency.observed.failedCaseLoopStops, 'builder_stalled_repeated_inspection=1,loop_completed=1')
+  assert.equal(residency.observed.failedCasesWithNoFileChange, 1)
+  assert.equal(residency.observed.competencyFailuresById, 'rollback_judgment=2')
   assert.match(describeStep1Evidence(report), /builder_residency :: .*caseOutcomes=infrastructure_failure=5,success=3,agent_failure=2/)
 })
 

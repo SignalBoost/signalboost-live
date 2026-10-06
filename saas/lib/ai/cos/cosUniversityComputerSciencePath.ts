@@ -69,6 +69,9 @@ export type ComputerSciencePath = Readonly<{
     /** Computer Science unique batchable items in that pass; null when the subject was absent (zero items). */
     supplyItems: number | null
     supplyShortfall: number | null
+    /** Unused real-source items vs what a batch needs (half real-source); null on receipts written before it was recorded. */
+    realSourceItems: number | null
+    realSourceNeeded: number | null
     batchMinimum: number
     preparedBufferTarget: number | null
     preparedBefore: number | null
@@ -228,6 +231,8 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
       receiptAt: iso(receipt?.observed_at),
       supplyItems: receipt ? number(csSupply.uniqueBatchableItems) : null,
       supplyShortfall: receipt ? (number(csSupply.shortfallToBatch) ?? (Object.keys(csSupply).length ? null : BATCH_MINIMUM)) : null,
+      realSourceItems: receipt ? number(csSupply.realSourceItems) : null,
+      realSourceNeeded: receipt ? number(csSupply.realSourceNeeded) : null,
       batchMinimum: BATCH_MINIMUM,
       preparedBufferTarget: number(evidence.preparedBufferTarget),
       preparedBefore: number(evidence.preparedBeforeReplenishment),
@@ -279,6 +284,8 @@ export function describeComputerSciencePath(path: ComputerSciencePath): string {
   const supply = p.receiptAt === null ? 'no packaging receipt'
     : p.supplyItems === null ? `absent from supply (0 batchable items; needs ${p.batchMinimum})`
       : `${p.supplyItems} batchable items (needs ${p.batchMinimum}; shortfall ${p.supplyShortfall ?? 'n/a'})`
+        + ` realSource=${p.realSourceItems ?? 'not recorded'}/${p.realSourceNeeded ?? 'n/a'}`
+        + (p.realSourceItems !== null && p.realSourceNeeded !== null && p.realSourceItems < p.realSourceNeeded ? ' BLOCKED: too little real-source material' : '')
   return [
     `COMPUTER SCIENCE PATH (now ${path.observedAt}; latest ${RECENT} of each)`,
     `  packaging           :: receiptAt=${p.receiptAt ?? 'none'} supply=${supply} preparedBuffer=${p.preparedBefore ?? 'n/a'}/${p.preparedBufferTarget ?? 'n/a'} replenishment=${p.replenishment ?? 'n/a'} curriculumBatches=${kv(p.curriculumBatchesByStatus)} latestBatchAt=${p.latestCurriculumBatchAt ?? 'none'} corpusRows(conf>=${MIN_CONFIDENCE}) real=${p.corpusRowsByOrigin.realSource} failureDerived=${p.corpusRowsByOrigin.failureDerived} teacherSynthetic=${p.corpusRowsByOrigin.teacherSynthetic}`,

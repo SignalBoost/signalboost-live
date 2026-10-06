@@ -43,6 +43,8 @@ const tests = [
   'tests/builderToolLoopForcedInspection.node.test.ts',
   // Step 1 report: where the newest Computer Science artifact stands between training and Residency (read only).
   'tests/cosUniversityComputerSciencePath.node.test.ts',
+  // Supply reports real-source items exactly as the packager counts them (Computer Science starved since 2026-10-03).
+  'tests/cosUniversityMassDistillationRealSourceSupply.node.test.ts',
   'tests/cosUniversityEvaluationInfrastructureNoParking.node.test.ts',
 
   'tests/cosArtifactBirthCertificate.node.test.ts',

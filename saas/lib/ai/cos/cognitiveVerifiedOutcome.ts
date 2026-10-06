@@ -201,8 +201,21 @@ async function attachCorrelatedTurnOutcome(
   occurredAt: string,
 ): Promise<void> {
   const kind = clean(input.correlation?.kind, 120).toLowerCase()
-  const turnId = clean(input.correlation?.value, 80)
-  if (kind !== 'cos_turn_id' || !turnId) return
+  const correlationValue = clean(input.correlation?.value, 500)
+  let turnId = kind === 'cos_turn_id' ? clean(correlationValue, 80) : ''
+  if (kind === 'cos_harness_run_id' && correlationValue) {
+    const db = cosServiceDb()
+    if (!db) return
+    const assignment = await db.from('cos_workforce_assignments')
+      .select('source_ref')
+      .eq('source_kind', 'production_request')
+      .eq('status', 'served')
+      .eq('harness_run_id', correlationValue)
+      .limit(2)
+    if (assignment.error || assignment.data?.length !== 1) return
+    turnId = clean(assignment.data[0]?.source_ref, 80)
+  }
+  if (!turnId) return
   await attachTurnOutcome(turnId, {
     ...(decision.success === null ? {} : {
       verifiedSuccess: decision.success,

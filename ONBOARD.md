@@ -2,6 +2,43 @@
 
 # iTMounts Engineering Blueprint
 
+## Product north star: iTMounts AI Lab — governed selection and certification (2026-10-06)
+
+**This section governs interpretation of all University, distillation, workforce, certification, and commercial Lab work below.** Existing security, Harness, deployment, and COS latency invariants remain in force; this section does not waive them. Developers and coding agents MUST read this section and inspect the actual repository, tests, and live evidence before proposing changes.
+
+**Motto: Graduation is not the product. Trustworthy selection is the product.** iTMounts is a production, multi-tenant, governed experimentation and certification engine for specialized AI artifacts, not a generic fine-tuning service, graduation counter, or COS-only workforce queue. A failed experiment is an acceptable research result; a falsely certified unsafe or regressed artifact is an unacceptable product failure. Never guarantee positive capability gains from every run, or absolute immunity from failure after certification. Guarantee process integrity through independently enforced, auditable gates and continued monitoring.
+
+### Canonical entity and artifact contract
+
+- Preserve the six-tier hierarchy: **Organization → University → Project → Experiment → Cohort → Artifact**. Organization owns tenant boundary and credit account; University owns environment and privacy tier; Project is the domain workspace; Experiment is the budgeted execution unit; Cohort groups candidates; Artifact is the immutable identity unit. Do not create a parallel Lab codebase: the same portable governed engine must support hosted and self-hosted deployment.
+- Each graduated artifact must have an immutable `permanent_artifact_id`, cryptographic **AI VIN**, signed birth certificate, teacher/model and dataset provenance, training recipe and compute identity, evaluator version and scorecard, residency evidence, exact deployed revision/hash, and Production outcome history. An AI VIN or certificate is not proof of competence without valid independent evaluation evidence.
+- Bind each consequential action to the Platform Harness and its existing trusted authority envelope. Customer-provided compute, teacher models, tools, code, and MCPs operate **only through scoped ComputeAdapter, TeacherAdapter, and ToolAdapter boundaries**; never execute customer code inside the core control plane or allow adapters to grant themselves authority.
+
+### Experiment truth, economics, and privacy
+
+- Capture a trace from **credit allocation → experiment → candidate → curriculum/version → teacher/version → recipe/version → compute/hardware → artifact/hash → independent evaluator/version → residency → disposition → Production outcome → actual cost**. The experimental knowledge graph must retain valid failures as well as successes; causal performance claims require controlled comparisons, not correlations alone.
+- Classify outcomes separately: **COMPETENCY_FAILURE** (valid evaluation failed; legitimate research cost), **CUSTOMER_INFRA_FAILURE** (customer infrastructure/API fault; preserve state and release unused reservations), and **PLATFORM_FAILURE** (our orchestration/evaluation fault; bounded recovery and governed refund of eligible reserved credits). Never count infrastructure errors as competency failures or as evidence of graduation.
+- Credit accounting must be append-only, double-entry, atomic, idempotent, and backed by actual measured token, teacher, evaluation, compute, and provider costs. Reserve before execution, settle valid consumption, release unused reservation, and refund eligible platform faults. Do not invent pricing or create public billing/marketplace UI before measurement and validation.
+- Machine-enforce tenant isolation and privacy tiers: **PRIVATE** (no data or telemetry leaves the tenant boundary), **AGGREGATE_METRICS** (only permitted anonymized statistics), **RESEARCH_OPT_IN** (explicitly authorized methodology improvement). Apply restrictions to traces, exports, learning, logs, adapters, and analytics; a label alone is not enforcement.
+
+### Certification and Production acceptance
+
+- The independent Referee/evaluator must reject unsafe, regressed, unqualified, unverifiable, or improperly sourced artifacts. Never lower thresholds, fabricate holdout gains, infer causal contribution from shared Harness IDs, or treat successful inference, shadow service, CI green, or a diploma as verified Production success.
+- Graduates enter governed Production only with verified exact artifact identity, existing authority, suitable runtime, a real authorized task, and an observable result. Keep interactive COS/Concierge latency separate from appropriately budgeted background Production work. Record served work **only after actual selection/delivery**, then verify the specific contribution independently; monitor drift and revoke/suspend/recertify when warranted.
+- Distinguish **implemented**, **tests passing**, **merged**, **deployed**, **observed running**, and **independently verified outcome** in every report. Step 1 is NOT READY until live end-to-end evidence exists; no invented counts or synthetic work presented as customer Production.
+
+### Execution order and developer completion criteria
+
+1. **Phase 1 — reliability and instrumentation FIRST:** inspect and repair current University orchestrator/evaluator and failure classification; instrument lineage, provider/token/compute costs, certification decisions, and real Production verification; demonstrate repeated unattended runs and explain remaining gaps with live evidence.
+2. **Phase 2 — governance and cryptographic artifact identity:** implement/verify deterministic VIN, signed birth certificate, exact-artifact integrity, privacy enforcement, and independent certification gates.
+3. **Phase 3 — portable tenancy and BYOI:** enforce hierarchy, isolation, and scoped provider adapters with adversarial cross-tenant and authority tests.
+4. **Phase 4 — immutable credit ledger and shadow pricing:** verify atomic reservations, consumption, release, platform-fault refund, idempotency, and reconciliation against measured cost.
+5. **Phase 5 — private design partners and rights:** validate with 2–3 enterprise design partners and teacher-output/data rights before self-service commercialization or marketplace work.
+
+**Required change protocol:** scan `ONBOARD.md` and affected code paths first; identify the actual failing contract and baseline; implement the smallest end-to-end repair within the existing engine; add positive, negative, isolation, and regression tests; run relevant gates; verify deployed behavior and independent evidence; report unresolved blocks plainly. Documentation or green CI alone never satisfies a Production acceptance criterion.
+
+---
+
 ## Interactive latency and one-pipeline invariant — 2026-09-27
 
 Owner COS and public Concierge answer in **≤ 5 seconds** (owner-verified 2026-09-27) through **one pipeline**. Full fix record, evidence and diagnosis runbook: `docs/COS-INTERACTIVE-LATENCY-2026-09-27.md`. Read it before changing `app/api/cos-browser`, `app/api/cos-primary`, `lib/ai/cos/cosFirstAnswer*.ts` or `lib/ai/local-inference.ts`.

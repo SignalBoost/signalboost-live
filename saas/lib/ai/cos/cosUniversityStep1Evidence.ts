@@ -1,11 +1,14 @@
 // saas/lib/ai/cos/cosUniversityStep1Evidence.ts
 //
-// Step 1 evidence report: the current University measured against the owner's Step 1 exit criterion.
+// Step 1 evidence report: the current University factory measured against the owner's Step 1 exit criterion.
 //
-// Owner, 2026-10-06: "Step 1 is complete when the current University operates end-to-end autonomously - from artifact
-// creation through qualification, graduation, Production serving and independently verified Production outcomes -
-// with failures correctly attributed and the loop demonstrably continuing without manual intervention or weakened
-// standards." And: "COS can recommend READY / NOT READY, but it should not silently declare the project phase
+// Owner, 2026-10-06 (scope): "the main goal is to commercialize my portable/software so users can create, train and
+// distil not make the artifacts created to work on my platform, it will be the next project". Step 1 is therefore the
+// FACTORY a buyer uses - creation, curriculum/distillation, training, independent examination, Builder Residency and
+// graduation - running end to end with failures correctly attributed and standards unweakened. Graduates serving work
+// and independently verified Production outcomes belong to the NEXT project: they are still printed here, marked
+// next_project, and never block Step 1.
+// Owner, 2026-10-06: "COS can recommend READY / NOT READY, but it should not silently declare the project phase
 // complete." The declaration belongs to the owner.
 //
 // This module is pure. It reads the Artifact Effectiveness Funnel (the tables' own record) and states, per criterion,
@@ -17,7 +20,7 @@
 // can make is INSUFFICIENT_EVIDENCE_FOR_READY. Repetition is shown by comparing dated runs of this report.
 import type { EffectivenessFunnel } from './cosUniversityEffectivenessFunnel.ts'
 
-export const STEP1_EVIDENCE_SCHEMA_VERSION = 'cos-university-step1-evidence-v1' as const
+export const STEP1_EVIDENCE_SCHEMA_VERSION = 'cos-university-step1-evidence-v2' as const
 
 export type Step1CriterionStatus =
   | 'evidence_present'
@@ -26,8 +29,12 @@ export type Step1CriterionStatus =
   | 'unavailable'
   | 'not_measured'
 
+/** step1 = the factory a buyer uses; next_project = graduates working (reported, never blocking Step 1). */
+export type Step1CriterionScope = 'step1' | 'next_project'
+
 export type Step1Criterion = Readonly<{
   id: string
+  scope: Step1CriterionScope
   question: string
   status: Step1CriterionStatus
   observed: Readonly<Record<string, number | string | boolean | null>>
@@ -62,6 +69,7 @@ const stageSource = (funnel: EffectivenessFunnel, id: string): string =>
 /** A stage whose chapter could not be read is unavailable, never a real zero. */
 function stageCriterion(funnel: EffectivenessFunnel, input: {
   id: string
+  scope?: Step1CriterionScope
   question: string
   stages: readonly string[]
   extra?: Readonly<Record<string, number | string | boolean | null>>
@@ -82,6 +90,7 @@ function stageCriterion(funnel: EffectivenessFunnel, input: {
     : allPresent ? 'evidence_present' : 'no_evidence'
   return Object.freeze({
     id: input.id,
+    scope: input.scope ?? 'step1',
     question: input.question,
     status,
     observed: Object.freeze(observed),
@@ -96,6 +105,8 @@ function unavailableFor(funnel: EffectivenessFunnel, stageId: string): boolean {
     birth_certificate: 'certified',
     examined: 'examined',
     passed_all_gates: 'examined',
+    residency_enrolled: 'residency',
+    residency_complete: 'residency',
     graduated: 'graduation',
     activated: 'graduation',
     hired: 'hired',
@@ -129,16 +140,17 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
   {
     const f = funnel.evaluationFailures
     if (!f.available) {
-      criteria.push(Object.freeze({ id: 'failure_attribution', question: 'Is every evaluation failure attributed to infrastructure or merit with an evidence-backed cause?', status: 'unavailable' as const, observed: Object.freeze({ error: f.error }), source: 'cos_university_distilled_evaluation_runs', note: null }))
+      criteria.push(Object.freeze({ id: 'failure_attribution', scope: 'step1' as const, question: 'Is every evaluation failure attributed to infrastructure or merit with an evidence-backed cause?', status: 'unavailable' as const, observed: Object.freeze({ error: f.error }), source: 'cos_university_distilled_evaluation_runs', note: null }))
     } else {
       const unresolved = f.explanations.filter(entry => entry.causeStatus !== 'evidence_backed')
       const unresolvedCount = unresolved.reduce((sum, entry) => sum + entry.count, 0)
       criteria.push(Object.freeze({
         id: 'failure_attribution',
+        scope: 'step1' as const,
         question: 'Is every evaluation failure attributed to infrastructure or merit with an evidence-backed cause?',
         // Zero failures means attribution was never exercised in this window: untested, not proven.
         status: f.total === 0 ? 'no_evidence' as const : unresolvedCount > 0 ? 'partial' as const : 'evidence_present' as const,
-        observed: Object.freeze({ total: f.total, infrastructure: f.infrastructure, merit: f.merit, unresolvedFailures: unresolvedCount, unresolvedReasons: unresolved.map(entry => entry.reason).slice(0, 10).join(',') || null }),
+        observed: Object.freeze({ total: f.total, infrastructure: f.infrastructure, merit: f.merit, infrastructureShare: f.total > 0 ? Math.round((f.infrastructure / f.total) * 1000) / 1000 : null, unresolvedFailures: unresolvedCount, unresolvedReasons: unresolved.map(entry => entry.reason).slice(0, 10).join(',') || null, topReasons: f.explanations.slice(0, 10).map(entry => `${entry.reason}=${entry.count}`).join(',') || null }),
         source: f.source,
         note: f.total === 0 ? 'no evaluation failures in this window; attribution is untested rather than proven' : null,
       }))
@@ -146,13 +158,21 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
   }
 
   criteria.push(stageCriterion(funnel, {
-    id: 'graduation',
-    question: 'Do qualified artifacts graduate and get activated?',
-    stages: ['graduated', 'activated'],
+    id: 'builder_residency',
+    question: 'Do Computer Science artifacts complete Builder Residency?',
+    stages: ['residency_enrolled', 'residency_complete'],
   }))
 
   criteria.push(stageCriterion(funnel, {
+    id: 'graduation',
+    question: 'Do qualified artifacts graduate?',
+    stages: ['graduated'],
+  }))
+
+  // NEXT PROJECT (owner 2026-10-06): graduates put to work. Reported for continuity, never blocking Step 1.
+  criteria.push(stageCriterion(funnel, {
     id: 'production_serving',
+    scope: 'next_project',
     question: 'Are graduates hired and serving real work successfully?',
     stages: ['hired', 'performed_work', 'served_successfully'],
     extra: funnel.reliability.available
@@ -162,6 +182,7 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
 
   criteria.push(stageCriterion(funnel, {
     id: 'verified_production_outcomes',
+    scope: 'next_project',
     question: 'Do graduates produce independently verified Production outcomes?',
     stages: ['verified_outcome'],
     extra: funnel.workforceEffectiveness.available
@@ -174,6 +195,7 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
     const health = funnel.lineHealth
     criteria.push(Object.freeze({
       id: 'line_flow',
+      scope: 'step1' as const,
       question: 'Is the line moving units between stations in this window?',
       status: !h.available ? 'unavailable' as const : h.transitions > 0 ? 'evidence_present' as const : 'no_evidence' as const,
       observed: Object.freeze({
@@ -190,6 +212,7 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
 
   criteria.push(Object.freeze({
     id: 'repeated_operation',
+    scope: 'step1' as const,
     question: 'Does the whole line operate repeatedly, not once?',
     status: 'not_measured' as const,
     observed: Object.freeze({}),
@@ -198,6 +221,7 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
   }))
   criteria.push(Object.freeze({
     id: 'no_manual_intervention',
+    scope: 'step1' as const,
     question: 'Does the loop continue without manual intervention?',
     status: 'not_measured' as const,
     observed: Object.freeze({}),
@@ -206,6 +230,7 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
   }))
   criteria.push(Object.freeze({
     id: 'standards_unweakened',
+    scope: 'step1' as const,
     question: 'Were graduation and evaluation standards kept unchanged?',
     status: 'not_measured' as const,
     observed: Object.freeze({}),
@@ -214,6 +239,7 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
   }))
 
   const blocking = criteria
+    .filter(entry => entry.scope === 'step1')
     .filter(entry => entry.status === 'no_evidence' || entry.status === 'unavailable' || entry.status === 'partial')
     .map(entry => entry.id)
   return Object.freeze({
@@ -236,11 +262,17 @@ export function describeStep1Evidence(report: Step1EvidenceReport): string {
   const lines = [
     `STEP 1 EVIDENCE window=${report.window} cohort=${report.cohort.size}${report.cohort.truncated ? '+ (truncated)' : ''} recommendation=${report.recommendation} declaration=owner_only`,
   ]
-  for (const entry of report.criteria) {
+  const line = (entry: Step1Criterion) => {
     const observed = Object.entries(entry.observed).map(([key, value]) => `${key}=${value === null ? 'n/a' : value}`).join(' ')
-    lines.push(`  [${entry.status}] ${entry.id}${observed ? ` :: ${observed}` : ''}${entry.note ? ` (${entry.note})` : ''}`)
+    return `  [${entry.status}] ${entry.id}${observed ? ` :: ${observed}` : ''}${entry.note ? ` (${entry.note})` : ''}`
   }
+  for (const entry of report.criteria.filter(item => item.scope === 'step1')) lines.push(line(entry))
   if (report.blocking.length) lines.push(`  blocking: ${report.blocking.join(', ')}`)
+  const next = report.criteria.filter(item => item.scope === 'next_project')
+  if (next.length) {
+    lines.push('  next project (graduates at work; reported only, not part of Step 1):')
+    for (const entry of next) lines.push(`  ${line(entry)}`)
+  }
   return lines.join('\n')
 }
 // end of saas/lib/ai/cos/cosUniversityStep1Evidence.ts (if this line is missing, the paste was cut short)

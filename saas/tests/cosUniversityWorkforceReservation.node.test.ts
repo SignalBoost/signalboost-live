@@ -173,7 +173,8 @@ test('the workforce station hands practice work only to the reserve and gives ou
   assert.match(route, /const offReserve = new Set\(reservation\.eligibilityKnown \? reservation\.excludedFromWork : \[\]\)/)
   assert.match(route, /const notEligibleForWork = new Set\(\[\.\.\.runtimeBlocked, \.\.\.offReserve\]\)/)
   assert.match(route, /const eligibleRecoveryTargets = reservation\.eligibilityKnown\s*\?[\s\S]{0,160}?!notEligibleForWork\.has\(String\(row\.registry_id\)\)\)\s*: \[\]/)
-  assert.match(route, /\}, objective, notEligibleForWork\)/)
+  assert.match(route, /const reservedForWork = new Set\(reservation\.eligibilityKnown \? reservation\.eligibleForWork : \[\]\)/)
+  assert.match(route, /\}, objective, notEligibleForWork, reservedForWork\)/)
   assert.doesNotMatch(route, /\}, objective, runtimeBlocked\)/, 'the old exclusion set alone let released graduates receive work')
 })
 // ---------------------------------------------------------------------------------------------------------------

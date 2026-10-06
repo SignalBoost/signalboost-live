@@ -48,6 +48,46 @@ BEGIN
  EXCEPTION WHEN OTHERS THEN rejected:=true;
  END;
  IF NOT rejected THEN RAISE EXCEPTION 'overspending accepted'; END IF;
+ 
+ -- Verify platform-fault refund is accounted for and reconciles to events.
+ PERFORM lab.apply_credit_event(o,e,r,'refund',100,'refund-accept-00001',null,null,'PLATFORM_FAILURE');
+ reconciliation:=lab.reconcile_credit_account(o);
+ IF NOT (reconciliation->>'pass')::boolean OR (reconciliation->>'event_refunded')::bigint<>100
+ THEN RAISE EXCEPTION 'refund reconciliation failed: %',reconciliation; END IF;
+ IF (SELECT refunded_microcredits FROM lab.credit_accounts WHERE organization_id=o)<>100
+ THEN RAISE EXCEPTION 'incorrect refunded balance'; END IF;
+ rejected:=false;
+ BEGIN
+  PERFORM lab.apply_credit_event(o,e,r,'refund',151,'refund-over-00001',null,null,'PLATFORM_FAILURE');
+ EXCEPTION WHEN OTHERS THEN rejected:=true;
+ END;
+ IF NOT rejected THEN RAISE EXCEPTION 'excess refund accepted'; END IF;
+ rejected:=false;
+ BEGIN
+  PERFORM lab.apply_credit_event(o,e,r,'refund',1,'refund-unauth-0001',null,null,'CUSTOMER_ERROR');
+ EXCEPTION WHEN OTHERS THEN rejected:=true;
+ END;
+ IF NOT rejected THEN RAISE EXCEPTION 'unauthorized refund accepted'; END IF;
+ -- A second experiment cannot borrow the first experiment's budget.
+ rejected:=false;
+ BEGIN
+  INSERT INTO lab.projects(id,organization_id,university_id,name)
+    VALUES(gen_random_uuid(),other_org,u,'cross-tenant-project');
+ EXCEPTION WHEN foreign_key_violation THEN rejected:=true;
+ END;
+ IF NOT rejected THEN RAISE EXCEPTION 'cross-tenant project hierarchy accepted'; END IF;
+ rejected:=false;
+ BEGIN
+  INSERT INTO lab.cohorts(organization_id,experiment_id) VALUES(other_org,e);
+ EXCEPTION WHEN foreign_key_violation THEN rejected:=true;
+ END;
+ IF NOT rejected THEN RAISE EXCEPTION 'cross-tenant cohort hierarchy accepted'; END IF;
+ rejected:=false;
+ BEGIN
+  PERFORM lab.apply_credit_event(o,e,gen_random_uuid(),'reserve',501,'budget-over-000001');
+ EXCEPTION WHEN OTHERS THEN rejected:=true;
+ END;
+ IF NOT rejected THEN RAISE EXCEPTION 'experiment budget overspend accepted'; END IF;
  RAISE NOTICE 'PASS lab credit reservation, replay, capture, release, reconciliation, isolation, conflict, overspend';
 END $test$;
 ROLLBACK;

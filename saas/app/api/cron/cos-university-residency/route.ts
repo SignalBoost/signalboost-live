@@ -225,13 +225,10 @@ export async function GET(req: Request) {
           const execution = result.execution as {
             result?: { outcome?: { status?: string } }
           }
-          const selfHealing = 'selfHealing' in result
-            ? result.selfHealing as { completed?: boolean }
-            : undefined
-          if (
-            execution.result?.outcome?.status === 'infrastructure_failure' &&
-            selfHealing?.completed !== true
-          ) break
+          // A successful control-plane reconciliation does not prove that a worker is awake.
+          // End this lane after any infrastructure failure; the next scheduled tick owns
+          // a fresh exact-artifact readiness check before running another case.
+          if (execution.result?.outcome?.status === 'infrastructure_failure') break
         }
       }
       return laneResults

@@ -84,7 +84,8 @@ const week = () => ({
   ],
   cos_university_residency_enrollments: [{ id: 'res-a', candidate_id: 'a', trained_artifact_hash: H('a'), standing: 'residency_complete' }],
   cos_university_residency_case_runs: [
-    { residency_id: 'res-a', status: 'passed' }, { residency_id: 'res-a', status: 'passed' }, { residency_id: 'res-a', status: 'failed' },
+    { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'failed', harness_outcome: 'agent_failure', failure_code: 'assertion_failed' },
+    { residency_id: 'res-a', status: 'started' },
   ],
   cos_university_residency_competency_evidence: [
     { residency_id: 'res-a', outcome: 'pass' }, { residency_id: 'res-a', outcome: 'pass' }, { residency_id: 'res-a', outcome: 'fail' },
@@ -203,7 +204,10 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
   }
   assert.ok(f.residencyEffectiveness.available)
   if (f.residencyEffectiveness.available) {
-    assert.equal(f.residencyEffectiveness.enrollments, 1); assert.equal(f.residencyEffectiveness.completed, 1); assert.equal(f.residencyEffectiveness.caseRuns, 3); assert.equal(f.residencyEffectiveness.casesPassed, 2); assert.equal(f.residencyEffectiveness.casePassRate, 2 / 3); assert.equal(f.residencyEffectiveness.competencyEvidence, 3)
+    assert.equal(f.residencyEffectiveness.enrollments, 1); assert.equal(f.residencyEffectiveness.completed, 1); assert.equal(f.residencyEffectiveness.caseRuns, 4); assert.equal(f.residencyEffectiveness.casesPassed, 2); assert.equal(f.residencyEffectiveness.casePassRate, 2 / 3); assert.equal(f.residencyEffectiveness.competencyEvidence, 3)
+    assert.deepEqual({ ...f.residencyEffectiveness.caseOutcomes }, { success: 2, agent_failure: 1 }, 'finished cases by Harness verdict; a started case is not finished')
+    assert.deepEqual({ ...f.residencyEffectiveness.topFailureCodes }, { assertion_failed: 1 }, 'failure codes only from non-passing finished cases')
+    assert.deepEqual({ ...f.residencyEffectiveness.standings }, { residency_complete: 1 })
   }
   assert.ok(f.workforceEffectiveness.available)
   if (f.workforceEffectiveness.available) {
@@ -218,7 +222,7 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.equal(f.provenance.birthCertificates, 3); assert.equal(f.provenance.graduates, 1); assert.equal(f.provenance.resumes, 1); assert.equal(f.provenance.workforceAssignmentsWithPermanentId, 4); assert.equal(f.provenance.traceableGraduates, 1); assert.equal(f.provenance.traceableGraduateRate, 1)
   }
   assert.deepEqual(f.unavailable, {})
-  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.02/h recovered=2 | residency complete=1/1 cases=3 | workforce assignments=4 verified=1 remediation=1 runtime_failed=1 | observed_provider_cost=2.90 settled_jobs=3 | provenance traceable_graduates=1/1 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
+  assert.equal(describeFunnel(f), 'funnel window=7d born=4 examined=2 (50%) passed_all=1 (25%) graduated=1 (25%) hired=1 worked=1 verified=1 (25%) | gain n=2 mean=0.2000 positive=100% | reliability attempts=4 success=50% p90=18000ms | line live=3 overdue=3 leased=1 bottleneck=EXACT_CANARY | flow transitions=3 throughput=0.02/h recovered=2 | residency complete=1/1 cases=4 | workforce assignments=4 verified=1 remediation=1 runtime_failed=1 | observed_provider_cost=2.90 settled_jobs=3 | provenance traceable_graduates=1/1 | rejected quarantined=1 retired=1 | eval failures=2 infra=1 merit=1')
 })
 
 

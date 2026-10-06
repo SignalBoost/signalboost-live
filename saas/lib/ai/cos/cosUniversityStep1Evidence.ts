@@ -157,11 +157,31 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
     }
   }
 
-  criteria.push(stageCriterion(funnel, {
-    id: 'builder_residency',
-    question: 'Do Computer Science artifacts complete Builder Residency?',
-    stages: ['residency_enrolled', 'residency_complete'],
-  }))
+  {
+    // Whether residents fail on skill (agent_failure) or on the platform (infrastructure/harness/verification) decides
+    // the repair, so the case evidence the funnel already reads is printed with the stage counts.
+    const r = funnel.residencyEffectiveness
+    const kv = (map: Readonly<Record<string, number>>) => Object.entries(map).map(([k, v]) => `${k}=${v}`).join(',') || null
+    criteria.push(stageCriterion(funnel, {
+      id: 'builder_residency',
+      question: 'Do Computer Science artifacts complete Builder Residency?',
+      stages: ['residency_enrolled', 'residency_complete'],
+      extra: r?.available
+        ? {
+            standings: kv(r.standings),
+            caseRuns: r.caseRuns,
+            casesPassed: r.casesPassed,
+            casesFailed: r.casesFailed,
+            casesRejected: r.casesRejected,
+            casePassRate: r.casePassRate === null ? null : Math.round(r.casePassRate * 1000) / 1000,
+            caseOutcomes: kv(r.caseOutcomes),
+            topFailureCodes: kv(r.topFailureCodes),
+            competencyPasses: r.competencyPasses,
+            competencyFailures: r.competencyFailures,
+          }
+        : { residencyEvidence: 'unavailable' },
+    }))
+  }
 
   criteria.push(stageCriterion(funnel, {
     id: 'graduation',

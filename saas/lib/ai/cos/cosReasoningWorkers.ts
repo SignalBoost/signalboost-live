@@ -359,27 +359,8 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
         outcome: 'success',
         latencyMs: Date.now() - startedAt,
       })
-      // WORKFORCE (2026-10-05): serving success is not automatically Production work. University exams/practice,
-      // controlled evaluation, workforce recovery/validation and unlabeled background calls can all execute this worker.
-      // Only an explicitly user-facing interactive request may create a production_request assignment. This fails closed:
-      // serving telemetry remains truthful for every successful execution, but internal traffic can never enter the
-      // governed Production-verification lifecycle merely because a graduate produced text.
-      const productionDelivery = INTERACTIVE_GRADUATE_FEATURES.has(
-        String(request.usageContext?.feature || '').trim().toLowerCase(),
-      )
-      if (productionDelivery) {
-        recordGraduateProductionServed({
-          registryId: runtime.registryId,
-          candidateId: runtime.candidateId,
-          trainedArtifactHash: runtime.trainedArtifactHash,
-          subjectId: runtime.subjectId,
-          turnId,
-          objective: request.prompt,
-          servingAttemptId: attemptId,
-          latencyMs: Date.now() - startedAt,
-          harnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
-        })
-      }
+      // The worker only reports an inference result. The control plane owns winner selection;
+      // a completed attempt must not claim a Production delivery before selection.
 
       recordReasoningWorkerMetric({
         turnId,
@@ -401,6 +382,8 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
           effectiveMaxTokens: fitted.maxTokens,
           graduateSystemCompactedCharacters: fitted.systemCompactedCharacters,
           universityGraduate: true,
+          graduateServingAttemptId: attemptId,
+          graduateLatencyMs: Date.now() - startedAt,
           graduateRegistryId: runtime.registryId,
           graduateCandidateId: runtime.candidateId,
           graduateSubjectId: runtime.subjectId,
@@ -661,6 +644,26 @@ export async function reasonThroughCosControlPlane(
     allowExternalEscalation: options.allowExternalEscalation,
   })
   if (!execution) return null
+  // Only the selected graduate may be credited with user-facing Production service.
+  // Shadow, evaluation, and fallback workers never enter the Production assignment ledger.
+  const selected = execution.result.metadata
+  if (INTERACTIVE_GRADUATE_FEATURES.has(String(args.usageContext?.feature || '').trim().toLowerCase())
+    && selected?.universityGraduate === true
+    && execution.worker.id.startsWith('cos-graduate-')
+    && typeof execution.result.turnId === 'string'
+    && typeof selected.graduateServingAttemptId === 'string') {
+    recordGraduateProductionServed({
+      registryId: String(selected.graduateRegistryId),
+      candidateId: String(selected.graduateCandidateId),
+      trainedArtifactHash: String(selected.graduateArtifactHash),
+      subjectId: String(selected.graduateSubjectId),
+      turnId: execution.result.turnId,
+      objective: args.prompt,
+      servingAttemptId: selected.graduateServingAttemptId,
+      latencyMs: Number(selected.graduateLatencyMs || 0),
+      harnessRunId: currentCosHarnessIngress()?.manifest.runId ?? null,
+    })
+  }
   // Real Production apprenticeship is advisory only: run after the authoritative answer exists and do not await it.
   // It cannot alter the answer, authority, routing verdict, or fallback behavior.
   const apprentice = () => runWorkforceApprenticeShadow(args, decision.objective).catch(error => {

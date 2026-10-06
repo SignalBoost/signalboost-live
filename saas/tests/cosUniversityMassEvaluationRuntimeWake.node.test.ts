@@ -31,8 +31,8 @@ test('runtime wake is bounded and hands cold-start readiness back to the evaluat
   assert.match(route, /wakeRequestTimedOut: true/)
   assert.match(route, /responseObserved: false/)
   // The initial trigger must stay shorter than the evaluator-owned readiness window so the two phases
-  // cannot recreate the sequential 150s + 280s Production stall.
-  assert.match(evaluator, /const READY_TIMEOUT_MS = 280_000/)
+  // cannot recreate the sequential 150s + 280s Production stall. Window 340s since 2026-10-06 (measured exam headroom).
+  assert.match(evaluator, /const READY_TIMEOUT_MS = 340_000/)
   assert.doesNotMatch(route, /150_000/)
   assert.doesNotMatch(route, /300_000/)
 })

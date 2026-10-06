@@ -127,7 +127,8 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.doesNotMatch(runner, /gatewayStatus==='ready'\|\|gatewayStatus==='accepting_requests'/)
   assert.doesNotMatch(runner, /health\.workers\.ready>0\|\|health\.workers\.running>0/)
   assert.doesNotMatch(runner, /fetch\(\`\$\{root\}\/ready\`/)
-  assert.match(runner, /const READY_TIMEOUT_MS = 280_000/)
+  // 340s since 2026-10-06: measured exam max 183s leaves room inside the 545s usable route budget.
+  assert.match(runner, /const READY_TIMEOUT_MS = 340_000/)
   assert.match(runner, /const ROUTE_RESERVE_MS = 25_000/)
   assert.match(runner, /teacherModelId/)
   assert.match(runner, /evaluatorIds\.has\(training\.teacherModelId\)/)

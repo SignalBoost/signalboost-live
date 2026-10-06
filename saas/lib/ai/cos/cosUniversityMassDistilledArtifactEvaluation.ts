@@ -71,7 +71,16 @@ const HOLDOUT_JUDGE_RUBRIC = ' HOLDOUT SUITE (applies only when the suite is "ho
 // readiness window plus preflight/wake overhead therefore clipped a real transient cold-start band.
 // Extend only the readiness wait to 280s. maxDuration remains 600s, the route keeps a 25s reserve,
 // and endpoint/judge calls remain independently bounded, so this adds no worker, call, score or promotion authority.
-const READY_TIMEOUT_MS = 280_000
+// Production 2026-10-06 (read-only evaluation failure trace, 7 days): completed exams waited p50 139s / p90 203s /
+// max 275s for readiness against the 280s window, and since the worker stage was recorded 32 readiness timeouts
+// (28 with the worker already RUNNING, 0 cold) outnumber the 24 recorded successes. Failed runs stop at 284s: they
+// are cut off while loading, not hung. The exam itself (claim -> completed minus readiness, 28 exams) took
+// p50 138s / p90 153s / max 183s, so of the 545s usable route budget (570s - 25s reserve) a window up to 362s would
+// not have cut any observed exam short. 340s leaves 205s for the exam (above the observed 183s maximum and the ~200s
+// implied by older 480s runs). The canary for the same exact artifact already allows 380s
+// (runpodMassDistilledProvision READY_TIMEOUT_MS). Still clamped by the route deadline below; no worker, call, spend,
+// score or promotion authority changes.
+const READY_TIMEOUT_MS = 340_000
 const READY_POLL_MS = 3_000
 const READY_PING_TIMEOUT_MS = 15_000
 const ROUTE_RESERVE_MS = 25_000

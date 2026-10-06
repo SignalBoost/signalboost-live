@@ -111,7 +111,7 @@ test('completed-exam readiness waits are compared with the readiness window, and
   assert.equal(waits.p50, 130)
   assert.equal(waits.max, 250)
   assert.equal(waits.windowSeconds, EVALUATION_READY_WINDOW_SECONDS)
-  assert.deepEqual(waits.withinSeconds, { '60': 1, '120': 1, '180': 2, '240': 2, '280': 3 })
+  assert.deepEqual(waits.withinSeconds, { '60': 1, '120': 1, '180': 2, '240': 2, [String(EVALUATION_READY_WINDOW_SECONDS)]: 3 })
   const trace = composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW, completed: null })
   assert.match(describeEvaluationFailureTrace(trace), /completed-exam readiness wait: unavailable/)
 })
@@ -142,6 +142,17 @@ test('run and exam time come from the claim reservation to the terminal event, a
   const trace = composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW, durations })
   assert.match(describeEvaluationFailureTrace(trace), /readiness window that would not cut any observed exam: <= 275s/)
   assert.match(describeEvaluationFailureTrace(composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW })), /run time from claim: unavailable/)
+})
+
+test('the trace reports the evaluator\'s real readiness window, and that window still leaves room for the measured exam', () => {
+  const evaluator = read('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
+  const match = /const READY_TIMEOUT_MS = (\d+)_000\b/.exec(evaluator)
+  assert.ok(match, 'READY_TIMEOUT_MS is declared in whole seconds')
+  assert.equal(Number(match![1]), EVALUATION_READY_WINDOW_SECONDS, 'trace constant must match the evaluator window')
+  // Measured 2026-10-06: exam (run - readiness) max 183s. The window must leave at least that inside the usable budget.
+  assert.ok(EVALUATION_ROUTE_USABLE_SECONDS - EVALUATION_READY_WINDOW_SECONDS >= 183)
+  // The route deadline still bounds the wait.
+  assert.match(evaluator, /const until=Math\.min\(Date\.now\(\)\+READY_TIMEOUT_MS,deadlineMs-ROUTE_RESERVE_MS\)/)
 })
 
 // end of saas/tests/cosUniversityEvaluationFailureTrace.node.test.ts (if this line is missing, the paste was cut short)

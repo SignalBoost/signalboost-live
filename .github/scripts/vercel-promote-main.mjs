@@ -73,8 +73,9 @@ async function currentProduction(deployments) {
   if (target && (target.id || target.uid)) {
     return { id: idOf(target), sha: shaOf(target), created: createdOf(target), source: 'project.targets.production' }
   }
-  const newest = deployments.find(d => d?.target === 'production' && stateOf(d) === 'READY')
-  return newest ? { id: idOf(newest), sha: shaOf(newest), created: createdOf(newest), source: 'newest READY production deployment' } : null
+  // A READY deployment is not proof of the active production alias.
+  // Never infer production identity from the deployment list.
+  return null
 }
 
 async function buildError(deployment) {
@@ -113,8 +114,7 @@ async function promote(deployment, reason) {
       return true
     }
   }
-  summary(`- Promotion of \`${short(shaOf(deployment))}\` was accepted but production had not switched after 5 minutes.`)
-  return false
+  throw new Error(`Promotion of ${short(shaOf(deployment))} was accepted but production alias could not be verified after 5 minutes`)
 }
 
 async function main() {
@@ -123,6 +123,7 @@ async function main() {
 
   const deployments = await listDeployments()
   const production = await currentProduction(deployments)
+  if (!production?.id) throw new Error('Cannot verify active production target; refusing promotion or fallback')
   summary('## Vercel production vs main')
   summary(`- Production serves \`${short(production?.sha)}\` (${production?.id || 'unknown'}, created ${when(production?.created)}, from ${production?.source || 'n/a'}).`)
   summary(`- main is at \`${short(mainSha)}\`.`)

@@ -10,6 +10,8 @@ import {
   EVALUATION_READY_WINDOW_SECONDS,
   composeEvaluationFailureTrace,
   composeReadinessWaits,
+  composeRunDurations,
+  EVALUATION_ROUTE_USABLE_SECONDS,
   describeEvaluationFailureTrace,
   failureDetail,
   failureFamily,
@@ -112,6 +114,34 @@ test('completed-exam readiness waits are compared with the readiness window, and
   assert.deepEqual(waits.withinSeconds, { '60': 1, '120': 1, '180': 2, '240': 2, '280': 3 })
   const trace = composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW, completed: null })
   assert.match(describeEvaluationFailureTrace(trace), /completed-exam readiness wait: unavailable/)
+})
+
+test('run and exam time come from the claim reservation to the terminal event, and give the readiness headroom', () => {
+  const K = (c: string) => c.repeat(64)
+  const durations = composeRunDurations({
+    reservations: [
+      { event_key: K('a'), observed_at: '2026-10-06T10:00:00Z' },
+      { event_key: K('b'), observed_at: '2026-10-06T11:00:00Z' },
+      { event_key: K('c'), observed_at: '2026-10-06T12:00:00Z' },
+    ],
+    completed: [
+      { observed_at: '2026-10-06T10:07:00Z', readiness_seconds: '150', reservation_event_key: K('a') },
+      { observed_at: '2026-10-06T11:06:00Z', readiness_seconds: null, reservation_event_key: K('b') },
+      { observed_at: '2026-10-06T13:00:00Z', readiness_seconds: '10', reservation_event_key: K('d') },
+    ],
+    failed: [
+      { observed_at: '2026-10-06T12:04:50Z', reservation_event_key: K('c'), error: 'mass_distilled_evaluation_runtime_not_ready:mass_distilled_gateway_ping_timeout:workers=warm' },
+      { observed_at: '2026-10-06T12:05:00Z', reservation_event_key: K('c'), error: 'mass_distilled_evaluation_judge_case_invalid' },
+    ],
+  })
+  assert.deepEqual(durations.completedRun, { count: 2, p50: 360, p90: 420, max: 420 })
+  assert.deepEqual(durations.completedExam, { count: 1, p50: 270, p90: 270, max: 270 }, 'exam = run - readiness, only where readiness is known')
+  assert.deepEqual(durations.failedRuntimeNotReadyRun, { count: 1, p50: 290, p90: 290, max: 290 }, 'only runtime_not_ready failures')
+  assert.equal(durations.unmatched, 1, 'a terminal event without its reservation is counted, not guessed')
+  assert.equal(durations.readinessHeadroomAtExamMax, EVALUATION_ROUTE_USABLE_SECONDS - 270)
+  const trace = composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW, durations })
+  assert.match(describeEvaluationFailureTrace(trace), /readiness window that would not cut any observed exam: <= 275s/)
+  assert.match(describeEvaluationFailureTrace(composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW })), /run time from claim: unavailable/)
 })
 
 // end of saas/tests/cosUniversityEvaluationFailureTrace.node.test.ts (if this line is missing, the paste was cut short)

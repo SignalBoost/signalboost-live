@@ -231,6 +231,8 @@ export async function reconcileMassDistillationHuggingFaceProviderLedger(input: 
         jobId,
         operation,
         providerStage: job.stage,
+        failureAttribution: job.stage === 'COMPLETED' ? 'NONE' : 'UNATTRIBUTED',
+        failureReason,
         observedCostUsd,
         reservedCostUsd: Number((row as any).reserved_cost_usd),
         settlement: settled.data,

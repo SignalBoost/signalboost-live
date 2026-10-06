@@ -185,7 +185,7 @@ revoke all on function lab.apply_credit_event(uuid,uuid,uuid,text,bigint,text,nu
 grant execute on function lab.apply_credit_event(uuid,uuid,uuid,text,bigint,text,numeric,text,text) to service_role;
 -- Operational reconciliation is computed from authoritative rows, not mutable billing estimates.
 create function lab.reconcile_credit_account(p_organization_id uuid)
-returns jsonb language plpgsql security definer set search_path = pg_catalog, lab as $
+returns jsonb language plpgsql security definer set search_path = pg_catalog, lab as $$
 declare a lab.credit_accounts%rowtype; agg record; mismatch boolean;
 begin
   if session_user not in ('postgres','service_role') or
@@ -204,7 +204,7 @@ begin
     'computed_reserved',agg.reserved,'stored_captured',a.captured_microcredits,
     'computed_captured',agg.captured,'stored_refunded',a.refunded_microcredits,
     'computed_refunded',agg.refunded);
-end $;
+end $$;
 revoke all on function lab.reconcile_credit_account(uuid) from public, anon, authenticated;
 grant execute on function lab.reconcile_credit_account(uuid) to service_role;
 

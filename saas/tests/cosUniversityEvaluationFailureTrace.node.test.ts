@@ -145,14 +145,14 @@ test('run and exam time come from the claim reservation to the terminal event, a
 })
 
 test('completed exam time is split by holdout size, so 12-case exams are not averaged into 6-case ones', () => {
-  const K = (c: string) => c.repeat(64)
+  const reservationKey = (c: string) => c.repeat(64)
   const durations = composeRunDurations({
-    reservations: ['a', 'b', 'c', 'd'].map((c, i) => ({ event_key: K(c), observed_at: `2026-10-07T1${i}:00:00Z` })),
+    reservations: ['a', 'b', 'c', 'd'].map((c, i) => ({ event_key: reservationKey(c), observed_at: `2026-10-07T1${i}:00:00Z` })),
     completed: [
-      { observed_at: '2026-10-07T10:05:00Z', readiness_seconds: '160', reservation_event_key: K('a'), holdout_cases: '6' },
-      { observed_at: '2026-10-07T11:07:00Z', readiness_seconds: '150', reservation_event_key: K('b'), holdout_cases: '12' },
-      { observed_at: '2026-10-07T12:08:00Z', readiness_seconds: '140', reservation_event_key: K('c'), holdout_cases: '12' },
-      { observed_at: '2026-10-07T13:04:00Z', readiness_seconds: '100', reservation_event_key: K('d') },
+      { observed_at: '2026-10-07T10:05:00Z', readiness_seconds: '160', reservation_event_key: reservationKey('a'), holdout_cases: '6' },
+      { observed_at: '2026-10-07T11:07:00Z', readiness_seconds: '150', reservation_event_key: reservationKey('b'), holdout_cases: '12' },
+      { observed_at: '2026-10-07T12:08:00Z', readiness_seconds: '140', reservation_event_key: reservationKey('c'), holdout_cases: '12' },
+      { observed_at: '2026-10-07T13:04:00Z', readiness_seconds: '100', reservation_event_key: reservationKey('d') },
     ],
     failed: [],
   })

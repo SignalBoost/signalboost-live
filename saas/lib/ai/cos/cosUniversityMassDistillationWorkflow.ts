@@ -134,10 +134,10 @@ async function preparedMassDistillationInventory(target: number): Promise<number
       const sourceKinds = await sourceKindsByContentHash(db, allHashes)
       available += unused.filter((row: any) => {
         // SQL ANY() counts each continuous-learning row once even if a source hash were duplicated.
-        const hashes = [...new Set(Array.isArray(row.source_hashes)
+        const hashes = [...new Set<string>(Array.isArray(row.source_hashes)
           ? row.source_hashes.map((hash: unknown) => String(hash || '')).filter(Boolean)
           : [])]
-        const kinds = hashes.flatMap(hash => sourceKinds.get(hash) || [])
+        const kinds = hashes.flatMap((hash: string) => sourceKinds.get(hash) || [])
         return massDistillationPreparedBatchIsAuthorizable({
           sourceCount: Number(row.source_count || 0),
           sourceKinds: kinds,

@@ -452,3 +452,27 @@ test('HF bootstrap exposes resolver diagnostics for every job operation', () => 
   assert.doesNotMatch(source, /pip install --quiet/)
   assert.match(source, /command = workerBootstrap\(\[/)
 })
+
+test('preparation uses the pair installed and smoke-tested on python:3.12-slim, without changing paid authority', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv())!
+  const spec = buildHuggingFaceJobSpec({
+    config,
+    callbackUrl: 'https://itmounts.com/api/internal/cos/university-training-executor/evidence',
+    callbackSecret: 'k'.repeat(64),
+    idempotencyKey: 'verified-prep-packages',
+    envelope: {
+      operation: 'prepare_dataset',
+      candidateId: 'study-plan:00000000-0000-4000-8000-000000000001',
+      candidate: { source: 'hf://datasets/cadomos/approved-training#train' },
+      authorityExpanded: false,
+    },
+  })
+  const command = spec.command.join(' ')
+  assert.equal(spec.dockerImage, 'python:3.12-slim')
+  assert.match(command, /huggingface_hub==1\.33\.0/)
+  assert.match(command, /datasets==4\.8\.5/)
+  assert.doesNotMatch(command, /huggingface_hub>=0\.34,<2/)
+  assert.doesNotMatch(command, /datasets>=3,<5/)
+  assert.equal(spec.secrets.HF_TOKEN, token)
+  assert.equal(spec.environment.HF_TOKEN, undefined)
+})

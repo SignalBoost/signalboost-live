@@ -78,6 +78,14 @@ FAILURE_DERIVED_REPLAY_MAX_ITEMS = 32
 FAILURE_DERIVED_REPLAY_EPOCHS = 3.0
 FAILURE_DERIVED_REPLAY_LEARNING_RATE = 5e-5
 FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION = 1
+# Controlled replay A/B (2026-10-07; ONBOARD Step 1 training gain: "check within each subject before acting on it", and causal
+# claims need controlled comparisons). Production gain trace, 7 days: replay=yes n=397 mean -0.031 (+114/-147), replay=no n=210
+# mean +0.043 (+62/-36); no-replay ahead in 10 of 13 subjects. Replay only runs where the batch carries failure-derived rows, so
+# a harder-lineage bias could still produce the gap. Among those eligible runs only, a fixed hash of the candidate id assigns
+# half to the post-GKD replay pass and half to a control that skips it. Both arms keep the failure-derived rows in the anchor
+# and GKD passes and the same batch, holdout, evaluator and pass rules; only the replay pass differs. The receipt records
+# eligibility and arm so the capability gain trace compares arm against arm.
+FAILURE_DERIVED_REPLAY_ROLLOUT_PERCENT = 50
 
 # Catastrophic-forgetting ballast (Production evidence 2026-09-29, 220 independent evaluations).
 # Per-case transfer scores showed distillation TEACHING one reasoning skill and ERASING two others:
@@ -903,6 +911,14 @@ def _configure_muon_canary(base, torch, trainer, candidate_id: str) -> dict[str,
     }
 
 
+def _failure_replay_arm_selected(base, candidate_id: str) -> bool:
+    """Deterministic replay A/B arm for a run with failure-derived rows: True runs the post-GKD replay pass."""
+    normalized_candidate = str(candidate_id or "").strip()
+    return bool(normalized_candidate) and (
+        int(base.sha256(f"failure-replay:{normalized_candidate}")[:8], 16) % 100 < FAILURE_DERIVED_REPLAY_ROLLOUT_PERCENT
+    )
+
+
 def _xsa_canary_evidence(base, base_model, candidate_id: str) -> dict[str, Any]:
     """Return fail-closed evidence for the XSA architecture experiment.
 
@@ -1045,6 +1061,13 @@ def train_student(base, envelope: dict[str, Any]) -> None:
                 failure_derived_replay_training.append(anchor_row)
         if not prompts:
             raise RuntimeError("worker_training_dataset_empty")
+        failure_derived_replay_eligible_items = len(failure_derived_replay_training)
+        failure_derived_replay_selected = failure_derived_replay_eligible_items > 0 and _failure_replay_arm_selected(
+            base, base.clean(envelope.get("candidateId"), 200)
+        )
+        if not failure_derived_replay_selected:
+            # Control arm: the rows stay in the anchor and GKD passes above; only the post-GKD replay pass is skipped.
+            failure_derived_replay_training = []
 
         # Fixed rehearsal rows, independent of this run's subject. Rendered with the same chat
         # contract as every other training row so the ballast pass cannot introduce a format skew.
@@ -1163,6 +1186,9 @@ def train_student(base, envelope: dict[str, Any]) -> None:
             "frontierResponseAnchorTrainableFp32TensorCount": anchor_trainable_fp32_tensors,
             "failureDerivedReplayRequired": len(failure_derived_replay_training) > 0,
             "failureDerivedReplayItems": len(failure_derived_replay_training),
+            "failureDerivedReplayEligibleItems": failure_derived_replay_eligible_items,
+            "failureDerivedReplayRolloutPercent": FAILURE_DERIVED_REPLAY_ROLLOUT_PERCENT,
+            "failureDerivedReplayRolloutSelected": failure_derived_replay_selected,
             "failureDerivedReplayEpochs": FAILURE_DERIVED_REPLAY_EPOCHS if failure_derived_replay_training else 0,
             "failureDerivedReplayLearningRate": FAILURE_DERIVED_REPLAY_LEARNING_RATE if failure_derived_replay_training else 0,
             "failureDerivedReplayGradientAccumulationSteps": FAILURE_DERIVED_REPLAY_GRADIENT_ACCUMULATION if failure_derived_replay_training else 0,

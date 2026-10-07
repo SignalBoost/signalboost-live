@@ -2840,6 +2840,15 @@ Owner go for each. Status: merged and deployed to Production; **live effect not 
 
 **Open (owner decision, evidence pending):** the 50% real-source floor. Owner SQL, 2026-10-07 01:40 UTC: packaging restarted around 01:21 UTC (only 2 batches in the previous 24 h), but seven subjects (Economics, Social Sciences, Statistics, Cybersecurity, Politics, Quantum, Computer Science) have had no new batch since 2026-10-06 20:50 UTC, and Mathematics none since 2026-10-03. Computer Science: 15 unused real-source items against 32 needed. The capability gain trace does not show real-source-heavy batches gaining more. Measure under the new gate before changing the floor.
 
+### Failure-replay A/B — 2026-10-07
+
+Owner approved. Status: implemented, tests and release gate passing; **not yet observed live**. Within-subject check (`subjectXfailureReplay`, 7 days): no-replay ahead in 10 of 13 subjects; replay=yes n=397 mean −0.031 (+114/−147), replay=no n=210 mean +0.043 (+62/−36). Replay only runs where the batch carries failure-derived rows, so lineage difficulty could still explain the gap, and a causal claim needs a controlled comparison.
+
+- `cos-university-hf-worker.py`: among runs with failure-derived rows only, a fixed hash of the candidate id (`failure-replay:<id>`, `FAILURE_DERIVED_REPLAY_ROLLOUT_PERCENT = 50`) runs the post-GKD replay pass (arm `replay`) or skips it (arm `control`). Both arms keep the failure-derived rows in the anchor and GKD passes, the same batch, holdout, evaluator and pass rules.
+- The training receipt records `failureDerivedReplayEligibleItems`, `failureDerivedReplayRolloutPercent` and `failureDerivedReplayRolloutSelected`. Control-arm artifacts carry `failureDerivedReplayRequired: false`, so they wait in the ordinary deploy/exam order instead of the replay-proof priority.
+- The capability gain trace prints `by failureReplayArm` (`replay`, `control`, `not_eligible`, `unrecorded` for runs trained before the A/B). Read replay against control only; do not compare either arm with `not_eligible`.
+- Decide on replay from that arm comparison under the significance gate and 12-case holdout, not from the pre-A/B correlation.
+
 ### AI Lab specification corrections — 2026-10-06
 
 External drafts of the Lab specification circulated on 2026-10-06. Where they conflict with this file, this file wins:

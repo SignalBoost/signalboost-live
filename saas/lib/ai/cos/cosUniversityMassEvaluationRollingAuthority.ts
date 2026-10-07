@@ -291,6 +291,20 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'mass_distilled_evaluation_route_deadline_exceeded'
     || error === 'bounded_runtime_evaluation_authorization_missing_or_expired'
     || /\bis not a function\b/.test(error)
+    // Step 1 failure attribution (2026-10-07): five shapes the all-time report still listed as unresolved, each raised by
+    // our own code or infrastructure and never by a model's answer. Charging them to an artifact's merit is the error.
+    //   fetch failed: undici transport failure on one of our HTTP calls (network, DNS, TLS) - nothing was answered.
+    //   pgrst204: PostgREST schema-cache miss (2026-09-20: a column the evaluator writes did not exist yet) - our schema.
+    //   independent_evaluator_evidence_http_<n>: our evaluator posting its signed evidence to our own route was refused.
+    //   mass_distilled_runtime_endpoint_worker_policy_drift: the provisioning guard refused the endpoint before any wake.
+    //   no_supported_evaluation_pending_artifact: the exam found no artifact to examine; no model was asked anything.
+    // Deliberately NOT here: mass_distilled_evaluation_runpod_http_400 (a malformed adapter could cause it) and any
+    // candidate_* shape (substantive artifact behaviour).
+    || error === 'fetch failed'
+    || error.startsWith('pgrst204:')
+    || /^independent_evaluator_evidence_http_\d{3}$/.test(error)
+    || error === 'mass_distilled_runtime_endpoint_worker_policy_drift'
+    || error === 'no_supported_evaluation_pending_artifact'
     // RunPod's own REST/control plane failing (2026-09-27 18:13-18:17 UTC: "RunPod GET /serverless HTTP 500:
     // failed to list endpoints", three times after the helper's own retries) quarantined mass:fce8f4ba without
     // one evaluation prompt ever reaching the artifact. A provider 5xx or 429 on a control-plane call happens

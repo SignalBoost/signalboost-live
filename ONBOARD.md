@@ -2849,6 +2849,10 @@ Owner approved. Status: implemented, tests and release gate passing; **not yet o
 - The capability gain trace prints `by failureReplayArm` (`replay`, `control`, `not_eligible`, `unrecorded` for runs trained before the A/B). Read replay against control only; do not compare either arm with `not_eligible`.
 - Decide on replay from that arm comparison under the significance gate and 12-case holdout, not from the pre-A/B correlation.
 
+### Failure attribution: our own error shapes are infrastructure — 2026-10-07
+
+The all-time Step 1 report still listed unresolved failure causes that are raised by our code or infrastructure, never by a model's answer: `fetch failed`, `PGRST204` schema-cache misses, `independent_evaluator_evidence_http_<n>` (our evaluator posting to our own route), `mass_distilled_runtime_endpoint_worker_policy_drift` (provisioning guard) and `no_supported_evaluation_pending_artifact` (no artifact was examined). They are now in the canonical `isEvaluatorInfrastructureFailure`, which production disposition and the report share, so they no longer spend an artifact's substantive attempts. `mass_distilled_evaluation_runpod_http_400` (a malformed adapter could cause it), every `candidate_*` shape and the historical `[object Object]` rows stay out and are reported as unresolved.
+
 ### AI Lab specification corrections — 2026-10-06
 
 External drafts of the Lab specification circulated on 2026-10-06. Where they conflict with this file, this file wins:

@@ -180,3 +180,19 @@ test('the trace reports the evaluator\'s real readiness window, and that window 
 })
 
 // end of saas/tests/cosUniversityEvaluationFailureTrace.node.test.ts (if this line is missing, the paste was cut short)
+
+test('our own transport, schema, evidence-route, provisioning and empty-claim failures are infrastructure; ambiguous shapes are not', () => {
+  for (const error of [
+    'fetch failed',
+    "PGRST204:Could not find the 'safety_absolute_threshold_met' column of 'cos_university_distilled_evaluation_runs' in the schema cache",
+    'independent_evaluator_evidence_http_401',
+    'mass_distilled_runtime_endpoint_worker_policy_drift',
+    'no_supported_evaluation_pending_artifact',
+  ]) assert.equal(isEvaluatorInfrastructureFailure(error), true, error)
+  for (const error of [
+    'mass_distilled_evaluation_runpod_http_400:candidate:cases=6:bad adapter',
+    'mass_distilled_evaluation_candidate_output_exhausted:abc:finish=length:think=0:open=1:close=0:other=0:cap=1024',
+    'fetch failed because the model said so',
+    'independent_evaluator_evidence_http_401:extra',
+  ]) assert.equal(isEvaluatorInfrastructureFailure(error), false, error)
+})

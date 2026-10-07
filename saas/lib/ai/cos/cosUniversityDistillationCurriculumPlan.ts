@@ -99,9 +99,19 @@ export function buildMassDistillationReplenishmentGaps(
 ): KnowledgeGap[] {
   const replenishmentSlot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
   const limit = Math.max(1, Math.floor(maxSubjects))
+  // Among subjects short only on real-source material, the one closest to the real-source need goes first.
+  // Production 2026-10-07: Computer Science needed 3-4 more real-source items, but each fill targeted three
+  // larger subjects first because ties fell back to item count, so Computer Science was never fetched for.
+  const realSourceGap = (subject: MassDistillationSubjectSupply) => subject.shortfallToBatch > 0
+    || !Number.isSafeInteger(subject.realSourceItems) || !Number.isSafeInteger(subject.realSourceNeeded)
+    ? 0
+    : Math.max(0, Number(subject.realSourceNeeded) - Number(subject.realSourceItems))
   const partial = supply
     .filter(subject => subject.canonicalSubjectId && subject.uniqueBatchableItems > 0 && needsMassDistillationReplenishment(subject))
-    .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))
+    .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch
+      || realSourceGap(a) - realSourceGap(b)
+      || b.uniqueBatchableItems - a.uniqueBatchableItems
+      || a.subjectKey.localeCompare(b.subjectKey))
   // A subject whose items were just packaged into a batch drops out of the supply list entirely. Filtering only on
   // supplied subjects therefore idled replenishment (Production 2026-09-16: "no_targetable_subject_shortfall" while no
   // batch was prepared and Hugging Face sat idle). Empty canonical subjects fill the remaining slots, rotating per slot.

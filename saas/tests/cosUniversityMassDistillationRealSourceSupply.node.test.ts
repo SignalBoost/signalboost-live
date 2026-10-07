@@ -14,6 +14,7 @@ import {
   buildMassDistillationBatches,
   type RetainedDistillationIdentity,
 } from '../lib/ai/cos/cosUniversityMassDistillation.ts'
+import { buildMassDistillationReplenishmentGaps } from '../lib/ai/cos/cosUniversityDistillationCurriculumPlan.ts'
 
 const CS = 'Computer Science & Coding'
 const h = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -107,5 +108,47 @@ test('independent provenance wins material deduplication even when synthetic cop
   assert.equal(batches[0].sourceCount, 64)
   for (const item of independent) assert.ok(batches[0].sourceHashes.includes(item.contentHash))
   for (const item of duplicateSynthetic) assert.ok(!batches[0].sourceHashes.includes(item.contentHash))
+})
+
+const fillSubject = (id: string, subject: string, items: number, shortfall: number, real?: number) => ({
+  subjectKey: id,
+  subject,
+  canonicalSubjectId: id as any,
+  uniqueBatchableItems: items,
+  shortfallToBatch: shortfall,
+  ...(real === undefined ? {} : { realSourceItems: real, realSourceNeeded: 32 }),
+})
+const fillTargets = (supply: ReturnType<typeof fillSubject>[]) =>
+  [...new Set(buildMassDistillationReplenishmentGaps(supply as any, new Date('2026-10-07T18:16:00Z'), 3, 1).map(gap => gap.subject))]
+
+test('the fill reaches the subject closest to the real-source need first (Production 2026-10-07)', () => {
+  // Five fills in a row targeted these three larger subjects while Computer Science sat at 28-29 of 32.
+  const supply = [
+    fillSubject('computer_science', CS, 678, 0, 29),
+    fillSubject('mathematics', 'Mathematics', 900, 0, 10),
+    fillSubject('economics_finance', 'Economics & Finance', 800, 0, 5),
+    fillSubject('history_culture_philosophy_religion', 'History, Culture, Philosophy & Religion', 700, 0, 20),
+  ]
+  assert.deepEqual(fillTargets(supply), [CS, 'History, Culture, Philosophy & Religion', 'Mathematics'])
+})
+
+test('subjects short on items keep their previous order; the real-source gap only ranks subjects with no item shortfall', () => {
+  const supply = [
+    fillSubject('computer_science', CS, 678, 0, 31),
+    fillSubject('mathematics', 'Mathematics', 40, 24, 2),
+    fillSubject('economics_finance', 'Economics & Finance', 50, 14, 30),
+    fillSubject('cybersecurity', 'Cybersecurity', 50, 14, 1),
+  ]
+  // Smallest item shortfall first, as before. Cybersecurity and Economics tie on shortfall and items; Economics has the
+  // smaller real-source gap but does not jump ahead, because the gap does not reorder item shortfalls.
+  assert.deepEqual(fillTargets(supply), [CS, 'Cybersecurity', 'Economics & Finance'])
+})
+
+test('subjects with no real-source counts keep the previous item-count order', () => {
+  const supply = [
+    fillSubject('mathematics', 'Mathematics', 40, 24),
+    fillSubject('economics_finance', 'Economics & Finance', 50, 14),
+  ]
+  assert.deepEqual(fillTargets(supply).slice(0, 2), ['Economics & Finance', 'Mathematics'])
 })
 // end of saas/tests/cosUniversityMassDistillationRealSourceSupply.node.test.ts (if this line is missing, the paste was cut short)

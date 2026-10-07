@@ -144,6 +144,30 @@ test('run and exam time come from the claim reservation to the terminal event, a
   assert.match(describeEvaluationFailureTrace(composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW })), /run time from claim: unavailable/)
 })
 
+test('completed exam time is split by holdout size, so 12-case exams are not averaged into 6-case ones', () => {
+  const reservationKey = (c: string) => c.repeat(64)
+  const durations = composeRunDurations({
+    reservations: ['a', 'b', 'c', 'd'].map((c, i) => ({ event_key: reservationKey(c), observed_at: `2026-10-07T1${i}:00:00Z` })),
+    completed: [
+      { observed_at: '2026-10-07T10:05:00Z', readiness_seconds: '160', reservation_event_key: reservationKey('a'), holdout_cases: '6' },
+      { observed_at: '2026-10-07T11:07:00Z', readiness_seconds: '150', reservation_event_key: reservationKey('b'), holdout_cases: '12' },
+      { observed_at: '2026-10-07T12:08:00Z', readiness_seconds: '140', reservation_event_key: reservationKey('c'), holdout_cases: '12' },
+      { observed_at: '2026-10-07T13:04:00Z', readiness_seconds: '100', reservation_event_key: reservationKey('d') },
+    ],
+    failed: [],
+  })
+  assert.deepEqual(durations.completedExamByHoldoutCases, {
+    '6': { count: 1, p50: 140, p90: 140, max: 140 },
+    '12': { count: 2, p50: 270, p90: 340, max: 340 },
+    unknown: { count: 1, p50: 140, p90: 140, max: 140 },
+  })
+  assert.deepEqual(Object.keys(durations.completedExamByHoldoutCases), ['6', '12', 'unknown'], 'ordered by size, unknown last')
+  const text = describeEvaluationFailureTrace(composeEvaluationFailureTrace({ rows: [], truncated: false, now: NOW, durations }))
+  assert.match(text, /completed exam by holdout cases: 6 cases n=1 p50=140s p90=140s max=140s \| 12 cases n=2 p50=270s p90=340s max=340s \| unknown cases n=1/)
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityEvaluationFailureTrace.ts', import.meta.url), 'utf8')
+  assert.match(source, /holdout_cases:evidence->holdout->>cases/)
+})
+
 test('the trace reports the evaluator\'s real readiness window, and that window still leaves room for the measured exam', () => {
   const evaluator = read('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
   const match = /const READY_TIMEOUT_MS = (\d+)_000\b/.exec(evaluator)

@@ -26,6 +26,8 @@ import { BUILDER_RESIDENCY_V1_COMPETENCIES, type BuilderResidencyCompetency } fr
 
 export const RESIDENCY_GAP_REMEDIATION_PROFILE = 'cos-university-residency-gap-remediation-v1' as const
 export const RESIDENCY_GAP_UNIVERSITY_SUBJECT = 'Computer Science & Coding' as const
+export const RESIDENCY_GAP_FAILURES_PER_GENERATION = 10
+export const RESIDENCY_GAP_MAX_GENERATIONS = 4
 const EVIDENCE_READ_LIMIT = 2000
 
 /** Five general practice focuses per competency. General skills only: no case, file name or fixture appears here. */
@@ -133,6 +135,21 @@ const PRACTICE_CONTEXTS = Object.freeze([
 
 export const RESIDENCY_GAP_ITEMS_PER_COMPETENCY = 20
 
+const GENERATION_EMPHASIS = Object.freeze([
+  '',
+  'Escalation focus: include a plausible but wrong repair, a boundary or revert regression that rejects it, and an independent proving command.',
+  'Escalation focus: combine two interacting failure modes and require the regression to distinguish the root cause from a symptom-only patch.',
+  'Escalation focus: require an adversarial edge case, a rollback-safe minimal repair, and a regression that still catches the defect after superficial refactoring.',
+] as const)
+
+export function residencyGapGenerationForFailures(failures: number): number {
+  if (!Number.isSafeInteger(failures) || failures <= 0) return 0
+  return Math.min(
+    RESIDENCY_GAP_MAX_GENERATIONS - 1,
+    Math.floor((failures - 1) / RESIDENCY_GAP_FAILURES_PER_GENERATION),
+  )
+}
+
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
@@ -145,31 +162,41 @@ function isCompetency(value: string): value is BuilderResidencyCompetency {
   return (BUILDER_RESIDENCY_V1_COMPETENCIES as readonly string[]).includes(value)
 }
 
-export function residencyGapCurriculumHash(input: { competencyId: string; ordinal: number }): string {
-  return hash([RESIDENCY_GAP_REMEDIATION_PROFILE, input.competencyId, input.ordinal])
+export function residencyGapCurriculumHash(input: { competencyId: string; ordinal: number; generation?: number }): string {
+  const generation = Number(input.generation ?? 0)
+  return generation === 0
+    ? hash([RESIDENCY_GAP_REMEDIATION_PROFILE, input.competencyId, input.ordinal])
+    : hash([RESIDENCY_GAP_REMEDIATION_PROFILE, input.competencyId, 'generation', generation, input.ordinal])
 }
 
 /** Pure: one general practice seed for a failed competency, or null for an unknown competency / ordinal. */
-export function residencyGapPracticeSeed(input: { competencyId: string; ordinal: number }):
-  Readonly<{ contentHash: string; universitySubject: string; summary: string; title: string }> | null {
+export function residencyGapPracticeSeed(input: { competencyId: string; ordinal: number; generation?: number }):
+  Readonly<{ contentHash: string; universitySubject: string; summary: string; title: string; generation: number }> | null {
   const competencyId = clean(input.competencyId, 120)
   if (!isCompetency(competencyId)) return null
   const ordinal = Number(input.ordinal)
+  const generation = Number(input.generation ?? 0)
   if (!Number.isSafeInteger(ordinal) || ordinal < 0 || ordinal >= RESIDENCY_GAP_ITEMS_PER_COMPETENCY) return null
+  if (!Number.isSafeInteger(generation) || generation < 0 || generation >= RESIDENCY_GAP_MAX_GENERATIONS) return null
   const focuses = COMPETENCY_FOCUS[competencyId]
   const focus = focuses[ordinal % focuses.length]!
   const context = PRACTICE_CONTEXTS[Math.floor(ordinal / focuses.length) % PRACTICE_CONTEXTS.length]!
+  const emphasis = GENERATION_EMPHASIS[generation] || ''
   return Object.freeze({
-    contentHash: residencyGapCurriculumHash({ competencyId, ordinal }),
+    contentHash: residencyGapCurriculumHash({ competencyId, ordinal, generation }),
     universitySubject: RESIDENCY_GAP_UNIVERSITY_SUBJECT,
-    title: `${RESIDENCY_GAP_UNIVERSITY_SUBJECT} — Builder Residency competency remediation ${ordinal + 1}`,
+    generation,
+    title: generation === 0
+      ? `${RESIDENCY_GAP_UNIVERSITY_SUBJECT} — Builder Residency competency remediation ${ordinal + 1}`
+      : `${RESIDENCY_GAP_UNIVERSITY_SUBJECT} — Builder Residency competency remediation G${generation + 1}.${ordinal + 1}`,
     summary: [
       `Builder Residency competency remediation for ${RESIDENCY_GAP_UNIVERSITY_SUBJECT}.`,
       `Practice focus: ${focus}, ${context}.`,
+      emphasis,
       'Create a new self-contained expert teaching example: a small defective workspace, the evidence an engineer would see, the minimal correct repair, and the command that proves it.',
       'Do not reconstruct or quote any Residency case, fixture, file, resident answer, trajectory, log, secret, conversation, hidden evaluation or production prompt.',
       'The example must preserve authorization and verification boundaries and must be independently checkable.',
-    ].join(' '),
+    ].filter(Boolean).join(' '),
   })
 }
 
@@ -212,15 +239,18 @@ export async function installResidencyGapDerivedCurriculum(input: {
 
   let inserted = 0
   const competencies: string[] = []
-  for (const { competencyId } of failed) {
+  for (const { competencyId, failures } of failed) {
+    const generation = residencyGapGenerationForFailures(failures)
     let competencyInserted = 0
     for (let ordinal = 0; ordinal < RESIDENCY_GAP_ITEMS_PER_COMPETENCY; ordinal += 1) {
-      const seed = residencyGapPracticeSeed({ competencyId, ordinal })
+      const seed = residencyGapPracticeSeed({ competencyId, ordinal, generation })
       if (!seed) break
       const write = await db.from('cos_continuous_learning').upsert({
         content_hash: seed.contentHash,
         source_kind: 'failure_derived_curriculum',
-        source_uri: `itmounts://cos-university/residency-gap/${competencyId}/${ordinal}`,
+        source_uri: generation === 0
+          ? `itmounts://cos-university/residency-gap/${competencyId}/${ordinal}`
+          : `itmounts://cos-university/residency-gap/${competencyId}/g${generation}/${ordinal}`,
         source_title: seed.title,
         observed_at: input.now.toISOString(),
         subject: seed.universitySubject,
@@ -230,6 +260,8 @@ export async function installResidencyGapDerivedCurriculum(input: {
           profile: RESIDENCY_GAP_REMEDIATION_PROFILE,
           residencyCompetency: competencyId,
           ordinal,
+          remediationGeneration: generation,
+          classFailureCountAtGeneration: failures,
           sourceDetailsCopied: false,
         }],
         confidence: 1,
@@ -239,6 +271,8 @@ export async function installResidencyGapDerivedCurriculum(input: {
           profile: RESIDENCY_GAP_REMEDIATION_PROFILE,
           residencyCompetencyGap: true,
           residencyCompetency: competencyId,
+          remediationGeneration: generation,
+          classFailureCountAtGeneration: failures,
           sourceDetailsCopied: false,
           authorityExpanded: false,
         }],

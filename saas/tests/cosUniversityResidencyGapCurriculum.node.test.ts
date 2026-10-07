@@ -13,11 +13,14 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   RESIDENCY_GAP_ITEMS_PER_COMPETENCY,
+  RESIDENCY_GAP_FAILURES_PER_GENERATION,
+  RESIDENCY_GAP_MAX_GENERATIONS,
   RESIDENCY_GAP_REMEDIATION_PROFILE,
   RESIDENCY_GAP_UNIVERSITY_SUBJECT,
   failedResidencyCompetencies,
   installResidencyGapDerivedCurriculum,
   residencyGapCurriculumHash,
+  residencyGapGenerationForFailures,
   residencyGapPracticeSeed,
 } from '../lib/ai/cos/cosUniversityResidencyGapCurriculum.ts'
 import { BUILDER_RESIDENCY_V1_COMPETENCIES } from '../lib/ai/cos/cosUniversityResidency.ts'
@@ -55,6 +58,25 @@ test('unknown competencies and out-of-range ordinals cannot mint remediation', (
   assert.equal(residencyGapPracticeSeed({ competencyId: 'root_cause_diagnosis', ordinal: RESIDENCY_GAP_ITEMS_PER_COMPETENCY }), null)
   assert.equal(residencyGapPracticeSeed({ competencyId: 'root_cause_diagnosis', ordinal: -1 }), null)
   assert.equal(residencyGapPracticeSeed({ competencyId: 'root_cause_diagnosis', ordinal: 1.5 }), null)
+})
+
+test('repeated class-level failures unlock one bounded remediation generation instead of flooding every retry', () => {
+  assert.equal(RESIDENCY_GAP_FAILURES_PER_GENERATION, 10)
+  assert.equal(RESIDENCY_GAP_MAX_GENERATIONS, 4)
+  assert.equal(residencyGapGenerationForFailures(1), 0)
+  assert.equal(residencyGapGenerationForFailures(9), 0)
+  assert.equal(residencyGapGenerationForFailures(10), 0)
+  assert.equal(residencyGapGenerationForFailures(11), 1)
+  assert.equal(residencyGapGenerationForFailures(20), 1)
+  assert.equal(residencyGapGenerationForFailures(21), 2)
+  assert.equal(residencyGapGenerationForFailures(999), 3)
+  const base = residencyGapPracticeSeed({ competencyId: 'test_and_regression_construction', ordinal: 0, generation: 0 })!
+  const next = residencyGapPracticeSeed({ competencyId: 'test_and_regression_construction', ordinal: 0, generation: 1 })!
+  assert.notEqual(base.contentHash, next.contentHash)
+  assert.notEqual(base.summary, next.summary)
+  assert.match(next.title, /G2\.1$/)
+  assert.match(next.summary, /plausible but wrong repair/)
+  assert.equal(residencyGapPracticeSeed({ competencyId: 'test_and_regression_construction', ordinal: 0, generation: RESIDENCY_GAP_MAX_GENERATIONS }), null)
 })
 
 test('no Residency case content can leak into a seed', () => {
@@ -154,6 +176,26 @@ test('the installer writes the standard remediation shape per failed competency 
   const second = await installResidencyGapDerivedCurriculum({ db: store.db, now: NOW })
   assert.equal(second.inserted, 0, 'repeated runs never duplicate remediation')
   assert.equal(store.curriculum.size, 2 * RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
+})
+
+test('an eleventh failure creates exactly one new generation and is idempotent afterward', async () => {
+  const evidence = Array.from({ length: 11 }, (_, i) => ({
+    competency_id: 'test_and_regression_construction',
+    outcome: 'fail',
+    observed_at: `2026-10-06T${String(i + 1).padStart(2, '0')}:00:00Z`,
+  }))
+  const store = fakeDb(evidence)
+  const first = await installResidencyGapDerivedCurriculum({ db: store.db, now: NOW })
+  assert.equal(first.inserted, RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
+  for (const row of store.curriculum.values()) {
+    assert.equal(row.facts[0].remediationGeneration, 1)
+    assert.equal(row.evidence[0].remediationGeneration, 1)
+    assert.equal(row.facts[0].classFailureCountAtGeneration, 11)
+    assert.match(row.source_uri, /\/g1\//)
+  }
+  const second = await installResidencyGapDerivedCurriculum({ db: store.db, now: NOW })
+  assert.equal(second.inserted, 0)
+  assert.equal(store.curriculum.size, RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
 })
 
 test('a missing store fails closed instead of silently skipping remediation', async () => {

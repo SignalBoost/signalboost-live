@@ -270,15 +270,34 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
       note: 'a full-line day has a birth, an exam and a graduate promotion among cohort artifacts on the same UTC day; unattended operation is a separate criterion',
     }))
   }
-  criteria.push(Object.freeze({
-    id: 'no_manual_intervention',
-    scope: 'step1' as const,
-    question: 'Does the loop continue without manual intervention?',
-    status: 'not_measured' as const,
-    observed: Object.freeze({}),
-    source: 'none in the tables',
-    note: 'the tables do not record who unblocked a unit; requires an operator-action ledger or owner attestation',
-  }))
+  // Read from cos_university_operator_actions (2026-10-07): direct writes to factory tables by any database session other
+  // than the platform's, and owner admin-route actions. Zero in a window the ledger fully covers is evidence; any manual
+  // action is listed (partial); a window that starts before the ledger existed is only partly measured (partial).
+  {
+    const m = funnel.manualIntervention
+    const kv = (map: Readonly<Record<string, number>>) => Object.entries(map).map(([k, v]) => `${k}=${v}`).join(',') || null
+    const installedMs = m?.available && m.measuredSince ? Date.parse(m.measuredSince) : NaN
+    const sinceMs = funnel.since ? Date.parse(funnel.since) : -Infinity
+    const fullyCovered = Number.isFinite(installedMs) && sinceMs >= installedMs
+    const manual = m?.available ? m.databaseSessionWrites + m.adminRouteActions : 0
+    criteria.push(Object.freeze({
+      id: 'no_manual_intervention',
+      scope: 'step1' as const,
+      question: 'Does the loop continue without manual intervention?',
+      status: !m || !m.available || !m.measuredSince ? 'unavailable' as const
+        : manual === 0 && fullyCovered ? 'evidence_present' as const
+          : 'partial' as const,
+      observed: Object.freeze({
+        measuredSince: m?.available ? m.measuredSince : null,
+        windowFullyCovered: m?.available ? fullyCovered : null,
+        databaseSessionWrites: m?.available ? m.databaseSessionWrites : null,
+        adminRouteActions: m?.available ? m.adminRouteActions : null,
+        byTarget: m?.available ? kv(m.byTarget) : null,
+      }),
+      source: m?.available ? m.source : `cos_university_operator_actions unavailable${m && !m.available ? `: ${m.error}` : ''}`,
+      note: 'manual = a factory-table write by a database session other than the platform (SQL editor, psql, table editor) or an owner admin-route action; measured from the ledger installation on',
+    }))
+  }
   // Two halves (2026-10-07). Code: every pass threshold is pinned by tests/cosUniversityStandardsRatchet.node.test.ts in the
   // release gate and may only tighten, so no deployed build can carry a loosened standard. Data: the cohort's latest exams
   // name the evaluator version and the fixed safety/transfer/retention suites they were graded with; one of each means

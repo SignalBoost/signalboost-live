@@ -9,6 +9,7 @@
 //          settings module before it is stored; an invalid window is refused with 400 and nothing changes.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
+import { recordAdminOperatorAction } from '@/lib/ai/cos/cosUniversityOperatorActions'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import {
   readLinePauseSetting,
@@ -46,6 +47,8 @@ export async function PATCH(req: NextRequest) {
   if (!guard.ok) {
     return NextResponse.json({ ok: false, error: guard.error, authRequired: true }, { status: guard.status, headers: NO_STORE })
   }
+  // Step 1 evidence: an owner action that steers the University line is recorded (never blocks the action).
+  await recordAdminOperatorAction({ route: 'cos-university-settings', operation: 'change_settings', actorUserId: guard.ctx.userId })
   let body: Record<string, unknown> = {}
   try { body = (await req.json()) ?? {} } catch { body = {} }
   if (!body || typeof body !== 'object') body = {}

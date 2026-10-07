@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
+import { recordAdminOperatorAction } from '@/lib/ai/cos/cosUniversityOperatorActions'
 import {
   dispatchUniversityApprovedTraining,
   dispatchUniversityDatasetPreparation,
@@ -38,6 +39,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  // Step 1 evidence: an owner action that steers the University line is recorded (never blocks the action).
+  await recordAdminOperatorAction({ route: 'cos-university-training-executor', operation: 'training_executor_operation', actorUserId: guard.ctx.userId })
   installHuggingFaceTrainingExecutorEnv()
   let body: any = null
   try { body = await request.json() } catch { body = null }

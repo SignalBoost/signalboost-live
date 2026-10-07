@@ -177,7 +177,7 @@ test('an empty University is NOT_READY, with every missing stage named as blocki
 function fullFunnel(overrides: Record<string, unknown> = {}): any {
   const ids = ['born', 'birth_certificate', 'examined', 'improved_over_baseline', 'passed_safety', 'passed_transfer', 'passed_retention', 'passed_all_gates', 'residency_enrolled', 'residency_complete', 'graduated', 'activated', 'hired', 'performed_work', 'served_successfully', 'verified_outcome']
   return {
-    window: 'all', since: null, cohort: { size: 10, truncated: false, source: 'x' },
+    window: '7d', since: '2026-09-29T12:00:00.000Z', cohort: { size: 10, truncated: false, source: 'x' },
     stages: ids.map(id => ({ id, count: 3, share: 0.3, source: `src:${id}` })),
     unavailable: {},
     capabilityGain: { available: true, sampleSize: 3, meanAbsoluteGain: 0.1, improved: 3, regressed: 0 },
@@ -186,6 +186,7 @@ function fullFunnel(overrides: Record<string, unknown> = {}): any {
     lineHistory: { available: true, transitions: 12, throughputPerHour: 0.5 },
     lineHealth: { available: true, liveUnits: 4, overdueUnits: 0, bottleneckStation: null },
     evaluationFailures: { available: true, total: 2, infrastructure: 1, merit: 1, explanations: [{ reason: 'r', count: 2, causeStatus: 'evidence_backed' }], source: 'evals' },
+    manualIntervention: { available: true, error: null, measuredSince: '2026-09-28T00:00:00.000Z', databaseSessionWrites: 0, adminRouteActions: 0, byTarget: {}, source: 'cos_university_operator_actions' },
     examStandards: { available: true, error: null, examined: 3, evaluatorVersions: { 'evaluator-v2': 3 }, fixedSuites: { 'aaa:bbb:ccc': 3 }, source: 'evals' },
     dailyActivity: { source: 'dated', methodology: 'm', days: [
       { day: '2026-10-04', born: 2, examined: 1, graduated: 1 },
@@ -217,7 +218,7 @@ test('even with evidence at every stage the report never recommends READY', () =
   assert.deepEqual([...report.blocking], [])
   assert.equal(report.recommendation, 'INSUFFICIENT_EVIDENCE_FOR_READY')
   const notMeasured = report.criteria.filter(entry => entry.status === 'not_measured').map(entry => entry.id)
-  assert.deepEqual(notMeasured, ['no_manual_intervention'])
+  assert.deepEqual(notMeasured, [])
   assert.doesNotMatch(JSON.stringify(report), /"recommendation":"READY"/)
 })
 
@@ -257,6 +258,36 @@ test('standards unweakened: one evaluator version and one fixed exam suite set, 
   assert.equal(entry({ examStandards: { available: false, error: 'unreadable' } }).status, 'unavailable')
   // The ratchet the criterion cites is really in the release gate.
   assert.match(read('../scripts/vercel-cos-gates.mjs'), /'tests\/cosUniversityStandardsRatchet\.node\.test\.ts'/)
+})
+
+test('no manual intervention is read from the operator-action ledger and only where the ledger covers the whole window', () => {
+  const entry = (overrides: Record<string, unknown>) => assessStep1Evidence(fullFunnel(overrides), NOW).criteria.find(c => c.id === 'no_manual_intervention')!
+  const ledger = (extra: Record<string, unknown>) => ({ manualIntervention: { available: true, error: null, measuredSince: '2026-09-28T00:00:00.000Z', databaseSessionWrites: 0, adminRouteActions: 0, byTarget: {}, source: 'l', ...extra } })
+  assert.equal(entry({}).status, 'evidence_present')
+  const sqlEdit = entry(ledger({ databaseSessionWrites: 2, byTarget: { 'database_session:cos_local_distillation_artifacts': 2 } }))
+  assert.equal(sqlEdit.status, 'partial', 'a direct database write is a manual intervention')
+  assert.equal((sqlEdit.observed as any).byTarget, 'database_session:cos_local_distillation_artifacts=2')
+  assert.equal(entry(ledger({ adminRouteActions: 1 })).status, 'partial', 'an owner admin action is a manual intervention')
+  const beforeLedger = entry(ledger({ measuredSince: '2026-10-05T00:00:00.000Z' }))
+  assert.equal(beforeLedger.status, 'partial', 'a window that starts before the ledger existed is only partly measured')
+  assert.equal((beforeLedger.observed as any).windowFullyCovered, false)
+  assert.equal(entry({ since: null }).status, 'partial', 'an all-time window always predates the ledger')
+  assert.equal(entry(ledger({ measuredSince: null })).status, 'unavailable', 'no install marker: not measured, never a zero')
+  assert.equal(entry({ manualIntervention: { available: false, error: 'relation does not exist' } }).status, 'unavailable')
+})
+
+test('the operator-action ledger migration records non-platform sessions only and covers the factory tables', () => {
+  const sql = read('../supabase/migrations/20261007030000_university_operator_action_ledger.sql')
+  assert.match(sql, /if session_user = 'authenticator' then\s+return null;/)
+  for (const table of ['cos_local_distillation_artifacts', 'cos_university_distilled_evaluation_runs', 'cos_university_residency_enrollments', 'cos_university_graduate_model_registry', 'cos_university_lifecycle_orchestration']) {
+    assert.match(sql, new RegExp(`'${table}'`))
+  }
+  assert.match(sql, /after insert or update or delete/)
+  assert.match(sql, /values \('ledger_installed'/)
+  assert.doesNotMatch(sql, /raise exception/i, 'the trigger never blocks a write')
+  for (const route of ['cos-university-recovery-drill', 'cos-university-runtime-approvals', 'cos-university-settings', 'cos-university-training-executor']) {
+    assert.match(read(`../app/api/admin/${route}/route.ts`), new RegExp(`recordAdminOperatorAction\\(\\{ route: '${route}'`))
+  }
 })
 
 test('graduates not serving and zero verified outcomes do not block Step 1: they are the next project, still reported', () => {

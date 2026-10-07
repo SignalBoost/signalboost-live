@@ -118,16 +118,11 @@ test.describe('COS University assembly line, proved from outside', () => {
       contentType: 'application/json',
     })
 
-    // The one hard failure: material in, nothing out, past the station's own allowance.
-    expect(proof.verdict, summary).not.toBe('line_stopped')
-
-    // An inconclusive run is reported, never silently passed. It is a run that produced no proof.
-    if (proof.verdict !== 'proven_moving') {
-      test.info().annotations.push({
-        type: 'line-proof-not-obtained',
-        description: `NOT PROVEN this run: ${proof.reason}. The line is not failing, but nothing was demonstrated.`,
-      })
-    }
+    // A green independent proof MUST contain observed movement. Merely avoiding the
+    // line_stopped verdict does not prove anything: inconclusive and idle runs fail
+    // this evidence job too, with the samples and reason preserved in the report.
+    // This changes the watchdog verdict, never station behavior or production state.
+    expect(proof.verdict, summary).toBe('proven_moving')
   })
 
   test('every observed unit is placed by its artifact status, and controller-ledger lag is reported', async ({ request }) => {

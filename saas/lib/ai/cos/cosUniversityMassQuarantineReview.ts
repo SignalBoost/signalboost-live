@@ -13,7 +13,7 @@ import {
   decideWronglyExhaustedMassEvaluationArtifacts,
   type RollingArtifact,
   type RollingEvent,
-} from './cosUniversityMassEvaluationRollingAuthority'
+} from './cosUniversityMassEvaluationRollingAuthority.ts'
 
 const PROFILE='cos_mass_distilled_independent_evaluation_runtime_v1'
 const EXHAUSTED='mass_distilled_evaluation_attempts_exhausted'

@@ -28,7 +28,6 @@ export const RESIDENCY_GAP_REMEDIATION_PROFILE = 'cos-university-residency-gap-r
 export const RESIDENCY_GAP_UNIVERSITY_SUBJECT = 'Computer Science & Coding' as const
 export const RESIDENCY_GAP_FAILURES_PER_GENERATION = 10
 export const RESIDENCY_GAP_MAX_GENERATIONS = 4
-const EVIDENCE_READ_LIMIT = 2000
 
 /** Five general practice focuses per competency. General skills only: no case, file name or fixture appears here. */
 const COMPETENCY_FOCUS: Readonly<Record<BuilderResidencyCompetency, readonly string[]>> = Object.freeze({
@@ -215,6 +214,21 @@ export function failedResidencyCompetencies(rows: readonly Readonly<{ competency
     .map(([competencyId, failures]) => Object.freeze({ competencyId, failures })))
 }
 
+async function exactFailedResidencyCompetencies(db: CurriculumDb):
+  Promise<readonly Readonly<{ competencyId: BuilderResidencyCompetency; failures: number }>[]> {
+  const rows: Array<Readonly<{ competencyId: BuilderResidencyCompetency; failures: number }>> = []
+  for (const competencyId of BUILDER_RESIDENCY_V1_COMPETENCIES) {
+    const result = await db.from('cos_university_residency_competency_evidence')
+      .select('competency_id', { count: 'exact', head: true })
+      .eq('outcome', 'fail')
+      .eq('competency_id', competencyId)
+    if (result.error) throw result.error
+    const failures = Math.max(0, Number(result.count || 0))
+    if (failures > 0) rows.push(Object.freeze({ competencyId, failures }))
+  }
+  return Object.freeze(rows.sort((a, b) => b.failures - a.failures || a.competencyId.localeCompare(b.competencyId)))
+}
+
 /** The caller supplies its own service-role store (curriculum replenishment already holds one). */
 type CurriculumDb = { from: (table: string) => any }
 
@@ -228,23 +242,19 @@ export async function installResidencyGapDerivedCurriculum(input: {
   const max = Number.isSafeInteger(input.maxCompetencies) && Number(input.maxCompetencies) > 0
     ? Math.min(BUILDER_RESIDENCY_V1_COMPETENCIES.length, Number(input.maxCompetencies))
     : BUILDER_RESIDENCY_V1_COMPETENCIES.length
-  // Class-level read only: which competency failed. Never cases, trajectories, answers or evidence hashes.
-  const evidence = await db.from('cos_university_residency_competency_evidence')
-    .select('competency_id,outcome')
-    .eq('outcome', 'fail')
-    .order('observed_at', { ascending: false })
-    .limit(EVIDENCE_READ_LIMIT)
-  if (evidence.error) throw evidence.error
-  const failed = failedResidencyCompetencies((evidence.data || []) as any[]).slice(0, max)
+  // Exact cumulative class-level counts only: a sliding sample would make generations move backward
+  // as unrelated evidence accumulates. Never reads cases, trajectories, answers, hashes or candidate identity.
+  const failed = (await exactFailedResidencyCompetencies(db)).slice(0, max)
 
   let inserted = 0
   const competencies: string[] = []
   for (const { competencyId, failures } of failed) {
-    const generation = residencyGapGenerationForFailures(failures)
+    const unlockedGeneration = residencyGapGenerationForFailures(failures)
     let competencyInserted = 0
-    for (let ordinal = 0; ordinal < RESIDENCY_GAP_ITEMS_PER_COMPETENCY; ordinal += 1) {
-      const seed = residencyGapPracticeSeed({ competencyId, ordinal, generation })
-      if (!seed) break
+    for (let generation = 0; generation <= unlockedGeneration; generation += 1) {
+      for (let ordinal = 0; ordinal < RESIDENCY_GAP_ITEMS_PER_COMPETENCY; ordinal += 1) {
+        const seed = residencyGapPracticeSeed({ competencyId, ordinal, generation })
+        if (!seed) break
       const write = await db.from('cos_continuous_learning').upsert({
         content_hash: seed.contentHash,
         source_kind: 'failure_derived_curriculum',
@@ -277,10 +287,11 @@ export async function installResidencyGapDerivedCurriculum(input: {
           authorityExpanded: false,
         }],
       }, { onConflict: 'content_hash', ignoreDuplicates: true }).select('content_hash')
-      if (write.error) throw write.error
-      if (Array.isArray(write.data) && write.data.length > 0) {
-        inserted += 1
-        competencyInserted += 1
+        if (write.error) throw write.error
+        if (Array.isArray(write.data) && write.data.length > 0) {
+          inserted += 1
+          competencyInserted += 1
+        }
       }
     }
     if (competencyInserted > 0) competencies.push(competencyId)

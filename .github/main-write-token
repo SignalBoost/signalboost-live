@@ -1,2 +1,2 @@
-base_sha=045c7310e55ac1ecc42a677d0d901a21016ae9ca
-branch=fix/quarantine-review-evaluation-ready
+base_sha=3c9d8d4920b839117aed76a3f27d2599065524ae
+branch=fix/quarantine-review-dedicated-gate

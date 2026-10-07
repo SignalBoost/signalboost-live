@@ -143,10 +143,10 @@ test('a fill that actually ran prints its targets and yield instead of n/a', asy
   const path = await readComputerSciencePath({ db: readOnlyDb(fakeDb({
     cos_university_learning_assurance_events: [{ event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-07T15:26:56Z', evidence: {
       curriculum: { supply: { subjects: [{ subject: CS, canonicalSubjectId: 'computer_science', uniqueBatchableItems: 678, shortfallToBatch: 0, realSourceItems: 28, realSourceNeeded: 32 }] } },
-      curriculumReplenishment: { ok: true, skipped: false, targets: [CS, 'Mathematics'], documentsAcquired: 40, accepted: 0, probationary: 1, rejected: { duplicate: 37, off_topic: 2, rights: 0 }, sourceErrors: [] },
+      curriculumReplenishment: { ok: true, skipped: false, targets: [CS, 'Mathematics'], documentsAcquired: 40, accepted: 0, probationary: 1, rejected: { duplicate: 37, off_topic: 2, rights: 0 }, sourceErrors: { openalex: 2, hf_nist_cc0: 0 } },
     } }],
   })), now: new Date('2026-10-07T15:30:00Z') })
-  assert.equal(path.packaging.replenishment, 'ran targets=[Computer Science & Coding; Mathematics] acquired=40 accepted=0 probationary=1 rejected=duplicate=37,off_topic=2 sourceErrors=0')
+  assert.equal(path.packaging.replenishment, 'ran targets=[Computer Science & Coding; Mathematics] acquired=40 accepted=0 probationary=1 rejected=duplicate=37,off_topic=2 sourceErrors=openalex=2')
   const failed = await readComputerSciencePath({ db: readOnlyDb(fakeDb({
     cos_university_learning_assurance_events: [{ event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-07T15:26:56Z', evidence: {
       curriculum: { supply: { subjects: [] } }, curriculumReplenishment: { ok: false, error: 'rights_cleared_distillation_adapters_unavailable' },

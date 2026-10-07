@@ -1,6 +1,7 @@
 import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 // saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { pausedStationResponse, readLinePauseSetting } from './cosUniversitySettings.ts'
 import {
   massDistillationDispatchReadiness,
   recoverMassDistillationCampaigns,
@@ -524,6 +525,19 @@ async function runCosUniversityMassDistillationWorkflowInsideHarness(input: {
   transportSucceeded: boolean
   skipped: boolean
 }> {
+  // Owner 2026-10-07: the always-on line is paused with the Production pause. The cron route already checked it, but the
+  // Self-Healing Supervisor (agent-gateway-host/university-distillation-recovery.ts) calls this workflow directly and
+  // could keep authorizing new campaigns while the operator had paused production. The pause is honored here, at the
+  // one entry every caller shares. Same fail-open read as every station (an unreadable store does not pause).
+  const pause = await readLinePauseSetting(cosServiceDb())
+  if (pause.paused) {
+    return {
+      response: { ...pausedStationResponse('cos-university-mass-distillation'), workflowSource: input.source },
+      invocationSucceeded: true,
+      transportSucceeded: true,
+      skipped: true,
+    }
+  }
   let lease: Awaited<ReturnType<typeof claimUniversityMassDistillationWorkflowLease>>
   try {
     lease = await claimUniversityMassDistillationWorkflowLease()

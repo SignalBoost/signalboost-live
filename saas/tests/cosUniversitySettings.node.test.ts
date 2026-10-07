@@ -231,4 +231,17 @@ test('the settings copy has the same keys in all five languages and no empty str
     for (const key of keys) assert.ok(String((block as any)[key]).trim().length > 0, `${language}.${key}`)
   }
 })
+
+test('the pause is honored by the shared distillation workflow, so the Supervisor path cannot bypass it', () => {
+  // Owner 2026-10-07: the always-on line is paused. agent-gateway-host/university-distillation-recovery.ts calls the
+  // workflow directly (not through the cron route), so the check must live inside the workflow every caller shares.
+  const workflow = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts', import.meta.url), 'utf8')
+  const body = workflow.slice(workflow.indexOf('async function runCosUniversityMassDistillationWorkflowInsideHarness('))
+  const pauseAt = body.indexOf('const pause = await readLinePauseSetting(cosServiceDb())')
+  const leaseAt = body.indexOf('lease = await claimUniversityMassDistillationWorkflowLease()')
+  assert.ok(pauseAt > 0 && leaseAt > pauseAt, 'pause is read before the workflow claims its lease or does any work')
+  assert.match(body, /if \(pause\.paused\) \{\s*return \{\s*response: \{ \.\.\.pausedStationResponse\('cos-university-mass-distillation'\)/)
+  const recovery = readFileSync(new URL('../agent-gateway-host/university-distillation-recovery.ts', import.meta.url), 'utf8')
+  assert.match(recovery, /runWorkflow\(\{ source: 'self_healing_supervisor'/, 'the Supervisor still enters through that workflow')
+})
 // end of saas/tests/cosUniversitySettings.node.test.ts (if this line is missing, the paste was cut short)

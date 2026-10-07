@@ -79,7 +79,9 @@ test('paid authorization and dispatch precede slower ready-inventory maintenance
   assert.match(workflow, /throughput\.acquisitionCandidatesPerCycle/)
   assert.match(workflow, /throughput\.corpusScanRows/)
   assert.match(workflow, /throughput\.maxBatchesPerSweep/)
-  assert.match(workflow, /slowMaintenanceDue = input\.source === 'self_healing_supervisor' \|\| now\.getUTCMinutes\(\) % 5 === 0/)
+  assert.match(workflow, /scheduledMinute % 5 === 0/)
+  assert.match(workflow, /scheduledMinute % 5 === 1/)
+  assert.doesNotMatch(workflow, /slowMaintenanceDue = input\.source === 'self_healing_supervisor' \|\| now\.getUTCMinutes\(\) % 5 === 0/)
   assert.match(workflow, /slowMaintenanceDue[\s\S]*campaign_recovery/)
   assert.match(workflow, /slowMaintenanceDue[\s\S]*semantic_reconciliation/)
   assert.match(workflow, /reason: 'maintenance_not_due'/)
@@ -274,4 +276,15 @@ test('ready-buffer accounting cannot let stale prepared rows suppress replenishm
   const migration = source('../supabase/migrations/20261006190000_mass_distillation_independent_source_admission.sql')
   assert.match(migration, />= ceil\(b\.source_count \* 0\.5\)/)
   assert.match(migration, /source_kind not in \([\s\S]*'teacher_synthetic_curriculum'[\s\S]*'teacher_hosted_curriculum'[\s\S]*'failure_derived_curriculum'/)
+})
+
+
+test('five-minute maintenance tolerates one-minute production cron delivery drift', () => {
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  // Production evidence on 2026-10-07 showed nominal :15/:20/:25/:30 jobs completing at
+  // :16/:21/:26/:31, which permanently starved a strict minute % 5 === 0 gate.
+  assert.match(workflow, /scheduledMinute % 5 === 0/)
+  assert.match(workflow, /scheduledMinute % 5 === 1/)
+  assert.match(workflow, /scheduler drift/)
+  assert.match(workflow, /workflow lease prevents[\s\S]*concurrent duplicate sweeps/)
 })

@@ -26,9 +26,9 @@ test('the Step 1 report shows each station, its oldest wait and any station idle
   const text = describeLineObservation({ at: NOW.toISOString(), paused: false, windowComplete: true, observation })
   console.log(text)
   assert.match(text, /^LINE NOW at 2026-10-07T16:00:00\.000Z: units=2 ledgerDisagreements=0 ledgerMissing=0/)
-  assert.match(text, /INDEPENDENT_EVALUATION \([a-z_]+\) :: waiting=2 inFlight=0 oldestWaitingMin=240 slaMin=\d+/)
-  for (const station of WORKING_STATIONS) assert.ok(text.includes(`  ${station.id} (`), `every working station is listed: ${station.id}`)
-  if (evaluation.stationSlaSeconds < 9000) assert.match(text, /stopped \(idle past SLA\): INDEPENDENT_EVALUATION waiting=2 idleMin=150/)
+  assert.match(text, /INDEPENDENT_EVALUATION \([a-z_]+\) :: held=2 inFlight=0 oldestHeldMin=240 slaMin=\d+/)
+  for (const station of WORKING_STATIONS) assert.ok(text.includes(`${station.id} (`), `every working station is listed: ${station.id}`)
+  if (evaluation.stationSlaSeconds < 9000) assert.match(text, /stopped \(idle past SLA\): INDEPENDENT_EVALUATION held=2 idleMin=150/)
   assert.doesNotMatch(text, /mass:a|aaaaaaaa/, 'no candidate ids or artifact hashes')
 })
 
@@ -46,4 +46,29 @@ test('the read-only route returns the summary and the Step 1 report publishes it
   assert.match(workflow, /name: Read the line now \(read only\)/)
   assert.match(workflow, /\/api\/cron\/cos-university-line-observation/)
   assert.match(workflow, /echo "## Line now"/)
+})
+
+test('a stopped WORKFORCE (next project) never appears as a Step 1 line stop (Codex review on #3769)', () => {
+  const workforce = WORKING_STATIONS.find(station => String(station.id) === 'WORKFORCE')!
+  const observation = observeLine({
+    now: NOW,
+    artifacts: [{ candidate_id: 'mass:w', trained_artifact_hash: H('w'), status: workforce.sourceStatus, updated_at: '2026-10-06T16:00:00Z' }],
+    ledger: [{ candidate_id: 'mass:w', station: workforce.id, stage_entered_at: '2026-10-06T16:00:00Z', last_transition_at: '2026-10-06T16:00:00Z', terminal: false }],
+  })
+  assert.ok(observation.lineStops.some(stop => String(stop.station) === 'WORKFORCE'), 'fixture: WORKFORCE is idle past its SLA')
+  const text = describeLineObservation({ at: NOW.toISOString(), paused: false, observation })
+  console.log(text)
+  assert.match(text, /\n  stopped \(idle past SLA\): none\n/)
+  assert.match(text, /next project \(not Step 1\): WORKFORCE \(active\) :: held=1 .* \| stopped: WORKFORCE held=1 idleMin=1440/)
+})
+
+test('held counts queued and in-flight units together and is labelled as such (Codex review on #3769)', () => {
+  const leased = observeLine({
+    now: NOW,
+    artifacts: [{ candidate_id: 'mass:l', trained_artifact_hash: H('l'), status: evaluation.sourceStatus, updated_at: '2026-10-07T15:50:00Z' }],
+    ledger: [{ candidate_id: 'mass:l', station: evaluation.id, stage_entered_at: '2026-10-07T15:50:00Z', last_transition_at: '2026-10-07T15:50:00Z', lease_until: '2026-10-07T16:10:00Z', terminal: false }],
+  })
+  const text = describeLineObservation({ at: NOW.toISOString(), paused: false, observation: leased })
+  assert.match(text, /INDEPENDENT_EVALUATION \([a-z_]+\) :: held=1 inFlight=1 oldestHeldMin=10/)
+  assert.doesNotMatch(text, /waiting=/)
 })

@@ -142,9 +142,13 @@ export function observeLine(input: {
 /**
  * The line as a human reads it in the Step 1 report (owner go, 2026-10-07). The report had only a line total and the
  * single most overdue station, so an exam station that went quiet for hours could not be told apart from an empty or
- * paused one. Per station: units waiting, units leased (in flight), how long the oldest has waited, and any station
- * idle past its SLA. Counts and times only: no candidate ids or artifact hashes.
+ * paused one. Per station: units held (queued plus in flight), units leased (in flight), how long the oldest held unit
+ * has been there, and any station idle past its SLA. WORKFORCE is the next project (ONBOARD Step 1 scope), so its
+ * station and any stop there are printed under a separate next-project label, the same split the live prover makes.
+ * Counts and times only: no candidate ids or artifact hashes.
  */
+const NEXT_PROJECT_STATIONS: ReadonlySet<string> = new Set(['WORKFORCE'])
+
 export function describeLineObservation(input: {
   at: string
   paused: boolean
@@ -160,15 +164,20 @@ export function describeLineObservation(input: {
     return Number.isFinite(ms) && Number.isFinite(nowMs) ? Math.max(0, Math.round((nowMs - ms) / 60000)) : null
   }
   const lines = [`LINE NOW at ${input.at}: units=${o.units.length}${input.windowComplete === false ? ' (window truncated)' : ''} ledgerDisagreements=${o.ledgerDisagreements} ledgerMissing=${o.ledgerMissing}`]
-  for (const station of o.line) {
+  const row = (station: (typeof o.line)[number]) => {
     const held = o.units.filter(unit => unit.station === station.station)
     const oldest = held.reduce<string | null>((min, unit) => (min === null || unit.enteredAt < min ? unit.enteredAt : min), null)
-    const age = minutes(oldest)
-    lines.push(`  ${station.station} (${station.status}) :: waiting=${station.waiting} inFlight=${station.inFlight} oldestWaitingMin=${age ?? 'n/a'} slaMin=${Math.round(station.stationSlaSeconds / 60)}`)
+    return `${station.station} (${station.status}) :: held=${station.waiting} inFlight=${station.inFlight} oldestHeldMin=${minutes(oldest) ?? 'n/a'} slaMin=${Math.round(station.stationSlaSeconds / 60)}`
   }
-  lines.push(o.lineStops.length
-    ? `  stopped (idle past SLA): ${o.lineStops.map(stop => `${stop.station} waiting=${stop.waiting} idleMin=${Math.round(stop.idleSeconds / 60)}`).join(', ')}`
-    : '  stopped (idle past SLA): none')
+  const stops = (list: typeof o.lineStops) => list.length
+    ? list.map(stop => `${stop.station} held=${stop.waiting} idleMin=${Math.round(stop.idleSeconds / 60)}`).join(', ')
+    : 'none'
+  for (const station of o.line) if (!NEXT_PROJECT_STATIONS.has(station.station)) lines.push(`  ${row(station)}`)
+  lines.push(`  stopped (idle past SLA): ${stops(o.lineStops.filter(stop => !NEXT_PROJECT_STATIONS.has(String(stop.station))))}`)
+  const nextProject = o.line.filter(station => NEXT_PROJECT_STATIONS.has(station.station))
+  if (nextProject.length) {
+    lines.push(`  next project (not Step 1): ${nextProject.map(row).join('; ')} | stopped: ${stops(o.lineStops.filter(stop => NEXT_PROJECT_STATIONS.has(String(stop.station))))}`)
+  }
   return lines.join('\n')
 }
 // end of saas/lib/ai/cos/cosUniversityLineObservation.ts (if this line is missing, the paste was cut short)

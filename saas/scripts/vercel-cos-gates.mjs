@@ -703,6 +703,7 @@ const tests = [
   // 2026-09-30 owner direction "remove them": paused XSA students leave as OUR failure, never a FAIL.
 
   'tests/universityXsaRemoval.node.test.ts',
+  'tests/universityStrandedComputerScience.node.test.ts',
 
   // 2026-09-30 pipeline row: left to right, ending at graduation.
 

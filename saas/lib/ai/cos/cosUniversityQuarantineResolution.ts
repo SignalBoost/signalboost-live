@@ -418,3 +418,143 @@ export async function retireUnexaminableXsaStudents(input: { db: any; now?: Date
   }
   return Object.freeze({ paused: true, checked: xsa.length, removed, keptInResidency })
 }
+
+export const STRANDED_RETURNED_TO_RESIDENCY_CLAIM = 'university_student_returned_to_residency' as const
+const BUILDER_SUBJECT = 'Computer Science & Coding'
+
+export type StrandedComputerScienceResult = Readonly<{
+  checked: number
+  returnedToResidency: number
+  retiredResidencyFailed: number
+  retiredResidencyNotCompletable: number
+  keptInResidency: number
+  examinable: number
+}>
+
+/**
+ * Production 2026-10-07: INDEPENDENT_EVALUATION held Computer Science students for ~99 hours with no exit. Since
+ * 2026-10-03 Builder Residency admits students at `evaluation_ready` (RESIDENCY_STUDENT_STATUS) and the exam lane
+ * admits a Computer Science student to `evaluation_pending` only after `residency_complete`. Students that were already
+ * `evaluation_pending` under the earlier flow fell between the two: the Residency withdrawal sweep withdrew their
+ * enrollment, a Residency FAIL quarantines only `evaluation_ready`, and both the exam claim and the exam lane's own
+ * exhausted-attempt disposition skip a Computer Science student without `residency_complete`. Nothing could move them.
+ *
+ * Every such student gets the exit its Residency record calls for:
+ *   no enrollment at all            -> back to `evaluation_ready`, where Residency admits it (the normal path)
+ *   Residency ended in a FAIL       -> leaves the University (`retired`), recorded as the Residency FAIL it is
+ *   enrollment withdrawn / unusable -> leaves as OURS (`retired`, never a FAIL): one enrollment per artifact means
+ *                                      it can never complete Residency, so it can never be examined
+ * A student in an active Residency, or with a completed one the exam can claim, is left alone. Nothing here examines,
+ * scores, promotes, spends, or lowers a standard: Computer Science still needs Residency AND the exam to graduate.
+ */
+export async function resolveStrandedComputerScienceExamStudents(input: { db: any }): Promise<StrandedComputerScienceResult> {
+  const db = input.db
+  if (!db) throw new Error('service_database_unavailable')
+
+  const pending: any[] = []
+  for (let from = 0; from < PAGE_SIZE * 40; from += PAGE_SIZE) {
+    const page = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,status')
+      .eq('status', 'evaluation_pending')
+      .eq('subject_id', BUILDER_SUBJECT)
+      .order('updated_at', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1)
+    if (page.error) throw page.error
+    pending.push(...(page.data || []))
+    if ((page.data || []).length < PAGE_SIZE) break
+  }
+  const students = pending
+    .map(row => ({ candidateId: text(row.candidate_id, 240), subjectId: text(row.subject_id, 240), artifactHash: text(row.trained_artifact_hash, 80).toLowerCase() }))
+    .filter(row => row.candidateId.startsWith('mass:') && HEX64.test(row.artifactHash))
+  const empty = { checked: 0, returnedToResidency: 0, retiredResidencyFailed: 0, retiredResidencyNotCompletable: 0, keptInResidency: 0, examinable: 0 }
+  if (!students.length) return Object.freeze(empty)
+
+  const enrollments = new Map<string, Array<{ standing: string; claimableCompletion: boolean }>>()
+  for (const chunk of chunks([...new Set(students.map(row => row.candidateId))])) {
+    const residency = await db.from('cos_university_residency_enrollments')
+      .select('candidate_id,trained_artifact_hash,standing,completed_at,authority_expanded')
+      .in('candidate_id', chunk)
+      .limit(1000)
+    if (residency.error) throw residency.error
+    for (const row of residency.data || []) {
+      const key = `${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 80).toLowerCase()}`
+      const standing = text(row.standing, 80)
+      const list = enrollments.get(key) || []
+      // The exam claim's own predicate for a completed Residency.
+      list.push({ standing, claimableCompletion: standing === 'residency_complete' && Boolean(row.completed_at) && row.authority_expanded === false })
+      enrollments.set(key, list)
+    }
+  }
+
+  const result = { ...empty, checked: students.length }
+  let changed = 0
+  for (const student of students) {
+    const mine = enrollments.get(`${student.candidateId}:${student.artifactHash}`) || []
+    if (mine.some(item => item.claimableCompletion)) { result.examinable += 1; continue }
+    if (mine.some(item => ACTIVE_RESIDENCY_STANDINGS.includes(item.standing))) { result.keptInResidency += 1; continue }
+    if (changed >= QUARANTINE_RESOLUTION_MAX_PER_RUN) break
+
+    const outcome = !mine.length ? 'return' as const
+      : mine.some(item => item.standing === 'residency_failed') ? 'residency_failed' as const
+      : 'residency_not_completable' as const
+    const nextStatus = outcome === 'return' ? 'evaluation_ready' : 'retired'
+    const at = new Date().toISOString()
+    // Conditional on the exact student still waiting at the exam: a retry or a concurrent run changes nothing twice.
+    const updated = await db.from('cos_local_distillation_artifacts')
+      .update({ status: nextStatus, updated_at: at })
+      .eq('candidate_id', student.candidateId)
+      .eq('trained_artifact_hash', student.artifactHash)
+      .eq('status', 'evaluation_pending')
+      .select('id')
+    if (updated.error) throw updated.error
+    if (!(updated.data || []).length) continue
+
+    const body = outcome === 'return'
+      ? {
+        profile: QUARANTINE_RESOLUTION_PROFILE,
+        claim: STRANDED_RETURNED_TO_RESIDENCY_CLAIM,
+        candidateId: student.candidateId,
+        artifactHash: student.artifactHash,
+        reason: 'computer_science_exam_without_residency',
+        previousStatus: 'evaluation_pending',
+        nextStatus,
+        evaluationPassed: false,
+        productionTrafficAuthorized: false,
+        authorityExpanded: false,
+      }
+      : {
+        profile: QUARANTINE_RESOLUTION_PROFILE,
+        claim: QUARANTINE_DISMISSED_CLAIM,
+        candidateId: student.candidateId,
+        artifactHash: student.artifactHash,
+        reason: outcome,
+        ours: outcome === 'residency_not_completable',
+        failedGates: [],
+        failedCompetencies: [],
+        lastError: outcome === 'residency_failed'
+          ? 'builder_residency_failed: Residency FAIL recorded while the student waited at the exam'
+          : `builder_residency_not_completable: enrollment ${mine.map(item => item.standing).join(',')}; one enrollment per artifact`,
+        previousStatus: 'evaluation_pending',
+        nextStatus,
+        evaluationPassed: false,
+        productionTrafficAuthorized: false,
+        authorityExpanded: false,
+      }
+    const event = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: hash([QUARANTINE_RESOLUTION_PROFILE, body.claim, 'stranded-computer-science', student.candidateId, student.artifactHash]),
+      event_type: 'fine_tune',
+      subject_id: student.subjectId || null,
+      candidate_id: student.candidateId,
+      evidence_hash: hash(body),
+      evidence: body,
+      verifier: 'host_controller',
+      observed_at: at,
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (event.error) throw event.error
+    changed += 1
+    if (outcome === 'return') result.returnedToResidency += 1
+    else if (outcome === 'residency_failed') result.retiredResidencyFailed += 1
+    else result.retiredResidencyNotCompletable += 1
+  }
+  return Object.freeze(result)
+}

@@ -15,17 +15,15 @@ const scored = [
   ...Array.from({ length: 3 }, (_, i) => ({ id: `case-${9 + i}`, baseline: 1, candidate: 1 })),
 ]
 const baselineAnswers = new Map(scored.map(item => [item.id, `The effect is X because the test shows Y for ${item.id}.`]))
-const candidateAnswers = new Map(scored.map((item, index) => [item.id, index < 4 ? '' : index < 9 ? 'Wrong   answer\n text '.repeat(40) : 'Correct.']))
+const candidateAnswers = new Map(scored.map((item, index) => [item.id, index < 9 ? 'Wrong   answer\n text '.repeat(40) : 'Correct.']))
 
-test('records every regressed case with scores, lengths, emptiness and bounded excerpts', () => {
+test('records every regressed case with scores, lengths and bounded excerpts', () => {
   const evidence = buildHoldoutRegressionEvidence({ scored, baselineAnswers, candidateAnswers })
   assert.equal(evidence.profile, HOLDOUT_REGRESSION_EVIDENCE_PROFILE)
   assert.equal(evidence.holdoutCases, 12)
   assert.equal(evidence.regressedCases, 9)
   assert.equal(evidence.cases.length, 9)
-  assert.equal(evidence.cases.filter(item => item.candidateEmpty).length, 4)
   const wrong = evidence.cases[5]
-  assert.equal(wrong.candidateEmpty, false)
   assert.ok(wrong.candidateChars > 280)
   assert.equal(wrong.candidateExcerpt.length, 280, 'excerpt is bounded')
   assert.doesNotMatch(wrong.candidateExcerpt, /\s{2,}|\n/, 'whitespace is flattened')
@@ -33,10 +31,12 @@ test('records every regressed case with scores, lengths, emptiness and bounded e
   assert.ok(evidence.cases.every(item => item.candidate < item.baseline))
 })
 
-test('a missing answer counts as empty, never as substantive', () => {
-  const evidence = buildHoldoutRegressionEvidence({ scored: [{ id: 'a', baseline: 1, candidate: 0 }], baselineAnswers: new Map([['a', 'ok']]), candidateAnswers: new Map() })
-  assert.equal(evidence.cases[0].candidateEmpty, true)
-  assert.equal(evidence.cases[0].candidateChars, 0)
+test('empty candidate answers fail the exam before scoring, so the evidence does not pretend to count them', () => {
+  // Codex review on #3762: an empty candidate answer throws candidate_answer_empty (merit) before the judge runs.
+  const evaluator = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
+  assert.match(evaluator, /mass_distilled_evaluation_candidate_answer_empty:/)
+  const module = readFileSync(new URL('../lib/ai/cos/cosUniversityHoldoutRegressionEvidence.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(module, /candidateEmpty|emptyCandidateAnswers|substantiveCandidateAnswers/)
 })
 
 test('the summary is counts and lengths only, and separates exams recorded before this change', () => {
@@ -51,8 +51,6 @@ test('the summary is counts and lengths only, and separates exams recorded befor
   assert.equal(summary.examsWithoutEvidence, 1)
   assert.equal(summary.examsWithARegressedCase, 1)
   assert.equal(summary.regressedCases, 9)
-  assert.equal(summary.emptyCandidateAnswers, 4)
-  assert.equal(summary.substantiveCandidateAnswers, 5)
   assert.equal(summary.examsWithBaselineAtLeast0_9, 2)
   assert.doesNotMatch(JSON.stringify(summary), /Wrong|effect is X|case-/)
 })
@@ -67,7 +65,7 @@ test('the Step 1 capability gain trace prints the regression block from the run 
   })
   const text = describeCapabilityGainTrace(trace)
   console.log(text.split('\n').find(line => line.includes('holdout regressions')))
-  assert.match(text, /holdout regressions .*examsWithEvidence=1 notRecorded=0 examsWithARegressedCase=1 regressedCases=9 candidateAnswer empty=4 substantive=5/)
+  assert.match(text, /holdout regressions .*examsWithEvidence=1 notRecorded=0 examsWithARegressedCase=1 regressedCases=9 \(all answered; empty answers fail the exam as candidate_answer_empty\)/)
   assert.match(text, /exams with baseline>=0\.9: 1/)
   assert.doesNotMatch(text, /Wrong answer|effect is X/, 'no answer text leaves the trace')
 })

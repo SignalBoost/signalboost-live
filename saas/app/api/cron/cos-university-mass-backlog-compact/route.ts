@@ -4,7 +4,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import { compactMassEvaluationBacklog } from '@/lib/ai/cos/cosUniversityMassBacklogCompactor'
 import { reviewMassQuarantine } from '@/lib/ai/cos/cosUniversityMassQuarantineReview'
-import { resolveQuarantine, retireUnexaminableXsaStudents } from '@/lib/ai/cos/cosUniversityQuarantineResolution'
+import { resolveQuarantine, resolveStrandedComputerScienceExamStudents, retireUnexaminableXsaStudents } from '@/lib/ai/cos/cosUniversityQuarantineResolution'
 import { QUARANTINE_RESOLUTION_LANE } from '@/lib/ai/cos/cosUniversityQuarantineReasons'
 import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -52,8 +52,11 @@ async function resolveQuarantineStep(){
     const quarantine=await resolveQuarantine({db:cosServiceDb()})
     // Owner direction 2026-09-30 ("remove them"): XSA students our server cannot examine leave as OUR failure.
     const xsa=await retireUnexaminableXsaStudents({db:cosServiceDb()})
-    const resolution={...quarantine,dismissed:quarantine.dismissed+xsa.removed,xsaRemoved:xsa.removed,xsaChecked:xsa.checked,xsaKeptInResidency:xsa.keptInResidency}
-    const changed=resolution.dismissed+resolution.returnedToExam
+    // Production 2026-10-07: Computer Science students stranded at the exam by the 2026-10-03 Residency flow change.
+    const stranded=await resolveStrandedComputerScienceExamStudents({db:cosServiceDb()})
+    const strandedDismissed=stranded.retiredResidencyFailed+stranded.retiredResidencyNotCompletable
+    const resolution={...quarantine,dismissed:quarantine.dismissed+xsa.removed+strandedDismissed,xsaRemoved:xsa.removed,xsaChecked:xsa.checked,xsaKeptInResidency:xsa.keptInResidency,strandedComputerScience:stranded}
+    const changed=resolution.dismissed+resolution.returnedToExam+stranded.returnedToResidency
     await recordCosLaneStatus({
       db:cosServiceDb(),
       lane:QUARANTINE_RESOLUTION_LANE,

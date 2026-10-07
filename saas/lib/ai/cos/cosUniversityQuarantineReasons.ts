@@ -26,6 +26,9 @@ export const QUARANTINE_REASONS = Object.freeze([
   // Owner direction 2026-09-30 ("remove them"): XSA students whose exams are paused because our XSA server is too
   // slow to answer inside the exam limit. Never examined, so never a FAIL: recorded as ours when they leave.
   'xsa_not_examinable',
+  // Production 2026-10-07: a Computer Science student stranded at the exam by the 2026-10-03 Residency flow change
+  // whose enrollment was withdrawn. One enrollment per artifact, so it can never complete Residency: ours, not a FAIL.
+  'residency_not_completable',
 ] as const)
 export type QuarantineReason = typeof QUARANTINE_REASONS[number]
 
@@ -371,6 +374,7 @@ export function quarantineNextAction(reason: QuarantineReason): string {
     case 'exhausted_our_errors': return 'Returns to the exam (our errors, not the student)'
     case 'exam_data_defect': return 'Leaves the University — not examinable: its frozen exam data is broken (ours, not a FAIL)'
     case 'xsa_not_examinable': return 'Leaves the University — not examinable: our XSA server is too slow for the exam (ours, not a FAIL)'
+    case 'residency_not_completable': return 'Leaves the University — not examinable: its Residency enrollment was withdrawn by our flow change (ours, not a FAIL)'
     default: return 'Returns to the exam once (no recorded reason); held for investigation if quarantined again'
   }
 }

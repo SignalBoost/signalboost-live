@@ -56,6 +56,12 @@ test('gain is grouped by recipe and source mix, using only the latest exam per e
   const cross = Object.fromEntries(trace.dimensions.subjectXfailureReplay.map(g => [g.key, g.n]))
   assert.deepEqual(cross, { 'law | replay=yes': 1, 'law | replay=no': 1, 'cs | replay=unknown': 1, 'unknown | replay=unknown': 1 })
   assert.match(describeCapabilityGainTrace(trace), /by subjectXfailureReplay:\n    cs \| replay=unknown/)
+  // Real-source share WITHIN each subject (2026-10-07), so the 50% floor decision is not read off a subject-mix effect.
+  const realCross = Object.fromEntries(trace.dimensions.subjectXrealSourceShare.map(g => [g.key, g.meanGain]))
+  console.log('[subjectXrealSourceShare]', JSON.stringify(realCross))
+  assert.ok(Object.keys(realCross).every(key => / \| real=(0%|1-49%|50-99%|100%|unknown)$/.test(key)))
+  assert.equal(trace.dimensions.subjectXrealSourceShare.reduce((sum, g) => sum + g.n, 0), trace.overall.n)
+  assert.match(describeCapabilityGainTrace(trace), /by subjectXrealSourceShare:\n/)
 })
 
 test('the replay A/B compares the randomized replay arm against its control, not against non-remediation runs', () => {

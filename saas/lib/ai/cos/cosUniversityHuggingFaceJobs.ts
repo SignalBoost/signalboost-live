@@ -381,9 +381,13 @@ export function buildHuggingFaceJobSpec(input: {
     dockerImage = 'python:3.12-slim'
     flavor = input.config.preparationFlavor
     timeoutSeconds = input.config.preparationTimeoutSeconds
+    // Validated in a clean python:3.12-slim installation (GitHub PR #3758) after
+    // the production pip resolver attempted multiple datasets 3.x versions and failed.
+    // Pin the preparation pair to remove needless version backtracking and preserve
+    // reproducibility. Teacher and training environments have separate dependencies.
     command = workerBootstrap([
-      'huggingface_hub>=0.34,<2',
-      'datasets>=3,<5',
+      'huggingface_hub==1.33.0',
+      'datasets==4.8.5',
     ])
   } else if (operation === 'train') {
     if (!isHuggingFaceDatasetRef(input.envelope.trainingDataRef) || !isHuggingFaceDatasetRef(input.envelope.holdoutDataRef)) {

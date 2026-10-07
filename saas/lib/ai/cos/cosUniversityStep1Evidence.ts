@@ -243,15 +243,33 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
     }))
   }
 
-  criteria.push(Object.freeze({
-    id: 'repeated_operation',
-    scope: 'step1' as const,
-    question: 'Does the whole line operate repeatedly, not once?',
-    status: 'not_measured' as const,
-    observed: Object.freeze({}),
-    source: 'dated runs of this report',
-    note: 'one snapshot cannot show repetition; compare this report across scheduled runs',
-  }))
+  // Repetition is read from the cohort's own dated events (2026-10-07): a "full-line day" is a UTC day on which the cohort
+  // had at least one birth, one exam and one graduate promotion. Two such days is what "more than once" means; no other
+  // threshold is set. Exam and graduation days need their chapters; an unreadable chapter reports unavailable, not zero.
+  {
+    const days = funnel.dailyActivity?.days ?? []
+    const chaptersRead = !funnel.unavailable.examined && !funnel.unavailable.graduation
+    const fullLineDays = days.filter(d => d.born > 0 && d.examined > 0 && d.graduated > 0).map(d => d.day)
+    const stageDays = { born: days.filter(d => d.born > 0).length, examined: days.filter(d => d.examined > 0).length, graduated: days.filter(d => d.graduated > 0).length }
+    criteria.push(Object.freeze({
+      id: 'repeated_operation',
+      scope: 'step1' as const,
+      question: 'Does the whole line operate repeatedly, not once?',
+      status: !funnel.dailyActivity || !chaptersRead ? 'unavailable' as const
+        : fullLineDays.length >= 2 ? 'evidence_present' as const
+          : (stageDays.born >= 2 || stageDays.examined >= 2 || stageDays.graduated >= 2) ? 'partial' as const
+            : 'no_evidence' as const,
+      observed: Object.freeze({
+        fullLineDays: fullLineDays.length,
+        bornDays: stageDays.born,
+        examinedDays: stageDays.examined,
+        graduatedDays: stageDays.graduated,
+        lastFullLineDay: fullLineDays[fullLineDays.length - 1] ?? null,
+      }),
+      source: funnel.dailyActivity?.source ?? 'dailyActivity unavailable',
+      note: 'a full-line day has a birth, an exam and a graduate promotion among cohort artifacts on the same UTC day; unattended operation is a separate criterion',
+    }))
+  }
   criteria.push(Object.freeze({
     id: 'no_manual_intervention',
     scope: 'step1' as const,

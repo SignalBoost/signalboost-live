@@ -16,6 +16,7 @@ import {
 } from './cosUniversityMassDistillation.ts'
 import { installVerifiedFailureDerivedCurriculum, maintainUniversityRightsClearedOpenSourceCorpus, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
 import { RESIDENCY_GAP_UNIVERSITY_SUBJECT, installResidencyGapDerivedCurriculum } from './cosUniversityResidencyGapCurriculum.ts'
+import { needsMassDistillationReplenishment } from './cosUniversityDistillationCurriculumPlan.ts'
 import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
 import { authorizeAvailableUniversityMassDistillationCampaigns, authorizeNextUniversityMassDistillationRemediationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs, recoverHuggingFaceStorageCapacityCircuit } from './cosUniversityHuggingFaceJobDiagnostics.ts'
@@ -324,7 +325,7 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
           uniqueBatchableItems: 0,
           shortfallToBatch: 64,
         })
-        .filter(subject => Number(subject?.shortfallToBatch || 0) > 0)
+        .filter(subject => needsMassDistillationReplenishment(subject))
       if (remediationShortfalls.length > 0) {
         curriculumReplenishment = { ...(await replenishUniversityMassDistillationCurriculum({
           supply: remediationShortfalls,

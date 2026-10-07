@@ -1,2 +1,2 @@
-base_sha=c5f08b2771def6623b55d1fe9ae10b1e242c1586
-branch=fix/hf-pip-resolution-classification-20261007
+base_sha=eda7da18c6cdef1c40dd1277cac6aaed019ff3b9
+branch=fix/hf-bootstrap-visible-pip-resolver-20261007

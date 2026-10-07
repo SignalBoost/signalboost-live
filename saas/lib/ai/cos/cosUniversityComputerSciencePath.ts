@@ -103,6 +103,34 @@ export type ComputerSciencePath = Readonly<{
   }>
 }>
 
+/**
+ * What the fill step did in that pass. A fill that actually ran returns its result without a `reason` (2026-10-07: the
+ * report printed "n/a" for it), so print its targets and yield: which subjects it searched for, documents acquired and
+ * accepted, rejections by cause, and source errors. A skipped or failed fill prints its reason or error.
+ */
+function describeReplenishment(value: Record<string, unknown>): string | null {
+  if (!Object.keys(value).length) return null
+  if (value.ok === false) return `error:${text(value.error, 120) || text(value.reason, 120) || 'unknown'}`
+  if (value.skipped === true) return `${text(value.reason, 120) || 'unspecified'} skipped`
+  const count = (key: string) => Number.isFinite(Number(value[key])) ? Number(value[key]) : null
+  const targets = Array.isArray(value.targets) ? (value.targets as unknown[]).map(item => text(item, 60)).filter(Boolean) : []
+  const rejected = record(value.rejected)
+  const rejectedText = Object.entries(rejected)
+    .filter(([, n]) => Number(n) > 0)
+    .map(([cause, n]) => `${text(cause, 40)}=${Number(n)}`)
+    .join(',')
+  const sourceErrors = Array.isArray(value.sourceErrors) ? value.sourceErrors.length : count('sourceErrors')
+  return [
+    `ran targets=[${targets.join('; ') || 'none'}]`,
+    `acquired=${count('documentsAcquired') ?? 'n/a'}`,
+    `accepted=${count('accepted') ?? 'n/a'}`,
+    `probationary=${count('probationary') ?? 'n/a'}`,
+    `rejected=${rejectedText || 'none'}`,
+    `sourceErrors=${sourceErrors ?? 'n/a'}`,
+    text(value.reason, 120) ? `reason=${text(value.reason, 120)}` : '',
+  ].filter(Boolean).join(' ')
+}
+
 /** Read the Computer Science path as it stands now. Window-independent: it describes the present, not a cohort. */
 export async function readComputerSciencePath(input: { db: Db; now?: Date }): Promise<ComputerSciencePath> {
   const db = input.db
@@ -236,10 +264,7 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
       batchMinimum: BATCH_MINIMUM,
       preparedBufferTarget: number(evidence.preparedBufferTarget),
       preparedBefore: number(evidence.preparedBeforeReplenishment),
-      replenishment: receipt
-        ? [text(replenishment.reason, 120) || (replenishment.ok === false ? `error:${text(replenishment.error, 120)}` : ''), replenishment.skipped === true ? 'skipped' : '']
-          .filter(Boolean).join(' ') || null
-        : null,
+      replenishment: receipt ? describeReplenishment(replenishment) : null,
       curriculumBatchesByStatus: tally(batchRows.map(row => text(row.status, 40) || 'unrecorded')),
       latestCurriculumBatchAt: iso(batchRows[0]?.prepared_at),
       corpusRowsByOrigin: Object.freeze({

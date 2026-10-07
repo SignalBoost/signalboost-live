@@ -62,6 +62,14 @@ export const MASS_EVALUATION_MAX_INFRASTRUCTURE_FAILURES_PER_GENERATION = 12
 // (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
 // compute each time and learning nothing. Identical repeats stop; a different failure resets the count.
 export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
+// Owner decision 2026-10-07: "every exam terminates with a verdict or an explained failure; infrastructure retries are
+// capped". The cooldown ladder below made a repeating defect reach the 12-failure stop only after days (Production
+// 2026-10-07: four artifacts waited ~4 days in evaluation_pending). The SAME infrastructure error this many times in a
+// row, in one evaluation generation, stops the generation now (about two hours with the floor and the first two
+// ladder steps). The artifact then takes the existing path: quarantined as OUR error, returned to the exam once, and
+// dismissed as ours ("could not be examined - platform fault") if it stops again. Never a FAIL, never a substantive
+// attempt, no score or gate changes.
+export const MASS_EVALUATION_IDENTICAL_INFRASTRUCTURE_STOP = 6
 // Production 2026-09-21: a single old artifact alternated among readiness, 502, timeout and
 // truncated-answer infrastructure failures. Because the error STRING changed, the identical-error ladder
 // reset and the same artifact could reclaim one of four evaluator slots seconds later while 240+ eligible
@@ -468,6 +476,24 @@ export function decideExhaustedMassEvaluationArtifacts(input: {
   return Object.freeze(exhausted)
 }
 
+/** Consecutive identical infrastructure failures, newest first, in the current evaluation generation. */
+function identicalInfrastructureRun(history: ArtifactHistory): number {
+  const failures = history.mine
+    .filter(event => history.inCurrentGeneration(event)
+      && event.evidence?.claim === 'mass_distilled_independent_evaluation_failed')
+    .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+  const newest = failures[0]
+  if (!newest || !evaluatorInfrastructureFailure(newest)) return 0
+  const key = String(newest.evidence?.error || '').trim().toLowerCase()
+  if (!key) return 0
+  let run = 0
+  for (const event of failures) {
+    if (!evaluatorInfrastructureFailure(event) || String(event.evidence?.error || '').trim().toLowerCase() !== key) break
+    run += 1
+  }
+  return run
+}
+
 export function decideInfrastructureStalledMassEvaluationArtifacts(input: {
   artifacts: readonly RollingArtifact[]
   events: readonly RollingEvent[]
@@ -479,7 +505,8 @@ export function decideInfrastructureStalledMassEvaluationArtifacts(input: {
     if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
     const history = artifactHistory(artifact, input.events, nowMs)
     if (history.hasVerdict || history.liveStart) continue
-    if (history.infrastructureFailures < MASS_EVALUATION_MAX_INFRASTRUCTURE_FAILURES_PER_GENERATION) continue
+    if (history.infrastructureFailures < MASS_EVALUATION_MAX_INFRASTRUCTURE_FAILURES_PER_GENERATION
+      && identicalInfrastructureRun(history) < MASS_EVALUATION_IDENTICAL_INFRASTRUCTURE_STOP) continue
     stalled.push(Object.freeze({
       candidateId: artifact.candidateId,
       subjectId: artifact.subjectId,

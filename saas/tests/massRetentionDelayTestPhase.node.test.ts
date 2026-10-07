@@ -94,12 +94,13 @@ test('the SQL claim carries the TypeScript call ceiling and keeps the 10-minute 
 // TypeScript deploys, or every tick reports no_atomically_claimable (2026-09-18, 2026-09-29). A migration that rewrites
 // the live claim to accept both the previous and the current ceiling must exist in the repository.
 test('a migration makes the live claim accept the current TypeScript call ceiling', () => {
-  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 35)
+  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 38)
   const dir = new URL('../supabase/migrations/', import.meta.url)
+  // 35 -> 38 (2026-10-07, owner option a) extends the 25/35 accept-list written by 20261007010000.
   const accepting = readdirSync(dir).filter(name => name.endsWith('.sql')).filter(name => {
     const sql = readFileSync(new URL(name, dir), 'utf8')
     return /claim_next_mass_distilled_evaluation/.test(sql)
-      && new RegExp(`'v_max_endpoint<>25', 'v_max_endpoint not in \\(25,${MASS_EVALUATION_ENDPOINT_CALLS}\\)'`).test(sql)
+      && new RegExp(`'v_max_endpoint not in \\(25,35\\)', 'v_max_endpoint not in \\(25,35,${MASS_EVALUATION_ENDPOINT_CALLS}\\)'`).test(sql)
   })
   assert.ok(accepting.length >= 1, `no migration rewrites the claim ceiling to accept ${MASS_EVALUATION_ENDPOINT_CALLS}`)
 })

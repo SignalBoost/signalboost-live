@@ -2818,7 +2818,7 @@ Read-only evidence (`/api/cron/cos-university-evaluation-failure-trace`, printed
 
 **Re-read 2026-10-07 20:17 UTC (Step 1 evidence report on `a6a12ad`).** `gateway_ping_timeout` per day: 10-04 58, 10-05 39, 10-06 4, 10-07 2. The drop started on 10-06, before the 340 s window was deployed (~23:00 UTC), and no completed exam has needed more than 280 s: readiness is still p50 163 s, p90 202 s, max 275 s (41 exams with a recorded wait). The two 10-07 timeouts ran the full window (failed run max 344 s). So the window did not cause the drop. The data is censored: a worker that would have become ready just after 340 s looks the same as one that never would. It therefore shows only that every completed exam was ready within 275 s, not that the window never cuts a healthy exam. Working hypothesis, unproven: the remaining timeouts are slow loads, and a faster cold start would fix them better than a longer window would. The exam itself grew with the 12-case holdout: p50 186 s, max 244 s, against 205 s left after a 340 s wait. The route deadline still bounds the run (completed-run max 477 s against 545 s usable), but the trace now reports that a window above 301 s could cut the slowest observed exam. Revisit the window if 12-case exams start ending in `runtime_not_ready` close to the route deadline.
 
-**Curriculum supply recovered.** Four changes were involved: #3734 makes deduplication prefer the independently sourced copy; 5d9d4cd sizes batches to the real-source material available; #3746 (`needsMassDistillationReplenishment`) replenishes subjects that have enough items in total but fewer than 32 independent ones; and #3770 puts Computer Science first in the fill order after it stalled at 28–29/32 while fills targeted other subjects. These are the mechanisms, not a measured share of the recovery for each. Births in the 24 h window went from 4 (10-06) to 28. Computer Science packaging at 20:14 UTC: 478 batchable items (needs 64), real source 34/32, prepared buffer 14/10. The 50% real-source floor is unchanged.
+**Curriculum supply recovered.** Four changes were involved: #3734 makes deduplication prefer the independently sourced copy; 5d9d4cd sizes batches to the real-source material available; #3746 (`needsMassDistillationReplenishment`) replenishes subjects that have enough items in total but fewer than 32 independent ones; and #3770 puts Computer Science first in the fill order after it stalled at 28–29/32 while fills targeted other subjects. These are the mechanisms, not a measured share of the recovery for each. Births in the 24 h window went from 4 (10-06) to 28. **Births per day is not a goal metric** (owner, 2026-10-07; see *The product is the user's experiment* below). This matters only because a user's batch must not be refused for a platform defect. Computer Science packaging at 20:14 UTC: 478 batchable items (needs 64), real source 34/32, prepared buffer 14/10. The 50% real-source floor is unchanged.
 
 **Open, owner decision: the baseline's no-answer budget on 12-case holdouts.** `mass_distilled_evaluation_answer_missing:<case>:finish=stop:think=0:open=0:close=0` (a baseline markerless normal stop) fired 9 times in 24 h on one holdout case. With 12 cases, `holdoutGroupTarget` = floor((35 − 6 − 5) / 2) = 12, so every baseline case is already a one-case request. The 35-call budget is fully allocated: 12 baseline, 12 candidate, 6 fixed suites, 2 baseline solo retries and 3 candidate solo retries. A baseline that abstains on a third case therefore has no solo retry left. It throws as infrastructure, does not spend a substantive attempt, and the same deterministic (temperature 0) exam is re-run on later ticks. There are two fixes, and both are owner decisions. (a) More exam calls: a claim-migration change to the 35-call ceiling, which is spend. (b) Accept the one-case first answer as the reproduction for the baseline, which extends the baseline-abstention rule, an evaluation standard. Until one is chosen, this stays reported, not changed.
 
@@ -2858,6 +2858,59 @@ Owner approved. Status: implemented, tests and release gate passing; **not yet o
 ### Failure attribution: our own error shapes are infrastructure — 2026-10-07
 
 The all-time Step 1 report still listed unresolved failure causes that are raised by our code or infrastructure, never by a model's answer: `fetch failed`, `PGRST204` schema-cache misses, `independent_evaluator_evidence_http_<n>` (our evaluator posting to our own route), `mass_distilled_runtime_endpoint_worker_policy_drift` (provisioning guard) and `no_supported_evaluation_pending_artifact` (no artifact was examined). They are now in the canonical `isEvaluatorInfrastructureFailure`, which production disposition and the report share, so they no longer spend an artifact's substantive attempts. `mass_distilled_evaluation_runpod_http_400` (a malformed adapter could cause it), every `candidate_*` shape and the historical `[object Object]` rows stay out and are reported as unresolved.
+
+### The product is the user's experiment, not volume — owner direction 2026-10-07
+
+Owner, verbatim: "How many times i have to say that the platform is NOT for keep creating artifacts forever! We are preparing it for users". And: "the metric isn't 'artifacts born per day,' it's whether the platform can carry a user's experiment all the way through with a clear verdict or explained failure."
+
+**Never report births per day, graduates per day or line throughput as progress.** Progress means a user's experiment (create → train → examine → Residency → graduate or reject) reaches a clear verdict or an explained failure, reliably. Line-flow numbers in the Step 1 report diagnose; they are not goals. A user experiment is never refused or stalled because of a platform defect.
+
+#### Exam reliability (owner decision 2026-10-07)
+
+Every exam ends with exactly one of these outcomes:
+- **A verdict on merit:** pass, or fail on a named gate.
+- **An explained platform fault:** "could not be examined — platform fault". It is recorded as ours (`ours: true`), never as a FAIL and never as a substantive attempt, and it is eligible for refund once the credit ledger exists.
+
+Infinite retries are not acceptable. Graduation standards are not loosened to achieve closure.
+
+- **Exams can finish (option a, chosen over b):** the evaluator call ceiling goes from 35 to 38, and the three added calls are base-model solo retries (2 → 5). Option (b), scoring the base model 0 on its first no-answer, was rejected because it makes passing easier. Claim SQL `20261007230000_mass_evaluation_claim_38.sql` must be applied before the code deploys.
+- **Hard stop on infrastructure retries:** six consecutive identical infrastructure errors (`MASS_EVALUATION_IDENTICAL_INFRASTRUCTURE_STOP`), or twelve infrastructure errors of any kind, stop the evaluation generation. Six identical errors is about two hours; before this, the cooldown ladder made a repeating defect take days (four artifacts waited ~4 days in `evaluation_pending`). The artifact is then:
+  1. quarantined as `exhausted_our_errors`;
+  2. returned to the exam once;
+  3. if it stops again, dismissed as ours, counted under "Not examinable — ours (not a FAIL)" on the University telemetry page.
+
+  A repeated merit failure never counts toward this stop.
+
+#### Always-on Production line: paused (owner decision 2026-10-07)
+
+The continuous artifact line spends money without proving the user-facing goal. It is paused with the buyer-controlled **Production pause** on the University telemetry page (`cos_university_line_paused`), which stops every factory station on the next tick and leaves graduates already serving untouched. Testing uses deliberate experiments run the way a user would run them.
+
+The pause is all-or-nothing today: it also stops a deliberate experiment. Running one chosen experiment while the always-on line stays off needs a user-started experiment entry point. That is the next Step 1 build item, not a reason to unpause the line.
+
+#### Exposure gates (owner checklist 2026-10-07)
+
+External exposure opens on these gates, never on volume. The serving and verified-outcome gates belong to the next project (graduates at work). They gate design partners; they are not Step 1 exit criteria. The targets are owner targets, to be confirmed against measurements on the lab instance.
+
+- **Exam reliability:** every exam ends with a verdict or an explained platform fault, and infrastructure retries are capped (above).
+- **Serving reliability (next project):** a graduate answers within about 8 s typically, the timeout rate is under 10%, and at least one awake graduate answers consistently.
+- **Verified outcomes (next project):** at least one graduate has independently verified work. Graduate Precision is measurable and is reported only together with Eligible-Graduate Testing Coverage.
+- **BYOI adapter contract:** RunPod hard-wiring is removed (31 University files import it directly). Customers bring GPU, API and MCP through governed adapters.
+- **Privacy tiers:** `PRIVATE` (no cross-customer learning) is enforced by the trace schema, and tenancy sits above the existing `permanent_artifact_id`.
+- **Economics:** credits are tied to Lab operations, platform faults are refunded, and cost per qualified graduate is measured before any external price.
+
+Stages: **Internal** (deliberate experiments only) → **Design Partner** (once serving reliability and ≥1 verified outcome exist) → **Private Beta** (once Graduate Precision is stable and the BYOI adapters are proven). This refines the 10-step order above; it does not replace it.
+
+#### Credits and refunds (owner direction 2026-10-07; consistent with the Credits section above)
+
+Users pay for Lab work that produced a valid result, and never for our faults.
+
+- **Reserve → capture/release, per operation:** create, train, examine, Residency and graduation/rejection each reserve credits before they run.
+  - A merit outcome captures the reservation; a legitimate rejection is a valid result the user paid for.
+  - A platform fault releases or refunds it.
+  - A customer-infrastructure fault follows the experiment's policy.
+- **Refund eligibility uses the same classifier the line uses** (`isEvaluatorInfrastructureFailure()` today, extended to the three-way attribution). Refundable: gateway or readiness timeouts, provider quota refusals, judge protocol or calibration failures, and "could not be examined — platform fault". Merit failures are not refunded.
+- **Visibility:** for each artifact, the University telemetry page shows credits reserved, captured and released. The economic trace belongs to the artifact's **life record**, not its birth certificate, which is issued at creation and never amended (see *AI Lab specification corrections* below).
+- **No price before measurement:** the cost per qualified graduate is measured before any external price is set.
 
 ### AI Lab specification corrections — 2026-10-06
 

@@ -34,6 +34,14 @@ const RULES: ReadonlyArray<readonly [RegExp, ProviderFailureClassification]> = [
     { failureClass: 'authentication_failed', disposition: 'open_circuit', deterministic: true, costBearingRetryAllowed: false, reason: 'provider_authentication_failed' }],
   [/permission denied|forbidden|not authorized|authorization failed|\b403\b/i,
     { failureClass: 'authorization_failed', disposition: 'open_circuit', deterministic: true, costBearingRetryAllowed: false, reason: 'provider_authorization_failed' }],
+  // Hugging Face Jobs prepare_dataset invokes OUR `pip install` bootstrap. A dependency
+  // resolver failure on those requirements is a deterministic worker-environment fault,
+  // not evidence that Hugging Face's model-training service is unavailable.
+  // 2026-10-07, job 6ac5aaa0fbc85ba6823bb648: datasets 3.0–3.5.1 conflicts,
+  // followed by `ERROR: ResolutionImpossible`. Do not permit a paid retry or open
+  // a provider-wide circuit for this failure; the dependency contract needs repair.
+  [/\bResolutionImpossible\b|Cannot install datasets==[^\n]*conflicting dependencies/i,
+    { failureClass: 'configuration_invalid', disposition: 'protected_halt', deterministic: true, costBearingRetryAllowed: false, reason: 'worker_contract_invalid' }],
   // OUR OWN WORKER'S FAULT, NOT THE PROVIDER'S (widened 2026-09-28).
   // The caller refuses to open a provider circuit when reason === 'worker_contract_invalid', which is
   // correct: a defect in a script we wrote and serve says nothing about the provider's health. The rule

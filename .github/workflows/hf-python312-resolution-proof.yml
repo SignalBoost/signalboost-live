@@ -1,0 +1,76 @@
+name: HF Python 3.12 dependency resolution proof
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hf-python312-resolution-proof.yml'
+      - 'saas/lib/ai/cos/cosUniversityHuggingFaceJobs.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-dependency-proof:
+    name: Python 3.12 pip dry-run (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: production-range
+            hub: 'huggingface_hub>=0.34,<2'
+          - label: hub-below-one
+            hub: 'huggingface_hub>=0.34,<1'
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Resolve the exact HF preparation requirements without installing or dispatching
+        shell: bash
+        env:
+          HUB_REQUIREMENT: ${{ matrix.hub }}
+        run: |
+          set -euo pipefail
+          python -m pip --version
+          python -m pip install --dry-run --report /tmp/hf-prep-resolution.json \
+            --disable-pip-version-check --progress-bar off \
+            --timeout 20 --retries 1 \
+            "$HUB_REQUIREMENT" 'datasets>=3,<5'
+          python - <<'PY'
+          import json
+          with open('/tmp/hf-prep-resolution.json', encoding='utf-8') as f:
+              result = json.load(f)
+          wanted = {'datasets', 'huggingface-hub'}
+          for entry in result.get('install', []):
+              meta = entry.get('metadata', {})
+              name = meta.get('name', '').lower().replace('_', '-')
+              if name in wanted:
+                  print(f"RESOLVED {name}=={meta.get('version')}")
+          PY
+
+  production-image-prepare:
+    name: Exact python:3.12-slim install and smoke test
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.12-slim
+    timeout-minutes: 15
+    steps:
+      - name: Verify pip resolves and installs production preparation requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          python --version
+          python -m pip --version
+          python -m pip install --disable-pip-version-check --progress-bar off \
+            --no-cache-dir --timeout 30 --retries 2 \
+            'huggingface_hub>=0.34,<2' 'datasets>=3,<5'
+          python - <<'PY'
+          import datasets
+          import huggingface_hub
+          from datasets import Dataset, DatasetDict
+          train = Dataset.from_list([{'text': 'a', 'label': 1}])
+          holdout = Dataset.from_list([{'text': 'b', 'label': 0}])
+          both = DatasetDict({'train': train, 'test': holdout})
+          assert len(both['train']) == 1 and len(both['test']) == 1
+          print('PRODUCTION_IMAGE_INSTALL_PASS datasets=' + datasets.__version__ + ' huggingface_hub=' + huggingface_hub.__version__)
+          PY

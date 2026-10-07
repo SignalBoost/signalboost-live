@@ -442,3 +442,13 @@ test('HF job diagnostics fetch only a bounded redacted log tail', async () => {
   assert.doesNotMatch(tail, /hf_q/)
   assert.match(tail, /REDACTED/)
 })
+
+// Production 2026-10-07: pip --quiet hid the dependency conflict chain for the
+// `datasets` resolver failure (HF job 6ac5aaa0...). Diagnostics retained only
+// the final ResolutionImpossible lines, blocking an evidence-based version fix.
+test('HF bootstrap exposes resolver diagnostics for every job operation', () => {
+  const source = readFileSync('lib/ai/cos/cosUniversityHuggingFaceJobs.ts', 'utf8')
+  assert.match(source, /pip install --disable-pip-version-check --progress-bar off --no-cache-dir/)
+  assert.doesNotMatch(source, /pip install --quiet/)
+  assert.match(source, /command = workerBootstrap\(\[/)
+})

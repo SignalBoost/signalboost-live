@@ -74,8 +74,7 @@ test('an evaluator age refusal is our own gate disagreement and never fails a st
 // may re-create it with the 12-hour wait while the test phase is on.
 test('the SQL claim carries the TypeScript call ceiling and keeps the 10-minute wait', () => {
   const ceiling = read('../supabase/migrations/20260929024000_mass_evaluation_claim_25_symmetric_holdout.sql')
-  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 25)
-  assert.match(ceiling, new RegExp(`replace\\(definition, 'v_max_endpoint<>18', 'v_max_endpoint<>${MASS_EVALUATION_ENDPOINT_CALLS}'\\)`))
+  assert.match(ceiling, /replace\(definition, 'v_max_endpoint<>18', 'v_max_endpoint<>25'\)/)
   assert.match(ceiling, /replace\(updated, 'interval ''12 hours''', 'interval ''10 minutes'''\)/)
   assert.doesNotMatch(ceiling, /create or replace function public\.claim_next_mass_distilled_evaluation/i)
 
@@ -85,6 +84,22 @@ test('the SQL claim carries the TypeScript call ceiling and keeps the 10-minute 
     const sql = readFileSync(new URL(name, dir), 'utf8')
     if (!/create or replace function public\.claim_next_mass_distilled_evaluation/i.test(sql)) continue
     assert.doesNotMatch(sql, /interval '12 hours'/, `${name} re-creates the exam claim with the 12-hour wait`)
-    assert.match(sql, new RegExp(`v_max_endpoint<>${MASS_EVALUATION_ENDPOINT_CALLS}\\b`), `${name} re-creates the exam claim with a stale call ceiling`)
+    // 25 is the ceiling these re-creations were written for; the 2026-10-07 migration (checked below) widens the live
+    // claim to the current ceiling, so a re-creation may carry 25 or already accept the current value.
+    assert.match(sql, new RegExp(`v_max_endpoint(<>(25|${MASS_EVALUATION_ENDPOINT_CALLS})\\b| not in \\([^)]*\\b${MASS_EVALUATION_ENDPOINT_CALLS}\\b)`), `${name} re-creates the exam claim with a stale call ceiling`)
   }
+})
+
+// 2026-10-07: the ceiling moved 25 -> 35 (holdout 6 -> 12). The claim must accept the TypeScript ceiling BEFORE the
+// TypeScript deploys, or every tick reports no_atomically_claimable (2026-09-18, 2026-09-29). A migration that rewrites
+// the live claim to accept both the previous and the current ceiling must exist in the repository.
+test('a migration makes the live claim accept the current TypeScript call ceiling', () => {
+  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 35)
+  const dir = new URL('../supabase/migrations/', import.meta.url)
+  const accepting = readdirSync(dir).filter(name => name.endsWith('.sql')).filter(name => {
+    const sql = readFileSync(new URL(name, dir), 'utf8')
+    return /claim_next_mass_distilled_evaluation/.test(sql)
+      && new RegExp(`'v_max_endpoint<>25', 'v_max_endpoint not in \\(25,${MASS_EVALUATION_ENDPOINT_CALLS}\\)'`).test(sql)
+  })
+  assert.ok(accepting.length >= 1, `no migration rewrites the claim ceiling to accept ${MASS_EVALUATION_ENDPOINT_CALLS}`)
 })

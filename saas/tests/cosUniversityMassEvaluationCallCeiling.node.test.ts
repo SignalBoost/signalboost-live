@@ -9,17 +9,20 @@ import {
 
 const evaluator = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 const authority = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts', import.meta.url), 'utf8')
+const worker = readFileSync(new URL('../scripts/cos-university-hf-worker-base.py', import.meta.url), 'utf8')
 const cron = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 
 // Owner decision 2026-09-17: ceiling raised 8 -> 14 so the trained candidate, measured at ~1.7x the baseline's wall
 // time on identical cases (28.4s vs 16.9s against a 35.2-40.4s gateway cutoff), can use smaller requests while
 // preserving every holdout case, the fixed suites, and bounded recovery headroom.
 
-test('the ceiling is 25 and is defined exactly once', () => {
+test('the ceiling is 35 and is defined exactly once', () => {
   // 14 -> 18: the four extra calls paid for one request per fixed suite per model.
   // 18 -> 25: the seven extra calls buy the BASELINE the same nine holdout requests the candidate already had,
   // so both models answer with the same output-token room on the comparison holdout_improved grades.
-  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 25)
+  // 25 -> 35 (owner 2026-10-07): the holdout grows 6 -> 12 cases and stays one case per request for both models.
+  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 35)
+  assert.match(worker, /^MASS_HOLDOUT_MAX_ITEMS = 12$/m)
   assert.equal(MASS_EVALUATION_JUDGE_CALLS, 4)
 })
 
@@ -34,7 +37,7 @@ test('all three enforcement points read the shared constant, so the approval sha
 })
 
 test('both models get the same budget-derived grouping, leaving fixed-suite and recovery capacity', () => {
-  assert.match(evaluator, /const fixedEndpointCalls=6;const recoveryReserve=1/)
+  assert.match(evaluator, /const fixedEndpointCalls=6;const recoveryReserve=5/)
   // The holdout budget is split evenly so the baseline is no longer pinned at 2 groups while the candidate takes
   // the remainder. Unequal requests meant unequal output-token room per answer on the exact comparison
   // holdout_improved grades (Production 2026-09-28: candidate 9 requests, baseline 2, on a 13-case holdout).
@@ -45,15 +48,13 @@ test('both models get the same budget-derived grouping, leaving fixed-suite and 
   assert.match(evaluator, /minGroups:baselineGroupCount,feature:'mass_distilled_eval_holdout_baseline'/)
 })
 
-test('the observed 13-case / two-baseline-group shape fits exactly with a dedicated retry reserve', () => {
-  const holdoutCases = 13
-  // Six: one request per fixed suite per model.
+test('a 12-case holdout is one case per request for both models, with fixed suites and recovery reserved', () => {
+  const holdoutCases = 12
+  // Six: one request per fixed suite per model. Five: the evaluator's recovery reserve.
   const fixedEndpointCalls = 6
-  const recoveryReserve = 1
+  const recoveryReserve = 5
   const groupsPerModel = Math.min(holdoutCases, Math.floor((MASS_EVALUATION_ENDPOINT_CALLS - fixedEndpointCalls - recoveryReserve) / 2))
-  // The candidate keeps the nine requests Production proved it needs at the gateway's ~40s cut-off, and the
-  // baseline now gets the same nine instead of two.
-  assert.equal(groupsPerModel, 9)
+  assert.equal(groupsPerModel, 12)
   assert.equal(groupsPerModel * 2 + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)
 })
 

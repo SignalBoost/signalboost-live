@@ -10,7 +10,9 @@ test('case-score persistence coexists with the repaired judge timeout', () => {
   assert.match(evaluator, /const JUDGE_CALL_TIMEOUT_MS = 60_000/)
   assert.match(evaluator, /const HOLDOUT_JUDGE_CALL_TIMEOUT_MS = 75_000/)
   assert.match(evaluator, /const JUDGE_MAX_OUTPUT_TOKENS = 512/)
-  assert.match(evaluator, /maxTokens:JUDGE_MAX_OUTPUT_TOKENS/)
+  assert.match(evaluator, /const HOLDOUT_JUDGE_MAX_OUTPUT_TOKENS = 1024/)
+  // Only the holdout call gets the larger allowance (12 cases + control); the fixed suites keep 512.
+  assert.match(evaluator, /maxTokens:input\.suiteName==='holdout'\?HOLDOUT_JUDGE_MAX_OUTPUT_TOKENS:JUDGE_MAX_OUTPUT_TOKENS/)
   assert.match(evaluator, /timeoutMs:input\.suiteName==='holdout'\?HOLDOUT_JUDGE_CALL_TIMEOUT_MS:JUDGE_CALL_TIMEOUT_MS/)
   assert.match(evaluator, /input\.deadlineMs,input\.suiteName==='holdout'\?HOLDOUT_JUDGE_CALL_TIMEOUT_MS:JUDGE_CALL_TIMEOUT_MS/)
   assert.match(evaluator, /mass_distilled_evaluation_judge_timeout:\$\{input\.suiteName\}/)

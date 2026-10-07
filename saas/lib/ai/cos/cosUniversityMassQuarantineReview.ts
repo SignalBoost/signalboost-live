@@ -154,7 +154,7 @@ export async function reviewMassQuarantine():Promise<Readonly<{
 
     const now=new Date().toISOString()
     const updated=await db.from('cos_local_distillation_artifacts')
-      .update({status:'evaluation_pending',updated_at:now})
+      .update({status:'evaluation_ready',updated_at:now})
       .eq('candidate_id',item.candidateId)
       .eq('trained_artifact_hash',item.artifactHash)
       .eq('status','quarantined')
@@ -170,7 +170,7 @@ export async function reviewMassQuarantine():Promise<Readonly<{
       priorDisposition:EXHAUSTED,
       currentSubstantiveFailures:item.substantiveFailures,
       lastError:item.lastError,
-      nextStatus:'evaluation_pending',
+      nextStatus:'evaluation_ready',
       evaluationPassed:false,
       productionTrafficAuthorized:false,
       authorityExpanded:false,

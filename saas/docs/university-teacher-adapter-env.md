@@ -83,11 +83,10 @@ The mass-distillation campaign can now use OpenAI, Claude, and Grok as the actua
 Production contract:
 
 - `COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED=true`
-- `COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS=20`
 - `COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS=384`
 - `COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM=8`
 
-The stage requires 20 distinct persisted teacher responses before the run advances to dataset preparation. Each row records provider, exact model, request ID, token counts, response hash, prompt identity, and batch/run identity. OpenAI, Claude, and Grok are rotated across prompts when they are credential-ready.
+The stage requires a persisted teacher response for every packaged prompt before the run advances to dataset preparation (owner go 2026-10-06; previously it stopped at 20, or 32 for remediation batches, and the unanswered rest of the batch was dropped). One invocation spends at most 32 calls; a larger batch is answered across consecutive invocations, each calling only the prompts still unanswered. Each row records provider, exact model, request ID, token counts, response hash, prompt identity, and batch/run identity. OpenAI, Claude, and Grok are rotated across prompts when they are credential-ready.
 
 The fixed mass-campaign teacher ceiling remains $0.20. To preserve that ceiling, the unpriced custom gateway is excluded from this direct mass-teacher stage. Custom gateways remain available to the general hosted curriculum lane.
 

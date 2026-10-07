@@ -241,7 +241,7 @@ function workerBootstrap(packages: readonly string[]): readonly string[] {
   const fetchWorker = `python -c "import os,urllib.request,pathlib; u=os.environ['ITMOUNTS_HF_WORKER_URL']; b=urllib.request.urlopen(u,timeout=30).read(); legacy=(b'ITMOUNTS_TRAINING_REQUEST' in b and b'HF_TOKEN' in b); wrapper=(b'BASE_WORKER_FILENAME' in b and b'BASE_CONTRACT_MARKERS' in b and b'base.main()' in b and b'HF_TOKEN' in b); assert legacy or wrapper, 'hf_worker_delivery_artifact_invalid'; pathlib.Path('/tmp/itmounts_hf_worker.py').write_bytes(b)"`
   const shell = [
     fetchWorker,
-    `pip install --quiet --disable-pip-version-check --no-cache-dir ${install}`,
+    `pip install --disable-pip-version-check --progress-bar off --no-cache-dir ${install}`,
     worker,
   ].join(' && ')
   return Object.freeze(['bash', '-lc', shell])

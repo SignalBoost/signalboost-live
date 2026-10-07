@@ -312,6 +312,16 @@ test('buyer causal explanations disclose unresolved causality instead of inventi
   assert.match(panel, /copy\.operationalBuyerMeaning/)
 })
 
+test('daily activity counts each cohort artifact once per stage on the UTC day of its birth, latest exam and promotion', async () => {
+  const f = await readEffectivenessFunnel({ db: fakeDb(week()).db, window: 'all', now: NOW })
+  assert.deepEqual(f.dailyActivity.days.map(d => [d.day, d.born, d.examined, d.graduated]), [
+    ['2026-09-30', 1, 0, 0],
+    ['2026-10-03', 1, 1, 0],
+    // a: born, latest exam (13:00, not the earlier failed run counted twice) and promoted on 10-04; b's exam is another hash.
+    ['2026-10-04', 2, 1, 1],
+  ])
+})
+
 test('window and subject narrow the cohort and the production counts', async () => {
   const day = await readEffectivenessFunnel({ db: fakeDb(week()).db, window: '24h', now: NOW })
   assert.equal(day.cohort.size, 2)

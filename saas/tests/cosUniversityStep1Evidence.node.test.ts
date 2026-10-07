@@ -186,6 +186,10 @@ function fullFunnel(overrides: Record<string, unknown> = {}): any {
     lineHistory: { available: true, transitions: 12, throughputPerHour: 0.5 },
     lineHealth: { available: true, liveUnits: 4, overdueUnits: 0, bottleneckStation: null },
     evaluationFailures: { available: true, total: 2, infrastructure: 1, merit: 1, explanations: [{ reason: 'r', count: 2, causeStatus: 'evidence_backed' }], source: 'evals' },
+    dailyActivity: { source: 'dated', methodology: 'm', days: [
+      { day: '2026-10-04', born: 2, examined: 1, graduated: 1 },
+      { day: '2026-10-05', born: 1, examined: 2, graduated: 1 },
+    ] },
     ...overrides,
   }
 }
@@ -212,8 +216,31 @@ test('even with evidence at every stage the report never recommends READY', () =
   assert.deepEqual([...report.blocking], [])
   assert.equal(report.recommendation, 'INSUFFICIENT_EVIDENCE_FOR_READY')
   const notMeasured = report.criteria.filter(entry => entry.status === 'not_measured').map(entry => entry.id)
-  assert.deepEqual(notMeasured, ['repeated_operation', 'no_manual_intervention', 'standards_unweakened'])
+  assert.deepEqual(notMeasured, ['no_manual_intervention', 'standards_unweakened'])
   assert.doesNotMatch(JSON.stringify(report), /"recommendation":"READY"/)
+})
+
+test('repeated operation is read from dated cohort events: two full-line days, never one snapshot or an unreadable chapter', () => {
+  const status = (overrides: Record<string, unknown>) => {
+    const entry = assessStep1Evidence(fullFunnel(overrides), NOW).criteria.find(c => c.id === 'repeated_operation')!
+    return { status: entry.status, observed: entry.observed as any }
+  }
+  const two = status({})
+  assert.equal(two.status, 'evidence_present')
+  assert.equal(two.observed.fullLineDays, 2)
+  assert.equal(two.observed.lastFullLineDay, '2026-10-05')
+  // Births and exams on several days, but graduation on only one: the whole line did not repeat.
+  const once = status({ dailyActivity: { source: 's', methodology: 'm', days: [
+    { day: '2026-10-04', born: 1, examined: 1, graduated: 1 },
+    { day: '2026-10-05', born: 1, examined: 1, graduated: 0 },
+  ] } })
+  assert.equal(once.status, 'partial')
+  assert.equal(once.observed.fullLineDays, 1)
+  assert.equal(status({ dailyActivity: { source: 's', methodology: 'm', days: [] } }).status, 'no_evidence')
+  assert.equal(status({ unavailable: { graduation: 'unreadable' } }).status, 'unavailable', 'an unreadable chapter is never a zero')
+  assert.equal(status({ dailyActivity: undefined }).status, 'unavailable')
+  const report = assessStep1Evidence(fullFunnel({ dailyActivity: { source: 's', methodology: 'm', days: [] } }), NOW)
+  assert.ok(report.blocking.includes('repeated_operation'))
 })
 
 test('graduates not serving and zero verified outcomes do not block Step 1: they are the next project, still reported', () => {

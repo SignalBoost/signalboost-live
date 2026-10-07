@@ -93,6 +93,11 @@ export type EffectivenessFunnel = Readonly<{
   since: string | null
   subjectId: string | null
   cohort: Readonly<{ size: number; truncated: boolean; source: string }>
+  /**
+   * The cohort's line activity by UTC day (birth, latest exam, graduate promotion), so one snapshot can show whether the
+   * whole line ran on more than one day. Days are event days of cohort members; nothing outside the cohort is counted.
+   */
+  dailyActivity: Readonly<{ days: readonly Readonly<{ day: string; born: number; examined: number; graduated: number }>[]; source: string; methodology: string }>
   /** Before birth: distillation runs started in the window and how they ended. */
   production: Chapter<{ runsStarted: number; runsCompleted: number; runsFailed: number; runsInFlight: number; source: string }>
   stages: readonly FunnelStage[]
@@ -305,13 +310,13 @@ export function composeFunnel(input: {
   window: FunnelWindow
   since: string | null
   subjectId: string | null
-  cohort: readonly Readonly<{ candidateId: string; hash: string; status: string }>[]
+  cohort: readonly Readonly<{ candidateId: string; hash: string; status: string; createdAt?: string | null }>[]
   truncated: boolean
   production: Chapter<{ runsStarted: number; runsCompleted: number; runsFailed: number }>
   certified: Chapter<{ candidates: ReadonlySet<string> }>
-  examined: Chapter<{ latestByKey: ReadonlyMap<string, { improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null }> }>
+  examined: Chapter<{ latestByKey: ReadonlyMap<string, { improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null; at?: number }> }>
   residency: Chapter<{ enrolled: ReadonlySet<string>; complete: ReadonlySet<string> }>
-  graduation: Chapter<{ promoted: ReadonlySet<string>; activated: ReadonlySet<string> }>
+  graduation: Chapter<{ promoted: ReadonlySet<string>; activated: ReadonlySet<string>; promotedAt?: ReadonlyMap<string, string> }>
   hired: Chapter<{ candidates: ReadonlySet<string> }>
   work: Chapter<{ attempted: ReadonlySet<string>; succeeded: ReadonlySet<string> }>
   verified: Chapter<{ candidates: ReadonlySet<string> }>
@@ -712,6 +717,28 @@ export function composeFunnel(input: {
     evaluationFailures = Object.freeze({ available: false as const, error: input.evaluationFailures.error })
   }
 
+  const dayOf = (value: unknown): string | null => {
+    const ms = typeof value === 'number' ? value : Date.parse(String(value ?? ''))
+    return Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString().slice(0, 10) : null
+  }
+  const activity = new Map<string, { born: number; examined: number; graduated: number }>()
+  const bump = (day: string | null, field: 'born' | 'examined' | 'graduated') => {
+    if (!day) return
+    const entry = activity.get(day) || { born: 0, examined: 0, graduated: 0 }
+    entry[field] += 1
+    activity.set(day, entry)
+  }
+  for (const a of input.cohort) {
+    bump(dayOf(a.createdAt), 'born')
+    if (input.examined.available) bump(dayOf(input.examined.latestByKey.get(keyOf(a))?.at), 'examined')
+    if (input.graduation.available && input.graduation.promoted.has(keyOf(a))) bump(dayOf(input.graduation.promotedAt?.get(keyOf(a))), 'graduated')
+  }
+  const dailyActivity = Object.freeze({
+    days: Object.freeze([...activity.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, v]) => Object.freeze({ day, ...v }))),
+    source: `${SOURCE.artifacts} created_at + ${SOURCE.evaluations} created_at (latest exam) + cos_university_graduate_model_registry promoted_at`,
+    methodology: 'cohort members only; each artifact counts once per stage, on the UTC day of its birth, latest exam and graduate promotion',
+  })
+
   return Object.freeze({
     schemaVersion: FUNNEL_SCHEMA_VERSION,
     generatedAt: input.now.toISOString(),
@@ -719,6 +746,7 @@ export function composeFunnel(input: {
     since: input.since,
     subjectId: input.subjectId,
     cohort: Object.freeze({ size, truncated: input.truncated, source: SOURCE.artifacts }),
+    dailyActivity,
     production,
     capabilityGain,
     reliability,
@@ -763,6 +791,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     candidateId: text(row.candidate_id, 240),
     hash: text(row.trained_artifact_hash, 64).toLowerCase(),
     status: text(row.status, 60),
+    createdAt: iso(row.created_at),
   }))
   const candidateIds = Array.from(new Set(cohort.map(a => a.candidateId))).filter(Boolean)
   const key = (row: any) => `${text(row.candidate_id, 240)}:${text(row.trained_artifact_hash, 64).toLowerCase()}`
@@ -823,6 +852,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return {
         promoted: new Set(list.filter((r: any) => iso(r.promoted_at)).map(key)),
         activated: new Set(list.filter((r: any) => iso(r.activated_at)).map(key)),
+        promotedAt: new Map(list.filter((r: any) => iso(r.promoted_at)).map((r: any) => [key(r), iso(r.promoted_at) as string])),
       }
     }),
     chapter(async () => ({ candidates: new Set((await forCohort('cos_workforce_roster', 'candidate_id,trained_artifact_hash')).map(key)) })),

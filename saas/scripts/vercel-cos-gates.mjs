@@ -17,6 +17,7 @@ if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 const tests = [
   // Buyer-owned settings and production pause contract.
   'tests/cosUniversitySettings.node.test.ts',
+  'tests/cosUniversityStandardsRatchet.node.test.ts',
   'tests/cosUniversityArtifactLifeRecord.node.test.ts',
   'tests/cosLabFailureAttribution.node.test.ts',
   'tests/cosLabSignedFailureVerdict.node.test.ts',

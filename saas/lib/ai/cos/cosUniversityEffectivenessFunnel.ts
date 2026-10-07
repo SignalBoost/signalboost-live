@@ -97,6 +97,11 @@ export type EffectivenessFunnel = Readonly<{
    * The cohort's line activity by UTC day (birth, latest exam, graduate promotion), so one snapshot can show whether the
    * whole line ran on more than one day. Days are event days of cohort members; nothing outside the cohort is counted.
    */
+  /**
+   * What the cohort's latest exams were graded with: evaluator version and the safety:transfer:retention suite fingerprint
+   * (the fixed exam sets; holdouts are per artifact). One of each in a window means the same exam standard throughout.
+   */
+  examStandards: Chapter<{ examined: number; evaluatorVersions: Readonly<Record<string, number>>; fixedSuites: Readonly<Record<string, number>>; source: string }>
   dailyActivity: Readonly<{ days: readonly Readonly<{ day: string; born: number; examined: number; graduated: number }>[]; source: string; methodology: string }>
   /** Before birth: distillation runs started in the window and how they ended. */
   production: Chapter<{ runsStarted: number; runsCompleted: number; runsFailed: number; runsInFlight: number; source: string }>
@@ -314,7 +319,7 @@ export function composeFunnel(input: {
   truncated: boolean
   production: Chapter<{ runsStarted: number; runsCompleted: number; runsFailed: number }>
   certified: Chapter<{ candidates: ReadonlySet<string> }>
-  examined: Chapter<{ latestByKey: ReadonlyMap<string, { improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null; at?: number }> }>
+  examined: Chapter<{ latestByKey: ReadonlyMap<string, { improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null; at?: number; evaluatorVersion?: string; suites?: string }> }>
   residency: Chapter<{ enrolled: ReadonlySet<string>; complete: ReadonlySet<string> }>
   graduation: Chapter<{ promoted: ReadonlySet<string>; activated: ReadonlySet<string>; promotedAt?: ReadonlyMap<string, string> }>
   hired: Chapter<{ candidates: ReadonlySet<string> }>
@@ -733,6 +738,23 @@ export function composeFunnel(input: {
     if (input.examined.available) bump(dayOf(input.examined.latestByKey.get(keyOf(a))?.at), 'examined')
     if (input.graduation.available && input.graduation.promoted.has(keyOf(a))) bump(dayOf(input.graduation.promotedAt?.get(keyOf(a))), 'graduated')
   }
+  let examStandards: EffectivenessFunnel['examStandards']
+  if (input.examined.available) {
+    const evaluatorVersions: Record<string, number> = {}
+    const fixedSuites: Record<string, number> = {}
+    let examinedCount = 0
+    for (const a of input.cohort) {
+      const exam = input.examined.latestByKey.get(keyOf(a))
+      if (!exam) continue
+      examinedCount += 1
+      const version = exam.evaluatorVersion || 'unrecorded'
+      const suites = exam.suites && !/^:*$/.test(exam.suites) ? exam.suites.split(':').map(h => h.slice(0, 12)).join(':') : 'unrecorded'
+      evaluatorVersions[version] = (evaluatorVersions[version] || 0) + 1
+      fixedSuites[suites] = (fixedSuites[suites] || 0) + 1
+    }
+    examStandards = Object.freeze({ available: true as const, error: null, examined: examinedCount, evaluatorVersions: Object.freeze(evaluatorVersions), fixedSuites: Object.freeze(fixedSuites), source: `${SOURCE.evaluations} evaluator_version + safety/transfer/retention suite hashes (latest exam per cohort artifact)` })
+  } else examStandards = Object.freeze({ available: false as const, error: input.examined.error })
+
   const dailyActivity = Object.freeze({
     days: Object.freeze([...activity.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, v]) => Object.freeze({ day, ...v }))),
     source: `${SOURCE.artifacts} created_at + ${SOURCE.evaluations} created_at (latest exam) + cos_university_graduate_model_registry promoted_at`,
@@ -746,6 +768,7 @@ export function composeFunnel(input: {
     since: input.since,
     subjectId: input.subjectId,
     cohort: Object.freeze({ size, truncated: input.truncated, source: SOURCE.artifacts }),
+    examStandards,
     dailyActivity,
     production,
     capabilityGain,
@@ -828,15 +851,15 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
     chapter(async () => ({ candidates: new Set((await forCohort('cos_university_artifact_birth_certificates', 'candidate_id')).map((r: any) => text(r.candidate_id, 240))) })),
     chapter(async () => {
-      const list = await forCohort('cos_university_distilled_evaluation_runs', 'candidate_id,trained_artifact_hash,created_at,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed', FUNNEL_ROWS_PER_CHUNK)
+      const list = await forCohort('cos_university_distilled_evaluation_runs', 'candidate_id,trained_artifact_hash,created_at,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,evaluator_version,safety_suite_hash,transfer_suite_hash,retention_suite_hash', FUNNEL_ROWS_PER_CHUNK)
       // Latest run per exact artifact decides the stage; an earlier failure that a later run cleared is not a failure.
-      const latestByKey = new Map<string, { at: number; improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null }>()
+      const latestByKey = new Map<string, { at: number; improved: boolean; safety: boolean; transfer: boolean; retention: boolean; baseline: number | null; trained: number | null; evaluatorVersion: string; suites: string }>()
       for (const row of list) {
         const k = key(row)
         const at = new Date(String(row.created_at || 0)).getTime() || 0
         const current = latestByKey.get(k)
         if (current && current.at > at) continue
-        latestByKey.set(k, { at, improved: row.holdout_improved === true, safety: row.safety_passed === true, transfer: row.unseen_transfer_passed === true, retention: row.delayed_retention_passed === true, baseline: Number.isFinite(Number(row.baseline_score)) ? Number(row.baseline_score) : null, trained: Number.isFinite(Number(row.trained_artifact_score)) ? Number(row.trained_artifact_score) : null })
+        latestByKey.set(k, { at, improved: row.holdout_improved === true, safety: row.safety_passed === true, transfer: row.unseen_transfer_passed === true, retention: row.delayed_retention_passed === true, baseline: Number.isFinite(Number(row.baseline_score)) ? Number(row.baseline_score) : null, trained: Number.isFinite(Number(row.trained_artifact_score)) ? Number(row.trained_artifact_score) : null, evaluatorVersion: text(row.evaluator_version, 120), suites: [row.safety_suite_hash, row.transfer_suite_hash, row.retention_suite_hash].map(v => text(v, 64).toLowerCase()).join(':') })
       }
       return { latestByKey }
     }),

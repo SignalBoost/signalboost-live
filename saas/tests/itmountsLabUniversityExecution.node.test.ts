@@ -1,7 +1,7 @@
 // saas/tests/itmountsLabUniversityExecution.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bindLabExperimentToUniversityRun, type LabExecutionDb, type VerifiedLabAuthority } from '../lib/ai/cos/itmountsLabUniversityExecution.ts'
+import { bindLabExperimentToUniversityRun, createSupabaseLabExecutionDb, type LabExecutionDb, type VerifiedLabAuthority } from '../lib/ai/cos/itmountsLabUniversityExecution.ts'
 
 const ORG='11111111-1111-4111-8111-111111111111'
 const EXP='22222222-2222-4222-8222-222222222222'
@@ -65,4 +65,42 @@ test('fails closed on University authority expansion and invalid experiment budg
 
   const badBudget=db({async readExperiment(){return {id:EXP,organizationId:ORG,privacyTier:'PRIVATE',budgetMicrocredits:-1}}})
   await assert.rejects(bindLabExperimentToUniversityRun({authority:authority(),experimentId:EXP,runId:RUN,db:badBudget.value}),/lab_execution_budget_invalid/)
+})
+
+
+test('Supabase adapter uses only the service-role RPC boundary and preserves database contract', async () => {
+  const calls:Array<{name:string,args:Record<string,unknown>}>=[]
+  const client={
+    async rpc(name:string,args:Record<string,unknown>) {
+      calls.push({name,args})
+      if(name==='itmounts_lab_experiment_execution_contract') return {data:{id:EXP,organization_id:ORG,privacy_tier:'PRIVATE',budget_microcredits:1000},error:null}
+      if(name==='itmounts_lab_university_run_execution_contract') return {data:{id:RUN,authority_expanded:false},error:null}
+      if(name==='itmounts_lab_bind_university_run') return {data:null,error:null}
+      return {data:null,error:{message:'unexpected_rpc'}}
+    },
+  }
+  const result=await bindLabExperimentToUniversityRun({authority:authority(),experimentId:EXP,runId:RUN,db:createSupabaseLabExecutionDb(client)})
+  assert.equal(result.ok,true)
+  assert.deepEqual(calls.map(call=>call.name),[
+    'itmounts_lab_experiment_execution_contract',
+    'itmounts_lab_university_run_execution_contract',
+    'itmounts_lab_bind_university_run',
+  ])
+  assert.equal(calls[2].args.p_organization_id,ORG)
+  assert.equal(calls[2].args.p_experiment_id,EXP)
+  assert.equal(calls[2].args.p_run_id,RUN)
+})
+
+test('Supabase adapter fails closed when the private binding RPC rejects authority', async () => {
+  const client={
+    async rpc(name:string,_args:Record<string,unknown>) {
+      if(name==='itmounts_lab_experiment_execution_contract') return {data:{id:EXP,organization_id:ORG,privacy_tier:'PRIVATE',budget_microcredits:1000},error:null}
+      if(name==='itmounts_lab_university_run_execution_contract') return {data:{id:RUN,authority_expanded:false},error:null}
+      return {data:null,error:{message:'lab_service_authority_denied'}}
+    },
+  }
+  await assert.rejects(
+    bindLabExperimentToUniversityRun({authority:authority(),experimentId:EXP,runId:RUN,db:createSupabaseLabExecutionDb(client)}),
+    /lab_service_authority_denied/
+  )
 })

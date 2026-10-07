@@ -36,13 +36,15 @@ type Db = { from: (table: string) => any }
 
 const text = (value: unknown, max = 200): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 /** The resident's own loop stop, from case-run metadata.builderLoop (platform-harness/residency/builder-case-runner.ts). */
-const builderLoopStop = (metadata: unknown): { loopStop: string; filesChanged: number | null } => {
+const builderLoopStop = (metadata: unknown): { loopStop: string; filesChanged: number | null; loopShape: string | null } => {
   const loop = metadata && typeof metadata === 'object' ? (metadata as { builderLoop?: Record<string, unknown> }).builderLoop : undefined
-  if (!loop || typeof loop !== 'object') return { loopStop: 'unrecorded', filesChanged: null }
+  if (!loop || typeof loop !== 'object') return { loopStop: 'unrecorded', filesChanged: null, loopShape: null }
   const files = Number(loop.filesChanged)
   return {
     loopStop: text(loop.failureCode, 80) || (text(loop.outcome, 20) === 'completed' ? 'loop_completed' : 'unrecorded'),
     filesChanged: loop.filesChanged === null || loop.filesChanged === undefined || !Number.isFinite(files) ? null : files,
+    // Content-free tool shape (builder-case-runner builderLoopShape), recorded since 2026-10-07.
+    loopShape: text(loop.shape, 400) || null,
   }
 }
 const iso = (value: unknown): string | null => {
@@ -176,6 +178,11 @@ export type EffectivenessFunnel = Readonly<{
     failedCaseLoopStops: Readonly<Record<string, number>>
     /** Failed cases where the resident changed no seed file at all. */
     failedCasesWithNoFileChange: number
+    /**
+     * The most common content-free loop shapes of FAILED cases (recorded since 2026-10-07), so a resident repeating one
+     * identical call can be told from a loop guard rejecting a new one. Rows without a shape are not counted here.
+     */
+    failedCaseLoopShapes: Readonly<Record<string, number>>
     /** Skill-failure competency evidence by competency. */
     competencyFailuresById: Readonly<Record<string, number>>
     source: string
@@ -311,7 +318,7 @@ export function composeFunnel(input: {
   serving: Chapter<{ terminalByAttempt: ReadonlyMap<string, { outcome: string; latencyMs: number; errorClass: string | null }> }>
   lineLedger: Chapter<{ rows: readonly Readonly<{ station: string; enteredAt: string | null; deadlineAt: string | null; leaseUntil: string | null; terminal: boolean }>[] }>
   transitionHistory: Chapter<{ rows: readonly Readonly<{ fromStation: string; transitionedAt: string | null; durationSeconds: number | null; wasOverdue: boolean }>[] }>
-  residencyEvidence: Chapter<{ enrollments: readonly Readonly<{ key: string; standing: string }>[]; caseStatuses: readonly string[]; competencyOutcomes: readonly string[]; caseRuns?: readonly Readonly<{ status: string; harnessOutcome: string; failureCode: string; loopStop?: string; filesChanged?: number | null }>[]; competencyFailures?: readonly string[] }>
+  residencyEvidence: Chapter<{ enrollments: readonly Readonly<{ key: string; standing: string }>[]; caseStatuses: readonly string[]; competencyOutcomes: readonly string[]; caseRuns?: readonly Readonly<{ status: string; harnessOutcome: string; failureCode: string; loopStop?: string; filesChanged?: number | null; loopShape?: string | null }>[]; competencyFailures?: readonly string[] }>
   workforceAssignments: Chapter<{ rows: readonly Readonly<{ status: string; sourceKind: string; permanentArtifactId: string }>[] }>
   providerCosts: Chapter<{ rows: readonly Readonly<{ operation: string; observedCostUsd: number }>[] }>
   provenanceEvidence: Chapter<{ certificates: ReadonlySet<string>; graduates: ReadonlySet<string>; resumes: ReadonlySet<string> }>
@@ -495,8 +502,9 @@ export function composeFunnel(input: {
     const failedCases = finished.filter(row => row.status === 'failed')
     const failedCaseLoopStops = topOf(tally(failedCases.map(row => row.loopStop || 'unrecorded')), 8)
     const failedCasesWithNoFileChange = failedCases.filter(row => row.filesChanged === 0).length
+    const failedCaseLoopShapes = topOf(tally(failedCases.filter(row => row.loopShape).map(row => row.loopShape as string)), 5)
     const competencyFailuresById = topOf(tally(e.competencyFailures || []), 13)
-    residencyEffectiveness = Object.freeze({ available: true as const, error: null, enrollments: e.enrollments.length, completed, remediationRequired, caseRuns: e.caseStatuses.length, casesPassed, casesFailed, casesRejected, competencyEvidence: e.competencyOutcomes.length, competencyPasses, competencyFailures, completionRate: e.enrollments.length ? completed / e.enrollments.length : null, casePassRate: terminalCases ? casesPassed / terminalCases : null, caseOutcomes, topFailureCodes, standings, failedCaseLoopStops, failedCasesWithNoFileChange, competencyFailuresById, source: 'cos_university_residency_enrollments + cos_university_residency_case_runs + cos_university_residency_competency_evidence', methodology: 'exact cohort artifacts; completion comes only from durable residency standing; case and competency outcomes are counted from durable practical evidence' })
+    residencyEffectiveness = Object.freeze({ available: true as const, error: null, enrollments: e.enrollments.length, completed, remediationRequired, caseRuns: e.caseStatuses.length, casesPassed, casesFailed, casesRejected, competencyEvidence: e.competencyOutcomes.length, competencyPasses, competencyFailures, completionRate: e.enrollments.length ? completed / e.enrollments.length : null, casePassRate: terminalCases ? casesPassed / terminalCases : null, caseOutcomes, topFailureCodes, standings, failedCaseLoopStops, failedCasesWithNoFileChange, failedCaseLoopShapes, competencyFailuresById, source: 'cos_university_residency_enrollments + cos_university_residency_case_runs + cos_university_residency_competency_evidence', methodology: 'exact cohort artifacts; completion comes only from durable residency standing; case and competency outcomes are counted from durable practical evidence' })
   } else residencyEffectiveness = Object.freeze({ available: false as const, error: input.residencyEvidence.error })
 
   let workforceEffectiveness: EffectivenessFunnel['workforceEffectiveness']

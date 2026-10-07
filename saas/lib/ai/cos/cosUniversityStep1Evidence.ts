@@ -186,6 +186,8 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
             topFailureCodes: kv(r.topFailureCodes),
             failedCaseLoopStops: kv(r.failedCaseLoopStops),
             failedCasesWithNoFileChange: r.failedCasesWithNoFileChange,
+            // Content-free loop shapes of failed cases (2026-10-07), most common first: "[n] shape | [n] shape".
+            failedCaseLoopShapes: Object.entries(r.failedCaseLoopShapes || {}).map(([shape, n]) => `[${n}] ${shape}`).join(' | ') || null,
             competencyPasses: r.competencyPasses,
             competencyFailures: r.competencyFailures,
             competencyFailuresById: kv(r.competencyFailuresById),

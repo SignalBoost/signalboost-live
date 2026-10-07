@@ -11,6 +11,7 @@ import test from 'node:test'
 import {
   BUILDER_RESIDENCY_CASES,
   builderLoopMetadata,
+  builderLoopShape,
   runBuilderResidencyCase,
   type BuilderResidencyEvidenceStore,
   type BuilderResidencyExactArtifactExecutor,
@@ -97,16 +98,44 @@ const base={
 test('the last loop observation becomes the case metadata; anything else is ignored',()=>{
   assert.deepEqual(builderLoopMetadata([
     loopObservation({builderOutcome:'incomplete',traceSteps:3,filesChanged:0,failureCode:'builder_deadline_reached'}),
-  ]),{builderLoop:{outcome:'incomplete',failureCode:'builder_deadline_reached',traceSteps:3,filesChanged:0}})
+  ]),{builderLoop:{outcome:'incomplete',failureCode:'builder_deadline_reached',traceSteps:3,filesChanged:0,shape:null}})
   assert.deepEqual(builderLoopMetadata([loopObservation({builderOutcome:'completed',traceSteps:7,filesChanged:1})]),
-    {builderLoop:{outcome:'completed',failureCode:null,traceSteps:7,filesChanged:1}})
+    {builderLoop:{outcome:'completed',failureCode:null,traceSteps:7,filesChanged:1,shape:null}})
   // An infrastructure-only observation (no loop ran) and non-observations carry no loop record.
   assert.equal(builderLoopMetadata([loopObservation({failureCode:'residency_exact_artifact_runtime_not_ready'})]),undefined)
   assert.equal(builderLoopMetadata([{kind:'verification',data:{builderOutcome:'completed'}}]),undefined)
   assert.equal(builderLoopMetadata(null),undefined)
   // Unknown counts are null, never guessed.
   assert.deepEqual(builderLoopMetadata([loopObservation({builderOutcome:'incomplete',traceSteps:'x',filesChanged:null})]),
-    {builderLoop:{outcome:'incomplete',failureCode:null,traceSteps:null,filesChanged:null}})
+    {builderLoop:{outcome:'incomplete',failureCode:null,traceSteps:null,filesChanged:null,shape:null}})
+})
+
+test('the loop shape is content-free and run-length encoded, so a repeated identical call is visible',()=>{
+  const trace=[
+    {round:1,toolId:'read_file',input:{path:'secret/case.js'},ok:true,output:'source text'},
+    {round:2,toolId:'run',input:{command:'node verify.js'},ok:false,error:'Error: expected 3 got 4 at verify.js:12'},
+    {round:3,toolId:'read_file',input:{path:'verify.js'},ok:false,error:'builder_repeated_tool_call:read_file; choose a different next step'},
+    {round:4,toolId:'read_file',input:{path:'verify.js'},ok:false,error:'builder_repeated_tool_call:read_file; choose a different next step'},
+    {round:5,toolId:'read_file',input:{path:'verify.js'},ok:false,error:'builder_repeated_tool_call:read_file; choose a different next step'},
+    {round:6,toolId:'model_control',input:{},ok:false,error:'builder_repair_progress_required'},
+    {round:7,toolId:'edit_file',input:{path:'case.js'},ok:true},
+  ]
+  const shape=builderLoopShape(trace)
+  assert.equal(shape,'read_file:ok > run:fail > read_file:builder_repeated_tool_call x3 > model_control:builder_repair_progress_required > edit_file:ok')
+  // No paths, commands, output or error text reach the record.
+  for(const leaked of ['secret','case.js','verify.js','node ','expected 3','source text']) assert.ok(!shape!.includes(leaked),leaked)
+  assert.equal(builderLoopShape([]),null)
+  assert.equal(builderLoopShape(null),null)
+  assert.equal(builderLoopShape([{toolId:'Bad Tool!',ok:false,error:'Weird: thing'}]),'unknown:error')
+  // Bounded.
+  const long=Array.from({length:200},(_,i)=>({toolId:i%2?'read_file':'list_files',ok:true}))
+  assert.ok(builderLoopShape(long)!.length<=400)
+  // Carried through the case metadata.
+  assert.deepEqual(builderLoopMetadata([loopObservation({builderOutcome:'incomplete',traceSteps:7,filesChanged:1,failureCode:'builder_stalled_repeated_inspection',loopShape:shape})]),
+    {builderLoop:{outcome:'incomplete',failureCode:'builder_stalled_repeated_inspection',traceSteps:7,filesChanged:1,shape}})
+  // The live executor records it on its observation.
+  const executorSource=readFileSync(new URL('../platform-harness/residency/live-builder-executor.ts',import.meta.url),'utf8')
+  assert.match(executorSource,/loopShape:builderLoopShape\(result\.trace\)/)
 })
 
 test('a counted failure keeps its outcome and now carries the loop record',async()=>{
@@ -121,7 +150,7 @@ test('a counted failure keeps its outcome and now carries the loop record',async
   assert.equal(mem.competency[0].outcome,'fail')
   assert.equal(mem.finished[0].status,'failed')
   assert.equal(mem.finished[0].failureCode,'residency_proof_exit_1')
-  assert.deepEqual(mem.finished[0].metadata,{builderLoop:{outcome:'incomplete',failureCode:'builder_deadline_reached',traceSteps:4,filesChanged:0}})
+  assert.deepEqual(mem.finished[0].metadata,{builderLoop:{outcome:'incomplete',failureCode:'builder_deadline_reached',traceSteps:4,filesChanged:0,shape:null}})
 })
 
 test('a pass carries it too, and a run without a loop observation writes no metadata',async()=>{
@@ -129,7 +158,7 @@ test('a pass carries it too, and a run without a loop observation writes no meta
   await runBuilderResidencyCase({...base,practiceCase:BUILDER_RESIDENCY_CASES[0],harnessEvidenceSink:mem.harnessEvidenceSink,store:mem.store,
     executor:{async run(input){return result(input.request.runId,'success',{builderOutcome:'completed',traceSteps:6,filesChanged:1})}}})
   assert.equal(mem.finished[0].status,'passed')
-  assert.deepEqual(mem.finished[0].metadata,{builderLoop:{outcome:'completed',failureCode:null,traceSteps:6,filesChanged:1}})
+  assert.deepEqual(mem.finished[0].metadata,{builderLoop:{outcome:'completed',failureCode:null,traceSteps:6,filesChanged:1,shape:null}})
 
   const bare=memoryStore()
   await runBuilderResidencyCase({...base,practiceCase:BUILDER_RESIDENCY_CASES[0],harnessEvidenceSink:bare.harnessEvidenceSink,store:bare.store,

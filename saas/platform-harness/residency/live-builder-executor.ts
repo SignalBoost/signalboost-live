@@ -30,7 +30,7 @@ import type { HarnessCapabilityResolverPort } from '../capabilities/resolver.ts'
 import { createGovernedHarnessExecutor } from '../runtime/governed-executor.ts'
 import { runHarnessWorker, type HarnessWorkerContext } from '../runtime/runner.ts'
 import type { HarnessTrajectoryVerifier } from '../verification/outcome-verifier.ts'
-import type { BuilderResidencyExactArtifactExecutor } from './builder-case-runner.ts'
+import { builderLoopShape, type BuilderResidencyExactArtifactExecutor } from './builder-case-runner.ts'
 import {
   createRunpodBuilderResidencyModelPort,
   type BuilderResidencyModelPort,
@@ -617,6 +617,7 @@ export function createLiveBuilderResidencyExecutor(input:{
             builderOutcome:result.ok?'completed':'incomplete',
             traceSteps:result.trace.length,
             filesChanged,
+            loopShape:builderLoopShape(result.trace),
           }
           if('error' in result){
             observationData.failureCode=result.error

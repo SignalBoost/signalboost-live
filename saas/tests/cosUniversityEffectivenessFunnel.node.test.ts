@@ -88,7 +88,7 @@ const week = () => ({
     { id: 'res-a-old', candidate_id: 'a', trained_artifact_hash: H('9'), standing: 'residency_failed' },
   ],
   cos_university_residency_case_runs: [
-    { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'failed', harness_outcome: 'agent_failure', failure_code: 'assertion_failed', metadata: { builderLoop: { outcome: 'incomplete', failureCode: 'builder_stalled_repeated_inspection', traceSteps: 19, filesChanged: 0 } } },
+    { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'passed', harness_outcome: 'success' }, { residency_id: 'res-a', status: 'failed', harness_outcome: 'agent_failure', failure_code: 'assertion_failed', metadata: { builderLoop: { outcome: 'incomplete', failureCode: 'builder_stalled_repeated_inspection', traceSteps: 19, filesChanged: 0, shape: 'read_file:ok > run:fail > read_file:builder_repeated_tool_call x5' } } },
     { residency_id: 'res-a', status: 'started' },
     { residency_id: 'res-a-old', status: 'failed', harness_outcome: 'infrastructure_failure', failure_code: 'old_artifact_failure' },
   ],
@@ -215,6 +215,7 @@ test('the 7-day cohort is followed through every stage; the latest exam decides;
     assert.deepEqual({ ...f.residencyEffectiveness.standings }, { residency_complete: 1 })
     assert.deepEqual({ ...f.residencyEffectiveness.failedCaseLoopStops }, { builder_stalled_repeated_inspection: 1 }, 'why the resident\'s own loop stopped, failed cases only')
     assert.equal(f.residencyEffectiveness.failedCasesWithNoFileChange, 1)
+    assert.deepEqual({ ...f.residencyEffectiveness.failedCaseLoopShapes }, { 'read_file:ok > run:fail > read_file:builder_repeated_tool_call x5': 1 }, 'content-free loop shape of failed cases')
     assert.deepEqual({ ...f.residencyEffectiveness.competencyFailuresById }, { supabase_diagnosis: 1 }, 'skill failures by competency, exact artifact only')
   }
   assert.ok(f.workforceEffectiveness.available)

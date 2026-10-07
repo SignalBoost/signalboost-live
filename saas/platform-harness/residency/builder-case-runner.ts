@@ -10,6 +10,36 @@ import type { BuilderResidencyCase } from '../cases/builder-residency.ts'
 const hash=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
 /**
+ * The resident's loop as a content-free shape (2026-10-07): each step is `tool:ok` or `tool:<error class>`, consecutive
+ * repeats are run-length encoded (`read_file:builder_repeated_tool_call x5`). It carries no paths, inputs, file content,
+ * command output or model text, so practice-case material cannot leak. Production: 61 of 63 failed cases had no stop
+ * reason recorded, and the recent ones stop as builder_stalled_repeated_inspection; the shape tells a resident that
+ * repeats one identical call (a skill or protocol problem) from a guard that rejects a new call (a harness problem, as
+ * the 2026-10-06 forced-read defect was).
+ */
+export const BUILDER_LOOP_SHAPE_MAX_CHARS=400
+export function builderLoopShape(trace:unknown):string|null{
+  if(!Array.isArray(trace)||!trace.length) return null
+  const steps=trace.map(item=>{
+    const entry=(item&&typeof item==='object'?item:{}) as {toolId?:unknown;ok?:unknown;error?:unknown}
+    const tool=/^[a-z_]{1,40}$/.test(String(entry.toolId??''))?String(entry.toolId):'unknown'
+    if(entry.ok===true) return `${tool}:ok`
+    const errorClass=/^[a-z][a-z0-9_]{0,59}/.exec(String(entry.error??''))?.[0]
+    return `${tool}:${tool==='run'&&!errorClass?.startsWith('builder_')?'fail':errorClass||'error'}`
+  })
+  const runs:string[]=[]
+  for(let index=0;index<steps.length;){
+    let end=index
+    while(end+1<steps.length&&steps[end+1]===steps[index]) end+=1
+    const count=end-index+1
+    runs.push(count>1?`${steps[index]} x${count}`:steps[index])
+    index=end+1
+  }
+  const shape=runs.join(' > ')
+  return shape.length>BUILDER_LOOP_SHAPE_MAX_CHARS?`${shape.slice(0,BUILDER_LOOP_SHAPE_MAX_CHARS-1)}…`:shape
+}
+
+/**
  * The resident's own work loop, as the executor observed it (2026-10-05): did it finish, why it stopped, how many steps,
  * how many seed files it changed. Production: 128 counted Residency failures were all `residency_proof_exit_1`, which
  * cannot tell a wrong fix from a resident that ran out of time before editing. Recorded on the case run's existing
@@ -26,6 +56,7 @@ export function builderLoopMetadata(trajectory:unknown):Readonly<Record<string,u
       failureCode:typeof data.failureCode==='string'?data.failureCode.slice(0,120):null,
       traceSteps:count(data.traceSteps),
       filesChanged:count(data.filesChanged),
+      shape:typeof data.loopShape==='string'?data.loopShape.slice(0,BUILDER_LOOP_SHAPE_MAX_CHARS):null,
     })})
   }
   return undefined

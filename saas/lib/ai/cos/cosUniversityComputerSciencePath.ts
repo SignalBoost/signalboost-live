@@ -114,19 +114,20 @@ function describeReplenishment(value: Record<string, unknown>): string | null {
   if (value.skipped === true) return `${text(value.reason, 120) || 'unspecified'} skipped`
   const count = (key: string) => Number.isFinite(Number(value[key])) ? Number(value[key]) : null
   const targets = Array.isArray(value.targets) ? (value.targets as unknown[]).map(item => text(item, 60)).filter(Boolean) : []
-  const rejected = record(value.rejected)
-  const rejectedText = Object.entries(rejected)
+  // rejected and sourceErrors are both per-cause count maps (sourceErrors is LearningCycleResult's Record<source, n>).
+  const counts = (map: unknown) => Object.entries(record(map))
     .filter(([, n]) => Number(n) > 0)
     .map(([cause, n]) => `${text(cause, 40)}=${Number(n)}`)
     .join(',')
-  const sourceErrors = Array.isArray(value.sourceErrors) ? value.sourceErrors.length : count('sourceErrors')
+  const rejectedText = counts(value.rejected)
+  const sourceErrorsText = counts(value.sourceErrors)
   return [
     `ran targets=[${targets.join('; ') || 'none'}]`,
     `acquired=${count('documentsAcquired') ?? 'n/a'}`,
     `accepted=${count('accepted') ?? 'n/a'}`,
     `probationary=${count('probationary') ?? 'n/a'}`,
     `rejected=${rejectedText || 'none'}`,
-    `sourceErrors=${sourceErrors ?? 'n/a'}`,
+    `sourceErrors=${sourceErrorsText || 'none'}`,
     text(value.reason, 120) ? `reason=${text(value.reason, 120)}` : '',
   ].filter(Boolean).join(' ')
 }

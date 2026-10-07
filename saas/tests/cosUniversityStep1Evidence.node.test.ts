@@ -190,6 +190,23 @@ function fullFunnel(overrides: Record<string, unknown> = {}): any {
   }
 }
 
+test('inconsistent failure totals cannot be presented as evidence-backed attribution', () => {
+  for (const failures of [
+    { total: 2, infrastructure: 1, merit: 0, explanations: [{ reason: 'r', count: 2, causeStatus: 'evidence_backed' }] },
+    { total: 2, infrastructure: 1, merit: 1, explanations: [{ reason: 'r', count: 1, causeStatus: 'evidence_backed' }] },
+    { total: 2, infrastructure: -1, merit: 3, explanations: [{ reason: 'r', count: 2, causeStatus: 'evidence_backed' }] },
+  ]) {
+    const report = assessStep1Evidence(fullFunnel({
+      evaluationFailures: { available: true, source: 'evals', ...failures },
+    }), NOW)
+    const attribution = report.criteria.find(entry => entry.id === 'failure_attribution')!
+    assert.equal(attribution.status, 'partial')
+    assert.equal(attribution.observed.countsConsistent, false)
+    assert.ok(report.blocking.includes('failure_attribution'))
+    assert.equal(report.recommendation, 'NOT_READY')
+  }
+})
+
 test('even with evidence at every stage the report never recommends READY', () => {
   const report = assessStep1Evidence(fullFunnel(), NOW)
   assert.deepEqual([...report.blocking], [])

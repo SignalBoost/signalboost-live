@@ -16,6 +16,7 @@ import {
   MASS_DISTILLATION_ROLLING_BATCHES_PER_CAMPAIGN,
   MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD,
 } from '../lib/ai/cos/cosUniversityMassDistillationRollingAuthorization.ts'
+import { massDistillationPreparedBatchIsAuthorizable } from '../lib/ai/cos/cosUniversityMassDistillationEligibility.ts'
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
@@ -226,4 +227,51 @@ test('no replenishment once both total-count and independent-source floors are m
   assert.equal(needsMassDistillationReplenishment({ ...satisfied, realSourceItems: undefined, realSourceNeeded: undefined }), false)
   const gaps = buildMassDistillationReplenishmentGaps([satisfied], new Date('2026-10-07T01:00:00Z'), 3, 1)
   assert.ok(!gaps.some(gap => gap.subject === satisfied.subject))
+})
+
+test('prepared inventory uses the same independent-source admission floor as paid authorization', () => {
+  // Production 2026-10-07 had 196 status=prepared rows but zero authorizable rows.
+  assert.equal(massDistillationPreparedBatchIsAuthorizable({
+    sourceCount: 64,
+    sourceKinds: [
+      ...Array(31).fill('scientific_journal'),
+      ...Array(33).fill('teacher_synthetic_curriculum'),
+    ],
+  }), false)
+  assert.equal(massDistillationPreparedBatchIsAuthorizable({
+    sourceCount: 64,
+    sourceKinds: [
+      ...Array(32).fill('scientific_journal'),
+      ...Array(32).fill('teacher_synthetic_curriculum'),
+    ],
+  }), true)
+
+  // Corrective batches with >=20 failure-derived items still preserve at least five
+  // non-failure items, matching authorize_next_cos_university_mass_distillation_campaign().
+  assert.equal(massDistillationPreparedBatchIsAuthorizable({
+    sourceCount: 64,
+    sourceKinds: [
+      ...Array(32).fill('scientific_journal'),
+      ...Array(32).fill('failure_derived_curriculum'),
+    ],
+  }), true)
+  assert.equal(massDistillationPreparedBatchIsAuthorizable({
+    sourceCount: 64,
+    sourceKinds: [
+      ...Array(32).fill('failure_derived_curriculum'),
+      ...Array(28).fill('scientific_journal'),
+      ...Array(4).fill('teacher_synthetic_curriculum'),
+    ],
+  }), false)
+})
+
+test('ready-buffer accounting cannot let stale prepared rows suppress replenishment', () => {
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  assert.match(workflow, /select\('batch_key,source_hashes,source_count'\)/)
+  assert.match(workflow, /massDistillationPreparedBatchIsAuthorizable\(/)
+  assert.match(workflow, /sourceKindsByContentHash\(db, allHashes\)/)
+  assert.doesNotMatch(workflow, /available \+= keys\.filter\(key => !used\.has\(key\)\)\.length/)
+  const migration = source('../supabase/migrations/20261006190000_mass_distillation_independent_source_admission.sql')
+  assert.match(migration, />= ceil\(b\.source_count \* 0\.5\)/)
+  assert.match(migration, /source_kind not in \([\s\S]*'teacher_synthetic_curriculum'[\s\S]*'teacher_hosted_curriculum'[\s\S]*'failure_derived_curriculum'/)
 })

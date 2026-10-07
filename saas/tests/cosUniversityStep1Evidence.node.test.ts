@@ -438,3 +438,12 @@ test('a window with zero evaluation failures has untested attribution, which blo
   assert.equal(report.recommendation, 'NOT_READY')
 })
 // end of saas/tests/cosUniversityStep1Evidence.node.test.ts (if this line is missing, the paste was cut short)
+
+test('the outside line prover fails on stopped Step 1 stations, names their units, and only reports the next-project WORKFORCE', () => {
+  const spec = read('./cosUniversityAssemblyLine.playwright.spec.ts')
+  assert.match(spec, /const NEXT_PROJECT_STATIONS: ReadonlySet<string> = new Set\(\['WORKFORCE'\]\)/)
+  assert.match(spec, /expect\(step1Stops, `stopped Step 1 stations: \$\{JSON\.stringify\(step1Stops\)\} held units: \$\{held\.join\(' \|\| '\)\}`\)\.toEqual\(\[\]\)/)
+  assert.match(spec, /type: 'next-project-line-stops'/)
+  // The movement proof itself is untouched: only observed movement is a pass.
+  assert.match(spec, /expect\(proof\.verdict, summary\)\.toBe\('proven_moving'\)/)
+})

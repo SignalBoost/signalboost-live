@@ -668,7 +668,7 @@ test('the Playwright prover skips rather than passes when it cannot reach a depl
   assert.match(spec, /type: 'line-proof-rehearsal'/)
   // It must compute movement itself, not read a verdict off the controller.
   assert.match(spec, /proveLineMovement\(\{ first: first\.sample, second: second\.sample \}\)/)
-  assert.match(spec, /expect\(proof\.verdict, summary\)\.not\.toBe\('line_stopped'\)/)
+  assert.match(spec, /expect\(proof\.verdict, summary\)\.toBe\('proven_moving'\)/)
   // And it must leave a durable artifact behind, which is the point of running it.
   assert.match(spec, /attach\('assembly-line-movement-proof\.json'/)
 })

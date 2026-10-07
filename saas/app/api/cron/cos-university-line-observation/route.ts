@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import { LIVE_STATUSES, lineConstraint } from '@/lib/ai/cos/cosUniversityAssemblyLine'
-import { LINE_OBSERVATION_SCHEMA_VERSION, observeLine } from '@/lib/ai/cos/cosUniversityLineObservation'
+import { LINE_OBSERVATION_SCHEMA_VERSION, describeLineObservation, observeLine } from '@/lib/ai/cos/cosUniversityLineObservation'
 import { readOnlyDb } from '@/lib/ai/cos/cosUniversityReadOnlyDb'
 
 export const runtime = 'nodejs'
@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
     if (pause.paused) {
       return NextResponse.json({
         ok: true, schemaVersion: LINE_OBSERVATION_SCHEMA_VERSION, at: now.toISOString(), paused: true, units: [],
+        summary: describeLineObservation({ at: now.toISOString(), paused: true }),
         readOnly: true, authorityExpanded: false,
       }, { headers: NO_STORE })
     }
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest) {
       ledgerMissing: observation.ledgerMissing,
       units: observation.units,
       unitsReported: observation.units.length,
+      summary: describeLineObservation({ at: now.toISOString(), paused: false, windowComplete: artifacts.length < MAX_ARTIFACTS, observation }),
       readOnly: true,
       authorityExpanded: false,
     }, { headers: NO_STORE })

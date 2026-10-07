@@ -138,4 +138,37 @@ export function observeLine(input: {
     ledgerMissing,
   })
 }
+
+/**
+ * The line as a human reads it in the Step 1 report (owner go, 2026-10-07). The report had only a line total and the
+ * single most overdue station, so an exam station that went quiet for hours could not be told apart from an empty or
+ * paused one. Per station: units waiting, units leased (in flight), how long the oldest has waited, and any station
+ * idle past its SLA. Counts and times only: no candidate ids or artifact hashes.
+ */
+export function describeLineObservation(input: {
+  at: string
+  paused: boolean
+  windowComplete?: boolean
+  observation?: Pick<LineObservation, 'units' | 'line' | 'lineStops' | 'ledgerDisagreements' | 'ledgerMissing'> | null
+}): string {
+  if (input.paused) return `LINE NOW at ${input.at}: PAUSED by the line pause setting (no station is woken while paused)`
+  const o = input.observation
+  if (!o) return `LINE NOW at ${input.at}: not observed`
+  const nowMs = Date.parse(input.at)
+  const minutes = (iso: string | null) => {
+    const ms = iso ? Date.parse(iso) : Number.NaN
+    return Number.isFinite(ms) && Number.isFinite(nowMs) ? Math.max(0, Math.round((nowMs - ms) / 60000)) : null
+  }
+  const lines = [`LINE NOW at ${input.at}: units=${o.units.length}${input.windowComplete === false ? ' (window truncated)' : ''} ledgerDisagreements=${o.ledgerDisagreements} ledgerMissing=${o.ledgerMissing}`]
+  for (const station of o.line) {
+    const held = o.units.filter(unit => unit.station === station.station)
+    const oldest = held.reduce<string | null>((min, unit) => (min === null || unit.enteredAt < min ? unit.enteredAt : min), null)
+    const age = minutes(oldest)
+    lines.push(`  ${station.station} (${station.status}) :: waiting=${station.waiting} inFlight=${station.inFlight} oldestWaitingMin=${age ?? 'n/a'} slaMin=${Math.round(station.stationSlaSeconds / 60)}`)
+  }
+  lines.push(o.lineStops.length
+    ? `  stopped (idle past SLA): ${o.lineStops.map(stop => `${stop.station} waiting=${stop.waiting} idleMin=${Math.round(stop.idleSeconds / 60)}`).join(', ')}`
+    : '  stopped (idle past SLA): none')
+  return lines.join('\n')
+}
 // end of saas/lib/ai/cos/cosUniversityLineObservation.ts (if this line is missing, the paste was cut short)

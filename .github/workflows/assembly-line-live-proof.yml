@@ -112,6 +112,7 @@ jobs:
           tests/cosUniversityCapabilityGainTrace.node.test.ts
           tests/cosUniversityHoldoutGainSignificance.node.test.ts
           tests/cosUniversityHoldoutRegressionEvidence.node.test.ts
+          tests/cosUniversityLineNowReport.node.test.ts
 
   line-live-proof:
     name: Line movement proof against production
@@ -249,6 +250,27 @@ jobs:
             head -c 2000 "$out" 2>/dev/null || true
           fi
           echo "::endgroup::"
+      - name: Read the line now (read only)
+        if: always()
+        env:
+          PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -u
+          mkdir -p step1-evidence
+          out="step1-evidence/line-observation.json"
+          status=$(curl -sS --max-time 90 -o "$out" -w '%{http_code}' \
+            -H "authorization: Bearer ${CRON_SECRET}" \
+            "${PRODUCTION_BASE_URL}/api/cron/cos-university-line-observation") || status=000
+          echo "::group::Line now (HTTP ${status})"
+          if [ "$status" = "200" ] && [ "$(jq -r '.ok' "$out" 2>/dev/null)" = "true" ]; then
+            jq -r '.summary' "$out"
+          else
+            # The observation route never drives the line; an unreadable observation is reported, not a job failure.
+            echo "::warning::Line observation could not be produced (HTTP ${status})."
+            head -c 2000 "$out" 2>/dev/null || true
+          fi
+          echo "::endgroup::"
       - name: Read the capability gain trace (read only)
         if: always()
         env:
@@ -300,6 +322,10 @@ jobs:
             f="step1-evidence/step1-evidence-24h.json"
             echo "## Computer Science path (now)"
             if [ "$(jq -r '.ok' "$f" 2>/dev/null)" = "true" ]; then jq -r '.computerSciencePathSummary // "Not produced in this run."' "$f"; else echo "Not produced in this run."; fi
+            echo
+            f="step1-evidence/line-observation.json"
+            echo "## Line now"
+            if [ "$(jq -r '.ok' "$f" 2>/dev/null)" = "true" ]; then jq -r '.summary // "Not produced in this run."' "$f"; else echo "Not produced in this run."; fi
             echo
             f="step1-evidence/evaluation-failure-trace.json"
             echo "## Evaluation failure trace"

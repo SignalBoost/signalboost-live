@@ -242,6 +242,15 @@ function massDistillationHybridOrigin(sourceKind: string): HybridDistillationOri
   return 'real_source'
 }
 
+// A duplicate teaching item must retain independent provenance even when a synthetic
+// representation is encountered first. Preserve the existing rights and quality gates.
+function prioritizeIndependentMaterial(rows: readonly NormalizedIdentity[]): NormalizedIdentity[] {
+  return [...rows].sort((a, b) =>
+    Number(massDistillationHybridOrigin(b.sourceKind) === 'real_source')
+      - Number(massDistillationHybridOrigin(a.sourceKind) === 'real_source')
+    || a.contentHash.localeCompare(b.contentHash))
+}
+
 function selectHybridDistillationChunk(rows: readonly NormalizedIdentity[]): NormalizedIdentity[] {
   if (rows.length < MASS_DISTILLATION_QUALITY_MIN_BATCH) return []
   const ordered = [...rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
@@ -343,7 +352,7 @@ export function analyzeMassDistillationSupply(
   }
 
   let rawUnassignedRows = 0
-  for (const row of eligible) {
+  for (const row of prioritizeIndependentMaterial(eligible)) {
     if (assignedHashes.has(row.contentHash)) continue
     rawUnassignedRows += 1
     const { group } = groupFor(row)
@@ -416,7 +425,7 @@ export function buildMassDistillationBatches(
     groupFor(row).materialHashes.add(row.materialHash)
   }
 
-  for (const row of normalized) {
+  for (const row of prioritizeIndependentMaterial(normalized)) {
     if (!retainedIdentityEligibleForMassDistillation(row) || assignedHashes.has(row.contentHash)) continue
     const group = groupFor(row)
     if (group.contentHashes.has(row.contentHash)) continue

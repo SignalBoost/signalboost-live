@@ -87,7 +87,18 @@ import { ESTIMATED_CHARACTERS_PER_TOKEN, RUNPOD_CONTEXT_WINDOW_TOKENS, estimateC
 // thresholds, exact-artifact binding, promotion gates and the Production-traffic prohibition are unchanged. The
 // claim SQL asserts the same number and is migrated in step - a TS-only change is rejected by the database and
 // every tick reports no_atomically_claimable.
-export const MASS_EVALUATION_ENDPOINT_CALLS = 25
+// 2026-10-07: raised 25 -> 35 for the owner's larger holdout (MASS_HOLDOUT_MAX_ITEMS 6 -> 12). Measured on 607
+// artifacts in 7 days: training gain was indistinguishable from chance (sign test z = -0.37), and 548 of 607 exams
+// had 6 holdout cases scored 0 / 0.5 / 1, where a single case moves the score by about 0.08-0.17. Twelve cases halve
+// that granularity. With the recovery reserve of 5 and 6 fixed calls, 35 gives each model 12 holdout requests, so
+// a 12-case holdout stays one case per request for BOTH models (no shared-request position decay, no multi-case
+// candidate request against the gateway cut-off): 12 + 12 + 6 + 5 = 35.
+//
+// This remains a CALL ceiling, not a SPEND ceiling: the $0.20 wake ceiling, the one-runtime-wake limit, scoring
+// thresholds, exact-artifact binding, promotion gates and the Production-traffic prohibition are unchanged. The
+// claim SQL (20261007010000) accepts 25 and 35 so it can be applied BEFORE this deploys; approvals recorded at 25
+// are refreshed by the rolling authority's stale-ceiling path, as in the 18 -> 25 raise.
+export const MASS_EVALUATION_ENDPOINT_CALLS = 35
 export const MASS_EVALUATION_JUDGE_CALLS = 4
 
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = RUNPOD_CONTEXT_WINDOW_TOKENS

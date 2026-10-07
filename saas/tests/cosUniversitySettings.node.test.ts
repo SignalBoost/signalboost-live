@@ -244,4 +244,17 @@ test('the pause is honored by the shared distillation workflow, so the Superviso
   const recovery = readFileSync(new URL('../agent-gateway-host/university-distillation-recovery.ts', import.meta.url), 'utf8')
   assert.match(recovery, /runWorkflow\(\{ source: 'self_healing_supervisor'/, 'the Supervisor still enters through that workflow')
 })
+
+test('while paused, Supervisor recovery is a verified intentional skip that never reaches the workflow', () => {
+  // The recovery module pulls the whole gateway graph, which the node test loader cannot import, so the order is
+  // pinned in source: the pause is read after the health check and before drill repair, preflight, wakes and workflow.
+  const source = readFileSync(new URL('../agent-gateway-host/university-distillation-recovery.ts', import.meta.url), 'utf8')
+  const recover = source.slice(source.indexOf('export async function recoverUniversityMassDistillation'))
+  const pauseAt = recover.indexOf('const pause = await (input.readPause ?? (() => readLinePauseSetting(input.db)))()')
+  assert.ok(pauseAt > recover.indexOf("if (!before.automaticRecoveryAuthorized)"), 'after the authority check')
+  for (const later of ['repairVerifiedRecoveryDrillFixture({', 'preflightWorker(', "runWorkflow({ source: 'self_healing_supervisor'"]) {
+    assert.ok(recover.indexOf(later) > pauseAt, `${later} comes after the pause check`)
+  }
+  assert.match(recover, /if \(pause\.paused\) \{[\s\S]{0,200}receiptRef: null,\s*invocationSucceeded: true,\s*skipped: true,\s*verified: true,[\s\S]{0,120}reason: 'line_paused_by_operator'/)
+})
 // end of saas/tests/cosUniversitySettings.node.test.ts (if this line is missing, the paste was cut short)

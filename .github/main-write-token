@@ -1,2 +1,2 @@
-base_sha=8edb631739b73c4d968e6c3cf784bfd1a5b28840
-branch=fix/openalex-replenishment-page-rotation-20261007
+base_sha=7ef9c158f1f4b802f51a5720d5f7102d4746c414
+branch=fix/distillation-maintenance-cron-drift-v2

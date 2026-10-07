@@ -107,6 +107,15 @@ test('the controller persists every real station transition in an append-only bu
   assert.doesNotMatch(migration, /grant .*update.* service_role/i, 'history must remain append-only')
 })
 
+test('Builder evaluation_ready cannot enter EXACT_CANARY before durable Residency completion', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-lifecycle-orchestrator/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /subject_id\s*\|\|\s*''\) === 'Computer Science & Coding'/)
+  assert.match(route, /eq\('standing', 'residency_complete'\)/)
+  assert.match(route, /eq\('authority_expanded', false\)/)
+  assert.match(route, /not\('completed_at', 'is', null\)/)
+  assert.match(route, /artifact\.subjectId === 'Computer Science & Coding'[\s\S]{0,180}!residencyCompleteIds\.has\(artifact\.candidateId\)\) continue/)
+})
+
 // ---------------------------------------------------------------------------------------------------------------
 // Rule 2: immediate handoff
 // ---------------------------------------------------------------------------------------------------------------

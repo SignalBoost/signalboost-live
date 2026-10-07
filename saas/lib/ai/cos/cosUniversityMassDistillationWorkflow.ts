@@ -172,7 +172,14 @@ async function runOwnedCosUniversityMassDistillationWorkflow(input: {
   // Keep the critical dispatch/reconciliation loop live every minute, but do the expensive
   // campaign-recovery + semantic/curriculum maintenance sweep only every five minutes.
   // A Self-Healing Supervisor invocation bypasses the cadence so an incident repair never waits.
-  const slowMaintenanceDue = input.source === 'self_healing_supervisor' || now.getUTCMinutes() % 5 === 0
+  const scheduledMinute = now.getUTCMinutes()
+  // Vercel cron delivery is not exact: a :15 trigger can execute at :16:xx. Treat the first minute
+  // after each five-minute boundary as the same maintenance window. The workflow lease prevents
+  // concurrent duplicate sweeps; every maintenance operation is idempotent/fail-isolated, so an
+  // occasional second sweep is safer than starving curriculum indefinitely because of scheduler drift.
+  const slowMaintenanceDue = input.source === 'self_healing_supervisor'
+    || scheduledMinute % 5 === 0
+    || scheduledMinute % 5 === 1
   // Cleanup/closure is deliberately first and fail-isolated. A telemetry or provider-ledger error
   // must never strand an expired active campaign and block the next authorized campaign.
   const campaignClosure = await isolatedStep('campaign_closure', () =>

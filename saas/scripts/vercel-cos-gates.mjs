@@ -24,6 +24,7 @@ const tests = [
   'tests/cosLabFailureVerdictIngestion.node.test.ts',
   'tests/cosLabVerdictReplayIdentity.node.test.ts',
   'tests/cosLabFailureVerdictConflict.node.test.ts',
+  'tests/cosLabFailureTelemetry.node.test.ts',
   'tests/cosUniversityEffectivenessFunnel.node.test.ts',
   // Read-only Step 1 evidence report and line observation (owner 2026-10-06).
   'tests/cosUniversityStep1Evidence.node.test.ts',

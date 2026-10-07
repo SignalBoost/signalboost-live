@@ -15,6 +15,9 @@
 // a sign test (improved vs regressed) so "regressed" is only claimed when it is distinguishable from chance.
 //
 // Counts and scores only: no candidate ids, prompts, answers or teacher text leave this module.
+// Holdout regression evidence (2026-10-07) is summarized here as counts and answer lengths only.
+
+import { summarizeHoldoutRegressionEvidence, type HoldoutRegressionSummary } from './cosUniversityHoldoutRegressionEvidence.ts'
 
 export const CAPABILITY_GAIN_TRACE_SCHEMA_VERSION = 'cos-university-capability-gain-trace-v1' as const
 export const CAPABILITY_GAIN_TRACE_DAYS = 7
@@ -41,6 +44,7 @@ export type EvaluationRow = Readonly<{
   delayed_retention_passed?: unknown
   evaluator_version?: unknown
   holdout_case_count?: unknown
+  regression?: unknown
 }>
 
 export type ArtifactRow = Readonly<{
@@ -82,6 +86,7 @@ export type CapabilityGainTrace = Readonly<{
   holdoutCases: Readonly<Record<string, number>>
   dimensions: Readonly<Record<string, readonly GainGroup[]>>
   unmatchedArtifacts: number
+  holdoutRegressions: HoldoutRegressionSummary
   readOnly: true
 }>
 
@@ -223,6 +228,7 @@ export function composeCapabilityGainTrace(input: {
     holdoutCases: Object.freeze(holdoutCases),
     dimensions: Object.freeze(dimensions),
     unmatchedArtifacts: unmatched,
+    holdoutRegressions: summarizeHoldoutRegressionEvidence([...latest.values()].map(row => ({ baseline: num(row.baseline_score), evidence: row.regression }))),
     readOnly: true as const,
   })
 }
@@ -239,7 +245,7 @@ export async function readCapabilityGainTrace(input: { db: Db; now?: Date; days?
   const evaluations: any[] = []
   for (let from = 0; from < ROW_LIMIT; from += PAGE) {
     const page = await rows(input.db.from('cos_university_distilled_evaluation_runs')
-      .select('candidate_id,trained_artifact_hash,created_at,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,evaluator_version,holdout_case_count')
+      .select('candidate_id,trained_artifact_hash,created_at,baseline_score,trained_artifact_score,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,evaluator_version,holdout_case_count,regression:response_hashes->holdoutRegressionEvidence')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .range(from, from + PAGE - 1))
@@ -289,6 +295,8 @@ export function describeCapabilityGainTrace(trace: CapabilityGainTrace, perDimen
     `  overall: ${g(o)} | sign test z=${z ?? 'n/a'}: ${verdict}`,
     `  holdout cases per exam: ${Object.entries(trace.holdoutCases).map(([k, v]) => `${k}=${v}`).join(' ') || 'none'} | artifacts without a recipe row: ${trace.unmatchedArtifacts}`,
   ]
+  const r = trace.holdoutRegressions
+  lines.push(`  holdout regressions (cases where the trained artifact scored below its baseline): examsWithEvidence=${r.examsWithEvidence} notRecorded=${r.examsWithoutEvidence} examsWithARegressedCase=${r.examsWithARegressedCase} regressedCases=${r.regressedCases} candidateAnswer empty=${r.emptyCandidateAnswers} substantive=${r.substantiveCandidateAnswers} medianChars candidate=${r.medianCandidateChars ?? 'n/a'} baseline=${r.medianBaselineChars ?? 'n/a'} | exams with baseline>=0.9: ${r.examsWithBaselineAtLeast0_9}`)
   for (const [dimension, groups] of Object.entries(trace.dimensions)) {
     lines.push(`  by ${dimension}:`)
     const crossed = dimension === 'subjectXfailureReplay' || dimension === 'subjectXrealSourceShare'

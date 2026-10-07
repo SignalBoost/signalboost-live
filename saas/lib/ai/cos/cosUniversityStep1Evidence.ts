@@ -144,13 +144,21 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
     } else {
       const unresolved = f.explanations.filter(entry => entry.causeStatus !== 'evidence_backed')
       const unresolvedCount = unresolved.reduce((sum, entry) => sum + entry.count, 0)
+      // An internally inconsistent failure ledger cannot establish complete attribution.
+      // Counts alone are insufficient if the infrastructure/merit split or reason totals disagree.
+      const countsConsistent = Number.isSafeInteger(f.total) && f.total > 0
+        && Number.isSafeInteger(f.infrastructure) && f.infrastructure >= 0
+        && Number.isSafeInteger(f.merit) && f.merit >= 0
+        && f.infrastructure + f.merit === f.total
+        && f.explanations.every(entry => Number.isSafeInteger(entry.count) && entry.count >= 0)
+        && f.explanations.reduce((sum, entry) => sum + entry.count, 0) === f.total
       criteria.push(Object.freeze({
         id: 'failure_attribution',
         scope: 'step1' as const,
         question: 'Is every evaluation failure attributed to infrastructure or merit with an evidence-backed cause?',
         // Zero failures means attribution was never exercised in this window: untested, not proven.
-        status: f.total === 0 ? 'no_evidence' as const : unresolvedCount > 0 ? 'partial' as const : 'evidence_present' as const,
-        observed: Object.freeze({ total: f.total, infrastructure: f.infrastructure, merit: f.merit, infrastructureShare: f.total > 0 ? Math.round((f.infrastructure / f.total) * 1000) / 1000 : null, unresolvedFailures: unresolvedCount, unresolvedReasons: unresolved.map(entry => entry.reason).slice(0, 10).join(',') || null, topReasons: f.explanations.slice(0, 10).map(entry => `${entry.reason}=${entry.count}`).join(',') || null }),
+        status: f.total === 0 ? 'no_evidence' as const : (unresolvedCount > 0 || !countsConsistent) ? 'partial' as const : 'evidence_present' as const,
+        observed: Object.freeze({ total: f.total, infrastructure: f.infrastructure, merit: f.merit, infrastructureShare: f.total > 0 ? Math.round((f.infrastructure / f.total) * 1000) / 1000 : null, unresolvedFailures: unresolvedCount, countsConsistent, unresolvedReasons: unresolved.map(entry => entry.reason).slice(0, 10).join(',') || null, topReasons: f.explanations.slice(0, 10).map(entry => `${entry.reason}=${entry.count}`).join(',') || null }),
         source: f.source,
         note: f.total === 0 ? 'no evaluation failures in this window; attribution is untested rather than proven' : null,
       }))

@@ -198,6 +198,7 @@ test('corrective mass batches preserve five independent non-failure holdout sour
 
 
 test('open-source maintenance uses the owner throughput profile instead of starving real-source diversity', () => {
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
   assert.match(workflow, /maxSubjects: Math\.max\(6, throughput\.targetSubjectsPerReplenishment\)/)
   assert.match(workflow, /queriesPerSubject: throughput\.queriesPerSubject/)
   assert.match(workflow, /maxCandidatesPerCycle: throughput\.acquisitionCandidatesPerCycle/)

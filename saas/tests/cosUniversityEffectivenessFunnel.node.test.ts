@@ -335,6 +335,24 @@ test('exam standards name the evaluator version and fixed suites of each cohort 
   assert.ok(bare.examStandards.available && bare.examStandards.fixedSuites.unrecorded === 2, 'rows without suite hashes read as unrecorded')
 })
 
+test('manual intervention is counted from the operator-action ledger, never from the install marker', async () => {
+  const tables: any = week()
+  tables.cos_university_operator_actions = [
+    { source: 'ledger_installed', actor: 'postgres', target: 'cos_university_operator_actions', operation: 'install', occurred_at: '2026-10-01T00:00:00Z' },
+    { source: 'database_session', actor: 'postgres', target: 'cos_local_distillation_artifacts', operation: 'update', occurred_at: '2026-10-04T08:00:00Z' },
+    { source: 'admin_route', actor: 'owner-id', target: 'cos-university-settings', operation: 'change_settings', occurred_at: '2026-10-04T09:00:00Z' },
+  ]
+  const f = await readEffectivenessFunnel({ db: fakeDb(tables).db, window: '7d', now: NOW })
+  assert.ok(f.manualIntervention.available)
+  if (!f.manualIntervention.available) return
+  assert.equal(f.manualIntervention.measuredSince, '2026-10-01T00:00:00.000Z')
+  assert.equal(f.manualIntervention.databaseSessionWrites, 1)
+  assert.equal(f.manualIntervention.adminRouteActions, 1)
+  assert.deepEqual(f.manualIntervention.byTarget, { 'database_session:cos_local_distillation_artifacts': 1, 'admin_route:cos-university-settings': 1 })
+  const missing = await readEffectivenessFunnel({ db: fakeDb(week(), new Set(['cos_university_operator_actions'])).db, window: '7d', now: NOW })
+  assert.equal(missing.manualIntervention.available, false, 'a ledger that is not installed is unavailable, never zero')
+})
+
 test('window and subject narrow the cohort and the production counts', async () => {
   const day = await readEffectivenessFunnel({ db: fakeDb(week()).db, window: '24h', now: NOW })
   assert.equal(day.cohort.size, 2)

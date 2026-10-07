@@ -18,6 +18,7 @@
 // shell around it.
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
+import { recordAdminOperatorAction } from '@/lib/ai/cos/cosUniversityOperatorActions'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { createHash } from 'node:crypto'
 import { readUniversityMassDistillationHealth } from '@/self-healing-host/university-distillation-monitoring'
@@ -145,6 +146,8 @@ async function record(db: any, drill: RecoveryDrillRecord, claim: string, eviden
 export async function POST(request: Request) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error, authRequired: true }, { status: guard.status, headers: NO_STORE })
+  // Step 1 evidence: an owner action that steers the University line is recorded (never blocks the action).
+  await recordAdminOperatorAction({ route: 'cos-university-recovery-drill', operation: 'start_recovery_drill', actorUserId: guard.ctx.userId })
   let body: any = null
   try { body = await request.json() } catch { body = null }
   if (text(body?.kind) !== 'self_healing_recovery') return fail('drill_kind_not_permitted', 400)

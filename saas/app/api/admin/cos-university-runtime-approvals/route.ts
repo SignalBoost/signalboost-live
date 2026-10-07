@@ -1,6 +1,7 @@
 // saas/app/api/admin/cos-university-runtime-approvals/route.ts
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
+import { recordAdminOperatorAction } from '@/lib/ai/cos/cosUniversityOperatorActions'
 import { issueDistilledEvaluationApproval, readDistilledEvaluationApprovalStatus } from '@/lib/ai/cos/cosUniversityRuntimeApprovals'
 
 export const runtime = 'nodejs'
@@ -21,6 +22,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error, authRequired: true }, { status: guard.status })
+  // Step 1 evidence: an owner action that steers the University line is recorded (never blocks the action).
+  await recordAdminOperatorAction({ route: 'cos-university-runtime-approvals', operation: 'issue_evaluation_approval', actorUserId: guard.ctx.userId })
   let body: any = null
   try { body = await request.json() } catch { body = null }
   // One kind only. Anything else is refused rather than guessed.

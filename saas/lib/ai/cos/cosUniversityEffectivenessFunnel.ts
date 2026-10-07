@@ -98,6 +98,11 @@ export type EffectivenessFunnel = Readonly<{
    * whole line ran on more than one day. Days are event days of cohort members; nothing outside the cohort is counted.
    */
   /**
+   * Manual actions recorded in the window (cos_university_operator_actions): direct database writes to factory tables by
+   * any session other than the platform's, and owner admin-route actions. measuredSince is when the ledger was installed.
+   */
+  manualIntervention: Chapter<{ measuredSince: string | null; databaseSessionWrites: number; adminRouteActions: number; byTarget: Readonly<Record<string, number>>; source: string }>
+  /**
    * What the cohort's latest exams were graded with: evaluator version and the safety:transfer:retention suite fingerprint
    * (the fixed exam sets; holdouts are per artifact). One of each in a window means the same exam standard throughout.
    */
@@ -335,6 +340,8 @@ export function composeFunnel(input: {
   governanceEvidence: Chapter<{ authorityExpansionObserved: number; assuranceEvents: number; repositoryEvidenceEntries: number; repositoryEvidenceChainValid: boolean | null }>
   evaluationFailures: Chapter<{ errors: readonly string[] }>
   operationalHealth?: Chapter<{ snapshot: UniversityDistillationHealthSnapshot }>
+  /** Manual actions on the line (migration 20261007030000): direct database writes and owner admin-route actions. */
+  operatorActions?: Chapter<{ installedAt: string | null; rows: readonly Readonly<{ source: string; target: string; operation: string; occurredAt: string | null }>[] }>
 }): EffectivenessFunnel {
   const size = input.cohort.length
   const share = (count: number) => size ? Number((count / size).toFixed(4)) : null
@@ -738,6 +745,23 @@ export function composeFunnel(input: {
     if (input.examined.available) bump(dayOf(input.examined.latestByKey.get(keyOf(a))?.at), 'examined')
     if (input.graduation.available && input.graduation.promoted.has(keyOf(a))) bump(dayOf(input.graduation.promotedAt?.get(keyOf(a))), 'graduated')
   }
+  let manualIntervention: EffectivenessFunnel['manualIntervention']
+  if (!input.operatorActions) manualIntervention = Object.freeze({ available: false as const, error: 'operator_actions_not_supplied' })
+  else if (!input.operatorActions.available) manualIntervention = Object.freeze({ available: false as const, error: input.operatorActions.error })
+  else {
+    const byTarget: Record<string, number> = {}
+    let databaseSessionWrites = 0
+    let adminRouteActions = 0
+    for (const row of input.operatorActions.rows) {
+      if (row.source === 'database_session') databaseSessionWrites += 1
+      else if (row.source === 'admin_route') adminRouteActions += 1
+      else continue
+      const k = `${row.source}:${row.target}`
+      byTarget[k] = (byTarget[k] || 0) + 1
+    }
+    manualIntervention = Object.freeze({ available: true as const, error: null, measuredSince: input.operatorActions.installedAt, databaseSessionWrites, adminRouteActions, byTarget: Object.freeze(byTarget), source: 'cos_university_operator_actions' })
+  }
+
   let examStandards: EffectivenessFunnel['examStandards']
   if (input.examined.available) {
     const evaluatorVersions: Record<string, number> = {}
@@ -768,6 +792,7 @@ export function composeFunnel(input: {
     since: input.since,
     subjectId: input.subjectId,
     cohort: Object.freeze({ size, truncated: input.truncated, source: SOURCE.artifacts }),
+    manualIntervention,
     examStandards,
     dailyActivity,
     production,
@@ -984,7 +1009,19 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
     }),
   ])
 
-  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, operationalHealth, evaluationFailures })
+  // Read on its own so a missing ledger (migration not yet applied) names its own chapter and touches nothing else.
+  const operatorActions = await chapter(async () => {
+    const installed = await rows(db.from('cos_university_operator_actions').select('occurred_at').eq('source', 'ledger_installed').order('occurred_at', { ascending: true }).limit(1))
+    let q = db.from('cos_university_operator_actions').select('source,target,operation,occurred_at').neq('source', 'ledger_installed')
+    if (since) q = q.gte('occurred_at', since)
+    const list = await exhaust(() => q.order('occurred_at', { ascending: false }))
+    return {
+      installedAt: iso(installed[0]?.occurred_at),
+      rows: list.map((row: any) => Object.freeze({ source: text(row.source, 40), target: text(row.target, 160), operation: text(row.operation, 80), occurredAt: iso(row.occurred_at) })),
+    }
+  })
+
+  return composeFunnel({ now, window, since, subjectId, cohort, truncated, production, certified, examined, residency, graduation, hired, work, verified, serving, lineLedger, transitionHistory, residencyEvidence, workforceAssignments, providerCosts, provenanceEvidence, governanceEvidence, operationalHealth, evaluationFailures, operatorActions })
 }
 
 /** One line: the funnel's top, its bottom, and the honesty row. */

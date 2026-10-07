@@ -75,6 +75,22 @@ for (const task of BUILDER_PROTOCOL_PRACTICE_TASKS) {
   })
 }
 
+// Production 2026-10-07: practice-trained residents failed the Residency regression cases whose checker replays the
+// resident's test against the original defect. The practice checkers in that shape must reject a test that cannot catch
+// the defect, or practising against them teaches nothing about it.
+test('replay checkers reject a regression test that passes on the defective code', () => {
+  const checkerTasks = BUILDER_PROTOCOL_PRACTICE_TASKS.filter(item => item.seedFiles.some(file => file.content.includes('still passes on the defective')))
+  assert.deepEqual(checkerTasks.map(item => item.taskId), ['trc-discount-checker', 'trc-median-checker'])
+  for (const task of checkerTasks) {
+    const testWrite = task.plan.find(step => step.tool === 'write_file')!
+    const vacuous = { ...task, plan: [...task.plan.map(step => step === testWrite ? { ...step, content: "console.log('ok')\n" } : step)] }
+    const observed = replay(vacuous as typeof task)
+    const testFile = testWrite.tool === 'write_file' ? testWrite.path : ''
+    assert.equal(observed.at(-1)!.exitCode, 1, `${task.taskId}: a vacuous test must not pass the checker`)
+    assert.match(observed.at(-1)!.stderr, new RegExp(`^FAIL: ${testFile.replace('.', '\\.')} still passes on the defective`), task.taskId)
+  }
+})
+
 test('no practice task reuses Residency exam material', () => {
   const caseFiles = new Set(BUILDER_RESIDENCY_CASES.flatMap(item => item.seedFiles.map(file => file.content)))
   const words = (value: string) => value.toLowerCase().match(/[a-z0-9_.-]+/g) || []

@@ -44,6 +44,48 @@ const VERDICT = [
   "if (problems.length) { console.error('FAIL: ' + problems[0]); process.exitCode = 1 } else console.log('ok')",
 ]
 
+const DISCOUNT_SEED = lines(
+  'function discounted(price, percent) {',
+  '  return price - percent',
+  '}',
+  'module.exports = { discounted }',
+)
+const MEDIAN_SEED = lines(
+  'function median(values) {',
+  '  const sorted = [...values].sort((a, b) => a - b)',
+  '  return sorted[Math.floor(sorted.length / 2)]',
+  '}',
+  'module.exports = { median }',
+)
+
+/**
+ * A practice-owned checker in the shape Residency grades regression tests with: the repaired source must behave, the
+ * resident's test must pass against it, and the same test, replayed beside the original defective source in a scratch
+ * directory, must fail. One deterministic verdict line, like every other practice proof.
+ */
+function replayChecker(input: { source: string; testFile: string; defective: string; behaviour: readonly string[] }): string {
+  return lines(
+    "const fs = require('fs')",
+    "const os = require('os')",
+    "const path = require('path')",
+    "const cp = require('child_process')",
+    'const problems = []',
+    `if (!fs.existsSync('${input.testFile}')) problems.push('${input.testFile} has not been written')`,
+    'else {',
+    ...input.behaviour.map(line => `  ${line}`),
+    `  if (!problems.length && cp.spawnSync(process.execPath, ['${input.testFile}']).status !== 0) problems.push('${input.testFile} fails against the repaired ${input.source}')`,
+    '  if (!problems.length) {',
+    "    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'practice-'))",
+    `    fs.writeFileSync(path.join(dir, '${input.source}'), ${JSON.stringify(input.defective)})`,
+    `    fs.copyFileSync('${input.testFile}', path.join(dir, '${input.testFile}'))`,
+    `    if (cp.spawnSync(process.execPath, ['${input.testFile}'], { cwd: dir }).status === 0) problems.push('${input.testFile} still passes on the defective ${input.source}')`,
+    '    fs.rmSync(dir, { recursive: true, force: true })',
+    '  }',
+    '}',
+    ...VERDICT,
+  )
+}
+
 function task(input: BuilderProtocolTask): BuilderProtocolTask {
   return Object.freeze({
     ...input,
@@ -176,6 +218,78 @@ export const BUILDER_PROTOCOL_PRACTICE_TASKS: readonly BuilderProtocolTask[] = O
   }),
 
   // ── test_and_regression_construction ──────────────────────────────────────────────────────────
+  // Two of the three Residency cases for this competency are graded by a checker that also replays the resident's new
+  // test against the original defective code (Production 2026-10-07: practice-trained residents failed there). These
+  // two tasks practise that shape with a practice-owned checker; the third keeps the plain write-the-test-first shape.
+  task({
+    taskId: 'trc-discount-checker',
+    competencyId: 'test_and_regression_construction',
+    objective: 'discount.js subtracts the percent as if it were an amount. Add discount.test.js that exposes the bug, fix discount.js, and prove with node check.js that the new test passes on the fix and catches the old code.',
+    seedFiles: [
+      { path: 'discount.js', content: DISCOUNT_SEED },
+      { path: 'check.js', content: replayChecker({
+        source: 'discount.js',
+        testFile: 'discount.test.js',
+        defective: DISCOUNT_SEED,
+        behaviour: [
+          "const { discounted } = require('./discount.js')",
+          "if (discounted(80, 25) !== 60) problems.push('discounted(80, 25) returned ' + discounted(80, 25) + ', expected 60')",
+        ],
+      }) },
+    ],
+    provingCommand: 'node check.js',
+    plan: [
+      { tool: 'read_file', path: 'discount.js' },
+      RUN,
+      { tool: 'write_file', path: 'discount.test.js', content: lines(
+        "const { discounted } = require('./discount.js')",
+        'const problems = []',
+        "if (discounted(80, 25) !== 60) problems.push('discounted(80, 25) returned ' + discounted(80, 25) + ', expected 60')",
+        "if (discounted(50, 10) !== 45) problems.push('discounted(50, 10) returned ' + discounted(50, 10) + ', expected 45')",
+        ...VERDICT,
+      ) },
+      RUN,
+      { tool: 'edit_file', path: 'discount.js', search: 'price - percent', replace: 'price - price * percent / 100' },
+      RUN,
+    ],
+    runs: [fail('discount.test.js has not been written'), fail('discounted(80, 25) returned 55, expected 60'), OK],
+  }),
+  task({
+    taskId: 'trc-median-checker',
+    competencyId: 'test_and_regression_construction',
+    objective: 'median.js picks the wrong middle when a list has an even count. Write median.test.js that catches this, correct median.js, then run node check.js: it confirms your test passes now and would have caught the old code.',
+    seedFiles: [
+      { path: 'median.js', content: MEDIAN_SEED },
+      { path: 'check.js', content: replayChecker({
+        source: 'median.js',
+        testFile: 'median.test.js',
+        defective: MEDIAN_SEED,
+        behaviour: [
+          "const { median } = require('./median.js')",
+          "if (median([4, 1, 3, 2]) !== 2.5) problems.push('median([4, 1, 3, 2]) returned ' + median([4, 1, 3, 2]) + ', expected 2.5')",
+        ],
+      }) },
+    ],
+    provingCommand: 'node check.js',
+    plan: [
+      { tool: 'read_file', path: 'median.js' },
+      RUN,
+      { tool: 'write_file', path: 'median.test.js', content: lines(
+        "const { median } = require('./median.js')",
+        'const problems = []',
+        "if (median([4, 1, 3, 2]) !== 2.5) problems.push('median of an even list returned ' + median([4, 1, 3, 2]) + ', expected 2.5')",
+        "if (median([5, 1, 9]) !== 5) problems.push('median of an odd list returned ' + median([5, 1, 9]) + ', expected 5')",
+        ...VERDICT,
+      ) },
+      RUN,
+      { tool: 'edit_file', path: 'median.js', search: '  return sorted[Math.floor(sorted.length / 2)]', replace: lines(
+        '  const middle = Math.floor(sorted.length / 2)',
+        '  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2',
+      ).slice(0, -1) },
+      RUN,
+    ],
+    runs: [fail('median.test.js has not been written'), fail('median([4, 1, 3, 2]) returned 3, expected 2.5'), OK],
+  }),
   task({
     taskId: 'trc-pad-left',
     competencyId: 'test_and_regression_construction',
@@ -202,59 +316,6 @@ export const BUILDER_PROTOCOL_PRACTICE_TASKS: readonly BuilderProtocolTask[] = O
     ],
     runs: [fail('padLeft(7, 3) returned 07, expected 007'), OK],
   }),
-  task({
-    taskId: 'trc-word-count',
-    competencyId: 'test_and_regression_construction',
-    objective: 'words.js miscounts text with repeated spaces. Add words.test.js as a regression test, run it to show the defect, repair words.js, and prove node words.test.js passes.',
-    seedFiles: [{ path: 'words.js', content: lines(
-      'function countWords(text) {',
-      "  return text.trim().split(' ').length",
-      '}',
-      'module.exports = { countWords }',
-    ) }],
-    provingCommand: 'node words.test.js',
-    plan: [
-      { tool: 'read_file', path: 'words.js' },
-      { tool: 'write_file', path: 'words.test.js', content: lines(
-        "const { countWords } = require('./words.js')",
-        'const problems = []',
-        "if (countWords('one  two   three') !== 3) problems.push('countWords with repeated spaces returned ' + countWords('one  two   three') + ', expected 3')",
-        "if (countWords('single') !== 1) problems.push('countWords(single) returned ' + countWords('single'))",
-        ...VERDICT,
-      ) },
-      RUN,
-      { tool: 'edit_file', path: 'words.js', search: "text.trim().split(' ').length", replace: 'text.trim().split(/\\s+/).length' },
-      RUN,
-    ],
-    runs: [fail('countWords with repeated spaces returned 6, expected 3'), OK],
-  }),
-  task({
-    taskId: 'trc-initials-case',
-    competencyId: 'test_and_regression_construction',
-    objective: 'initials.js returns lowercase initials. Write initials.test.js that fails on this defect, run it, repair initials.js, and prove node initials.test.js passes.',
-    seedFiles: [{ path: 'initials.js', content: lines(
-      'function initials(fullName) {',
-      "  return fullName.split(' ').map(part => part[0]).join('')",
-      '}',
-      'module.exports = { initials }',
-    ) }],
-    provingCommand: 'node initials.test.js',
-    plan: [
-      { tool: 'read_file', path: 'initials.js' },
-      { tool: 'write_file', path: 'initials.test.js', content: lines(
-        "const { initials } = require('./initials.js')",
-        'const problems = []',
-        "if (initials('grace hopper') !== 'GH') problems.push('initials(grace hopper) returned ' + initials('grace hopper') + ', expected GH')",
-        "if (initials('Alan Mathison Turing') !== 'AMT') problems.push('initials of three names returned ' + initials('Alan Mathison Turing'))",
-        ...VERDICT,
-      ) },
-      RUN,
-      { tool: 'edit_file', path: 'initials.js', search: "map(part => part[0])", replace: "map(part => part[0].toUpperCase())" },
-      RUN,
-    ],
-    runs: [fail('initials(grace hopper) returned gh, expected GH'), OK],
-  }),
-
   // ── repository_navigation ─────────────────────────────────────────────────────────────────────
   task({
     taskId: 'rn-temperature-owner',

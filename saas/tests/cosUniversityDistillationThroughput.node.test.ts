@@ -9,6 +9,7 @@ import {
   MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS,
   buildMassDistillationOpenSourceMaintenanceGaps,
   buildMassDistillationReplenishmentGaps,
+  needsMassDistillationReplenishment,
   massDistillationThroughputProfile,
 } from '../lib/ai/cos/cosUniversityDistillationCurriculumPlan.ts'
 import {
@@ -203,4 +204,26 @@ test('open-source maintenance uses the owner throughput profile instead of starv
   assert.match(workflow, /queriesPerSubject: throughput\.queriesPerSubject/)
   assert.match(workflow, /maxCandidatesPerCycle: throughput\.acquisitionCandidatesPerCycle/)
   assert.doesNotMatch(workflow, /queriesPerSubject: 1,[\s\S]{0,120}maxCandidatesPerCycle: Math\.min\(20/)
+})
+
+// Regression: production Computer Science had 678 batchable items but only 15 of 32 independent items.
+// An item-count-only planner skipped replenishment while the quality packager rightly refused training.
+test('replenishment targets subjects missing independent material despite a full total batch', () => {
+  const blocked = { subjectKey: 'computer_science', subject: 'Computer Science & Coding', canonicalSubjectId: 'computer_science' as const, uniqueBatchableItems: 678, shortfallToBatch: 0, realSourceItems: 15, realSourceNeeded: 32 }
+  assert.equal(needsMassDistillationReplenishment(blocked), true)
+  const gaps = buildMassDistillationReplenishmentGaps([blocked], new Date('2026-10-07T01:00:00Z'), 1, 2)
+  assert.equal(gaps.length, 2)
+  assert.ok(gaps.every(gap => gap.subject === blocked.subject && gap.sourceKinds?.includes('scientific_journal')))
+  assert.ok(gaps.every(gap => gap.evidence.includes('real_source_items=15') && gap.evidence.includes('real_source_needed=32')))
+  assert.match(source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'), /\.filter\(subject => needsMassDistillationReplenishment\(subject\)\)/)
+})
+
+test('no replenishment once both total-count and independent-source floors are met', () => {
+  const satisfied = { subjectKey: 'computer_science', subject: 'Computer Science & Coding', canonicalSubjectId: 'computer_science' as const, uniqueBatchableItems: 678, shortfallToBatch: 0, realSourceItems: 32, realSourceNeeded: 32 }
+  assert.equal(needsMassDistillationReplenishment(satisfied), false)
+  assert.equal(needsMassDistillationReplenishment({ ...satisfied, realSourceItems: 60 }), false)
+  assert.equal(needsMassDistillationReplenishment({ ...satisfied, realSourceItems: 31 }), true)
+  assert.equal(needsMassDistillationReplenishment({ ...satisfied, realSourceItems: undefined, realSourceNeeded: undefined }), false)
+  const gaps = buildMassDistillationReplenishmentGaps([satisfied], new Date('2026-10-07T01:00:00Z'), 3, 1)
+  assert.ok(!gaps.some(gap => gap.subject === satisfied.subject))
 })

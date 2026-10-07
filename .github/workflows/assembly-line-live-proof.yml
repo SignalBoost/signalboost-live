@@ -112,6 +112,7 @@ jobs:
           tests/cosUniversityCapabilityGainTrace.node.test.ts
           tests/cosUniversityHoldoutGainSignificance.node.test.ts
           tests/cosUniversityHoldoutRegressionEvidence.node.test.ts
+          tests/cosUniversityMassEvaluationAnswerProtocolEvidence.node.test.ts
           tests/cosUniversityLineNowReport.node.test.ts
 
   line-live-proof:

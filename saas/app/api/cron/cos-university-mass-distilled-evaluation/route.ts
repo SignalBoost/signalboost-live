@@ -19,6 +19,7 @@ import {
   type MassEvaluationClaim,
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import { judgeCalibrationDiagnosticOf, judgeProtocolDiagnosticOf, zeroCollapseDiagnosticOf } from '@/lib/ai/cos/cosUniversityMassEvaluationZeroCollapse'
+import { answerProtocolDiagnosticOf } from '@/lib/ai/cos/cosUniversityMassEvaluationAnswerProtocolEvidence'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
   MASS_EVALUATION_BUILDER_V2_OPTIMIZER,
@@ -931,6 +932,8 @@ export async function GET(req: NextRequest) {
     const judgeCalibration = judgeCalibrationDiagnosticOf(error)
     // The judge's reply broke the scoring protocol (2026-10-04): its raw reply and the broken rule, nothing else.
     const judgeProtocol = judgeProtocolDiagnosticOf(error)
+    // A model answer could not be parsed (2026-10-07): which model, the markers in order and bounded text, nothing else.
+    const answerProtocol = answerProtocolDiagnosticOf(error)
     const workerQuotaDeferred = Boolean(claim)
       && message.toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
     if (claim) {
@@ -947,6 +950,7 @@ export async function GET(req: NextRequest) {
           ...(zeroCollapseDiagnostic ? { zeroCollapseDiagnostic } : {}),
           ...(judgeCalibration ? { judgeCalibration } : {}),
           ...(judgeProtocol ? { judgeProtocol } : {}),
+          ...(answerProtocol ? { answerProtocol } : {}),
         },
       }).catch(() => undefined)
     }

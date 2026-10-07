@@ -9,6 +9,7 @@ import { MASS_EVALUATION_ENDPOINT_CALLS, MASS_EVALUATION_JUDGE_CALLS, MASS_EVALU
 import { persistDistilledEvaluationCaseScores } from './cosUniversityDistilledEvaluationCaseScores.ts'
 import { assessHoldoutGain } from './cosUniversityHoldoutGainSignificance.ts'
 import { buildHoldoutRegressionEvidence } from './cosUniversityHoldoutRegressionEvidence.ts'
+import { MassEvaluationAnswerProtocolError, describeAnswerProtocol, type AnswerProtocolDiagnostic } from './cosUniversityMassEvaluationAnswerProtocolEvidence.ts'
 import { recoverStoppedOpenAnswer, recoverStoppedSoloMismatchedMarkerAnswer, recoverStoppedSoloForeignOpenCorrectCloseAnswer, recoverStoppedSoloMissingOpenAnswer, recoverStoppedSoloPlainAnswer, recoverStoppedSoloWrappedAnswer, recoverStoppedSoloForeignEndAnswer, recoverStoppedSoloCorrectOpenForeignEndAnswer } from './cosUniversityMassEvaluationAnswerRecovery.ts'
 import { servedCandidateModelFromCanary } from './cosUniversityMassEvaluationServedModel.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
@@ -487,7 +488,7 @@ function parseAnswers(text:string,cases:readonly EvalCase[]){const answers=new M
 // answer that parsed, then retry only the slipped cases solo under the identical request contract, inside the approved endpoint-call
 // ceiling and never touching calls reserved for later suites. A case that still fails alone raises the same error name, now with the
 // provider finish_reason appended. Cases, references, judging, thresholds and promotion are unchanged.
-type PartialAnswers = Readonly<{ answers:Map<string,string>; responseHash:string; rawExcerpt:string; missing:readonly string[]; errors:Readonly<Record<string,string>> }>
+type PartialAnswers = Readonly<{ answers:Map<string,string>; responseHash:string; rawExcerpt:string; missing:readonly string[]; errors:Readonly<Record<string,string>>; protocol:Readonly<Record<string,AnswerProtocolDiagnostic>> }>
 // 2026-09-17 21:18 UTC, mass:8f5af666: answer_missing:0ee6ecdba3940d76:finish=length again, after the solo allowance was
 // raised to 1,024 tokens (21:02) and after /no_think was added to the evaluator system prompt (21:17). The error name says a
 // marker was absent and the generation was truncated; it does not say WHICH of the three possible causes produced that, so each
@@ -559,7 +560,7 @@ function parseAnswersPartial(text:string,cases:readonly EvalCase[],finish:string
 async function callRunpod(input:{endpointId:string;model:string;cases:readonly EvalCase[];candidateId:string;artifactId?:string;artifactHash?:string;feature:string;deadlineMs:number}){
   const key=configuredRunpodApiKey();if(!key)throw new Error('mass_distilled_evaluation_runpod_key_missing');await waitReady(input.endpointId,input.deadlineMs)
   const started=Date.now();const requestId=randomUUID();let httpStatus:number|null=null;let success=false;let usage:any=null;let finishReason:string|null=null
-  try{const timeout=Math.max(1,Math.min(ENDPOINT_CALL_TIMEOUT_MS,remaining(input.deadlineMs)));const userPrompt=batchPrompt(input.cases);const cap=massEvaluationOutputTokens(input.cases.length,userPrompt);const response=await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.model,temperature:0,max_tokens:cap,messages:[{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT},{role:'user',content:userPrompt}]}),signal:AbortSignal.timeout(timeout)});httpStatus=response.status;if(!response.ok){const detail=clean((await response.text().catch(()=>'')).replace(/\s+/g,' '),240);const role=input.model===BASE_MODEL_ID?'baseline':'candidate';throw new Error(`mass_distilled_evaluation_runpod_http_${response.status}:${role}:cases=${input.cases.length}:${detail}`)}const payload:any=await response.json();usage=payload?.usage||null;const text=clean(payload?.choices?.[0]?.message?.content,200_000);if(!text)throw new Error('mass_distilled_evaluation_runpod_empty');success=true;finishReason=clean(payload?.choices?.[0]?.finish_reason,40)||null;const parsed=parseAnswersPartial(text,input.cases,finishReason||'',cap);return {...parsed,responseHash:sha256Raw(text),rawExcerpt:clean(text,2400)} as PartialAnswers}catch(error){
+  try{const timeout=Math.max(1,Math.min(ENDPOINT_CALL_TIMEOUT_MS,remaining(input.deadlineMs)));const userPrompt=batchPrompt(input.cases);const cap=massEvaluationOutputTokens(input.cases.length,userPrompt);const response=await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.model,temperature:0,max_tokens:cap,messages:[{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT},{role:'user',content:userPrompt}]}),signal:AbortSignal.timeout(timeout)});httpStatus=response.status;if(!response.ok){const detail=clean((await response.text().catch(()=>'')).replace(/\s+/g,' '),240);const role=input.model===BASE_MODEL_ID?'baseline':'candidate';throw new Error(`mass_distilled_evaluation_runpod_http_${response.status}:${role}:cases=${input.cases.length}:${detail}`)}const payload:any=await response.json();usage=payload?.usage||null;const text=clean(payload?.choices?.[0]?.message?.content,200_000);if(!text)throw new Error('mass_distilled_evaluation_runpod_empty');success=true;finishReason=clean(payload?.choices?.[0]?.finish_reason,40)||null;const parsed=parseAnswersPartial(text,input.cases,finishReason||'',cap);const role=input.model===BASE_MODEL_ID?'baseline':'candidate';const protocol=Object.fromEntries(parsed.missing.map(id=>[id,describeAnswerProtocol({text,caseId:id,role,cases:input.cases.length,finish:finishReason||'',cap})]));return {...parsed,protocol,responseHash:sha256Raw(text),rawExcerpt:clean(text,2400)} as PartialAnswers}catch(error){
     const name=error instanceof Error?error.name:''
     if(name==='TimeoutError'||name==='AbortError'){
       const role=input.model===BASE_MODEL_ID?'baseline':'candidate'
@@ -621,7 +622,7 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
       const recovered=new Map(first.answers);const parts=[first.responseHash];const rawExcerpts=[first.rawExcerpt]
       for(const id of first.missing){
         const item=cases.find(entry=>entry.id===id)
-        if(!item||soloRecoveries>=(input.maxSoloRecoveries??1)||input.budget.used+1+reserve>input.budget.max)throw new Error(first.errors[id])
+        if(!item||soloRecoveries>=(input.maxSoloRecoveries??1)||input.budget.used+1+reserve>input.budget.max)throw new MassEvaluationAnswerProtocolError(first.errors[id],first.protocol[id])
         soloRecoveries+=1;input.budget.used+=1;const solo=await raw([item])
         if(solo.missing.length){
           const failure=solo.errors[id]
@@ -636,7 +637,8 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
           // student is judged on it normally. Only the two deterministic normal-stop shapes qualify; every other baseline
           // failure (truncation, transport, foreign markers) remains fail-closed infrastructure as before.
           if(!input.candidate&&(candidateSoloEmptyAnswer(failure)||candidateSoloMarkerlessNoAnswer(failure))){abstained.set(id,failure);parts.push(solo.responseHash);rawExcerpts.push(solo.rawExcerpt);if(solo.rawExcerpt)excerpts.push(solo.rawExcerpt);continue}
-          throw new Error(failure)
+          // Owner go 2026-10-07: the unchanged message plus what the failing response looked like (see the evidence module).
+          throw new MassEvaluationAnswerProtocolError(failure,solo.protocol[id])
         }
         for(const [key,answer] of solo.answers)recovered.set(key,answer);parts.push(solo.responseHash);rawExcerpts.push(solo.rawExcerpt);if(solo.rawExcerpt)excerpts.push(solo.rawExcerpt)
       }

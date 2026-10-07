@@ -22,7 +22,7 @@ test('solo candidate output exhaustion becomes model-quality only after the boun
   assert.match(source, /finish=length:think=0:open=1:close=0:other=0:cap=1024/)
   assert.match(source, /if\(input\.candidate&&candidateSoloOutputExhaustion\(failure\)\)throw new Error\(failure\.replace\('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_output_exhausted:'\)\)/)
   // Baseline truncation and every non-exact shape keep the original fail-closed error.
-  assert.match(source, /throw new Error\(failure\)/)
+  assert.match(source, /throw new MassEvaluationAnswerProtocolError\(failure,solo\.protocol\[id\]\)/)
   assert.match(source, /errors\[item\.id\]=`\$\{error instanceof Error\?error\.message:String\(error\)\}:\$\{answerFailureFingerprint\(text,item,finish,cap\)\}`/)
   assert.match(source, /throw new Error\(`mass_distilled_evaluation_answer_missing:\$\{item\.id\}`\)/)
 })

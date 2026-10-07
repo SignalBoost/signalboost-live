@@ -19,6 +19,7 @@ import {
   type QuarantineStudent,
 } from '@/lib/ai/cos/cosUniversityQuarantineReasons'
 import type { RollingEvent } from '@/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority'
+import { readLabFailureTelemetry } from '@/lib/ai/cos/cosLabFailureTelemetry'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -812,6 +813,8 @@ export async function GET() {
       0,
     )
 
+    const failureAttribution = await readLabFailureTelemetry(db, since)
+
     return NextResponse.json({
       ok: true,
       readOnly: true,
@@ -824,8 +827,11 @@ export async function GET() {
         failedRuns24h,
         inFlightRuns24h,
         hfObservedCostUsd24h: Number(hfObservedCostUsd24h.toFixed(6)),
+        classifiedFailures24h: failureAttribution.available ? failureAttribution.classified : null,
+        failureClassificationCoverage24h: failureAttribution.available ? failureAttribution.classificationCoverage : null,
         openSourceItems24h: Array.from(openSources.values()).reduce((total, source) => total + source.items24h, 0),
       },
+      failureAttribution,
       openSources: Array.from(openSources.values()).map(source => ({
         ...source,
         status: source.items24h > 0 ? 'observed' : source.integration,

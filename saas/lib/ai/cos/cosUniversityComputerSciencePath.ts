@@ -100,6 +100,8 @@ export type ComputerSciencePath = Readonly<{
     recentCases: number
     recentFailedCases: number
     recentFailedCasesWithLoopStop: number
+    /** Failed cases among the recent ones, by Residency case family (one family per exam variant), e.g. clamp_bounds_regression. */
+    recentFailedByCaseFamily: Readonly<Record<string, number>>
   }>
 }>
 
@@ -200,7 +202,7 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
       .select('id')
       .in('standing', [...ACTIVE_STANDINGS])),
     rows(db.from('cos_university_residency_case_runs')
-      .select('status,started_at,completed_at,metadata')
+      .select('status,started_at,completed_at,metadata,case_family')
       .order('started_at', { ascending: false })
       .limit(RECENT)),
   ])
@@ -298,6 +300,7 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
       latestCaseStatus: caseRows[0] ? text(caseRows[0].status, 40) || null : null,
       recentCases: caseRows.length,
       recentFailedCases: failedCases.length,
+      recentFailedByCaseFamily: tally(failedCases.map(row => text(row.case_family, 80) || 'unrecorded')),
       recentFailedCasesWithLoopStop: withLoopStop.length,
     }),
   })
@@ -319,7 +322,7 @@ export function describeComputerSciencePath(path: ComputerSciencePath): string {
     `  training dispatches :: recent=${d.recent} withProtocolPractice=${d.withPractice} latestAt=${d.latestAt ?? 'none'} latestWithPractice=${yes(d.latestWithPractice)}${d.latestPracticeTaskIds.length ? ` latestTasks=${d.latestPracticeTaskIds.join(',')}` : ''}`,
     `  training runs       :: recent=${r.recent} latestStage=${r.latestStage ?? 'none'} latestAt=${r.latestAt ?? 'none'} byStage=${kv(r.byStage)}`,
     `  trained artifacts   :: recent=${a.recent} trainedWithProtocolPractice=${a.trainedWithPractice} latestAt=${a.latestAt ?? 'none'} latestStatus=${a.latestStatus ?? 'none'} latestWithPractice=${yes(a.latestWithPractice)} byStatus=${kv(a.byStatus)}`,
-    `  residency           :: awaitingAdmission=${s.awaitingAdmission} (withPractice=${s.awaitingAdmissionWithPractice}) activeResidents=${s.activeResidents} latestCaseStartedAt=${s.latestCaseStartedAt ?? 'none'} latestCaseCompletedAt=${s.latestCaseCompletedAt ?? 'none'} latestCaseStatus=${s.latestCaseStatus ?? 'none'} recentCases=${s.recentCases} recentFailed=${s.recentFailedCases} recentFailedWithLoopStop=${s.recentFailedCasesWithLoopStop}`,
+    `  residency           :: awaitingAdmission=${s.awaitingAdmission} (withPractice=${s.awaitingAdmissionWithPractice}) activeResidents=${s.activeResidents} latestCaseStartedAt=${s.latestCaseStartedAt ?? 'none'} latestCaseCompletedAt=${s.latestCaseCompletedAt ?? 'none'} latestCaseStatus=${s.latestCaseStatus ?? 'none'} recentCases=${s.recentCases} recentFailed=${s.recentFailedCases} recentFailedWithLoopStop=${s.recentFailedCasesWithLoopStop} failedByCase=${kv(s.recentFailedByCaseFamily)}`,
   ].join('\n')
 }
 // end of saas/lib/ai/cos/cosUniversityComputerSciencePath.ts (if this line is missing, the paste was cut short)

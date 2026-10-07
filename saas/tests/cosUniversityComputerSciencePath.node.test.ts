@@ -94,9 +94,9 @@ const tables: Record<string, Row[]> = {
     { id: 'res-2', artifact_row_id: 'art-graduated', standing: 'resident' },
   ],
   cos_university_residency_case_runs: [
-    { status: 'failed', started_at: '2026-10-06T17:00:00Z', completed_at: '2026-10-06T17:04:00Z', metadata: { builderLoop: { outcome: 'incomplete', failureCode: 'builder_round_budget_exhausted' } } },
-    { status: 'failed', started_at: '2026-10-05T23:00:00Z', completed_at: '2026-10-05T23:03:00Z', metadata: {} },
-    { status: 'passed', started_at: '2026-10-05T22:00:00Z', completed_at: '2026-10-05T22:02:00Z', metadata: {} },
+    { status: 'failed', case_family: 'clamp_bounds_regression', started_at: '2026-10-06T17:00:00Z', completed_at: '2026-10-06T17:04:00Z', metadata: { builderLoop: { outcome: 'incomplete', failureCode: 'builder_round_budget_exhausted' } } },
+    { status: 'failed', case_family: 'clamp_bounds_regression', started_at: '2026-10-05T23:00:00Z', completed_at: '2026-10-05T23:03:00Z', metadata: {} },
+    { status: 'passed', case_family: 'regression_test_construction', started_at: '2026-10-05T22:00:00Z', completed_at: '2026-10-05T22:02:00Z', metadata: {} },
   ],
 }
 
@@ -127,7 +127,8 @@ test('the snapshot follows the newest Computer Science artifact from dispatch to
   const text = describeComputerSciencePath(path)
   assert.match(text, /training dispatches :: recent=2 withProtocolPractice=1 .*latestWithPractice=yes latestTasks=tsn-count-return-type,rwid-greeting-export/)
   assert.match(text, /residency +:: awaitingAdmission=2 \(withPractice=1\) activeResidents=1 latestCaseStartedAt=2026-10-06T17:00:00.000Z/)
-  assert.match(text, /recentFailed=2 recentFailedWithLoopStop=1/)
+  assert.match(text, /recentFailed=2 recentFailedWithLoopStop=1 failedByCase=clamp_bounds_regression=2$/m)
+  assert.deepEqual({ ...path.residency.recentFailedByCaseFamily }, { clamp_bounds_regression: 2 }, 'only failed cases, by exam variant family')
   assert.match(text, /packaging +:: receiptAt=2026-10-06T19:05:00.000Z supply=41 batchable items \(needs 64; shortfall 23\) realSource=12\/32 BLOCKED: too little real-source material preparedBuffer=12\/12 replenishment=prepared_buffer_satisfied skipped curriculumBatches=consumed=1,superseded=1 .*real=30 failureDerived=50 teacherSynthetic=10/)
 })
 

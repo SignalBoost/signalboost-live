@@ -1,2 +1,2 @@
-base_sha=ecd585b361813f79365d189177cdf3abf9c26b25
-branch=fix/cs-path-source-errors-unknown
+base_sha=a6a12addb68288fb86f08c07c53bfabcb226ff5d
+branch=fix/cs-path-failed-case-variant

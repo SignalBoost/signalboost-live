@@ -127,7 +127,8 @@ function describeReplenishment(value: Record<string, unknown>): string | null {
     `accepted=${count('accepted') ?? 'n/a'}`,
     `probationary=${count('probationary') ?? 'n/a'}`,
     `rejected=${rejectedText || 'none'}`,
-    `sourceErrors=${sourceErrorsText || 'none'}`,
+    // "none" only when the fill recorded an empty map; a receipt without the field stays unknown (Codex on #3774).
+    `sourceErrors=${sourceErrorsText || (value.sourceErrors && typeof value.sourceErrors === 'object' && !Array.isArray(value.sourceErrors) ? 'none' : 'n/a')}`,
     text(value.reason, 120) ? `reason=${text(value.reason, 120)}` : '',
   ].filter(Boolean).join(' ')
 }

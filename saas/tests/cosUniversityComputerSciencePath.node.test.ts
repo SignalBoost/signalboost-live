@@ -153,6 +153,14 @@ test('a fill that actually ran prints its targets and yield instead of n/a', asy
     } }],
   })), now: new Date('2026-10-07T15:30:00Z') })
   assert.equal(failed.packaging.replenishment, 'error:rights_cleared_distillation_adapters_unavailable')
+  const receiptWith = async (replenishment: Record<string, unknown>) => (await readComputerSciencePath({ db: readOnlyDb(fakeDb({
+    cos_university_learning_assurance_events: [{ event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-07T15:26:56Z', evidence: {
+      curriculum: { supply: { subjects: [] } }, curriculumReplenishment: replenishment,
+    } }],
+  })), now: new Date('2026-10-07T15:30:00Z') })).packaging.replenishment
+  // An empty recorded map means no source failed; a receipt without the field (full-buffer remediation) is unknown.
+  assert.match(String(await receiptWith({ ok: true, skipped: false, targets: [CS], accepted: 1, sourceErrors: {} })), /sourceErrors=none$/)
+  assert.match(String(await receiptWith({ ok: true, skipped: false, failureDerivedInserted: 3 })), /sourceErrors=n\/a$/)
 })
 
 test('a packaging pass without Computer Science in its supply is reported as zero batchable items', async () => {

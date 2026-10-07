@@ -335,6 +335,48 @@ test('an unreadable table zeroes its stages AND is named; a reader can never tak
   assert.match(describeFunnel(f), /\| unavailable=graduation$/)
 })
 
+test('failure explanations follow the full-string classifier even when the family key truncates the matched words', () => {
+  const empty = <T,>(v: T) => Object.freeze({ available: true as const, error: null, ...v })
+  // Production 2026-10-07: RunPod quota refusals were counted as infrastructure but explained as unresolved competency,
+  // because the 80-character family key cut "must not exceed your workers quota" off the message.
+  const quota = 'RunPod PATCH /serverless/zp1tvf6v8cmhbu HTTP 400: Max workers across all endpoints must not exceed your workers quota (10). Lower the max worker count'
+  const exhausted = 'mass_distilled_evaluation_candidate_output_exhausted:32cb43d20ea8f7ca:finish=length:think=0:open=1:close=0:other=0:cap=1024'
+  const f = composeFunnel({
+    now: NOW, window: '24h', since: '2026-10-03T20:00:00.000Z', subjectId: null, cohort: [], truncated: false,
+    production: empty({ runsStarted: 0, runsCompleted: 0, runsFailed: 0 }),
+    certified: empty({ candidates: new Set<string>() }),
+    examined: empty({ latestByKey: new Map() }),
+    residency: empty({ enrolled: new Set<string>(), complete: new Set<string>() }),
+    graduation: empty({ promoted: new Set<string>(), activated: new Set<string>() }),
+    hired: empty({ candidates: new Set<string>() }),
+    work: empty({ attempted: new Set<string>(), succeeded: new Set<string>() }),
+    verified: empty({ candidates: new Set<string>() }),
+    serving: empty({ terminalByAttempt: new Map() }),
+    lineLedger: empty({ rows: [] }),
+    transitionHistory: empty({ rows: [] }),
+    residencyEvidence: empty({ enrollments: [], caseStatuses: [], competencyOutcomes: [] }),
+    workforceAssignments: empty({ rows: [] }),
+    providerCosts: empty({ rows: [] }),
+    provenanceEvidence: empty({ certificates: new Set<string>(), graduates: new Set<string>(), resumes: new Set<string>() }),
+    governanceEvidence: empty({ authorityExpansionObserved: 0, assuranceEvents: 0, repositoryEvidenceEntries: 0, repositoryEvidenceChainValid: null }),
+    evaluationFailures: empty({ errors: [quota, quota, exhausted, 'something_never_seen_before'] }),
+  })
+  assert.ok(f.evaluationFailures.available)
+  if (!f.evaluationFailures.available) return
+  assert.equal(f.evaluationFailures.infrastructure, 2)
+  const byPrefix = (prefix: string) => f.evaluationFailures.available ? f.evaluationFailures.explanations.find(x => x.reason.startsWith(prefix)) : undefined
+  const quotaExplanation = byPrefix('RunPod PATCH')
+  assert.ok(!quotaExplanation?.reason.includes('workers quota'), 'the family key really is truncated before the matched words')
+  assert.equal(quotaExplanation?.attribution, 'infrastructure')
+  assert.equal(quotaExplanation?.causeStatus, 'evidence_backed')
+  const exhaustedExplanation = byPrefix('mass_distilled_evaluation_candidate_output_exhausted')
+  assert.equal(exhaustedExplanation?.attribution, 'competency')
+  assert.equal(exhaustedExplanation?.causeStatus, 'evidence_backed')
+  assert.match(exhaustedExplanation?.cause || '', /bounded candidate-only retry/)
+  const unknown = byPrefix('something_never_seen_before')
+  assert.equal(unknown?.causeStatus, 'unresolved', 'an unrecognised reason is still disclosed as unresolved')
+})
+
 test('an empty cohort has no shares and no division by zero', () => {
   const empty = <T,>(v: T) => Object.freeze({ available: true as const, error: null, ...v })
   const f = composeFunnel({

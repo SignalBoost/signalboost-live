@@ -577,8 +577,11 @@ export function composeFunnel(input: {
     provenance = Object.freeze({ available: true as const, error: null, birthCertificates: input.cohort.filter(a => p.certificates.has(keyOf(a))).length, graduates: graduates.length, resumes: input.cohort.filter(a => p.resumes.has(keyOf(a))).length, workforceAssignmentsWithPermanentId: input.workforceAssignments.rows.filter(row => Boolean(row.permanentArtifactId)).length, traceableGraduates, traceableGraduateRate: graduates.length ? traceableGraduates / graduates.length : null, source: 'cos_university_artifact_birth_certificates + cos_university_graduate_model_registry + cos_university_graduate_resumes + cos_workforce_assignments', methodology: 'exact candidate+artifact hash across birth certificate, graduate registry and evidence-derived résumé; Workforce assignments must carry permanent_artifact_id' })
   } else provenance = Object.freeze({ available: false as const, error: input.provenanceEvidence.available === false ? input.provenanceEvidence.error : input.workforceAssignments.available === false ? input.workforceAssignments.error : 'provenance_unavailable' })
 
-  const explainEvaluationFailure = (reason: string, count: number): EffectivenessFunnel['evaluationFailures'] extends Chapter<infer T> ? T extends { explanations: readonly (infer E)[] } ? E : never : never => {
-    const infrastructure = isEvaluatorInfrastructureFailure(reason)
+  // classifiedInfrastructure: every full error string in this family matched the canonical classifier. The family key is
+  // an 80-character prefix, so a long provider message ("RunPod PATCH ... HTTP 400: Max workers across all endpoin") can
+  // lose the very words the classifier matches; the explanation must follow the same full-string rule as the counts.
+  const explainEvaluationFailure = (reason: string, count: number, classifiedInfrastructure = false): EffectivenessFunnel['evaluationFailures'] extends Chapter<infer T> ? T extends { explanations: readonly (infer E)[] } ? E : never : never => {
+    const infrastructure = classifiedInfrastructure || isEvaluatorInfrastructureFailure(reason)
     const lower = reason.toLowerCase()
     const evidence = (cause: string, impact: string, systemResponse: string, buyerMeaning: string) => Object.freeze({ reason, count, attribution: 'infrastructure' as const, causeStatus: 'evidence_backed' as const, cause, impact, systemResponse, buyerMeaning })
     if (lower.startsWith('mass_distilled_evaluation_judge_calibration_failed:')) return evidence(
@@ -605,6 +608,16 @@ export function composeFunnel(input: {
       impact: 'The affected exam case cannot be credited as a successful trained-artifact response.',
       systemResponse: 'The event remains a substantive artifact outcome and is handled by the normal bounded merit/disposition policy.',
       buyerMeaning: 'The report distinguishes reproducible artifact behavior from evaluator or runtime faults instead of masking it as infrastructure.'
+    }) as any
+    // Recorded only when the trained artifact opened its answer and ran to the 1,024-token output cap
+    // (finish=length, open=1, close=0) on the batch call AND on the bounded candidate-only solo retry
+    // (cosUniversityMassDistilledArtifactEvaluation candidateSoloOutputExhaustion). The baseline never produces it.
+    if (lower.includes('candidate_output_exhausted')) return Object.freeze({
+      reason, count, attribution: 'competency' as const, causeStatus: 'evidence_backed' as const,
+      cause: 'The trained artifact began its answer but never finished it within the output limit, and reproduced that on the evaluator\'s bounded candidate-only retry.',
+      impact: 'The affected exam case cannot be credited as a completed trained-artifact response.',
+      systemResponse: 'The event remains a substantive artifact outcome and is handled by the normal bounded merit/disposition policy.',
+      buyerMeaning: 'A model that cannot finish an answer within the limit is reported as its own result, not as an evaluator fault.'
     }) as any
     if (infrastructure) return evidence(
       'The recorded reason matches the University\'s canonical evaluator-infrastructure classifier; the available evidence establishes that the evaluation mechanism, runtime, provider, budget, or protocol prevented a trustworthy competency result.',
@@ -675,11 +688,15 @@ export function composeFunnel(input: {
   let evaluationFailures: EffectivenessFunnel['evaluationFailures']
   if (input.evaluationFailures.available) {
     const byReason: Record<string, number> = {}
+    const infrastructureByReason: Record<string, number> = {}
     let infrastructure = 0
     for (const error of input.evaluationFailures.errors) {
       const family = text(error, 80).split(':').slice(0, 2).join(':')
       byReason[family] = (byReason[family] || 0) + 1
-      if (isEvaluatorInfrastructureFailure(error)) infrastructure += 1
+      if (isEvaluatorInfrastructureFailure(error)) {
+        infrastructure += 1
+        infrastructureByReason[family] = (infrastructureByReason[family] || 0) + 1
+      }
     }
     evaluationFailures = Object.freeze({
       available: true as const, error: null,
@@ -687,7 +704,7 @@ export function composeFunnel(input: {
       infrastructure,
       merit: input.evaluationFailures.errors.length - infrastructure,
       byReason: Object.freeze(byReason),
-      explanations: Object.freeze(Object.entries(byReason).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([reason, count]) => explainEvaluationFailure(reason, count))),
+      explanations: Object.freeze(Object.entries(byReason).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([reason, count]) => explainEvaluationFailure(reason, count, infrastructureByReason[reason] === count))),
       source: SOURCE.assurance,
       rule: 'cosUniversityMassEvaluationRollingAuthority.isEvaluatorInfrastructureFailure',
     })

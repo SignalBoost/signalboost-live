@@ -4,6 +4,7 @@ import type { AgentRequest, AllowlistEntry } from '../agent-gateway/index.ts'
 import type { ChainAttempt, ChainExecutor } from './execution-chain.ts'
 import { runCosUniversityMassDistillationWorkflow } from '../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'
 import { triggerStation } from '../lib/ai/cos/cosUniversityAssemblyLineHandoff.ts'
+import { readLinePauseSetting } from '../lib/ai/cos/cosUniversitySettings.ts'
 import {
   LINE_REPAIR_AUTHORIZATION_REF,
   onlyDeferredLineReasonsRemain,
@@ -198,6 +199,7 @@ export async function recoverUniversityMassDistillation(input: {
   readHealth?: HealthReader
   preflightWorker?: WorkerPreflight
   wakeStation?: StationWaker
+  readPause?: () => Promise<{ paused: boolean }>
 }): Promise<UniversityDistillationRecoveryResult> {
   const now = input.now ?? (() => new Date())
   const runWorkflow = input.runWorkflow ?? runCosUniversityMassDistillationWorkflow
@@ -227,6 +229,28 @@ export async function recoverUniversityMassDistillation(input: {
     }
   }
   if (!before.automaticRecoveryAuthorized) throw new Error('university_distillation_recovery_not_authorized')
+
+  // Owner 2026-10-07: while the operator has paused production, a stalled line is intended, not a fault. Recovery
+  // would only reach the paused workflow, find the condition unchanged and report a failed verification every tick.
+  // Stop here as a verified, intentional skip: no drill repair, no worker preflight, no station wake, no spend.
+  const pause = await (input.readPause ?? (() => readLinePauseSetting(input.db)))()
+  if (pause.paused) {
+    const finishedAt = now()
+    return {
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      receiptRef: null,
+      invocationSucceeded: true,
+      skipped: true,
+      verified: true,
+      before,
+      after: before,
+      response: { ok: true, skipped: true, reason: 'line_paused_by_operator' },
+      automaticPromotionAuthorized: false,
+      runpodMutationAuthorized: false,
+      authorityExpanded: false,
+    }
+  }
 
   // Recovery-drill fixtures are deliberately excluded from the paid claim path. Clear only an
   // exact, still-armed fixture first; if that was the only fault, verification completes here

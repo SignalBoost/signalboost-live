@@ -60,6 +60,9 @@ type LineState = {
   unitsReported?: number
 }
 
+// Stations whose work is the next project (owner, 2026-10-06), reported but never a Step 1 line stop.
+const NEXT_PROJECT_STATIONS: ReadonlySet<string> = new Set(['WORKFORCE'])
+
 test.describe('COS University assembly line, proved from outside', () => {
   // One real takt plus the two reads, with generous headroom for a cold start on each.
   test.setTimeout((INTERVAL_SECONDS + 240) * 1000)
@@ -171,7 +174,23 @@ test.describe('COS University assembly line, proved from outside', () => {
     const state = (await response.json()) as LineState
     const stops = Array.isArray(state.lineStops) ? state.lineStops : []
     test.info().annotations.push({ type: 'controller-line-stops', description: JSON.stringify(stops) })
-    expect(stops, `stopped stations: ${JSON.stringify(stops)}`).toEqual([])
+    // Owner scope 2026-10-06 (ONBOARD Step 1): graduates at work (WORKFORCE) are the next project. A stopped WORKFORCE
+    // station is reported here, never a Step 1 failure, exactly as the Step 1 evidence report treats next-project data.
+    const stationOf = (stop: unknown) => String((stop as Record<string, unknown>)?.station ?? '')
+    const nextProject = stops.filter(stop => NEXT_PROJECT_STATIONS.has(stationOf(stop)))
+    const step1Stops = stops.filter(stop => !NEXT_PROJECT_STATIONS.has(stationOf(stop)))
+    if (nextProject.length) test.info().annotations.push({ type: 'next-project-line-stops', description: JSON.stringify(nextProject) })
+    // Name the units a stopped station is holding (oldest first, content-free identity only), so a stop can be traced to
+    // the exact artifacts instead of a count.
+    const rows = Array.isArray(state.units) ? (state.units as Array<Record<string, unknown>>) : []
+    const heldBy = (station: string) => rows
+      .filter(row => String(row.station ?? '') === station)
+      .sort((a, b) => String(a.enteredAt ?? '').localeCompare(String(b.enteredAt ?? '')))
+      .slice(0, 5)
+      .map(row => `${String(row.candidateId ?? '').slice(0, 40)}@${String(row.artifactHash ?? '').slice(0, 12)} status=${String(row.sourceStatus ?? '')} since=${String(row.enteredAt ?? '')} ledger=${String(row.ledgerStation ?? 'none')}`)
+    const held = step1Stops.map(stop => `${stationOf(stop)}: ${heldBy(stationOf(stop)).join(' | ') || 'no unit rows'}`)
+    if (held.length) test.info().annotations.push({ type: 'stopped-station-units', description: held.join(' || ') })
+    expect(step1Stops, `stopped Step 1 stations: ${JSON.stringify(step1Stops)} held units: ${held.join(' || ')}`).toEqual([])
   })
 })
 // end of saas/tests/cosUniversityAssemblyLine.playwright.spec.ts (if this line is missing, the paste was cut short)

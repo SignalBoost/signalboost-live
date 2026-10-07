@@ -113,3 +113,23 @@ test('deterministic University worker exceptions do not classify Hugging Face as
   assert.match(diagnostics, /classification\.reason === 'worker_contract_invalid'/)
   assert.match(diagnostics, /worker_failure_not_provider_scoped/)
 })
+
+// Production 2026-10-07: job 6ac5aaa0fbc85ba6823bb648 failed in pip's
+// resolver before running our worker; that is not a Hugging Face provider outage.
+test('pip dependency ResolutionImpossible is classified as our deterministic worker contract, never a provider circuit', () => {
+  const lines = [
+    '===== Job started at 2026-10-07 02:12:49 =====',
+    'ERROR: Cannot install datasets==3.0.0, datasets==3.5.1 because these package versions have conflicting dependencies.',
+    'ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts',
+  ]
+  const failure = classifyProviderFailure(lines)
+  assert.equal(failure.failureClass, 'configuration_invalid')
+  assert.equal(failure.reason, 'worker_contract_invalid')
+  assert.equal(failure.disposition, 'protected_halt')
+  assert.equal(failure.deterministic, true)
+  assert.equal(failure.costBearingRetryAllowed, false)
+  assert.equal(classifyProviderFailure(['unrelated unknown provider condition']).failureClass, 'unknown')
+  const diagnostics = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityHuggingFaceJobDiagnostics.ts'), 'utf8')
+  assert.match(diagnostics, /classification\.reason === 'worker_contract_invalid'/)
+  assert.match(diagnostics, /worker_failure_not_provider_scoped/)
+})

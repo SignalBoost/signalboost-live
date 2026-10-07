@@ -83,6 +83,14 @@ const REPLENISHMENT_RESEARCH_LENSES = [
  * subject. The live workflow explicitly supplies the owner-controlled query count. The helper keeps
  * a one-query default for callers that only need prioritization semantics.
  */
+/** A sufficient total-item count does not satisfy the 50% independent-source floor. */
+export function needsMassDistillationReplenishment(subject: MassDistillationSubjectSupply): boolean {
+  const sourceShortfall = Number.isSafeInteger(subject.realSourceItems)
+    && Number.isSafeInteger(subject.realSourceNeeded)
+    && Number(subject.realSourceNeeded) > Number(subject.realSourceItems)
+  return subject.shortfallToBatch > 0 || sourceShortfall
+}
+
 export function buildMassDistillationReplenishmentGaps(
   supply: readonly MassDistillationSubjectSupply[],
   now = new Date(),
@@ -92,14 +100,14 @@ export function buildMassDistillationReplenishmentGaps(
   const replenishmentSlot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
   const limit = Math.max(1, Math.floor(maxSubjects))
   const partial = supply
-    .filter(subject => subject.canonicalSubjectId && subject.uniqueBatchableItems > 0 && subject.shortfallToBatch > 0)
+    .filter(subject => subject.canonicalSubjectId && subject.uniqueBatchableItems > 0 && needsMassDistillationReplenishment(subject))
     .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))
   // A subject whose items were just packaged into a batch drops out of the supply list entirely. Filtering only on
   // supplied subjects therefore idled replenishment (Production 2026-09-16: "no_targetable_subject_shortfall" while no
   // batch was prepared and Hugging Face sat idle). Empty canonical subjects fill the remaining slots, rotating per slot.
   const present = new Set(partial.map(subject => subject.canonicalSubjectId))
   const empty = COS_UNIVERSITY_SUBJECTS.filter(subject => !present.has(subject.id)
-    && !supply.some(entry => entry.canonicalSubjectId === subject.id && entry.shortfallToBatch <= 0))
+    && !supply.some(entry => entry.canonicalSubjectId === subject.id && !needsMassDistillationReplenishment(entry)))
   const rotatedEmpty = empty.map((_, index) => empty[(replenishmentSlot + index) % empty.length])
     .map((subject): MassDistillationSubjectSupply => ({ subjectKey: subject.id, subject: subject.title, canonicalSubjectId: subject.id, uniqueBatchableItems: 0, shortfallToBatch: MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS }))
   const selected = [...partial, ...rotatedEmpty].slice(0, limit)
@@ -131,6 +139,7 @@ export function buildMassDistillationReplenishmentGaps(
           'mass_distillation_post_dedup_supply_shortfall',
           `unique_batchable_items=${supplySubject.uniqueBatchableItems}`,
           `shortfall_to_batch=${supplySubject.shortfallToBatch}`,
+          ...(Number.isSafeInteger(supplySubject.realSourceNeeded) ? [`real_source_items=${supplySubject.realSourceItems ?? 'unknown'}`, `real_source_needed=${supplySubject.realSourceNeeded}`] : []),
           `query_variant=${queryIndex + 1}/${queryCount}`,
         ],
         sourceKinds: ['scientific_journal', 'public_dataset'],

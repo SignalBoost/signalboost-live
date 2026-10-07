@@ -107,6 +107,26 @@ async function run(req: NextRequest) {
     .limit(MAX_ARTIFACTS)
   if (source.error) throw source.error
 
+  // Builder/Computer Science artifacts must graduate Residency before the assembly line may hand them to EXACT_CANARY.
+  // Their artifact status remains evaluation_ready while Residency owns them, so status alone is insufficient routing evidence.
+  // Fail closed: absence of durable residency_complete evidence leaves the student with Residency and out of the canary queue.
+  const residencyRequiredIds = (source.data || [])
+    .filter((row: any) => String(row.subject_id || '') === 'Computer Science & Coding' && String(row.status || '') === 'evaluation_ready')
+    .map((row: any) => String(row.candidate_id || ''))
+    .filter(Boolean)
+  const residencyCompleteIds = new Set<string>()
+  for (let offset = 0; offset < residencyRequiredIds.length; offset += LEDGER_READ_CHUNK) {
+    const chunk = residencyRequiredIds.slice(offset, offset + LEDGER_READ_CHUNK)
+    const completed = await db.from('cos_university_residency_enrollments')
+      .select('candidate_id')
+      .in('candidate_id', chunk)
+      .eq('standing', 'residency_complete')
+      .eq('authority_expanded', false)
+      .not('completed_at', 'is', null)
+    if (completed.error) throw completed.error
+    for (const row of completed.data || []) residencyCompleteIds.add(String((row as any).candidate_id || ''))
+  }
+
   const ids = (source.data || []).map((row: any) => String(row.candidate_id || '')).filter(Boolean)
   const existingRows: any[] = []
   for (let offset = 0; offset < ids.length; offset += LEDGER_READ_CHUNK) {
@@ -139,6 +159,7 @@ async function run(req: NextRequest) {
       updatedAt: String(raw.updated_at || nowIso),
     }
     if (!artifact.candidateId || !artifact.artifactHash) continue
+    if (artifact.subjectId === 'Computer Science & Coding' && artifact.status === 'evaluation_ready' && !residencyCompleteIds.has(artifact.candidateId)) continue
     const plan = lifecyclePlan(artifact.status)
     if (!plan) continue
     const previous: any = byId.get(artifact.candidateId) || null

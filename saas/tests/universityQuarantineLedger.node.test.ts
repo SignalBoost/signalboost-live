@@ -136,6 +136,9 @@ test('the review reads the quarantine in bounded chunks and keeps its narrow res
   assert.match(review, /\.range\(from,from\+PAGE_SIZE-1\)/, 'the disposed list is paginated')
   assert.match(review, new RegExp(`REVIEW_PROFILE='${QUARANTINE_REVIEW_PROFILE}'`))
   assert.match(review, new RegExp(`RESTORED='${QUARANTINE_RESTORED_CLAIM}'`))
+  assert.match(review, /\.update\(\{status:'evaluation_ready',updated_at:now\}\)/, 'review returns our-fault students to qualification, never bypasses evaluator admission')
+  assert.match(review, /nextStatus:'evaluation_ready'/)
+  assert.doesNotMatch(review, /\.update\(\{status:'evaluation_pending'/, 'evaluation_pending requires the live exact evaluator approval trigger')
   assert.match(read('app/api/cron/cos-university-mass-backlog-compact/route.ts'), new RegExp(`REVIEW_LANE='${QUARANTINE_REVIEW_LANE}'`))
 })
 

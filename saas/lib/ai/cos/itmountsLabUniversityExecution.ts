@@ -95,3 +95,47 @@ export async function bindLabExperimentToUniversityRun(input: {
     factory: 'existing_cos_university' as const,
   }
 }
+
+
+type RpcClient = {
+  rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: null | { message?: string } }>
+}
+
+function rpcError(error: null | { message?: string }, fallback: string) {
+  if (error) throw new Error(error.message || fallback)
+}
+
+export function createSupabaseLabExecutionDb(client: RpcClient): LabExecutionDb {
+  return {
+    async readExperiment({ organizationId, experimentId }) {
+      const { data, error } = await client.rpc('itmounts_lab_experiment_execution_contract', {
+        p_organization_id: organizationId,
+        p_experiment_id: experimentId,
+      })
+      rpcError(error, 'lab_execution_experiment_read_failed')
+      if (!data) return null
+      const row = data as Record<string, unknown>
+      return {
+        id: String(row.id ?? ''),
+        organizationId: String(row.organization_id ?? ''),
+        privacyTier: String(row.privacy_tier ?? '') as LabPrivacyTier,
+        budgetMicrocredits: Number(row.budget_microcredits),
+      }
+    },
+    async readUniversityRun(runId) {
+      const { data, error } = await client.rpc('itmounts_lab_university_run_execution_contract', { p_run_id: runId })
+      rpcError(error, 'lab_execution_university_run_read_failed')
+      if (!data) return null
+      const row = data as Record<string, unknown>
+      return { id: String(row.id ?? ''), authorityExpanded: row.authority_expanded === true }
+    },
+    async bindUniversityRun({ organizationId, experimentId, runId }) {
+      const { error } = await client.rpc('itmounts_lab_bind_university_run', {
+        p_run_id: runId,
+        p_organization_id: organizationId,
+        p_experiment_id: experimentId,
+      })
+      rpcError(error, 'lab_execution_university_run_bind_failed')
+    },
+  }
+}

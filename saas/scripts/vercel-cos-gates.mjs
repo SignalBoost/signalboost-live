@@ -20,6 +20,8 @@ const tests = [
   'tests/cosUniversityStandardsRatchet.node.test.ts',
   'tests/cosUniversityArtifactLifeRecord.node.test.ts',
   'tests/cosLabFailureAttribution.node.test.ts',
+  // Commercial Lab must reuse the existing University factory behind verified tenant authority.
+  'tests/itmountsLabUniversityExecution.node.test.ts',
   'tests/cosLabSignedFailureVerdict.node.test.ts',
   'tests/cosLabFailureVerdictIngestion.node.test.ts',
   'tests/cosLabVerdictReplayIdentity.node.test.ts',

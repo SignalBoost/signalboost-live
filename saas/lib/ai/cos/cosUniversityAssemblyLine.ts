@@ -164,6 +164,16 @@ export function stationForStatus(status: string): Station | null {
   return BY_STATUS.get(String(status || '').trim()) ?? null
 }
 
+/**
+ * Whether a candidate is a unit of THIS line. Working-COS candidates (`working-cos:<id>`) share the artifact table and its
+ * statuses, but they are a separate owner-dispatched program with no University station worker (ONBOARD: "not part of
+ * the assembly line"). Production 2026-10-07: one sat at `evaluation_pending` from 2026-10-03 and made
+ * INDEPENDENT_EVALUATION read as stopped for 100 hours although no University exam could ever claim it.
+ */
+export function isAssemblyLineCandidate(candidateId: string): boolean {
+  return !/^working-cos:/i.test(String(candidateId || '').trim())
+}
+
 export function stationById(id: string): Station | null {
   return BY_ID.get(String(id || '').trim()) ?? null
 }

@@ -25,6 +25,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
 import {
   LIVE_STATUSES,
+  isAssemblyLineCandidate,
   UNIVERSITY_LINE_CAPACITY,
   WORKING_STATIONS,
   decideLineStops,
@@ -159,6 +160,7 @@ async function run(req: NextRequest) {
       updatedAt: String(raw.updated_at || nowIso),
     }
     if (!artifact.candidateId || !artifact.artifactHash) continue
+    if (!isAssemblyLineCandidate(artifact.candidateId)) continue
     if (artifact.subjectId === 'Computer Science & Coding' && artifact.status === 'evaluation_ready' && !residencyCompleteIds.has(artifact.candidateId)) continue
     const plan = lifecyclePlan(artifact.status)
     if (!plan) continue

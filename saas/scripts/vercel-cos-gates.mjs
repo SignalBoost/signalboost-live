@@ -697,6 +697,7 @@ const tests = [
   'tests/cosUniversityLineCapacity.node.test.ts',
   'tests/cosUniversityWorkforceReservation.node.test.ts',
   'tests/cosUniversityLifecycleOrchestrator.node.test.ts',
+  'tests/cosUniversityLineWorkingCosExclusion.node.test.ts',
   'tests/massGraduateRegistrationStarvation.node.test.ts',
   'tests/cosUniversityMassGraduateRegistration.node.test.ts',
   'tests/pendingGraduateEndpointProtection.node.test.ts',

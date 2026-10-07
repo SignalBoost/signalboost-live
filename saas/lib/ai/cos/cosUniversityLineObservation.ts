@@ -15,6 +15,7 @@ import {
   WORKING_STATIONS,
   decideLineStops,
   leaseIsLive,
+  isAssemblyLineCandidate,
   stationForStatus,
   type LineStop,
   type StationReading,
@@ -89,6 +90,7 @@ export function observeLine(input: {
     const sourceStatus = text(raw.status, 60)
     const station = stationForStatus(sourceStatus)
     if (!candidateId || !artifactHash || !station || station.terminal) continue
+    if (!isAssemblyLineCandidate(candidateId)) continue
     const ledger = ledgerById.get(candidateId) || null
     const ledgerStation = ledger ? text(ledger.station, 60) || null : null
     if (!ledger) ledgerMissing += 1

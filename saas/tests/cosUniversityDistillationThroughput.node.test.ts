@@ -275,3 +275,19 @@ test('ready-buffer accounting cannot let stale prepared rows suppress replenishm
   assert.match(migration, />= ceil\(b\.source_count \* 0\.5\)/)
   assert.match(migration, /source_kind not in \([\s\S]*'teacher_synthetic_curriculum'[\s\S]*'teacher_hosted_curriculum'[\s\S]*'failure_derived_curriculum'/)
 })
+
+
+test('saturated OpenAlex replenishment rotates bounded result pages instead of re-reading page one forever', () => {
+  // Production 2026-10-07 18:00-18:35 UTC: each five-minute run retrieved 90 documents,
+  // but accepted zero; 84-86/90 were duplicates and the HF CC0 sources returned zero.
+  const replenishment = source('../lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts')
+  const liveSources = source('../lib/cos-core/layers/learning/liveSources.ts')
+  const publicClients = source('../lib/cos-core/layers/learning/publicClients.ts')
+  assert.match(replenishment, /openAlexReplenishmentPage\(now: Date\)/)
+  assert.match(replenishment, /1 \+ \(slot % 8\)/)
+  assert.match(replenishment, /COS_LEARNING_OPENALEX_PAGE: String\(openAlexReplenishmentPage\(now\)\)/)
+  assert.match(replenishment, /rightsClearedDistillationAdapters\(now\)/)
+  assert.match(liveSources, /createOpenAlexScientificSearch\(\{page:Number\(env\.COS_LEARNING_OPENALEX_PAGE\|\|'1'\)\}\)/)
+  assert.match(publicClients, /createOpenAlexScientificSearch\(options:\{page\?:number\}=\{\}\)/)
+  assert.match(publicClients, /&page=\$\{page\}&mailto=/)
+})

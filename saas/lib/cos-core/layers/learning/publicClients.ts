@@ -28,10 +28,13 @@ export const crossrefScientificSearch:LearningConnectorSearch=async(query,limit)
  * bibliographic stub and fails the confidence floor no matter how relevant the work is. No extra
  * request, no new source, and the licence label still states what the evidence actually is.
  */
-export const openAlexScientificSearch:LearningConnectorSearch=async(query,limit)=>{
-  const q=compactQuery(query,8)
-  const json=await getJson(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=${Math.min(limit,10)}&mailto=hello%40signalboostapp.com`)
-  return(json?.results??[]).map((item:any):LearningConnectorResult=>{
+export function createOpenAlexScientificSearch(options:{page?:number}={}):LearningConnectorSearch{
+  const configuredPage=Number(options.page)
+  const page=Number.isSafeInteger(configuredPage)&&configuredPage>0?configuredPage:1
+  return async(query,limit)=>{
+    const q=compactQuery(query,8)
+    const json=await getJson(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=${Math.min(limit,10)}&page=${page}&mailto=hello%40signalboostapp.com`)
+    return(json?.results??[]).map((item:any):LearningConnectorResult=>{
     const title=clean(item.title)
     const abstract=clean(abstractFromInvertedIndex(item.abstract_inverted_index))
     const descriptor=clean(`${item.primary_topic?.display_name??''}. ${(item.keywords??[]).slice(0,6).map((k:any)=>k.display_name).join(', ')}. Cited by ${item.cited_by_count??0}.`)
@@ -44,8 +47,10 @@ export const openAlexScientificSearch:LearningConnectorSearch=async(query,limit)
         ?'OpenAlex CC0 abstract read for grounded learning; COS retains only facts, summary, and provenance'
         :(item.open_access?.is_oa?'open-access metadata':'metadata only'),
     }
-  }).filter((x:LearningConnectorResult)=>x.uri&&x.text)
+    }).filter((x:LearningConnectorResult)=>x.uri&&x.text)
+  }
 }
+export const openAlexScientificSearch:LearningConnectorSearch=createOpenAlexScientificSearch()
 
 export const openLibrarySearch:LearningConnectorSearch=async(query,limit)=>{const json=await getJson(`https://openlibrary.org/search.json?q=${encodeURIComponent(compactQuery(query,8))}&limit=${Math.min(limit,10)}`);return(json?.docs??[]).map((item:any):LearningConnectorResult=>({uri:item.key?`https://openlibrary.org${item.key}`:'',title:clean(item.title),text:clean(`${item.title??''}. ${item.author_name?.join(', ')??''}. First published ${item.first_publish_year??'unknown'}. Subjects: ${item.subject?.slice(0,8).join(', ')??''}.`),license:'Open Library metadata'})).filter((x:LearningConnectorResult)=>x.uri&&x.text)}
 

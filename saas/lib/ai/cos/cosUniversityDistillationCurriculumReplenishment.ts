@@ -74,9 +74,15 @@ function openSourceMaintenanceSlotKey(now: Date): string {
   return `distillation-open-source-maintenance-${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
 }
 
-function rightsClearedDistillationAdapters() {
+function openAlexReplenishmentPage(now: Date): number {
+  const slot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
+  return 1 + (slot % 8)
+}
+
+function rightsClearedDistillationAdapters(now: Date) {
   return createLiveLearningAdapters({
     ...process.env,
+    COS_LEARNING_OPENALEX_PAGE: String(openAlexReplenishmentPage(now)),
     COS_LEARNING_CAP_OPENALEX: String(DISTILLATION_OPENALEX_RESULTS_PER_QUERY),
     COS_LEARNING_CAP_HF_NIST: String(DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY),
     COS_LEARNING_CAP_HF_GITHUB_CC0: String(DISTILLATION_OPEN_DATA_RESULTS_PER_QUERY),
@@ -124,7 +130,7 @@ export async function maintainUniversityRightsClearedOpenSourceCorpus(input: {
   if (claim.error) throw claim.error
   if (!claim.data?.id) throw new Error('open_source_maintenance_slot_claim_failed')
 
-  const adapters = rightsClearedDistillationAdapters()
+  const adapters = rightsClearedDistillationAdapters(now)
   if (!adapters.length) {
     const completedAt = new Date().toISOString()
     await db.from('cos_university_continuous_runs').update({
@@ -559,7 +565,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
   // enough free calls to fill its own shortage targets. Admission, relevance, rights, dedup and cost gates
   // remain unchanged; arXiv metadata is intentionally excluded because its underlying paper rights are not
   // asserted for training.
-  const adapters = rightsClearedDistillationAdapters()
+  const adapters = rightsClearedDistillationAdapters(now)
   if (!adapters.length) {
     await db.from('cos_university_continuous_runs').update({
       status: 'error', errors: ['rights_cleared_distillation_adapters_unavailable'], completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),

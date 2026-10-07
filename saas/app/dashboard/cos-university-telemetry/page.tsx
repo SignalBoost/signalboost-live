@@ -628,7 +628,7 @@ export default function CosUniversityTelemetryPage() {
           <Card label={copy.quarantineExamFailed} value={String(leftReasons.exam_failed ?? 0)} />
           <Card label={copy.quarantineResidencyFailed} value={String(leftReasons.residency_failed ?? 0)} />
           <Card label={copy.quarantineExhaustedReal} value={String(leftReasons.exhausted_real_failures ?? 0)} />
-          <Card label={copy.leftUnexaminable} value={String((leftReasons.exam_data_defect ?? 0) + (leftReasons.xsa_not_examinable ?? 0) + (leftReasons.residency_not_completable ?? 0))} />
+          <Card label={copy.leftUnexaminable} value={String((leftReasons.exam_data_defect ?? 0) + (leftReasons.xsa_not_examinable ?? 0) + (leftReasons.residency_not_completable ?? 0) + (leftReasons.exhausted_our_errors ?? 0))} />
         </div>
       </section>
 

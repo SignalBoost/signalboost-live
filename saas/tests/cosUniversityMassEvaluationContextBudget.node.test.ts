@@ -72,13 +72,13 @@ test('seven-case holdouts use the available transport budget instead of collapsi
   assert.deepEqual(baseline.flat().map(item => item.id), seven.map(item => item.id), 'baseline order and content preserved')
 })
 
-test('a 12-case holdout fits the 35-call ceiling as single-case requests for both models', () => {
+test('a 12-case holdout fits the 38-call ceiling as single-case requests for both models', () => {
   const cases = Array.from({ length: 12 }, (_, i) => ({ id: `twelve-${i}`, text: 'x'.repeat(1700) }))
   const promptFor = (group: readonly { text: string }[]) => group.map(item => item.text).join('\n')
   // Six fixed calls (three suites x two models) and the evaluator's five recovery calls; the rest is split evenly so
   // the baseline is asked in the same shape as the candidate (2026-09-28), now one case per request (2026-10-07).
   const fixedEndpointCalls = 6
-  const recoveryReserve = 5
+  const recoveryReserve = 8
   const groupsPerModel = Math.min(cases.length, Math.floor((MASS_EVALUATION_ENDPOINT_CALLS - fixedEndpointCalls - recoveryReserve) / 2))
   assert.equal(groupsPerModel, 12)
   const baseline = planMassEvaluationGroups(cases, promptFor, groupsPerModel, groupsPerModel)

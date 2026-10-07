@@ -98,7 +98,12 @@ import { ESTIMATED_CHARACTERS_PER_TOKEN, RUNPOD_CONTEXT_WINDOW_TOKENS, estimateC
 // thresholds, exact-artifact binding, promotion gates and the Production-traffic prohibition are unchanged. The
 // claim SQL (20261007010000) accepts 25 and 35 so it can be applied BEFORE this deploys; approvals recorded at 25
 // are refreshed by the rolling authority's stale-ceiling path, as in the 18 -> 25 raise.
-export const MASS_EVALUATION_ENDPOINT_CALLS = 35
+// 2026-10-07 owner decision (option a): 35 -> 38 so every exam can finish. At 35 the plan was full - 12 + 12 + 6 fixed,
+// 2 baseline and 3 candidate solo retries - so a base model that gave no answer on a third holdout case had no retry
+// left. The exam then failed as infrastructure and was re-run on later ticks with the same temperature-0 result (one
+// case 9 times in 24 h). The three added calls are baseline solo retries (2 -> 5); the candidate's retries, every
+// score, threshold and gate are unchanged. Claim SQL 20261007230000 accepts 25, 35 and 38 and is applied first.
+export const MASS_EVALUATION_ENDPOINT_CALLS = 38
 export const MASS_EVALUATION_JUDGE_CALLS = 4
 
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = RUNPOD_CONTEXT_WINDOW_TOKENS

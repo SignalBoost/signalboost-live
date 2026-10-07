@@ -16,12 +16,13 @@ const cron = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled
 // time on identical cases (28.4s vs 16.9s against a 35.2-40.4s gateway cutoff), can use smaller requests while
 // preserving every holdout case, the fixed suites, and bounded recovery headroom.
 
-test('the ceiling is 35 and is defined exactly once', () => {
+test('the ceiling is 38 and is defined exactly once', () => {
   // 14 -> 18: the four extra calls paid for one request per fixed suite per model.
   // 18 -> 25: the seven extra calls buy the BASELINE the same nine holdout requests the candidate already had,
   // so both models answer with the same output-token room on the comparison holdout_improved grades.
   // 25 -> 35 (owner 2026-10-07): the holdout grows 6 -> 12 cases and stays one case per request for both models.
-  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 35)
+  // 35 -> 38 (owner 2026-10-07, option a): three more baseline solo retries so every exam can finish.
+  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 38)
   assert.match(worker, /^MASS_HOLDOUT_MAX_ITEMS = 12$/m)
   assert.equal(MASS_EVALUATION_JUDGE_CALLS, 4)
 })
@@ -37,7 +38,7 @@ test('all three enforcement points read the shared constant, so the approval sha
 })
 
 test('both models get the same budget-derived grouping, leaving fixed-suite and recovery capacity', () => {
-  assert.match(evaluator, /const fixedEndpointCalls=6;const recoveryReserve=5/)
+  assert.match(evaluator, /const fixedEndpointCalls=6;const recoveryReserve=8/)
   // The holdout budget is split evenly so the baseline is no longer pinned at 2 groups while the candidate takes
   // the remainder. Unequal requests meant unequal output-token room per answer on the exact comparison
   // holdout_improved grades (Production 2026-09-28: candidate 9 requests, baseline 2, on a 13-case holdout).
@@ -52,7 +53,7 @@ test('a 12-case holdout is one case per request for both models, with fixed suit
   const holdoutCases = 12
   // Six: one request per fixed suite per model. Five: the evaluator's recovery reserve.
   const fixedEndpointCalls = 6
-  const recoveryReserve = 5
+  const recoveryReserve = 8
   const groupsPerModel = Math.min(holdoutCases, Math.floor((MASS_EVALUATION_ENDPOINT_CALLS - fixedEndpointCalls - recoveryReserve) / 2))
   assert.equal(groupsPerModel, 12)
   assert.equal(groupsPerModel * 2 + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)

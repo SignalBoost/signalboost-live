@@ -730,7 +730,7 @@ async function runMassDistilledArtifactEvaluationInsideHarness(input:{claim:Mass
     // junk. Give each suite its own request so the per-request output allowance covers four cases
     // instead of twelve. Three suites x two models = 6 calls, inside the 18-call ceiling alongside the
     // holdout plan and one recovery slot.
-    const fixedEndpointCalls=6;const recoveryReserve=5
+    const fixedEndpointCalls=6;const recoveryReserve=8
     // Both models answer under identical conditions. The holdout call budget is split evenly, so the baseline gets
     // the same number of requests - and therefore the same output-token room per answer - as the slower candidate,
     // which is what holdout_improved compares. Before this, the baseline was pinned at 2 groups while the candidate
@@ -739,7 +739,7 @@ async function runMassDistilledArtifactEvaluationInsideHarness(input:{claim:Mass
     const baselineGroupCount=holdoutGroupTarget
     const candidateGroupTarget=holdoutGroupTarget
     if(candidateGroupTarget<1)throw new Error(`mass_distilled_evaluation_endpoint_call_ceiling_plan:baseline=${baselineGroupCount}:candidate=${candidateGroupTarget}:fixed=${fixedEndpointCalls}:recovery=${recoveryReserve}:max=${ENDPOINT_CALLS}`)
-    const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:baselineGroupCount,reserveCallsAfter:candidateGroupTarget+fixedEndpointCalls+3,maxSoloRecoveries:2,minGroups:baselineGroupCount,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
+    const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:baselineGroupCount,reserveCallsAfter:candidateGroupTarget+fixedEndpointCalls+3,maxSoloRecoveries:5,minGroups:baselineGroupCount,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
     // The slower candidate receives the maximum number of near-equal groups that fit the current authorization
     // after baseline, fixed suites and one recovery slot. minGroups pins the planner to that budget-derived shape.
     const holdoutCandidate=await answersFor({...common,model,cases:holdoutCases,maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls,maxSoloRecoveries:3,feature:'mass_distilled_eval_holdout_candidate',candidate:true})

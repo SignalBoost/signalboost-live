@@ -29,6 +29,7 @@ import {
   releaseUniversityMassDistillationWorkflowLease,
 } from './cosUniversityMassDistillationWorkflowLease.ts'
 import { readMassEvaluationBacklogGate } from './cosUniversityMassEvaluationBacklogGate.ts'
+import { massDistillationPreparedBatchIsAuthorizable } from './cosUniversityMassDistillationEligibility.ts'
 
 export type MassDistillationWorkflowSource = 'scheduled_cron' | 'self_healing_supervisor'
 
@@ -72,7 +73,36 @@ async function consumedBatchKeys(db: any, keys: readonly string[]): Promise<Set<
   return consumed
 }
 
-/** Count prepared batches until the buyer/owner configured inventory target is satisfied. */
+async function sourceKindsByContentHash(db: any, hashes: readonly string[]): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>()
+  const unique = [...new Set(hashes.map(value => String(value || '')).filter(Boolean))]
+  const chunkSize = 200
+  for (let offset = 0; offset < unique.length; offset += chunkSize) {
+    const chunk = unique.slice(offset, offset + chunkSize)
+    const rows = await db.from('cos_continuous_learning')
+      .select('content_hash,source_kind')
+      .in('content_hash', chunk)
+    if (rows.error) throw rows.error
+    for (const row of rows.data || []) {
+      const hash = String((row as any).content_hash || '')
+      const kind = String((row as any).source_kind || '')
+      if (!hash || !kind) continue
+      const existing = result.get(hash)
+      if (existing) existing.push(kind)
+      else result.set(hash, [kind])
+    }
+  }
+  return result
+}
+
+/**
+ * Count only prepared batches that can pass the same non-spending admission law as the
+ * production authorization RPC. A stale synthetic-heavy prepared row is not ready inventory.
+ *
+ * Production 2026-10-07: 196 rows were status=prepared, but 0 were authorizable. Counting the
+ * stale rows satisfied the ready-buffer target and suppressed replenishment even though the
+ * rolling authorizer correctly returned no_prepared_batch / no_authorized_campaign.
+ */
 async function preparedMassDistillationInventory(target: number): Promise<number> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -81,7 +111,7 @@ async function preparedMassDistillationInventory(target: number): Promise<number
   let available = 0
   while (available < target) {
     const prepared = await db.from('cos_university_distillation_curriculum_batches')
-      .select('batch_key')
+      .select('batch_key,source_hashes,source_count')
       .eq('status', 'prepared')
       .eq('dispatch_authorized', false)
       .eq('authority_expanded', false)
@@ -95,7 +125,24 @@ async function preparedMassDistillationInventory(target: number): Promise<number
     const keys = rows.map((row: any) => String(row.batch_key || '')).filter(Boolean)
     if (keys.length) {
       const used = await consumedBatchKeys(db, keys)
-      available += keys.filter(key => !used.has(key)).length
+      const unused = rows.filter((row: any) => {
+        const key = String(row.batch_key || '')
+        return key && !used.has(key)
+      })
+      const allHashes = unused.flatMap((row: any) =>
+        Array.isArray(row.source_hashes) ? row.source_hashes.map((hash: unknown) => String(hash || '')).filter(Boolean) : [])
+      const sourceKinds = await sourceKindsByContentHash(db, allHashes)
+      available += unused.filter((row: any) => {
+        // SQL ANY() counts each continuous-learning row once even if a source hash were duplicated.
+        const hashes = [...new Set<string>(Array.isArray(row.source_hashes)
+          ? row.source_hashes.map((hash: unknown) => String(hash || '')).filter(Boolean)
+          : [])]
+        const kinds = hashes.flatMap((hash: string) => sourceKinds.get(hash) || [])
+        return massDistillationPreparedBatchIsAuthorizable({
+          sourceCount: Number(row.source_count || 0),
+          sourceKinds: kinds,
+        })
+      }).length
     }
     if (rows.length < pageSize) break
     offset += pageSize

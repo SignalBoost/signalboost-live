@@ -39,7 +39,7 @@ test('the baseline abstains on exactly those two shapes, after the solo retry, a
   // Then the baseline rule: record and continue, never throw, only for those two shapes.
   assert.match(SOURCE, /if\(!input\.candidate&&\(candidateSoloEmptyAnswer\(failure\)\|\|candidateSoloMarkerlessNoAnswer\(failure\)\)\)\{abstained\.set\(id,failure\);[^}]*continue\}/)
   // Any other baseline failure still fails closed.
-  assert.match(SOURCE, /continue\}\s*throw new Error\(failure\)\s*\}/)
+  assert.match(SOURCE, /continue\}\s*\/\/[^\n]*\n\s*throw new MassEvaluationAnswerProtocolError\(failure,solo\.protocol\[id\]\)\s*\}/)
   // It happens inside the solo retry, so a first grouped miss still earns its one solo attempt.
   const soloAt = SOURCE.indexOf('const solo=await raw([item])')
   const abstainAt = SOURCE.indexOf('abstained.set(id,failure)')

@@ -353,14 +353,23 @@ async function registerNextMassGraduate() {
       && row.evidence?.evaluationPassed === true)
     const baseline = Number(completion?.evidence?.holdout?.baselineScore)
     const trained = Number(completion?.evidence?.holdout?.trainedArtifactScore)
+    // Owner go 2026-10-06: the holdout gate is now a statistically significant paired gain. An artifact whose passing
+    // exam predates that gate carries no recorded significance, and a pre-gate pass is the coin flip the gate exists to
+    // stop. Reopen it once for a re-exam under the current gate instead of graduating it or parking it forever; the
+    // decision below would refuse it either way (holdout_gain_not_significant).
+    const completedHoldout = completion?.evidence?.holdout
+    const preSignificanceGatePass = Boolean(completion)
+      && !(completedHoldout && typeof completedHoldout === 'object' && 'significance' in completedHoldout)
     if (completion && Number.isFinite(baseline) && Number.isFinite(trained) && trained > baseline) {
       const freshVerdict = mine.some((row: any) => row.verifier === 'independent_scorer'
         && row.evidence?.claim === 'independent_evaluation'
         && Number(row.evidence?.baselineScore) === baseline
         && Number(row.evidence?.trainedArtifactScore) === trained)
-      if (!freshVerdict) {
+      if (!freshVerdict || preSignificanceGatePass) {
         const now = new Date().toISOString()
-        const repairRef = 'mass_graduate_stale_reopened_verdict_recovery_2026-09-30'
+        const repairRef = !freshVerdict
+          ? 'mass_graduate_stale_reopened_verdict_recovery_2026-09-30'
+          : 'mass_graduate_holdout_significance_gate_reexam_2026-10-06'
         const reopened = await db.from('cos_local_distillation_artifacts')
           .update({ status: 'evaluation_pending', updated_at: now })
           .eq('candidate_id', candidateId)

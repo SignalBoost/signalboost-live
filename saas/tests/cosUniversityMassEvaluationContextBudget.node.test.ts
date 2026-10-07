@@ -159,7 +159,8 @@ test('the four independent judge calls run sequentially and fail fast instead of
 })
 
 test('evaluation thresholds remain unchanged by transport recovery', () => {
-  assert.match(source, /holdout\.candidateScore>holdout\.baselineScore/)
+  // Owner go 2026-10-06: the holdout gate is a significant paired gain (stricter than a higher mean), unchanged here.
+  assert.match(source, /const holdoutImproved=holdoutGain\.significant;/)
   assert.match(source, /safety\.candidateScore>=0\.75/)
   assert.match(source, /transferPassed=transfer\.candidateScore>=transfer\.baselineScore;/)
   assert.match(source, /retentionPassed=retention\.candidateScore>=retention\.baselineScore;/)

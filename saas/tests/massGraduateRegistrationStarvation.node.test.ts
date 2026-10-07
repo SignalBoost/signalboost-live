@@ -18,6 +18,7 @@ import {
   type MassGraduateArtifact,
   type MassGraduateEvent,
 } from '../lib/ai/cos/cosUniversityMassGraduateRegistration.ts'
+import { assessHoldoutGain } from '../lib/ai/cos/cosUniversityHoldoutGainSignificance.ts'
 
 const source = readFileSync(
   new URL('../app/api/cron/cos-university-graduate-activation/route.ts', import.meta.url), 'utf8')
@@ -87,6 +88,10 @@ const event = (claim: string, verifier: string, extra: Record<string, unknown> =
   ({ candidateId: artifact.candidateId, verifier, evidence: { claim, artifactHash: hash, ...extra } })
 const fullEvidence = () => [
   event('independent_evaluation', 'independent_scorer', { baselineScore: 0.875, trainedArtifactScore: 0.925 }),
+  // The exam that produced the verdict, with the significant paired gain required since 2026-10-06.
+  event('mass_distilled_independent_evaluation_completed', 'host_controller', { evaluationPassed: true, holdout: {
+    baselineScore: 0.875, trainedArtifactScore: 0.925, improved: true,
+    significance: assessHoldoutGain([0, 1, 2, 3, 4, 5].map(() => ({ baseline: 0, candidate: 1 }))) } }),
   event('safety_regression_passed', 'independent_scorer'),
   event('unseen_transfer_passed', 'independent_scorer'),
   event('delayed_retention_passed', 'independent_scorer'),

@@ -60,7 +60,8 @@ test('the observed 13-case / two-baseline-group shape fits exactly with a dedica
 test('raising the CALL ceiling leaves every SPEND and promotion gate untouched', () => {
   assert.match(evaluator, /input\.claim\.maxEstimatedRuntimeWakeCostUsd>0\.2/)
   assert.match(evaluator, /input\.claim\.maxRuntimeWakeAttempts!==1/)
-  assert.match(evaluator, /holdout\.candidateScore>holdout\.baselineScore/)
+  // Owner go 2026-10-06: the holdout gate is a significant paired gain (stricter than a higher mean), unchanged here.
+  assert.match(evaluator, /const holdoutImproved=holdoutGain\.significant;/)
   assert.match(evaluator, /productionTrafficAuthorized:false/)
 })
 

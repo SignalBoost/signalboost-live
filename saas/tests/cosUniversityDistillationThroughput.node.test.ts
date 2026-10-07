@@ -79,7 +79,7 @@ test('paid authorization and dispatch precede slower ready-inventory maintenance
   assert.match(workflow, /throughput\.acquisitionCandidatesPerCycle/)
   assert.match(workflow, /throughput\.corpusScanRows/)
   assert.match(workflow, /throughput\.maxBatchesPerSweep/)
-  assert.match(workflow, /slowMaintenanceDue = input\.source === 'self_healing_supervisor' \|\| now\.getUTCMinutes\(\) % 5 === 0/)
+  assert.match(workflow, /scheduledMinute % 5 === 0/)\n  assert.match(workflow, /scheduledMinute % 5 === 1/)
   assert.match(workflow, /slowMaintenanceDue[\s\S]*campaign_recovery/)
   assert.match(workflow, /slowMaintenanceDue[\s\S]*semantic_reconciliation/)
   assert.match(workflow, /reason: 'maintenance_not_due'/)
@@ -290,4 +290,13 @@ test('saturated OpenAlex replenishment rotates bounded result pages instead of r
   assert.match(liveSources, /createOpenAlexScientificSearch\(\{page:Number\(env\.COS_LEARNING_OPENALEX_PAGE\|\|'1'\)\}\)/)
   assert.match(publicClients, /createOpenAlexScientificSearch\(options:\{page\?:number\}=\{\}\)/)
   assert.match(publicClients, /&page=\$\{page\}&mailto=/)
+})
+
+
+test('five-minute maintenance tolerates one-minute production cron delivery drift', () => {
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  assert.match(workflow, /scheduledMinute % 5 === 0/)
+  assert.match(workflow, /scheduledMinute % 5 === 1/)
+  assert.match(workflow, /scheduler drift/)
+  assert.match(workflow, /workflow lease prevents[\s\S]*concurrent duplicate sweeps/)
 })

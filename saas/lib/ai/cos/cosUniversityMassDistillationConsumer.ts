@@ -45,8 +45,6 @@ export const MASS_DISTILLATION_TEACHER_COST_CEILING_USD = 0.20 as const
 export const MASS_DISTILLATION_PREPARATION_COST_CEILING_USD = 0.015 as const
 export const MASS_DISTILLATION_TRAINING_COST_CEILING_USD = 1.61 as const
 const MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS = 20 as const
-const MASS_REMEDIATION_TEACHER_MIN_ROWS = 27 as const
-const MASS_REMEDIATION_TEACHER_MAX_CALLS = 32 as const
 const MASS_REMEDIATION_HOLDOUT_TARGET = 5 as const
 const MASS_REMEDIATION_ORDINARY_TRAINING_MIN = 2 as const
 const MASS_REMEDIATION_ORDINARY_PROMPT_MIN = MASS_REMEDIATION_HOLDOUT_TARGET + MASS_REMEDIATION_ORDINARY_TRAINING_MIN
@@ -488,43 +486,27 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       if (student.license !== 'apache-2.0') throw new Error('mass_distillation_student_model_rights_invalid')
       const failureDerivedPromptIds = new Set(promptSet.failureDerivedPromptIds)
       const remediationTeacherRequired = failureDerivedPromptIds.size >= MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS
-      const remediationTeacherPrompts = remediationTeacherRequired
-        ? (() => {
-            const failureDerived = promptSet.prompts.filter(item => failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
-            const ordinary = promptSet.prompts.filter(item => !failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
-            if (ordinary.length < MASS_REMEDIATION_ORDINARY_PROMPT_MIN) {
-              throw new Error(`mass_distillation_remediation_ordinary_training_floor_unreachable:${ordinary.length}/${MASS_REMEDIATION_ORDINARY_PROMPT_MIN}`)
-            }
-            const failureDerivedTarget = MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS
-            if (failureDerived.length < failureDerivedTarget) {
-              throw new Error(`mass_distillation_remediation_teacher_floor_unreachable:${failureDerived.length}/${failureDerivedTarget}`)
-            }
-            // Preserve all 20 corrective prompts while adding as much independent ordinary subject material
-            // as the existing 32-call teacher ceiling permits. The preparation worker withholds five ordinary
-            // rows for holdout, leaving at least MASS_REMEDIATION_ORDINARY_TRAINING_MIN ordinary examples in
-            // training. This prevents a remediation batch from becoming "20 safety examples, 0 subject examples".
-            const ordinaryTarget = Math.min(
-              ordinary.length,
-              MASS_REMEDIATION_TEACHER_MAX_CALLS - failureDerivedTarget,
-            )
-            const selected = [
-              ...failureDerived.slice(0, failureDerivedTarget),
-              ...ordinary.slice(0, ordinaryTarget),
-            ]
-            if (selected.length < MASS_REMEDIATION_TEACHER_MIN_ROWS || selected.length > MASS_REMEDIATION_TEACHER_MAX_CALLS) {
-              throw new Error(`mass_distillation_remediation_teacher_selection_invalid:${selected.length}`)
-            }
-            return Object.freeze(selected)
-          })()
-        : promptSet.prompts
+      // Owner go 2026-10-06: the teacher answers EVERY packaged prompt. Production 2026-09-29..10-06: batches were
+      // packaged with 64-72 items but the stage completed at 20 (or 32 with remediation) answers and the rest were
+      // dropped, so every artifact trained on 26-31 items and the holdout stayed at 6 cases. A remediation batch must
+      // still carry its corrective prompts and enough ordinary subject material for an independent holdout.
+      if (remediationTeacherRequired) {
+        const ordinary = promptSet.prompts.filter(item => !failureDerivedPromptIds.has(clean(item.id, 64).toLowerCase()))
+        if (ordinary.length < MASS_REMEDIATION_ORDINARY_PROMPT_MIN) {
+          throw new Error(`mass_distillation_remediation_ordinary_training_floor_unreachable:${ordinary.length}/${MASS_REMEDIATION_ORDINARY_PROMPT_MIN}`)
+        }
+      }
+      const teacherPrompts = promptSet.prompts
 
       const hosted = await runMassHostedTeacherStage({
         db: cosServiceDb(),
         run,
-        prompts: remediationTeacherPrompts,
+        prompts: teacherPrompts,
         promptSetHash: promptSet.promptSetHash,
-        minimumRows: remediationTeacherRequired ? remediationTeacherPrompts.length : undefined,
-        maxCalls: remediationTeacherRequired ? MASS_REMEDIATION_TEACHER_MAX_CALLS : undefined,
+        // Every prompt must be answered. A batch larger than one invocation's call budget is answered across consecutive
+        // invocations: the incomplete stage is a non-terminal failure that the bounded retry re-arms, and each retry
+        // calls only the prompts that still have no persisted answer.
+        minimumRows: teacherPrompts.length,
         fetchImpl: fetchImpl as typeof fetch | undefined,
       })
       if (hosted.skipped && hosted.reason === 'no_active_hosted_teacher_provider') {

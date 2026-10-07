@@ -15,9 +15,12 @@ const HOSTED_TRANSPORTS: readonly UniversityTeacherTransport[] = Object.freeze([
   'gemini_generate_content',
 ])
 const MIN_TEACHER_ROWS = 20
-const DEFAULT_MAX_CALLS = 20
-const HARD_MAX_CALLS = 20
-const HARD_MAX_REMEDIATION_CALLS = 32
+// One invocation's call budget. 32 is the largest budget Production has run inside the route (remediation batches);
+// it is a per-invocation attempt budget, never a row cap: rows persist per call and the next invocation answers only
+// the prompts still missing.
+const INVOCATION_MAX_CALLS = 32
+// Every packaged prompt must be answered (owner go 2026-10-06). MASS_DISTILLATION_MAX_BATCH is 128.
+const HARD_MAX_PROMPTS = 128
 const DEFAULT_MAX_OUTPUT_TOKENS = 384
 const HARD_MAX_OUTPUT_TOKENS = 512
 const DEFAULT_PARALLELISM = 8
@@ -94,7 +97,6 @@ function hostedActiveTeachers(env: Env): UniversityTeacherDefinition[] {
 export function massHostedTeacherStageConfig(env: Env = process.env) {
   return Object.freeze({
     enabled: truthy(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED),
-    maxCalls: boundedInt(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS, DEFAULT_MAX_CALLS, MIN_TEACHER_ROWS, HARD_MAX_CALLS),
     maxOutputTokens: boundedInt(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS, DEFAULT_MAX_OUTPUT_TOKENS, 128, HARD_MAX_OUTPUT_TOKENS),
     parallelism: boundedInt(env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM, DEFAULT_PARALLELISM, 1, HARD_MAX_PARALLELISM),
     minimumRows: MIN_TEACHER_ROWS,
@@ -175,14 +177,13 @@ export async function runMassHostedTeacherStage(input: {
   prompts: readonly Prompt[]
   promptSetHash: string
   minimumRows?: number
-  maxCalls?: number
   env?: Env
   fetchImpl?: typeof fetch
 }) {
   const env = input.env || process.env
   const config = massHostedTeacherStageConfig(env)
-  const minimumRows = boundedInt(input.minimumRows, MIN_TEACHER_ROWS, MIN_TEACHER_ROWS, HARD_MAX_REMEDIATION_CALLS)
-  const effectiveMaxCalls = boundedInt(input.maxCalls, config.maxCalls, minimumRows, HARD_MAX_REMEDIATION_CALLS)
+  const minimumRows = boundedInt(input.minimumRows, MIN_TEACHER_ROWS, MIN_TEACHER_ROWS, HARD_MAX_PROMPTS)
+  const effectiveMaxCalls = INVOCATION_MAX_CALLS
   const teachers = hostedActiveTeachers(env)
 
   if (!config.enabled) {

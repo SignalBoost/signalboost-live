@@ -88,7 +88,6 @@ const env = {
   COS_UNIVERSITY_TEACHER_GEMINI_ADAPTER_READY: 'true',
   COS_UNIVERSITY_TEACHER_GEMINI_MODEL: 'gemini-3.8-flash',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED: 'true',
-  COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS: '20',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS: '384',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM: '8',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_COST_USD_JSON: JSON.stringify({
@@ -104,7 +103,6 @@ const env = {
 test('mass hosted teacher stage is hard-bounded to the existing teacher ceiling envelope', () => {
   const config = massHostedTeacherStageConfig(env)
   assert.equal(config.enabled, true)
-  assert.equal(config.maxCalls, 20)
   assert.equal(config.maxOutputTokens, 384)
   assert.equal(config.parallelism, 8)
   assert.equal(config.minimumRows, 20)
@@ -246,7 +244,8 @@ test('hosted teacher preparation restores prompt-response structure without chan
 test('production config activates the bounded parallel teacher stage without embedding credentials', () => {
   const vercel = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../vercel.json'), 'utf8'))
   assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED, 'true')
-  assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS, '20')
+  // Removed 2026-10-06: the per-invocation budget is fixed in code and every packaged prompt must be answered.
+  assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS, undefined)
   assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS, '384')
   assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM, '8')
   assert.deepEqual(JSON.parse(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PROVIDER_COST_USD_JSON), {
@@ -363,10 +362,13 @@ test('missing teacher work reroutes to another available provider instead of wai
   const first = await runMassHostedTeacherStage({
     db, run, prompts, promptSetHash: '1'.repeat(64), env: retryEnv, fetchImpl,
   })
-  assert.equal(first.rows, 16)
+  // Since 2026-10-06 one invocation may spend 32 calls, so after 20 first routes the 12 spare calls give some prompts a
+  // backup route in the same invocation: two of the four failed Claude prompts already land on OpenAI here.
+  console.log('[reroute-first]', JSON.stringify({ rows: first.rows, mix: first.providerMix, failures: first.failures.length, attempted: first.attemptedCalls }))
+  assert.equal(first.rows, 18)
   assert.equal(first.completed, false)
   assert.deepEqual(first.activeProviders, ['openai', 'claude'])
-  assert.equal(first.providerMix.openai, 16)
+  assert.equal(first.providerMix.openai, 18)
   assert.equal(first.providerMix.claude, undefined)
   assert.equal(first.failures.length, 4)
   assert.ok(first.failures.every(item => item.teacherId === 'claude'))
@@ -381,8 +383,9 @@ test('missing teacher work reroutes to another available provider instead of wai
   assert.equal(second.completed, true)
   assert.equal(second.providerMix.openai, 20)
   assert.equal(second.providerMix.claude, undefined)
+  console.log('[reroute-second]', JSON.stringify({ rows: second.rows, attempted: second.attemptedCalls, rerouted: second.reroutedPrompts }))
   assert.equal(second.reroutedPrompts, 0)
-  assert.equal(second.attemptedCalls, 4)
+  assert.equal(second.attemptedCalls, 2)
   assert.equal(second.failures.length, 0)
 })
 
@@ -427,7 +430,6 @@ test('remediation teacher override can produce twenty-five rows without widening
     prompts,
     promptSetHash: '9'.repeat(64),
     minimumRows: 25,
-    maxCalls: 32,
     env,
     fetchImpl: async (input, init) => {
       calls += 1
@@ -461,7 +463,6 @@ test('remediation teacher override can produce twenty-five rows without widening
     },
   })
 
-  assert.equal(massHostedTeacherStageConfig(env).maxCalls, 20)
   assert.equal(result.minimumRows, 25)
   assert.equal(result.effectiveMaxCalls, 32)
   assert.equal(result.rows, 25)
@@ -479,11 +480,11 @@ test('remediation consumer keeps ordinary subject examples in training after ind
   assert.match(consumer, /MASS_REMEDIATION_HOLDOUT_TARGET = 5/)
   assert.match(consumer, /MASS_REMEDIATION_ORDINARY_TRAINING_MIN = 2/)
   assert.match(consumer, /MASS_REMEDIATION_ORDINARY_PROMPT_MIN = MASS_REMEDIATION_HOLDOUT_TARGET \+ MASS_REMEDIATION_ORDINARY_TRAINING_MIN/)
-  assert.match(consumer, /MASS_REMEDIATION_TEACHER_MIN_ROWS = 27/)
   assert.match(consumer, /ordinary\.length < MASS_REMEDIATION_ORDINARY_PROMPT_MIN/)
-  assert.match(consumer, /failureDerivedTarget = MASS_REMEDIATION_REPLAY_MIN_TRAINING_ROWS/)
-  assert.match(consumer, /MASS_REMEDIATION_TEACHER_MAX_CALLS - failureDerivedTarget/)
-  assert.match(consumer, /minimumRows: remediationTeacherRequired \? remediationTeacherPrompts\.length : undefined/)
+  // Owner go 2026-10-06: every packaged prompt is answered, corrective and ordinary alike.
+  assert.match(consumer, /const teacherPrompts = promptSet\.prompts/)
+  assert.match(consumer, /minimumRows: teacherPrompts\.length,/)
+  assert.doesNotMatch(consumer, /MASS_REMEDIATION_TEACHER_MAX_CALLS|remediationTeacherPrompts/)
 
   // Mass preparation still withholds holdout exclusively from ordinary rows, so >=7 ordinary teacher
   // rows means the five-row holdout cannot consume every ordinary subject example.
@@ -500,4 +501,76 @@ test('dataset preparation emits assessment-ready Holdout rows without changing t
   assert.match(worker, /\{\*\*row, "holdout_format": "training_pair_v1"\} for _, row in training_pairs/)
   assert.match(worker, /"holdout_format": "assessment_ready_v1"/)
   assert.match(worker, /Do not invent a different example/)
+})
+
+
+test('a 70-prompt batch is answered in full across invocations, each calling only unanswered prompts (owner go 2026-10-06)', async () => {
+  // Production 2026-09-29..10-06: batches packaged 64-72 items, the stage stopped at 20/32 answers and every artifact
+  // trained on 26-31 items. Completion now means every packaged prompt has an answer.
+  const db = memoryDb()
+  const prompts = Array.from({ length: 70 }, (_, index) => ({
+    id: (index + 500).toString(16).padStart(64, '0'),
+    prompt: `Subject prompt ${index + 1}`,
+  }))
+  const run = {
+    id: '99999999-9999-4999-8999-999999999999',
+    candidate_id: 'mass:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:eeeeeeeeeeeeeeee',
+    batch_key: 'b'.repeat(64),
+  }
+  const calledPrompts: string[] = []
+  const fetchImpl = async (input: unknown, init?: RequestInit) => {
+    const url = String(input)
+    const body = JSON.parse(String(init?.body || '{}'))
+    const text = JSON.stringify(body)
+    const match = text.match(/Subject prompt \d+/)
+    calledPrompts.push(match ? match[0] : 'unknown')
+    const answer = `answer-${calledPrompts.length}`
+    if (url.includes('anthropic.com')) {
+      return new Response(JSON.stringify({ content: [{ type: 'text', text: answer }], usage: { input_tokens: 10, output_tokens: 5 } }),
+        { status: 200, headers: { 'request-id': `a-${calledPrompts.length}` } })
+    }
+    if (url.includes('generativelanguage.googleapis.com')) {
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: answer }] } }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 } }),
+        { status: 200, headers: { 'x-goog-request-id': `g-${calledPrompts.length}` } })
+    }
+    if (url.includes('api.openai.com/v1/responses')) {
+      return new Response(JSON.stringify({ id: `r-${calledPrompts.length}`, output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: answer }] }], usage: { input_tokens: 10, output_tokens: 5 } }),
+        { status: 200, headers: { 'x-request-id': `o-${calledPrompts.length}` } })
+    }
+    return new Response(JSON.stringify({ choices: [{ message: { content: answer } }], usage: { prompt_tokens: 10, completion_tokens: 5 } }),
+      { status: 200, headers: { 'x-request-id': `c-${calledPrompts.length}` } })
+  }
+  const invoke = () => runMassHostedTeacherStage({ db, run, prompts, promptSetHash: '8'.repeat(64), minimumRows: prompts.length, env, fetchImpl })
+
+  const first = await invoke()
+  assert.equal(first.effectiveMaxCalls, 32)
+  assert.equal(first.rows, 32)
+  assert.equal(first.completed, false, 'a partial batch never advances to preparation')
+  assert.equal(first.datasetHash, null)
+
+  const second = await invoke()
+  assert.equal(second.rows, 64)
+  assert.equal(second.completed, false)
+
+  const third = await invoke()
+  assert.equal(third.rows, 70)
+  assert.equal(third.minimumRows, 70)
+  assert.equal(third.completed, true)
+  assert.ok(third.datasetHash)
+  assert.equal(third.outputHashes.length, 70)
+
+  // 70 calls for 70 prompts: no answered prompt was ever bought twice.
+  assert.equal(calledPrompts.length, 70)
+  assert.equal(new Set(calledPrompts).size, 70)
+  assert.equal(db.rows.length, 70)
+  console.log(`[teacher-full-coverage] plannedEstimatedCostUsd(70 prompts, production unit prices)=${first.plannedEstimatedCostUsd} perPrompt=${(first.plannedEstimatedCostUsd / 70).toFixed(5)}`)
+  console.log(`[teacher-full-coverage] prompts=70 invocations=3 rowsAfterEach=${first.rows},${second.rows},${third.rows} calls=${calledPrompts.length} completed=${third.completed}`)
+})
+
+test('the per-invocation call budget is fixed in code and the minimum is every packaged prompt up to the 128-item batch maximum', () => {
+  const source = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts'), 'utf8')
+  assert.match(source, /const INVOCATION_MAX_CALLS = 32\b/)
+  assert.match(source, /const HARD_MAX_PROMPTS = 128\b/)
+  assert.match(source, /const effectiveMaxCalls = INVOCATION_MAX_CALLS/)
+  assert.doesNotMatch(source, /COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS|DEFAULT_MAX_CALLS|HARD_MAX_CALLS\b/)
 })

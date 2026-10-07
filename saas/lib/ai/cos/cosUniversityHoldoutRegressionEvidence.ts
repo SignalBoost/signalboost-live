@@ -8,7 +8,9 @@
 // format defect) or a full, wrong answer (lost knowledge). Those need different repairs.
 //
 // For every holdout case where the trained artifact scored strictly below the baseline, this records the two scores,
-// both answers' lengths, whether the candidate answer is empty, and a bounded excerpt of each answer. It is written
+// both answers' lengths and a bounded excerpt of each answer. An EMPTY candidate answer never reaches this point: it
+// fails the exam as mass_distilled_evaluation_candidate_answer_empty (a merit failure, counted in the Evaluation failure
+// trace), so every case recorded here was answered and scored. It is written
 // on the exam's own run row (response_hashes.holdoutRegressionEvidence, the column that already carries dead-case
 // diagnostics). It is evidence only: it is never read by scoring, gating, promotion or spend.
 export const HOLDOUT_REGRESSION_EVIDENCE_PROFILE = 'cos-university-holdout-regression-evidence-v1' as const
@@ -21,7 +23,6 @@ export type HoldoutRegressionCase = Readonly<{
   candidate: number
   baselineChars: number
   candidateChars: number
-  candidateEmpty: boolean
   baselineExcerpt: string
   candidateExcerpt: string
 }>
@@ -50,7 +51,6 @@ export function buildHoldoutRegressionEvidence(input: {
       candidate: item.candidate,
       baselineChars: baselineAnswer.length,
       candidateChars: candidateAnswer.length,
-      candidateEmpty: candidateAnswer.length === 0,
       baselineExcerpt: baselineAnswer.slice(0, EXCERPT_CHARS),
       candidateExcerpt: candidateAnswer.slice(0, EXCERPT_CHARS),
     })
@@ -76,8 +76,6 @@ export type HoldoutRegressionSummary = Readonly<{
   examsWithoutEvidence: number
   examsWithARegressedCase: number
   regressedCases: number
-  emptyCandidateAnswers: number
-  substantiveCandidateAnswers: number
   medianCandidateChars: number | null
   medianBaselineChars: number | null
   /** Exams whose baseline already scored at least 0.9 on the holdout: little room left to show a gain. */
@@ -92,7 +90,6 @@ export function summarizeHoldoutRegressionEvidence(exams: readonly Readonly<{ ba
   let atCeiling = 0
   const candidateChars: number[] = []
   const baselineChars: number[] = []
-  let empty = 0
   let regressedCases = 0
   for (const exam of exams) {
     if (exam.baseline !== null && exam.baseline >= 0.9) atCeiling += 1
@@ -104,7 +101,6 @@ export function summarizeHoldoutRegressionEvidence(exams: readonly Readonly<{ ba
     regressedCases += Number.isFinite(count) ? count : 0
     for (const item of evidence.cases as unknown[]) {
       const row = item && typeof item === 'object' ? item as Record<string, unknown> : {}
-      if (row.candidateEmpty === true) empty += 1
       if (Number.isFinite(Number(row.candidateChars))) candidateChars.push(Number(row.candidateChars))
       if (Number.isFinite(Number(row.baselineChars))) baselineChars.push(Number(row.baselineChars))
     }
@@ -114,8 +110,6 @@ export function summarizeHoldoutRegressionEvidence(exams: readonly Readonly<{ ba
     examsWithoutEvidence: without,
     examsWithARegressedCase: withRegressed,
     regressedCases,
-    emptyCandidateAnswers: empty,
-    substantiveCandidateAnswers: candidateChars.length - empty,
     medianCandidateChars: median(candidateChars),
     medianBaselineChars: median(baselineChars),
     examsWithBaselineAtLeast0_9: atCeiling,

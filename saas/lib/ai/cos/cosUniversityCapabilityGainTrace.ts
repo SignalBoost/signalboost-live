@@ -296,7 +296,7 @@ export function describeCapabilityGainTrace(trace: CapabilityGainTrace, perDimen
     `  holdout cases per exam: ${Object.entries(trace.holdoutCases).map(([k, v]) => `${k}=${v}`).join(' ') || 'none'} | artifacts without a recipe row: ${trace.unmatchedArtifacts}`,
   ]
   const r = trace.holdoutRegressions
-  lines.push(`  holdout regressions (cases where the trained artifact scored below its baseline): examsWithEvidence=${r.examsWithEvidence} notRecorded=${r.examsWithoutEvidence} examsWithARegressedCase=${r.examsWithARegressedCase} regressedCases=${r.regressedCases} candidateAnswer empty=${r.emptyCandidateAnswers} substantive=${r.substantiveCandidateAnswers} medianChars candidate=${r.medianCandidateChars ?? 'n/a'} baseline=${r.medianBaselineChars ?? 'n/a'} | exams with baseline>=0.9: ${r.examsWithBaselineAtLeast0_9}`)
+  lines.push(`  holdout regressions (cases where the trained artifact scored below its baseline): examsWithEvidence=${r.examsWithEvidence} notRecorded=${r.examsWithoutEvidence} examsWithARegressedCase=${r.examsWithARegressedCase} regressedCases=${r.regressedCases} (all answered; empty answers fail the exam as candidate_answer_empty) medianChars candidate=${r.medianCandidateChars ?? 'n/a'} baseline=${r.medianBaselineChars ?? 'n/a'} | exams with baseline>=0.9: ${r.examsWithBaselineAtLeast0_9}`)
   for (const [dimension, groups] of Object.entries(trace.dimensions)) {
     lines.push(`  by ${dimension}:`)
     const crossed = dimension === 'subjectXfailureReplay' || dimension === 'subjectXrealSourceShare'

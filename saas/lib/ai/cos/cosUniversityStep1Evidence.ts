@@ -279,15 +279,34 @@ export function assessStep1Evidence(funnel: EffectivenessFunnel, now: Date = new
     source: 'none in the tables',
     note: 'the tables do not record who unblocked a unit; requires an operator-action ledger or owner attestation',
   }))
-  criteria.push(Object.freeze({
-    id: 'standards_unweakened',
-    scope: 'step1' as const,
-    question: 'Were graduation and evaluation standards kept unchanged?',
-    status: 'not_measured' as const,
-    observed: Object.freeze({}),
-    source: 'repository history of evaluator thresholds',
-    note: 'requires review of evaluator/graduation code and configuration history, not derivable from these tables',
-  }))
+  // Two halves (2026-10-07). Code: every pass threshold is pinned by tests/cosUniversityStandardsRatchet.node.test.ts in the
+  // release gate and may only tighten, so no deployed build can carry a loosened standard. Data: the cohort's latest exams
+  // name the evaluator version and the fixed safety/transfer/retention suites they were graded with; one of each means
+  // one exam standard throughout the window. More than one is reported as partial for a reviewer to read, never hidden.
+  {
+    const e = funnel.examStandards
+    const kv = (map: Readonly<Record<string, number>>) => Object.entries(map).map(([k, v]) => `${k}=${v}`).join(',') || null
+    const versions = e?.available ? Object.keys(e.evaluatorVersions).length : 0
+    const suites = e?.available ? Object.keys(e.fixedSuites).length : 0
+    const unrecorded = e?.available ? Boolean(e.evaluatorVersions.unrecorded || e.fixedSuites.unrecorded) : false
+    criteria.push(Object.freeze({
+      id: 'standards_unweakened',
+      scope: 'step1' as const,
+      question: 'Were graduation and evaluation standards kept unchanged?',
+      status: !e || !e.available ? 'unavailable' as const
+        : e.examined === 0 ? 'no_evidence' as const
+          : versions === 1 && suites === 1 && !unrecorded ? 'evidence_present' as const
+            : 'partial' as const,
+      observed: Object.freeze({
+        examined: e?.available ? e.examined : null,
+        evaluatorVersions: e?.available ? kv(e.evaluatorVersions) : null,
+        fixedSuites: e?.available ? kv(e.fixedSuites) : null,
+        thresholdRatchet: 'tests/cosUniversityStandardsRatchet.node.test.ts (release gate)',
+      }),
+      source: e?.available ? `${e.source} + release-gate threshold ratchet` : 'examStandards unavailable',
+      note: 'thresholds can only tighten (release-gate ratchet); several evaluator versions or exam suites in one window are shown for review, not judged',
+    }))
+  }
 
   const blocking = criteria
     .filter(entry => entry.scope === 'step1')

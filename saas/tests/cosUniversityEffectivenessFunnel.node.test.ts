@@ -322,6 +322,19 @@ test('daily activity counts each cohort artifact once per stage on the UTC day o
   ])
 })
 
+test('exam standards name the evaluator version and fixed suites of each cohort artifact\'s latest exam', async () => {
+  const tables: any = week()
+  tables.cos_university_distilled_evaluation_runs = tables.cos_university_distilled_evaluation_runs.map((row: any) => ({ ...row, evaluator_version: 'evaluator-v2', safety_suite_hash: H('1'), transfer_suite_hash: H('2'), retention_suite_hash: H('3') }))
+  const f = await readEffectivenessFunnel({ db: fakeDb(tables).db, window: 'all', now: NOW })
+  assert.ok(f.examStandards.available)
+  if (!f.examStandards.available) return
+  assert.equal(f.examStandards.examined, 2, 'a and c; the other-hash exam of b is not this cohort\'s')
+  assert.deepEqual(f.examStandards.evaluatorVersions, { 'evaluator-v2': 2 })
+  assert.deepEqual(f.examStandards.fixedSuites, { [`${H('1').slice(0, 12)}:${H('2').slice(0, 12)}:${H('3').slice(0, 12)}`]: 2 })
+  const bare = await readEffectivenessFunnel({ db: fakeDb(week()).db, window: 'all', now: NOW })
+  assert.ok(bare.examStandards.available && bare.examStandards.fixedSuites.unrecorded === 2, 'rows without suite hashes read as unrecorded')
+})
+
 test('window and subject narrow the cohort and the production counts', async () => {
   const day = await readEffectivenessFunnel({ db: fakeDb(week()).db, window: '24h', now: NOW })
   assert.equal(day.cohort.size, 2)

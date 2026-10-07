@@ -186,6 +186,7 @@ function fullFunnel(overrides: Record<string, unknown> = {}): any {
     lineHistory: { available: true, transitions: 12, throughputPerHour: 0.5 },
     lineHealth: { available: true, liveUnits: 4, overdueUnits: 0, bottleneckStation: null },
     evaluationFailures: { available: true, total: 2, infrastructure: 1, merit: 1, explanations: [{ reason: 'r', count: 2, causeStatus: 'evidence_backed' }], source: 'evals' },
+    examStandards: { available: true, error: null, examined: 3, evaluatorVersions: { 'evaluator-v2': 3 }, fixedSuites: { 'aaa:bbb:ccc': 3 }, source: 'evals' },
     dailyActivity: { source: 'dated', methodology: 'm', days: [
       { day: '2026-10-04', born: 2, examined: 1, graduated: 1 },
       { day: '2026-10-05', born: 1, examined: 2, graduated: 1 },
@@ -216,7 +217,7 @@ test('even with evidence at every stage the report never recommends READY', () =
   assert.deepEqual([...report.blocking], [])
   assert.equal(report.recommendation, 'INSUFFICIENT_EVIDENCE_FOR_READY')
   const notMeasured = report.criteria.filter(entry => entry.status === 'not_measured').map(entry => entry.id)
-  assert.deepEqual(notMeasured, ['no_manual_intervention', 'standards_unweakened'])
+  assert.deepEqual(notMeasured, ['no_manual_intervention'])
   assert.doesNotMatch(JSON.stringify(report), /"recommendation":"READY"/)
 })
 
@@ -241,6 +242,21 @@ test('repeated operation is read from dated cohort events: two full-line days, n
   assert.equal(status({ dailyActivity: undefined }).status, 'unavailable')
   const report = assessStep1Evidence(fullFunnel({ dailyActivity: { source: 's', methodology: 'm', days: [] } }), NOW)
   assert.ok(report.blocking.includes('repeated_operation'))
+})
+
+test('standards unweakened: one evaluator version and one fixed exam suite set, backed by the release-gate ratchet', () => {
+  const entry = (overrides: Record<string, unknown>) => assessStep1Evidence(fullFunnel(overrides), NOW).criteria.find(c => c.id === 'standards_unweakened')!
+  const same = entry({})
+  assert.equal(same.status, 'evidence_present')
+  assert.equal((same.observed as any).thresholdRatchet, 'tests/cosUniversityStandardsRatchet.node.test.ts (release gate)')
+  const changed = entry({ examStandards: { available: true, error: null, examined: 3, evaluatorVersions: { v2: 2, v3: 1 }, fixedSuites: { 'a:b:c': 3 }, source: 'e' } })
+  assert.equal(changed.status, 'partial', 'two evaluator versions in one window are shown for review, not judged')
+  assert.equal((changed.observed as any).evaluatorVersions, 'v2=2,v3=1')
+  assert.equal(entry({ examStandards: { available: true, error: null, examined: 2, evaluatorVersions: { v2: 2 }, fixedSuites: { unrecorded: 2 }, source: 'e' } }).status, 'partial', 'an unrecorded suite is never presented as the same standard')
+  assert.equal(entry({ examStandards: { available: true, error: null, examined: 0, evaluatorVersions: {}, fixedSuites: {}, source: 'e' } }).status, 'no_evidence')
+  assert.equal(entry({ examStandards: { available: false, error: 'unreadable' } }).status, 'unavailable')
+  // The ratchet the criterion cites is really in the release gate.
+  assert.match(read('../scripts/vercel-cos-gates.mjs'), /'tests\/cosUniversityStandardsRatchet\.node\.test\.ts'/)
 })
 
 test('graduates not serving and zero verified outcomes do not block Step 1: they are the next project, still reported', () => {

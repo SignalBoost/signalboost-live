@@ -111,7 +111,7 @@ test('only fail evidence for known competencies counts, most-failed first', () =
   ])
 })
 
-/** Minimal PostgREST-shaped store: records selects, upserts with ignoreDuplicates on content_hash. */
+/** Minimal PostgREST-shaped store: supports exact head counts and idempotent curriculum upserts. */
 function fakeDb(evidence: Array<{ competency_id: string; outcome: string; observed_at: string }>) {
   const curriculum = new Map<string, any>()
   const selects: string[] = []
@@ -120,12 +120,19 @@ function fakeDb(evidence: Array<{ competency_id: string; outcome: string; observ
     from(table: string) {
       if (table === 'cos_university_residency_competency_evidence') {
         let rows = [...evidence]
+        let head = false
+        let exactCount = false
         const q: any = {
-          select(columns: string) { selects.push(`${table}:${columns}`); return q },
+          select(columns: string, options?: { count?: string; head?: boolean }) {
+            selects.push(`${table}:${columns}:${options?.count || 'none'}:${options?.head === true ? 'head' : 'rows'}`)
+            head = options?.head === true
+            exactCount = options?.count === 'exact'
+            return q
+          },
           eq(column: string, value: string) { evidenceFilters.push(`${column}=${value}`); rows = rows.filter(row => (row as any)[column] === value); return q },
-          order() { return q },
-          limit() { return q },
-          then(resolve: (v: unknown) => unknown) { return Promise.resolve({ data: rows, error: null }).then(resolve) },
+          then(resolve: (v: unknown) => unknown) {
+            return Promise.resolve({ data: head ? null : rows, count: exactCount ? rows.length : null, error: null }).then(resolve)
+          },
         }
         return q
       }
@@ -159,8 +166,10 @@ test('the installer writes the standard remediation shape per failed competency 
   assert.equal(first.failedCompetencies, 2)
   assert.equal(first.inserted, 2 * RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
   assert.deepEqual([...first.competencies], ['root_cause_diagnosis', 'rollback_judgment'])
-  assert.deepEqual(store.selects, ['cos_university_residency_competency_evidence:competency_id,outcome'])
-  assert.deepEqual(store.evidenceFilters, ['outcome=fail'])
+  assert.equal(store.selects.length, BUILDER_RESIDENCY_V1_COMPETENCIES.length)
+  assert.ok(store.selects.every(value => value === 'cos_university_residency_competency_evidence:competency_id:exact:head'))
+  assert.equal(store.evidenceFilters.filter(value => value === 'outcome=fail').length, BUILDER_RESIDENCY_V1_COMPETENCIES.length)
+  assert.equal(store.evidenceFilters.filter(value => value.startsWith('competency_id=')).length, BUILDER_RESIDENCY_V1_COMPETENCIES.length)
   for (const row of store.curriculum.values()) {
     assert.equal(row.source_kind, 'failure_derived_curriculum')
     assert.equal(row.subject, 'Computer Science & Coding')
@@ -178,7 +187,7 @@ test('the installer writes the standard remediation shape per failed competency 
   assert.equal(store.curriculum.size, 2 * RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
 })
 
-test('an eleventh failure creates exactly one new generation and is idempotent afterward', async () => {
+test('an eleventh failure backfills the base generation plus exactly one new generation and is idempotent afterward', async () => {
   const evidence = Array.from({ length: 11 }, (_, i) => ({
     competency_id: 'test_and_regression_construction',
     outcome: 'fail',
@@ -186,16 +195,29 @@ test('an eleventh failure creates exactly one new generation and is idempotent a
   }))
   const store = fakeDb(evidence)
   const first = await installResidencyGapDerivedCurriculum({ db: store.db, now: NOW })
-  assert.equal(first.inserted, RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
+  assert.equal(first.inserted, 2 * RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
+  const generations = new Set([...store.curriculum.values()].map(row => row.facts[0].remediationGeneration))
+  assert.deepEqual([...generations].sort(), [0, 1])
   for (const row of store.curriculum.values()) {
-    assert.equal(row.facts[0].remediationGeneration, 1)
-    assert.equal(row.evidence[0].remediationGeneration, 1)
     assert.equal(row.facts[0].classFailureCountAtGeneration, 11)
-    assert.match(row.source_uri, /\/g1\//)
+    if (row.facts[0].remediationGeneration === 1) assert.match(row.source_uri, /\/g1\//)
   }
   const second = await installResidencyGapDerivedCurriculum({ db: store.db, now: NOW })
   assert.equal(second.inserted, 0)
-  assert.equal(store.curriculum.size, RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
+  assert.equal(store.curriculum.size, 2 * RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
+})
+
+test('historical failures backfill every unlocked bounded generation without gaps', async () => {
+  const evidence = Array.from({ length: 31 }, (_, i) => ({
+    competency_id: 'root_cause_diagnosis',
+    outcome: 'fail',
+    observed_at: `2026-10-06T${String((i % 23) + 1).padStart(2, '0')}:00:00Z`,
+  }))
+  const store = fakeDb(evidence)
+  const result = await installResidencyGapDerivedCurriculum({ db: store.db, now: NOW })
+  assert.equal(result.inserted, 4 * RESIDENCY_GAP_ITEMS_PER_COMPETENCY)
+  const generations = new Set([...store.curriculum.values()].map(row => row.facts[0].remediationGeneration))
+  assert.deepEqual([...generations].sort(), [0, 1, 2, 3])
 })
 
 test('a missing store fails closed instead of silently skipping remediation', async () => {
@@ -212,7 +234,7 @@ test('no Residency failures means no curriculum writes', async () => {
 
 test('the installer reads class-level evidence only and never case, trajectory or answer material', () => {
   const source = read('../lib/ai/cos/cosUniversityResidencyGapCurriculum.ts')
-  assert.match(source, /select\('competency_id,outcome'\)/)
+  assert.match(source, /select\('competency_id', \{ count: 'exact', head: true \}\)/)
   assert.doesNotMatch(source, /select\([^)]*(variant_hash|trajectory_hash|evidence_hash|case_run_id|case_family|residency_id|seedFiles|objective)/)
   assert.doesNotMatch(source, /builder-residency\.ts/, 'the case catalog is never imported by the curriculum generator')
   assert.match(source, /sourceDetailsCopied: false/)

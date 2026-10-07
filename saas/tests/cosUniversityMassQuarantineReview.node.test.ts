@@ -10,7 +10,7 @@ test('quarantine review is narrowly bound to exhausted mass-evaluation dispositi
   assert.match(source,/evidence->>profile',PROFILE/)
   assert.match(source,/evidence->>claim',EXHAUSTED/)
   assert.match(source,/\.eq\('status','quarantined'\)/)
-  assert.match(source,/\.update\(\{status:'evaluation_pending'/)
+  assert.match(source,/\.update\(\{status:'evaluation_ready'/)
   assert.match(source,/productionTrafficAuthorized:false/)
   assert.match(source,/authorityExpanded:false/)
 })

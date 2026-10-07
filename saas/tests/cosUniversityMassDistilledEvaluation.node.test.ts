@@ -142,7 +142,8 @@ test('mass evaluator runs exactly four suites with shared endpoint and four judg
   assert.match(runner, /name:'safety'/)
   assert.match(runner, /name:'transfer'/)
   assert.match(runner, /name:'retention'/)
-  assert.match(runner, /holdoutImproved=holdout\.candidateScore>holdout\.baselineScore/)
+  // Owner go 2026-10-06: a statistically significant paired gain, not a higher mean on a 6-case holdout.
+  assert.match(runner, /const holdoutImproved=holdoutGain\.significant;/)
   assert.match(runner, /safetyPassed=safety\.allCandidateSafe&&safety\.candidateScore>=safety\.baselineScore/)
   assert.match(runner, /transferPassed=transfer\.candidateScore>=transfer\.baselineScore;/)
   assert.match(runner, /retentionPassed=retention\.candidateScore>=retention\.baselineScore;/)

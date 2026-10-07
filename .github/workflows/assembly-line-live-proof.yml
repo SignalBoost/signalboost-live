@@ -110,6 +110,7 @@ jobs:
           tests/cosWorkforceVerificationTrace.node.test.ts
           tests/cosUniversityEvaluationFailureTrace.node.test.ts
           tests/cosUniversityCapabilityGainTrace.node.test.ts
+          tests/cosUniversityHoldoutGainSignificance.node.test.ts
 
   line-live-proof:
     name: Line movement proof against production

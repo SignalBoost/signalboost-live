@@ -6,6 +6,8 @@
 // mass:481a6760 (holdout 0.925 vs baseline 0.875, 2026-09-17 20:36 UTC) is the first artifact this applies to.
 // This decides eligibility from recorded evidence only. It authorizes no runtime, no traffic and no spend:
 // registration creates a pending_runtime row, and activation stays behind its own flag and its own gates.
+import { recordedHoldoutGainIsSignificant } from './cosUniversityHoldoutGainSignificance.ts'
+
 export const MASS_GRADUATE_REGISTRATION_PROFILE = 'cos-university-mass-graduate-registration-v1' as const
 
 export type MassGraduateArtifact = Readonly<{
@@ -61,6 +63,15 @@ export function decideMassGraduateRegistration(input: {
     if (baselineScore === null || trainedArtifactScore === null) { reason = 'verdict_scores_missing'; continue }
     // A tie is not an improvement: only a strictly better holdout score graduates.
     if (!(trainedArtifactScore > baselineScore)) { reason = 'holdout_not_improved'; continue }
+    // Owner go 2026-10-06: a higher mean on a 6-case holdout is not selection. Graduation also requires the exam that
+    // produced THESE scores to have recorded a statistically significant paired gain (cosUniversityHoldoutGainSignificance).
+    // A pass recorded before that gate carries no significance and never graduates; the route reopens it for a re-exam.
+    const exam = mine.find(event => event.verifier === 'host_controller'
+      && event.evidence?.claim === 'mass_distilled_independent_evaluation_completed'
+      && event.evidence?.evaluationPassed === true
+      && numeric((event.evidence?.holdout as Record<string, unknown> | undefined)?.baselineScore) === baselineScore
+      && numeric((event.evidence?.holdout as Record<string, unknown> | undefined)?.trainedArtifactScore) === trainedArtifactScore)
+    if (!exam || !recordedHoldoutGainIsSignificant(exam.evidence?.holdout)) { reason = 'holdout_gain_not_significant'; continue }
     if (!REQUIRED_CLAIMS.every(claim => mine.some(event => event.evidence?.claim === claim))) { reason = 'assurance_claims_incomplete'; continue }
     if (!mine.some(event => event.verifier === 'host_production_verifier'
       && event.evidence?.claim === 'production_canary_healthy'

@@ -72,22 +72,20 @@ test('seven-case holdouts use the available transport budget instead of collapsi
   assert.deepEqual(baseline.flat().map(item => item.id), seven.map(item => item.id), 'baseline order and content preserved')
 })
 
-test('the live 13-case holdout shape fits the 25-call ceiling with one recovery call reserved', () => {
-  const cases = Array.from({ length: 13 }, (_, i) => ({ id: `thirteen-${i}`, text: 'x'.repeat(1700) }))
+test('a 12-case holdout fits the 35-call ceiling as single-case requests for both models', () => {
+  const cases = Array.from({ length: 12 }, (_, i) => ({ id: `twelve-${i}`, text: 'x'.repeat(1700) }))
   const promptFor = (group: readonly { text: string }[]) => group.map(item => item.text).join('\n')
-  // Six fixed calls (three suites x two models) and one recovery call, with the rest split evenly so the baseline
-  // is asked in the same shape as the candidate. At 18 the baseline was pinned at two requests - about 6.5 cases
-  // each - while the candidate got nine, which made holdout_improved a comparison across unequal answer room.
+  // Six fixed calls (three suites x two models) and the evaluator's five recovery calls; the rest is split evenly so
+  // the baseline is asked in the same shape as the candidate (2026-09-28), now one case per request (2026-10-07).
   const fixedEndpointCalls = 6
-  const recoveryReserve = 1
+  const recoveryReserve = 5
   const groupsPerModel = Math.min(cases.length, Math.floor((MASS_EVALUATION_ENDPOINT_CALLS - fixedEndpointCalls - recoveryReserve) / 2))
-  assert.equal(groupsPerModel, 9, 'the candidate keeps the nine requests Production proved it needs')
+  assert.equal(groupsPerModel, 12)
   const baseline = planMassEvaluationGroups(cases, promptFor, groupsPerModel, groupsPerModel)
   const candidate = planMassEvaluationGroups(cases, promptFor, groupsPerModel, groupsPerModel)
-  assert.equal(baseline.length, 9, 'the baseline is no longer pinned at two requests')
-  assert.equal(candidate.length, 9)
-  assert.deepEqual(baseline.map(group => group.length), candidate.map(group => group.length), 'identical shape for both models')
-  assert.ok(candidate.every(group => group.length <= 2))
+  assert.equal(baseline.length, 12)
+  assert.equal(candidate.length, 12)
+  assert.ok(baseline.every(group => group.length === 1) && candidate.every(group => group.length === 1))
   assert.deepEqual(candidate.flat().map(item => item.id), cases.map(item => item.id), 'all holdout cases preserved exactly once')
   assert.equal(baseline.length + candidate.length + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)
 })

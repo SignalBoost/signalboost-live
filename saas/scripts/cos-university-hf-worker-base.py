@@ -27,7 +27,11 @@ HEX64 = re.compile(r"^[a-f0-9]{64}$", re.I)
 HEX40 = re.compile(r"^[a-f0-9]{40}$", re.I)
 
 
-MASS_HOLDOUT_MAX_ITEMS = 6
+# Owner decision 2026-10-07: 6 -> 12. Of 607 exams in 7 days, 548 used 6 holdout cases, where one case moves the
+# score by about 0.08-0.17, so "improved over baseline" was close to a coin flip. The evaluator ceiling
+# (MASS_EVALUATION_ENDPOINT_CALLS = 35) keeps 12 cases at one case per request for both models. The cap stays
+# proportional (batch // 5), so a 64-item batch holds out at most 12 and a smaller one holds out less.
+MASS_HOLDOUT_MAX_ITEMS = 12
 
 
 def clean(value: Any, limit: int = 4000) -> str:
@@ -473,11 +477,10 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
             raise RuntimeError("worker_working_cos_holdout_manifest_mismatch")
     else:
         # Mass-distillation holdouts are capped at MASS_HOLDOUT_MAX_ITEMS. The mass evaluator grades a
-        # holdout inside a fixed call ceiling behind a ~40s serverless gateway: the baseline in at most two
-        # requests (a 6-case holdout is 3+3) and the slower candidate one request per case. Larger
-        # holdouts push several cases into one baseline request, where Production showed answers late in a
-        # shared request degrading by position, which would bias the comparison toward the candidate.
-        # Capping the holdout rather than the batch lets a full 128-item batch train on ~122 examples.
+        # holdout inside a fixed call ceiling behind a ~40s serverless gateway, one request per case for both
+        # models up to MASS_HOLDOUT_MAX_ITEMS. Larger holdouts would push several cases into one request,
+        # where Production showed answers late in a shared request degrading by position.
+        # Capping the holdout rather than the batch lets a full 128-item batch train on ~116 examples.
         # Single-artifact lanes keep the proportional split; their evaluator chunks larger holdouts.
         proportional = len(ordered) // 5
         if clean(envelope.get("candidateId"), 200).startswith("mass:"):

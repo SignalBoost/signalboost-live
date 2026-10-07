@@ -32,7 +32,7 @@ export async function POST(req:NextRequest){
     verifiedByHarness:true,organizationId,harnessRunId:manifest.runId,
     capability:'university.distillation.execute',authorityExpanded:false,
    }
-   return bindLabExperimentToUniversityRun({authority,experimentId,runId,db:createSupabaseLabExecutionDb(service)})
+   return bindLabExperimentToUniversityRun({authority,experimentId,runId,db:createSupabaseLabExecutionDb({rpc:async(name,args)=>{const {data,error}=await service.rpc(name,args);return {data,error}}})})
   }})
   return NextResponse.json(result)
  }catch(e){

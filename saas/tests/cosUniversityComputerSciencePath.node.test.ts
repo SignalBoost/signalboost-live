@@ -139,6 +139,22 @@ test('an empty path says none rather than inventing a state', async () => {
   assert.match(describeComputerSciencePath(path), /supply=no packaging receipt/)
 })
 
+test('a fill that actually ran prints its targets and yield instead of n/a', async () => {
+  const path = await readComputerSciencePath({ db: readOnlyDb(fakeDb({
+    cos_university_learning_assurance_events: [{ event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-07T15:26:56Z', evidence: {
+      curriculum: { supply: { subjects: [{ subject: CS, canonicalSubjectId: 'computer_science', uniqueBatchableItems: 678, shortfallToBatch: 0, realSourceItems: 28, realSourceNeeded: 32 }] } },
+      curriculumReplenishment: { ok: true, skipped: false, targets: [CS, 'Mathematics'], documentsAcquired: 40, accepted: 0, probationary: 1, rejected: { duplicate: 37, off_topic: 2, rights: 0 }, sourceErrors: [] },
+    } }],
+  })), now: new Date('2026-10-07T15:30:00Z') })
+  assert.equal(path.packaging.replenishment, 'ran targets=[Computer Science & Coding; Mathematics] acquired=40 accepted=0 probationary=1 rejected=duplicate=37,off_topic=2 sourceErrors=0')
+  const failed = await readComputerSciencePath({ db: readOnlyDb(fakeDb({
+    cos_university_learning_assurance_events: [{ event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-07T15:26:56Z', evidence: {
+      curriculum: { supply: { subjects: [] } }, curriculumReplenishment: { ok: false, error: 'rights_cleared_distillation_adapters_unavailable' },
+    } }],
+  })), now: new Date('2026-10-07T15:30:00Z') })
+  assert.equal(failed.packaging.replenishment, 'error:rights_cleared_distillation_adapters_unavailable')
+})
+
 test('a packaging pass without Computer Science in its supply is reported as zero batchable items', async () => {
   const path = await readComputerSciencePath({ db: readOnlyDb(fakeDb({
     cos_university_learning_assurance_events: [{ event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-06T19:05:00Z', evidence: { curriculum: { supply: { subjects: [{ subject: 'Mathematics', canonicalSubjectId: 'mathematics', uniqueBatchableItems: 400, shortfallToBatch: 0 }] } } } }],

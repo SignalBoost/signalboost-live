@@ -31,7 +31,7 @@ type Db = { from: (table: string) => any }
 const text = (value: unknown, max = 300): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 
 export type FailureRow = Readonly<{ observed_at: unknown; error: unknown }>
-export type CompletedRow = Readonly<{ observed_at: unknown; readiness_seconds: unknown; reservation_event_key?: unknown }>
+export type CompletedRow = Readonly<{ observed_at: unknown; readiness_seconds: unknown; reservation_event_key?: unknown; holdout_cases?: unknown }>
 export type TerminalRow = Readonly<{ observed_at: unknown; reservation_event_key: unknown; error?: unknown }>
 export type ReservationRow = Readonly<{ event_key: unknown; observed_at: unknown }>
 
@@ -52,6 +52,12 @@ export type RunDurations = Readonly<{
   readinessHeadroomAtExamMax: number | null
   /** usableSeconds - completedExam.p90. */
   readinessHeadroomAtExamP90: number | null
+  /**
+   * Completed exam time split by holdout size (2026-10-07: the mass holdout grew from 6 to 12 cases, one request per
+   * case, so a 12-case exam makes about 12 more sequential calls). Keyed by the case count the completed event
+   * recorded; exams that recorded none are under 'unknown'. Mixing the two sizes would hide whether 12 fits the budget.
+   */
+  completedExamByHoldoutCases: Readonly<Record<string, Spread>>
 }>
 
 /** How long COMPLETED exams waited for the exact artifact's runtime, against the window failed exams ran out of. */
@@ -162,13 +168,19 @@ export function composeRunDurations(input: {
   let unmatched = 0
   const completedRun: number[] = []
   const completedExam: number[] = []
+  const examByCases = new Map<string, number[]>()
   for (const row of input.completed) {
     const start = claimedAt.get(text(row.reservation_event_key, 64))
     const run = start === undefined ? null : secondsBetween(start, row.observed_at)
     if (run === null) { unmatched += 1; continue }
     completedRun.push(run)
     const ready = finiteOrNull(row.readiness_seconds)
-    if (ready !== null && ready <= run) completedExam.push(run - ready)
+    if (ready !== null && ready <= run) {
+      completedExam.push(run - ready)
+      const cases = finiteOrNull(row.holdout_cases)
+      const key = cases !== null && Number.isInteger(cases) && cases > 0 ? String(cases) : 'unknown'
+      examByCases.set(key, [...(examByCases.get(key) || []), run - ready])
+    }
   }
   const failedRun: number[] = []
   for (const row of input.failed) {
@@ -187,6 +199,9 @@ export function composeRunDurations(input: {
     usableSeconds: EVALUATION_ROUTE_USABLE_SECONDS,
     readinessHeadroomAtExamMax: exam.max === null ? null : EVALUATION_ROUTE_USABLE_SECONDS - exam.max,
     readinessHeadroomAtExamP90: exam.p90 === null ? null : EVALUATION_ROUTE_USABLE_SECONDS - exam.p90,
+    completedExamByHoldoutCases: Object.freeze(Object.fromEntries([...examByCases.entries()]
+      .sort(([a], [b]) => (Number(a) || Infinity) - (Number(b) || Infinity))
+      .map(([key, values]) => [key, spread(values)]))),
   })
 }
 
@@ -306,7 +321,7 @@ export async function readEvaluationFailureTrace(input: { db: Db; now?: Date; da
     completed = []
     for (let from = 0; from < EVALUATION_FAILURE_TRACE_ROW_LIMIT; from += PAGE) {
       const page = await rows(input.db.from('cos_university_learning_assurance_events')
-        .select('observed_at,readiness_seconds:evidence->>readinessSeconds,reservation_event_key:evidence->>reservationEventKey')
+        .select('observed_at,readiness_seconds:evidence->>readinessSeconds,reservation_event_key:evidence->>reservationEventKey,holdout_cases:evidence->holdout->>cases')
         .eq('event_type', 'fine_tune')
         .eq('evidence->>claim', EVALUATION_COMPLETED_CLAIM)
         .gte('observed_at', since)
@@ -360,6 +375,8 @@ export function describeEvaluationFailureTrace(trace: EvaluationFailureTrace, to
   const sp = (x: Spread) => `n=${x.count} p50=${x.p50 ?? 'n/a'}s p90=${x.p90 ?? 'n/a'}s max=${x.max ?? 'n/a'}s`
   if (d) {
     lines.push(`  run time from claim (usable route budget ${d.usableSeconds}s): completed run ${sp(d.completedRun)} | completed exam (run - readiness) ${sp(d.completedExam)} | failed runtime_not_ready run ${sp(d.failedRuntimeNotReadyRun)} | unmatched=${d.unmatched}`)
+    const byCases = Object.entries(d.completedExamByHoldoutCases)
+    lines.push(`  completed exam by holdout cases: ${byCases.length ? byCases.map(([cases, x]) => `${cases} cases ${sp(x)}`).join(' | ') : 'none'}`)
     lines.push(`  readiness window that would not cut any observed exam: <= ${d.readinessHeadroomAtExamMax ?? 'n/a'}s (at exam p90: ${d.readinessHeadroomAtExamP90 ?? 'n/a'}s); current window ${EVALUATION_READY_WINDOW_SECONDS}s`)
   } else {
     lines.push('  run time from claim: unavailable')

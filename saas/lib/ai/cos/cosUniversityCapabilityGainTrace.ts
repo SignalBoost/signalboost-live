@@ -53,6 +53,8 @@ export type ArtifactRow = Readonly<{
   optimizer?: unknown
   items?: unknown
   replay?: unknown
+  replayEligible?: unknown
+  replayArm?: unknown
   anchor?: unknown
   ballast?: unknown
 }>
@@ -127,7 +129,17 @@ const flag = (value: unknown): string => {
 
 // subjectXfailureReplay compares replay against no replay WITHIN each subject, so a subject-mix difference (replay is
 // used for remediation of harder subjects) cannot pass for a recipe effect.
-const DIMENSIONS = ['subject', 'teacher', 'baseModel', 'profile', 'optimizer', 'trainingItems', 'realSourceShare', 'failureReplay', 'frontierAnchor', 'reasoningBallast', 'evaluatorVersion', 'subjectXfailureReplay'] as const
+// failureReplayArm is the controlled comparison (worker FAILURE_DERIVED_REPLAY_ROLLOUT_PERCENT, 2026-10-07): among runs with
+// failure-derived rows, a hash of the candidate id decides replay or control, so replay vs control is not confounded by which
+// lineages needed remediation. Runs trained before the A/B carry no eligibility receipt and read `unrecorded`.
+const replayArm = (eligible: unknown, selected: unknown): string => {
+  const items = num(eligible)
+  if (items === null) return 'unrecorded'
+  if (items <= 0) return 'not_eligible'
+  const arm = flag(selected)
+  return arm === 'yes' ? 'replay' : arm === 'no' ? 'control' : 'unrecorded'
+}
+const DIMENSIONS = ['subject', 'teacher', 'baseModel', 'profile', 'optimizer', 'trainingItems', 'realSourceShare', 'failureReplay', 'failureReplayArm', 'frontierAnchor', 'reasoningBallast', 'evaluatorVersion', 'subjectXfailureReplay'] as const
 
 export function composeCapabilityGainTrace(input: {
   evaluations: readonly EvaluationRow[]
@@ -177,6 +189,7 @@ export function composeCapabilityGainTrace(input: {
       trainingItems: itemsBucket(artifact?.items),
       realSourceShare: realShareBucket(realByHash.get(hash)),
       failureReplay: flag(artifact?.replay),
+      failureReplayArm: replayArm(artifact?.replayEligible, artifact?.replayArm),
       frontierAnchor: flag(artifact?.anchor),
       reasoningBallast: num(artifact?.ballast) === null ? 'unknown' : (num(artifact?.ballast)! > 0 ? 'yes' : 'no'),
       evaluatorVersion: text(row.evaluator_version, 80) || 'unknown',
@@ -243,6 +256,8 @@ export async function readCapabilityGainTrace(input: { db: Db; now?: Date; days?
         'optimizer:intended_use->trainingReceipt->>optimizer',
         'items:intended_use->trainingReceipt->>trainingItems',
         'replay:intended_use->trainingReceipt->>failureDerivedReplayRequired',
+        'replayEligible:intended_use->trainingReceipt->>failureDerivedReplayEligibleItems',
+        'replayArm:intended_use->trainingReceipt->>failureDerivedReplayRolloutSelected',
         'anchor:intended_use->trainingReceipt->>frontierResponseAnchorRequired',
         'ballast:intended_use->trainingReceipt->>generalReasoningBallastItems',
       ].join(','))

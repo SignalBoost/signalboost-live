@@ -58,6 +58,34 @@ test('gain is grouped by recipe and source mix, using only the latest exam per e
   assert.match(describeCapabilityGainTrace(trace), /by subjectXfailureReplay:\n    cs \| replay=unknown/)
 })
 
+test('the replay A/B compares the randomized replay arm against its control, not against non-remediation runs', () => {
+  const trace = composeCapabilityGainTrace({
+    now: NOW,
+    since: '2026-09-29T12:00:00Z',
+    evaluations: [
+      evalRow('mass:r', H('r'), 0.5, 0.25),
+      evalRow('mass:c', H('c'), 0.5, 0.75),
+      evalRow('mass:n', H('n'), 0.5, 0.5),
+      evalRow('mass:o', H('o'), 0.5, 0.5),
+      evalRow('mass:m', H('m'), 0.5, 0.5),
+    ],
+    artifacts: [
+      { candidate_id: 'mass:r', trained_artifact_hash: H('r'), replay: 'true', replayEligible: '20', replayArm: 'true' },
+      // Control: eligible, not selected, so no replay pass ran (failureDerivedReplayRequired false).
+      { candidate_id: 'mass:c', trained_artifact_hash: H('c'), replay: 'false', replayEligible: '20', replayArm: 'false' },
+      { candidate_id: 'mass:n', trained_artifact_hash: H('n'), replay: 'false', replayEligible: '0', replayArm: 'false' },
+      // Trained before the A/B: no eligibility receipt.
+      { candidate_id: 'mass:o', trained_artifact_hash: H('o'), replay: 'true' },
+      { candidate_id: 'mass:m', trained_artifact_hash: H('m'), replay: 'false', replayEligible: '5' },
+    ],
+    attributions: [],
+  })
+  const arms = Object.fromEntries(trace.dimensions.failureReplayArm.map(g => [g.key, g.meanGain]))
+  assert.deepEqual(arms, { replay: -0.25, control: 0.25, not_eligible: 0, unrecorded: 0 })
+  assert.equal(trace.dimensions.failureReplayArm.find(g => g.key === 'unrecorded')!.n, 2, 'pre-A/B and arm-less receipts never count as an arm')
+  assert.match(describeCapabilityGainTrace(trace), /by failureReplayArm:/)
+})
+
 test('the sign test only calls a regression when it is distinguishable from chance', () => {
   // 166 improved vs 179 regressed (the 2026-10-06 7-day cohort): z ~ -0.7, which is chance.
   const evaluations = [

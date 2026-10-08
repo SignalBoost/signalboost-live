@@ -33,3 +33,11 @@ test('manifest tampering and missing clock fail closed',()=>{
  assert.equal(verifyPhase5ReviewWithPolicy(review,Buffer.from('altered'),[policy],now).eligibleForIndependentSignoffReview,false)
  assert.equal(verifyPhase5ReviewWithPolicy(review,manifest,[policy],'no-clock').eligibleForIndependentSignoffReview,false)
 })
+
+test('UTC policy windows reject malformed, rollover, offset and noncanonical timestamps',()=>{
+ for (const bad of ['2026-02-30T00:00:00.000Z','2026-01-01T00:00:00Z','2026-01-01T00:00:00.000+00:00','not-a-date']) {
+  assert.equal(verifyPhase5ReviewWithPolicy(review,manifest,[{...policy,notBefore:bad}],now).eligibleForIndependentSignoffReview,false)
+ }
+ assert.equal(verifyPhase5ReviewWithPolicy(review,manifest,[policy],'2026-10-08T12:00:00Z').eligibleForIndependentSignoffReview,false)
+ assert.equal(verifyPhase5ReviewWithPolicy(review,manifest,[policy],policy.expiresAt).eligibleForIndependentSignoffReview,false)
+})

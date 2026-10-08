@@ -8,6 +8,7 @@ on:
       - 'saas/supabase/migrations/20261006210000_lab_experiment_budget_enforcement.sql'
       - 'saas/supabase/migrations/20261008030000_lab_approved_usage_rates.sql'
       - 'saas/supabase/migrations/20261008040000_lab_rated_capture_receipts.sql'
+      - 'saas/supabase/migrations/20261008050000_lab_capture_provenance_audit.sql'
       - 'saas/tests/sql/lab-*.sql'
   workflow_dispatch:
 
@@ -61,6 +62,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261006210000_lab_experiment_budget_enforcement.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008030000_lab_approved_usage_rates.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008040000_lab_rated_capture_receipts.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008050000_lab_capture_provenance_audit.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |
@@ -88,3 +90,7 @@ jobs:
       - name: Verify rated capture receipt binding
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-rated-capture-acceptance.sql
+      - name: Verify unrated legacy captures fail provenance audit
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-capture-provenance-audit.sql
+

@@ -107,7 +107,6 @@ jobs:
       - name: Verify inactive commercial wallet schema boundaries
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-commercial-wallet-foundation-acceptance.sql
-
-      - name: Verify isolated atomic commercial grant proof
+      - name: Verify atomic commercial grant proof
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-commercial-atomic-grant-acceptance.sql

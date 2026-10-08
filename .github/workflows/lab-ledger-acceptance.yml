@@ -9,6 +9,7 @@ on:
       - 'saas/supabase/migrations/20261008030000_lab_approved_usage_rates.sql'
       - 'saas/supabase/migrations/20261008040000_lab_rated_capture_receipts.sql'
       - 'saas/supabase/migrations/20261008050000_lab_capture_provenance_audit.sql'
+      - 'saas/supabase/migrations/20261008060000_lab_capture_rate_reconciliation_audit.sql'
       - 'saas/tests/sql/lab-*.sql'
   workflow_dispatch:
 
@@ -63,6 +64,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008030000_lab_approved_usage_rates.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008040000_lab_rated_capture_receipts.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008050000_lab_capture_provenance_audit.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008060000_lab_capture_rate_reconciliation_audit.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |
@@ -94,3 +96,6 @@ jobs:
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-capture-provenance-audit.sql
 
+      - name: Reject rated capture with forged rate arithmetic
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-capture-rate-reconciliation-acceptance.sql

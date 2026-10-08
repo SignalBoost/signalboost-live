@@ -86,8 +86,11 @@ test('a workspace without search refuses the call rather than silently answering
   // matters is that it can never quietly succeed and return an empty result the model would
   // read as "this symbol does not exist anywhere".
   const searched = result.trace.filter(item => item.toolId === 'search_files')
-  assert.equal(searched.length > 0, true)
-  assert.equal(searched.every(item => item.ok === false), true)
+  // Unavailable tools are rejected before dispatch, and the controller now offers a
+  // same-round recovery instead of recording a fake search or wasting work rounds.
+  assert.equal(searched.some(item => item.ok), false)
+  assert.equal(ai.prompts.some(prompt => prompt.includes('Only these tools are available NOW:')), true)
+  assert.equal(result.ok, true)
 
   // Defense in depth: dispatch refuses outright even if the tool were ever offered by mistake.
   const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')

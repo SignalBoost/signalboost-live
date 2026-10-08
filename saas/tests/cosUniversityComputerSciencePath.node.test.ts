@@ -164,6 +164,23 @@ test('a fill that actually ran prints its targets and yield instead of n/a', asy
   assert.match(String(await receiptWith({ ok: true, skipped: false, failureDerivedInserted: 3 })), /sourceErrors=n\/a$/)
 })
 
+test('a failed training run prints its recorded failure reason; a path without one prints nothing extra', async () => {
+  const path = await readComputerSciencePath({ db: readOnlyDb(fakeDb({
+    cos_university_mass_distillation_batch_runs: [
+      { subject_id: CS, stage: 'failed', failure_reason: 'mass_distillation_stalled_dispatch_claim:training_dispatching', created_at: '2026-10-08T09:00:00Z', updated_at: '2026-10-08T10:37:54Z' },
+      { subject_id: CS, stage: 'complete', created_at: '2026-10-08T06:40:00Z', updated_at: '2026-10-08T07:38:29Z' },
+      { subject_id: CS, stage: 'failed', failure_reason: 'older', created_at: '2026-10-07T06:40:00Z', updated_at: '2026-10-07T07:00:00Z' },
+      { subject_id: 'Mathematics', stage: 'failed', failure_reason: 'not computer science', created_at: '2026-10-08T10:00:00Z', updated_at: '2026-10-08T10:40:00Z' },
+    ],
+  })), now: new Date('2026-10-08T10:40:00Z') })
+  assert.equal(path.trainingRuns.latestFailureAt, '2026-10-08T10:37:54.000Z')
+  assert.equal(path.trainingRuns.latestFailureReason, 'mass_distillation_stalled_dispatch_claim:training_dispatching')
+  assert.match(describeComputerSciencePath(path), /training runs +:: recent=3 latestStage=failed .*byStage=failed=2,complete=1 latestFailure=2026-10-08T10:37:54.000Z mass_distillation_stalled_dispatch_claim:training_dispatching$/m)
+  const healthy = await readComputerSciencePath({ db: readOnlyDb(fakeDb(tables)), now: new Date('2026-10-06T21:30:00Z') })
+  assert.equal(healthy.trainingRuns.latestFailureReason, null)
+  assert.doesNotMatch(describeComputerSciencePath(healthy), /latestFailure=/)
+})
+
 test('a packaging pass without Computer Science in its supply is reported as zero batchable items', async () => {
   const path = await readComputerSciencePath({ db: readOnlyDb(fakeDb({
     cos_university_learning_assurance_events: [{ event_type: 'production_path', path_id: 'mass_distillation_campaign', observed_at: '2026-10-06T19:05:00Z', evidence: { curriculum: { supply: { subjects: [{ subject: 'Mathematics', canonicalSubjectId: 'mathematics', uniqueBatchableItems: 400, shortfallToBatch: 0 }] } } } }],

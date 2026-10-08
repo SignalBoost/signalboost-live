@@ -8,7 +8,8 @@
 //   packaging             Computer Science supply in the latest packaging pass, curriculum batches, and teaching rows by origin
 //   training dispatches   latest Computer Science training dispatches and whether each carried Builder protocol practice
 //                         (pre-dispatch assurance evidence, cos_university_learning_assurance_events)
-//   training runs         latest Computer Science mass-distillation runs by stage (cos_university_mass_distillation_batch_runs)
+//   training runs         latest Computer Science mass-distillation runs by stage, and the newest failed run's recorded
+//                         failure_reason (cos_university_mass_distillation_batch_runs)
 //   trained artifacts     latest Computer Science artifacts, their status, and whether their durable training receipt
 //                         records protocol practice (cos_local_distillation_artifacts.intended_use.trainingReceipt)
 //   Residency             artifacts waiting for admission, active residents, and the latest case runs with their times
@@ -81,7 +82,15 @@ export type ComputerSciencePath = Readonly<{
     /** Computer Science rows at mass-distillation confidence, by origin (the packager needs half real-source). */
     corpusRowsByOrigin: Readonly<{ realSource: number; failureDerived: number; teacherSynthetic: number }>
   }>
-  trainingRuns: Readonly<{ recent: number; byStage: Readonly<Record<string, number>>; latestStage: string | null; latestAt: string | null }>
+  trainingRuns: Readonly<{
+    recent: number
+    byStage: Readonly<Record<string, number>>
+    latestStage: string | null
+    latestAt: string | null
+    /** The newest failed run's recorded failure_reason, so a failed training run is explained in the report. */
+    latestFailureAt: string | null
+    latestFailureReason: string | null
+  }>
   trainedArtifacts: Readonly<{
     recent: number
     byStatus: Readonly<Record<string, number>>
@@ -188,7 +197,7 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
       .order('observed_at', { ascending: false })
       .limit(RECENT)),
     rows(db.from('cos_university_mass_distillation_batch_runs')
-      .select('stage,created_at,updated_at')
+      .select('stage,failure_reason,created_at,updated_at')
       .eq('subject_id', SUBJECT)
       .order('created_at', { ascending: false })
       .limit(RECENT)),
@@ -217,6 +226,7 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
   const receiptPractice = (row: any) =>
     text(record(record(row?.intended_use).trainingReceipt).builderProtocolPracticeProfile, 120) === BUILDER_PROTOCOL_PRACTICE_PROFILE
   const recentArtifacts = artifactRows.slice(0, RECENT)
+  const latestFailedRun = runRows.find(row => text(row.stage, 60) === 'failed')
 
   // Waiting means evaluation_ready and not yet enrolled in Builder Residency, read completely (the same queue the
   // admission station pages through), so an old waiting artifact is never hidden behind newer ones.
@@ -282,6 +292,8 @@ export async function readComputerSciencePath(input: { db: Db; now?: Date }): Pr
       byStage: tally(runRows.map(row => text(row.stage, 60) || 'unrecorded')),
       latestStage: runRows[0] ? text(runRows[0].stage, 60) || null : null,
       latestAt: iso(runRows[0]?.updated_at ?? runRows[0]?.created_at),
+      latestFailureAt: iso(latestFailedRun?.updated_at ?? latestFailedRun?.created_at),
+      latestFailureReason: latestFailedRun ? text(latestFailedRun.failure_reason, 200) || 'unrecorded' : null,
     }),
     trainedArtifacts: Object.freeze({
       recent: recentArtifacts.length,
@@ -320,7 +332,7 @@ export function describeComputerSciencePath(path: ComputerSciencePath): string {
     `COMPUTER SCIENCE PATH (now ${path.observedAt}; latest ${RECENT} of each)`,
     `  packaging           :: receiptAt=${p.receiptAt ?? 'none'} supply=${supply} preparedBuffer=${p.preparedBefore ?? 'n/a'}/${p.preparedBufferTarget ?? 'n/a'} replenishment=${p.replenishment ?? 'n/a'} curriculumBatches=${kv(p.curriculumBatchesByStatus)} latestBatchAt=${p.latestCurriculumBatchAt ?? 'none'} corpusRows(conf>=${MIN_CONFIDENCE}) real=${p.corpusRowsByOrigin.realSource} failureDerived=${p.corpusRowsByOrigin.failureDerived} teacherSynthetic=${p.corpusRowsByOrigin.teacherSynthetic}`,
     `  training dispatches :: recent=${d.recent} withProtocolPractice=${d.withPractice} latestAt=${d.latestAt ?? 'none'} latestWithPractice=${yes(d.latestWithPractice)}${d.latestPracticeTaskIds.length ? ` latestTasks=${d.latestPracticeTaskIds.join(',')}` : ''}`,
-    `  training runs       :: recent=${r.recent} latestStage=${r.latestStage ?? 'none'} latestAt=${r.latestAt ?? 'none'} byStage=${kv(r.byStage)}`,
+    `  training runs       :: recent=${r.recent} latestStage=${r.latestStage ?? 'none'} latestAt=${r.latestAt ?? 'none'} byStage=${kv(r.byStage)}${r.latestFailureReason ? ` latestFailure=${r.latestFailureAt ?? 'n/a'} ${r.latestFailureReason}` : ''}`,
     `  trained artifacts   :: recent=${a.recent} trainedWithProtocolPractice=${a.trainedWithPractice} latestAt=${a.latestAt ?? 'none'} latestStatus=${a.latestStatus ?? 'none'} latestWithPractice=${yes(a.latestWithPractice)} byStatus=${kv(a.byStatus)}`,
     `  residency           :: awaitingAdmission=${s.awaitingAdmission} (withPractice=${s.awaitingAdmissionWithPractice}) activeResidents=${s.activeResidents} latestCaseStartedAt=${s.latestCaseStartedAt ?? 'none'} latestCaseCompletedAt=${s.latestCaseCompletedAt ?? 'none'} latestCaseStatus=${s.latestCaseStatus ?? 'none'} recentCases=${s.recentCases} recentFailed=${s.recentFailedCases} recentFailedWithLoopStop=${s.recentFailedCasesWithLoopStop} failedByCase=${kv(s.recentFailedByCaseFamily)}`,
   ].join('\n')

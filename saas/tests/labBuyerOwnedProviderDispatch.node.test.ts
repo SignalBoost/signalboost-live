@@ -44,3 +44,25 @@ test('Phase 3: changed vault path between grant reads blocks execution',async()=
  assert.equal(result.status,'denied')
  assert.equal(s.stats().executions,0)
 })
+
+test('Phase 3: async grant callback cannot retarget the governed action ID',async()=>{
+ const s=setup()
+ const observed:string[]=[]
+ const input: typeof s.input={
+  ...s.input,
+  readGrant:async()=>{input.actionId='injected-action';return grant},
+  executor:{execute:async(_m,action)=>{
+   observed.push(action.actionId)
+   return {actionId:action.actionId,capabilityId:action.capabilityId,status:'executed'}
+  }},
+ }
+ const result=await dispatchBuyerOwnedProvider(input)
+ assert.equal(result.status,'executed')
+ assert.deepEqual(observed,['call-1'])
+})
+test('Phase 3: invalid action ID fails closed before any grant or Harness reads',async()=>{
+ const s=setup()
+ const result=await dispatchBuyerOwnedProvider({...s.input,actionId:'  '})
+ assert.equal(result.status,'denied')
+ assert.deepEqual(s.stats(),{reads:0,checks:0,executions:0})
+})

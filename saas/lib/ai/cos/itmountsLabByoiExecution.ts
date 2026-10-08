@@ -12,12 +12,18 @@ export async function executeLabByoi(request: ScopedProviderRequest, host: LabBy
   if (!request || !request.organizationId || !request.providerId || !request.artifactId ||
       !['teacher.invoke','compute.execute','tool.invoke'].includes(request.capability) ||
       !Number.isSafeInteger(request.nowMs)) throw new Error('lab_byoi_scope_denied')
-  const grant = await host.loadGrant(request)
+  let grant: ScopedProviderGrant | null
+  try { grant = await host.loadGrant(request) }
+  catch { throw new Error('lab_byoi_grant_unavailable') }
   if (!grant) throw new Error('lab_byoi_scope_denied')
   const reference = assertCustomerProviderScope(grant, request)
-  const credential = await host.resolveSecret(reference)
+  let credential: string
+  try { credential = await host.resolveSecret(reference) }
+  catch { throw new Error('lab_byoi_credential_unavailable') }
   if (!credential) throw new Error('lab_byoi_credential_unavailable')
-  const result = await host.invokeProvider({ request, credential })
+  let result: { receiptId: string }
+  try { result = await host.invokeProvider({ request, credential }) }
+  catch { throw new Error('lab_byoi_provider_failed') }
   if (!result || typeof result.receiptId !== 'string' || !result.receiptId.trim()) {
     throw new Error('lab_byoi_receipt_missing')
   }

@@ -104,6 +104,10 @@ jobs:
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-capture-rate-reconciliation-acceptance.sql
 
+      - name: Verify BYOI isolated experiment accounting
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-byoi-experiment-accounting-acceptance.sql
+
       - name: Verify inactive commercial wallet schema boundaries
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-commercial-wallet-foundation-acceptance.sql

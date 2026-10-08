@@ -8,14 +8,6 @@ on:
       - 'saas/lib/ai/cos/labHarnessBoundProviderGrant.ts'
       - 'saas/lib/ai/cos/labTenantProviderGrantGuard.ts'
       - 'saas/tests/labGovernedProviderExecution.node.test.ts'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/lab-phase3-byoi-execution.yml'
-      - 'saas/lib/ai/cos/labGovernedProviderExecution.ts'
-      - 'saas/lib/ai/cos/labHarnessBoundProviderGrant.ts'
-      - 'saas/lib/ai/cos/labTenantProviderGrantGuard.ts'
-      - 'saas/tests/labGovernedProviderExecution.node.test.ts'
   workflow_dispatch:
 
 permissions:

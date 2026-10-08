@@ -201,8 +201,12 @@ export function selectBuilderProtocolPracticeTasks(input: {
   const take = (item: BuilderProtocolTask | undefined) => {
     if (item && chosen.length < maxTasks && !chosen.includes(item)) chosen.push(item)
   }
-  // Breadth first: every resident must pass all 13 competencies, so each failing competency gets one task before any
-  // gets a second; then one task for every remaining competency; then the rest of the catalog.
+  // The competency residents are failing now (first in priority) gets its whole practice set. Production 2026-10-08:
+  // seven consecutive Computer Science residents failed only test_and_regression_construction, yet breadth-first over
+  // nine historically failing competencies gave it one task of ten and never its other two.
+  for (const item of priority.length ? byCompetency.get(priority[0]) || [] : []) take(item)
+  // Then breadth first: every resident must pass all 13 competencies, so each failing competency gets one task before
+  // any gets a second; then one task for every remaining competency; then the rest of the catalog.
   const depth = Math.max(0, ...[...byCompetency.values()].map(list => list.length))
   for (let index = 0; index < depth; index += 1) for (const competencyId of priority) take((byCompetency.get(competencyId) || [])[index])
   for (const competencyId of BUILDER_RESIDENCY_V1_COMPETENCIES) take((byCompetency.get(competencyId) || [])[0])
@@ -274,7 +278,12 @@ export async function builderProtocolPracticeForRun(input: {
     rows.push(...data)
     if (data.length < EVIDENCE_PAGE_ROWS) break
   }
+  // Rows are read oldest first. Rank by each competency's latest failure, newest first, so the competency residents are
+  // failing now leads; all-time counts kept competencies that residents had since passed ahead of it.
+  const latestFailure = new Map<string, number>()
+  rows.forEach((row, index) => latestFailure.set(String(row.competency_id ?? '').trim(), index))
   const priorityCompetencies = failedResidencyCompetencies(rows).map(item => item.competencyId)
+    .sort((a, b) => (latestFailure.get(b) ?? -1) - (latestFailure.get(a) ?? -1))
   const selection = await buildBuilderProtocolPracticeSelection({
     priorityCompetencies,
     maxTasks: BUILDER_PROTOCOL_PRACTICE_TASKS_PER_RUN,

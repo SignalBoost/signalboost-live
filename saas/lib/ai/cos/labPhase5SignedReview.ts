@@ -1,4 +1,4 @@
-import { createPublicKey, verify, type KeyObject } from 'node:crypto'
+import { createHash, createPublicKey, verify, type KeyObject } from 'node:crypto'
 import { assessPrivateDesignPartner, type PartnerEvidence } from './labPhase5PartnerIntake.ts'
 
 /** A signed review attests to one immutable evidence manifest; it is not proof of the documents' legal validity. */
@@ -41,7 +41,7 @@ export function phase5ReviewPayload(review: Pick<EvidenceReview, 'partner' | 'ma
   }), 'utf8')
 }
 
-export function verifyPhase5SignedReview(review: EvidenceReview, trustedReviewers: readonly TrustedReviewer[]): Readonly<{
+export function verifyPhase5SignedReview(review: EvidenceReview, trustedReviewers: readonly TrustedReviewer[], manifestBytes: Uint8Array): Readonly<{
   eligibleForIndependentSignoffReview: boolean
   blockers: readonly string[]
   authorizesProduction: false
@@ -49,6 +49,7 @@ export function verifyPhase5SignedReview(review: EvidenceReview, trustedReviewer
 }> {
   const blockers = [...assessPrivateDesignPartner(review.partner).blockers]
   if (!SHA256.test(review.manifestDigest)) blockers.push('manifest_digest_invalid')
+  if (!(manifestBytes instanceof Uint8Array) || createHash('sha256').update(manifestBytes).digest('hex') !== review.manifestDigest) blockers.push('manifest_content_mismatch')
   const matches = trustedReviewers.filter(k => k.keyId === review.reviewerKeyId)
   if (matches.length !== 1) blockers.push('trusted_reviewer_key_missing_or_ambiguous')
   if (!BASE64.test(review.signatureBase64) || review.signatureBase64.length !== 88) blockers.push('review_signature_invalid')

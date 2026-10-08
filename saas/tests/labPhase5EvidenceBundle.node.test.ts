@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import test from 'node:test'
 import { verifyPhase5EvidenceBundle } from '../lib/ai/cos/labPhase5EvidenceBundle.ts'
+import { verifyPhase5SignedDocumentDigests } from '../lib/ai/cos/labPhase5SignedDocumentDigests.ts'
 import { phase5ReviewPayload } from '../lib/ai/cos/labPhase5SignedReview.ts'
 const keys=generateKeyPairSync('ed25519')
 const manifest=Buffer.from('test-phase5-manifest')
@@ -51,4 +52,28 @@ test('cross-tenant evidence and tampered hashes are rejected',()=>{
 test('unexpected evidence outside the signed review bundle is rejected',()=>{
  const bytes=Buffer.from('extra')
  assert.equal(verify([...documents,{ref:'ref:extra',tenantId:'tenant-a',bytes,sha256:createHash('sha256').update(bytes).digest('hex')}]).eligibleForIndependentLegalReview,false)
+})
+
+test('signed manifest binds each underlying document digest',()=>{
+ const fields = [
+  'signedEvaluationScopeRef','signedPartnerAcceptanceRef','teacherOutputRightsRef',
+  'trainingDataRightsRef','retentionDeletionTermsRef','privacyReviewRef',
+  'tenantSecurityReviewRef','penetrationTestRef','recoveryDrillRef',
+  'auditLogReviewRef','supportIncidentResponseRef','legalCommercialApprovalRef',
+  'deploymentRollbackDecisionRef',
+ ] as const
+ const pinned = Buffer.from(JSON.stringify({
+  contract:'itmounts-phase5-evidence-digests-v1', tenantId:'tenant-a',
+  documents:fields.map((field,index)=>({field,ref:partner[field],sha256:documents[index].sha256}))
+ }))
+ const signedUnsigned={...unsigned,manifestDigest:createHash('sha256').update(pinned).digest('hex')}
+ const signedReview={...signedUnsigned,signatureBase64:sign(null,phase5ReviewPayload(signedUnsigned),keys.privateKey).toString('base64')}
+ const evaluate=(docs:typeof documents)=>verifyPhase5SignedDocumentDigests({
+  review:signedReview,manifest:pinned,documents:docs,policies,observedAt,
+ })
+ assert.equal(evaluate(documents).eligibleForIndependentLegalReview,true)
+ const bytes=Buffer.from('substituted document')
+ const changed=[{...documents[0],bytes,sha256:createHash('sha256').update(bytes).digest('hex')},...documents.slice(1)]
+ assert.equal(evaluate(changed).eligibleForIndependentLegalReview,false)
+ assert.ok(evaluate(changed).blockers.some(b=>b.includes('signed_document_digest_mismatch')))
 })

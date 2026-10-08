@@ -4,7 +4,7 @@ import { createTenantOwnedBirthSource } from '../lib/ai/cos/universityTenantOwne
 const org='11111111-2222-4333-8444-555555555555'
 const other='22222222-3333-4444-8555-666666666666'
 const id='f2cb6434-a7ac-49ee-88f0-34a94f31a422'
-function fixture(opts:{owner?:string;artifact?:string;fail?:boolean}={}){
+function fixture(opts:{owner?:string|null;artifact?:string;fail?:boolean}={}){
  const calls:string[]=[]
  const db={
   schema:(schema:string)=>({from:(table:string)=>query(schema+'.'+table)}),

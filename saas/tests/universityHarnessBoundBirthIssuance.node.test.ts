@@ -37,7 +37,7 @@ function make(status:'active'|'completed'='active'){
 test('verified active Harness resolution is required throughout signature issuance',async()=>{
  const s=make()
  assert.equal(await issueBirthWithTrustedHarness(s.input),'verified_persisted')
- assert.deepEqual(s.stats(),{signing:1,writes:1,lookups:2})
+ assert.deepEqual(s.stats(),{signing:1,writes:1,lookups:3})
 })
 test('completed HarnessRun refuses signing and persistence',async()=>{
  const s=make('completed')
@@ -55,9 +55,8 @@ test('revocation after read prevents persistence',async()=>{
  const outcome=await issueBirthWithTrustedHarness({...s.input,resolveTrustedRun:async()=>{
    calls++; return {manifest,status:calls===1?'active' as const:'cancelled' as const,authorityVerified:true}
  }})
- assert.equal(outcome,'not_authorized')
- // Storage must be refused, but on this base branch signing already occurred.
- // PR #3830 is required to eliminate the earlier signing window.
- assert.equal(s.stats().signing,1)
+ assert.equal(outcome,'invalid_grant')
+ // Revoked before signing must prevent both external signature and DB write.
+ assert.equal(s.stats().signing,0)
  assert.equal(s.stats().writes,0)
 })

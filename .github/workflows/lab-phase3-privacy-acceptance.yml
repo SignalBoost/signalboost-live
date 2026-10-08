@@ -6,6 +6,8 @@ on:
       - '.github/workflows/lab-phase3-privacy-acceptance.yml'
       - 'saas/lib/ai/cos/itmountsLabEgressPolicy.ts'
       - 'saas/tests/itmountsLabEgressPolicy.node.test.ts'
+      - 'saas/lib/ai/cos/itmountsLabEgressExecution.ts'
+      - 'saas/tests/itmountsLabEgressExecution.node.test.ts'
   workflow_dispatch:
 
 permissions:
@@ -23,4 +25,4 @@ jobs:
           node-version: '24'
       - name: Verify Phase 3 privacy policy, including unknown tiers
         working-directory: saas
-        run: node --test tests/itmountsLabEgressPolicy.node.test.ts
+        run: node --test tests/itmountsLabEgressPolicy.node.test.ts tests/itmountsLabEgressExecution.node.test.ts

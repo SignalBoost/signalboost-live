@@ -143,12 +143,14 @@ async function findUserIdByEmail(supabase: any, email: string): Promise<string |
 }
 
 async function claimStripeEvent(supabase: any, eventId: string | undefined): Promise<boolean> {
-  if (!eventId) return true
+  // A missing event ID or an unavailable idempotency store must NEVER
+  // authorize a top-up. Stripe will retry a non-2xx response.
+  if (!eventId || !eventId.trim()) throw new Error('stripe_event_id_required')
   const { error } = await supabase.from('stripe_processed_events').insert({ event_id: eventId })
   if (!error) return true
   if (error.code === '23505') return false
-  console.warn('Webhook: claimStripeEvent insert error (proceeding fail-open)', error.code, error.message)
-  return true
+  console.error('Webhook: Stripe event claim failed closed', error.code, error.message)
+  throw new Error('stripe_event_claim_unavailable')
 }
 
 async function releaseStripeEvent(supabase: any, eventId: string | undefined): Promise<void> {

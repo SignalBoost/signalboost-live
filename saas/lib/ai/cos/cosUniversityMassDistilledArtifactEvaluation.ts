@@ -536,6 +536,13 @@ function candidateSoloEmptyAnswer(error:string){
 function candidateSoloMarkerlessNoAnswer(error:string){
   return /^mass_distilled_evaluation_answer_missing:[^:]+:finish=stop:think=0:open=0:close=0:other=0:cap=1024$/.test(error)
 }
+/** The candidate-attributed error for a solo response in one of the deterministic no-answer shapes, or null. */
+export function candidateSoloFailure(failure:string):string|null{
+  if(candidateSoloOutputExhaustion(failure))return failure.replace('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_output_exhausted:')
+  if(candidateSoloEmptyAnswer(failure))return failure.replace('mass_distilled_evaluation_answer_empty:','mass_distilled_evaluation_candidate_answer_empty:')
+  if(candidateSoloMarkerlessNoAnswer(failure))return failure.replace('mass_distilled_evaluation_answer_missing:','mass_distilled_evaluation_candidate_answer_missing:')
+  return null
+}
 function parseAnswersPartial(text:string,cases:readonly EvalCase[],finish:string,cap:number){
   const answers=new Map<string,string>();const missing:string[]=[];const errors:Record<string,string>={}
   for(const item of cases){
@@ -621,7 +628,16 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
       const recovered=new Map(first.answers);const parts=[first.responseHash];const rawExcerpts=[first.rawExcerpt]
       for(const id of first.missing){
         const item=cases.find(entry=>entry.id===id)
-        if(!item||soloRecoveries>=(input.maxSoloRecoveries??1)||input.budget.used+1+reserve>input.budget.max)throw new Error(first.errors[id])
+        if(!item||soloRecoveries>=(input.maxSoloRecoveries??1)||input.budget.used+1+reserve>input.budget.max){
+          // Production 2026-10-07: with 12 holdout cases every holdout group is already ONE case, so the first response is the
+          // exact solo request at temperature 0. When the retry allowance or call budget is spent, a candidate solo response in
+          // one of the deterministic no-answer shapes is the student's answer, exactly as a reproduced retry would be. It used
+          // to throw the raw infrastructure error instead, and the same student re-failed identically on every paid wake
+          // (answer_missing:36d2ea4c x9, :17e509bb x6 in 24h). Baseline failures stay fail-closed infrastructure here: scoring
+          // a baseline 0 without a reproduction could only flatter the student.
+          const attributed=input.candidate&&cases.length===1?candidateSoloFailure(first.errors[id]):null
+          throw new Error(attributed||first.errors[id])
+        }
         soloRecoveries+=1;input.budget.used+=1;const solo=await raw([item])
         if(solo.missing.length){
           const failure=solo.errors[id]

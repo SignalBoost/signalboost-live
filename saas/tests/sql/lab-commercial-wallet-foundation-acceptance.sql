@@ -1,7 +1,7 @@
 -- Run after the isolated commercial-wallet foundation migration on a disposable DB.
 begin;
 do $t$
-declare org_id uuid:=gen_random_uuid();lot uuid:=gen_random_uuid();denied boolean;
+declare org_id uuid:=gen_random_uuid();other_org uuid:=gen_random_uuid();lot uuid:=gen_random_uuid();denied boolean;
 begin
   if has_table_privilege('anon','lab.commercial_credit_lots','INSERT')
    or has_table_privilege('authenticated','lab.commercial_credit_journal','SELECT')
@@ -30,6 +30,14 @@ begin
   exception when unique_violation then denied:=true;
   end;
   if not denied then raise exception 'duplicate source lot accepted'; end if;
+  insert into lab.organizations(id,name) values(other_org,'wallet-foundation-other-tenant');
+  denied:=false;
+  begin
+    insert into lab.commercial_credit_journal(organization_id,lot_id,operation,amount_credits,event_key,source_reference)
+    values(other_org,lot,'grant',100,'wallet-cross-tenant-test-0001','acceptance-foreign-lot-01');
+  exception when foreign_key_violation then denied:=true;
+  end;
+  if not denied then raise exception 'cross-tenant commercial journal lot accepted'; end if;
   raise notice 'PASS wallet schema isolated, immutable and purchased credits do not expire';
 end $t$;
 rollback;

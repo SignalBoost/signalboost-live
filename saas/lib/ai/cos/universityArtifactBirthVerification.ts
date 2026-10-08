@@ -23,7 +23,9 @@ export type SignedBirthIdentity = Readonly<{
 }>
 
 function normalized(input: BirthIdentity): BirthIdentity | null {
-  if (!input || !UUID.test(input.permanentArtifactId)
+  if (!input || typeof input !== 'object'
+    || !Object.prototype.hasOwnProperty.call(input, 'parentPermanentArtifactId')
+    || !UUID.test(input.permanentArtifactId)
     || !SHA256.test(input.trainedArtifactHash)
     || !SHA256.test(input.revisionKey)
     || !SHA256.test(input.datasetHash)

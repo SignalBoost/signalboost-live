@@ -13,6 +13,8 @@ export type LabEgressAuthority = Readonly<{
 }>
 export function authorizeLabEgress(tier: LabPrivacyTier, kind: LabEgressKind, authority: LabEgressAuthority): boolean {
   if (!authority || authority.verifiedByHarness !== true) return false
+  // Runtime input can bypass TypeScript unions; unknown privacy tiers must never grant egress.
+  if (!['PRIVATE', 'AGGREGATE_METRICS', 'RESEARCH_OPT_IN'].includes(tier)) return false
   if (!authority.sourceOrganizationId || !authority.destinationOrganizationId) return false
   // This cross-tenant policy never approves raw records, weights, secrets or diagnostic logs.
   if (['raw_artifact','model_weights','training_records','provider_credentials','audit_logs'].includes(kind)) return false

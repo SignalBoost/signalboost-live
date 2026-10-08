@@ -83,7 +83,8 @@ test('Residency cron runs one bounded lane per admitted resident without widenin
   assert.match(source, /Promise\.all\(laneStores\.map\(laneStore => runLane\(laneStore\)\)\)/)
   assert.match(source, /await runBuilderResidencyOrchestrator/)
   assert.match(source, /parallelExecution: lanes\.length > 1/)
-  assert.match(source, /admitNextBuilderResidency\(\{ db, activeLimit: RESIDENCY_ACTIVE_LIMIT \}\)/)
+  // 2026-10-08: the experiment scope (undefined on the scheduled line) is the only addition; the limit is unchanged.
+  assert.match(source, /admitNextBuilderResidency\(\{ db, activeLimit: RESIDENCY_ACTIVE_LIMIT, candidateIds \}\)/)
 })
 
 

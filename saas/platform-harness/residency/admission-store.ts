@@ -109,13 +109,17 @@ type AutoAdmissionArtifact = Readonly<{
 export async function admitNextBuilderResidency(input:{
   db:SupabaseClient
   activeLimit?:number
+  /** Paused factory, one Lab experiment: admit only these candidates and count only their residents. */
+  candidateIds?:readonly string[]
 }){
   const activeLimit=Math.max(1,Math.min(16,Math.trunc(input.activeLimit??AUTO_ADMISSION_ACTIVE_LIMIT)))
+  const inScope=(query:any):any=>
+    input.candidateIds?query.in('candidate_id',[...input.candidateIds]):query
 
-  const active=await input.db
+  const active=await inScope(input.db
     .from('cos_university_residency_enrollments')
     .select('id')
-    .in('standing',['resident','senior_resident'])
+    .in('standing',['resident','senior_resident']))
     .limit(activeLimit)
   if(active.error) throw active.error
   if((active.data??[]).length>=activeLimit){
@@ -135,13 +139,13 @@ export async function admitNextBuilderResidency(input:{
   // once the oldest rows have already been admitted.
   const candidatePageSize=64
   for(let offset=0;;offset+=candidatePageSize){
-    const artifacts=await input.db
+    const artifacts=await inScope(input.db
       .from('cos_local_distillation_artifacts')
       .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,status,authority_expanded')
       .eq('status',RESIDENCY_STUDENT_STATUS)
       .eq('subject_id','Computer Science & Coding')
       .eq('authority_expanded',false)
-      .like('candidate_id','mass:%')
+      .like('candidate_id','mass:%'))
       .order('created_at',{ascending:true})
       .range(offset,offset+candidatePageSize-1)
     if(artifacts.error) throw artifacts.error

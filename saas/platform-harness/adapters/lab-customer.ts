@@ -1,3 +1,4 @@
+// saas/platform-harness/adapters/lab-customer.ts
 // Customer Lab Harness ingress.
 // Auth + explicit Lab membership are verified before this helper is called. The host then issues
 // one narrow, non-expanding Production authority envelope for the Lab binding operation.
@@ -12,11 +13,13 @@ export const LAB_UNIVERSITY_BIND_CAPABILITY='university.distillation.execute' as
 export async function withCustomerLabUniversityBindingHarness<T>(input:{
   organizationId:string
   operation:(manifest:HarnessManifest)=>Promise<T>
+  /** What the authenticated customer asked for. The authority envelope is identical either way. */
+  objective?:string
 }):Promise<T>{
   const runId=`lab-customer-${randomUUID()}`
   const request=createProductionHarnessRequest({
     runId,
-    objective:'Bind an authenticated customer Lab Experiment to an existing governed University run.',
+    objective:input.objective||'Bind an authenticated customer Lab Experiment to an existing governed University run.',
     tenantId:input.organizationId,
     portableId:'itmounts-lab',
     agentId:'itmounts-lab-customer-ingress',

@@ -218,7 +218,7 @@ test('registration is batched, because a registry write spends nothing and reser
 
   const route = readFileSync(new URL('../app/api/cron/cos-university-graduate-activation/route.ts', import.meta.url), 'utf8')
   const registerFn = route.slice(
-    route.indexOf('async function registerNextMassGraduate()'),
+    route.indexOf('async function registerNextMassGraduate('),
     route.indexOf('async function proveNextGraduateRollback()'),
   )
   assert.ok(registerFn.length > 0)

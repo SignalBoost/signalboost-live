@@ -1,3 +1,4 @@
+// saas/tests/massGraduateRegistrationStarvation.node.test.ts
 //
 // Production 2026-09-29: an artifact sat at `runtime_pending` for DAYS while newer artifacts registered past it.
 // registerNextMassGraduate read every candidate's evidence in one query -
@@ -24,7 +25,7 @@ const source = readFileSync(
   new URL('../app/api/cron/cos-university-graduate-activation/route.ts', import.meta.url), 'utf8')
 
 const registerFn = (() => {
-  const start = source.indexOf('async function registerNextMassGraduate()')
+  const start = source.indexOf('async function registerNextMassGraduate(')
   const end = source.indexOf('async function proveNextGraduateRollback()')
   assert.ok(start > 0 && end > start, 'registerNextMassGraduate is no longer in this route')
   return source.slice(start, end)

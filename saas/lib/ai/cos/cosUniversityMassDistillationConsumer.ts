@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
 import { persistDistillationAssetVault, tryReadDistillationAssetsBySourceRef } from './cosUniversityDistillationAssetVault.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -1228,7 +1229,12 @@ export async function runMassDistillationCampaignConsumer(input: {
   now?: Date
   maxDispatches?: number
   fetchImpl?: FetchPort
+  /** Paused factory, one Lab experiment: claim stages only from these campaigns. Absent = every authorized campaign. */
+  campaignIds?: readonly string[]
 } = {}) {
+  if (input.campaignIds && input.campaignIds.length === 0) {
+    return { ok: true as const, skipped: true as const, reason: 'no_experiment_campaign' as const, dispatched: 0 }
+  }
   const readiness = massDistillationDispatchReadiness()
   if (!readiness.ready) return { ok: false as const, skipped: true as const, reason: readiness.reason }
   const executor = trainingExecutorConfigFromEnv()
@@ -1263,10 +1269,12 @@ export async function runMassDistillationCampaignConsumer(input: {
   const maxDispatches = recoveryProbeArmed
     ? 1
     : Math.max(1, Math.min(5, Math.floor(input.maxDispatches ?? 3)))
-  const campaigns = await db.from('cos_university_mass_distillation_campaigns')
+  let campaignQuery = db.from('cos_university_mass_distillation_campaigns')
     .select('id,status,max_total_cost_usd,committed_cost_usd,expires_at')
     .in('status', ['authorized', 'active'])
     .gt('expires_at', (input.now || new Date()).toISOString())
+  if (input.campaignIds) campaignQuery = campaignQuery.in('id', [...input.campaignIds])
+  const campaigns = await campaignQuery
     .order('authorized_at', { ascending: true })
     .limit(100)
   if (campaigns.error) throw campaigns.error

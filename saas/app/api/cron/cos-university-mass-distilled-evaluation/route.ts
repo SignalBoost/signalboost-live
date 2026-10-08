@@ -6,7 +6,8 @@ import { REQUIRED_EVALUATION_RUN_COLUMNS, isMissingColumnError, missingColumnsFr
 import { NextRequest, NextResponse } from 'next/server'
 import { HOLDOUT_EXAM_MAX_SET_ATTEMPTS, holdoutExamReadyArtifacts } from '@/lib/ai/cos/cosUniversityHoldoutExamItems'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
+import { pausedStationResponse } from '@/lib/ai/cos/cosUniversitySettings'
+import { experimentScopeEvidence, resolveUniversityStationScope } from '@/lib/ai/cos/itmountsLabExperimentStationScope'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -240,7 +241,9 @@ function isRemediationReplayReceipt(intendedUse: unknown): boolean {
     && Number(receipt.failureDerivedReplayLearningRate) >= MASS_EVALUATION_REMEDIATION_REPLAY_MIN_LEARNING_RATE)
 }
 
-async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
+// scopeCandidateIds: paused factory, one Lab experiment. Only those artifacts are considered (read directly, so a deep backlog
+// cannot hide them), so no approval, disposition or exam-set request touches any other artifact.
+async function ensureRollingMassEvaluationApproval(scopeCandidateIds?: readonly string[]): Promise<RollingOutcome> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   // Keep legacy work bounded to the oldest 500, but separately include the current anchored recipe
@@ -290,6 +293,15 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const artifactByCandidate = new Map<string, any>()
   for (const row of [...(oldestArtifacts.data || []), ...confirmedCurrentRecipeArtifacts, ...confirmedBuilderV2Artifacts, ...confirmedReplayArtifacts]) {
     artifactByCandidate.set(String((row as any).candidate_id), row)
+  }
+  if (scopeCandidateIds) {
+    const scoped = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
+      .in('status', ['evaluation_ready', 'evaluation_pending'])
+      .in('candidate_id', [...scopeCandidateIds])
+    if (scoped.error) throw scoped.error
+    artifactByCandidate.clear()
+    for (const row of scoped.data || []) artifactByCandidate.set(String((row as any).candidate_id), row)
   }
   const artifactRows = [...artifactByCandidate.values()]
 
@@ -634,10 +646,12 @@ async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   return { issued: true, candidateId: decision.artifact.candidateId, artifactHash: decision.artifact.artifactHash, disposed: disposed.length }
 }
 
-async function claimNext(): Promise<MassEvaluationClaim | null> {
+async function claimNext(candidateIds?: readonly string[]): Promise<MassEvaluationClaim | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const result = await db.rpc('claim_next_mass_distilled_evaluation')
+  const result = candidateIds
+    ? await db.rpc('scoped_claim_next_mass_distilled_evaluation', { p_candidate_ids: [...candidateIds] })
+    : await db.rpc('claim_next_mass_distilled_evaluation')
   if (result.error) throw result.error
   const row = Array.isArray(result.data) ? result.data[0] as RawClaim | undefined : undefined
   if (!row) return null
@@ -751,8 +765,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no exam, no wake.
-  const pause = await readLinePauseSetting(cosServiceDb())
-  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-mass-distilled-evaluation'))
+  // Owner 2026-10-07: while paused, a live Lab experiment grant examines only that experiment's artifact.
+  const scope = await resolveUniversityStationScope({ db: cosServiceDb() })
+  if (scope.run === 'paused') return NextResponse.json(pausedStationResponse('cos-university-mass-distilled-evaluation'))
+  const candidateIds = scope.run === 'experiment' ? scope.candidateIds : undefined
+  const experimentScope = experimentScopeEvidence(scope)
 
   let claim: MassEvaluationClaim | null = null
   let evaluationWorkerActivated = false
@@ -812,11 +829,11 @@ export async function GET(req: NextRequest) {
 
     let rolling: RollingOutcome
     try {
-      rolling = await ensureRollingMassEvaluationApproval()
+      rolling = await ensureRollingMassEvaluationApproval(candidateIds)
     } catch (error) {
       throw new Error(`mass_distilled_evaluation_rolling_preflight_failed:${boundedErrorMessage(error)}`)
     }
-    console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
+    console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify({ ...rolling, experimentScope }))
     // A previous tick may already have issued a bounded approval that has not yet been atomically
     // claimed. Draining that approval does not mint new authority or expand spend: claimNext() re-validates
     // the exact unexpired approval, canary, artifact identity, 18-call ceiling, 4 judge calls, 1 wake and
@@ -839,9 +856,9 @@ export async function GET(req: NextRequest) {
         reason: rolling.reason,
         ...(rolling.skipped ? { approvalConsidered: rolling.considered, approvalSkipped: rolling.skipped } : {}),
       }).catch(() => undefined)
-      return NextResponse.json({ ok: true, skipped: true, reason: rolling.reason })
+      return NextResponse.json({ ok: true, skipped: true, reason: rolling.reason, experimentScope })
     }
-    claim = await claimNext()
+    claim = await claimNext(candidateIds)
     if (!claim) {
       await recordProduction(true, {
         runnerInvoked: false,
@@ -850,7 +867,7 @@ export async function GET(req: NextRequest) {
         reason: 'no_atomically_claimable_mass_distilled_evaluation',
         approvalReason: rolling.reason,
         ...(rolling.skipped ? { approvalConsidered: rolling.considered, approvalSkipped: rolling.skipped } : {}),      }).catch(() => undefined)
-      return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
+      return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation', experimentScope })
     }
 
     // The evaluator must not depend on a separate canary cron having already applied the current GPU policy.

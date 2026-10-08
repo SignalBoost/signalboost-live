@@ -11,7 +11,8 @@
 // returning a success that says only `ready: 0`.
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
+import { pausedStationResponse } from '@/lib/ai/cos/cosUniversitySettings'
+import { experimentScopeEvidence, resolveUniversityStationScope } from '@/lib/ai/cos/itmountsLabExperimentStationScope'
 import { fillRequestedHoldoutExamSets } from '@/lib/ai/cos/cosUniversityHoldoutExamItems'
 import { lineCapacity } from '@/lib/ai/cos/cosUniversityLineCapacity'
 import { describeExamSetPopulation } from '@/lib/ai/cos/cosUniversityHoldoutExamSetRecovery'
@@ -33,8 +34,10 @@ export async function GET(request: NextRequest) {
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok: false, error: 'service_database_unavailable' }, { status: 503 })
   // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no teacher calls.
-  const pause = await readLinePauseSetting(db)
-  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-holdout-exam-items'))
+  // Owner 2026-10-07: while paused, a live Lab experiment grant prepares only that experiment's exam set.
+  const scope = await resolveUniversityStationScope({ db })
+  if (scope.run === 'paused') return NextResponse.json(pausedStationResponse('cos-university-holdout-exam-items'))
+  const experimentScope = experimentScopeEvidence(scope)
   try {
     // 975 exams requested against 157 ready: at 3 sets per tick the writer never catches up with training output, so
     // students keep arriving in a queue that grows faster than it drains. 10 is the function's own built-in ceiling
@@ -47,6 +50,7 @@ export async function GET(request: NextRequest) {
       db,
       limit: lineCapacity().examSetsPerTick,
       deadlineMs: startedAt + maxDuration * 1000 - ROUTE_RESERVE_MS,
+      ...(scope.run === 'experiment' ? { candidateIds: scope.candidateIds } : {}),
     })
     const summary = result.population ? describeExamSetPopulation(result.population) : 'exam set population unreadable'
     if (result.errors.length || result.aborted || result.deadlineReached) console.warn('[cos-holdout-exam-items]', JSON.stringify({ ...result, summary }))
@@ -69,6 +73,7 @@ export async function GET(request: NextRequest) {
         unreached: result.unreached,
         population: result.population,
         summary,
+        experimentScope,
         authorityExpanded: false,
       },
     }).catch(() => null)
@@ -76,9 +81,9 @@ export async function GET(request: NextRequest) {
     // A global precondition means this station cannot work at all, and nothing downstream can move while it holds.
     // Answering 200/ok for that is how a line stop stays invisible for a day.
     if (result.aborted) {
-      return NextResponse.json({ ok: false, error: result.aborted, ...result, summary, authorityExpanded: false }, { status: 503 })
+      return NextResponse.json({ ok: false, error: result.aborted, ...result, summary, experimentScope, authorityExpanded: false }, { status: 503 })
     }
-    return NextResponse.json({ ok: true, ...result, summary, authorityExpanded: false })
+    return NextResponse.json({ ok: true, ...result, summary, experimentScope, authorityExpanded: false })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('[cos-holdout-exam-items] failed', message)

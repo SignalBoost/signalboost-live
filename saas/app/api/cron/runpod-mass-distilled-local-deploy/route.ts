@@ -3,7 +3,8 @@
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
+import { pausedStationResponse } from '@/lib/ai/cos/cosUniversitySettings'
+import { experimentScopeEvidence, resolveUniversityStationScope } from '@/lib/ai/cos/itmountsLabExperimentStationScope'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import {
   MASS_CANARY_BUILDER_APPRENTICESHIP_PRIORITY_AFTER,
@@ -178,7 +179,9 @@ function rollingEventKey(row:any){
 
 // Issues at most one bounded canary approval per tick before the unchanged atomic claim.
 // Kill switch: COS_MASS_CANARY_ROLLING_AUTHORIZATION=false.
-async function issueRollingCanaryApproval(now:Date){
+// scopeCandidateIds: paused factory, one Lab experiment. Only those artifacts are considered, read directly so a deep
+// backlog cannot hide a new experiment artifact outside the cohort windows below.
+async function issueRollingCanaryApproval(now:Date,scopeCandidateIds?:readonly string[]){
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
   // Keep legacy fairness bounded to the oldest 200, but separately include the current anchored recipe
   // across every subject. Production quality telemetry showed the old stable-on-policy cohort at 0 full passes
@@ -270,6 +273,15 @@ async function issueRollingCanaryApproval(now:Date){
   const artifactByCandidate=new Map<string,any>()
   for(const row of [...(oldestArtifacts.data||[]),...pendingCurrentRecipeArtifacts,...pendingBuilderArtifacts,...pendingReplayArtifacts,...confirmedXsaArtifacts]){
     artifactByCandidate.set(String((row as any).candidate_id),row)
+  }
+  if(scopeCandidateIds){
+    const scoped=await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,trained_artifact_hash,created_at,status,intended_use')
+      .in('status',['evaluation_ready','evaluation_pending'])
+      .in('candidate_id',[...scopeCandidateIds])
+    if(scoped.error) throw scoped.error
+    artifactByCandidate.clear()
+    for(const row of scoped.data||[]) artifactByCandidate.set(String((row as any).candidate_id),row)
   }
   const artifactRows=[...artifactByCandidate.values()]
 
@@ -390,9 +402,11 @@ async function issueRollingCanaryApproval(now:Date){
   return {issued:true,candidateId:decision.artifact.candidateId,artifactHash:decision.artifact.artifactHash}
 }
 
-async function claimNext():Promise<AtomicClaim|null>{
+async function claimNext(candidateIds?:readonly string[]):Promise<AtomicClaim|null>{
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
-  const result=await db.rpc('claim_next_mass_distilled_runtime_canary')
+  const result=candidateIds
+    ? await db.rpc('scoped_claim_next_mass_distilled_runtime_canary',{p_candidate_ids:[...candidateIds]})
+    : await db.rpc('claim_next_mass_distilled_runtime_canary')
   if(result.error) throw result.error
   const row=Array.isArray(result.data)?result.data[0] as AtomicClaim|undefined:undefined
   return row||null
@@ -498,8 +512,11 @@ export async function GET(req:NextRequest){
   const secret=process.env.CRON_SECRET
   if(!secret||req.headers.get('authorization')!==`Bearer ${secret}`) return NextResponse.json({ok:false,error:'Unauthorized'},{status:401})
   // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no canary wake.
-  const pause=await readLinePauseSetting(cosServiceDb())
-  if(pause.paused) return NextResponse.json(pausedStationResponse('runpod-mass-distilled-local-deploy'))
+  // Owner 2026-10-07: while paused, a live Lab experiment grant canaries only that experiment's artifact.
+  const scope=await resolveUniversityStationScope({db:cosServiceDb()})
+  if(scope.run==='paused') return NextResponse.json(pausedStationResponse('runpod-mass-distilled-local-deploy'))
+  const candidateIds=scope.run==='experiment'?scope.candidateIds:undefined
+  const experimentScope=experimentScopeEvidence(scope)
 
   let active:ActiveClaim|null=null
   let providerInvocationStarted=false
@@ -508,17 +525,17 @@ export async function GET(req:NextRequest){
     const account=await queryRunpodAccountStatus()
     if(account.clientBalance!==null&&account.clientBalance<MIN_BALANCE_USD){await laneStatus('skipped','runpod_balance_guard',{balance:account.clientBalance,minBalanceUsd:MIN_BALANCE_USD});return NextResponse.json({ok:false,error:'runpod_balance_guard',balance:account.clientBalance},{status:402})}
 
-    const rolling=await issueRollingCanaryApproval(new Date(Date.now()-1000))
-    console.log('[cos-mass-distilled-rolling-canary-authorization]',JSON.stringify(rolling))
-    const claim=await claimNext()
+    const rolling=await issueRollingCanaryApproval(new Date(Date.now()-1000),candidateIds)
+    console.log('[cos-mass-distilled-rolling-canary-authorization]',JSON.stringify({...rolling,experimentScope}))
+    const claim=await claimNext(candidateIds)
     if(!claim){
       const inFlight=await readInFlightCanary(new Date())
       if(inFlight){
         await laneStatus('running','canary_in_progress',inFlight)
-        return NextResponse.json({ok:true,running:true,reason:'canary_in_progress',candidateId:inFlight.candidateId,endpointId:inFlight.endpointId,startedAt:inFlight.startedAt,approval:rolling})
+        return NextResponse.json({ok:true,running:true,reason:'canary_in_progress',candidateId:inFlight.candidateId,endpointId:inFlight.endpointId,startedAt:inFlight.startedAt,approval:rolling,experimentScope})
       }
       await laneStatus('skipped','no_atomically_claimable_mass_distilled_artifact',{approvalIssued:Boolean((rolling as any)?.issued),approvalReason:(rolling as any)?.reason})
-      return NextResponse.json({ok:true,skipped:true,reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling})
+      return NextResponse.json({ok:true,skipped:true,reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling,experimentScope})
     }
     const {artifact,revisionKey}=await artifactFromClaim(claim)
     const approvedCost=Number(claim.max_estimated_canary_cost_usd)
@@ -598,7 +615,7 @@ export async function GET(req:NextRequest){
     await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,...resumeEvidence,...gpuTelemetry,explicitWorkerWarmStart:true,workerWarmStart,workerScaleDown,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false,healthAfter}})
     await recordFineTuneCanary({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactId:runtimeArtifact.artifactId,artifactHash:runtimeArtifact.artifactHash,revisionKey,endpointId:provisioned.endpointId,responseHash,attentionArchitecture:runtimeArtifact.attentionArchitecture,xsaProfile:runtimeArtifact.xsaProfile})
     await laneStatus('worked','canary_passed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,model:provisioned.modelName})
-    return NextResponse.json({ok:true,deployed:true,canaryPassed:true,candidateId:runtimeArtifact.candidateId,artifactHash:runtimeArtifact.artifactHash,endpointId:provisioned.endpointId,model:provisioned.modelName,productionTrafficAuthorized:false})
+    return NextResponse.json({ok:true,deployed:true,canaryPassed:true,candidateId:runtimeArtifact.candidateId,artifactHash:runtimeArtifact.artifactHash,endpointId:provisioned.endpointId,model:provisioned.modelName,productionTrafficAuthorized:false,experimentScope})
   }catch(error){
     const message=describeThrownValue(error,300)
     if(active&&!providerInvocationStarted){

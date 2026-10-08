@@ -395,6 +395,8 @@ export async function fillRequestedHoldoutExamSets(input: {
   readRows?: typeof readPinnedHfParquetRows
   /** Epoch milliseconds after which no NEW set is started. The route derives it from its own execution limit. */
   deadlineMs?: number
+  /** Paused factory, one Lab experiment: prepare only these candidates' sets and revive nothing else. */
+  candidateIds?: readonly string[]
 }): Promise<HoldoutExamFillResult> {
   const env = input.env || process.env
   const now = input.now || new Date()
@@ -410,10 +412,12 @@ export async function fillRequestedHoldoutExamSets(input: {
   let itemsWritten = 0
   let itemsReused = 0
 
-  const pending = await db.from(HOLDOUT_EXAM_SETS_TABLE)
+  let pendingQuery = db.from(HOLDOUT_EXAM_SETS_TABLE)
     .select('candidate_id,trained_artifact_hash,status,attempts,last_error')
     .in('status', ['requested', 'failed'])
     .lt('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS)
+  if (input.candidateIds) pendingQuery = pendingQuery.in('candidate_id', [...input.candidateIds])
+  const pending = await pendingQuery
     // Newest request first: the evaluation route requests (or refreshes) exactly the artifacts it will examine next.
     .order('updated_at', { ascending: false })
     .limit(limit)
@@ -442,7 +446,7 @@ export async function fillRequestedHoldoutExamSets(input: {
 
   // Give exhausted sets their budget back when their recorded failure was not structural. Without this, a population
   // burned out by an earlier outage stays invisible to this writer forever and the line never restarts.
-  const revived = await reviveExhaustedExamSets({ db, now })
+  const revived = input.candidateIds ? 0 : await reviveExhaustedExamSets({ db, now })
 
   if (!sets.length) {
     const population = await readExamSetPopulation(db)

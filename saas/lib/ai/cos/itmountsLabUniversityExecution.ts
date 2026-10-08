@@ -30,12 +30,40 @@ export type LabExecutionDb = {
   }): Promise<void>
 }
 
+export type LabExperimentStartDb = {
+  readExperiment: LabExecutionDb['readExperiment']
+  startExperimentUniversityRun(input: {
+    organizationId: string
+    experimentId: string
+    subjectId: string
+    harnessRunId: string
+    startedBy: string
+  }): Promise<Record<string, unknown> | null>
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+// The customer Harness names its runs `lab-customer-<uuid>` (platform-harness/adapters/lab-customer.ts). Requiring a
+// bare UUID here rejected every real binding with lab_execution_invalid_identifier.
+const HARNESS_RUN = /^(?:lab-customer-)?[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function uuid(value: unknown): string {
   const out = String(value ?? '').trim()
   if (!UUID.test(out)) throw new Error('lab_execution_invalid_identifier')
   return out
+}
+
+function harnessRun(value: unknown): string {
+  const out = String(value ?? '').trim()
+  if (!HARNESS_RUN.test(out)) throw new Error('lab_execution_invalid_identifier')
+  return out
+}
+
+function assertHarnessAuthority(authority: VerifiedLabAuthority) {
+  if (authority?.verifiedByHarness !== true
+    || authority.capability !== 'university.distillation.execute'
+    || authority.authorityExpanded !== false) {
+    throw new Error('lab_execution_harness_authority_denied')
+  }
 }
 
 /**
@@ -49,16 +77,12 @@ export async function bindLabExperimentToUniversityRun(input: {
   db: LabExecutionDb
 }) {
   const authority = input.authority
-  if (authority?.verifiedByHarness !== true
-    || authority.capability !== 'university.distillation.execute'
-    || authority.authorityExpanded !== false) {
-    throw new Error('lab_execution_harness_authority_denied')
-  }
+  assertHarnessAuthority(authority)
 
   const organizationId = uuid(authority.organizationId)
   const experimentId = uuid(input.experimentId)
   const runId = uuid(input.runId)
-  const harnessRunId = uuid(authority.harnessRunId)
+  const harnessRunId = harnessRun(authority.harnessRunId)
 
   const experiment = await input.db.readExperiment({ organizationId, experimentId })
   if (!experiment || experiment.organizationId !== organizationId) {
@@ -96,6 +120,60 @@ export async function bindLabExperimentToUniversityRun(input: {
   }
 }
 
+/**
+ * Start one experiment run on the existing factory: one prepared batch of the chosen subject, admitted under the same
+ * rules as the rolling authorizer, one $1.825-ceiling campaign, bound to the experiment, plus an expiring execution
+ * grant so the paused factory carries this run (and only this run) to a verdict. All of it is one database
+ * transaction (lab.start_experiment_university_run). The caller must supply authority verified by the Harness.
+ */
+export async function startLabExperimentUniversityRun(input: {
+  authority: VerifiedLabAuthority
+  experimentId: string
+  subjectId: string
+  startedBy: string
+  db: LabExperimentStartDb
+}) {
+  const authority = input.authority
+  assertHarnessAuthority(authority)
+  const organizationId = uuid(authority.organizationId)
+  const experimentId = uuid(input.experimentId)
+  const startedBy = uuid(input.startedBy)
+  const harnessRunId = harnessRun(authority.harnessRunId)
+  if (!harnessRunId.startsWith('lab-customer-')) throw new Error('lab_execution_invalid_identifier')
+  const subjectId = String(input.subjectId ?? '').trim()
+  if (!subjectId || subjectId.length > 200) throw new Error('lab_execution_subject_invalid')
+
+  const experiment = await input.db.readExperiment({ organizationId, experimentId })
+  if (!experiment || experiment.organizationId !== organizationId) {
+    throw new Error('lab_execution_experiment_tenant_mismatch')
+  }
+
+  const started = await input.db.startExperimentUniversityRun({ organizationId, experimentId, subjectId, harnessRunId, startedBy })
+  if (!started) throw new Error('lab_execution_start_failed')
+  if (started.ok !== true) {
+    return { ok: false as const, reason: String(started.reason || 'lab_execution_start_refused'), subjectId, authorityExpanded: false as const }
+  }
+  if (started.authorityExpanded !== false || started.organizationId !== organizationId || started.experimentId !== experimentId) {
+    throw new Error('lab_execution_start_contract_violation')
+  }
+  return {
+    ok: true as const,
+    organizationId,
+    experimentId,
+    subjectId,
+    grantId: String(started.grantId),
+    universityRunId: String(started.universityRunId),
+    campaignId: String(started.campaignId),
+    candidateId: String(started.candidateId),
+    batchKey: String(started.batchKey),
+    expiresAt: String(started.expiresAt),
+    maxTrainingCostUsd: Number(started.maxTrainingCostUsd),
+    privacyTier: experiment.privacyTier,
+    harnessRunId,
+    authorityExpanded: false as const,
+    factory: 'existing_cos_university' as const,
+  }
+}
 
 type RpcClient = {
   rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: null | { message?: string } }>
@@ -105,8 +183,19 @@ function rpcError(error: null | { message?: string }, fallback: string) {
   if (error) throw new Error(error.message || fallback)
 }
 
-export function createSupabaseLabExecutionDb(client: RpcClient): LabExecutionDb {
+export function createSupabaseLabExecutionDb(client: RpcClient): LabExecutionDb & LabExperimentStartDb {
   return {
+    async startExperimentUniversityRun({ organizationId, experimentId, subjectId, harnessRunId, startedBy }) {
+      const { data, error } = await client.rpc('itmounts_lab_start_experiment_university_run', {
+        p_organization_id: organizationId,
+        p_experiment_id: experimentId,
+        p_subject_id: subjectId,
+        p_harness_run_id: harnessRunId,
+        p_started_by: startedBy,
+      })
+      rpcError(error, 'lab_execution_start_failed')
+      return data && typeof data === 'object' ? data as Record<string, unknown> : null
+    },
     async readExperiment({ organizationId, experimentId }) {
       const { data, error } = await client.rpc('itmounts_lab_experiment_execution_contract', {
         p_organization_id: organizationId,

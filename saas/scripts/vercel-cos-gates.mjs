@@ -23,6 +23,8 @@ const tests = [
   // Commercial Lab must reuse the existing University factory behind verified tenant authority.
   'tests/itmountsLabUniversityExecution.node.test.ts',
   'tests/itmountsLabCustomerHarness.node.test.ts',
+  'tests/itmountsLabExperimentStationScope.node.test.ts',
+  'tests/itmountsLabExperimentStart.node.test.ts',
   'tests/cosLabSignedFailureVerdict.node.test.ts',
   'tests/cosLabFailureVerdictIngestion.node.test.ts',
   'tests/cosLabVerdictReplayIdentity.node.test.ts',

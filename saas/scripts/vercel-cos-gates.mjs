@@ -26,6 +26,7 @@ const tests = [
   'tests/labPhase5PartnerIntake.node.test.ts',
   'tests/labPhase5SignedReview.node.test.ts',
   'tests/labPhase5ReviewerPolicy.node.test.ts',
+  'tests/labPhase5EvidenceBundle.node.test.ts',
   'tests/itmountsLabEgressPolicy.node.test.ts',
   'tests/itmountsLabEgressExecution.node.test.ts',
   'tests/itmountsLabByoiScope.node.test.ts',

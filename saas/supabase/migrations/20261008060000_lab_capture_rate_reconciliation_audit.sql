@@ -24,8 +24,7 @@ begin
    or rate.provider<>r.provider or rate.model<>r.model or rate.unit<>r.usage_unit
    or rate.effective_at>r.used_at
    or (rate.expires_at is not null and r.used_at>=rate.expires_at)
-   or r.usage_units > 9223372036854775807 / greatest(coalesce(rate.microcredits_per_unit,1),1)
-   or r.quoted_microcredits<>r.usage_units*coalesce(rate.microcredits_per_unit,0)
+   or r.quoted_microcredits::numeric<>r.usage_units::numeric*coalesce(rate.microcredits_per_unit,0)::numeric
    or r.quoted_microcredits<>e.amount_microcredits
    or r.source_receipt_ref is distinct from e.measured_cost_ref
    or e.measured_cost_usd is null or e.measured_cost_usd<0

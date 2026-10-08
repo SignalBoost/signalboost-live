@@ -35,6 +35,11 @@ const WINDOW_HOURS: Readonly<Record<FunnelWindow, number | null>> = Object.freez
 type Db = { from: (table: string) => any }
 
 const text = (value: unknown, max = 200): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+// A case run's failure_code is stored untruncated. The longest producers are the exact-artifact runtime codes
+// (platform-harness/residency/exact-artifact-model.ts): `residency_exact_artifact_runtime_not_ready:` plus a provider or
+// probe detail capped at 240 characters, or a bootstrap detail capped at 180, so under 300. Reading back 80 cut the
+// readiness code mid-word (2026-10-08: `...provider_workers_ready_0_running_0_in`), hiding whether workers were booting.
+const RESIDENCY_FAILURE_CODE_MAX = 300
 /** The resident's own loop stop, from case-run metadata.builderLoop (platform-harness/residency/builder-case-runner.ts). */
 const builderLoopStop = (metadata: unknown): { loopStop: string; filesChanged: number | null; loopShape: string | null } => {
   const loop = metadata && typeof metadata === 'object' ? (metadata as { builderLoop?: Record<string, unknown> }).builderLoop : undefined
@@ -952,7 +957,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
         enrollments: enrollments.map((row: any) => ({ key: key(row), standing: text(row.standing, 60) })),
         caseStatuses: caseRows.map((row: any) => text(row.status, 40)),
         competencyOutcomes: competencyRows.map((row: any) => text(row.outcome, 20)),
-        caseRuns: caseRows.map((row: any) => ({ status: text(row.status, 40), harnessOutcome: text(row.harness_outcome, 60), failureCode: text(row.failure_code, 80), ...builderLoopStop(row.metadata) })),
+        caseRuns: caseRows.map((row: any) => ({ status: text(row.status, 40), harnessOutcome: text(row.harness_outcome, 60), failureCode: text(row.failure_code, RESIDENCY_FAILURE_CODE_MAX), ...builderLoopStop(row.metadata) })),
         competencyFailures: competencyRows.filter((row: any) => text(row.outcome, 20) === 'fail').map((row: any) => text(row.competency_id, 80) || 'unrecorded'),
       }
     }),

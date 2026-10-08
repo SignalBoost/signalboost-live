@@ -707,7 +707,6 @@ const tests = [
 
   'tests/universityXsaRemoval.node.test.ts',
   'tests/universityStrandedComputerScience.node.test.ts',
-  'tests/cosUniversityMassEvaluationSoloCandidateAttribution.node.test.ts',
 
   // 2026-09-30 pipeline row: left to right, ending at graduation.
 

@@ -572,7 +572,7 @@ export class BuilderToolLoop {
       let controlFailure: ModelControlFailure | null = null
       for (let controlAttempt = 0; !action && controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
         const recoveryInstruction = controlAttempt > 0
-          ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response could not be used. Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Use only type, toolId, and input; input must be an object, not a JSON string. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
+          ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response could not be used. Only these tools are available NOW: ${availableTools.join(', ')}. ${repairMutationRequired ? 'The failing command has already been run and source inspected: use edit_file or write_file for a justified repair; no run/read/answer until a mutation.' : ''} Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Use only type, toolId, and input; input must be an object, not a JSON string. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
           : ''
         const controlBudget = controlAttempt > 0
           ? MODEL_CONTROL_RECOVERY_MAX_TOKENS
@@ -603,10 +603,13 @@ export class BuilderToolLoop {
         }
 
         action = parse(response, availableTools)
-        if (action) break
+        if (action) { blockedAction = null; break }
         const unrestricted = parse(response)
         if (unrestricted?.type === 'tool' && !availableTools.includes(unrestricted.toolId)) {
           blockedAction = unrestricted
+          // One bounded same-round retry with the actual available tool set, instead of spending
+          // many Builder rounds repeating a forbidden run/read after a reproduced failure.
+          if (controlAttempt < MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS) continue
           break
         }
         controlFailure = modelControlFailure(response)
@@ -629,6 +632,7 @@ export class BuilderToolLoop {
           ok: false,
           error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
         })
+        if (repairMutationRequired) return { ok: false, error: 'builder_repair_mutation_not_produced', trace }
         continue
       }
       if (!action) {

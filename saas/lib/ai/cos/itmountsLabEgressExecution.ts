@@ -23,17 +23,24 @@ export async function executeLabEgress(request: LabEgressRequest, host: LabEgres
     || !request.destinationOrganizationId || request.sourceOrganizationId === request.destinationOrganizationId) {
     throw new Error('lab_egress_denied')
   }
+  // Snapshot and freeze the approved request: host callbacks must not be able to retarget delivery.
+  const scopedRequest: LabEgressRequest = Object.freeze({
+    sourceOrganizationId: request.sourceOrganizationId,
+    destinationOrganizationId: request.destinationOrganizationId,
+    experimentId: request.experimentId,
+    kind: request.kind,
+  })
   let decision: TrustedLabEgressDecision | null
-  try { decision = await host.readTrustedDecision(request) }
+  try { decision = await host.readTrustedDecision(scopedRequest) }
   catch { throw new Error('lab_egress_authority_unavailable') }
-  if (!decision || decision.experimentId !== request.experimentId
-    || decision.authority.sourceOrganizationId !== request.sourceOrganizationId
-    || decision.authority.destinationOrganizationId !== request.destinationOrganizationId
-    || !authorizeLabEgress(decision.tier, request.kind, decision.authority)) {
+  if (!decision || decision.experimentId !== scopedRequest.experimentId
+    || decision.authority.sourceOrganizationId !== scopedRequest.sourceOrganizationId
+    || decision.authority.destinationOrganizationId !== scopedRequest.destinationOrganizationId
+    || !authorizeLabEgress(decision.tier, scopedRequest.kind, decision.authority)) {
     throw new Error('lab_egress_denied')
   }
   try {
-    const result = await host.deliver(request)
+    const result = await host.deliver(scopedRequest)
     if (!result?.receiptId?.trim()) throw new Error('lab_egress_receipt_missing')
     return { receiptId: result.receiptId }
   } catch { throw new Error('lab_egress_delivery_failed') }

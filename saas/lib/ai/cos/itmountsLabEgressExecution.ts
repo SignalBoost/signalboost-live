@@ -1,0 +1,40 @@
+// Phase 3: mandatory host boundary for cross-tenant Lab data egress.
+// The trusted host MUST resolve tenant privacy, consent, and data rights from server-owned records,
+// not from the request or model output. The authorized payload is delivered only after policy checks.
+import { authorizeLabEgress, type LabPrivacyTier, type LabEgressKind, type LabEgressAuthority } from './itmountsLabEgressPolicy.ts'
+
+export type LabEgressRequest = Readonly<{
+  sourceOrganizationId: string
+  destinationOrganizationId: string
+  experimentId: string
+  kind: LabEgressKind
+}>
+export type TrustedLabEgressDecision = Readonly<{
+  experimentId: string
+  tier: LabPrivacyTier
+  authority: LabEgressAuthority
+}>
+export type LabEgressHost = {
+  readTrustedDecision(request: LabEgressRequest): Promise<TrustedLabEgressDecision | null>
+  deliver(request: LabEgressRequest): Promise<{ receiptId: string }>
+}
+export async function executeLabEgress(request: LabEgressRequest, host: LabEgressHost): Promise<{ receiptId: string }> {
+  if (!request || !request.experimentId || !request.sourceOrganizationId
+    || !request.destinationOrganizationId || request.sourceOrganizationId === request.destinationOrganizationId) {
+    throw new Error('lab_egress_denied')
+  }
+  let decision: TrustedLabEgressDecision | null
+  try { decision = await host.readTrustedDecision(request) }
+  catch { throw new Error('lab_egress_authority_unavailable') }
+  if (!decision || decision.experimentId !== request.experimentId
+    || decision.authority.sourceOrganizationId !== request.sourceOrganizationId
+    || decision.authority.destinationOrganizationId !== request.destinationOrganizationId
+    || !authorizeLabEgress(decision.tier, request.kind, decision.authority)) {
+    throw new Error('lab_egress_denied')
+  }
+  try {
+    const result = await host.deliver(request)
+    if (!result?.receiptId?.trim()) throw new Error('lab_egress_receipt_missing')
+    return { receiptId: result.receiptId }
+  } catch { throw new Error('lab_egress_delivery_failed') }
+}

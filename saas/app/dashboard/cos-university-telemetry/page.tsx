@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import UniversitySettingsPanel from './UniversitySettingsPanel.tsx'
+import LabPhasesObservabilityPanel from './LabPhasesObservabilityPanel.tsx'
 import { COS_UNIVERSITY_SETTINGS_COPY } from '@/lib/i18n/cosUniversitySettingsCopy'
 import LabExperimentPanel from './LabExperimentPanel.tsx'
 import { ITMOUNTS_LAB_EXPERIMENT_COPY } from '@/lib/i18n/itmountsLabExperimentCopy'
@@ -344,6 +345,7 @@ export default function CosUniversityTelemetryPage() {
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-6">
+      <LabPhasesObservabilityPanel />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">{copy.title}</h1>

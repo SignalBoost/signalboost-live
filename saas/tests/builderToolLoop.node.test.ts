@@ -311,7 +311,9 @@ test('Builder recovers when the model requests a tool that was explicitly remove
   const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '1\\n', stderr: '', timedOut: false } } }
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Create hello.js and run it.', workspaceId: 'user:blocked-tool', maxRounds: 3 })
   assert.equal(result.ok, true)
-  assert.equal(result.trace.filter(item => item.error === 'builder_repeated_tool_call:read_file; choose a different next step').length, 2)
+  // The controller now retries an unavailable read inside the same round instead of spending
+  // another outer work round. The retry must never dispatch the unavailable read.
+  assert.equal(result.trace.filter(item => item.error === 'builder_repeated_tool_call:read_file; choose a different next step').length, 1)
   assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
 })
 

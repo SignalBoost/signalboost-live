@@ -59,3 +59,25 @@ test('Phase 2: tampered storage readback cannot prove successful issuance', asyn
   const s = setup({ tamper: true })
   assert.equal(await issueVerifiedNativeBirth(s.input), 'storage_failed')
 })
+
+test('Phase 2: revoked Harness grant between signature and persistence cannot write', async () => {
+  const s = setup()
+  let approvals = 0
+  const result = await issueVerifiedNativeBirth({
+    ...s.input,
+    verifyGrant: async () => ++approvals === 1,
+  })
+  assert.equal(result, 'not_authorized')
+  assert.equal(approvals, 2)
+  assert.equal(s.signingCalls(), 1)
+  assert.equal(s.writes(), 0)
+})
+test('Phase 2: a certificate cannot be issued under a grant for another artifact', async () => {
+  const s = setup()
+  const result = await issueVerifiedNativeBirth({
+    ...s.input, grant: { ...grant, permanentArtifactId: '11111111-2222-4333-8444-555555555555' },
+  })
+  assert.equal(result, 'birth_mismatch')
+  assert.equal(s.signingCalls(), 0)
+  assert.equal(s.writes(), 0)
+})

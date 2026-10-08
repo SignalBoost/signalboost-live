@@ -12,6 +12,7 @@ on:
       - 'saas/supabase/migrations/20261008060000_lab_capture_rate_reconciliation_audit.sql'
       - 'saas/tests/sql/lab-*.sql'
       - 'saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql'
+      - 'saas/supabase/migrations/20261008180000_lab_commercial_atomic_grant_proof.sql'
   workflow_dispatch:
 
 permissions:
@@ -67,6 +68,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008050000_lab_capture_provenance_audit.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008060000_lab_capture_rate_reconciliation_audit.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008180000_lab_commercial_atomic_grant_proof.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |
@@ -105,3 +107,7 @@ jobs:
       - name: Verify inactive commercial wallet schema boundaries
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-commercial-wallet-foundation-acceptance.sql
+
+      - name: Verify isolated atomic commercial grant proof
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-commercial-atomic-grant-acceptance.sql

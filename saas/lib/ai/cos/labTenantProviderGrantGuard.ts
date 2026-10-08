@@ -16,7 +16,7 @@ export type ProviderUseScope = Readonly<{
   providerId: string
   capability: ProviderGrantCapability
 }>
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const PROVIDER = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/
 export function validateTenantProviderGrant(
   scope: ProviderUseScope,

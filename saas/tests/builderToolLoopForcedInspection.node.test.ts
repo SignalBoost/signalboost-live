@@ -71,4 +71,35 @@ test('a file the failure names that was NOT read yet is still force-read once', 
   assert.equal(result.ok, true)
   assert.deepEqual(result.trace.map(entry => `${entry.toolId}:${entry.ok}`), ['run:false', 'read_file:true', 'write_file:true', 'run:true'])
 })
+
+
+test('two rejected retries after a failed run force a source mutation even without a new inspection', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('w', 'check.js', CHECK)
+  const prompts: string[] = []
+  let wrote = false
+  const ai = { async generate(input: any) {
+    const prompt = JSON.stringify(input)
+    prompts.push(prompt)
+    if (prompt.includes('The defect is reproduced and the bounded diagnostic allowance is exhausted')) {
+      wrote = true
+      return JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'plan.json', content: '{"target":"d2"}\\n' } })
+    }
+    if (wrote) return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node check.js' } })
+    return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node check.js' } })
+  } }
+  const runner = { async run(input: { files: readonly { path: string }[] }) {
+    return input.files.some(file => file.path === 'plan.json')
+      ? { exitCode: 0, stdout: 'ok\\n', stderr: '', timedOut: false }
+      : { exitCode: 1, stdout: '', stderr: 'Error: missing plan', timedOut: false }
+  } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Repair check.js failure, create plan.json and verify the fix.',
+    workspaceId: 'w', maxRounds: 16, deadlineAtMs: Date.now() + 220_000, minimumStepMs: 25_000,
+  })
+  assert.equal(wrote, true, 'controller must force mutation after refused repeat runs')
+  assert.ok(prompts.some(prompt => prompt.includes('The defect is reproduced and the bounded diagnostic allowance is exhausted')))
+  assert.ok(result.trace.some(entry => entry.toolId === 'write_file' && entry.ok))
+  assert.ok(result.trace.some(entry => entry.toolId === 'run' && entry.ok))
+})
 // end of saas/tests/builderToolLoopForcedInspection.node.test.ts (if this line is missing, the paste was cut short)

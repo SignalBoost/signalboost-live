@@ -37,6 +37,7 @@ export function createTenantOwnedBirthSource(db: Db): AuthorizedBirthAuditSource
       const row = await exactlyOne(db.from('cos_university_artifact_birth_certificates')
         .select('permanent_artifact_id,trained_artifact_hash,revision_key,dataset_hash,parent_permanent_artifact_id,issuance_kind')
         .eq('permanent_artifact_id', id))
+      await assertOwned(tenantId, id)
       if (row && row.permanent_artifact_id !== id) throw new Error('phase2_birth_identity_mismatch')
       return row as BirthRecord | null
     },
@@ -45,6 +46,7 @@ export function createTenantOwnedBirthSource(db: Db): AuthorizedBirthAuditSource
       const row = await exactlyOne(db.from('cos_university_signed_birth_envelopes')
         .select('permanent_artifact_id,trained_artifact_hash,revision_key,dataset_hash,parent_permanent_artifact_id,vin,algorithm,signature_base64,issuer_public_key_pem,issuer_fingerprint')
         .eq('permanent_artifact_id', id))
+      await assertOwned(tenantId, id)
       if (row && row.permanent_artifact_id !== id) throw new Error('phase2_signed_birth_identity_mismatch')
       return row as SignedBirthStorageRow | null
     },

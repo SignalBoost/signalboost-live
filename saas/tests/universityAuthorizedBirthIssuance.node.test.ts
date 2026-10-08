@@ -65,10 +65,10 @@ test('Phase 2: revoked Harness grant between signature and persistence cannot wr
   let approvals = 0
   const result = await issueVerifiedNativeBirth({
     ...s.input,
-    verifyGrant: async () => ++approvals === 1,
+    verifyGrant: async () => ++approvals <= 2,
   })
   assert.equal(result, 'not_authorized')
-  assert.equal(approvals, 2)
+  assert.equal(approvals, 3)
   assert.equal(s.signingCalls(), 1)
   assert.equal(s.writes(), 0)
 })
@@ -78,6 +78,19 @@ test('Phase 2: a certificate cannot be issued under a grant for another artifact
     ...s.input, grant: { ...grant, permanentArtifactId: '11111111-2222-4333-8444-555555555555' },
   })
   assert.equal(result, 'birth_mismatch')
+  assert.equal(s.signingCalls(), 0)
+  assert.equal(s.writes(), 0)
+})
+
+test('Phase 2: grant revoked during birth lookup never invokes external signer', async () => {
+  const s = setup()
+  let checks = 0
+  const result = await issueVerifiedNativeBirth({
+    ...s.input,
+    verifyGrant: async () => ++checks === 1,
+  })
+  assert.equal(result, 'invalid_grant')
+  assert.equal(checks, 2)
   assert.equal(s.signingCalls(), 0)
   assert.equal(s.writes(), 0)
 })

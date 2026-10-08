@@ -433,16 +433,22 @@ export class BuilderToolLoop {
       const lastWorkspaceChange = Math.max(...trace.map((item, index) => (
         item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file') ? index : -1
       )))
+      // Only a run that executed is a failure. A run rejected as a repeat executed nothing; counting it restarted the
+      // repair window, so the inspections and refusals after the real failure were forgotten every round.
       const latestFailedRunIndex = trace.reduce((latest, item, index) => (
-        item.toolId === 'run' && !item.ok ? index : latest
+        item.toolId === 'run' && !item.ok && !String(item.error || '').startsWith('builder_repeated_tool_call:') ? index : latest
       ), -1)
       const repairTraceAfterFailure = latestFailedRunIndex >= 0 ? trace.slice(latestFailedRunIndex + 1) : []
       const repairMutationAfterFailure = repairTraceAfterFailure.some(item => item.ok
         && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
       const repairInspectionsAfterFailure = repairTraceAfterFailure.filter(item => item.ok
         && (item.toolId === 'list_files' || item.toolId === 'read_file' || item.toolId === 'search_files' || item.toolId === 'mcp_read')).length
+      // Re-running the failed command against unchanged source is rejected as a repeat; asking for it after the failure
+      // was inspected is the same "no progress" signal as answering early. Production 2026-10-07: 3 of 4 failed Builder
+      // Residency cases ended `read_file:ok > run:builder_repeated_tool_call x7..x10` and never reached the mutation step.
       const repairProgressRefusalsAfterFailure = repairTraceAfterFailure.filter(item =>
-        item.toolId === 'model_control' && item.error === 'builder_repair_progress_required').length
+        (item.toolId === 'model_control' && item.error === 'builder_repair_progress_required')
+        || (item.toolId === 'run' && !item.ok && String(item.error || '').startsWith('builder_repeated_tool_call:'))).length
       const failedRun = latestFailedRunIndex >= 0 ? trace[latestFailedRunIndex] : undefined
       const failedRunOutput = failedRun && isRecord(failedRun.output)
         ? `${text(failedRun.output.stderr)}\n${text(failedRun.output.stdout)}`

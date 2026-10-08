@@ -21,7 +21,7 @@ const policy = {keyId:'reviewer-a',tenantId:'tenant-a',publicKeyPem:publicKey.ex
 const now='2026-10-08T12:00:00.000Z'
 test('valid review remains advisory only',()=>{
  const result=verifyPhase5ReviewWithPolicy(review,manifest,[policy],now)
- assert.equal(result.eligibleForIndependentSignoffReview,true)
+ assert.equal(result.eligibleForIndependentSignoffReview,true, result.blockers.join(', '))
  assert.equal(result.authorizesProduction,false)
 })
 test('unknown, duplicate, revoked, wrong-tenant, expired policies fail closed',()=>{

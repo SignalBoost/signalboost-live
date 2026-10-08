@@ -7,6 +7,8 @@ on:
       - 'saas/tests/sql/lab-phase3-two-tenants-acceptance.sql'
       - 'saas/tests/sql/lab-phase3-membership-acceptance.sql'
       - 'saas/tests/sql/lab-phase3-trusted-records-acceptance.sql'
+      - 'saas/tests/sql/lab-phase3-one-time-approval-acceptance.sql'
+      - 'saas/supabase/migrations/20261008114600_lab_provider_human_approval_consumption.sql'
       - 'saas/supabase/migrations/20261008033500_lab_phase3_trusted_consent_provider_grants.sql'
       - 'saas/supabase/migrations/20261007223926_lab_customer_tenant_membership.sql'
       - 'saas/supabase/migrations/20261006190000_itmounts_lab_tenancy_credit_ledger.sql'
@@ -82,3 +84,12 @@ jobs:
       - name: Verify cross-organization consent and provider grant denials
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-phase3-trusted-records-acceptance.sql
+      - name: Install one-use human approval consumption function
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008114600_lab_provider_human_approval_consumption.sql
+      - name: Enforce current human approver membership
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008120000_lab_provider_approval_active_approver.sql
+      - name: Verify scoped first-use consumption and replay denial
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-phase3-one-time-approval-acceptance.sql

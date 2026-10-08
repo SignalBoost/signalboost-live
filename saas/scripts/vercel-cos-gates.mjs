@@ -47,6 +47,7 @@ const tests = [
   // on a forced re-read of a file it already read (owner go 2026-10-06).
   'tests/cosUniversityBuilderProtocolPractice.node.test.ts',
   'tests/builderToolLoopForcedInspection.node.test.ts',
+  'tests/builderToolLoopRepeatedRunAfterFailure.node.test.ts',
   // Step 1 report: where the newest Computer Science artifact stands between training and Residency (read only).
   'tests/cosUniversityComputerSciencePath.node.test.ts',
   // Supply reports real-source items exactly as the packager counts them (Computer Science starved since 2026-10-03).

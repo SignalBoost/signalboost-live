@@ -222,3 +222,33 @@ test('older failures do not veto later successful tied observations', async () =
   assert.equal(verify(h.rows).verified, true)
   assert.deepEqual(verify(h.rows), verify([...h.rows].reverse()))
 })
+
+test('a skipped leased tick cannot claim University execution, including caller-supplied success', async () => {
+  const h = harness()
+  await h.record({
+    path: 'masters_learning',
+    invocationSucceeded: true,
+    evidence: {
+      runnerInvoked: false,
+      skipped: true,
+      reason: 'workflow_lease_held',
+      invocationSucceeded: true,
+    },
+    now: at(10),
+  })
+  assert.equal(h.rows[0].evidence!.invocationSucceeded, false)
+  assert.equal(h.rows[0].evidence!.invocationDowngraded, 'runner_skipped')
+  assert.equal(verify(h.rows).verified, false)
+})
+
+test('caller-supplied receipt success cannot overwrite a failed execution verdict', async () => {
+  const h = harness()
+  await h.record({
+    path: 'masters_learning',
+    invocationSucceeded: false,
+    evidence: { ...failure, invocationSucceeded: true },
+    now: at(10),
+  })
+  assert.equal(h.rows[0].evidence!.invocationSucceeded, false)
+  assert.equal(verify(h.rows).verified, false)
+})

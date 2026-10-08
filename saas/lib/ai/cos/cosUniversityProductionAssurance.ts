@@ -36,9 +36,12 @@ export async function recordCosUniversityProductionPath(input: {
   const examinedNothing = batchExecutedNothing(suppliedEvidence)
   const evidence = {
     claim: 'path_executed_not_learning_improved', featureFlag, featureEnabled,
-    invocationSucceeded: input.invocationSucceeded && !examinedNothing,
-    ...(examinedNothing ? { invocationDowngraded: 'all_runs_ended_in_error' } : {}),
     ...suppliedEvidence,
+    // A skipped/lease-held tick is a scheduling observation, not runner execution.
+    // Keep the decision AFTER caller evidence: an upstream receipt must never override it.
+    invocationSucceeded: input.invocationSucceeded && !examinedNothing && suppliedEvidence.skipped !== true,
+    ...(examinedNothing ? { invocationDowngraded: 'all_runs_ended_in_error' } :
+      suppliedEvidence.skipped === true ? { invocationDowngraded: 'runner_skipped' } : {}),
   }
   const evidenceHash = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
   // Each recording is a distinct invocation observation, not an hourly content summary.

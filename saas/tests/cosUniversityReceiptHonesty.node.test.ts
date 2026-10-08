@@ -11,7 +11,7 @@ const cronDir = path.join(process.cwd(), 'app/api/cron')
 
 test('the recorder downgrades a claimed success when the batch examined nothing', () => {
   assert.match(recorder, /const examinedNothing = batchExecutedNothing\(suppliedEvidence\)/)
-  assert.match(recorder, /invocationSucceeded: input\.invocationSucceeded && !examinedNothing/)
+  assert.match(recorder, /invocationSucceeded: input\.invocationSucceeded && !examinedNothing && suppliedEvidence\.skipped !== true/)
   assert.match(recorder, /invocationDowngraded: 'all_runs_ended_in_error'/)
 })
 

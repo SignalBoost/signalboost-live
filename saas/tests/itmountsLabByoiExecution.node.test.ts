@@ -36,3 +36,19 @@ test('forged org A grant pointing to org B secret never reaches vault or provide
   await assert.rejects(executeLabByoi(request,host),/lab_byoi_scope_denied/)
   assert.deepEqual(calls,['load:org-a'])
 })
+
+test('provider, grant-store and vault errors never echo customer credentials or inner error causes',async()=>{
+  const secret = 'private-key-DO-NOT-LOG'
+  const methods = ['loadGrant','resolveSecret','invokeProvider'] as const
+  const expected = ['lab_byoi_grant_unavailable','lab_byoi_credential_unavailable','lab_byoi_provider_failed']
+  for(let i=0;i<methods.length;i++){
+    const {host}=setup(grant)
+    ;(host as any)[methods[i]] = async()=>{throw new Error('provider response with '+secret)}
+    await assert.rejects(executeLabByoi(request,host), (error:unknown)=>{
+      assert.equal((error as Error).message,expected[i])
+      assert.equal((error as Error).message.includes(secret),false)
+      assert.equal((error as Error).cause,undefined)
+      return true
+    })
+  }
+})

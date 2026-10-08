@@ -22,15 +22,25 @@ export async function executeTenantProviderGoverned<T>(input: Readonly<{
   }>) => Promise<T>
 }>): Promise<ProviderExecutionOutcome<T>> {
   const denied = { status: 'denied', value: null } as const
+  // Snapshot tenant authority before any await: caller-held objects are not trusted to remain stable.
+  if (!input?.scope || !input.harnessRunId?.trim()) return { status: 'denied', value: null }
+  const scope: ProviderUseScope = Object.freeze({
+    organizationId: input.scope.organizationId,
+    permanentArtifactId: input.scope.permanentArtifactId,
+    providerId: input.scope.providerId,
+    capability: input.scope.capability,
+  })
+  const harnessRunId = input.harnessRunId
+  const trustedInput = { ...input, scope, harnessRunId }
   try {
-    const first = await authorizeTenantProviderPreflight({ ...input, now: input.now() })
+    const first = await authorizeTenantProviderPreflight({ ...trustedInput, now: input.now() })
     if (!first.allowed) return denied
     // A network hop, lease renewal or queue delay may revoke the original approval.
     // Re-fetch the grant and Harness authority immediately before invoking the socket.
-    const fresh = await authorizeTenantProviderPreflight({ ...input, now: input.now() })
+    const fresh = await authorizeTenantProviderPreflight({ ...trustedInput, now: input.now() })
     if (!fresh.allowed || fresh.secretReference !== first.secretReference) return denied
     const value = await input.executeGoverned({
-      scope: input.scope, harnessRunId: input.harnessRunId,
+      scope, harnessRunId,
       secretReference: fresh.secretReference!,
     })
     return { status: 'executed', value }

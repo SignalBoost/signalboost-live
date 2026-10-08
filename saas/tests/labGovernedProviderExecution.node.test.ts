@@ -32,3 +32,29 @@ test('Phase 3 vault reference substitution after approval is denied',async()=>{
  const result=await executeTenantProviderGoverned({...s.input,readGrant:async()=>++reads===1?grant:{...grant,secret_reference:`vault://${org}/other`}})
  assert.equal(result.status,'denied');assert.equal(s.stats().executions,0)
 })
+
+test('Phase 3 caller cannot retarget tenant or provider during asynchronous grant lookup',async()=>{
+ const s=setup()
+ const mutableScope={...scope}
+ const seen: string[]=[]
+ const result=await executeTenantProviderGoverned({
+   ...s.input,
+   scope:mutableScope,
+   readGrant:async received=>{
+     assert.equal(Object.isFrozen(received),true)
+     seen.push(received.organizationId+':'+received.providerId)
+     mutableScope.organizationId='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+     mutableScope.providerId='provider-b'
+     return grant
+   },
+   executeGoverned:async args=>{
+     assert.equal(args.scope.organizationId,org)
+     assert.equal(args.scope.providerId,'provider-a')
+     assert.equal(Object.isFrozen(args.scope),true)
+     seen.push(args.scope.organizationId+':'+args.scope.providerId)
+     return 'ok'
+   },
+ })
+ assert.deepEqual(result,{status:'executed',value:'ok'})
+ assert.deepEqual(seen,Array(3).fill(org+':provider-a'))
+})

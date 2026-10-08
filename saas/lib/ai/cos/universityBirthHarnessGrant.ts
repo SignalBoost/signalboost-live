@@ -8,8 +8,7 @@ export const BIRTH_ISSUE_CAPABILITY = 'university.artifact.birth.sign' as const
 
 export type BirthHarnessAuthorityResolver = (
   runId: string,
-  authorityManifestRef: string,
-) => Promise<HarnessManifest | null>
+ ) => Promise<HarnessManifest | null>
 
 /** Only a host-authenticated manifest returned from the durable authority resolver can authorize issuance. */
 export async function verifyTrustedBirthGrant(
@@ -21,7 +20,7 @@ export async function verifyTrustedBirthGrant(
     || !grant.permanentArtifactId?.trim()) return false
   try {
     // Look up by the run identity, never by an artifact-provided envelope or custom approval flag.
-    const manifest = await resolveTrustedManifest(grant.harnessRunId, BIRTH_ISSUE_CAPABILITY)
+    const manifest = await resolveTrustedManifest(grant.harnessRunId)
     if (!manifest || manifest.runId !== grant.harnessRunId
       || manifest.identity.tenantId !== grant.tenantId
       || manifest.identity.artifact?.artifactId !== grant.permanentArtifactId

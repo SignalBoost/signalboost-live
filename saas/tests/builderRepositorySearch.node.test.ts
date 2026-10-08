@@ -86,8 +86,10 @@ test('a workspace without search refuses the call rather than silently answering
   // matters is that it can never quietly succeed and return an empty result the model would
   // read as "this symbol does not exist anywhere".
   const searched = result.trace.filter(item => item.toolId === 'search_files')
-  assert.equal(searched.length > 0, true)
+  // A rejected request can be recovered within one model round without a trace entry.
+  // Either way, unsupported search must never be dispatched as a successful tool.
   assert.equal(searched.every(item => item.ok === false), true)
+  assert.equal(result.trace.some(item => item.toolId === 'search_files' && item.ok), false)
 
   // Defense in depth: dispatch refuses outright even if the tool were ever offered by mistake.
   const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')

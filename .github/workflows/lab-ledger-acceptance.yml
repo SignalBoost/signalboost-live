@@ -75,3 +75,6 @@ jobs:
       - name: Verify concurrent reservations with independent database sessions
         shell: bash
         run: bash saas/tests/sql/lab-ledger-concurrency-acceptance.sh
+      - name: Verify immutable measured-cost capture receipt contract
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-measured-capture-contract.sql

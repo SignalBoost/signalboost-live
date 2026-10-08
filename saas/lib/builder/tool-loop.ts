@@ -468,7 +468,10 @@ export class BuilderToolLoop {
       const repairMutationRequired = repairObjective && latestFailedRunIndex >= 0
         && !repairMutationAfterFailure
         && (repairInspectionsAfterFailure >= MAX_REPAIR_INSPECTIONS_AFTER_FAILURE
-          || (repairInspectionsAfterFailure > 0 && repairProgressRefusalsAfterFailure > 0))
+          || (repairInspectionsAfterFailure > 0 && repairProgressRefusalsAfterFailure > 0)
+          // A file inspected before the failing run need not be read again. Two refused re-runs
+          // against unchanged source are sufficient evidence of stalled repair progress.
+          || repairProgressRefusalsAfterFailure >= 2)
       // The controller owns verification scheduling. Once a new build's declared files
       // exist, execute the user's explicit Run list before asking for any more edits.
       // A failed command is attempted only once per file revision, then returned to the

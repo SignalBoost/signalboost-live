@@ -353,6 +353,16 @@ test('manual intervention is counted from the operator-action ledger, never from
   assert.equal(missing.manualIntervention.available, false, 'a ledger that is not installed is unavailable, never zero')
 })
 
+test('a Residency failure code is read back whole, up to what the runner stores', async () => {
+  const code = 'residency_exact_artifact_runtime_not_ready:provider_workers_ready_0_running_0_initializing_1_idle_0_wake_attempts_1'
+  const tables = week()
+  tables.cos_university_residency_case_runs = tables.cos_university_residency_case_runs.map((row: any) =>
+    row.failure_code === 'assertion_failed' ? { ...row, harness_outcome: 'infrastructure_failure', failure_code: code } : row)
+  const f = await readEffectivenessFunnel({ db: fakeDb(tables).db, window: '7d', now: NOW })
+  assert.ok(f.residencyEffectiveness.available)
+  if (f.residencyEffectiveness.available) assert.deepEqual({ ...f.residencyEffectiveness.topFailureCodes }, { [code]: 1 })
+})
+
 test('window and subject narrow the cohort and the production counts', async () => {
   const day = await readEffectivenessFunnel({ db: fakeDb(week()).db, window: '24h', now: NOW })
   assert.equal(day.cohort.size, 2)

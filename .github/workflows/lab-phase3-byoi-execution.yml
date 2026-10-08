@@ -1,0 +1,36 @@
+name: Phase 3 BYOI governed execution acceptance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lab-phase3-byoi-execution.yml'
+      - 'saas/lib/ai/cos/labGovernedProviderExecution.ts'
+      - 'saas/lib/ai/cos/labHarnessBoundProviderGrant.ts'
+      - 'saas/lib/ai/cos/labTenantProviderGrantGuard.ts'
+      - 'saas/tests/labGovernedProviderExecution.node.test.ts'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lab-phase3-byoi-execution.yml'
+      - 'saas/lib/ai/cos/labGovernedProviderExecution.ts'
+      - 'saas/lib/ai/cos/labHarnessBoundProviderGrant.ts'
+      - 'saas/lib/ai/cos/labTenantProviderGrantGuard.ts'
+      - 'saas/tests/labGovernedProviderExecution.node.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governed-execution:
+    name: Freeze BYOI scope and verify revocation guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test tenant scope snapshot and double-preflight
+        working-directory: saas
+        run: node --test tests/labGovernedProviderExecution.node.test.ts

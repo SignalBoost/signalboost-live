@@ -255,6 +255,18 @@ test('while paused, Supervisor recovery is a verified intentional skip that neve
   for (const later of ['repairVerifiedRecoveryDrillFixture({', 'preflightWorker(', "runWorkflow({ source: 'self_healing_supervisor'"]) {
     assert.ok(recover.indexOf(later) > pauseAt, `${later} comes after the pause check`)
   }
-  assert.match(recover, /if \(pause\.paused\) \{[\s\S]{0,200}receiptRef: null,\s*invocationSucceeded: true,\s*skipped: true,\s*verified: true,[\s\S]{0,120}reason: 'line_paused_by_operator'/)
+  assert.match(recover, /if \(pause\.paused\) \{[\s\S]{0,200}receiptRef: null,\s*invocationSucceeded: true,\s*skipped: true,\s*verified: null,[\s\S]{0,120}reason: 'line_paused_by_operator'/)
+})
+
+test('a paused recovery is recorded as observed, never as a verified repair or a remediation success', async () => {
+  // Codex on #3793: verified:true made the Council bridge record a successful Production outcome and a succeeded
+  // remediation experience on every paused tick. verified:null classifies as observed, and observed outcomes never
+  // reach remediation memory (council-outcome-bridge records only success/failure there).
+  const { classifyDeterministicToolOutcome } = await import('../lib/ai/cos/councilObjectiveOutcomePure.ts')
+  const paused = { invocationSucceeded: true, skipped: true, verified: null, response: { ok: true, skipped: true, reason: 'line_paused_by_operator' } }
+  assert.equal(classifyDeterministicToolOutcome({ ok: true, result: paused }).status, 'observed')
+  assert.equal(classifyDeterministicToolOutcome({ ok: true, result: { ...paused, verified: true } }).status, 'success', 'the trap this avoids')
+  const bridge = readFileSync(new URL('../self-healing-host/council-outcome-bridge.ts', import.meta.url), 'utf8')
+  assert.match(bridge, /if \(input\.remediationMemory && \(classified\.status === 'success' \|\| classified\.status === 'failure'\)\)/)
 })
 // end of saas/tests/cosUniversitySettings.node.test.ts (if this line is missing, the paste was cut short)

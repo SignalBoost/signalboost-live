@@ -33,7 +33,12 @@ export interface UniversityDistillationRecoveryResult {
   receiptRef: string | null
   invocationSucceeded: boolean
   skipped: boolean
-  verified: boolean
+  /**
+   * true = the fault is confirmed gone; false = it was not. null = nothing was repaired or checked because the
+   * operator paused production (owner 2026-10-07): an intentional no-op is neither a verified repair nor a failure,
+   * so the Council outcome classifier records it as `observed` and no remediation success is learned from it.
+   */
+  verified: boolean | null
   /**
    * A station was woken and its work takes minutes, so the fault could not be confirmed gone in this request.
    * `verified` stays FALSE and nothing throws: the repair happened, the confirmation waits for the station's SLA.
@@ -232,7 +237,8 @@ export async function recoverUniversityMassDistillation(input: {
 
   // Owner 2026-10-07: while the operator has paused production, a stalled line is intended, not a fault. Recovery
   // would only reach the paused workflow, find the condition unchanged and report a failed verification every tick.
-  // Stop here as a verified, intentional skip: no drill repair, no worker preflight, no station wake, no spend.
+  // Stop here as an intentional skip (verified: null, never a repair success): no drill repair, no worker preflight,
+  // no station wake, no spend.
   const pause = await (input.readPause ?? (() => readLinePauseSetting(input.db)))()
   if (pause.paused) {
     const finishedAt = now()
@@ -242,7 +248,7 @@ export async function recoverUniversityMassDistillation(input: {
       receiptRef: null,
       invocationSucceeded: true,
       skipped: true,
-      verified: true,
+      verified: null,
       before,
       after: before,
       response: { ok: true, skipped: true, reason: 'line_paused_by_operator' },

@@ -65,8 +65,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008030000_lab_approved_usage_rates.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008040000_lab_rated_capture_receipts.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008050000_lab_capture_provenance_audit.sql
-          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008060000_lab_capture_rate_reconciliation_audit.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |

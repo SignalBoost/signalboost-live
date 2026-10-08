@@ -1,7 +1,7 @@
 import { createPublicKey } from 'node:crypto'
 import { verifyPhase5SignedReview, type EvidenceReview, type TrustedReviewer } from './labPhase5SignedReview.ts'
 
-const CANONICAL_UTC = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/
+const CANONICAL_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 function exactUtc(value: string): number | null {
   if (!CANONICAL_UTC.test(value)) return null
   const time = Date.parse(value)

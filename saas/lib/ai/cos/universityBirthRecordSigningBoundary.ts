@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/universityBirthRecordSigningBoundary.ts
 // Phase 2: map a DB birth row into the independently verifiable certificate envelope.
 // This module does not own keys, mint authority, write DB rows or activate any artifact.
 import { createPublicKey, verify } from 'node:crypto'
@@ -21,12 +22,14 @@ export function nativeBirthIdentity(row: BirthRecord): BirthIdentity | null {
     || typeof row.trained_artifact_hash !== 'string' || typeof row.revision_key !== 'string'
     || typeof row.dataset_hash !== 'string'
     || (row.parent_permanent_artifact_id !== null && typeof row.parent_permanent_artifact_id !== 'string')) return null
+  // Narrowed explicitly: with strict off, TypeScript does not narrow `unknown` through `!== null`, so the build failed.
+  const parent = row.parent_permanent_artifact_id
   const identity: BirthIdentity = {
     permanentArtifactId: row.permanent_artifact_id,
     trainedArtifactHash: row.trained_artifact_hash,
     revisionKey: row.revision_key,
     datasetHash: row.dataset_hash,
-    parentPermanentArtifactId: row.parent_permanent_artifact_id,
+    parentPermanentArtifactId: typeof parent === 'string' ? parent : null,
   }
   return canonicalBirthBytes(identity) ? identity : null
 }

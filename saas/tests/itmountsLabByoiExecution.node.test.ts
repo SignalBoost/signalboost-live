@@ -89,3 +89,10 @@ test('malformed provider receipt cannot echo arbitrary payload or secret text',a
    return true
  })
 })
+
+
+test('provider receipt IDs cannot return credential material even if otherwise well-formed', async () => {
+ const {host}=setup(grant)
+ host.invokeProvider=async()=>({receiptId:'provider-private-key-receipt'})
+ await assert.rejects(executeLabByoi(request,host), /lab_byoi_receipt_missing/)
+})

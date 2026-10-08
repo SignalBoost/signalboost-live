@@ -25,7 +25,7 @@ create function lab.capture_rated_usage(
  p_cost_usd numeric,p_receipt_ref text
 ) returns jsonb language plpgsql security definer
 set search_path=pg_catalog,lab as $$
-declare amount bigint; outcome jsonb; event_id bigint; prior lab.rated_capture_receipts%rowtype;
+declare amount bigint; outcome jsonb; captured_event_id bigint; prior lab.rated_capture_receipts%rowtype;
 begin
  if session_user not in ('postgres','service_role') or
   current_setting('lab.trusted_organization_id',true) is distinct from p_org::text
@@ -48,9 +48,9 @@ begin
    then raise exception 'lab_receipt_conflict'; end if;
  end if;
  outcome:=lab.apply_credit_event(p_org,p_experiment,p_reservation,'capture',amount,p_key,p_cost_usd,p_receipt_ref);
- event_id:=(outcome->>'event_id')::bigint;
- if exists(select 1 from lab.rated_capture_receipts where event_id=event_id) then
-   if not exists(select 1 from lab.rated_capture_receipts x where x.event_id=event_id
+ captured_event_id:=(outcome->>'event_id')::bigint;
+ if exists(select 1 from lab.rated_capture_receipts where event_id=captured_event_id) then
+   if not exists(select 1 from lab.rated_capture_receipts x where x.event_id=captured_event_id
      and x.organization_id=p_org and x.rate_id=p_rate and x.provider=p_provider
      and x.model=p_model and x.usage_unit=p_unit and x.usage_units=p_units
      and x.used_at=p_used_at and x.source_receipt_ref=p_receipt_ref
@@ -59,7 +59,7 @@ begin
  else
   insert into lab.rated_capture_receipts(event_id,organization_id,rate_id,provider,model,
     usage_unit,usage_units,used_at,source_receipt_ref,quoted_microcredits)
-  values(event_id,p_org,p_rate,p_provider,p_model,p_unit,p_units,p_used_at,p_receipt_ref,amount);
+  values(captured_event_id,p_org,p_rate,p_provider,p_model,p_unit,p_units,p_used_at,p_receipt_ref,amount);
  end if;
  return outcome;
 end $$;

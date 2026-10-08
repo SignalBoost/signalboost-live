@@ -26,7 +26,7 @@ export function nativeBirthIdentity(row: BirthRecord): BirthIdentity | null {
     trainedArtifactHash: row.trained_artifact_hash,
     revisionKey: row.revision_key,
     datasetHash: row.dataset_hash,
-    parentPermanentArtifactId: row.parent_permanent_artifact_id,
+    parentPermanentArtifactId: typeof row.parent_permanent_artifact_id === 'string' ? row.parent_permanent_artifact_id : null,
   }
   return canonicalBirthBytes(identity) ? identity : null
 }

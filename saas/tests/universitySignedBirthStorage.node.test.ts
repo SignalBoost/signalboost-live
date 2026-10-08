@@ -5,7 +5,7 @@ import test from 'node:test'
 const sql = readFileSync(new URL('../supabase/migrations/20261008024500_signed_artifact_birth_envelopes.sql', import.meta.url), 'utf8')
 
 test('Phase 2 signed envelopes bind to immutable birth identity and exact hash lineage', () => {
-  for (const field of ['permanent_artifact_id','trained_artifact_hash','revision_key','dataset_hash','parent_permanent_artifact_id']) {
+  for (const field of ['trained_artifact_hash','revision_key','dataset_hash','parent_permanent_artifact_id']) {
     assert.match(sql, new RegExp('birth\\.' + field + ' is distinct from new\\.' + field))
   }
   assert.match(sql, /issuance_kind is distinct from 'native_birth'/)

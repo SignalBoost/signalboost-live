@@ -29,3 +29,11 @@ test('Phase 3: expired, revoked, missing and foreign vault references fail close
     { ...grant, secret_reference: `vault://${org}/../escape` },
   ]) assert.equal(valid(g).allowed, false)
 })
+
+test('Phase 3: truncated four-group UUIDs cannot masquerade as tenant or artifact identities', () => {
+  const malformed = '11111111-2222-4333-555555555555'
+  assert.equal(valid({ ...grant, organization_id: malformed, secret_reference: `vault://${malformed}/teacher-key` },
+    { ...scope, organizationId: malformed }).allowed, false)
+  assert.equal(valid({ ...grant, permanent_artifact_id: malformed },
+    { ...scope, permanentArtifactId: malformed }).allowed, false)
+})

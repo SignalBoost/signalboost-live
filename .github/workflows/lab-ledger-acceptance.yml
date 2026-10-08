@@ -14,6 +14,7 @@ on:
       - 'saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql'
       - 'saas/supabase/migrations/20261008180000_lab_commercial_atomic_grant_proof.sql'
       - 'saas/supabase/migrations/20261008190000_lab_commercial_event_claim_tenant_binding.sql'
+      - 'saas/supabase/migrations/20261008200000_lab_commercial_grant_reconciliation.sql'
   workflow_dispatch:
 
 permissions:
@@ -71,6 +72,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008180000_lab_commercial_atomic_grant_proof.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008190000_lab_commercial_event_claim_tenant_binding.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008200000_lab_commercial_grant_reconciliation.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |
@@ -120,3 +122,7 @@ jobs:
       - name: Reject cross-tenant commercial event claims
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-commercial-event-claim-tenant-acceptance.sql
+
+      - name: Verify private commercial grant reconciliation
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-commercial-grant-reconciliation-acceptance.sql

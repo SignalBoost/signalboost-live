@@ -1,2 +1,2 @@
-base_sha=f4cd131575fa9ef1219c17a8ef46873b8290a227
-branch=fix/cs-practice-follows-current-failures-20261008
+base_sha=6caf265197e205c583f651e66d18c39a8873b76c
+branch=feat/phase4-wallet-reconciliation-audit-20261008

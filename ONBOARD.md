@@ -2879,6 +2879,16 @@ Owner, verbatim: "How many times i have to say that the platform is NOT for keep
 
 **Never report births per day, graduates per day or line throughput as progress.** Progress means a user's experiment (create → train → examine → Residency → graduate or reject) reaches a clear verdict or an explained failure, reliably. Line-flow numbers in the Step 1 report diagnose; they are not goals. A user experiment is never refused or stalled because of a platform defect.
 
+#### The University is a continuous workshop (owner direction 2026-10-07)
+
+Owner, verbatim: "my goal is users themselves can build their own artifacts and themselves train and fine tune that must fits them goals, graduation is not the limit, it just show that the artifact can learn, it is like humans, finish university is not the end but the beginning - my platform gives users the opportunity to train their artifacts over and over again until they are satisfy with the result".
+
+- **Graduation is a milestone, not the end.** It proves an artifact can learn under independent examination. The product is the loop a user runs on their own artifact: train → examine → read why it passed or failed → change data, recipe or teacher → train again, until the user is satisfied.
+- **Each round must be comparable.** A retrained artifact is a descendant with its own fingerprint, linked to its parent (permanent identity rules above). It is examined on the same pinned holdout and significance gate as its parent, and shown as v(n) against v(n−1) and the base model. Without a comparable measurement, the loop is guesswork. That measurement is the product.
+- **Users define their own goal, inside fixed safety.** A user may bring their own exam cases and pass criteria. The platform's safety, unseen-transfer and delayed-retention gates stay mandatory and cannot be removed by the user, so a certificate always means at least that.
+- **Speed and spend belong to the user.** In BYOI mode, the user brings providers, MCPs and APIs and decides how many rounds to run. Credits pay for Lab work, never for platform faults.
+- **Gap, Step 1 build item:** retraining today is automatic platform remediation (failure-derived curriculum). No user-started "retrain this artifact with my changes, then compare" exists yet. Build it on the Lab experiment entry point (`itmountsLabExperimentPausePolicy.ts`, `lab.university_run_bindings`), not beside it.
+
 #### Exam reliability (owner decision 2026-10-07)
 
 Every exam ends with exactly one of these outcomes:

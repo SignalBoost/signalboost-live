@@ -31,7 +31,7 @@ export async function executeLabByoi(request: ScopedProviderRequest, host: LabBy
   let result: { receiptId: string }
   try { result = await host.invokeProvider({ request: scopedRequest, credential }) }
   catch { throw new Error('lab_byoi_provider_failed') }
-  if (!result || typeof result.receiptId !== 'string' || !result.receiptId.trim()) {
+  if (!result || typeof result.receiptId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(result.receiptId)) {
     throw new Error('lab_byoi_receipt_missing')
   }
   return { receiptId: result.receiptId }

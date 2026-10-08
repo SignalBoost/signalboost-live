@@ -353,8 +353,10 @@ test('manual intervention is counted from the operator-action ledger, never from
   assert.equal(missing.manualIntervention.available, false, 'a ledger that is not installed is unavailable, never zero')
 })
 
-test('a Residency failure code is read back whole, up to what the runner stores', async () => {
-  const code = 'residency_exact_artifact_runtime_not_ready:provider_workers_ready_0_running_0_initializing_1_idle_0_wake_attempts_1'
+test('a Residency failure code is read back whole, including the longest exact-artifact runtime codes', async () => {
+  // The longest producer: the runtime-not-ready prefix plus a 240-character provider-health detail.
+  const code = `residency_exact_artifact_runtime_not_ready:${`provider_health_probe:${'x'.repeat(240)}`.slice(0, 240)}`
+  assert.ok(code.length > 280)
   const tables = week()
   tables.cos_university_residency_case_runs = tables.cos_university_residency_case_runs.map((row: any) =>
     row.failure_code === 'assertion_failed' ? { ...row, harness_outcome: 'infrastructure_failure', failure_code: code } : row)

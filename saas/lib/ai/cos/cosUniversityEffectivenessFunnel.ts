@@ -35,10 +35,11 @@ const WINDOW_HOURS: Readonly<Record<FunnelWindow, number | null>> = Object.freez
 type Db = { from: (table: string) => any }
 
 const text = (value: unknown, max = 200): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
-// The Residency runner stores up to 120 characters of a case failure code (builder-case-runner.ts). Reading back fewer cut
-// the runtime-readiness code mid-word (2026-10-08: `...provider_workers_ready_0_running_0_in`), hiding whether workers
-// were initializing or never allocated.
-const RESIDENCY_FAILURE_CODE_MAX = 120
+// A case run's failure_code is stored untruncated. The longest producers are the exact-artifact runtime codes
+// (platform-harness/residency/exact-artifact-model.ts): `residency_exact_artifact_runtime_not_ready:` plus a provider or
+// probe detail capped at 240 characters, or a bootstrap detail capped at 180, so under 300. Reading back 80 cut the
+// readiness code mid-word (2026-10-08: `...provider_workers_ready_0_running_0_in`), hiding whether workers were booting.
+const RESIDENCY_FAILURE_CODE_MAX = 300
 /** The resident's own loop stop, from case-run metadata.builderLoop (platform-harness/residency/builder-case-runner.ts). */
 const builderLoopStop = (metadata: unknown): { loopStop: string; filesChanged: number | null; loopShape: string | null } => {
   const loop = metadata && typeof metadata === 'object' ? (metadata as { builderLoop?: Record<string, unknown> }).builderLoop : undefined

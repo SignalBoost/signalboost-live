@@ -47,16 +47,16 @@ test('Phase 3: changed vault path between grant reads blocks execution',async()=
 
 test('Phase 3: async grant callback cannot retarget the governed action ID',async()=>{
  const s=setup()
- const mutable={...s.input}
  const observed:string[]=[]
- const result=await dispatchBuyerOwnedProvider({
-  ...mutable,
-  readGrant:async()=>{mutable.actionId='injected-action';return grant},
+ const input={
+  ...s.input,
+  readGrant:async()=>{input.actionId='injected-action';return grant},
   executor:{execute:async(_m,action)=>{
    observed.push(action.actionId)
    return {actionId:action.actionId,capabilityId:action.capabilityId,status:'executed'}
   }},
- })
+ }
+ const result=await dispatchBuyerOwnedProvider(input)
  assert.equal(result.status,'executed')
  assert.deepEqual(observed,['call-1'])
 })

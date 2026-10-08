@@ -313,6 +313,12 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || /^independent_evaluator_evidence_http_\d{3}$/.test(error)
     || error === 'mass_distilled_runtime_endpoint_worker_policy_drift'
     || error === 'no_supported_evaluation_pending_artifact'
+    // A thrown plain object (a PostgREST/Supabase or SDK error), never a model answer: model-quality failures are always
+    // Error instances with a mass_distilled_evaluation_* message. The route records it as code:message, or as
+    // structured_error_without_message when it has none; before boundedErrorMessage existed it was stringified to the
+    // literal "[object Object]", which the all-time Step 1 report still listed as an unresolved failure (2026-10-08).
+    || error === 'structured_error_without_message'
+    || error === '[object object]'
     // RunPod's own REST/control plane failing (2026-09-27 18:13-18:17 UTC: "RunPod GET /serverless HTTP 500:
     // failed to list endpoints", three times after the helper's own retries) quarantined mass:fce8f4ba without
     // one evaluation prompt ever reaching the artifact. A provider 5xx or 429 on a control-plane call happens

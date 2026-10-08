@@ -188,11 +188,16 @@ test('our own transport, schema, evidence-route, provisioning and empty-claim fa
     'independent_evaluator_evidence_http_401',
     'mass_distilled_runtime_endpoint_worker_policy_drift',
     'no_supported_evaluation_pending_artifact',
+    // A thrown plain object (database/SDK error), today and in its pre-2026-09 stringified form.
+    'structured_error_without_message',
+    '[object Object]',
   ]) assert.equal(isEvaluatorInfrastructureFailure(error), true, error)
   for (const error of [
     'mass_distilled_evaluation_runpod_http_400:candidate:cases=6:bad adapter',
     'mass_distilled_evaluation_candidate_output_exhausted:abc:finish=length:think=0:open=1:close=0:other=0:cap=1024',
     'fetch failed because the model said so',
     'independent_evaluator_evidence_http_401:extra',
+    '[object Object] candidate answered nothing',
+    'structured_error_without_message:extra',
   ]) assert.equal(isEvaluatorInfrastructureFailure(error), false, error)
 })

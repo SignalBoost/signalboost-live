@@ -43,6 +43,9 @@ export async function issueVerifiedNativeBirth(input: Readonly<{
     if (!await input.verifyGrant(grant)) return 'invalid_grant'
     const birth = await input.readNativeBirth(grant.tenantId, grant.permanentArtifactId)
     if (!birth || birth.permanent_artifact_id !== grant.permanentArtifactId) return 'birth_mismatch'
+    // The tenant-scoped lookup can be slow: recheck live Harness authority immediately
+    // before invoking a consequential external signer, not only before lookup/storage.
+    if (!await input.verifyGrant(grant)) return 'invalid_grant'
     // Never call an external signer if a native birth row cannot be independently verified.
     const cert = await signNativeBirthRecord(birth, input.signer, input.issuerPublicKeyPem, input.trustedIssuerFingerprint)
     if (!cert) return 'signer_failed'

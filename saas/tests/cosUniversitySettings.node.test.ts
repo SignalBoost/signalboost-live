@@ -148,9 +148,17 @@ const PAUSED_STATIONS = [
 test('every production station checks the pause switch right after authorization and answers with the shared shape', () => {
   for (const station of PAUSED_STATIONS) {
     const route = read(`../app/api/cron/${station}/route.ts`)
-    assert.match(route, /import \{ pausedStationResponse, readLinePauseSetting \} from '@\/lib\/ai\/cos\/cosUniversitySettings'/, station)
+    // 2026-10-08: Step 1 stations read the pause through resolveUniversityStationScope (paused = idle unless a live Lab
+    // experiment grant scopes the tick to that experiment); the others read the switch directly. Same position rule.
+    const scoped = route.includes('resolveUniversityStationScope(')
+    if (scoped) {
+      assert.match(route, /import \{ pausedStationResponse \} from '@\/lib\/ai\/cos\/cosUniversitySettings'/, station)
+      assert.match(route, /import \{ experimentScopeEvidence, resolveUniversityStationScope \} from '@\/lib\/ai\/cos\/itmountsLabExperimentStationScope'/, station)
+    } else {
+      assert.match(route, /import \{ pausedStationResponse, readLinePauseSetting \} from '@\/lib\/ai\/cos\/cosUniversitySettings'/, station)
+    }
     const authAt = route.search(/Unauthorized/)
-    const pauseAt = route.indexOf('readLinePauseSetting(')
+    const pauseAt = route.indexOf(scoped ? 'resolveUniversityStationScope(' : 'readLinePauseSetting(')
     assert.ok(authAt > 0 && pauseAt > authAt, `${station}: pause check comes after authorization`)
     assert.match(route, new RegExp(`pausedStationResponse\\('${station}'\\)`), station)
     // Nothing that spends or writes may precede the pause check: no RunPod call, no claim, no fetch before it.

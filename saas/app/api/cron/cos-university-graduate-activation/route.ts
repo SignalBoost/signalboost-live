@@ -4,7 +4,8 @@ import { activateGraduateRuntime } from '@/lib/ai/cos/cosUniversityGraduateRunti
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { servedCandidateModelFromCanary, type CanaryEventRow } from '@/lib/ai/cos/cosUniversityMassEvaluationServedModel'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
+import { pausedStationResponse } from '@/lib/ai/cos/cosUniversitySettings'
+import { experimentScopeEvidence, resolveUniversityStationScope } from '@/lib/ai/cos/itmountsLabExperimentStationScope'
 import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduateModelRegistry'
 import { decideMassGraduateRegistration, type MassGraduateArtifact, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
 import { decideGraduateArtifactLifecycleSync } from '@/lib/ai/cos/cosUniversityGraduateArtifactSync'
@@ -290,14 +291,17 @@ async function reconcileGraduateArtifactLifecycle() {
 const MASS_GRADUATE_REGISTRATION_SCAN_LIMIT = 10
 const MASS_GRADUATE_EVIDENCE_ROW_LIMIT = 400
 
-async function registerNextMassGraduate() {
+// scopeCandidateIds: paused factory, one Lab experiment. Only those artifacts may be registered as graduates.
+async function registerNextMassGraduate(scopeCandidateIds?: readonly string[]) {
   const db = cosServiceDb()
   if (!db) return { registered: false as const, reason: 'service_database_unavailable' }
   const enabled = String(process.env.COS_MASS_GRADUATE_REGISTRATION || '').trim() !== 'false'
-  const artifacts = await db.from('cos_local_distillation_artifacts')
+  let artifactQuery = db.from('cos_local_distillation_artifacts')
     .select('candidate_id,subject_id,student_model_id,trained_artifact_id,trained_artifact_hash,rollback_artifact_ref,status,created_at')
     .eq('status', 'runtime_pending')
     .like('candidate_id', 'mass:%')
+  if (scopeCandidateIds) artifactQuery = artifactQuery.in('candidate_id', [...scopeCandidateIds])
+  const artifacts = await artifactQuery
     .order('created_at', { ascending: true })
     .limit(50)
   if (artifacts.error) throw artifacts.error
@@ -527,8 +531,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no graduation.
-  const pause = await readLinePauseSetting(cosServiceDb())
-  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-graduate-activation'))
+  // Owner 2026-10-07: while paused, a live Lab experiment grant may register only that experiment's graduate.
+  // Activation, rotation and rollback proof are the next project (graduates at work) and stay paused.
+  const scope = await resolveUniversityStationScope({ db: cosServiceDb() })
+  if (scope.run === 'paused') return NextResponse.json(pausedStationResponse('cos-university-graduate-activation'))
+  if (scope.run === 'experiment') {
+    try {
+      const experimentScope = experimentScopeEvidence(scope)
+      const massRegistration = await registerNextMassGraduate(scope.candidateIds)
+      await recordCosUniversityProductionPath({
+        path: 'graduate_runtime_activation',
+        invocationSucceeded: true,
+        evidence: { skipped: true, reason: 'experiment_registration_only', massRegistration, experimentScope },
+      })
+      return NextResponse.json({ ok: true, skipped: true, reason: 'experiment_registration_only', massRegistration, experimentScope })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return NextResponse.json({ ok: false, error: message.slice(0, 300), reason: 'experiment_registration_failed' }, { status: 500 })
+    }
+  }
   try {
     // Registration is a durable record, not a runtime: it writes one pending_runtime row and spends nothing, so it
     // runs before the activation flag. Activation itself stays behind that flag and its own evidence gates.

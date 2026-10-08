@@ -1,8 +1,12 @@
 // saas/app/api/cron/cos-university-mass-distillation/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { runCosUniversityMassDistillationWorkflow } from '@/lib/ai/cos/cosUniversityMassDistillationWorkflow'
+import {
+  runCosUniversityMassDistillationExperimentWorkflow,
+  runCosUniversityMassDistillationWorkflow,
+} from '@/lib/ai/cos/cosUniversityMassDistillationWorkflow'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
-import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
+import { pausedStationResponse } from '@/lib/ai/cos/cosUniversitySettings'
+import { experimentScopeEvidence, resolveUniversityStationScope } from '@/lib/ai/cos/itmountsLabExperimentStationScope'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
 export const runtime = 'nodejs'
@@ -15,46 +19,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no new campaign.
-  const pause = await readLinePauseSetting(cosServiceDb())
-  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-mass-distillation'))
+  // Owner 2026-10-07: while paused, a live Lab experiment grant advances only that experiment's own campaign.
+  const scope = await resolveUniversityStationScope({ db: cosServiceDb() })
+  if (scope.run === 'paused') return NextResponse.json(pausedStationResponse('cos-university-mass-distillation'))
 
-  // Temporary Sep 18 control-plane forensics. Run concurrently so evidence capture cannot delay
-  // the University workflow. Hard sunset prevents repeated historical queries if cleanup is delayed.
-  const forensicCapture = Date.now() < Date.parse('2026-09-19T01:15:00Z')
-    ? (() => {
-        const configured = String(process.env.NEXT_PUBLIC_APP_URL || '').trim()
-        const vercelProduction = String(process.env.VERCEL_PROJECT_PRODUCTION_URL || '').trim()
-        const baseUrl = configured
-          ? configured.replace(/\/+$/, '')
-          : vercelProduction
-            ? `https://${vercelProduction.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`
-            : 'https://itmounts.com'
-        return fetch(`${baseUrl}/api/cron/vercel-cron-forensics`, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${secret}`, 'User-Agent': 'SignalBoost-University-Forensics/1.0' },
-          cache: 'no-store',
-          signal: AbortSignal.timeout(25_000),
-        }).then(async response => {
-          console.info('[vercel-cron-forensics-minute-trigger]', { status: response.status })
-          try { await response.body?.cancel() } catch {}
-        }).catch(error => {
-          console.warn('[vercel-cron-forensics-minute-trigger] failed', error instanceof Error ? error.message : String(error))
-        })
-      })()
-    : Promise.resolve()
   try {
-    const { response, invocationSucceeded, transportSucceeded, skipped } = await runCosUniversityMassDistillationWorkflow({
-      source: 'scheduled_cron',
-    })
+    const { response, invocationSucceeded, transportSucceeded, skipped } = scope.run === 'experiment'
+      ? await runCosUniversityMassDistillationExperimentWorkflow({ campaignIds: scope.campaignIds })
+      : await runCosUniversityMassDistillationWorkflow({ source: 'scheduled_cron' })
+    const experimentScope = experimentScopeEvidence(scope)
 
     await recordCosUniversityProductionPath({
       path: 'mass_distillation_campaign',
       invocationSucceeded,
-      evidence: { ...response, transportSucceeded, runnerInvoked: !skipped, skipped },
+      evidence: { ...response, transportSucceeded, runnerInvoked: !skipped, skipped, experimentScope },
     })
-    console.info('[cos-university-mass-distillation]', JSON.stringify(response))
-    await forensicCapture
-    return NextResponse.json(response, {
+    console.info('[cos-university-mass-distillation]', JSON.stringify({ ...response, experimentScope }))
+    return NextResponse.json({ ...response, experimentScope }, {
       status: transportSucceeded ? 200 : 503,
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     })

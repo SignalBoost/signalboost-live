@@ -173,7 +173,11 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
   portableId:string
   agentId:string
   sandboxEnvironmentId:string
+  /** Paused factory, one Lab experiment: schedule and sweep only these candidates' residents. Absent = every resident. */
+  candidateIds?:readonly string[]
 }):SupabaseBuilderResidencyOrchestratorStore{
+  const inScope=(query:any):any=>
+    input.candidateIds?query.in('candidate_id',[...input.candidateIds]):query
   const evidenceStore=createSupabaseBuilderResidencyEvidenceStore(input.db)
 
   const toEnrollment=(data:any):BuilderResidencyEnrollment=>Object.freeze({
@@ -297,10 +301,10 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
   const enrollmentKey=(row:any)=>`${String(row.candidate_id)}:${String(row.trained_artifact_hash).toLowerCase()}`
 
   async function readSchedulingState(){
-    const active=await input.db
+    const active=await inScope(input.db
       .from('cos_university_residency_enrollments')
       .select(ENROLLMENT_COLUMNS)
-      .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
+      .in('standing',[...ACTIVE_RESIDENCY_STANDINGS]))
       .order('updated_at',{ascending:true})
       .limit(32)
     if(active.error) throw active.error
@@ -410,10 +414,10 @@ export function createSupabaseBuilderResidencyOrchestratorStore(input:{
     },
 
     async closeUnrecoverableResidencies():Promise<BuilderResidencyFailureSweep>{
-      const active=await input.db
+      const active=await inScope(input.db
         .from('cos_university_residency_enrollments')
         .select('id,candidate_id,subject_id,trained_artifact_id,trained_artifact_hash,revision_key,standing,updated_at')
-        .in('standing',[...ACTIVE_RESIDENCY_STANDINGS])
+        .in('standing',[...ACTIVE_RESIDENCY_STANDINGS]))
         .order('updated_at',{ascending:true})
         .limit(RESIDENCY_FAILURE_SWEEP_LIMIT)
       if(active.error) throw active.error

@@ -1,7 +1,8 @@
 // saas/app/api/cron/cos-university-residency/route.ts
 import { NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
-import { pausedStationResponse, readLinePauseSetting } from '@/lib/ai/cos/cosUniversitySettings'
+import { pausedStationResponse } from '@/lib/ai/cos/cosUniversitySettings'
+import { experimentScopeEvidence, resolveUniversityStationScope } from '@/lib/ai/cos/itmountsLabExperimentStationScope'
 import {
   BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
   createBuilderResidencyNativeAuthority,
@@ -130,8 +131,13 @@ export async function GET(req: Request) {
     )
   }
   // Owner 2026-10-04: the production pause switch, set from the University telemetry page. Paused = no residency case.
-  const pause = await readLinePauseSetting(getAdminSupabase())
-  if (pause.paused) return NextResponse.json(pausedStationResponse('cos-university-residency'))
+  // Owner 2026-10-07: while paused, a live Lab experiment grant admits and teaches only that experiment's resident.
+  // The stale-case and departed-resident sweeps stay global: they close abandoned bookkeeping, spend nothing and move
+  // no artifact.
+  const scope = await resolveUniversityStationScope({ db: getAdminSupabase() as any })
+  if (scope.run === 'paused') return NextResponse.json(pausedStationResponse('cos-university-residency'))
+  const candidateIds = scope.run === 'experiment' ? scope.candidateIds : undefined
+  const experimentScope = experimentScopeEvidence(scope)
 
   if (!enabled()) {
     const body = {
@@ -158,6 +164,7 @@ export async function GET(req: Request) {
     portableId: RESIDENCY_PORTABLE,
     agentId: RESIDENCY_AGENT,
     sandboxEnvironmentId: RESIDENCY_SANDBOX,
+    candidateIds,
   })
   const harnessEvidenceSink =
     createSupervisorAuditHarnessEvidenceSink(db as any)
@@ -188,7 +195,7 @@ export async function GET(req: Request) {
     // Admission is bounded separately from practical execution. At most one new
     // exact artifact is admitted per tick, and no more than four residents may
     // remain active concurrently.
-    const admission = await admitNextBuilderResidency({ db, activeLimit: RESIDENCY_ACTIVE_LIMIT })
+    const admission = await admitNextBuilderResidency({ db, activeLimit: RESIDENCY_ACTIVE_LIMIT, candidateIds })
 
     // One lane per resident, in parallel. Each lane gives consecutive case turns to ITS resident while the time
     // budget allows, so the resident's warm worker is reused instead of a different artifact cold-starting per case.
@@ -250,6 +257,7 @@ export async function GET(req: Request) {
           quarantinedArtifacts: residencyFailures.quarantinedArtifacts,
           errors: residencyFailures.errors,
         },
+        experimentScope,
         automaticFinalGateEnable: false,
         promotionAuthorized: false,
         productionTrafficAuthorized: false,
@@ -291,6 +299,7 @@ export async function GET(req: Request) {
         elapsedMs: Date.now() - tickStartedAt,
         parallelExecution: lanes.length > 1,
       },
+      experimentScope,
     }
     await recordResidencyProductionPath(invocationSucceeded, {
       runnerInvoked: results.some(item => Boolean(item.practiceCase)),
@@ -303,6 +312,7 @@ export async function GET(req: Request) {
       withdrawals: body.withdrawals,
       selfHealing: body.selfHealing ?? null,
       batch: body.batch,
+      experimentScope,
       automaticFinalGateEnable: false,
       promotionAuthorized: false,
       productionTrafficAuthorized: false,

@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import UniversitySettingsPanel from './UniversitySettingsPanel.tsx'
 import { COS_UNIVERSITY_SETTINGS_COPY } from '@/lib/i18n/cosUniversitySettingsCopy'
+import LabExperimentPanel from './LabExperimentPanel.tsx'
+import { ITMOUNTS_LAB_EXPERIMENT_COPY } from '@/lib/i18n/itmountsLabExperimentCopy'
 import ArtifactLifeRecordPanel from './ArtifactLifeRecordPanel.tsx'
 import { COS_UNIVERSITY_LIFE_RECORD_COPY } from '@/lib/i18n/cosUniversityLifeRecordCopy'
 import EffectivenessFunnelPanel from './EffectivenessFunnelPanel.tsx'
@@ -226,6 +228,9 @@ export default function CosUniversityTelemetryPage() {
   const settingsCopy = COS_UNIVERSITY_SETTINGS_COPY[
     (lang in COS_UNIVERSITY_SETTINGS_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
   ]
+  const labExperimentCopy = ITMOUNTS_LAB_EXPERIMENT_COPY[
+    (lang in ITMOUNTS_LAB_EXPERIMENT_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
+  ]
   const lifeRecordCopy = COS_UNIVERSITY_LIFE_RECORD_COPY[
     (lang in COS_UNIVERSITY_LIFE_RECORD_COPY ? lang : 'en') as CosUniversityTelemetryLanguage
   ]
@@ -358,6 +363,8 @@ export default function CosUniversityTelemetryPage() {
       </header>
 
       <UniversitySettingsPanel copy={settingsCopy} />
+
+      <LabExperimentPanel copy={labExperimentCopy} />
 
       <EffectivenessFunnelPanel copy={funnelCopy} subjects={funnelSubjects} />
 

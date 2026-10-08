@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityMassDistilledEvaluation.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -175,7 +176,7 @@ test('evaluation route claims once, checks balance before reservation and writes
   assert.match(route, /maxEstimatedRuntimeWakeCostUsd <= 0/)
   assert.match(route, /ENDPOINT_ID\.test\(endpointId\)/)
   const balance = route.indexOf('queryRunpodAccountStatus()')
-  const claim = route.indexOf('claim = await claimNext()')
+  const claim = route.indexOf('claim = await claimNext(candidateIds)')
   assert.ok(balance >= 0 && claim > balance)
   assert.match(route, /productionTrafficAuthorized: false/)
 })
@@ -205,14 +206,14 @@ test('structured evaluator errors retain bounded code and message instead of [ob
 test('bounded queue-state denials may drain existing approvals while unknown or disabled denials still stop before provider work', () => {
   const drain = route.indexOf('const mayDrainExistingApproval')
   const denial = route.indexOf('if (!rolling.issued && !mayDrainExistingApproval)')
-  const claim = route.indexOf('claim = await claimNext()')
+  const claim = route.indexOf('claim = await claimNext(candidateIds)')
   const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
   const wake = route.indexOf('activateMassDistilledEvaluationWorker(claim.endpointId')
   assert.ok(drain >= 0 && denial > drain && claim > denial && preflight > claim && wake > preflight)
   assert.match(route, /rolling\.reason === 'no_mass_artifact_eligible_for_rolling_evaluation'/)
   assert.match(route, /rolling\.reason === 'rolling_mass_evaluation_window_exhausted'/)
   assert.match(route, /if \(!rolling\.issued && !mayDrainExistingApproval\)/)
-  assert.match(route, /return NextResponse\.json\(\{ ok: true, skipped: true, reason: rolling\.reason \}\)/)
+  assert.match(route, /return NextResponse\.json\(\{ ok: true, skipped: true, reason: rolling\.reason, experimentScope \}\)/)
 })
 
 

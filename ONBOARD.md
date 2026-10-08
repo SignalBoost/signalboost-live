@@ -1,3 +1,4 @@
+<!-- ONBOARD.md -->
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
@@ -2909,7 +2910,21 @@ Infinite retries are not acceptable. Graduation standards are not loosened to ac
 
 The continuous artifact line spends money without proving the user-facing goal. It is paused with the buyer-controlled **Production pause** on the University telemetry page (`cos_university_line_paused`), which stops every factory station on the next tick and leaves graduates already serving untouched. Testing uses deliberate experiments run the way a user would run them.
 
-The pause is all-or-nothing today: it also stops a deliberate experiment. Running one chosen experiment while the always-on line stays off needs a user-started experiment entry point. That is the next Step 1 build item, not a reason to unpause the line.
+**User-started experiment while paused (2026-10-08).** "Run one experiment" on the University telemetry page (`LabExperimentPanel.tsx`, `/api/lab/experiments`) lets an owner/admin member of a Lab organization start one run of a Lab experiment for a chosen subject. Starting is the spend decision for one training batch.
+
+`lab.start_experiment_university_run` (migration `20261008020000_lab_experiment_execution_scope.sql`) runs in one transaction and does four things:
+1. Picks one prepared batch under the same admission rules as the rolling authorizer: 64–128 items, ≥50% independent sources, and the failure-derived limit.
+2. Authorizes a one-batch campaign at the existing $1.825 ceiling.
+3. Binds the run to the experiment.
+4. Writes an expiring execution grant (≤48 h). Grants are written only inside the customer HarnessRun; nothing in a request is authority.
+
+While the line is paused, `resolveUniversityStationScope` (`itmountsLabExperimentStationScope.ts`) checks each live grant with `decideUniversityStationExecution`. Six stations then work only on the granted candidates: distillation (consumer only, campaign-scoped), exam-set writer, Residency (admission, lanes, failure sweep), canary, exam, and graduate registration.
+- The canary and exam use `scoped_claim_next_*` wrappers. They set a transaction-local candidate scope that the unchanged claims honour; unscoped scheduled calls see every candidate as before.
+- Graduate activation/rotation/rollback, the lifecycle controller and backlog compaction stay fully paused.
+- Line running, or the pause store unreadable: unchanged behaviour. Grant store unreadable: stations stay paused (fail closed).
+- Every limit, ceiling and evaluation standard is unchanged.
+
+The same delivery fixed the bind route, which rejected every real customer HarnessRun id (`lab-customer-<uuid>`) as `lab_execution_invalid_identifier`. Tests: `itmountsLabExperimentStationScope`, `itmountsLabExperimentStart` (release gate). Not yet observed live.
 
 #### Exposure gates (owner checklist 2026-10-07)
 

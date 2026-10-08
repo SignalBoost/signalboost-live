@@ -1,5 +1,5 @@
-import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 // saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts
+import { withHostProductionHarnessIngress } from '../../../platform-harness/runtime/host-ingress.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { pausedStationResponse, readLinePauseSetting } from './cosUniversitySettings.ts'
 import {
@@ -611,6 +611,61 @@ async function runCosUniversityMassDistillationWorkflowInsideHarness(input: {
   }
 }
 
+
+/**
+ * Paused factory, one Lab experiment (lib/ai/cos/itmountsLabExperimentStationScope.ts decided the scope). Only the
+ * consumer runs, restricted to the experiment's own campaigns: no new campaign is authorized, no curriculum is
+ * prepared, and no other campaign is recovered or advanced. Same HarnessRun ingress and workflow lease as the line.
+ */
+export async function runCosUniversityMassDistillationExperimentWorkflow(input: {
+  campaignIds: readonly string[]
+  now?: Date
+}): Promise<{
+  response: Record<string, unknown>
+  invocationSucceeded: boolean
+  transportSucceeded: boolean
+  skipped: boolean
+}> {
+  return withHostProductionHarnessIngress({
+    objective: 'Advance one Lab experiment through COS University mass distillation',
+    portableId: 'cos-university',
+    agentId: 'cos-university-mass-distillation',
+    role: 'university_worker',
+    capabilityId: 'university.distillation.execute',
+    risk: 'write',
+    deadlineMs: 300_000,
+    maxConcurrency: 1,
+    maxToolCalls: 50,
+  }, async () => {
+    const lease = await claimUniversityMassDistillationWorkflowLease().catch((error: unknown) => ({ acquired: false as const, error: safeError(error) }))
+    if (!lease.acquired) {
+      const failed = 'error' in lease
+      return {
+        response: { ok: !failed, skipped: true, reason: failed ? 'workflow_lease_unavailable' : 'workflow_lease_held', experimentOnly: true, authorityExpanded: false },
+        invocationSucceeded: !failed,
+        transportSucceeded: !failed,
+        skipped: true,
+      }
+    }
+    try {
+      const consumer: Record<string, any> = await runMassDistillationCampaignConsumer({
+        now: input.now || new Date(),
+        maxDispatches: 5,
+        campaignIds: input.campaignIds,
+      })
+      return {
+        response: { ok: consumer.ok !== false, experimentOnly: true, campaignIds: input.campaignIds, consumer, authorityExpanded: false },
+        invocationSucceeded: consumer.ok !== false,
+        transportSucceeded: true,
+        skipped: consumer.skipped === true,
+      }
+    } finally {
+      await releaseUniversityMassDistillationWorkflowLease((lease as any).ownerToken).catch((error: unknown) => {
+        console.error('[cos-university-mass-distillation-lease]', JSON.stringify({ ok: false, reason: 'workflow_lease_release_failed', error: safeError(error) }))
+      })
+    }
+  })
+}
 
 /** Scheduled and Self-Healing distillation must never start outside a HarnessRun. */
 export async function runCosUniversityMassDistillationWorkflow(

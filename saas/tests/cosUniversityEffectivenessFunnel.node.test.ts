@@ -536,7 +536,8 @@ test('the API is owner-gated read-only, the panel is mounted after the settings 
   assert.doesNotMatch(api, /export async function (POST|PATCH|PUT|DELETE)/)
   assert.match(api, /window: req\.nextUrl\.searchParams\.get\('window'\),\s*subjectId: req\.nextUrl\.searchParams\.get\('subject'\)/)
   const page = read('../app/dashboard/cos-university-telemetry/page.tsx')
-  assert.match(page, /<UniversitySettingsPanel copy=\{settingsCopy\} \/>\s*<EffectivenessFunnelPanel copy=\{funnelCopy\} subjects=\{funnelSubjects\} \/>\s*<ArtifactLifeRecordPanel copy=\{lifeRecordCopy\} \/>/)
+  // 2026-10-08: the Lab experiment block sits between the settings and the funnel (a control, beside the settings).
+  assert.match(page, /<UniversitySettingsPanel copy=\{settingsCopy\} \/>\s*<LabExperimentPanel copy=\{labExperimentCopy\} \/>\s*<EffectivenessFunnelPanel copy=\{funnelCopy\} subjects=\{funnelSubjects\} \/>\s*<ArtifactLifeRecordPanel copy=\{lifeRecordCopy\} \/>/)
   const panel = read('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx')
   assert.match(panel, /const FUNNEL_URL = '\/api\/admin\/cos-university-effectiveness'/)
   assert.doesNotMatch(panel, /method: '(POST|PATCH|PUT|DELETE)'/)

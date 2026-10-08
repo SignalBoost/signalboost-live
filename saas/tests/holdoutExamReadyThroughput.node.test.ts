@@ -36,7 +36,7 @@ test('the exam writer fills at the declared capacity, not at a baked-in ceiling'
   // 10-worker RunPod account. Writing exam items spends small teacher calls and NO inference worker, so this station
   // never needed to be narrow, and a canary waiting on an exam set was that morning's line stop. The batch now comes
   // from the capacity the deployment declares, and must stay AHEAD of the canary.
-  assert.match(writer, /fillRequestedHoldoutExamSets\(\{\s*db,\s*limit: lineCapacity\(\)\.examSetsPerTick,\s*deadlineMs: startedAt \+ maxDuration \* 1000 - ROUTE_RESERVE_MS,\s*\}\)/,
+  assert.match(writer, /fillRequestedHoldoutExamSets\(\{\s*db,\s*limit: lineCapacity\(\)\.examSetsPerTick,\s*deadlineMs: startedAt \+ maxDuration \* 1000 - ROUTE_RESERVE_MS,\s*\.\.\.\(scope\.run === 'experiment' \? \{ candidateIds: scope\.candidateIds \} : \{\}\),\s*\}\)/,
     'the exam-items cron must size its batch from declared capacity and hand the writer its own deadline')
   assert.doesNotMatch(writer, /fillRequestedHoldoutExamSets\(\{ db, limit: \d+ \}\)/,
     'a literal batch size is back')

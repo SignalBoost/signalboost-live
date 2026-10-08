@@ -92,3 +92,24 @@ test('Phase 2: revocation during birth lookup prevents signing and persistence',
   assert.equal(s.signingCalls(), 0)
   assert.equal(s.writes(), 0)
 })
+
+test('Phase 2: external signer failure fails closed without persistence', async () => {
+  const s = setup()
+  const outcome = await issueVerifiedNativeBirth({
+    ...s.input,
+    signer: async () => { throw new Error('KMS unavailable: do not disclose provider details') },
+  })
+  assert.notEqual(outcome, 'verified_persisted')
+  assert.equal(s.writes(), 0)
+})
+
+test('Phase 2: trusted authorization resolver failure fails closed before signing', async () => {
+  const s = setup()
+  const outcome = await issueVerifiedNativeBirth({
+    ...s.input,
+    verifyGrant: async () => { throw new Error('Harness authority store unavailable') },
+  })
+  assert.equal(outcome, 'storage_failed')
+  assert.equal(s.signingCalls(), 0)
+  assert.equal(s.writes(), 0)
+})

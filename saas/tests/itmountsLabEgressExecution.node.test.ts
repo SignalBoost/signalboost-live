@@ -63,3 +63,24 @@ test('source errors and delivery errors are sanitized',async()=>{
  h.host.readTrustedDecision=async()=>{throw new Error('secret-DO-NOT-ECHO')}
  await assert.rejects(executeLabEgress(request,h.host),e=>{assert.equal((e as Error).message,'lab_egress_authority_unavailable');return true})
 })
+
+test('host callback cannot retarget destination after approval',async()=>{
+ const mutable={...request}
+ const seen:string[]=[]
+ const host:LabEgressHost={
+  async readTrustedDecision(scoped){
+   seen.push('decision:'+scoped.destinationOrganizationId)
+   try {(scoped as any).destinationOrganizationId='tenant-evil'}catch{}
+   mutable.destinationOrganizationId='tenant-evil'
+   return decision
+  },
+  async deliver(scoped){
+   seen.push('delivery:'+scoped.destinationOrganizationId)
+   assert.equal(scoped.destinationOrganizationId,'tenant-b')
+   assert.equal(Object.isFrozen(scoped),true)
+   return {receiptId:'receipt-safe'}
+  },
+ }
+ assert.deepEqual(await executeLabEgress(mutable,host),{receiptId:'receipt-safe'})
+ assert.deepEqual(seen,['decision:tenant-b','delivery:tenant-b'])
+})

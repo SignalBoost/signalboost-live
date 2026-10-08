@@ -7,6 +7,7 @@ on:
       - 'saas/supabase/migrations/20261006190000_itmounts_lab_tenancy_credit_ledger.sql'
       - 'saas/supabase/migrations/20261006210000_lab_experiment_budget_enforcement.sql'
       - 'saas/supabase/migrations/20261008030000_lab_approved_usage_rates.sql'
+      - 'saas/supabase/migrations/20261008040000_lab_rated_capture_receipts.sql'
       - 'saas/tests/sql/lab-*.sql'
   workflow_dispatch:
 
@@ -59,6 +60,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261006190000_itmounts_lab_tenancy_credit_ledger.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261006210000_lab_experiment_budget_enforcement.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008030000_lab_approved_usage_rates.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008040000_lab_rated_capture_receipts.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |
@@ -83,3 +85,6 @@ jobs:
       - name: Verify immutable approved usage-rate contract
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-approved-rate-contract.sql
+      - name: Verify rated capture receipt binding
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-rated-capture-acceptance.sql

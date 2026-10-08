@@ -16,14 +16,14 @@ export type ScopedProviderRequest = Readonly<{
   nowMs: number
 }>
 const ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/
-const SECRET_REF = /^vault:\/\/[a-zA-Z0-9/_-]{3,200}$/
+const SECRET_REF = /^vault:\/\/([a-zA-Z0-9][a-zA-Z0-9._:-]{0,127})\/([a-zA-Z0-9/_-]{1,200})$/
 export function assertCustomerProviderScope(grant: ScopedProviderGrant, request: ScopedProviderRequest): string {
   // This function validates a trusted grant fetched by the server from tenant-scoped storage.
   // Never construct the grant from a request body, JWT user metadata or model output.
   if (!grant || !request || !ID.test(grant.organizationId) || !ID.test(request.organizationId)
     || !ID.test(grant.providerId) || !ID.test(request.providerId)
     || !ID.test(grant.artifactId) || !ID.test(request.artifactId)
-    || !SECRET_REF.test(grant.secretReference)
+    || SECRET_REF.exec(grant.secretReference)?.[1] !== grant.organizationId
     || !['teacher.invoke','compute.execute','tool.invoke'].includes(grant.capability)
     || !Number.isSafeInteger(grant.expiresAtMs) || !Number.isSafeInteger(request.nowMs)
     || grant.expiresAtMs <= request.nowMs

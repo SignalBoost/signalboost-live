@@ -99,3 +99,7 @@ jobs:
       - name: Reject rated capture with forged rate arithmetic
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-capture-rate-reconciliation-acceptance.sql
+
+      - name: Verify BYOI isolated experiment accounting
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-byoi-experiment-accounting-acceptance.sql

@@ -64,3 +64,28 @@ test('provider grant lookup cannot mutate the destination tenant or artifact bet
   assert.deepEqual(await executeLabByoi(original,host),{receiptId:'safe'})
   assert.deepEqual(received,['grant:org-a:artifact-a','vault','invoke:org-a:artifact-a'])
 })
+
+test('grant, vault and provider errors are sanitized with no original secret in message or cause', async () => {
+ const secret='private-key-DO-NOT-LOG'
+ for (const step of ['loadGrant','resolveSecret','invokeProvider'] as const) {
+   const {host}=setup(grant)
+   ;(host as any)[step]=async()=>{throw new Error('leaked '+secret)}
+   await assert.rejects(executeLabByoi(request,host),(e:unknown)=>{
+     const err=e as Error
+     assert.equal(err.message,({loadGrant:'lab_byoi_grant_unavailable',resolveSecret:'lab_byoi_credential_unavailable',invokeProvider:'lab_byoi_provider_failed'} as const)[step])
+     assert.equal(err.message.includes(secret),false)
+     assert.equal(err.cause,undefined)
+     return true
+   })
+ }
+})
+
+test('malformed provider receipt cannot echo arbitrary payload or secret text',async()=>{
+ const {host}=setup(grant)
+ host.invokeProvider=async()=>({receiptId:'provider says: secret=do-not-share\nAuthorization: Bearer abc'})
+ await assert.rejects(executeLabByoi(request,host),(e:unknown)=>{
+   assert.equal((e as Error).message,'lab_byoi_receipt_missing')
+   assert.equal((e as Error).message.includes('Bearer'),false)
+   return true
+ })
+})

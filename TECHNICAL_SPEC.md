@@ -127,7 +127,7 @@ PHASE 5: Design Partner Onboarding & IP Rights Gate (Weeks 17-20)
 
 ### DATABASE SCHEMA REFERENCE (POSTGRESQL)
 
-Developers must implement the database schema utilizing atomic row locks (`FOR UPDATE`), double-entry credit states, and immutable trigger constraints for `credit_ledger_entries`.
+Developers must implement the database schema utilizing atomic row locks (`FOR UPDATE`), authorization-hold credit states, and immutable trigger constraints for `credit_ledger_entries`.
 
 ```sql
 -- Core Types

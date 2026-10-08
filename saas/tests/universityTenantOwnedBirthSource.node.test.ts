@@ -31,8 +31,8 @@ test('Phase 2: canonical tenant ownership precedes both birth and signed reads',
  assert.ok(await f.source.readBirth(org,id))
  assert.ok(await f.source.readSignedEnvelope(org,id))
  assert.deepEqual(f.calls.filter(c=>c.endsWith(':read')),[
-  'lab.artifacts:read','public.cos_university_artifact_birth_certificates:read',
-  'lab.artifacts:read','public.cos_university_signed_birth_envelopes:read'])
+  'lab.artifacts:read','public.cos_university_artifact_birth_certificates:read','lab.artifacts:read',
+  'lab.artifacts:read','public.cos_university_signed_birth_envelopes:read','lab.artifacts:read'])
 })
 test('Phase 2: foreign tenant, invalid UUID and absent owner fail before sensitive read',async()=>{
  for(const opts of [{owner:other},{owner:null},{artifact:other},{fail:true}]){
@@ -57,4 +57,22 @@ test('Phase 2: reads explicitly restrict columns and do not retrieve model promp
  await f.source.readSignedEnvelope(org,id)
  assert.equal(f.calls.some(c=>c.includes(':select:*')),false)
  assert.equal(f.calls.some(c=>/response_text|private_key|prompt_text/.test(c)),false)
+})
+
+test('Phase 2: ownership lost during certificate read refuses record release',async()=>{
+ const f=fixture()
+ let ownershipChecks=0
+ const original=f.source
+ // Simulate changing canonical owner by wrapping the DB layer in a separate fixture below.
+ const calls:string[]=[]
+ function query(table:string){const q:any={select:()=>q,eq:()=>q,maybeSingle:async()=>{
+  calls.push(table)
+  if(table==='lab.artifacts')return {error:null,data:{permanent_artifact_id:id,organization_id:++ownershipChecks===1?org:other}}
+  return {error:null,data:{permanent_artifact_id:id}}
+ }};return q}
+ const db={schema:(s:string)=>({from:(t:string)=>query(s+'.'+t)}),from:(t:string)=>query('public.'+t)}
+ const source=createTenantOwnedBirthSource(db)
+ await assert.rejects(source.readSignedEnvelope(org,id))
+ assert.deepEqual(calls,['lab.artifacts','public.cos_university_signed_birth_envelopes','lab.artifacts'])
+ assert.ok(original)
 })

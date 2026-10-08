@@ -27,7 +27,7 @@ function fixture(owner:string=tenant){
 test('Phase 2: matching host tenant and active read Harness allow only owned DB access',async()=>{
  const f=fixture()
  assert.equal(await auditBirthAgainstTenantDatabase(f.input),'missing_birth')
- assert.deepEqual(f.reads,['lab.artifacts','public.cos_university_artifact_birth_certificates','lab.artifacts','public.cos_university_signed_birth_envelopes'])
+ assert.deepEqual(f.reads,['lab.artifacts','public.cos_university_artifact_birth_certificates','lab.artifacts','lab.artifacts','public.cos_university_signed_birth_envelopes','lab.artifacts'])
 })
 test('Phase 2: host tenant mismatch denies all authority resolution and DB reads',async()=>{
  const f=fixture()

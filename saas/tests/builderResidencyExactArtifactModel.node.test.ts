@@ -236,12 +236,55 @@ test('Residency runtime preparation classifies unavailable provider readiness as
   })
   await assert.rejects(
     ()=>port.prepare!(identity),
-    /residency_exact_artifact_runtime_not_ready:provider_workers_ready_0_running_0_initializing_1_idle_0_wake_attempts_1/,
+    /residency_exact_artifact_runtime_not_ready:provider_workers_ready_0_running_0_initializing_1_idle_0_throttled_0_unhealthy_0_wake_attempts_1/,
   )
   assert.ok(healthCalls>=1)
 })
 
 
+
+test('a runtime that never gets a worker says whether RunPod throttled it or reported it unhealthy',async()=>{
+  const {db}=artifactDb()
+  const port=createRunpodBuilderResidencyModelPort({
+    db,
+    apiKey:'secret',
+    readyTimeoutMs:1000,
+    provisionImpl:async()=>({endpointId:'ep_residency_123',modelName:'itmounts-resident-model',baseUrl:'https://ep_residency_123.api.runpod.ai/v1'}),
+    healthImpl:async()=>({
+      ok:true,
+      httpStatus:200,
+      jobs:{inProgress:0,inQueue:1,failed:0,completed:0},
+      workers:{idle:0,ready:0,running:0,initializing:0,throttled:1,unhealthy:0},
+      error:null,
+    }),
+    sleepImpl:async()=>{},
+    fetchImpl:async()=>{throw new DOMException('timeout','TimeoutError')},
+  })
+  await assert.rejects(
+    ()=>port.prepare!(identity),
+    /residency_exact_artifact_runtime_not_ready:provider_workers_ready_0_running_0_initializing_0_idle_0_throttled_1_unhealthy_0_wake_attempts_\d$/,
+  )
+})
+
+test('the RunPod health read keeps the throttled and unhealthy worker counts',async()=>{
+  const original=globalThis.fetch
+  const originalKey=process.env.RUNPOD_API_KEY
+  process.env.RUNPOD_API_KEY='test-key'
+  globalThis.fetch=(async()=>new Response(JSON.stringify({
+    jobs:{inQueue:1},
+    workers:{idle:0,initializing:0,ready:0,running:0,throttled:2,unhealthy:1},
+  }),{status:200})) as typeof fetch
+  try{
+    const {massDistilledRuntimeHealth}=await import('../lib/ai/cos/runpodMassDistilledProvision.ts')
+    const state=await massDistilledRuntimeHealth('ep_residency_123')
+    assert.equal(state.workers.throttled,2)
+    assert.equal(state.workers.unhealthy,1)
+  }finally{
+    globalThis.fetch=original
+    if(originalKey===undefined) delete process.env.RUNPOD_API_KEY
+    else process.env.RUNPOD_API_KEY=originalKey
+  }
+})
 
 test('Residency accepts exact application readiness while RunPod still reports running but not ready',async()=>{
   const {db}=artifactDb()

@@ -254,8 +254,12 @@ export function createRunpodBuilderResidencyModelPort(input:{
           const running=Math.max(0,Number(state.workers?.running??0))
           const initializing=Math.max(0,Number(state.workers?.initializing??0))
           const idle=Math.max(0,Number(state.workers?.idle??0))
+          // Production 2026-10-08: four Computer Science cases ended ready_0_running_0_initializing_0_idle_0 after three
+          // wakes, which cannot tell a provider with no GPU to give (throttled) from workers that failed (unhealthy).
+          const throttled=Math.max(0,Number(state.workers?.throttled??0))
+          const unhealthy=Math.max(0,Number(state.workers?.unhealthy??0))
           if(state.ok){
-            lastHealthError=`provider_workers_ready_${ready}_running_${running}_initializing_${initializing}_idle_${idle}_wake_attempts_${wakeAttempts}`
+            lastHealthError=`provider_workers_ready_${ready}_running_${running}_initializing_${initializing}_idle_${idle}_throttled_${throttled}_unhealthy_${unhealthy}_wake_attempts_${wakeAttempts}`
           }
           // Once RunPod reports an allocated running worker, probe the application directly
           // even if the provider has not promoted that worker to "ready" yet. This distinguishes

@@ -431,7 +431,7 @@ export async function massDistilledRuntimeHealth(endpointId:string){
   const key=configuredRunpodApiKey(); if(!key) throw new Error('RUNPOD_API_KEY is not configured')
   const response=await fetch(`${SERVERLESS_API}/${endpointId}/health`,{headers:{Authorization:`Bearer ${key}`},signal:AbortSignal.timeout(HEALTH_TIMEOUT_MS)})
   const raw=await response.text(); let payload:any={}; try{payload=JSON.parse(raw)}catch{}
-  return Object.freeze({ok:response.ok,httpStatus:response.status,jobs:{inProgress:Number(payload?.jobs?.inProgress||0),inQueue:Number(payload?.jobs?.inQueue||0),failed:Number(payload?.jobs?.failed||0),completed:Number(payload?.jobs?.completed||0)},workers:{idle:Number(payload?.workers?.idle||0),ready:Number(payload?.workers?.ready||0),running:Number(payload?.workers?.running||0),initializing:Number(payload?.workers?.initializing||0)},error:response.ok?null:(safeError(raw)||`HTTP ${response.status}`)})
+  return Object.freeze({ok:response.ok,httpStatus:response.status,jobs:{inProgress:Number(payload?.jobs?.inProgress||0),inQueue:Number(payload?.jobs?.inQueue||0),failed:Number(payload?.jobs?.failed||0),completed:Number(payload?.jobs?.completed||0)},workers:{idle:Number(payload?.workers?.idle||0),ready:Number(payload?.workers?.ready||0),running:Number(payload?.workers?.running||0),initializing:Number(payload?.workers?.initializing||0),throttled:Number(payload?.workers?.throttled||0),unhealthy:Number(payload?.workers?.unhealthy||0)},error:response.ok?null:(safeError(raw)||`HTTP ${response.status}`)})
 }
 
 /** First-request window after readiness: the unused shared budget, capped at 150s, never below 35s. */

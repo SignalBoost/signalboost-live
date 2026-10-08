@@ -23,12 +23,13 @@ create table lab.commercial_credit_lots (
  expiry_at timestamptz,
  created_at timestamptz not null default now(),
  unique (organization_id,source_system,source_reference),
+ unique (lot_id,organization_id),
  check (kind <> 'purchased' or expiry_at is null)
 );
 create table lab.commercial_credit_journal (
  journal_id bigint generated always as identity primary key,
  organization_id uuid not null references lab.organizations(id),
- lot_id uuid not null references lab.commercial_credit_lots(lot_id),
+ lot_id uuid not null,
  operation text not null check (operation in ('grant','reserve','capture','release','refund','chargeback')),
  amount_credits bigint not null check (amount_credits > 0),
  event_key text not null check (length(btrim(event_key)) between 16 and 200),
@@ -36,6 +37,7 @@ create table lab.commercial_credit_journal (
  experiment_id uuid,
  created_at timestamptz not null default now(),
  unique (organization_id,event_key),
+ foreign key (lot_id,organization_id) references lab.commercial_credit_lots(lot_id,organization_id),
  foreign key (experiment_id,organization_id) references lab.experiments(id,organization_id)
 );
 create function lab.prevent_commercial_wallet_mutation() returns trigger

@@ -87,6 +87,9 @@ jobs:
       - name: Install one-use human approval consumption function
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008114600_lab_provider_human_approval_consumption.sql
+      - name: Enforce current human approver membership
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008120000_lab_provider_approval_active_approver.sql
       - name: Verify scoped first-use consumption and replay denial
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-phase3-one-time-approval-acceptance.sql

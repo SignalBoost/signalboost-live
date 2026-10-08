@@ -18,6 +18,7 @@ BEGIN
  INSERT INTO lab.artifacts(permanent_artifact_id,organization_id,cohort_id,fingerprint_sha256)
  VALUES(artifact,org,cohort,repeat('a',64));
  ref:='vault://' || org::text || '/teacher';
+ INSERT INTO lab.organization_members(organization_id,user_id,role,status) VALUES(org,human,'owner','active');
  INSERT INTO lab.provider_human_approvals
  (approval_id,organization_id,permanent_artifact_id,provider_id,capability,
   harness_run_id,action_id,secret_reference,action_digest,expires_at,approved_by)
@@ -35,6 +36,23 @@ BEGIN
  SELECT lab.consume_provider_human_approval('approve-1',org,artifact,
   'provider-a','teacher.invoke','run-1','action-1',ref,dig) INTO ok;
  IF ok THEN RAISE EXCEPTION 'FAIL: replay accepted'; END IF;
+ UPDATE lab.organization_members SET status='removed' WHERE organization_id=org AND user_id=human;
+ INSERT INTO lab.provider_human_approvals
+ (approval_id,organization_id,permanent_artifact_id,provider_id,capability,
+  harness_run_id,action_id,secret_reference,action_digest,expires_at,approved_by)
+ VALUES('approve-3',org,artifact,'provider-a','teacher.invoke','run-1','action-3',
+  ref,dig,clock_timestamp()+interval '1 hour',human);
+ SELECT lab.consume_provider_human_approval('approve-3',org,artifact,
+  'provider-a','teacher.invoke','run-1','action-3',ref,dig) INTO ok;
+ IF ok THEN RAISE EXCEPTION 'FAIL: removed approver accepted'; END IF;
+ UPDATE lab.organization_members SET status='active', role='member' WHERE organization_id=org AND user_id=human;
+ SELECT lab.consume_provider_human_approval('approve-3',org,artifact,
+  'provider-a','teacher.invoke','run-1','action-3',ref,dig) INTO ok;
+ IF ok THEN RAISE EXCEPTION 'FAIL: non-admin approver accepted'; END IF;
+ UPDATE lab.organization_members SET role='admin' WHERE organization_id=org AND user_id=human;
+ SELECT lab.consume_provider_human_approval('approve-3',org,artifact,
+  'provider-a','teacher.invoke','run-1','action-3',ref,dig) INTO ok;
+ IF NOT ok THEN RAISE EXCEPTION 'FAIL: restored admin approver rejected'; END IF;
  IF (SELECT consumed_at IS NULL FROM lab.provider_human_approvals
   WHERE approval_id='approve-1') THEN RAISE EXCEPTION 'FAIL: consumption not persisted'; END IF;
  INSERT INTO lab.provider_human_approvals

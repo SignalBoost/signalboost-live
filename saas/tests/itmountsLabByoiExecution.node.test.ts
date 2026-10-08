@@ -36,3 +36,31 @@ test('forged org A grant pointing to org B secret never reaches vault or provide
   await assert.rejects(executeLabByoi(request,host),/lab_byoi_scope_denied/)
   assert.deepEqual(calls,['load:org-a'])
 })
+
+test('provider grant lookup cannot mutate the destination tenant or artifact between check and invoke',async()=>{
+  const original={...request}
+  const received:string[]=[]
+  const host={
+    async loadGrant(scoped:ScopedProviderRequest){
+      received.push('grant:'+scoped.organizationId+':'+scoped.artifactId)
+      original.organizationId='org-b'
+      original.artifactId='artifact-b'
+      try {(scoped as any).organizationId='org-b'}catch{}
+      return grant
+    },
+    async resolveSecret(reference:string){
+      assert.equal(reference,'vault://org-a/teacher')
+      received.push('vault')
+      return 'private-key'
+    },
+    async invokeProvider({request:scoped}:{request:ScopedProviderRequest}){
+      assert.equal(Object.isFrozen(scoped),true)
+      assert.equal(scoped.organizationId,'org-a')
+      assert.equal(scoped.artifactId,'artifact-a')
+      received.push('invoke:'+scoped.organizationId+':'+scoped.artifactId)
+      return {receiptId:'safe'}
+    },
+  }
+  assert.deepEqual(await executeLabByoi(original,host),{receiptId:'safe'})
+  assert.deepEqual(received,['grant:org-a:artifact-a','vault','invoke:org-a:artifact-a'])
+})

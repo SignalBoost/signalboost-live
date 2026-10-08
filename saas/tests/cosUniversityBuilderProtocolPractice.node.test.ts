@@ -157,11 +157,10 @@ test('rows are deterministic: the same failures always produce the same rows and
   assert.equal(first.taskIds.length, BUILDER_PROTOCOL_PRACTICE_TASKS_PER_RUN)
 })
 
-test('selection aims at failing competencies breadth first, then covers the rest', () => {
-  const chosen = selectBuilderProtocolPracticeTasks({ priorityCompetencies: ['supabase_diagnosis', 'rollback_judgment', 'not_a_competency'], maxTasks: 10 })
-  assert.deepEqual(chosen.slice(0, 2).map(item => item.competencyId), ['supabase_diagnosis', 'rollback_judgment'])
-  assert.deepEqual(chosen.slice(2, 4).map(item => item.competencyId), ['supabase_diagnosis', 'rollback_judgment'])
-  assert.deepEqual(chosen.slice(4, 6).map(item => item.competencyId), ['supabase_diagnosis', 'rollback_judgment'])
+test('selection gives the leading failing competency its whole set, then the other failures breadth first, then the rest', () => {
+  const chosen = selectBuilderProtocolPracticeTasks({ priorityCompetencies: ['supabase_diagnosis', 'rollback_judgment', 'chrome_devtools_evidence', 'not_a_competency'], maxTasks: 10 })
+  assert.deepEqual(chosen.slice(0, 3).map(item => item.competencyId), ['supabase_diagnosis', 'supabase_diagnosis', 'supabase_diagnosis'])
+  assert.deepEqual(chosen.slice(3, 7).map(item => item.competencyId), ['rollback_judgment', 'chrome_devtools_evidence', 'rollback_judgment', 'chrome_devtools_evidence'])
   assert.equal(new Set(chosen.map(item => item.taskId)).size, 10)
   const none = selectBuilderProtocolPracticeTasks({ priorityCompetencies: [], maxTasks: 13 })
   assert.deepEqual([...new Set(none.map(item => item.competencyId))].sort(), [...BUILDER_RESIDENCY_V1_COMPETENCIES].sort())
@@ -213,8 +212,8 @@ test('only Computer Science runs carry practice, aimed at skill failures recorde
     lte: ['created_at', '2026-10-06T08:00:00.000Z'], order: ['created_at', 'id'], from: 0, to: 999,
   })
   assert.equal(practice.evidenceRows, 3)
-  assert.deepEqual(practice.priorityCompetencies, ['chrome_devtools_evidence', 'rollback_judgment'])
-  assert.ok(practice.taskIds[0].startsWith('cde-') && practice.taskIds[1].startsWith('rj-'))
+  assert.deepEqual(practice.priorityCompetencies, ['rollback_judgment', 'chrome_devtools_evidence'])
+  assert.ok(practice.taskIds.slice(0, 3).every(id => id.startsWith('rj-')) && practice.taskIds[3].startsWith('cde-'))
   // A retry of the same run, after more failures were recorded, rebuilds the identical rows.
   const retry = await builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', evidenceCutoff: '2026-10-06T08:00:00Z', db })
   assert.equal(retry?.envelope.rowsHash, practice.envelope.rowsHash)
@@ -235,7 +234,23 @@ test('failure evidence is read completely, page by page, before competencies are
   const practice = await builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', evidenceCutoff: '2026-10-06T00:00:00Z', db })
   assert.equal(practice?.evidenceRows, 2_500)
   assert.deepEqual(reads.map(read => [read.from, read.to]), [[0, 999], [1_000, 1_999], [2_000, 2_999]])
-  assert.deepEqual(practice?.priorityCompetencies, ['supabase_diagnosis', 'rollback_judgment'])
+  assert.deepEqual(practice?.priorityCompetencies, ['rollback_judgment', 'supabase_diagnosis'])
+})
+
+test('the competency residents are failing now leads, even when others have more failures on record', async () => {
+  // Production 2026-10-08: residents had stopped failing root_cause_diagnosis and typescript_nextjs_repair, but their
+  // older failures still outnumbered the current ones, and test_and_regression_construction got one practice task.
+  const rows = [
+    ...Array.from({ length: 30 }, (_, index) => ({ competency_id: index % 2 ? 'root_cause_diagnosis' : 'typescript_nextjs_repair', outcome: 'fail', created_at: new Date(Date.UTC(2026, 9, 1) + index * 60_000).toISOString() })),
+    ...Array.from({ length: 6 }, (_, index) => ({ competency_id: 'test_and_regression_construction', outcome: 'fail', created_at: new Date(Date.UTC(2026, 9, 7) + index * 60_000).toISOString() })),
+  ]
+  const { db } = evidenceStore(rows)
+  const practice = await builderProtocolPracticeForRun({ subjectId: 'Computer Science & Coding', evidenceCutoff: '2026-10-08T00:00:00Z', db })
+  assert.equal(practice?.priorityCompetencies[0], 'test_and_regression_construction')
+  const regression = BUILDER_PROTOCOL_PRACTICE_TASKS.filter(item => item.competencyId === 'test_and_regression_construction').map(item => item.taskId)
+  assert.equal(regression.length, 3)
+  assert.deepEqual(practice?.taskIds.slice(0, 3), regression)
+  assert.equal(practice?.taskIds.length, BUILDER_PROTOCOL_PRACTICE_TASKS_PER_RUN)
 })
 
 test('the dispatch pins practice to the run and binds its hash; the durable receipt keeps its provenance', () => {

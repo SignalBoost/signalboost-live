@@ -6,6 +6,8 @@ on:
       - '.github/workflows/lab-phase3-tenant-acceptance.yml'
       - 'saas/tests/sql/lab-phase3-two-tenants-acceptance.sql'
       - 'saas/tests/sql/lab-phase3-membership-acceptance.sql'
+      - 'saas/tests/sql/lab-phase3-trusted-records-acceptance.sql'
+      - 'saas/supabase/migrations/20261008033500_lab_phase3_trusted_consent_provider_grants.sql'
       - 'saas/supabase/migrations/20261007223926_lab_customer_tenant_membership.sql'
       - 'saas/supabase/migrations/20261006190000_itmounts_lab_tenancy_credit_ledger.sql'
       - 'saas/supabase/migrations/20261006210000_lab_experiment_budget_enforcement.sql'
@@ -74,3 +76,9 @@ jobs:
       - name: Verify cross-tenant membership and removed administrator denials
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-phase3-membership-acceptance.sql
+      - name: Install private Phase 3 consent and BYOI grant records
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008033500_lab_phase3_trusted_consent_provider_grants.sql
+      - name: Verify cross-organization consent and provider grant denials
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-phase3-trusted-records-acceptance.sql

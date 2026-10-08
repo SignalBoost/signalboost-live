@@ -79,3 +79,13 @@ test('grant, vault and provider errors are sanitized with no original secret in 
    })
  }
 })
+
+test('malformed provider receipt cannot echo arbitrary payload or secret text',async()=>{
+ const {host}=setup(grant)
+ host.invokeProvider=async()=>({receiptId:'provider says: secret=do-not-share\nAuthorization: Bearer abc'})
+ await assert.rejects(executeLabByoi(request,host),(e:unknown)=>{
+   assert.equal((e as Error).message,'lab_byoi_receipt_missing')
+   assert.equal((e as Error).message.includes('Bearer'),false)
+   return true
+ })
+})

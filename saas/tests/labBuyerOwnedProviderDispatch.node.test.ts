@@ -48,7 +48,7 @@ test('Phase 3: changed vault path between grant reads blocks execution',async()=
 test('Phase 3: async grant callback cannot retarget the governed action ID',async()=>{
  const s=setup()
  const observed:string[]=[]
- const input={
+ const input: typeof s.input={
   ...s.input,
   readGrant:async()=>{input.actionId='injected-action';return grant},
   executor:{execute:async(_m,action)=>{

@@ -24,6 +24,7 @@ const tests = [
   'tests/itmountsLabUniversityExecution.node.test.ts',
   // Phase 5 design-partner evidence intake must fail closed before independent review.
   'tests/labPhase5PartnerIntake.node.test.ts',
+  'tests/labPhase5SignedReview.node.test.ts',
   'tests/itmountsLabEgressPolicy.node.test.ts',
   'tests/itmountsLabEgressExecution.node.test.ts',
   'tests/itmountsLabByoiScope.node.test.ts',

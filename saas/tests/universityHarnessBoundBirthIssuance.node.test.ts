@@ -56,5 +56,8 @@ test('revocation after read prevents persistence',async()=>{
    calls++; return {manifest,status:calls===1?'active' as const:'cancelled' as const,authorityVerified:true}
  }})
  assert.equal(outcome,'not_authorized')
+ // Storage must be refused, but on this base branch signing already occurred.
+ // PR #3830 is required to eliminate the earlier signing window.
+ assert.equal(s.stats().signing,1)
  assert.equal(s.stats().writes,0)
 })

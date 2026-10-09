@@ -34,5 +34,5 @@ export const pressMediaManifest: PortableProductManifest = Object.freeze({
   architectureReferences: Object.freeze(['press-media-core', 'press-media-host']),
   documentationReferences: Object.freeze(['docs/portables/press-media-portable-design.md']),
   futureFeatures: Object.freeze(['marketplace-distribution-connectors']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

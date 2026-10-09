@@ -27,7 +27,7 @@ test('homepage status, routes, and localization remain supported', () => {
   assert.ok(products.filter(product => product.manifest.status === 'preview').every(product => product.manifest.status === 'preview'))
   assert.equal(products.find(product => product.manifest.productId === 'campaign-studio')?.route, '/agency')
   assert.ok(products.filter(product => product.manifest.status === 'preview' && !product.route).every(product => !product.route))
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) for (const product of products) assert.ok(locales[language].portables[product.localizationKey]?.name && locales[language].portables[product.localizationKey]?.desc)
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) for (const product of products) assert.ok(locales[language].portables[product.localizationKey]?.name && locales[language].portables[product.localizationKey]?.desc)
 })
 
 test('homepage source contains no inline English UI fallbacks', () => {
@@ -51,7 +51,7 @@ test('homepage source contains no inline English UI fallbacks', () => {
 })
 
 test('homepage operational labels exist in every supported language', () => {
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     const copy = HOMEPAGE_UI_LOCALES[language]
     assert.equal(typeof copy?.languages, 'object')
     assert.equal(typeof copy?.stats, 'object')

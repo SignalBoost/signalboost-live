@@ -1,16 +1,21 @@
-name: i18n expansion readiness
+# .github/workflows/i18n-expansion-readiness.yml
+name: i18n eleven-language platform
 on:
   pull_request:
     paths:
       - 'saas/lib/i18n/**'
       - 'saas/components/i18n/**'
-      - 'saas/scripts/check-language-expansion-readiness.mjs'
+      - 'saas/scripts/check-eleven-language-platform.mjs'
       - 'saas/scripts/check-eleven-language-coverage.mjs'
-      - 'saas/scripts/audit-pending-locale-structure.mjs'
+      - 'saas/scripts/audit-locale-structure.mjs'
       - 'saas/scripts/inventory-app-router-i18n.mjs'
+      - 'saas/scripts/generated-ui-locale-utils.mjs'
       - 'saas/app/**'
       - 'saas/components/**'
       - 'saas/locales/*.json'
+      - 'saas/public/i18n/*.json'
+      - 'saas/marketing-sales-core/i18n/**'
+      - 'saas/components/LanguageSuggestion.tsx'
       - 'saas/scripts/export-eleven-language-translation-packages.mjs'
       - 'saas/scripts/check-translation-package-export.mjs'
       - 'saas/scripts/check-translated-package-negative-fixtures.mjs'
@@ -20,11 +25,9 @@ on:
       - 'saas/scripts/translate-pending-language-packages.mjs'
       - 'saas/scripts/check-translation-engine-safety.mjs'
       - 'saas/scripts/check-six-language-batch-e2e.mjs'
-      - 'saas/scripts/check-five-language-platform.mjs'
-      - 'saas/components/LanguageSuggestion.tsx'
-      - 'saas/lib/i18n/pageLocales.ts'
-      - 'saas/locales/pages.*.json'
       - 'saas/tests/sixLanguageCampaignPages.node.test.ts'
+      - 'saas/tests/navbarLanguageOptions.node.test.ts'
+      - 'saas/tests/platformElevenLanguageI18n.node.test.ts'
       - '.github/workflows/i18n-expansion-readiness.yml'
 jobs:
   ensure-safe-expansion:
@@ -37,20 +40,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Protect existing five-language production contract
-        run: node scripts/check-five-language-platform.mjs
-      - name: Check six-language roadmap and Arabic direction
-        run: node scripts/check-language-expansion-readiness.mjs
-      - name: Report eleven-language catalog gaps without claiming release readiness
-        run: node scripts/check-eleven-language-coverage.mjs
-      - name: Audit exact key types and interpolation tokens across all nine locale stores
-        run: node scripts/audit-pending-locale-structure.mjs --report .i18n-evidence/six-locale-structure.json
-      - name: Upload exact locale gap evidence
+      - name: Enforce the eleven-language production contract
+        run: node scripts/check-eleven-language-platform.mjs
+      - name: Require complete coverage for every active language
+        run: node scripts/check-eleven-language-coverage.mjs --require-all
+      - name: Audit exact keys, types and interpolation tokens across all locale stores
+        run: node scripts/audit-locale-structure.mjs --report .i18n-evidence/locale-structure.json
+      - name: Upload locale structure evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eleven-language-readiness-evidence
-          path: saas/.i18n-evidence/six-locale-structure.json
+          name: eleven-language-structure-evidence
+          path: saas/.i18n-evidence/locale-structure.json
           if-no-files-found: warn
       - name: Inventory actual routes for full-site localization work
         run: node scripts/inventory-app-router-i18n.mjs --report .i18n-evidence/app-route-inventory.json
@@ -61,15 +62,12 @@ jobs:
           name: i18n-app-route-inventory
           path: saas/.i18n-evidence/app-route-inventory.json
           if-no-files-found: warn
-      - name: Verify source translation packages for six pending languages
-        run: node scripts/check-translation-package-export.mjs
-      - name: Reject incomplete and omitted locale catalogs
-        run: node scripts/check-translated-package-negative-fixtures.mjs
-      - name: Reject unreviewed package imports and partial catalog writes
-        run: node scripts/check-reviewed-package-import.mjs
-      - name: Verify six translated campaign-page catalogs
-        run: node --test tests/sixLanguageCampaignPages.node.test.ts
-      - name: Verify translator opt-in safety offline
-        run: node scripts/check-translation-engine-safety.mjs
-      - name: Execute all six locale batches against offline mocked provider
-        run: node scripts/check-six-language-batch-e2e.mjs
+      - name: Verify language picker, public campaign pages and platform language tests
+        run: node --test tests/navbarLanguageOptions.node.test.ts tests/sixLanguageCampaignPages.node.test.ts tests/platformElevenLanguageI18n.node.test.ts
+      - name: Verify translation-package export, reviewed import and draft engine tooling
+        run: |
+          node scripts/check-translation-package-export.mjs
+          node scripts/check-translated-package-negative-fixtures.mjs
+          node scripts/check-reviewed-package-import.mjs
+          node scripts/check-translation-engine-safety.mjs
+          node scripts/check-six-language-batch-e2e.mjs

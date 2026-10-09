@@ -1,7 +1,8 @@
 # Internationalization (i18n) Guide
 
-The app ships in **five languages** — English (`en`), Spanish (`es`), Portuguese
-(`pt`), Polish (`pl`), and Russian (`ru`) — with an English-fallback design: any
+The app ships in **eleven languages** — English (`en`), Spanish (`es`), Portuguese
+(`pt`), Polish (`pl`), Russian (`ru`), German (`de`), French (`fr`), Italian (`it`),
+Japanese (`ja`), Korean (`ko`), and Arabic (`ar`, right-to-left) — with an English-fallback design: any
 key missing from a target language automatically falls back to English, so a
 partial translation never renders a blank string.
 
@@ -41,8 +42,8 @@ translate later without breaking the UI.
 
 | File | Contents |
 |---|---|
-| `locales/en.json`, `es.json`, `pt.json`, `pl.json`, `ru.json` | The main per-language dictionaries (lazy-loaded). `en.json` is canonical. |
-| `lib/i18n/consoleLocales.json` | The **console** namespace — one JSON file with all five languages, so the Hub Console is translated by editing string values in one place. |
+| `locales/en.json`, `es.json`, `pt.json`, `pl.json`, `ru.json`, `de.json`, `fr.json`, `it.json`, `ja.json`, `ko.json`, `ar.json` | The main per-language dictionaries (lazy-loaded). `en.json` is canonical. |
+| `lib/i18n/consoleLocales.json` | The **console** namespace — one JSON file with all eleven languages, so the Hub Console is translated by editing string values in one place. |
 | `lib/i18n/onboardingLocales.json` | The **onboarding** namespace — same single-file, all-languages pattern. |
 | `lib/i18n/loadLanguage.ts` | Loader + English-fallback merge. |
 | `lib/i18n/t.ts` | The `t(dict, path, fallback)` lookup. |

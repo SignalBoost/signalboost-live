@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 type GroupId = 'free' | 'growth' | 'office'
 type ItemId =
   | 'websiteOptimizer'
@@ -73,10 +73,46 @@ const COPY: Record<Lang, Copy> = {
     groups: { free: 'Бесплатные инструменты', growth: 'Marketing + Sales', office: 'Офис' },
     items: { websiteOptimizer: 'Website Optimizer', repoCheck: 'Repo / Аудит', agencyEngine: 'Agency Engine', promoteBusiness: 'Promote Business', outreach: 'Outreach', calendar: 'Calendar', spreadsheets: 'Spreadsheets' },
   },
+  de: {
+    intro: 'Schnellzugriff vor der Registrierung',
+    gated: 'mehr erfahren',
+    groups: { free: 'Kostenlose Tools', growth: 'Marketing + Vertrieb', office: 'Office-Tools' },
+    items: { websiteOptimizer: 'Website-Optimierer', repoCheck: `${'Repo-Prüfung'} / ${'Audit-Konsole'}`, agencyEngine: 'Agentur-Engine', promoteBusiness: 'Unternehmen bewerben', outreach: 'Outreach', calendar: 'Kalender', spreadsheets: 'Tabellen' },
+  },
+  fr: {
+    intro: 'Accès rapide avant l\'inscription',
+    gated: 'en savoir plus',
+    groups: { free: 'Outils gratuits', growth: 'Marketing + Ventes', office: 'Outils bureautiques' },
+    items: { websiteOptimizer: 'Optimiseur de site web', repoCheck: `${'Vérification du dépôt'} / ${'Console d\'audit'}`, agencyEngine: 'Moteur d’agence', promoteBusiness: 'Promouvoir l’entreprise', outreach: 'Prospection', calendar: 'Calendrier', spreadsheets: 'Feuilles de calcul' },
+  },
+  it: {
+    intro: 'Accesso rapido prima della registrazione',
+    gated: 'scopri di più',
+    groups: { free: 'Strumenti gratuiti', growth: 'Marketing + Vendite', office: 'Strumenti per l’ufficio' },
+    items: { websiteOptimizer: 'Ottimizzatore di siti web', repoCheck: `${'Controllo repository'} / ${'Console di audit'}`, agencyEngine: 'Motore agenzia', promoteBusiness: 'Promuovi l’attività', outreach: 'Outreach', calendar: 'Calendario', spreadsheets: 'Fogli di calcolo' },
+  },
+  ja: {
+    intro: '登録前のクイックアクセス',
+    gated: '詳細',
+    groups: { free: '無料ツール', growth: 'マーケティング + 営業', office: 'オフィスツール' },
+    items: { websiteOptimizer: 'ウェブサイト最適化', repoCheck: `${'リポジトリチェック'} / ${'監査コンソール'}`, agencyEngine: 'エージェンシーエンジン', promoteBusiness: 'ビジネスを宣伝', outreach: 'アウトリーチ', calendar: 'カレンダー', spreadsheets: 'スプレッドシート' },
+  },
+  ko: {
+    intro: '가입 전 빠른 액세스',
+    gated: '자세히 알아보기',
+    groups: { free: '무료 도구', growth: '마케팅 + 영업', office: '오피스 도구' },
+    items: { websiteOptimizer: '웹사이트 최적화 도구', repoCheck: `${'저장소 검사'} / ${'감사 콘솔'}`, agencyEngine: '에이전시 엔진', promoteBusiness: '비즈니스 홍보', outreach: '아웃리치', calendar: '캘린더', spreadsheets: '스프레드시트' },
+  },
+  ar: {
+    intro: 'وصول سريع قبل التسجيل',
+    gated: 'اعرف المزيد',
+    groups: { free: 'أدوات مجانية', growth: 'التسويق + المبيعات', office: 'أدوات المكتب' },
+    items: { websiteOptimizer: 'مُحسِّن المواقع الإلكترونية', repoCheck: `${'فحص المستودع'} / ${'وحدة تحكم التدقيق'}`, agencyEngine: 'محرك الوكالة', promoteBusiness: 'الترويج للنشاط التجاري', outreach: 'التواصل', calendar: 'التقويم', spreadsheets: 'جداول البيانات' },
+  },
 }
 
 function activeLang(lang: string): Lang {
-  return (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
+  return (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as Lang
 }
 
 export default function PublicServiceWindowNav() {

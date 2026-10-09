@@ -7,7 +7,7 @@ const footer = read('components/Footer.tsx')
 const baseline = JSON.parse(read('scripts/i18n-hardcoded-baseline.json'))
 
 for (const [name, source] of [['Header', header], ['Footer', footer]]) {
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     assert.match(source, new RegExp(`\\b${language}:\\s*\\{`), `${name} is missing ${language} copy`)
   }
   assert.doesNotMatch(source, /\bt\(dict,/, `${name} still uses an English fallback`)

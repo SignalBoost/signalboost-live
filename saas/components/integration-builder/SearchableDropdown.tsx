@@ -12,6 +12,12 @@ const COPY = {
   pt: { select: 'Selecione uma opção', search: 'Pesquisar metadados', done: 'Concluído' },
   pl: { select: 'Wybierz opcję', search: 'Szukaj metadanych', done: 'Gotowe' },
   ru: { select: 'Выберите вариант', search: 'Поиск метаданных', done: 'Готово' },
+  de: { select: 'Option auswählen', search: 'Suchmetadaten', done: 'Fertig' },
+  fr: { select: 'Sélectionnez une option', search: 'Métadonnées de recherche', done: 'Terminé' },
+  it: { select: 'Seleziona un\'opzione', search: 'Metadati di ricerca', done: 'Fatto' },
+  ja: { select: 'オプションを選択', search: '検索メタデータ', done: '完了' },
+  ko: { select: '옵션을 선택하세요', search: '검색 메타데이터', done: '완료' },
+  ar: { select: 'اختر خيارًا', search: 'البيانات الوصفية للبحث', done: 'تم' },
 } as const
 
 export default function SearchableDropdown({ label, options, value, onChange, placeholder, multiple = false }: { label: string; options: Option[]; value: string | string[]; onChange: (value: string | string[]) => void; placeholder?: string; multiple?: boolean }) {

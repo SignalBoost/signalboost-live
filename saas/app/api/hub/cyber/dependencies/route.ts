@@ -66,6 +66,48 @@ function cyberPlanCopy(lang: ReportLang) {
       validation: ['Подтвердите рекомендуемую исправленную версию для каждого затронутого пакета.', 'Обновите package.json и lockfile в отдельной ветке.', 'Запустите npm install или эквивалентный менеджер пакетов проекта.', 'Запустите npm run build и доступные команды test/lint.', 'Вручную проверьте diff перед открытием или слиянием pull request.'],
       requestTitle: (repo: string) => `План исправления зависимостей: ${repo}`,
     },
+    de: {
+      title: (repo: string) => `Korrekturplan für ${repo}`,
+      updateAction: (target: string) => `Aktualisieren Sie diese Abhängigkeit auf ${target}, generieren Sie die Lockfile neu und führen Sie vor dem Deployment Build und Tests aus.`,
+      confirmAction: 'Bestätigen Sie die kompatible, gepatchte Version, aktualisieren Sie diese Abhängigkeit, generieren Sie die Lockfile neu und führen Sie vor dem Deployment Build und Tests aus.',
+      validation: ['Bestätigen Sie die empfohlene gepatchte Version für jedes betroffene Paket.', 'Aktualisieren Sie package.json und die Lockfile in einem eigenen Branch.', 'Führen Sie npm install oder das entsprechende Kommando des Paketmanagers des Projekts aus.', 'Führen Sie npm run build und die verfügbaren Test-/Lint-Befehle aus.', 'Prüfen Sie den Diff manuell, bevor Sie einen Pull Request öffnen oder mergen.'],
+      requestTitle: (repo: string) => `Plan zur Behebung von Abhängigkeiten: ${repo}`,
+    },
+    fr: {
+      title: (repo: string) => `Plan de correction pour ${repo}`,
+      updateAction: (target: string) => `Mettez à jour cette dépendance vers ${target}, régénérez le lockfile et exécutez la compilation et les tests avant le déploiement.`,
+      confirmAction: 'Confirmez la version corrigée compatible, mettez à jour cette dépendance, régénérez le lockfile et exécutez la compilation et les tests avant le déploiement.',
+      validation: ['Confirmez la version corrigée recommandée pour chaque paquet concerné.', 'Mettez à jour package.json et le lockfile dans une branche dédiée.', 'Exécutez npm install ou l’équivalent pour le gestionnaire de paquets du projet.', 'Exécutez npm run build et les commandes de test/lint disponibles.', 'Examinez le diff manuellement avant d’ouvrir ou de fusionner une pull request.'],
+      requestTitle: (repo: string) => `Plan de remédiation des dépendances : ${repo}`,
+    },
+    it: {
+      title: (repo: string) => `Piano di correzione per ${repo}`,
+      updateAction: (target: string) => `Aggiorna questa dipendenza a ${target}, rigenera il lockfile ed esegui build e test prima del deployment.`,
+      confirmAction: 'Conferma la versione corretta compatibile, aggiorna questa dipendenza, rigenera il lockfile ed esegui build e test prima del deployment.',
+      validation: ['Conferma la versione corretta consigliata per ogni pacchetto interessato.', 'Aggiorna package.json e il lockfile in un branch dedicato.', 'Esegui npm install o l’equivalente per il gestore di pacchetti del progetto.', 'Esegui npm run build e i comandi di test/lint disponibili.', 'Controlla manualmente il diff prima di aprire o unire una pull request.'],
+      requestTitle: (repo: string) => `Piano di risoluzione delle dipendenze: ${repo}`,
+    },
+    ja: {
+      title: (repo: string) => `${repo} の修正計画`,
+      updateAction: (target: string) => `この依存関係を ${target} に更新し、lockfile を再生成して、デプロイ前にビルドとテストを実行してください。`,
+      confirmAction: '互換性のある修正済みバージョンを確認し、この依存関係を更新して lockfile を再生成し、デプロイ前にビルドとテストを実行してください。',
+      validation: ['影響を受ける各パッケージについて、推奨される修正済みバージョンを確認してください。', '専用のブランチで package.json と lockfile を更新してください。', 'npm install、またはプロジェクトのパッケージマネージャーで同等のコマンドを実行してください。', 'npm run build と、利用可能なテスト/lint コマンドを実行してください。', 'プルリクエストを作成またはマージする前に、差分を手動で確認してください。'],
+      requestTitle: (repo: string) => `依存関係の修復計画: ${repo}`,
+    },
+    ko: {
+      title: (repo: string) => `${repo} 수정 계획`,
+      updateAction: (target: string) => `이 종속성을 ${target}(으)로 업데이트하고 lockfile을 다시 생성한 뒤, 배포 전에 빌드/테스트를 실행하세요.`,
+      confirmAction: '호환되는 패치 버전을 확인하고 이 종속성을 업데이트한 다음 lockfile을 다시 생성하고, 배포 전에 빌드/테스트를 실행하세요.',
+      validation: ['영향을 받는 각 패키지의 권장 패치 버전을 확인하세요.', '전용 브랜치에서 package.json과 lockfile을 업데이트하세요.', 'npm install 또는 프로젝트 패키지 관리자의 동등한 명령을 실행하세요.', 'npm run build와 사용 가능한 테스트/lint 명령을 실행하세요.', '풀 리퀘스트를 열거나 병합하기 전에 diff를 직접 검토하세요.'],
+      requestTitle: (repo: string) => `종속성 해결 계획: ${repo}`,
+    },
+    ar: {
+      title: (repo: string) => `خطة إصلاح لـ ${repo}`,
+      updateAction: (target: string) => `حدّث هذه التبعية إلى ${target}، وأعد إنشاء ملف القفل، وشغّل البناء والاختبارات قبل النشر.`,
+      confirmAction: 'أكّد الإصدار المصحَّح المتوافق، وحدّث هذه التبعية، وأعد إنشاء ملف القفل، وشغّل البناء والاختبارات قبل النشر.',
+      validation: ['أكّد الإصدار المصحَّح الموصى به لكل حزمة متأثرة.', 'حدّث package.json وملف القفل في فرع مخصص.', 'شغّل npm install أو ما يعادله في مدير الحزم الخاص بالمشروع.', 'شغّل npm run build وأوامر الاختبار/الفحص المتاحة.', 'راجع الفروقات يدويًا قبل فتح طلب سحب أو دمجه.'],
+      requestTitle: (repo: string) => `خطة معالجة التبعيات: ${repo}`,
+    },
   }[lang]
   const policyCopy = remediationAutonomyCopy(lang)
   return { ...legacy, summary: (_count: number) => policyCopy.planSummary,

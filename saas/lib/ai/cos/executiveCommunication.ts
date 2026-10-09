@@ -1,5 +1,5 @@
 // REPO PATH: saas/lib/ai/cos/executiveCommunication.ts
-export type SupportedExecutiveLocale = 'en' | 'pt' | 'es' | 'pl' | 'ru'
+export type SupportedExecutiveLocale = 'en' | 'pt' | 'es' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 const LOCALE_ALIASES: Record<string, SupportedExecutiveLocale> = {
   en: 'en', english: 'en',
@@ -7,6 +7,12 @@ const LOCALE_ALIASES: Record<string, SupportedExecutiveLocale> = {
   es: 'es', spanish: 'es', español: 'es',
   pl: 'pl', polish: 'pl', polski: 'pl',
   ru: 'ru', russian: 'ru', русский: 'ru',
+  de: 'de', german: 'de', deutsch: 'de',
+  fr: 'fr', french: 'fr', français: 'fr', francais: 'fr',
+  it: 'it', italian: 'it', italiano: 'it',
+  ja: 'ja', japanese: 'ja', 日本語: 'ja',
+  ko: 'ko', korean: 'ko', 한국어: 'ko',
+  ar: 'ar', arabic: 'ar', العربية: 'ar',
 }
 
 export function executiveLocale(language?: string): SupportedExecutiveLocale {
@@ -51,18 +57,74 @@ const EXECUTIVE_WRITING_MODULES: Record<SupportedExecutiveLocale, string> = {
     '- В деловой переписке начинайте с ясной цели, логично выстраивайте основную часть и используйте краткое профессиональное завершение, когда оно уместно.',
     '- Повышайте качество неформального или ненативного текста до уровня руководительской коммуникации, не меняя намерение, факты, обязательства или степень уверенности.',
   ].join('\n'),
+  de: [
+    'DEUTSCHE FÜHRUNGSKOMMUNIKATION:',
+    '- Schreiben Sie wie eine gebildete, erwachsene Fachkraft: konkret, flüssig, souverän und knapp. Kein Schulaufsatz und kein zeremonieller Führungstext.',
+    '- Bevorzugen Sie Aktiv, konkrete Substantive, präzise Verben und unterschiedliche Satzlängen. Entfernen Sie Füllwörter, Wiederholungen und holprige wörtliche Formulierungen. Ersetzen Sie konkrete Bilder der Quelle nicht durch abstrakte Oberbegriffe.',
+    '- Leiten Sie bei Korrespondenz Anrede und Schluss aus der Quelle ab. Fügen Sie keine zweckorientierte Begrüßung und keinen förmlichen Abschluss hinzu, die der Verfasser nicht verwendet hat. Strukturieren Sie den Hauptteil nur so weit, wie die Argumentation es erfordert.',
+    '- Verwandeln Sie unausgereifte oder nicht muttersprachliche Eingaben in ausgefeilte Führungskommunikation, ohne die beabsichtigte Bedeutung, Fakten, Zusagen oder den Grad der Gewissheit des Nutzers zu verändern.',
+  ].join('\n'),
+  fr: [
+    'COMMUNICATION EXÉCUTIVE EN FRANÇAIS :',
+    '- Écrivez comme un professionnel adulte cultivé : précis, fluide, assuré et concis. Ni dissertation scolaire, ni discours de direction cérémonieux.',
+    '- Privilégiez la voix active, les noms concrets, les verbes précis et des phrases de longueur variée. Supprimez le remplissage, les répétitions et les tournures littérales maladroites. Ne remplacez pas les images concrètes de la source par des termes de catégorie abstraits.',
+    '- Pour la correspondance, déduisez l’ouverture et la formule de clôture de la source. N’ajoutez pas de salutation axée sur l’objectif ni de clôture formelle que l’auteur n’a pas utilisées. N’organisez le corps du texte que dans la mesure où l’argumentation l’exige.',
+    '- Transformez un texte brut ou rédigé par un non-natif en communication de direction soignée, sans modifier le sens voulu, les faits, les engagements ni le degré de certitude de l’utilisateur.',
+  ].join('\n'),
+  it: [
+    'COMUNICAZIONE EXECUTIVE IN ITALIANO:',
+    '- Scrivi come un professionista adulto e colto: specifico, scorrevole, sicuro ed essenziale. Non un tema scolastico né un testo di leadership celebrativo.',
+    '- Preferisci la forma attiva, sostantivi concreti, verbi precisi e frasi di lunghezza variabile. Elimina riempitivi, ripetizioni e formulazioni letterali goffe. Non sostituire le immagini concrete della fonte con termini astratti di categoria.',
+    '- Nella corrispondenza, ricava apertura e chiusura dalla fonte. Non aggiungere un saluto orientato allo scopo o una chiusura formale che l’autore non ha usato. Organizza il corpo solo quanto richiesto dall’argomentazione.',
+    '- Trasforma testi grezzi o scritti da non madrelingua in una comunicazione di leadership curata, senza modificare il significato inteso, i fatti, gli impegni o il grado di certezza dell’utente.',
+  ].join('\n'),
+  ja: [
+    '日本語のエグゼクティブコミュニケーション：',
+    '- 教養のある成人のプロフェッショナルとして書いてください。具体的で、流暢で、自信があり、簡潔に。学校の作文や儀礼的なリーダーシップ文書にはしないでください。',
+    '- 能動態、具体的な名詞、正確な動詞、変化のある文の長さを優先してください。冗長な表現、繰り返し、不自然な直訳調の言い回しを取り除いてください。原文の具体的なイメージを抽象的なカテゴリー語に置き換えないでください。',
+    '- 書簡では、書き出しと結びを原文から判断してください。書き手が使っていない目的重視の挨拶や改まった結びを加えないでください。本文の構成は論旨に必要な範囲にとどめてください。',
+    '- 粗い文章や非ネイティブの入力を、ユーザーの意図、事実、約束、確信の度合いを変えずに、洗練されたリーダーシップコミュニケーションへと高めてください。',
+  ].join('\n'),
+  ko: [
+    '한국어 경영진 커뮤니케이션:',
+    '- 교양 있는 성인 전문가처럼 작성하세요. 구체적이고 유창하며 자신감 있고 간결하게 씁니다. 학교 작문이나 의례적인 리더십 문구처럼 쓰지 마세요.',
+    '- 능동태, 구체적인 명사, 정확한 동사, 다양한 문장 길이를 우선하세요. 군더더기, 반복, 어색한 직역 표현을 제거하세요. 원문의 구체적인 이미지를 추상적인 범주어로 바꾸지 마세요.',
+    '- 서신에서는 시작과 맺음말을 원문에서 유추하세요. 작성자가 사용하지 않은 목적 중심의 인사말이나 격식 있는 맺음말을 추가하지 마세요. 본문은 논지에 필요한 만큼만 구성하세요.',
+    '- 다듬어지지 않았거나 비원어민이 작성한 입력을 사용자의 의도, 사실, 약속, 확신의 정도를 바꾸지 않고 세련된 리더십 커뮤니케이션으로 끌어올리세요.',
+  ].join('\n'),
+  ar: [
+    'التواصل التنفيذي باللغة العربية:',
+    '- اكتب كمحترف بالغ ومثقف: محدد وسلس وواثق وموجز. لا تكتب كأنه موضوع إنشاء مدرسي ولا كخطاب قيادي احتفالي.',
+    '- فضّل صيغة المبني للمعلوم والأسماء الملموسة والأفعال الدقيقة وتنويع أطوال الجمل. احذف الحشو والتكرار والصياغات الحرفية الركيكة. لا تستبدل الصور الملموسة في المصدر بكلمات فئوية مجردة.',
+    '- في المراسلات، استنتج الافتتاحية والخاتمة من المصدر. لا تُضف تحية تركز على الغرض أو خاتمة رسمية لم يستخدمها الكاتب. نظّم متن الرسالة بالقدر الذي تتطلبه الحجة فقط.',
+    '- ارتقِ بالنصوص الأولية أو المكتوبة من غير الناطقين الأصليين إلى تواصل قيادي مصقول دون تغيير المعنى الذي يقصده المستخدم أو الحقائق أو الالتزامات أو درجة اليقين.',
+  ].join('\n'),
 }
 
 export function executiveWritingModule(language?: string): string {
   return EXECUTIVE_WRITING_MODULES[executiveLocale(language)]
 }
 
+const TRANSLATION_TARGET_NAMES: Record<SupportedExecutiveLocale, string> = {
+  en: 'English',
+  pt: 'Brazilian Portuguese',
+  es: 'Spanish',
+  pl: 'Polish',
+  ru: 'Russian',
+  de: 'German',
+  fr: 'French',
+  it: 'Italian',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ar: 'Arabic',
+}
+
 export function multilingualTranslationQualityRule(language?: string): string {
   const locale = executiveLocale(language)
-  const fallbackTarget = locale === 'pt' ? 'Brazilian Portuguese' : locale === 'es' ? 'Spanish' : locale === 'pl' ? 'Polish' : locale === 'ru' ? 'Russian' : 'English'
+  const fallbackTarget = TRANSLATION_TARGET_NAMES[locale]
   return [
     'MULTILINGUAL QUALITY:',
-    '- Supported languages are English, Brazilian Portuguese, Spanish, Polish, and Russian.',
+    '- Supported languages are English, Brazilian Portuguese, Spanish, Polish, Russian, German, French, Italian, Japanese, Korean, and Arabic.',
     '- For editing/rewrite work, preserve the source language unless the user explicitly requests another language.',
     `- For translation, use the target language named by the user; if none is named, use the interface language (${fallbackTarget}).`,
     '- Translate meaning and register, not word-for-word syntax. Preserve nuance, names, numbers, dates, terminology, commitments, and degree of certainty.',

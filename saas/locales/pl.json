@@ -385,7 +385,7 @@
       "analyzedSource": "Przeanalizowane źródło"
     },
     "placeholders": {
-      "sourceUrl": "https://przyklad.com lub https://github.com/org/repo",
+      "sourceUrl": "https://example.com lub https://github.com/org/repo",
       "searchOptions": "Szukaj opcji",
       "selectOption": "Wybierz opcję",
       "selectMany": "Wybierz jedną lub więcej opcji"
@@ -638,7 +638,13 @@
       "pt": "Português",
       "es": "Español",
       "pl": "Polski",
-      "ru": "Русский"
+      "ru": "Русский",
+      "de": "Deutsch",
+      "fr": "Français",
+      "it": "Italiano",
+      "ja": "日本語",
+      "ko": "한국어",
+      "ar": "العربية"
     },
     "publicTools": {
       "label": "Narzędzia publiczne",
@@ -3352,7 +3358,7 @@
     "u_f45198e459f8516b": "Użytkownicy wersji bezpłatnej lub demonstracyjnej mogą odtwarzać tylko podgląd. Uaktualnij, aby eksportować.",
     "u_5fa206e85ecfbf38": "Nadwyżka:",
     "u_f1c65341b8172c5f": "dodatkowe minuty o godz",
-    "u_d1eae51ccd25a84d": "/min. SignalBoost will open a billing session before rendering.",
+    "u_d1eae51ccd25a84d": "/min. SignalBoost otworzy sesję rozliczeniową przed renderowaniem.",
     "u_56b564b75c7fdb48": "Szablony",
     "u_02a92943466e7958": "Punkty początkowe w stylu Canvy",
     "u_6da87f3748b4df1e": "Oś czasu napisów",
@@ -4084,7 +4090,7 @@
     "viewPricing": "Zobacz ceny",
     "unifiedAria": "Podgląd szkieletu pulpitu nawigacyjnego ujednoliconego SaaS",
     "sidebarAria": "Nawigacja w module SaaS",
-    "i18nStatus": "i18n online: EN · ES · PT · PL · RU",
+    "i18nStatus": "i18n online: EN · ES · PT · PL · RU · DE · FR · IT · JA · KO · AR",
     "kicker": "Modele szkieletowe kokpitu SaaS",
     "title": "Konsola kokpitu do obsługi narzędzi biurowych i przepływu pracy asystentów",
     "subtitle": "Responsywny system dashboardów z kartami telemetrycznymi, nawigacją przyjazną klawiaturze, szklanymi panelami i podglądami modułów gotowymi do zatwierdzenia przed kodowaniem produkcyjnym.",

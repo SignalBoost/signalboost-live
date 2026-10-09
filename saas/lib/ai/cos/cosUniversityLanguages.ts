@@ -1,7 +1,7 @@
 import type { CosUniversityAssessmentKind, CosUniversityGrade } from './cosUniversity.ts'
 
-/** The five first-class SignalBoost platform languages. */
-export type CosPlatformLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+/** The eleven first-class SignalBoost platform languages. */
+export type CosPlatformLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 export type CosPlatformLanguageDefinition = {
   id: CosPlatformLanguage
@@ -30,6 +30,12 @@ export const COS_PLATFORM_LANGUAGES: ReadonlyArray<CosPlatformLanguageDefinition
   { id: 'pt', title: 'Portuguese', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
   { id: 'pl', title: 'Polish', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
   { id: 'ru', title: 'Russian', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
+  { id: 'de', title: 'German', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
+  { id: 'fr', title: 'French', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
+  { id: 'it', title: 'Italian', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
+  { id: 'ja', title: 'Japanese', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
+  { id: 'ko', title: 'Korean', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
+  { id: 'ar', title: 'Arabic', required: true, competencyDimensions: LANGUAGE_DIMENSIONS },
 ]
 
 export type CosPlatformLanguageDimension = typeof LANGUAGE_DIMENSIONS[number]
@@ -95,7 +101,7 @@ function allDimensionsPass(
 }
 
 /**
- * A language is not averaged from the other four languages, and one strong dimension cannot hide a
+ * A language is not averaged from the other platform languages, and one strong dimension cannot hide a
  * weak one. B or higher requires a fresh independent unseen exam in every language dimension.
  * A-range grades then require transfer/Production/capstone evidence for that same language.
  */
@@ -162,7 +168,7 @@ export function buildCosPlatformLanguageTranscript(
   return COS_PLATFORM_LANGUAGES.map(language => deriveCosPlatformLanguageGrade(language.id, evidence))
 }
 
-/** No averaging: every one of EN/ES/PT/PL/RU must independently satisfy the target. */
+/** No averaging: every one of EN/ES/PT/PL/RU/DE/FR/IT/JA/KO/AR must independently satisfy the target. */
 export function platformLanguageGraduationReady(
   transcript: CosPlatformLanguageTranscriptEntry[],
   target: 'A' | 'A+' = 'A',

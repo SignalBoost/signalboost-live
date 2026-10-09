@@ -200,7 +200,7 @@ test('the resolution runs every 15 minutes after the review, and removed student
   assert.match(read('lib/ai/cos/cosLocalDistillationPolicy.ts'), /existingStatus === 'retired'\) \{\s+status = existingStatus/)
 })
 
-test('the dashboard shows the resolution, WHY students fail, and who left the University, in all five languages', () => {
+test('the dashboard shows the resolution, WHY students fail, and who left the University, in all eleven languages', () => {
   const api = read('app/api/admin/cos-university-telemetry/route.ts')
   assert.match(api, /\.eq\('lane', QUARANTINE_RESOLUTION_LANE\)/)
   assert.match(api, /currentStage = 'Left the University'/)
@@ -212,7 +212,7 @@ test('the dashboard shows the resolution, WHY students fail, and who left the Un
   assert.match(page, /residencyInUniversity\.map\(row =>/)
   const copy = read('lib/i18n/cosUniversityTelemetryCopy.ts')
   for (const key of ['leftTitle', 'leftExplanation', 'whyTitle', 'whyHoldout', 'whyErrors', 'resolutionFailed', 'resolutionHeld']) {
-    assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 5, `${key} in en, es, pt, pl, ru`)
+    assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 11, `${key} in all eleven languages`)
   }
 })
 

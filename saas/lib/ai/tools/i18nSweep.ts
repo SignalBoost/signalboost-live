@@ -203,7 +203,7 @@ export function formatSweepForAI(r: SweepResult): string {
     ``,
     `PATH: ${r.path || ''}`,
     ``,
-    `INSTRUCTIONS: Translate THIS ONE file into all five languages (en, es, pt, pl, ru) using the INLINE COPY pattern — a 'const COPY: Record<Lang, ...>' object inside the file plus language detection, exactly like app/not-found.tsx and the admin pages. Do NOT use the separate locale-file approach. Render every user-facing string from COPY[lang]; leave dynamic data ({variables}) alone. Commit the COMPLETE updated file to the branch ai/i18n-sweep via proposeCodeCommit. Then tell the owner: which file you did, that ~${Math.max(0, remaining - 1)} remain, and to merge the ai/i18n-sweep preview and say "continue" for the next file. One file per reply.`,
+    `INSTRUCTIONS: Translate THIS ONE file into all eleven platform languages (en, es, pt, pl, ru, de, fr, it, ja, ko, ar) using the INLINE COPY pattern — a 'const COPY: Record<Lang, ...>' object inside the file plus language detection, exactly like app/not-found.tsx and the admin pages. Do NOT use the separate locale-file approach. Render every user-facing string from COPY[lang]; leave dynamic data ({variables}) alone. Commit the COMPLETE updated file to the branch ai/i18n-sweep via proposeCodeCommit. Then tell the owner: which file you did, that ~${Math.max(0, remaining - 1)} remain, and to merge the ai/i18n-sweep preview and say "continue" for the next file. One file per reply.`,
     ``,
     `CURRENT FILE CONTENT (${r.path || ''}):`,
     r.content || '',

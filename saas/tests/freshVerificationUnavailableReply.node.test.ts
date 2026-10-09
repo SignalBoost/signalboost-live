@@ -20,7 +20,7 @@ test('the production question now gets an actionable reply', () => {
 
 test('no internal vocabulary reaches the reader, in any language', () => {
   const forbidden = /synthes|grounded|evidence|retriev|confidence|threshold|gate|rejected|corpus|telemetry|COS\b/i
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     for (const prompt of [FLIGHTS, 'who is the current CEO of Nike?', 'hello', '']) {
       const reply = buildFreshVerificationUnavailableReply({ prompt, language })
       assert.ok(!forbidden.test(reply), `${language}: ${reply}`)
@@ -52,19 +52,19 @@ test('the hint is derived from the question only, never from anything retrieved'
   assert.ok(!/http/i.test(a), 'no URL may appear')
 })
 
-test('all five languages produce distinct, non-empty replies', () => {
+test('all eleven languages produce distinct, non-empty replies', () => {
   const seen = new Set<string>()
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     const reply = buildFreshVerificationUnavailableReply({ prompt: FLIGHTS, language })
     assert.ok(reply.trim().length > 100, language)
     seen.add(reply)
   }
-  assert.equal(seen.size, 5)
+  assert.equal(seen.size, 11)
 })
 
 test('unknown language falls back to English, and junk input is safe', () => {
   const english = buildFreshVerificationUnavailableReply({ prompt: FLIGHTS, language: 'en' })
-  assert.equal(buildFreshVerificationUnavailableReply({ prompt: FLIGHTS, language: 'de' }), english)
+  assert.equal(buildFreshVerificationUnavailableReply({ prompt: FLIGHTS, language: 'xx' }), english)
   assert.equal(buildFreshVerificationUnavailableReply({ prompt: FLIGHTS, language: null }), english)
   assert.ok(buildFreshVerificationUnavailableReply({}).length > 100)
   assert.ok(buildFreshVerificationUnavailableReply({ prompt: null, language: undefined }).length > 100)

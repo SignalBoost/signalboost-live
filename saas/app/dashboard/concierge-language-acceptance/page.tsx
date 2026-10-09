@@ -46,8 +46,8 @@ type Result = {
 }
 type State = { requiredCases:number; runs:Run[]; results:Result[] }
 
-const LANGUAGES = ['en','es','pt','pl','ru'] as const
-const LANGUAGE_NAMES:Record<string,string> = { en:'English', es:'Español', pt:'Português (Brasil)', pl:'Polski', ru:'Русский' }
+const LANGUAGES = ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar'] as const
+const LANGUAGE_NAMES:Record<string,string> = { en:'English', es:'Español', pt:'Português (Brasil)', pl:'Polski', ru:'Русский', de: 'Deutsch', fr: 'Français', it: 'Italiano', ja: '日本語', ko: '한국어', ar: 'العربية' }
 const VERDICT_LABELS:Record<keyof Verdicts,string> = {
   handled:'Handled', selectedLanguage:'Selected language', noEnglishLeakage:'No English leakage',
   criticalTokensPreserved:'Critical tokens', routingHealthy:'Routing', latencyHealthy:'Latency',
@@ -56,7 +56,7 @@ const VERDICT_LABELS:Record<keyof Verdicts,string> = {
 export default function ConciergeLanguageAcceptancePage() {
   const { lang } = useTranslation()
   const c = getConciergeLanguageAcceptanceCopy(lang)
-  const [state,setState] = useState<State>({ requiredCases:25, runs:[], results:[] })
+  const [state,setState] = useState<State>({ requiredCases:55, runs:[], results:[] })
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
   const [notes,setNotes] = useState<Record<string,string>>({})
@@ -65,7 +65,7 @@ export default function ConciergeLanguageAcceptancePage() {
     const response = await fetch('/api/admin/concierge-language-acceptance', { credentials:'include', cache:'no-store' })
     const body = await response.json()
     if (!response.ok) throw new Error(body.error || 'Could not load language acceptance evidence.')
-    setState({ requiredCases:Number(body.requiredCases || 25), runs:Array.isArray(body.runs) ? body.runs : [], results:Array.isArray(body.results) ? body.results : [] })
+    setState({ requiredCases:Number(body.requiredCases || 55), runs:Array.isArray(body.runs) ? body.runs : [], results:Array.isArray(body.results) ? body.results : [] })
   }
   useEffect(() => { void load().catch(e => setError(e instanceof Error ? e.message : String(e))) }, [])
 
@@ -128,7 +128,7 @@ export default function ConciergeLanguageAcceptancePage() {
     {!latest ? <div className="rounded-md border border-border p-5 text-muted-foreground">{c.noRuns}</div> : <>
       <section className="grid gap-4 md:grid-cols-4">
         <div className="rounded-md border border-border p-4"><div className="text-sm text-muted-foreground">{c.automated}</div><div className="mt-2 text-xl font-semibold">{status(latest.automated_gate_passed)}</div><div className="mt-2 text-xs text-muted-foreground">{c.automatedNote}</div></div>
-        <div className="rounded-md border border-border p-4"><div className="text-sm text-muted-foreground">{c.native}</div><div className="mt-2 text-xl font-semibold">{LANGUAGES.filter(code => latest.native_reviews?.[code] === 'pass').length} / 5</div><div className="mt-2 text-xs text-muted-foreground">{c.nativeNote}</div></div>
+        <div className="rounded-md border border-border p-4"><div className="text-sm text-muted-foreground">{c.native}</div><div className="mt-2 text-xl font-semibold">{LANGUAGES.filter(code => latest.native_reviews?.[code] === 'pass').length} / {LANGUAGES.length}</div><div className="mt-2 text-xs text-muted-foreground">{c.nativeNote}</div></div>
         <div className="rounded-md border border-border p-4"><div className="text-sm text-muted-foreground">{c.full}</div><div className={`mt-2 text-xl font-semibold ${latest.full_gate_passed ? 'text-green-400' : 'text-yellow-400'}`}>{latest.full_gate_passed ? c.pass : c.pending}</div></div>
         <div className="rounded-md border border-border p-4"><div className="text-sm text-muted-foreground">{c.cases}</div><div className="mt-2 text-xl font-semibold">{latest.observed_cases} / {state.requiredCases}</div></div>
       </section>

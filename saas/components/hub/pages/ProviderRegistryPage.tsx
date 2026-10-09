@@ -12,17 +12,23 @@ import { uiText } from '@/lib/i18n/uiText'
 
 // Native per-language copy for this console page. `lang` arrives via PageProps.
 const COPY: Record<string, Record<string, string>> = {
-  monitor3: { en: uiText('generatedUi.u_5173c68c4f32106a'), es: 'Monitor 3', pt: 'Monitor 3', pl: 'Monitor 3', ru: 'Монитор 3' },
-  title: { en: uiText('generatedUi.u_a3f792dda5fc8060'), es: 'Registro de proveedores', pt: 'Registro de provedores', pl: 'Rejestr dostawców', ru: 'Реестр провайдеров' },
+  monitor3: { en: uiText('generatedUi.u_5173c68c4f32106a'), es: 'Monitor 3', pt: 'Monitor 3', pl: 'Monitor 3', ru: 'Монитор 3', de: 'Monitor 3', fr: 'Moniteur 3', it: 'Monitor 3', ja: 'モニター 3', ko: '모니터 3', ar: 'المراقب 3' },
+  title: { en: uiText('generatedUi.u_a3f792dda5fc8060'), es: 'Registro de proveedores', pt: 'Registro de provedores', pl: 'Rejestr dostawców', ru: 'Реестр провайдеров', de: 'Anbieterregister', fr: 'Registre des fournisseurs', it: 'Registro dei provider', ja: 'プロバイダーレジストリ', ko: '공급자 레지스트리', ar: 'سجل المزوّدين' },
   desc: {
     en: uiText('generatedUi.u_f5384c08daf2c30c'),
     es: 'Mapa de expansión para la consola de operaciones SaaS multimonitor. Capa de planificación de solo lectura.',
     pt: 'Mapa de expansão para o console de operações SaaS multimonitor. Camada de planejamento somente leitura.',
     pl: 'Mapa rozwoju dla wielomonitorowej konsoli operacji SaaS. Warstwa planowania tylko do odczytu.',
     ru: 'Карта расширения для многомониторной консоли операций SaaS. Слой планирования только для чтения.',
+    de: 'Erweiterungsplan für die Multi-Monitor-SaaS-Betriebskonsole. Schreibgeschützte Planungsebene.',
+    fr: 'Carte d\'expansion de la console d\'opérations SaaS multi-écrans. Couche de planification en lecture seule.',
+    it: 'Mappa di espansione per la console operativa SaaS multi-monitor. Livello di pianificazione in sola lettura.',
+    ja: 'マルチモニター SaaS 運用コンソールの拡張マップ。読み取り専用の計画レイヤーです。',
+    ko: '멀티 모니터 SaaS 운영 콘솔의 확장 맵입니다. 읽기 전용 계획 레이어입니다.',
+    ar: 'خريطة توسعة لوحدة تحكم عمليات SaaS متعددة الشاشات. طبقة تخطيط للقراءة فقط.',
   },
-  credentialPatterns: { en: uiText('generatedUi.u_319215b37b1cc3ef'), es: 'Patrones de credenciales', pt: 'Padrões de credenciais', pl: 'Wzorce poświadczeń', ru: 'Шаблоны учётных данных' },
-  policyActions: { en: uiText('generatedUi.u_f326c235cd3a001c'), es: 'Acciones de política', pt: 'Ações de política', pl: 'Akcje zasad', ru: 'Действия политики' },
+  credentialPatterns: { en: uiText('generatedUi.u_319215b37b1cc3ef'), es: 'Patrones de credenciales', pt: 'Padrões de credenciais', pl: 'Wzorce poświadczeń', ru: 'Шаблоны учётных данных', de: 'Muster für Anmeldedaten', fr: 'Modèles d\'identifiants', it: 'Pattern di credenziali', ja: '認証情報のパターン', ko: '자격 증명 패턴', ar: 'أنماط بيانات الاعتماد' },
+  policyActions: { en: uiText('generatedUi.u_f326c235cd3a001c'), es: 'Acciones de política', pt: 'Ações de política', pl: 'Akcje zasad', ru: 'Действия политики', de: 'Richtlinienaktionen', fr: 'Actions de stratégie', it: 'Azioni dei criteri', ja: 'ポリシーアクション', ko: '정책 작업', ar: 'إجراءات السياسة' },
 }
 function tx(key: string, lang: string): string {
   return COPY[key]?.[lang] ?? COPY[key]?.en ?? key

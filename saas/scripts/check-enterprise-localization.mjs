@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-const locales=['en','es','pt','pl','ru']
+const locales=['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']
 const data=Object.fromEntries(locales.map(l=>[l, JSON.parse(readFileSync(`locales/${l}.json`,'utf8'))]))
 function flatten(o,p='',out={}){ for(const [k,v] of Object.entries(o)){ const key=p?`${p}.${k}`:k; if(v&&typeof v==='object'&&!Array.isArray(v)) flatten(v,key,out); else out[key]=v } return out }
 const flat=Object.fromEntries(locales.map(l=>[l,flatten(data[l])]))

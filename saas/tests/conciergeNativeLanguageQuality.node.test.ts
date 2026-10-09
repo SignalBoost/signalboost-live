@@ -13,11 +13,11 @@ import { classifyConciergeIntent, getConciergeAnswer } from '../lib/platform/uni
 
 const read = (path:string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-test('Concierge has a native-language quality contract for all five supported languages', () => {
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru'] as const) {
+test('Concierge has a native-language quality contract for all eleven supported languages', () => {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const) {
     const instruction = conciergeLanguageQualityInstruction(language)
     assert.match(instruction, /NATIVE-LANGUAGE QUALITY CONTRACT:/)
-    assert.match(instruction, /direct|directamente|diretamente|bezpośrednio|сразу/i)
+    assert.match(instruction, /direct|directamente|diretamente|bezpośrednio|сразу|direkt|direttamente|最初から|처음부터|مباشرةً/i)
     assert.match(instruction, /MUST contain that exact literal/)
   }
   const spanish = conciergeLanguageQualityInstruction('es')
@@ -29,6 +29,12 @@ test('Concierge has a native-language quality contract for all five supported la
   assert.match(polish, /Pan\/Pani/)
   assert.match(polish, /kalek/)
   assert.match(polish, /kontrolę odmiany/)
+  assert.match(conciergeLanguageQualityInstruction('de'), /Kasus, Genus, Numerus/)
+  assert.match(conciergeLanguageQualityInstruction('fr'), /accord du participe passé/)
+  assert.match(conciergeLanguageQualityInstruction('it'), /congiuntivo/)
+  assert.match(conciergeLanguageQualityInstruction('ja'), /です・ます調/)
+  assert.match(conciergeLanguageQualityInstruction('ko'), /높임법/)
+  assert.match(conciergeLanguageQualityInstruction('ar'), /المطابقة/)
   assert.equal(normalizeConciergeLanguage('pl-PL'), 'pl')
   assert.equal(normalizeConciergeLanguage('xx'), 'en')
 })

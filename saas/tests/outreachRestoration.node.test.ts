@@ -9,15 +9,15 @@ async function source(relativePath: string): Promise<string> {
   return readFile(path.resolve(process.cwd(), relativePath), 'utf8').then(hydrateLocalizedSource)
 }
 
-test('Outreach is restored as the five-language umbrella instead of Email Outreach', () => {
+test('Outreach is restored as the eleven-language umbrella instead of Email Outreach', () => {
   assert.equal(outreachNavLabel('en'), 'Outreach')
   assert.equal(outreachNavLabel('es'), 'Alcance')
   assert.equal(outreachNavLabel('pt'), 'Prospecção')
   assert.equal(outreachNavLabel('pl'), 'Outreach')
   assert.equal(outreachNavLabel('ru'), 'Аутрич')
-  assert.deepEqual(Object.keys(OUTREACH_COPY).sort(), ['en', 'es', 'pl', 'pt', 'ru'])
+  assert.deepEqual(Object.keys(OUTREACH_COPY).sort(), ['ar', 'de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru'])
   for (const copy of Object.values(OUTREACH_COPY)) {
-    assert.match(copy.definition, /Email|correo|e-mail|E-mail|Электронная/i)
+    assert.match(copy.definition, /Email|correo|e-mail|E-mail|Электронная|courriel|メール|이메일|البريد الإلكتروني/i)
     assert.equal(Object.keys(copy.channels).length, 7)
   }
 })

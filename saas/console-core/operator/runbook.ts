@@ -18,8 +18,8 @@ import type { RiskLevel, ApprovalRequirement, PermissionPolicy } from './templat
 import { preExecutionCheck } from './capabilityMatrix.ts'
 
 export type ExecutionMode = 'simulation' | 'execution'
-export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
+export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
+const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 /** Normalize an arbitrary locale string to a supported one, English fallback. */
 export function resolveLocale(input?: string | null): SupportedLocale {

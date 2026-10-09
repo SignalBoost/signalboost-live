@@ -18,6 +18,12 @@ const COPY = {
   pt: { pause: 'Pausar faixa', play: 'Reproduzir faixa', download: 'Baixar MP3' },
   pl: { pause: 'Wstrzymaj utwór', play: 'Odtwórz utwór', download: 'Pobierz MP3' },
   ru: { pause: 'Приостановить трек', play: 'Воспроизвести трек', download: 'Скачать MP3' },
+  de: { pause: 'Titel pausieren', play: 'Titel abspielen', download: 'MP3 herunterladen' },
+  fr: { pause: 'Mettre la piste en pause', play: 'Lire la piste', download: 'Télécharger le MP3' },
+  it: { pause: 'Metti in pausa la traccia', play: 'Riproduci traccia', download: 'Scarica MP3' },
+  ja: { pause: 'トラックを一時停止', play: 'トラックを再生', download: 'MP3 をダウンロード' },
+  ko: { pause: '트랙 일시 정지', play: '트랙 재생', download: 'MP3 다운로드' },
+  ar: { pause: 'إيقاف المقطع مؤقتًا', play: 'تشغيل المقطع', download: 'تنزيل MP3' },
 } as const;
 
 export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayerProps) {

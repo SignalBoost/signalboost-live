@@ -4,18 +4,30 @@ import consoleEs from './console.es.json'
 import consolePt from './console.pt.json'
 import consolePl from './console.pl.json'
 import consoleRu from './console.ru.json'
+import consoleDe from './console.de.json'
+import consoleFr from './console.fr.json'
+import consoleIt from './console.it.json'
+import consoleJa from './console.ja.json'
+import consoleKo from './console.ko.json'
+import consoleAr from './console.ar.json'
 
 import auditEn from './audit.en.json'
 import auditEs from './audit.es.json'
 import auditPt from './audit.pt.json'
 import auditPl from './audit.pl.json'
 import auditRu from './audit.ru.json'
+import auditDe from './audit.de.json'
+import auditFr from './audit.fr.json'
+import auditIt from './audit.it.json'
+import auditJa from './audit.ja.json'
+import auditKo from './audit.ko.json'
+import auditAr from './audit.ar.json'
 
 const CONSOLE_TABLE: Record<string, unknown> = {
-  en: consoleEn, es: consoleEs, pt: consolePt, pl: consolePl, ru: consoleRu,
+  en: consoleEn, es: consoleEs, pt: consolePt, pl: consolePl, ru: consoleRu, de: consoleDe, fr: consoleFr, it: consoleIt, ja: consoleJa, ko: consoleKo, ar: consoleAr,
 }
 const AUDIT_TABLE: Record<string, unknown> = {
-  en: auditEn, es: auditEs, pt: auditPt, pl: auditPl, ru: auditRu,
+  en: auditEn, es: auditEs, pt: auditPt, pl: auditPl, ru: auditRu, de: auditDe, fr: auditFr, it: auditIt, ja: auditJa, ko: auditKo, ar: auditAr,
 }
 import onboardingLocales from './onboardingLocales.json'
 import marketingSalesLocales from './marketingSalesLocales.json'
@@ -35,6 +47,12 @@ const dictionaries: Record<string, () => Promise<Dict>> = {
   es: () => import('@/locales/es.json').then(m => m.default as Dict),
   pl: () => import('@/locales/pl.json').then(m => m.default as Dict),
   ru: () => import('@/locales/ru.json').then(m => m.default as Dict),
+  de: () => import('@/locales/de.json').then(m => m.default as Dict),
+  fr: () => import('@/locales/fr.json').then(m => m.default as Dict),
+  it: () => import('@/locales/it.json').then(m => m.default as Dict),
+  ja: () => import('@/locales/ja.json').then(m => m.default as Dict),
+  ko: () => import('@/locales/ko.json').then(m => m.default as Dict),
+  ar: () => import('@/locales/ar.json').then(m => m.default as Dict),
 }
 
 function loadConsole(lang: string): Dict {

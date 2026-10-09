@@ -4,9 +4,13 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { resolveResponseLanguage } from '../lib/i18n/responseLanguage.ts'
 
-test('COS i18n supports exactly the five product languages', () => {
+test('COS i18n supports exactly the eleven product languages', () => {
   const source = readFileSync(join(process.cwd(), 'lib/i18n/responseLanguage.ts'), 'utf8')
-  assert.match(source, /\['en', 'es', 'pt', 'pl', 'ru'\]/)
+  assert.match(source, /type SupportedLanguage \} from '\.\/supportedLanguages\.ts'/)
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
+    assert.equal(resolveResponseLanguage('OK', language), language)
+    assert.match(source, new RegExp(`\\['${language}', overridePatterns\\(`))
+  }
 })
 
 test('prompt language overrides an English UI locale', () => {

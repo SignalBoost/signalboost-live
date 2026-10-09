@@ -13,7 +13,7 @@ import { FACTUAL_DISCIPLINE } from '@/portable-kernel'
 // back to the dynamic template generator rather than failing the campaign.
 
 const LANG_NAMES: Record<string, string> = {
-  en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian',
+  en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Arabic',
 }
 
 function extractJson(raw: string): any | null {

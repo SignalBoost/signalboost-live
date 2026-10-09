@@ -1,0 +1,298 @@
+{
+  "dashboard.title": "لوحة المعلومات",
+  "dashboard.subtitle": "إدارة مشاريعك وعمليات الأتمتة",
+  "nav.dashboard": "لوحة المعلومات",
+  "nav.projects": "المشاريع",
+  "nav.automations": "عمليات الأتمتة",
+  "nav.courses": "الدورات",
+  "nav.billing": "الفوترة",
+  "nav.settings": "الإعدادات",
+  "projects.title": "المشاريع",
+  "projects.create": "إنشاء مشروع",
+  "projects.empty": "لا توجد مشاريع بعد.",
+  "editor.save": "حفظ",
+  "editor.generating": "جارٍ الإنشاء…",
+  "editor.preview": "معاينة",
+  "billing.title": "الفوترة والخطط",
+  "billing.upgrade": "ترقية",
+  "billing.current": "الخطة الحالية",
+  "mobile.install": "تثبيت التطبيق",
+  "common.loading": "جارٍ التحميل...",
+  "common.cancel": "إلغاء",
+  "common.delete": "حذف",
+  "common.edit": "تعديل",
+  "reset": "إعادة تعيين",
+  "errors": {
+    "generationFailed": "Generation failed",
+    "networkError": "Network error",
+    "unauthorized": "Unauthorized"
+  },
+  "api": {
+    "invalidJson": "Invalid JSON",
+    "promptRequired": "Prompt is required"
+  },
+  "projects": {
+    "limitReached": "Project limit reached for your plan."
+  },
+  "actionRouter": {
+    "openWebsiteBuilder": "Open Website Builder",
+    "openReviewCollector": "Open Review Collector",
+    "openAudioStudio": "Open Audio Studio",
+    "openVideoStudio": "Open Video Studio",
+    "openSalesAgent": "Open Sales Agent",
+    "openSalesPipeline": "Open Sales Pipeline",
+    "answerInChat": "Answer in chat"
+  },
+  "videoSearch": {
+    "timeout": {
+      "generic": "Request timed out.",
+      "aiService": "AI service timed out.",
+      "intent": "Intent processing timed out.",
+      "script": "Script generation timed out.",
+      "search": "Video search timed out.",
+      "searchDetailed": "Video search timed out. Try a shorter request."
+    },
+    "status": {
+      "searching": "Searching for videos...",
+      "searchingPromptMatch": "Searching for videos matching your prompt..."
+    },
+    "errors": {
+      "generateScriptFailed": "Failed to generate script",
+      "searchFailed": "Search failed"
+    },
+    "rights": {
+      "restricted": "All results are rights-restricted for this query.",
+      "embeddableOnly": "Only embeddable results were found."
+    }
+  },
+  "videoGenerate": {
+    "errors": {
+      "authRequired": "You must be signed in.",
+      "promptRequired": "Please enter a prompt.",
+      "imageRequired": "Please attach an image.",
+      "noCredits": "No video credits left this month.",
+      "creditCheckFailed": "Could not check your credits."
+    },
+    "defaults": {
+      "imagePrompt": "Add natural, subtle motion to this image."
+    }
+  },
+  "operator": {
+    "commitPrefix": "Website Operator update:",
+    "errors": {
+      "requestRequired": "Please describe what you want to change.",
+      "planCreateFailed": "Could not create the plan right now.",
+      "planIdRequired": "Plan ID is required.",
+      "planNotFound": "Plan not found.",
+      "approvalRequired": "Approval required before applying changes.",
+      "applyFailed": "Could not apply approved update.",
+      "jobIdRequired": "Job ID is required.",
+      "jobNotFound": "Job not found.",
+      "rollbackUnavailable": "Rollback is not available for this update.",
+      "rollbackFailed": "Could not complete rollback.",
+      "statusNotFound": "Status not found."
+    },
+    "success": {
+      "published": "Changes published. Rollback is available.",
+      "approvedAndPublished": "Update approved and published with rollback point.",
+      "rollbackComplete": "Rollback complete. Previous version restored."
+    },
+    "input": {
+      "defaultRequest": "A high-end rooftop cocktail bar in Rio with bottle service and DJ nights"
+    },
+    "preview": {
+      "liveLabel": "معاينة مباشرة",
+      "dark": "داكن",
+      "light": "فاتح",
+      "sections": "أقسام",
+      "empty": "سيظهر موقعك المصمَّم هنا.",
+      "loading": "جارٍ تصميم موقعك…"
+    }
+  },
+  "reviews": {
+    "errors": {
+      "unauthorized": "Unauthorized",
+      "missingSlug": "Missing slug",
+      "invalidNameLength": "Name must be 1-80 characters",
+      "invalidEmail": "Invalid email",
+      "invalidRating": "Rating must be 1-5",
+      "invalidContentLength": "Content must be 1-2000 characters",
+      "lookupFailed": "Lookup failed",
+      "notFound": "Not found",
+      "tooManySubmissions": "Too many submissions. Try again tomorrow.",
+      "reviewCapReached": "Not accepting more reviews on current plan.",
+      "saveFailed": "Could not save review",
+      "missingId": "Missing ID",
+      "approvedMustBeBoolean": "Approved must be boolean"
+    }
+  },
+  "dash": {
+    "concierge": {
+      "title": "SignalBoost Concierge",
+      "loading": "جارٍ تحميل مساحة عملك والتحقق مما يحتاج إلى انتباه.",
+      "welcome": "مرحبًا بك. ابدأ بإنشاء مشروعك الأول، أو اسأل SignalBoost عمّا يجب بناؤه أولًا.",
+      "drafts": {
+        "one": "لديك مسودة مشروع واحدة. افتحها وانشرها عندما تكون جاهزة.",
+        "many": "لديك {count} من مسودات المشاريع. افتح واحدة وانشرها عندما تكون جاهزة."
+      },
+      "live": {
+        "one": "لديك مشروع منشور واحد. الخطوة التالية: الترويج أو جمع المراجعات أو إنشاء المحتوى.",
+        "many": "لديك {count} من المشاريع المنشورة. الخطوة التالية: الترويج أو جمع المراجعات أو إنشاء المحتوى."
+      },
+      "help": "هل تحتاج إلى مساعدة في اختيار الخطوة التالية؟ اسأل SignalBoost أدناه.",
+      "askNext": "ASK_NEXT"
+    },
+    "ai": {
+      "currentPage": "Dashboard"
+    },
+    "prompt": {
+      "nextAction": "ماذا يجب أن أفعل بعد ذلك؟"
+    }
+  },
+  "builder": {
+    "ai": {
+      "currentPage": "Site Builder",
+      "userPlan": "free",
+      "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
+    }
+  },
+  "podcasters_page": {
+    "deliverables": {
+      "voiceover": {
+        "title": "تعليق صوتي بلغة أصلية",
+        "desc": "حوّل حلقة واحدة إلى نسخ صوتية طبيعية بلغات متعددة."
+      },
+      "clips": {
+        "title": "مصنع المقاطع",
+        "desc": "اعثر على أفضل اللحظات وحوّلها إلى Shorts وReels ومقاطع TikTok."
+      },
+      "captions": {
+        "title": "الترجمات المصاحبة",
+        "desc": "أنشئ الترجمات المصاحبة والنصوص المكتوبة وتعليقات وسائل التواصل الاجتماعي تلقائيًا."
+      },
+      "website": {
+        "title": "موقع إلكتروني للبودكاست",
+        "desc": "مساحة تحمل علامتك التجارية للحلقات وملاحظات البرنامج والمراجعات واللغات."
+      },
+      "distribution": {
+        "title": "التوزيع",
+        "desc": "جهّز المحتوى لـ YouTube وTikTok وInstagram والبريد الإلكتروني والمزيد."
+      },
+      "growth": {
+        "title": "نمو المستمعين",
+        "desc": "اجمع المراجعات والشهادات وإشارات الجمهور."
+      }
+    },
+    "how": {
+      "step1": {
+        "title": "ارفع حلقتك",
+        "desc": "أحضر الصوت أو الفيديو النهائي."
+      },
+      "step2": {
+        "title": "اختر المخرجات",
+        "desc": "المقاطع والترجمات المصاحبة واللغات والتعليق الصوتي وملاحظات البرنامج."
+      },
+      "step3": {
+        "title": "فريق الذكاء الاصطناعي يعمل",
+        "desc": "تُجهّز وكلاء النسخ والمقاطع والترجمة والتوزيع الأصول."
+      },
+      "step4": {
+        "title": "انشر في كل مكان",
+        "desc": "نزّل المحتوى أو جهّزه لكل قناة."
+      }
+    },
+    "plans": {
+      "networkEmailSubject": "SignalBoost Network Plan"
+    }
+  },
+  "singleLanguageContent": "محتوى بـ{language}",
+  "docs": {
+    "pricing": {
+      "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo"
+    }
+  },
+  "pricing_page": {
+    "free": {
+      "video": "أدوات الفيديو مضمّنة"
+    },
+    "starter": {
+      "video": "إنشاء فيديو Starter"
+    },
+    "pro": {
+      "video": "إنشاء فيديو Pro"
+    },
+    "business": {
+      "video": "إنشاء فيديو للأعمال"
+    }
+  },
+  "settings": {
+    "title": "إعدادات النظام",
+    "subtitle": "اضبط خيارات الحساب وخطافات الويب لمزامنة البيانات وقواعد التوجيه.",
+    "workspace": "الإعدادات العامة لمساحة العمل",
+    "platformLabel": "تسمية مثيل المنصة",
+    "ingestion": "قنوات استيعاب البيانات",
+    "webhookTarget": "وجهة خطاف الويب لاستيعاب بيانات الشركاء التابعين",
+    "webhookHelp": "عنوان وجهة مباشر لمعالجة خطافات حركة المرور الواردة من أنظمة السفر والأسواق التابعة لجهات خارجية.",
+    "automation": "الأتمتة والمشغّلات",
+    "emailSummaries": "ملخصات الإنشاء عبر البريد الإلكتروني",
+    "emailSummariesHelp": "استلم سجلات نشاط تلقائية عند اكتمال معالجة أصول الفيديو.",
+    "autoTopup": "إعادة الشحن التلقائي للحوسبة",
+    "autoTopupHelp": "إعادة تعبئة أرصدة النظام تلقائيًا عندما ينخفض الرصيد عن 50 وحدة.",
+    "saving": "جارٍ تحديث القواعد…",
+    "save": "حفظ الإعدادات",
+    "saved": "تم حفظ إعدادات النظام بنجاح!"
+  },
+  "data": {
+    "title": "موصل البيانات الشامل",
+    "wikipediaReminder": "تذكير ويكيبيديا: المحتوى مرخّص بموجب CC-BY-SA ويلزم ذكر المصدر.",
+    "uploadCsv": "رفع ملف CSV",
+    "addApi": "إضافة موصل API",
+    "runApi": "تشغيل استيراد API",
+    "addScraper": "إضافة موصل استخراج البيانات",
+    "runScraper": "تشغيل الاستيراد بأداة الاستخراج",
+    "importedItems": "العناصر المستوردة حسب الفئة",
+    "sourceHistory": "سجل المصادر",
+    "importing": "جارٍ الاستيراد…",
+    "done": "تم: أُدرج {count}",
+    "error": "خطأ: {error}"
+  },
+  "sales": {
+    "title": "🧠 وكيل مبيعات بالذكاء الاصطناعي",
+    "subtitle": "زوّد الذكاء الاصطناعي بعميل محتمل، وسيصوغ لك رسالة بريد إلكتروني مبيعات احترافية لتراجعها وترسلها.",
+    "prospect": "عميل محتمل",
+    "company": "اسم الشركة",
+    "contact": "اسم جهة الاتصال",
+    "email": "Email",
+    "website": "الموقع الإلكتروني",
+    "industry": "القطاع",
+    "notes": "ملاحظات حول هذا العميل المحتمل",
+    "drafting": "جارٍ الصياغة...",
+    "generate": "إنشاء رسالة مبيعات",
+    "aiDraft": "مسودة بالذكاء الاصطناعي",
+    "emptyDraft": "ستظهر رسالة المبيعات هنا.",
+    "subject": "الموضوع",
+    "openEmail": "فتح في البريد الإلكتروني",
+    "pipeline": {
+      "title": "مسار المبيعات",
+      "subtitle": "تتبّع العملاء المحتملين من مرحلة الاكتشاف حتى يصبحوا عملاء.",
+      "loading": "جارٍ تحميل مسار العمل…",
+      "noLeads": "لا يوجد عملاء محتملون",
+      "unnamed": "شركة بلا اسم",
+      "noIndustry": "لا يوجد قطاع",
+      "noCountry": "لا يوجد بلد",
+      "noEmail": "لا يوجد بريد إلكتروني",
+      "draft": "مسودة:"
+    },
+    "status": {
+      "discovered": "مُكتشَف",
+      "approved": "تمت الموافقة",
+      "draft_ready": "المسودة جاهزة",
+      "sketch_ready": "المخطط جاهز",
+      "sent": "تم الإرسال",
+      "replied": "تم الرد",
+      "client": "العميل",
+      "draft_failed": "فشلت المسودة"
+    }
+  },
+  "orchestration.kicker": "تنسيق الذكاء الاصطناعي"
+}

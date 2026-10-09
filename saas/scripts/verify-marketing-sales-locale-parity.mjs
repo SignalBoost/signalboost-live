@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA = join(__dirname, '..', 'marketing-sales-core', 'i18n', 'data')
-const LANGS = ['en', 'es', 'pt', 'pl', 'ru']
+const LANGS = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 function load(lang) {
   try {

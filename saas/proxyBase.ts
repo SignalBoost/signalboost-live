@@ -246,7 +246,7 @@ function overLimit(key: string): boolean {
 function languageFrom(req: NextRequest): string {
   const stored = req.cookies.get('sb_locale')?.value || ''
   const normalized = stored.toLowerCase().slice(0, 2)
-  return ['en', 'es', 'pt', 'pl', 'ru'].includes(normalized) ? normalized : 'en'
+  return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(normalized) ? normalized : 'en'
 }
 
 function limitReply(language: string): string {
@@ -256,6 +256,12 @@ function limitReply(language: string): string {
     pt: 'Você atingiu o limite da prévia gratuita deste assistente. Entre na sua conta para continuar: sua conta tem um limite muito maior e a conversa segue a partir daqui.',
     pl: 'Osiągnięto limit bezpłatnego podglądu tego asystenta. Zaloguj się, aby kontynuować — Twoje konto ma znacznie wyższy limit, a rozmowa jest kontynuowana od tego miejsca.',
     ru: 'Достигнут лимит бесплатного предпросмотра этого ассистента. Войдите в аккаунт, чтобы продолжить: там лимит значительно выше, а разговор продолжится с этого места.',
+    de: 'Sie haben das Limit der kostenlosen Vorschau für diesen Assistenten erreicht. Melden Sie sich an, um weiterzumachen – Ihr Konto hat ein deutlich höheres Kontingent, und die Unterhaltung wird an dieser Stelle fortgesetzt.',
+    fr: 'Vous avez atteint la limite de l’aperçu gratuit pour cet assistant. Connectez-vous pour continuer — votre compte dispose d’un quota bien plus élevé, et la conversation reprend à partir d’ici.',
+    it: 'Hai raggiunto il limite dell’anteprima gratuita per questo assistente. Accedi per continuare: il tuo account ha un limite molto più alto e la conversazione riprende da qui.',
+    ja: 'このアシスタントの無料プレビューの上限に達しました。続けるにはサインインしてください。アカウントでははるかに多くの利用枠があり、会話はここから続きます。',
+    ko: '이 어시스턴트의 무료 미리보기 한도에 도달했습니다. 계속하려면 로그인하세요. 계정에는 훨씬 더 많은 사용량이 제공되며, 대화는 여기서부터 이어집니다.',
+    ar: 'لقد بلغت حد المعاينة المجانية لهذا المساعد. سجّل الدخول للمتابعة — فحسابك يتمتع بحصة أعلى بكثير، وستستمر المحادثة من هنا.',
   }
   return messages[language] || messages.en
 }

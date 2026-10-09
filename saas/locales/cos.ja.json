@@ -1,0 +1,99 @@
+{
+  "cos": {
+    "nav": {
+      "mining": "マイニング",
+      "features": "特徴量",
+      "segments": "セグメント",
+      "rules": "パターン",
+      "runs": "実行履歴"
+    },
+    "mining": {
+      "title": "データマイニング",
+      "subtitle": "予測を支える行動パターンと取引パターン",
+      "run_now": "今すぐ実行",
+      "last_run": "最終実行",
+      "events_scanned": "スキャンしたイベント",
+      "users_processed": "処理済みユーザー",
+      "features_written": "書き込まれた特徴量",
+      "rules_found": "検出されたパターン"
+    },
+    "features": {
+      "title": "抽出された特徴量",
+      "name": "特徴量",
+      "value": "値",
+      "updated": "更新済み",
+      "names": {
+        "event_frequency_per_day": "1日あたりのアクティビティ",
+        "transaction_count": "取引",
+        "avg_deposit_cents": "平均入金額",
+        "avg_transfer_cents": "平均送金額",
+        "preferred_txn_hour": "希望時間帯",
+        "dominant_device_code": "メインデバイス",
+        "campaign_engagement_rate": "キャンペーンエンゲージメント",
+        "recency_days": "最終アクティビティからの日数",
+        "amount_trend_slope": "支出傾向"
+      }
+    },
+    "segments": {
+      "title": "行動セグメント",
+      "cluster": "クラスター",
+      "members": "メンバー"
+    },
+    "rules": {
+      "title": "検出されたパターン",
+      "if": "条件",
+      "then": "ならば",
+      "support": "サポート",
+      "confidence": "信頼度",
+      "lift": "リフト"
+    },
+    "status": {
+      "running": "実行中",
+      "success": "成功",
+      "error": "エラー"
+    },
+    "empty": {
+      "no_features": "特徴量はまだありません。マイニングジョブを実行して生成してください。",
+      "no_rules": "パターンはまだ検出されていません。",
+      "no_runs": "マイニングの実行記録はまだありません。"
+    },
+    "errors": {
+      "unauthorized": "続行するにはサインインしてください。",
+      "forbidden": "このデータへのアクセス権がありません。",
+      "load_failed": "データを読み込めませんでした。もう一度お試しください。"
+    },
+    "tooltips": {
+      "confidence": "条件が満たされたときにパターンが成立する頻度。",
+      "lift": "偶然と比べて結果がどれだけ起こりやすいか。",
+      "segment": "類似した行動を持つユーザーのグループ。"
+    },
+    "meta": {
+      "title": "COS データマイニング — SignalBoost",
+      "description": "COS の予測を支える、抽出された行動シグナルと取引シグナル。"
+    },
+    "dashboard": {
+      "overview": "概要",
+      "refresh": "更新",
+      "run_history": "実行履歴",
+      "segment_distribution": "セグメント分布",
+      "top_patterns": "上位パターン",
+      "no_access": "マイニングインテリジェンスを表示するには管理者アクセスが必要です。",
+      "lookup_user": "ユーザー特徴量の検索",
+      "user_id_placeholder": "ユーザー ID を入力",
+      "view": "表示",
+      "never": "なし",
+      "users": "ユーザー"
+    },
+    "predict": {
+      "title": "予測される次のアクション",
+      "action": "アクション",
+      "score": "スコア",
+      "basis": "理由",
+      "none": "予測に十分なシグナルがまだありません。",
+      "propensity": "傾向スコア",
+      "engagement": "エンゲージメント",
+      "churn_risk": "解約リスク",
+      "value": "値"
+    }
+  }
+}

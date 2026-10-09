@@ -187,7 +187,7 @@ test('repository drift, transitive-only entries and unsafe paths cannot be silen
 })
 
 test('autonomy and separate-history copy exists in all supported languages', () => {
-  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     const copy = remediationAutonomyCopy(lang)
     assert.ok(copy.humanEmpty)
     assert.ok(copy.activeWork)

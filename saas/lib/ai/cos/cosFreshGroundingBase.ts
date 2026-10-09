@@ -163,7 +163,7 @@ function extractCandidates(text: string, role: string): string[] {
   return [...out]
 }
 
-function directFlightQuestionLanguage(input: string): 'en' | 'es' | 'pt' | 'pl' | 'ru' | null {
+function directFlightQuestionLanguage(input: string): 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar' | null {
   const text = String(input || '').trim()
   const routeShape = /\bfrom\b[\s\S]+\bto\b/i.test(text)
   if (routeShape && /\b(?:direct|non[-\s]?stop)\b/i.test(text) && /\bflights?\b/i.test(text)) return 'en'
@@ -171,6 +171,12 @@ function directFlightQuestionLanguage(input: string): 'en' | 'es' | 'pt' | 'pl' 
   if (/\b(?:voos?)\b/i.test(text) && /\b(?:diretos?|sem\s+escalas?)\b/i.test(text) && /\bde\b[\s\S]+\bpara\b/i.test(text)) return 'pt'
   if (/\b(?:bezpośredni(?:e|ch)?|bezposredni(?:e|ch)?)\b/i.test(text) && /\blot(?:y|ów|ow)\b/i.test(text) && /\bz\b[\s\S]+\bdo\b/i.test(text)) return 'pl'
   if (/\bпрям\w*\b/iu.test(text) && /\bрейс\w*\b/iu.test(text) && /\bиз\b[\s\S]+\bв\b/iu.test(text)) return 'ru'
+  if (/(?:direktfl[üu]g|direkte[nr]?\s+fl[üu]g|nonstop-?fl[üu]g)/i.test(text) && /\bvon\b[\s\S]+\bnach\b/i.test(text)) return 'de'
+  if (/\bvols?\b/i.test(text) && /\b(?:directs?|sans\s+escales?)\b/i.test(text) && /\b(?:de|d['’])[\s\S]+\s(?:à|a|vers|pour)\s/i.test(text)) return 'fr'
+  if (/\bvol[io]\b/i.test(text) && /\b(?:dirett[io]|senza\s+scal[ei])\b/i.test(text) && /\bda\b[\s\S]+\ba\b/i.test(text)) return 'it'
+  if (/(?:直行便|ノンストップ便)/u.test(text) && /から/u.test(text)) return 'ja'
+  if (/(?:직항|논스톱)/u.test(text) && /에서/u.test(text)) return 'ko'
+  if (/(?:رحلات|رحلة|طيران)\s+(?:جوية\s+)?مباشر/u.test(text) && /من[\s\S]+إلى/u.test(text)) return 'ar'
   return null
 }
 
@@ -201,12 +207,18 @@ function explicitDirectFlightVerdict(source: FreshEvidenceSource): boolean | nul
   return null
 }
 
-function directFlightReply(language: 'en' | 'es' | 'pt' | 'pl' | 'ru', direct: boolean, sources: FreshEvidenceSource[]): string {
+function directFlightReply(language: 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar', direct: boolean, sources: FreshEvidenceSource[]): string {
   const sourceText = sources.map(source => `[${source.id}] (${source.url})`).join(' and ')
   if (language === 'es') return `${direct ? 'Sí. La evidencia actual de rutas confirma vuelos directos/sin escalas en esta ruta.' : 'No. La evidencia actual de rutas indica que no hay vuelos directos/sin escalas en esta ruta.'} Fuentes: ${sourceText}.`
   if (language === 'pt') return `${direct ? 'Sim. A evidência atual de rotas confirma voos diretos/sem escalas nesta rota.' : 'Não. A evidência atual de rotas indica que não há voos diretos/sem escalas nesta rota.'} Fontes: ${sourceText}.`
   if (language === 'pl') return `${direct ? 'Tak. Aktualne dane tras potwierdzają bezpośrednie loty na tej trasie.' : 'Nie. Aktualne dane tras wskazują, że na tej trasie nie ma bezpośrednich lotów.'} Źródła: ${sourceText}.`
   if (language === 'ru') return `${direct ? 'Да. Актуальные данные по маршруту подтверждают прямые рейсы по этому направлению.' : 'Нет. Актуальные данные по маршруту показывают, что прямых рейсов по этому направлению нет.'} Источники: ${sourceText}.`
+  if (language === 'de') return `${direct ? 'Ja. Aktuelle Live-Streckendaten bestätigen Direkt-/Nonstop-Flüge auf dieser Strecke.' : 'Nein. Aktuelle Live-Streckendaten zeigen, dass es auf dieser Strecke keine Direkt-/Nonstop-Flüge gibt.'} Quellen: ${sourceText}.`
+  if (language === 'fr') return `${direct ? 'Oui. Les données actuelles sur les liaisons confirment des vols directs/sans escale sur cette ligne.' : 'Non. Les données actuelles sur les liaisons indiquent qu’il n’y a pas de vols directs/sans escale sur cette ligne.'} Sources : ${sourceText}.`
+  if (language === 'it') return `${direct ? 'Sì. I dati attuali sulle rotte confermano voli diretti/senza scali su questa tratta.' : 'No. I dati attuali sulle rotte indicano che non ci sono voli diretti/senza scali su questa tratta.'} Fonti: ${sourceText}.`
+  if (language === 'ja') return `${direct ? 'はい。現在の路線データにより、この路線に直行便/ノンストップ便があることが確認されています。' : 'いいえ。現在の路線データによると、この路線に直行便/ノンストップ便はありません。'} 情報源：${sourceText}。`
+  if (language === 'ko') return `${direct ? '네. 현재 노선 데이터에서 이 노선의 직항/논스톱 항공편이 확인됩니다.' : '아니요. 현재 노선 데이터에 따르면 이 노선에는 직항/논스톱 항공편이 없습니다.'} 출처: ${sourceText}.`
+  if (language === 'ar') return `${direct ? 'نعم. تؤكد بيانات المسارات الحالية وجود رحلات مباشرة/دون توقف على هذا المسار.' : 'لا. تشير بيانات المسارات الحالية إلى عدم وجود رحلات مباشرة/دون توقف على هذا المسار.'} المصادر: ${sourceText}.`
   return `${direct ? 'Yes. Current live route evidence confirms direct/nonstop flights on this route.' : 'No. Current live route evidence indicates there are no direct/nonstop flights on this route.'} Sources: ${sourceText}.`
 }
 

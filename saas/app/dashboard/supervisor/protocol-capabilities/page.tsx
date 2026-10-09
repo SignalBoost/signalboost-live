@@ -7,7 +7,7 @@ import ProtocolCapabilityCatalogClient, { labelsForLocale } from './ProtocolCapa
 
 const locale = (value?: string) => {
   const candidate = (value || 'en').slice(0, 2).toLowerCase()
-  return ['en', 'es', 'pt', 'pl', 'ru'].includes(candidate) ? candidate : 'en'
+  return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(candidate) ? candidate : 'en'
 }
 
 export default async function ProtocolCapabilityCatalogPage() {

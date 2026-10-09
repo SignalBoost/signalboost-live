@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { cyberProductText, cyberReportPresentationCopy } from '../lib/cyber/cyberReportPresentation.ts'
 
 test('historical saved-plan notice visibly discloses iTMounts display normalization without claiming normalized text is original', () => {
-  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     const copy = cyberReportPresentationCopy(lang)
     assert.match(copy.savedPlanNotice, /iTMounts/)
     assert.ok(copy.savedPlanNotice.length > copy.brandDisplayNotice.length)

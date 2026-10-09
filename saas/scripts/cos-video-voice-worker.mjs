@@ -33,14 +33,24 @@ if (!renderBucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required')
 
 const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 
-const VOICES = { en: 'en-us', es: 'es', pt: 'pt-br', pl: 'pl', ru: 'ru' }
+const VOICES = { en: 'en-us', es: 'es', pt: 'pt-br', pl: 'pl', ru: 'ru', de: 'de', fr: 'fr', it: 'it', ja: 'ja', ko: 'ko', ar: 'ar' }
 const FALLBACK_COPY = {
   en: 'SignalBoostAi helps small businesses turn ideas into professional marketing campaigns faster. Build your campaign, review every asset, and stay in control before anything is published.',
   es: 'SignalBoostAi ayuda a las pequeñas empresas a convertir ideas en campañas profesionales con mayor rapidez. Crea tu campaña, revisa cada recurso y mantén el control antes de publicar.',
   pt: 'A SignalBoostAi ajuda pequenas empresas a transformar ideias em campanhas profissionais com mais rapidez. Crie sua campanha, revise cada material e mantenha o controle antes da publicação.',
   pl: 'SignalBoostAi pomaga małym firmom szybciej zamieniać pomysły w profesjonalne kampanie. Utwórz kampanię, sprawdź każdy materiał i zachowaj kontrolę przed publikacją.',
   ru: 'SignalBoostAi помогает малому бизнесу быстрее превращать идеи в профессиональные кампании. Создайте кампанию, проверьте каждый материал и сохраняйте контроль до публикации.',
+  de: 'SignalBoostAi hilft kleinen Unternehmen, Ideen schneller in professionelle Marketingkampagnen zu verwandeln. Erstellen Sie Ihre Kampagne, prüfen Sie jedes Material und behalten Sie die Kontrolle, bevor etwas veröffentlicht wird.',
+  fr: 'SignalBoostAi aide les petites entreprises à transformer plus rapidement leurs idées en campagnes marketing professionnelles. Créez votre campagne, vérifiez chaque support et gardez le contrôle avant toute publication.',
+  it: 'SignalBoostAi aiuta le piccole imprese a trasformare più rapidamente le idee in campagne di marketing professionali. Crea la tua campagna, rivedi ogni materiale e mantieni il controllo prima di qualsiasi pubblicazione.',
+  ja: 'SignalBoostAi は、小規模ビジネスがアイデアをより速くプロフェッショナルなマーケティングキャンペーンに変えるのを支援します。キャンペーンを作成し、すべての素材を確認して、公開前に主導権を保ちましょう。',
+  ko: 'SignalBoostAi는 소규모 비즈니스가 아이디어를 더 빠르게 전문적인 마케팅 캠페인으로 바꾸도록 돕습니다. 캠페인을 만들고, 모든 자료를 검토하고, 게시 전에 통제권을 유지하세요.',
+  ar: 'تساعد SignalBoostAi الشركات الصغيرة على تحويل الأفكار إلى حملات تسويقية احترافية بسرعة أكبر. أنشئ حملتك، وراجع كل مادة، وابقَ متحكمًا قبل نشر أي شيء.',
 }
+
+// Sentence ends. Japanese and Chinese full stops are not followed by a space, so they
+// split on their own; Latin, Cyrillic and Arabic punctuation still needs the space.
+const SENTENCE_BREAK = /(?<=[.!?؟])\s+|(?<=[。！？])/
 
 function errText(error) {
   return error instanceof Error ? error.message : String(error || 'unknown error')
@@ -66,7 +76,7 @@ function normalizeKey(value) {
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\u0400-\u04ff]+/g, ' ')
+    .replace(/[^a-z0-9\u0400-\u04ff\u0600-\u06ff\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]+/g, ' ')
     .trim()
 }
 
@@ -75,7 +85,7 @@ function productionInstruction(fragment) {
   if (!value) return true
   const lower = value.toLowerCase()
 
-  if (/(do not repeat|don['’]t repeat|must not repeat|not be repeated|do not mention|don['’]t mention|do not say|ignore previous|system prompt|user prompt|these instructions|the instructions|não repita|nao repita|não repetir|nao repetir|não mencione|nao mencione|não diga|nao diga|estas instruções|essas instruções|sin repetir|no repitas|no repetir|no menciones|no digas|estas instrucciones|nie powtarzaj|nie wspominaj|nie mów|tych instrukcji|не повторяй|не упоминай|не говори|эти инструкции)/i.test(lower)) return true
+  if (/(do not repeat|don['’]t repeat|must not repeat|not be repeated|do not mention|don['’]t mention|do not say|ignore previous|system prompt|user prompt|these instructions|the instructions|não repita|nao repita|não repetir|nao repetir|não mencione|nao mencione|não diga|nao diga|estas instruções|essas instruções|sin repetir|no repitas|no repetir|no menciones|no digas|estas instrucciones|nie powtarzaj|nie wspominaj|nie mów|tych instrukcji|не повторяй|не упоминай|не говори|эти инструкции|nicht wiederholen|nicht erwähnen|diese anweisungen|ne pas répéter|ne répète pas|ne mentionne pas|ces instructions|non ripetere|non menzionare|queste istruzioni|繰り返さないで|言及しないで|この指示|반복하지 마|언급하지 마|이 지시|لا تكرر|لا تذكر|هذه التعليمات)/i.test(lower)) return true
 
   if (/^(instructions?|requirements?|prompt|system|assistant|voiceover|narration|captions?|subtitles?|scenes?|visuals?|format|duration|aspect ratio|tone|style|language|target audience|audience|cta|hook|instruções|requisitos|narração|legendas|cenas|formato|duração|idioma|público[- ]alvo|instrucciones|requisitos|narración|subtítulos|escenas|formato|duración|idioma|público objetivo|instrukcje|wymagania|narracja|napisy|sceny|format|czas trwania|język|grupa docelowa|инструкции|требования|озвучка|субтитры|сцены|формат|длительность|язык|аудитория)\s*[:\-–—]/i.test(value)) return true
 
@@ -92,7 +102,7 @@ function sanitizeCampaignCopy(value, max = 900) {
   if (!source) return ''
   const fragments = source
     .replace(/[•▪◦]/g, '\n')
-    .split(/\n+|(?<=[.!?])\s+|\s*;\s+/)
+    .split(/\n+|(?<=[.!?؟])\s+|(?<=[。！？])|\s*;\s+/)
     .map((part) => part.replace(/^[-–—*#\d.)\s]+/, '').trim())
     .filter(Boolean)
 
@@ -137,14 +147,20 @@ function scriptFrom(campaign) {
         : lang === 'es' ? `Creada para ${audience}.`
           : lang === 'pl' ? `Stworzona dla: ${audience}.`
             : lang === 'ru' ? `Создано для: ${audience}.`
-              : `Built for ${audience}.`)
+              : lang === 'de' ? `Erstellt für: ${audience}.`
+                : lang === 'fr' ? `Conçue pour : ${audience}.`
+                  : lang === 'it' ? `Pensata per: ${audience}.`
+                    : lang === 'ja' ? `対象：${audience}。`
+                      : lang === 'ko' ? `대상: ${audience}.`
+                        : lang === 'ar' ? `صُممت من أجل: ${audience}.`
+                          : `Built for ${audience}.`)
     }
   }
 
   const sentences = []
   const seen = new Set()
   for (const candidate of candidates) {
-    for (const part of candidate.split(/(?<=[.!?])\s+/)) {
+    for (const part of candidate.split(SENTENCE_BREAK)) {
       const safe = sanitizeCampaignCopy(part, 500)
       const key = normalizeKey(safe)
       if (!safe || !key || seen.has(key)) continue
@@ -155,14 +171,36 @@ function scriptFrom(campaign) {
   return clean(sentences.join(' '), 850) || FALLBACK_COPY[lang] || FALLBACK_COPY.en
 }
 
+// Full-width CJK and Hangul glyphs take about two Latin columns; every other script
+// counts one, so Latin and Cyrillic captions break exactly where they did before.
+function captionWidth(value) {
+  return Array.from(String(value || '')).reduce((sum, ch) => sum + (/[\u1100-\u11ff\u3000-\u30ff\u3400-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch) ? 2 : 1), 0)
+}
+
+// Japanese is written without spaces, so a "word" can be a whole sentence. Break any
+// token wider than one caption line into line-sized pieces.
+function captionTokens(text, maxChars) {
+  const tokens = []
+  for (const word of String(text || '').split(/\s+/).filter(Boolean)) {
+    if (captionWidth(word) <= maxChars) { tokens.push(word); continue }
+    let piece = ''
+    for (const ch of Array.from(word)) {
+      if (piece && captionWidth(piece + ch) > maxChars) { tokens.push(piece); piece = '' }
+      piece += ch
+    }
+    if (piece) tokens.push(piece)
+  }
+  return tokens
+}
+
 function captionChunks(text, maxChars = 58) {
   const chunks = []
-  for (const sentence of String(text || '').split(/(?<=[.!?])\s+/).filter(Boolean)) {
-    const words = sentence.split(/\s+/).filter(Boolean)
+  for (const sentence of String(text || '').split(SENTENCE_BREAK).filter(Boolean)) {
+    const words = captionTokens(sentence, maxChars)
     let current = ''
     for (const word of words) {
-      const next = `${current} ${word}`.trim()
-      if (next.length > maxChars && current) {
+      const next = /[\u3000-\u30ff\u3400-\u9fff]$/.test(current) && /^[\u3000-\u30ff\u3400-\u9fff]/.test(word) ? `${current}${word}` : `${current} ${word}`.trim()
+      if (captionWidth(next) > maxChars && current) {
         chunks.push(current)
         current = word
       } else current = next

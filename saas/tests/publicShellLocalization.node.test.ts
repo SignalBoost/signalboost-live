@@ -10,7 +10,7 @@ const baseline = JSON.parse(hydrateLocalizedSource(readFileSync(new URL('../scri
 
 for (const [name, source] of [['Header', header], ['Footer', footer]] as const) {
   test(`${name} has complete five-language component copy`, () => {
-    for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+    for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
       assert.match(source, new RegExp(`\\b${language}:\\s*\\{`))
     }
   })

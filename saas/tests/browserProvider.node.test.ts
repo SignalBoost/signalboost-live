@@ -186,7 +186,7 @@ test('BPAL source has one canonical implementation and forbidden imports are abs
 })
 
 test('browser provider localization keys exist for all five languages', async () => {
-  const locales = ['en','es','pt','pl','ru']
+  const locales = ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']
   const keys = [VercelBrowserAdapter.displayNameKey, ...VercelBrowserAdapter.capabilities.flatMap(c => [c.displayNameKey, c.descriptionKey]), ...VercelBrowserAdapter.origins.map(o => o.labelKey), ...VercelBrowserAdapter.navigationProfiles.map(n => n.labelKey)].filter(Boolean)
   for (const locale of locales) {
     const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8').then(hydrateLocalizedSource))

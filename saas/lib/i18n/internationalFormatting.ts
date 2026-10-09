@@ -1,6 +1,6 @@
 // Locale-aware presentation helpers for the eleven-language roadmap.
 // These helpers do not activate pending user-facing locales.
-import { writingDirection } from './localeExpansion.ts'
+import { writingDirection } from './supportedLanguages.ts'
 export const INTERNATIONAL_LOCALES = Object.freeze({
   en: 'en-US', es: 'es-ES', pt: 'pt-BR', pl: 'pl-PL', ru: 'ru-RU',
   de: 'de-DE', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP', ko: 'ko-KR', ar: 'ar-SA',

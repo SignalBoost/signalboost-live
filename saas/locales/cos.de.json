@@ -1,0 +1,99 @@
+{
+  "cos": {
+    "nav": {
+      "mining": "Mining",
+      "features": "Features",
+      "segments": "Segmente",
+      "rules": "Muster",
+      "runs": "Laufverlauf"
+    },
+    "mining": {
+      "title": "Data Mining",
+      "subtitle": "Verhaltens- und Transaktionsmuster als Grundlage für Vorhersagen",
+      "run_now": "Jetzt ausführen",
+      "last_run": "Letzter Lauf",
+      "events_scanned": "Gescannte Ereignisse",
+      "users_processed": "Verarbeitete Benutzer",
+      "features_written": "Geschriebene Features",
+      "rules_found": "Gefundene Muster"
+    },
+    "features": {
+      "title": "Extrahierte Features",
+      "name": "Feature",
+      "value": "Wert",
+      "updated": "Aktualisiert",
+      "names": {
+        "event_frequency_per_day": "Aktivität pro Tag",
+        "transaction_count": "Transaktionen",
+        "avg_deposit_cents": "Durchschnittliche Einzahlung",
+        "avg_transfer_cents": "Durchschnittliche Überweisung",
+        "preferred_txn_hour": "Bevorzugte Uhrzeit",
+        "dominant_device_code": "Hauptgerät",
+        "campaign_engagement_rate": "Kampagneninteraktion",
+        "recency_days": "Tage seit letzter Aktivität",
+        "amount_trend_slope": "Ausgabentrend"
+      }
+    },
+    "segments": {
+      "title": "Verhaltenssegmente",
+      "cluster": "Cluster",
+      "members": "Mitglieder"
+    },
+    "rules": {
+      "title": "Erkannte Muster",
+      "if": "Wenn",
+      "then": "dann",
+      "support": "Support",
+      "confidence": "Konfidenz",
+      "lift": "Lift"
+    },
+    "status": {
+      "running": "Wird ausgeführt",
+      "success": "Erfolg",
+      "error": "Fehler"
+    },
+    "empty": {
+      "no_features": "Noch keine Features – führen Sie einen Mining-Job aus, um sie zu befüllen.",
+      "no_rules": "Noch keine Muster erkannt.",
+      "no_runs": "Noch keine Mining-Läufe aufgezeichnet."
+    },
+    "errors": {
+      "unauthorized": "Bitte melden Sie sich an, um fortzufahren.",
+      "forbidden": "Sie haben keinen Zugriff auf diese Daten.",
+      "load_failed": "Daten konnten nicht geladen werden. Bitte versuchen Sie es erneut."
+    },
+    "tooltips": {
+      "confidence": "Wie oft das Muster zutrifft, wenn die Bedingung erfüllt ist.",
+      "lift": "Wie viel wahrscheinlicher das Ergebnis im Vergleich zum Zufall ist.",
+      "segment": "Gruppe von Benutzern mit ähnlichem Verhalten."
+    },
+    "meta": {
+      "title": "COS Data Mining — SignalBoost",
+      "description": "Extrahierte Verhaltens- und Transaktionssignale, die COS-Vorhersagen antreiben."
+    },
+    "dashboard": {
+      "overview": "Übersicht",
+      "refresh": "Aktualisieren",
+      "run_history": "Ausführungsverlauf",
+      "segment_distribution": "Segmentverteilung",
+      "top_patterns": "Top-Muster",
+      "no_access": "Zum Anzeigen der Mining-Intelligence ist Administratorzugriff erforderlich.",
+      "lookup_user": "Benutzer-Feature-Suche",
+      "user_id_placeholder": "Benutzer-ID eingeben",
+      "view": "Anzeigen",
+      "never": "Nie",
+      "users": "Benutzer"
+    },
+    "predict": {
+      "title": "Vorhergesagte nächste Aktionen",
+      "action": "Aktion",
+      "score": "Bewertung",
+      "basis": "Begründung",
+      "none": "Noch nicht genug Signale für eine Vorhersage.",
+      "propensity": "Neigung",
+      "engagement": "Interaktion",
+      "churn_risk": "Abwanderungsrisiko",
+      "value": "Wert"
+    }
+  }
+}

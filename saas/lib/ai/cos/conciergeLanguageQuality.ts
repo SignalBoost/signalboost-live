@@ -1,6 +1,6 @@
-export type ConciergeLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type ConciergeLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
-const SUPPORTED = new Set<ConciergeLanguage>(['en', 'es', 'pt', 'pl', 'ru'])
+const SUPPORTED = new Set<ConciergeLanguage>(['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
 
 export function normalizeConciergeLanguage(value?: string | null): ConciergeLanguage {
   const code = String(value || 'en').trim().toLowerCase().split('-')[0] as ConciergeLanguage
@@ -44,6 +44,54 @@ const PROFILES: Record<ConciergeLanguage, string> = {
     'Последовательно сохраняй регистр общения (вы/ты), избегай английских синтаксических калек и выбирай формулировки, характерные для носителя русского языка.',
     'Перед возвратом ответа молча проверь падежное управление, род и число, согласование определений и существительных, вид глаголов, предлоги и неестественные англицизмы.',
   ].join(' '),
+  de: [
+    'Schreiben Sie natürliches, idiomatisches und professionelles Deutsch.',
+    'Formulieren Sie die Antwort direkt auf Deutsch; übersetzen Sie keinen zuerst auf Englisch gedachten Entwurf wörtlich.',
+    'Achten Sie auf Kasus, Genus, Numerus, Verbstellung (Verbzweitstellung im Hauptsatz, Verbendstellung im Nebensatz), Rektion von Verben und Präpositionen sowie korrekte Großschreibung von Substantiven.',
+    'Behalten Sie die Anrede des Nutzers (Sie oder du) konsequent bei; ohne Hinweis verwenden Sie im geschäftlichen Kontext die Sie-Form.',
+    'Prüfen Sie vor der Rückgabe still jede Nominalgruppe auf Kongruenz von Artikel, Adjektivendung und Substantiv, die Satzklammer, die Rektion und unnatürliche Anglizismen.',
+    'Vermeiden Sie unnötige englische Prozessbegriffe wie onboarding, rollout, overhead, trade-off oder scope creep, wenn es eine natürliche deutsche Formulierung gibt, außer der Nutzer hat ausdrücklich verlangt, den Begriff wörtlich beizubehalten, oder es handelt sich um einen technischen, Produkt- oder Oberflächennamen.',
+  ].join(' '),
+  fr: [
+    'Rédigez dans un français naturel, idiomatique et professionnel.',
+    'Formulez la réponse directement en français ; ne traduisez pas littéralement un brouillon pensé en anglais.',
+    'Respectez l’accord en genre et en nombre, l’accord du participe passé, la concordance des temps, l’emploi du subjonctif, les prépositions et la typographie française (espace avant « ; : ! ? », guillemets « »).',
+    'Conservez de façon cohérente le registre de l’utilisateur ; à défaut d’indication, vouvoyez dans un contexte professionnel.',
+    'Avant de renvoyer la réponse, vérifiez en silence chaque groupe nominal, les accords verbaux, les constructions prépositionnelles et les calques de l’anglais.',
+    'Évitez les anglicismes de processus inutiles : n’employez pas onboarding, rollout, overhead, trade-off ni scope creep lorsqu’une formulation française naturelle existe, sauf si l’utilisateur a demandé de conserver le terme tel quel ou s’il s’agit d’un nom technique, de produit ou d’interface.',
+  ].join(' '),
+  it: [
+    'Scrivi in un italiano naturale, idiomatico e professionale.',
+    'Formula la risposta direttamente in italiano; non tradurre letteralmente una bozza pensata in inglese.',
+    'Cura l’accordo di genere e numero, l’uso degli articoli e delle preposizioni articolate, la concordanza dei tempi, il congiuntivo e la reggenza dei verbi.',
+    'Mantieni in modo coerente il registro dell’utente (tu o Lei) ed evita calchi sintattici dall’inglese.',
+    'Prima di restituire la risposta, controlla in silenzio ogni sintagma nominale, gli accordi verbali, le preposizioni e i calchi innaturali.',
+    'Evita anglicismi di processo superflui: non usare onboarding, rollout, overhead, trade-off né scope creep quando esiste un’espressione italiana naturale, salvo che l’utente abbia chiesto di conservare il termine alla lettera o che si tratti di un nome tecnico, di prodotto o di interfaccia.',
+  ].join(' '),
+  ja: [
+    '自然で慣用的な、ビジネスにふさわしい日本語で書いてください。',
+    '英語で考えた下書きを直訳せず、最初から日本語で回答を組み立ててください。',
+    '指定がない限り、です・ます調で文体を統一し、敬語（尊敬語・謙譲語・丁寧語）を正しく使い分けてください。',
+    '助詞（は・が・を・に・で）の使い分け、主語と述語の対応、語順、漢字・ひらがな・カタカナの表記の自然さに注意してください。',
+    '回答を返す前に、助詞、文体の統一、敬語、不自然な直訳調や不要なカタカナ語がないかを黙って確認してください。',
+    'onboarding、rollout、overhead、trade-off、scope creep などの不要な英語のプロセス用語は、自然な日本語表現がある場合は使わないでください。ただし、ユーザーがその語をそのまま残すよう求めた場合や、技術名・製品名・UI ラベルである場合は除きます。',
+  ].join(''),
+  ko: [
+    '자연스럽고 관용적이며 업무에 적합한 한국어로 작성하세요.',
+    '영어로 먼저 구상한 초안을 직역하지 말고 처음부터 한국어로 답변을 구성하세요.',
+    '별도 지시가 없으면 합니다체 또는 해요체로 높임법을 일관되게 유지하세요.',
+    '조사(은/는, 이/가, 을/를)의 선택, 주어와 서술어의 호응, 어순, 띄어쓰기에 주의하세요.',
+    '답변을 반환하기 전에 조사, 높임법의 일관성, 띄어쓰기, 어색한 번역투와 불필요한 외래어를 조용히 점검하세요.',
+    'onboarding, rollout, overhead, trade-off, scope creep 같은 불필요한 영어 프로세스 용어는 자연스러운 한국어 표현이 있으면 사용하지 마세요. 단, 사용자가 해당 용어를 그대로 유지하라고 요청했거나 기술명, 제품명, UI 레이블인 경우는 예외입니다.',
+  ].join(' '),
+  ar: [
+    'اكتب بعربية فصحى معاصرة طبيعية وسليمة ومهنية.',
+    'صُغ الإجابة مباشرةً بالعربية، ولا تترجم حرفيًا مسودةً فكّرت فيها بالإنجليزية.',
+    'راعِ المطابقة في التذكير والتأنيث والعدد، وقواعد العدد والمعدود، والإعراب حيث يظهر، وحروف الجر، وترتيب الجملة الطبيعي.',
+    'حافظ على مستوى رسمي ثابت مناسب لسياق الأعمال، واستخدم علامات الترقيم العربية (، ؛ ؟).',
+    'قبل إرجاع الإجابة، راجع بصمت المطابقة بين الموصوف والصفة، والفعل والفاعل، وحروف الجر، والتراكيب المترجمة حرفيًا.',
+    'تجنّب المصطلحات الإنجليزية غير الضرورية مثل onboarding وrollout وoverhead وtrade-off وscope creep عند وجود تعبير عربي طبيعي، إلا إذا طلب المستخدم الإبقاء على المصطلح حرفيًا أو كان اسمًا تقنيًا أو اسم منتج أو تسمية واجهة.',
+  ].join(' '),
 }
 
 const LITERAL_PRESERVATION_RULE = [
@@ -61,7 +109,7 @@ const AVOIDABLE_PROCESS_JARGON_RULE = [
 
 /**
  * Compact first-pass policy shared by the enterprise COS prompt and public Concierge prompt.
- * It names all five supported output languages because the shared answer policy is static; the
+ * It names all eleven supported output languages because the shared answer policy is static; the
  * surrounding reasoner prompt still selects exactly one response language for the turn.
  */
 export const NATIVE_LANGUAGE_ANSWER_POLICY: readonly string[] = [
@@ -71,6 +119,12 @@ export const NATIVE_LANGUAGE_ANSWER_POLICY: readonly string[] = [
   `- Brazilian Portuguese: ${PROFILES.pt}`,
   `- Polish: ${PROFILES.pl}`,
   `- Russian: ${PROFILES.ru}`,
+  `- German: ${PROFILES.de}`,
+  `- French: ${PROFILES.fr}`,
+  `- Italian: ${PROFILES.it}`,
+  `- Japanese: ${PROFILES.ja}`,
+  `- Korean: ${PROFILES.ko}`,
+  `- Arabic: ${PROFILES.ar}`,
   '- Apply only the rule for the response language selected elsewhere in this prompt. Do not translate through English first.',
   '- Before returning, silently perform the morphology, agreement, government/regency, preposition, and idiom scan appropriate to the selected language. A high-level correct meaning does not excuse a grammatical mismatch.',
   `- ${LITERAL_PRESERVATION_RULE}`,
@@ -98,6 +152,12 @@ export function conciergeLanguageName(language?: string | null): string {
     pt: 'Brazilian Portuguese',
     pl: 'Polish',
     ru: 'Russian',
+    de: 'German',
+    fr: 'French',
+    it: 'Italian',
+    ja: 'Japanese',
+    ko: 'Korean',
+    ar: 'Arabic',
   }
   return names[normalizeConciergeLanguage(language)]
 }
@@ -117,7 +177,7 @@ export function criticalLanguageTokens(text: string): string[] {
   return [...new Set(tokens)]
 }
 
-const PRESERVATION_DIRECTIVE = /(?:\bkeep\b|\bpreserv\p{L}*|\bunchanged\b|\bexact(?:ly)?\b|\bmant[eé]n\p{L}*|\bconserv\p{L}*|\bsin\s+cambios\b|\bexactamente\b|\bmantenh\p{L}*|\bsem\s+altera[cç][oõ]es\b|\bexatamente\b|\bzachow\p{L}*|\bbez\s+zmian\b|\bdokładnie\b|\bсохран\p{L}*|\bбез\s+изменений\b|\bточно\b)/iu
+const PRESERVATION_DIRECTIVE = /(?:\bkeep\b|\bpreserv\p{L}*|\bunchanged\b|\bexact(?:ly)?\b|\bmant[eé]n\p{L}*|\bconserv\p{L}*|\bsin\s+cambios\b|\bexactamente\b|\bmantenh\p{L}*|\bsem\s+altera[cç][oõ]es\b|\bexatamente\b|\bzachow\p{L}*|\bbez\s+zmian\b|\bdokładnie\b|\bсохран\p{L}*|\bбез\s+изменений\b|\bточно\b|\bbeibehalt\p{L}*|\bbehalt\p{L}*|\bunverändert\p{L}*|\bgenau\b|\bwörtlich\b|\bgarde[rz]?\b|\binchangé\p{L}*|\bexactement\b|\bmantieni\b|\binvariat\p{L}*|\besattamente\b|そのまま|変更せず|正確に|保持して|그대로|변경\s*없이|정확히|유지하|احتفظ|حافظ\s+على|دون\s+تغيير|كما\s+(?:هو|هي)|بالضبط|حرفي)/iu
 const AVOIDABLE_ENGLISH_PROCESS_JARGON = /\b(?:onboarding|rollout|overhead|trade[- ]?off|scope\s+creep)\b/giu
 
 function escapeRegExp(value: string): string {

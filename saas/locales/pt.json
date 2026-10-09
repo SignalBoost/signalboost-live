@@ -385,7 +385,7 @@
       "analyzedSource": "Fonte analisada"
     },
     "placeholders": {
-      "sourceUrl": "https://exemplo.com ou https://github.com/org/repo",
+      "sourceUrl": "https://example.com ou https://github.com/org/repo",
       "searchOptions": "Buscar opções",
       "selectOption": "Selecione uma opção",
       "selectMany": "Selecione uma ou mais opções"
@@ -638,7 +638,13 @@
       "pt": "Português",
       "es": "Español",
       "pl": "Polski",
-      "ru": "Русский"
+      "ru": "Русский",
+      "de": "Deutsch",
+      "fr": "Français",
+      "it": "Italiano",
+      "ja": "日本語",
+      "ko": "한국어",
+      "ar": "العربية"
     },
     "publicTools": {
       "label": "Ferramentas públicas",
@@ -3352,7 +3358,7 @@
     "u_f45198e459f8516b": "Usuários gratuitos/demo obtêm apenas uma reprodução prévia. Atualize para exportar.",
     "u_5fa206e85ecfbf38": "Excedente:",
     "u_f1c65341b8172c5f": "minuto(s) extra em",
-    "u_d1eae51ccd25a84d": "/min. SignalBoost will open a billing session before rendering.",
+    "u_d1eae51ccd25a84d": "/min. O SignalBoost abrirá uma sessão de faturamento antes da renderização.",
     "u_56b564b75c7fdb48": "Modelos",
     "u_02a92943466e7958": "Pontos de partida no estilo Canva",
     "u_6da87f3748b4df1e": "Linha do tempo da legenda",
@@ -4084,7 +4090,7 @@
     "viewPricing": "Ver preços",
     "unifiedAria": "Pré-visualização do wireframe do painel SaaS unificado",
     "sidebarAria": "Navegação do módulo SaaS",
-    "i18nStatus": "i18n online: EN · ES · PT · PL · RU",
+    "i18nStatus": "i18n online: EN · ES · PT · PL · RU · DE · FR · IT · JA · KO · AR",
     "kicker": "Wireframes de cockpit SaaS",
     "title": "Console Cockpit para utilitários de escritório e fluxos de trabalho de assistente",
     "subtitle": "Um sistema de painel responsivo com cartões de telemetria, navegação fácil de usar, painéis de vidro e visualizações de módulos prontos para aprovação antes da codificação de produção.",

@@ -20,5 +20,5 @@ export const aiDistillationEngineManifest: PortableProductManifest = Object.free
   architectureReferences: Object.freeze(['saas/lib/ai/cos/cosUniversityMassDistillation.ts', 'saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts', 'saas/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts']),
   documentationReferences: Object.freeze(['docs/ONBOARD-SNAPSHOT-2026-09-15-PRE-DISTILLATION-PORTABLE.md', 'docs/portables/ai-university-distillation-suite.md']),
   futureFeatures: Object.freeze(['buyer-neutral-training-provider-port', 'versioned-buyer-release-package', 'licensing-activation']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

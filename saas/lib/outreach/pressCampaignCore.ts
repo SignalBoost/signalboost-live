@@ -44,7 +44,7 @@ const TABLE = 'press_campaign_jobs'
 const TICK_BUDGET_MS = 50_000
 const DRAFTS_PER_TICK = 6
 const MAX_REQUESTED = 40
-const LANGS = ['en', 'es', 'pt', 'pl', 'ru']
+const LANGS = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 export type PressCampaignStatus =
   | 'queued' | 'discovering' | 'running' | 'completed' | 'failed' | 'cancelled'

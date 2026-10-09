@@ -1,4 +1,4 @@
-export const UI_LOCALES = ['en', 'es', 'pt', 'pl', 'ru']
+export const UI_LOCALES = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 export const TARGET_UI_LOCALES = UI_LOCALES.filter(locale => locale !== 'en')
 
 const PROTECTED_TERMS = new Set([

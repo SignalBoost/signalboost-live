@@ -30,7 +30,7 @@ test('Provider Hub dashboard renders only public status fields', async () => {
 
 test('Provider Hub dashboard localizes the public status surface in all supported languages', async () => {
   const source = await readUiSourceAsync(componentUrl)
-  for (const locale of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(source, new RegExp(`\\b${locale}: \\{`))
+  for (const locale of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) assert.match(source, new RegExp(`\\b${locale}: \\{`))
   assert.match(source, /useI18n\(\)/)
   assert.match(source, /actionLabels/)
   assert.match(source, /noticeLabels/)

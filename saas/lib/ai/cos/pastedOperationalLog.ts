@@ -103,6 +103,12 @@ export function operationalLogRepairHandoff(language = 'en'): string {
   if (locale === 'pt') return 'Posso reparar isso. Quer que eu faça?'
   if (locale === 'pl') return 'Mogę to naprawić. Chcesz, żebym to zrobił?'
   if (locale === 'ru') return 'Я могу это исправить. Хотите, чтобы я это сделал?'
+  if (locale === 'de') return 'Ich kann das reparieren. Soll ich das tun?'
+  if (locale === 'fr') return 'Je peux le réparer. Voulez-vous que je le fasse ?'
+  if (locale === 'it') return 'Posso ripararlo. Vuoi che lo faccia?'
+  if (locale === 'ja') return 'これを修復できます。修復してもよろしいですか？'
+  if (locale === 'ko') return '이 문제를 복구할 수 있습니다. 진행할까요?'
+  if (locale === 'ar') return 'يمكنني إصلاح هذا. هل تريد أن أقوم بذلك؟'
   return 'I can repair this. Want me to?'
 }
 
@@ -110,7 +116,7 @@ export function operationalLogRepairHandoff(language = 'en'): string {
  * not classifying a human's words, so no vocabulary rule is implied by this list. */
 export function isOperationalLogRepairOffer(reply: string): boolean {
   const text = String(reply || '')
-  return (['en', 'es', 'pt', 'pl', 'ru'] as const).some(locale => text.includes(operationalLogRepairHandoff(locale)))
+  return (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const).some(locale => text.includes(operationalLogRepairHandoff(locale)))
 }
 
 export function ensureOperationalLogRepairHandoff(reply: string, language = 'en'): string {

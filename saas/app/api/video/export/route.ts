@@ -9,7 +9,7 @@ import { refundVideoCredit, spendVideoCredit } from '@/lib/credits'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type CaptionCue = {
   id: string
@@ -54,7 +54,7 @@ type AccountRow = {
   id?: string | null
 }
 
-const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
+const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) {
   return NextResponse.json(body, { status })

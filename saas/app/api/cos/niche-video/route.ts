@@ -12,7 +12,7 @@ import { resolveCompanyFacts, isSoldCopy } from '@/lib/portable/companyIdentity'
 
 export const dynamic = 'force-dynamic'
 
-const FIVE_LANGUAGES: NicheVideoStrategyInput['languages'] = ['en', 'es', 'pt', 'pl', 'ru']
+const FIVE_LANGUAGES: NicheVideoStrategyInput['languages'] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 function withFiveLanguages(input: NicheVideoStrategyInput): NicheVideoStrategyInput {
   return { ...input, languages: FIVE_LANGUAGES }

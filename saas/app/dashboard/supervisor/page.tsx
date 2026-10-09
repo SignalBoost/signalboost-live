@@ -44,7 +44,7 @@ import OperationalAssessmentPanel from '@/components/supervisor/OperationalAsses
 type Row = Record<string, any>
 const PERSISTENCE_PROBE_ID = 'database'
 const PERSISTENCE_PROBE_TARGET = 'self-healing:persistence-roundtrip'
-const safeLang = (value?: string) => { const lang = (value || 'en').slice(0, 2).toLowerCase(); return ['en','es','pt','pl','ru'].includes(lang) ? lang : 'en' }
+const safeLang = (value?: string) => { const lang = (value || 'en').slice(0, 2).toLowerCase(); return ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar'].includes(lang) ? lang : 'en' }
 const fmt = (value?: string | null) => value || '—'
 const ms = (start?: string, end?: string) => { const a = Date.parse(start || ''); const b = Date.parse(end || ''); return Number.isFinite(a) && Number.isFinite(b) ? `${Math.max(0, Math.round((b - a) / 1000))}s` : '—' }
 const age = (value?: string) => { const t = Date.parse(value || ''); return Number.isFinite(t) ? `${Math.max(0, Math.round((Date.now() - t) / 60000))}m` : '—' }

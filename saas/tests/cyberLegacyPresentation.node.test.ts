@@ -103,7 +103,7 @@ test('current advisory recommendations never suggest a downgrade from an unrelat
 
 test('historical-policy and severity disclosures are present in all five languages', () => {
   const keys = Object.keys(cyberReportPresentationCopy('en')).sort()
-  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     assert.deepEqual(Object.keys(cyberReportPresentationCopy(lang)).sort(), keys)
     assert.ok(Object.values(cyberReportPresentationCopy(lang)).every(v => typeof v === 'string' && v.length > 0))
     if (lang !== 'en') assert.notEqual(cyberReportPresentationCopy(lang).severityWarning, copy.severityWarning)
@@ -225,7 +225,7 @@ test('display branding handles legacy casing and prose in all five supported lan
   assert.equal(cyberProductText(undefined), '')
   assert.equal(cyberProductText(null), '')
   assert.equal(cyberProductText('iTMounts'), 'iTMounts')
-  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(cyberReportPresentationCopy(lang).brandDisplayNotice, /iTMounts/)
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) assert.match(cyberReportPresentationCopy(lang).brandDisplayNotice, /iTMounts/)
 })
 
 

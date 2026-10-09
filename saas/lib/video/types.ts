@@ -25,7 +25,7 @@ export const defaultCaptionStyle: CaptionStyle = {
   y: 70,
 }
 
-export type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 export type VideoQuota = {
   usedMinutes: number

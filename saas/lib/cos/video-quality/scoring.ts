@@ -42,7 +42,7 @@ function passes(candidate: VideoQualityCandidate, feature: VideoQualityFeature) 
     case 'branded_url': return BRANDED_URL_PATTERN.test(candidate.destination_url || candidate.call_to_action || '')
     case 'traffic_plan': return hasItems(candidate.traffic_plan)
     case 'monetization_plan': return hasItems(candidate.monetization_plan)
-    case 'five_languages': return ['en', 'es', 'pt', 'pl', 'ru'].every(language => candidate.languages?.includes(language))
+    case 'five_languages': return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].every(language => candidate.languages?.includes(language))
     case 'approval_gates': return hasItems(candidate.approval_gates)
     case 'mined_signals': return hasItems(candidate.mining_summary)
     case 'prediction_summary': return hasText(candidate.prediction_summary)
@@ -99,7 +99,7 @@ export function buildVideoQualityComparison(): VideoQualityComparison {
     destination_url: PUBLIC_BRAND_DOMAIN,
     traffic_plan: decision.traffic_plan,
     monetization_plan: decision.monetization_plan,
-    languages: ['en', 'es', 'pt', 'pl', 'ru'],
+    languages: ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'],
     approval_gates: decision.approval_required,
     mining_summary: decision.mining_summary,
     prediction_summary: decision.prediction_summary,

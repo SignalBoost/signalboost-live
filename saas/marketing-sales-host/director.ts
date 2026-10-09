@@ -53,12 +53,12 @@ function makeGenerate(host: MarketingHost) {
       buildFactualPreamble(facts),
       '',
       `You are the marketing director for ${hostBrandName()}.`,
-      'Write ONE short promotional campaign for the given theme, in FIVE languages: en, es, pt, pl, ru.',
+      `Write ONE short promotional campaign for the given theme, in ${LANGS.length} languages: ${LANGS.join(', ')}.`,
       'For each language produce a native-quality title (max ~60 chars) and a body of 2-4 sentences.',
-      'Write natively in each language — do NOT machine-translate from English.',
+      'Write natively in each language — do NOT machine-translate from English. Use Modern Standard Arabic for ar.',
       'Do NOT invent statistics, prices, names, testimonials, awards, or guarantees. Exactly one clear call to action.',
       'Return ONLY raw JSON, no markdown fences, shaped exactly:',
-      '{"objective":"<short internal objective>","drafts":[{"lang":"en","title":"...","body":"..."},{"lang":"es",...},{"lang":"pt",...},{"lang":"pl",...},{"lang":"ru",...}]}',
+      `{"objective":"<short internal objective>","drafts":[{"lang":"${LANGS[0]}","title":"...","body":"..."},${LANGS.slice(1).map(lang => `{"lang":"${lang}",...}`).join(',')}]}`,
     ].join('\n')
 
     let text = ''
@@ -66,7 +66,8 @@ function makeGenerate(host: MarketingHost) {
       text = await ai.generate({
         systemPrompt: system,
         prompt: `Theme: ${theme.prompt}`,
-        maxTokens: 1400,
+        // ~280 tokens per language, the same budget the original five-language prompt had.
+        maxTokens: 280 * LANGS.length,
       })
     } catch { return null }
 

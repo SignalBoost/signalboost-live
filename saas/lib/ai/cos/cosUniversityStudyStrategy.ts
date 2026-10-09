@@ -352,6 +352,15 @@ export function detectPlatformLanguages(text: unknown): CosPlatformLanguage[] {
     ['pt', /\b(?:portuguese|português|\bpt\b)/i],
     ['pl', /\b(?:polish|polski|\bpl\b)/i],
     ['ru', /\b(?:russian|русск|\bru\b)/i],
+    // The new languages match on their English name or endonym only. Their bare codes are
+    // ordinary words elsewhere ("de" in es/pt, "it" in English, "ja" in German), so a code
+    // match would invent a language the text never asked about.
+    ['de', /\b(?:german|deutsch)/i],
+    ['fr', /\b(?:french|français|francais)/i],
+    ['it', /\b(?:italian|italiano)/i],
+    ['ja', /\bjapanese\b|日本語/i],
+    ['ko', /\bkorean\b|한국어/i],
+    ['ar', /\barabic\b|العربية/i],
   ]
   for (const [language, pattern] of patterns) if (pattern.test(value)) found.push(language)
   return found

@@ -594,5 +594,719 @@
       "error": "COS временно недоступен. Попробуйте ещё раз или перейдите к полному помощнику.",
       "trust": "COS использует управляемое рассуждение, соблюдает границы одобрения и не представляет неопределённую информацию как факты."
     }
+  },
+  "de": {
+    "kicker": "KI-gestützt · Menschen behalten die Kontrolle",
+    "title": "Ein Ort für jede Wachstumsaufgabe.",
+    "languagesAria": "In fünf Sprachen verfügbar",
+    "publicModules": "Öffentliche Tools",
+    "portableEngines": "Unternehmenssoftware – lizenzieren Sie die Software hinter SignalBoost",
+    "license": "Lizenz",
+    "campaignStudio": "Kampagnen-Studio",
+    "live": "Aktiv",
+    "preview": "Vorschau",
+    "open": "Offen",
+    "stats": {
+      "workflows": "Workflows",
+      "actions": "Aktionen",
+      "markets": "Märkte",
+      "uptime": "Verfügbarkeit"
+    },
+    "modules": {
+      "audit": {
+        "title": "Website-Prüfung",
+        "desc": "Prüfen Sie öffentliche Websites, finden Sie Probleme und erhalten Sie eine klare Aufgabenliste."
+      },
+      "security": {
+        "title": "Sicherheitsprüfung",
+        "desc": "Prüfen Sie Links, Header, Cookies und HTTPS, ohne auf private Systeme zuzugreifen."
+      },
+      "optimization": {
+        "title": "Website verbessern",
+        "desc": "Erstellen Sie lokale Inhalte, verbessern Sie Seiten, prüfen Sie Änderungen und veröffentlichen Sie, wenn Sie bereit sind."
+      }
+    },
+    "portables": {
+      "providerHub": {
+        "name": "Software für Anbieter-Verbindungs-Hub",
+        "desc": "Nutzen Sie Ihre eigenen KI- und Geschäftskonten, verbunden über einen einzigen kontrollierten Arbeitsbereich."
+      },
+      "campaign": {
+        "name": "Software für Kampagnen-Studio",
+        "desc": "Aus einer kurzen Anfrage wird eine fertige Kampagne."
+      },
+      "integrations": {
+        "name": "Software für Integrations-Hub",
+        "desc": "Sichere Verbindungen zu Vertriebstools, Websites, Zahlungen, Kalendern, KI-Tools und APIs."
+      },
+      "render": {
+        "name": "Software für Videoerstellung",
+        "desc": "Sprache und Markenvideos mit sicherer Prepaid-Nutzung."
+      },
+      "console": {
+        "name": "Software für Kontrollzentrum",
+        "desc": "Schlüssel, Webhooks, Protokolle, Releases und Aktivitätsprüfungen."
+      },
+      "marketingSales": {
+        "name": "Software für Marketing- + Vertriebs-Engine",
+        "desc": "Kampagnen, Kundenansprache und Veröffentlichung auf sieben sozialen Plattformen – über Ihre eigenen Konten."
+      },
+      "chiefOfStaff": {
+        "name": "Software für KI-Stabschef",
+        "desc": "Plant und erledigt nur genehmigte Arbeit über vom Käufer bereitgestellte Ports."
+      },
+      "browser": {
+        "name": "Software für Browser-Tool",
+        "desc": "Sichere Browserarbeit mit klaren Grenzen und Prüfungen."
+      },
+      "press": {
+        "name": "Software für Presse- & Medien-Engine",
+        "desc": "Erreichen Sie verifizierte Redakteure und kostenpflichtige Nachrichtendienste über eine einzige kontrollierte Engine."
+      },
+      "selfHealing": {
+        "name": "Software für selbstheilenden Supervisor",
+        "desc": "Erkennt eigene Fehler, diagnostiziert sie und repariert sie innerhalb der von Ihnen genehmigten Grenzen."
+      },
+      "browserAgents": {
+        "name": "Software für Browser-Automatisierungs-Governance",
+        "desc": "Plug-and-Play-Ports, vorbereitet für verwaltete, selbst gehostete und künftige Browser-Agent-Stacks."
+      },
+      "agentOperations": {
+        "name": "Software für Agent-Operations-Plattform",
+        "desc": "Geschützte Workflows mit Kontingenten, Audit, Idempotenz, Wiederherstellung und anbieterneutralen Adaptern."
+      },
+      "aiUniversity": {
+        "name": "Software für KI-Universität",
+        "desc": "Eine kontrollierte KI-Universität mit gemeinsamem Kern, Hauptfächern, Wahlfächern, Organisationskursen, Prüfungen, Wissenserhalt und Nachweisen."
+      },
+      "aiDistillation": {
+        "name": "Software für KI-Destillations-Engine",
+        "desc": "Verwandeln Sie einen genehmigten Lehrplan in kontrollierte Trainingsbatches, evaluierte Modellartefakte und rollback-fähige Nachweise."
+      },
+      "dynamicRouter": {
+        "name": "Software für dynamisches Pipeline-Routing",
+        "desc": "Leitet eingehende Arbeit an kompatible, funktionsfähige Kapazität weiter, statt auf einen festen Anbieter oder eine feste Pipeline zu warten."
+      }
+    },
+    "portableMaturity": {
+      "live": "Aktiv",
+      "preview": "Vorschau",
+      "deprecated": "Veraltet"
+    },
+    "concierge": {
+      "eyebrow": "IHR SIGNALBOOST-CONCIERGE",
+      "greeting": "Hallo — ich bin COS.",
+      "headline": "Was möchten Sie heute erreichen?",
+      "subhead": "Stellen Sie eine Frage, beschreiben Sie ein Ziel oder sagen Sie mir, wohin Sie möchten. Ich helfe Ihnen, den passenden SignalBoost-Arbeitsbereich zu finden, und gebe eine belegbasierte Antwort, wenn eine verfügbar ist.",
+      "workspace": "Plattform erkunden",
+      "placeholder": "Fragen Sie COS etwas…",
+      "thinking": "Denkt nach…",
+      "send": "COS fragen",
+      "suggested": "Vorgeschlagene Fragen",
+      "grow": "Hilf mir, mein Unternehmen auszubauen",
+      "review": "Prüfe meine Website",
+      "campaign": "Kampagne planen",
+      "show": "Zeig mir, was SignalBoost kann",
+      "cosLabel": "COS-Antwort",
+      "yourRequest": "IHRE ANFRAGE",
+      "continue": "Weiter mit COS",
+      "error": "COS ist vorübergehend nicht verfügbar. Bitte versuchen Sie es erneut oder fahren Sie im vollständigen Assistenten fort.",
+      "trust": "COS nutzt kontrolliertes Schlussfolgern, respektiert Genehmigungsgrenzen und stellt unsichere Informationen nicht als Tatsache dar."
+    }
+  },
+  "fr": {
+    "kicker": "Propulsé par l’IA · L’humain aux commandes",
+    "title": "Un seul endroit pour chaque tâche de croissance.",
+    "languagesAria": "Disponible en cinq langues",
+    "publicModules": "Outils publics",
+    "portableEngines": "Logiciel d’entreprise — obtenez une licence du logiciel qui fait fonctionner SignalBoost",
+    "license": "Licence",
+    "campaignStudio": "Studio de campagnes",
+    "live": "Actif",
+    "preview": "Aperçu",
+    "open": "Ouvert",
+    "stats": {
+      "workflows": "workflows",
+      "actions": "actions",
+      "markets": "marchés",
+      "uptime": "disponibilité"
+    },
+    "modules": {
+      "audit": {
+        "title": "Analyse du site",
+        "desc": "Analysez des sites web publics, détectez les problèmes et obtenez une liste d’actions claire."
+      },
+      "security": {
+        "title": "Contrôle de sécurité",
+        "desc": "Vérifiez les liens, en-têtes, cookies et HTTPS sans accéder aux systèmes privés."
+      },
+      "optimization": {
+        "title": "Améliorer votre site",
+        "desc": "Créez du contenu local, améliorez vos pages, vérifiez les modifications et publiez quand vous êtes prêt."
+      }
+    },
+    "portables": {
+      "providerHub": {
+        "name": "Logiciel Hub de connexion des fournisseurs",
+        "desc": "Utilisez vos propres comptes IA et professionnels, connectés via un seul espace de travail encadré."
+      },
+      "campaign": {
+        "name": "Logiciel de studio de campagnes",
+        "desc": "Une courte demande devient une campagne aboutie."
+      },
+      "integrations": {
+        "name": "Logiciel Hub d’intégrations",
+        "desc": "Connexions sécurisées vers les outils de vente, sites web, paiements, calendriers, outils d’IA et API."
+      },
+      "render": {
+        "name": "Logiciel de création vidéo",
+        "desc": "Voix et vidéo de marque avec une utilisation prépayée sécurisée."
+      },
+      "console": {
+        "name": "Logiciel de centre de contrôle",
+        "desc": "Clés, webhooks, journaux, versions et contrôles d’activité."
+      },
+      "marketingSales": {
+        "name": "Logiciel de moteur Marketing + Ventes",
+        "desc": "Campagnes, prospection et publication sur sept plateformes sociales — avec vos propres comptes."
+      },
+      "chiefOfStaff": {
+        "name": "Logiciel de chef de cabinet IA",
+        "desc": "Planifie et exécute uniquement le travail approuvé, via des ports fournis par l’acheteur."
+      },
+      "browser": {
+        "name": "Logiciel d’outil navigateur",
+        "desc": "Travail sécurisé dans le navigateur, avec des limites et des contrôles clairs."
+      },
+      "press": {
+        "name": "Logiciel de moteur Presse & Médias",
+        "desc": "Touchez des rédacteurs vérifiés et des fils de presse payants depuis un seul moteur encadré."
+      },
+      "selfHealing": {
+        "name": "Logiciel de superviseur auto-réparateur",
+        "desc": "Détecte ses propres défaillances, les diagnostique et les répare dans les limites que vous approuvez."
+      },
+      "browserAgents": {
+        "name": "Logiciel de gouvernance de l’automatisation du navigateur",
+        "desc": "Ports prêts à l’emploi, préinstallés pour les piles d’agents navigateur gérées, auto-hébergées et futures."
+      },
+      "agentOperations": {
+        "name": "Logiciel de plateforme d’opérations d’agents",
+        "desc": "Workflows protégés avec quotas, audit, idempotence, reprise et adaptateurs neutres vis-à-vis des fournisseurs."
+      },
+      "aiUniversity": {
+        "name": "Logiciel d’université IA",
+        "desc": "Une université IA encadrée avec un tronc commun, des majeures, des options, des cours propres à l’organisation, des examens, de la rétention et des preuves."
+      },
+      "aiDistillation": {
+        "name": "Logiciel de moteur de distillation IA",
+        "desc": "Transformez un programme approuvé en lots d’entraînement encadrés, en artefacts de modèle évalués et en preuves prêtes pour un retour arrière."
+      },
+      "dynamicRouter": {
+        "name": "Logiciel de routeur dynamique de pipelines",
+        "desc": "Achemine le travail entrant vers une capacité compatible et disponible au lieu d’attendre un fournisseur ou un pipeline fixe."
+      }
+    },
+    "portableMaturity": {
+      "live": "Actif",
+      "preview": "Aperçu",
+      "deprecated": "Obsolète"
+    },
+    "concierge": {
+      "eyebrow": "VOTRE CONCIERGE SIGNALBOOST",
+      "greeting": "Bonjour — je suis COS.",
+      "headline": "Que souhaitez-vous accomplir aujourd’hui ?",
+      "subhead": "Posez une question, décrivez un objectif ou dites-moi où vous voulez aller. Je vous aiderai à trouver le bon espace SignalBoost et fournirai une réponse fondée sur des preuves lorsqu’elle est disponible.",
+      "workspace": "Explorer la plateforme",
+      "placeholder": "Posez une question à COS…",
+      "thinking": "Réflexion…",
+      "send": "Demander à COS",
+      "suggested": "Questions suggérées",
+      "grow": "Aidez-moi à développer mon entreprise",
+      "review": "Analysez mon site web",
+      "campaign": "Planifier une campagne",
+      "show": "Montrez-moi ce que SignalBoost peut faire",
+      "cosLabel": "Réponse de COS",
+      "yourRequest": "VOTRE DEMANDE",
+      "continue": "Continuer avec COS",
+      "error": "COS est temporairement indisponible. Veuillez réessayer ou continuer dans l’assistant complet.",
+      "trust": "COS utilise un raisonnement encadré, respecte les limites d’approbation et ne présente pas d’informations incertaines comme des faits."
+    }
+  },
+  "it": {
+    "kicker": "Basato sull’AI · Le persone al comando",
+    "title": "Un unico posto per ogni attività di crescita.",
+    "languagesAria": "Disponibile in cinque lingue",
+    "publicModules": "Strumenti pubblici",
+    "portableEngines": "Software enterprise: acquista la licenza del software alla base di SignalBoost",
+    "license": "Licenza",
+    "campaignStudio": "Studio campagne",
+    "live": "Attivo",
+    "preview": "Anteprima",
+    "open": "Aperto",
+    "stats": {
+      "workflows": "workflow",
+      "actions": "azioni",
+      "markets": "mercati",
+      "uptime": "uptime"
+    },
+    "modules": {
+      "audit": {
+        "title": "Revisione del sito",
+        "desc": "Controlla siti web pubblici, trova i problemi e ottieni un elenco chiaro di azioni."
+      },
+      "security": {
+        "title": "Controllo di sicurezza",
+        "desc": "Controlla link, intestazioni, cookie e HTTPS senza accedere a sistemi privati."
+      },
+      "optimization": {
+        "title": "Migliora il tuo sito",
+        "desc": "Crea contenuti locali, migliora le pagine, rivedi le modifiche e pubblica quando sei pronto."
+      }
+    },
+    "portables": {
+      "providerHub": {
+        "name": "Software Hub Connessione Provider",
+        "desc": "Usa i tuoi account AI e aziendali, collegati tramite un unico spazio di lavoro governato."
+      },
+      "campaign": {
+        "name": "Software Studio Campagne",
+        "desc": "Una breve richiesta diventa una campagna completa."
+      },
+      "integrations": {
+        "name": "Software Hub Integrazioni",
+        "desc": "Connessioni sicure per strumenti di vendita, siti web, pagamenti, calendari, strumenti AI e API."
+      },
+      "render": {
+        "name": "Software Creazione Video",
+        "desc": "Voce e video brandizzati con utilizzo prepagato sicuro."
+      },
+      "console": {
+        "name": "Software Centro di Controllo",
+        "desc": "Chiavi, webhook, log, release e controlli delle attività."
+      },
+      "marketingSales": {
+        "name": "Software Motore Marketing + Vendite",
+        "desc": "Campagne, outreach e pubblicazione su sette piattaforme social, con i tuoi account."
+      },
+      "chiefOfStaff": {
+        "name": "Software Capo di Gabinetto AI",
+        "desc": "Pianifica ed esegue solo il lavoro approvato tramite porte fornite dall’acquirente."
+      },
+      "browser": {
+        "name": "Software Strumento Browser",
+        "desc": "Lavoro sicuro nel browser con limiti e controlli chiari."
+      },
+      "press": {
+        "name": "Software Motore Stampa e Media",
+        "desc": "Raggiungi redattori verificati e agenzie di stampa a pagamento da un unico motore governato."
+      },
+      "selfHealing": {
+        "name": "Software Supervisore Autoriparante",
+        "desc": "Rileva i propri guasti, li diagnostica e li ripara entro i limiti che approvi."
+      },
+      "browserAgents": {
+        "name": "Software Governance dell’Automazione Browser",
+        "desc": "Porte plug-and-play predisposte per stack di agenti browser gestiti, self-hosted e futuri."
+      },
+      "agentOperations": {
+        "name": "Software Piattaforma Operazioni Agenti",
+        "desc": "Workflow protetti con quote, audit, idempotenza, ripristino e adattatori indipendenti dal provider."
+      },
+      "aiUniversity": {
+        "name": "Software Università AI",
+        "desc": "Un’università AI governata con nucleo comune, indirizzi, corsi a scelta, corsi dell’organizzazione, esami, ritenzione ed evidenze."
+      },
+      "aiDistillation": {
+        "name": "Software Motore di Distillazione AI",
+        "desc": "Trasforma un curriculum approvato in batch di addestramento governati, artefatti di modello valutati ed evidenze pronte per il rollback."
+      },
+      "dynamicRouter": {
+        "name": "Software Router Dinamico di Pipeline",
+        "desc": "Instrada il lavoro in arrivo verso capacità compatibile e funzionante invece di attendere un unico provider o pipeline fisso."
+      }
+    },
+    "portableMaturity": {
+      "live": "Attivo",
+      "preview": "Anteprima",
+      "deprecated": "Deprecato"
+    },
+    "concierge": {
+      "eyebrow": "IL TUO CONCIERGE SIGNALBOOST",
+      "greeting": "Ciao — sono COS.",
+      "headline": "Cosa vorresti realizzare oggi?",
+      "subhead": "Fai una domanda, descrivi un obiettivo o dimmi dove vuoi andare. Ti aiuterò a trovare lo spazio di lavoro SignalBoost giusto e fornirò una risposta basata su prove quando disponibile.",
+      "workspace": "Esplora la piattaforma",
+      "placeholder": "Chiedi qualsiasi cosa a COS…",
+      "thinking": "Sto pensando…",
+      "send": "Chiedi a COS",
+      "suggested": "Domande suggerite",
+      "grow": "Aiutami a far crescere la mia attività",
+      "review": "Rivedi il mio sito web",
+      "campaign": "Pianifica una campagna",
+      "show": "Mostrami cosa può fare SignalBoost",
+      "cosLabel": "Risposta di COS",
+      "yourRequest": "LA TUA RICHIESTA",
+      "continue": "Continua con COS",
+      "error": "COS non è temporaneamente disponibile. Riprova o continua nell’assistente completo.",
+      "trust": "COS utilizza un ragionamento governato, rispetta i limiti di approvazione e non presenta informazioni incerte come fatti."
+    }
+  },
+  "ja": {
+    "kicker": "AI搭載 · 人が主導",
+    "title": "あらゆるグロース業務をひとつの場所で。",
+    "languagesAria": "5か国語に対応",
+    "publicModules": "公開ツール",
+    "portableEngines": "エンタープライズソフトウェア — SignalBoostを支えるソフトウェアをライセンス",
+    "license": "ライセンス",
+    "campaignStudio": "キャンペーンスタジオ",
+    "live": "稼働中",
+    "preview": "プレビュー",
+    "open": "オープン",
+    "stats": {
+      "workflows": "ワークフロー",
+      "actions": "アクション",
+      "markets": "市場",
+      "uptime": "稼働率"
+    },
+    "modules": {
+      "audit": {
+        "title": "サイトレビュー",
+        "desc": "公開ウェブサイトをチェックして問題を見つけ、明確なアクションリストを入手しましょう。"
+      },
+      "security": {
+        "title": "セキュリティチェック",
+        "desc": "非公開システムに入ることなく、リンク、ヘッダー、Cookie、HTTPS をチェックします。"
+      },
+      "optimization": {
+        "title": "サイトを改善",
+        "desc": "ローカルコンテンツを作成し、ページを改善し、変更を確認して、準備ができたら公開しましょう。"
+      }
+    },
+    "portables": {
+      "providerHub": {
+        "name": "プロバイダー接続Hubソフトウェア",
+        "desc": "ご自身のAIアカウントとビジネスアカウントを、ガバナンスの効いた1つのワークスペースで接続できます。"
+      },
+      "campaign": {
+        "name": "キャンペーンスタジオソフトウェア",
+        "desc": "短い依頼ひとつが、完成したキャンペーンになります。"
+      },
+      "integrations": {
+        "name": "インテグレーションHubソフトウェア",
+        "desc": "営業ツール、ウェブサイト、決済、カレンダー、AIツール、APIへの安全な連携。"
+      },
+      "render": {
+        "name": "動画作成ソフトウェア",
+        "desc": "音声とブランド動画を、安全なプリペイド利用で。"
+      },
+      "console": {
+        "name": "コントロールセンターソフトウェア",
+        "desc": "キー、Webhook、ログ、リリース、アクティビティチェック。"
+      },
+      "marketingSales": {
+        "name": "マーケティング＋セールスエンジンソフトウェア",
+        "desc": "7つのソーシャルプラットフォームでのキャンペーン、アウトリーチ、投稿を、ご自身のアカウントで。"
+      },
+      "chiefOfStaff": {
+        "name": "AIチーフ・オブ・スタッフソフトウェア",
+        "desc": "購入者が提供するポートを通じて、承認された作業だけを計画・実行します。"
+      },
+      "browser": {
+        "name": "ブラウザツールソフトウェア",
+        "desc": "明確な制限とチェックによる安全なブラウザ作業。"
+      },
+      "press": {
+        "name": "プレス＆メディアエンジンソフトウェア",
+        "desc": "ガバナンスの効いた1つのエンジンから、検証済みの編集者や有料配信サービスにリーチできます。"
+      },
+      "selfHealing": {
+        "name": "自己修復スーパーバイザーソフトウェア",
+        "desc": "自らの障害を検知・診断し、承認した範囲内で修復します。"
+      },
+      "browserAgents": {
+        "name": "ブラウザ自動化ガバナーソフトウェア",
+        "desc": "マネージド型、セルフホスト型、そして将来のブラウザエージェントスタック向けにあらかじめ用意されたプラグアンドプレイのポート。"
+      },
+      "agentOperations": {
+        "name": "エージェント運用プラットフォームソフトウェア",
+        "desc": "クォータ、監査、冪等性、リカバリ、プロバイダー非依存のアダプターを備えた保護されたワークフロー。"
+      },
+      "aiUniversity": {
+        "name": "AI大学ソフトウェア",
+        "desc": "共通コア、専攻、選択科目、組織独自のコース、試験、定着、エビデンスを備えた、ガバナンスの効いたAI大学。"
+      },
+      "aiDistillation": {
+        "name": "AI蒸留エンジンソフトウェア",
+        "desc": "承認済みのカリキュラムを、ガバナンスの効いたトレーニングバッチ、評価済みのモデル成果物、ロールバック可能なエビデンスに変換します。"
+      },
+      "dynamicRouter": {
+        "name": "ダイナミックパイプラインルーターソフトウェア",
+        "desc": "特定のプロバイダーやパイプラインを待つのではなく、受信した作業を互換性のある正常なキャパシティへルーティングします。"
+      }
+    },
+    "portableMaturity": {
+      "live": "稼働中",
+      "preview": "プレビュー",
+      "deprecated": "非推奨"
+    },
+    "concierge": {
+      "eyebrow": "あなたの SIGNALBOOST コンシェルジュ",
+      "greeting": "こんにちは — COS です。",
+      "headline": "今日は何を達成したいですか?",
+      "subhead": "質問をしたり、目標を説明したり、行きたい場所を教えてください。適切な SignalBoost ワークスペースを見つけるお手伝いをし、可能な場合は根拠に基づいた回答を提供します。",
+      "workspace": "プラットフォームを見る",
+      "placeholder": "COS に何でも聞いてください…",
+      "thinking": "考え中…",
+      "send": "COS に質問",
+      "suggested": "おすすめの質問",
+      "grow": "ビジネスの成長を手伝って",
+      "review": "私のウェブサイトをレビューして",
+      "campaign": "キャンペーンを計画",
+      "show": "SignalBoost でできることを見せて",
+      "cosLabel": "COSの回答",
+      "yourRequest": "ご依頼内容",
+      "continue": "COSで続ける",
+      "error": "COSは一時的に利用できません。もう一度お試しいただくか、フル機能のアシスタントで続行してください。",
+      "trust": "COS はガバナンスの効いた推論を使用し、承認の境界を尊重し、不確かな情報を事実として提示しません。"
+    }
+  },
+  "ko": {
+    "kicker": "AI 기반 · 사람이 통제",
+    "title": "모든 성장 업무를 한곳에서.",
+    "languagesAria": "5개 언어로 제공",
+    "publicModules": "공개 도구",
+    "portableEngines": "엔터프라이즈 소프트웨어 — SignalBoost를 구동하는 소프트웨어를 라이선스하세요",
+    "license": "라이선스",
+    "campaignStudio": "캠페인 스튜디오",
+    "live": "활성",
+    "preview": "미리 보기",
+    "open": "열림",
+    "stats": {
+      "workflows": "워크플로",
+      "actions": "작업",
+      "markets": "시장",
+      "uptime": "가동률"
+    },
+    "modules": {
+      "audit": {
+        "title": "사이트 검토",
+        "desc": "공개 웹사이트를 점검하고 문제를 찾아 명확한 작업 목록을 받으세요."
+      },
+      "security": {
+        "title": "보안 점검",
+        "desc": "비공개 시스템에 접근하지 않고 링크, 헤더, 쿠키, HTTPS를 점검하세요."
+      },
+      "optimization": {
+        "title": "사이트 개선",
+        "desc": "현지 콘텐츠를 만들고, 페이지를 개선하고, 변경 사항을 검토한 뒤 준비되면 출시하세요."
+      }
+    },
+    "portables": {
+      "providerHub": {
+        "name": "공급자 연결 Hub 소프트웨어",
+        "desc": "자체 AI 및 비즈니스 계정을 거버넌스가 적용된 하나의 작업 공간으로 연결하세요."
+      },
+      "campaign": {
+        "name": "캠페인 스튜디오 소프트웨어",
+        "desc": "짧은 요청 하나가 완성된 캠페인이 됩니다."
+      },
+      "integrations": {
+        "name": "통합 Hub 소프트웨어",
+        "desc": "영업 도구, 웹사이트, 결제, 캘린더, AI 도구, API를 위한 안전한 연결."
+      },
+      "render": {
+        "name": "동영상 제작 소프트웨어",
+        "desc": "안전한 선불 사용 방식의 음성 및 브랜드 동영상."
+      },
+      "console": {
+        "name": "컨트롤 센터 소프트웨어",
+        "desc": "키, 웹훅, 로그, 릴리스, 활동 점검."
+      },
+      "marketingSales": {
+        "name": "마케팅 + 영업 엔진 소프트웨어",
+        "desc": "7개 소셜 플랫폼에서의 캠페인, 아웃리치, 게시를 자체 계정으로 진행합니다."
+      },
+      "chiefOfStaff": {
+        "name": "AI 비서실장 소프트웨어",
+        "desc": "구매자가 제공한 포트를 통해 승인된 작업만 계획하고 수행합니다."
+      },
+      "browser": {
+        "name": "브라우저 도구 소프트웨어",
+        "desc": "명확한 한도와 점검을 갖춘 안전한 브라우저 작업."
+      },
+      "press": {
+        "name": "보도 및 미디어 엔진 소프트웨어",
+        "desc": "거버넌스가 적용된 하나의 엔진으로 검증된 편집자와 유료 통신사에 도달하세요."
+      },
+      "selfHealing": {
+        "name": "자가 복구 감독자 소프트웨어",
+        "desc": "자체 장애를 감지하고 진단하며, 승인한 한도 내에서 복구합니다."
+      },
+      "browserAgents": {
+        "name": "브라우저 자동화 거버너 소프트웨어",
+        "desc": "관리형, 자체 호스팅 및 향후 브라우저 에이전트 스택을 위해 미리 준비된 플러그 앤 플레이 포트."
+      },
+      "agentOperations": {
+        "name": "에이전트 운영 플랫폼 소프트웨어",
+        "desc": "할당량, 감사, 멱등성, 복구, 공급자 중립 어댑터를 갖춘 보호된 워크플로."
+      },
+      "aiUniversity": {
+        "name": "AI 대학 소프트웨어",
+        "desc": "공통 핵심 과정, 전공, 선택 과목, 조직 과정, 시험, 지식 유지, 증거를 갖춘 거버넌스 기반 AI 대학."
+      },
+      "aiDistillation": {
+        "name": "AI 증류 엔진 소프트웨어",
+        "desc": "승인된 커리큘럼을 거버넌스가 적용된 학습 배치, 평가된 모델 아티팩트, 롤백 가능한 증거로 전환합니다."
+      },
+      "dynamicRouter": {
+        "name": "동적 파이프라인 라우터 소프트웨어",
+        "desc": "고정된 공급자나 파이프라인을 기다리는 대신 들어오는 작업을 호환되고 정상인 용량으로 라우팅합니다."
+      }
+    },
+    "portableMaturity": {
+      "live": "활성",
+      "preview": "미리 보기",
+      "deprecated": "지원 중단"
+    },
+    "concierge": {
+      "eyebrow": "나의 SIGNALBOOST 컨시어지",
+      "greeting": "안녕하세요 — COS입니다.",
+      "headline": "오늘 무엇을 이루고 싶으신가요?",
+      "subhead": "질문하거나, 목표를 설명하거나, 가고 싶은 곳을 알려 주세요. 적합한 SignalBoost 작업 공간을 찾도록 돕고, 가능한 경우 근거에 기반한 답변을 제공합니다.",
+      "workspace": "플랫폼 둘러보기",
+      "placeholder": "COS에게 무엇이든 물어보세요…",
+      "thinking": "생각 중…",
+      "send": "COS에게 질문",
+      "suggested": "추천 질문",
+      "grow": "비즈니스 성장을 도와줘",
+      "review": "내 웹사이트 검토해 줘",
+      "campaign": "캠페인 계획",
+      "show": "SignalBoost로 무엇을 할 수 있는지 보여줘",
+      "cosLabel": "COS 응답",
+      "yourRequest": "요청 내용",
+      "continue": "COS로 계속하기",
+      "error": "COS를 일시적으로 사용할 수 없습니다. 다시 시도하거나 전체 어시스턴트에서 계속하세요.",
+      "trust": "COS는 통제된 추론을 사용하고, 승인 경계를 준수하며, 불확실한 정보를 사실로 제시하지 않습니다."
+    }
+  },
+  "ar": {
+    "kicker": "مدعوم بالذكاء الاصطناعي · والتحكم للبشر",
+    "title": "مكان واحد لكل مهمة نمو.",
+    "languagesAria": "متاح بخمس لغات",
+    "publicModules": "الأدوات العامة",
+    "portableEngines": "برمجيات المؤسسات — رخّص البرمجيات التي يقوم عليها SignalBoost",
+    "license": "الترخيص",
+    "campaignStudio": "استوديو الحملات",
+    "live": "نشط",
+    "preview": "معاينة",
+    "open": "مفتوح",
+    "stats": {
+      "workflows": "مسارات عمل",
+      "actions": "إجراءات",
+      "markets": "أسواق",
+      "uptime": "وقت التشغيل"
+    },
+    "modules": {
+      "audit": {
+        "title": "مراجعة الموقع",
+        "desc": "افحص المواقع العامة، واكتشف المشكلات، واحصل على قائمة إجراءات واضحة."
+      },
+      "security": {
+        "title": "فحص الأمان",
+        "desc": "افحص الروابط والترويسات وملفات تعريف الارتباط وHTTPS دون الدخول إلى الأنظمة الخاصة."
+      },
+      "optimization": {
+        "title": "حسّن موقعك",
+        "desc": "أنشئ محتوى محليًا، وحسّن الصفحات، وراجع التغييرات، وانشر عندما تكون جاهزًا."
+      }
+    },
+    "portables": {
+      "providerHub": {
+        "name": "برنامج Hub ربط المزوّدين",
+        "desc": "استخدم حساباتك الخاصة للذكاء الاصطناعي والأعمال، متصلةً عبر مساحة عمل واحدة محكومة."
+      },
+      "campaign": {
+        "name": "برنامج استوديو الحملات",
+        "desc": "طلب قصير واحد يتحول إلى حملة متكاملة."
+      },
+      "integrations": {
+        "name": "برنامج Hub التكاملات",
+        "desc": "روابط آمنة لأدوات المبيعات والمواقع الإلكترونية والمدفوعات والتقويمات وأدوات الذكاء الاصطناعي وواجهات API."
+      },
+      "render": {
+        "name": "برنامج صناعة الفيديو",
+        "desc": "صوت وفيديو بعلامتك التجارية مع استخدام مسبق الدفع آمن."
+      },
+      "console": {
+        "name": "برنامج مركز التحكم",
+        "desc": "المفاتيح وخطافات الويب والسجلات والإصدارات وفحوصات النشاط."
+      },
+      "marketingSales": {
+        "name": "برنامج محرك التسويق + المبيعات",
+        "desc": "حملات وتواصل ونشر على سبع منصات اجتماعية — عبر حساباتك الخاصة."
+      },
+      "chiefOfStaff": {
+        "name": "برنامج رئيس الديوان بالذكاء الاصطناعي",
+        "desc": "يخطط وينفّذ العمل المعتمد فقط عبر منافذ يوفرها المشتري."
+      },
+      "browser": {
+        "name": "برنامج أداة المتصفح",
+        "desc": "عمل آمن في المتصفح بحدود وضوابط واضحة."
+      },
+      "press": {
+        "name": "برنامج محرك الصحافة والإعلام",
+        "desc": "تواصل مع محررين موثّقين ووكالات أنباء مدفوعة من محرك واحد محكوم."
+      },
+      "selfHealing": {
+        "name": "برنامج المشرف ذاتي الإصلاح",
+        "desc": "يكتشف أعطاله بنفسه ويشخّصها ويصلحها ضمن الحدود التي توافق عليها."
+      },
+      "browserAgents": {
+        "name": "برنامج حوكمة أتمتة المتصفح",
+        "desc": "منافذ جاهزة للتوصيل والتشغيل مُعدّة مسبقًا لحزم وكلاء المتصفح المُدارة والمستضافة ذاتيًا والمستقبلية."
+      },
+      "agentOperations": {
+        "name": "برنامج منصة عمليات الوكلاء",
+        "desc": "مسارات عمل محمية مع حصص وتدقيق وتكرار آمن (Idempotency) واسترداد ومحوّلات محايدة تجاه المزوّدين."
+      },
+      "aiUniversity": {
+        "name": "برنامج جامعة الذكاء الاصطناعي",
+        "desc": "جامعة ذكاء اصطناعي محكومة تضم نواة مشتركة وتخصصات رئيسية ومواد اختيارية ومقررات خاصة بالمؤسسة واختبارات واستبقاء للمعرفة وأدلة."
+      },
+      "aiDistillation": {
+        "name": "برنامج محرك تقطير الذكاء الاصطناعي",
+        "desc": "حوّل منهجًا معتمدًا إلى دفعات تدريب محكومة، وعناصر نماذج مُقيَّمة، وأدلة جاهزة للتراجع."
+      },
+      "dynamicRouter": {
+        "name": "برنامج الموجّه الديناميكي لمسارات العمل",
+        "desc": "يوجّه العمل الوارد إلى سعة متوافقة وسليمة بدلًا من انتظار مزوّد أو مسار ثابت واحد."
+      }
+    },
+    "portableMaturity": {
+      "live": "نشط",
+      "preview": "معاينة",
+      "deprecated": "مُهمَل"
+    },
+    "concierge": {
+      "eyebrow": "الكونسيرج الخاص بك في SIGNALBOOST",
+      "greeting": "مرحبًا — أنا COS.",
+      "headline": "ما الذي تود إنجازه اليوم؟",
+      "subhead": "اطرح سؤالًا، أو صف هدفًا، أو أخبرني إلى أين تريد الذهاب. سأساعدك في العثور على مساحة عمل SignalBoost المناسبة وأقدم إجابة مستندة إلى الأدلة عند توفرها.",
+      "workspace": "استكشف المنصة",
+      "placeholder": "اسأل COS عن أي شيء…",
+      "thinking": "جارٍ التفكير…",
+      "send": "اسأل COS",
+      "suggested": "أسئلة مقترحة",
+      "grow": "ساعدني في تنمية عملي",
+      "review": "راجع موقعي الإلكتروني",
+      "campaign": "خطّط لحملة",
+      "show": "أرني ما يمكن أن يفعله SignalBoost",
+      "cosLabel": "رد COS",
+      "yourRequest": "طلبك",
+      "continue": "المتابعة مع COS",
+      "error": "COS غير متاح مؤقتًا. يُرجى المحاولة مرة أخرى أو المتابعة في المساعد الكامل.",
+      "trust": "يستخدم COS استدلالًا خاضعًا للحوكمة، ويحترم حدود الموافقة، ولا يقدّم المعلومات غير المؤكدة على أنها حقائق."
+    }
   }
 }

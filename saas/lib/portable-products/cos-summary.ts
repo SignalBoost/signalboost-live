@@ -64,7 +64,7 @@ export function buildProductCatalogSummary(): string {
 
   const allLanguages = entries.every(p =>
     p.manifest.supportedLanguages.length === 5 &&
-    ['en', 'es', 'pt', 'pl', 'ru'].every(l => p.manifest.supportedLanguages.includes(l)),
+    ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].every(l => p.manifest.supportedLanguages.includes(l)),
   )
 
   return [

@@ -57,6 +57,12 @@ function honestCorrection(languageCode: string): string {
     pt: 'Nenhuma ferramenta foi executada neste turno. Portanto, qualquer linguagem de execução acima não comprova uma ação, e qualquer ferramenta que não esteja no registro real não é uma integração disponível.',
     pl: 'W tej turze nie wykonano żadnego narzędzia. Dlatego wcześniejsze deklaracje wykonania nie są dowodem działania, a narzędzie spoza rzeczywistego rejestru nie jest dostępną integracją.',
     ru: 'В этом ходе ни один инструмент не был выполнен. Поэтому заявления о выполнении выше не являются доказательством действия, а инструмент вне реального реестра недоступен.',
+    de: 'In diesem Durchgang wurde kein Tool ausgeführt. Jede obige Ausführungsformulierung ist daher kein Nachweis einer Aktion, und jeder Tool-Name, der nicht in der tatsächlichen Tool-Registry vorhanden ist, ist keine verfügbare Integration.',
+    fr: 'Aucun outil n’a été exécuté lors de ce tour. Toute formulation d’exécution ci-dessus ne constitue donc pas la preuve d’une action, et tout nom d’outil absent du registre réel des outils n’est pas une intégration disponible.',
+    it: 'In questo turno non è stato eseguito alcuno strumento. Qualsiasi linguaggio di esecuzione riportato sopra non è quindi una prova di un’azione, e qualsiasi nome di strumento non presente nel registro effettivo degli strumenti non è un’integrazione disponibile.',
+    ja: 'このターンではツールは実行されていません。したがって、上記の実行を示す表現は操作の証拠ではなく、実際のツールレジストリに存在しないツール名は利用可能な連携ではありません。',
+    ko: '이번 턴에서는 도구가 실행되지 않았습니다. 따라서 위의 실행 관련 표현은 작업의 증거가 아니며, 실제 도구 레지스트리에 없는 도구 이름은 사용 가능한 연동이 아닙니다.',
+    ar: 'لم تُنفَّذ أي أداة في هذه الجولة. لذلك فإن أي صياغة تنفيذ أعلاه ليست دليلًا على إجراء، وأي اسم أداة غير موجود في سجل الأدوات الفعلي ليس تكاملًا متاحًا.',
   }
   return M[languageCode] || M.en
 }

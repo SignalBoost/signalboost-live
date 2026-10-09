@@ -46,7 +46,7 @@ const CODE_SIGNAL = /[`{}]|=>|\b(?:yaml|json|sql|regex|snippet|example|syntax|co
 /** Placed in a prompt scoped for a general explanatory question; the reasoning workers read it to pick their compact discipline. */
 export const EXPLANATORY_QUESTION_SCOPE_LINE = 'QUESTION SCOPE: a general explanatory question. Explain the concept directly and accurately; no task, decision, approval or deliverable is requested.'
 
-const LANGUAGE_PROFILE_LINE = /^- (English|Spanish|Brazilian Portuguese|Polish|Russian): /
+const LANGUAGE_PROFILE_LINE = /^- (English|Spanish|Brazilian Portuguese|Polish|Russian|German|French|Italian|Japanese|Korean|Arabic): /
 
 const LANGUAGE_BY_CODE: Readonly<Record<string, string>> = {
   en: 'English',
@@ -54,6 +54,12 @@ const LANGUAGE_BY_CODE: Readonly<Record<string, string>> = {
   pt: 'Brazilian Portuguese',
   pl: 'Polish',
   ru: 'Russian',
+  de: 'German',
+  fr: 'French',
+  it: 'Italian',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ar: 'Arabic',
 }
 
 export type ReasonerPromptScope = Readonly<{
@@ -76,7 +82,13 @@ function selectedLanguageProfile(language: string | null | undefined): string | 
   if (raw.startsWith('spanish') || raw.startsWith('español') || raw.startsWith('espanol')) return 'Spanish'
   if (raw.includes('portug')) return 'Brazilian Portuguese'
   if (raw.startsWith('polish') || raw.startsWith('polski')) return 'Polish'
-  if (raw.startsWith('russian')) return 'Russian'
+  if (raw.startsWith('russian') || raw.startsWith('русский')) return 'Russian'
+  if (raw.startsWith('german') || raw.startsWith('deutsch')) return 'German'
+  if (raw.startsWith('french') || raw.startsWith('français') || raw.startsWith('francais')) return 'French'
+  if (raw.startsWith('italian')) return 'Italian'
+  if (raw.startsWith('japanese') || raw.startsWith('日本語')) return 'Japanese'
+  if (raw.startsWith('korean') || raw.startsWith('한국어')) return 'Korean'
+  if (raw.startsWith('arabic') || raw.startsWith('العربية')) return 'Arabic'
   // Unknown language: keep every profile.
   return null
 }

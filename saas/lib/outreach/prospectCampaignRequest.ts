@@ -22,7 +22,7 @@ export type ParsedProspectCampaignRequest = {
   targetCriteria: string
   region: string | null
   requestedCount: number
-  language: 'en' | 'es' | 'pt' | 'pl' | 'ru'
+  language: 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 }
 
 const COUNT_PATTERN = /\b(?:find|get|build|list|source|research|identify|locate|encontr\w*|busca\w*|lista\w*|pesquis\w*|znajd\w*|wyszuk\w*|найд\w*|исслед\w*)\D{0,28}(\d{1,3})\b|\b(\d{1,3})\s*(?:companies|company|prospects?|leads?|targets?|accounts?|empresas?|firmas?|firmy|prospek\w*|компани\w*|лид\w*)/i
@@ -77,7 +77,7 @@ function clean(value: unknown, max: number): string {
 
 function normalizeLanguage(value: string): ParsedProspectCampaignRequest['language'] {
   const language = String(value || 'en').toLowerCase()
-  return ['en', 'es', 'pt', 'pl', 'ru'].includes(language)
+  return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(language)
     ? language as ParsedProspectCampaignRequest['language']
     : 'en'
 }
@@ -242,6 +242,12 @@ export function prospectCampaignQueuedReply(params: {
     pt: `Campanha de prospecção enfileirada (tarefa ${params.jobId}) para ${params.requestedCount} rascunhos de outreach pendentes${location}. A descoberta e a redação estão sendo executadas em segundo plano. Nada foi enviado e nenhuma empresa foi contatada. Os rascunhos aparecerão no console de Outreach para sua aprovação.`,
     pl: `Kampania prospectingowa została dodana do kolejki (zadanie ${params.jobId}) dla ${params.requestedCount} oczekujących wersji wiadomości${location}. Wyszukiwanie i przygotowanie treści działają w tle. Nic nie zostało wysłane i nie skontaktowano się z żadną firmą. Wersje robocze pojawią się w konsoli Outreach do zatwierdzenia.`,
     ru: `Кампания поиска потенциальных клиентов поставлена в очередь (задание ${params.jobId}) для ${params.requestedCount} черновиков${location}. Поиск и подготовка текстов выполняются в фоновом режиме. Ничего не отправлено, и ни с одной компанией не связывались. Черновики появятся в консоли Outreach для вашего одобрения.`,
+    de: `Akquise-Kampagne in die Warteschlange gestellt (Job ${params.jobId}) für ${params.requestedCount} ausstehende Outreach-Entwürfe${location}. Recherche und Erstellung der Entwürfe laufen im Hintergrund. Es wurde nichts gesendet und kein Unternehmen kontaktiert. Die Entwürfe erscheinen zur Freigabe in der Outreach-Konsole.`,
+    fr: `Campagne de prospection mise en file d’attente (tâche ${params.jobId}) pour ${params.requestedCount} brouillons de prospection en attente${location}. La découverte et la rédaction s’exécutent en arrière-plan. Rien n’a été envoyé et aucune entreprise n’a été contactée. Les brouillons apparaîtront dans la console Outreach pour votre approbation.`,
+    it: `Campagna di prospecting in coda (job ${params.jobId}) per ${params.requestedCount} bozze di outreach in sospeso${location}. La ricerca e la stesura sono in esecuzione in background. Non è stato inviato nulla e nessuna azienda è stata contattata. Le bozze appariranno nella console Outreach per la tua approvazione.`,
+    ja: `見込み客キャンペーンをキューに追加しました(ジョブ ${params.jobId})。保留中のアウトリーチ下書き ${params.requestedCount} 件${location}。探索と下書き作成はバックグラウンドで実行中です。何も送信されておらず、どの企業にも連絡していません。下書きは承認のために Outreach コンソールに表示されます。`,
+    ko: `잠재 고객 캠페인이 대기열에 추가되었습니다(작업 ${params.jobId}). 보류 중인 아웃리치 초안 ${params.requestedCount}개${location}. 탐색과 초안 작성은 백그라운드에서 실행 중입니다. 아무것도 전송되지 않았으며 어떤 회사에도 연락하지 않았습니다. 초안은 승인을 위해 Outreach 콘솔에 표시됩니다.`,
+    ar: `تمت إضافة حملة العملاء المحتملين إلى قائمة الانتظار (المهمة ${params.jobId}) لـ ${params.requestedCount} من مسودات التواصل المعلّقة${location}. يجري الاستكشاف والصياغة في الخلفية. لم يُرسَل أي شيء ولم يتم التواصل مع أي شركة. ستظهر المسودات في وحدة تحكم Outreach للموافقة عليها.`,
   }
   return messages[params.language] || messages.en
 }
@@ -254,6 +260,12 @@ export function prospectCampaignQueueError(error: string, language: string): str
     pt: `Reconheci isto como uma campanha de prospecção em segundo plano, mas não consegui enfileirar a tarefa. Nada foi enviado e nenhuma empresa foi contatada. Diagnóstico do proprietário: ${detail}`,
     pl: `Rozpoznałem to jako kampanię prospectingową w tle, ale nie udało się dodać zadania do kolejki. Nic nie zostało wysłane i nie skontaktowano się z żadną firmą. Diagnostyka właściciela: ${detail}`,
     ru: `Запрос распознан как фоновая кампания поиска клиентов, но поставить задание в очередь не удалось. Ничего не отправлено, и ни с одной компанией не связывались. Диагностика владельца: ${detail}`,
+    de: `Ich habe dies als Akquise-Kampagne im Hintergrund erkannt, konnte den Job aber nicht in die Warteschlange stellen. Es wurde nichts gesendet und kein Unternehmen kontaktiert. Diagnose für den Inhaber: ${detail}`,
+    fr: `J’ai identifié cette demande comme une campagne de prospection en arrière-plan, mais je n’ai pas pu mettre la tâche en file d’attente. Rien n’a été envoyé et aucune entreprise n’a été contactée. Diagnostic pour le propriétaire : ${detail}`,
+    it: `Ho riconosciuto questa richiesta come una campagna di prospecting in background, ma non sono riuscito a mettere il job in coda. Non è stato inviato nulla e nessuna azienda è stata contattata. Diagnostica per il proprietario: ${detail}`,
+    ja: `これをバックグラウンドの見込み客キャンペーンとして認識しましたが、ジョブをキューに追加できませんでした。何も送信されておらず、どの企業にも連絡していません。オーナー向け診断:${detail}`,
+    ko: `백그라운드 잠재 고객 캠페인으로 인식했지만 작업을 대기열에 추가하지 못했습니다. 아무것도 전송되지 않았으며 어떤 회사에도 연락하지 않았습니다. 소유자 진단: ${detail}`,
+    ar: `تعرّفتُ على هذا الطلب بوصفه حملة عملاء محتملين في الخلفية، لكنني لم أتمكن من إضافة المهمة إلى قائمة الانتظار. لم يُرسَل أي شيء ولم يتم التواصل مع أي شركة. تشخيص المالك: ${detail}`,
   }
   return messages[language] || messages.en
 }

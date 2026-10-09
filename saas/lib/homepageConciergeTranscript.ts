@@ -1,7 +1,7 @@
 export type ConciergeTranscriptTurn = {
   request: string
   response: string
-  sourceLanguage?: 'en' | 'es' | 'pt' | 'pl' | 'ru'
+  sourceLanguage?: 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
   suggestedFollowups?: string[]
   builderWorkspaceId?: string
   builderFiles?: string[]

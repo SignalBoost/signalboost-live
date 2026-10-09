@@ -5,7 +5,7 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { ADMIN_SIDEBAR } from '@/lib/platform/unifiedPlatform'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 type MetricValues = Record<string, number | string>
 
 const COPY: Record<Lang, {
@@ -92,10 +92,94 @@ const COPY: Record<Lang, {
     noneYet: 'Пока нет',
     sectionStatus: 'Live-сводка раздела',
   },
+  de: {
+    eyebrow: 'Inhaberkonsole',
+    title: 'SignalBoost-Live-Kommandozentrale',
+    body: 'Inhaber-/Admin-Navigation mit echten Plattformmetriken: Konten, Outreach, KI-Nutzung, Abonnements, Systemzustand und Admin-Steuerung.',
+    role: "Eingeschränkt: Eigentümer/Admin",
+    open: 'Live-Konsole öffnen',
+    loading: 'Live-Metriken werden geladen…',
+    updated: 'Aktualisiert',
+    live: 'Live-Kennzahlen',
+    noActivity: 'Noch keine Aktivität',
+    notConnected: 'Nicht verbunden',
+    noneYet: 'Noch keine',
+    sectionStatus: 'Live-Zusammenfassung des Abschnitts',
+  },
+  fr: {
+    eyebrow: 'Console du propriétaire',
+    title: 'Centre de commande SignalBoost en direct',
+    body: 'Navigation propriétaire/administrateur reliée aux métriques réelles de la plateforme : comptes, prospection, utilisation de l\'IA, abonnements, santé du système et contrôles d\'administration.',
+    role: "Restreint : Propriétaire/Admin",
+    open: 'Ouvrir la console en direct',
+    loading: 'Chargement des métriques en direct…',
+    updated: 'Mis à jour',
+    live: 'Métriques en direct',
+    noActivity: 'Aucune activité pour l\'instant',
+    notConnected: 'Non connecté',
+    noneYet: 'Aucun pour l’instant',
+    sectionStatus: 'Résumé de la section en direct',
+  },
+  it: {
+    eyebrow: 'Console del proprietario',
+    title: 'Centro di comando SignalBoost live',
+    body: 'Navigazione proprietario/amministratore collegata alle metriche reali della piattaforma: account, outreach, utilizzo AI, abbonamenti, stato del sistema e controlli amministrativi.',
+    role: "Riservato: Proprietario/Admin",
+    open: 'Apri console live',
+    loading: 'Caricamento metriche in tempo reale…',
+    updated: 'Aggiornato',
+    live: 'Metriche in tempo reale',
+    noActivity: 'Ancora nessuna attività',
+    notConnected: 'Non connesso',
+    noneYet: 'Ancora nessuno',
+    sectionStatus: 'Riepilogo della sezione in tempo reale',
+  },
+  ja: {
+    eyebrow: 'オーナーコンソール',
+    title: 'SignalBoost ライブ コマンドセンター',
+    body: '実際のプラットフォーム指標に接続されたオーナー／管理者ナビゲーション：アカウント、アウトリーチ、AI 使用量、サブスクリプション、システムの状態、管理コントロール。',
+    role: "制限: オーナー/管理者",
+    open: 'ライブコンソールを開く',
+    loading: 'ライブ指標を読み込み中…',
+    updated: '更新済み',
+    live: 'リアルタイム指標',
+    noActivity: 'まだアクティビティはありません',
+    notConnected: '未接続',
+    noneYet: 'まだありません',
+    sectionStatus: 'セクションのライブ概要',
+  },
+  ko: {
+    eyebrow: '소유자 콘솔',
+    title: 'SignalBoost 실시간 커맨드 센터',
+    body: '실제 플랫폼 지표에 연결된 소유자/관리자 탐색: 계정, 아웃리치, AI 사용량, 구독, 시스템 상태, 관리자 제어.',
+    role: "제한됨: 소유자/관리자",
+    open: '실시간 콘솔 열기',
+    loading: '실시간 지표 로드 중…',
+    updated: '업데이트됨',
+    live: '실시간 지표',
+    noActivity: '아직 활동 없음',
+    notConnected: '연결되지 않음',
+    noneYet: '아직 없음',
+    sectionStatus: '섹션 실시간 요약',
+  },
+  ar: {
+    eyebrow: 'وحدة تحكم المالك',
+    title: 'مركز قيادة SignalBoost المباشر',
+    body: 'تنقّل المالك/المسؤول متصل بمقاييس المنصة الفعلية: الحسابات والتواصل واستخدام AI والاشتراكات وسلامة النظام وعناصر التحكم الإدارية.',
+    role: "مقيَّد: المالك/المسؤول",
+    open: 'فتح وحدة التحكم المباشرة',
+    loading: 'جارٍ تحميل المقاييس المباشرة…',
+    updated: 'تم التحديث',
+    live: 'مقاييس مباشرة',
+    noActivity: 'لا يوجد نشاط بعد',
+    notConnected: 'غير متصل',
+    noneYet: 'لا شيء بعد',
+    sectionStatus: 'ملخص القسم المباشر',
+  },
 }
 
 function copyFor(lang: string): typeof COPY.en {
-  return COPY[(['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang]
+  return COPY[(['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as Lang]
 }
 
 function value(values: MetricValues, key: string, fallback: string | number = 0): string | number {

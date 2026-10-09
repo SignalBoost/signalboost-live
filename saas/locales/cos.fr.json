@@ -1,0 +1,99 @@
+{
+  "cos": {
+    "nav": {
+      "mining": "Minage",
+      "features": "Caractéristiques",
+      "segments": "Segments",
+      "rules": "Modèles",
+      "runs": "Historique des exécutions"
+    },
+    "mining": {
+      "title": "Exploration de données",
+      "subtitle": "Modèles comportementaux et transactionnels qui alimentent les prédictions",
+      "run_now": "Exécuter maintenant",
+      "last_run": "Dernière exécution",
+      "events_scanned": "Événements analysés",
+      "users_processed": "Utilisateurs traités",
+      "features_written": "Caractéristiques écrites",
+      "rules_found": "Modèles trouvés"
+    },
+    "features": {
+      "title": "Caractéristiques extraites",
+      "name": "Caractéristique",
+      "value": "Valeur",
+      "updated": "Mis à jour",
+      "names": {
+        "event_frequency_per_day": "Activité par jour",
+        "transaction_count": "Transactions",
+        "avg_deposit_cents": "Dépôt moyen",
+        "avg_transfer_cents": "Virement moyen",
+        "preferred_txn_hour": "Heure préférée",
+        "dominant_device_code": "Appareil principal",
+        "campaign_engagement_rate": "Engagement envers les campagnes",
+        "recency_days": "Jours depuis la dernière activité",
+        "amount_trend_slope": "Tendance des dépenses"
+      }
+    },
+    "segments": {
+      "title": "Segments comportementaux",
+      "cluster": "Cluster",
+      "members": "Membres"
+    },
+    "rules": {
+      "title": "Modèles détectés",
+      "if": "Si",
+      "then": "alors",
+      "support": "Assistance",
+      "confidence": "Confiance",
+      "lift": "Lift"
+    },
+    "status": {
+      "running": "En cours",
+      "success": "Succès",
+      "error": "Erreur"
+    },
+    "empty": {
+      "no_features": "Aucune caractéristique pour l’instant — lancez une tâche de minage pour les générer.",
+      "no_rules": "Aucun modèle détecté pour l’instant.",
+      "no_runs": "Aucune exécution de minage enregistrée pour l’instant."
+    },
+    "errors": {
+      "unauthorized": "Veuillez vous connecter pour continuer.",
+      "forbidden": "Vous n’avez pas accès à ces données.",
+      "load_failed": "Impossible de charger les données. Veuillez réessayer."
+    },
+    "tooltips": {
+      "confidence": "Fréquence à laquelle le modèle se vérifie lorsque la condition est remplie.",
+      "lift": "Dans quelle mesure le résultat est plus probable que le hasard.",
+      "segment": "Groupe d’utilisateurs au comportement similaire."
+    },
+    "meta": {
+      "title": "Exploration de données COS — SignalBoost",
+      "description": "Signaux comportementaux et transactionnels extraits qui alimentent les prédictions de COS."
+    },
+    "dashboard": {
+      "overview": "Vue d’ensemble",
+      "refresh": "Actualiser",
+      "run_history": "Historique des exécutions",
+      "segment_distribution": "Répartition des segments",
+      "top_patterns": "Principaux modèles",
+      "no_access": "Un accès administrateur est requis pour consulter l’intelligence de minage.",
+      "lookup_user": "Recherche des caractéristiques utilisateur",
+      "user_id_placeholder": "Saisissez l’ID utilisateur",
+      "view": "Voir",
+      "never": "Jamais",
+      "users": "utilisateurs"
+    },
+    "predict": {
+      "title": "Prochaines actions prévues",
+      "action": "Action",
+      "score": "Score",
+      "basis": "Motif",
+      "none": "Pas encore assez de signaux pour prédire.",
+      "propensity": "Propension",
+      "engagement": "Engagement",
+      "churn_risk": "Risque d’attrition",
+      "value": "Valeur"
+    }
+  }
+}

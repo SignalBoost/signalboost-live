@@ -40,7 +40,7 @@ export default function PodcastPage() {
     try { source = JSON.parse(saved) } catch { setSketch(null); return }
     if (!source) { setSketch(null); return }
 
-    const target = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
+    const target = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en'
     const cacheKey = `podcastSketch_${target}`
     const cached = localStorage.getItem(cacheKey)
     if (cached) {

@@ -16,7 +16,7 @@ import { buildFactualPreamble } from '@/portable-kernel'
 import type { CompanyFacts } from '@/portable-kernel'
 import type { CosContentWorkerOutput } from './types.ts'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 const MODEL = 'gpt-4o-mini'
 
@@ -28,6 +28,12 @@ const LANG_AUTONYM: Record<Lang, string> = {
   pt: 'Portugues',
   pl: 'Polski',
   ru: 'Russkij',
+  de: 'Deutsch',
+  fr: 'Français',
+  it: 'Italiano',
+  ja: '日本語',
+  ko: '한국어',
+  ar: 'العربية',
 }
 
 // Platform standards expressed as language-neutral config (schema tokens +

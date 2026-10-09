@@ -24,7 +24,7 @@ test('dashboard response parser accepts only the supported schema and validated 
 })
 
 test('dashboard state copy is complete and localized across all five required languages', () => {
-  const locales = ['en', 'es', 'pt', 'pl', 'ru'] as const
+  const locales = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
   const keys = Object.keys(operationsDashboardStateCopy.en).sort()
   for (const locale of locales) {
     const copy = operationsDashboardStateCopy[locale]

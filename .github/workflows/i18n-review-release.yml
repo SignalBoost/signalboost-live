@@ -14,7 +14,7 @@ jobs:
           node-version: '22'
       - name: Verify review-gate regressions
         working-directory: saas
-        run: node --test tests/sixLanguageReviewGate.node.test.mjs tests/stageReviewedLanguagePackages.node.test.mjs tests/euProjectReadiness.node.test.ts
+        run: node --test tests/sixLanguageReviewGate.node.test.mjs tests/stageReviewedLanguagePackages.node.test.mjs tests/euEnrollmentRouting.node.test.ts tests/euProjectReadiness.node.test.ts
       - name: Check enabled locale loader wiring
         working-directory: saas
         run: node scripts/check-pending-locale-wiring.mjs

@@ -25,6 +25,14 @@ export async function executeLabByoi(request: ScopedProviderRequest, host: LabBy
   catch { throw new Error('lab_byoi_grant_unavailable') }
   if (!grant) throw new Error('lab_byoi_scope_denied')
   const reference = assertCustomerProviderScope(grant, scopedRequest)
+  // A grant may be revoked or repointed while the first lookup is in flight.
+  // Revalidate immediately before opening the vault; never substitute a new reference.
+  let freshGrant: ScopedProviderGrant | null
+  try { freshGrant = await loadGrant(scopedRequest) }
+  catch { throw new Error('lab_byoi_grant_unavailable') }
+  if (!freshGrant || assertCustomerProviderScope(freshGrant, scopedRequest) !== reference) {
+    throw new Error('lab_byoi_scope_denied')
+  }
   let credential: string
   try { credential = await resolveSecret(reference) }
   catch { throw new Error('lab_byoi_credential_unavailable') }

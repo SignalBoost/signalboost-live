@@ -27,6 +27,8 @@ globalThis.fetch=async (url, options)=>{
  const result=JSON.parse(first.stdout)
  assert.equal(result.generatedDrafts,42*6)
  assert.equal(result.requests,12,'42 entries must be batched into 2 requests per locale')
+ const requestRows=fs.readFileSync(logfile,'utf8').trim().split('\n').map(line=>JSON.parse(line))
+ for(const lang of langs)assert.deepEqual(requestRows.filter(row=>row.lang===lang).map(row=>row.count),[40,2])
  for(const lang of langs){
   assert.equal(result.perLanguage[lang],42)
   const data=JSON.parse(fs.readFileSync(path.join(dir,lang+'.json'),'utf8'))
@@ -37,6 +39,6 @@ globalThis.fetch=async (url, options)=>{
  const second=run()
  assert.equal(second.status,0,second.stderr)
  assert.equal(JSON.parse(second.stdout).generatedDrafts,0,'resume must skip all completed strings')
- assert.equal(fs.readFileSync(logfile,'utf8').trim().split('\\n').length,12,'resume must not incur more requests')
+ assert.equal(fs.readFileSync(logfile,'utf8').trim().split('\n').length,12,'resume must not incur more requests')
  console.log('PASS: 252 draft translations across six languages, 12 batched requests, review flags, zero-cost resume')
 }finally{fs.rmSync(dir,{recursive:true,force:true})}

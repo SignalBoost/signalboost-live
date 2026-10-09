@@ -4,6 +4,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 import { placeholderTokens } from './generated-ui-locale-utils.mjs'
 
 const expectedLanguages = ['de','fr','it','ja','ko','ar']
@@ -67,7 +68,8 @@ for (const lang of expectedLanguages) {
       }
       if (requireReviewed) {
         const state = reviewData?.[store]?.[key]
-        if (!state || state.status !== 'approved' || typeof state.reviewer !== 'string' || !state.reviewer.trim()) {
+        const checksum = createHash('sha256').update(JSON.stringify(entry?.translation)).digest('hex')
+        if (!state || state.status !== 'approved' || typeof state.reviewer !== 'string' || !state.reviewer.trim() || state.translationSha256 !== checksum) {
           failures.push(lang+'/'+store+'/'+key+': explicit reviewer approval missing')
         }
       }

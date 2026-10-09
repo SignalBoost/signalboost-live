@@ -1,2 +1,2 @@
-base_sha=359258f0bf238e7ede752d561ff13cd576ea2064
-branch=fix/eu-oauth-signup-safeguard-20261009
+base_sha=53bd3345647393180428721a9b7b12d5bcada334
+branch=fix/auth-modal-jsx-build-20261009

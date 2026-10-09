@@ -1,3 +1,5 @@
+# .github/workflows/complete-generated-ui-locales.yml
+# Locale completeness only; type-check and production build run in SaaS CI for every saas/** change.
 name: Validate generated UI locales
 
 on:
@@ -18,9 +20,6 @@ on:
 
 permissions:
   contents: read
-
-env:
-  NODE_OPTIONS: '--max-old-space-size=7168'
 
 concurrency:
   group: validate-generated-ui-locales-${{ github.event.pull_request.number }}
@@ -48,16 +47,6 @@ jobs:
         working-directory: saas
         run: npm ci
 
-      - name: Validate all five locale catalogs
+      - name: Validate all eleven locale catalogs
         working-directory: saas
         run: npm run validate:i18n-copy
-
-      - name: Type-check
-        working-directory: saas
-        run: npm run typecheck
-
-      - name: Production build
-        working-directory: saas
-        env:
-          NEXT_TELEMETRY_DISABLED: '1'
-        run: npm run build

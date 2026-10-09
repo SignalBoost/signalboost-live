@@ -30,8 +30,9 @@ export async function executeLabEgress(request: LabEgressRequest, host: LabEgres
     experimentId: request.experimentId,
     kind: request.kind,
   })
+  const { readTrustedDecision, deliver } = host
   let decision: TrustedLabEgressDecision | null
-  try { decision = await host.readTrustedDecision(scopedRequest) }
+  try { decision = await readTrustedDecision(scopedRequest) }
   catch { throw new Error('lab_egress_authority_unavailable') }
   if (!decision || decision.experimentId !== scopedRequest.experimentId
     || decision.authority.sourceOrganizationId !== scopedRequest.sourceOrganizationId
@@ -40,7 +41,7 @@ export async function executeLabEgress(request: LabEgressRequest, host: LabEgres
     throw new Error('lab_egress_denied')
   }
   try {
-    const result = await host.deliver(scopedRequest)
+    const result = await deliver(scopedRequest)
     if (!result?.receiptId?.trim()) throw new Error('lab_egress_receipt_missing')
     return { receiptId: result.receiptId }
   } catch { throw new Error('lab_egress_delivery_failed') }

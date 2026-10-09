@@ -1,0 +1,33 @@
+name: i18n expansion readiness
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/i18n/**'
+      - 'saas/components/i18n/**'
+      - 'saas/scripts/check-language-expansion-readiness.mjs'
+      - 'saas/scripts/check-five-language-platform.mjs'
+      - 'saas/components/LanguageSuggestion.tsx'
+      - '.github/workflows/i18n-expansion-readiness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/i18n/**'
+      - 'saas/components/i18n/**'
+      - 'saas/scripts/check-language-expansion-readiness.mjs'
+      - 'saas/scripts/check-five-language-platform.mjs'
+      - '.github/workflows/i18n-expansion-readiness.yml'
+jobs:
+  ensure-safe-expansion:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Protect existing five-language production contract
+        run: node scripts/check-five-language-platform.mjs
+      - name: Check six-language roadmap and Arabic direction
+        run: node scripts/check-language-expansion-readiness.mjs

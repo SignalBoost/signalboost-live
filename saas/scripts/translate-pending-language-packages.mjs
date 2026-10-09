@@ -1,7 +1,7 @@
 // Generate DRAFT translations in exported six-language packages only.
 // Azure is optional, called explicitly by a trusted operator. Never run with secrets on PRs.
 // Translation credentials: AZURE_TRANSLATOR_KEY and AZURE_TRANSLATOR_REGION.
-// Usage: node scripts/translate-pending-language-packages.mjs <package-dir> [--limit 100]
+// Usage: node scripts/translate-pending-language-packages.mjs <package-dir> [--limit 100] (limit per language)
 // Output remains outside runtime locale catalogs; review status is stored separately.
 import fs from 'node:fs'
 import path from 'node:path'
@@ -50,7 +50,9 @@ async function translate(source,lang) {
   return output
 }
 let completed=0, skipped=0
+const perLanguage={}
 for (const lang of locales) {
+  let languageCompleted=0
   const file=lang+'.json'
   const pack=JSON.parse(fs.readFileSync(path.join(directory,file),'utf8'))
   const reviewFile=lang+'.review.json'
@@ -58,7 +60,7 @@ for (const lang of locales) {
     ? JSON.parse(fs.readFileSync(path.join(directory,reviewFile),'utf8')) : {}
   for (const [store,entries] of Object.entries(pack)) {
     for(const [id,entry] of Object.entries(entries)) {
-      if(completed>=limit) break
+      if(languageCompleted>=limit) break
       if(typeof entry.source!=='string' || !entry.source.trim() || entry.translation!==null) {skipped++;continue}
       // No credentials, PII, tenant content or user prompts should ever enter this public-copy-only pipeline.
       const result=await translate(entry.source,lang)
@@ -69,6 +71,7 @@ for (const lang of locales) {
       save(file,pack)
       save(reviewFile,reviews)
       completed++
+      languageCompleted++
     }
     if(completed>=limit) break
   }

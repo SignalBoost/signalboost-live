@@ -30,7 +30,19 @@ export async function GET(req:NextRequest){
       stale:alerts.filter(a=>a.code==='lab_phase_signal_stale').length,
       blocked:alerts.filter(a=>a.code==='lab_phase_signal_blocked').length}
     if (alerts.length) console.warn('[lab_phase_observability_health_alerts]', counts)
-    return NextResponse.json({ok:true,revision,alerts,health:result.health,deliveredToExternalSupervisor:false},{headers})
+    // Store advisory alerts within this tenant's private service-role boundary.
+    // Persist before acknowledging the check. Never claim an external Supervisor received them.
+    if (alerts.length) {
+      const rows=alerts.map(a=>({
+        tenant_id:tenant,exact_revision:revision,phase:a.phase,signal:a.signal,
+        code:a.code,severity:a.severity,last_seen_at:new Date().toISOString(),
+      }))
+      const {error:outboxError}=await getAdminSupabase().from('lab_phase_health_alerts')
+        .upsert(rows,{onConflict:'tenant_id,exact_revision,phase,signal'})
+      if(outboxError) throw Error('lab_phase_alert_outbox_unavailable')
+    }
+    return NextResponse.json({ok:true,revision,alerts,health:result.health,
+      persistedAlerts:alerts.length,deliveredToExternalSupervisor:false},{headers})
   }catch{
     return NextResponse.json({ok:false,error:'observability_health_check_unavailable'},{status:503,headers})
   }

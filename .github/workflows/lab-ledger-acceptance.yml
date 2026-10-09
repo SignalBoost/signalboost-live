@@ -11,6 +11,8 @@ on:
       - 'saas/supabase/migrations/20261008050000_lab_capture_provenance_audit.sql'
       - 'saas/supabase/migrations/20261008060000_lab_capture_rate_reconciliation_audit.sql'
       - 'saas/tests/sql/lab-*.sql'
+      - 'saas/tests/phase4StripeTestVerification.node.test.mjs'
+      - 'saas/lib/billing/phase4StripeTestVerification.mjs'
       - 'saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql'
       - 'saas/supabase/migrations/20261008180000_lab_commercial_atomic_grant_proof.sql'
       - 'saas/supabase/migrations/20261008190000_lab_commercial_event_claim_tenant_binding.sql'
@@ -152,3 +154,7 @@ jobs:
       - name: Guard USD test settlement credit rate conversion
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-testmode-settlement-rate-guard-acceptance.sql
+
+      - name: Verify authoritative Stripe test-mode proof contract
+        shell: bash
+        run: node --test saas/tests/phase4StripeTestVerification.node.test.mjs

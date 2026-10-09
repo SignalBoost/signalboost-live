@@ -3,6 +3,12 @@ import pagesEs from '@/locales/pages.es.json'
 import pagesPt from '@/locales/pages.pt.json'
 import pagesPl from '@/locales/pages.pl.json'
 import pagesRu from '@/locales/pages.ru.json'
+import pagesDe from '@/locales/pages.de.json'
+import pagesFr from '@/locales/pages.fr.json'
+import pagesIt from '@/locales/pages.it.json'
+import pagesJa from '@/locales/pages.ja.json'
+import pagesKo from '@/locales/pages.ko.json'
+import pagesAr from '@/locales/pages.ar.json'
 import type { Dict, DictValue } from '@/lib/i18n/loadLanguage'
 
 const PAGE_TABLE: Record<string, Dict> = {
@@ -11,6 +17,12 @@ const PAGE_TABLE: Record<string, Dict> = {
   pt: pagesPt as Dict,
   pl: pagesPl as Dict,
   ru: pagesRu as Dict,
+  de: pagesDe as Dict,
+  fr: pagesFr as Dict,
+  it: pagesIt as Dict,
+  ja: pagesJa as Dict,
+  ko: pagesKo as Dict,
+  ar: pagesAr as Dict,
 }
 
 function isDict(value: DictValue | undefined): value is Dict {

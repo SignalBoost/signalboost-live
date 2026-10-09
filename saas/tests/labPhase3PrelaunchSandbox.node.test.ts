@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createVercelDeploymentSnapshotAdapter } from '../lib/portable/state-snapshot-adapters.ts'
 import test from 'node:test'
 import { executeLabByoi } from '../lib/ai/cos/itmountsLabByoiExecution.ts'
 import { executeLabEgress } from '../lib/ai/cos/itmountsLabEgressExecution.ts'
@@ -81,4 +82,31 @@ test('Phase 3 prelaunch privacy: raw records, provider credentials and logs neve
   await assert.rejects(executeLabEgress({sourceOrganizationId:tenants[0],destinationOrganizationId:tenants[1],experimentId:'sandbox-experiment',kind},host),/lab_egress_denied/)
  }
  assert.equal(deliveries,0)
+})
+
+test('Phase 3 prelaunch sandbox: portable deployment snapshot restores previously captured revision',async()=>{
+ let active='sandbox-deployment-A'
+ const port=createVercelDeploymentSnapshotAdapter({
+  currentDeploymentId:()=>active,
+  assignAlias:async id=>{active=id},
+  projectId:'synthetic-project',
+ })
+ const captured=await port.capture({scope:'deployment',provider:'vercel',environment:'sandbox',reason:'prelaunch restore drill'})
+ assert.equal(captured.ok,true)
+ assert.equal(captured.snapshot?.snapshotId,'sandbox-deployment-A')
+ active='sandbox-deployment-B'
+ const result=await port.restore(captured.snapshot!)
+ assert.equal(result.ok,true)
+ assert.equal(active,'sandbox-deployment-A')
+})
+test('Phase 3 prelaunch sandbox: failed restore is not certified as successful',async()=>{
+ const port=createVercelDeploymentSnapshotAdapter({
+  currentDeploymentId:()=> 'sandbox-deployment-A',
+  assignAlias:async()=>{throw Error('sandbox restore unavailable')},
+ })
+ const captured=await port.capture({scope:'deployment',provider:'vercel',environment:'sandbox',reason:'restore failure drill'})
+ assert.equal(captured.ok,true)
+ const result=await port.restore(captured.snapshot!)
+ assert.equal(result.ok,false)
+ assert.match(result.error||'',/restore failed/)
 })

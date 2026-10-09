@@ -16,7 +16,7 @@ function setup(returned: ScopedProviderGrant | null) {
 test('valid owner-only BYOI dispatch resolves credential after scope and returns only receipt',async()=>{
   const {calls,host}=setup(grant)
   assert.deepEqual(await executeLabByoi(request,host),{receiptId:'provider-receipt'})
-  assert.deepEqual(calls,['load:org-a','secret:vault://org-a/teacher','invoke'])
+  assert.deepEqual(calls,['load:org-a','load:org-a','secret:vault://org-a/teacher','invoke'])
 })
 test('org B cannot invoke org A credential even if grant store returns an A grant',async()=>{
   const {calls,host}=setup(grant)
@@ -62,7 +62,7 @@ test('provider grant lookup cannot mutate the destination tenant or artifact bet
     },
   }
   assert.deepEqual(await executeLabByoi(original,host),{receiptId:'safe'})
-  assert.deepEqual(received,['grant:org-a:artifact-a','vault','invoke:org-a:artifact-a'])
+  assert.deepEqual(received,['grant:org-a:artifact-a','grant:org-a:artifact-a','vault','invoke:org-a:artifact-a'])
 })
 
 test('grant, vault and provider errors are sanitized with no original secret in message or cause', async () => {
@@ -95,4 +95,30 @@ test('provider receipt IDs cannot return credential material even if otherwise w
  const {host}=setup(grant)
  host.invokeProvider=async()=>({receiptId:'provider-private-key-receipt'})
  await assert.rejects(executeLabByoi(request,host), /lab_byoi_receipt_missing/)
+})
+
+test('grant revoked between lookups never opens vault or invokes provider',async()=>{
+ let reads=0
+ const {host,calls}=setup(grant)
+ host.loadGrant=async()=>{calls.push('load');return ++reads===1?grant:null}
+ await assert.rejects(executeLabByoi(request,host),/lab_byoi_scope_denied/)
+ assert.deepEqual(calls,['load','load'])
+})
+test('grant vault reference swapped between lookups never opens vault',async()=>{
+ let reads=0
+ const {host,calls}=setup(grant)
+ host.loadGrant=async()=>{calls.push('load');return ++reads===1?grant:{...grant,secretReference:'vault://org-a/other'}}
+ await assert.rejects(executeLabByoi(request,host),/lab_byoi_scope_denied/)
+ assert.deepEqual(calls,['load','load'])
+})
+test('second grant reader failure is sanitized and never opens vault',async()=>{
+ let reads=0
+ const {host,calls}=setup(grant)
+ host.loadGrant=async()=>{calls.push('load');if(++reads===2)throw Error('sensitive grant failure');return grant}
+ await assert.rejects(executeLabByoi(request,host),(err:unknown)=>{
+  assert.equal((err as Error).message,'lab_byoi_grant_unavailable')
+  assert.equal((err as Error).cause,undefined)
+  return true
+ })
+ assert.deepEqual(calls,['load','load'])
 })

@@ -13,12 +13,12 @@ const LANGUAGES = [
   { code: "pt", label: uiText('generatedUi.u_169b032adf2ab80f') },
   { code: "pl", label: uiText('generatedUi.u_293650de072648b9') },
   { code: "ru", label: uiText('generatedUi.u_f37e3358243de943') },
-  { code: "de", label: "DE" },
-  { code: "fr", label: "FR" },
-  { code: "it", label: "IT" },
-  { code: "ja", label: "JA" },
-  { code: "ko", label: "KO" },
-  { code: "ar", label: "AR" }
+  { code: "de", label: uiText('generatedUi.u_6814ef46f686990c') },
+  { code: "fr", label: uiText('generatedUi.u_501c26b2571a1f7f') },
+  { code: "it", label: uiText('generatedUi.u_f415bf7b07a9b2c0') },
+  { code: "ja", label: uiText('generatedUi.u_2c24576872f7b538') },
+  { code: "ko", label: uiText('generatedUi.u_849af174c5b12dfa') },
+  { code: "ar", label: uiText('generatedUi.u_b1b7afa76db27145') }
 ];
 
 export default function LanguageSwitcher({

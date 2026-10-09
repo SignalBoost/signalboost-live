@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
 // Canonical acceptance coverage for retained knowledge becoming semantically reusable.
-const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
+const read = (file: string) => hydrateLocalizedSource(readFileSync(new URL(file, import.meta.url), 'utf8'))
 
 test('continuous indexer prioritizes newest eligible retained knowledge and stale vector spaces', () => {
   const source = read('../lib/ai/cos/learnedCorpusIndexing.ts')

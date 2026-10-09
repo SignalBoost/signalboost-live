@@ -99,3 +99,48 @@ test('rendered pages stay server authored and protected from saved application-l
     assert.match(source, /generateStaticParams/)
   }
 })
+
+
+test('localized pages retain the global navbar and footer; only share demos hide chrome', () => {
+  const gate = read('../components/layout/ShareRouteChrome.tsx')
+  assert.match(gate, /if \(isShareRoute\(pathname\)\) return null/)
+  assert.doesNotMatch(gate, /publicLocaleFromPath\(pathname\)/)
+  const root = read('../app/layout.tsx')
+  assert.match(root, /<ShareRouteChrome>\s*<Navbar \/>/)
+  assert.match(root, /<ShareRouteChrome>\s*<Footer \/>/)
+})
+
+test('global navbar uses route-bound translations on every public language', () => {
+  const navbar = read('../components/Navbar.tsx')
+  const localized = read('../components/seo/LocalizedPublicNavbar.tsx')
+  assert.match(navbar, /publicLocaleFromPath\(usePathname\(\)\)/)
+  assert.match(navbar, /<LocalizedPublicNavbar locale=\{locale\}/)
+  assert.match(localized, /PUBLIC_COPY\[locale\]/)
+  for (const locale of PUBLIC_LOCALES) {
+    assert.ok(PUBLIC_COPY[locale].home)
+    assert.ok(PUBLIC_COPY[locale].languages)
+    assert.ok(PUBLIC_COPY[locale].support)
+    assert.ok(PUBLIC_COPY[locale].privacy)
+  }
+})
+
+test('translated site navigation preserves each public locale and route', () => {
+  const nav = read('../components/seo/LocalizedPublicNavbar.tsx')
+  const switcher = read('../components/Navbar.tsx')
+  assert.match(switcher, /publicLocaleFromPath\(usePathname\(\)\)/)
+  assert.match(switcher, /<LocalizedPublicNavbar locale=\{locale\}/)
+  assert.match(nav, /PUBLIC_COPY\[locale\]/)
+  assert.match(nav, /lang=\{locale\}/)
+  assert.match(nav, /locale === 'ar' \? 'rtl' : 'ltr'/)
+  assert.match(nav, /publicPagePath\(locale, item\)/)
+  assert.match(nav, /publicPagePath\(event.target.value as PublicLocale, topic\)/)
+  for (const locale of PUBLIC_LOCALES) {
+    const copy = PUBLIC_COPY[locale]
+    for (const key of ['home', 'websiteTitle', 'reviewsTitle', 'contentTitle', 'labTitle', 'support', 'privacy', 'languages', 'start'] as const) {
+      assert.ok(copy[key]?.trim(), `${locale} navbar lacks ${key}`)
+    }
+    for (const topic of [undefined, ...PUBLIC_TOPICS]) {
+      assert.equal(publicPagePath(locale, topic).split('/')[1], locale)
+    }
+  }
+})

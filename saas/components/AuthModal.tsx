@@ -170,7 +170,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
           </svg>
           {t(dict, 'auth.continueGitHub')}
         </button></>}
-        {mode === 'signup' && <div style={{ fontSize: 12, marginBottom: 16, color: 'rgba(255,255,255,0.7)' }}>Social account registration is temporarily unavailable while regional hosting controls are being configured. Use email signup and choose your country.</div>}
+        {mode === 'signup' && <div style={{ fontSize: 12, marginBottom: 16, color: 'rgba(255,255,255,0.7)' }}>{uiText('generatedUi.u_c32dde7da40f229a')}</div>}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
@@ -180,8 +180,8 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
 
         {mode === 'signup' && (
           <div style={{ fontSize: 12, marginBottom: 12 }}>
-            <label htmlFor="signup-country-code">Country of residence (ISO two-letter code)</label>
-            <input id="signup-country-code" type="text" maxLength={2} autoComplete="country" value={countryCode} placeholder="DE, FR, US…" onChange={e => setCountryCode(e.target.value.toUpperCase())} style={{ ...inp, marginTop: 6 }} />
+            <label htmlFor="signup-country-code">{uiText('generatedUi.u_cd7f11a13a138446')}</label>
+            <input id="signup-country-code" type="text" maxLength={2} autoComplete="country" value={countryCode} placeholder={uiText('generatedUi.u_24b3eb963f3707e0')} onChange={e => setCountryCode(e.target.value.toUpperCase())} style={{ ...inp, marginTop: 6 }} />
           </div>
         )}
         {mode === 'signup' && (

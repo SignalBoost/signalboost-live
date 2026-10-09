@@ -6,21 +6,22 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
+const read = (path: string) => hydrateLocalizedSource(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'))
 
 test('the pipeline row runs left to right and ends at graduation before the ways out', () => {
   const page = read('app/dashboard/cos-university-telemetry/page.tsx')
   const row = page.slice(page.indexOf('{copy.pipelineExplanation}'), page.indexOf('</section>', page.indexOf('{copy.pipelineExplanation}')))
   const order = [
-    'label="CS Residency residents"',
-    'label="CS Residency remediation"',
-    'label="CS Residency complete"',
-    'label="Evaluation pending — both branches"',
+    "label={'CS Residency residents'}",
+    "label={'CS Residency remediation'}",
+    "label={'CS Residency complete'}",
+    "label={'Evaluation pending — both branches'}",
     'label={copy.pipelinePassedGraduating}',
     'label={copy.pipelineGraduated}',
     'label={copy.pipelineResidencyFailed}',
-    'label="Quarantined"',
+    "label={'Quarantined'}",
   ].map(marker => row.indexOf(marker))
   assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `order ${order.join(',')}`)
   assert.match(row, /artifacts\.filter\(artifact => artifact\.status === 'runtime_pending'\)\.length/, 'passed = exam PASS, now graduating')

@@ -1,7 +1,7 @@
 // saas/lib/i18n/cosUniversityFunnelCopy.ts
 //
 // Copy for the Artifact Effectiveness Funnel block on the University telemetry page. Five languages, same keys.
-import type { CosUniversityTelemetryLanguage } from './cosUniversityTelemetryCopy'
+import type { CosUniversityTelemetryLanguage } from './cosUniversityTelemetryCopy.ts'
 
 export type CosUniversityFunnelCopy = Readonly<{
   title: string

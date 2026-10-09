@@ -16,6 +16,8 @@ import {
   COS_UNIVERSITY_TELEMETRY_COPY,
   type CosUniversityTelemetryLanguage,
 } from '@/lib/i18n/cosUniversityTelemetryCopy'
+import { uiText } from '@/lib/i18n/uiText'
+
 
 // Post-graduation employment stages in pipeline order (cos_workforce_stage).
 const WORKFORCE_STAGE_ORDER = [
@@ -538,28 +540,28 @@ export default function CosUniversityTelemetryPage() {
       </section>
 
       <section className="rounded-lg border p-4">
-        <h2 className="font-semibold">University pipeline — live state</h2>
+        <h2 className="font-semibold">{uiText('generatedUi.u_b897e6e3c193e94c')}</h2>
         <p className="mt-1 text-xs opacity-65">{copy.pipelineExplanation}</p>
         <div className="mt-4 rounded-lg border p-3 text-xs">
-          <div className="font-medium">Computer Science branch</div>
-          <div className="mt-1 opacity-70">Artifact → Builder Residency → remediation when required → Residency complete → Evaluation</div>
-          <div className="mt-3 font-medium">All other subjects</div>
-          <div className="mt-1 opacity-70">Artifact → Evaluation</div>
-          <div className="mt-3 font-medium">Shared downstream path</div>
-          <div className="mt-1 opacity-70">Evaluation PASS → runtime verification → Graduation → Workforce</div>
+          <div className="font-medium">{uiText('generatedUi.u_b72aa6738334b1a6')}</div>
+          <div className="mt-1 opacity-70">{uiText('generatedUi.u_c5553f3be0343525')}</div>
+          <div className="mt-3 font-medium">{uiText('generatedUi.u_210fe2eb0a3a50d2')}</div>
+          <div className="mt-1 opacity-70">{uiText('generatedUi.u_87321818a86e1365')}</div>
+          <div className="mt-3 font-medium">{uiText('generatedUi.u_a9518c05cb483e09')}</div>
+          <div className="mt-1 opacity-70">{uiText('generatedUi.u_2122bee6ac2c45be')}</div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-9">
-          <Card label="CS Residency residents" value={String(pipeline.residencyResidents ?? 0)} />
-          <Card label="CS Residency remediation" value={String(pipeline.residencyRemediation ?? 0)} />
-          <Card label="CS Residency complete" value={String(pipeline.residencyComplete ?? 0)} />
-          <Card label="Evaluation ready — exact canary" value={String(pipeline.evaluationReady ?? 0)} />
-          <Card label="Evaluation pending — both branches" value={String(pipeline.evaluationPending ?? 0)} />
+          <Card label={uiText('generatedUi.u_e089768732b054c6')} value={String(pipeline.residencyResidents ?? 0)} />
+          <Card label={uiText('generatedUi.u_4cf968659daf70d9')} value={String(pipeline.residencyRemediation ?? 0)} />
+          <Card label={uiText('generatedUi.u_fe50dcaae0fb96a7')} value={String(pipeline.residencyComplete ?? 0)} />
+          <Card label={uiText('generatedUi.u_3034284949c964e7')} value={String(pipeline.evaluationReady ?? 0)} />
+          <Card label={uiText('generatedUi.u_d97a140fa3306af5')} value={String(pipeline.evaluationPending ?? 0)} />
           <Card label={copy.pipelinePassedGraduating} value={String(artifacts.filter(artifact => artifact.status === 'runtime_pending').length)} />
           {/* Owner 2026-09-29: graduates LEAVE the University when hired into the Workforce. This card counts only
               graduates still waiting to be hired; hired graduates are shown in the Workforce section below. */}
           <Card label={copy.pipelineGraduated} value={String(graduatedAwaitingHire)} />
           <Card label={copy.pipelineResidencyFailed} value={String(pipeline.residencyFailed ?? 0)} />
-          <Card label="Quarantined" value={String(pipeline.quarantined ?? 0)} />
+          <Card label={uiText('generatedUi.u_bb132e07e0f3fd13')} value={String(pipeline.quarantined ?? 0)} />
         </div>
       </section>
 
@@ -681,9 +683,9 @@ export default function CosUniversityTelemetryPage() {
       </section>
 
       <section className="rounded-lg border p-4">
-        <h2 className="font-semibold">Builder Residency — live cohort</h2>
-        <p className="mt-1 text-xs opacity-65">Every enrolled Computer Science artifact and its durable progress.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">{residencyInUniversity.map(row => <div key={row.residencyId} className="rounded-lg border p-3 text-xs"><div className="font-semibold">{gateLabel(row.standing)} · {row.demonstratedCompetencies}/{row.totalCompetencies} competencies</div><div className="mt-1 font-mono opacity-60">{short(row.candidateId,28)}</div><div className="mt-2">{row.completedCases} cases · {row.realOutcomes} real outcomes · {row.infrastructureFailures} infrastructure failures</div><div className="mt-1">Latest: {row.latestCase ? gateLabel(row.latestCase.outcome || row.latestCase.status) : 'no case yet'}</div><div className="mt-1 font-medium">Next: {row.standing === 'residency_complete' ? 'fresh exact-artifact canary' : row.standing === 'residency_failed' ? 'none — Residency FAIL (final)' : row.standing === 'remediation_required' ? 'remediation case' : 'continue competency cases'}</div></div>)}</div>
+        <h2 className="font-semibold">{uiText('generatedUi.u_4f426e7a79a021ca')}</h2>
+        <p className="mt-1 text-xs opacity-65">{uiText('generatedUi.u_f715304c1076dfc7')}</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">{residencyInUniversity.map(row => <div key={row.residencyId} className="rounded-lg border p-3 text-xs"><div className="font-semibold">{gateLabel(row.standing)} · {row.demonstratedCompetencies}/{row.totalCompetencies} {uiText('generatedUi.u_938e05bf3ff9352b')}</div><div className="mt-1 font-mono opacity-60">{short(row.candidateId,28)}</div><div className="mt-2">{row.completedCases} {uiText('generatedUi.u_dc71652767294f9b')} {row.realOutcomes} {uiText('generatedUi.u_c2f0aacd18d11d5d')} {row.infrastructureFailures} {uiText('generatedUi.u_7ede40465de56f6a')}</div><div className="mt-1">{uiText('generatedUi.u_983fbfe22297cbb7')} {row.latestCase ? gateLabel(row.latestCase.outcome || row.latestCase.status) : uiText('generatedUi.u_cbac8b454806fae2')}</div><div className="mt-1 font-medium">{uiText('generatedUi.u_5693e770dd678bff')} {row.standing === 'residency_complete' ? uiText('generatedUi.u_4156bc8401b842db') : row.standing === 'residency_failed' ? uiText('generatedUi.u_b375a221078de725') : row.standing === 'remediation_required' ? uiText('generatedUi.u_4617cb6f2b608a4a') : uiText('generatedUi.u_c50439fb181efaa7')}</div></div>)}</div>
       </section>
 
       <section className="rounded-lg border p-4">
@@ -696,7 +698,7 @@ export default function CosUniversityTelemetryPage() {
             <thead className="border-b text-xs uppercase opacity-60">
               <tr>
                 <th className="pb-3 pr-4">{copy.subject}</th>
-                <th className="pb-3 pr-4">{copy.artifactStatus}</th><th className="pb-3 pr-4">Current stage</th><th className="pb-3 pr-4">Blocker</th><th className="pb-3 pr-4">Next action</th>
+                <th className="pb-3 pr-4">{copy.artifactStatus}</th><th className="pb-3 pr-4">{uiText('generatedUi.u_91766a00731be267')}</th><th className="pb-3 pr-4">{uiText('generatedUi.u_8cd6bbc7db414796')}</th><th className="pb-3 pr-4">{uiText('generatedUi.u_365987d015f79bfb')}</th>
                 <th className="pb-3 pr-4">{copy.retentionGate}</th>
                 <th className="pb-3 pr-4">{copy.claimability}</th>
                 <th className="pb-3 pr-4">{copy.holdout}</th>

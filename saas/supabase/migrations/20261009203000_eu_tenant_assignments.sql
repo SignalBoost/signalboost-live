@@ -12,3 +12,16 @@ grant select, insert on public.eu_tenant_assignments to service_role;
 -- Assignments are immutable; do not grant UPDATE or DELETE, including to service_role.
 comment on table public.eu_tenant_assignments is
  'EU-only immutable enrollment region record. Not evidence of complete regional hosting.';
+
+-- Database-level immutable boundary, including privileged application roles.
+create or replace function public.reject_eu_tenant_assignment_mutation()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+ raise exception 'eu_tenant_assignment_immutable';
+end;
+$$;
+revoke all on function public.reject_eu_tenant_assignment_mutation() from public, anon, authenticated;
+drop trigger if exists eu_tenant_assignments_immutable on public.eu_tenant_assignments;
+create trigger eu_tenant_assignments_immutable
+before update or delete on public.eu_tenant_assignments
+for each row execute function public.reject_eu_tenant_assignment_mutation();

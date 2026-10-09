@@ -3,6 +3,22 @@
 
 # iTMounts Engineering Blueprint
 
+## Binding commercial boundary: platform-only Self-Healing Supervisor (owner directive, 2026-10-09)
+
+**This rule applies to every Supervisor entry point, agent, scheduled job, MCP integration, repair dispatcher, and future feature. It supersedes older language suggesting that iTMounts maintains customers' external platforms.**
+
+iTMounts is a commercial hosted platform, including LAB. Customers come to iTMounts to create, train, distill, evaluate, and manage their own AI artifacts, in a model comparable to using a hosted AI laboratory. **Do not ask customers to give the iTMounts Self-Healing Supervisor access to their infrastructure, repositories, cloud accounts, databases, or administrative consoles.** Do not introduce a customer-facing Supervisor infrastructure-access consent screen, premium access upsell, or mandatory customer-platform monitoring connection.
+
+- **Platform-only maintenance:** Self-Healing Supervisor monitors and repairs iTMounts-owned infrastructure, services, agents, queues, jobs, orchestration, and other verified platform-controlled resources. Maintenance authority is never inferred from possession of credentials or provider connectivity.
+- **Customer BYOI remains product execution only:** LAB, Builder, COS, and other customer-invoked capabilities may use customer-provided provider/tool connections solely for the customer's explicitly authorized product task, under the existing tenant isolation, scope, budget, data-use, and Harness gates. This does **not** delegate those credentials or permissions to the Supervisor.
+- **No customer infrastructure repair:** Supervisor must not read customer BYOI secrets, acquire customer provider admin permissions, initiate customer-system repair, or repurpose customer execution grants for maintenance. Do not route a failed LAB or Builder task into an unrestricted external repair action.
+- **Failure containment:** On customer-provider errors, Supervisor may recover only the iTMounts-owned side (safe retry of a previously authorized request under its original limits, internal queue/job state repair, circuit breaking, bounded backoff, pause or clear error reporting). No new external action, changed target, broader permission, alternate provider, or new spend without the original customer's task-specific authorization.
+- **Enforcement, not prose:** Keep Supervisor credentials and execution hosts separate from customer BYOI connections. Authorize platform repairs against trusted platform ownership provenance at the common execution boundary, not model-written target names, caller input, provider name, or matching a string alone. Deny ambiguous targets and test alternate routes, including internal APIs and MCP/tool bridges. Do not disable Builder/LAB's legitimate customer-authorized workflows while enforcing this separation.
+- **Telemetry and honesty:** Tenant-isolated operational status may indicate customer workflow failures, but must not grant repair authority. Never claim customer-system access or repair, end-to-end isolation, certification, or production deployment based solely on a policy document, PR, or synthetic CI test.
+
+**Engineering acceptance:** prove unauthorized customer-provider maintenance paths are blocked; prove iTMounts platform-owned recovery still works; prove normal customer-directed LAB/Builder tasks still work under their own authorization; and verify the exact deployed revision. Security tests must fail closed if platform ownership cannot be established.
+
+
 ## Product north star: iTMounts AI Lab — governed selection and certification (2026-10-06)
 
 **This section governs interpretation of all University, distillation, workforce, certification, and commercial Lab work below.** Existing security, Harness, deployment, and COS latency invariants remain in force; this section does not waive them.

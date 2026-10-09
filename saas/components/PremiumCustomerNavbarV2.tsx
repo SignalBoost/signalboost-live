@@ -8,6 +8,8 @@ import { useTranslation } from '@/components/i18n/useTranslation'
 import AuthModal from './AuthModal.tsx'
 import { supabase } from '@/utils/supabase/client'
 import { uiText } from '@/lib/i18n/uiText'
+import { SUPPORTED_LANGUAGES } from '@/lib/i18n/supportedLanguages'
+import { PENDING_LANGUAGES, PENDING_LANGUAGE_NAMES } from '@/lib/i18n/localeExpansion'
 
 type NavItem = {
   icon: string
@@ -26,7 +28,7 @@ type NavGroup = {
 }
 
 const PURPLE = '#a78bfa'
-const LANGUAGES = ['en', 'pt', 'es', 'pl', 'ru'] as const
+const LANGUAGES = SUPPORTED_LANGUAGES
 
 const GROUPS: NavGroup[] = [
   {
@@ -473,7 +475,7 @@ export default function PremiumCustomerNavbarV2() {
           {searchOpen ? <div className="sbnav-dropdown sbnav-search-results" role="listbox">{searchResults.length ? searchResults.map(item => <button key={item.href} type="button" className="sbnav-row" role="option" onClick={() => selectSearchResult(item.href!)}>{item.icon}<span>{item.label}</span></button>) : <span className="sbnav-row">{t('nav.noSearchResults', "No matching sections")}</span>}</div> : null}
         </div>
         {user ? <span className="sbnav-credits" aria-live="polite" title={t('nav.credits.label', "credits")}>⚡ {ownerAccess ? t('nav.credits.unlimited', "Unlimited") : (credits === null ? '…' : credits.toLocaleString())}</span> : null}
-        <select className="sbnav-language" value={lang} aria-label={t('nav.languageLabel', "Language")} onChange={event => setLang(event.target.value)}>{LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`, code.toUpperCase())}</option>)}</select>
+        <select className="sbnav-language" value={lang} aria-label={t('nav.languageLabel', "Language")} onChange={event => setLang(event.target.value)}>{LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`, code.toUpperCase())}</option>)}{PENDING_LANGUAGES.map(code => <option key={code} value={code} disabled>{PENDING_LANGUAGE_NAMES[code]} — coming soon</option>)}</select>
         {user ? <button type="button" className="sbnav-auth sbnav-logout" onClick={handleLogout}>{t('nav.logOut', "Log out")}</button> : <><button type="button" className="sbnav-auth sbnav-sign-in" onClick={() => { setAuthMode('login'); setShowAuth(true) }}>{t('auth.logIn', "Sign in")}</button><button type="button" className="sbnav-auth" onClick={() => { setAuthMode('signup'); setShowAuth(true) }}>{t('auth.createAccount', "Create account")}</button></>}
         <button type="button" className="sbnav-burger" aria-label={t('nav.menu', "Menu")} aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>{mobileOpen ? '✕' : '☰'}</button>
       </nav>

@@ -21,5 +21,11 @@ try {
   const omitted=validator()
   assert.equal(omitted.status,1,'Omitted catalog must fail closed')
   assert.match(omitted.stderr,/required source stores missing or unexpected/)
-  console.log('PASS: incomplete translations and omitted catalog blocked')
+  // Even a structurally valid manifest cannot waive explicit review requirements.
+  manifest.stores.de.audit = Object.keys(JSON.parse(fs.readFileSync(path.join(dir,'de.json'),'utf8')).audit).length
+  fs.writeFileSync(filename,JSON.stringify(manifest))
+  const reviewRequired=run(['scripts/validate-translated-packages.mjs',dir,'--require-reviewed'])
+  assert.equal(reviewRequired.status,1,'Absent reviewer metadata must fail closed')
+  assert.match(reviewRequired.stderr,/no reviewed translation metadata/)
+  console.log('PASS: incomplete translations, omitted catalog and missing reviews blocked')
 } finally {fs.rmSync(dir,{recursive:true,force:true})}

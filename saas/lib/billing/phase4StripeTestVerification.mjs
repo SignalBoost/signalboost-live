@@ -20,7 +20,8 @@ export function validateAuthoritativeTestPayment({event,paymentIntent,tenantId,a
  if(!id(event?.id,'evt_')||event.livemode!==false||event.type!=='payment_intent.succeeded'
    ||!id(event.data?.object?.id,'pi_')) throw Error('stripe_test_event_invalid')
  if(!paymentIntent||paymentIntent.id!==event.data.object.id||paymentIntent.livemode!==false
-    ||paymentIntent.status!=='succeeded'||paymentIntent.amount_received<=0
+    ||paymentIntent.status!=='succeeded'||!Number.isSafeInteger(paymentIntent.amount_received)
+    ||!Number.isSafeInteger(paymentIntent.amount)||paymentIntent.amount_received<=0
     ||paymentIntent.amount_received!==paymentIntent.amount
     ||!id(paymentIntent.id,'pi_')) throw Error('stripe_authoritative_payment_invalid')
  if(typeof tenantId!=='string'||!tenantId||paymentIntent.metadata?.lab_organization_id!==tenantId

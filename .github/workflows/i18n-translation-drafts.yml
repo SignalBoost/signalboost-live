@@ -1,0 +1,46 @@
+name: Generate six-language translation drafts
+on:
+  workflow_dispatch:
+    inputs:
+      max_strings:
+        description: 'Maximum translated entries for this run (1–500)'
+        required: true
+        default: '500'
+permissions:
+  contents: read
+jobs:
+  translate-drafts:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: translation-drafts
+    defaults:
+      run:
+        working-directory: saas
+    env:
+      AZURE_TRANSLATOR_KEY: ${{ secrets.AZURE_TRANSLATOR_KEY }}
+      AZURE_TRANSLATOR_REGION: ${{ secrets.AZURE_TRANSLATOR_REGION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check optional translation-provider configuration
+        run: |
+          test -n "$AZURE_TRANSLATOR_KEY" && test -n "$AZURE_TRANSLATOR_REGION" || {
+            echo 'Azure Translator credentials unavailable. Nothing sent or changed.'
+            exit 1
+          }
+      - name: Export canonical public-copy packages
+        run: node scripts/export-eleven-language-translation-packages.mjs --out .translation-drafts
+      - name: Generate strictly nonproduction translations
+        run: node scripts/translate-pending-language-packages.mjs .translation-drafts --limit "${{ inputs.max_strings }}"
+      - name: Upload private review-required translation packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: six-language-drafts
+          path: saas/.translation-drafts
+          retention-days: 7
+          if-no-files-found: error

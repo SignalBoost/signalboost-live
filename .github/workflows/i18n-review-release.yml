@@ -1,0 +1,41 @@
+name: Six-language translation release review gate
+on:
+  pull_request:
+    paths:
+      - 'saas/scripts/verify-six-language-review-gate.mjs'
+      - 'saas/tests/sixLanguageReviewGate.node.test.mjs'
+      - 'saas/translation-release/**'
+      - 'saas/lib/i18n/supportedLanguages.ts'
+      - '.github/workflows/i18n-review-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify review-gate regressions
+        working-directory: saas
+        run: node --test tests/sixLanguageReviewGate.node.test.mjs
+      - name: Require approved exact-source packages before application-language activation
+        working-directory: saas
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq "'(de|fr|it|ja|ko|ar)'" lib/i18n/supportedLanguages.ts; then
+            test -f translation-release/manifest.json || {
+              echo '::error::A pending language was enabled without reviewed translation-release packages'
+              exit 1
+            }
+            node scripts/verify-six-language-review-gate.mjs translation-release
+          elif test -f translation-release/manifest.json; then
+            node scripts/verify-six-language-review-gate.mjs translation-release
+          else
+            echo 'Five current application languages unchanged; six new languages are gated until reviewed'
+          fi

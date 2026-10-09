@@ -48,7 +48,7 @@ const scanComponents=dir=>{
  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   if(entry.isDirectory()){
    if(!excluded.has(entry.name)&&!entry.name.startsWith('_'))scanComponents(path.join(dir,entry.name))
-  }else if(/\.(tsx|jsx)$/.test(entry.name)&&!(/\.test\.|\.spec\.|\.stories\./.test(entry.name))){
+  }else if(/\.(tsx|jsx)$/.test(entry.name)&&!(/\.test\.|\.spec\.|\.stories\.|^(page|layout|template|loading|error|global-error|not-found|default)\.(tsx|jsx)$/.test(entry.name))){
    const sourceFile=path.join(dir,entry.name)
    const src=fs.readFileSync(sourceFile,'utf8')
    const found=candidates(src)
@@ -61,6 +61,8 @@ const scanComponents=dir=>{
  }
 }
 scanComponents(path.join(root,'components'))
+// App Router feature components are colocated beside pages.
+scanComponents(path.join(root,'app'))
 componentFiles.sort((a,b)=>a.source.localeCompare(b.source))
 const flagged=routes.filter(x=>!x.explicitI18n)
 const report={status:'INVENTORY_ONLY_NOT_RUNTIME_CERTIFICATION',totalPages:routes.length,withoutObviousI18nHook:flagged.length,

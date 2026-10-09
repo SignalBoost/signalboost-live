@@ -16,6 +16,21 @@ export async function buildVerifiedTestSettlementEnvelope({
  const verified=await verifyRetrievedStripeTestPayment({
   event,tenantId,approvedPrice,stripeSecretKey,fetchImpl,signal
  })
+ // Stripe account association must be retrieved independently using the same test credential.
+ // A caller-supplied account ID alone cannot establish where payment settled.
+ let accountResponse
+ try {
+  accountResponse=await fetchImpl('https://api.stripe.com/v1/account',{
+   method:'GET',headers:{Authorization:'Bearer '+stripeSecretKey},
+   redirect:'error',cache:'no-store',signal
+  })
+ } catch {throw Error('stripe_account_retrieval_unavailable')}
+ if(!accountResponse||accountResponse.ok!==true||typeof accountResponse.json!=='function')
+  throw Error('stripe_account_retrieval_failed')
+ let account
+ try {account=await accountResponse.json()}catch {throw Error('stripe_account_json_invalid')}
+ if(account?.id!==stripeAccountId||account?.object!=='account')
+  throw Error('stripe_account_binding_mismatch')
  // An envelope is not a financial receipt and cannot grant credits on its own.
  // Explicitly keep Stripe live mode unrepresentable.
  return Object.freeze({

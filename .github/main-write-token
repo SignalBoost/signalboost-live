@@ -1,2 +1,2 @@
-base_sha=b40e273aa3ff53f3450cf041826eb2bb8fb1ff28
-branch=fix-holdout-revival-scope-current-20261009
+base_sha=140ecd0a33e410cbdee6d711a69f08c7007aa04a
+branch=feat/phase4-stripe-test-account-binding-20261008

@@ -16,7 +16,7 @@ jobs:
           node-version: '22'
       - name: Verify review-gate regressions
         working-directory: saas
-        run: node --test tests/sixLanguageReviewGate.node.test.mjs
+        run: node --test tests/sixLanguageReviewGate.node.test.mjs tests/stageReviewedLanguagePackages.node.test.mjs
       - name: Require approved exact-source packages before application-language activation
         working-directory: saas
         shell: bash

@@ -36,6 +36,7 @@ const out = path.resolve(root, process.argv.includes('--out')
   ? process.argv[process.argv.indexOf('--out') + 1] : 'translation-packages')
 if (!out.startsWith(root + path.sep)) throw new Error('Translation output must stay inside saas working tree')
 fs.mkdirSync(out,{recursive:true})
+const resume=process.argv.includes('--resume')
 const manifest = {}
 for (const lang of pending) {
   const packageData = {}
@@ -43,10 +44,22 @@ for (const lang of pending) {
     packageData[store] = Object.fromEntries(Object.entries(items).map(([key,source]) =>
       [key, { source, translation: null }]))
   }
-  fs.writeFileSync(path.join(out,lang+'.json'),JSON.stringify(packageData,null,2)+'\n')
+  const destination=path.join(out,lang+'.json')
+  if(resume && fs.existsSync(destination)) {
+    const previous=JSON.parse(fs.readFileSync(destination,'utf8'))
+    for(const [store,entries] of Object.entries(packageData)) {
+      for(const [key,entry] of Object.entries(entries)) {
+        const old=previous?.[store]?.[key]
+        if(old && JSON.stringify(old.source)===JSON.stringify(entry.source) && old.translation!==null && old.translation!==undefined) {
+          entry.translation=old.translation
+        }
+      }
+    }
+  }
+  fs.writeFileSync(destination,JSON.stringify(packageData,null,2)+'\n')
   manifest[lang] = Object.fromEntries(Object.entries(packageData).map(([store,entries]) =>
     [store,Object.keys(entries).length]))
 }
 fs.writeFileSync(path.join(out,'manifest.json'),JSON.stringify({languages:pending,stores:manifest,
   status:'UNTRANSLATED_SOURCE_PACKAGES',instructions:'Translate every source value; preserve keys, placeholders, named technical terms and markup. Review with native speakers. Do not deploy package data directly.'},null,2)+'\n')
-console.log('Exported six UNTRANSLATED packages to '+out)
+console.log('Exported six source packages to '+out+' (resume='+resume+')')

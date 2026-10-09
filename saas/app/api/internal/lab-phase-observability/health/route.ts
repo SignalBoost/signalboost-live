@@ -25,6 +25,11 @@ export async function GET(req:NextRequest){
     const events=await readTenantLabObservations(getAdminSupabase(),tenant,revision)
     const alerts: {code:string;phase:number;signal:string;exactRevision:string;severity:string}[]=[]
     const result=await dispatchLabHealthAlerts(events,revision,Date.now(),alert=>{alerts.push(alert)})
+    // Aggregate only: no tenant IDs or raw evidence in deployment logs.
+    const counts = {unknown: alerts.filter(a=>a.code==='lab_phase_signal_unknown').length,
+      stale:alerts.filter(a=>a.code==='lab_phase_signal_stale').length,
+      blocked:alerts.filter(a=>a.code==='lab_phase_signal_blocked').length}
+    if (alerts.length) console.warn('[lab_phase_observability_health_alerts]', counts)
     return NextResponse.json({ok:true,revision,alerts,health:result.health,deliveredToExternalSupervisor:false},{headers})
   }catch{
     return NextResponse.json({ok:false,error:'observability_health_check_unavailable'},{status:503,headers})

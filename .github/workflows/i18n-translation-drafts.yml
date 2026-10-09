@@ -6,8 +6,13 @@ on:
         description: 'Maximum translated entries per language (1–10000; default runs all)'
         required: true
         default: '10000'
+      resume_run_id:
+        description: 'Optional previous translation workflow run ID to resume (same repository)'
+        required: false
+        default: ''
 permissions:
   contents: read
+  actions: read
 jobs:
   translate-drafts:
     if: github.ref == 'refs/heads/main'
@@ -33,14 +38,30 @@ jobs:
             echo 'Azure Translator credentials unavailable. Nothing sent or changed.'
             exit 1
           }
-      - name: Export canonical public-copy packages
-        run: node scripts/export-eleven-language-translation-packages.mjs --out .translation-drafts
+      - name: Validate optional resume reference
+        env:
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+        run: |
+          if [ -n "$RESUME_RUN_ID" ] && ! [[ "$RESUME_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo 'Invalid resume run ID'; exit 2
+          fi
+      - name: Recover drafts from a prior workflow run
+        if: inputs.resume_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: six-language-drafts
+          path: saas/.translation-drafts
+          run-id: ${{ inputs.resume_run_id }}
+          github-token: ${{ github.token }}
+      - name: Export canonical public-copy packages (preserve unchanged prior drafts)
+        run: node scripts/export-eleven-language-translation-packages.mjs --out .translation-drafts --resume
       - name: Generate strictly nonproduction translations
         run: node scripts/translate-pending-language-packages.mjs .translation-drafts --limit "${{ inputs.max_strings }}"
-      - name: Upload private review-required translation packages
+      - name: Upload private review-required translation packages (including partial progress)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: six-language-drafts
           path: saas/.translation-drafts
           retention-days: 7
-          if-no-files-found: error
+          if-no-files-found: warn

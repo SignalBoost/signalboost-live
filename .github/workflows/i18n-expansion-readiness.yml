@@ -5,6 +5,7 @@ on:
       - 'saas/lib/i18n/**'
       - 'saas/components/i18n/**'
       - 'saas/scripts/check-language-expansion-readiness.mjs'
+      - 'saas/scripts/check-eleven-language-coverage.mjs'
       - 'saas/scripts/check-five-language-platform.mjs'
       - 'saas/components/LanguageSuggestion.tsx'
       - '.github/workflows/i18n-expansion-readiness.yml'
@@ -31,3 +32,5 @@ jobs:
         run: node scripts/check-five-language-platform.mjs
       - name: Check six-language roadmap and Arabic direction
         run: node scripts/check-language-expansion-readiness.mjs
+      - name: Report eleven-language catalog gaps without claiming release readiness
+        run: node scripts/check-eleven-language-coverage.mjs

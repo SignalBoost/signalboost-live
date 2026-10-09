@@ -1,2 +1,2 @@
-base_sha=f5a71d6d8fc1214b7c3854c7e2fd563820db0c8f
-branch=feat/eu-runtime-config-gate-oct09
+base_sha=3b4170901d9c81b50e11a1d09277f49a71e6878d
+branch=fix/eu-readiness-import-oct09

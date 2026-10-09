@@ -1,0 +1,33 @@
+name: LAB launch evidence (zero spend)
+on:
+  pull_request:
+    paths:
+      - 'saas/scripts/lab-launch-acceptance.mjs'
+      - '.github/workflows/lab-launch-evidence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - name: Install pinned application dependencies
+        working-directory: saas
+        run: npm ci --ignore-scripts
+      - name: Run bounded contract acceptance and record unverified production gates
+        working-directory: saas
+        run: node scripts/lab-launch-acceptance.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lab-launch-acceptance-${{ github.sha }}
+          path: saas/artifacts/launch-acceptance/report.json
+          if-no-files-found: error
+          retention-days: 30

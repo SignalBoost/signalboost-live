@@ -15,20 +15,47 @@ test('BYOT rejects an untrusted run before resolving tenant connections', async 
   assert.equal(connections, 0)
 })
 
-test('BYOT does not issue using another tenant connection', async () => {
-  // A trusted run is required independently, so even a cross-tenant
-  // connection resolver is never allowed to substitute its own authority.
-  const result = await issueTenantByotBirth({
-    tenantId: 'customer-a', harnessRunId: 'untrusted', permanentArtifactId: artifactId,
-    resolveTrustedRun: async () => null,
-    resolveTenantProvider: async () => ({
-      tenantId: 'customer-b', connectionId: 'other-tenant',
-      trustedIssuerFingerprint: 'a'.repeat(64),
-      issuerPublicKeyPem: 'wrong',
-      signer: async () => new Uint8Array(64),
-      readNativeBirth: async () => null, insertOnce: async () => true,
-      readStored: async () => null,
-    }),
+test('BYOT refuses cross-tenant provider after a valid trusted Harness grant', async () => {
+  let connections = 0, signs = 0, reads = 0, writes = 0
+  const runId = 'trusted-birth-run'
+  // The resolver stands in for the host's independently validated, durable run.
+  // Unlike the untrusted-run case, this reaches the provider tenant check.
+  const resolveTrustedRun = async () => ({
+    status: 'active' as const,
+    authorityVerified: true,
+    manifest: {
+      runId,
+      identity: { tenantId: 'customer-a', artifact: { artifactId } },
+      authorityManifestRef: 'trusted-host-authority',
+      profile: 'production',
+      environment: { class: 'staging' },
+      capabilities: [{
+        id: 'university.artifact.birth.sign',
+        mutating: true,
+        risk: 'consequential',
+        environments: ['staging'],
+        scopes: [artifactId],
+      }],
+    },
   })
-  assert.equal(result, 'invalid_grant')
+  const result = await issueTenantByotBirth({
+    tenantId: 'customer-a', harnessRunId: runId, permanentArtifactId: artifactId,
+    resolveTrustedRun: resolveTrustedRun as any,
+    resolveTenantProvider: async () => {
+      connections++
+      return {
+        tenantId: 'customer-b', connectionId: 'other-tenant',
+        trustedIssuerFingerprint: 'a'.repeat(64),
+        issuerPublicKeyPem: 'wrong',
+        signer: async () => { signs++; return new Uint8Array(64) },
+        readNativeBirth: async () => { reads++; return null },
+        insertOnce: async () => { writes++; return true },
+        readStored: async () => { reads++; return null },
+      }
+    },
+  })
+  assert.equal(result, 'provider_unavailable')
+  assert.deepEqual({ connections, signs, reads, writes }, {
+    connections: 1, signs: 0, reads: 0, writes: 0,
+  })
 })

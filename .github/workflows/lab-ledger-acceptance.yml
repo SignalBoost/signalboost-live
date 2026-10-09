@@ -19,6 +19,7 @@ on:
       - 'saas/supabase/migrations/20261008220000_lab_commercial_stripe_evidence_reconciliation.sql'
       - 'saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql'
       - 'saas/supabase/migrations/20261008240000_lab_commercial_claim_reconciliation_source_binding.sql'
+      - 'saas/supabase/migrations/20261009000000_lab_testmode_settlement_rate_guard.sql'
   workflow_dispatch:
 
 permissions:
@@ -81,6 +82,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008220000_lab_commercial_stripe_evidence_reconciliation.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008240000_lab_commercial_claim_reconciliation_source_binding.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261009000000_lab_testmode_settlement_rate_guard.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |
@@ -146,3 +148,7 @@ jobs:
       - name: Prove atomic test-only Stripe wallet settlement
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-testmode-atomic-stripe-settlement-acceptance.sql
+
+      - name: Guard USD test settlement credit rate conversion
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-testmode-settlement-rate-guard-acceptance.sql

@@ -40,7 +40,14 @@ jobs:
       - name: Report eleven-language catalog gaps without claiming release readiness
         run: node scripts/check-eleven-language-coverage.mjs
       - name: Audit exact key types and interpolation tokens across all nine locale stores
-        run: node scripts/audit-pending-locale-structure.mjs
+        run: node scripts/audit-pending-locale-structure.mjs --report .i18n-evidence/six-locale-structure.json
+      - name: Upload exact locale gap evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eleven-language-readiness-evidence
+          path: saas/.i18n-evidence/six-locale-structure.json
+          if-no-files-found: warn
       - name: Verify source translation packages for six pending languages
         run: node scripts/check-translation-package-export.mjs
       - name: Reject incomplete and omitted locale catalogs

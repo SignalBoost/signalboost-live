@@ -10,6 +10,7 @@ const combined=['lib/i18n/onboardingLocales.json','lib/i18n/marketingSalesLocale
 const flatten=(item,prefix='',out={})=>{for(const [key,value] of Object.entries(item)){const full=prefix?prefix+'.'+key:key;if(value&&typeof value==='object'&&!Array.isArray(value))flatten(value,full,out);else out[full]=value}return out}
 const file=(p)=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8'))
 const issues=[]
+const perLocale=Object.fromEntries(pending.map(lang=>[lang,{catalogsChecked:0,issues:0}]))
 const compare=(label,en,other)=>{
  const a=flatten(en),b=flatten(other)
  for(const [key,value] of Object.entries(a)){
@@ -33,10 +34,22 @@ for(const lang of pending){
   if(!obj[lang]){issues.push(p+': missing '+lang);continue}
   compare(p+': '+lang,obj.en,obj[lang])
  }
+ perLocale[lang].catalogsChecked=storePaths.length+combined.length
+ perLocale[lang].issues=issues.filter(issue=>issue.startsWith(lang+'/')||issue.startsWith(lang+'.')||issue.includes(': '+lang+' ')).length
 }
 const core=fs.readFileSync(path.join(root,'lib/i18n/supportedLanguages.ts'),'utf8')
 const live=core.match(/SUPPORTED_LANGUAGES\s*=\s*\[([^\]]+)\]/)?.[1]||''
 const enabled=pending.filter(code=>live.includes("'"+code+"'")||live.includes('"'+code+'"'))
+const report={status:issues.length?'NOT_READY':'STRUCTURALLY_COMPLETE',languages:perLocale,issues,activeCandidates:enabled,generatedAt:new Date().toISOString()}
+const reportArg=process.argv.indexOf('--report')
+if(reportArg>=0){
+ const output=process.argv[reportArg+1]
+ if(!output||output.startsWith('-'))throw Error('--report requires a file path')
+ const dest=path.resolve(root,output)
+ if(!dest.startsWith(root+path.sep))throw Error('Report path must be inside saas')
+ fs.mkdirSync(path.dirname(dest),{recursive:true})
+ fs.writeFileSync(dest,JSON.stringify(report,null,2)+'\n')
+}
 console.log('Six-language structural audit: '+issues.length+' gap(s); active candidates: '+(enabled.join(',')||'none'))
 for(const issue of issues.slice(0,100))console.log(' - '+issue)
 if(issues.length>100)console.log(' ... '+(issues.length-100)+' additional gaps')

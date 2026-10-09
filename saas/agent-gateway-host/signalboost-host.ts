@@ -2,7 +2,6 @@
 // SignalBoost-specific live wiring. Governance decides; this file only assembles real adapters.
 
 import { stageInfrastructurePR } from '@/lib/hub/pr-engine'
-import { runUniversalProvider } from '@/lib/engine/universalRunner'
 import { createInfraPr } from '@/lib/infra-pr/store'
 import { triggerProductionRedeploy } from '@/lib/infra-pr/redeploy'
 import { getAdminSupabase } from '@/utils/supabase/server'
@@ -20,7 +19,7 @@ import {
 import { createUniversityDistillationRecoveryExecutor } from './university-distillation-recovery.ts'
 import { createBuilderResidencyRuntimeRecoveryExecutor } from './builder-residency-runtime-recovery.ts'
 import { GATEWAY_ALLOWLIST, GATEWAY_POLICY } from './gateway-policy.ts'
-import { createExecutionChain, createUniversalChainExecutor, createBrowserChainExecutor } from './execution-chain.ts'
+import { createExecutionChain } from './execution-chain.ts'
 import type { ExecutableAction } from './universal-execution.ts'
 
 export { GATEWAY_ALLOWLIST, GATEWAY_POLICY } from './gateway-policy.ts'
@@ -31,6 +30,7 @@ export const API_ACTIONS: readonly ExecutableAction[] = []
 export const APPROVABLE_ACTIONS: readonly ApprovableAction[] = SUPERVISOR_REPAIR_ACTIONS
 
 export function createSignalBoostGatewayHost(): GatewayHost {
+  // Platform-only host: never install generic customer BYOI or browser executors.
   const holdingPen = createInfraPrApprovalPort({ createInfraPr })
   return {
     execution: createExecutionChain({
@@ -45,14 +45,6 @@ export function createSignalBoostGatewayHost(): GatewayHost {
           // the exact deployment it created. A deploy hook without exact identity fails closed here.
           redeploy: () => triggerProductionRedeploy({ requireExactIdentity: true }),
         }),
-        createUniversalChainExecutor({
-          runUniversalProvider: async (input) => {
-            const r = await runUniversalProvider(input)
-            return { ok: r.ok, status: r.status, outputs: r.outputs, error: r.error }
-          },
-          actions: API_ACTIONS,
-        }),
-        createBrowserChainExecutor({ actions: [] }),
       ],
     }),
     approvals: createPrEngineApprovalPort({

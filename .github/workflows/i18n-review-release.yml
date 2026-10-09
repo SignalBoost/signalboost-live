@@ -9,27 +9,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Verify review-gate regressions
         working-directory: saas
         run: node --test tests/sixLanguageReviewGate.node.test.mjs tests/stageReviewedLanguagePackages.node.test.mjs
-      - name: Require approved exact-source packages before application-language activation
+      - name: Check enabled locale loader wiring
+        working-directory: saas
+        run: node scripts/check-pending-locale-wiring.mjs
+      - name: Require approved packages before application-language activation
         working-directory: saas
         shell: bash
         run: |
           set -euo pipefail
           if grep -Eq "'(de|fr|it|ja|ko|ar)'" lib/i18n/supportedLanguages.ts; then
-            test -f translation-release/manifest.json || {
-              echo '::error::A pending language was enabled without reviewed translation-release packages'
-              exit 1
-            }
+            test -f translation-release/manifest.json || exit 1
             node scripts/verify-six-language-review-gate.mjs translation-release
           elif test -f translation-release/manifest.json; then
             node scripts/verify-six-language-review-gate.mjs translation-release
-          else
-            echo 'Five current application languages unchanged; six new languages are gated until reviewed'
           fi

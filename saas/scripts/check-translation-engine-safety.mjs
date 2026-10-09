@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..')
 const script=fs.readFileSync(path.join(root,'scripts/translate-pending-language-packages.mjs'),'utf8')
+const workflow=fs.readFileSync(path.join(root,'../.github/workflows/i18n-translation-drafts.yml'),'utf8')
 assert.match(script,/AZURE_TRANSLATOR_KEY/)
 assert.match(script,/AZURE_TRANSLATOR_REGION/)
 assert.match(script,/AbortSignal\.timeout/)
@@ -21,6 +22,11 @@ assert.match(script,/const pending=\[\]/)
 assert.match(script,/chunk\.length<maxItems/)
 assert.match(script,/perLanguage\[lang\]=processed/)
 assert.doesNotMatch(script,/locales\/de\.json|locales\/fr\.json/)
+assert.match(workflow,/resume_run_id:/)
+assert.match(workflow,/actions\/download-artifact@v4/)
+assert.match(workflow,/--resume/)
+assert.match(workflow,/if: always\(\)/)
+assert.match(workflow,/actions: read/)
 const run=spawnSync(process.execPath,['scripts/translate-pending-language-packages.mjs','nonexistent-packages'],{
   cwd:root,encoding:'utf8',env:{...process.env,AZURE_TRANSLATOR_KEY:'',AZURE_TRANSLATOR_REGION:''}
 })

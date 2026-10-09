@@ -26,3 +26,9 @@ test('reject live, tenant substitution, mismatched amount, and unapproved rate',
 test('never trust webhook object payment fields without authoritative payment intent',()=>{
  assert.throws(()=>validateAuthoritativeTestPayment({event,paymentIntent:null,tenantId:'tenant-a',approvedPrice}))
 })
+
+test('reject non-integer, NaN and unsafe Stripe monetary values',()=>{
+ for(const amount of ['500',NaN,500.5,Number.MAX_SAFE_INTEGER+1]) {
+  assert.throws(()=>validateAuthoritativeTestPayment({event,paymentIntent:{...intent,amount,amount_received:amount},tenantId:'tenant-a',approvedPrice}))
+ }
+})

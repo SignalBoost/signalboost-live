@@ -1,0 +1,24 @@
+{
+  "promote_page": {
+    "badge": "Promouvoir mon entreprise",
+    "title": "Créer une campagne complète",
+    "businessName": "Nom de l’entreprise",
+    "businessPlaceholder": "p. ex. Luna Travel",
+    "audience": "Public cible",
+    "audiencePlaceholder": "p. ex. les familles locales",
+    "offer": "Que souhaitez-vous promouvoir ?",
+    "offerPlaceholder": "p. ex. 20 % de réduction sur les séjours du week-end. Places limitées.",
+    "tone": "Ton",
+    "generate": "Générer la campagne",
+    "subtitle": "Votre campagne apparaîtra ici : textes pour le site web, publications sur les réseaux sociaux, e-mail, script vidéo et plus encore.",
+    "preview": {
+      "title": "Aperçu de la campagne"
+    },
+    "tones": {
+      "friendly": "Convivial",
+      "premium": "Haut de gamme",
+      "urgent": "Urgent",
+      "local": "Local"
+    }
+  }
+}

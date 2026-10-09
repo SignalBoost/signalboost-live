@@ -1,0 +1,24 @@
+{
+  "promote_page": {
+    "badge": "ビジネスを宣伝",
+    "title": "キャンペーン全体を作成",
+    "businessName": "ビジネス名",
+    "businessPlaceholder": "例：Luna Travel",
+    "audience": "ターゲット層",
+    "audiencePlaceholder": "例：地域の家族",
+    "offer": "何を宣伝しますか？",
+    "offerPlaceholder": "例：週末プランが20％オフ。定員に限りがあります。",
+    "tone": "トーン",
+    "generate": "キャンペーンを生成",
+    "subtitle": "ここにキャンペーンが表示されます。ウェブサイト用の文章、SNS投稿、メール、動画台本などが含まれます。",
+    "preview": {
+      "title": "キャンペーンのプレビュー"
+    },
+    "tones": {
+      "friendly": "親しみやすい",
+      "premium": "プレミアム",
+      "urgent": "緊急",
+      "local": "地域密着"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "promote_page": {
+    "badge": "Promuovi la mia attività",
+    "title": "Crea una campagna completa",
+    "businessName": "Nome dell’attività",
+    "businessPlaceholder": "ad es. Luna Travel",
+    "audience": "Pubblico di riferimento",
+    "audiencePlaceholder": "ad es. famiglie della zona",
+    "offer": "Che cosa vuoi promuovere?",
+    "offerPlaceholder": "ad es. 20% di sconto sui pacchetti del fine settimana. Posti limitati.",
+    "tone": "Tono",
+    "generate": "Genera campagna",
+    "subtitle": "La tua campagna apparirà qui: testi per il sito web, post sui social, e-mail, copione video e altro ancora.",
+    "preview": {
+      "title": "Anteprima della campagna"
+    },
+    "tones": {
+      "friendly": "Amichevole",
+      "premium": "Premium",
+      "urgent": "Urgente",
+      "local": "Locale"
+    }
+  }
+}

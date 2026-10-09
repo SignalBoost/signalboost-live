@@ -1,0 +1,24 @@
+{
+  "promote_page": {
+    "badge": "Mein Unternehmen bewerben",
+    "title": "Eine vollständige Kampagne erstellen",
+    "businessName": "Unternehmensname",
+    "businessPlaceholder": "z. B. Luna Travel",
+    "audience": "Zielgruppe",
+    "audiencePlaceholder": "z. B. Familien vor Ort",
+    "offer": "Was möchten Sie bewerben?",
+    "offerPlaceholder": "z. B. 20 % Rabatt auf Wochenendpakete. Begrenzte Plätze.",
+    "tone": "Tonfall",
+    "generate": "Kampagne erstellen",
+    "subtitle": "Hier erscheint Ihre Kampagne – Website-Texte, Social-Media-Beiträge, E-Mail, Videoskript und mehr.",
+    "preview": {
+      "title": "Kampagnenvorschau"
+    },
+    "tones": {
+      "friendly": "Freundlich",
+      "premium": "Premium",
+      "urgent": "Dringend",
+      "local": "Lokal"
+    }
+  }
+}

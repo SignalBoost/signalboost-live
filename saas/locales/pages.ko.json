@@ -1,0 +1,24 @@
+{
+  "promote_page": {
+    "badge": "내 비즈니스 홍보",
+    "title": "전체 캠페인 만들기",
+    "businessName": "비즈니스 이름",
+    "businessPlaceholder": "예: Luna Travel",
+    "audience": "대상 고객",
+    "audiencePlaceholder": "예: 지역 가족",
+    "offer": "무엇을 홍보하시겠습니까?",
+    "offerPlaceholder": "예: 주말 패키지 20% 할인. 한정 수량.",
+    "tone": "문체",
+    "generate": "캠페인 생성",
+    "subtitle": "웹사이트 문구, 소셜 미디어 게시물, 이메일, 동영상 대본 등을 포함한 캠페인이 여기에 표시됩니다.",
+    "preview": {
+      "title": "캠페인 미리보기"
+    },
+    "tones": {
+      "friendly": "친근한",
+      "premium": "프리미엄",
+      "urgent": "긴급",
+      "local": "지역"
+    }
+  }
+}

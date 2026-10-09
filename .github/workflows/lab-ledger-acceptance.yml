@@ -28,6 +28,7 @@ on:
       - 'saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql'
       - 'saas/supabase/migrations/20261008240000_lab_commercial_claim_reconciliation_source_binding.sql'
       - 'saas/supabase/migrations/20261009000000_lab_testmode_settlement_rate_guard.sql'
+      - 'saas/supabase/migrations/20261009170000_lab_testmode_commercial_wallet_event.sql'
   workflow_dispatch:
 
 permissions:
@@ -91,6 +92,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008240000_lab_commercial_claim_reconciliation_source_binding.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261009000000_lab_testmode_settlement_rate_guard.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261009170000_lab_testmode_commercial_wallet_event.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |
@@ -180,3 +182,7 @@ jobs:
       - name: Verify commercial wallet balance invariants
         shell: bash
         run: node --test saas/tests/phase4CommercialWalletAudit.node.test.mjs
+
+      - name: Verify test-only wallet reservation, capture and release
+        shell: bash
+        run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-testmode-commercial-wallet-usage-acceptance.sql

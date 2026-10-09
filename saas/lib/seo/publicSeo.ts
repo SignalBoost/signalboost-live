@@ -1,0 +1,60 @@
+import { PUBLIC_BRAND } from '../public-brand.ts'
+import { PUBLIC_COPY } from './publicCopy.ts'
+import { PUBLIC_LOCALES, PUBLIC_TOPICS, publicPagePath, type PublicLocale, type PublicTopic } from './publicLocales.ts'
+
+export function publicTopicCopy(locale: PublicLocale, topic?: PublicTopic) {
+  const copy = PUBLIC_COPY[locale]
+  switch (topic) {
+    case 'ai-website-builder': return { title: copy.websiteTitle, description: copy.website }
+    case 'customer-reviews': return { title: copy.reviewsTitle, description: copy.reviews }
+    case 'ai-content': return { title: copy.contentTitle, description: copy.content }
+    case 'ai-lab': return { title: copy.labTitle, description: copy.lab }
+    default: return { title: copy.title, description: copy.lead }
+  }
+}
+
+export function publicAlternates(topic?: PublicTopic): Record<string, string> {
+  return Object.fromEntries([
+    ...PUBLIC_LOCALES.map(locale => [locale, `${PUBLIC_BRAND.siteUrl}${publicPagePath(locale, topic)}`]),
+    ['x-default', `${PUBLIC_BRAND.siteUrl}${publicPagePath('en', topic)}`],
+  ])
+}
+
+export function publicMetadata(locale: PublicLocale, topic?: PublicTopic) {
+  const { title, description } = publicTopicCopy(locale, topic)
+  const url = `${PUBLIC_BRAND.siteUrl}${publicPagePath(locale, topic)}`
+  const fullTitle = `${title} · ${PUBLIC_BRAND.name}`
+  const ogLocale: Record<PublicLocale, string> = {
+    en: 'en_US', es: 'es_ES', pt: 'pt_BR', pl: 'pl_PL', ru: 'ru_RU',
+    de: 'de_DE', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP', ko: 'ko_KR', ar: 'ar_AR',
+  }
+  return {
+    title: { absolute: fullTitle }, description,
+    alternates: { canonical: url, languages: publicAlternates(topic) },
+    robots: { index: true, follow: true },
+    openGraph: { type: 'website' as const, url, siteName: PUBLIC_BRAND.name, title: fullTitle, description,
+      locale: ogLocale[locale], alternateLocale: PUBLIC_LOCALES.filter(value => value !== locale).map(value => ogLocale[value]),
+      images: [{ url: `${PUBLIC_BRAND.siteUrl}/og-image.png`, width: 1200, height: 630, alt: fullTitle }] },
+    twitter: { card: 'summary_large_image' as const, title: fullTitle, description, images: [`${PUBLIC_BRAND.siteUrl}/og-image.png`] },
+  }
+}
+
+export function publicSitemapEntries() {
+  return [
+    { url: PUBLIC_BRAND.siteUrl },
+    ...PUBLIC_LOCALES.flatMap(locale => [undefined, ...PUBLIC_TOPICS].map(topic => ({
+      url: `${PUBLIC_BRAND.siteUrl}${publicPagePath(locale, topic)}`,
+      alternates: { languages: publicAlternates(topic) },
+    }))),
+  ]
+}
+
+export function publicPageSchema(locale: PublicLocale, topic?: PublicTopic) {
+  const { title, description } = publicTopicCopy(locale, topic)
+  return {
+    '@context': 'https://schema.org', '@type': 'WebPage',
+    name: title, description, inLanguage: locale,
+    url: `${PUBLIC_BRAND.siteUrl}${publicPagePath(locale, topic)}`,
+    isPartOf: { '@type': 'WebSite', name: PUBLIC_BRAND.name, url: PUBLIC_BRAND.siteUrl },
+  }
+}

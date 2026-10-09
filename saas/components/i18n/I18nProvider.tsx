@@ -15,6 +15,8 @@ import { applyHardcodedUiCopy } from '@/lib/i18n/hardcoded-ui-copy'
 import { setRuntimeDictionary } from '@/lib/i18n/uiText'
 import { normalizeSupportedLanguage, type SupportedLanguage } from '@/lib/i18n/supportedLanguages'
 import { writingDirection } from '@/lib/i18n/localeExpansion'
+import { usePathname } from 'next/navigation'
+import { publicLocaleFromPath } from '@/lib/seo/publicLocales'
 
 type I18nContextType = {
   lang: string
@@ -46,6 +48,11 @@ function persistLanguage(lang: string) {
   localStorage.setItem('site-language', safe)
   document.documentElement.lang = safe
   document.documentElement.dir = writingDirection(safe)
+  const publicLocale = publicLocaleFromPath(window.location.pathname)
+  if (publicLocale) {
+    document.documentElement.lang = publicLocale
+    document.documentElement.dir = writingDirection(publicLocale)
+  }
   document.cookie = `signalboost_language=${encodeURIComponent(safe)}; Path=/; Max-Age=31536000; SameSite=Lax`
   return safe
 }
@@ -133,6 +140,7 @@ function applyLocaleSafetyNet(map: Map<string, string>, lang: SupportedLang) {
   if (typeof document === 'undefined') return () => {}
 
   const translateElement = (el: Element) => {
+    if (el.closest('[data-public-localized]')) return
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
       if (el.placeholder) {
         const original = originalAttrFor(el, 'placeholder', el.placeholder)
@@ -163,6 +171,7 @@ function applyLocaleSafetyNet(map: Map<string, string>, lang: SupportedLang) {
     if (node.nodeType !== Node.TEXT_NODE) return
     const parent = node.parentElement
     if (!parent) return
+    if (parent.closest('[data-public-localized]')) return
     if (['SCRIPT', 'STYLE', 'TEXTAREA', 'CODE', 'PRE', 'OPTION'].includes(parent.tagName)) return
 
     const current = node.textContent || ''
@@ -207,6 +216,7 @@ export function I18nProvider({
 }: {
   children: React.ReactNode
 }) {
+  const pathname = usePathname()
   const [lang, setLangState] =
     useState<SupportedLang>('en')
 
@@ -214,6 +224,12 @@ export function I18nProvider({
     useState<Dict>(englishCopy as Dict)
   const [isReady, setIsReady] =
     useState(false)
+
+  useLayoutEffect(() => {
+    const documentLocale = publicLocaleFromPath(pathname) || lang
+    document.documentElement.lang = documentLocale
+    document.documentElement.dir = writingDirection(documentLocale)
+  }, [pathname, lang])
 
   useLayoutEffect(() => {
     const initialLang = persistLanguage(getInitialLanguage())
@@ -298,3 +314,4 @@ export function useI18n() {
 
   return ctx
 }
+

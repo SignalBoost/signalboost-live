@@ -3,6 +3,7 @@
 // COS integrity checks, and output-file tracing all evaluate the same policy.
 
 import path from 'node:path'
+import { PUBLIC_LOCALES, PUBLIC_TOPICS, publicPagePath } from './lib/seo/publicLocales.ts'
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'", "base-uri 'self'", "object-src 'none'", "frame-ancestors 'self'",
@@ -46,6 +47,9 @@ const nextConfig = {
     return [
       { source: '/:path*', headers: PUBLIC_SECURITY_HEADERS },
       { source: '/', headers: PUBLIC_ROOT_EXPOSURE_HEADERS },
+      ...PUBLIC_LOCALES.flatMap(locale => [undefined, ...PUBLIC_TOPICS].map(topic => ({
+        source: publicPagePath(locale, topic), headers: [{ key: 'Content-Language', value: locale }],
+      }))),
     ]
   },
 }

@@ -4,10 +4,11 @@ import { usePathname } from 'next/navigation'
 import Concierge from '@/components/Concierge'
 import ShareRouteChrome from '@/components/layout/ShareRouteChrome'
 import { AI_DOCK_CSS_VARS } from '@/lib/layout/aiDock'
+import { publicLocaleFromPath } from '@/lib/seo/publicLocales'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isConciergeHome = pathname === '/'
+  const isConciergeHome = pathname === '/' || Boolean(publicLocaleFromPath(pathname))
 
   return (
     <div className={isConciergeHome ? "sb-ai-app-shell sb-ai-app-shell--home" : "sb-ai-app-shell"} style={AI_DOCK_CSS_VARS}>
@@ -23,3 +24,4 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+

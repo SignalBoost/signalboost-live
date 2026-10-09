@@ -15,6 +15,7 @@ if (bypassAudit.status !== 0) process.exit(bypassAudit.status ?? 1)
 
 
 const tests = [
+  'tests/publicInternationalSeo.node.test.ts',
   // Buyer-owned settings and production pause contract.
   'tests/cosUniversitySettings.node.test.ts',
   'tests/cosUniversityStandardsRatchet.node.test.ts',
@@ -805,3 +806,4 @@ if (result.error) {
 
 process.exit(result.status ?? 1)
 // end of saas/scripts/vercel-cos-gates.mjs (if this line is missing, the paste was cut short)
+

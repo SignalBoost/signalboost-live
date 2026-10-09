@@ -6,7 +6,8 @@ test('trusted health endpoint needs a full bearer secret before service-role acc
  assert.ok(route.indexOf("authorized(req.headers.get('authorization')")<route.indexOf('getAdminSupabase()'))
  assert.match(route,/timingSafeEqual/)
  assert.match(route,/secret.length<32/)
- assert.match(route,/ITMOUNTS_LAB_OBSERVABILITY_TENANT_ID/)
+ assert.match(route,/resolveLabMonitoringTenant\(db\)/)
+ assert.ok(route.indexOf('resolveLabMonitoringTenant(db)') > route.indexOf('getAdminSupabase()'))
  assert.doesNotMatch(route,/searchParams|request\.json\(/)
 })
 test('checks are read-only and refuse to claim supervisor delivery',()=>{

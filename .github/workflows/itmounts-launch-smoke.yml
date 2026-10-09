@@ -3,9 +3,6 @@ name: iTMounts production launch smoke
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/itmounts-launch-smoke.yml'
-      - 'saas/scripts/launch-production-smoke.mjs'
   workflow_dispatch:
     inputs:
       base_url:

@@ -32,8 +32,9 @@ const english = Object.fromEntries([
   ...Object.entries(stores).map(([name,file]) => [name,flatten(read(file))]),
   ...Object.entries(combinedStores).map(([name,file]) => [name,flatten(read(file).en)]),
 ])
-const out = path.resolve(process.cwd(), process.argv.includes('--out')
+const out = path.resolve(root, process.argv.includes('--out')
   ? process.argv[process.argv.indexOf('--out') + 1] : 'translation-packages')
+if (!out.startsWith(root + path.sep)) throw new Error('Translation output must stay inside saas working tree')
 fs.mkdirSync(out,{recursive:true})
 const manifest = {}
 for (const lang of pending) {

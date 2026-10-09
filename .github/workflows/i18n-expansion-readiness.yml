@@ -16,6 +16,15 @@ on:
       - 'saas/public/i18n/*.json'
       - 'saas/marketing-sales-core/i18n/**'
       - 'saas/components/LanguageSuggestion.tsx'
+      - 'saas/scripts/export-eleven-language-translation-packages.mjs'
+      - 'saas/scripts/check-translation-package-export.mjs'
+      - 'saas/scripts/check-translated-package-negative-fixtures.mjs'
+      - 'saas/scripts/validate-translated-packages.mjs'
+      - 'saas/scripts/import-reviewed-language-packages.mjs'
+      - 'saas/scripts/check-reviewed-package-import.mjs'
+      - 'saas/scripts/translate-pending-language-packages.mjs'
+      - 'saas/scripts/check-translation-engine-safety.mjs'
+      - 'saas/scripts/check-six-language-batch-e2e.mjs'
       - 'saas/tests/sixLanguageCampaignPages.node.test.ts'
       - 'saas/tests/navbarLanguageOptions.node.test.ts'
       - 'saas/tests/platformElevenLanguageI18n.node.test.ts'
@@ -55,3 +64,10 @@ jobs:
           if-no-files-found: warn
       - name: Verify language picker, public campaign pages and platform language tests
         run: node --test tests/navbarLanguageOptions.node.test.ts tests/sixLanguageCampaignPages.node.test.ts tests/platformElevenLanguageI18n.node.test.ts
+      - name: Verify translation-package export, reviewed import and draft engine tooling
+        run: |
+          node scripts/check-translation-package-export.mjs
+          node scripts/check-translated-package-negative-fixtures.mjs
+          node scripts/check-reviewed-package-import.mjs
+          node scripts/check-translation-engine-safety.mjs
+          node scripts/check-six-language-batch-e2e.mjs

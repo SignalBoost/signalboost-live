@@ -1,7 +1,7 @@
 // Server-side readiness gate for EU authentication and data routing.
 // Never include credentials or this module in browser bundles.
 import 'server-only'
-import { verifyEuProjectEvidence } from './euProjectReadiness'
+import { verifyEuProjectEvidence } from './euProjectReadiness.ts'
 
 export function euRuntimeReadiness(env: NodeJS.ProcessEnv = process.env): {
   ready: boolean

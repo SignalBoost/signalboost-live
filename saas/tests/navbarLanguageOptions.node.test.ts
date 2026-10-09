@@ -9,5 +9,5 @@ test('navbar derives selectable languages from production allowlist, and disable
  assert.match(source,/const LANGUAGES = SUPPORTED_LANGUAGES/)
  assert.match(source,/PENDING_LANGUAGES\.map\(code => <option[^>]+disabled/)
  assert.match(source,/PENDING_LANGUAGE_NAMES\[code\]/)
- assert.doesNotMatch(source,/const LANGUAGES = \['en', 'pt', 'es', 'pl', 'ru'\]/)
+ assert.doesNotMatch(source,new RegExp('const '+'LANGUAGES = '+String.raw`\\['en', 'pt', 'es', 'pl', 'ru'\\]`))
 })

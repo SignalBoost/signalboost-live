@@ -43,3 +43,29 @@ test('Phase 3: malformed missing run and action identifiers fail closed',async()
  assert.equal(await executeProviderViaHarness({...s.input,harnessRunId:''}),null)
  assert.equal(s.stats().calls,0)
 })
+
+
+test('Phase 3: async trusted-run lookup cannot redirect tenant, artifact or provider dispatch',async()=>{
+ const s=setup()
+ let calls=0
+ const input={...s.input,scope:{...scope},executor:{execute:async(_m,action)=>{
+  calls++
+  assert.equal(_m.identity.tenantId,org)
+  assert.equal(action.params.providerId,'provider-a')
+  assert.equal(action.params.permanentArtifactId,artifact)
+  assert.equal(action.params.secretReference,secretReference)
+  assert.equal(action.actionId,'provider-call-1')
+  return {actionId:action.actionId,capabilityId:action.capabilityId,status:'authority_boundary' as const}
+ }},resolveTrustedRun:async()=>{
+  input.scope.organizationId='forged-org'
+  input.scope.permanentArtifactId='forged-artifact'
+  input.scope.providerId='forged-provider'
+  input.actionId='forged-action'
+  input.secretReference='vault://forged-org/secret'
+  input.executor={execute:async()=>{throw Error('swapped executor ran')}}
+  return {manifest,status:'active' as const,authorityVerified:true}
+ }}
+ const result=await executeProviderViaHarness(input)
+ assert.equal(result?.status,'authority_boundary')
+ assert.equal(calls,1)
+})

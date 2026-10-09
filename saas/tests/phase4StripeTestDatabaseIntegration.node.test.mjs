@@ -33,7 +33,7 @@ test('verified test payment settles and spends inside one rollback-only PostgreS
   assert.equal(args.credits,50)
   const sql=`begin;
   insert into lab.organizations(id,name) values('${org}','Phase4 disposable bridge');
-  insert into lab.universities(id,organization_id,name) values('${university}','bridge university');
+  insert into lab.universities(id,organization_id,name) values('${university}','${org}','bridge university');
   insert into lab.projects(id,organization_id,university_id,name) values('${project}','${org}','${university}','bridge project');
   insert into lab.experiments(id,organization_id,project_id,privacy_tier,budget_microcredits) values('${experiment}','${org}','${project}','PRIVATE',1000);
   insert into lab.commercial_credit_rate_versions(rate_version_id,currency_code,denomination,software_service,credits_per_unit,effective_at,approval_ref)

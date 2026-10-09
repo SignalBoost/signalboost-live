@@ -7,10 +7,16 @@ export const INTERNATIONAL_LOCALES = Object.freeze({
 } as const)
 export type InternationalLocale = keyof typeof INTERNATIONAL_LOCALES
 export function canonicalIntlLocale(locale: string): string {
-  const base = locale.trim().toLowerCase().split(/[-_]/, 1)[0]
-  return Object.prototype.hasOwnProperty.call(INTERNATIONAL_LOCALES, base)
-    ? INTERNATIONAL_LOCALES[base as InternationalLocale]
-    : INTERNATIONAL_LOCALES.en
+  const input = String(locale || '').trim().replace(/_/g, '-')
+  const base = input.toLowerCase().split('-', 1)[0]
+  if (!Object.prototype.hasOwnProperty.call(INTERNATIONAL_LOCALES, base)) return INTERNATIONAL_LOCALES.en
+  try {
+    // Honor an explicitly chosen region (e.g. fr-CA, pt-PT) without widening
+    // the platform's allowed language set or accepting arbitrary locale data.
+    const candidate = new Intl.Locale(input)
+    if (candidate.language.toLowerCase() === base) return candidate.toString()
+  } catch { /* malformed BCP-47 tags fall back to the canonical regional default */ }
+  return INTERNATIONAL_LOCALES[base as InternationalLocale]
 }
 export function formatLocalizedNumber(value: number, locale: string, options?: Intl.NumberFormatOptions): string {
   return new Intl.NumberFormat(canonicalIntlLocale(locale), options).format(value)

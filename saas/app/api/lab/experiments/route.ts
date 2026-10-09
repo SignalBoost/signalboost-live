@@ -16,6 +16,7 @@ import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cosServiceDb } from '@/lib/cos-core/storage/service-db'
 import { createSupabaseLabExecutionDb, startLabExperimentUniversityRun, type VerifiedLabAuthority } from '@/lib/ai/cos/itmountsLabUniversityExecution'
 import { withCustomerLabUniversityBindingHarness } from '@/platform-harness/adapters/lab-customer'
+import { makeLabPhaseObservation } from '@/lib/ai/cos/labAllPhasesObservability'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -89,6 +90,24 @@ export async function POST(req: NextRequest) {
         })
       },
     })
+    // Record an observed start only after the governed Lab factory accepts the run.
+    // A start is NOT a finished experiment, passed evaluation, or independent certification.
+    if (result.ok) {
+      const revision = process.env.VERCEL_GIT_COMMIT_SHA?.trim()
+      if (revision && /^[a-f0-9]{7,64}$/i.test(revision)) {
+        const event = makeLabPhaseObservation({
+          phase: 1, signal: 'factory_execution', source: 'live_runtime', outcome: 'started',
+          exactRevision: revision, observedAt: new Date().toISOString(),
+        })
+        const { error: observationError } = await service.from('lab_phase_observations').insert({
+          tenant_id: organizationId, phase: event.phase, signal: event.signal,
+          source: event.source, outcome: event.outcome,
+          exact_revision: event.exactRevision, observed_at: event.observedAt,
+        })
+        // Telemetry must not roll back an already-authorized customer experiment.
+        if (observationError) console.error('[lab_phase_observation_delivery_failed]', { phase: 1 })
+      } else console.error('[lab_phase_observation_revision_unavailable]', { phase: 1 })
+    }
     return NextResponse.json(result, { status: result.ok ? 200 : 409 })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'lab_execution_failed'

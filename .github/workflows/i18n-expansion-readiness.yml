@@ -6,6 +6,8 @@ on:
       - 'saas/components/i18n/**'
       - 'saas/scripts/check-language-expansion-readiness.mjs'
       - 'saas/scripts/check-eleven-language-coverage.mjs'
+      - 'saas/scripts/export-eleven-language-translation-packages.mjs'
+      - 'saas/scripts/check-translation-package-export.mjs'
       - 'saas/scripts/check-five-language-platform.mjs'
       - 'saas/components/LanguageSuggestion.tsx'
       - '.github/workflows/i18n-expansion-readiness.yml'
@@ -26,3 +28,5 @@ jobs:
         run: node scripts/check-language-expansion-readiness.mjs
       - name: Report eleven-language catalog gaps without claiming release readiness
         run: node scripts/check-eleven-language-coverage.mjs
+      - name: Verify source translation packages for six pending languages
+        run: node scripts/check-translation-package-export.mjs

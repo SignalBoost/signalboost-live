@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dir = fs.mkdtempSync(path.join(root,'.i18n-verify-'))
@@ -27,5 +28,15 @@ try {
   const reviewRequired=run(['scripts/validate-translated-packages.mjs',dir,'--require-reviewed'])
   assert.equal(reviewRequired.status,1,'Absent reviewer metadata must fail closed')
   assert.match(reviewRequired.stderr,/no reviewed translation metadata/)
-  console.log('PASS: incomplete translations, omitted catalog and missing reviews blocked')
+  // An approval for different text must be invalid even with a real reviewer identity.
+  const firstPack=JSON.parse(fs.readFileSync(path.join(dir,'de.json'),'utf8'))
+  const [firstStore,firstKey]=['pages',Object.keys(firstPack.pages)[0]]
+  firstPack[firstStore][firstKey].translation='Prüfübersetzung'
+  fs.writeFileSync(path.join(dir,'de.json'),JSON.stringify(firstPack))
+  const forged={ [firstStore]: { [firstKey]: {status:'approved',reviewer:'translator-QA',translationSha256:createHash('sha256').update(JSON.stringify('different approved text')).digest('hex')} } }
+  fs.writeFileSync(path.join(dir,'de.review.json'),JSON.stringify(forged))
+  const mismatched=run(['scripts/validate-translated-packages.mjs',dir,'--require-reviewed'])
+  assert.equal(mismatched.status,1,'Approval hash for other text must not pass')
+  assert.match(mismatched.stderr,/explicit reviewer approval missing/)
+  console.log('PASS: missing keys, missing reviews and stale reviewer approval hashes blocked')
 } finally {fs.rmSync(dir,{recursive:true,force:true})}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { VOICE_INPUT_COPY } from '@/lib/i18n/dashboardCopy'
 
-type VoiceLang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type VoiceLang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type SpeechRecognitionResultLike = {
   isFinal: boolean

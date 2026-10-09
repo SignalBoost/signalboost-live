@@ -24,7 +24,35 @@ const LANG_PATTERNS: Record<string, RegExp> = {
   ru: /\b(не|для|как|это|что|сайт|бизнес|район|команда|футбол|ресторан|лучших|знаменитых|мир|создай|сгенерируй|покажи)\b/i,
 }
 
+// Japanese, Korean and Arabic are identified by script. Japanese needs kana: kanji
+// alone is shared with Chinese and is not evidence of Japanese.
+const SCRIPT_PATTERNS: Array<[string, RegExp]> = [
+  ['ja', /[\u3040-\u30ff]/],
+  ['ko', /[\uac00-\ud7af]/],
+  ['ar', /[\u0600-\u06ff]/],
+]
+
+// German, French and Italian share short function words with Portuguese and Spanish
+// (de, da, um, que, con), so the first-match patterns above would claim them. They are
+// checked first, and only on TWO distinct words that Portuguese, Spanish and English
+// do not use, so a genuine pt/es/en prompt is never re-labelled.
+const LATIN_MARKERS: Array<[string, RegExp]> = [
+  ['de', /(?<!\p{L})(und|der|die|das|nicht|ist|ich|mit|für|eine|einen|auf|wie|über|erstelle|erstellen|zeige|besten|berühmte|mannschaft|webseite|unternehmen|stadtteil)(?!\p{L})/giu],
+  ['fr', /(?<!\p{L})(des|est|et|une|pour|avec|dans|pas|vous|nous|créer|crée|meilleurs|meilleures|célèbres|équipe|quartier|entreprise)(?!\p{L})/giu],
+  ['it', /(?<!\p{L})(il|gli|della|delle|degli|dei|che|sono|questo|questa|creare|mostra|migliori|famosi|squadra|quartiere|sito|azienda)(?!\p{L})/giu],
+]
+
+function distinctMatches(text: string, pattern: RegExp): number {
+  return new Set((text.toLowerCase().match(pattern) || [])).size
+}
+
 export function detectLanguage(text: string): string {
+  for (const [lang, pattern] of SCRIPT_PATTERNS) {
+    if (pattern.test(text)) return lang
+  }
+  for (const [lang, pattern] of LATIN_MARKERS) {
+    if (distinctMatches(text, pattern) >= 2) return lang
+  }
   for (const [lang, pattern] of Object.entries(LANG_PATTERNS)) {
     if (pattern.test(text)) return lang
   }
@@ -50,6 +78,18 @@ const LOCAL_KEYWORDS = [
   'dzielnica', 'lokalne', 'amatorski', 'lokalna drużyna',
   // Russian
   'район', 'местные', 'любительский', 'местная команда',
+  // German
+  'stadtteil', 'viertel', 'lokale', 'amateur', 'lokale mannschaft',
+  // French
+  'quartier', 'locaux', 'locales', 'amateur', 'équipe locale',
+  // Italian
+  'quartiere', 'locali', 'dilettanti', 'squadra locale',
+  // Japanese
+  '地元', '近所', 'アマチュア', '地域',
+  // Korean
+  '동네', '지역', '아마추어', '지역 팀',
+  // Arabic
+  'الحي', 'محلي', 'محلية', 'هواة', 'فريق محلي',
 ]
 
 const BUSINESS_KEYWORDS = [

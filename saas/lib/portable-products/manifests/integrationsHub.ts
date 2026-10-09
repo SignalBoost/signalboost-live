@@ -34,5 +34,5 @@ export const integrationsHubManifest: PortableProductManifest = Object.freeze({
   architectureReferences: Object.freeze(['universal-provider-framework', 'integration-catalog']),
   documentationReferences: Object.freeze(['saas/docs/provider-integration.md']),
   futureFeatures: Object.freeze(['marketplace-listing']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

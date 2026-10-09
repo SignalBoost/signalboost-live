@@ -37,7 +37,7 @@ export function uiText<T extends string = string>(path: string): T {
   return path as T
 }
 
-export type WebsiteOptimizerReportLang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
+export type WebsiteOptimizerReportLang = 'en' | 'pt' | 'es' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type IssueCopy = { title: string; detail: (value?: string | number | boolean) => string }
 
@@ -122,5 +122,77 @@ export const WEBSITE_OPTIMIZER_REPORT_COPY: Record<WebsiteOptimizerReportLang, W
       missing_cta: { title: 'Не обнаружен ясный призыв к действию', detail: () => 'Сканирование не обнаружило очевидного следующего шага, например регистрации, демо, цен, запроса предложения, бронирования или контакта.' },
     },
     fixes: { performance: 'Улучшите скорость загрузки, кеширование, обработку изображений и лишние скрипты.', seo: 'Улучшите метаданные, структуру страницы, видимость в поиске и социальные превью.', accessibility: 'Улучшите язык страницы, альтернативный текст и семантическую структуру.', security: 'Улучшите публичные заголовки безопасности и сигналы HTTPS.', conversion: 'Добавьте понятный следующий шаг: регистрацию, демо, цены, запрос предложения или бронирование.' },
+  },
+  de: {
+    medium: 'Mittel', low: 'Niedrig', metrics: 'Seitenmetriken', html: 'HTML', titleLength: 'Titellänge', descriptionLength: 'Beschreibungslänge', scripts: 'Skripte', stylesheets: 'Stylesheets', images: 'Bilder', missingAlt: 'Bilder ohne Alt-Text', h1: 'Anzahl H1', lazyImages: 'Verzögert geladene Bilder', detailLabel: 'Unsere Ergebnisse', fixLabel: 'Empfohlene Behebung', genericFinding: 'Optimierungspotenzial erkannt',
+    genericDetail: (category, value) => value === undefined ? `Dieses ${category}-Signal muss geprüft werden.` : `Dieses ${category}-Signal muss geprüft werden. Beobachteter Wert: ${value}.`,
+    issueCopy: {
+      large_html: { title: 'Große HTML-Seite', detail: value => `Das HTML der Seite ist etwa ${Math.max(1, Math.round(Number(value || 0) / 1024))} KB groß, was den Übertragungs- und Renderingaufwand erhöhen kann.` },
+      many_scripts: { title: 'Zu viele JavaScript-Elemente', detail: value => `Die Seite enthält ${value ?? 0} Script-Elemente, was die Browserlast erhöhen und die Interaktion verlangsamen kann.` },
+      title_length: { title: 'Seitentitel sollte verbessert werden', detail: value => `Der Seitentitel ist ${value ?? 0} Zeichen lang. Suchtitel sind in der Regel klarer, wenn sie beschreibend und angemessen lang sind.` },
+      h1_count: { title: 'Primäre H1-Überschrift fehlt oder ist doppelt', detail: value => Number(value) === 0 ? 'Auf dieser Seite wurde keine H1-Überschrift erkannt.' : `Es wurden ${value} H1-Überschriften erkannt. Eine Seite profitiert normalerweise von einer einzigen klaren Haupt-H1.` },
+      missing_cta: { title: 'Kein klarer Call-to-Action erkannt', detail: () => 'Die Analyse hat keinen offensichtlichen nächsten Schritt wie Registrierung, Demo, Preise, Angebot, Buchung oder Kontakt erkannt.' },
+    },
+    fixes: { performance: 'Verbessern Sie Ladegeschwindigkeit, Caching, Bildverarbeitung und unnötige Skripte.', seo: 'Verbessern Sie Metadaten, Seitenstruktur, Sichtbarkeit in Suchmaschinen und Social-Media-Vorschauen.', accessibility: 'Verbessern Sie Barrierefreiheitssignale wie Sprachangabe, Bildtexte und semantische Struktur.', security: 'Verbessern Sie öffentliche Sicherheits-Header und HTTPS-Vertrauenssignale.', conversion: 'Fügen Sie einen klaren nächsten Schritt hinzu, z. B. Registrierung, Demo, Preise, Angebot oder Buchung.' },
+  },
+  fr: {
+    medium: 'Moyen', low: 'Faible', metrics: 'Métriques de la page', html: 'HTML', titleLength: 'Longueur du titre', descriptionLength: 'Longueur de la description', scripts: 'Scripts', stylesheets: 'Feuilles de style', images: 'Images', missingAlt: 'Images sans attribut alt', h1: 'Nombre de H1', lazyImages: 'Images en chargement différé', detailLabel: 'Ce que nous avons trouvé', fixLabel: 'Correctif recommandé', genericFinding: 'Opportunité d\'optimisation détectée',
+    genericDetail: (category, value) => value === undefined ? `Ce signal ${category} doit être examiné.` : `Ce signal ${category} doit être examiné. Valeur observée : ${value}.`,
+    issueCopy: {
+      large_html: { title: 'Page HTML volumineuse', detail: value => `Le HTML de la page fait environ ${Math.max(1, Math.round(Number(value || 0) / 1024))} Ko, ce qui peut augmenter le transfert et le travail de rendu.` },
+      many_scripts: { title: 'Trop d\'éléments JavaScript', detail: value => `La page contient ${value ?? 0} éléments script, ce qui peut augmenter la charge du navigateur et ralentir l'interaction.` },
+      title_length: { title: 'Le titre de la page doit être amélioré', detail: value => `Le titre de la page comporte ${value ?? 0} caractères. Les titres de recherche sont généralement plus clairs lorsqu'ils sont descriptifs et de longueur appropriée.` },
+      h1_count: { title: 'Titre H1 principal manquant ou en double', detail: value => Number(value) === 0 ? 'Aucun titre H1 n\'a été détecté sur cette page.' : `${value} titres H1 ont été détectés. Une page gagne généralement à avoir un seul titre H1 principal clair.` },
+      missing_cta: { title: 'Aucun appel à l’action clair détecté', detail: () => 'L’analyse n’a détecté aucune étape suivante évidente, comme l’inscription, une démo, les tarifs, un devis, une réservation ou un contact.' },
+    },
+    fixes: { performance: 'Améliorez la vitesse de chargement, la mise en cache, la gestion des images et les scripts inutiles.', seo: 'Améliorez les métadonnées, la structure des pages, la visibilité dans les moteurs de recherche et les aperçus sur les réseaux sociaux.', accessibility: 'Améliorez les signaux d’accessibilité tels que la langue, le texte des images et la structure sémantique.', security: 'Améliorez les en-têtes de sécurité publics et les signaux de confiance HTTPS.', conversion: 'Ajoutez une étape suivante claire, comme l’inscription, une démo, les tarifs, un devis ou une réservation.' },
+  },
+  it: {
+    medium: 'Medio', low: 'Bassa', metrics: 'Metriche della pagina', html: 'HTML', titleLength: 'Lunghezza del titolo', descriptionLength: 'Lunghezza della descrizione', scripts: 'Script', stylesheets: 'Fogli di stile', images: 'Immagini', missingAlt: 'Immagini senza alt', h1: 'Numero di H1', lazyImages: 'Immagini con caricamento differito', detailLabel: 'Cosa abbiamo trovato', fixLabel: 'Correzione consigliata', genericFinding: 'Opportunità di ottimizzazione rilevata',
+    genericDetail: (category, value) => value === undefined ? `Questo segnale ${category} richiede una revisione.` : `Questo segnale ${category} richiede una revisione. Valore osservato: ${value}.`,
+    issueCopy: {
+      large_html: { title: 'Pagina HTML di grandi dimensioni', detail: value => `L'HTML della pagina è di circa ${Math.max(1, Math.round(Number(value || 0) / 1024))} KB, il che può aumentare il trasferimento e il lavoro di rendering.` },
+      many_scripts: { title: 'Troppi elementi JavaScript', detail: value => `La pagina contiene ${value ?? 0} elementi script, il che può aumentare il carico del browser e rallentare l'interazione.` },
+      title_length: { title: 'Il titolo della pagina va migliorato', detail: value => `Il titolo della pagina è lungo ${value ?? 0} caratteri. I titoli di ricerca sono di solito più chiari quando sono descrittivi e di lunghezza adeguata.` },
+      h1_count: { title: 'Intestazione H1 principale mancante o duplicata', detail: value => Number(value) === 0 ? 'Nessuna intestazione H1 rilevata in questa pagina.' : `Sono stati rilevati ${value} titoli H1. Di solito una pagina trae vantaggio da un unico H1 principale chiaro.` },
+      missing_cta: { title: 'Nessuna call to action chiara rilevata', detail: () => 'L’analisi non ha rilevato un passo successivo evidente, come registrazione, demo, prezzi, preventivo, prenotazione o contatto.' },
+    },
+    fixes: { performance: 'Migliora velocità di caricamento, caching, gestione delle immagini e script non necessari.', seo: 'Migliora metadati, struttura della pagina, visibilità nei motori di ricerca e anteprime social.', accessibility: 'Migliora i segnali di accessibilità come lingua, testo alternativo delle immagini e struttura semantica.', security: 'Migliora gli header di sicurezza pubblici e i segnali di affidabilità HTTPS.', conversion: 'Aggiungi un passo successivo chiaro, come registrazione, demo, prezzi, preventivo o prenotazione.' },
+  },
+  ja: {
+    medium: '中', low: '低', metrics: 'ページ指標', html: 'HTML', titleLength: 'タイトルの長さ', descriptionLength: '説明の長さ', scripts: 'スクリプト', stylesheets: 'スタイルシート', images: '画像', missingAlt: 'alt のない画像', h1: 'H1 の数', lazyImages: '遅延読み込み画像', detailLabel: '検出内容', fixLabel: '推奨される修正', genericFinding: '最適化の機会を検出しました',
+    genericDetail: (category, value) => value === undefined ? `この ${category} シグナルは確認が必要です。` : `この ${category} シグナルは確認が必要です。観測値：${value}。`,
+    issueCopy: {
+      large_html: { title: 'HTML ページが大きすぎます', detail: value => `ページの HTML は約 ${Math.max(1, Math.round(Number(value || 0) / 1024))} KB あり、転送量と描画処理が増える可能性があります。` },
+      many_scripts: { title: 'JavaScript 要素が多すぎます', detail: value => `このページには ${value ?? 0} 個の script 要素が含まれており、ブラウザーの処理が増えて操作が遅くなる可能性があります。` },
+      title_length: { title: 'ページタイトルの改善が必要です', detail: value => `ページタイトルは ${value ?? 0} 文字です。検索タイトルは、内容を説明し適切な長さであるほど分かりやすくなります。` },
+      h1_count: { title: 'メインの H1 見出しがないか重複しています', detail: value => Number(value) === 0 ? 'このページで H1 見出しは検出されませんでした。' : `${value} 個の H1 見出しが検出されました。通常、ページには明確なメインの H1 が 1 つあるのが望ましいです。` },
+      missing_cta: { title: '明確な CTA が検出されませんでした', detail: () => 'スキャンでは、登録、デモ、料金、見積もり、予約、問い合わせなどの明確な次のステップが検出されませんでした。' },
+    },
+    fixes: { performance: '読み込み速度、キャッシュ、画像処理、不要なスクリプトを改善します。', seo: 'メタデータ、ページ構造、検索での可視性、ソーシャルプレビューを改善します。', accessibility: '言語、画像の代替テキスト、セマンティック構造などのアクセシビリティ要素を改善します。', security: '公開セキュリティヘッダーと HTTPS の信頼性シグナルを改善します。', conversion: '登録、デモ、料金、見積もり、予約など、明確な次のステップを追加してください。' },
+  },
+  ko: {
+    medium: '보통', low: '낮음', metrics: '페이지 지표', html: 'HTML', titleLength: '제목 길이', descriptionLength: '설명 길이', scripts: '스크립트', stylesheets: '스타일시트', images: '이미지', missingAlt: 'alt 누락 이미지', h1: 'H1 개수', lazyImages: '지연 로드 이미지', detailLabel: '발견 내용', fixLabel: '권장 해결 방법', genericFinding: '최적화 기회 감지됨',
+    genericDetail: (category, value) => value === undefined ? `이 ${category} 신호는 검토가 필요합니다.` : `이 ${category} 신호는 검토가 필요합니다. 관측값: ${value}.`,
+    issueCopy: {
+      large_html: { title: '큰 HTML 페이지', detail: value => `페이지 HTML이 약 ${Math.max(1, Math.round(Number(value || 0) / 1024))} KB로, 전송 및 렌더링 작업이 늘어날 수 있습니다.` },
+      many_scripts: { title: 'JavaScript 요소가 너무 많음', detail: value => `페이지에 ${value ?? 0}개의 script 요소가 있어 브라우저 작업이 늘고 상호작용이 느려질 수 있습니다.` },
+      title_length: { title: '페이지 제목 개선 필요', detail: value => `페이지 제목은 ${value ?? 0}자입니다. 검색 제목은 설명적이고 적절한 길이일 때 일반적으로 더 명확합니다.` },
+      h1_count: { title: '기본 H1 제목이 없거나 중복됨', detail: value => Number(value) === 0 ? '이 페이지에서 H1 제목이 감지되지 않았습니다.' : `H1 제목이 ${value}개 감지되었습니다. 일반적으로 페이지에는 명확한 기본 H1이 하나만 있는 것이 좋습니다.` },
+      missing_cta: { title: '명확한 행동 유도(CTA)가 감지되지 않음', detail: () => '스캔에서 가입, 데모, 요금, 견적, 예약, 문의 등 명확한 다음 단계가 감지되지 않았습니다.' },
+    },
+    fixes: { performance: '로딩 속도, 캐싱, 이미지 처리 및 불필요한 스크립트를 개선하세요.', seo: '메타데이터, 페이지 구조, 검색 노출 및 소셜 미리보기를 개선하세요.', accessibility: '언어, 이미지 대체 텍스트, 시맨틱 구조 등 접근성 신호를 개선하세요.', security: '공개 보안 헤더와 HTTPS 신뢰 신호를 개선하세요.', conversion: '가입, 데모, 요금, 견적, 예약 등 명확한 다음 단계를 추가하세요.' },
+  },
+  ar: {
+    medium: 'متوسط', low: 'منخفض', metrics: 'مقاييس الصفحة', html: 'HTML', titleLength: 'طول العنوان', descriptionLength: 'طول الوصف', scripts: 'البرامج النصية', stylesheets: 'أوراق الأنماط', images: 'الصور', missingAlt: 'صور بدون نص alt', h1: 'عدد H1', lazyImages: 'الصور ذات التحميل المؤجل', detailLabel: 'ما وجدناه', fixLabel: 'الإصلاح الموصى به', genericFinding: 'تم اكتشاف فرصة للتحسين',
+    genericDetail: (category, value) => value === undefined ? `تحتاج إشارة ${category} هذه إلى مراجعة.` : `تحتاج إشارة ${category} هذه إلى مراجعة. القيمة المرصودة: ${value}.`,
+    issueCopy: {
+      large_html: { title: 'صفحة HTML كبيرة', detail: value => `يبلغ حجم HTML للصفحة نحو ${Math.max(1, Math.round(Number(value || 0) / 1024))} كيلوبايت، مما قد يزيد من عبء النقل والعرض.` },
+      many_scripts: { title: 'عناصر JavaScript كثيرة جدًا', detail: value => `تحتوي الصفحة على ${value ?? 0} من عناصر script، مما قد يزيد من عبء المتصفح ويبطئ التفاعل.` },
+      title_length: { title: 'عنوان الصفحة يحتاج إلى تحسين', detail: value => `يبلغ طول عنوان الصفحة ${value ?? 0} حرفًا. تكون عناوين البحث عادةً أوضح عندما تكون وصفية وذات طول مناسب.` },
+      h1_count: { title: 'عنوان H1 الرئيسي مفقود أو مكرر', detail: value => Number(value) === 0 ? 'لم يُكتشف أي عنوان H1 في هذه الصفحة.' : `تم اكتشاف ${value} من عناوين H1. عادةً ما تستفيد الصفحة من عنوان H1 رئيسي واحد وواضح.` },
+      missing_cta: { title: 'لم يتم اكتشاف دعوة واضحة لاتخاذ إجراء', detail: () => 'لم يكتشف الفحص خطوة تالية واضحة مثل التسجيل أو العرض التوضيحي أو الأسعار أو طلب عرض سعر أو الحجز أو التواصل.' },
+    },
+    fixes: { performance: 'حسِّن سرعة التحميل والتخزين المؤقت ومعالجة الصور والنصوص البرمجية غير الضرورية.', seo: 'حسِّن البيانات الوصفية وبنية الصفحة والظهور في نتائج البحث ومعاينات الشبكات الاجتماعية.', accessibility: 'حسِّن مؤشرات إمكانية الوصول مثل اللغة والنص البديل للصور والبنية الدلالية.', security: 'حسِّن ترويسات الأمان العامة ومؤشرات الثقة الخاصة بـ HTTPS.', conversion: 'أضف خطوة تالية واضحة مثل التسجيل أو العرض التوضيحي أو الأسعار أو طلب عرض سعر أو الحجز.' },
   },
 }

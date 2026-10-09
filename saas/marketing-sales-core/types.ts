@@ -2,8 +2,8 @@
 // Portable contracts for the Marketing & Sales department. NO app imports — this
 // is the whole point: the core depends only on the seams below, never on the host.
 
-export type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-export const LANGS: Lang[] = ['en', 'es', 'pt', 'pl', 'ru']
+export type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
+export const LANGS: Lang[] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 export type Role = 'owner' | 'admin' | 'operator' | 'viewer'
 

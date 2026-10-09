@@ -10,7 +10,7 @@ import {
 } from '../lib/supervisor/licenseMintContract.ts'
 import { LICENSE_SETUP_COPY } from '../lib/i18n/licenseSetupCopy.ts'
 
-const supportedLocales = ['en', 'es', 'pt', 'pl', 'ru'] as const
+const supportedLocales = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 
 function assertLocalizedRecord<Key extends string>(
   locale: (typeof supportedLocales)[number],

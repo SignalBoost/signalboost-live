@@ -18,6 +18,12 @@ const LANGUAGE_NAMES: Record<string, string> = {
   es: 'Spanish',
   pl: 'Polish',
   ru: 'Russian',
+  de: 'German',
+  fr: 'French',
+  it: 'Italian',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ar: 'Arabic',
 }
 
 type PromoteRequest = {

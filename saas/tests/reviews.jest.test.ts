@@ -10,7 +10,7 @@ import {
 
 describe('Reviews SaaS module', () => {
   test('supports review submission metadata in all 5 languages', () => {
-    expect(REVIEW_LOCALES).toEqual(['en', 'es', 'pt', 'pl', 'ru'])
+    expect(REVIEW_LOCALES).toEqual(['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
   })
 
   test('validates sentiment accuracy fixtures', () => {

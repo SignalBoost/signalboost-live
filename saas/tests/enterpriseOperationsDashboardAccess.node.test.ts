@@ -102,7 +102,7 @@ test('dashboard loader uses GET-only no-store reads and exposes five-language fa
   const [loader, stateCopy] = await Promise.all([source(loaderUrl), source(stateCopyUrl)])
 
   assert.match(loader, /getOperationsDashboardStateCopy\(lang\)/)
-  for (const locale of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const locale of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     assert.match(stateCopy, new RegExp(`\\b${locale}: \\{`))
   }
 

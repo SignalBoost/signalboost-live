@@ -229,9 +229,9 @@ test('the window is picked from two clocks, never typed: pickers in, HH:MM-HH:MM
   assert.equal(localWarmWindowRange(null, noon, 'en-GB', 'UTC'), null)
 })
 
-test('the settings copy has the same keys in all five languages and no empty string', () => {
+test('the settings copy has the same keys in all eleven languages and no empty string', () => {
   const languages = Object.keys(COS_UNIVERSITY_SETTINGS_COPY).sort()
-  assert.deepEqual(languages, ['en', 'es', 'pl', 'pt', 'ru'])
+  assert.deepEqual(languages, ['ar', 'de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru'])
   const keys = Object.keys(COS_UNIVERSITY_SETTINGS_COPY.en)
   for (const language of languages) {
     const block = COS_UNIVERSITY_SETTINGS_COPY[language as keyof typeof COS_UNIVERSITY_SETTINGS_COPY]

@@ -29,10 +29,10 @@ test('the pipeline row runs left to right and ends at graduation before the ways
   assert.match(page, /Math\.max\(0, \(pipeline\.activeGraduates \?\? 0\) - \(workforce\.onCall \?\? 0\)\)/, 'active diplomas minus hired workers')
 })
 
-test('the pipeline explanation and the two graduation cards exist in all five languages', () => {
+test('the pipeline explanation and the two graduation cards exist in all eleven languages', () => {
   const copy = read('lib/i18n/cosUniversityTelemetryCopy.ts')
   for (const key of ['pipelineExplanation', 'pipelinePassedGraduating', 'pipelineGraduated']) {
-    assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 5, `${key} in en, es, pt, pl, ru`)
+    assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 11, `${key} in all eleven languages`)
   }
 })
 // end of saas/tests/universityPipelineOrder.node.test.ts (if this line is missing, the paste was cut short)

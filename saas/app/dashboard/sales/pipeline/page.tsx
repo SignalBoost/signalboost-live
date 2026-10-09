@@ -4,27 +4,27 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 const COPY = {
-  eyebrow:    { en: uiText('generatedUi.u_8de4e0ea7370e4e6'), es: 'Ventas', pt: 'Vendas', pl: 'Sprzedaż', ru: 'Продажи' },
-  title:      { en: uiText('generatedUi.u_22a3534629d2dcf1'), es: 'Pipeline de Ventas', pt: 'Pipeline de Vendas', pl: 'Pipeline Sprzedaży', ru: 'Пайплайн продаж' },
-  subtitle:   { en: uiText('generatedUi.u_298a1e10558a1c56'), es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do descobrimento ao cliente.', pl: 'Śledź prospektów od odkrycia do klienta.', ru: 'Отслеживайте потенциальных клиентов от поиска до закрытия.' },
-  loading:    { en: uiText('generatedUi.u_c0577197648affd1'), es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…' },
-  noLeads:    { en: uiText('generatedUi.u_9bb32a44e756d534'), es: 'Sin leads', pt: 'Sem leads', pl: 'Brak leadów', ru: 'Нет лидов' },
-  unnamed:    { en: uiText('generatedUi.u_ec3be783cc7bc215'), es: 'Empresa sin nombre', pt: 'Empresa sem nome', pl: 'Firma bez nazwy', ru: 'Компания без названия' },
-  noIndustry: { en: uiText('generatedUi.u_ae4c00e6a9bd0ba4'), es: 'Sin industria', pt: 'Sem indústria', pl: 'Brak branży', ru: 'Без отрасли' },
-  noCountry:  { en: uiText('generatedUi.u_b70285418438b053'), es: 'Sin país', pt: 'Sem país', pl: 'Brak kraju', ru: 'Без страны' },
-  noEmail:    { en: uiText('generatedUi.u_2f44d9d0a44fa838'), es: 'Sin email', pt: 'Sem email', pl: 'Brak emaila', ru: 'Без email' },
-  draft:      { en: uiText('generatedUi.u_d156b8fc2bbacf41'), es: 'Borrador:', pt: 'Rascunho:', pl: 'Szkic:', ru: 'Черновик:' },
+  eyebrow:    { en: uiText('generatedUi.u_8de4e0ea7370e4e6'), es: 'Ventas', pt: 'Vendas', pl: 'Sprzedaż', ru: 'Продажи', de: 'Vertrieb', fr: 'Ventes', it: 'Vendite', ja: '営業', ko: '영업', ar: 'المبيعات' },
+  title:      { en: uiText('generatedUi.u_22a3534629d2dcf1'), es: 'Pipeline de Ventas', pt: 'Pipeline de Vendas', pl: 'Pipeline Sprzedaży', ru: 'Пайплайн продаж', de: 'Vertriebspipeline', fr: 'Pipeline commercial', it: 'Pipeline di vendita', ja: 'セールスパイプライン', ko: '영업 파이프라인', ar: 'مسار المبيعات' },
+  subtitle:   { en: uiText('generatedUi.u_298a1e10558a1c56'), es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do descobrimento ao cliente.', pl: 'Śledź prospektów od odkrycia do klienta.', ru: 'Отслеживайте потенциальных клиентов от поиска до закрытия.', de: 'Verfolgen Sie Interessenten von der Entdeckung bis zum Kunden.', fr: 'Suivez vos prospects de la découverte jusqu\'à la conversion en client.', it: 'Monitora i potenziali clienti dalla scoperta fino alla conversione in clienti.', ja: '見込み客を発見から顧客化まで追跡します。', ko: '잠재 고객을 발굴부터 고객 전환까지 추적하세요.', ar: 'تتبّع العملاء المحتملين من مرحلة الاكتشاف حتى يصبحوا عملاء.' },
+  loading:    { en: uiText('generatedUi.u_c0577197648affd1'), es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…', de: 'Pipeline wird geladen…', fr: 'Chargement du pipeline…', it: 'Caricamento pipeline…', ja: 'パイプラインを読み込み中…', ko: '파이프라인 불러오는 중…', ar: 'جارٍ تحميل خط المعالجة…' },
+  noLeads:    { en: uiText('generatedUi.u_9bb32a44e756d534'), es: 'Sin leads', pt: 'Sem leads', pl: 'Brak leadów', ru: 'Нет лидов', de: 'Keine Leads', fr: 'Aucun prospect', it: 'Nessun lead', ja: 'リードなし', ko: '리드 없음', ar: 'لا يوجد عملاء محتملون' },
+  unnamed:    { en: uiText('generatedUi.u_ec3be783cc7bc215'), es: 'Empresa sin nombre', pt: 'Empresa sem nome', pl: 'Firma bez nazwy', ru: 'Компания без названия', de: 'Unbenanntes Unternehmen', fr: 'Entreprise sans nom', it: 'Azienda senza nome', ja: '名称未設定の会社', ko: '이름 없는 회사', ar: 'شركة بلا اسم' },
+  noIndustry: { en: uiText('generatedUi.u_ae4c00e6a9bd0ba4'), es: 'Sin industria', pt: 'Sem indústria', pl: 'Brak branży', ru: 'Без отрасли', de: 'Keine Branche', fr: 'Aucun secteur', it: 'Nessun settore', ja: '業界なし', ko: '업종 없음', ar: 'لا يوجد قطاع' },
+  noCountry:  { en: uiText('generatedUi.u_b70285418438b053'), es: 'Sin país', pt: 'Sem país', pl: 'Brak kraju', ru: 'Без страны', de: 'Kein Land', fr: 'Aucun pays', it: 'Nessun paese', ja: '国なし', ko: '국가 없음', ar: 'لا يوجد بلد' },
+  noEmail:    { en: uiText('generatedUi.u_2f44d9d0a44fa838'), es: 'Sin email', pt: 'Sem email', pl: 'Brak emaila', ru: 'Без email', de: 'Keine E-Mail', fr: 'Aucun e-mail', it: 'Nessuna email', ja: 'メールなし', ko: '이메일 없음', ar: 'لا يوجد بريد إلكتروني' },
+  draft:      { en: uiText('generatedUi.u_d156b8fc2bbacf41'), es: 'Borrador:', pt: 'Rascunho:', pl: 'Szkic:', ru: 'Черновик:', de: 'Entwurf:', fr: 'Brouillon :', it: 'Bozza:', ja: '下書き：', ko: '초안:', ar: 'مسودة:' },
   statuses: {
-    discovered:   { en: uiText('generatedUi.u_96a5ba634bfc2ed4'),   es: 'Descubierto',  pt: 'Descoberto',  pl: 'Odkryty',        ru: 'Обнаружен' },
-    approved:     { en: uiText('generatedUi.u_87b42e40c2a290e0'),     es: 'Aprobado',     pt: 'Aprovado',    pl: 'Zatwierdzony',   ru: 'Одобрен' },
-    draft_ready:  { en: uiText('generatedUi.u_034d508c85559380'),  es: 'Borrador listo', pt: 'Rascunho pronto', pl: 'Szkic gotowy', ru: 'Черновик готов' },
-    sketch_ready: { en: uiText('generatedUi.u_fad8fb09b821a826'), es: 'Esquema listo', pt: 'Esboço pronto', pl: 'Szkic gotowy', ru: 'Эскиз готов' },
-    sent:         { en: uiText('generatedUi.u_c16bc82bf1f04ede'),         es: 'Enviado',      pt: 'Enviado',     pl: 'Wysłany',        ru: 'Отправлен' },
-    replied:      { en: uiText('generatedUi.u_1cd7fa936258e09c'),      es: 'Respondió',    pt: 'Respondeu',   pl: 'Odpowiedział',   ru: 'Ответил' },
-    client:       { en: uiText('generatedUi.u_0c77fe09ab336a3e'),       es: 'Cliente',      pt: 'Cliente',     pl: 'Klient',         ru: 'Клиент' },
-    draft_failed: { en: uiText('generatedUi.u_cf5f027c83afa32e'), es: 'Borrador fallido', pt: 'Rascunho falhou', pl: 'Szkic nieudany', ru: 'Ошибка черновика' },
+    discovered:   { en: uiText('generatedUi.u_96a5ba634bfc2ed4'),   es: 'Descubierto',  pt: 'Descoberto',  pl: 'Odkryty',        ru: 'Обнаружен', de: 'Erkannt', fr: 'Découvert', it: 'Rilevato', ja: '検出済み', ko: '검색됨', ar: 'مُكتشَف' },
+    approved:     { en: uiText('generatedUi.u_87b42e40c2a290e0'),     es: 'Aprobado',     pt: 'Aprovado',    pl: 'Zatwierdzony',   ru: 'Одобрен', de: 'Genehmigt', fr: 'Approuvé', it: 'Approvato', ja: '承認済み', ko: '승인됨', ar: 'تمت الموافقة' },
+    draft_ready:  { en: uiText('generatedUi.u_034d508c85559380'),  es: 'Borrador listo', pt: 'Rascunho pronto', pl: 'Szkic gotowy', ru: 'Черновик готов', de: 'Entwurf bereit', fr: 'Brouillon prêt', it: 'Bozza pronta', ja: '下書き準備完了', ko: '초안 준비됨', ar: 'المسودة جاهزة' },
+    sketch_ready: { en: uiText('generatedUi.u_fad8fb09b821a826'), es: 'Esquema listo', pt: 'Esboço pronto', pl: 'Szkic gotowy', ru: 'Эскиз готов', de: 'Skizze bereit', fr: 'Esquisse prête', it: 'Bozza pronta', ja: 'スケッチ準備完了', ko: '스케치 준비됨', ar: 'المخطط جاهز' },
+    sent:         { en: uiText('generatedUi.u_c16bc82bf1f04ede'),         es: 'Enviado',      pt: 'Enviado',     pl: 'Wysłany',        ru: 'Отправлен', de: 'Gesendet', fr: 'Envoyé', it: 'Inviato', ja: '送信済み', ko: '발송됨', ar: 'تم الإرسال' },
+    replied:      { en: uiText('generatedUi.u_1cd7fa936258e09c'),      es: 'Respondió',    pt: 'Respondeu',   pl: 'Odpowiedział',   ru: 'Ответил', de: 'Beantwortet', fr: 'Répondu', it: 'Risposto', ja: '返信済み', ko: '답장함', ar: 'تم الرد' },
+    client:       { en: uiText('generatedUi.u_0c77fe09ab336a3e'),       es: 'Cliente',      pt: 'Cliente',     pl: 'Klient',         ru: 'Клиент', de: 'Kunde', fr: 'Client', it: 'Cliente', ja: 'クライアント', ko: '클라이언트', ar: 'العميل' },
+    draft_failed: { en: uiText('generatedUi.u_cf5f027c83afa32e'), es: 'Borrador fallido', pt: 'Rascunho falhou', pl: 'Szkic nieudany', ru: 'Ошибка черновика', de: 'Entwurf fehlgeschlagen', fr: 'Échec du brouillon', it: 'Bozza non riuscita', ja: '下書きに失敗しました', ko: '초안 작성 실패', ar: 'فشلت المسودة' },
   },
 }
 
@@ -47,7 +47,7 @@ const STATUSES = ['discovered', 'approved', 'draft_ready', 'sketch_ready', 'sent
 
 export default function SalesPipelinePage() {
   const { lang } = useI18n()
-  const l = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
+  const l = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en'
 
   const [leads, setLeads]     = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)

@@ -33,7 +33,7 @@ const allowedStatuses: CosCampaignQueueStatus[] = ['draft', 'waiting_approval', 
 const allowedRequestChannels: CosChannel[] = ['youtube', 'short_video', 'linkedin', 'blog', 'email', 'outreach', 'landing_page', 'review_campaign']
 const allowedDepartments: CosDepartment[] = ['marketing', 'sales']
 const allowedPriorities: CosPriority[] = ['low', 'medium', 'high', 'critical']
-const allowedLanguages = ['en', 'es', 'pt', 'pl', 'ru'] as const
+const allowedLanguages = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 
 type SupportedCampaignLanguage = typeof allowedLanguages[number]
 
@@ -287,7 +287,7 @@ function recommendationFromDepartmentRequest(input: unknown): CosRecommendation 
 // objective is used verbatim, so the queue row is still created and reviewable —
 // AI is assistance here, never a hard dependency.
 
-const OUTREACH_LANGUAGE_NAMES: Record<string, string> = { en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian' }
+const OUTREACH_LANGUAGE_NAMES: Record<string, string> = { en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Arabic' }
 
 type DraftedOutreachEmail = { subject: string; body: string; drafted_by: 'cosa_model' | 'objective_fallback'; language: string }
 

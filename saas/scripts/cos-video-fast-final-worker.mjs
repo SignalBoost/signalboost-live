@@ -27,7 +27,7 @@ if (!bucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required')
 const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 const FINAL_SCHEMA = 'signalboost-fast-final-v1'
 const BRAND_TEXT = 'iTMounts · itmounts.com'
-const VOICES = { en: 'en-us', es: 'es', pt: 'pt-br', pl: 'pl', ru: 'ru' }
+const VOICES = { en: 'en-us', es: 'es', pt: 'pt-br', pl: 'pl', ru: 'ru', de: 'de', fr: 'fr', it: 'it', ja: 'ja', ko: 'ko', ar: 'ar' }
 
 function errorText(error) {
   return error instanceof Error ? error.message : String(error || 'unknown error')
@@ -74,7 +74,7 @@ function cleanText(value, max = 320) {
 function isInstruction(value) {
   const text = String(value || '').toLowerCase()
   if (!text) return true
-  return /(do not repeat|don['’]t repeat|do not mention|instructions?|requirements?|prompt|voiceover|narration|captions?|subtitles?|scenes?|visual direction|aspect ratio|duration|on[- ]screen|camera|b[- ]roll|watermark|não repita|nao repita|instruções|requisitos|narração|legendas|cenas|texto na tela|duração|no repitas|instrucciones|narración|subtítulos|escenas|texto en pantalla|duración|nie powtarzaj|instrukcje|narracja|napisy|sceny|tekst na ekranie|не повторяй|инструкции|озвучка|субтитры|сцены|текст на экране)/i.test(text)
+  return /(do not repeat|don['’]t repeat|do not mention|instructions?|requirements?|prompt|voiceover|narration|captions?|subtitles?|scenes?|visual direction|aspect ratio|duration|on[- ]screen|camera|b[- ]roll|watermark|não repita|nao repita|instruções|requisitos|narração|legendas|cenas|texto na tela|duração|no repitas|instrucciones|narración|subtítulos|escenas|texto en pantalla|duración|nie powtarzaj|instrukcje|narracja|napisy|sceny|tekst na ekranie|не повторяй|инструкции|озвучка|субтитры|сцены|текст на экране|nicht wiederholen|anweisungen|anforderungen|sprechertext|untertitel|text auf dem bildschirm|ne pas répéter|ne répète pas|consignes|exigences|voix off|sous-titres|texte à l’écran|non ripetere|istruzioni|requisiti|voce fuori campo|sottotitoli|testo a schermo|繰り返さない|指示|要件|ナレーション|字幕|画面テキスト|반복하지 마|지시사항|요구사항|내레이션|자막|화면 텍스트|لا تكرر|تعليمات|متطلبات|تعليق صوتي|نص على الشاشة)/i.test(text)
 }
 
 function safeSubject(campaign) {
@@ -90,6 +90,12 @@ function safeAudience(campaign, lang) {
   if (lang === 'es') return 'pequeñas y medianas empresas'
   if (lang === 'pl') return 'małych i średnich firm'
   if (lang === 'ru') return 'малому и среднему бизнесу'
+  if (lang === 'de') return 'kleinen und mittleren Unternehmen'
+  if (lang === 'fr') return 'les petites et moyennes entreprises'
+  if (lang === 'it') return 'le piccole e medie imprese'
+  if (lang === 'ja') return '中小企業'
+  if (lang === 'ko') return '중소기업'
+  if (lang === 'ar') return 'الشركات الصغيرة والمتوسطة'
   return 'small and midsize businesses'
 }
 
@@ -116,6 +122,24 @@ function scriptFor(campaign) {
   }
   if (lang === 'ru') {
     return cleanText(`iTMounts помогает ${audience} получать больше клиентов с помощью профессиональных кампаний, которые легко проверить. Подготовьте сообщение, материалы и отслеживайте результаты в одном месте. Начните бесплатно на itmounts.com.`, 360)
+  }
+  if (lang === 'de') {
+    return cleanText(`iTMounts hilft ${audience}, mit professionellen, leicht prüfbaren Kampagnen mehr Chancen zu gewinnen. Bündeln Sie Ihre Botschaft, bereiten Sie die Materialien vor und verfolgen Sie die Ergebnisse an einem Ort. Starten Sie kostenlos auf itmounts.com.`, 360)
+  }
+  if (lang === 'fr') {
+    return cleanText(`iTMounts aide ${audience} à générer plus d’opportunités grâce à des campagnes professionnelles faciles à valider. Organisez votre message, préparez vos supports et suivez les résultats au même endroit. Commencez gratuitement sur itmounts.com.`, 360)
+  }
+  if (lang === 'it') {
+    return cleanText(`iTMounts aiuta ${audience} a generare più opportunità con campagne professionali e facili da revisionare. Organizza il messaggio, prepara i materiali e monitora i risultati in un unico posto. Inizia gratis su itmounts.com.`, 360)
+  }
+  if (lang === 'ja') {
+    return cleanText(`iTMounts は、確認しやすいプロフェッショナルなキャンペーンで${audience}のビジネスチャンス拡大を支援します。メッセージを整理し、素材を準備し、成果を一か所で追跡できます。itmounts.com で無料で始めましょう。`, 360)
+  }
+  if (lang === 'ko') {
+    return cleanText(`iTMounts는 검토하기 쉬운 전문 캠페인으로 ${audience}의 더 많은 기회 창출을 돕습니다. 메시지를 정리하고, 자료를 준비하고, 결과를 한곳에서 추적하세요. itmounts.com에서 무료로 시작하세요.`, 360)
+  }
+  if (lang === 'ar') {
+    return cleanText(`تساعد iTMounts ${audience} على تحقيق المزيد من الفرص من خلال حملات احترافية يسهل مراجعتها. نظّم رسالتك، وجهّز موادك، وتابع النتائج في مكان واحد. ابدأ مجانًا على itmounts.com.`, 360)
   }
   return cleanText(`iTMounts helps ${audience} generate more opportunities with professional campaigns that are easy to review. Organize the message, prepare the assets, and track results in one place. Start free at itmounts.com.`, 360)
 }
@@ -173,13 +197,35 @@ function assTime(seconds) {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`
 }
 
+// Full-width CJK and Hangul glyphs take about two Latin columns; every other script
+// counts one, so Latin and Cyrillic captions break exactly where they did before.
+function captionWidth(value) {
+  return Array.from(String(value || '')).reduce((sum, ch) => sum + (/[\u1100-\u11ff\u3000-\u30ff\u3400-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch) ? 2 : 1), 0)
+}
+
+// Japanese is written without spaces, so a "word" can be a whole sentence. Break any
+// token wider than one caption line into line-sized pieces.
+function captionTokens(text, maxChars) {
+  const tokens = []
+  for (const word of String(text || '').split(/\s+/).filter(Boolean)) {
+    if (captionWidth(word) <= maxChars) { tokens.push(word); continue }
+    let piece = ''
+    for (const ch of Array.from(word)) {
+      if (piece && captionWidth(piece + ch) > maxChars) { tokens.push(piece); piece = '' }
+      piece += ch
+    }
+    if (piece) tokens.push(piece)
+  }
+  return tokens
+}
+
 function captionChunks(text, maxChars) {
-  const words = String(text || '').split(/\s+/).filter(Boolean)
+  const words = captionTokens(text, maxChars)
   const chunks = []
   let current = ''
   for (const word of words) {
-    const next = `${current} ${word}`.trim()
-    if (next.length > maxChars && current) {
+    const next = /[\u3000-\u30ff\u3400-\u9fff]$/.test(current) && /^[\u3000-\u30ff\u3400-\u9fff]/.test(word) ? `${current}${word}` : `${current} ${word}`.trim()
+    if (captionWidth(next) > maxChars && current) {
       chunks.push(current)
       current = word
     } else current = next

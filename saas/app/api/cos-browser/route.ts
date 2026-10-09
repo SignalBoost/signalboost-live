@@ -599,6 +599,12 @@ const BROWSER_TURN_DEADLINE_REPLY: Record<string, string> = {
   pt: 'O COS esgotou o tempo deste turno antes de produzir uma resposta verificada, portanto nada foi enviado em seu lugar. O pedido não foi repetido.',
   pl: 'COS przekroczył czas tej tury, zanim przygotował zweryfikowaną odpowiedź, więc nic nie zostało wysłane w zamian. Żądanie nie zostało powtórzone.',
   ru: 'COS исчерпал время этого хода до того, как подготовил проверенный ответ, поэтому взамен ничего не отправлено. Запрос не повторялся.',
+  de: 'COS ist in diesem Durchlauf die Zeit ausgegangen, bevor eine verifizierte Antwort erstellt wurde, daher wurde stattdessen nichts gesendet. Die Anfrage wurde nicht erneut ausgeführt.',
+  fr: 'COS a manqué de temps pendant ce tour avant de produire une réponse vérifiée ; rien n’a donc été envoyé à la place. La demande n’a pas été relancée.',
+  it: 'COS ha esaurito il tempo in questo turno prima di produrre una risposta verificata, quindi non è stato inviato nulla al suo posto. La richiesta non è stata ripetuta.',
+  ja: 'COS は検証済みの回答を生成する前にこのターンの制限時間に達したため、代わりに何も送信されませんでした。リクエストは再実行されていません。',
+  ko: 'COS가 검증된 응답을 생성하기 전에 이번 턴의 시간이 초과되어 대신 아무것도 전송되지 않았습니다. 요청은 재실행되지 않았습니다.',
+  ar: 'نفد الوقت من COS في هذه الجولة قبل أن ينتج ردًا موثَّقًا، لذلك لم يُرسَل أي شيء بدلًا منه. لم تتم إعادة تشغيل الطلب.',
 }
 
 class BrowserTurnWatchdogElapsed extends Error {}

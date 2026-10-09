@@ -40,7 +40,7 @@ export interface PortableProductReadinessDashboard {
 }
 
 export const portableProductReadinessSchemaVersion = 'portable-product-readiness.v1' as const
-const requiredLanguages = Object.freeze(['en', 'pt', 'es', 'pl', 'ru'])
+const requiredLanguages = Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
 const readinessDimensions = Object.freeze([
   'registry', 'manifest', 'documentation', 'architecture', 'dependencies', 'localization', 'testing', 'security', 'packaging-specification', 'licensing-metadata',
 ] as const)

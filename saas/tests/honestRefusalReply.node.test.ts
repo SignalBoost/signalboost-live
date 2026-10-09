@@ -40,7 +40,7 @@ test('diagnostic prompts ask for readings and baselines, not prices', () => {
 
 test('no internal vocabulary reaches the public surface', () => {
   const forbidden = /confidence|threshold|gate|evidence|retriev|fallback|corpus|telemetry|qwen|deepinfra|model|provider|synthesis|independen/i
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     for (const prompt of [MIGRATION, 'why did the switch fail?', 'hello']) {
       const reply = buildHonestRefusalReply({ prompt, language })
       assert.ok(!forbidden.test(reply), `${language}: ${reply}`)
@@ -55,19 +55,19 @@ test('the dead-end phrasing is gone', () => {
   assert.ok(!/external AI/i.test(reply))
 })
 
-test('all five languages produce distinct non-empty replies', () => {
+test('all eleven languages produce distinct non-empty replies', () => {
   const seen = new Set<string>()
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     const reply = buildHonestRefusalReply({ prompt: MIGRATION, language })
     assert.ok(reply.trim().length > 60, language)
     seen.add(reply)
   }
-  assert.equal(seen.size, 5)
+  assert.equal(seen.size, 11)
 })
 
 test('unknown or missing language falls back to English', () => {
   const expected = buildHonestRefusalReply({ prompt: MIGRATION, language: 'en' })
-  assert.equal(buildHonestRefusalReply({ prompt: MIGRATION, language: 'de' }), expected)
+  assert.equal(buildHonestRefusalReply({ prompt: MIGRATION, language: 'xx' }), expected)
   assert.equal(buildHonestRefusalReply({ prompt: MIGRATION, language: null }), expected)
   assert.equal(buildHonestRefusalReply({ prompt: MIGRATION }), expected)
 })

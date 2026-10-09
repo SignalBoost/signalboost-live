@@ -1,5 +1,5 @@
 // saas/lib/i18n/cosUniversityApprovalsCopy.ts
-export type CosUniversityApprovalsLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type CosUniversityApprovalsLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 export type CosUniversityApprovalsCopy = {
   title: string
@@ -87,5 +87,71 @@ export const COS_UNIVERSITY_APPROVALS_COPY: Record<CosUniversityApprovalsLanguag
     authorize: 'Разрешить одну попытку оценки', authorizing: 'Разрешение…', refresh: 'Обновить',
     waitSeconds: 'Слишком близко к следующему запуску. Повторите через {s} с.', issued: 'Одобрение выдано и подтверждено в журнале.',
     signInRequired: 'Требуется вход владельца.',
+  },
+  de: {
+    title: 'Genehmigung der Bewertung des destillierten Modells',
+    subtitle: 'Autorisiert einen begrenzten Bewertungsversuch. Die Limits werden aus dem fixierten Holdout-Satz berechnet und umfassen höchstens zwei Marker-Wiederherstellungsaufrufe, eine Aufweck-Obergrenze von $0.20 und einen Ablauf nach 2 Stunden. Produktionsverkehr wird niemals autorisiert.',
+    candidate: 'Kandidat', artifact: 'Artefakt', holdoutCases: 'Fixierte Holdout-Fälle', callCeilings: 'Maximale Modell-/Bewerter-/Wiederholungsaufrufe', noArtifact: 'Kein Artefakt wartet auf eine Bewertung.',
+    state: 'Genehmigung', stateNone: 'Keine ausgestellt', stateArmed: 'Scharf — wartet auf den nächsten Bewertungslauf', stateConsumed: 'Verwendet — Versuch bereits ausgeführt', stateExpired: 'Ungenutzt abgelaufen', stateEvaluated: 'Bewertet — dieses Artefakt hat bereits sein unabhängiges Urteil', evaluationScores: 'Unabhängiges Urteil: Schüler {student} vs. Basis {baseline}', alreadyEvaluated: 'Dieses Artefakt hat bereits ein unabhängiges Urteil. Ein weiterer Versuch kann das Modell nicht ändern.',
+    armedAt: 'Ausgestellt', expiresAt: 'Läuft ab', nextTick: 'Nächster Bewertungslauf', lastOutcome: 'Letzter Versuch',
+    outcomeSucceeded: 'Erfolgreich', outcomeFailed: 'Fehlgeschlagen', noOutcome: 'Noch kein Versuchsergebnis',
+    authorize: 'Einen Bewertungsversuch autorisieren', authorizing: 'Wird autorisiert…', refresh: 'Aktualisieren',
+    waitSeconds: 'Zu nah am nächsten Bewertungslauf. Versuchen Sie es in {s} Sekunden erneut.', issued: 'Genehmigung ausgestellt und im Ledger bestätigt.',
+    signInRequired: 'Anmeldung des Eigentümers erforderlich.',
+  },
+  fr: {
+    title: 'Approbation de l’évaluation du modèle distillé',
+    subtitle: 'Autorise une tentative d’évaluation encadrée. Les limites sont calculées à partir du jeu de test figé et incluent au plus deux appels de récupération de marqueurs, un plafond de réveil de $0.20 et une expiration de 2 heures. N’autorise jamais de trafic de production.',
+    candidate: 'Candidat', artifact: 'Artefact', holdoutCases: 'Cas de test réservés épinglés', callCeilings: 'Nombre maximal d’appels modèle / juge / nouvelle tentative', noArtifact: 'Aucun artefact n’attend d’évaluation.',
+    state: 'Approbation', stateNone: 'Aucune émise', stateArmed: 'Armée — en attente de la prochaine exécution de l’évaluateur', stateConsumed: 'Utilisée — tentative déjà exécutée', stateExpired: 'Expirée sans être utilisée', stateEvaluated: 'Évalué — cet artefact a déjà son verdict indépendant', evaluationScores: 'Verdict indépendant : étudiant {student} contre référence {baseline}', alreadyEvaluated: 'Cet artefact a déjà un verdict indépendant. Une autre tentative ne peut pas modifier le modèle.',
+    armedAt: 'Émise', expiresAt: 'Expire', nextTick: 'Prochaine exécution de l’évaluateur', lastOutcome: 'Dernière tentative',
+    outcomeSucceeded: 'Réussi', outcomeFailed: 'Échec', noOutcome: 'Aucun résultat de tentative pour l’instant',
+    authorize: 'Autoriser une tentative d’évaluation', authorizing: 'Autorisation…', refresh: 'Actualiser',
+    waitSeconds: 'Trop proche de la prochaine exécution de l’évaluateur. Réessayez dans {s} secondes.', issued: 'Approbation émise et confirmée dans le registre.',
+    signInRequired: 'Connexion du propriétaire requise.',
+  },
+  it: {
+    title: 'Approvazione della valutazione del modello distillato',
+    subtitle: 'Autorizza un tentativo di valutazione limitato. I limiti sono calcolati dal set di holdout fissato e includono al massimo due chiamate di recupero dei marker, un tetto di riattivazione di $0.20 e una scadenza di 2 ore. Non autorizza mai traffico di produzione.',
+    candidate: 'Candidato', artifact: 'Artefatto', holdoutCases: 'Casi di holdout fissati', callCeilings: 'Numero massimo di chiamate modello / giudice / nuovo tentativo', noArtifact: 'Nessun artefatto in attesa di valutazione.',
+    state: 'Approvazione', stateNone: 'Nessuna emessa', stateArmed: 'Attiva — in attesa della prossima esecuzione del valutatore', stateConsumed: 'Usata — il tentativo è già stato eseguito', stateExpired: 'Scaduta senza essere usata', stateEvaluated: 'Valutato — questo artefatto ha già il suo verdetto indipendente', evaluationScores: 'Verdetto indipendente: studente {student} vs riferimento {baseline}', alreadyEvaluated: 'Questo artefatto ha già un verdetto indipendente. Un altro tentativo non può cambiare il modello.',
+    armedAt: 'Emessa', expiresAt: 'Scade', nextTick: 'Prossima esecuzione del valutatore', lastOutcome: 'Ultimo tentativo',
+    outcomeSucceeded: 'Riuscito', outcomeFailed: 'Non riuscito', noOutcome: 'Ancora nessun risultato',
+    authorize: 'Autorizza un tentativo di valutazione', authorizing: 'Autorizzazione…', refresh: 'Aggiorna',
+    waitSeconds: 'Troppo vicino alla prossima esecuzione del valutatore. Riprova tra {s} secondi.', issued: 'Approvazione emessa e confermata nel registro.',
+    signInRequired: 'È richiesto l’accesso del proprietario.',
+  },
+  ja: {
+    title: '蒸留モデル評価の承認',
+    subtitle: '上限付きの評価試行を 1 回だけ承認します。上限は固定されたホールドアウトセットから算出され、マーカー復旧呼び出しは最大 2 回、起動コストの上限は $0.20、有効期限は 2 時間です。本番トラフィックは一切承認しません。',
+    candidate: '候補', artifact: 'アーティファクト', holdoutCases: '固定されたホールドアウトケース', callCeilings: 'モデル／審査／再試行の最大呼び出し数', noArtifact: '評価待ちのアーティファクトはありません。',
+    state: '承認', stateNone: '未発行', stateArmed: '有効 — 次回の評価実行を待機中', stateConsumed: '使用済み — 試行は実行済みです', stateExpired: '未使用のまま期限切れ', stateEvaluated: '評価済み — このアーティファクトには独立した判定がすでにあります', evaluationScores: '独立判定：生徒 {student} 対 ベースライン {baseline}', alreadyEvaluated: 'このアーティファクトには独立した判定がすでにあります。再試行してもモデルは変わりません。',
+    armedAt: '発行日時', expiresAt: '有効期限', nextTick: '次回の評価実行', lastOutcome: '前回の試行',
+    outcomeSucceeded: '成功', outcomeFailed: '失敗', noOutcome: '試行結果はまだありません',
+    authorize: '評価を1回承認', authorizing: '承認中…', refresh: '更新',
+    waitSeconds: '次回の評価実行が近すぎます。{s} 秒後にもう一度お試しください。', issued: '承認が発行され、台帳で確認されました。',
+    signInRequired: 'オーナーのサインインが必要です。',
+  },
+  ko: {
+    title: '증류 모델 평가 승인',
+    subtitle: '제한된 평가 시도 1회를 승인합니다. 한도는 고정된 홀드아웃 세트에서 계산되며 마커 복구 호출 최대 2회, 기동 비용 상한 $0.20, 2시간 만료를 포함합니다. 프로덕션 트래픽은 절대 승인하지 않습니다.',
+    candidate: '후보', artifact: '아티팩트', holdoutCases: '고정된 홀드아웃 케이스', callCeilings: '모델 / 심사 / 재시도 최대 호출 수', noArtifact: '평가를 기다리는 아티팩트가 없습니다.',
+    state: '승인', stateNone: '발급된 항목 없음', stateArmed: '활성 — 다음 평가 실행 대기 중', stateConsumed: '사용됨 — 시도가 이미 실행되었습니다', stateExpired: '미사용 만료', stateEvaluated: '평가됨 — 이 아티팩트에는 이미 독립 판정이 있습니다', evaluationScores: '독립 판정: 학생 {student} 대 기준선 {baseline}', alreadyEvaluated: '이 아티팩트에는 이미 독립 판정이 있습니다. 다시 시도해도 모델은 바뀌지 않습니다.',
+    armedAt: '발급됨', expiresAt: '만료', nextTick: '다음 평가 실행', lastOutcome: '마지막 시도',
+    outcomeSucceeded: '성공', outcomeFailed: '실패', noOutcome: '아직 시도 결과가 없습니다',
+    authorize: '평가 시도 1회 승인', authorizing: '승인 중…', refresh: '새로 고침',
+    waitSeconds: '다음 평가 실행이 너무 가깝습니다. {s}초 후에 다시 시도하세요.', issued: '승인이 발급되어 원장에서 확인되었습니다.',
+    signInRequired: '소유자 로그인이 필요합니다.',
+  },
+  ar: {
+    title: 'الموافقة على تقييم النموذج المُقطَّر',
+    subtitle: 'يأذن بمحاولة تقييم واحدة محدودة. تُحسب الحدود من مجموعة الاختبار المثبّتة، وتشمل استدعاءين على الأكثر لاستعادة العلامات، وسقف تنشيط قدره $0.20، وانتهاء صلاحية بعد ساعتين. لا يأذن أبدًا بحركة مرور الإنتاج.',
+    candidate: 'المرشح', artifact: 'الأداة', holdoutCases: 'حالات الاختبار المحجوزة المثبتة', callCeilings: 'الحد الأقصى لاستدعاءات النموذج / المُحكّم / إعادة المحاولة', noArtifact: 'لا توجد أداة بانتظار التقييم.',
+    state: 'الموافقة', stateNone: 'لم تُصدر أي موافقة', stateArmed: 'مفعّلة — بانتظار التشغيل التالي للمُقيّم', stateConsumed: 'مستخدمة — تم تنفيذ المحاولة بالفعل', stateExpired: 'انتهت صلاحيتها دون استخدام', stateEvaluated: 'تم التقييم — لهذه الأداة حكم مستقل بالفعل', evaluationScores: 'الحكم المستقل: الطالب {student} مقابل خط الأساس {baseline}', alreadyEvaluated: 'لهذه الأداة حكم مستقل بالفعل. لا يمكن لمحاولة أخرى تغيير النموذج.',
+    armedAt: 'صدرت', expiresAt: 'تنتهي الصلاحية', nextTick: 'التشغيل التالي للمُقيّم', lastOutcome: 'المحاولة الأخيرة',
+    outcomeSucceeded: 'نجحت', outcomeFailed: 'فشل', noOutcome: 'لا توجد نتيجة للمحاولة بعد',
+    authorize: 'تفويض محاولة تقييم واحدة', authorizing: 'جارٍ التفويض…', refresh: 'تحديث',
+    waitSeconds: 'الموعد قريب جدًا من التشغيل التالي للمُقيّم. حاول مرة أخرى بعد {s} ثانية.', issued: 'تم إصدار الموافقة وتأكيدها في السجل.',
+    signInRequired: 'يلزم تسجيل دخول المالك.',
   },
 }

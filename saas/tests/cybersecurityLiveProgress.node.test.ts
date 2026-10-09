@@ -34,7 +34,7 @@ test('Cybersecurity dependency scans stream real server progress', () => {
 
 test('Cybersecurity activity monitor distinguishes heartbeat from progress', () => {
   const panel = read('../components/cybersecurity/CyberActivityPanel.tsx')
-  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(panel, new RegExp('\\b' + lang + ': \\{'))
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) assert.match(panel, new RegExp('\\b' + lang + ': \\{'))
   assert.match(panel, /role="progressbar"/)
   assert.match(panel, /heartbeatAge !== null && heartbeatAge > 45/)
   assert.match(panel, /stageAge !== null && stageAge > 900/)

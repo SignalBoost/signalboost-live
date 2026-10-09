@@ -19,6 +19,12 @@ const LANGUAGE_REGION: Record<string, string> = {
   pt: 'brazil',
   pl: 'poland',
   ru: 'global_ru',
+  de: 'eu',
+  fr: 'eu',
+  it: 'eu',
+  ja: 'jp',
+  ko: 'kr',
+  ar: 'mena',
 }
 
 function inc(map: Record<string, number>, key: string | null | undefined) {

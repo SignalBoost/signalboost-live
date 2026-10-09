@@ -34,6 +34,24 @@ test('an English gap gets no language shortcut, because its anchors already matc
   assert.equal(documentMatchesTargetLanguage(english.repeat(3), 'en'), false)
 })
 
+test('the six newer platform languages are detected, and Chinese is not mistaken for Japanese', () => {
+  const samples: Record<string, string> = {
+    de: 'Das Erlernen einer zweiten Sprache erfordert regelmäßige Übung und den Kontakt mit lebendigen Texten. Leseverstehen ist nicht dasselbe wie Übersetzen, aber die beiden Fähigkeiten entwickeln sich gemeinsam. Die Grammatik ist ein Werkzeug, das der Kommunikation dient. ',
+    fr: 'L’apprentissage d’une deuxième langue exige une pratique régulière et un contact avec des textes vivants. La compréhension écrite n’est pas la même chose que la traduction, mais les deux compétences se développent ensemble. La grammaire est un outil qui est au service de la communication. ',
+    it: 'Imparare una seconda lingua richiede pratica regolare e contatto con testi vivi. La comprensione della lettura non è la stessa cosa della traduzione, ma le due abilità si sviluppano insieme. La grammatica è uno strumento che è al servizio della comunicazione. ',
+    ja: '第二言語の習得には、定期的な練習と生きた文章に触れることが必要です。読解は翻訳と同じではありませんが、二つの技能は一緒に伸びていきます。文法はコミュニケーションに役立つ道具です。',
+    ko: '제2언어를 배우려면 꾸준한 연습과 살아 있는 글을 접하는 것이 필요합니다. 독해는 번역과 같지 않지만 두 능력은 함께 발전합니다. 문법은 의사소통을 돕는 도구입니다.',
+    ar: 'يتطلب تعلم لغة ثانية ممارسة منتظمة واحتكاكًا بالنصوص الحية. فهم المقروء ليس هو الترجمة نفسها، لكن المهارتين تتطوران معًا. القواعد أداة تخدم التواصل.',
+  }
+  for (const [language, text] of Object.entries(samples)) {
+    assert.equal(detectDominantLanguage(text.repeat(4)), language, language)
+    assert.equal(documentMatchesTargetLanguage(text.repeat(4), language), true, language)
+  }
+  const chinese = '学习第二语言需要定期练习并接触真实的文本。阅读理解与翻译并不相同，但这两种能力会共同发展。语法是服务于交流的工具。'
+  assert.equal(detectDominantLanguage(chinese.repeat(4)), null)
+  assert.equal(documentMatchesTargetLanguage(chinese.repeat(4), 'ja'), false)
+})
+
 test('short or tokenless text yields no verdict rather than a guess', () => {
   assert.equal(detectDominantLanguage('krótki tekst'), null)
   assert.equal(detectDominantLanguage(''), null)

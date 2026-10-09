@@ -37,7 +37,7 @@ test('University telemetry dashboard watches multi-provider calls and the HF pip
   assert.match(page, /COS_UNIVERSITY_TELEMETRY_COPY/)
   assert.match(copy, /HF observed cost/)
   assert.match(copy, /read-only/i)
-  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(copy, new RegExp('\\b' + lang + ': \\{'))
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) assert.match(copy, new RegExp('\\b' + lang + ': \\{'))
 })
 
 

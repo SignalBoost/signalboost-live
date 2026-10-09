@@ -42,10 +42,10 @@ test('an unverified match gets an honest caveat prepended, not silent unconditio
   assert.match(ROUTE, /verified \? formatted : \[unverifiedProvenanceCaveat\(languageCode\), '', formatted\]\.join/)
 })
 
-test('the caveat exists in all five UI languages and names the actual reason plainly', () => {
+test('the caveat exists in all eleven UI languages and names the actual reason plainly', () => {
   assert.match(ROUTE, /function unverifiedProvenanceCaveat/)
-  const fn = ROUTE.slice(ROUTE.indexOf('function unverifiedProvenanceCaveat'), ROUTE.indexOf('function unverifiedProvenanceCaveat') + 2000)
-  for (const marker of ["languageCode === 'es'", "languageCode === 'pt'", "languageCode === 'pl'", "languageCode === 'ru'"]) {
+  const fn = ROUTE.slice(ROUTE.indexOf('function unverifiedProvenanceCaveat'), ROUTE.indexOf('function deterministicProvenance'))
+  for (const marker of ["languageCode === 'es'", "languageCode === 'pt'", "languageCode === 'pl'", "languageCode === 'ru'", "languageCode === 'de'", "languageCode === 'fr'", "languageCode === 'it'", "languageCode === 'ja'", "languageCode === 'ko'", "languageCode === 'ar'"]) {
     assert.match(fn, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   }
   assert.match(fn, /could not confirm this record matches the immediately preceding answer exactly/)

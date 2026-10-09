@@ -42,7 +42,7 @@ test('COS Learning dashboard exposes the bounded owner backfill action with expl
 })
 
 test('embedding and auth controls are localized in every COS Learning language', () => {
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     assert.match(copy, new RegExp(`\\b${language}:\\{[^}]*embeddingBacklog:`))
     assert.match(copy, new RegExp(`\\b${language}:\\{[^}]*ownerSessionRequired:`))
     assert.match(copy, new RegExp(`\\b${language}:\\{[^}]*canonicalHostRequired:`))

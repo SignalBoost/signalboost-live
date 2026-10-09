@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const locales = ['en', 'es', 'pt', 'pl', 'ru']
+const locales = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 const guestNotice = /Please sign in|Por favor inicia sesión|Faça login|Zaloguj się|Войдите/i
 
 test.describe('Reviews module responsive SaaS page', () => {

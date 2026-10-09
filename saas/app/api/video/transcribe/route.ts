@@ -8,7 +8,7 @@ import { refundVideoCredit, spendVideoCredit } from '@/lib/credits'
 export const runtime = 'nodejs'
 export const maxDuration = 300
 
-type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type CaptionCue = {
   id: string
@@ -48,7 +48,7 @@ const ENV_OPENAI = ['OPENAI', 'API', 'KEY'].join('_')
 const ENV_TRANSCRIPTION_MODEL = ['OPENAI', 'TRANSCRIPTION', 'MODEL'].join('_')
 
 const defaultStorageBucket = 'video-uploads'
-const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
+const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 const storageCaptionMaxMb = 24
 const directCaptionMaxMb = 4
 

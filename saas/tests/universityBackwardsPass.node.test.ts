@@ -96,7 +96,7 @@ test('Residency starts a case only when it fits in what is left of the invocatio
   assert.match(read('platform-harness/residency/live-builder-executor.ts'), /timeoutMs:BUILDER_RESIDENCY_PROVIDER_TIMEOUT_MS,\s+readyTimeoutMs,/)
 })
 
-test('the University dashboard no longer lists graduates; the Workforce does, in all five languages', () => {
+test('the University dashboard no longer lists graduates; the Workforce does, in all eleven languages', () => {
   const page = read('app/dashboard/cos-university-telemetry/page.tsx')
   assert.doesNotMatch(page, /label="Active graduates"/)
   assert.match(page, /copy\.workforceTitle/)
@@ -106,6 +106,6 @@ test('the University dashboard no longer lists graduates; the Workforce does, in
   assert.match(api, /available: !workforceResult\.error/)
   const copy = read('lib/i18n/cosUniversityTelemetryCopy.ts')
   for (const key of ['workforceTitle', 'workforceOnCall', 'workforceNone', 'pipelineResidencyFailed']) {
-    assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 5, `${key} in en, es, pt, pl, ru`)
+    assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 11, `${key} in all eleven languages`)
   }
 })

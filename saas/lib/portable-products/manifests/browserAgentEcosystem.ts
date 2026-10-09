@@ -37,5 +37,5 @@ export const browserAgentEcosystemManifest: PortableProductManifest = Object.fre
     'docs/portables/browser-agent-commercial-portability.md',
   ]),
   futureFeatures: Object.freeze(['approved-browser-adapters', 'versioned-distribution-artifacts']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

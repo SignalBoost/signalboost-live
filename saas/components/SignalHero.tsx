@@ -10,6 +10,12 @@ const LANGS = [
   { code: 'es', name: 'Español', flag: '🇪🇸' },
   { code: 'pl', name: 'Polski', flag: '🇵🇱' },
   { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'it', name: 'Italiano', flag: '🇮🇹' },
+  { code: 'ja', name: '日本語', flag: '🇯🇵' },
+  { code: 'ko', name: '한국어', flag: '🇰🇷' },
+  { code: 'ar', name: 'العربية', flag: '🇸🇦' },
 ]
 
 const PLATFORM_SIGNALS = [
@@ -81,6 +87,12 @@ export default function SignalHero() {
       'Auditoría, ciberseguridad, sitios web y crecimiento',
       'Audyt, cyberbezpieczeństwo, strony WWW i rozwój',
       'Аудит, кибербезопасность, сайты и рост',
+      'Audit, Cybersicherheit, Webdesign und Wachstum',
+      'Audit, cybersécurité, conception web et croissance',
+      'Audit, cybersicurezza, web design e crescita',
+      '監査、サイバーセキュリティ、Webデザイン、成長',
+      '감사, 사이버 보안, 웹 디자인, 성장',
+      'التدقيق والأمن السيبراني وتصميم المواقع والنمو',
     ]
     const list: string[] =
       Array.isArray(hero.headlines) && hero.headlines.length > 0

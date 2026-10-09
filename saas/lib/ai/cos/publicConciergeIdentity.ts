@@ -1,7 +1,7 @@
 import { PUBLIC_BRAND } from '../../public-brand.ts'
 
 type PublicIdentityReply = Readonly<{ reply: string; source: string }>
-export type IdentityLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type IdentityLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 export type PublicIdentityIntent = 'platform_identity' | 'assistant_employer'
 
 function normalizedQuestion(prompt: string): string {
@@ -87,6 +87,12 @@ const COMPANY_NAME_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.
   pt: `Nossa empresa e plataforma pública se chamam ${PUBLIC_BRAND.name}.`,
   pl: `Nasza firma i publiczna platforma nazywają się ${PUBLIC_BRAND.name}.`,
   ru: `Наша компания и публичная платформа называются ${PUBLIC_BRAND.name}.`,
+  de: `Unser Unternehmen und unsere öffentliche Plattform heißen ${PUBLIC_BRAND.name}.`,
+  fr: `Notre entreprise et notre plateforme publique s’appellent ${PUBLIC_BRAND.name}.`,
+  it: `La nostra azienda e la nostra piattaforma pubblica si chiamano ${PUBLIC_BRAND.name}.`,
+  ja: `当社および公開プラットフォームの名称は${PUBLIC_BRAND.name}です。`,
+  ko: `당사와 공개 플랫폼의 이름은 ${PUBLIC_BRAND.name}입니다.`,
+  ar: `تحمل شركتنا ومنصتنا العامة اسم ${PUBLIC_BRAND.name}.`,
 })
 
 const IDENTITY_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.freeze({
@@ -95,6 +101,12 @@ const IDENTITY_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.free
   pt: 'Sou o iTMounts Concierge, um assistente de IA, não uma pessoa, portanto não tenho empregador.',
   pl: 'Jestem iTMounts Concierge, asystentem sztucznej inteligencji, a nie osobą, więc nie mam pracodawcy.',
   ru: 'Я — iTMounts Concierge, ИИ-ассистент, а не человек, поэтому у меня нет работодателя.',
+  de: 'Ich bin iTMounts Concierge, ein KI-Assistent – keine Person –, daher habe ich keinen Arbeitgeber.',
+  fr: 'Je suis le Concierge iTMounts, un assistant IA — pas une personne —, je n’ai donc pas d’employeur.',
+  it: 'Sono iTMounts Concierge, un assistente AI, non una persona, quindi non ho un datore di lavoro.',
+  ja: '私はiTMounts コンシェルジュです。人ではなくAIアシスタントのため、雇用主はいません。',
+  ko: '저는 사람이 아닌 AI 어시스턴트인 iTMounts 컨시어지이므로 고용주가 없습니다.',
+  ar: 'أنا كونسيرج iTMounts، مساعد ذكاء اصطناعي ولست شخصًا، لذا ليس لديّ صاحب عمل.',
 })
 
 export function publicConciergeIdentityReplyForIntent(

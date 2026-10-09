@@ -12,7 +12,13 @@ const LANGUAGES = [
   { code: "es", label: uiText('generatedUi.u_ce344a418127968f') },
   { code: "pt", label: uiText('generatedUi.u_169b032adf2ab80f') },
   { code: "pl", label: uiText('generatedUi.u_293650de072648b9') },
-  { code: "ru", label: uiText('generatedUi.u_f37e3358243de943') }
+  { code: "ru", label: uiText('generatedUi.u_f37e3358243de943') },
+  { code: "de", label: "DE" },
+  { code: "fr", label: "FR" },
+  { code: "it", label: "IT" },
+  { code: "ja", label: "JA" },
+  { code: "ko", label: "KO" },
+  { code: "ar", label: "AR" }
 ];
 
 export default function LanguageSwitcher({

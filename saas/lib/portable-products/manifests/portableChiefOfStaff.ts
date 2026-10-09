@@ -34,5 +34,5 @@ export const portableChiefOfStaffManifest: PortableProductManifest = Object.free
   architectureReferences: Object.freeze(['COS', 'portable-kernel']),
   documentationReferences: Object.freeze(['docs/portables/cos-host-integration-guide.md']),
   futureFeatures: Object.freeze(['licensing-activation']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

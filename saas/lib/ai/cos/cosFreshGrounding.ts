@@ -61,9 +61,13 @@ const TRAVEL_SOURCE_LANGUAGE_MARKERS: Record<SupportedResponseLanguage, RegExp> 
   es: /\b(?:aeropuerto|tren|autob[uú]s|billete|entradas?|atracci[oó]n|museo|horario|transporte\s+p[uú]blico|centro|turismo|viaje)\b/iu,
   pt: /\b(?:comboio|trem|autocarro|[oô]nibus|bilhete|ingresso|atra[cç][aã]o|museu|hor[aá]rio|transporte\s+p[uú]blico|viagem)\b/iu,
   ru: /\b(?:аэропорт|поезд|автобус|метро|трамвай|билет|достопримечательность|музей|часы\s+работы|общественный\s+транспорт|центр|туризм|путешествие)\b/iu,
+  de: /(?<!\p{L})(?:flughafen|zug|bahnhof|stra[sß]enbahn|fahrkarten?|eintritt|sehensw[uü]rdigkeit(?:en)?|[oö]ffnungszeiten|nahverkehr|innenstadt|reise|verkehr)(?!\p{L})/iu,
+  fr: /(?<!\p{L})(?:a[eé]roport|gare|billets?|mus[eé]e|horaires\s+d['’]ouverture|transports?\s+en\s+commun|centre-ville|tourisme|voyage)(?!\p{L})/iu,
+  it: /(?<!\p{L})(?:aeroporto|treno|stazione|biglietti?|attrazion[ei]|orari|trasporto|mezzi\s+pubblici|collegamenti|arrivare|come|museo|centro\s+citt[aà]|viaggio)(?!\p{L})/iu,
+  ja: /(?:空港|電車|列車|バス|路面電車|切符|チケット|観光|博物館|美術館|営業時間|公共交通|市内中心部|旅行)/u,
+  ko: /(?:공항|기차|열차|버스|트램|티켓|입장권|관광|박물관|미술관|운영\s*시간|대중교통|시내|여행)/u,
+  ar: /(?:المطار|مطار|القطار|قطار|الحافلة|حافلة|الترام|تذكرة|تذاكر|معالم|المتحف|متحف|ساعات\s+العمل|النقل\s+العام|وسط\s+المدينة|السياحة|سفر)/u,
 }
-
-const TRAVEL_OTHER_LANGUAGE_MARKERS = /\b(?:collegamenti|arrivare|biglietti|orari|trasporto|aeroporto|museo|come|tourisme|billets|a[eé]roport|verkehr|fahrkarten|flughafen|sehensw[uü]rdigkeiten)\b/iu
 
 const TRAVEL_USER_COUNTRY_TLDS: Record<SupportedResponseLanguage, readonly string[]> = {
   pl: ['pl'],
@@ -71,6 +75,12 @@ const TRAVEL_USER_COUNTRY_TLDS: Record<SupportedResponseLanguage, readonly strin
   es: ['es', 'mx', 'ar', 'cl', 'co', 'pe'],
   pt: ['pt', 'br'],
   ru: ['ru'],
+  de: ['de', 'at', 'ch'],
+  fr: ['fr', 'be', 'ch', 'lu'],
+  it: ['it', 'ch', 'sm'],
+  ja: ['jp'],
+  ko: ['kr'],
+  ar: ['sa', 'ae', 'eg', 'ma', 'jo', 'qa', 'kw', 'om', 'bh'],
 }
 
 function travelSourceCountryCode(result: Pick<SearchResult, 'url'>): string | null {
@@ -79,12 +89,11 @@ function travelSourceCountryCode(result: Pick<SearchResult, 'url'>): string | nu
   return /^[a-z]{2}$/.test(tld) ? tld : null
 }
 
-function travelSourceLanguage(result: Pick<SearchResult, 'title' | 'snippet'>): SupportedResponseLanguage | 'other' | 'unknown' {
+function travelSourceLanguage(result: Pick<SearchResult, 'title' | 'snippet'>): SupportedResponseLanguage | 'unknown' {
   const text = `${result.title || ''} ${result.snippet || ''}`
-  for (const language of ['pl', 'en', 'es', 'pt', 'ru'] as const) {
+  for (const language of ['pl', 'en', 'es', 'pt', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const) {
     if (TRAVEL_SOURCE_LANGUAGE_MARKERS[language].test(text)) return language
   }
-  if (TRAVEL_OTHER_LANGUAGE_MARKERS.test(text)) return 'other'
   return 'unknown'
 }
 

@@ -36,4 +36,46 @@ export const WORKSPACE_COPY: Record<string, FlatCopy> = {
     'services.creativeStudio.desc': 'Создавайте промо-баннеры и визуалы кампаний с помощью ИИ.',
     'services.creativeStudio.cta': 'Открыть креативную студию',
   },
+  de: {
+    // ...existing entries...
+
+    'services.creativeStudio.title': 'Kreativstudio',
+    'services.creativeStudio.desc': 'Erstellen Sie professionelle Werbebanner und Kampagnenvisuals mit KI.',
+    'services.creativeStudio.cta': 'Kreativstudio öffnen',
+  },
+  fr: {
+    // ...existing entries...
+
+    'services.creativeStudio.title': 'Studio créatif',
+    'services.creativeStudio.desc': 'Générez des bannières promotionnelles professionnelles et des visuels de campagne grâce à l’IA.',
+    'services.creativeStudio.cta': 'Ouvrir le studio créatif',
+  },
+  it: {
+    // ...existing entries...
+
+    'services.creativeStudio.title': 'Studio creativo',
+    'services.creativeStudio.desc': 'Genera banner promozionali professionali e visual per le campagne con l’AI.',
+    'services.creativeStudio.cta': 'Apri lo studio creativo',
+  },
+  ja: {
+    // ...existing entries...
+
+    'services.creativeStudio.title': 'クリエイティブスタジオ',
+    'services.creativeStudio.desc': 'AI を活用して、プロ品質のプロモーションバナーとキャンペーンビジュアルを生成します。',
+    'services.creativeStudio.cta': 'クリエイティブスタジオを開く',
+  },
+  ko: {
+    // ...existing entries...
+
+    'services.creativeStudio.title': '크리에이티브 스튜디오',
+    'services.creativeStudio.desc': 'AI 기반으로 전문적인 홍보 배너와 캠페인 비주얼을 생성하세요.',
+    'services.creativeStudio.cta': '크리에이티브 스튜디오 열기',
+  },
+  ar: {
+    // ...existing entries...
+
+    'services.creativeStudio.title': 'الاستوديو الإبداعي',
+    'services.creativeStudio.desc': 'أنشئ لافتات ترويجية احترافية ومرئيات للحملات مدعومة بـ AI.',
+    'services.creativeStudio.cta': 'فتح الاستوديو الإبداعي',
+  },
 }

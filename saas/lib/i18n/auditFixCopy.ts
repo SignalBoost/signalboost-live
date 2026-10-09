@@ -187,10 +187,10 @@ const RAW: Record<string, Five> = {
   'footer.brandName': ['SignalBoost AI', 'SignalBoost AI', 'SignalBoost AI', 'SignalBoost AI', 'SignalBoost AI'],
 }
 
-const LANGS = ['en', 'es', 'pt', 'pl', 'ru'] as const
+const LANGS = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 
 export const AUDIT_FIX_COPY: Record<string, Record<string, string>> = {
-  en: {}, es: {}, pt: {}, pl: {}, ru: {},
+  en: {}, es: {}, pt: {}, pl: {}, ru: {}, de: {}, fr: {}, it: {}, ja: {}, ko: {}, ar: {},
 }
 
 for (const [key, vals] of Object.entries(RAW)) {

@@ -1,0 +1,1051 @@
+{
+  "actionForm": {
+    "noExtraInfo": "この操作に追加情報は必要ありません。",
+    "activeEnvMap": "有効な環境変数マップ",
+    "envHelp": "稼働中の環境構成から選択してください。コンソールが主要な変数 ID を直接マッピングします。",
+    "stripeHelp": "Stripe の稼働中カタログから選択してください。コンソールが非表示の商品 ID を Stripe に送信します。",
+    "selectStripeProduct": "Stripe の商品を選択",
+    "selectEnvToDelete": "削除する環境変数を選択"
+  },
+  "tier": {
+    "core": "コア",
+    "tier2": "スケール",
+    "tier3": "エンタープライズ",
+    "tier4": "内部",
+    "sidebar": {
+      "core": "ティア 1 プロバイダー",
+      "tier2": "ティア 2 プロバイダー",
+      "tier3": "ティア 3 プロバイダー",
+      "tier4": "ティア 4 ツール"
+    },
+    "blurb": {
+      "core": "主要インフラ：クラウド、支払い、データ、ホスティング、ソース管理。",
+      "tier2": "メッセージング、メール、エッジネットワーク、コンピューティング連携。",
+      "tier3": "アプリプラットフォーム、オブザーバビリティ、エラー追跡、インシデント対応。",
+      "tier4": "暗号化シークレット保管庫とチームガバナンス。"
+    }
+  },
+  "util": {
+    "domains": "ドメイン/DNS",
+    "deployments": "デプロイ",
+    "logs": "ログ",
+    "settings": "設定"
+  },
+  "sub": {
+    "ai_and_models": "AI とモデル",
+    "email": "メール",
+    "transcription": "文字起こし",
+    "cloud_infrastructure": "クラウドインフラ",
+    "cloud_platform": "クラウドプラットフォーム",
+    "microsoft_cloud": "Microsoft クラウド",
+    "payments_and_billing": "支払いと請求",
+    "database_and_authentication": "データベースと認証",
+    "deployments_and_networking": "デプロイとネットワーク",
+    "source_control": "ソース管理",
+    "messaging_and_sms": "メッセージングと SMS",
+    "transactional_email": "トランザクションメール",
+    "dns_cdn_and_edge": "DNS、CDN、エッジ",
+    "cloud_compute": "クラウドコンピューティング",
+    "app_platform": "アプリプラットフォーム",
+    "observability": "オブザーバビリティ",
+    "error_monitoring": "エラー監視",
+    "incident_response": "インシデント対応",
+    "encrypted_secret_vault": "暗号化シークレット保管庫",
+    "team_access_and_compliance": "チームアクセスとコンプライアンス",
+    "voice_and_audio": "音声とオーディオ"
+  },
+  "sec": {
+    "repositories": "リポジトリ",
+    "pull_requests": "プルリクエスト",
+    "branches": "ブランチ",
+    "issues": "課題",
+    "activity": "アクティビティ",
+    "secrets_and_tokens": "シークレットとトークン",
+    "models": "モデル",
+    "files": "ファイル",
+    "jobs": "ジョブ",
+    "voices": "音声",
+    "account": "アカウント",
+    "history": "履歴",
+    "domains": "ドメイン",
+    "audiences": "オーディエンス",
+    "broadcasts": "ブロードキャスト",
+    "api_keys": "API キー",
+    "transcripts": "文字起こし",
+    "data": "データ",
+    "auth": "認証",
+    "storage": "ストレージ",
+    "customers": "顧客",
+    "prices_and_tiers": "価格とプラン",
+    "catalog": "カタログ",
+    "table_crud": "テーブル CRUD",
+    "sql_engine": "SQL エンジン",
+    "users_and_access": "ユーザーとアクセス",
+    "credentials": "認証情報",
+    "environment_variables": "環境変数",
+    "deployments": "デプロイ",
+    "networking_and_logs": "ネットワークとログ",
+    "email": "メール",
+    "messaging": "メッセージング",
+    "dns": "DNS",
+    "cache": "キャッシュ",
+    "compute": "コンピュート",
+    "iam": "IAM",
+    "security": "セキュリティ",
+    "security_rules": "セキュリティルール",
+    "secrets_storage": "シークレットストレージ",
+    "monitoring": "モニタリング",
+    "incidents": "インシデント",
+    "team_access": "チームアクセス",
+    "compliance_and_audit": "コンプライアンスと監査",
+    "audit": "監査"
+  },
+  "fld": {
+    "repository": "リポジトリ",
+    "pull_request": "プルリクエスト",
+    "issue": "Issue",
+    "branch": "ブランチ",
+    "model": "モデル",
+    "voice": "音声",
+    "table": "テーブル",
+    "transcript": "文字起こし",
+    "title": "タイトル",
+    "new_title": "新しいタイトル",
+    "description": "説明",
+    "body": "本文",
+    "content": "コンテンツ",
+    "name": "名前",
+    "message": "メッセージ",
+    "email": "メール",
+    "new_email": "新しいメール",
+    "merge_method": "マージ方法",
+    "region": "リージョン",
+    "domain": "ドメイン",
+    "bucket": "バケット",
+    "product": "製品",
+    "price": "価格",
+    "query": "クエリ",
+    "operation": "操作",
+    "phone_number": "電話番号",
+    "bucket_name": "バケット名",
+    "username": "ユーザー名",
+    "iam_username": "IAM ユーザー名",
+    "product_name": "商品名",
+    "new_product_name": "新しい商品名",
+    "amount_usd": "金額（USD）",
+    "price_id": "価格 ID",
+    "subscription_tier": "サブスクリプションティア",
+    "customer": "顧客",
+    "amount_cents": "金額（セント）",
+    "charge": "請求",
+    "amount_in_cents": "金額（セント単位）",
+    "sql_raw_statement": "生の SQL ステートメント",
+    "migration_payload": "移行ペイロード",
+    "json_row_object": "JSON 行オブジェクト",
+    "match_column_value": "一致条件（列=値）",
+    "new_values_json": "新しい値（JSON）",
+    "row": "行",
+    "user_email": "ユーザーのメールアドレス",
+    "user": "ユーザー",
+    "object_path": "オブジェクトパス",
+    "bucket_identifier": "バケット識別子",
+    "deployment_id": "デプロイID",
+    "build_id": "ビルド ID",
+    "env_variable_id": "環境変数 ID",
+    "new_value": "新しい値",
+    "target": "ターゲット",
+    "env_variable_key_reference": "環境変数キー参照",
+    "domain_address_string": "ドメインアドレス",
+    "to": "宛先",
+    "subject": "件名",
+    "type": "種類",
+    "ttl_sec": "TTL（秒）",
+    "proxied": "プロキシ経由",
+    "record_id": "レコード ID",
+    "droplet_name": "Droplet 名",
+    "size": "サイズ",
+    "image": "画像",
+    "rules_source": "ルールのソース",
+    "monitor_name": "モニター名",
+    "alert_message": "アラートメッセージ",
+    "metric_query": "メトリッククエリ",
+    "project_slug": "プロジェクトスラッグ",
+    "issue_id": "課題 ID",
+    "service_id": "サービス ID",
+    "urgency": "緊急度",
+    "master_passphrase": "マスターパスフレーズ",
+    "secret_key_reference": "シークレットキー参照",
+    "encrypted_value": "暗号化された値",
+    "key_name": "キー名",
+    "team_member_id": "チームメンバー ID",
+    "target_privilege_domain_access_tier": "対象の権限アクセスレベル",
+    "member_id": "メンバー ID",
+    "permissions_comma_separated": "権限（カンマ区切り）",
+    "scope": "スコープ"
+  },
+  "opt": {
+    "open": "オープン",
+    "closed": "クローズ",
+    "merge_commit": "マージコミット",
+    "squash": "Squash",
+    "rebase": "Rebase",
+    "production": "本番環境",
+    "preview": "プレビュー",
+    "development": "開発",
+    "indie_tier_9_mo": "Indie ティア（$9/月）",
+    "pro_tier_29_mo": "Pro ティア（$29/月）",
+    "growth_tier_79_mo": "Growth ティア（$79/月）",
+    "list_objects": "オブジェクトを一覧表示",
+    "upload": "アップロード",
+    "download": "ダウンロード",
+    "high": "高",
+    "low": "低",
+    "billing_administrator": "請求管理者",
+    "platform_core_developer": "プラットフォームコア開発者",
+    "standard_team_member": "標準チームメンバー",
+    "everything": "すべて",
+    "access_and_roles": "アクセスとロール",
+    "billing": "請求",
+    "data": "データ"
+  },
+  "ui": {
+    "execute": "実行",
+    "confirm": "確認",
+    "cancel": "キャンセル",
+    "preview": "プレビュー",
+    "close": "閉じる",
+    "error": "エラー",
+    "success": "成功",
+    "running": "実行中…",
+    "no_inputs": "この操作に入力は不要です。",
+    "workspace": "ワークスペース",
+    "hub_home": "Hub ホーム",
+    "back": "戻る",
+    "tier": "ティア",
+    "providers": "プロバイダー",
+    "utility_views": "ユーティリティビュー",
+    "review_action": "送信先へ送られる操作を確認してください：",
+    "cannot_undo": "確定すると元に戻せません。",
+    "about_to_execute": "次を実行しようとしています",
+    "on": "上の"
+  },
+  "tpl": {
+    "github": {
+      "list_repos": {
+        "label": "リポジトリを表示",
+        "desc": "設定済みのアクセストークンで参照できるリポジトリを一覧表示します。"
+      },
+      "list_prs": {
+        "label": "プルリクエスト一覧",
+        "desc": "リポジトリのオープンなプルリクエストを表示します（新しい順）。"
+      },
+      "view_pr_files": {
+        "label": "PR のファイルを表示",
+        "desc": "プルリクエストで変更されたファイルを一覧表示します。"
+      },
+      "merge_pr": {
+        "label": "PR をマージ",
+        "desc": "プルリクエストをベースブランチにマージします。"
+      },
+      "close_pr": {
+        "label": "PR をクローズ",
+        "desc": "マージせずにプルリクエストをクローズします。"
+      },
+      "list_branches": {
+        "label": "ブランチ一覧",
+        "desc": "リポジトリのブランチを一覧表示します（ai/* の整理に便利）。"
+      },
+      "delete_branch": {
+        "label": "ブランチを削除",
+        "desc": "名前を指定してブランチを削除します（main は保護されています）。"
+      },
+      "list_commits": {
+        "label": "最近のコミット",
+        "desc": "リポジトリの最新コミットを表示します。"
+      },
+      "list_issues": {
+        "label": "Issue 一覧",
+        "desc": "リポジトリのオープンな Issue を表示します。"
+      },
+      "open_issue": {
+        "label": "Issue を作成",
+        "desc": "リポジトリに新しい Issue を作成します。"
+      },
+      "edit_issue": {
+        "label": "Issue を編集",
+        "desc": "Issue のタイトルまたはオープン/クローズ状態を更新します。"
+      },
+      "close_issue": {
+        "label": "Issue をクローズ",
+        "desc": "オープンな Issue をクローズします。"
+      },
+      "rotate_token": {
+        "label": "トークンをローテーション",
+        "desc": "保存済みの GitHub アクセストークンをローテーションします（失効 + 再発行）。"
+      },
+      "manage_secrets": {
+        "label": "シークレットを管理",
+        "desc": "リポジトリの Actions シークレットを作成または更新します。"
+      }
+    },
+    "openai": {
+      "list_models": {
+        "label": "モデルを表示",
+        "desc": "設定済みの API キーで利用可能なモデルを一覧表示します。"
+      },
+      "retrieve_model": {
+        "label": "モデルの詳細",
+        "desc": "特定のモデルの詳細を表示します。"
+      },
+      "list_files": {
+        "label": "ファイル一覧",
+        "desc": "OpenAI アカウントにアップロードされたファイル。"
+      },
+      "list_fine_tunes": {
+        "label": "ファインチューニングジョブ",
+        "desc": "最近のファインチューニングジョブとそのステータス。"
+      },
+      "list_batches": {
+        "label": "バッチジョブ",
+        "desc": "最近のバッチジョブとそのステータス。"
+      }
+    },
+    "elevenlabs": {
+      "list_voices": {
+        "label": "音声一覧",
+        "desc": "アカウントで利用可能な音声。"
+      },
+      "voice_details": {
+        "label": "音声の詳細",
+        "desc": "特定の音声を確認します。"
+      },
+      "list_models": {
+        "label": "モデル一覧",
+        "desc": "アカウントで利用可能な音声モデル。"
+      },
+      "subscription": {
+        "label": "サブスクリプションと使用状況",
+        "desc": "プランのティアと文字数クォータの使用状況。"
+      },
+      "list_history": {
+        "label": "生成履歴",
+        "desc": "最近の音声合成の生成結果。"
+      }
+    },
+    "anthropic": {
+      "list_models": {
+        "label": "モデルを表示",
+        "desc": "API キーで利用可能なモデル。"
+      },
+      "retrieve_model": {
+        "label": "モデルの詳細",
+        "desc": "特定のモデルの詳細。"
+      }
+    },
+    "gemini": {
+      "list_models": {
+        "label": "モデルを表示",
+        "desc": "Gemini キーで利用可能なモデル。"
+      },
+      "model_details": {
+        "label": "モデルの詳細",
+        "desc": "特定のモデルの詳細。"
+      }
+    },
+    "resend": {
+      "list_domains": {
+        "label": "ドメイン一覧",
+        "desc": "送信ドメインと検証ステータス。"
+      },
+      "list_audiences": {
+        "label": "オーディエンス一覧",
+        "desc": "連絡先オーディエンス。"
+      },
+      "list_broadcasts": {
+        "label": "一斉配信一覧",
+        "desc": "最近の一斉配信。"
+      },
+      "list_api_keys": {
+        "label": "API キー一覧",
+        "desc": "アカウントの API キー。"
+      }
+    },
+    "assemblyai": {
+      "list_transcripts": {
+        "label": "最近の文字起こし",
+        "desc": "最新の文字起こしジョブ。"
+      },
+      "transcript_details": {
+        "label": "文字起こしの詳細",
+        "desc": "文字起こしジョブを確認します。"
+      }
+    },
+    "supabase_mkt": {
+      "list_tables": {
+        "label": "テーブル一覧",
+        "desc": "マーケティングプロジェクトの公開テーブル。"
+      },
+      "list_rows": {
+        "label": "行一覧",
+        "desc": "選択したテーブルの行。"
+      },
+      "list_users": {
+        "label": "ユーザー一覧",
+        "desc": "マーケティングプロジェクトの認証ユーザー。"
+      },
+      "list_buckets": {
+        "label": "バケット一覧",
+        "desc": "マーケティングプロジェクトのストレージバケット。"
+      }
+    },
+    "aws": {
+      "create_s3_bucket": {
+        "label": "S3 バケットを作成",
+        "desc": "グローバルに一意な新しい S3 バケットを作成します。"
+      },
+      "list_iam_users": {
+        "label": "IAM ユーザーを一覧表示",
+        "desc": "ID ディレクトリの現在のユーザーをすべて取得します。"
+      },
+      "disable_iam_user": {
+        "label": "IAM ユーザーを無効化",
+        "desc": "ユーザーのキーと認証情報を直ちに無効化します。"
+      },
+      "rotate_credential": {
+        "label": "認証情報をローテーション",
+        "desc": "ユーザーの IAM アクセスキーペアをローテーションします。"
+      }
+    },
+    "gcp": {
+      "list_service_accounts": {
+        "label": "サービスアカウント一覧",
+        "desc": "システム ID のサービスアカウントをすべて取得します。"
+      }
+    },
+    "stripe": {
+      "create_product": {
+        "label": "商品を作成",
+        "desc": "新しい Stripe 商品と最初の定期価格を作成します。"
+      },
+      "edit_product": {
+        "label": "商品を編集",
+        "desc": "Stripe 商品の名前、説明、またはアクティブ状態を更新します。"
+      },
+      "view_products": {
+        "label": "商品を表示",
+        "desc": "有効な Stripe 商品とその ID を一覧表示します。"
+      },
+      "archive_product": {
+        "label": "商品をアーカイブ",
+        "desc": "Stripe の商品をアーカイブします（非アクティブになります — 再度アクティブに編集すると復元可能）。"
+      },
+      "delete_product": {
+        "label": "商品を削除",
+        "desc": "Stripe の商品を完全に削除します。アクティブな価格がない商品のみ削除できます。"
+      },
+      "create_price": {
+        "label": "価格を作成",
+        "desc": "既存の Stripe 商品に新しい定期または一回限りの価格を追加します。"
+      },
+      "view_prices": {
+        "label": "価格を表示",
+        "desc": "Stripe の価格を一覧表示します（商品で絞り込み可能）。"
+      },
+      "edit_price": {
+        "label": "価格を編集",
+        "desc": "価格のニックネームを更新するか、有効化/無効化します（Stripe では金額は変更できません）。"
+      },
+      "archive_price": {
+        "label": "価格をアーカイブ",
+        "desc": "価格を無効にして購入できないようにします（復元可能）。"
+      },
+      "apply_tier_template": {
+        "label": "プランテンプレート",
+        "desc": "標準化された Indie、Pro、Growth のチェックアウトプランを即座に作成します。"
+      },
+      "list_customers": {
+        "label": "顧客ビュー",
+        "desc": "顧客、請求書、アクティブな定期支払いの指標を一覧表示します。"
+      },
+      "adjust_balance": {
+        "label": "残高を調整",
+        "desc": "顧客残高台帳の手動修正や取引調整を適用します。"
+      },
+      "issue_refund": {
+        "label": "返金/調整",
+        "desc": "処理済み取引の残高を取り消すか、手動でサービスクレジットを適用します。"
+      }
+    },
+    "supabase": {
+      "sql_editor": {
+        "label": "SQL エディター",
+        "desc": "データテーブルに対して任意の生クエリを直接実行します。"
+      },
+      "run_migration": {
+        "label": "移行を実行",
+        "desc": "コンパイル済みのデータ定義スキーマ移行をクエリブリッジ経由で実行します。"
+      },
+      "insert_row": {
+        "label": "行を挿入",
+        "desc": "構造化された行データを既存のスキーマに直接挿入します。"
+      },
+      "edit_row": {
+        "label": "行を編集",
+        "desc": "フィルター式に一致する既存のテーブル行を更新します。"
+      },
+      "archive_row": {
+        "label": "行をアーカイブ",
+        "desc": "特定のデータベースレコードの表示フラグを切り替えます。"
+      },
+      "delete_row": {
+        "label": "行を削除",
+        "desc": "行レコードをストレージ層から完全に削除します。"
+      },
+      "invite_user": {
+        "label": "ユーザーを招待",
+        "desc": "メール招待を送信して、新しい認証済みユーザーをプロビジョニングします。"
+      },
+      "edit_user": {
+        "label": "ユーザーを編集",
+        "desc": "ユーザーのメールアドレス、メタデータ、確認状態を更新します。"
+      },
+      "delete_user": {
+        "label": "ユーザーを削除",
+        "desc": "認証済みユーザーとその ID を完全に削除します。"
+      },
+      "reset_password": {
+        "label": "パスワードをリセット",
+        "desc": "ユーザーアカウントのパスワード再設定メールを送信します。"
+      },
+      "rotate_service_key": {
+        "label": "キーをローテーション",
+        "desc": "現在の service_role JSON トークンを無効化し、新しい認証情報を発行します。"
+      },
+      "storage_panel": {
+        "label": "ストレージパネル",
+        "desc": "ストレージバケット内のオブジェクトをアップロード、ダウンロード、または一覧表示します。"
+      },
+      "create_bucket": {
+        "label": "バケットを作成",
+        "desc": "メディアまたはバイナリ用の新しいオブジェクトストレージコンテナを作成します。"
+      },
+      "empty_bucket": {
+        "label": "バケットを空にする",
+        "desc": "メインのアセットコンテナを削除せずに、ネストされたオブジェクトをすべて削除します。"
+      }
+    },
+    "vercel": {
+      "list_deployments": {
+        "label": "デプロイパネル",
+        "desc": "実行中のビルド、コミット記録、本番ターゲットの割り当てを確認します。"
+      },
+      "trigger_rollback": {
+        "label": "デプロイのロールバック",
+        "desc": "本番エッジドメインを以前のデプロイハッシュへ即座に戻します。"
+      },
+      "cancel_build": {
+        "label": "ビルドをキャンセル",
+        "desc": "アクティブなビルドキューの項目をゲートウェイで直接中止します。"
+      },
+      "view_env": {
+        "label": "環境変数を表示",
+        "desc": "このプロジェクトで有効な環境変数の設定をすべて一覧表示します。"
+      },
+      "edit_env": {
+        "label": "環境変数を編集",
+        "desc": "変数の値や対象環境を更新します。"
+      },
+      "delete_env": {
+        "label": "環境変数を削除",
+        "desc": "アクティブなビルドパイプラインから環境変数キーを完全に削除します。"
+      },
+      "sync_dns_domain": {
+        "label": "ドメイン/DNS",
+        "desc": "正規設定やエイリアスパスを構成するか、エッジの SSL 証明書ルールを実行します。"
+      },
+      "logs": {
+        "label": "ログビューアー",
+        "desc": "最近のプラットフォーム、ビルド、ランタイムのログイベントをストリーミングします。"
+      }
+    },
+    "twilio": {
+      "send_sms": {
+        "label": "SMS を送信",
+        "desc": "Twilio 番号から SMS を送信します。"
+      },
+      "verify_number": {
+        "label": "番号を確認",
+        "desc": "電話番号の確認を開始します（ワンタイムコードを送信）。"
+      }
+    },
+    "sendgrid": {
+      "send_email": {
+        "label": "メールを送信",
+        "desc": "SendGrid でトランザクションメールを送信します。"
+      },
+      "check_domain_auth": {
+        "label": "ドメイン認証を確認",
+        "desc": "送信元ドメイン認証（SPF/DKIM）の状態を確認します。"
+      }
+    },
+    "cloudflare": {
+      "add_dns_record": {
+        "label": "DNS レコードを追加",
+        "desc": "設定済みの Cloudflare ゾーンに DNS レコードを作成します。"
+      },
+      "toggle_proxy": {
+        "label": "プロキシを切り替え",
+        "desc": "レコードのオレンジクラウドプロキシをオン/オフにします。"
+      },
+      "purge_cache": {
+        "label": "キャッシュをパージ",
+        "desc": "ゾーンの Cloudflare エッジキャッシュをすべてパージします。"
+      }
+    },
+    "digitalocean": {
+      "create_droplet": {
+        "label": "Droplet を作成",
+        "desc": "新しい DigitalOcean コンピューティング Droplet をプロビジョニングします。"
+      },
+      "view_droplets": {
+        "label": "Droplet を表示",
+        "desc": "稼働中の Droplet とそのステータスを一覧表示します。"
+      }
+    },
+    "firebase": {
+      "upload_rules": {
+        "label": "ルールをアップロード",
+        "desc": "新しい Firestore/Storage セキュリティルールセットを公開します。"
+      },
+      "view_rules": {
+        "label": "ルールを表示",
+        "desc": "現在公開されているセキュリティルールセットを表示します。"
+      }
+    },
+    "datadog": {
+      "create_monitor": {
+        "label": "モニターを作成",
+        "desc": "メトリック/アラートモニターを作成します。"
+      },
+      "check_metrics": {
+        "label": "メトリクスを確認",
+        "desc": "メトリッククエリを実行し、最新の系列を表示します。"
+      }
+    },
+    "sentry": {
+      "list_issues": {
+        "label": "Issue 一覧",
+        "desc": "プロジェクトの未解決の課題を一覧表示します。"
+      },
+      "resolve_issue": {
+        "label": "課題を解決",
+        "desc": "課題を解決済みにします。"
+      }
+    },
+    "pagerduty": {
+      "list_incidents": {
+        "label": "インシデント一覧",
+        "desc": "最近の、および進行中のインシデントを一覧表示します。"
+      },
+      "trigger_incident": {
+        "label": "インシデントを発生",
+        "desc": "サービスで新しいインシデントを手動で発生させます。"
+      }
+    },
+    "vault": {
+      "unlock_vault": {
+        "label": "保管庫のロックを解除",
+        "desc": "システム全体のマスターパスフレーズを入力して、機密キーを読み込みます。"
+      },
+      "seal_vault": {
+        "label": "保管庫を封印",
+        "desc": "復号されたメモリ層を即座に消去し、すべての主要操作を再びロックします。"
+      },
+      "add_secret": {
+        "label": "シークレットを追加",
+        "desc": "高度に保護された暗号化変数を格納します。"
+      },
+      "edit_secret": {
+        "label": "キーを編集",
+        "desc": "保管庫の既存シークレットの値を更新します。"
+      },
+      "reveal_secret": {
+        "label": "キーを表示",
+        "desc": "シークレットの値を復号して表示します（監査ログに記録されます）。"
+      },
+      "archive_secret": {
+        "label": "キーをアーカイブ",
+        "desc": "シークレットをアーカイブします（非表示ですが復元可能）。"
+      },
+      "delete_secret": {
+        "label": "シークレットを削除",
+        "desc": "キー参照オブジェクトをストレージブロックから完全に消去します。"
+      },
+      "view_keys": {
+        "label": "監査ログのキー",
+        "desc": "最近の復号イベントを記録したコンプライアンス証跡を確認します。"
+      },
+      "audit_log": {
+        "label": "監査ログ",
+        "desc": "保管庫へのアクセスと変更の監査証跡を表示します。"
+      }
+    },
+    "gov": {
+      "assign_role": {
+        "label": "ロールの割り当て",
+        "desc": "組織内の特定の担当者グループにプラットフォームのアクセス設定をプロビジョニングします。"
+      },
+      "change_permissions": {
+        "label": "ロール権限の変更",
+        "desc": "メンバーまたはロールに割り当てられた権限セットを調整します。"
+      },
+      "deactivate_member": {
+        "label": "メンバーをアーカイブ",
+        "desc": "組織の権限を停止し、アカウントへのアクセスを全体で無効にします。"
+      },
+      "view_timeline": {
+        "label": "アクティビティタイムライン",
+        "desc": "クラスターの最近の実行コンテキストをすべて追跡する監査トレース行です。"
+      },
+      "run_compliance_audit": {
+        "label": "コンプライアンス監査を実行",
+        "desc": "選択した範囲でコンプライアンスチェックを実行します。"
+      },
+      "clear_stale_sessions": {
+        "label": "セッションをクリア",
+        "desc": "非アクティブなトークンを強制ログアウトし、認可パラメーターを更新します。"
+      }
+    }
+  },
+  "domains": {
+    "err_load": "ドメインを読み込めませんでした",
+    "err_load2": "ドメインの読み込み中にエラーが発生しました",
+    "err_add": "ドメインを追加できませんでした",
+    "err_add2": "ドメインの追加中にエラーが発生しました",
+    "err_verify": "検証に失敗しました",
+    "err_verify2": "ドメインの検証中にエラーが発生しました",
+    "title": "ドメインと DNS",
+    "subtitle": "ドメイン、DNS レコード、SSL 証明書を管理",
+    "add_domain": "ドメインを追加",
+    "add": "追加",
+    "loading": "ドメインを読み込み中...",
+    "empty": "ドメインはまだ設定されていません",
+    "verified": "検証済み",
+    "pending": "検証待ち",
+    "verification_required": "検証が必要です",
+    "check_verification": "検証を確認",
+    "ssl_cert": "SSL 証明書",
+    "status": "ステータス",
+    "expires": "有効期限",
+    "nameservers": "ネームサーバー",
+    "created": "作成日",
+    "updated": "更新済み"
+  },
+  "env": {
+    "title": "環境変数を追加",
+    "count_live": "{n} 件が有効",
+    "type": "種類",
+    "targets": "ターゲット",
+    "add": "変数を追加",
+    "adding": "追加中…",
+    "list_title": "変数",
+    "refresh": "更新",
+    "loading": "変数を読み込み中…",
+    "empty": "変数はまだありません。上で追加してください。",
+    "system": "システム",
+    "edit": "編集",
+    "close": "閉じる",
+    "delete": "削除",
+    "cancel": "キャンセル",
+    "save": "変更を保存",
+    "saving": "保存中…",
+    "ph_value": "値",
+    "ph_new_value": "新しい値（現在の値を保持する場合は空欄）",
+    "err_load": "変数を読み込めませんでした",
+    "err_load2": "変数の読み込み中にエラーが発生しました",
+    "err_required": "キーと値は必須です",
+    "added": "{key} を追加しました",
+    "err_add": "変数を追加できませんでした",
+    "err_add2": "変数の追加中にエラーが発生しました",
+    "err_edit_required": "新しい値を設定するか、ターゲットを変更してください",
+    "updated": "変数を更新しました",
+    "err_update": "変数を更新できませんでした",
+    "err_update2": "変数の更新中にエラーが発生しました",
+    "confirm_delete": "{key} を削除しますか？ビルドパイプラインから削除され、元に戻せません。",
+    "deleted": "{key} を削除しました",
+    "err_delete": "変数を削除できませんでした",
+    "err_delete2": "変数の削除中にエラーが発生しました"
+  },
+  "logs": {
+    "title": "監査ログ",
+    "subtitle": "すべての保管庫操作のリアルタイムアクティビティログ",
+    "stat_actions_24h": "操作（24時間）",
+    "stat_success_rate": "成功率",
+    "stat_failed": "失敗した操作",
+    "stat_unique_users": "ユニークユーザー",
+    "filters": "フィルター",
+    "action": "アクション",
+    "all_actions": "すべての操作",
+    "accessed": "アクセス済み",
+    "rotated": "ローテーション済み",
+    "verified": "検証済み",
+    "created": "作成日",
+    "deleted": "削除済み",
+    "revoked": "取り消し済み",
+    "exported": "エクスポート済み",
+    "status": "ステータス",
+    "all_statuses": "すべてのステータス",
+    "success": "成功",
+    "failed": "失敗",
+    "pending": "保留中",
+    "secret_id": "シークレット ID",
+    "ph_secret": "シークレットで絞り込み",
+    "user_email": "ユーザーのメールアドレス",
+    "ph_user": "ユーザーで絞り込み",
+    "export_csv": "CSV としてエクスポート",
+    "loading": "ログを読み込み中...",
+    "no_logs": "ログが見つかりません",
+    "timestamp": "タイムスタンプ",
+    "col_user": "ユーザー",
+    "message": "メッセージ",
+    "previous": "前へ",
+    "page_n": "{n} ページ",
+    "next": "次へ",
+    "err_load": "ログを読み込めませんでした",
+    "err_load2": "ログの読み込み中にエラーが発生しました",
+    "err_export": "エクスポートに失敗しました"
+  },
+  "deploy": {
+    "err_load": "デプロイを読み込めませんでした",
+    "err_load2": "デプロイの読み込み中にエラーが発生しました",
+    "confirm_rollback": "{target} にロールバックしますか？本番環境に再度昇格されます。",
+    "confirm_cancel": "ビルド {target} をキャンセルしますか？実行中のビルドが中止されます。",
+    "done_rollback": "ロールバック完了",
+    "done_cancel": "ビルドをキャンセルしました",
+    "err_rollback": "ロールバックに失敗しました",
+    "err_cancel": "キャンセルに失敗しました",
+    "err_during_rollback": "ロールバック中にエラーが発生しました",
+    "err_during_cancel": "キャンセル中にエラーが発生しました",
+    "head_rollback": "デプロイのロールバック",
+    "head_cancel": "ビルドをキャンセル",
+    "head_view": "デプロイ",
+    "sub_rollback": "本番環境に再度昇格する、以前のREADYデプロイを選択してください。",
+    "sub_cancel": "進行中のビルドを中止します(BUILDING、QUEUED、INITIALIZING)。",
+    "sub_view": "最近のVercelデプロイ履歴とステータス。",
+    "refresh": "更新",
+    "loading": "デプロイを読み込み中...",
+    "empty": "デプロイが見つかりません",
+    "deployment": "デプロイ",
+    "current": "現在",
+    "by": "作成者: {name}",
+    "promoting": "昇格中…",
+    "roll_back_this": "これにロールバック",
+    "current_target": "現在の本番ターゲット",
+    "only_ready": "昇格できるのはREADYのデプロイのみです",
+    "canceling": "キャンセル中…",
+    "cancel_build": "ビルドをキャンセル",
+    "not_in_progress": "進行中ではありません — キャンセルするものはありません",
+    "live_url": "公開URL",
+    "git_commit": "Gitコミット",
+    "deployment_id": "デプロイID",
+    "created": "作成日",
+    "aliases": "エイリアス",
+    "view_inspector": "インスペクターでデプロイの詳細を表示",
+    "just_now": "たった今",
+    "m_ago": "{n} 分前",
+    "h_ago": "{n} 時間前",
+    "d_ago": "{n} 日前"
+  },
+  "settings": {
+    "err_load": "設定を読み込めませんでした",
+    "err_load2": "設定の読み込み中にエラーが発生しました",
+    "err_update": "設定を更新できませんでした",
+    "err_update2": "設定の更新中にエラーが発生しました",
+    "loading": "設定を読み込み中...",
+    "title": "コンソール設定",
+    "subtitle": "セキュリティポリシー、承認、監査設定を構成",
+    "saved": "設定を保存しました",
+    "sec_security": "セキュリティ",
+    "sec_automation": "自動化",
+    "sec_audit": "監査と保持",
+    "sec_notifications": "通知",
+    "sec_advanced": "詳細",
+    "mfa_l": "ロック解除に MFA を必須にする",
+    "mfa_d": "ユーザーは保管庫にアクセスする前に TOTP で認証する必要があります",
+    "rot_approval_l": "キーのローテーションに承認を必須にする",
+    "rot_approval_d": "キーのローテーションは実行前に承認が必要です",
+    "exp_approval_l": "エクスポートに承認を必須にする",
+    "exp_approval_d": "シークレットのエクスポートには明示的な承認が必要です",
+    "enc_l": "暗号化有効",
+    "enc_d": "すべてのシークレットを保存時に暗号化",
+    "autorot_l": "キーの自動ローテーション",
+    "autorot_d": "スケジュールに従ってキーを自動ローテーション",
+    "autorot_int_l": "自動ローテーション間隔（日）",
+    "audit_ret_l": "監査ログの保持（日）",
+    "audit_ret_d": "監査ログの保持期間",
+    "session_l": "セッションタイムアウト（分）",
+    "session_d": "再認証が必要になるまでのアイドルタイムアウト",
+    "notify_unauth_l": "不正アクセスを通知",
+    "notify_unauth_d": "不正アクセスを検出したときにアラートを送信",
+    "notify_rot_l": "キーのローテーションを通知",
+    "notify_rot_d": "キーがローテーションされたときに通知を送信",
+    "notify_exp_l": "キーの有効期限切れを通知",
+    "notify_exp_d": "キーの有効期限が近づいたら警告",
+    "pub_l": "公開 URL を許可",
+    "pub_d": "公開 URL へのデプロイを許可",
+    "last_updated": "最終更新"
+  },
+  "pr": {
+    "title": "オープンなプルリクエスト",
+    "refresh": "更新",
+    "subtitle": "AI が作成したインフラ変更です。計画済みステップを確認してからマージしてください。マージするまで何も実行されません。",
+    "loading": "読み込み中…",
+    "empty": "オープンな PR はありません。首席補佐官が承認待ちの変更をここに追加します。",
+    "planned_steps": "計画済みステップ（マージ時に順番に実行 — まだ何も実行されていません）",
+    "no_steps": "ステップはありません。",
+    "risk_word": "リスク",
+    "level_low": "低",
+    "level_medium": "中",
+    "level_high": "高",
+    "needs": "{role} が必要",
+    "steps_one": "{n} ステップ",
+    "steps_many": "{n} ステップ",
+    "redeploys": "再デプロイ",
+    "redeploy_tag": "↻ 再デプロイ",
+    "hide_payloads": "ペイロードを非表示",
+    "inspect_payloads": "ペイロードを確認",
+    "high_risk_a": "高リスクの変更です。本番で実行され、元に戻せません。必要な権限: ",
+    "high_risk_b": " — 続行するには確認してください。",
+    "merging": "マージ中…",
+    "confirm_run": "確認 — 本番で実行",
+    "merge_high": "マージ / 承認（高リスク）",
+    "merge": "マージ / 承認",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "history": "履歴",
+    "succeeded_one": "{ok}/{total} ステップが成功しました。",
+    "succeeded_many": "{ok}/{total} ステップが成功しました。",
+    "redeploy_included": "本番環境への再デプロイのステップが含まれています。",
+    "merged_at": "{date} にマージ済み",
+    "load_failed": "読み込みに失敗しました",
+    "merge_failed": "マージに失敗しました"
+  },
+  "cui": {
+    "audit_log": "監査ログ:",
+    "audit_note": "すべての操作はコンプライアンスのために記録されます。",
+    "view_log": "ログを表示 →",
+    "unknown_page": "不明なページです。",
+    "soon": "近日公開",
+    "soon_short": "近日公開",
+    "not_available": "まだ利用できません",
+    "coming_soon": "近日公開",
+    "workspace_title": "{name} ワークスペース",
+    "coming_soon_banner": "⏳ {name} の操作は近日提供予定です。これは今後利用可能になる内容のプレビューです。",
+    "provider_not_found": "プロバイダーが見つかりません: {id}",
+    "no_actions": "{name} で利用可能な操作はありません",
+    "actions_for": "{name} の操作",
+    "available_one": "利用可能な操作 {n} 件",
+    "available_many": "利用可能な操作 {n} 件",
+    "confirm_action": "操作を確認",
+    "executing_action": "操作を実行中…",
+    "back": "戻る",
+    "execute_now": "今すぐ実行",
+    "select_key_id": "キー ID を選択...",
+    "querying_vars": "クラスター変数台帳を照会中...",
+    "no_config_keys": "有効な構成キーが見つかりません。",
+    "nothing_to_select": "まだ選択できる項目はありません。"
+  },
+  "vault": {
+    "cred_mgmt": "認証情報の管理",
+    "rotate_title": "{name} をローテーション",
+    "rotate_sub": "{provider} の新しい認証情報を生成します。",
+    "cannot_undo": "この操作は元に戻せません",
+    "current_secret": "現在のシークレット",
+    "after_rotation": "ローテーション後",
+    "after_desc": "新しい認証情報が生成されます。古い認証情報は自動的に失効し、Vercel の環境変数に同期されます。",
+    "rotate_key": "キーをローテーション",
+    "generating": "新しい認証情報を生成しています...",
+    "may_take": "しばらく時間がかかる場合があります。",
+    "rotation_success": "ローテーションに成功しました",
+    "new_secret_masked": "新しいシークレット（マスク済み）",
+    "chk_generated": "新しい認証情報を生成済み",
+    "chk_synced": "Vercel の環境変数に同期済み",
+    "chk_revoked": "古い認証情報を失効済み",
+    "chk_audited": "監査ログに記録済み",
+    "done": "完了",
+    "rotation_failed": "ローテーションに失敗しました",
+    "retry": "再試行"
+  },
+  "vaultx": {
+    "audit": {
+      "empty": "監査ログのエントリはありません",
+      "entries": "件",
+      "failed": "失敗",
+      "ip": "IP:",
+      "loading": "監査ログを読み込んでいます...",
+      "showing": "最新 50 件を表示 / 全",
+      "success": "成功",
+      "trail": "監査証跡"
+    },
+    "grid": {
+      "created": "作成日:",
+      "day": "日",
+      "days": "日",
+      "empty": "保管庫にシークレットはありません",
+      "emptyHint": "接続済みプロバイダーのシークレットがここに表示されます。",
+      "expires": "有効期限:",
+      "expiresIn": "有効期限まで",
+      "lastRotated": "最終ローテーション:",
+      "statusActive": "有効",
+      "statusExpiringSoon": "まもなく期限切れ",
+      "statusExpired": "期限切れ",
+      "statusRotated": "最近ローテーション済み",
+      "statusRevoked": "取り消し済み"
+    },
+    "page": {
+      "active": "有効",
+      "browseSecrets": "シークレットを参照",
+      "encryptedNote": "完全な値は暗号化されており、UI には表示されません。",
+      "expiration": "有効期限",
+      "expiring": "期限切れ間近",
+      "inventory": "認証情報の一覧、有効期限アラート、ローテーション状況。",
+      "keysSecrets": "キーとシークレット",
+      "lastRotated": "最終ローテーション",
+      "lockVault": "保管庫をロック",
+      "maskedValue": "マスクされた値",
+      "ops": "運用と制作",
+      "providerPlaceholder": "プロバイダーを検索して選択...",
+      "secretWord": "件のシークレット",
+      "secretsWord": "件のシークレット",
+      "selected": "選択済み:",
+      "statusActive": "アクティブなシークレット",
+      "statusExpired": "期限切れ",
+      "statusExpiringSoon": "まもなく期限切れ",
+      "statusRevoked": "取り消し済み",
+      "statusRotated": "最近ローテーション済み",
+      "stored": "を保存済み。",
+      "typeEnv": "種類と環境"
+    },
+    "unlock": {
+      "back": "戻る",
+      "continue": "続行",
+      "enable2fa": "2FA を有効化",
+      "enter2faCode": "2FA コードを入力",
+      "enter6digit": "確認のため 6 桁のコードを入力してください",
+      "enterPassword": "パスワードを入力してください",
+      "errInvalidCode": "有効な 6 桁のコードを入力してください",
+      "errPasswordRequired": "パスワードは必須です",
+      "password": "パスワード",
+      "refresh": "更新",
+      "saveBackup": "これらのバックアップコードを保存してください:",
+      "scanAuthApps": "Google Authenticator、Microsoft Authenticator、または Authy でスキャンしてください",
+      "scanQr": "Google Authenticator で QR コードをスキャンしてください",
+      "secureAccess": "セキュアなアクセスが必要です",
+      "sessionExpire": "セキュリティのため、このセッションは 30 分後に期限切れになります。",
+      "twofaCode": "2FA コード",
+      "unlock": "ロック解除",
+      "unlockVault": "保管庫のロックを解除",
+      "verifying": "確認中..."
+    }
+  }
+}

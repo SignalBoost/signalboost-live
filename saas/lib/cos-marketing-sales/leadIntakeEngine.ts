@@ -20,7 +20,7 @@ const SOURCE_NOTES: Record<LeadIntakeSource, string> = {
 }
 
 export function normalizeCosLocale(locale?: string): CosLocale {
-  if (locale === 'es' || locale === 'pt-BR' || locale === 'pl' || locale === 'ru') return locale
+  if (locale === 'es' || locale === 'pt-BR' || locale === 'pl' || locale === 'ru' || locale === 'de' || locale === 'fr' || locale === 'it' || locale === 'ja' || locale === 'ko' || locale === 'ar') return locale
   if (locale === 'pt') return 'pt-BR'
   return 'en'
 }

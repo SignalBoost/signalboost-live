@@ -50,7 +50,7 @@ test('Supabase store uses RPC for atomic lease operations and sanitizes errors',
 })
 
 test('operator HA localization contains durable coordination labels in all required locales', () => {
-  for (const lang of ['en','es','pt','pl','ru']) {
+  for (const lang of ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']) {
     const json = JSON.parse(hydrateLocalizedSource(readFileSync(new URL(`../locales/${lang}.json`, import.meta.url),'utf8')))
     for (const key of ['durableCoordination','coordinationStore','connected','supervisorInstance','runtimeId','lastHeartbeat','activeLease','leaseExpired','leaseOwner','fencingGeneration','workItem','queued','leased','processing','reassigned','abandoned','staleOwner','coordinationConflict','browserSessionLost','newExecutionRequired','providerWorker','reconciliation','noActiveLease','productionBrowserExecutionDisabled']) assert.equal(typeof json.supervisorHa[key], 'string', `${lang}.${key}`)
   }

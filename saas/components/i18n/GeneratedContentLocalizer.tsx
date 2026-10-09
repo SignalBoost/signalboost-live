@@ -10,7 +10,7 @@
 import { useEffect } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 
-type SupportedLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type SupportedLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 type TranslationSegment = { id: string; text: string }
 type TranslationResponse = {
   ok?: boolean
@@ -94,7 +94,7 @@ const STRUCTURED_TAGS = new Set([
 
 function normalizeLanguage(value: string | null | undefined): SupportedLanguage {
   const short = String(value || 'en').slice(0, 2).toLowerCase()
-  return ['en', 'es', 'pt', 'pl', 'ru'].includes(short)
+  return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(short)
     ? short as SupportedLanguage
     : 'en'
 }

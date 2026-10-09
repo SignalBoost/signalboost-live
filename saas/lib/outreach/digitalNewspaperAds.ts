@@ -12,7 +12,7 @@ export type DigitalNewspaperAdTarget = {
   name: string
   channelType: 'digital_newspaper' | 'community_classifieds' | 'local_business_directory'
   region: string
-  language: 'en' | 'es' | 'pt' | 'pl' | 'ru'
+  language: 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
   categoryHints: string[]
   submissionMode: 'manual_review' | 'api_when_available'
   notes: string[]
@@ -23,7 +23,7 @@ export type DigitalNewspaperAdInput = {
   offer?: string
   audience?: string
   region?: string
-  language?: 'en' | 'es' | 'pt' | 'pl' | 'ru'
+  language?: 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
   landingUrl?: string
   landingPageGoal?: AdLandingPageGoal
   adFormat?: DigitalNewspaperAdFormat
@@ -148,6 +148,66 @@ function copyForLanguage(input: NormalizedDigitalNewspaperAdInput) {
       longBody: `${product} помогает ${audience} улучшить онлайн-присутствие через ${offer}. Платформа сохраняет человеческое одобрение перед публикацией или отправкой кампаний.`,
       callToAction: `Подробнее: ${url}`,
       disclosure: 'Коммерческое объявление. Публикация зависит от правил издания или каталога.',
+    }
+  }
+
+  if (input.language === 'de') {
+    return {
+      headline: `${product}: KI-gestütztes digitales Wachstum für lokale Unternehmen`,
+      shortBody: `${product} unterstützt lokale Unternehmen mit KI-gestützten Websites, Bewertungen, Inhalten und Outreach-Kampagnen.`,
+      longBody: `${product} hilft ${audience}, ihre Online-Präsenz mit ${offer} zu verbessern. Die Plattform behält die menschliche Freigabe bei, bevor Kampagnen veröffentlicht oder versendet werden.`,
+      callToAction: `Mehr erfahren: ${url}`,
+      disclosure: 'Werbeanzeige. Die Veröffentlichung richtet sich nach den Regeln der Zeitung, des Kleinanzeigenportals oder des Verzeichnisses.',
+    }
+  }
+
+  if (input.language === 'fr') {
+    return {
+      headline: `${product} : croissance numérique propulsée par l’IA pour les entreprises locales`,
+      shortBody: `${product} aide les entreprises locales avec des sites web, des avis, du contenu et des campagnes de prospection propulsés par l’IA.`,
+      longBody: `${product} aide ${audience} à améliorer leur présence en ligne grâce à ${offer}. La plateforme conserve une validation humaine avant toute publication ou tout envoi de campagne.`,
+      callToAction: `En savoir plus : ${url}`,
+      disclosure: 'Annonce commerciale. La publication dépend des règles du journal, du site de petites annonces ou de l’annuaire.',
+    }
+  }
+
+  if (input.language === 'it') {
+    return {
+      headline: `${product}: crescita digitale con l’IA per le attività locali`,
+      shortBody: `${product} aiuta le attività locali con siti web, recensioni, contenuti e campagne di outreach basati sull’IA.`,
+      longBody: `${product} aiuta ${audience} a migliorare la presenza online con ${offer}. La piattaforma mantiene l’approvazione umana prima di pubblicare o inviare campagne.`,
+      callToAction: `Scopri di più: ${url}`,
+      disclosure: 'Annuncio commerciale. La pubblicazione dipende dalle regole del giornale, della bacheca annunci o della directory.',
+    }
+  }
+
+  if (input.language === 'ja') {
+    return {
+      headline: `${product}:地域ビジネスのための AI によるデジタル成長`,
+      shortBody: `${product} は、AI を活用したウェブサイト、レビュー、コンテンツ、アウトリーチキャンペーンで地域ビジネスを支援します。`,
+      longBody: `${product} は、${offer} によって ${audience} のオンラインでの存在感を高めます。キャンペーンの公開や送信の前には、必ず人による承認を行います。`,
+      callToAction: `詳しくはこちら:${url}`,
+      disclosure: '広告です。掲載可否は新聞、案内広告、またはディレクトリの規定によります。',
+    }
+  }
+
+  if (input.language === 'ko') {
+    return {
+      headline: `${product}: 지역 비즈니스를 위한 AI 기반 디지털 성장`,
+      shortBody: `${product}은(는) AI 기반 웹사이트, 리뷰, 콘텐츠, 아웃리치 캠페인으로 지역 비즈니스를 지원합니다.`,
+      longBody: `${product}은(는) ${offer}을(를) 통해 ${audience}의 온라인 존재감을 높입니다. 플랫폼은 캠페인을 게시하거나 발송하기 전에 사람의 승인을 거칩니다.`,
+      callToAction: `자세히 알아보기: ${url}`,
+      disclosure: '광고입니다. 게재 여부는 신문, 안내 광고 또는 디렉터리의 규정에 따릅니다.',
+    }
+  }
+
+  if (input.language === 'ar') {
+    return {
+      headline: `${product}: نمو رقمي مدعوم بالذكاء الاصطناعي للشركات المحلية`,
+      shortBody: `تساعد ${product} الشركات المحلية في المواقع الإلكترونية والتقييمات والمحتوى وحملات التواصل المدعومة بالذكاء الاصطناعي.`,
+      longBody: `تساعد ${product} ${audience} على تحسين حضورها الرقمي من خلال ${offer}. وتحافظ المنصة على موافقة بشرية قبل نشر الحملات أو إرسالها.`,
+      callToAction: `اعرف المزيد: ${url}`,
+      disclosure: 'إعلان تجاري. يخضع النشر لقواعد الصحيفة أو موقع الإعلانات المبوبة أو الدليل.',
     }
   }
 

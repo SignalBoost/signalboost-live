@@ -14,7 +14,7 @@ import { loadLanguage, type Dict, type DictValue } from '@/lib/i18n/loadLanguage
 import { applyHardcodedUiCopy } from '@/lib/i18n/hardcoded-ui-copy'
 import { setRuntimeDictionary } from '@/lib/i18n/uiText'
 import { normalizeSupportedLanguage, type SupportedLanguage } from '@/lib/i18n/supportedLanguages'
-import { writingDirection } from '@/lib/i18n/localeExpansion'
+import { writingDirection } from '@/lib/i18n/supportedLanguages'
 import { usePathname } from 'next/navigation'
 import { publicLocaleFromPath } from '@/lib/seo/publicLocales'
 

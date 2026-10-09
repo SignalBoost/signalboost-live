@@ -6,7 +6,7 @@
 // country signals), so a generically-named firm is still classified by the language
 // its website is actually written in. No model call, no guessing a country we can't see.
 
-export type OutreachLang = 'pt' | 'es' | 'pl' | 'ru' | 'en'
+export type OutreachLang = 'pt' | 'es' | 'pl' | 'ru' | 'en' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 // Spanish-speaking Latin America (Brazil is handled separately as pt).
 const LATAM_TLDS = ['.mx', '.ar', '.co', '.cl', '.pe', '.ve', '.ec', '.gt', '.bo', '.do', '.hn', '.py', '.sv', '.ni', '.cr', '.pa', '.uy', '.pr']

@@ -3,6 +3,7 @@ import { parseLocalResult } from './reasonerOutput.ts'
 import { analyzeOperationalLog, ensureOperationalLogRepairHandoff, operationalLogReply } from './pastedOperationalLog.ts'
 import { publicDisclosureViolations } from './publicDisclosureGate.ts'
 import { hasUnsafePublicModelOutput } from './publicPromptSecurity.ts'
+import { SUPPORTED_LANGUAGE_NAMES, normalizeSupportedLanguage } from '../../i18n/supportedLanguages.ts'
 
 export type OperationalLogDiagnosticResult = Readonly<{
   reply: string
@@ -14,12 +15,7 @@ const MAX_LOG_CHARS = 18_000
 const MAX_REQUEST_CHARS = 1_200
 
 function languageInstruction(language: string): string {
-  const value = String(language || 'en').toLowerCase()
-  if (value === 'es') return 'Answer in Spanish.'
-  if (value === 'pt') return 'Answer in Portuguese.'
-  if (value === 'pl') return 'Answer in Polish.'
-  if (value === 'ru') return 'Answer in Russian.'
-  return 'Answer in English.'
+  return `Answer in ${SUPPORTED_LANGUAGE_NAMES[normalizeSupportedLanguage(language || 'en')]}.`
 }
 
 export function operationalLogDiagnosticPrompt(input: {

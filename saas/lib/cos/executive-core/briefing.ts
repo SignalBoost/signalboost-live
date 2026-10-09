@@ -6,7 +6,7 @@ import type { CosLocale, ExecutiveBriefing, ExecutiveBriefingItem, ExecutiveMetr
 
 function normalizeLocale(locale?: string): CosLocale {
   const value = (locale || 'en').slice(0, 2).toLowerCase()
-  if (value === 'es' || value === 'pt' || value === 'pl' || value === 'ru') return value
+  if (value === 'es' || value === 'pt' || value === 'pl' || value === 'ru' || value === 'de' || value === 'fr' || value === 'it' || value === 'ja' || value === 'ko' || value === 'ar') return value
   return 'en'
 }
 

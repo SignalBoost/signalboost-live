@@ -10,12 +10,18 @@ import {
   multilingualTranslationQualityRule,
 } from '../lib/ai/cos/executiveCommunication.ts'
 
-test('executive locale resolution covers all five SignalBoost languages', () => {
+test('executive locale resolution covers all eleven SignalBoost languages', () => {
   assert.equal(executiveLocale('English'), 'en')
   assert.equal(executiveLocale('pt-BR'), 'pt')
   assert.equal(executiveLocale('Español'), 'es')
   assert.equal(executiveLocale('Polski'), 'pl')
   assert.equal(executiveLocale('Русский'), 'ru')
+  assert.equal(executiveLocale('Deutsch'), 'de')
+  assert.equal(executiveLocale('fr-FR'), 'fr')
+  assert.equal(executiveLocale('Italian'), 'it')
+  assert.equal(executiveLocale('日本語'), 'ja')
+  assert.equal(executiveLocale('ko-KR'), 'ko')
+  assert.equal(executiveLocale('العربية'), 'ar')
 })
 
 test('each supported locale has a native executive writing module', () => {
@@ -39,12 +45,15 @@ test('each supported locale has a native executive writing module', () => {
 })
 
 test('translation quality preserves meaning and native professional register in all locales', () => {
-  for (const locale of ['en', 'pt', 'es', 'pl', 'ru']) {
+  for (const locale of ['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     const rule = multilingualTranslationQualityRule(locale)
-    assert.match(rule, /Supported languages are English, Brazilian Portuguese, Spanish, Polish, and Russian/)
+    assert.match(rule, /Supported languages are English, Brazilian Portuguese, Spanish, Polish, Russian, German, French, Italian, Japanese, Korean, and Arabic/)
     assert.match(rule, /Translate meaning and register, not word-for-word syntax/)
     assert.match(rule, /native professional/)
   }
+  assert.match(multilingualTranslationQualityRule('de'), /interface language \(German\)/)
+  assert.match(multilingualTranslationQualityRule('ja'), /interface language \(Japanese\)/)
+  assert.match(multilingualTranslationQualityRule('ar'), /interface language \(Arabic\)/)
 })
 
 test('executive reasoning is a silent quality discipline and cannot override governance', () => {

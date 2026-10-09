@@ -90,5 +90,5 @@ test('review UI makes GET-only Phase 6 requests and exposes no mutation controls
 test('required safety labels are visible and localized in all supported languages', () => {
   const source = client(); const locales = JSON.parse(read('../lib/i18n/supervisorSocLocales.json'))
   for (const key of ['manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled']) assert.match(source, new RegExp(`labels\\.${key}`))
-  for (const lang of ['en', 'pt', 'es', 'pl', 'ru']) for (const key of ['title', 'manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled', 'loading', 'empty', 'error', 'openDetail', 'closeDetail', 'pagination', 'fingerprintCopied', 'fingerprintCopyFailed', 'retryDiagnostics', 'retryDetail']) assert.ok(locales[lang].missionReviewUi[key], `${lang}.${key}`)
+  for (const lang of ['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) for (const key of ['title', 'manualReviewOnly', 'noRepair', 'productionDisabled', 'providerDisabled', 'loading', 'empty', 'error', 'openDetail', 'closeDetail', 'pagination', 'fingerprintCopied', 'fingerprintCopyFailed', 'retryDiagnostics', 'retryDetail']) assert.ok(locales[lang].missionReviewUi[key], `${lang}.${key}`)
 })

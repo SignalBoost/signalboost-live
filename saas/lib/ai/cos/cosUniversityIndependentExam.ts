@@ -149,6 +149,13 @@ function languageMarker(language: CosPlatformLanguage): RegExp {
   if (language === 'pl') return /(?:[ąćęłńóśźż]|\b(?:proszę|dziękuj\w*|jest|będzie|spotkanie|raport|sprawdzenie|projekt|wdrożenia|pozostaje|nieznan\w*)\b)/i
   if (language === 'pt') return /(?:[ãõçáéíóúâêô]|\b(?:obrigad\w*|por favor|está|será|reunião|relatório|verificação|projeto|implantação|desconhecid\w*)\b)/i
   if (language === 'es') return /(?:[ñáéíóúü¿¡]|\b(?:gracias|por favor|está|será|reunión|informe|verificación|proyecto|despliegue|desconocid\w*)\b)/i
+  if (language === 'de') return /(?:[äöüß]|(?<!\p{L})(?:bitte|danke|ist|wird|besprechung|bericht|prüfung\p{L}*|projekt|bereitstellung|unbekannt\p{L}*|nicht)(?!\p{L}))/iu
+  if (language === 'fr') return /(?:[œ]|(?<!\p{L})(?:merci|s’il vous plaît|s'il vous plaît|est|sera|réunion|rapport|vérification\p{L}*|projet|déploiement|inconnu\p{L}*|les|des|du|vous|nous|avec|dans|sur)(?!\p{L}))/iu
+  if (language === 'it') return /(?<!\p{L})(?:grazie|per favore|è|sarà|riunione|rapporto|controll[io]|progetto|rilascio|sconosciut\p{L}*|della|sono)(?!\p{L})/iu
+  // Hiragana separates Japanese from Chinese-only text; Hangul and Arabic script identify Korean and Arabic.
+  if (language === 'ja') return /[\u3040-\u309f]{2,}/u
+  if (language === 'ko') return /[\uac00-\ud7af]{2,}/u
+  if (language === 'ar') return /[\u0621-\u064a]{3,}/u
   return /\b(?:the|please|is|are|will|meeting|report|check|project|deployment|unknown)\b/i
 }
 
@@ -402,6 +409,82 @@ function subjectExam(seed: string, subjectId: CosUniversitySubjectId): CosUniver
   })
 }
 
+/** The deployment stems the first five platform languages have always shared; kept as one list so their rubrics are unchanged. */
+const SHARED_DEPLOYMENT_TERMS: readonly string[] = ['deploy', 'desplieg', 'implant', 'wdroż', 'развер']
+
+/** Target-language forms of the facts each language exam requires the answer to state. */
+const LANGUAGE_EXAM_TERMS: Record<CosPlatformLanguage, {
+  orion: readonly string[]
+  three: readonly string[]
+  fourteen: readonly string[]
+  unknown: readonly string[]
+  deployment: readonly string[]
+  smoke: readonly string[]
+  friday: readonly string[]
+  twelve: readonly string[]
+  time: readonly string[]
+  risk: readonly string[]
+  please: readonly string[]
+  thanks: readonly string[]
+  meeting: readonly string[]
+}> = {
+  en: {
+    orion: ['orion'], three: ['3'], fourteen: ['14'], unknown: ['unknown'], deployment: SHARED_DEPLOYMENT_TERMS, smoke: ['smoke'],
+    friday: ['friday'], twelve: ['12'], time: ['14:30'], risk: ['risk'],
+    please: ['please', 'could we', 'would it be possible'], thanks: ['thank'], meeting: ['meeting'],
+  },
+  es: {
+    orion: ['orion'], three: ['3'], fourteen: ['14'], unknown: ['desconocid'], deployment: SHARED_DEPLOYMENT_TERMS, smoke: ['smoke'],
+    friday: ['viernes'], twelve: ['12'], time: ['14:30'], risk: ['riesgo'],
+    please: ['por favor', 'podríamos', 'podemos'], thanks: ['gracias'], meeting: ['reuni'],
+  },
+  pt: {
+    orion: ['orion'], three: ['3'], fourteen: ['14'], unknown: ['desconhecid'], deployment: SHARED_DEPLOYMENT_TERMS, smoke: ['smoke'],
+    friday: ['sexta'], twelve: ['12'], time: ['14:30'], risk: ['risco'],
+    please: ['por favor', 'poderíamos', 'podemos'], thanks: ['obrigad'], meeting: ['reuni'],
+  },
+  pl: {
+    orion: ['orion'], three: ['3'], fourteen: ['14'], unknown: ['nieznan'], deployment: SHARED_DEPLOYMENT_TERMS, smoke: ['smoke'],
+    friday: ['piątek', 'piątku'], twelve: ['12'], time: ['14:30'], risk: ['ryzyk'],
+    please: ['proszę', 'czy możemy', 'czy moglibyśmy'], thanks: ['dziękuj'], meeting: ['spotkan'],
+  },
+  ru: {
+    orion: ['orion'], three: ['3'], fourteen: ['14'], unknown: ['неизвест'], deployment: SHARED_DEPLOYMENT_TERMS, smoke: ['smoke'],
+    friday: ['пятниц'], twelve: ['12'], time: ['14:30'], risk: ['риск'],
+    please: ['пожалуйста', 'прошу', 'можно'], thanks: ['спасибо', 'благодар'], meeting: ['встреч'],
+  },
+  de: {
+    orion: ['orion'], three: ['3'], fourteen: ['14'], unknown: ['unbekannt', 'ungeklärt', 'offen'], deployment: ['deploy', 'bereitstell'], smoke: ['smoke'],
+    friday: ['freitag'], twelve: ['12'], time: ['14:30', '14.30'], risk: ['risiko'],
+    please: ['bitte', 'könnten wir', 'wäre es möglich'], thanks: ['dank'], meeting: ['meeting', 'besprechung', 'termin', 'sitzung'],
+  },
+  fr: {
+    orion: ['orion'], three: ['3'], fourteen: ['14'], unknown: ['inconnu', 'incertain'], deployment: ['deploy', 'déploi'], smoke: ['smoke'],
+    friday: ['vendredi'], twelve: ['12'], time: ['14:30', '14 h 30', '14h30'], risk: ['risque'],
+    please: ['s’il vous plaît', 's\'il vous plaît', 'pourriez-vous', 'pourrions-nous', 'serait-il possible', 'pourrais-tu'], thanks: ['merci', 'remerci'], meeting: ['réunion'],
+  },
+  it: {
+    orion: ['orion'], three: ['3'], fourteen: ['14'], unknown: ['sconosciut', 'non noto', 'non è noto', 'ignot'], deployment: ['deploy', 'rilasci'], smoke: ['smoke'],
+    friday: ['venerdì', 'venerdi'], twelve: ['12'], time: ['14:30', '14.30'], risk: ['rischi'],
+    please: ['per favore', 'potremmo', 'potresti', 'sarebbe possibile'], thanks: ['grazie', 'ringrazi'], meeting: ['riunione'],
+  },
+  ja: {
+    orion: ['orion', 'オリオン'], three: ['3', '３', '三'], fourteen: ['14', '１４'], unknown: ['不明', 'わかって', '分かって', '未確認'], deployment: ['deploy', 'デプロイ'], smoke: ['smoke', 'スモーク'],
+    friday: ['金曜'], twelve: ['12', '１２'], time: ['14:30', '14時30分', '１４:３０'], risk: ['リスク'],
+    please: ['お願い', 'いただけ', 'ください'], thanks: ['ありがとう', '感謝'], meeting: ['会議', 'ミーティング', '打ち合わせ'],
+  },
+  ko: {
+    orion: ['orion', '오리온'], three: ['3'], fourteen: ['14'], unknown: ['알 수 없', '알려지지', '미확인', '확인되지', '불명'], deployment: ['deploy', '배포'], smoke: ['smoke', '스모크'],
+    friday: ['금요일'], twelve: ['12'], time: ['14:30', '14시 30분', '오후 2시 30분'], risk: ['위험', '리스크'],
+    please: ['부탁', '주시겠', '주실 수', '가능할까요', '주세요'], thanks: ['감사', '고맙'], meeting: ['회의', '미팅'],
+  },
+  ar: {
+    orion: ['orion', 'أوريون', 'اوريون'], three: ['3', '٣', 'ثلاث'], fourteen: ['14', '١٤'], unknown: ['غير معروف', 'مجهول', 'غير مؤكد', 'غير واضح'], deployment: ['deploy', 'النشر', 'نشر'], smoke: ['smoke', 'فحص أولي', 'الفحص الأولي', 'فحص الدخان'],
+    friday: ['الجمعة'], twelve: ['12', '١٢'], time: ['14:30', '١٤:٣٠'], risk: ['مخاطر', 'المخاطر', 'الخطر'],
+    please: ['من فضلك', 'هل يمكن', 'هل يمكنك', 'هل يمكننا', 'أرجو', 'يرجى', 'نرجو', 'الرجاء', 'لو سمحت'], thanks: ['شكر'], meeting: ['اجتماع'],
+  },
+}
+
 function languageExam(seed: string, language: CosPlatformLanguage, dimension: CosPlatformLanguageDimension): CosUniversityBlindExam {
   const languageTitle = COS_PLATFORM_LANGUAGES.find(row => row.id === language)?.title ?? language
   const base = {
@@ -450,8 +533,51 @@ function languageExam(seed: string, language: CosPlatformLanguage, dimension: Co
       translation_localization: 'Переведите на естественный профессиональный русский, сохранив все факты: "The review is on 12 September at 14:30. Bring the risk memo."',
       cultural_pragmatics: 'Напишите по-русски вежливое профессиональное сообщение с просьбой перенести завтрашнюю встречу на один час. Поблагодарите и оставьте возможность сказать, что новое время не подходит.',
     },
+    de: {
+      comprehension: 'Projekt Orion hat am 14. September 3 Prüfungen bestanden. Der Bereitstellungsstatus ist weiterhin unbekannt. Antworten Sie auf Deutsch: Wie viele Prüfungen wurden bestanden, an welchem Datum, und was ist noch unbekannt?',
+      writing: 'Schreiben Sie ein professionelles Status-Update auf Deutsch in zwei oder drei Sätzen: 27 Tests bestanden; die Bereitstellung ist noch nicht verifiziert; der nächste Schritt ist ein Smoke-Check. Fügen Sie keine neuen Fakten hinzu.',
+      instruction_following: 'Antworten Sie auf Deutsch mit genau drei nummerierten Maßnahmen. Jede Maßnahme muss Verantwortlich, Frist und Erledigt, wenn enthalten. Verwenden Sie Maya als Verantwortliche und Freitag als Frist.',
+      translation_localization: 'Übersetzen Sie in natürliches, professionelles Deutsch und bewahren Sie dabei jede Tatsache: "The review is on 12 September at 14:30. Bring the risk memo."',
+      cultural_pragmatics: 'Schreiben Sie eine höfliche, professionelle Nachricht auf Deutsch, in der Sie einen Kollegen bitten, das morgige Meeting um eine Stunde zu verschieben. Bedanken Sie sich und lassen Sie dem Kollegen Raum zu sagen, dass die vorgeschlagene Zeit nicht passt.',
+    },
+    fr: {
+      comprehension: 'Le projet Orion a réussi 3 vérifications le 14 septembre. L\'état du déploiement reste inconnu. Répondez en français : combien de vérifications ont réussi, à quelle date, et qu\'est-ce qui reste inconnu ?',
+      writing: 'Rédigez une mise à jour de statut professionnelle en français en deux ou trois phrases : 27 tests réussis ; le déploiement n\'est pas encore vérifié ; la prochaine étape est un smoke check. N\'ajoutez aucun fait nouveau.',
+      instruction_following: 'Répondez en français avec exactement trois actions numérotées. Chaque action doit contenir Responsable, Échéance et Terminé quand. Utilisez Maya comme responsable et vendredi comme échéance.',
+      translation_localization: 'Traduisez en français naturel et professionnel en conservant chaque fait : "The review is on 12 September at 14:30. Bring the risk memo."',
+      cultural_pragmatics: 'Rédigez un message professionnel et courtois en français demandant à un collègue de décaler d’une heure la réunion de demain. Remerciez-le et laissez-lui la possibilité de dire que l’horaire proposé ne lui convient pas.',
+    },
+    it: {
+      comprehension: 'Il progetto Orion ha superato 3 controlli il 14 settembre. Lo stato del deploy resta sconosciuto. Rispondi in italiano: quanti controlli sono stati superati, in quale data e cosa resta sconosciuto?',
+      writing: 'Scrivi un aggiornamento di stato professionale in italiano in due o tre frasi: 27 test superati; il deploy non è ancora verificato; il prossimo passo è uno smoke check. Non aggiungere fatti nuovi.',
+      instruction_following: 'Rispondi in italiano con esattamente tre azioni numerate. Ogni azione deve contenere Responsabile, Scadenza e Completato quando. Usa Maya come responsabile e venerdì come scadenza.',
+      translation_localization: 'Traduci in un italiano naturale e professionale conservando ogni fatto: "The review is on 12 September at 14:30. Bring the risk memo."',
+      cultural_pragmatics: 'Scrivi un messaggio professionale e cortese in italiano per chiedere a un collega di spostare di un’ora la riunione di domani. Includi un ringraziamento e lascia al collega la possibilità di dire che l’orario proposto non va bene.',
+    },
+    ja: {
+      comprehension: 'プロジェクト Orion は9月14日に3件のチェックに合格しました。デプロイの状態は依然として不明です。日本語で答えてください：合格したチェックは何件で、日付はいつで、何が不明のままですか？',
+      writing: '日本語で2〜3文のプロフェッショナルな状況報告を書いてください：27件のテストに合格。デプロイはまだ検証されていない。次のステップはスモークチェック。新しい事実は追加しないでください。',
+      instruction_following: '日本語で、番号付きのアクションをちょうど3つ挙げて回答してください。各アクションには担当者、期限、完了条件を含める必要があります。担当者はMaya、期限は金曜日としてください。',
+      translation_localization: 'すべての事実を保ったまま、自然でプロフェッショナルな日本語に翻訳してください："The review is on 12 September at 14:30. Bring the risk memo."',
+      cultural_pragmatics: '明日の会議を1時間ずらしてもらうよう同僚に依頼する、丁寧でプロフェッショナルな日本語のメッセージを書いてください。感謝の言葉を含め、提案した時間が都合に合わない場合に同僚がそう言える余地を残してください。',
+    },
+    ko: {
+      comprehension: '프로젝트 Orion은 9월 14일에 3개의 검사를 통과했습니다. 배포 상태는 여전히 알 수 없습니다. 한국어로 답하세요: 몇 개의 검사가 통과했고, 날짜는 언제이며, 무엇이 아직 알려지지 않았습니까?',
+      writing: '한국어로 두세 문장의 전문적인 상태 업데이트를 작성하세요: 27개 테스트 통과, 배포는 아직 검증되지 않음, 다음 단계는 스모크 점검. 새로운 사실은 추가하지 마세요.',
+      instruction_following: '한국어로 번호가 매겨진 실행 항목을 정확히 세 개 작성하여 답변하세요. 각 항목에는 담당자, 기한, 완료 기준이 포함되어야 합니다. 담당자는 Maya, 기한은 금요일로 하세요.',
+      translation_localization: '모든 사실을 유지하면서 자연스럽고 전문적인 한국어로 번역하세요: "The review is on 12 September at 14:30. Bring the risk memo."',
+      cultural_pragmatics: '동료에게 내일 회의를 한 시간 옮겨 달라고 요청하는 정중하고 전문적인 한국어 메시지를 작성하세요. 감사 인사를 포함하고, 제안한 시간이 맞지 않으면 동료가 말할 수 있는 여지를 남기세요.',
+    },
+    ar: {
+      comprehension: 'اجتاز مشروع Orion 3 فحوصات في 14 سبتمبر. لا تزال حالة النشر غير معروفة. أجب بالعربية: كم عدد الفحوصات التي اجتيزت، وفي أي تاريخ، وما الذي لا يزال غير معروف؟',
+      writing: 'اكتب تحديثًا مهنيًا للحالة باللغة العربية في جملتين أو ثلاث: نجح 27 اختبارًا؛ لم يتم التحقق من النشر بعد؛ الخطوة التالية هي فحص أولي (smoke check). لا تُضف أي حقائق جديدة.',
+      instruction_following: 'أجب باللغة العربية بثلاثة إجراءات مرقمة بالضبط. يجب أن يتضمن كل إجراء المسؤول والموعد النهائي ومعيار الإنجاز. استخدم Maya مسؤولةً ويوم الجمعة موعدًا نهائيًا.',
+      translation_localization: 'ترجم إلى عربية مهنية طبيعية مع الحفاظ على كل الحقائق: "The review is on 12 September at 14:30. Bring the risk memo."',
+      cultural_pragmatics: 'اكتب رسالة مهنية مهذبة باللغة العربية تطلب فيها من زميل تأجيل اجتماع الغد ساعة واحدة. أضف عبارة شكر واترك للزميل مجالًا ليقول إن الموعد المقترح لا يناسبه.',
+    },
   } as const
 
+  const terms = LANGUAGE_EXAM_TERMS[language]
   const common: CosUniversityExamRubric = {
     requiredGroups: [],
     targetLanguage: language,
@@ -461,36 +587,32 @@ function languageExam(seed: string, language: CosPlatformLanguage, dimension: Co
   if (dimension === 'comprehension') {
     return finishExam({ ...base, prompt: localized[language].comprehension, rubric: {
       ...common,
-      requiredGroups: [['orion'], ['3'], ['14'], language === 'ru' ? ['неизвест'] : language === 'pl' ? ['nieznan'] : language === 'pt' ? ['desconhecid'] : language === 'es' ? ['desconocid'] : ['unknown']],
+      requiredGroups: [terms.orion, terms.three, terms.fourteen, terms.unknown],
     } })
   }
   if (dimension === 'writing') {
     return finishExam({ ...base, prompt: localized[language].writing, rubric: {
       ...common,
-      requiredGroups: [['27'], ['deploy', 'desplieg', 'implant', 'wdroż', 'развер'], ['smoke']],
+      requiredGroups: [['27'], terms.deployment, terms.smoke],
       forbiddenTerms: language === 'en' ? ['deployment succeeded', 'deployment failed'] : undefined,
     } })
   }
   if (dimension === 'instruction_following') {
     return finishExam({ ...base, prompt: localized[language].instruction_following, rubric: {
       ...common,
-      requiredGroups: [['maya'], language === 'ru' ? ['пятниц'] : language === 'pl' ? ['piątek', 'piątku'] : language === 'pt' ? ['sexta'] : language === 'es' ? ['viernes'] : ['friday']],
+      requiredGroups: [['maya'], terms.friday],
       numberedActions: 3,
     } })
   }
   if (dimension === 'translation_localization') {
     return finishExam({ ...base, prompt: localized[language].translation_localization, rubric: {
       ...common,
-      requiredGroups: [['12'], ['14:30'], language === 'ru' ? ['риск'] : language === 'pl' ? ['ryzyk'] : language === 'pt' ? ['risco'] : language === 'es' ? ['riesgo'] : ['risk']],
+      requiredGroups: [terms.twelve, terms.time, terms.risk],
     } })
   }
   return finishExam({ ...base, prompt: localized[language].cultural_pragmatics, rubric: {
     ...common,
-    requiredGroups: [
-      language === 'ru' ? ['пожалуйста', 'прошу', 'можно'] : language === 'pl' ? ['proszę', 'czy możemy', 'czy moglibyśmy'] : language === 'pt' ? ['por favor', 'poderíamos', 'podemos'] : language === 'es' ? ['por favor', 'podríamos', 'podemos'] : ['please', 'could we', 'would it be possible'],
-      language === 'ru' ? ['спасибо', 'благодар'] : language === 'pl' ? ['dziękuj'] : language === 'pt' ? ['obrigad'] : language === 'es' ? ['gracias'] : ['thank'],
-      language === 'ru' ? ['встреч'] : language === 'pl' ? ['spotkan'] : language === 'pt' ? ['reuni'] : language === 'es' ? ['reuni'] : ['meeting'],
-    ],
+    requiredGroups: [terms.please, terms.thanks, terms.meeting],
     forbiddenTerms: ['lol', 'whatever'],
   } })
 }

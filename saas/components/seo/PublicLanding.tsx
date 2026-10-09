@@ -3,7 +3,7 @@ import { PUBLIC_BRAND } from '@/lib/public-brand'
 import { PUBLIC_COPY } from '@/lib/seo/publicCopy'
 import { PUBLIC_LOCALES, PUBLIC_LOCALE_NAMES, PUBLIC_TOPICS, publicPagePath, type PublicLocale, type PublicTopic } from '@/lib/seo/publicLocales'
 import { publicPageSchema, publicTopicCopy } from '@/lib/seo/publicSeo'
-import { writingDirection } from '@/lib/i18n/localeExpansion'
+import { writingDirection } from '@/lib/i18n/supportedLanguages'
 
 export default function PublicLanding({ locale, topic }: { locale: PublicLocale; topic?: PublicTopic }) {
   const copy = PUBLIC_COPY[locale]

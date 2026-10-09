@@ -250,7 +250,7 @@ export default function Home() {
       setTurns((current) => [...current, {
         request: displayContent,
         response: reply,
-        sourceLanguage: (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as ConciergeTranscriptTurn['sourceLanguage'],
+        sourceLanguage: (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as ConciergeTranscriptTurn['sourceLanguage'],
         ...(result.suggestedFollowups.length === 2 ? { suggestedFollowups: result.suggestedFollowups } : {}),
         ...(result.builderWorkspaceId && result.builderFiles.length ? { builderWorkspaceId: result.builderWorkspaceId, builderFiles: result.builderFiles } : {}),
         ...(result.visualPreviewUrl ? { visualPreviewUrl: result.visualPreviewUrl } : {}),
@@ -474,7 +474,7 @@ export default function Home() {
             title={t(dict, 'concierge.attach')}
           >📎</button>
           <VoiceInputButton
-            lang={(['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as 'en' | 'es' | 'pt' | 'pl' | 'ru'}
+            lang={(['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'}
             value={question}
             onChange={setQuestion}
             disabled={loading}

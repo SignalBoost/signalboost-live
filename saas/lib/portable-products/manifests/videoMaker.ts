@@ -34,5 +34,5 @@ export const videoMakerManifest: PortableProductManifest = Object.freeze({
   architectureReferences: Object.freeze(['render-core', 'render-host']),
   documentationReferences: Object.freeze(['docs/portables/render-module.md']),
   futureFeatures: Object.freeze(['package-presets']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

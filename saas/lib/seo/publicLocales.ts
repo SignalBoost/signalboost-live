@@ -1,14 +1,11 @@
-import { PLANNED_LANGUAGES, type PlannedLanguage } from '../i18n/localeExpansion.ts'
+import { SUPPORTED_LANGUAGES, SUPPORTED_LANGUAGE_NATIVE_NAMES, type SupportedLanguage } from '../i18n/supportedLanguages.ts'
 
-// Public marketing translations are complete independently of dashboard activation.
-export const PUBLIC_LOCALES = PLANNED_LANGUAGES
-export type PublicLocale = PlannedLanguage
+// Public marketing pages are published in every platform language.
+export const PUBLIC_LOCALES = SUPPORTED_LANGUAGES
+export type PublicLocale = SupportedLanguage
 export const PUBLIC_TOPICS = ['ai-website-builder', 'customer-reviews', 'ai-content', 'ai-lab'] as const
 export type PublicTopic = (typeof PUBLIC_TOPICS)[number]
-export const PUBLIC_LOCALE_NAMES: Record<PublicLocale, string> = {
-  en: 'English', es: 'Español', pt: 'Português', pl: 'Polski', ru: 'Русский',
-  de: 'Deutsch', fr: 'Français', it: 'Italiano', ja: '日本語', ko: '한국어', ar: 'العربية',
-}
+export const PUBLIC_LOCALE_NAMES: Readonly<Record<PublicLocale, string>> = SUPPORTED_LANGUAGE_NATIVE_NAMES
 
 export function isPublicLocale(value: unknown): value is PublicLocale {
   return typeof value === 'string' && PUBLIC_LOCALES.some(locale => locale === value)

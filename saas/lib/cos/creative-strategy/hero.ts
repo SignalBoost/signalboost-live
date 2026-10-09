@@ -3,7 +3,7 @@ import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import type { CompanyFacts } from '@/portable-kernel'
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
-const FIVE_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru'] as const
+const FIVE_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 const DESTINATION_URL = PUBLIC_BRAND_DOMAIN
 
 function id(prefix: string) {

@@ -42,7 +42,7 @@ async function defaultReasoner(args: Record<string, unknown>) {
   return result
 }
 
-const SUPPORTED_LANGUAGES = new Set<IdentityLanguage>(['en', 'es', 'pt', 'pl', 'ru'])
+const SUPPORTED_LANGUAGES = new Set<IdentityLanguage>(['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
 const MAX_IDENTITY_PROMPT_CHARS = 300
 
 const SEMANTIC_IDENTITY_CANDIDATE = [
@@ -70,7 +70,7 @@ const SYSTEM_PROMPT = [
   'assistant_employer means the user asks who employs, owns, or operates the AI assistant itself.',
   'other means naming suggestions, renaming, domain ideas, branding work, third-party companies, or any unrelated request.',
   'A question asking what the current platform is named is platform_identity, never a request to generate names.',
-  'Return only strict JSON: {"identity_intent":"platform_identity"|"assistant_employer"|"other","language":"en"|"es"|"pt"|"pl"|"ru"}.',
+  'Return only strict JSON: {"identity_intent":"platform_identity"|"assistant_employer"|"other","language":"en"|"es"|"pt"|"pl"|"ru"|"de"|"fr"|"it"|"ja"|"ko"|"ar"}.',
 ].join(' ')
 
 export async function resolveSemanticPublicIdentity(

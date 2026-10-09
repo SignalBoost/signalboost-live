@@ -1,3 +1,4 @@
+// saas/tests/platformElevenLanguageI18n.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -11,18 +12,24 @@ import { resolveResponseLanguage } from '../lib/i18n/responseLanguage.ts'
 
 const ROOT = process.cwd()
 
-test('platform exposes exactly five first-class languages', () => {
-  assert.deepEqual([...SUPPORTED_LANGUAGES], ['en', 'es', 'pt', 'pl', 'ru'])
+test('platform exposes exactly eleven first-class languages', () => {
+  assert.deepEqual([...SUPPORTED_LANGUAGES], ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
   assert.equal(DEFAULT_LANGUAGE, 'en')
 })
 
-test('BCP-47 and regional variants normalize into the five platform languages', () => {
+test('BCP-47 and regional variants normalize into the eleven platform languages', () => {
   assert.equal(normalizeSupportedLanguage('en-US'), 'en')
   assert.equal(normalizeSupportedLanguage('es-MX'), 'es')
   assert.equal(normalizeSupportedLanguage('pt-BR'), 'pt')
   assert.equal(normalizeSupportedLanguage('pl-PL'), 'pl')
   assert.equal(normalizeSupportedLanguage('ru-RU'), 'ru')
-  assert.equal(normalizeSupportedLanguage('de-DE'), 'en')
+  assert.equal(normalizeSupportedLanguage('de-DE'), 'de')
+  assert.equal(normalizeSupportedLanguage('fr-CA'), 'fr')
+  assert.equal(normalizeSupportedLanguage('it-IT'), 'it')
+  assert.equal(normalizeSupportedLanguage('ja-JP'), 'ja')
+  assert.equal(normalizeSupportedLanguage('ko-KR'), 'ko')
+  assert.equal(normalizeSupportedLanguage('ar-SA'), 'ar')
+  assert.equal(normalizeSupportedLanguage('zh-CN'), 'en')
 })
 
 test('current prompt language outranks UI locale unless user explicitly requests another output language', () => {
@@ -31,8 +38,8 @@ test('current prompt language outranks UI locale unless user explicitly requests
   assert.equal(resolveResponseLanguage(`${polish} Odpowiedz po angielsku.`, 'pl'), 'en')
 })
 
-test('five-language platform build gate covers all major locale stores', () => {
-  const gate = readFileSync(join(ROOT, 'scripts/check-five-language-platform.mjs'), 'utf8')
+test('eleven-language platform build gate covers all major locale stores', () => {
+  const gate = readFileSync(join(ROOT, 'scripts/check-eleven-language-platform.mjs'), 'utf8')
   for (const fragment of [
     "locales/${lang}.json",
     "locales/pages.${lang}.json",
@@ -51,9 +58,9 @@ test('five-language platform build gate covers all major locale stores', () => {
 test('prebuild blocks deployment on production i18n regressions', () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
   assert.match(pkg.scripts['validate:i18n-platform'], /check-generated-ui-locale-completeness\.mjs/)
-  assert.match(pkg.scripts['validate:i18n-platform'], /check-five-language-platform\.mjs/)
+  assert.match(pkg.scripts['validate:i18n-platform'], /check-eleven-language-platform\.mjs/)
   assert.match(pkg.scripts['validate:i18n-platform'], /cosResponseLanguage\.node\.test\.ts/)
-  assert.match(pkg.scripts['validate:i18n-platform'], /platformFiveLanguageI18n\.node\.test\.ts/)
+  assert.match(pkg.scripts['validate:i18n-platform'], /platformElevenLanguageI18n\.node\.test\.ts/)
   assert.doesNotMatch(pkg.scripts['validate:i18n-platform'], /check-hardcoded-copy\.mjs/)
   assert.doesNotMatch(pkg.scripts['validate:i18n-platform'], /migrate-page-copy-to-locales/)
   assert.match(pkg.scripts['audit:i18n-hardcoded'], /check-hardcoded-copy\.mjs/)

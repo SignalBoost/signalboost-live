@@ -47,11 +47,11 @@ function latestUserText(body: any): string {
 }
 function languageFrom(body: any): string {
   const value = String(body?.context?.language || 'en').toLowerCase()
-  return ['en', 'es', 'pt', 'pl', 'ru'].includes(value) ? value : 'en'
+  return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(value) ? value : 'en'
 }
 
 function localeFrom(language: string): string {
-  return language === 'pt' ? 'pt-BR' : language === 'es' ? 'es' : language === 'pl' ? 'pl' : language === 'ru' ? 'ru' : 'en-US'
+  return language === 'pt' ? 'pt-BR' : language === 'es' ? 'es' : language === 'pl' ? 'pl' : language === 'ru' ? 'ru' : language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : language === 'it' ? 'it-IT' : language === 'ja' ? 'ja-JP' : language === 'ko' ? 'ko-KR' : language === 'ar' ? 'ar-SA' : 'en-US'
 }
 
 function confidenceThreshold(): number {
@@ -337,6 +337,12 @@ function timeoutReply(language: string) {
     pt: 'Esta solicitação atingiu o limite de processamento antes de a resposta final ficar pronta. Ninguém foi contatado e nenhuma ação externa foi realizada. Responda “continuar esta tarefa” e o COS continuará a partir do pedido original.',
     pl: 'To żądanie osiągnęło limit przetwarzania, zanim odpowiedź końcowa była gotowa. Z nikim się nie skontaktowano i nie wykonano żadnej czynności zewnętrznej. Odpowiedz „kontynuuj to zadanie”, a COS podejmie pracę od pierwotnej prośby.',
     ru: 'Этот запрос достиг лимита обработки до подготовки итогового ответа. Ни с кем не связывались и никаких внешних действий не выполнялось. Ответьте «продолжить эту задачу», и COS продолжит исходный запрос.',
+    de: 'Diese Anfrage hat das Verarbeitungslimit erreicht, bevor die endgültige Antwort fertig war. Niemand wurde kontaktiert und keine externe Aktion ausgeführt. Antworten Sie „diese Aufgabe fortsetzen“, und COS setzt die ursprüngliche Anfrage fort.',
+    fr: 'Cette demande a atteint la limite de traitement avant que la réponse finale ne soit prête. Personne n’a été contacté et aucune action externe n’a été effectuée. Répondez « continuer cette tâche » et COS reprendra à partir de la demande initiale.',
+    it: 'Questa richiesta ha raggiunto il limite di elaborazione prima che la risposta finale fosse pronta. Nessuno è stato contattato e non è stata eseguita alcuna azione esterna. Rispondi “continua questa attività” e COS riprenderà dalla richiesta originale.',
+    ja: '最終回答の準備が整う前に、このリクエストは処理上限に達しました。誰にも連絡しておらず、外部アクションも実行していません。「このタスクを続行」と返信すると、COS が元のリクエストから処理を再開します。',
+    ko: '최종 응답이 준비되기 전에 이 요청이 처리 한도에 도달했습니다. 아무에게도 연락하지 않았으며 외부 작업도 수행하지 않았습니다. “이 작업 계속”이라고 답장하면 COS가 원래 요청부터 이어서 진행합니다.',
+    ar: 'بلغ هذا الطلب حد المعالجة قبل أن يصبح الرد النهائي جاهزًا. لم يتم التواصل مع أي شخص ولم يُتخذ أي إجراء خارجي. أجب بـ “تابع هذه المهمة” وسيتابع COS من الطلب الأصلي.',
   }
   return messages[language] || messages.en
 }
@@ -348,6 +354,12 @@ function publicContinuityReply(language: string) {
     pt: 'O COS está temporariamente indisponível no Concierge público. Não posso usar sistemas privados da empresa como alternativa aqui. Tente novamente em breve ou continue em outro espaço público do SignalBoost.',
     pl: 'COS jest chwilowo niedostępny w publicznym Concierge. Nie mogę tutaj użyć prywatnych systemów firmy jako rozwiązania awaryjnego. Spróbuj ponownie za chwilę lub przejdź do innego publicznego obszaru SignalBoost.',
     ru: 'COS временно недоступен в публичном Concierge. Я не могу использовать частные системы компании как резервный путь. Попробуйте снова немного позже или продолжите в другом публичном разделе SignalBoost.',
+    de: 'COS ist im öffentlichen Concierge vorübergehend nicht verfügbar. Ich kann hier keine privaten Unternehmenssysteme als Ausweichlösung nutzen. Bitte versuchen Sie es in Kürze erneut oder fahren Sie in einem anderen öffentlichen SignalBoost-Arbeitsbereich fort.',
+    fr: 'COS est temporairement indisponible sur le Concierge public. Je ne peux pas utiliser ici les systèmes privés de l’entreprise comme solution de repli. Veuillez réessayer sous peu ou continuer dans un autre espace de travail public SignalBoost.',
+    it: 'COS non è temporaneamente disponibile sul Concierge pubblico. Qui non posso usare i sistemi aziendali privati come alternativa. Riprova tra poco o continua in un altro spazio di lavoro pubblico di SignalBoost.',
+    ja: '公開 Concierge では COS を一時的に利用できません。ここでは社内の非公開システムを代替手段として使用できません。しばらくしてから再度お試しいただくか、別の公開 SignalBoost ワークスペースで続行してください。',
+    ko: '공개 Concierge에서 COS를 일시적으로 사용할 수 없습니다. 여기서는 회사의 비공개 시스템을 대체 수단으로 사용할 수 없습니다. 잠시 후 다시 시도하거나 다른 공개 SignalBoost 워크스페이스에서 계속하세요.',
+    ar: 'COS غير متاح مؤقتًا على خدمة الكونسيرج العامة. لا يمكنني استخدام أنظمة الشركة الخاصة كبديل هنا. يُرجى المحاولة مرة أخرى بعد قليل أو المتابعة في مساحة عمل SignalBoost عامة أخرى.',
   }
   return messages[language] || messages.en
 }

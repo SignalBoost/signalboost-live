@@ -16,7 +16,7 @@ import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/age
 import VoiceInputButton from '@/components/VoiceInputButton'
 import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
 
-type SupportedLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type SupportedLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string; error?: string }
 type Message = {
@@ -125,7 +125,7 @@ function ConciergeVideoMessage({ content }: { content: string }) {
 export default function Concierge() {
   const pathname = usePathname()
   const { lang, dict } = useI18n()
-  const activeLang = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as SupportedLanguage
+  const activeLang = (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as SupportedLanguage
 
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
@@ -600,7 +600,7 @@ export default function Concierge() {
                 className="h-[42px] w-10 shrink-0 rounded-xl border border-white/10 bg-white/[.06] text-base text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
               >📎</button>
               <VoiceInputButton
-                lang={activeLang as 'en' | 'es' | 'pt' | 'pl' | 'ru'}
+                lang={activeLang as 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'}
                 value={input}
                 onChange={setInput}
                 disabled={loading}

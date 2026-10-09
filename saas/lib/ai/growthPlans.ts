@@ -180,10 +180,10 @@ ${blocks.join('\n\n')}`
 // found on the target's own website. If none is found, the company is SKIPPED
 // (no draft, ok:false + skipped:true). COS never invents or guesses an address —
 // there is nothing to send to, so nothing is queued.
-const LANG_NAMES: Record<string, string> = { pt: 'Brazilian Portuguese', es: 'Spanish', pl: 'Polish', ru: 'Russian' }
+const LANG_NAMES: Record<string, string> = { pt: 'Brazilian Portuguese', es: 'Spanish', pl: 'Polish', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Modern Standard Arabic' }
 
 // Detect the target's region language from its OWN website content (script + signals),
-// so a generically-named Polish/Russian/Brazilian firm is still classified correctly.
+// so a generically-named Polish/Russian/Brazilian/German/Japanese/... firm is still classified correctly.
 async function detectTargetLanguage(businessUrl: string, businessName: string): Promise<string> {
   let text = ''
   try {
@@ -389,7 +389,8 @@ export async function createOutreachDraft(params: {
     const senderKey = VALID_SENDER_KEYS.includes(String(params.senderKey || '')) ? String(params.senderKey) : null
 
     // Standing directive enforced in code: localize the outbound message to the target's
-    // region (Brazil→pt, Spanish-speaking LATAM→es, Poland→pl, Russia→ru; else English).
+    // region (Brazil→pt, Spanish-speaking LATAM→es, Poland→pl, Russia→ru, Germany→de, France→fr,
+    // Italy→it, Japan→ja, Korea→ko, Arabic-speaking markets→ar; else English).
     // The COS writes English; this guaranteed chokepoint makes the prompt irrelevant.
     const targetLang = await detectTargetLanguage(businessUrl, businessName)
     const localizedMessage = targetLang === 'en' ? message : await localizeMessage(message, targetLang)

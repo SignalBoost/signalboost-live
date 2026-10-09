@@ -379,6 +379,10 @@
     {
       "path": "/api/cron/cos-university-lifecycle-orchestrator",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/lab-phase-observability/health",
+      "schedule": "17 * * * *"
     }
   ]
 }

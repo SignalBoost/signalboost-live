@@ -4,6 +4,7 @@ import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import { uiText } from '@/lib/i18n/uiText'
+import { proposedEnrollmentRegion } from '@/lib/security/euEnrollmentRouting'
 
 type Mode = 'login' | 'signup'
 
@@ -11,6 +12,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
   const { dict } = useI18n()
   const [mode, setMode] = useState<Mode>(initialMode)
   const [name, setName] = useState('')
+  const [countryCode, setCountryCode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,6 +31,8 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
     setLoading(true)
     if (mode === 'signup') {
       if (!name.trim()) { setError(t(dict, 'auth.errorNoName')); setLoading(false); return }
+      if (!/^[A-Za-z]{2}$/.test(countryCode.trim())) { setError('Enter your two-letter country code (for example, DE or US).'); setLoading(false); return }
+      if (proposedEnrollmentRegion(countryCode) === 'EU_EEA') { setError('EU/EEA account registration is not yet enabled while European authentication and application data routing are being configured. Please contact support.'); setLoading(false); return }
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -138,7 +142,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
           </div>
         </div>
 
-        <button onClick={handleGoogle}
+        {mode === 'login' && <><button onClick={handleGoogle}
           style={{
             width: '100%', padding: '11px 0', borderRadius: 10, marginBottom: 10,
             background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
@@ -165,7 +169,8 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
           </svg>
           {t(dict, 'auth.continueGitHub')}
-        </button>
+        </button></>}
+        {mode === 'signup' && <div style={{ fontSize: 12, marginBottom: 16, color: 'rgba(255,255,255,0.7)' }}>Social account registration is temporarily unavailable while regional hosting controls are being configured. Use email signup and choose your country.</div>}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
@@ -173,6 +178,12 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
           <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
         </div>
 
+        {mode === 'signup' && (
+          <div style={{ fontSize: 12, marginBottom: 12 }}>
+            <label htmlFor="signup-country-code">Country of residence (ISO two-letter code)</label>
+            <input id="signup-country-code" type="text" maxLength={2} autoComplete="country" value={countryCode} placeholder="DE, FR, US…" onChange={e => setCountryCode(e.target.value.toUpperCase())} style={{ ...inp, marginTop: 6 }} />
+          </div>
+        )}
         {mode === 'signup' && (
           <input type="text" placeholder={t(dict, 'auth.namePlaceholder')} value={name}
             onChange={e => setName(e.target.value)} style={inp}

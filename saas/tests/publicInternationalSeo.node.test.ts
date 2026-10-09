@@ -123,3 +123,24 @@ test('global navbar uses route-bound translations on every public language', () 
     assert.ok(PUBLIC_COPY[locale].privacy)
   }
 })
+
+test('translated site navigation preserves each public locale and route', () => {
+  const nav = read('../components/seo/LocalizedPublicNavbar.tsx')
+  const switcher = read('../components/Navbar.tsx')
+  assert.match(switcher, /publicLocaleFromPath\(usePathname\(\)\)/)
+  assert.match(switcher, /<LocalizedPublicNavbar locale=\{locale\}/)
+  assert.match(nav, /PUBLIC_COPY\[locale\]/)
+  assert.match(nav, /lang=\{locale\}/)
+  assert.match(nav, /locale === 'ar' \? 'rtl' : 'ltr'/)
+  assert.match(nav, /publicPagePath\(locale, item\)/)
+  assert.match(nav, /publicPagePath\(event.target.value as PublicLocale, topic\)/)
+  for (const locale of PUBLIC_LOCALES) {
+    const copy = PUBLIC_COPY[locale]
+    for (const key of ['home', 'websiteTitle', 'reviewsTitle', 'contentTitle', 'labTitle', 'support', 'privacy', 'languages', 'start'] as const) {
+      assert.ok(copy[key]?.trim(), `${locale} navbar lacks ${key}`)
+    }
+    for (const topic of [undefined, ...PUBLIC_TOPICS]) {
+      assert.equal(publicPagePath(locale, topic).split('/')[1], locale)
+    }
+  }
+})

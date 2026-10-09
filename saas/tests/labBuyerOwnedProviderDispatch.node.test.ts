@@ -66,3 +66,21 @@ test('Phase 3: invalid action ID fails closed before any grant or Harness reads'
  assert.equal(result.status,'denied')
  assert.deepEqual(s.stats(),{reads:0,checks:0,executions:0})
 })
+
+
+test('Phase 3: async grant cannot swap the governed executor after authorization starts',async()=>{
+ const s=setup()
+ let trusted=0, injected=0
+ const input: typeof s.input={...s.input,
+  readGrant:async()=>{
+   input.executor={execute:async(_m,action)=>{injected++;return {actionId:action.actionId,capabilityId:action.capabilityId,status:'executed'}}}
+   input.resolveTrustedRun=async()=>null
+   return grant
+  },
+  executor:{execute:async(_m,action)=>{trusted++;return {actionId:action.actionId,capabilityId:action.capabilityId,status:'executed'}}},
+ }
+ const outcome=await dispatchBuyerOwnedProvider(input)
+ assert.equal(outcome.status,'executed')
+ assert.equal(trusted,1)
+ assert.equal(injected,0)
+})

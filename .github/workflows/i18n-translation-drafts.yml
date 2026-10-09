@@ -3,16 +3,16 @@ on:
   workflow_dispatch:
     inputs:
       max_strings:
-        description: 'Maximum translated entries for this run (1–500)'
+        description: 'Maximum translated entries per language (1–10000; default runs all)'
         required: true
-        default: '500'
+        default: '10000'
 permissions:
   contents: read
 jobs:
   translate-drafts:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     environment: translation-drafts
     defaults:
       run:

@@ -21,5 +21,17 @@ try {
       }
     }
   }
-  console.log('PASS: six untranslated packages, key parity and manifest verified')
+  // Resume must preserve a source-matched draft, but regenerate its baseline source safely.
+  const example=path.join(output,'de.json')
+  const before=JSON.parse(fs.readFileSync(example,'utf8'))
+  const key=Object.keys(before.pages)[0]
+  before.pages[key].translation='Übersetzungsentwurf'
+  fs.writeFileSync(example,JSON.stringify(before))
+  const again=spawnSync(process.execPath,['scripts/export-eleven-language-translation-packages.mjs','--out',path.relative(root,output),'--resume'],{cwd:root,encoding:'utf8'})
+  assert.equal(again.status,0,again.stderr)
+  const after=JSON.parse(fs.readFileSync(example,'utf8'))
+  assert.equal(after.pages[key].translation,'Übersetzungsentwurf')
+  const unrelated=Object.keys(after.pages).find(k=>k!==key)
+  assert.equal(after.pages[unrelated].translation,null)
+  console.log('PASS: source key parity, new packages and resumable prior drafts verified')
 } finally {fs.rmSync(output,{recursive:true,force:true})}

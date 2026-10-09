@@ -5,15 +5,20 @@ import { useCallback, useEffect, useState } from 'react'
 type Signal = {signal:string; status:'unknown'|'stale'|'blocked'|'observed';lastObservedAt:string|null;source:string|null}
 type Phase = {phase:number;status:string;certified:false;signals:Signal[]}
 type Status = {ok:true;exactRevision:string;phases:Phase[];allObserved:boolean;allCertified:false;productionAuthorized:false;observationCount:number}
+type Readiness = {ok:true;organizations:number;readyForMonitoring:boolean;blockers:string[]}
 const PHASES:Record<number,string> = {1:'Factory',2:'Governance and identity',3:'Tenancy and BYOI',4:'Credit ledger',5:'Enterprise pilots'}
 const STATUS_CLASS:Record<string,string> = {blocked:'text-red-700 dark:text-red-300',stale:'text-amber-700 dark:text-amber-300',unknown:'opacity-70',observed:'text-green-700 dark:text-green-300'}
 export default function LabPhasesObservabilityPanel() {
   const [result,setResult] = useState<Status|null>(null)
+  const [readiness,setReadiness] = useState<Readiness|null>(null)
   const [error,setError] = useState<string|null>(null)
   const [loading,setLoading] = useState(false)
   const refresh=useCallback(async()=>{
     setLoading(true)
     try {
+      const preflight=await fetch('/api/admin/lab-phase-observability/readiness',{cache:'no-store'})
+      const readinessPayload=preflight.ok?await preflight.json():null
+      setReadiness(readinessPayload?.ok?readinessPayload:null)
       const response=await fetch('/api/admin/lab-phase-observability',{cache:'no-store'})
       if (!response.ok) throw new Error('Monitoring unavailable or deployment configuration incomplete')
       const payload=await response.json()
@@ -29,6 +34,7 @@ export default function LabPhasesObservabilityPanel() {
       <button type="button" onClick={()=>void refresh()} disabled={loading} className="rounded border px-3 py-1 text-xs">{loading?'Refreshing…':'Refresh'}</button>
     </div>
     <p className="mt-2 text-xs opacity-70">Only verified runtime observations are counted. Green CI is not production evidence or certification.</p>
+    {readiness?<p className="mt-3 text-xs" role="status">Monitoring prerequisites: {readiness.readyForMonitoring?'configured, not certified':'blocked'}. Lab organizations: {readiness.organizations}. {readiness.blockers.join(', ').replaceAll('_',' ')}.</p>:<p className="mt-3 text-xs" role="status">Monitoring readiness is unavailable.</p>}
     {error?<p role="alert" className="mt-3 text-sm text-amber-700 dark:text-amber-300">{error} — no health status can be confirmed.</p>:null}
     {!error && !result?<p className="mt-3 text-sm">No monitoring evidence loaded.</p>:null}
     {result?<div className="mt-3 space-y-3">

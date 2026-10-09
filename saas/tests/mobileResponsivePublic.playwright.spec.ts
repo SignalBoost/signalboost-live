@@ -15,7 +15,7 @@ for (const phone of phones) {
     await expect(menu.locator('summary')).toBeVisible()
     await expect(page.locator('.localized-nav-desktop')).toBeHidden()
     await menu.locator('summary').click()
-    await expect(menu.getByRole('link', { name: /KI-Labor|KI-Lab/i })).toBeVisible()
+    await expect(menu.locator('a[href="/de/ai-lab"]')).toBeVisible()
     await expect(menu.getByRole('combobox')).toHaveValue('de')
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(2)

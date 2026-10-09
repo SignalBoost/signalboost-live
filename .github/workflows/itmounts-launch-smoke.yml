@@ -1,6 +1,11 @@
 name: iTMounts production launch smoke
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/itmounts-launch-smoke.yml'
+      - 'saas/scripts/launch-production-smoke.mjs'
   workflow_dispatch:
     inputs:
       base_url:
@@ -23,7 +28,7 @@ jobs:
           node-version: '24'
       - name: Public reachability and internal authorization
         env:
-          ITMOUNTS_SMOKE_BASE_URL: ${{ inputs.base_url }}
+          ITMOUNTS_SMOKE_BASE_URL: ${{ inputs.base_url || 'https://www.itmounts.com' }}
         run: node saas/scripts/launch-production-smoke.mjs
       - name: Scope declaration
         run: echo 'This smoke does not prove account signup, LAB execution, tenancy, billing, artifacts, or rollback; those require separate controlled acceptance evidence.'

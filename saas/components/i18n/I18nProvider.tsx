@@ -48,11 +48,6 @@ function persistLanguage(lang: string) {
   localStorage.setItem('site-language', safe)
   document.documentElement.lang = safe
   document.documentElement.dir = writingDirection(safe)
-  const publicLocale = publicLocaleFromPath(window.location.pathname)
-  if (publicLocale) {
-    document.documentElement.lang = publicLocale
-    document.documentElement.dir = writingDirection(publicLocale)
-  }
   document.cookie = `signalboost_language=${encodeURIComponent(safe)}; Path=/; Max-Age=31536000; SameSite=Lax`
   return safe
 }
@@ -61,6 +56,11 @@ function getInitialLanguage() {
   if (typeof window === 'undefined') {
     return 'en'
   }
+
+  // A localized public page (/de, /ja/ai-content, …) is authoritative for the whole UI,
+  // so the navbar and footer render in the same language as the page body.
+  const pageLocale = publicLocaleFromPath(window.location.pathname)
+  if (pageLocale) return pageLocale
 
   const saved =
     localStorage.getItem('signalboost_language') ||
@@ -226,9 +226,13 @@ export function I18nProvider({
     useState(false)
 
   useLayoutEffect(() => {
-    const documentLocale = publicLocaleFromPath(pathname) || lang
-    document.documentElement.lang = documentLocale
-    document.documentElement.dir = writingDirection(documentLocale)
+    const pageLocale = publicLocaleFromPath(pathname)
+    if (pageLocale && pageLocale !== lang) {
+      setLangState(persistLanguage(pageLocale))
+      return
+    }
+    document.documentElement.lang = lang
+    document.documentElement.dir = writingDirection(lang)
   }, [pathname, lang])
 
   useLayoutEffect(() => {

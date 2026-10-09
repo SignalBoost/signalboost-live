@@ -25,7 +25,6 @@
 
 import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
-import { publicLocaleFromPath } from '@/lib/seo/publicLocales'
 
 /** Routes served to people who are not signed in and are not customers yet. */
 const SHARE_ROUTES = ['/demo/supervisor']
@@ -41,7 +40,7 @@ export function isShareRoute(pathname: string | null): boolean {
  */
 export default function ShareRouteChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  if (isShareRoute(pathname) || publicLocaleFromPath(pathname)) return null
+  if (isShareRoute(pathname)) return null
   return <>{children}</>
 }
 

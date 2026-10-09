@@ -58,3 +58,19 @@ test('Phase 3 caller cannot retarget tenant or provider during asynchronous gran
  assert.deepEqual(result,{status:'executed',value:'ok'})
  assert.deepEqual(seen,Array(3).fill(org+':provider-a'))
 })
+
+test('Phase 3 host callback replacement during grant lookup cannot replace execution',async()=>{
+ const s=setup()
+ let hijacked=0
+ const input={...s.input}
+ input.readGrant=async()=>{
+  input.executeGoverned=async()=>{hijacked++;return 'hijacked'}
+  input.resolveTrustedRun=async()=>null as never
+  input.now=()=>new Date('2030-01-01T00:00:00Z')
+  return grant
+ }
+ const result=await executeTenantProviderGoverned(input)
+ assert.deepEqual(result,{status:'executed',value:'ok'})
+ assert.equal(hijacked,0)
+ assert.equal(s.stats().executions,1)
+})

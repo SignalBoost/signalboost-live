@@ -19,17 +19,18 @@ export async function dispatchBuyerOwnedProvider(input: Readonly<{
   // Snapshot the action identity before any asynchronous grant or Harness lookup.
   // Caller-owned input may be mutated by an untrusted callback while awaiting.
   const actionId = input.actionId
+  const { executor, resolveTrustedRun, readGrant, now } = input
   if (typeof actionId !== 'string' || !actionId.trim()) return { status: 'denied', value: null }
   const outcome = await executeTenantProviderGoverned({
     scope: input.scope,
     harnessRunId: input.harnessRunId,
-    now: input.now,
-    readGrant: input.readGrant,
-    resolveTrustedRun: input.resolveTrustedRun,
+    now,
+    readGrant,
+    resolveTrustedRun,
     executeGoverned: async ({ scope, harnessRunId, secretReference }) => {
       const result = await executeProviderViaHarness({
         scope, harnessRunId, secretReference, actionId,
-        executor: input.executor, resolveTrustedRun: input.resolveTrustedRun,
+        executor, resolveTrustedRun,
       })
       if (!result || result.status !== 'executed') {
         throw new Error('governed_provider_execution_denied')

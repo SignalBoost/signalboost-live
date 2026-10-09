@@ -17,8 +17,8 @@ on:
       - 'saas/supabase/migrations/20261008200000_lab_commercial_grant_reconciliation.sql'
       - 'saas/supabase/migrations/20261008210000_lab_commercial_stripe_settlement_evidence.sql'
       - 'saas/supabase/migrations/20261008220000_lab_commercial_stripe_evidence_reconciliation.sql'
-      - 'saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql'
       - 'saas/supabase/migrations/20261008240000_lab_commercial_claim_reconciliation_source_binding.sql'
+      - 'saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql'
   workflow_dispatch:
 
 permissions:
@@ -79,8 +79,8 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008200000_lab_commercial_grant_reconciliation.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008210000_lab_commercial_stripe_settlement_evidence.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008220000_lab_commercial_stripe_evidence_reconciliation.sql
-          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008240000_lab_commercial_claim_reconciliation_source_binding.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
         run: |

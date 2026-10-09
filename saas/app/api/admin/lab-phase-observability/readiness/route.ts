@@ -16,13 +16,18 @@ export async function GET(){
  const revision=process.env.VERCEL_GIT_COMMIT_SHA?.trim()??''
  const tenantConfigured=tenant.length>0&&tenant.length<=128
  const revisionConfigured=/^[a-f0-9]{7,64}$/i.test(revision)
+ const {data:tenantValid,error:scopeError}=tenantConfigured
+   ? await db.rpc('itmounts_lab_observability_scope_valid',{p_tenant_id:tenant})
+   : {data:false,error:null}
+ if(scopeError)return NextResponse.json({ok:false,error:'lab_scope_validation_unavailable'},{status:503,headers})
  return NextResponse.json({
-  ok:true,organizations:Number(memberships??0),tenantConfigured,revisionConfigured,
+  ok:true,organizations:Number(memberships??0),tenantConfigured,tenantValid:tenantValid===true,revisionConfigured,
   liveEvidenceVerified:false,supervisorDeliveryVerified:false,
-  readyForMonitoring:tenantConfigured&&revisionConfigured&&Number(memberships)>0,
+  readyForMonitoring:tenantConfigured&&tenantValid===true&&revisionConfigured&&Number(memberships)>0,
   blockers:[
    ...(!Number(memberships)?['no_registered_lab_organizations']:[]),
    ...(!tenantConfigured?['tenant_not_configured']:[]),
+   ...(tenantConfigured&&tenantValid!==true?['configured_tenant_has_no_active_lab_owner']:[]),
    ...(!revisionConfigured?['exact_revision_not_configured']:[]),
   ],
  },{headers})

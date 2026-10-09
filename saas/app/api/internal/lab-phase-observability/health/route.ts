@@ -22,7 +22,10 @@ export async function GET(req:NextRequest){
   if(!tenant||!revision||!/^[a-f0-9]{7,64}$/i.test(revision))
     return NextResponse.json({ok:false,error:'observability_scope_not_configured'},{status:503,headers})
   try{
-    const events=await readTenantLabObservations(getAdminSupabase(),tenant,revision)
+    const db=getAdminSupabase()
+    const {data:valid,error:scopeError}=await db.rpc('itmounts_lab_observability_scope_valid',{p_tenant_id:tenant})
+    if(scopeError||valid!==true)return NextResponse.json({ok:false,error:'observability_scope_not_authorized'},{status:503,headers})
+    const events=await readTenantLabObservations(db,tenant,revision)
     const alerts: {code:string;phase:number;signal:string;exactRevision:string;severity:string}[]=[]
     const result=await dispatchLabHealthAlerts(events,revision,Date.now(),alert=>{alerts.push(alert)})
     // Aggregate only: no tenant IDs or raw evidence in deployment logs.

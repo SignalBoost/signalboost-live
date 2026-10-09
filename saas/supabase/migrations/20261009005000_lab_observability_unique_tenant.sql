@@ -7,7 +7,7 @@ returns text language sql security definer set search_path=pg_catalog,lab as $$
    join lab.organization_members m on m.organization_id=o.id
    where m.role='owner' and m.status='active'
  )
- select case when count(*)=1 then min(id)::text else null end from eligible
+ select case when count(*)=1 then min(id::text) else null end from eligible
 $$;
 revoke all on function public.itmounts_lab_observability_unique_tenant() from public,anon,authenticated;
 grant execute on function public.itmounts_lab_observability_unique_tenant() to service_role;

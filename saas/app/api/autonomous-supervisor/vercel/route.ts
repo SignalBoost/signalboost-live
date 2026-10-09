@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { diagnoseIncident } from '@/lib/autonomous-supervisor/diagnostic'
 import {
   normalizeVercelIncident,
+  verifiedPlatformVercelWebhookScope,
   stageApprovedInvestigation,
   verifySignalBoostSupervisorSignature,
   verifyVercelWebhookSignature,
@@ -58,6 +59,10 @@ export async function POST(req: NextRequest) {
     body = JSON.parse(rawBody)
   } catch {
     return NextResponse.json({ ok: false, error: 'Invalid JSON body.' }, { status: 400 })
+  }
+
+  if (!verifiedPlatformVercelWebhookScope(body,process.env.VERCEL_PROJECT_ID)) {
+    return NextResponse.json({ok:true,ignored:true,reason:'not_platform_owned_deployment'})
   }
 
   const incident = await normalizeVercelIncident(body)

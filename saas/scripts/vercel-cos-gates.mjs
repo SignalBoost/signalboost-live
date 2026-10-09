@@ -46,6 +46,7 @@ const tests = [
   'tests/labValidMonitoringScope.node.test.ts',
   'tests/supervisorPlatformOwnership.node.test.ts',
   'tests/supervisorNoByoiExecution.node.test.ts',
+  'tests/supervisorWebhookScope.node.test.ts',
   'tests/itmountsLabEgressPolicy.node.test.ts',
   'tests/itmountsLabEgressExecution.node.test.ts',
   'tests/itmountsLabByoiScope.node.test.ts',

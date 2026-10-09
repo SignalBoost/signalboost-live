@@ -27,6 +27,13 @@ export function verifySignalBoostSupervisorSignature(rawBody: string, supplied: 
   return equalHex(createHmac('sha256', secret).update(rawBody).digest('hex'), supplied)
 }
 
+export function verifiedPlatformVercelWebhookScope(input: any, projectId: string | undefined): boolean {
+  if (!projectId || !/^prj_[A-Za-z0-9]+$/.test(projectId)) return false
+  const deployment = input?.payload?.deployment ?? input?.deployment ?? input?.data ?? input?.payload
+  const provided = [deployment?.projectId, input?.payload?.project?.id, input?.projectId].filter(Boolean)
+  return provided.length > 0 && provided.every((id: unknown) => id === projectId)
+}
+
 export async function normalizeVercelIncident(input: any): Promise<NormalizedIncidentPayload | null> {
   const type = String(input?.type || input?.trigger || input?.event || '')
   const deployment = input?.payload?.deployment || input?.deployment || input?.data || input?.payload || {}

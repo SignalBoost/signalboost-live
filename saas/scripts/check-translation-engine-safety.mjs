@@ -11,6 +11,10 @@ assert.match(script,/AZURE_TRANSLATOR_REGION/)
 assert.match(script,/AbortSignal\.timeout/)
 assert.match(script,/placeholderTokens\(source\)/)
 assert.match(script,/needs_review/)
+assert.match(script,/const perLanguage=\{\}/)
+assert.match(script,/let languageCompleted=0/)
+assert.match(script,/if\(languageCompleted>=limit\) break/)
+assert.match(script,/perLanguage\[lang\]=languageCompleted/)
 assert.doesNotMatch(script,/locales\/de\.json|locales\/fr\.json/)
 const run=spawnSync(process.execPath,['scripts/translate-pending-language-packages.mjs','nonexistent-packages'],{
   cwd:root,encoding:'utf8',env:{...process.env,AZURE_TRANSLATOR_KEY:'',AZURE_TRANSLATOR_REGION:''}

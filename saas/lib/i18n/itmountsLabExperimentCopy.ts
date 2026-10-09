@@ -38,7 +38,7 @@ export type ItmountsLabExperimentCopy = Readonly<{
 export const ITMOUNTS_LAB_EXPERIMENT_COPY: Record<CosUniversityTelemetryLanguage, ItmountsLabExperimentCopy> = {
   en: {
     title: 'Run one experiment',
-    explanation: 'Starts one training batch for the chosen subject and carries that artifact alone through training, Residency (Computer Science), canary, independent exam and graduation or rejection. While production is paused, only this run moves.',
+    explanation: 'Starts one governed training batch for the chosen subject. Training results and artifact status are separate from optional internal Residency, examination and graduation outcomes. A customer does not need model certification to use the Lab. While the continuous factory is paused, only this authorized run moves.',
     costNote: 'Spends at most $1.825 on training, then the usual ≤$0.20 canary and ≤$0.20 exam wakes. The run window is 48 hours.',
     loading: 'Loading experiments…',
     unavailable: 'Experiments could not be read.',
@@ -69,7 +69,7 @@ export const ITMOUNTS_LAB_EXPERIMENT_COPY: Record<CosUniversityTelemetryLanguage
   },
   es: {
     title: 'Ejecutar un experimento',
-    explanation: 'Inicia un lote de entrenamiento para la materia elegida y lleva solo ese artefacto por entrenamiento, Residencia (Ciencias de la Computación), canario, examen independiente y graduación o rechazo. Con la producción en pausa, solo se mueve esta ejecución.',
+    explanation: 'Inicia un lote de entrenamiento autorizado para la materia elegida. El resultado del entrenamiento y el estado del artefacto son independientes de la residencia, el examen y la graduación internos opcionales. Los clientes no necesitan certificar el modelo para utilizar el Lab. Con la línea continua en pausa, solo avanza esta ejecución autorizada.',
     costNote: 'Gasta como máximo $1.825 en entrenamiento, luego los arranques habituales de ≤$0.20 del canario y ≤$0.20 del examen. La ventana de ejecución es de 48 horas.',
     loading: 'Cargando experimentos…',
     unavailable: 'No se pudieron leer los experimentos.',
@@ -100,7 +100,7 @@ export const ITMOUNTS_LAB_EXPERIMENT_COPY: Record<CosUniversityTelemetryLanguage
   },
   pt: {
     title: 'Executar um experimento',
-    explanation: 'Inicia um lote de treinamento para a matéria escolhida e leva apenas esse artefato por treinamento, Residência (Ciência da Computação), canário, exame independente e graduação ou rejeição. Com a produção pausada, só esta execução se move.',
+    explanation: 'Inicia um lote de treinamento autorizado para a matéria escolhida. O resultado do treinamento e o estado do artefato são separados da residência, do exame e da graduação internos opcionais. O cliente não precisa certificar o modelo para usar o Lab. Com a linha contínua pausada, somente esta execução autorizada avança.',
     costNote: 'Gasta no máximo $1.825 em treinamento e depois os despertares habituais de ≤$0.20 do canário e ≤$0.20 do exame. A janela de execução é de 48 horas.',
     loading: 'Carregando experimentos…',
     unavailable: 'Não foi possível ler os experimentos.',
@@ -131,7 +131,7 @@ export const ITMOUNTS_LAB_EXPERIMENT_COPY: Record<CosUniversityTelemetryLanguage
   },
   pl: {
     title: 'Uruchom jeden eksperyment',
-    explanation: 'Uruchamia jedną partię treningową dla wybranego przedmiotu i prowadzi tylko ten artefakt przez trening, rezydenturę (informatyka), test kanarkowy, niezależny egzamin oraz dyplom lub odrzucenie. Przy wstrzymanej produkcji porusza się tylko to uruchomienie.',
+    explanation: 'Uruchamia jedną autoryzowaną partię treningową dla wybranego przedmiotu. Wynik treningu i stan artefaktu są niezależne od opcjonalnej wewnętrznej rezydentury, egzaminu i ukończenia programu. Klient nie musi certyfikować modelu, aby korzystać z Lab. Gdy ciągła linia jest wstrzymana, działa tylko to autoryzowane uruchomienie.',
     costNote: 'Wydaje najwyżej 1,825 USD na trening, potem zwykłe wybudzenia ≤0,20 USD dla testu kanarkowego i ≤0,20 USD dla egzaminu. Okno uruchomienia wynosi 48 godzin.',
     loading: 'Wczytywanie eksperymentów…',
     unavailable: 'Nie udało się odczytać eksperymentów.',
@@ -162,7 +162,7 @@ export const ITMOUNTS_LAB_EXPERIMENT_COPY: Record<CosUniversityTelemetryLanguage
   },
   ru: {
     title: 'Запустить один эксперимент',
-    explanation: 'Запускает одну учебную партию по выбранному предмету и проводит только этот артефакт через обучение, резидентуру (информатика), канареечную проверку, независимый экзамен и выпуск или отказ. При остановленном производстве движется только этот запуск.',
+    explanation: 'Запускает одну авторизованную партию обучения по выбранной теме. Результат обучения и статус артефакта не зависят от необязательной внутренней резидентуры, экзамена и выпуска. Для использования Lab клиенту не требуется сертифицировать модель. Пока непрерывная линия остановлена, выполняется только этот авторизованный запуск.',
     costNote: 'Тратит не более $1.825 на обучение, затем обычные пробуждения ≤$0.20 для канареечной проверки и ≤$0.20 для экзамена. Окно запуска — 48 часов.',
     loading: 'Загрузка экспериментов…',
     unavailable: 'Не удалось прочитать эксперименты.',

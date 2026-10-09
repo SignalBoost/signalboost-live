@@ -85,4 +85,11 @@ console.log('[eleven-language coverage] '+(issues.length?'NOT READY':'ALL REQUIR
 for(const issue of issues.slice(0,150)) console.log(' - '+issue)
 if(issues.length>150) console.log(' ... '+(issues.length-150)+' additional gaps')
 console.log('Total gaps: '+issues.length)
-// Any activation of a pending locale must automatically activate the strict release gate.\n// A forgotten --require-all flag must never make incomplete production locales deployable.\nconst activeLine = core.match(/SUPPORTED_LANGUAGES\\s*=\\s*\\[([^\\]]+)\\]/)?.[1] || ''\nconst enabledCandidates = additions.filter(lang => new RegExp("['\\\"]" + lang + "['\\\"]").test(activeLine))\nif ((process.argv.includes('--require-all') || enabledCandidates.length > 0) && issues.length) {\n  console.error('[eleven-language coverage] FAIL — incomplete locales cannot be activated: ' + enabledCandidates.join(', '))\n  process.exit(1)\n}
+// Any activation of a pending locale must automatically activate the strict release gate.
+// A forgotten --require-all flag must never make incomplete production locales deployable.
+const activeLine = core.match(/SUPPORTED_LANGUAGES\s*=\s*\[([^\]]+)\]/)?.[1] || ''
+const enabledCandidates = additions.filter(lang => activeLine.includes("'" + lang + "'") || activeLine.includes('"' + lang + '"'))
+if ((process.argv.includes('--require-all') || enabledCandidates.length > 0) && issues.length) {
+  console.error('[eleven-language coverage] FAIL — incomplete locales cannot be activated: ' + enabledCandidates.join(', '))
+  process.exit(1)
+}

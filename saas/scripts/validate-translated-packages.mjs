@@ -69,7 +69,8 @@ for (const lang of expectedLanguages) {
       if (requireReviewed) {
         const state = reviewData?.[store]?.[key]
         const checksum = createHash('sha256').update(JSON.stringify(entry?.translation)).digest('hex')
-        if (!state || state.status !== 'approved' || typeof state.reviewer !== 'string' || !state.reviewer.trim() || state.translationSha256 !== checksum) {
+        const sourceChecksum = createHash('sha256').update(JSON.stringify(entry?.source)).digest('hex')
+        if (!state || state.status !== 'approved' || typeof state.reviewer !== 'string' || !state.reviewer.trim() || state.translationSha256 !== checksum || state.sourceSha256 !== sourceChecksum) {
           failures.push(lang+'/'+store+'/'+key+': explicit reviewer approval missing')
         }
       }

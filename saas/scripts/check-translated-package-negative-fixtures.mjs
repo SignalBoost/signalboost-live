@@ -38,5 +38,16 @@ try {
   const mismatched=run(['scripts/validate-translated-packages.mjs',dir,'--require-reviewed'])
   assert.equal(mismatched.status,1,'Approval hash for other text must not pass')
   assert.match(mismatched.stderr,/explicit reviewer approval missing/)
-  console.log('PASS: missing keys, missing reviews and stale reviewer approval hashes blocked')
+  // Approval must also be tied to the specific English source that was reviewed.
+  // A correct target hash with a stale/wrong source hash cannot authorize an import.
+  forged[firstStore][firstKey]={
+    status:'approved',reviewer:'translator-QA',
+    translationSha256:createHash('sha256').update(JSON.stringify(firstPack[firstStore][firstKey].translation)).digest('hex'),
+    sourceSha256:createHash('sha256').update(JSON.stringify('old English source')).digest('hex')
+  }
+  fs.writeFileSync(path.join(dir,'de.review.json'),JSON.stringify(forged))
+  const staleSource=run(['scripts/validate-translated-packages.mjs',dir,'--require-reviewed'])
+  assert.equal(staleSource.status,1,'Approval tied to outdated English source must fail')
+  assert.match(staleSource.stderr,/explicit reviewer approval missing/)
+  console.log('PASS: missing keys, missing reviews, stale target hashes and outdated source approvals blocked')
 } finally {fs.rmSync(dir,{recursive:true,force:true})}

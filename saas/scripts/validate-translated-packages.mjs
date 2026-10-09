@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { placeholderTokens } from './generated-ui-locale-utils.mjs'
 
 const expectedLanguages = ['de','fr','it','ja','ko','ar']
+const requireReviewed = process.argv.includes('--require-reviewed')
 
 const directory = process.argv[2]
 if (!directory) {
@@ -44,6 +45,9 @@ for (const lang of expectedLanguages) {
     continue
   }
   const packageData = load(lang + '.json')
+  const reviewPath = path.join(directory,lang + '.review.json')
+  const reviewData = fs.existsSync(reviewPath) ? load(lang + '.review.json') : null
+  if (requireReviewed && !reviewData) failures.push(lang+': no reviewed translation metadata')
   if (JSON.stringify(Object.keys(packageData).sort()) !== JSON.stringify(expectedStores)) {
     failures.push(lang + ': package stores missing or unexpected')
   }
@@ -60,6 +64,12 @@ for (const lang of expectedLanguages) {
       if (!(key in english) || JSON.stringify(entry?.source) !== JSON.stringify(english[key])) {
         failures.push(lang+'/'+store+'/'+key+': source key/value differs from canonical English')
         continue
+      }
+      if (requireReviewed) {
+        const state = reviewData?.[store]?.[key]
+        if (!state || state.status !== 'approved' || typeof state.reviewer !== 'string' || !state.reviewer.trim()) {
+          failures.push(lang+'/'+store+'/'+key+': explicit reviewer approval missing')
+        }
       }
       const source = entry?.source
       const translated = entry?.translation

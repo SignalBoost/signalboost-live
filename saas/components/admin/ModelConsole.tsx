@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { uiText } from '@/lib/i18n/uiText'
+
 
 type Certification = {
   certificationId: string
@@ -70,28 +72,28 @@ type Inventory = {
 type Locale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 const COPY: Record<Locale, Record<string, string>> = {
   en: {
-    eyebrow:'Platform Models', title:'Model & Provider Console',
-    intro:'Register buyer models, keep credentials encrypted, certify real capabilities, and govern assignment or rollback for COS, Builder, and specialists.',
-    loading:'Loading model inventory…', unavailable:'Model console unavailable',
-    strict:'Strict registered-model routing', enabled:'Enabled', disabled:'Migration compatibility mode',
-    registration:'Registration source', durable:'Durable host-neutral registry',
-    registerTitle:'Register or update a buyer model', registerNote:'Credentials are encrypted server-side and are never returned to this browser. Updating a credential rotates and deletes the superseded ciphertext.',
-    key:'Profile key', family:'Family', model:'Model ID', providerModel:'Provider model ID', revisionPolicy:'Revision policy', revision:'Revision', tokenizer:'Tokenizer ID',
-    uses:'Allowed uses', transport:'Transport', provider:'Provider label', endpoint:'HTTPS endpoint', credential:'Provider credential', cost:'Maximum provider cost per call (USD)', timeout:'Timeout (ms)',
-    json:'Structured JSON', tools:'Tool calling', streaming:'Streaming', save:'Save registration', saving:'Saving…',
-    inventory:'Registered model inventory', adapter:'Adapter', available:'available', hostRequired:'host plug-in required',
-    cert:'Certification', none:'No certification receipt', certify:'Run live certification', certifying:'Certifying…',
-    spend:'Certification makes bounded live provider calls and may incur charges.',
-    checks:'Checks', partial:'Unverified declared capabilities',
-    assignments:'Production assignments', assign:'Assign', assigning:'Assigning…', rollback:'Rollback', release:'Use platform default', disabling:'Disabling…', disable:'Disable registration',
-    current:'Current', noAssignment:'No durable assignment', history:'Recent assignment history',
-    confirmRegister:'Save this model registration and encrypted credential configuration?',
-    confirmCert:'Run live certification? This can incur bounded provider charges.',
-    confirmAssign:'Activate this exact certified model for this platform role? Cross-model fallback will remain disabled.',
-    confirmRollback:'Rollback this role to its previous recorded model assignment?',
-    confirmRelease:'Release this assignment and return the role to platform default routing?',
-    confirmDisable:'Disable this model registration? Active assignments must be rolled back first.',
-    saved:'Model registration saved.', assigned:'Model assignment changed.', rolledBack:'Model assignment rolled back.', released:'Assignment released to platform default routing.', disabledModel:'Model registration disabled.',
+    eyebrow:uiText('generatedUi.u_45313f94f36602b8'), title:uiText('generatedUi.u_a562b70726c1b3ea'),
+    intro:uiText('generatedUi.u_d5bbd2162bf4ec76'),
+    loading:uiText('generatedUi.u_c4d90a5bc541f363'), unavailable:uiText('generatedUi.u_e93393ea2d0f3271'),
+    strict:uiText('generatedUi.u_fa30dcef58aa63a2'), enabled:uiText('generatedUi.u_92c1cdfdf4cb9cf6'), disabled:uiText('generatedUi.u_0a78e4a1db8cfae0'),
+    registration:uiText('generatedUi.u_1bd5a23939fe3527'), durable:uiText('generatedUi.u_516d18db3049668d'),
+    registerTitle:uiText('generatedUi.u_ba99965dfae53b49'), registerNote:uiText('generatedUi.u_88341ea572f908d8'),
+    key:'Profile key', family:uiText('generatedUi.u_bd2d677b2ed4381b'), model:uiText('generatedUi.u_089ef2b6dbb34fa9'), providerModel:uiText('generatedUi.u_7aed0880728081cb'), revisionPolicy:uiText('generatedUi.u_c5bdb5ecf3a9955b'), revision:uiText('generatedUi.u_2e516d68f42f3e35'), tokenizer:uiText('generatedUi.u_735c9f3f4b42f5c4'),
+    uses:uiText('generatedUi.u_96ee07b30e30c703'), transport:uiText('generatedUi.u_aaead4abf5d0fd5e'), provider:uiText('generatedUi.u_96cd4b4aa9291460'), endpoint:uiText('generatedUi.u_bde065b3835c90ee'), credential:uiText('generatedUi.u_a97d83648fc247e9'), cost:uiText('generatedUi.u_85fec3d60799d99f'), timeout:uiText('generatedUi.u_3b453bc8bd286be4'),
+    json:uiText('generatedUi.u_d6fc4c85a1b0a651'), tools:uiText('generatedUi.u_10d67f48de9986c9'), streaming:uiText('generatedUi.u_a951c5945635e2d3'), save:uiText('generatedUi.u_f5bee9cb6313b524'), saving:uiText('generatedUi.u_23e39291d6135814'),
+    inventory:uiText('generatedUi.u_af6195df362c8444'), adapter:uiText('generatedUi.u_0252b84901033771'), available:uiText('generatedUi.u_ddd9818abacfde7a'), hostRequired:uiText('generatedUi.u_8c30cb2e54fd41a1'),
+    cert:uiText('generatedUi.u_86846f67dd19ad45'), none:uiText('generatedUi.u_7f8ecd1bd7fd19c4'), certify:uiText('generatedUi.u_48ff9521e1087816'), certifying:uiText('generatedUi.u_cf37a56bc78d921b'),
+    spend:uiText('generatedUi.u_0e8a3b921df137d3'),
+    checks:uiText('generatedUi.u_de07d07209556c79'), partial:uiText('generatedUi.u_f7e3a9227b046f1d'),
+    assignments:uiText('generatedUi.u_70bdfc4e6bac0eda'), assign:uiText('generatedUi.u_8ece895c9b32c643'), assigning:uiText('generatedUi.u_8157fc4e6bdbbefa'), rollback:uiText('generatedUi.u_c591f5574995c740'), release:uiText('generatedUi.u_092390d46657bc5a'), disabling:uiText('generatedUi.u_fb7bdec372eeef3f'), disable:uiText('generatedUi.u_40cc2683713b4e4d'),
+    current:uiText('generatedUi.u_e0d1b68224bf0b31'), noAssignment:uiText('generatedUi.u_c47dadc5e63c74b4'), history:uiText('generatedUi.u_60d04d82b62a8886'),
+    confirmRegister:uiText('generatedUi.u_0e0770333c91df08'),
+    confirmCert:uiText('generatedUi.u_8d742d112db235a2'),
+    confirmAssign:uiText('generatedUi.u_9748e1ae0aa7711d'),
+    confirmRollback:uiText('generatedUi.u_55a335160f876171'),
+    confirmRelease:uiText('generatedUi.u_dde0e20e29669178'),
+    confirmDisable:uiText('generatedUi.u_e3da7b10b3f6c9bc'),
+    saved:uiText('generatedUi.u_84368feb416ba1d3'), assigned:uiText('generatedUi.u_376a4046ba5ec2cc'), rolledBack:uiText('generatedUi.u_3c3d4356831c12d3'), released:uiText('generatedUi.u_c618fe17763edfbe'), disabledModel:uiText('generatedUi.u_e395e0aae4dfd264'),
   },
   es: {
     eyebrow:'Modelos de plataforma', title:'Consola de modelos y proveedores',
@@ -483,7 +485,7 @@ export default function ModelConsole() {
           <label>{text.model}<input required value={form.modelId} onChange={e=>setForm(v=>({...v,modelId:e.target.value}))} style={inputStyle()} /></label>
           <label>{text.providerModel}<input value={form.providerModelId} onChange={e=>setForm(v=>({...v,providerModelId:e.target.value}))} style={inputStyle()} /></label>
           <label>{text.revisionPolicy}<select value={form.revisionPolicy} onChange={e=>setForm(v=>({...v,revisionPolicy:e.target.value}))} style={inputStyle()}>
-            <option value="runtime_owned">runtime_owned</option><option value="fixed">fixed</option><option value="resolve_and_pin_at_dispatch">resolve_and_pin_at_dispatch</option>
+            <option value="runtime_owned">{uiText('generatedUi.u_b8925443a580caf2')}</option><option value="fixed">{uiText('generatedUi.u_992a93455c71fedd')}</option><option value="resolve_and_pin_at_dispatch">{uiText('generatedUi.u_e6141342004e6f27')}</option>
           </select></label>
           <label>{text.revision}<input value={form.revision} onChange={e=>setForm(v=>({...v,revision:e.target.value}))} style={inputStyle()} /></label>
           <label>{text.tokenizer}<input value={form.tokenizerModelId} onChange={e=>setForm(v=>({...v,tokenizerModelId:e.target.value}))} style={inputStyle()} /></label>
@@ -499,7 +501,7 @@ export default function ModelConsole() {
           {uses.map(use=><label key={use} style={{ marginRight:18 }}><input type="checkbox" checked={form[use]} onChange={e=>setForm(v=>({...v,[use]:e.target.checked}))} /> {use}</label>)}
         </fieldset>
         <fieldset style={{ marginTop:12, border:'1px solid #334155', borderRadius:10 }}>
-          <legend>Capabilities</legend>
+          <legend>{uiText('generatedUi.u_9460f16ac9b5171e')}</legend>
           <label style={{ marginRight:18 }}><input type="checkbox" checked={form.structuredJson} onChange={e=>setForm(v=>({...v,structuredJson:e.target.checked}))} /> {text.json}</label>
           <label style={{ marginRight:18 }}><input type="checkbox" checked={form.toolCalling} onChange={e=>setForm(v=>({...v,toolCalling:e.target.checked}))} /> {text.tools}</label>
           <label><input type="checkbox" checked={form.streaming} onChange={e=>setForm(v=>({...v,streaming:e.target.checked}))} /> {text.streaming}</label>
@@ -550,10 +552,10 @@ export default function ModelConsole() {
               <div><strong>{text.cost}</strong><p>{profile.binding ? `$${profile.binding.maxCallCostUsd}` : '—'}</p></div>
               <div><strong>{text.cert}</strong><p>{cert ? statusLabel(cert.status) : text.none}</p></div>
             </div>
-            <details><summary>Capabilities</summary><ul>{Object.entries(profile.inference).map(([name,state])=><li key={name}>{name}: {state}</li>)}</ul></details>
+            <details><summary>{uiText('generatedUi.u_9460f16ac9b5171e')}</summary><ul>{Object.entries(profile.inference).map(([name,state])=><li key={name}>{name}: {state}</li>)}</ul></details>
             {cert ? <div style={{ marginTop:12 }}>
               <strong>{text.checks}</strong>
-              <ul>{(cert.checks || []).map(item=><li key={item.id}>{item.id}: {item.status} · {item.latencyMs} ms{item.errorCode ? ` · ${item.errorCode}` : ''}</li>)}</ul>
+              <ul>{(cert.checks || []).map(item=><li key={item.id}>{item.id}: {item.status} · {item.latencyMs} {uiText('generatedUi.u_f785c3ce1d580c8f')}{item.errorCode ? ` · ${item.errorCode}` : ''}</li>)}</ul>
               {cert.unverifiedDeclaredCapabilities?.length ? <p><strong>{text.partial}:</strong> {cert.unverifiedDeclaredCapabilities.join(', ')}</p> : null}
             </div> : null}
             {profile.certifiable ? <p style={{ fontSize:12, color:'#fbbf24' }}>{text.spend}</p> : null}

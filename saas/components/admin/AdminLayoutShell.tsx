@@ -21,7 +21,7 @@ const COPY: Record<string, Record<string, any>> = {
     controlRoomDesc: uiText('generatedUi.u_22751c061570d2b5'),
     adminFlow: uiText('generatedUi.u_db93cd9512403072'), execPreview: uiText('generatedUi.u_80ad3c268ddeb079'), ownerRestricted: uiText('generatedUi.u_3a4becb6a0f683e3'),
     ownerRestrictedDesc: uiText('generatedUi.u_83984a699379c549'),
-    nav: { 'Overview': uiText('generatedUi.u_d4b1ea5708dd5329'), 'Logs': uiText('generatedUi.u_ea2100dc89ae9fe2'), 'Outreach': uiText('generatedUi.u_a5803fdf10e57e66'), 'Marketing + Sales': uiText('generatedUi.u_dcba31525bd63b56'), 'Insights': uiText('generatedUi.u_2a932f90172e99ea'), 'Models': 'Models', 'Role Management': uiText('generatedUi.u_a5b449f8e7b1f4be'), 'Marketplace Monitor': uiText('generatedUi.u_025e59e79d169987'), 'SaaS Monitor': uiText('generatedUi.u_45c0d5e16acb8738'), 'Concierge Monitor': uiText('generatedUi.u_a1f160e587a8808c') },
+    nav: { 'Overview': uiText('generatedUi.u_d4b1ea5708dd5329'), 'Logs': uiText('generatedUi.u_ea2100dc89ae9fe2'), 'Outreach': uiText('generatedUi.u_a5803fdf10e57e66'), 'Marketing + Sales': uiText('generatedUi.u_dcba31525bd63b56'), 'Insights': uiText('generatedUi.u_2a932f90172e99ea'), 'Models': uiText('generatedUi.u_d17d2d78d76e6a6c'), 'Role Management': uiText('generatedUi.u_a5b449f8e7b1f4be'), 'Marketplace Monitor': uiText('generatedUi.u_025e59e79d169987'), 'SaaS Monitor': uiText('generatedUi.u_45c0d5e16acb8738'), 'Concierge Monitor': uiText('generatedUi.u_a1f160e587a8808c') },
   },
   es: {
     checkingAccess: 'Comprobando acceso de propietario/administrador…',

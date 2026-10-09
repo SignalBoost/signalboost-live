@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { euCustomerLaunchReadiness } from '@/lib/security/euCustomerLaunchReadiness.ts'
 import { getEuUserSupabase } from '@/lib/security/euUserSupabaseServer.ts'
+import { uiText } from '@/lib/i18n/uiText'
+
 
 export const dynamic = 'force-dynamic'
 
@@ -8,9 +10,9 @@ export default async function EuAccountPage() {
   const readiness = euCustomerLaunchReadiness()
   if (!readiness.ready) {
     return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>
-      <h1>European account enrollment is not available yet</h1>
-      <p>European account access will open after regional authentication, application data routing and privacy workflows are verified. No account information is transferred to another region.</p>
-      <Link href="/">Return to iTMounts</Link>
+      <h1>{uiText('generatedUi.u_d2d3109cbacf0a41')}</h1>
+      <p>{uiText('generatedUi.u_f06d45815a9c047d')}</p>
+      <Link href="/">{uiText('generatedUi.u_2af5c4957e43e5de')}</Link>
     </main>
   }
 
@@ -18,9 +20,9 @@ export default async function EuAccountPage() {
   const { data, error } = await eu.auth.getUser()
   if (error || !data.user) {
     return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>
-      <h1>Sign in to your European account</h1>
-      <p>Your European session is missing or expired. Sign-in must be completed through the Frankfurt authentication service.</p>
-      <Link href="/">Return to iTMounts</Link>
+      <h1>{uiText('generatedUi.u_fb78737aa9e7dba8')}</h1>
+      <p>{uiText('generatedUi.u_96004513494635b2')}</p>
+      <Link href="/">{uiText('generatedUi.u_2af5c4957e43e5de')}</Link>
     </main>
   }
 
@@ -28,13 +30,13 @@ export default async function EuAccountPage() {
     .select('tenant_id').eq('user_id', data.user.id).maybeSingle()
   if (bindingError || !binding) {
     return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>
-      <h1>European account setup incomplete</h1>
-      <p>Your regional account is not fully provisioned. Access is temporarily limited to prevent cross-region data access.</p>
+      <h1>{uiText('generatedUi.u_3981d43d273b483c')}</h1>
+      <p>{uiText('generatedUi.u_56c6c4fa5a11004c')}</p>
     </main>
   }
   return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>
-    <h1>European account</h1>
-    <p>Your session and tenant binding were verified against the Frankfurt project.</p>
-    <p>Application workspaces remain unavailable until their EU data workflows are independently verified.</p>
+    <h1>{uiText('generatedUi.u_2d6f36be6db892d3')}</h1>
+    <p>{uiText('generatedUi.u_1c226f074c356e7e')}</p>
+    <p>{uiText('generatedUi.u_bdf2df8f973c1202')}</p>
   </main>
 }

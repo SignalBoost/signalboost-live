@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
 function source(path: string): string {
-  return readFileSync(new URL('../' + path, import.meta.url), 'utf8')
+  return hydrateLocalizedSource(readFileSync(new URL('../' + path, import.meta.url), 'utf8'))
 }
 
 test('University telemetry is owner-only, read-only and never exposes teacher response text', () => {

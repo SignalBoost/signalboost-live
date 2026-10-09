@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { COS_LEARNING_COPY, type CosLearningLanguage } from '@/lib/i18n/cosLearningCopy'
 import { PUBLIC_BRAND } from '@/lib/public-brand'
+import { uiText } from '@/lib/i18n/uiText'
+
 
 type Readiness = { ok?: boolean; enabled?: boolean; questions?: number; sourceAdapters?: string[]; recommendedBatchSize?: number; retainedKnowledge?: number | null; authRequired?: boolean; error?: string }
 type CycleResult = { gapsConsidered?: number; documentsAcquired?: number; accepted?: number; rejected?: Record<string, number>; sourceErrors?: Record<string, number>; externalCostUsd?: number }
@@ -156,30 +158,30 @@ export default function CosLearningPage() {
     </div>
     <p className="text-xs text-text-muted">{copy.embeddingScope}</p>
     <section className="rounded-md border border-border bg-surface p-4">
-      <h2 className="text-base font-semibold">Automatic embedding telemetry</h2>
-      <p className="mt-1 text-xs text-text-muted">The indexer runs automatically every 5 minutes. The manual button below is optional acceleration, not the normal workflow.</p>
+      <h2 className="text-base font-semibold">{uiText('generatedUi.u_0056436652fb6864')}</h2>
+      <p className="mt-1 text-xs text-text-muted">{uiText('generatedUi.u_f321e55a04e99c1a')}</p>
       <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <Card label="Indexer status" value={String(observability?.automaticIndexer?.status ?? '—').toUpperCase()} />
-        <Card label="Last automatic run" value={observability?.automaticIndexer?.lastCompletedAt ? new Date(observability.automaticIndexer.lastCompletedAt).toLocaleTimeString() : '—'} />
-        <Card label="Embedded last run" value={String(observability?.automaticIndexer?.embedded ?? '—')} />
-        <Card label="Failed last run" value={String(observability?.automaticIndexer?.failed ?? '—')} />
-        <Card label="Pending before" value={String(observability?.automaticIndexer?.pendingBefore ?? '—')} />
-        <Card label="Pending after" value={String(observability?.automaticIndexer?.pendingAfter ?? '—')} />
-        <Card label="Run duration" value={observability?.automaticIndexer?.durationMs != null ? `${(observability.automaticIndexer.durationMs / 1000).toFixed(1)}s` : '—'} />
-        <Card label="Cadence" value={`${observability?.automaticIndexer?.cadenceMinutes ?? 5} min`} />
+        <Card label={uiText('generatedUi.u_a9e6d9fff2d33824')} value={String(observability?.automaticIndexer?.status ?? '—').toUpperCase()} />
+        <Card label={uiText('generatedUi.u_00a36523b72b9006')} value={observability?.automaticIndexer?.lastCompletedAt ? new Date(observability.automaticIndexer.lastCompletedAt).toLocaleTimeString() : '—'} />
+        <Card label={uiText('generatedUi.u_6e70f2336b1a75ca')} value={String(observability?.automaticIndexer?.embedded ?? '—')} />
+        <Card label={uiText('generatedUi.u_32c7c358080538a2')} value={String(observability?.automaticIndexer?.failed ?? '—')} />
+        <Card label={uiText('generatedUi.u_ec1771f95b83ab39')} value={String(observability?.automaticIndexer?.pendingBefore ?? '—')} />
+        <Card label={uiText('generatedUi.u_da0882b5cabed93e')} value={String(observability?.automaticIndexer?.pendingAfter ?? '—')} />
+        <Card label={uiText('generatedUi.u_b5e9698b25697ec7')} value={observability?.automaticIndexer?.durationMs != null ? `${(observability.automaticIndexer.durationMs / 1000).toFixed(1)}s` : '—'} />
+        <Card label={uiText('generatedUi.u_316d43c021472bb1')} value={`${observability?.automaticIndexer?.cadenceMinutes ?? 5} min`} />
       </div>
       {observability?.automaticIndexer?.error && <p className="mt-3 text-xs text-danger">{observability.automaticIndexer.error}</p>}
     </section>
     <section className="rounded-md border border-border bg-surface p-4">
-      <h2 className="text-base font-semibold">COS learned-evidence application telemetry</h2>
-      <p className="mt-1 text-xs text-text-muted">Injection is not counted as learning use. Only evidence actually cited by the recorded answer is material use.</p>
+      <h2 className="text-base font-semibold">{uiText('generatedUi.u_2931530642140d92')}</h2>
+      <p className="mt-1 text-xs text-text-muted">{uiText('generatedUi.u_5f577fc0bbd1c896')}</p>
       <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Card label="Measured turns" value={String(observability?.learnedEvidenceUse?.turns ?? '—')} />
-        <Card label="Evidence injected" value={String(observability?.learnedEvidenceUse?.totalInjected ?? '—')} />
-        <Card label="Evidence cited/used" value={String(observability?.learnedEvidenceUse?.totalCited ?? '—')} />
-        <Card label="Zero-citation turns" value={String(observability?.learnedEvidenceUse?.zeroCitationTurns ?? '—')} />
-        <Card label="University injected" value={String(observability?.learnedEvidenceUse?.university?.injected ?? '—')} />
-        <Card label="University cited/used" value={String(observability?.learnedEvidenceUse?.university?.cited ?? '—')} />
+        <Card label={uiText('generatedUi.u_784c81326ee842ee')} value={String(observability?.learnedEvidenceUse?.turns ?? '—')} />
+        <Card label={uiText('generatedUi.u_6a42a6df1db6c0bf')} value={String(observability?.learnedEvidenceUse?.totalInjected ?? '—')} />
+        <Card label={uiText('generatedUi.u_fddb7a5224d4bd8b')} value={String(observability?.learnedEvidenceUse?.totalCited ?? '—')} />
+        <Card label={uiText('generatedUi.u_7c72709203bf6be1')} value={String(observability?.learnedEvidenceUse?.zeroCitationTurns ?? '—')} />
+        <Card label={uiText('generatedUi.u_5de40bff0d12a445')} value={String(observability?.learnedEvidenceUse?.university?.injected ?? '—')} />
+        <Card label={uiText('generatedUi.u_78f4a6e72d642956')} value={String(observability?.learnedEvidenceUse?.university?.cited ?? '—')} />
       </div>
       {observability?.learnedEvidenceUse?.summary && <p className="mt-3 text-xs text-text-muted">{observability.learnedEvidenceUse.summary}</p>}
     </section>

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {verifiedPlatformVercelWebhookScope} from '../lib/autonomous-supervisor/vercel.ts'
+import {verifiedPlatformVercelWebhookScope} from '../lib/autonomous-supervisor/vercelWebhookScope.ts'
 import {readFileSync} from 'node:fs'
 
 test('Supervisor webhook refuses absent, foreign, or conflicting project identity',()=>{

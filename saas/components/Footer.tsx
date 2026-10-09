@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 import { PUBLIC_BRAND } from '@/lib/public-brand'
+import { PUBLIC_LOCALES, PUBLIC_LOCALE_NAMES, publicPagePath } from '@/lib/seo/publicLocales'
+import { PUBLIC_COPY } from '@/lib/seo/publicCopy'
 
 const GOLD = '#ffc300'
 
@@ -130,6 +132,9 @@ export default function Footer() {
         </div>
 
         <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 20, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <nav data-public-localized aria-label={PUBLIC_COPY[(lang as Language) in COPY ? lang as Language : 'en'].languages} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: '100%' }}>
+            {PUBLIC_LOCALES.map(locale => <Link key={locale} href={publicPagePath(locale)} hrefLang={locale} lang={locale} prefetch={false} style={{ fontSize: 12 }}><bdi>{PUBLIC_LOCALE_NAMES[locale]}</bdi></Link>)}
+          </nav>
           <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>© {year} {PUBLIC_BRAND.name}</div>
           <div style={{ fontSize: 12, color: GOLD, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             {PUBLIC_BRAND.tagline}
@@ -139,3 +144,4 @@ export default function Footer() {
     </footer>
   )
 }
+

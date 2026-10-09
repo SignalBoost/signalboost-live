@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import LabOwnerActivationPanel from './LabOwnerActivationPanel.tsx'
 
 type Signal = {signal:string; status:'unknown'|'stale'|'blocked'|'observed';lastObservedAt:string|null;source:string|null}
 type Phase = {phase:number;status:string;certified:false;signals:Signal[]}
@@ -35,6 +36,7 @@ export default function LabPhasesObservabilityPanel() {
     </div>
     <p className="mt-2 text-xs opacity-70">Only verified runtime observations are counted. Green CI is not production evidence or certification.</p>
     {readiness?<p className="mt-3 text-xs" role="status">Monitoring prerequisites: {readiness.readyForMonitoring?'configured, not certified':'blocked'}. Lab organizations: {readiness.organizations}. {readiness.blockers.join(', ').replaceAll('_',' ')}.</p>:<p className="mt-3 text-xs" role="status">Monitoring readiness is unavailable.</p>}
+    {readiness?.organizations===0?<LabOwnerActivationPanel onActivated={()=>void refresh()} />:null}
     {error?<p role="alert" className="mt-3 text-sm text-amber-700 dark:text-amber-300">{error} — no health status can be confirmed.</p>:null}
     {!error && !result?<p className="mt-3 text-sm">No monitoring evidence loaded.</p>:null}
     {result?<div className="mt-3 space-y-3">

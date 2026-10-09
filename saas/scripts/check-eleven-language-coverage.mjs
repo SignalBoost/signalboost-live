@@ -7,6 +7,25 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const additions = ['de','fr','it','ja','ko','ar']
 const all = ['en','es','pt','pl','ru',...additions]
 const issues = []
+const fixedLocaleList = /\[\s*['\"]en['\"]\s*,\s*['\"]es['\"]\s*,\s*['\"]pt['\"]\s*,\s*['\"]pl['\"]\s*,\s*['\"]ru['\"]\s*\]/g
+const sourceExt = /\.(?:ts|tsx|js|jsx|mjs)$/
+const excludedDirectories = new Set(['node_modules', '.next', '.git', 'dist', 'coverage'])
+function scanPinnedLanguageLists(dir) {
+  if (!exists(dir)) return
+  for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+    if (entry.name.startsWith('.') && entry.name !== '.github') continue
+    const rel = path.posix.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (!excludedDirectories.has(entry.name)) scanPinnedLanguageLists(rel)
+    } else if (sourceExt.test(entry.name) && !rel.includes('.test.') && !rel.includes('/tests/')) {
+      if (rel === 'lib/i18n/supportedLanguages.ts' || rel === 'scripts/check-five-language-platform.mjs' || rel === 'scripts/check-eleven-language-coverage.mjs' || rel === 'scripts/generated-ui-locale-utils.mjs') continue
+      const source = load(rel)
+      if (fixedLocaleList.test(source)) issues.push(rel + ': hardcoded five-language array requires eleven-language review')
+      fixedLocaleList.lastIndex = 0
+    }
+  }
+}
+
 const load = rel => fs.readFileSync(path.join(root,rel),'utf8')
 const exists = rel => fs.existsSync(path.join(root,rel))
 const flatten = (x, prefix='', out={}) => {
@@ -58,6 +77,8 @@ for (const rel of ['lib/i18n/loadLanguage.ts','lib/i18n/pageLocales.ts',
   for(const lang of additions) if(!new RegExp('\\b'+lang+'\\b').test(source))
     issues.push(rel+': missing '+lang+' registration')
 }
+// Inventory duplicated runtime locale lists beyond the canonical contract.
+for (const dir of ['app', 'components', 'lib', 'marketing-sales-core', 'scripts']) scanPinnedLanguageLists(dir)
 const core=load('lib/i18n/supportedLanguages.ts')
 for(const lang of all) if(!core.includes("'"+lang+"'")) issues.push('canonical registry missing '+lang)
 console.log('[eleven-language coverage] '+(issues.length?'NOT READY':'ALL REQUIRED SOURCES PRESENT'))

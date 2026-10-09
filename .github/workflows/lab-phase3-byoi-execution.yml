@@ -17,6 +17,7 @@ on:
       - 'saas/lib/ai/cos/itmountsLabByoiScope.ts'
       - 'saas/tests/itmountsLabByoiExecution.node.test.ts'
       - 'saas/tests/itmountsLabByoiScope.node.test.ts'
+      - 'saas/tests/labPhase3SyntheticTenantAcceptance.node.test.ts'
   workflow_dispatch:
 
 permissions:
@@ -34,4 +35,4 @@ jobs:
           node-version: '24'
       - name: Test tenant scope snapshot and double-preflight
         working-directory: saas
-        run: node --test tests/labGovernedProviderExecution.node.test.ts tests/labProviderGovernedHarnessAdapter.node.test.ts tests/labBuyerOwnedProviderDispatch.node.test.ts tests/labBuyerOwnedProviderRealSocket.node.test.ts tests/itmountsLabByoiExecution.node.test.ts tests/itmountsLabByoiScope.node.test.ts
+        run: node --test tests/labGovernedProviderExecution.node.test.ts tests/labProviderGovernedHarnessAdapter.node.test.ts tests/labBuyerOwnedProviderDispatch.node.test.ts tests/labBuyerOwnedProviderRealSocket.node.test.ts tests/itmountsLabByoiExecution.node.test.ts tests/itmountsLabByoiScope.node.test.ts tests/labPhase3SyntheticTenantAcceptance.node.test.ts

@@ -13,6 +13,8 @@ on:
       - 'saas/tests/sql/lab-*.sql'
       - 'saas/tests/phase4StripeTestVerification.node.test.mjs'
       - 'saas/lib/billing/phase4StripeTestVerification.mjs'
+      - 'saas/lib/billing/phase4VerifiedTestSettlementEnvelope.mjs'
+      - 'saas/tests/phase4VerifiedTestSettlementEnvelope.node.test.mjs'
       - 'saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql'
       - 'saas/supabase/migrations/20261008180000_lab_commercial_atomic_grant_proof.sql'
       - 'saas/supabase/migrations/20261008190000_lab_commercial_event_claim_tenant_binding.sql'
@@ -162,3 +164,7 @@ jobs:
       - name: Verify Stripe test authoritative API retrieval boundary
         shell: bash
         run: node --test saas/tests/phase4StripeTestRetrieval.node.test.mjs
+
+      - name: Verify signed and retrieved Stripe test evidence envelope
+        shell: bash
+        run: node --test saas/tests/phase4VerifiedTestSettlementEnvelope.node.test.mjs

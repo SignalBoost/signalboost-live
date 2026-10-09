@@ -15,7 +15,7 @@ export async function executeConfiguredUniversityBirthSigning(input: Readonly<{
   sdk: KmsSdk
 }>) {
   const parsed = readUniversitySigningConfig(input.env)
-  if (parsed.ok === false) return parsed.reason
+  if ('reason' in parsed) return parsed.reason
   const { region, keyArn, trustedIssuerFingerprint } = parsed.config
   // Neither an AWS client nor any privileged signer is constructed if the
   // exact pinned configuration is absent or invalid.

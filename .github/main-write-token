@@ -1,2 +1,2 @@
-base_sha=bc9fe641330aadca88b0687d16850049fa19cf6d
-branch=feat/phase4-testmode-atomic-settlement-20261008
+base_sha=3bc4d2c01379962db19e15f5b86a2467b68ac809
+branch=fix/phase4-testmode-settlement-authorization-20261008

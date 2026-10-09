@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..')
 const directory=process.argv[2]
+const dryRun=process.argv.includes('--dry-run')
 if(!directory)throw Error('Usage: node scripts/import-reviewed-language-packages.mjs <package-dir>')
 const verified=spawnSync(process.execPath,['scripts/validate-translated-packages.mjs',directory,'--require-reviewed'],{cwd:root,encoding:'utf8'})
 if(verified.status!==0)throw Error('Reviewed package validation failed. No production dictionaries modified.\n'+verified.stderr.slice(0,5000))
@@ -18,7 +19,11 @@ function unflatten(entries){
  for(const [key,entry] of Object.entries(entries)){
   const segments=key.split('.')
   let at=result
-  for(const segment of segments.slice(0,-1))at=at[segment]??={}
+  for(const segment of segments.slice(0,-1)){
+   if(['__proto__','prototype','constructor'].includes(segment))throw Error('Unsafe translation key: '+key)
+   at=at[segment]??={}
+  }
+  if(['__proto__','prototype','constructor'].includes(segments.at(-1)))throw Error('Unsafe translation key: '+key)
   at[segments.at(-1)]=entry.translation
  }
  return result
@@ -32,6 +37,10 @@ for(const lang of locales){
   current[lang]=unflatten(pack[name])
   writes.set(filename,current)
  }
+}
+if(dryRun){
+ console.log('Reviewed import preview: '+writes.size+' catalog files; no files changed.')
+ process.exit(0)
 }
 // Stage every output before committing any destination. All sources were already validated.
 const pending=[]

@@ -39,10 +39,38 @@ const walk=(dir,segments=[])=>{
 }
 walk(app)
 routes.sort((a,b)=>a.route.localeCompare(b.route))
+
+// Include shared UI: many pages inherit untranslated text from components.
+// This remains an advisory lexical inventory; imported components may already localize.
+const componentFiles=[]
+const scanComponents=dir=>{
+ if(!fs.existsSync(dir))return
+ for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+  if(entry.isDirectory()){
+   if(!excluded.has(entry.name)&&!entry.name.startsWith('_'))scanComponents(path.join(dir,entry.name))
+  }else if(/\.(tsx|jsx)$/.test(entry.name)&&!(/\.test\.|\.spec\.|\.stories\./.test(entry.name))){
+   const sourceFile=path.join(dir,entry.name)
+   const src=fs.readFileSync(sourceFile,'utf8')
+   const found=candidates(src)
+   componentFiles.push({
+    source:path.relative(root,sourceFile).replaceAll(path.sep,'/'),
+    explicitI18n:/\b(useTranslation|useTranslations|loadLanguage|useLocale|I18nProvider|\bt\()/.test(src),
+    possibleHardcodedText:found
+   })
+  }
+ }
+}
+scanComponents(path.join(root,'components'))
+componentFiles.sort((a,b)=>a.source.localeCompare(b.source))
 const flagged=routes.filter(x=>!x.explicitI18n)
 const report={status:'INVENTORY_ONLY_NOT_RUNTIME_CERTIFICATION',totalPages:routes.length,withoutObviousI18nHook:flagged.length,
  pagesWithPossibleHardcodedText:routes.filter(x=>x.possibleHardcodedText.length).length,
- possibleHardcodedTextSamples:routes.reduce((count,x)=>count+x.possibleHardcodedText.length,0),routes}
+ possibleHardcodedTextSamples:routes.reduce((count,x)=>count+x.possibleHardcodedText.length,0),
+ totalComponents:componentFiles.length,
+ componentsWithoutObviousI18nHook:componentFiles.filter(x=>!x.explicitI18n).length,
+ componentsWithPossibleHardcodedText:componentFiles.filter(x=>x.possibleHardcodedText.length).length,
+ componentPossibleHardcodedSamples:componentFiles.reduce((sum,x)=>sum+x.possibleHardcodedText.length,0),
+ routes,components:componentFiles}
 const at=process.argv.indexOf('--report')
 if(at>=0){
  const output=process.argv[at+1]
@@ -53,4 +81,5 @@ if(at>=0){
  fs.writeFileSync(dest,JSON.stringify(report,null,2)+'\n')
 }
 console.log('App Router pages: '+routes.length+'; no obvious page-level localization hook: '+flagged.length+'; possible inline text: '+report.possibleHardcodedTextSamples)
+console.log('Shared components: '+componentFiles.length+'; possible inline text samples: '+report.componentPossibleHardcodedSamples)
 console.log('This is a source inventory, not a measure of rendered translated coverage.')

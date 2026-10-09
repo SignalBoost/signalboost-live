@@ -4,6 +4,7 @@ import { supabase } from '@/utils/supabase/client'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import { uiText } from '@/lib/i18n/uiText'
+import { proposedEnrollmentRegion } from '@/lib/security/euEnrollmentRouting'
 
 type Mode = 'login' | 'signup'
 
@@ -11,6 +12,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
   const { dict } = useI18n()
   const [mode, setMode] = useState<Mode>(initialMode)
   const [name, setName] = useState('')
+  const [countryCode, setCountryCode] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,6 +31,8 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
     setLoading(true)
     if (mode === 'signup') {
       if (!name.trim()) { setError(t(dict, 'auth.errorNoName')); setLoading(false); return }
+      if (!/^[A-Za-z]{2}$/.test(countryCode.trim())) { setError('Enter your two-letter country code (for example, DE or US).'); setLoading(false); return }
+      if (proposedEnrollmentRegion(countryCode) === 'EU_EEA') { setError('EU/EEA account hosting is being prepared. Registration cannot proceed until an EU database is available. Please contact support.'); setLoading(false); return }
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -173,6 +177,12 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
           <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
         </div>
 
+        {mode === 'signup' && (
+          <div style={{ fontSize: 12, marginBottom: 12 }}>
+            <label htmlFor="signup-country-code">Country of residence (ISO two-letter code)</label>
+            <input id="signup-country-code" type="text" maxLength={2} autoComplete="country" value={countryCode} placeholder="DE, FR, US…" onChange={e => setCountryCode(e.target.value.toUpperCase())} style={{ ...inp, marginTop: 6 }} />
+          </div>
+        )}
         {mode === 'signup' && (
           <input type="text" placeholder={t(dict, 'auth.namePlaceholder')} value={name}
             onChange={e => setName(e.target.value)} style={inp}

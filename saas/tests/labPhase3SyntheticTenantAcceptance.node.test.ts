@@ -24,7 +24,7 @@ const manifests:HarnessManifest[]=tenants.map((t,i)=>({
 test('Phase 3 synthetic tenants: each can invoke only its own provider grant and artifact',async()=>{
  const invoked:string[]=[]
  const executor:GovernedHarnessExecutor={execute:async(manifest,action)=>{
-   assert.equal(manifest.identity.tenantId,action.params?.secretReference?.toString().split('/')[2])
+   assert.equal(manifest.identity.tenantId,String((action.params as Record<string,unknown>).secretReference).split('/')[2])
    invoked.push(manifest.identity.tenantId)
    return {actionId:action.actionId,capabilityId:action.capabilityId,status:'executed'}
  }}

@@ -9,8 +9,14 @@ const script=fs.readFileSync(path.join(root,'scripts/translate-pending-language-
 assert.match(script,/AZURE_TRANSLATOR_KEY/)
 assert.match(script,/AZURE_TRANSLATOR_REGION/)
 assert.match(script,/AbortSignal\.timeout/)
-assert.match(script,/placeholderTokens\(source\)/)
+assert.match(script,/texts\.map\(text=>\(\{text\}\)\)/)
+assert.match(script,/maxChars=8000/)
+assert.match(script,/placeholderTokens\(texts\[i\]\)/)
 assert.match(script,/needs_review/)
+assert.match(script,/const perLanguage=\{\}/)
+assert.match(script,/const pending=\[\]/)
+assert.match(script,/chunk\.length<maxItems/)
+assert.match(script,/perLanguage\[lang\]=processed/)
 assert.doesNotMatch(script,/locales\/de\.json|locales\/fr\.json/)
 const run=spawnSync(process.execPath,['scripts/translate-pending-language-packages.mjs','nonexistent-packages'],{
   cwd:root,encoding:'utf8',env:{...process.env,AZURE_TRANSLATOR_KEY:'',AZURE_TRANSLATOR_REGION:''}

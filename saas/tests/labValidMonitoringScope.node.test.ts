@@ -5,9 +5,9 @@ const readiness=readFileSync('app/api/admin/lab-phase-observability/readiness/ro
 const cron=readFileSync('app/api/internal/lab-phase-observability/health/route.ts','utf8')
 const migration=readFileSync('supabase/migrations/20261009003000_lab_observability_valid_scope.sql','utf8')
 test('readiness and cron require real scoped active Lab owner',()=>{
- assert.match(readiness,/tenantValid===true/)
- assert.match(readiness,/configured_tenant_has_no_active_lab_owner/)
- assert.ok(cron.indexOf("itmounts_lab_observability_scope_valid")<cron.indexOf('readTenantLabObservations('))
+ assert.match(readiness,/tenantValid=Boolean\(tenant\)/)
+ assert.match(readiness,/no_unique_authorized_monitoring_tenant/)
+ assert.ok(cron.indexOf("resolveLabMonitoringTenant(db)")<cron.indexOf('readTenantLabObservations('))
  assert.match(cron,/observability_scope_not_authorized/)
 })
 test('scope lookup is service-only and requires real membership',()=>{

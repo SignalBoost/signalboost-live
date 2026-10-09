@@ -61,6 +61,8 @@ const scanComponents=dir=>{
  }
 }
 scanComponents(path.join(root,'components'))
+// App Router feature components are colocated beside pages.
+scanComponents(path.join(root,'app'))
 componentFiles.sort((a,b)=>a.source.localeCompare(b.source))
 const flagged=routes.filter(x=>!x.explicitI18n)
 const report={status:'INVENTORY_ONLY_NOT_RUNTIME_CERTIFICATION',totalPages:routes.length,withoutObviousI18nHook:flagged.length,

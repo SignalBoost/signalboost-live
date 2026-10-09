@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../app/api/auth/eu/complete-enrollment/route.ts', import.meta.url), 'utf8')
 
 test('EU enrollment completion is gated and never trusts a user ID from caller', () => {
-  assert.match(source, /euRuntimeReadiness\(\)/)
+  assert.match(source, /euCustomerLaunchReadiness\(\)/)
   assert.match(source, /if \(!readiness\.ready\)/)
   assert.match(source, /eu\.auth\.getUser\(match\[1\]\)/)
   assert.match(source, /euAuthUserId: data\.user\.id/)

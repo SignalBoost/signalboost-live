@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { euRuntimeReadiness } from '@/lib/security/euRuntimeReadiness.ts'
+import { euCustomerLaunchReadiness } from '@/lib/security/euCustomerLaunchReadiness.ts'
 import { proposedEnrollmentRegion } from '@/lib/security/euEnrollmentRouting.ts'
 import { provisionEuAccount } from '@/lib/security/provisionEuAccount.ts'
 
@@ -12,7 +12,7 @@ export const runtime = 'nodejs'
  * and schema readiness are explicitly enabled after integration verification.
  */
 export async function POST(request: NextRequest) {
-  const readiness = euRuntimeReadiness()
+  const readiness = euCustomerLaunchReadiness()
   if (!readiness.ready) {
     return NextResponse.json({ error: 'eu_enrollment_unavailable' }, { status: 503 })
   }

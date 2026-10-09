@@ -15,6 +15,7 @@ on:
       - 'saas/lib/i18n/**'
       - 'saas/components/i18n/**'
       - 'saas/scripts/check-language-expansion-readiness.mjs'
+      - 'saas/scripts/check-eleven-language-coverage.mjs'
       - 'saas/scripts/check-five-language-platform.mjs'
       - '.github/workflows/i18n-expansion-readiness.yml'
 jobs:

@@ -3,6 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from 'crypto'
 import { getVercelDeployments } from '@/lib/hub/deployments-service'
 import { stageInfrastructurePR } from '@/lib/hub/pr-engine'
 import type { DiagnosticResult, NormalizedIncidentPayload } from './types.ts'
+export { verifiedPlatformVercelWebhookScope } from './vercelWebhookScope.ts'
 
 function shortHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 8).toUpperCase()
@@ -25,13 +26,6 @@ export function verifySignalBoostSupervisorSignature(rawBody: string, supplied: 
   const secret = process.env.COS_SUPERVISOR_WEBHOOK_SECRET || ''
   if (!secret) return false
   return equalHex(createHmac('sha256', secret).update(rawBody).digest('hex'), supplied)
-}
-
-export function verifiedPlatformVercelWebhookScope(input: any, projectId: string | undefined): boolean {
-  if (!projectId || !/^prj_[A-Za-z0-9]+$/.test(projectId)) return false
-  const deployment = input?.payload?.deployment ?? input?.deployment ?? input?.data ?? input?.payload
-  const provided = [deployment?.projectId, input?.payload?.project?.id, input?.projectId].filter(Boolean)
-  return provided.length > 0 && provided.every((id: unknown) => id === projectId)
 }
 
 export async function normalizeVercelIncident(input: any): Promise<NormalizedIncidentPayload | null> {

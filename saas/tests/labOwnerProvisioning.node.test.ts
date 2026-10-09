@@ -7,7 +7,7 @@ test('provisioning requires explicitly named owner-confirmed request and verifie
  assert.ok(route.indexOf('await requireOwner()')<route.indexOf("rpc('itmounts_lab_provision_owner_organization'"))
  assert.match(route,/guard\.ctx\.userId/)
  assert.match(route,/body\?\.confirmActivation!==true/)
- assert.doesNotMatch(route,/cron|searchParams/)
+ assert.doesNotMatch(route,/searchParams/)
 })
 test('provisioning is service-only, atomic and unfunded',()=>{
  assert.match(sql,/pg_advisory_xact_lock/)

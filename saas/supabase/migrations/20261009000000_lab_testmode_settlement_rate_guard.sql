@@ -1,6 +1,6 @@
 -- Replacement with strict USD test-credit rate conversion. This function does not verify Stripe itself.
 -- No customer/service-role execute permission; never connect to a live webhook.
-create function lab.testmode_atomic_stripe_settlement(
+create or replace function lab.testmode_atomic_stripe_settlement(
  p_organization_id uuid, p_event_id text, p_payment_intent text, p_account_id text,
  p_rate_version_id uuid, p_received_minor bigint, p_currency text,
  p_payload_sha256 text, p_credits bigint

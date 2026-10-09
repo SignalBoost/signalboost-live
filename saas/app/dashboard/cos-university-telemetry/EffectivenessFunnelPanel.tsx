@@ -6,6 +6,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { EffectivenessFunnel, FunnelWindow } from '@/lib/ai/cos/cosUniversityEffectivenessFunnel'
 import type { CosUniversityFunnelCopy } from '@/lib/i18n/cosUniversityFunnelCopy'
+import { uiText } from '@/lib/i18n/uiText'
+
 
 const FUNNEL_URL = '/api/admin/cos-university-effectiveness'
 
@@ -155,8 +157,8 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
               <>
                 <div className="mt-2 grid gap-2 sm:grid-cols-4 text-sm">
                   <div><span className="opacity-60">{copy.governanceAuthorityExpansion}:</span> {f.governanceAssurance.authorityExpansionObserved}</div>
-                  <div><span className="opacity-60">{copy.governanceEvidenceChain}:</span> {f.governanceAssurance.repositoryEvidenceEntries} / {f.governanceAssurance.repositoryEvidenceChainValid === null ? 'not evidenced' : f.governanceAssurance.repositoryEvidenceChainValid ? 'continuous' : 'BROKEN'}</div>
-                  <div><span className="opacity-60">{copy.governanceControls}:</span> implemented / not live-attested</div>
+                  <div><span className="opacity-60">{copy.governanceEvidenceChain}:</span> {f.governanceAssurance.repositoryEvidenceEntries} / {f.governanceAssurance.repositoryEvidenceChainValid === null ? uiText('generatedUi.u_bc4b37fda072c7fe') : f.governanceAssurance.repositoryEvidenceChainValid ? uiText('generatedUi.u_f7496f1fc9731f2e') : uiText('generatedUi.u_d84771511dbeaa73')}</div>
+                  <div><span className="opacity-60">{copy.governanceControls}:</span> {uiText('generatedUi.u_ef4ba6f0d5afc9e8')}</div>
                   <div><span className="opacity-60">{copy.governancePentest}:</span> {f.governanceAssurance.thirdPartyPenetrationTest}</div>
                 </div>
                 <div className="mt-1 text-[10px] opacity-50">{copy.source}: {f.governanceAssurance.source} · {copy.methodology}: {f.governanceAssurance.methodology}</div>
@@ -172,7 +174,7 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                   <div><span className="opacity-60">{copy.reliabilityAttempts}:</span> {f.reliability.attempts}</div>
                   <div><span className="opacity-60">{copy.reliabilityDirectSuccess}:</span> {f.reliability.successRate === null ? '—' : Math.round(f.reliability.successRate * 100) + '%'}</div>
                   <div><span className="opacity-60">{copy.reliabilityFailuresFallbacks}:</span> {f.reliability.failures} / {f.reliability.fallbacks}</div>
-                  <div><span className="opacity-60">{copy.reliabilityLatency}:</span> {f.reliability.p50LatencyMs ?? '—'} / {f.reliability.p90LatencyMs ?? '—'} / {f.reliability.p99LatencyMs ?? '—'} ms</div>
+                  <div><span className="opacity-60">{copy.reliabilityLatency}:</span> {f.reliability.p50LatencyMs ?? '—'} / {f.reliability.p90LatencyMs ?? '—'} / {f.reliability.p99LatencyMs ?? '—'} {uiText('generatedUi.u_f785c3ce1d580c8f')}</div>
                   <div><span className="opacity-60">{copy.reliabilityOver15s}:</span> {f.reliability.over15s}</div>
                   <div className="sm:col-span-3 font-mono text-xs" style={{ overflowWrap: 'anywhere' }}><span className="opacity-60">{copy.reliabilityOutcomes}:</span> {counts(f.reliability.byOutcome)} · <span className="opacity-60">{copy.reliabilityErrors}:</span> {counts(f.reliability.byErrorClass)}</div>
                 </div>
@@ -189,7 +191,7 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                   <div><span className="opacity-60">{copy.lineLive}:</span> {f.lineHealth.liveUnits}</div>
                   <div><span className="opacity-60">{copy.lineOverdue}:</span> {f.lineHealth.overdueUnits}</div>
                   <div><span className="opacity-60">{copy.lineLeased}:</span> {f.lineHealth.leasedUnits}</div>
-                  <div><span className="opacity-60">{copy.lineOldestWait}:</span> {f.lineHealth.oldestWaitingSeconds === null ? '—' : Math.round(f.lineHealth.oldestWaitingSeconds / 60) + ' min'}</div>
+                  <div><span className="opacity-60">{copy.lineOldestWait}:</span> {f.lineHealth.oldestWaitingSeconds === null ? '—' : Math.round(f.lineHealth.oldestWaitingSeconds / 60) + uiText('generatedUi.u_1f6fa6f69d185e60')}</div>
                   <div><span className="opacity-60">{copy.lineBottleneck}:</span> {f.lineHealth.bottleneckStation || '—'}</div>
                 </div>
                 <div className="mt-2 text-xs"><span className="opacity-60">{copy.lineStations}:</span> {Object.entries(f.lineHealth.byStation).sort((a, b) => b[1].waiting - a[1].waiting).map(([station, row]) => station + ' ' + row.waiting + ' (' + row.overdue + ' overdue, ' + row.leased + ' leased)').join(' · ') || '—'}</div>
@@ -206,9 +208,9 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                   <div><span className="opacity-60">{copy.flowTransitions}:</span> {f.lineHistory.transitions}</div>
                   <div><span className="opacity-60">{copy.flowThroughput}:</span> {f.lineHistory.throughputPerHour === null ? '—' : f.lineHistory.throughputPerHour.toFixed(2) + '/h'}</div>
                   <div><span className="opacity-60">{copy.flowRecovered}:</span> {f.lineHistory.recoveredOverdue}</div>
-                  <div><span className="opacity-60">{copy.flowMeanRecovery}:</span> {f.lineHistory.meanRecoverySeconds === null ? '—' : Math.round(f.lineHistory.meanRecoverySeconds / 60) + ' min'}</div>
-                  <div><span className="opacity-60">{copy.flowMedianRecovery}:</span> {f.lineHistory.medianRecoverySeconds === null ? '—' : Math.round(f.lineHistory.medianRecoverySeconds / 60) + ' min'}</div>
-                  <div><span className="opacity-60">{copy.flowP90Recovery}:</span> {f.lineHistory.p90RecoverySeconds === null ? '—' : Math.round(f.lineHistory.p90RecoverySeconds / 60) + ' min'}</div>
+                  <div><span className="opacity-60">{copy.flowMeanRecovery}:</span> {f.lineHistory.meanRecoverySeconds === null ? '—' : Math.round(f.lineHistory.meanRecoverySeconds / 60) + uiText('generatedUi.u_1f6fa6f69d185e60')}</div>
+                  <div><span className="opacity-60">{copy.flowMedianRecovery}:</span> {f.lineHistory.medianRecoverySeconds === null ? '—' : Math.round(f.lineHistory.medianRecoverySeconds / 60) + uiText('generatedUi.u_1f6fa6f69d185e60')}</div>
+                  <div><span className="opacity-60">{copy.flowP90Recovery}:</span> {f.lineHistory.p90RecoverySeconds === null ? '—' : Math.round(f.lineHistory.p90RecoverySeconds / 60) + uiText('generatedUi.u_1f6fa6f69d185e60')}</div>
                   <div className="sm:col-span-2"><span className="opacity-60">{copy.flowDwell}:</span> {f.lineHistory.p50DwellSeconds === null ? '—' : [f.lineHistory.p50DwellSeconds, f.lineHistory.p90DwellSeconds, f.lineHistory.p99DwellSeconds].map(seconds => seconds === null ? '—' : Math.round(seconds / 60) + ' min').join(' / ')}</div>
                   <div className="sm:col-span-2"><span className="opacity-60">{copy.flowByStation}:</span> {counts(f.lineHistory.byFromStation)}</div>
                 </div>
@@ -287,10 +289,10 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                     {f.evaluationFailures.explanations.map(item => (
                       <div key={item.reason} className="rounded border p-2">
                         <div className="font-mono text-[10px]" style={{ overflowWrap: 'anywhere' }}>{item.reason} × {item.count}</div>
-                        <div className="mt-1"><b>Attribution:</b> {item.attribution} · <b>Cause:</b> {item.causeStatus}</div>
-                        <div><b>Why:</b> {item.cause}</div>
-                        <div><b>Impact:</b> {item.impact}</div>
-                        <div><b>System response:</b> {item.systemResponse}</div>
+                        <div className="mt-1"><b>{uiText('generatedUi.u_dc3d2ce7d8a25ca4')}</b> {item.attribution} · <b>{uiText('generatedUi.u_1a39eedbb9df45e9')}</b> {item.causeStatus}</div>
+                        <div><b>{uiText('generatedUi.u_ad389aa4c08e3d7c')}</b> {item.cause}</div>
+                        <div><b>{uiText('generatedUi.u_caa811e967d61158')}</b> {item.impact}</div>
+                        <div><b>{uiText('generatedUi.u_78a5353147445dec')}</b> {item.systemResponse}</div>
                         <div><b>{copy.operationalBuyerMeaning}:</b> {item.buyerMeaning}</div>
                       </div>
                     ))}

@@ -77,7 +77,7 @@ const BENCHMARK_BATCH_SIZE = 1
 
 export default function DataCenterOperationsPage() {
   const { lang } = useI18n()
-  const language = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as DataCenterUiLang
+  const language = (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as DataCenterUiLang
   const c = (key: Parameters<typeof dataCenterUiText>[0]) => dataCenterUiText(key, language)
   const [scenario, setScenario] = useState<Scenario>('cooling-loop-degradation')
   const [result, setResult] = useState<Result | null>(null)

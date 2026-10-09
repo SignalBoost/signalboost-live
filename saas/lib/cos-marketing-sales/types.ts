@@ -3,9 +3,9 @@
 // Phase 1 is mock-safe: no automatic publishing, no real email dispatch,
 // no external social posting, and every outbound action is represented as a plan.
 
-export type CosLocale = 'en' | 'es' | 'pt-BR' | 'pl' | 'ru'
+export type CosLocale = 'en' | 'es' | 'pt-BR' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
-export const COS_LOCALES: CosLocale[] = ['en', 'es', 'pt-BR', 'pl', 'ru']
+export const COS_LOCALES: CosLocale[] = ['en', 'es', 'pt-BR', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 export type LeadSource =
   | 'website_optimizer'

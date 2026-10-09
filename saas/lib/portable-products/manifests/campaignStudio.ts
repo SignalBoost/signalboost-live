@@ -18,5 +18,5 @@ export const campaignStudioManifest: PortableProductManifest = Object.freeze({
   architectureReferences: Object.freeze(['cosa', 'agency']),
   documentationReferences: Object.freeze(['saas/docs/developer-guide.md']),
   futureFeatures: Object.freeze(['licensing-packaging']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

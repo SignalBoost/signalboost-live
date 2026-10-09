@@ -40,5 +40,5 @@ export const providerHubManifest: PortableProductManifest = Object.freeze({
     'saas/docs/provider-integration.md',
   ]),
   futureFeatures: Object.freeze(['dedicated-self-service-provider-hub', 'enterprise-admin-console', 'white-label-packaging', 'licensing-enforcement']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

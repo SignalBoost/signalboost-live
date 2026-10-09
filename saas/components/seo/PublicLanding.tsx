@@ -3,7 +3,7 @@ import { PUBLIC_BRAND } from '@/lib/public-brand'
 import { PUBLIC_COPY } from '@/lib/seo/publicCopy'
 import { PUBLIC_LOCALES, PUBLIC_LOCALE_NAMES, PUBLIC_TOPICS, publicPagePath, type PublicLocale, type PublicTopic } from '@/lib/seo/publicLocales'
 import { publicPageSchema, publicTopicCopy } from '@/lib/seo/publicSeo'
-import { writingDirection } from '@/lib/i18n/localeExpansion'
+import { writingDirection } from '@/lib/i18n/supportedLanguages'
 
 const EU_PRIVACY_COPY: Partial<Record<PublicLocale, { heading: string; body: string; link: string }>> = {
   en: { heading: 'Privacy, GDPR and data location', body: 'We take European data-protection requirements seriously. Where personal data is stored or processed can depend on the service and the providers you connect. Review our data-handling information and contact support for the applicable hosting region, subprocessors, international transfers, retention and your access or deletion rights before sharing sensitive data.', link: 'Data-handling information' },

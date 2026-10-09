@@ -50,5 +50,5 @@ export const marketingSalesManifest: PortableProductManifest = Object.freeze({
   architectureReferences: Object.freeze(['marketing-sales-core', 'marketing-sales-host', 'lib/outreach/marketing-sales-portable', 'lib/ads/ads-connector', 'scripts/build-marketing-sales-portable']),
   documentationReferences: Object.freeze(['saas/docs/marketing-sales-module-design.md', 'docs/portables/social-outreach-integration-guide.md', 'docs/portables/buyer-package/social-outreach-presentation.md']),
   futureFeatures: Object.freeze(['catalog-templates']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

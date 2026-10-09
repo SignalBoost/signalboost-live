@@ -22,7 +22,7 @@
 //
 // Zero imports.
 
-export type VerificationLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type VerificationLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 /** Coarse classes of current fact, each with an obvious authoritative place to look. */
 type FactClass = 'travel' | 'price' | 'hours' | 'role' | 'status' | 'generic'
@@ -99,11 +99,77 @@ const COPY: Record<VerificationLanguage, { opening: string; where: Record<FactCl
       generic: 'Первичный источник по теме даст актуальный ответ.',
     },
   },
+  de: {
+    opening: 'Ich konnte dies gerade nicht anhand einer aktuellen Quelle bestätigen, und es handelt sich um eine Angabe, die sich ändert. Daher antworte ich lieber nicht aus dem Gedächtnis und riskiere, veraltet zu sein.',
+    where: {
+      travel: 'Die Website des Betreibers oder eine Live-Buchungssuche zeigt die heutigen Verbindungen und Zeiten.',
+      price: 'Die Preisseite des Anbieters nennt den aktuellen Betrag.',
+      hours: 'Der Eintrag oder die Website des Veranstaltungsorts nennt die heutigen Öffnungszeiten.',
+      role: 'Die Website der Organisation ist die verlässliche Quelle dafür, wer die Position derzeit innehat.',
+      status: 'Die Seite des Anbieters zeigt den aktuellen Status.',
+      generic: 'Eine Primärquelle zum Thema liefert die aktuelle Antwort.',
+    },
+  },
+  fr: {
+    opening: 'Je n’ai pas pu le confirmer auprès d’une source récente pour le moment, et c’est le genre d’information qui change ; je préfère donc ne pas répondre de mémoire au risque d’être dépassé.',
+    where: {
+      travel: 'Le site de l’opérateur ou une recherche de réservation en direct indiquera les itinéraires et horaires du jour.',
+      price: 'La page de tarifs du fournisseur indiquera le montant actuel.',
+      hours: 'La fiche ou le site de l’établissement indiquera les horaires du jour.',
+      role: 'Le site de l’organisation est la source fiable pour savoir qui occupe actuellement ce poste.',
+      status: 'La page du fournisseur affichera le statut actuel.',
+      generic: 'Une source primaire sur le sujet fournira la réponse actuelle.',
+    },
+  },
+  it: {
+    opening: 'Non sono riuscito a confermarlo con una fonte aggiornata in questo momento, ed è un tipo di dato che cambia, quindi preferisco non rispondere a memoria rischiando di essere superato.',
+    where: {
+      travel: 'Il sito dell’operatore o una ricerca di prenotazione in tempo reale riporterà le tratte e gli orari di oggi.',
+      price: 'La pagina dei prezzi del fornitore riporterà la cifra attuale.',
+      hours: 'La scheda o il sito del locale riporterà gli orari di oggi.',
+      role: 'Il sito dell’organizzazione è la fonte affidabile per sapere chi ricopre attualmente la posizione.',
+      status: 'La pagina del fornitore mostrerà lo stato attuale.',
+      generic: 'Una fonte primaria sull’argomento fornirà la risposta aggiornata.',
+    },
+  },
+  ja: {
+    opening: '現時点では最新の情報源で確認できませんでした。この種の情報は変わるため、記憶に頼って回答し、情報が古くなるリスクは避けたいと思います。',
+    where: {
+      travel: '運行会社の公式サイトやリアルタイムの予約検索で、本日の路線と時刻を確認できます。',
+      price: 'プロバイダーの料金ページで現在の金額を確認できます。',
+      hours: '施設の掲載情報や公式サイトで本日の営業時間を確認できます。',
+      role: '現在その役職に就いている人物については、その組織の公式サイトが信頼できる情報源です。',
+      status: 'プロバイダーの公式ページで現在のステータスを確認できます。',
+      generic: 'このテーマに関する一次情報源で最新の回答を確認できます。',
+    },
+  },
+  ko: {
+    opening: '지금은 최신 출처로 이를 확인할 수 없었고, 이런 정보는 바뀌기 쉬우므로 기억에 의존해 답변했다가 오래된 정보가 될 위험을 감수하지 않겠습니다.',
+    where: {
+      travel: '운영사 공식 사이트나 실시간 예약 검색에서 오늘의 노선과 시간을 확인할 수 있습니다.',
+      price: '제공업체의 요금 페이지에서 현재 금액을 확인할 수 있습니다.',
+      hours: '해당 장소의 등록 정보나 사이트에서 오늘의 영업시간을 확인할 수 있습니다.',
+      role: '현재 해당 직책을 맡고 있는 사람은 그 조직의 공식 사이트에서 확인하는 것이 가장 신뢰할 수 있습니다.',
+      status: '제공업체의 페이지에서 현재 상태를 확인할 수 있습니다.',
+      generic: '해당 주제의 1차 출처에서 최신 답변을 확인할 수 있습니다.',
+    },
+  },
+  ar: {
+    opening: 'لم أتمكن من التحقق من ذلك عبر مصدر حديث الآن، وهذا من نوع المعلومات التي تتغير، لذا أفضّل ألا أجيب من الذاكرة وأخاطر بتقديم معلومات قديمة.',
+    where: {
+      travel: 'سيعرض موقع المشغّل نفسه أو بحث الحجز المباشر مسارات ومواعيد اليوم.',
+      price: 'ستعرض صفحة الأسعار الخاصة بالمزوّد الرقم الحالي.',
+      hours: 'ستعرض صفحة المكان أو موقعه مواعيد العمل لهذا اليوم.',
+      role: 'موقع المنظمة نفسها هو المصدر الموثوق لمعرفة من يشغل المنصب حاليًا.',
+      status: 'ستعرض صفحة المزوّد الحالة الراهنة.',
+      generic: 'سيقدّم مصدر أولي حول الموضوع الإجابة الحالية.',
+    },
+  },
 }
 
 function normalize(language: string | null | undefined): VerificationLanguage {
   const code = String(language ?? 'en').trim().slice(0, 2).toLowerCase()
-  return code === 'es' || code === 'pt' || code === 'pl' || code === 'ru' ? code : 'en'
+  return code === 'es' || code === 'pt' || code === 'pl' || code === 'ru' || code === 'de' || code === 'fr' || code === 'it' || code === 'ja' || code === 'ko' || code === 'ar' ? code : 'en'
 }
 
 /**

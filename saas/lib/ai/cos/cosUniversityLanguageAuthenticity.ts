@@ -11,7 +11,7 @@
  *   - English prose with the localized terms quoted inside it. Every required group matched, and
  *     `LANGUAGE_MARKERS` fired on a single accented character or one borrowed noun.
  *
- * Both defeat the purpose: five-language competence cannot be evidenced by keyword coverage. This
+ * Both defeat the purpose: platform-language competence cannot be evidenced by keyword coverage. This
  * module adds three deterministic host-side checks — no model, no network, no stored rubric:
  *
  *   1. Prose. The reply must be sentences, not a term list.
@@ -37,9 +37,11 @@ export const MAXIMUM_PACKET_SHINGLE_OVERLAP = 0.5
 const SHINGLE = 8
 
 /**
- * Closed-class words. Chosen to discriminate between the five platform languages rather than to be
+ * Closed-class words. Chosen to discriminate between the platform languages rather than to be
  * exhaustive: Spanish and Portuguese share most function words, so each list keeps the forms the
- * other does not use (`el/los/las/una` against `o/os/as/uma/do/da`).
+ * other does not use (`el/los/las/una` against `o/os/as/uma/do/da`). The same rule separates Italian
+ * from Spanish/French (`il/gli/della/è` against `el/los` and `le/les/des`). Japanese, Korean and
+ * Arabic are identified by their own scripts (see ORTHOGRAPHY), so their lists stay empty.
  */
 const FUNCTION_WORDS: Record<CosPlatformLanguage, readonly string[]> = Object.freeze({
   en: ['the', 'and', 'of', 'to', 'is', 'are', 'that', 'with', 'this', 'for', 'not', 'but', 'has',
@@ -52,6 +54,15 @@ const FUNCTION_WORDS: Record<CosPlatformLanguage, readonly string[]> = Object.fr
     'ale', 'oraz', 'który', 'która', 'które', 'przy', 'jako', 'już', 'tylko', 'zostało'],
   ru: ['и', 'в', 'не', 'что', 'на', 'с', 'по', 'для', 'это', 'как', 'из', 'но', 'при', 'же',
     'есть', 'был', 'была', 'будет', 'к', 'от', 'ещё', 'только', 'который', 'которые'],
+  de: ['der', 'die', 'das', 'und', 'ist', 'nicht', 'mit', 'für', 'ein', 'eine', 'einen', 'zu', 'den',
+    'von', 'auf', 'dem', 'des', 'sich', 'auch', 'noch', 'wird', 'wurde', 'sind', 'bei', 'nach', 'dass', 'aber'],
+  fr: ['le', 'les', 'des', 'du', 'est', 'une', 'pour', 'avec', 'pas', 'dans', 'qui', 'sur', 'au',
+    'aux', 'cette', 'sont', 'été', 'mais', 'leur', 'ces', 'ont', 'être', 'elle', 'donc', 'reste'],
+  it: ['il', 'gli', 'di', 'che', 'è', 'per', 'della', 'delle', 'dei', 'degli', 'nel', 'nella', 'alla',
+    'sono', 'non', 'anche', 'ma', 'questo', 'questa', 'perché', 'più', 'ancora', 'già', 'stato', 'stata'],
+  ja: [],
+  ko: [],
+  ar: [],
 })
 
 /**
@@ -65,14 +76,28 @@ const ORTHOGRAPHY: Record<CosPlatformLanguage, RegExp | null> = Object.freeze({
   pt: /(?:ção|ções|ã|õ|ç|nh|lh)/g,
   pl: /[ąćęłńśźż]/g,
   ru: /[а-яё]/g,
+  de: /[äöüß]/g,
+  // Avoids â/ê/ô, which Portuguese also uses, and è, which Italian uses as a verb.
+  fr: /(?:[îûëïœ]|eau)/g,
+  it: /(?:[ìò]|zz|cch)/g,
+  // Kana never occurs in Chinese-only text, so Han characters alone do not count as Japanese.
+  ja: /[\u3040-\u30ff]/g,
+  ko: /[\uac00-\ud7af]/g,
+  ar: /[\u0621-\u064a]/g,
 })
 
 const PLATFORM_LANGUAGES: readonly CosPlatformLanguage[] = COS_PLATFORM_LANGUAGES.map(item => item.id)
 
+/**
+ * Japanese and Chinese are written without spaces, and Korean attaches particles and endings to each
+ * word, so each kana, Han or Hangul syllable is its own token. Sentence length then reflects content
+ * rather than spacing conventions; the three-sentence prose rule still rejects a term list.
+ */
 function tokens(value: string): string[] {
   return String(value ?? '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/gu, character => ` ${character} `)
     .split(/\s+/)
     .filter(Boolean)
 }
@@ -80,7 +105,7 @@ function tokens(value: string): string[] {
 /** Sentences long enough to be prose. A comma-separated term list produces none. */
 function proseSentences(value: string): string[] {
   return String(value ?? '')
-    .split(/(?<=[.!?。！？])\s+|\n+/)
+    .split(/(?<=[.!?؟])\s+|(?<=[。！？])\s*|\n+/)
     .map(part => part.trim())
     .filter(part => tokens(part).length >= MINIMUM_PROSE_SENTENCE_TOKENS)
 }

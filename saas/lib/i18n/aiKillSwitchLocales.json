@@ -24,5 +24,35 @@
     "unavailable": "АВТОНОМИЯ ИИ ЗАБЛОКИРОВАНА — ГЛОБАЛЬНЫЙ СТАТУС НЕ ЧИТАЕТСЯ",
     "unavailableDescription": "Не удалось прочитать строку глобального статуса ИИ. Входящий трафик Supervisor, автоматические вебхуки и фоновые cron-задачи по умолчанию блокируются именно в этом случае, поэтому автономное выполнение сейчас отклоняется, хотя аварийный выключатель никто не активировал. Пользовательский трафик работает как обычно.",
     "unavailableAction": "Выполните supabase/migrations/20260726_ensure_global_ai_kill_switch.sql и перезагрузите эту страницу. Переключателем нельзя управлять, пока строка глобального статуса не станет читаемой."
+  },
+  "de": {
+    "unavailable": "KI-AUTONOMIE BLOCKIERT — GLOBALER STATUS NICHT LESBAR",
+    "unavailableDescription": "Die globale KI-Statuszeile konnte nicht gelesen werden. Supervisor-Eingang, automatisierte Webhooks und Cron-Hintergrundjobs schlagen genau bei dieser Bedingung geschlossen fehl, daher wird die autonome Ausführung gerade abgelehnt, obwohl niemand den Notschalter betätigt hat. Menschlicher Datenverkehr läuft normal weiter.",
+    "unavailableAction": "Führen Sie supabase/migrations/20260726_ensure_global_ai_kill_switch.sql aus und laden Sie diese Seite anschließend neu. Der Schalter kann erst bedient werden, wenn die globale Statuszeile lesbar ist."
+  },
+  "fr": {
+    "unavailable": "AUTONOMIE DE L'IA BLOQUÉE — ÉTAT GLOBAL ILLISIBLE",
+    "unavailableDescription": "La ligne d'état global de l'IA n'a pas pu être lue. L'entrée du Superviseur, les webhooks automatisés et les tâches cron en arrière-plan échouent en mode fermé précisément dans ce cas ; l'exécution autonome est donc rejetée en ce moment, même si personne n'a activé l'arrêt d'urgence. Le trafic humain continue normalement.",
+    "unavailableAction": "Exécutez supabase/migrations/20260726_ensure_global_ai_kill_switch.sql, puis rechargez cette page. L'interrupteur ne peut pas être utilisé tant que la ligne d'état global n'est pas lisible."
+  },
+  "it": {
+    "unavailable": "AUTONOMIA DELL'IA BLOCCATA — STATO GLOBALE ILLEGGIBILE",
+    "unavailableDescription": "Impossibile leggere la riga di stato globale dell'IA. L'ingresso del Supervisore, i webhook automatici e i job cron in background falliscono in modalità chiusa proprio in questa condizione, quindi l'esecuzione autonoma viene rifiutata in questo momento anche se nessuno ha attivato l'interruttore di emergenza. Il traffico umano prosegue normalmente.",
+    "unavailableAction": "Esegui supabase/migrations/20260726_ensure_global_ai_kill_switch.sql, quindi ricarica questa pagina. L'interruttore non può essere usato finché la riga di stato globale non è leggibile."
+  },
+  "ja": {
+    "unavailable": "AI の自律実行がブロックされています — グローバルステータスを読み取れません",
+    "unavailableDescription": "グローバル AI ステータス行を読み取れませんでした。スーパーバイザーの受信、自動 Webhook、バックグラウンドの cron ジョブは、まさにこの状態でフェイルクローズするため、誰もキルスイッチを作動させていなくても、現在自律実行は拒否されています。人によるトラフィックは通常どおり継続します。",
+    "unavailableAction": "supabase/migrations/20260726_ensure_global_ai_kill_switch.sql を実行してから、このページを再読み込みしてください。グローバルステータス行が読み取れるようになるまで、スイッチは操作できません。"
+  },
+  "ko": {
+    "unavailable": "AI 자율 실행 차단됨 — 전역 상태를 읽을 수 없음",
+    "unavailableDescription": "전역 AI 상태 행을 읽을 수 없습니다. 감독자 수신, 자동화된 웹훅 및 백그라운드 cron 작업은 바로 이 조건에서 페일 클로즈되므로, 아무도 킬 스위치를 작동하지 않았더라도 현재 자율 실행이 거부되고 있습니다. 사람의 트래픽은 정상적으로 계속됩니다.",
+    "unavailableAction": "supabase/migrations/20260726_ensure_global_ai_kill_switch.sql을 실행한 후 이 페이지를 새로 고치세요. 전역 상태 행을 읽을 수 있을 때까지 스위치를 작동할 수 없습니다."
+  },
+  "ar": {
+    "unavailable": "تم حظر استقلالية الذكاء الاصطناعي — تعذّرت قراءة الحالة العامة",
+    "unavailableDescription": "تعذّرت قراءة صف الحالة العامة للذكاء الاصطناعي. تفشل مدخلات المشرف وخطافات الويب الآلية ومهام cron في الخلفية بوضع الإغلاق عند هذا الشرط تحديدًا، لذا يُرفض التنفيذ الذاتي الآن رغم أن أحدًا لم يفعّل مفتاح الإيقاف الطارئ. تستمر حركة المرور البشرية بشكل طبيعي.",
+    "unavailableAction": "شغّل supabase/migrations/20260726_ensure_global_ai_kill_switch.sql ثم أعد تحميل هذه الصفحة. لا يمكن تشغيل المفتاح حتى يصبح صف الحالة العامة قابلًا للقراءة."
   }
 }

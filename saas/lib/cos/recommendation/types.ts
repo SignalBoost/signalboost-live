@@ -49,7 +49,7 @@ export type CosRecommendation = {
 export type CosCampaignAsset = {
   type: 'script' | 'thumbnail' | 'description' | 'seo' | 'translation' | 'post' | 'email'
   status: 'needed' | 'drafted' | 'approved' | 'published'
-  language?: 'en' | 'es' | 'pt' | 'pl' | 'ru'
+  language?: 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
   brief: string
 }
 
@@ -60,7 +60,7 @@ export type CosCampaign = {
   objective: string
   channel: CosChannel
   audience: string
-  languages: Array<'en' | 'es' | 'pt' | 'pl' | 'ru'>
+  languages: Array<'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'>
   assets: CosCampaignAsset[]
   approval_status: CosApprovalStatus
   created_at: string

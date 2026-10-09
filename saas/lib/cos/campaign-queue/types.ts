@@ -13,7 +13,7 @@ export type CosCampaignWorkItem = {
     campaign_id: string
     recommendation_id: string
     channel: CosCampaign['channel']
-    language: 'en' | 'es' | 'pt' | 'pl' | 'ru'
+    language: 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
     brief: string
   }
   output?: Record<string, unknown>

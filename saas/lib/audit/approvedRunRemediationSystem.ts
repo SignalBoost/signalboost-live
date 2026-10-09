@@ -22,7 +22,7 @@ const OWNER = 'SignalBoost'
 const BASE_BRANCH = 'main'
 const MAX_GITHUB_ATTEMPTS = 3
 const RETRY_DELAYS_MS = [0, 500, 1500] as const
-const SUPPORTED_LANGS = ['es', 'pt', 'pl', 'ru'] as const
+const SUPPORTED_LANGS = ['es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 
 const ROOT_CATALOG = 'lib/i18n/approvedAuditRemediationCopy.ts'
 const SAAS_CATALOG = 'saas/lib/i18n/approvedAuditRemediationCopy.ts'

@@ -115,6 +115,66 @@ test('language examinations are independent by language and communication dimens
   }
 })
 
+const NATIVE_LANGUAGE_ANSWERS = {
+  de: {
+    comprehension: 'Projekt Orion hat am 14. September 3 Prüfungen bestanden. Der Status der Bereitstellung ist weiterhin unbekannt.',
+    writing: 'Es wurden 27 Tests bestanden. Die Bereitstellung ist noch nicht verifiziert. Als Nächstes führen wir einen Smoke-Check durch.',
+    instruction_following: '1. Verantwortlich: Maya; Frist: Freitag; Erledigt, wenn der Bericht geprüft ist.\n2. Verantwortlich: Maya; Frist: Freitag; Erledigt, wenn die Tests grün sind.\n3. Verantwortlich: Maya; Frist: Freitag; Erledigt, wenn die Freigabe vorliegt.',
+    translation_localization: 'Die Besprechung findet am 12. September um 14:30 Uhr statt. Bitte bringen Sie das Risiko-Memo mit.',
+    cultural_pragmatics: 'Hallo Anna, könnten wir das Meeting morgen bitte um eine Stunde verschieben? Vielen Dank im Voraus, und sagen Sie mir gern, falls die neue Zeit nicht passt.',
+  },
+  fr: {
+    comprehension: 'Le projet Orion a réussi 3 vérifications le 14 septembre. L’état du déploiement reste inconnu.',
+    writing: 'Les 27 tests ont réussi. Le déploiement n’est pas encore vérifié. La prochaine étape est un smoke check.',
+    instruction_following: '1. Responsable : Maya ; échéance : vendredi ; terminé quand le rapport est relu.\n2. Responsable : Maya ; échéance : vendredi ; terminé quand les tests passent.\n3. Responsable : Maya ; échéance : vendredi ; terminé quand la validation est obtenue.',
+    translation_localization: 'La revue a lieu le 12 septembre à 14:30. Apportez la note sur les risques.',
+    cultural_pragmatics: 'Bonjour Claire, pourriez-vous décaler la réunion de demain d’une heure ? Merci beaucoup, et n’hésitez pas à me dire si ce nouvel horaire ne vous convient pas.',
+  },
+  it: {
+    comprehension: 'Il progetto Orion ha superato 3 controlli il 14 settembre. Lo stato del rilascio resta sconosciuto.',
+    writing: 'Sono stati superati 27 test. Il rilascio non è ancora verificato. Il prossimo passo è uno smoke check.',
+    instruction_following: '1. Responsabile: Maya; scadenza: venerdì; completato quando il rapporto è rivisto.\n2. Responsabile: Maya; scadenza: venerdì; completato quando i test sono verdi.\n3. Responsabile: Maya; scadenza: venerdì; completato quando arriva l’approvazione.',
+    translation_localization: 'La revisione è il 12 settembre alle 14:30. Porta la nota sui rischi.',
+    cultural_pragmatics: 'Ciao Luca, potremmo spostare di un’ora la riunione di domani per favore? Grazie mille, e dimmi pure se il nuovo orario non ti va bene.',
+  },
+  ja: {
+    comprehension: 'プロジェクト Orion は9月14日に3件のチェックに合格しました。デプロイの状態はまだ不明です。',
+    writing: '27件のテストに合格しました。デプロイはまだ検証されていません。次のステップはスモークチェックです。',
+    instruction_following: '1. 担当者：Maya、期限：金曜日、完了条件：レポートのレビューが終わったとき。\n2. 担当者：Maya、期限：金曜日、完了条件：テストがすべて通ったとき。\n3. 担当者：Maya、期限：金曜日、完了条件：承認が得られたとき。',
+    translation_localization: 'レビューは9月12日の14:30に行われます。リスクメモをお持ちください。',
+    cultural_pragmatics: 'お疲れさまです。明日の会議を1時間後ろにずらしていただけますか。ご都合が合わない場合は遠慮なくお知らせください。よろしくお願いします。ありがとうございます。',
+  },
+  ko: {
+    comprehension: '프로젝트 Orion은 9월 14일에 3개의 검사를 통과했습니다. 배포 상태는 아직 알 수 없습니다.',
+    writing: '27개의 테스트를 통과했습니다. 배포는 아직 검증되지 않았습니다. 다음 단계는 스모크 점검입니다.',
+    instruction_following: '1. 담당자: Maya, 기한: 금요일, 완료 기준: 보고서 검토 완료.\n2. 담당자: Maya, 기한: 금요일, 완료 기준: 테스트 전체 통과.\n3. 담당자: Maya, 기한: 금요일, 완료 기준: 승인 확보.',
+    translation_localization: '검토는 9월 12일 14:30에 진행됩니다. 위험 메모를 가져오세요.',
+    cultural_pragmatics: '안녕하세요. 내일 회의를 한 시간 늦춰 주실 수 있을까요? 혹시 그 시간이 어려우시면 편하게 말씀해 주세요. 감사합니다.',
+  },
+  ar: {
+    comprehension: 'اجتاز مشروع Orion ثلاثة فحوصات (3) في 14 سبتمبر. لا تزال حالة النشر غير معروفة.',
+    writing: 'نجح 27 اختبارًا. لم يتم التحقق من النشر بعد. الخطوة التالية هي فحص أولي (smoke check).',
+    instruction_following: '1. المسؤول: Maya؛ الموعد النهائي: الجمعة؛ يكتمل عند مراجعة التقرير.\n2. المسؤول: Maya؛ الموعد النهائي: الجمعة؛ يكتمل عند نجاح الاختبارات.\n3. المسؤول: Maya؛ الموعد النهائي: الجمعة؛ يكتمل عند الحصول على الموافقة.',
+    translation_localization: 'المراجعة في 12 سبتمبر الساعة 14:30. أحضر مذكرة المخاطر.',
+    cultural_pragmatics: 'مرحبًا، هل يمكننا تأجيل اجتماع الغد ساعة واحدة؟ شكرًا جزيلًا، ولا تتردد في إخباري إذا كان الموعد الجديد لا يناسبك.',
+  },
+} as const
+
+test('the six newer platform languages are examined in their own language and pass only native answers', () => {
+  for (const [language, answers] of Object.entries(NATIVE_LANGUAGE_ANSWERS) as Array<[keyof typeof NATIVE_LANGUAGE_ANSWERS, Record<string, string>]>) {
+    for (const [dimension, reply] of Object.entries(answers)) {
+      const target = { kind: 'language', language, dimension } as CosUniversityExamTarget
+      const exam = buildCosUniversityBlindExam('12345678-1234-4234-8234-123456789abc', target)
+      assert.doesNotMatch(exam.prompt, /\b(?:in English|professional English|into natural professional English)\b/, `${language}:${dimension}`)
+      const score = scoreCosUniversityBlindExam(exam, reply, provenance)
+      assert.equal(score.passed, true, `${language}:${dimension}: ${score.reasons.join(',')}`)
+    }
+    const exam = buildCosUniversityBlindExam('12345678-1234-4234-8234-123456789abc', { kind: 'language', language, dimension: 'comprehension' })
+    const english = scoreCosUniversityBlindExam(exam, 'Project Orion passed 3 checks on 14 September. Deployment status remains unknown.', provenance)
+    assert.equal(english.passed, false, `${language}: English answer accepted`)
+  }
+})
+
 test('exam selection always reserves one subject and one language-dimension lane', () => {
   const now = new Date('2026-09-08T00:00:00.000Z')
   const first = selectCosUniversityExamTargets([], now)

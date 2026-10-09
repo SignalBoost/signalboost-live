@@ -11,7 +11,7 @@ import { PUBLIC_COPY } from '@/lib/seo/publicCopy'
 
 const GOLD = '#ffc300'
 
-type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type FooterCopy = {
   product: string
@@ -52,6 +52,24 @@ const COPY: Record<Language, FooterCopy> = {
   },
   ru: {
     product: 'Продукт', home: 'Главная', pricing: 'Цены', repoCheck: 'Бесплатная проверка репозитория', websiteOptimizer: 'Бесплатный оптимизатор сайта', dashboard: 'Панель', documentation: 'Документация', faq: 'Частые вопросы', podcasters: 'Подкастеры', build: 'Создание', buildWebsite: 'Создать сайт', collectReviews: 'Собирать отзывы', generateNativeAudio: 'Создать естественное аудио', createVideos: 'Создавать видео', company: 'Компания', about: 'О нас', partners: 'Партнёры', privacy: 'Конфиденциальность', contact: 'Контакты', nativeExperiences: 'Локализованные версии доступны на языках', poweredBy: 'Работает на платформе',
+  },
+  de: {
+    product: 'Produkt', home: 'Startseite', pricing: 'Preise', repoCheck: 'Kostenlose Repo-Prüfung', websiteOptimizer: 'Kostenloser Website-Optimierer', dashboard: 'Dashboard', documentation: 'Dokumentation', faq: 'Häufige Fragen', podcasters: 'Podcaster', build: 'Erstellen', buildWebsite: 'Website erstellen', collectReviews: 'Bewertungen sammeln', generateNativeAudio: 'Natives Audio generieren', createVideos: 'Videos erstellen', company: 'Unternehmen', about: 'Über', partners: 'Partner', privacy: 'Datenschutz', contact: 'Kontakt', nativeExperiences: 'Native Erlebnisse verfügbar in', poweredBy: 'Bereitgestellt von',
+  },
+  fr: {
+    product: 'Produit', home: 'Accueil', pricing: 'Tarifs', repoCheck: 'Vérification gratuite du dépôt', websiteOptimizer: 'Optimiseur de site web gratuit', dashboard: 'Tableau de bord', documentation: 'Documentation', faq: 'FAQ', podcasters: 'Podcasteurs', build: 'Créer', buildWebsite: 'Créer un site web', collectReviews: 'Collecter des avis', generateNativeAudio: 'Générer un audio natif', createVideos: 'Créer des vidéos', company: 'Entreprise', about: 'À propos', partners: 'Partenaires', privacy: 'Confidentialité', contact: 'Contact', nativeExperiences: 'Expériences natives disponibles en', poweredBy: 'Propulsé par',
+  },
+  it: {
+    product: 'Prodotto', home: 'Home', pricing: 'Prezzi', repoCheck: 'Controllo gratuito del repository', websiteOptimizer: 'Ottimizzatore di siti web gratuito', dashboard: 'Dashboard', documentation: 'Documentazione', faq: 'FAQ', podcasters: 'Podcaster', build: 'Crea', buildWebsite: 'Crea un sito web', collectReviews: 'Raccogli recensioni', generateNativeAudio: 'Genera audio nativo', createVideos: 'Crea video', company: 'Azienda', about: 'Informazioni', partners: 'Partner', privacy: 'Privacy', contact: 'Contatto', nativeExperiences: 'Esperienze native disponibili in', poweredBy: 'Con tecnologia di',
+  },
+  ja: {
+    product: '製品', home: 'ホーム', pricing: '料金', repoCheck: '無料リポジトリチェック', websiteOptimizer: '無料 Web サイト最適化ツール', dashboard: 'ダッシュボード', documentation: 'ドキュメント', faq: 'よくある質問', podcasters: 'ポッドキャスター', build: '構築', buildWebsite: 'Web サイトを作成', collectReviews: 'レビューを収集', generateNativeAudio: 'ネイティブ音声を生成', createVideos: '動画を作成', company: '会社', about: '概要', partners: 'パートナー', privacy: 'プライバシー', contact: '連絡先', nativeExperiences: 'ネイティブ対応言語：', poweredBy: '提供元',
+  },
+  ko: {
+    product: '제품', home: '홈', pricing: '요금', repoCheck: '무료 저장소 점검', websiteOptimizer: '무료 웹사이트 최적화 도구', dashboard: '대시보드', documentation: '문서', faq: '자주 묻는 질문', podcasters: '팟캐스터', build: '빌드', buildWebsite: '웹사이트 만들기', collectReviews: '리뷰 수집', generateNativeAudio: '네이티브 오디오 생성', createVideos: '동영상 만들기', company: '회사', about: '정보', partners: '파트너', privacy: '개인정보 보호', contact: '연락처', nativeExperiences: '기본 제공 언어:', poweredBy: '제공:',
+  },
+  ar: {
+    product: 'المنتج', home: 'الرئيسية', pricing: 'الأسعار', repoCheck: 'فحص مجاني للمستودع', websiteOptimizer: 'أداة مجانية لتحسين المواقع', dashboard: 'لوحة المعلومات', documentation: 'الوثائق', faq: 'الأسئلة الشائعة', podcasters: 'صانعو البودكاست', build: 'إنشاء', buildWebsite: 'إنشاء موقع ويب', collectReviews: 'جمع المراجعات', generateNativeAudio: 'إنشاء صوت أصلي', createVideos: 'إنشاء مقاطع فيديو', company: 'الشركة', about: 'حول', partners: 'الشركاء', privacy: 'الخصوصية', contact: 'جهة الاتصال', nativeExperiences: 'تجارب أصلية متاحة بـ', poweredBy: 'مدعوم من',
   },
 }
 

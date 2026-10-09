@@ -1,4 +1,5 @@
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
+import { SUPPORTED_LANGUAGE_NAMES, normalizeSupportedLanguage } from '../../i18n/supportedLanguages.ts'
 import type { FreshEvidenceSemanticPlan } from './freshEvidenceSynthesisContract.ts'
 
 export type FreshEvidencePredicateAmbiguityKind =
@@ -35,12 +36,7 @@ const ALLOWED_AMBIGUITY_KINDS = new Set<FreshEvidencePredicateAmbiguityKind>([
 ])
 
 function languageLabel(language: string): string {
-  const normalized = String(language || 'en').toLowerCase()
-  if (normalized === 'es') return 'Spanish'
-  if (normalized === 'pt' || normalized === 'pt-br') return 'Portuguese'
-  if (normalized === 'pl') return 'Polish'
-  if (normalized === 'ru') return 'Russian'
-  return 'English'
+  return SUPPORTED_LANGUAGE_NAMES[normalizeSupportedLanguage(language || 'en')]
 }
 
 function parseJsonObject(text: string): Record<string, unknown> | null {

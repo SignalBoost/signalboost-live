@@ -21,7 +21,16 @@ const LANGUAGE_NAMES = {
   pt: 'natural Brazilian Portuguese',
   pl: 'natural Polish',
   ru: 'natural Russian',
+  de: 'natural German using the formal "Sie" form',
+  fr: 'natural French using the formal "vous" form',
+  it: 'natural Italian using the informal "tu" form',
+  ja: 'natural Japanese in polite です/ます style',
+  ko: 'natural Korean in polite 합니다/하세요 style',
+  ar: 'natural Modern Standard Arabic',
 }
+
+const missingLanguageNames = TARGET_UI_LOCALES.filter(locale => !LANGUAGE_NAMES[locale])
+if (missingLanguageNames.length) throw new Error(`No translation language name for locale(s): ${missingLanguageNames.join(', ')}`)
 
 const TOKEN_PATTERN = /\{\{[^{}]+\}\}|\$\{[^{}]+\}|\{[^{}]+\}|%(?:\d+\$)?[sdif]|https?:\/\/[^\s)\]}]+|\b[^\s@]+@[^\s@]+\.[^\s@]+\b|`[^`]+`/g
 

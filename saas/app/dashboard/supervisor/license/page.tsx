@@ -26,11 +26,11 @@ import {
   type LicenseMintResult,
 } from '@/lib/supervisor/licenseMintContract'
 
-type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 function pick(value?: string): Language {
   const short = String(value || 'en').slice(0, 2).toLowerCase()
-  return (['en', 'es', 'pt', 'pl', 'ru'] as Language[]).includes(short as Language) ? (short as Language) : 'en'
+  return (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as Language[]).includes(short as Language) ? (short as Language) : 'en'
 }
 
 function editionLabel(copy: LicenseSetupCopy, value?: string) {

@@ -33,7 +33,7 @@ test('outreach engine, CRM, forecasting, financial, and KPI datasets are telemet
   assert.equal(FINANCIAL_LEDGER.unifiedRevenue, '$96.7K')
   assert.equal(KPI_DASHBOARD.unifiedEngagementIndex, '87/100')
   assert.equal(COCKPIT_PANELS.length, 6)
-  assert.deepEqual(REVIEW_ADMIN_TELEMETRY.localeVolume, ['en', 'es', 'pt', 'pl', 'ru'])
+  assert.deepEqual(REVIEW_ADMIN_TELEMETRY.localeVolume, ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
   assert.equal(REVIEW_ADMIN_TELEMETRY.outreachTrigger.includes('CRM'), true)
 })
 
@@ -44,10 +44,13 @@ test('concierge answers reviews sentiment and moderation queries with outreach c
 })
 
 test('i18n locales are supported for concierge fallback responses', () => {
+  const english = getConciergeAnswer('hello', 'en').reply
   for (const locale of SUPPORTED_LOCALES) {
     const answer = getConciergeAnswer('hello', locale)
     assert.equal(answer.language, locale)
-    assert.ok(answer.reply.length > 50)
+    // CJK scripts are denser than Latin ones, so assert a real localized sentence rather than a character count.
+    assert.ok(answer.reply.length > 20)
+    if (locale !== 'en') assert.notEqual(answer.reply, english)
   }
 })
 

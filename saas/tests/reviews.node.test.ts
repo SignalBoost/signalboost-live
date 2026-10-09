@@ -16,7 +16,7 @@ import {
 } from '../lib/reviews.ts'
 
 test('review submission metadata supports all five locales with flags and LTR-safe normalization', () => {
-  assert.deepEqual(REVIEW_LOCALES, ['en', 'es', 'pt', 'pl', 'ru'])
+  assert.deepEqual(REVIEW_LOCALES, ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
   for (const locale of REVIEW_LOCALES) {
     assert.equal(normalizeReviewLocale(`${locale}-${locale.toUpperCase()}`), locale)
     assert.ok(getFlagForLocale(locale).length > 0)

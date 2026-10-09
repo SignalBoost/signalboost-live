@@ -41,6 +41,12 @@ const LANG_NAMES: Record<string, string> = {
   pt: 'Portuguese',
   pl: 'Polish',
   ru: 'Russian',
+  de: 'German',
+  fr: 'French',
+  it: 'Italian',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ar: 'Arabic',
 }
 
 function sameOriginOk(req: Request) {

@@ -226,9 +226,9 @@ test('with no failure signal continuous machine education targets A+ by default'
   assert.ok(target?.reasons.includes('academic_gap=unassessed->A+'))
 })
 
-test('SignalBoost platform languages are exactly English Spanish Portuguese Polish and Russian', () => {
-  assert.deepEqual(COS_PLATFORM_LANGUAGES.map(language => language.id), ['en', 'es', 'pt', 'pl', 'ru'])
-  assert.deepEqual(COS_PLATFORM_LANGUAGES.map(language => language.title), ['English', 'Spanish', 'Portuguese', 'Polish', 'Russian'])
+test('SignalBoost platform languages are exactly the eleven platform languages', () => {
+  assert.deepEqual(COS_PLATFORM_LANGUAGES.map(language => language.id), ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
+  assert.deepEqual(COS_PLATFORM_LANGUAGES.map(language => language.title), ['English', 'Spanish', 'Portuguese', 'Polish', 'Russian', 'German', 'French', 'Italian', 'Japanese', 'Korean', 'Arabic'])
   assert.ok(COS_PLATFORM_LANGUAGES.every(language => language.required))
 })
 
@@ -256,7 +256,7 @@ test('one weak language dimension blocks the language from being averaged upward
   assert.equal(entry.dimensionsPassed.includes('writing'), false)
 })
 
-test('five-language graduation readiness requires every platform language independently at target', () => {
+test('platform-language graduation readiness requires every platform language independently at target', () => {
   const evidence: CosPlatformLanguageAssessmentEvidence[] = []
   for (const language of COS_PLATFORM_LANGUAGES) {
     evidence.push(

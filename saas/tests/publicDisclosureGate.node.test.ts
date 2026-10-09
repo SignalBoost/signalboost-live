@@ -103,7 +103,7 @@ test('ordinary questions containing the same words are not self-referential', ()
 })
 
 test('the implementation reply passes the gate it exists to satisfy', () => {
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     const reply = publicImplementationDisclosureReply(language)
     assert.deepEqual(publicDisclosureViolations(reply), [], language)
     assert.ok(reply.length > 80, language)
@@ -117,7 +117,7 @@ test('the implementation reply states a boundary, not an outage', () => {
 })
 
 test('unknown language falls back to English', () => {
-  assert.equal(publicImplementationDisclosureReply('de'), publicImplementationDisclosureReply('en'))
+  assert.equal(publicImplementationDisclosureReply('xx'), publicImplementationDisclosureReply('en'))
   assert.equal(publicImplementationDisclosureReply(null), publicImplementationDisclosureReply('en'))
 })
 

@@ -1,5 +1,5 @@
 // saas/marketing-sales-core/i18n/dictionaries.ts
-// Five-language dictionaries. The JSON files under ./data are the SINGLE SOURCE
+// Eleven-language dictionaries. The JSON files under ./data are the SINGLE SOURCE
 // of truth — this file only imports and types them, and the CI parity guard
 // validates the same JSON. No inline copy can drift, and the data travels inside
 // the module (self-contained / portable). No English default leaks: every key
@@ -10,7 +10,13 @@ import es from './data/es.json'
 import pt from './data/pt.json'
 import pl from './data/pl.json'
 import ru from './data/ru.json'
+import de from './data/de.json'
+import fr from './data/fr.json'
+import it from './data/it.json'
+import ja from './data/ja.json'
+import ko from './data/ko.json'
+import ar from './data/ar.json'
 
 export type MsDict = typeof en
 
-export const DICTIONARIES: Record<Lang, MsDict> = { en, es, pt, pl, ru }
+export const DICTIONARIES: Record<Lang, MsDict> = { en, es, pt, pl, ru, de, fr, it, ja, ko, ar }

@@ -579,9 +579,9 @@ test('the API is owner-gated read-only, the panel is mounted after the settings 
   for (const id of ids) assert.match(panel, new RegExp(`^\\s+${id}: 'stage[A-Za-z]+',$`, 'm'), `${id} has a label`)
 })
 
-test('the funnel copy has the same keys in all five languages and no empty string', () => {
+test('the funnel copy has the same keys in all eleven languages and no empty string', () => {
   const languages = Object.keys(COS_UNIVERSITY_FUNNEL_COPY).sort()
-  assert.deepEqual(languages, ['en', 'es', 'pl', 'pt', 'ru'])
+  assert.deepEqual(languages, ['ar', 'de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru'])
   const keys = Object.keys(COS_UNIVERSITY_FUNNEL_COPY.en)
   for (const language of languages) {
     const block = COS_UNIVERSITY_FUNNEL_COPY[language as keyof typeof COS_UNIVERSITY_FUNNEL_COPY]

@@ -6,7 +6,7 @@ function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-const FIVE_LANGUAGES: CosCampaign['languages'] = ['en', 'es', 'pt', 'pl', 'ru']
+const FIVE_LANGUAGES: CosCampaign['languages'] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 const DEFAULT_AUDIENCE = 'Small business owners and operators who need more growth capacity without adding manual work.'
 
 const LANGUAGE_LABELS: Record<CosCampaign['languages'][number], string> = {
@@ -15,6 +15,12 @@ const LANGUAGE_LABELS: Record<CosCampaign['languages'][number], string> = {
   pt: 'Portuguese',
   pl: 'Polish',
   ru: 'Russian',
+  de: 'German',
+  fr: 'French',
+  it: 'Italian',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ar: 'Arabic',
 }
 
 function cleanBrief(value: string, maxLength = 520) {

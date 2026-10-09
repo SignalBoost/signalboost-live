@@ -78,6 +78,42 @@ const LANGUAGE_RUBRIC_GROUPS: Record<CosPlatformLanguage, string[][]> = {
     ['доказательства', 'запись', 'релевантно'],
     ['аудитория', 'тон', 'смысл', 'инструкция'],
   ],
+  de: [
+    ['unbekannt', 'nicht verifiziert', 'nicht festgestellt', 'ungeklärt'],
+    ['verifizieren', 'verifizierung', 'überprüfen', 'prüfung'],
+    ['nachweis', 'beleg', 'aufzeichnung', 'relevant'],
+    ['zielgruppe', 'publikum', 'ton', 'bedeutung', 'anweisung'],
+  ],
+  fr: [
+    ['inconnu', 'inconnue', 'non vérifié', 'non établi'],
+    ['vérifier', 'vérification', 'contrôler'],
+    ['preuve', 'élément probant', 'registre', 'pertinent'],
+    ['public', 'ton', 'sens', 'consigne', 'instruction'],
+  ],
+  it: [
+    ['sconosciuto', 'sconosciuta', 'non verificato', 'non accertato'],
+    ['verificare', 'verifica', 'controllare'],
+    ['evidenza', 'prova', 'registro', 'rilevante'],
+    ['pubblico', 'destinatari', 'tono', 'significato', 'istruzione'],
+  ],
+  ja: [
+    ['不明', '未確認', '未検証', '確立されていない'],
+    ['検証', '確認', 'チェック'],
+    ['証拠', 'エビデンス', '記録', '関連'],
+    ['読み手', '対象者', 'トーン', '口調', '意味', '指示'],
+  ],
+  ko: [
+    ['알 수 없', '불명', '확인되지', '검증되지'],
+    ['검증', '확인', '점검'],
+    ['증거', '근거', '기록', '관련'],
+    ['대상', '독자', '어조', '톤', '의미', '지시'],
+  ],
+  ar: [
+    ['غير معروف', 'غير مؤكد', 'لم يتم التحقق', 'غير مثبت'],
+    ['التحقق', 'تحقق', 'فحص', 'مراجعة'],
+    ['دليل', 'الأدلة', 'أدلة', 'سجل', 'ذات صلة'],
+    ['الجمهور', 'النبرة', 'المعنى', 'التعليمات'],
+  ],
 }
 
 const LANGUAGE_FORBIDDEN: Record<CosPlatformLanguage, string[]> = {
@@ -86,6 +122,12 @@ const LANGUAGE_FORBIDDEN: Record<CosPlatformLanguage, string[]> = {
   pt: ['produção verificada', 'produção confirmada', 'sucesso garantido', 'sem incerteza'],
   pl: ['produkcja jest zweryfikowana', 'produkcja jest potwierdzona', 'gwarantowany sukces', 'bez niepewności'],
   ru: ['продакшен проверен', 'продакшен подтвержден', 'гарантированный успех', 'нет неопределенности'],
+  de: ['Produktion ist verifiziert', 'Produktion ist bestätigt', 'garantierter Erfolg', 'keine Unsicherheit'],
+  fr: ['la production est vérifiée', 'la production est confirmée', 'succès garanti', 'aucune incertitude'],
+  it: ['la produzione è verificata', 'la produzione è confermata', 'successo garantito', 'nessuna incertezza'],
+  ja: ['本番環境は検証済み', '本番環境は確認済み', '成功を保証', '不確実性なし'],
+  ko: ['프로덕션이 검증됨', '프로덕션이 확인됨', '성공 보장', '불확실성 없음'],
+  ar: ['تم التحقق من الإنتاج', 'تم تأكيد الإنتاج', 'نجاح مضمون', 'لا يوجد شك'],
 }
 
 function clean(value: unknown, max = 4000): string {
@@ -241,6 +283,24 @@ function localizedInstruction(language: CosPlatformLanguage, packet: string, sub
   }
   if (language === 'ru') {
     return `ЦЕЛЕНАПРАВЛЕННАЯ ПРАКТИКА. Ответьте только по-русски. Используйте факты задачи и релевантные управляемые знания, которые COS может извлечь; не выдумывайте факты. ${packet} Основная дисциплина: ${subjectTitle}. Цель обучения: ${objective}. Объясните, что подтверждено, что остаётся неизвестным, какие доказательства действительно релевантны и какая проверка должна быть следующей.`
+  }
+  if (language === 'de') {
+    return `GEZIELTE ÜBUNG. Antworten Sie ausschließlich auf Deutsch. Verwenden Sie die Fakten des Falls und jedes relevante verwaltete Wissen, das COS abrufen kann; erfinden Sie keine Fakten. ${packet} Hauptdisziplin: ${subjectTitle}. Lernziel: ${objective}. Erklären Sie, was belegt ist, was unbekannt bleibt, welche Nachweise tatsächlich relevant sind und welche Verifizierung als Nächstes erfolgen sollte.`
+  }
+  if (language === 'fr') {
+    return `PRATIQUE DÉLIBÉRÉE. Répondez uniquement en français. Utilisez les faits du cas et toute connaissance gouvernée pertinente que COS peut récupérer ; n’inventez aucun fait. ${packet} Discipline principale : ${subjectTitle}. Objectif d’apprentissage : ${objective}. Expliquez ce qui est étayé, ce qui reste inconnu, quelles preuves sont réellement pertinentes et quelle est la prochaine vérification.`
+  }
+  if (language === 'it') {
+    return `PRATICA DELIBERATA. Rispondi esclusivamente in italiano. Usa i fatti del caso e qualsiasi conoscenza governata pertinente che COS possa recuperare; non inventare fatti. ${packet} Disciplina principale: ${subjectTitle}. Obiettivo di apprendimento: ${objective}. Spiega che cosa è supportato, che cosa resta sconosciuto, quali evidenze sono davvero rilevanti e quale dovrebbe essere la prossima verifica.`
+  }
+  if (language === 'ja') {
+    return `意図的練習。日本語のみで回答してください。ケースの事実と、COS が取得できる関連する管理済みの知識を使い、事実を捏造しないでください。${packet} 主な分野：${subjectTitle}。学習目標：${objective}。何が裏付けられているか、何が不明のままか、どの証拠が本当に関連しているか、次にどの検証を行うべきかを説明してください。`
+  }
+  if (language === 'ko') {
+    return `의도적 연습. 한국어로만 답하세요. 사례의 사실과 COS가 가져올 수 있는 관련 관리 지식을 사용하고, 사실을 지어내지 마세요. ${packet} 주요 분야: ${subjectTitle}. 학습 목표: ${objective}. 무엇이 뒷받침되는지, 무엇이 아직 알 수 없는지, 어떤 증거가 실제로 관련이 있는지, 다음에 어떤 검증을 해야 하는지 설명하세요.`
+  }
+  if (language === 'ar') {
+    return `تدريب متعمَّد. أجب بالعربية فقط. استخدم وقائع الحالة وأي معرفة محكومة ذات صلة يستطيع COS استرجاعها، ولا تختلق أي وقائع. ${packet} التخصص الرئيسي: ${subjectTitle}. هدف التعلّم: ${objective}. اشرح ما هو مدعوم بالأدلة، وما الذي لا يزال غير معروف، وأي الأدلة ذات صلة فعلًا، وما التحقق التالي الواجب إجراؤه.`
   }
   return `DELIBERATE PRACTICE. Answer only in English. Use the case facts and any relevant governed knowledge COS can retrieve; do not invent facts. ${packet} Primary discipline: ${subjectTitle}. Learning objective: ${objective}. Explain what is supported, what remains unknown, which evidence is actually relevant, and the next verification.`
 }

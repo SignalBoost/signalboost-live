@@ -13,7 +13,7 @@ test('Supervisor Operations Center is authenticated, admin-gated, localized, and
   assert.match(source, /access\.isAdmin/)
   assert.match(source, /loadLanguage/)
   assert.doesNotMatch(source, /<form|<button|method="post"|approve|redeploy|repair|BrowserRuntime|Playwright|process\.env\[[^\]]+\]/i)
-  for (const lang of ['en','es','pt','pl','ru']) {
+  for (const lang of ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']) {
     const dict = JSON.parse(hydrateLocalizedSource(readFileSync(new URL('../lib/i18n/supervisorSocLocales.json', import.meta.url), 'utf8')))[lang].supervisorSoc
     for (const key of ['title','readOnly','supervisorCluster','providerHealth','incidentQueue','activeWork','auditTimeline','verification','metrics','filters','search']) assert.ok(dict[key], `${lang}.${key}`)
   }

@@ -91,7 +91,7 @@ test('missing subject evidence blocks graduation rather than averaging around it
   assert.equal(status.subjectBlockers.at(-1)?.grade, 'missing')
 })
 
-test('all five platform languages must independently meet A; one weak language blocks graduation', () => {
+test('all eleven platform languages must independently meet A; one weak language blocks graduation', () => {
   const transcript = languages()
   transcript[4] = { ...transcript[4], grade: 'A-' }
   const status = deriveCosUniversityGeneralistGraduation({

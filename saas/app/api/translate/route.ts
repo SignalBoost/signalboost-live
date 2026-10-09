@@ -6,7 +6,7 @@ import { createServerClient } from '@supabase/ssr'
 export const dynamic = 'force-dynamic'
 
 const LANG_NAMES: Record<string, string> = {
-  en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian',
+  en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Arabic',
 }
 
 // Translates every string value (including inside arrays) of a JSON object

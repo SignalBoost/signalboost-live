@@ -22,6 +22,12 @@ const WRITTEN = {
   pl: 'Zespół potwierdził, że projekt przeszedł kontrole wydania, ale to nie dowodzi gotowości Produkcji. Wdrożenie produkcyjne nadal nie zostało zweryfikowane, a przegląd bezpieczeństwa ma jedną nierozstrzygniętą kwestię kontroli dostępu. Nie mamy również lokalnego zezwolenia regulacyjnego, więc budżet pozostaje obciążony ryzykiem. Proponuję decyzję po zebraniu dowodów.',
   ru: 'Команда подтвердила, что проект прошёл проверки выпуска, но это не доказывает готовность Production. Развертывание по-прежнему не подтверждено, и в проверке безопасности остаётся нерешённый вопрос контроля доступа. Местное регуляторное разрешение также не предоставлено, поэтому бюджет остаётся под риском. Предлагаю решение после сбора доказательств.',
   en: 'The team confirmed that the project passed its release checks, but that does not prove Production readiness. The deployment is still unverified and the security review has one unresolved access control item. Local regulatory clearance has not been provided, so the budget remains exposed. I propose a decision once the evidence is gathered.',
+  de: 'Das Team hat bestätigt, dass das Projekt die Release-Prüfungen bestanden hat, aber das belegt noch nicht die Bereitschaft für Production. Die Bereitstellung ist weiterhin nicht verifiziert, und in der Sicherheitsprüfung ist ein Punkt zur Zugriffskontrolle noch offen. Auch die lokale regulatorische Genehmigung liegt nicht vor, daher ist das Budget weiter einem Risiko ausgesetzt. Ich schlage vor, die Entscheidung zu treffen, sobald die Nachweise gesammelt sind.',
+  fr: 'L’équipe a confirmé que le projet a réussi les contrôles de mise en production, mais cela ne prouve pas que la Production est prête. Le déploiement n’est toujours pas vérifié et la revue de sécurité garde un point de contrôle d’accès en suspens. L’autorisation réglementaire locale n’a pas été fournie non plus, donc le budget reste exposé. Je propose de décider lorsque les preuves seront réunies.',
+  it: 'Il team ha confermato che il progetto ha superato i controlli di rilascio, ma questo non dimostra che la Produzione sia pronta. Il rilascio non è ancora verificato e nella revisione di sicurezza resta un punto di controllo degli accessi irrisolto. Anche l’autorizzazione normativa locale non è stata fornita, perciò il budget è ancora esposto. Propongo di decidere quando le evidenze saranno raccolte.',
+  ja: 'チームはプロジェクトがリリースチェックに合格したことを確認しましたが、それだけでは Production の準備が整ったとは言えません。デプロイはまだ検証されておらず、セキュリティレビューにはアクセス制御に関する未解決の項目が一つ残っています。現地の規制当局による許認可も提出されていないため、予算は引き続きリスクにさらされています。証拠がそろった時点で判断することを提案します。',
+  ko: '팀은 프로젝트가 릴리스 점검을 통과했다고 확인했지만, 그것만으로 Production 준비가 증명되지는 않습니다. 배포는 아직 검증되지 않았고 보안 검토에는 접근 제어 관련 미해결 항목이 하나 남아 있습니다. 현지 규제 인허가도 제출되지 않았기 때문에 예산은 여전히 위험에 노출되어 있습니다. 증거가 모이면 결정할 것을 제안합니다.',
+  ar: 'أكد الفريق أن المشروع اجتاز فحوصات الإصدار، لكن ذلك لا يثبت جاهزية بيئة Production. لا يزال النشر غير متحقق منه، وتبقى في مراجعة الأمن مسألة واحدة غير محسومة تتعلق بالتحكم في الوصول. كما لم يُقدَّم الترخيص التنظيمي المحلي، لذلك تظل الميزانية معرّضة للخطر. أقترح اتخاذ القرار بعد جمع الأدلة.',
 } as const
 
 test('the repository regression that passed was a bag of the rubric its own required terms', () => {
@@ -68,7 +74,7 @@ test('copying the supplied packet back is not evidence of writing it', () => {
 })
 
 test('original prose in the target language still passes, in every platform language', () => {
-  for (const language of ['es', 'pt', 'pl', 'ru', 'en'] as const) {
+  for (const language of ['es', 'pt', 'pl', 'ru', 'en', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const) {
     assert.deepEqual(
       cosUniversityLanguageAuthenticityReasons({ reply: WRITTEN[language], packet: '', targetLanguage: language }),
       [], language,
@@ -77,8 +83,8 @@ test('original prose in the target language still passes, in every platform lang
 })
 
 test('one platform language cannot be handed in for another, including Spanish for Portuguese', () => {
-  for (const target of ['es', 'pt', 'pl', 'ru', 'en'] as const) {
-    for (const written of ['es', 'pt', 'pl', 'ru', 'en'] as const) {
+  for (const target of ['es', 'pt', 'pl', 'ru', 'en', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const) {
+    for (const written of ['es', 'pt', 'pl', 'ru', 'en', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const) {
       const reasons = cosUniversityLanguageAuthenticityReasons({
         reply: WRITTEN[written], packet: '', targetLanguage: target,
       })
@@ -91,7 +97,7 @@ test('one platform language cannot be handed in for another, including Spanish f
 test('signal density counts a token once however many signals it carries', () => {
   // Cyrillic tokens are both orthography and, some of them, function words. Double counting used to
   // push Russian above 1.0, which would let one long word outweigh a sentence.
-  for (const language of ['es', 'pt', 'pl', 'ru', 'en'] as const) {
+  for (const language of ['es', 'pt', 'pl', 'ru', 'en', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const) {
     const density = languageSignalDensity(WRITTEN[language], language)
     assert.ok(density > 0 && density <= 1, `${language}=${density}`)
   }

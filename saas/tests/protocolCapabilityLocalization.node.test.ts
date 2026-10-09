@@ -8,7 +8,7 @@ const layout = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/sup
 const summary = hydrateLocalizedSource(readFileSync(new URL('../components/supervisor/ProtocolCapabilitySummary.tsx', import.meta.url), 'utf8'))
 
 test('supervisor protocol capability surfaces support five languages', () => {
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(layout, new RegExp(`${language}:`))
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) assert.match(layout, new RegExp(`${language}:`))
   assert.match(layout, /sb_locale/)
 })
 

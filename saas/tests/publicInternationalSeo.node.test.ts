@@ -5,14 +5,14 @@ import { PUBLIC_COPY } from '../lib/seo/publicCopy.ts'
 import { PUBLIC_LOCALES, PUBLIC_TOPICS, publicPagePath, publicLocaleFromPath, isPublicLocale, isPublicTopic } from '../lib/seo/publicLocales.ts'
 import { publicAlternates, publicMetadata, publicPageSchema, publicSitemapEntries } from '../lib/seo/publicSeo.ts'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n/supportedLanguages.ts'
-import { writingDirection } from '../lib/i18n/localeExpansion.ts'
+import { writingDirection } from '../lib/i18n/supportedLanguages.ts'
 import config from '../next.config.mjs'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 test('public translations cover eleven languages without activating incomplete app locales', () => {
   assert.deepEqual([...PUBLIC_LOCALES], ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
-  assert.deepEqual([...SUPPORTED_LANGUAGES], ['en', 'es', 'pt', 'pl', 'ru'])
+  assert.deepEqual([...SUPPORTED_LANGUAGES], ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
   assert.deepEqual(Object.keys(PUBLIC_COPY).sort(), [...PUBLIC_LOCALES].sort())
 })
 

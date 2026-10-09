@@ -7,9 +7,15 @@ import { spanishGreeting } from './es.ts'
 import { portugueseGreeting } from './pt.ts'
 import { polishGreeting } from './pl.ts'
 import { russianGreeting } from './ru.ts'
+import { germanGreeting } from './de.ts'
+import { frenchGreeting } from './fr.ts'
+import { italianGreeting } from './it.ts'
+import { japaneseGreeting } from './ja.ts'
+import { koreanGreeting } from './ko.ts'
+import { arabicGreeting } from './ar.ts'
 import type { GreetingContext, Greeting } from './helpers.ts'
 
-export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type SupportedLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 export type { GreetingContext, Greeting }
 
 // Detect user's locale from browser. Falls back to 'en'.
@@ -23,6 +29,12 @@ export function detectLocale(): SupportedLocale {
   if (raw.startsWith('pt')) return 'pt'
   if (raw.startsWith('pl')) return 'pl'
   if (raw.startsWith('ru')) return 'ru'
+  if (raw.startsWith('de')) return 'de'
+  if (raw.startsWith('fr')) return 'fr'
+  if (raw.startsWith('it')) return 'it'
+  if (raw.startsWith('ja')) return 'ja'
+  if (raw.startsWith('ko')) return 'ko'
+  if (raw.startsWith('ar')) return 'ar'
   return 'en'
 }
 
@@ -34,6 +46,12 @@ export function getGreeting(locale: SupportedLocale, ctx: GreetingContext): Gree
     case 'pt': return portugueseGreeting(now, ctx)
     case 'pl': return polishGreeting(now, ctx)
     case 'ru': return russianGreeting(now, ctx)
+    case 'de': return germanGreeting(now, ctx)
+    case 'fr': return frenchGreeting(now, ctx)
+    case 'it': return italianGreeting(now, ctx)
+    case 'ja': return japaneseGreeting(now, ctx)
+    case 'ko': return koreanGreeting(now, ctx)
+    case 'ar': return arabicGreeting(now, ctx)
     case 'en':
     default:   return englishGreeting(now, ctx)
   }

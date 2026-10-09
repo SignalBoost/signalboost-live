@@ -9,7 +9,7 @@ const ts = require('typescript')
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const WRITE = process.argv.includes('--write')
-const LOCALE_CODES = ['en', 'es', 'pt', 'pl', 'ru']
+const LOCALE_CODES = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 const LOCALE_PATHS = Object.fromEntries(LOCALE_CODES.map(code => [code, path.join(ROOT, 'locales', `${code}.json`)]))
 const SCAN_ROOTS = ['app', 'components']
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'coverage', '__tests__', '__mocks__'])

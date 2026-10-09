@@ -69,10 +69,10 @@ const RAW: Record<string, Five> = {
   'credits.packs': ['Starter Pack: 50 Credits = $15 · Pro Pack: 200 Credits = $50.', 'Paquete Inicial: 50 créditos = $15 · Paquete Pro: 200 créditos = $50.', 'Pacote Inicial: 50 Créditos = $15 · Pacote Pro: 200 Créditos = $50.', 'Pakiet Startowy: 50 kredytów = 15 USD · Pakiet Pro: 200 kredytów = 50 USD.', 'Стартовый пакет: 50 кредитов = $15 · Пакет Pro: 200 кредитов = $50.'],
 }
 
-const LANGS = ['en', 'es', 'pt', 'pl', 'ru'] as const
+const LANGS = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 
 export const STUDIO_HUB_COPY: Record<string, Record<string, string>> = {
-  en: {}, es: {}, pt: {}, pl: {}, ru: {},
+  en: {}, es: {}, pt: {}, pl: {}, ru: {}, de: {}, fr: {}, it: {}, ja: {}, ko: {}, ar: {},
 }
 
 for (const [key, vals] of Object.entries(RAW)) {

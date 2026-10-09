@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 const COPY: Record<Lang, Record<string, string>> = {
   en: {
     eyebrow: uiText('generatedUi.u_c0a1ec0a03c6b0bf'), title: uiText('generatedUi.u_c0a1ec0a03c6b0bf'),
@@ -51,11 +51,65 @@ const COPY: Record<Lang, Record<string, string>> = {
     generate: 'Создать изображение', generating: 'Создание…', download: 'Скачать изображение', again: 'Создать ещё',
     empty: 'Здесь появится созданное изображение.', errorGeneric: 'Что-то пошло не так. Попробуйте снова.',
   },
+  de: {
+    eyebrow: 'Kreativstudio', title: 'Kreativstudio',
+    subtitle: 'Erstellen Sie professionelle Werbebanner und Kampagnenvisuals mit KI.',
+    promptLabel: 'Beschreiben Sie das gewünschte Bild',
+    promptPlaceholder: 'z. B. Ein lebendiges Werbebanner für ein Café in São Paulo, warme Töne, lachende Menschen, filmische Beleuchtung',
+    aspect: 'Form', landscape: 'Querformat (16:9)', square: 'Quadratisch (1:1)', portrait: 'Hochformat (4:5)',
+    generate: 'Bild generieren', generating: 'Wird generiert…', download: 'Bild herunterladen', again: 'Weitere generieren',
+    empty: 'Ihr generiertes Bild wird hier angezeigt.', errorGeneric: 'Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.',
+  },
+  fr: {
+    eyebrow: 'Studio créatif', title: 'Studio créatif',
+    subtitle: 'Générez des bannières promotionnelles professionnelles et des visuels de campagne grâce à l’IA.',
+    promptLabel: 'Décrivez l\'image souhaitée',
+    promptPlaceholder: 'ex. Une bannière promotionnelle éclatante pour un café de São Paulo, tons chauds, personnes qui rient, éclairage cinématographique',
+    aspect: 'Forme', landscape: 'Paysage (16:9)', square: 'Carré (1:1)', portrait: 'Portrait (4:5)',
+    generate: 'Générer une image', generating: 'Génération…', download: 'Télécharger l’image', again: 'En générer un autre',
+    empty: 'Votre image générée s\'affichera ici.', errorGeneric: 'Une erreur s’est produite. Veuillez réessayer.',
+  },
+  it: {
+    eyebrow: 'Studio creativo', title: 'Studio creativo',
+    subtitle: 'Genera banner promozionali professionali e visual per le campagne con l’AI.',
+    promptLabel: 'Descrivi l\'immagine che desideri',
+    promptPlaceholder: 'es. Un banner promozionale vivace per una caffetteria di São Paulo, toni caldi, persone che ridono, illuminazione cinematografica',
+    aspect: 'Forma', landscape: 'Orizzontale (16:9)', square: 'Quadrato (1:1)', portrait: 'Verticale (4:5)',
+    generate: 'Genera immagine', generating: 'Generazione…', download: 'Scarica immagine', again: 'Genera un altro',
+    empty: 'L\'immagine generata apparirà qui.', errorGeneric: 'Si è verificato un errore. Riprova.',
+  },
+  ja: {
+    eyebrow: 'クリエイティブスタジオ', title: 'クリエイティブスタジオ',
+    subtitle: 'AI を活用して、プロ品質のプロモーションバナーとキャンペーンビジュアルを生成します。',
+    promptLabel: '作成したい画像を説明してください',
+    promptPlaceholder: '例：サンパウロのコーヒーショップ向けの鮮やかなプロモーションバナー、暖色系、笑い合う人々、映画のような照明',
+    aspect: '形状', landscape: '横向き (16:9)', square: '正方形（1:1）', portrait: '縦向き（4:5）',
+    generate: '画像を生成', generating: '生成中…', download: '画像をダウンロード', again: 'もう一度生成',
+    empty: '生成された画像がここに表示されます。', errorGeneric: '問題が発生しました。もう一度お試しください。',
+  },
+  ko: {
+    eyebrow: '크리에이티브 스튜디오', title: '크리에이티브 스튜디오',
+    subtitle: 'AI 기반으로 전문적인 홍보 배너와 캠페인 비주얼을 생성하세요.',
+    promptLabel: '원하는 이미지를 설명하세요',
+    promptPlaceholder: '예: 상파울루 커피숍을 위한 생동감 있는 프로모션 배너, 따뜻한 색조, 웃고 있는 사람들, 영화 같은 조명',
+    aspect: '도형', landscape: '가로 (16:9)', square: '정사각형 (1:1)', portrait: '세로(4:5)',
+    generate: '이미지 생성', generating: '생성 중…', download: '이미지 다운로드', again: '하나 더 생성',
+    empty: '생성된 이미지가 여기에 표시됩니다.', errorGeneric: '문제가 발생했습니다. 다시 시도하세요.',
+  },
+  ar: {
+    eyebrow: 'الاستوديو الإبداعي', title: 'الاستوديو الإبداعي',
+    subtitle: 'أنشئ لافتات ترويجية احترافية ومرئيات للحملات مدعومة بـ AI.',
+    promptLabel: 'صف الصورة التي تريدها',
+    promptPlaceholder: 'مثال: لافتة ترويجية نابضة بالحياة لمقهى في ساو باولو، بألوان دافئة وأشخاص يضحكون وإضاءة سينمائية',
+    aspect: 'الشكل', landscape: 'أفقي (16:9)', square: 'مربع (1:1)', portrait: 'عمودي (4:5)',
+    generate: 'إنشاء صورة', generating: 'جارٍ الإنشاء…', download: 'تنزيل الصورة', again: 'إنشاء آخر',
+    empty: 'ستظهر صورتك المُنشأة هنا.', errorGeneric: 'حدث خطأ ما. يُرجى المحاولة مرة أخرى.',
+  },
 }
 
 export default function CreativeStudioPage() {
   const { lang } = useI18n()
-  const L: Lang = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
+  const L: Lang = (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as Lang
   const c = COPY[L]
 
   const [prompt, setPrompt]           = useState('')

@@ -126,16 +126,16 @@ test('an incomplete build excerpt asks for missing failure evidence, not reposit
   assert.doesNotMatch(reply, /not editable source code|not a request to portray anyone/i)
 })
 
-test('host handoff is deterministic after a richer neural diagnosis and localized across all five platform languages', () => {
+test('host handoff is deterministic after a richer neural diagnosis and localized across all eleven platform languages', () => {
   const neural = 'The build has one isolated assertion failure in the contextual-interpretation ordering gate.'
   const English = ensureOperationalLogRepairHandoff(neural, 'en')
   assert.match(English, /I can repair this\. Want me to\?/)
   assert.equal(ensureOperationalLogRepairHandoff(English, 'en'), English)
 
-  const localized = ['en', 'es', 'pt', 'pl', 'ru'].map(locale => operationalLogRepairHandoff(locale))
-  assert.equal(new Set(localized).size, 5)
+  const localized = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].map(locale => operationalLogRepairHandoff(locale))
+  assert.equal(new Set(localized).size, 11)
   for (const handoff of localized) {
-    assert.ok(handoff.trim().length > 0 && handoff.trim().endsWith("?"), handoff)
+    assert.ok(handoff.trim().length > 0 && /[?？؟]$/u.test(handoff.trim()), handoff)
   }
 })
 

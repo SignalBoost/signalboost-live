@@ -14,7 +14,7 @@ import { getAdminMetricAction } from '@/lib/admin/metricActions'
 import { AdminSectionConfig, translateSection } from '@/lib/admin/sections'
 import { uiText } from '@/lib/i18n/uiText'
 
-const SUPPORTED = new Set(['en', 'es', 'pt', 'pl', 'ru'])
+const SUPPORTED = new Set(['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
 const PLACEHOLDER_VALUES = new Set([
   'Not tracked yet',
   'Aún no rastreado',
@@ -41,6 +41,12 @@ function emptyMetricLabel(lang: string): string {
     pt: 'Métrica ativa da plataforma',
     pl: 'Aktywna metryka platformy',
     ru: 'Активная метрика платформы',
+    de: 'Live-Plattformkennzahl',
+    fr: 'Métrique de plateforme en direct',
+    it: 'Metrica della piattaforma in tempo reale',
+    ja: 'リアルタイムのプラットフォーム指標',
+    ko: '실시간 플랫폼 지표',
+    ar: 'مقياس مباشر للمنصة',
   }
   return copy[lang] || copy.en
 }
@@ -52,6 +58,12 @@ function noActivityLabel(lang: string): string {
     pt: 'Sem atividade ainda',
     pl: 'Brak aktywności',
     ru: 'Пока нет активности',
+    de: 'Noch keine Aktivität',
+    fr: 'Aucune activité pour l\'instant',
+    it: 'Ancora nessuna attività',
+    ja: 'まだアクティビティはありません',
+    ko: '아직 활동 없음',
+    ar: 'لا يوجد نشاط بعد',
   }
   return copy[lang] || copy.en
 }
@@ -63,6 +75,12 @@ function noneYetLabel(lang: string): string {
     pt: 'Nada ainda',
     pl: 'Jeszcze brak',
     ru: 'Пока нет',
+    de: 'Noch keine',
+    fr: 'Aucun pour l’instant',
+    it: 'Ancora nessuno',
+    ja: 'まだありません',
+    ko: '아직 없음',
+    ar: 'لا شيء بعد',
   }
   return copy[lang] || copy.en
 }
@@ -91,6 +109,12 @@ function notConnectedLabel(lang: string): string {
     pt: 'Não conectado',
     pl: 'Nie połączono',
     ru: 'Не подключено',
+    de: 'Nicht verbunden',
+    fr: 'Non connecté',
+    it: 'Non connesso',
+    ja: '未接続',
+    ko: '연결되지 않음',
+    ar: 'غير متصل',
   }
   return copy[lang] || copy.en
 }

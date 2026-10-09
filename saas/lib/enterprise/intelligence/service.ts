@@ -13,7 +13,7 @@ import type { EnterpriseApprovalPackage, EnterpriseIntelligenceRequest, Enterpri
 
 function schemaLanguage(value?: string) {
   const code = (value || '').toLowerCase().split(/[-_]/)[0]
-  return ({ en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian' } as Record<string, string>)[code] || 'English'
+  return ({ en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Arabic' } as Record<string, string>)[code] || 'English'
 }
 
 function creativeSuggestions(workspace: EnterpriseWorkspace): EnterpriseApprovalPackage['creativeSuggestions'] {

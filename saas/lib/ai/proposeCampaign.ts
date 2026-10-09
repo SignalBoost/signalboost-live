@@ -12,7 +12,7 @@ import { PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 const SAAS_URL = PUBLIC_BRAND_DOMAIN
 const VIDEO_CHANNELS = new Set(['youtube', 'short_video'])
-const allowedLanguages = ['en', 'es', 'pt', 'pl', 'ru']
+const allowedLanguages = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 const GITHUB_OWNER = 'SignalBoost'
 const GITHUB_REPO = 'signalboost-live'
 const VIDEO_WORKFLOW = 'cos-video-production.yml'
@@ -160,6 +160,12 @@ function fallbackScript(lang: string, subject: string, audience: string, offer: 
   if (lang === 'es') return `SignalBoostAi ayuda a ${audience} a convertir ${topic} en una campaña profesional con mayor rapidez. Crea los recursos, revisa todo y mantén el control antes de publicar. ${offer}`
   if (lang === 'pl') return `SignalBoostAi pomaga ${audience} szybciej zamienić ${topic} w profesjonalną kampanię. Utwórz materiały, sprawdź wszystko i zachowaj kontrolę przed publikacją. ${offer}`
   if (lang === 'ru') return `SignalBoostAi помогает ${audience} быстрее превратить ${topic} в профессиональную кампанию. Подготовьте материалы, проверьте всё и сохраняйте контроль до публикации. ${offer}`
+  if (lang === 'de') return `SignalBoostAi hilft ${audience}, ${topic} schneller in eine professionelle Kampagne zu verwandeln. Erstellen Sie die Materialien, prüfen Sie alles und behalten Sie vor der Veröffentlichung die Kontrolle. ${offer}`
+  if (lang === 'fr') return `SignalBoostAi aide ${audience} à transformer ${topic} en campagne professionnelle plus rapidement. Créez les supports, vérifiez tout et gardez le contrôle avant la publication. ${offer}`
+  if (lang === 'it') return `SignalBoostAi aiuta ${audience} a trasformare ${topic} in una campagna professionale più rapidamente. Crea i materiali, controlla tutto e mantieni il controllo prima della pubblicazione. ${offer}`
+  if (lang === 'ja') return `SignalBoostAi は、${audience} が ${topic} をよりすばやくプロフェッショナルなキャンペーンにできるよう支援します。素材を作成し、すべてを確認し、公開前まで管理を保ちましょう。${offer}`
+  if (lang === 'ko') return `SignalBoostAi는 ${audience}이(가) ${topic}을(를) 더 빠르게 전문적인 캠페인으로 만들 수 있도록 돕습니다. 자료를 만들고 모든 내용을 검토하며 게시 전까지 통제권을 유지하세요. ${offer}`
+  if (lang === 'ar') return `تساعد SignalBoostAi ${audience} على تحويل ${topic} إلى حملة احترافية بسرعة أكبر. أنشئ المواد وراجع كل شيء وحافظ على التحكم قبل النشر. ${offer}`
   return `SignalBoostAi helps ${audience} turn ${topic} into a professional campaign faster. Create the assets, review everything, and stay in control before publishing. ${offer}`
 }
 
@@ -218,6 +224,12 @@ function openingFor(lang: string) {
   if (lang === 'es') return 'SignalBoostAi ayuda a las empresas a crear campañas profesionales con mayor rapidez.'
   if (lang === 'pl') return 'SignalBoostAi pomaga firmom szybciej tworzyć profesjonalne kampanie.'
   if (lang === 'ru') return 'SignalBoostAi помогает компаниям быстрее создавать профессиональные кампании.'
+  if (lang === 'de') return 'SignalBoostAi hilft Unternehmen, schneller professionelle Kampagnen zu erstellen.'
+  if (lang === 'fr') return 'SignalBoostAi aide les entreprises à créer plus rapidement des campagnes professionnelles.'
+  if (lang === 'it') return 'SignalBoostAi aiuta le aziende a creare campagne professionali più rapidamente.'
+  if (lang === 'ja') return 'SignalBoostAi は、企業がプロフェッショナルなキャンペーンをよりすばやく作成できるよう支援します。'
+  if (lang === 'ko') return 'SignalBoostAi는 기업이 전문적인 캠페인을 더 빠르게 만들 수 있도록 돕습니다.'
+  if (lang === 'ar') return 'تساعد SignalBoostAi الشركات على إنشاء حملات احترافية بسرعة أكبر.'
   return 'SignalBoostAi helps businesses create professional campaigns faster.'
 }
 

@@ -9,6 +9,12 @@ const COPY = {
   pt: { navigation: 'Navegação administrativa', operator: 'Operador' },
   pl: { navigation: 'Nawigacja administracyjna', operator: 'Operator' },
   ru: { navigation: 'Навигация администратора', operator: 'Оператор' },
+  de: { navigation: 'Admin-Navigation', operator: 'Operator' },
+  fr: { navigation: 'Navigation d’administration', operator: 'Opérateur' },
+  it: { navigation: 'Navigazione amministratore', operator: 'Operatore' },
+  ja: { navigation: '管理者ナビゲーション', operator: 'オペレーター' },
+  ko: { navigation: '관리자 탐색', operator: '운영자' },
+  ar: { navigation: 'تنقّل المسؤول', operator: 'المشغّل' },
 } as const
 
 export default function AdminSidebar() {

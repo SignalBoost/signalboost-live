@@ -23,7 +23,7 @@ function langOf(campaign) {
     ? String(campaign.languages[0])
     : 'en'
   const short = raw.toLowerCase().split(/[-_]/)[0]
-  return ['en', 'es', 'pt', 'pl', 'ru'].includes(short) ? short : 'en'
+  return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(short) ? short : 'en'
 }
 
 function isMaintenance(campaign) {
@@ -42,6 +42,24 @@ function localizedScript(lang) {
   }
   if (lang === 'ru') {
     return 'iTMounts помогает малому и среднему бизнесу получать больше клиентов с помощью профессиональных кампаний, которые легко проверить. Подготовьте сообщение, материалы и отслеживайте результаты в одном месте. Начните бесплатно на itmounts.com.'
+  }
+  if (lang === 'de') {
+    return 'iTMounts hilft kleinen und mittleren Unternehmen, mit professionellen, leicht prüfbaren Kampagnen mehr Chancen zu gewinnen. Bündeln Sie Ihre Botschaft, bereiten Sie die Materialien vor und verfolgen Sie die Ergebnisse an einem Ort. Starten Sie kostenlos auf itmounts.com.'
+  }
+  if (lang === 'fr') {
+    return 'iTMounts aide les petites et moyennes entreprises à générer plus d’opportunités grâce à des campagnes professionnelles faciles à valider. Organisez votre message, préparez vos supports et suivez les résultats au même endroit. Commencez gratuitement sur itmounts.com.'
+  }
+  if (lang === 'it') {
+    return 'iTMounts aiuta le piccole e medie imprese a generare più opportunità con campagne professionali e facili da revisionare. Organizza il messaggio, prepara i materiali e monitora i risultati in un unico posto. Inizia gratis su itmounts.com.'
+  }
+  if (lang === 'ja') {
+    return 'iTMounts は、確認しやすいプロフェッショナルなキャンペーンで中小企業のビジネスチャンス拡大を支援します。メッセージを整理し、素材を準備し、成果を一か所で追跡できます。itmounts.com で無料で始めましょう。'
+  }
+  if (lang === 'ko') {
+    return 'iTMounts는 검토하기 쉬운 전문 캠페인으로 중소기업의 더 많은 기회 창출을 돕습니다. 메시지를 정리하고, 자료를 준비하고, 결과를 한곳에서 추적하세요. itmounts.com에서 무료로 시작하세요.'
+  }
+  if (lang === 'ar') {
+    return 'تساعد iTMounts الشركات الصغيرة والمتوسطة على تحقيق المزيد من الفرص من خلال حملات احترافية يسهل مراجعتها. نظّم رسالتك، وجهّز موادك، وتابع النتائج في مكان واحد. ابدأ مجانًا على itmounts.com.'
   }
   return 'iTMounts helps small and midsize businesses generate more opportunities with professional campaigns that are easy to review. Organize the message, prepare the assets, and track results in one place. Start free at itmounts.com.'
 }

@@ -108,7 +108,7 @@ export function createAiPort(): AiPort {
         'Return only the finished copy — no preamble, no notes, no markdown code fences.',
       ].filter(Boolean).join('\n')
 
-      const today = new Date().toLocaleDateString(brief.language === 'es' ? 'es-ES' : brief.language === 'pt' ? 'pt-BR' : brief.language === 'pl' ? 'pl-PL' : brief.language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      const today = new Date().toLocaleDateString(brief.language === 'es' ? 'es-ES' : brief.language === 'pt' ? 'pt-BR' : brief.language === 'pl' ? 'pl-PL' : brief.language === 'ru' ? 'ru-RU' : brief.language === 'de' ? 'de-DE' : brief.language === 'fr' ? 'fr-FR' : brief.language === 'it' ? 'it-IT' : brief.language === 'ja' ? 'ja-JP' : brief.language === 'ko' ? 'ko-KR' : brief.language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })
       const prompt = [
         `Goal: ${brief.goal}`,
         brief.audience ? `Audience: ${brief.audience}` : '',

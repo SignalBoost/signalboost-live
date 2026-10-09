@@ -27,7 +27,7 @@
 //
 // Zero imports so the wording is unit-testable without the reasoner or the route.
 
-export type RefusalLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type RefusalLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type Shape = 'economics' | 'sizing' | 'capacity' | 'diagnosis' | 'unknown'
 
@@ -143,6 +143,66 @@ const LABELS: Record<RefusalLanguage, Record<string, string>> = {
     measurements: 'измерения, разделяющие возможные причины',
     baseline: 'нормальные или эталонные значения для сравнения',
   },
+  de: {
+    period: 'der Zeitraum, den der Vergleich abdecken soll',
+    power: 'die gesamte Leistungsaufnahme der beteiligten Geräte',
+    bandwidth: 'die verfügbare Netzwerkbandbreite zwischen den Standorten',
+    volume: 'das Datenvolumen, das übertragen oder gespeichert wird',
+    unitPrice: 'der geltende Stückpreis',
+    frequency: 'wie oft sich der Vorgang wiederholt',
+    measurements: 'die Messwerte, die die möglichen Ursachen voneinander unterscheiden',
+    baseline: 'die Normal- oder Referenzwerte für den Vergleich',
+  },
+  fr: {
+    period: 'la période que la comparaison doit couvrir',
+    power: 'la consommation électrique totale des équipements concernés',
+    bandwidth: 'la bande passante réseau disponible entre les sites',
+    volume: 'le volume de données déplacé ou stocké',
+    unitPrice: 'le prix unitaire applicable',
+    frequency: 'la fréquence à laquelle l’opération se répète',
+    measurements: 'les mesures qui permettent de distinguer les causes possibles',
+    baseline: 'les valeurs normales ou de référence servant de comparaison',
+  },
+  it: {
+    period: 'il periodo di tempo che il confronto deve coprire',
+    power: 'l’assorbimento totale di potenza delle apparecchiature coinvolte',
+    bandwidth: 'la larghezza di banda di rete disponibile tra le sedi',
+    volume: 'il volume di dati trasferito o archiviato',
+    unitPrice: 'il prezzo unitario applicabile',
+    frequency: 'la frequenza con cui l’operazione si ripete',
+    measurements: 'le misurazioni che distinguono le possibili cause',
+    baseline: 'i valori normali o di riferimento con cui confrontare',
+  },
+  ja: {
+    period: '比較の対象とする期間',
+    power: '関係する機器の総消費電力',
+    bandwidth: '拠点間で利用可能なネットワーク帯域幅',
+    volume: '移動または保存されるデータ量',
+    unitPrice: '適用される単価',
+    frequency: 'その操作が繰り返される頻度',
+    measurements: '候補となる原因を切り分けるための測定値',
+    baseline: '比較対象となる通常値または基準値',
+  },
+  ko: {
+    period: '비교 대상 기간',
+    power: '관련 장비의 총 소비 전력',
+    bandwidth: '사이트 간 사용 가능한 네트워크 대역폭',
+    volume: '이동하거나 저장되는 데이터 양',
+    unitPrice: '적용되는 단가',
+    frequency: '작업이 반복되는 빈도',
+    measurements: '후보 원인을 구별하는 측정값',
+    baseline: '비교할 정상값 또는 기준값',
+  },
+  ar: {
+    period: 'الفترة الزمنية التي يجب أن تغطيها المقارنة',
+    power: 'إجمالي استهلاك الطاقة للمعدات المعنية',
+    bandwidth: 'عرض النطاق الترددي المتاح للشبكة بين المواقع',
+    volume: 'حجم البيانات التي يجري نقلها أو تخزينها',
+    unitPrice: 'سعر الوحدة المطبَّق',
+    frequency: 'عدد مرات تكرار العملية',
+    measurements: 'القراءات التي تميّز بين الأسباب المحتملة',
+    baseline: 'القيم الطبيعية أو المرجعية للمقارنة بها',
+  },
 }
 
 const COPY: Record<RefusalLanguage, {
@@ -181,6 +241,42 @@ const COPY: Record<RefusalLanguage, {
     assumptions: 'Если хотите, чтобы я всё же продолжил, скажите — я разберу задачу на явно указанных стандартных допущениях, каждое из которых помечу, чтобы вы могли его изменить.',
     generic: 'Скажите, какие части важнее всего, или сузьте вопрос — и я продолжу. Если предпочитаете, чтобы я работал на явно указанных стандартных допущениях, скажите, и я помечу каждое из них.',
   },
+  de: {
+    opening: 'Ich kann trotzdem helfen, aber für eine verlässliche, konkrete Antwort brauche ich noch eine weitere konkrete Angabe.',
+    needsLead: 'Um die Frage richtig zu beantworten, benötige ich',
+    assumptions: 'Wenn ich trotzdem fortfahren soll, sagen Sie es mir, und ich arbeite es auf Basis klar benannter Standardannahmen durch – jede gekennzeichnet, damit Sie sie überschreiben können.',
+    generic: 'Sagen Sie mir, welche Teile am wichtigsten sind, oder grenzen Sie die Frage ein, dann mache ich von dort aus weiter. Wenn ich lieber auf Basis klar benannter Standardannahmen fortfahren soll, sagen Sie es mir, und ich kennzeichne jede davon, damit Sie sie überschreiben können.',
+  },
+  fr: {
+    opening: 'Je peux tout de même vous aider, mais une réponse précise et fiable nécessite une donnée concrète supplémentaire.',
+    needsLead: 'Pour y répondre correctement, j’ai besoin de',
+    assumptions: 'Si vous préférez que je poursuive malgré tout, dites-le-moi et je traiterai la question sur la base d’hypothèses standard clairement énoncées, chacune signalée pour que vous puissiez la modifier.',
+    generic: 'Dites-moi quelles parties comptent le plus, ou précisez la question, et je reprendrai à partir de là. Si vous préférez que je poursuive sur la base d’hypothèses standard clairement énoncées, dites-le-moi et je signalerai chacune d’elles pour que vous puissiez la modifier.',
+  },
+  it: {
+    opening: 'Posso comunque aiutarti, ma per una risposta specifica e affidabile serve un altro dato concreto.',
+    needsLead: 'Per rispondere correttamente mi serve',
+    assumptions: 'Se preferisci che proceda comunque, dimmelo e lo svolgerò sulla base di ipotesi standard chiaramente indicate, ciascuna etichettata così che tu possa modificarla.',
+    generic: 'Dimmi quali parti contano di più, o restringi la domanda, e proseguo da lì. Se preferisci che proceda sulla base di ipotesi standard chiaramente indicate, dimmelo ed etichetterò ciascuna così che tu possa modificarla.',
+  },
+  ja: {
+    opening: '引き続きお手伝いできますが、信頼できる具体的な回答には、もう一つ具体的な情報が必要です。',
+    needsLead: '正確に回答するには、次の情報が必要です：',
+    assumptions: 'それでも進めてほしい場合はお知らせください。明示した標準的な前提に基づいて検討し、各前提にラベルを付けて変更できるようにします。',
+    generic: 'どの部分が最も重要かを教えていただくか、質問を絞り込んでいただければ、そこから進めます。明示した標準的な前提に基づいて進めることをご希望の場合はお知らせください。各前提にラベルを付けて変更できるようにします。',
+  },
+  ko: {
+    opening: '계속 도와드릴 수 있지만, 신뢰할 수 있는 구체적인 답변을 드리려면 구체적인 정보가 하나 더 필요합니다.',
+    needsLead: '정확하게 답변하려면 다음이 필요합니다:',
+    assumptions: '그래도 진행하기를 원하시면 말씀해 주세요. 명확히 밝힌 표준 가정을 바탕으로 처리하고, 각 가정에 표시를 달아 변경할 수 있게 하겠습니다.',
+    generic: '어떤 부분이 가장 중요한지 알려 주시거나 질문 범위를 좁혀 주시면 거기서부터 진행하겠습니다. 명확히 밝힌 표준 가정을 바탕으로 진행하기를 원하시면 말씀해 주세요. 각 가정에 표시를 달아 변경할 수 있게 하겠습니다.',
+  },
+  ar: {
+    opening: 'لا يزال بإمكاني المساعدة، لكن الإجابة المحددة والموثوقة تحتاج إلى معطى ملموس إضافي.',
+    needsLead: 'للإجابة بشكل صحيح أحتاج إلى',
+    assumptions: 'إذا كنت تفضّل أن أتابع على أي حال، فأخبرني وسأعالج المسألة بناءً على افتراضات قياسية مذكورة بوضوح، مع تمييز كل منها لتتمكن من تعديله.',
+    generic: 'أخبرني بالأجزاء الأكثر أهمية، أو ضيّق نطاق السؤال، وسأتابع من هناك. وإذا كنت تفضّل أن أتابع بناءً على افتراضات قياسية مذكورة بوضوح، فأخبرني وسأميّز كل افتراض لتتمكن من تعديله.',
+  },
 }
 
 const DIAGNOSIS_COPY: Record<RefusalLanguage, { next: string; final: string; supplied: string }> = {
@@ -209,6 +305,36 @@ const DIAGNOSIS_COPY: Record<RefusalLanguage, { next: string; final: string; sup
     next: 'Сопоставьте эти измерения с кандидатными гипотезами в одном временном окне и относительно одной базовой линии; следующий полезный шаг — различить гипотезы, а не угадывать отказавший компонент.',
     final: 'Я всё ещё не могу обоснованно назвать единственную причину.',
   },
+  de: {
+    supplied: 'Die Anfrage enthält bereits Messwerte zum Vorfall und eine Referenz; verwenden Sie diese als Ausgangsbasis für den Vergleich.',
+    next: 'Verwenden Sie diese Messwerte, um die möglichen Hypothesen im selben Zeitfenster und gegen dieselbe Referenz zu vergleichen; der sinnvolle nächste Schritt ist die Unterscheidung, nicht das Raten eines defekten Teils.',
+    final: 'Ich kann mich noch nicht auf eine einzelne Ursache festlegen.',
+  },
+  fr: {
+    supplied: 'La demande fournit déjà des mesures de l’incident et une référence ; utilisez-les comme point de départ de la comparaison.',
+    next: 'Utilisez ces mesures pour comparer les hypothèses possibles sur la même fenêtre temporelle et par rapport à la même référence ; l’étape utile suivante consiste à les départager, pas à deviner quelle pièce a lâché.',
+    final: 'Je ne peux pas encore me prononcer sur une cause unique.',
+  },
+  it: {
+    supplied: 'La richiesta fornisce già misurazioni dell’incidente e un riferimento; usali come punto di partenza per il confronto.',
+    next: 'Usa queste misurazioni per confrontare le ipotesi candidate nella stessa finestra temporale e rispetto allo stesso riferimento; il passo successivo utile è distinguerle, non indovinare quale componente si è guastato.',
+    final: 'Non posso ancora sostenere una singola causa.',
+  },
+  ja: {
+    supplied: 'リクエストにはすでにインシデントの測定値と基準値が含まれています。それらを比較の出発点として使用してください。',
+    next: 'これらの測定値を使い、同じ時間枠と同じ基準値に対して候補となる仮説を比較してください。次に有効なステップは仮説の切り分けであり、故障した部品を推測することではありません。',
+    final: 'まだ単一の原因を断定することはできません。',
+  },
+  ko: {
+    supplied: '요청에 이미 인시던트 측정값과 기준값이 포함되어 있습니다. 이를 비교의 출발점으로 사용하세요.',
+    next: '이 측정값을 사용해 같은 시간대와 같은 기준값에 대해 후보 가설을 비교하세요. 다음으로 유용한 단계는 가설을 구별하는 것이지, 고장 난 부품을 추측하는 것이 아닙니다.',
+    final: '아직 단일 원인을 확정할 수 없습니다.',
+  },
+  ar: {
+    supplied: 'يتضمن الطلب بالفعل قراءات الحادثة وقيمة مرجعية؛ استخدمها نقطةَ انطلاق للمقارنة.',
+    next: 'استخدم هذه القراءات لمقارنة الفرضيات المرشحة ضمن النافذة الزمنية نفسها ومقابل القيمة المرجعية نفسها؛ الخطوة التالية المفيدة هي التمييز بينها، لا تخمين الجزء المعطّل.',
+    final: 'لا يمكنني حتى الآن الجزم بسبب واحد.',
+  },
 }
 
 const JOIN: Record<RefusalLanguage, { sep: string; last: string }> = {
@@ -217,11 +343,17 @@ const JOIN: Record<RefusalLanguage, { sep: string; last: string }> = {
   pt: { sep: ', ', last: ' e ' },
   pl: { sep: ', ', last: ' oraz ' },
   ru: { sep: ', ', last: ' и ' },
+  de: { sep: ', ', last: ', und ' },
+  fr: { sep: ', ', last: ', et ' },
+  it: { sep: ', ', last: ', e ' },
+  ja: { sep: ', ', last: '、および ' },
+  ko: { sep: ', ', last: ', 그리고 ' },
+  ar: { sep: ', ', last: '، وكذلك ' },
 }
 
 function normalizeLanguage(language: string | null | undefined): RefusalLanguage {
   const code = String(language ?? 'en').trim().slice(0, 2).toLowerCase()
-  return code === 'es' || code === 'pt' || code === 'pl' || code === 'ru' ? code : 'en'
+  return code === 'es' || code === 'pt' || code === 'pl' || code === 'ru' || code === 'de' || code === 'fr' || code === 'it' || code === 'ja' || code === 'ko' || code === 'ar' ? code : 'en'
 }
 
 function shapesOf(prompt: string): Shape[] {
@@ -260,6 +392,12 @@ const CATALOG_COPY: Record<RefusalLanguage, string> = {
   es: 'La búsqueda en vivo no devolvió una lista usable de equipos amateur/várzea. COS no inventará nombres desde un archivo estático. Configure BRAVE_SEARCH_API_KEY y pregunte otra vez.',
   pl: 'Wyszukiwanie na żywo nie zwróciło użytecznej listy drużyn amatorskich. COS nie wymyśli nazw z pliku statycznego. Ustaw BRAVE_SEARCH_API_KEY i zapytaj ponownie.',
   ru: 'Живой веб-поиск не вернул пригодный любительский список. COS не будет выдумывать названия из статического файла. Настройте BRAVE_SEARCH_API_KEY и спросите снова.',
+  de: 'Die Live-Websuche hat für diese Anfrage keine verwertbare Liste von Amateur-/Várzea-Teams geliefert. COS erfindet keine Vereinsnamen aus einer statischen Datei. Konfigurieren Sie BRAVE_SEARCH_API_KEY und fragen Sie erneut.',
+  fr: 'La recherche web en direct n’a renvoyé aucune liste exploitable d’équipes amateurs/várzea pour cette demande. COS n’inventera pas de noms de clubs à partir d’un fichier statique. Configurez BRAVE_SEARCH_API_KEY et posez à nouveau la question.',
+  it: 'La ricerca web in tempo reale non ha restituito un elenco utilizzabile di squadre amatoriali/várzea per questa richiesta. COS non inventerà nomi di club da un file statico. Configura BRAVE_SEARCH_API_KEY e chiedi di nuovo.',
+  ja: 'このリクエストに対し、リアルタイムのWeb検索では利用可能なアマチュア/várzeaのチーム一覧が返されませんでした。COSは静的ファイルからクラブ名を作り出すことはしません。BRAVE_SEARCH_API_KEYを設定して、もう一度お尋ねください。',
+  ko: '실시간 웹 검색에서 이 요청에 사용할 수 있는 아마추어/várzea 팀 목록을 찾지 못했습니다. COS는 정적 파일에서 클럽 이름을 지어내지 않습니다. BRAVE_SEARCH_API_KEY를 구성한 후 다시 질문하세요.',
+  ar: 'لم يُرجع البحث المباشر على الويب قائمة صالحة لفرق الهواة/várzea لهذا الطلب. لن يختلق COS أسماء أندية من ملف ثابت. اضبط BRAVE_SEARCH_API_KEY واسأل مرة أخرى.',
 }
 
 export function isAmateurCatalogListPrompt(prompt: string): boolean {

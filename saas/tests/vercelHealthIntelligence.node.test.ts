@@ -50,7 +50,7 @@ test('governed run fails closed for missing lease, stale fence, mismatched owner
 test('operator page has no mutation controls and localization is complete for Vercel health labels', () => {
   const page = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/vercel-health/page.tsx', import.meta.url), 'utf8'))
   assert.doesNotMatch(page, /Redeploy|Cancel deployment|Edit environment variable|Retry mutation|Approve production browser|<button/i)
-  for (const lang of ['en','es','pt','pl','ru']) {
+  for (const lang of ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']) {
     const json = JSON.parse(hydrateLocalizedSource(readFileSync(new URL(`../locales/${lang}.json`, import.meta.url), 'utf8')))
     assert.ok(json.vercelHealth.productionBrowserDisabled)
     assert.ok(json.vercelHealth.providerMutationDisabled)

@@ -15,7 +15,7 @@ import { PROSPECT_INTELLIGENCE_COPY } from '../lib/prospect-intelligence/copy.ts
 import { validateProspectProviderManifest } from '../lib/prospect-intelligence/provider-manifest.ts'
 
 test('prospect intelligence supports exactly the five platform languages', () => {
-  assert.deepEqual(PROSPECT_INTELLIGENCE_LANGUAGES, ['en', 'es', 'pt', 'pl', 'ru'])
+  assert.deepEqual(PROSPECT_INTELLIGENCE_LANGUAGES, ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'])
 })
 
 test('region tags normalize to the supported base language', () => {
@@ -23,7 +23,8 @@ test('region tags normalize to the supported base language', () => {
   assert.equal(normalizeProspectIntelligenceLanguage('es-MX'), 'es')
   assert.equal(normalizeProspectIntelligenceLanguage('pl-PL'), 'pl')
   assert.equal(normalizeProspectIntelligenceLanguage('ru_RU'), 'ru')
-  assert.equal(normalizeProspectIntelligenceLanguage('fr-FR'), 'en')
+  assert.equal(normalizeProspectIntelligenceLanguage('fr-FR'), 'fr')
+  assert.equal(normalizeProspectIntelligenceLanguage('zh-CN'), 'en')
 })
 
 test('all foundation copy keys have five-language parity', () => {

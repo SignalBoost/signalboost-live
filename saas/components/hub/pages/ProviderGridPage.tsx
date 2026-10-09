@@ -12,17 +12,23 @@ import { uiText } from '@/lib/i18n/uiText'
 
 // Native per-language copy for this console page. `lang` arrives via PageProps.
 const COPY: Record<string, Record<string, string>> = {
-  opsProduction: { en: uiText('generatedUi.u_e6c8ed547fda01b0'), es: 'Operaciones y producción', pt: 'Operações e produção', pl: 'Operacje i produkcja', ru: 'Операции и продакшн' },
-  title: { en: uiText('generatedUi.u_8e48e0d31472fc43'), es: 'Socios operativos del negocio', pt: 'Parceiros operacionais do negócio', pl: 'Partnerzy operacyjni firmy', ru: 'Операционные бизнес-партнёры' },
+  opsProduction: { en: uiText('generatedUi.u_e6c8ed547fda01b0'), es: 'Operaciones y producción', pt: 'Operações e produção', pl: 'Operacje i produkcja', ru: 'Операции и продакшн', de: 'Betrieb & Produktion', fr: 'Opérations et production', it: 'Operazioni e produzione', ja: '運用と制作', ko: '운영 및 제작', ar: 'العمليات والإنتاج' },
+  title: { en: uiText('generatedUi.u_8e48e0d31472fc43'), es: 'Socios operativos del negocio', pt: 'Parceiros operacionais do negócio', pl: 'Partnerzy operacyjni firmy', ru: 'Операционные бизнес-партнёры', de: 'Geschäftsbetriebspartner', fr: 'Partenaires opérationnels', it: 'Partner operativi aziendali', ja: 'ビジネス運営パートナー', ko: '비즈니스 운영 파트너', ar: 'شركاء العمليات التجارية' },
   subtitle: {
     en: uiText('generatedUi.u_3c0bfb87f1eeb483'),
     es: 'Cuatro socios por página. Estado claro. Acciones claras. El objetivo es trabajar desde la consola siempre que sea posible.',
     pt: 'Quatro parceiros por página. Status claro. Ações claras. O objetivo é trabalhar pelo console sempre que possível.',
     pl: 'Czterech partnerów na stronę. Jasny status. Jasne akcje. Celem jest praca z poziomu konsoli, gdy to możliwe.',
     ru: 'Четыре партнёра на странице. Понятный статус. Понятные действия. Цель — работать из консоли, когда это возможно.',
+    de: 'Vier Partner pro Seite. Klarer Status. Klare Aktionen. Ziel ist es, wann immer möglich über die Konsole zu arbeiten.',
+    fr: 'Quatre partenaires par page. Un statut clair. Des actions claires. L’objectif est de travailler depuis la console autant que possible.',
+    it: 'Quattro partner per pagina. Stato chiaro. Azioni chiare. L’obiettivo è lavorare dalla console ogni volta che è possibile.',
+    ja: '1 ページに 4 社のパートナー。明確なステータス。明確なアクション。可能な限りコンソールから作業することが目標です。',
+    ko: '페이지당 파트너 4곳. 명확한 상태. 명확한 작업. 가능한 한 콘솔에서 작업하는 것이 목표입니다.',
+    ar: 'أربعة شركاء في كل صفحة. حالة واضحة. إجراءات واضحة. الهدف هو العمل من وحدة التحكم كلما أمكن ذلك.',
   },
-  keySignals: { en: uiText('generatedUi.u_9475389a9491e180'), es: 'Señales clave', pt: 'Sinais principais', pl: 'Kluczowe sygnały', ru: 'Ключевые сигналы' },
-  healthy: { en: uiText('generatedUi.u_7f1e323b6272c620'), es: 'Saludable', pt: 'Saudável', pl: 'Sprawny', ru: 'В норме' },
+  keySignals: { en: uiText('generatedUi.u_9475389a9491e180'), es: 'Señales clave', pt: 'Sinais principais', pl: 'Kluczowe sygnały', ru: 'Ключевые сигналы', de: 'Wichtige Signale', fr: 'Signaux clés', it: 'Segnali chiave', ja: '主要シグナル', ko: '주요 신호', ar: 'الإشارات الرئيسية' },
+  healthy: { en: uiText('generatedUi.u_7f1e323b6272c620'), es: 'Saludable', pt: 'Saudável', pl: 'Sprawny', ru: 'В норме', de: 'Fehlerfrei', fr: 'Sain', it: 'Integro', ja: '正常', ko: '정상', ar: 'سليم' },
 }
 function tx(key: string, lang: string): string {
   return COPY[key]?.[lang] ?? COPY[key]?.en ?? key

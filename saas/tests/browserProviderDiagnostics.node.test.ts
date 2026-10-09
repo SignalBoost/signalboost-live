@@ -66,7 +66,7 @@ test('Supervisor provider diagnostics page is admin-gated and contains no execut
 })
 
 test('Supervisor provider diagnostics labels are available in all five operator languages', async () => {
-  const locales = ['en', 'es', 'pt', 'pl', 'ru']
+  const locales = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
   const keys = [
     'supervisorHa.providerWorker',
     'supervisorHa.executionMethod',

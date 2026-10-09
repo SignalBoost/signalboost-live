@@ -1,0 +1,99 @@
+{
+  "cos": {
+    "nav": {
+      "mining": "التنقيب",
+      "features": "الخصائص",
+      "segments": "الشرائح",
+      "rules": "الأنماط",
+      "runs": "سجل التشغيل"
+    },
+    "mining": {
+      "title": "التنقيب في البيانات",
+      "subtitle": "أنماط سلوكية ومعاملاتية تدعم التنبؤات",
+      "run_now": "تشغيل الآن",
+      "last_run": "آخر تشغيل",
+      "events_scanned": "الأحداث التي تم فحصها",
+      "users_processed": "المستخدمون الذين تمت معالجتهم",
+      "features_written": "الخصائص المكتوبة",
+      "rules_found": "الأنماط المكتشفة"
+    },
+    "features": {
+      "title": "الخصائص المستخرجة",
+      "name": "الخاصية",
+      "value": "القيمة",
+      "updated": "تم التحديث",
+      "names": {
+        "event_frequency_per_day": "النشاط اليومي",
+        "transaction_count": "المعاملات",
+        "avg_deposit_cents": "متوسط الإيداع",
+        "avg_transfer_cents": "متوسط التحويل",
+        "preferred_txn_hour": "الساعة المفضلة",
+        "dominant_device_code": "الجهاز الرئيسي",
+        "campaign_engagement_rate": "التفاعل مع الحملات",
+        "recency_days": "أيام منذ آخر نشاط",
+        "amount_trend_slope": "اتجاه الإنفاق"
+      }
+    },
+    "segments": {
+      "title": "الشرائح السلوكية",
+      "cluster": "المجموعة",
+      "members": "الأعضاء"
+    },
+    "rules": {
+      "title": "الأنماط المكتشفة",
+      "if": "إذا",
+      "then": "فإن",
+      "support": "الدعم",
+      "confidence": "الثقة",
+      "lift": "الرفع"
+    },
+    "status": {
+      "running": "قيد التشغيل",
+      "success": "نجاح",
+      "error": "خطأ"
+    },
+    "empty": {
+      "no_features": "لا توجد خصائص بعد — شغّل مهمة تنقيب لملئها.",
+      "no_rules": "لم تُكتشف أي أنماط بعد.",
+      "no_runs": "لم تُسجَّل أي عمليات تنقيب بعد."
+    },
+    "errors": {
+      "unauthorized": "يُرجى تسجيل الدخول للمتابعة.",
+      "forbidden": "ليس لديك صلاحية الوصول إلى هذه البيانات.",
+      "load_failed": "تعذّر تحميل البيانات. يُرجى المحاولة مرة أخرى."
+    },
+    "tooltips": {
+      "confidence": "عدد مرات تحقق النمط عند استيفاء الشرط.",
+      "lift": "مدى ارتفاع احتمال النتيجة مقارنةً بالصدفة.",
+      "segment": "مجموعة من المستخدمين ذوي سلوك متشابه."
+    },
+    "meta": {
+      "title": "التنقيب في بيانات COS — SignalBoost",
+      "description": "إشارات سلوكية ومعاملاتية مستخرجة تدعم تنبؤات COS."
+    },
+    "dashboard": {
+      "overview": "نظرة عامة",
+      "refresh": "تحديث",
+      "run_history": "سجل التشغيل",
+      "segment_distribution": "توزيع الشرائح",
+      "top_patterns": "أبرز الأنماط",
+      "no_access": "يلزم وصول المسؤول لعرض ذكاء التنقيب.",
+      "lookup_user": "البحث عن خصائص المستخدم",
+      "user_id_placeholder": "أدخل معرّف المستخدم",
+      "view": "عرض",
+      "never": "أبدًا",
+      "users": "مستخدمون"
+    },
+    "predict": {
+      "title": "الإجراءات التالية المتوقعة",
+      "action": "الإجراء",
+      "score": "النتيجة",
+      "basis": "السبب",
+      "none": "لا توجد إشارات كافية للتنبؤ بعد.",
+      "propensity": "الميل",
+      "engagement": "التفاعل",
+      "churn_risk": "خطر التسرّب",
+      "value": "القيمة"
+    }
+  }
+}

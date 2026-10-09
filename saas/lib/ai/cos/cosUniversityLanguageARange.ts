@@ -65,7 +65,7 @@ export type CosUniversityLanguageARangeExam = Readonly<{
 
 export type CosUniversityLanguageARangeScore = { passed: boolean; reasons: string[] }
 
-const LANGUAGE_PRODUCTION_SOURCE = /^(?:production_verified):language:(en|es|pt|pl|ru):(comprehension|writing|instruction_following|translation_localization|cultural_pragmatics):([a-z0-9][a-z0-9_.:/-]{2,118})$/i
+const LANGUAGE_PRODUCTION_SOURCE = /^(?:production_verified):language:(en|es|pt|pl|ru|de|fr|it|ja|ko|ar):(comprehension|writing|instruction_following|translation_localization|cultural_pragmatics):([a-z0-9][a-z0-9_.:/-]{2,118})$/i
 
 const LANGUAGE_MARKERS: Record<CosPlatformLanguage, RegExp> = {
   en: /\b(?:the|please|is|are|will|project|deployment|security|regulatory|thank)\b/i,
@@ -73,6 +73,13 @@ const LANGUAGE_MARKERS: Record<CosPlatformLanguage, RegExp> = {
   pt: /(?:[ãõçáéíóúâêô]|\b(?:por favor|obrigad\w*|projeto|implantação|segurança|regulatóri\w*|desconhecid\w*)\b)/i,
   pl: /(?:[ąćęłńóśźż]|\b(?:proszę|dziękuj\w*|projekt|wdrożeni\w*|bezpieczeństw\w*|regulacyj\w*|nieznan\w*)\b)/i,
   ru: /[А-Яа-яЁё]{3,}/,
+  de: /(?:[äöüß]|(?<!\p{L})(?:bitte|danke|projekt|bereitstellung|sicherheit|regulator\p{L}*|unbekannt\p{L}*|nicht)(?!\p{L}))/iu,
+  fr: /(?:[œ]|(?<!\p{L})(?:merci|projet|déploiement|sécurité|réglementaire|inconnu\p{L}*|veuillez)(?!\p{L}))/iu,
+  it: /(?<!\p{L})(?:grazie|progetto|rilascio|sicurezza|normativ\p{L}*|sconosciut\p{L}*|per favore|della|sono)(?!\p{L})/iu,
+  // Hiragana separates Japanese from Chinese-only text; Hangul and Arabic script identify Korean and Arabic.
+  ja: /[\u3040-\u309f]{2,}/u,
+  ko: /[\uac00-\ud7af]{2,}/u,
+  ar: /[\u0621-\u064a]{3,}/u,
 }
 
 const DOMAIN_GROUPS: Record<CosPlatformLanguage, {
@@ -107,6 +114,36 @@ const DOMAIN_GROUPS: Record<CosPlatformLanguage, {
     security: ['безопасн', 'контрол доступа'], regulation: ['регулятор', 'соответств', 'разрешен'],
     uncertainty: ['неизвест', 'не провер', 'не подтвержд', 'нереш'], finance: ['бюджет', 'стоимост', 'финанс'],
     please: ['пожалуйста', 'можете', 'могли бы'], thanks: ['спасибо', 'благодар'],
+  },
+  de: {
+    security: ['sicherheit', 'zugriffskontroll', 'zugangskontroll'], regulation: ['regulator', 'regulier', 'genehmigung', 'compliance'],
+    uncertainty: ['unbekannt', 'nicht verifiziert', 'nicht bestätigt', 'ungeklärt', 'offen', 'ausstehend'], finance: ['budget', 'kosten', 'finanz'],
+    please: ['bitte', 'könnten sie', 'würden sie'], thanks: ['dank'],
+  },
+  fr: {
+    security: ['sécurité', 'contrôle d’accès', "contrôle d'accès"], regulation: ['réglementaire', 'régulat', 'autorisation', 'conformité'],
+    uncertainty: ['inconnu', 'non vérifié', 'non confirmé', 'non résolu', 'en suspens', 'en attente'], finance: ['budget', 'budgét', 'coût', 'financ'],
+    please: ['s’il vous plaît', "s'il vous plaît", 'pourriez-vous', 'veuillez'], thanks: ['merci', 'remerci'],
+  },
+  it: {
+    security: ['sicurezza', 'controllo degli accessi', 'controllo accessi'], regulation: ['regolament', 'normativ', 'autorizzazione', 'conformità'],
+    uncertainty: ['sconosciut', 'non verificat', 'non confermat', 'irrisolt', 'in sospeso', 'in attesa'], finance: ['budget', 'cost', 'finanz'],
+    please: ['per favore', 'potrebbe', 'potreste', 'vi chiedo', 'le chiedo'], thanks: ['grazie', 'ringrazi'],
+  },
+  ja: {
+    security: ['セキュリティ', 'アクセス制御', 'アクセス管理'], regulation: ['規制', '許認可', '認可', 'コンプライアンス'],
+    uncertainty: ['不明', '未確認', '未検証', '未解決', '保留'], finance: ['予算', '費用', 'コスト', '財務'],
+    please: ['お願い', 'ください', 'いただけ'], thanks: ['ありがとう', '感謝'],
+  },
+  ko: {
+    security: ['보안', '접근 제어', '접근 통제'], regulation: ['규제', '인허가', '승인', '컴플라이언스'],
+    uncertainty: ['불확실', '미확인', '확인되지', '검증되지', '미해결', '해결되지', '보류'], finance: ['예산', '비용', '재무'],
+    please: ['부탁', '주시기', '주십시오', '주세요'], thanks: ['감사'],
+  },
+  ar: {
+    security: ['الأمن', 'الأمان', 'التحكم في الوصول'], regulation: ['تنظيمي', 'التنظيمية', 'الترخيص', 'ترخيص', 'الامتثال'],
+    uncertainty: ['غير معروف', 'غير مؤكد', 'لم يتم التحقق', 'غير محسوم', 'معلق', 'معلّق'], finance: ['الميزانية', 'ميزاني', 'التكلفة', 'تكلفة', 'المالي'],
+    please: ['يرجى', 'نرجو', 'الرجاء', 'من فضلك'], thanks: ['شكر'],
   },
 }
 
@@ -151,6 +188,12 @@ function localizedPacket(language: CosPlatformLanguage, facts: { project: string
     pt: `O projeto ${project} tem ${checks} verificações de lançamento aprovadas e um limite de orçamento de ${budget} milhões. A implantação em Produção não foi verificada. Um item de controle de acesso da revisão de segurança continua pendente e a autorização regulatória local não foi fornecida. A liderança precisa de uma decisão em ${weeks} semanas.`,
     pl: `Projekt ${project} ma ${checks} zaliczonych kontroli wydania i limit budżetu ${budget} milionów. Wdrożenie produkcyjne nie zostało zweryfikowane. Jedna kwestia kontroli dostępu w przeglądzie bezpieczeństwa pozostaje nierozstrzygnięta, a lokalne zezwolenie regulacyjne nie zostało przedstawione. Kierownictwo potrzebuje decyzji w ciągu ${weeks} tygodni.`,
     ru: `Проект ${project} прошёл ${checks} проверок выпуска и имеет бюджетный лимит ${budget} миллионов. Развертывание в Production не подтверждено. Один вопрос контроля доступа в проверке безопасности остаётся нерешённым, а местное регуляторное разрешение не предоставлено. Руководству нужно решение в течение ${weeks} недель.`,
+    de: `Das Projekt ${project} hat ${checks} bestandene Release-Prüfungen und eine Budgetobergrenze von ${budget} Millionen. Die Bereitstellung in Production ist nicht verifiziert. Ein Punkt zur Zugriffskontrolle in der Sicherheitsprüfung ist ungeklärt, und die lokale regulatorische Genehmigung liegt nicht vor. Die Geschäftsleitung benötigt innerhalb von ${weeks} Wochen eine Entscheidung.`,
+    fr: `Le projet ${project} compte ${checks} contrôles de mise en production réussis et un plafond budgétaire de ${budget} millions. Le déploiement en Production n’est pas vérifié. Un point de contrôle d’accès de la revue de sécurité reste non résolu, et l’autorisation réglementaire locale n’a pas été fournie. La direction a besoin d’une décision d’ici ${weeks} semaines.`,
+    it: `Il progetto ${project} ha superato ${checks} controlli di rilascio e ha un tetto di budget di ${budget} milioni. Il rilascio in Produzione non è verificato. Un punto di controllo degli accessi nella revisione di sicurezza è irrisolto e l’autorizzazione normativa locale non è stata fornita. La direzione ha bisogno di una decisione entro ${weeks} settimane.`,
+    ja: `プロジェクト ${project} はリリースチェックに ${checks} 件合格しており、予算上限は ${budget} 百万です。Production へのデプロイは未検証です。セキュリティレビューのアクセス制御に関する項目が 1 件未解決で、現地の規制当局による許認可も提出されていません。経営陣は ${weeks} 週間以内に判断を必要としています。`,
+    ko: `프로젝트 ${project}는 릴리스 점검 ${checks}건을 통과했으며 예산 상한은 ${budget}백만입니다. Production 배포는 검증되지 않았습니다. 보안 검토의 접근 제어 항목 1건이 미해결 상태이며, 현지 규제 인허가도 제출되지 않았습니다. 경영진은 ${weeks}주 안에 결정이 필요합니다.`,
+    ar: `اجتاز المشروع ${project} عدد ${checks} من فحوصات الإصدار، وسقف ميزانيته ${budget} مليون. لم يتم التحقق من النشر في بيئة Production. لا يزال بند واحد يتعلق بالتحكم في الوصول في مراجعة الأمن غير محسوم، ولم يُقدَّم الترخيص التنظيمي المحلي. تحتاج الإدارة إلى قرار خلال ${weeks} أسابيع.`,
   }
   return packets[language]
 }
@@ -199,6 +242,48 @@ function dimensionInstruction(language: CosPlatformLanguage, dimension: CosPlatf
       instruction_following: 'Ответьте по-русски ровно четырьмя нумерованными действиями. В каждом укажите ответственную роль, проверку доказательства и условие завершения.',
       translation_localization: 'Переведите и локализуйте пакет на естественный профессиональный русский для руководства, сохранив все факты, числа и неопределённость.',
       cultural_pragmatics: 'Напишите по-русски вежливое профессиональное сообщение с просьбой к ответственным за безопасность, регулирование и операции предоставить недостающие доказательства без обвинений. Поблагодарите и признайте неопределённость.',
+    },
+    de: {
+      comprehension: 'Antworten Sie auf Deutsch. Trennen Sie verifizierte Fakten von ungeklärten Punkten und erklären Sie, warum bestandene Prüfungen nicht die Bereitschaft für Production belegen.',
+      writing: 'Schreiben Sie auf Deutsch ein prägnantes, professionelles Status-Update für die Geschäftsleitung. Bewahren Sie alle wesentlichen Fakten und erfinden Sie keinen Abschluss.',
+      instruction_following: 'Antworten Sie auf Deutsch mit genau vier nummerierten Maßnahmen. Jede Maßnahme muss eine verantwortliche Rolle, eine Nachweisprüfung und eine Abschlussbedingung nennen.',
+      translation_localization: 'Übersetzen und lokalisieren Sie das Paket in natürliches, professionelles Deutsch für die Geschäftsleitung und bewahren Sie dabei alle Fakten, Zahlen und Unsicherheiten.',
+      cultural_pragmatics: 'Schreiben Sie auf Deutsch eine höfliche, professionelle Nachricht, in der Sie die Verantwortlichen für Sicherheit, Regulierung und Betrieb ohne Schuldzuweisung um die fehlenden Nachweise bitten. Bedanken Sie sich und benennen Sie die Unsicherheit.',
+    },
+    fr: {
+      comprehension: 'Répondez en français. Distinguez les faits vérifiés des points non résolus et expliquez pourquoi les contrôles réussis ne prouvent pas que la Production est prête.',
+      writing: 'Rédigez en français un point d’étape professionnel et concis pour la direction. Conservez tous les faits importants et n’inventez aucun achèvement.',
+      instruction_following: 'Répondez en français avec exactement quatre actions numérotées. Chaque action doit indiquer un rôle responsable, une vérification de preuve et une condition d’achèvement.',
+      translation_localization: 'Traduisez et adaptez le dossier dans un français naturel et professionnel destiné à la direction, en conservant tous les faits, chiffres et incertitudes.',
+      cultural_pragmatics: 'Rédigez en français un message courtois et professionnel demandant aux responsables de la sécurité, de la réglementation et des opérations les preuves manquantes, sans les blâmer. Remerciez-les et reconnaissez l’incertitude.',
+    },
+    it: {
+      comprehension: 'Rispondi in italiano. Separa i fatti verificati dai punti irrisolti e spiega perché i controlli superati non dimostrano che la Produzione sia pronta.',
+      writing: 'Scrivi in italiano un aggiornamento professionale e conciso per la direzione. Conserva tutti i fatti rilevanti e non inventare che il lavoro sia concluso.',
+      instruction_following: 'Rispondi in italiano con esattamente quattro azioni numerate. Ogni azione deve indicare un ruolo responsabile, una verifica delle evidenze e una condizione di completamento.',
+      translation_localization: 'Traduci e localizza il pacchetto in un italiano naturale e professionale per la direzione, conservando tutti i fatti, i numeri e le incertezze.',
+      cultural_pragmatics: 'Scrivi in italiano un messaggio cortese e professionale per chiedere ai responsabili di sicurezza, normativa e operazioni le evidenze mancanti senza colpevolizzarli. Ringrazia e riconosci l’incertezza.',
+    },
+    ja: {
+      comprehension: '日本語で回答してください。検証済みの事実と未解決の項目を区別し、チェックに合格しても Production の準備が整ったことの証明にならない理由を説明してください。',
+      writing: '経営陣向けの簡潔でビジネスにふさわしい状況報告を日本語で書いてください。重要な事実をすべて残し、完了したと捏造しないでください。',
+      instruction_following: 'ちょうど 4 つの番号付きアクションで、日本語で回答してください。各アクションには担当する役割、証拠の確認方法、完了条件を明記してください。',
+      translation_localization: '事実、数値、不確実性をすべて保ったまま、この資料を経営陣向けの自然でビジネスにふさわしい日本語に翻訳・ローカライズしてください。',
+      cultural_pragmatics: 'セキュリティ、規制、運用の各担当者に、責めることなく不足している証拠の提出を依頼する、丁寧でビジネスにふさわしいメッセージを日本語で書いてください。感謝を伝え、不確実性にも触れてください。',
+    },
+    ko: {
+      comprehension: '한국어로 답하세요. 검증된 사실과 미해결 항목을 구분하고, 점검을 통과했다고 해서 Production 준비가 증명되지 않는 이유를 설명하세요.',
+      writing: '경영진을 위한 간결하고 전문적인 현황 보고를 한국어로 작성하세요. 중요한 사실을 모두 유지하고 완료되었다고 지어내지 마세요.',
+      instruction_following: '정확히 네 개의 번호가 매겨진 조치로 한국어로 답하세요. 각 조치에는 담당 역할, 증거 확인 방법, 완료 조건이 있어야 합니다.',
+      translation_localization: '모든 사실, 수치, 불확실성을 유지하면서 이 자료를 경영진을 위한 자연스럽고 전문적인 한국어로 번역하고 현지화하세요.',
+      cultural_pragmatics: '보안, 규제, 운영 담당자에게 탓하지 않고 누락된 증거를 요청하는 정중하고 전문적인 메시지를 한국어로 작성하세요. 감사를 전하고 불확실성을 인정하세요.',
+    },
+    ar: {
+      comprehension: 'أجب بالعربية. افصل بين الحقائق التي تم التحقق منها والبنود غير المحسومة، واشرح لماذا لا يثبت اجتياز الفحوصات جاهزية بيئة Production.',
+      writing: 'اكتب بالعربية تحديثًا موجزًا ومهنيًا عن الحالة موجّهًا إلى الإدارة العليا. حافظ على جميع الحقائق الجوهرية ولا تدّعِ اكتمال العمل.',
+      instruction_following: 'أجب بالعربية بأربعة إجراءات مرقمة بالضبط. يجب أن يحدد كل إجراء الدور المسؤول وطريقة التحقق من الدليل وشرط الإنجاز.',
+      translation_localization: 'ترجم الحزمة وكيّفها إلى عربية مهنية وطبيعية موجّهة إلى الإدارة العليا، مع الحفاظ على جميع الحقائق والأرقام وجوانب عدم اليقين.',
+      cultural_pragmatics: 'اكتب بالعربية رسالة مهذبة ومهنية تطلب فيها من المسؤولين عن الأمن والتنظيم والعمليات تقديم الأدلة الناقصة دون لومهم. اشكرهم واعترف بعدم اليقين.',
     },
   }
   return instructions[language][dimension]

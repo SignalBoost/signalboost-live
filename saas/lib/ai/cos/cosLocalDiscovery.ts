@@ -52,6 +52,12 @@ function intro(language: string, yesNo: boolean): string {
   if (key === 'pt' || key === 'pt-br') return yesNo ? 'Sim. Encontrei resultados locais atuais relevantes:' : 'Encontrei estes resultados locais atuais:'
   if (key === 'pl') return yesNo ? 'Tak. Znalazłem aktualne, pasujące wyniki lokalne:' : 'Znalazłem te aktualne wyniki lokalne:'
   if (key === 'ru') return yesNo ? 'Да. Я нашёл актуальные местные результаты по вашему запросу:' : 'Я нашёл следующие актуальные местные результаты:'
+  if (key === 'de') return yesNo ? 'Ja. Ich habe aktuelle lokale Ergebnisse zu Ihrer Anfrage gefunden:' : 'Ich habe diese aktuellen lokalen Ergebnisse gefunden:'
+  if (key === 'fr') return yesNo ? 'Oui. J’ai trouvé des résultats locaux actuels correspondant à votre demande :' : 'J’ai trouvé ces résultats locaux actuels :'
+  if (key === 'it') return yesNo ? 'Sì. Ho trovato risultati locali attuali pertinenti alla tua richiesta:' : 'Ho trovato questi risultati locali attuali:'
+  if (key === 'ja') return yesNo ? 'はい。ご依頼に関連する現在の地域の検索結果が見つかりました：' : '現在の地域の検索結果は次のとおりです：'
+  if (key === 'ko') return yesNo ? '네. 요청하신 내용과 관련된 현재 지역 검색 결과를 찾았습니다:' : '다음과 같은 현재 지역 검색 결과를 찾았습니다:'
+  if (key === 'ar') return yesNo ? 'نعم. وجدت نتائج محلية حالية ذات صلة بطلبك:' : 'وجدت هذه النتائج المحلية الحالية:'
   return yesNo ? 'Yes. I found current local results relevant to your request:' : 'I found these current local results:'
 }
 

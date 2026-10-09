@@ -1,6 +1,6 @@
 // saas/lib/prospect-intelligence/contracts.ts
 
-export const PROSPECT_INTELLIGENCE_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru'] as const
+export const PROSPECT_INTELLIGENCE_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 
 export type ProspectIntelligenceLanguage =
   (typeof PROSPECT_INTELLIGENCE_LANGUAGES)[number]

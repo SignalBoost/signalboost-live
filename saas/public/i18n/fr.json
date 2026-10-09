@@ -1,0 +1,298 @@
+{
+  "dashboard.title": "Tableau de bord",
+  "dashboard.subtitle": "Gérez vos projets et automatisations",
+  "nav.dashboard": "Tableau de bord",
+  "nav.projects": "Projets",
+  "nav.automations": "Automatisations",
+  "nav.courses": "Cours",
+  "nav.billing": "Facturation",
+  "nav.settings": "Paramètres",
+  "projects.title": "Projets",
+  "projects.create": "Créer un projet",
+  "projects.empty": "Aucun projet pour l’instant.",
+  "editor.save": "Enregistrer",
+  "editor.generating": "Génération…",
+  "editor.preview": "Aperçu",
+  "billing.title": "Facturation et forfaits",
+  "billing.upgrade": "Passer au niveau supérieur",
+  "billing.current": "Forfait actuel",
+  "mobile.install": "Installer l’app",
+  "common.loading": "Chargement...",
+  "common.cancel": "Annuler",
+  "common.delete": "Supprimer",
+  "common.edit": "Modifier",
+  "reset": "Réinitialiser",
+  "errors": {
+    "generationFailed": "Generation failed",
+    "networkError": "Network error",
+    "unauthorized": "Unauthorized"
+  },
+  "api": {
+    "invalidJson": "Invalid JSON",
+    "promptRequired": "Prompt is required"
+  },
+  "projects": {
+    "limitReached": "Project limit reached for your plan."
+  },
+  "actionRouter": {
+    "openWebsiteBuilder": "Open Website Builder",
+    "openReviewCollector": "Open Review Collector",
+    "openAudioStudio": "Open Audio Studio",
+    "openVideoStudio": "Open Video Studio",
+    "openSalesAgent": "Open Sales Agent",
+    "openSalesPipeline": "Open Sales Pipeline",
+    "answerInChat": "Answer in chat"
+  },
+  "videoSearch": {
+    "timeout": {
+      "generic": "Request timed out.",
+      "aiService": "AI service timed out.",
+      "intent": "Intent processing timed out.",
+      "script": "Script generation timed out.",
+      "search": "Video search timed out.",
+      "searchDetailed": "Video search timed out. Try a shorter request."
+    },
+    "status": {
+      "searching": "Searching for videos...",
+      "searchingPromptMatch": "Searching for videos matching your prompt..."
+    },
+    "errors": {
+      "generateScriptFailed": "Failed to generate script",
+      "searchFailed": "Search failed"
+    },
+    "rights": {
+      "restricted": "All results are rights-restricted for this query.",
+      "embeddableOnly": "Only embeddable results were found."
+    }
+  },
+  "videoGenerate": {
+    "errors": {
+      "authRequired": "You must be signed in.",
+      "promptRequired": "Please enter a prompt.",
+      "imageRequired": "Please attach an image.",
+      "noCredits": "No video credits left this month.",
+      "creditCheckFailed": "Could not check your credits."
+    },
+    "defaults": {
+      "imagePrompt": "Add natural, subtle motion to this image."
+    }
+  },
+  "operator": {
+    "commitPrefix": "Website Operator update:",
+    "errors": {
+      "requestRequired": "Please describe what you want to change.",
+      "planCreateFailed": "Could not create the plan right now.",
+      "planIdRequired": "Plan ID is required.",
+      "planNotFound": "Plan not found.",
+      "approvalRequired": "Approval required before applying changes.",
+      "applyFailed": "Could not apply approved update.",
+      "jobIdRequired": "Job ID is required.",
+      "jobNotFound": "Job not found.",
+      "rollbackUnavailable": "Rollback is not available for this update.",
+      "rollbackFailed": "Could not complete rollback.",
+      "statusNotFound": "Status not found."
+    },
+    "success": {
+      "published": "Changes published. Rollback is available.",
+      "approvedAndPublished": "Update approved and published with rollback point.",
+      "rollbackComplete": "Rollback complete. Previous version restored."
+    },
+    "input": {
+      "defaultRequest": "A high-end rooftop cocktail bar in Rio with bottle service and DJ nights"
+    },
+    "preview": {
+      "liveLabel": "Aperçu en direct",
+      "dark": "sombre",
+      "light": "clair",
+      "sections": "sections",
+      "empty": "Votre site web conçu apparaîtra ici.",
+      "loading": "Conception de votre site web…"
+    }
+  },
+  "reviews": {
+    "errors": {
+      "unauthorized": "Unauthorized",
+      "missingSlug": "Missing slug",
+      "invalidNameLength": "Name must be 1-80 characters",
+      "invalidEmail": "Invalid email",
+      "invalidRating": "Rating must be 1-5",
+      "invalidContentLength": "Content must be 1-2000 characters",
+      "lookupFailed": "Lookup failed",
+      "notFound": "Not found",
+      "tooManySubmissions": "Too many submissions. Try again tomorrow.",
+      "reviewCapReached": "Not accepting more reviews on current plan.",
+      "saveFailed": "Could not save review",
+      "missingId": "Missing ID",
+      "approvedMustBeBoolean": "Approved must be boolean"
+    }
+  },
+  "dash": {
+    "concierge": {
+      "title": "SignalBoost Concierge",
+      "loading": "Chargement de votre espace de travail et vérification des points à traiter.",
+      "welcome": "Bienvenue. Commencez par créer votre premier projet, ou demandez à SignalBoost quoi construire en premier.",
+      "drafts": {
+        "one": "Vous avez 1 projet en brouillon. Ouvrez-le et publiez-le quand il est prêt.",
+        "many": "Vous avez {count} projets en brouillon. Ouvrez-en un et publiez-le quand il est prêt."
+      },
+      "live": {
+        "one": "Vous avez 1 projet en ligne. Prochaine étape : promouvoir, recueillir des avis ou créer du contenu.",
+        "many": "Vous avez {count} projets en ligne. Prochaine étape : promouvoir, recueillir des avis ou créer du contenu."
+      },
+      "help": "Besoin d’aide pour choisir la prochaine étape ? Interrogez SignalBoost ci-dessous.",
+      "askNext": "ASK_NEXT"
+    },
+    "ai": {
+      "currentPage": "Dashboard"
+    },
+    "prompt": {
+      "nextAction": "Que dois-je faire ensuite ?"
+    }
+  },
+  "builder": {
+    "ai": {
+      "currentPage": "Site Builder",
+      "userPlan": "free",
+      "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
+    }
+  },
+  "podcasters_page": {
+    "deliverables": {
+      "voiceover": {
+        "title": "Voix off native",
+        "desc": "Transformez un épisode en versions vocales naturelles dans plusieurs langues."
+      },
+      "clips": {
+        "title": "Usine à clips",
+        "desc": "Repérez les meilleurs moments et transformez-les en Shorts, Reels et TikToks."
+      },
+      "captions": {
+        "title": "Sous-titres",
+        "desc": "Générez automatiquement des sous-titres, des transcriptions et des légendes pour les réseaux sociaux."
+      },
+      "website": {
+        "title": "Site web du podcast",
+        "desc": "Un espace à votre image pour les épisodes, notes d’émission, avis et langues."
+      },
+      "distribution": {
+        "title": "Diffusion",
+        "desc": "Préparez du contenu pour YouTube, TikTok, Instagram, l’e-mail et plus encore."
+      },
+      "growth": {
+        "title": "Croissance de l’audience",
+        "desc": "Recueillez des avis, des témoignages et des signaux d’audience."
+      }
+    },
+    "how": {
+      "step1": {
+        "title": "Importez votre épisode",
+        "desc": "Apportez l’audio ou la vidéo finalisés."
+      },
+      "step2": {
+        "title": "Choisissez les livrables",
+        "desc": "Extraits, sous-titres, langues, voix off et notes d’émission."
+      },
+      "step3": {
+        "title": "L’équipe IA s’active",
+        "desc": "Des agents de transcription, d’extraits, de traduction et de diffusion préparent les ressources."
+      },
+      "step4": {
+        "title": "Publiez partout",
+        "desc": "Téléchargez ou préparez du contenu pour chaque canal."
+      }
+    },
+    "plans": {
+      "networkEmailSubject": "SignalBoost Network Plan"
+    }
+  },
+  "singleLanguageContent": "Contenu en {language}",
+  "docs": {
+    "pricing": {
+      "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo"
+    }
+  },
+  "pricing_page": {
+    "free": {
+      "video": "Outils vidéo inclus"
+    },
+    "starter": {
+      "video": "Génération vidéo Starter"
+    },
+    "pro": {
+      "video": "Génération vidéo Pro"
+    },
+    "business": {
+      "video": "Génération vidéo Business"
+    }
+  },
+  "settings": {
+    "title": "Paramètres système",
+    "subtitle": "Configurez les options du compte, les webhooks de synchronisation des données et les règles de routage.",
+    "workspace": "Paramètres généraux de l’espace de travail",
+    "platformLabel": "Libellé de l’instance de la plateforme",
+    "ingestion": "Canaux d’ingestion de données",
+    "webhookTarget": "Cible du webhook d’ingestion d’affiliation",
+    "webhookHelp": "Adresse de destination directe pour traiter les hooks de trafic provenant de systèmes tiers de voyage et de places de marché.",
+    "automation": "Automatisation et déclencheurs",
+    "emailSummaries": "Résumés de génération par e-mail",
+    "emailSummariesHelp": "Recevez des journaux d’activité automatisés dès que le traitement des ressources vidéo est terminé.",
+    "autoTopup": "Recharge automatique de calcul",
+    "autoTopupHelp": "Rechargez automatiquement les crédits du solde système lorsque celui-ci passe sous 50 unités.",
+    "saving": "Mise à jour des règles…",
+    "save": "Enregistrer la configuration",
+    "saved": "Configuration système enregistrée avec succès !"
+  },
+  "data": {
+    "title": "Connecteur de données universel",
+    "wikipediaReminder": "Rappel Wikipedia : le contenu est sous licence CC-BY-SA et l’attribution est obligatoire.",
+    "uploadCsv": "Importer un CSV",
+    "addApi": "Ajouter un connecteur API",
+    "runApi": "Lancer l’import API",
+    "addScraper": "Ajouter un connecteur de scraping",
+    "runScraper": "Lancer l’import par scraping",
+    "importedItems": "Éléments importés par catégorie",
+    "sourceHistory": "Historique des sources",
+    "importing": "Importation…",
+    "done": "Terminé : {count} insérés",
+    "error": "Erreur : {error}"
+  },
+  "sales": {
+    "title": "🧠 Agent commercial IA",
+    "subtitle": "Donnez un prospect à l’IA. Elle rédige un e-mail commercial professionnel que vous pourrez relire et envoyer.",
+    "prospect": "Prospect",
+    "company": "Nom de l’entreprise",
+    "contact": "Nom du contact",
+    "email": "Email",
+    "website": "Site web",
+    "industry": "Secteur",
+    "notes": "Notes sur ce prospect",
+    "drafting": "Rédaction...",
+    "generate": "Générer un e-mail commercial",
+    "aiDraft": "Brouillon IA",
+    "emptyDraft": "L’e-mail commercial apparaîtra ici.",
+    "subject": "Objet",
+    "openEmail": "Ouvrir dans la messagerie",
+    "pipeline": {
+      "title": "Pipeline commercial",
+      "subtitle": "Suivez vos prospects de la découverte jusqu'à la conversion en client.",
+      "loading": "Chargement du pipeline…",
+      "noLeads": "Aucun prospect",
+      "unnamed": "Entreprise sans nom",
+      "noIndustry": "Aucun secteur",
+      "noCountry": "Aucun pays",
+      "noEmail": "Aucun e-mail",
+      "draft": "Brouillon :"
+    },
+    "status": {
+      "discovered": "Découvert",
+      "approved": "Approuvé",
+      "draft_ready": "Brouillon prêt",
+      "sketch_ready": "Esquisse prête",
+      "sent": "Envoyé",
+      "replied": "Répondu",
+      "client": "Client",
+      "draft_failed": "Échec du brouillon"
+    }
+  },
+  "orchestration.kicker": "Orchestration IA"
+}

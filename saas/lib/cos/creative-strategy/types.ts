@@ -1,4 +1,4 @@
-export type CosCreativeLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type CosCreativeLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 export type CosHeroArchetype =
   | 'overwhelmed_owner'

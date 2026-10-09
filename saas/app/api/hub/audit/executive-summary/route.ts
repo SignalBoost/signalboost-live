@@ -22,7 +22,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const LANGUAGE_NAME: Record<string, string> = {
-  en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian',
+  en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Arabic',
 }
 const ai = createPlatformAiPort()
 

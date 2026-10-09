@@ -39,5 +39,5 @@ export const socialOutreachConnectorManifest: PortableProductManifest = Object.f
     'docs/portables/buyer-package/social-outreach-presentation.md',
   ]),
   futureFeatures: Object.freeze(['native-video-on-x-and-reddit', 'scheduling-adapter']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

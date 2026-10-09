@@ -14,7 +14,7 @@ const PACKS: { id: 'small' | 'medium' | 'large'; credits: number; popular?: bool
   { id: 'large', credits: 15000 },
 ]
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 const COPY: Record<Lang, {
   title: string
@@ -34,11 +34,17 @@ const COPY: Record<Lang, {
   pt: { title: 'Créditos de render', subtitle: 'Créditos pré-pagos alimentam a produção cinematográfica. Recarregue uma vez e pague apenas pelo uso.', balanceLabel: 'Seu saldo', creditsWord: 'créditos', unlimited: 'Ilimitados', ownerSubtitle: 'O acesso do proprietário inclui créditos ilimitados e todas as ferramentas internas aprovadas.', buyCta: 'Comprar', redirecting: 'Redirecionando…', buyError: 'Não foi possível iniciar o pagamento.', popular: 'Popular', signedOut: 'Faça login para ver seu saldo e recarregar créditos de render.' },
   pl: { title: 'Kredyty renderowania', subtitle: 'Przedpłacone kredyty napędzają produkcję. Doładuj konto i płać tylko za użycie.', balanceLabel: 'Twoje saldo', creditsWord: 'kredytów', unlimited: 'Bez limitu', ownerSubtitle: 'Dostęp właściciela obejmuje nielimitowane kredyty i wszystkie zatwierdzone narzędzia wewnętrzne.', buyCta: 'Kup', redirecting: 'Przekierowanie…', buyError: 'Nie udało się rozpocząć płatności.', popular: 'Popularne', signedOut: 'Zaloguj się, aby zobaczyć saldo i doładować kredyty.' },
   ru: { title: 'Кредиты рендеринга', subtitle: 'Предоплаченные кредиты обеспечивают производство. Пополняйте и платите только за использование.', balanceLabel: 'Ваш баланс', creditsWord: 'кредитов', unlimited: 'Без ограничений', ownerSubtitle: 'Доступ владельца включает неограниченные кредиты и все одобренные внутренние инструменты.', buyCta: 'Купить', redirecting: 'Перенаправление…', buyError: 'Не удалось начать оплату.', popular: 'Популярный', signedOut: 'Войдите, чтобы увидеть баланс и пополнить кредиты.' },
+  de: { title: 'Render-Guthaben', subtitle: 'Prepaid-Credits treiben die filmische Produktion an. Einmal aufladen, nur das ausgeben, was jedes Rendering verbraucht – es wird nichts berechnet, bis Sie produzieren.', balanceLabel: 'Ihr Guthaben', creditsWord: 'Credits', unlimited: 'Unbegrenzt', ownerSubtitle: 'Der Inhaberzugang umfasst unbegrenzte Plattform-Credits und alle genehmigten internen Tools.', buyCta: 'Kaufen', redirecting: 'Weiterleitung…', buyError: 'Der Bezahlvorgang konnte nicht gestartet werden.', popular: 'Beliebt', signedOut: 'Melden Sie sich an, um Ihr Guthaben zu sehen und Render-Credits aufzuladen.' },
+  fr: { title: 'Crédits de rendu', subtitle: 'Les crédits prépayés alimentent la production cinématographique. Rechargez une fois, ne dépensez que ce que consomme chaque rendu : rien n’est facturé tant que vous ne produisez pas.', balanceLabel: 'Votre solde', creditsWord: 'crédits', unlimited: 'Illimité', ownerSubtitle: 'L’accès propriétaire inclut des crédits de plateforme illimités et tous les outils internes approuvés.', buyCta: 'Acheter', redirecting: 'Redirection…', buyError: 'Impossible de lancer le paiement.', popular: 'Populaire', signedOut: 'Connectez-vous pour consulter votre solde et recharger vos crédits de rendu.' },
+  it: { title: 'Crediti di rendering', subtitle: 'I crediti prepagati alimentano la produzione cinematografica. Ricarica una volta e spendi solo ciò che usa ogni rendering: non viene addebitato nulla finché non produci.', balanceLabel: 'Il tuo saldo', creditsWord: 'crediti', unlimited: 'Illimitato', ownerSubtitle: 'L’accesso proprietario include crediti di piattaforma illimitati e tutti gli strumenti interni approvati.', buyCta: 'Acquista', redirecting: 'Reindirizzamento…', buyError: 'Impossibile avviare il checkout.', popular: 'Popolare', signedOut: 'Accedi per vedere il tuo saldo e ricaricare i crediti di rendering.' },
+  ja: { title: 'レンダリングクレジット', subtitle: 'プリペイドクレジットでシネマティック制作を行います。一度チャージすれば、各レンダリングで使用した分だけを消費します。制作するまで料金は発生しません。', balanceLabel: '残高', creditsWord: 'クレジット', unlimited: '無制限', ownerSubtitle: 'オーナーアクセスには、無制限のプラットフォームクレジットと承認済みのすべての社内ツールが含まれます。', buyCta: '購入', redirecting: 'リダイレクト中…', buyError: 'チェックアウトを開始できませんでした。', popular: '人気', signedOut: 'サインインして残高を確認し、レンダリングクレジットをチャージしてください。' },
+  ko: { title: '렌더링 크레딧', subtitle: '선불 크레딧으로 시네마틱 제작이 이루어집니다. 한 번 충전하고 각 렌더링에 사용한 만큼만 지출하세요. 제작하기 전까지는 요금이 청구되지 않습니다.', balanceLabel: '내 잔액', creditsWord: '크레딧', unlimited: '무제한', ownerSubtitle: '소유자 액세스에는 무제한 플랫폼 크레딧과 승인된 모든 내부 도구가 포함됩니다.', buyCta: '구매', redirecting: '리디렉션 중…', buyError: '결제를 시작할 수 없습니다.', popular: '인기', signedOut: '로그인하여 잔액을 확인하고 렌더링 크레딧을 충전하세요.' },
+  ar: { title: 'أرصدة العرض', subtitle: 'تُشغّل الأرصدة المدفوعة مسبقًا الإنتاج السينمائي. اشحن مرة واحدة وأنفق فقط ما يستهلكه كل عرض؛ لا يُفرض أي رسم حتى تبدأ الإنتاج.', balanceLabel: 'رصيدك', creditsWord: 'أرصدة', unlimited: 'غير محدود', ownerSubtitle: 'يشمل وصول المالك أرصدة منصة غير محدودة وجميع الأدوات الداخلية المعتمدة.', buyCta: 'شراء', redirecting: 'جارٍ إعادة التوجيه…', buyError: 'تعذّر بدء عملية الدفع.', popular: 'الأكثر رواجًا', signedOut: 'سجّل الدخول لعرض رصيدك وشحن أرصدة العرض.' },
 }
 
 export default function RenderCredits() {
   const { lang } = useI18n()
-  const copy = COPY[(['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang]
+  const copy = COPY[(['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as Lang]
   const [signedIn, setSignedIn] = useState(false)
   const [balance, setBalance] = useState<number | null>(null)
   const [unlimited, setUnlimited] = useState(false)

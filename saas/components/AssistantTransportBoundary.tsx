@@ -151,7 +151,7 @@ function bodyWithOperationalRepairFollowup(body: AssistantRequestBody, operation
 
 function localeFromBody(body: AssistantRequestBody): AssistantTransportLocale {
   const value = String(body.context?.language || 'en').toLowerCase()
-  return (['en', 'es', 'pt', 'pl', 'ru'].includes(value) ? value : 'en') as AssistantTransportLocale
+  return (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(value) ? value : 'en') as AssistantTransportLocale
 }
 
 function isCosPrimaryPost(input: RequestInfo | URL, init?: RequestInit): boolean {

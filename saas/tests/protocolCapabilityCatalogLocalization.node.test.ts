@@ -8,7 +8,7 @@ const page = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/super
 const client = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/supervisor/protocol-capabilities/ProtocolCapabilityCatalogClient.tsx', import.meta.url), 'utf8'))
 
 test('protocol catalog resolves the five supported locales with English fallback', () => {
-  for (const locale of ['en','es','pt','pl','ru']) assert.match(client, new RegExp(`\\b${locale}: \\{`))
+  for (const locale of ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']) assert.match(client, new RegExp(`\\b${locale}: \\{`))
   assert.match(page, /sb_locale/)
   assert.match(page, /includes\(candidate\) \? candidate : 'en'/)
   assert.match(client, /dictionaries\[locale\] \|\| dictionaries\.en/)

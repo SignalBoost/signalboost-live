@@ -22,6 +22,12 @@ const LANGUAGES = [
   ['🇧🇷', 'pt'],
   ['🇵🇱', 'pl'],
   ['🇷🇺', 'ru'],
+  ['🇩🇪', 'de'],
+  ['🇫🇷', 'fr'],
+  ['🇮🇹', 'it'],
+  ['🇯🇵', 'ja'],
+  ['🇰🇷', 'ko'],
+  ['🇸🇦', 'ar'],
 ] as const
 
 const PUBLIC_TOOLS = [

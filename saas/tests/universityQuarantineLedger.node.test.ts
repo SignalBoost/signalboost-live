@@ -153,13 +153,13 @@ test('telemetry names the reason for every quarantined student and reports the r
   assert.doesNotMatch(route, /Retrain on the failed Residency competencies/, 'there is no retraining path; a Residency FAIL is final')
 })
 
-test('the dashboard shows the quarantine breakdown in all five languages', () => {
+test('the dashboard shows the quarantine breakdown in all eleven languages', () => {
   const page = read('app/dashboard/cos-university-telemetry/page.tsx')
   for (const key of ['quarantineTitle', 'quarantineFinal', 'quarantinePending', 'quarantineExhaustedOurs', 'quarantineDataDefect', 'quarantineReturned', 'quarantineReviewNever']) {
     assert.match(page, new RegExp(`copy\\.${key}\\b`))
   }
   const copy = read('lib/i18n/cosUniversityTelemetryCopy.ts')
   for (const key of ['quarantineTitle', 'quarantineExplanation', 'quarantineExamFailed', 'quarantineExhaustedOurs', 'quarantineDataDefect', 'quarantineReviewFailed']) {
-    assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 5, `${key} in en, es, pt, pl, ru`)
+    assert.equal(copy.match(new RegExp(`\\n    ${key}: `, 'g'))?.length, 11, `${key} in all eleven languages`)
   }
 })

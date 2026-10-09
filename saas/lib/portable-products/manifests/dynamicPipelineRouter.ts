@@ -19,5 +19,5 @@ export const dynamicPipelineRouterManifest: PortableProductManifest = Object.fre
   architectureReferences: Object.freeze(['saas/lib/dynamic-pipeline-router', 'provider-hub-core', 'workflow-coordinator']),
   documentationReferences: Object.freeze(['docs/portables/dynamic-pipeline-router.md']),
   futureFeatures: Object.freeze(['buyer-host-durable-lease-adapter', 'router-telemetry-ledger', 'cross-product-routing-console', 'licensing-activation']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

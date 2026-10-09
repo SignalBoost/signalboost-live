@@ -22,7 +22,7 @@ export type NicheVideoStrategyInput = {
   predicted_need: string
   primary_pain: string
   desired_action: string
-  languages: Array<'en' | 'es' | 'pt' | 'pl' | 'ru'>
+  languages: Array<'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'>
   preferred_channels?: VideoDistributionChannel[]
 }
 

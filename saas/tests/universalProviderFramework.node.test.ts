@@ -88,7 +88,7 @@ test('future provider classes fit without architectural changes', () => {
 
 test('localization keys exist for all universal provider operator strings', async () => {
   const keys = ['universalProvider.operator.ownerTeam','universalProvider.operator.documentation','universalProvider.vercel.description']
-  for (const locale of ['en','es','pt','pl','ru']) {
+  for (const locale of ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar']) {
     const dict = JSON.parse(await readFile(new URL(`../locales/${locale}.json`, import.meta.url), 'utf8').then(hydrateLocalizedSource))
     for (const key of keys) assert.ok(key.split('.').reduce((value, part) => value?.[part], dict), `${locale}:${key}`)
   }

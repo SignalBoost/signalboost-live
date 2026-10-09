@@ -101,6 +101,14 @@ const PRESS_LOCALES: Record<string, PressLocale> = {
   es: { searchName: 'España', publicationWords: ['periódico', 'revista', 'diario', 'portal de noticias'], techWords: ['tecnología', 'TI', 'negocios'], submitWords: ['contacto redacción editor correo'], contactPrefixes: ['redaccion', 'redacción', 'noticias', 'prensa'], adWords: ['anunciar publicidad media kit contacto', 'tarifas publicidad'] },
   pl: { searchName: 'Polska', publicationWords: ['gazeta', 'czasopismo', 'portal informacyjny', 'dziennik'], techWords: ['technologia', 'IT', 'biznes'], submitWords: ['kontakt redakcja e-mail', 'zgłoś temat redakcja'], contactPrefixes: ['redakcja', 'newsroom', 'kontakt'], adWords: ['reklama media kit kontakt', 'cennik reklamy'] },
   ru: { searchName: 'Россия', publicationWords: ['газета', 'журнал', 'новостной портал', 'издание'], techWords: ['технологии', 'ИТ', 'бизнес'], submitWords: ['контакты редакция email', 'прислать новость редакция'], contactPrefixes: ['redakciya', 'redaktor', 'news', 'press'], adWords: ['реклама медиакит контакты', 'прайс реклама'] },
+  de: { searchName: 'Deutschland', publicationWords: ['Zeitung', 'Zeitschrift', 'Nachrichtenportal', 'Fachmagazin'], techWords: ['Technologie', 'IT', 'Wirtschaft'], submitWords: ['Kontakt Redaktion E-Mail', 'Pressemitteilung einreichen Redaktion'], contactPrefixes: ['redaktion', 'presse', 'newsroom', 'news'], adWords: ['Werbung Mediadaten Kontakt', 'Anzeigenpreise Mediadaten'] },
+  fr: { searchName: 'France', publicationWords: ['journal', 'magazine', 'site d’actualités', 'quotidien'], techWords: ['technologie', 'informatique', 'entreprises'], submitWords: ['contact rédaction e-mail', 'envoyer communiqué de presse rédaction'], contactPrefixes: ['redaction', 'rédaction', 'presse', 'actu'], adWords: ['publicité kit média contact', 'tarifs publicité'] },
+  it: { searchName: 'Italia', publicationWords: ['giornale', 'rivista', 'portale di notizie', 'quotidiano'], techWords: ['tecnologia', 'informatica', 'business'], submitWords: ['contatti redazione email', 'inviare comunicato stampa redazione'], contactPrefixes: ['redazione', 'stampa', 'notizie'], adWords: ['pubblicità media kit contatti', 'listino pubblicità'] },
+  jp: { searchName: '日本', publicationWords: ['新聞', '雑誌', 'ニュースサイト', '業界誌'], techWords: ['テクノロジー', 'IT', 'ビジネス'], submitWords: ['編集部 お問い合わせ メール', 'プレスリリース 送付先 編集部'], contactPrefixes: ['henshu', 'editor', 'press', 'news'], adWords: ['広告掲載 媒体資料 お問い合わせ', '広告料金'] },
+  kr: { searchName: '대한민국', publicationWords: ['신문', '잡지', '뉴스 사이트', '전문지'], techWords: ['기술', 'IT', '비즈니스'], submitWords: ['편집부 연락처 이메일', '보도자료 제보 편집부'], contactPrefixes: ['press', 'news', 'editor', 'jebo'], adWords: ['광고 문의 미디어킷', '광고 단가'] },
+  sa: { searchName: 'السعودية', publicationWords: ['صحيفة', 'مجلة', 'موقع إخباري', 'جريدة'], techWords: ['التقنية', 'تقنية المعلومات', 'الأعمال'], submitWords: ['التواصل مع التحرير البريد الإلكتروني', 'إرسال بيان صحفي التحرير'], contactPrefixes: ['editor', 'news', 'press', 'info'], adWords: ['الإعلان ملف الوسائط تواصل', 'أسعار الإعلانات'] },
+  ae: { searchName: 'الإمارات', publicationWords: ['صحيفة', 'مجلة', 'موقع إخباري', 'جريدة'], techWords: ['التقنية', 'تقنية المعلومات', 'الأعمال'], submitWords: ['التواصل مع التحرير البريد الإلكتروني', 'إرسال بيان صحفي التحرير'], contactPrefixes: ['editor', 'news', 'press', 'info'], adWords: ['الإعلان ملف الوسائط تواصل', 'أسعار الإعلانات'] },
+  eg: { searchName: 'مصر', publicationWords: ['صحيفة', 'مجلة', 'موقع إخباري', 'جريدة'], techWords: ['التكنولوجيا', 'تكنولوجيا المعلومات', 'الأعمال'], submitWords: ['التواصل مع التحرير البريد الإلكتروني', 'إرسال بيان صحفي التحرير'], contactPrefixes: ['editor', 'news', 'press', 'info'], adWords: ['الإعلان ملف الوسائط تواصل', 'أسعار الإعلانات'] },
   uk: { searchName: 'United Kingdom', publicationWords: ['newspaper', 'magazine', 'news site'], techWords: ['technology', 'IT', 'business'], submitWords: ['contact editor email', 'submit news editor'], contactPrefixes: ['editor', 'newsdesk', 'newsroom'], adWords: ['advertise media kit contact', 'advertising rate card'] },
   us: { searchName: 'United States', publicationWords: ['newspaper', 'magazine', 'trade publication'], techWords: ['technology', 'IT', 'business'], submitWords: ['submit news editor email', 'contact editor'], contactPrefixes: ['editor', 'newsroom', 'newsdesk'], adWords: ['advertise with us media kit contact', 'advertising rate card'] },
 }
@@ -159,6 +167,9 @@ function localeFor(region?: string | null): PressLocale | null {
     brazil: 'br', brasil: 'br', portugal: 'pt', mexico: 'mx', 'méxico': 'mx',
     argentina: 'ar', colombia: 'co', chile: 'cl', spain: 'es', 'españa': 'es',
     poland: 'pl', polska: 'pl', russia: 'ru', 'united kingdom': 'uk', britain: 'uk',
+    germany: 'de', deutschland: 'de', france: 'fr', italy: 'it', italia: 'it',
+    japan: 'jp', '日本': 'jp', 'south korea': 'kr', korea: 'kr', '대한민국': 'kr', '한국': 'kr',
+    'saudi arabia': 'sa', ksa: 'sa', 'united arab emirates': 'ae', uae: 'ae', egypt: 'eg', 'مصر': 'eg',
     'united states': 'us', usa: 'us', america: 'us',
   }
   return aliases[wanted] ? PRESS_LOCALES[aliases[wanted]] : null
@@ -168,7 +179,7 @@ function domainOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./i, '').toLowerCase() } catch { return '' }
 }
 
-const TWO_LEVEL_SUFFIXES = new Set(['co.uk', 'org.uk', 'com.br', 'net.br', 'com.mx', 'com.ar', 'com.au', 'co.jp', 'com.pl', 'co.za'])
+const TWO_LEVEL_SUFFIXES = new Set(['co.uk', 'org.uk', 'com.br', 'net.br', 'com.mx', 'com.ar', 'com.au', 'co.jp', 'ne.jp', 'or.jp', 'co.kr', 'or.kr', 'com.sa', 'com.eg', 'co.ae', 'com.pl', 'co.za'])
 function registrableDomain(host: string): string {
   const parts = host.split('.').filter(Boolean)
   if (parts.length <= 2) return host

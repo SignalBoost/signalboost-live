@@ -8,11 +8,12 @@ const rawBody=JSON.stringify(event)
 const signed=body=>'t='+now+',v1='+createHmac('sha256',secret).update(now+'.'+body).digest('hex')
 const intent={id:'pi_1234567890',livemode:false,status:'succeeded',amount:500,amount_received:500,currency:'usd',
  metadata:{lab_organization_id:'tenant-a',purpose:'itmounts_lab_credits',price_version_id:'rate-1'}}
+const api=async(url)=>({ok:true,json:async()=>url.endsWith('/v1/account')?{id:'acct_1234567890',object:'account'}:intent})
 const base={rawBody,signatureHeader:signed(rawBody),webhookSecret:secret,nowSeconds:now,
  stripeSecretKey:'sk_test_fake12345678',tenantId:'tenant-a',stripeAccountId:'acct_1234567890',
  approvedPrice:{currency:'usd',amountMinor:500,credits:50,rateVersionId:'rate-1'}}
 test('signed event plus independent payment produces frozen non-settling test envelope',async()=>{
- const value=await buildVerifiedTestSettlementEnvelope({...base,fetchImpl:async()=>({ok:true,json:async()=>intent})})
+ const value=await buildVerifiedTestSettlementEnvelope({...base,fetchImpl:api})
  assert.equal(value.kind,'test_only_unsettled_evidence')
  assert.equal(value.stripeLivemode,false)
  assert.equal(value.credits,50)
@@ -32,8 +33,13 @@ test('pinned Stripe account and approved tenant/amount cannot be bypassed',async
  {tenantId:'tenant-b'},
  {approvedPrice:{...base.approvedPrice,amountMinor:100}},
  {stripeSecretKey:'sk_live_fake12345678'}
- ]) await assert.rejects(buildVerifiedTestSettlementEnvelope({...base,...patch,fetchImpl:async()=>({ok:true,json:async()=>intent})}))
+ ]) await assert.rejects(buildVerifiedTestSettlementEnvelope({...base,...patch,fetchImpl:api}))
 })
 test('Stripe API errors fail closed; no envelope is emitted',async()=>{
  await assert.rejects(buildVerifiedTestSettlementEnvelope({...base,fetchImpl:async()=>{throw Error('network')}}))
+})
+
+test('rejects spoofed Stripe account and untrusted account retrieval',async()=>{
+ await assert.rejects(buildVerifiedTestSettlementEnvelope({...base,fetchImpl:async url=>({ok:true,json:async()=>url.endsWith('/v1/account')?{id:'acct_attacker99999',object:'account'}:intent})}),/stripe_account_binding_mismatch/)
+ await assert.rejects(buildVerifiedTestSettlementEnvelope({...base,fetchImpl:async url=>url.endsWith('/v1/account')?{ok:false}:api(url)}),/stripe_account_retrieval_failed/)
 })

@@ -3,6 +3,7 @@
 // The export manifest is the authority for expected stores and keys.
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { placeholderTokens } from './generated-ui-locale-utils.mjs'
 
 const expectedLanguages = ['de','fr','it','ja','ko','ar']
@@ -25,7 +26,7 @@ const sourceStores = {
   auditCenter: 'lib/i18n/auditCenterLocales.json', supervisor: 'lib/i18n/supervisorSocLocales.json',
   homepage: 'lib/i18n/homepageLocales.json',
 }
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 function flatten(value, prefix='', out={}) {
   for (const [key, child] of Object.entries(value)) {
     const full = prefix ? prefix+'.'+key : key
@@ -35,14 +36,23 @@ function flatten(value, prefix='', out={}) {
   return out
 }
 
-for (const lang of manifest.languages) {
+const expectedStores = Object.keys(sourceStores).sort()
+for (const lang of expectedLanguages) {
+  const declaredStores = manifest.stores?.[lang]
+  if (!declaredStores || JSON.stringify(Object.keys(declaredStores).sort()) !== JSON.stringify(expectedStores)) {
+    failures.push(lang + ': required source stores missing or unexpected')
+    continue
+  }
   const packageData = load(lang + '.json')
-  for (const [store, expectedCount] of Object.entries(manifest.stores[lang])) {
+  if (JSON.stringify(Object.keys(packageData).sort()) !== JSON.stringify(expectedStores)) {
+    failures.push(lang + ': package stores missing or unexpected')
+  }
+  for (const [store, expectedCount] of Object.entries(declaredStores)) {
     const entries = packageData[store]
     if (!(store in sourceStores)) { failures.push(lang+'/'+store+': unexpected store'); continue }
     const baseline = JSON.parse(fs.readFileSync(path.join(root,sourceStores[store]),'utf8'))
     const english = flatten(['onboarding','marketingSales','auditCenter','supervisor','homepage'].includes(store) ? baseline.en : baseline)
-    if (!entries || Object.keys(entries).length !== expectedCount || Object.keys(entries).length !== Object.keys(english).length || Object.keys(english).some(key => !(key in entries))) {
+    if (!entries || Object.keys(entries).length !== expectedCount || expectedCount !== Object.keys(english).length || Object.keys(entries).length !== Object.keys(english).length || Object.keys(english).some(key => !(key in entries))) {
       failures.push(lang + '/' + store + ': key count mismatch')
       continue
     }

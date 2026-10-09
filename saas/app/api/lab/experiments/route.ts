@@ -99,13 +99,17 @@ export async function POST(req: NextRequest) {
           phase: 1, signal: 'factory_execution', source: 'live_runtime', outcome: 'started',
           exactRevision: revision, observedAt: new Date().toISOString(),
         })
-        const { error: observationError } = await service.from('lab_phase_observations').insert({
-          tenant_id: organizationId, phase: event.phase, signal: event.signal,
-          source: event.source, outcome: event.outcome,
-          exact_revision: event.exactRevision, observed_at: event.observedAt,
-        })
-        // Telemetry must not roll back an already-authorized customer experiment.
-        if (observationError) console.error('[lab_phase_observation_delivery_failed]', { phase: 1 })
+        try {
+          const { error: observationError } = await service.from('lab_phase_observations').insert({
+            tenant_id: organizationId, phase: event.phase, signal: event.signal,
+            source: event.source, outcome: event.outcome,
+            exact_revision: event.exactRevision, observed_at: event.observedAt,
+          })
+          // Telemetry must not roll back an already-authorized customer experiment.
+          if (observationError) console.error('[lab_phase_observation_delivery_failed]', { phase: 1 })
+        } catch {
+          console.error('[lab_phase_observation_delivery_failed]', { phase: 1 })
+        }
       } else console.error('[lab_phase_observation_revision_unavailable]', { phase: 1 })
     }
     return NextResponse.json(result, { status: result.ok ? 200 : 409 })

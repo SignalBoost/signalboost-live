@@ -9,7 +9,7 @@ const routes=[]
 const candidates=(source)=>{
  const results=[]
  const checks=[
-  {kind:'jsx-text',pattern:/>\s*([A-Za-z][^<>{}\\n]{3,100}?)\s*</g},
+  {kind:'jsx-text',pattern:/>\s*([A-Za-z][^<>{}\n]{3,100}?)\s*</g},
   {kind:'accessibility-or-form-text',pattern:/\b(aria-label|placeholder|title|alt)\s*=\s*["']([^"'{}]{4,120})["']/g}
  ]
  for(const {kind,pattern} of checks){

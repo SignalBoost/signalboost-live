@@ -1,2 +1,2 @@
-base_sha=4964a0d130ce66dfcb6776ab4c50a433cdacfa2b
-branch=feat/residency-signup-gate-oct9
+base_sha=359258f0bf238e7ede752d561ff13cd576ea2064
+branch=fix/eu-oauth-signup-safeguard-20261009

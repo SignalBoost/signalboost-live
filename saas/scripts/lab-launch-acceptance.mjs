@@ -24,10 +24,10 @@ const cases=[
 const results=[]
 for(const [id,file] of cases){
   const started=new Date().toISOString()
-  const run=spawnSync(process.execPath,['--import','tsx','--test',file],{cwd:process.cwd(),encoding:'utf8',timeout:120000,maxBuffer:1024*1024*2})
+  const run=spawnSync(process.execPath,['--test',file],{cwd:process.cwd(),encoding:'utf8',timeout:120000,maxBuffer:1024*1024*2})
   const status=run.error?'ERROR':run.status===0?'PASS':'FAIL'
-  results.push({id,scope:'repository_contract',status,startedAt:started,finishedAt:new Date().toISOString(),exitCode:run.status,error:run.error?.message?.slice(0,160)||null})
-  console.log(JSON.stringify({id,status,exitCode:run.status}))
+  results.push({id,scope:'repository_contract',status,startedAt:started,finishedAt:new Date().toISOString(),exitCode:run.status,error:run.error?.message?.slice(0,160)||null,diagnostic:status==='PASS'?null:(run.stderr||run.stdout||'').slice(-1600)})
+  console.log(JSON.stringify({id,status,exitCode:run.status,diagnostic:status==='PASS'?undefined:(run.stderr||run.stdout||'').slice(-1000)}))
 }
 const outstanding=['live_public_http','owner_login','organization_creation','cross_tenant_live_requests','real_experiment','provider_execution_receipt','training_or_distillation_receipt','evaluation','artifact_retrieval','stripe_test_webhook_settlement','controlled_recovery','exact_revision_rollback']
 const report={schema:'itmounts-launch-acceptance-v1',revision,generatedAt:new Date().toISOString(),environment:'CI',realCustomerDataUsed:false,externalProviderSpendAuthorized:false,contractTests:results,liveAcceptance:outstanding.map(id=>({id,status:'NOT_RUN',evidenceRef:null})),releaseReady:false,reason:'Live authenticated production transaction evidence has not been supplied or executed'}

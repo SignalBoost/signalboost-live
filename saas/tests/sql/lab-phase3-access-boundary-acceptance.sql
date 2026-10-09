@@ -28,6 +28,16 @@ BEGIN
   IF has_schema_privilege('anon','lab','USAGE') OR has_schema_privilege('authenticated','lab','USAGE') THEN
     RAISE EXCEPTION 'FAIL phase3: lab schema exposed to client roles';
   END IF;
+  -- The sole exempt Lab function has PostgreSQL's trigger-only return type.
+  -- It must never be converted into a privileged callable RPC.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+     WHERE n.nspname='lab' AND p.proname='prevent_credit_event_mutation'
+       AND p.prorettype='pg_catalog.trigger'::regtype AND p.prosecdef=false
+       AND p.prokind='f'
+  ) THEN
+    RAISE EXCEPTION 'FAIL phase3: credit-event trigger exception is missing or privileged';
+  END IF;
   FOR f IN
     SELECT p.oid,p.proname,n.nspname
       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace

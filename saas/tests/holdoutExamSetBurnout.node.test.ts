@@ -200,7 +200,7 @@ test('the live writer aborts on a precondition instead of charging the batch', (
   assert.match(source, /status: charged \? 'failed' : 'requested',/)
   assert.match(source, /TRANSIENT_BACKOFF_MS/)
   // The exhausted population is revived and reported on every run.
-  assert.match(source, /const revived = await reviveExhaustedExamSets\(\{ db, now \}\)/)
+  assert.match(source, /const revived = input\.candidateIds \? 0 : await reviveExhaustedExamSets\(\{ db, now \}\)/)
   assert.match(source, /\.gte\('attempts', HOLDOUT_EXAM_MAX_SET_ATTEMPTS\)/)
   // The writer still only ever prepares exams; it must not grade, admit or promote anything.
   assert.doesNotMatch(source, /status: 'evaluation_pending'/)

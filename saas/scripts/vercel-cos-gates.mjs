@@ -37,6 +37,7 @@ const tests = [
   'tests/labPhaseHealthEndpoint.node.test.ts',
   'tests/labPhaseObservabilityCron.node.test.ts',
   'tests/labPhaseAlertOutbox.node.test.ts',
+  'tests/labPhaseSupervisorAlertFeed.node.test.ts',
   'tests/itmountsLabEgressPolicy.node.test.ts',
   'tests/itmountsLabEgressExecution.node.test.ts',
   'tests/itmountsLabByoiScope.node.test.ts',

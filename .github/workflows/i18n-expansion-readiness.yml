@@ -10,6 +10,8 @@ on:
       - 'saas/scripts/check-translation-package-export.mjs'
       - 'saas/scripts/check-translated-package-negative-fixtures.mjs'
       - 'saas/scripts/validate-translated-packages.mjs'
+      - 'saas/scripts/translate-pending-language-packages.mjs'
+      - 'saas/scripts/check-translation-engine-safety.mjs'
       - 'saas/scripts/check-five-language-platform.mjs'
       - 'saas/components/LanguageSuggestion.tsx'
       - '.github/workflows/i18n-expansion-readiness.yml'
@@ -34,3 +36,5 @@ jobs:
         run: node scripts/check-translation-package-export.mjs
       - name: Reject incomplete and omitted locale catalogs
         run: node scripts/check-translated-package-negative-fixtures.mjs
+      - name: Verify translator opt-in safety offline
+        run: node scripts/check-translation-engine-safety.mjs

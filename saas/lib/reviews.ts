@@ -39,12 +39,12 @@ const localeFlags: Record<ReviewLocale, string> = {
   pt: '🇵🇹',
   pl: '🇵🇱',
   ru: '🇷🇺',
-  de: '🇺🇸',
-  fr: '🇺🇸',
-  it: '🇺🇸',
-  ja: '🇺🇸',
-  ko: '🇺🇸',
-  ar: '🇺🇸',
+  de: '🇩🇪',
+  fr: '🇫🇷',
+  it: '🇮🇹',
+  ja: '🇯🇵',
+  ko: '🇰🇷',
+  ar: '🇸🇦',
 }
 
 const localeDateFormats: Record<ReviewLocale, string> = {
@@ -67,12 +67,12 @@ const localeCurrencies: Record<ReviewLocale, { locale: string; currency: string 
   pt: { locale: 'pt-PT', currency: 'EUR' },
   pl: { locale: 'pl-PL', currency: 'PLN' },
   ru: { locale: 'ru-RU', currency: 'RUB' },
-  de: { locale: 'de-DE', currency: 'USD' },
-  fr: { locale: 'fr-FR', currency: 'USD' },
-  it: { locale: 'it-IT', currency: 'USD' },
-  ja: { locale: 'ja-JP', currency: 'USD' },
-  ko: { locale: 'ko-KR', currency: 'USD' },
-  ar: { locale: 'ar-SA', currency: 'USD' },
+  de: { locale: 'de-DE', currency: 'EUR' },
+  fr: { locale: 'fr-FR', currency: 'EUR' },
+  it: { locale: 'it-IT', currency: 'EUR' },
+  ja: { locale: 'ja-JP', currency: 'JPY' },
+  ko: { locale: 'ko-KR', currency: 'KRW' },
+  ar: { locale: 'ar-SA', currency: 'SAR' },
 }
 
 const positiveWords = [

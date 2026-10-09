@@ -79,6 +79,12 @@ const LANGUAGES = [
   { flag: '🇪🇸', name: 'Español' },
   { flag: '🇵🇱', name: 'Polski' },
   { flag: '🇷🇺', name: 'Русский' },
+  { flag: '🇩🇪', name: 'Deutsch' },
+  { flag: '🇫🇷', name: 'Français' },
+  { flag: '🇮🇹', name: 'Italiano' },
+  { flag: '🇯🇵', name: '日本語' },
+  { flag: '🇰🇷', name: '한국어' },
+  { flag: '🇸🇦', name: 'العربية' },
 ]
 
 export default function Footer() {

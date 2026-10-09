@@ -14,6 +14,7 @@ import { loadLanguage, type Dict, type DictValue } from '@/lib/i18n/loadLanguage
 import { applyHardcodedUiCopy } from '@/lib/i18n/hardcoded-ui-copy'
 import { setRuntimeDictionary } from '@/lib/i18n/uiText'
 import { normalizeSupportedLanguage, type SupportedLanguage } from '@/lib/i18n/supportedLanguages'
+import { writingDirection } from '@/lib/i18n/localeExpansion'
 
 type I18nContextType = {
   lang: string
@@ -44,6 +45,7 @@ function persistLanguage(lang: string) {
   localStorage.setItem('signalboost_language', safe)
   localStorage.setItem('site-language', safe)
   document.documentElement.lang = safe
+  document.documentElement.dir = writingDirection(safe)
   document.cookie = `signalboost_language=${encodeURIComponent(safe)}; Path=/; Max-Age=31536000; SameSite=Lax`
   return safe
 }

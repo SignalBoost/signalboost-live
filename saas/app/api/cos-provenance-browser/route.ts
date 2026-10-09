@@ -64,7 +64,7 @@ function precedingAssistant(body: any): BrowserMessage | null {
 
 function languageFrom(body: any): string {
   const language = String(body?.context?.language || 'en').toLowerCase()
-  return ['en', 'es', 'pt', 'pl', 'ru'].includes(language) ? language : 'en'
+  return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(language) ? language : 'en'
 }
 
 function publicSurface(req: NextRequest): boolean {

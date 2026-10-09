@@ -16,7 +16,8 @@ import { getConciergeAnswer } from '../lib/platform/unifiedPlatform.ts'
 const read = (path:string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 test('acceptance matrix contains exactly five distinct categories for each supported language', () => {
-  assert.equal(CONCIERGE_LANGUAGE_ACCEPTANCE_CASES.length, 25)
+  assert.equal(ACCEPTANCE_LANGUAGES.length, 11)
+  assert.equal(CONCIERGE_LANGUAGE_ACCEPTANCE_CASES.length, 55)
   const expected = ['conversation','fallback','operational','reasoning','transformation']
   for (const language of ACCEPTANCE_LANGUAGES) {
     const rows = CONCIERGE_LANGUAGE_ACCEPTANCE_CASES.filter(item => item.language === language)
@@ -38,12 +39,27 @@ test('COS acceptance prompts carry a stable factual token and transformations ca
   }
 })
 
-test('language signal recognizes representative native-language prose for all five locales', () => {
+test('language signal recognizes representative native-language prose for all eleven locales', () => {
   assert.equal(selectedLanguageSignal('The team can use the short pilot to learn and reduce risk for the next release.', 'en'), true)
   assert.equal(selectedLanguageSignal('El equipo puede usar el piloto para reducir el riesgo y aprender antes de la implantación.', 'es'), true)
   assert.equal(selectedLanguageSignal('A equipe pode usar o piloto para reduzir o risco e aprender antes da implementação.', 'pt'), true)
   assert.equal(selectedLanguageSignal('Zespół może użyć pilotażu, aby ograniczyć ryzyko i sprawdzić rozwiązanie przed wdrożeniem.', 'pl'), true)
   assert.equal(selectedLanguageSignal('Команда может использовать пилот, чтобы снизить риск и проверить решение перед внедрением.', 'ru'), true)
+  assert.equal(selectedLanguageSignal('Das Team kann den kurzen Pilot nutzen, um das Risiko zu senken und die Lösung vor der Einführung zu prüfen.', 'de'), true)
+  assert.equal(selectedLanguageSignal('L’équipe peut utiliser le pilote pour réduire le risque et valider la solution avant le déploiement.', 'fr'), true)
+  assert.equal(selectedLanguageSignal('Il team può usare il pilota per ridurre il rischio e verificare la soluzione prima della messa in produzione.', 'it'), true)
+  assert.equal(selectedLanguageSignal('チームは短いパイロットを使って、本番導入の前にリスクを下げ、解決策を確認できます。', 'ja'), true)
+  assert.equal(selectedLanguageSignal('팀은 짧은 파일럿을 활용해 도입 전에 위험을 줄이고 해결책을 검증할 수 있습니다.', 'ko'), true)
+  assert.equal(selectedLanguageSignal('يمكن للفريق استخدام التجربة القصيرة لتقليل المخاطر والتحقق من الحل قبل التنفيذ.', 'ar'), true)
+})
+
+test('related languages and shared scripts are not accepted for one another', () => {
+  assert.equal(selectedLanguageSignal('El equipo puede usar el piloto para reducir el riesgo y aprender antes de la implantación.', 'it'), false)
+  assert.equal(selectedLanguageSignal('El equipo puede usar el piloto para reducir el riesgo y aprender antes de la implantación.', 'fr'), false)
+  assert.equal(selectedLanguageSignal('Il team può usare il pilota per ridurre il rischio e verificare la soluzione prima della messa in produzione.', 'es'), false)
+  assert.equal(selectedLanguageSignal('团队可以利用短期试点在正式上线之前降低风险并验证解决方案。', 'ja'), false)
+  assert.equal(selectedLanguageSignal('The team can use the short pilot to learn and reduce risk for the next release.', 'de'), false)
+  assert.equal(selectedLanguageSignal('チームは短いパイロットを使って、本番導入の前にリスクを下げ、解決策を確認できます。', 'ko'), false)
 })
 
 test('Polish orthographic evidence prevents a false negative on natural concise Polish guidance', () => {
@@ -54,7 +70,7 @@ test('Polish orthographic evidence prevents a false negative on natural concise 
 
 test('obvious English support leakage is rejected in every non-English locale', () => {
   const leak = 'I can help. To get started, tell me your goal and then choose the next step.'
-  for (const language of ['es','pt','pl','ru'] as const) assert.equal(hasEnglishLeakage(leak, language), true, language)
+  for (const language of ['es','pt','pl','ru','de','fr','it','ja','ko','ar'] as const) assert.equal(hasEnglishLeakage(leak, language), true, language)
   assert.equal(hasEnglishLeakage(leak, 'en'), false)
 })
 
@@ -110,7 +126,7 @@ test('malformed public-only completion retry is bounded and cannot retry policy 
   assert.doesNotMatch(source, /shouldRetryMalformedPublicCoreResult[\s\S]{0,500}(?:disclosure|authorization|confidence).*return true/i)
 })
 
-test('deterministic Concierge fallback stays in the selected language across all five locales', () => {
+test('deterministic Concierge fallback stays in the selected language across all eleven locales', () => {
   for (const language of ACCEPTANCE_LANGUAGES) {
     const caseItem = CONCIERGE_LANGUAGE_ACCEPTANCE_CASES.find(item => item.language === language && item.mode === 'deterministic_fallback')!
     const result = getConciergeAnswer(caseItem.prompt, language)

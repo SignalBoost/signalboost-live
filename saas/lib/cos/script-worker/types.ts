@@ -5,7 +5,7 @@ export type CosContentWorkerInput = {
   objective: string
   channel: string
   audience: string
-  language: 'en' | 'es' | 'pt' | 'pl' | 'ru'
+  language: 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
   brief: string
 }
 

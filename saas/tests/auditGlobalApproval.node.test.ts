@@ -76,10 +76,10 @@ test('the system recovers missing PR creation and waits for protected checks', (
   assert.match(system, /mergeCleanPullRequest/)
 })
 
-test('approved i18n findings receive real four-language catalog entries before merge', () => {
+test('approved i18n findings receive real ten-language catalog entries before merge', () => {
   const system = read('../lib/audit/approvedRunRemediationSystem.ts')
 
-  assert.match(system, /SUPPORTED_LANGS = \['es', 'pt', 'pl', 'ru'\]/)
+  assert.match(system, /SUPPORTED_LANGS = \['es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'\]/)
   assert.match(system, /ROOT_CATALOG = 'lib\/i18n\/approvedAuditRemediationCopy\.ts'/)
   assert.match(system, /SAAS_CATALOG = 'saas\/lib\/i18n\/approvedAuditRemediationCopy\.ts'/)
   assert.match(system, /ensureLocalizationCatalogs/)

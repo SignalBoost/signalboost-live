@@ -5,7 +5,7 @@ import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
-const VALID_LOCALES = ['en', 'es', 'pt', 'pl', 'ru']
+const VALID_LOCALES = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 async function getClientAndUser() {
   const cookieStore = await cookies()

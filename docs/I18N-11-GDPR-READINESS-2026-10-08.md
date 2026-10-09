@@ -3,7 +3,7 @@
 **Status:** implementation specification, **not** localization or GDPR certification. Owner request: 2026-10-08. Tracking: [#3922](https://github.com/SignalBoost/signalboost-live/issues/3922).
 
 ## Release invariant
-The shipped canonical languages remain `en/es/pt/pl/ru` until the six added languages `de/fr/it/ja/ko/ar` are fully translated and validated. **Do not expose incomplete locales** by simply changing `SUPPORTED_LANGUAGES`: current `check-five-language-platform.mjs` deliberately fails partial catalog expansion. Preserve existing release protections until the replacement eleven-language gate has equivalent or stronger coverage.
+**Activated 2026-10-09:** all eleven languages `en/es/pt/pl/ru/de/fr/it/ja/ko/ar` are canonical in `SUPPORTED_LANGUAGES`. The five-language gate was replaced by `check-eleven-language-platform.mjs`, `check-eleven-language-coverage.mjs --require-all` and `audit-locale-structure.mjs` (exact key parity, blank, placeholder/URL-token and untranslated-English checks across every locale store), wired into `prebuild` so a regression fails the Vercel build. The six new languages were AI-translated and validated automatically; they have **not** had native-speaker review. The GDPR section below is unaffected by this activation and remains open.
 
 ## Implementation checklist
 1. Add six languages to every user-facing locale store and canonical language routing, translations for AI/COS and generated UI, notifications, onboarding, public pages, accessibility, pricing and legal text. Translate from vetted copy, not duplicate English as a placeholder. Keep locale key parity and add automated missing/extra/blank/untranslated checks.

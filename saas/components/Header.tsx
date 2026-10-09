@@ -6,7 +6,7 @@ import { uiText } from '@/lib/i18n/uiText'
 
 const BRAND = '⚡ SignalBoost'
 
-type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type HeaderCopy = {
   podcasters: string
@@ -23,6 +23,12 @@ const COPY: Record<Language, HeaderCopy> = {
   pt: { podcasters: 'Podcasters', pricing: 'Preços', docs: 'Documentação', dashboard: 'Painel', faq: 'Perguntas frequentes', getStarted: 'Começar' },
   pl: { podcasters: 'Podcasterzy', pricing: 'Cennik', docs: 'Dokumentacja', dashboard: 'Panel', faq: 'Najczęstsze pytania', getStarted: 'Rozpocznij' },
   ru: { podcasters: 'Подкастеры', pricing: 'Цены', docs: 'Документация', dashboard: 'Панель', faq: 'Частые вопросы', getStarted: 'Начать' },
+  de: { podcasters: 'Podcaster', pricing: 'Preise', docs: 'Dokumentation', dashboard: 'Dashboard', faq: 'Häufige Fragen', getStarted: 'Loslegen' },
+  fr: { podcasters: 'Podcasteurs', pricing: 'Tarifs', docs: 'Documentation', dashboard: 'Tableau de bord', faq: 'FAQ', getStarted: 'Commencer' },
+  it: { podcasters: 'Podcaster', pricing: 'Prezzi', docs: 'Documentazione', dashboard: 'Dashboard', faq: 'FAQ', getStarted: 'Inizia' },
+  ja: { podcasters: 'ポッドキャスター', pricing: '料金', docs: 'ドキュメント', dashboard: 'ダッシュボード', faq: 'よくある質問', getStarted: '始める' },
+  ko: { podcasters: '팟캐스터', pricing: '요금', docs: '문서', dashboard: '대시보드', faq: '자주 묻는 질문', getStarted: '시작하기' },
+  ar: { podcasters: 'صانعو البودكاست', pricing: 'الأسعار', docs: 'المستندات', dashboard: 'لوحة المعلومات', faq: 'الأسئلة الشائعة', getStarted: 'ابدأ الآن' },
 }
 
 export default function Header() {

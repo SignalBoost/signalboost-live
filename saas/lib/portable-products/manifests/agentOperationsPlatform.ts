@@ -34,5 +34,5 @@ export const agentOperationsPlatformManifest: PortableProductManifest = Object.f
   architectureReferences: Object.freeze(['agent-runtime', 'workflow-coordinator', 'durable-execution']),
   documentationReferences: Object.freeze(['docs/portables/enterprise-portables-and-blank-cos.md']),
   futureFeatures: Object.freeze(['enterprise-catalog-listing']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

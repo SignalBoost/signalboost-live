@@ -1,0 +1,298 @@
+{
+  "dashboard.title": "ダッシュボード",
+  "dashboard.subtitle": "プロジェクトと自動化を管理",
+  "nav.dashboard": "ダッシュボード",
+  "nav.projects": "プロジェクト",
+  "nav.automations": "自動化",
+  "nav.courses": "コース",
+  "nav.billing": "請求",
+  "nav.settings": "設定",
+  "projects.title": "プロジェクト",
+  "projects.create": "プロジェクトを作成",
+  "projects.empty": "プロジェクトはまだありません。",
+  "editor.save": "保存",
+  "editor.generating": "生成中…",
+  "editor.preview": "プレビュー",
+  "billing.title": "請求とプラン",
+  "billing.upgrade": "アップグレード",
+  "billing.current": "現在のプラン",
+  "mobile.install": "アプリをインストール",
+  "common.loading": "読み込み中...",
+  "common.cancel": "キャンセル",
+  "common.delete": "削除",
+  "common.edit": "編集",
+  "reset": "リセット",
+  "errors": {
+    "generationFailed": "Generation failed",
+    "networkError": "Network error",
+    "unauthorized": "Unauthorized"
+  },
+  "api": {
+    "invalidJson": "Invalid JSON",
+    "promptRequired": "Prompt is required"
+  },
+  "projects": {
+    "limitReached": "Project limit reached for your plan."
+  },
+  "actionRouter": {
+    "openWebsiteBuilder": "Open Website Builder",
+    "openReviewCollector": "Open Review Collector",
+    "openAudioStudio": "Open Audio Studio",
+    "openVideoStudio": "Open Video Studio",
+    "openSalesAgent": "Open Sales Agent",
+    "openSalesPipeline": "Open Sales Pipeline",
+    "answerInChat": "Answer in chat"
+  },
+  "videoSearch": {
+    "timeout": {
+      "generic": "Request timed out.",
+      "aiService": "AI service timed out.",
+      "intent": "Intent processing timed out.",
+      "script": "Script generation timed out.",
+      "search": "Video search timed out.",
+      "searchDetailed": "Video search timed out. Try a shorter request."
+    },
+    "status": {
+      "searching": "Searching for videos...",
+      "searchingPromptMatch": "Searching for videos matching your prompt..."
+    },
+    "errors": {
+      "generateScriptFailed": "Failed to generate script",
+      "searchFailed": "Search failed"
+    },
+    "rights": {
+      "restricted": "All results are rights-restricted for this query.",
+      "embeddableOnly": "Only embeddable results were found."
+    }
+  },
+  "videoGenerate": {
+    "errors": {
+      "authRequired": "You must be signed in.",
+      "promptRequired": "Please enter a prompt.",
+      "imageRequired": "Please attach an image.",
+      "noCredits": "No video credits left this month.",
+      "creditCheckFailed": "Could not check your credits."
+    },
+    "defaults": {
+      "imagePrompt": "Add natural, subtle motion to this image."
+    }
+  },
+  "operator": {
+    "commitPrefix": "Website Operator update:",
+    "errors": {
+      "requestRequired": "Please describe what you want to change.",
+      "planCreateFailed": "Could not create the plan right now.",
+      "planIdRequired": "Plan ID is required.",
+      "planNotFound": "Plan not found.",
+      "approvalRequired": "Approval required before applying changes.",
+      "applyFailed": "Could not apply approved update.",
+      "jobIdRequired": "Job ID is required.",
+      "jobNotFound": "Job not found.",
+      "rollbackUnavailable": "Rollback is not available for this update.",
+      "rollbackFailed": "Could not complete rollback.",
+      "statusNotFound": "Status not found."
+    },
+    "success": {
+      "published": "Changes published. Rollback is available.",
+      "approvedAndPublished": "Update approved and published with rollback point.",
+      "rollbackComplete": "Rollback complete. Previous version restored."
+    },
+    "input": {
+      "defaultRequest": "A high-end rooftop cocktail bar in Rio with bottle service and DJ nights"
+    },
+    "preview": {
+      "liveLabel": "ライブプレビュー",
+      "dark": "ダーク",
+      "light": "ライト",
+      "sections": "セクション",
+      "empty": "デザインされたウェブサイトがここに表示されます。",
+      "loading": "ウェブサイトをデザインしています…"
+    }
+  },
+  "reviews": {
+    "errors": {
+      "unauthorized": "Unauthorized",
+      "missingSlug": "Missing slug",
+      "invalidNameLength": "Name must be 1-80 characters",
+      "invalidEmail": "Invalid email",
+      "invalidRating": "Rating must be 1-5",
+      "invalidContentLength": "Content must be 1-2000 characters",
+      "lookupFailed": "Lookup failed",
+      "notFound": "Not found",
+      "tooManySubmissions": "Too many submissions. Try again tomorrow.",
+      "reviewCapReached": "Not accepting more reviews on current plan.",
+      "saveFailed": "Could not save review",
+      "missingId": "Missing ID",
+      "approvedMustBeBoolean": "Approved must be boolean"
+    }
+  },
+  "dash": {
+    "concierge": {
+      "title": "SignalBoost Concierge",
+      "loading": "ワークスペースを読み込み、対応が必要な項目を確認しています。",
+      "welcome": "ようこそ。まず最初のプロジェクトを作成するか、何から作るべきかSignalBoostに質問してください。",
+      "drafts": {
+        "one": "下書きのプロジェクトが1件あります。開いて、準備ができたら公開してください。",
+        "many": "下書きのプロジェクトが{count}件あります。1つを開き、準備ができたら公開してください。"
+      },
+      "live": {
+        "one": "公開中のプロジェクトが1件あります。次のステップ:宣伝する、レビューを集める、またはコンテンツを作成する。",
+        "many": "公開中のプロジェクトが{count}件あります。次のステップ:宣伝する、レビューを集める、またはコンテンツを作成する。"
+      },
+      "help": "次の一手に迷っていますか?下でSignalBoostに質問してください。",
+      "askNext": "ASK_NEXT"
+    },
+    "ai": {
+      "currentPage": "Dashboard"
+    },
+    "prompt": {
+      "nextAction": "次に何をすればよいですか?"
+    }
+  },
+  "builder": {
+    "ai": {
+      "currentPage": "Site Builder",
+      "userPlan": "free",
+      "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
+    }
+  },
+  "podcasters_page": {
+    "deliverables": {
+      "voiceover": {
+        "title": "ネイティブ音声ナレーション",
+        "desc": "1つのエピソードを、複数言語の自然な音声バージョンに変換します。"
+      },
+      "clips": {
+        "title": "クリップ工場",
+        "desc": "最高の瞬間を見つけて、Shorts、Reels、TikTok に変換します。"
+      },
+      "captions": {
+        "title": "字幕",
+        "desc": "字幕、文字起こし、SNS 用キャプションを自動生成します。"
+      },
+      "website": {
+        "title": "ポッドキャスト Web サイト",
+        "desc": "エピソード、番組ノート、レビュー、言語をまとめるブランド化されたホーム。"
+      },
+      "distribution": {
+        "title": "配信",
+        "desc": "YouTube、TikTok、Instagram、メールなど向けにコンテンツを準備します。"
+      },
+      "growth": {
+        "title": "リスナーの拡大",
+        "desc": "レビュー、推薦の声、オーディエンスシグナルを収集します。"
+      }
+    },
+    "how": {
+      "step1": {
+        "title": "エピソードをアップロード",
+        "desc": "完成した音声または動画をお持ちください。"
+      },
+      "step2": {
+        "title": "出力を選択",
+        "desc": "クリップ、字幕、言語、ナレーション、番組ノート。"
+      },
+      "step3": {
+        "title": "AI クルーが作業",
+        "desc": "文字起こし、クリップ、翻訳、配信の各エージェントがアセットを準備します。"
+      },
+      "step4": {
+        "title": "あらゆる場所に公開",
+        "desc": "あらゆるチャネル向けにコンテンツをダウンロードまたは準備します。"
+      }
+    },
+    "plans": {
+      "networkEmailSubject": "SignalBoost Network Plan"
+    }
+  },
+  "singleLanguageContent": "{language} のコンテンツ",
+  "docs": {
+    "pricing": {
+      "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo"
+    }
+  },
+  "pricing_page": {
+    "free": {
+      "video": "動画ツール付き"
+    },
+    "starter": {
+      "video": "Starter 動画生成"
+    },
+    "pro": {
+      "video": "Pro 動画生成"
+    },
+    "business": {
+      "video": "ビジネス向け動画生成"
+    }
+  },
+  "settings": {
+    "title": "システム設定",
+    "subtitle": "アカウントオプション、データ同期 Webhook、ルーティングルールを設定します。",
+    "workspace": "ワークスペースの一般設定",
+    "platformLabel": "プラットフォームインスタンスのラベル",
+    "ingestion": "データ取り込みチャネル",
+    "webhookTarget": "アフィリエイト取り込み Webhook の送信先",
+    "webhookHelp": "サードパーティの旅行・マーケットプレイスシステムからのトラフィックフックを処理するための直接送信先アドレス。",
+    "automation": "自動化とトリガー",
+    "emailSummaries": "生成サマリーのメール通知",
+    "emailSummariesHelp": "動画アセットの処理が完了するたびに、自動アクティビティログを受け取ります。",
+    "autoTopup": "コンピュートの自動チャージ",
+    "autoTopupHelp": "残高が 50 ユニットを下回ったら、システム残高クレジットを自動でチャージします。",
+    "saving": "ルールを更新中…",
+    "save": "設定を保存",
+    "saved": "システム設定を保存しました。"
+  },
+  "data": {
+    "title": "ユニバーサルデータコネクタ",
+    "wikipediaReminder": "Wikipedia に関する注意: コンテンツは CC-BY-SA ライセンスであり、帰属表示が必要です。",
+    "uploadCsv": "CSV をアップロード",
+    "addApi": "API コネクタを追加",
+    "runApi": "API インポートを実行",
+    "addScraper": "スクレイパーコネクタを追加",
+    "runScraper": "スクレイパーインポートを実行",
+    "importedItems": "カテゴリ別のインポート済みアイテム",
+    "sourceHistory": "ソース履歴",
+    "importing": "インポート中…",
+    "done": "完了: {count} 件挿入",
+    "error": "エラー: {error}"
+  },
+  "sales": {
+    "title": "🧠 AI 営業エージェント",
+    "subtitle": "AI に見込み客を指定してください。確認・送信用のプロフェッショナルな営業メールを作成します。",
+    "prospect": "見込み客",
+    "company": "会社名",
+    "contact": "担当者名",
+    "email": "Email",
+    "website": "ウェブサイト",
+    "industry": "業種",
+    "notes": "この見込み客に関するメモ",
+    "drafting": "作成中...",
+    "generate": "営業メールを生成",
+    "aiDraft": "AI 下書き",
+    "emptyDraft": "営業メールがここに表示されます。",
+    "subject": "件名",
+    "openEmail": "メールで開く",
+    "pipeline": {
+      "title": "セールスパイプライン",
+      "subtitle": "見込み客を発見から顧客化まで追跡します。",
+      "loading": "パイプラインを読み込み中…",
+      "noLeads": "リードなし",
+      "unnamed": "名称未設定の会社",
+      "noIndustry": "業界なし",
+      "noCountry": "国なし",
+      "noEmail": "メールなし",
+      "draft": "下書き："
+    },
+    "status": {
+      "discovered": "検出済み",
+      "approved": "承認済み",
+      "draft_ready": "下書き準備完了",
+      "sketch_ready": "スケッチ準備完了",
+      "sent": "送信済み",
+      "replied": "返信済み",
+      "client": "クライアント",
+      "draft_failed": "下書きに失敗しました"
+    }
+  },
+  "orchestration.kicker": "AI オーケストレーション"
+}

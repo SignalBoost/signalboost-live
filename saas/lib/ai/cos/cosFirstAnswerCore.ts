@@ -102,6 +102,12 @@ function ownerPlatformStackReply(language?: string | null): string {
   if (code === 'es') return ['Canal del propietario — configuración actual:', ...facts, note].join('\n')
   if (code === 'pl') return ['Kanał właściciela — bieżąca konfiguracja:', ...facts, note].join('\n')
   if (code === 'ru') return ['Канал владельца — текущая конфигурация:', ...facts, note].join('\n')
+  if (code === 'de') return ['Eigentümerkanal — aktuelle Laufzeitkonfiguration:', ...facts, note].join('\n')
+  if (code === 'fr') return ['Canal du propriétaire — configuration d’exécution actuelle :', ...facts, note].join('\n')
+  if (code === 'it') return ['Canale del proprietario — configurazione di runtime attuale:', ...facts, note].join('\n')
+  if (code === 'ja') return ['オーナーチャネル — 現在のランタイム構成：', ...facts, note].join('\n')
+  if (code === 'ko') return ['소유자 채널 — 현재 런타임 구성:', ...facts, note].join('\n')
+  if (code === 'ar') return ['قناة المالك — إعدادات التشغيل الحالية:', ...facts, note].join('\n')
   return ['Owner channel — current runtime configuration:', ...facts, note].join('\n')
 }
 
@@ -119,6 +125,12 @@ function freshVerificationUnavailable(language = 'en'): string {
   if (language === 'pt') return 'Não consegui verificar este fato atual com fontes independentes e autorizadas suficientes. Não vou adivinhar nem usar um modelo externo para substituir evidência ausente.'
   if (language === 'pl') return 'Nie udało mi się zweryfikować tego aktualnego faktu w wystarczającej liczbie niezależnych i autorytatywnych źródeł. Nie będę zgadywać ani używać zewnętrznego modelu zamiast brakujących dowodów.'
   if (language === 'ru') return 'Мне не удалось подтвердить этот текущий факт достаточным числом независимых авторитетных источников. Я не буду угадывать или использовать внешнюю модель вместо отсутствующих доказательств.'
+  if (language === 'de') return 'Ich konnte diesen aktuellen Sachverhalt nicht anhand ausreichend vieler unabhängiger, maßgeblicher Live-Quellen überprüfen. Ich werde nicht raten und kein externes Modell als Ersatz für fehlende Belege verwenden.'
+  if (language === 'fr') return 'Je n’ai pas pu vérifier ce fait actuel à partir de suffisamment de sources indépendantes et faisant autorité. Je ne vais pas deviner ni utiliser un modèle externe pour remplacer des preuves manquantes.'
+  if (language === 'it') return 'Non sono riuscito a verificare questo fatto attuale con un numero sufficiente di fonti indipendenti e autorevoli. Non tirerò a indovinare né userò un modello esterno al posto delle prove mancanti.'
+  if (language === 'ja') return 'この最新の事実を、十分な数の独立した信頼できるリアルタイムの情報源で検証できませんでした。推測したり、不足している根拠の代わりに外部モデルを使用したりすることはしません。'
+  if (language === 'ko') return '이 최신 사실을 충분한 수의 독립적이고 신뢰할 수 있는 실시간 출처로 검증할 수 없었습니다. 추측하거나 부족한 근거를 대신해 외부 모델을 사용하지 않겠습니다.'
+  if (language === 'ar') return 'لم أتمكن من التحقق من هذه الحقيقة الحالية من خلال عدد كافٍ من المصادر المباشرة المستقلة والموثوقة. لن أخمّن ولن أستخدم نموذجًا خارجيًا بديلًا عن الأدلة المفقودة.'
   return 'I could not verify this current fact from enough independent authoritative live sources. I will not guess or use an external model as a substitute for missing evidence.'
 }
 

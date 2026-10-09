@@ -7,7 +7,7 @@ import { getAccess } from '@/lib/auth/access'
 export const runtime = 'nodejs'
 export const maxDuration = 300
 
-type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type JsonSafeVideoResponse<T> = {
   ok: boolean
@@ -16,7 +16,7 @@ type JsonSafeVideoResponse<T> = {
   meta: { locale: SupportedVideoLocale; generatedAt: string }
 }
 
-const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
+const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 const maxUploadMb = 250
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) { return NextResponse.json(body, { status }) }
 function locale(value: FormDataEntryValue | null): SupportedVideoLocale {

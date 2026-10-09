@@ -30,7 +30,7 @@ type ImageMotionSource = {
 // (jsonb — no schema change needed).
 export type StartVideoOpts = { lang?: string; title?: string; hook?: string }
 
-export const SUPPORTED_VIDEO_LANGS = ['en', 'es', 'pt', 'pl', 'ru'] as const
+export const SUPPORTED_VIDEO_LANGS = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 
 export function normalizeVideoLang(value: any): string {
   const raw = String(value || '').toLowerCase().trim()
@@ -44,6 +44,12 @@ const AUDIENCE_BY_LANG: Record<string, string> = {
   pt: 'donos de negócios, agências, consultores e operadores',
   pl: 'właścicieli firm, agencji, konsultantów i operatorów',
   ru: 'владельцев бизнеса, агентств, консультантов и операторов',
+  de: 'Geschäftsinhaber, Agenturen, Berater und Betreiber',
+  fr: 'propriétaires d’entreprise, agences, consultants et opérateurs',
+  it: 'titolari d’azienda, agenzie, consulenti e operatori',
+  ja: '事業オーナー、代理店、コンサルタント、運営担当者',
+  ko: '사업주, 에이전시, 컨설턴트 및 운영자',
+  ar: 'أصحاب الأعمال والوكالات والاستشاريين والمشغّلين',
 }
 
 const LEARN_MORE_BY_LANG: Record<string, string> = {
@@ -52,6 +58,12 @@ const LEARN_MORE_BY_LANG: Record<string, string> = {
   pt: `Saiba mais em ${PUBLIC_BRAND_DOMAIN}.`,
   pl: `Dowiedz się więcej na ${PUBLIC_BRAND_DOMAIN}.`,
   ru: `Подробнее на ${PUBLIC_BRAND_DOMAIN}.`,
+  de: `Weitere Informationen unter ${PUBLIC_BRAND_DOMAIN}.`,
+  fr: `En savoir plus sur ${PUBLIC_BRAND_DOMAIN}.`,
+  it: `Scopri di più su ${PUBLIC_BRAND_DOMAIN}.`,
+  ja: `詳しくは ${PUBLIC_BRAND_DOMAIN} をご覧ください。`,
+  ko: `자세한 내용은 ${PUBLIC_BRAND_DOMAIN}에서 확인하세요.`,
+  ar: `اعرف المزيد على ${PUBLIC_BRAND_DOMAIN}.`,
 }
 
 function adminDb() {

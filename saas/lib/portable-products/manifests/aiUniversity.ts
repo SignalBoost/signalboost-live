@@ -20,5 +20,5 @@ export const aiUniversityManifest: PortableProductManifest = Object.freeze({
   architectureReferences: Object.freeze(['saas/lib/portable-university', 'saas/lib/ai/cos/cosCurriculumPriority.ts', 'saas/lib/cos/dailyAutonomousLearning.ts']),
   documentationReferences: Object.freeze(['docs/COS-UNIVERSITY-POST-UNDERGRADUATE-ROADMAP-2026-09-08.md', 'docs/portables/ai-university-distillation-suite.md']),
   futureFeatures: Object.freeze(['buyer-neutral-host-extraction', 'curriculum-administration-ui', 'versioned-curriculum-import-export', 'licensing-activation']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

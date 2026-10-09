@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import type { AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 const COPY: Record<Lang, { active: string; elapsed: string; stages: string[]; note: string }> = {
   en: { active: uiText('generatedUi.u_cos_activity_active'), elapsed: uiText('generatedUi.u_cos_activity_elapsed'), stages: [uiText('generatedUi.u_cos_activity_understand'), uiText('generatedUi.u_cos_activity_evidence'), uiText('generatedUi.u_cos_activity_reason'), uiText('generatedUi.u_cos_activity_prepare')], note: uiText('generatedUi.u_cos_activity_note') },
@@ -12,10 +12,16 @@ const COPY: Record<Lang, { active: string; elapsed: string; stages: string[]; no
   pt: { active: 'Trabalhando na sua solicitação', elapsed: 'decorrido', stages: ['Entendendo a solicitação', 'Verificando o contexto e as evidências disponíveis', 'Analisando a melhor resposta', 'Preparando o resultado'], note: 'Resumo da atividade ao vivo; o raciocínio privado não é exibido.' },
   pl: { active: 'Pracuję nad Twoją prośbą', elapsed: 'czas', stages: ['Analizuję prośbę', 'Sprawdzam kontekst i dostępne dowody', 'Opracowuję najlepszą odpowiedź', 'Przygotowuję wynik'], note: 'Podsumowanie aktywności na żywo; prywatne rozumowanie nie jest ujawniane.' },
   ru: { active: 'Работаю над запросом', elapsed: 'прошло', stages: ['Изучаю запрос', 'Проверяю контекст и доступные данные', 'Формирую лучший ответ', 'Готовлю результат'], note: 'Сводка активности в реальном времени; внутренние рассуждения не раскрываются.' },
+  de: { active: 'Ihre Anfrage wird bearbeitet', elapsed: 'vergangen', stages: ['Anfrage wird analysiert', 'Kontext und verfügbare Belege werden geprüft', 'Die beste Antwort wird ermittelt', 'Ergebnis wird vorbereitet'], note: 'Live-Aktivitätsübersicht – private Denkprozesse werden nicht offengelegt.' },
+  fr: { active: 'Traitement de votre demande', elapsed: 'écoulé', stages: ['Compréhension de la demande', 'Vérification du contexte et des éléments disponibles', 'Recherche de la meilleure réponse', 'Préparation du résultat'], note: 'Résumé de l’activité en direct — le raisonnement privé n’est pas exposé.' },
+  it: { active: 'Sto elaborando la tua richiesta', elapsed: 'trascorso', stages: ['Comprensione della richiesta', 'Verifica del contesto e delle prove disponibili', 'Elaborazione della risposta migliore', 'Preparazione del risultato'], note: 'Riepilogo dell’attività in tempo reale: il ragionamento privato non viene mostrato.' },
+  ja: { active: 'リクエストを処理中', elapsed: '経過', stages: ['リクエストを理解中', 'コンテキストと利用可能な根拠を確認中', '最適な回答を検討中', '結果を準備中'], note: 'ライブアクティビティの概要 — 内部の推論は表示されません。' },
+  ko: { active: '요청을 처리하는 중', elapsed: '경과', stages: ['요청을 파악하는 중', '컨텍스트와 사용 가능한 근거를 확인하는 중', '최적의 응답을 추론하는 중', '결과를 준비하는 중'], note: '실시간 활동 요약 — 비공개 추론은 노출되지 않습니다.' },
+  ar: { active: 'جارٍ العمل على طلبك', elapsed: 'منقضٍ', stages: ['جارٍ فهم الطلب', 'جارٍ التحقق من السياق والأدلة المتاحة', 'جارٍ التفكير في أفضل استجابة', 'جارٍ إعداد النتيجة'], note: 'ملخص النشاط المباشر — لا يتم كشف الاستدلال الخاص.' },
 }
 
 export default function AgentActivity({ lang = 'en', compact = false, activity }: { lang?: string; compact?: boolean; activity?: AgentProgressEvent | null }) {
-  const selected = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
+  const selected = (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as Lang
   const copy = COPY[selected]
   const [seconds, setSeconds] = useState(0)
 

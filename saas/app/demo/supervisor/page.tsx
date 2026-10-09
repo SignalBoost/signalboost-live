@@ -50,7 +50,7 @@ type Record_ = {
 
 function pickLanguage(value?: string): DemoShareLanguage {
   const short = String(value || 'en').slice(0, 2).toLowerCase()
-  return (['en', 'es', 'pt', 'pl', 'ru'] as DemoShareLanguage[]).includes(short as DemoShareLanguage)
+  return (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as DemoShareLanguage[]).includes(short as DemoShareLanguage)
     ? (short as DemoShareLanguage)
     : 'en'
 }

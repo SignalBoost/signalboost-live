@@ -153,7 +153,7 @@ export async function createProspectCampaignJob(input: {
   const capNote = requested < asked
     ? `Asked for ${asked}; this worker runs at most ${MAX_REQUESTED} per campaign, so it is running ${requested}. Start a second campaign for the rest.`
     : null
-  const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(input.language))
+  const language = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(String(input.language))
     ? String(input.language)
     : 'en'
 
@@ -269,6 +269,48 @@ const SECTOR_QUERIES: Record<string, string[]> = {
     'компания облачная инфраструктура', 'SaaS компания платформа',
     'финтех компания технологии', 'логистическая технологическая компания',
     'компания электронной коммерции платформа', 'компания кибербезопасность',
+  ],
+  de: [
+    'Cloud-Infrastrukturunternehmen', 'Engineering-Team eines SaaS-Plattformunternehmens',
+    'Fintech-Engineering-Unternehmen', 'Plattform eines Gesundheitstechnologieunternehmens',
+    'Logistik-Technologieunternehmen', 'e-commerce platform company',
+    'Engineering eines Datenanalyseunternehmens', 'Plattform eines Cybersicherheitsunternehmens',
+    'Telekommunikations-Softwareunternehmen', 'Softwareunternehmen für die Fertigung',
+  ],
+  fr: [
+    'entreprise d’infrastructure cloud', 'équipe d’ingénierie d’une entreprise de plateforme SaaS',
+    'entreprise d’ingénierie fintech', 'plateforme d’une entreprise de technologies de santé',
+    'entreprise de technologies logistiques', 'e-commerce platform company',
+    'ingénierie d’une entreprise d’analyse de données', 'plateforme d’une entreprise de cybersécurité',
+    'éditeur de logiciels télécoms', 'éditeur de logiciels industriels',
+  ],
+  it: [
+    'azienda di infrastruttura cloud', 'team di ingegneria di un’azienda di piattaforme SaaS',
+    'azienda di ingegneria fintech', 'piattaforma di un’azienda di tecnologia sanitaria',
+    'azienda di tecnologia logistica', 'e-commerce platform company',
+    'ingegneria di un’azienda di analisi dei dati', 'piattaforma di un’azienda di cybersicurezza',
+    'azienda di software per telecomunicazioni', 'azienda di software per il manifatturiero',
+  ],
+  ja: [
+    'クラウドインフラ企業', 'SaaS プラットフォーム企業のエンジニアリングチーム',
+    'フィンテックエンジニアリング企業', 'ヘルスケアテクノロジー企業のプラットフォーム',
+    '物流テクノロジー企業', 'e-commerce platform company',
+    'データ分析企業のエンジニアリング', 'サイバーセキュリティ企業のプラットフォーム',
+    '通信ソフトウェア企業', '製造業向けソフトウェア企業',
+  ],
+  ko: [
+    '클라우드 인프라 기업', 'SaaS 플랫폼 기업 엔지니어링 팀',
+    '핀테크 엔지니어링 기업', '헬스케어 기술 기업 플랫폼',
+    '물류 기술 기업', 'e-commerce platform company',
+    '데이터 분석 기업 엔지니어링', '사이버 보안 기업 플랫폼',
+    '통신 소프트웨어 기업', '제조 소프트웨어 기업',
+  ],
+  ar: [
+    'شركة بنية تحتية سحابية', 'فريق هندسي في شركة منصات SaaS',
+    'شركة هندسة للتقنية المالية', 'منصة شركة تقنيات الرعاية الصحية',
+    'شركة تقنيات لوجستية', 'e-commerce platform company',
+    'الهندسة في شركة تحليلات بيانات', 'منصة شركة أمن سيبراني',
+    'شركة برمجيات اتصالات', 'شركة برمجيات للتصنيع',
   ],
 }
 
@@ -444,7 +486,7 @@ async function runDiscovery(
   return { ok: true, candidates: ordered, note }
 }
 const LANGUAGE_NAMES: Record<string, string> = {
-  en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian',
+  en: 'English', es: 'Spanish', pt: 'Portuguese', pl: 'Polish', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian', ja: 'Japanese', ko: 'Korean', ar: 'Arabic',
 }
 
 function offerProfileFor(offer: string): string {

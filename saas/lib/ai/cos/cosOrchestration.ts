@@ -211,6 +211,12 @@ export function restrictedProvenanceReply(language: string): string {
   if (language === 'pt') return 'Não posso compartilhar informações de proveniência técnica, arquitetura ou modelo neste canal.'
   if (language === 'pl') return 'Nie mogę udostępniać technicznych informacji o pochodzeniu, architekturze ani modelu na tym kanale.'
   if (language === 'ru') return 'Я не могу делиться технической информацией о происхождении ответа, архитектуре или модели в этом канале.'
+  if (language === 'de') return 'Technische Herkunfts-, Architektur- oder Modelldetails kann ich in diesem Kanal nicht weitergeben.'
+  if (language === 'fr') return 'Je ne peux pas partager d’informations techniques de provenance, d’architecture ou de modèle sur ce canal.'
+  if (language === 'it') return 'Non posso condividere dettagli tecnici su provenienza, architettura o modello in questo canale.'
+  if (language === 'ja') return 'このチャネルでは、技術的な出所、アーキテクチャ、モデルの詳細を共有できません。'
+  if (language === 'ko') return '이 채널에서는 기술적 출처, 아키텍처 또는 모델 세부 정보를 공유할 수 없습니다.'
+  if (language === 'ar') return 'لا يمكنني مشاركة تفاصيل تقنية حول المصدر أو البنية أو النموذج عبر هذه القناة.'
   return 'I can\'t share technical provenance, architecture, or model details on this channel.'
 }
 
@@ -222,6 +228,12 @@ export function publicProvenanceReply(language: string, provenance?: any, origin
     if (language === 'pt') return 'Foi um rascunho original criado para esta conversa. Nenhuma fonte externa ou dado privado foi usado.'
     if (language === 'pl') return 'To był oryginalny tekst przygotowany dla tej rozmowy. Nie użyto źródeł zewnętrznych ani danych prywatnych.'
     if (language === 'ru') return 'Это был оригинальный текст, созданный для этого разговора. Внешние источники и частные данные не использовались.'
+    if (language === 'de') return 'Das war ein eigens für dieses Gespräch erstellter Originalentwurf. Es wurden weder externe Recherchen noch private Daten verwendet.'
+    if (language === 'fr') return 'Il s’agissait d’un brouillon original créé pour cette conversation. Aucune recherche externe ni donnée privée n’a été utilisée.'
+    if (language === 'it') return 'Era una bozza originale creata per questa conversazione. Non sono state usate ricerche esterne né dati privati.'
+    if (language === 'ja') return 'これはこの会話のために作成されたオリジナルの下書きです。外部の調査や個人データは使用していません。'
+    if (language === 'ko') return '이 대화를 위해 작성된 원본 초안입니다. 외부 조사나 개인 데이터는 사용하지 않았습니다.'
+    if (language === 'ar') return 'كانت تلك مسودة أصلية أُعدّت لهذه المحادثة. لم يُستخدم أي بحث خارجي أو بيانات خاصة.'
     return 'That was an original draft created for this conversation. No external research or private data was used.'
   }
   const fromCache = Boolean(provenance?.answer_origin?.from_cache)
@@ -231,6 +243,12 @@ export function publicProvenanceReply(language: string, provenance?: any, origin
     if (language === 'pt') return 'A resposta foi recuperada de uma resposta anterior muito semelhante. Nenhuma fonte privada foi usada.'
     if (language === 'pl') return 'Odpowiedź pochodzi z wcześniejszej, bardzo podobnej odpowiedzi. Nie użyto prywatnych źródeł.'
     if (language === 'ru') return 'Ответ был взят из предыдущего очень похожего ответа. Частные источники не использовались.'
+    if (language === 'de') return 'Diese Antwort wurde aus einer sehr ähnlichen früheren Antwort übernommen. Es wurden keine privaten Quellen verwendet.'
+    if (language === 'fr') return 'Cette réponse a été récupérée à partir d’une réponse antérieure très similaire. Aucune source privée n’a été utilisée.'
+    if (language === 'it') return 'Questa risposta è stata recuperata da una risposta precedente molto simile. Non sono state usate fonti private.'
+    if (language === 'ja') return 'この回答は、非常によく似た以前の回答から取得されました。非公開の情報源は使用していません。'
+    if (language === 'ko') return '이 답변은 매우 유사한 이전 답변에서 가져왔습니다. 비공개 출처는 사용하지 않았습니다.'
+    if (language === 'ar') return 'تم استرجاع هذه الإجابة من إجابة سابقة مطابقة إلى حد كبير. لم تُستخدم أي مصادر خاصة.'
     return 'This answer was retrieved from a closely matching earlier response. No private sources were used.'
   }
   if (usedPublicSources) {
@@ -238,12 +256,24 @@ export function publicProvenanceReply(language: string, provenance?: any, origin
     if (language === 'pt') return 'A resposta foi elaborada a partir do seu pedido e de fontes públicas consultadas para esta resposta. Nenhum dado privado foi usado.'
     if (language === 'pl') return 'Odpowiedź została przygotowana na podstawie Twojego pytania i publicznych źródeł sprawdzonych dla tej odpowiedzi. Nie użyto danych prywatnych.'
     if (language === 'ru') return 'Ответ подготовлен на основе вашего запроса и публичных источников, проверенных для этого ответа. Частные данные не использовались.'
+    if (language === 'de') return 'Diese Antwort wurde auf Grundlage Ihrer Anfrage und der für diese Antwort geprüften öffentlichen Quellen erstellt. Es wurden keine privaten Daten verwendet.'
+    if (language === 'fr') return 'Cette réponse a été générée à partir de votre demande et de sources publiques consultées pour cette réponse. Aucune donnée privée n’a été utilisée.'
+    if (language === 'it') return 'Questa risposta è stata generata dalla tua richiesta e da fonti pubbliche consultate per questa risposta. Non sono stati usati dati privati.'
+    if (language === 'ja') return 'この回答は、ご依頼内容と、この回答のために確認した公開情報源をもとに作成しました。個人データは使用していません。'
+    if (language === 'ko') return '이 답변은 요청하신 내용과 이 답변을 위해 확인한 공개 출처를 바탕으로 작성되었습니다. 개인 데이터는 사용하지 않았습니다.'
+    if (language === 'ar') return 'أُعدّت هذه الإجابة بناءً على طلبك وعلى مصادر عامة جرى الاطلاع عليها لهذه الإجابة. لم تُستخدم أي بيانات خاصة.'
     return 'This answer was generated from your request and public sources checked for this response. No private data was used.'
   }
   if (language === 'es') return 'La respuesta se generó a partir de tu solicitud y del conocimiento general del asistente. No se usaron fuentes externas ni datos privados.'
   if (language === 'pt') return 'A resposta foi gerada a partir do seu pedido e do conhecimento geral do assistente. Nenhuma fonte externa ou dado privado foi usado.'
   if (language === 'pl') return 'Odpowiedź została wygenerowana na podstawie Twojego pytania i ogólnej wiedzy asystenta. Nie użyto źródeł zewnętrznych ani danych prywatnych.'
   if (language === 'ru') return 'Ответ был сформирован на основе вашего запроса и общих знаний ассистента. Внешние источники и частные данные не использовались.'
+  if (language === 'de') return 'Diese Antwort wurde auf Grundlage Ihrer Anfrage und des allgemeinen Wissens des Assistenten erstellt. Es wurden weder externe Quellen noch private Daten verwendet.'
+  if (language === 'fr') return 'Cette réponse a été générée à partir de votre demande et des connaissances générales de l’assistant. Aucune source externe ni donnée privée n’a été utilisée.'
+  if (language === 'it') return 'Questa risposta è stata generata dalla tua richiesta e dalle conoscenze generali dell’assistente. Non sono state usate fonti esterne né dati privati.'
+  if (language === 'ja') return 'この回答は、ご依頼内容とアシスタントの一般的な知識をもとに作成しました。外部の情報源や個人データは使用していません。'
+  if (language === 'ko') return '이 답변은 요청하신 내용과 어시스턴트의 일반 지식을 바탕으로 작성되었습니다. 외부 출처나 개인 데이터는 사용하지 않았습니다.'
+  if (language === 'ar') return 'أُعدّت هذه الإجابة بناءً على طلبك وعلى المعرفة العامة للمساعد. لم تُستخدم أي مصادر خارجية أو بيانات خاصة.'
   return 'This answer was generated from your request and the assistant’s general knowledge. No external sources or private data were used.'
 }
 

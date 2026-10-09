@@ -8,7 +8,7 @@ import { SupabaseVercelTriggerStore } from '@/lib/supervisor/providers/vercel/tr
 import { getAdminSupabase, getCurrentUser } from '@/utils/supabase/server'
 
 function Field({ k, v }: { k: string; v: string }) { return <div><dt style={muted}>{k}</dt><dd style={{ margin: 0, wordBreak: 'break-word' }}>{v}</dd></div> }
-function pick(v?: string) { const l = (v || 'en').slice(0, 2).toLowerCase(); return ['en','es','pt','pl','ru'].includes(l) ? l : 'en' }
+function pick(v?: string) { const l = (v || 'en').slice(0, 2).toLowerCase(); return ['en','es','pt','pl','ru','de','fr','it','ja','ko','ar'].includes(l) ? l : 'en' }
 export default async function VercelHealthPage() {
   const user = await getCurrentUser(); if (!user) redirect('/login')
   const access = await getAccess(); const dict = await loadLanguage(pick((await cookies()).get('sb_locale')?.value)); const t = (dict as any).vercelHealth || {}; const label=t.labels || {}

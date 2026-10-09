@@ -14,9 +14,9 @@ const offline = (async () => null) as any
 
 // The offer is a question a person can answer, not a phrase they must reproduce.
 test('the offer is a plain question in every platform language', () => {
-  for (const locale of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const locale of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     const offer = operationalLogRepairHandoff(locale)
-    assert.ok(offer.trim().endsWith('?'), offer)
+    assert.ok(/[?？؟]$/.test(offer.trim()), offer)
     assert.doesNotMatch(offer, /fix it/i, offer)
     assert.ok(offer.length < 60, offer)
   }

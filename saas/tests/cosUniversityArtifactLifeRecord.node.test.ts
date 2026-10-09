@@ -206,9 +206,9 @@ test('the API is owner-gated and read-only; the panel is mounted on the telemetr
   assert.doesNotMatch(panel, />[A-Z][a-z]+ [a-z]+</, 'every visible string comes from copy')
 })
 
-test('the life record copy has the same keys in all five languages and no empty string', () => {
+test('the life record copy has the same keys in all eleven languages and no empty string', () => {
   const languages = Object.keys(COS_UNIVERSITY_LIFE_RECORD_COPY).sort()
-  assert.deepEqual(languages, ['en', 'es', 'pl', 'pt', 'ru'])
+  assert.deepEqual(languages, ['ar', 'de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru'])
   const keys = Object.keys(COS_UNIVERSITY_LIFE_RECORD_COPY.en)
   for (const language of languages) {
     const block = COS_UNIVERSITY_LIFE_RECORD_COPY[language as keyof typeof COS_UNIVERSITY_LIFE_RECORD_COPY]

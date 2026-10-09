@@ -60,5 +60,5 @@ export const selfHealingSupervisorManifest: PortableProductManifest = Object.fre
   architectureReferences: Object.freeze(['supervisor', 'policy-engine', 'durable-coordination']),
   documentationReferences: Object.freeze(['docs/portables/self-healing-integration-guide.md']),
   futureFeatures: Object.freeze(['operator-catalog']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   TARGET_UI_LOCALES,
+  UI_LOCALES,
   placeholderTokens,
   shouldTranslateUiCopy,
 } from './generated-ui-locale-utils.mjs'
@@ -82,4 +83,4 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log(`[validate:i18n-generated-ui] PASS — ${englishKeys.length} generated UI keys are complete across en/es/pt/pl/ru.`)
+console.log(`[validate:i18n-generated-ui] PASS — ${englishKeys.length} generated UI keys are complete across ${UI_LOCALES.join('/')}.`)

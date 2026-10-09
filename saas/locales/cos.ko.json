@@ -1,0 +1,99 @@
+{
+  "cos": {
+    "nav": {
+      "mining": "마이닝",
+      "features": "특성",
+      "segments": "세그먼트",
+      "rules": "패턴",
+      "runs": "실행 기록"
+    },
+    "mining": {
+      "title": "데이터 마이닝",
+      "subtitle": "예측을 뒷받침하는 행동 및 거래 패턴",
+      "run_now": "지금 실행",
+      "last_run": "마지막 실행",
+      "events_scanned": "스캔한 이벤트",
+      "users_processed": "처리된 사용자",
+      "features_written": "기록된 특성",
+      "rules_found": "발견된 패턴"
+    },
+    "features": {
+      "title": "추출된 특성",
+      "name": "특성",
+      "value": "값",
+      "updated": "업데이트됨",
+      "names": {
+        "event_frequency_per_day": "일일 활동",
+        "transaction_count": "거래",
+        "avg_deposit_cents": "평균 입금액",
+        "avg_transfer_cents": "평균 이체액",
+        "preferred_txn_hour": "선호 시간대",
+        "dominant_device_code": "주 사용 기기",
+        "campaign_engagement_rate": "캠페인 참여도",
+        "recency_days": "마지막 활동 이후 일수",
+        "amount_trend_slope": "지출 추세"
+      }
+    },
+    "segments": {
+      "title": "행동 세그먼트",
+      "cluster": "클러스터",
+      "members": "구성원"
+    },
+    "rules": {
+      "title": "감지된 패턴",
+      "if": "조건",
+      "then": "결과",
+      "support": "지원",
+      "confidence": "신뢰도",
+      "lift": "리프트"
+    },
+    "status": {
+      "running": "실행 중",
+      "success": "성공",
+      "error": "오류"
+    },
+    "empty": {
+      "no_features": "아직 특성이 없습니다. 마이닝 작업을 실행하여 채우세요.",
+      "no_rules": "아직 감지된 패턴이 없습니다.",
+      "no_runs": "아직 기록된 마이닝 실행이 없습니다."
+    },
+    "errors": {
+      "unauthorized": "계속하려면 로그인하세요.",
+      "forbidden": "이 데이터에 대한 액세스 권한이 없습니다.",
+      "load_failed": "데이터를 불러올 수 없습니다. 다시 시도하세요."
+    },
+    "tooltips": {
+      "confidence": "조건이 충족될 때 패턴이 성립하는 빈도입니다.",
+      "lift": "우연 대비 결과가 얼마나 더 발생하기 쉬운지를 나타냅니다.",
+      "segment": "유사한 행동을 보이는 사용자 그룹입니다."
+    },
+    "meta": {
+      "title": "COS 데이터 마이닝 — SignalBoost",
+      "description": "COS 예측을 뒷받침하는 추출된 행동 및 거래 신호입니다."
+    },
+    "dashboard": {
+      "overview": "개요",
+      "refresh": "새로 고침",
+      "run_history": "실행 기록",
+      "segment_distribution": "세그먼트 분포",
+      "top_patterns": "주요 패턴",
+      "no_access": "마이닝 인텔리전스를 보려면 관리자 액세스 권한이 필요합니다.",
+      "lookup_user": "사용자 특성 조회",
+      "user_id_placeholder": "사용자 ID 입력",
+      "view": "보기",
+      "never": "없음",
+      "users": "사용자"
+    },
+    "predict": {
+      "title": "예측된 다음 행동",
+      "action": "작업",
+      "score": "점수",
+      "basis": "근거",
+      "none": "아직 예측할 만큼 신호가 충분하지 않습니다.",
+      "propensity": "성향",
+      "engagement": "참여도",
+      "churn_risk": "이탈 위험",
+      "value": "값"
+    }
+  }
+}

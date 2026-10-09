@@ -553,5 +553,671 @@
       "back": "← Назад",
       "continue": "Продолжить →"
     }
+  },
+  "de": {
+    "loading": "Onboarding wird geladen…",
+    "skip": "Zum Dashboard springen →",
+    "progressComplete": "{pct} % abgeschlossen",
+    "steps": {
+      "welcome": {
+        "label": "Willkommen",
+        "kicker": "Schritt 1"
+      },
+      "profiling": {
+        "label": "Profilerstellung",
+        "kicker": "Schritt 2"
+      },
+      "consent": {
+        "label": "Einwilligung",
+        "kicker": "Schritt 3"
+      },
+      "tone": {
+        "label": "Tonalität",
+        "kicker": "Schritt 4"
+      },
+      "confirmation": {
+        "label": "Bestätigung",
+        "kicker": "Schritt 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "Entwickler",
+        "body": "Zeigen Sie mir technische Steuerelemente, Protokolle, Deployment-Details und codebezogene Anleitungen."
+      },
+      "non_developer": {
+        "title": "Kein Entwickler",
+        "body": "Halten Sie die Einrichtung geführt, in verständlicher Sprache und ergebnisorientiert."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "Einsteiger",
+        "body": "Geben Sie mir geführte Checklisten, Definitionen und Standardwerte mit einem Klick."
+      },
+      "intermediate": {
+        "title": "Fortgeschritten",
+        "body": "Ausgewogene Anleitung mit Konfigurations-Shortcuts und Beispielen."
+      },
+      "advanced": {
+        "title": "Erweitert",
+        "body": "Priorisieren Sie Diagnosen, erweiterte Einstellungen und schnellere Workflows."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "Freundlich",
+        "sample": "Ich führe Sie Schritt für Schritt und sorge für Klarheit."
+      },
+      "professional": {
+        "title": "Professional",
+        "sample": "Ich halte Empfehlungen knapp, direkt und geschäftstauglich."
+      },
+      "playful": {
+        "title": "Verspielt",
+        "sample": "Ich gestalte die Einrichtung positiv, kreativ und mit Schwung."
+      }
+    },
+    "welcome": {
+      "title": "Willkommen, {name}. Schneller entwickeln mit einer intelligenteren Einrichtung.",
+      "intro": "SignalBoost passt die Anleitungen der Lehrwerkstatt, den KI-Ton und die Produktstandards anhand von vier kurzen Präferenzen an. Jede Auswahl kann später in den Einstellungen geändert werden.",
+      "storyboardLabel": "Storyboard",
+      "storyboardBody": "Willkommen → Kenntnisstand angeben → Datenschutz-Einwilligung wählen → Ton des Assistenten wählen → Einrichtung bestätigen.",
+      "start": "Onboarding starten →"
+    },
+    "profiling": {
+      "heading": "Helfen Sie uns, die Lehrwerkstatt anzupassen.",
+      "intro": "Wählen Sie den Pfad, der am besten dazu passt, wie SignalBoost Ihnen Einrichtung, Dashboards und technische Entscheidungen erklären soll.",
+      "itComfort": "Vertrautheit mit IT"
+    },
+    "consent": {
+      "heading": "Wählen Sie Ihre Präferenz für das KI-Training.",
+      "intro": "Die Einwilligung ist freiwillig und standardmäßig nicht aktiviert. SignalBoost kann Ihr Konto auch ohne Nutzung Ihrer Daten für das KI-Training personalisieren.",
+      "checkboxLabel": "Ich willige ein, dass SignalBoost meine Onboarding-Präferenzen zur Verbesserung des KI-Trainings verwendet.",
+      "checkboxBody": "Wir speichern diese Präferenz mit Zeitstempel, bieten später Widerrufsoptionen an und verkaufen keine personenbezogenen Daten.",
+      "save": "Einwilligung speichern →",
+      "continueWithout": "Ohne Einwilligung fortfahren →"
+    },
+    "tone": {
+      "heading": "Wählen Sie den Ton Ihres Assistenten.",
+      "intro": "Diese Präferenz gilt auch für die Inhaltserstellung, Support-Texte und Erklärungen der Lehrwerkstatt."
+    },
+    "confirm": {
+      "heading": "Bestätigen Sie Ihre personalisierte Einrichtung.",
+      "intro": "Prüfen Sie die Onboarding-Zusammenfassung, bevor Sie Ihr Dashboard öffnen. Ihre Auswahl wird in den Profileinstellungen gespeichert und von der Lehrwerkstatt verwendet.",
+      "role": "Rolle",
+      "itLevel": "IT-Kenntnisstand",
+      "tone": "Tonalität",
+      "consent": "Einwilligung zum KI-Training",
+      "notSelected": "Nicht ausgewählt",
+      "granted": "Erteilt",
+      "notGranted": "Nicht erteilt",
+      "previewLabel": "Vorschau der Lehrwerkstatt",
+      "previewAdvanced": "Sie sehen schnellere technische Abläufe, Diagnosen und Bereitstellungsprüfungen.",
+      "previewIntermediate": "Sie erhalten ausgewogene Anleitungen mit konfigurierbaren Abkürzungen.",
+      "previewBeginner": "Sie sehen einsteigerfreundliche Lektionen, Definitionen und sichere Standardeinstellungen.",
+      "editTone": "← Tonfall bearbeiten",
+      "saving": "Wird gespeichert…",
+      "complete": "Onboarding abschließen →"
+    },
+    "common": {
+      "back": "← Zurück",
+      "continue": "Weiter →"
+    }
+  },
+  "fr": {
+    "loading": "Chargement de l’intégration…",
+    "skip": "Passer au tableau de bord →",
+    "progressComplete": "{pct} % terminé",
+    "steps": {
+      "welcome": {
+        "label": "Bienvenue",
+        "kicker": "Étape 1"
+      },
+      "profiling": {
+        "label": "Profilage",
+        "kicker": "Étape 2"
+      },
+      "consent": {
+        "label": "Consentement",
+        "kicker": "Étape 3"
+      },
+      "tone": {
+        "label": "Ton",
+        "kicker": "Étape 4"
+      },
+      "confirmation": {
+        "label": "Confirmation",
+        "kicker": "Étape 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "Développeur",
+        "body": "Montrez-moi les contrôles techniques, les journaux, les détails de déploiement et des conseils adaptés au code."
+      },
+      "non_developer": {
+        "title": "Non-développeur",
+        "body": "Gardez une configuration guidée, en langage clair et axée sur les résultats."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "Débutant",
+        "body": "Donnez-moi des listes de contrôle guidées, des définitions et des valeurs par défaut en un clic."
+      },
+      "intermediate": {
+        "title": "Intermédiaire",
+        "body": "Équilibrez les conseils avec des raccourcis de configuration et des exemples."
+      },
+      "advanced": {
+        "title": "Avancé",
+        "body": "Privilégiez les diagnostics, les paramètres avancés et des workflows plus rapides."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "Amical",
+        "sample": "Je vous guiderai pas à pas en gardant les choses claires."
+      },
+      "professional": {
+        "title": "Professionnel",
+        "sample": "Je formulerai des recommandations concises, directes et prêtes pour l’entreprise."
+      },
+      "playful": {
+        "title": "Ludique",
+        "sample": "Je garderai une configuration dynamique, créative et axée sur l’élan."
+      }
+    },
+    "welcome": {
+      "title": "Bienvenue, {name}. Avancez plus vite grâce à une configuration plus intelligente.",
+      "intro": "SignalBoost adaptera l’accompagnement de l’Atelier d’apprentissage, le ton de l’IA et les paramètres par défaut du produit à partir de quatre préférences rapides. Chaque choix peut être modifié ultérieurement dans les paramètres.",
+      "storyboardLabel": "Storyboard",
+      "storyboardBody": "Bienvenue → définissez votre niveau → choisissez votre consentement de confidentialité → choisissez le ton de l’assistant → confirmez votre configuration.",
+      "start": "Commencer l’intégration →"
+    },
+    "profiling": {
+      "heading": "Aidez-nous à adapter l’Atelier d’apprentissage.",
+      "intro": "Choisissez le parcours qui correspond le mieux à la manière dont vous souhaitez que SignalBoost explique la configuration, les tableaux de bord et les décisions techniques.",
+      "itComfort": "Aisance en informatique"
+    },
+    "consent": {
+      "heading": "Choisissez votre préférence d’entraînement de l’IA.",
+      "intro": "Le consentement est facultatif et non coché par défaut. SignalBoost peut tout de même personnaliser votre compte sans utiliser vos données pour l’entraînement de l’IA.",
+      "checkboxLabel": "J’accepte que SignalBoost utilise mes préférences d’intégration pour améliorer l’entraînement de l’IA.",
+      "checkboxBody": "Nous enregistrons cette préférence avec un horodatage, proposerons ultérieurement des options de désinscription et ne vendons pas de données personnelles.",
+      "save": "Enregistrer le consentement →",
+      "continueWithout": "Continuer sans consentement →"
+    },
+    "tone": {
+      "heading": "Choisissez le ton de votre assistant.",
+      "intro": "Cette préférence s’applique également à la génération de contenu, aux textes d’assistance et aux explications de l’Atelier d’apprentissage."
+    },
+    "confirm": {
+      "heading": "Confirmez votre configuration personnalisée.",
+      "intro": "Vérifiez le récapitulatif d’intégration avant d’ouvrir votre tableau de bord. Vos choix sont enregistrés dans les paramètres du profil et utilisés par l’Atelier d’apprentissage.",
+      "role": "Rôle",
+      "itLevel": "Niveau informatique",
+      "tone": "Ton",
+      "consent": "Consentement à l’entraînement de l’IA",
+      "notSelected": "Non sélectionné",
+      "granted": "Accordé",
+      "notGranted": "Non accordé",
+      "previewLabel": "Aperçu de l’Atelier d’apprentissage",
+      "previewAdvanced": "Vous verrez des parcours techniques, des diagnostics et des vérifications de déploiement plus rapides.",
+      "previewIntermediate": "Vous bénéficierez d’un accompagnement équilibré avec des raccourcis configurables.",
+      "previewBeginner": "Vous verrez des leçons adaptées aux débutants, des définitions et des paramètres par défaut sûrs.",
+      "editTone": "← Modifier le ton",
+      "saving": "Enregistrement…",
+      "complete": "Terminer l’intégration →"
+    },
+    "common": {
+      "back": "← Retour",
+      "continue": "Continuer →"
+    }
+  },
+  "it": {
+    "loading": "Caricamento dell’onboarding…",
+    "skip": "Vai alla dashboard →",
+    "progressComplete": "{pct}% completato",
+    "steps": {
+      "welcome": {
+        "label": "Benvenuto",
+        "kicker": "Passaggio 1"
+      },
+      "profiling": {
+        "label": "Profilazione",
+        "kicker": "Passaggio 2"
+      },
+      "consent": {
+        "label": "Consenso",
+        "kicker": "Passaggio 3"
+      },
+      "tone": {
+        "label": "Tono",
+        "kicker": "Passaggio 4"
+      },
+      "confirmation": {
+        "label": "Conferma",
+        "kicker": "Passaggio 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "Sviluppatore",
+        "body": "Mostrami controlli tecnici, log, dettagli di deployment e indicazioni basate sul codice."
+      },
+      "non_developer": {
+        "title": "Non sviluppatore",
+        "body": "Mantieni la configurazione guidata, in linguaggio semplice e orientata ai risultati."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "Principiante",
+        "body": "Dammi checklist guidate, definizioni e impostazioni predefinite con un clic."
+      },
+      "intermediate": {
+        "title": "Intermedio",
+        "body": "Bilancia la guida con scorciatoie di configurazione ed esempi."
+      },
+      "advanced": {
+        "title": "Avanzate",
+        "body": "Dai priorità a diagnostica, impostazioni avanzate e flussi di lavoro più rapidi."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "Cordiale",
+        "sample": "Ti guiderò passo dopo passo e manterrò tutto chiaro."
+      },
+      "professional": {
+        "title": "Professional",
+        "sample": "Manterrò i consigli concisi, diretti e pronti per il business."
+      },
+      "playful": {
+        "title": "Giocoso",
+        "sample": "Manterrò la configurazione positiva, creativa e ricca di slancio."
+      }
+    },
+    "welcome": {
+      "title": "Benvenuto, {name}. Crea più velocemente con una configurazione più intelligente.",
+      "intro": "SignalBoost adatterà la guida del Laboratorio dell’apprendista, il tono dell’AI e le impostazioni predefinite del prodotto in base a quattro rapide preferenze. Ogni scelta può essere modificata in seguito nelle impostazioni.",
+      "storyboardLabel": "Storyboard",
+      "storyboardBody": "Benvenuto → indica il tuo livello di competenza → scegli il consenso alla privacy → scegli il tono dell’assistente → conferma la configurazione.",
+      "start": "Inizia l’onboarding →"
+    },
+    "profiling": {
+      "heading": "Aiutaci ad adattare il Laboratorio dell’apprendista.",
+      "intro": "Scegli il percorso più adatto a come vuoi che SignalBoost ti spieghi configurazione, dashboard e decisioni tecniche.",
+      "itComfort": "Familiarità con l’IT"
+    },
+    "consent": {
+      "heading": "Scegli la tua preferenza per l’addestramento dell’AI.",
+      "intro": "Il consenso è facoltativo e non selezionato per impostazione predefinita. SignalBoost può comunque personalizzare il tuo account senza usare i tuoi dati per l’addestramento dell’AI.",
+      "checkboxLabel": "Acconsento che SignalBoost utilizzi le mie preferenze di onboarding per migliorare l’addestramento dell’AI.",
+      "checkboxBody": "Salviamo questa preferenza con un timestamp, forniremo in seguito controlli di opt-out ed evitiamo di vendere dati personali.",
+      "save": "Salva consenso →",
+      "continueWithout": "Continua senza consenso →"
+    },
+    "tone": {
+      "heading": "Scegli il tono del tuo assistente.",
+      "intro": "Questa preferenza si applica anche alla generazione di contenuti, ai testi di supporto e alle spiegazioni del Laboratorio dell’apprendista."
+    },
+    "confirm": {
+      "heading": "Conferma la tua configurazione personalizzata.",
+      "intro": "Controlla il riepilogo dell’onboarding prima di aprire la tua dashboard. Le tue scelte vengono salvate nelle impostazioni del profilo e utilizzate dal Laboratorio dell’apprendista.",
+      "role": "Ruolo",
+      "itLevel": "Livello IT",
+      "tone": "Tono",
+      "consent": "Consenso all’addestramento AI",
+      "notSelected": "Non selezionato",
+      "granted": "Concesso",
+      "notGranted": "Non concesso",
+      "previewLabel": "Anteprima del Laboratorio dell’apprendista",
+      "previewAdvanced": "Vedrai percorsi tecnici, diagnostica e controlli di deployment più rapidi.",
+      "previewIntermediate": "Vedrai una guida equilibrata con scorciatoie configurabili.",
+      "previewBeginner": "Vedrai lezioni adatte ai principianti, definizioni e impostazioni predefinite sicure.",
+      "editTone": "← Modifica il tono",
+      "saving": "Salvataggio…",
+      "complete": "Completa l’onboarding →"
+    },
+    "common": {
+      "back": "← Indietro",
+      "continue": "Continua →"
+    }
+  },
+  "ja": {
+    "loading": "オンボーディングを読み込み中…",
+    "skip": "ダッシュボードへスキップ →",
+    "progressComplete": "{pct}% 完了",
+    "steps": {
+      "welcome": {
+        "label": "ようこそ",
+        "kicker": "ステップ 1"
+      },
+      "profiling": {
+        "label": "プロファイリング",
+        "kicker": "ステップ 2"
+      },
+      "consent": {
+        "label": "同意",
+        "kicker": "ステップ 3"
+      },
+      "tone": {
+        "label": "トーン",
+        "kicker": "ステップ 4"
+      },
+      "confirmation": {
+        "label": "確認",
+        "kicker": "ステップ 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "開発者",
+        "body": "技術的な制御、ログ、デプロイの詳細、コードに即したガイダンスを表示してください。"
+      },
+      "non_developer": {
+        "title": "非開発者",
+        "body": "設定はガイド付きで、平易な言葉を使い、成果に焦点を当ててください。"
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "初心者",
+        "body": "ガイド付きチェックリスト、用語の定義、ワンクリックの初期設定が欲しいです。"
+      },
+      "intermediate": {
+        "title": "中級",
+        "body": "ガイダンスと設定ショートカットや例をバランスよく組み合わせます。"
+      },
+      "advanced": {
+        "title": "詳細",
+        "body": "診断、詳細設定、より高速なワークフローを優先します。"
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "フレンドリー",
+        "sample": "ステップごとにわかりやすくご案内します。"
+      },
+      "professional": {
+        "title": "プロフェッショナル",
+        "sample": "簡潔かつ率直で、ビジネスにすぐ使える提案をします。"
+      },
+      "playful": {
+        "title": "遊び心のある",
+        "sample": "前向きでクリエイティブに、勢いを大切にしながら設定を進めます。"
+      }
+    },
+    "welcome": {
+      "title": "ようこそ、{name} さん。よりスマートなセットアップで、より速く構築しましょう。",
+      "intro": "SignalBoost は 4 つの簡単な設定をもとに、見習いワークショップのガイダンス、AI のトーン、製品のデフォルト設定を最適化します。選択内容は後から設定でいつでも変更できます。",
+      "storyboardLabel": "ストーリーボード",
+      "storyboardBody": "ようこそ → スキルレベルを設定 → プライバシーの同意を選択 → アシスタントのトーンを選択 → セットアップを確認。",
+      "start": "オンボーディングを開始 →"
+    },
+    "profiling": {
+      "heading": "見習いワークショップの調整にご協力ください。",
+      "intro": "SignalBoost にセットアップ、ダッシュボード、技術的な判断をどのように説明してほしいかに最も合うパスを選択してください。",
+      "itComfort": "IT の習熟度"
+    },
+    "consent": {
+      "heading": "AI トレーニングの設定を選択してください。",
+      "intro": "同意は任意で、デフォルトではオフになっています。データを AI トレーニングに使用しなくても、SignalBoost はアカウントをパーソナライズできます。",
+      "checkboxLabel": "SignalBoost がオンボーディング設定を AI トレーニングの改善に使用することに同意します。",
+      "checkboxBody": "この設定はタイムスタンプ付きで保存され、後からオプトアウトできる設定を提供します。また、個人データを販売することはありません。",
+      "save": "同意を保存 →",
+      "continueWithout": "同意せずに続行 →"
+    },
+    "tone": {
+      "heading": "アシスタントのトーンを選択してください。",
+      "intro": "この設定は、コンテンツ生成、サポート文面、見習いワークショップの説明にも適用されます。"
+    },
+    "confirm": {
+      "heading": "パーソナライズされた設定を確認してください。",
+      "intro": "ダッシュボードを開く前にオンボーディングの概要を確認してください。選択内容はプロフィール設定に保存され、見習いワークショップで使用されます。",
+      "role": "ロール",
+      "itLevel": "ITレベル",
+      "tone": "トーン",
+      "consent": "AI トレーニングへの同意",
+      "notSelected": "未選択",
+      "granted": "許可済み",
+      "notGranted": "未許可",
+      "previewLabel": "見習いワークショップのプレビュー",
+      "previewAdvanced": "より迅速な技術的手順、診断、デプロイチェックが表示されます。",
+      "previewIntermediate": "設定可能なショートカット付きのバランスの取れたガイダンスが表示されます。",
+      "previewBeginner": "初心者向けのレッスン、用語の定義、安全なデフォルト設定が表示されます。",
+      "editTone": "← トーンを編集",
+      "saving": "保存中…",
+      "complete": "オンボーディングを完了 →"
+    },
+    "common": {
+      "back": "← 戻る",
+      "continue": "続行 →"
+    }
+  },
+  "ko": {
+    "loading": "온보딩 불러오는 중…",
+    "skip": "대시보드로 건너뛰기 →",
+    "progressComplete": "{pct}% 완료",
+    "steps": {
+      "welcome": {
+        "label": "환영합니다",
+        "kicker": "1단계"
+      },
+      "profiling": {
+        "label": "프로파일링",
+        "kicker": "2단계"
+      },
+      "consent": {
+        "label": "동의",
+        "kicker": "3단계"
+      },
+      "tone": {
+        "label": "톤",
+        "kicker": "4단계"
+      },
+      "confirmation": {
+        "label": "확인",
+        "kicker": "5단계"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "개발자",
+        "body": "기술 제어, 로그, 배포 세부 정보 및 코드 기반 안내를 보여 주세요."
+      },
+      "non_developer": {
+        "title": "비개발자",
+        "body": "설정은 안내형으로, 쉬운 언어로, 결과 중심으로 유지하세요."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "초보자",
+        "body": "가이드형 체크리스트, 용어 정의, 원클릭 기본값을 제공해 주세요."
+      },
+      "intermediate": {
+        "title": "중급",
+        "body": "안내와 구성 바로 가기 및 예시의 균형을 맞춥니다."
+      },
+      "advanced": {
+        "title": "고급",
+        "body": "진단, 고급 설정, 더 빠른 워크플로를 우선시하세요."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "친근함",
+        "sample": "단계별로 명확하게 안내해 드리겠습니다."
+      },
+      "professional": {
+        "title": "프로페셔널",
+        "sample": "간결하고 직접적이며 비즈니스에 바로 활용할 수 있는 추천을 드리겠습니다."
+      },
+      "playful": {
+        "title": "장난스러운",
+        "sample": "설정을 활기차고 창의적으로, 추진력 있게 진행하겠습니다."
+      }
+    },
+    "welcome": {
+      "title": "{name}님, 환영합니다. 더 스마트한 설정으로 더 빠르게 구축하세요.",
+      "intro": "SignalBoost는 네 가지 간단한 설정을 바탕으로 견습생 워크숍 안내, AI 어조 및 제품 기본값을 맞춤화합니다. 모든 선택은 나중에 설정에서 변경할 수 있습니다.",
+      "storyboardLabel": "스토리보드",
+      "storyboardBody": "환영 → 기술 수준 설정 → 개인정보 동의 선택 → 어시스턴트 어조 선택 → 설정 확인.",
+      "start": "온보딩 시작 →"
+    },
+    "profiling": {
+      "heading": "견습생 워크숍을 맞춤화할 수 있도록 도와주세요.",
+      "intro": "SignalBoost가 설정, 대시보드 및 기술적 결정을 설명하는 방식에 가장 잘 맞는 경로를 선택하세요.",
+      "itComfort": "IT 숙련도"
+    },
+    "consent": {
+      "heading": "AI 학습 설정을 선택하세요.",
+      "intro": "동의는 선택 사항이며 기본적으로 선택되어 있지 않습니다. SignalBoost는 데이터를 AI 학습에 사용하지 않고도 계정을 맞춤 설정할 수 있습니다.",
+      "checkboxLabel": "SignalBoost가 AI 학습 개선을 위해 내 온보딩 설정을 사용하는 데 동의합니다.",
+      "checkboxBody": "이 설정은 타임스탬프와 함께 저장되며, 나중에 동의 철회 옵션을 제공하고 개인 데이터를 판매하지 않습니다.",
+      "save": "동의 저장 →",
+      "continueWithout": "동의 없이 계속 →"
+    },
+    "tone": {
+      "heading": "어시스턴트의 어조를 선택하세요.",
+      "intro": "이 설정은 콘텐츠 생성, 지원 문구 및 견습생 워크숍 설명에도 적용됩니다."
+    },
+    "confirm": {
+      "heading": "맞춤 설정을 확인하세요.",
+      "intro": "대시보드를 열기 전에 온보딩 요약을 검토하세요. 선택 사항은 프로필 설정에 저장되며 견습생 워크숍에서 사용됩니다.",
+      "role": "역할",
+      "itLevel": "IT 수준",
+      "tone": "톤",
+      "consent": "AI 학습 동의",
+      "notSelected": "선택되지 않음",
+      "granted": "허용됨",
+      "notGranted": "허용되지 않음",
+      "previewLabel": "견습생 워크숍 미리 보기",
+      "previewAdvanced": "더 빠른 기술 경로, 진단 및 배포 점검이 표시됩니다.",
+      "previewIntermediate": "구성 가능한 바로 가기와 함께 균형 잡힌 안내가 표시됩니다.",
+      "previewBeginner": "초보자에게 적합한 강의, 용어 정의 및 안전한 기본 설정이 표시됩니다.",
+      "editTone": "← 어조 편집",
+      "saving": "저장 중…",
+      "complete": "온보딩 완료 →"
+    },
+    "common": {
+      "back": "← 뒤로",
+      "continue": "계속 →"
+    }
+  },
+  "ar": {
+    "loading": "جارٍ تحميل الإعداد…",
+    "skip": "التخطي إلى لوحة التحكم →",
+    "progressComplete": "اكتمل {pct}%",
+    "steps": {
+      "welcome": {
+        "label": "مرحبًا",
+        "kicker": "الخطوة 1"
+      },
+      "profiling": {
+        "label": "التوصيف",
+        "kicker": "الخطوة 2"
+      },
+      "consent": {
+        "label": "الموافقة",
+        "kicker": "الخطوة 3"
+      },
+      "tone": {
+        "label": "النبرة",
+        "kicker": "الخطوة 4"
+      },
+      "confirmation": {
+        "label": "التأكيد",
+        "kicker": "الخطوة 5"
+      }
+    },
+    "roles": {
+      "developer": {
+        "title": "المطوّر",
+        "body": "اعرض لي الضوابط التقنية والسجلات وتفاصيل النشر والإرشادات المستندة إلى الشيفرة."
+      },
+      "non_developer": {
+        "title": "غير مطوّر",
+        "body": "اجعل الإعداد موجَّهًا، بلغة واضحة، ومركّزًا على النتائج."
+      }
+    },
+    "itLevels": {
+      "beginner": {
+        "title": "مبتدئ",
+        "body": "أعطني قوائم تحقق موجّهة وتعريفات وإعدادات افتراضية بنقرة واحدة."
+      },
+      "intermediate": {
+        "title": "متوسط",
+        "body": "وازن بين الإرشادات واختصارات الإعداد والأمثلة."
+      },
+      "advanced": {
+        "title": "متقدم",
+        "body": "أعطِ الأولوية للتشخيصات والإعدادات المتقدمة وسير العمل الأسرع."
+      }
+    },
+    "tones": {
+      "friendly": {
+        "title": "ودّي",
+        "sample": "سأرشدك خطوة بخطوة وأحرص على أن تبقى الأمور واضحة."
+      },
+      "professional": {
+        "title": "احترافي",
+        "sample": "سأقدّم توصيات موجزة ومباشرة وجاهزة للأعمال."
+      },
+      "playful": {
+        "title": "مرِح",
+        "sample": "سأجعل الإعداد مفعمًا بالحيوية والإبداع ومركّزًا على الزخم."
+      }
+    },
+    "welcome": {
+      "title": "مرحبًا، {name}. ابنِ بشكل أسرع مع إعداد أذكى.",
+      "intro": "سيخصّص SignalBoost إرشادات ورشة المتدربين ونبرة الذكاء الاصطناعي والإعدادات الافتراضية للمنتج بناءً على أربعة تفضيلات سريعة. يمكن تغيير كل اختيار لاحقًا من الإعدادات.",
+      "storyboardLabel": "لوحة القصة",
+      "storyboardBody": "مرحبًا ← حدّد مستوى مهارتك ← اختر موافقة الخصوصية ← اختر نبرة المساعد ← أكّد إعدادك.",
+      "start": "بدء الإعداد →"
+    },
+    "profiling": {
+      "heading": "ساعدنا في تكييف ورشة المتدربين.",
+      "intro": "اختر المسار الأنسب للطريقة التي تريد أن يشرح بها SignalBoost الإعداد ولوحات التحكم والقرارات التقنية.",
+      "itComfort": "مستوى الإلمام بتقنية المعلومات"
+    },
+    "consent": {
+      "heading": "اختر تفضيلك لتدريب الذكاء الاصطناعي.",
+      "intro": "الموافقة اختيارية وغير محددة افتراضيًا. لا يزال بإمكان SignalBoost تخصيص حسابك دون استخدام بياناتك لتدريب الذكاء الاصطناعي.",
+      "checkboxLabel": "أوافق على أن تستخدم SignalBoost تفضيلات الإعداد الخاصة بي لتحسين تدريب الذكاء الاصطناعي.",
+      "checkboxBody": "نخزّن هذا التفضيل مع طابع زمني، ونوفّر لاحقًا عناصر تحكم لإلغاء الاشتراك، ونتجنب بيع البيانات الشخصية.",
+      "save": "حفظ الموافقة →",
+      "continueWithout": "المتابعة دون موافقة →"
+    },
+    "tone": {
+      "heading": "اختر نبرة مساعدك.",
+      "intro": "يرافقك هذا التفضيل في إنشاء المحتوى ونصوص الدعم وشروحات ورشة المتدربين."
+    },
+    "confirm": {
+      "heading": "أكّد إعدادك المخصص.",
+      "intro": "راجع ملخص الإعداد قبل فتح لوحة التحكم. تُحفظ اختياراتك في إعدادات الملف الشخصي وتستخدمها ورشة المتدربين.",
+      "role": "الدور",
+      "itLevel": "مستوى تقنية المعلومات",
+      "tone": "النبرة",
+      "consent": "الموافقة على تدريب الذكاء الاصطناعي",
+      "notSelected": "غير محدد",
+      "granted": "ممنوح",
+      "notGranted": "غير ممنوح",
+      "previewLabel": "معاينة ورشة المتدربين",
+      "previewAdvanced": "سترى مسارات تقنية وتشخيصات وفحوصات نشر أسرع.",
+      "previewIntermediate": "سترى إرشادات متوازنة مع اختصارات قابلة للتهيئة.",
+      "previewBeginner": "سترى دروسًا مناسبة للمبتدئين وتعريفات وإعدادات افتراضية آمنة.",
+      "editTone": "← تعديل النبرة",
+      "saving": "جارٍ الحفظ…",
+      "complete": "إكمال الإعداد →"
+    },
+    "common": {
+      "back": "← رجوع",
+      "continue": "متابعة →"
+    }
   }
 }

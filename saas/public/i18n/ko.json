@@ -1,0 +1,298 @@
+{
+  "dashboard.title": "대시보드",
+  "dashboard.subtitle": "프로젝트 및 자동화 관리",
+  "nav.dashboard": "대시보드",
+  "nav.projects": "프로젝트",
+  "nav.automations": "자동화",
+  "nav.courses": "강좌",
+  "nav.billing": "결제",
+  "nav.settings": "설정",
+  "projects.title": "프로젝트",
+  "projects.create": "프로젝트 만들기",
+  "projects.empty": "아직 프로젝트가 없습니다.",
+  "editor.save": "저장",
+  "editor.generating": "생성 중…",
+  "editor.preview": "미리 보기",
+  "billing.title": "결제 및 요금제",
+  "billing.upgrade": "업그레이드",
+  "billing.current": "현재 요금제",
+  "mobile.install": "앱 설치",
+  "common.loading": "로딩 중...",
+  "common.cancel": "취소",
+  "common.delete": "삭제",
+  "common.edit": "편집",
+  "reset": "초기화",
+  "errors": {
+    "generationFailed": "Generation failed",
+    "networkError": "Network error",
+    "unauthorized": "Unauthorized"
+  },
+  "api": {
+    "invalidJson": "Invalid JSON",
+    "promptRequired": "Prompt is required"
+  },
+  "projects": {
+    "limitReached": "Project limit reached for your plan."
+  },
+  "actionRouter": {
+    "openWebsiteBuilder": "Open Website Builder",
+    "openReviewCollector": "Open Review Collector",
+    "openAudioStudio": "Open Audio Studio",
+    "openVideoStudio": "Open Video Studio",
+    "openSalesAgent": "Open Sales Agent",
+    "openSalesPipeline": "Open Sales Pipeline",
+    "answerInChat": "Answer in chat"
+  },
+  "videoSearch": {
+    "timeout": {
+      "generic": "Request timed out.",
+      "aiService": "AI service timed out.",
+      "intent": "Intent processing timed out.",
+      "script": "Script generation timed out.",
+      "search": "Video search timed out.",
+      "searchDetailed": "Video search timed out. Try a shorter request."
+    },
+    "status": {
+      "searching": "Searching for videos...",
+      "searchingPromptMatch": "Searching for videos matching your prompt..."
+    },
+    "errors": {
+      "generateScriptFailed": "Failed to generate script",
+      "searchFailed": "Search failed"
+    },
+    "rights": {
+      "restricted": "All results are rights-restricted for this query.",
+      "embeddableOnly": "Only embeddable results were found."
+    }
+  },
+  "videoGenerate": {
+    "errors": {
+      "authRequired": "You must be signed in.",
+      "promptRequired": "Please enter a prompt.",
+      "imageRequired": "Please attach an image.",
+      "noCredits": "No video credits left this month.",
+      "creditCheckFailed": "Could not check your credits."
+    },
+    "defaults": {
+      "imagePrompt": "Add natural, subtle motion to this image."
+    }
+  },
+  "operator": {
+    "commitPrefix": "Website Operator update:",
+    "errors": {
+      "requestRequired": "Please describe what you want to change.",
+      "planCreateFailed": "Could not create the plan right now.",
+      "planIdRequired": "Plan ID is required.",
+      "planNotFound": "Plan not found.",
+      "approvalRequired": "Approval required before applying changes.",
+      "applyFailed": "Could not apply approved update.",
+      "jobIdRequired": "Job ID is required.",
+      "jobNotFound": "Job not found.",
+      "rollbackUnavailable": "Rollback is not available for this update.",
+      "rollbackFailed": "Could not complete rollback.",
+      "statusNotFound": "Status not found."
+    },
+    "success": {
+      "published": "Changes published. Rollback is available.",
+      "approvedAndPublished": "Update approved and published with rollback point.",
+      "rollbackComplete": "Rollback complete. Previous version restored."
+    },
+    "input": {
+      "defaultRequest": "A high-end rooftop cocktail bar in Rio with bottle service and DJ nights"
+    },
+    "preview": {
+      "liveLabel": "실시간 미리보기",
+      "dark": "다크",
+      "light": "라이트",
+      "sections": "섹션",
+      "empty": "디자인된 웹사이트가 여기에 표시됩니다.",
+      "loading": "웹사이트를 디자인하는 중…"
+    }
+  },
+  "reviews": {
+    "errors": {
+      "unauthorized": "Unauthorized",
+      "missingSlug": "Missing slug",
+      "invalidNameLength": "Name must be 1-80 characters",
+      "invalidEmail": "Invalid email",
+      "invalidRating": "Rating must be 1-5",
+      "invalidContentLength": "Content must be 1-2000 characters",
+      "lookupFailed": "Lookup failed",
+      "notFound": "Not found",
+      "tooManySubmissions": "Too many submissions. Try again tomorrow.",
+      "reviewCapReached": "Not accepting more reviews on current plan.",
+      "saveFailed": "Could not save review",
+      "missingId": "Missing ID",
+      "approvedMustBeBoolean": "Approved must be boolean"
+    }
+  },
+  "dash": {
+    "concierge": {
+      "title": "SignalBoost Concierge",
+      "loading": "워크스페이스를 불러오고 주의가 필요한 항목을 확인하는 중입니다.",
+      "welcome": "환영합니다. 첫 프로젝트를 만들거나 무엇부터 만들지 SignalBoost에 물어보세요.",
+      "drafts": {
+        "one": "초안 프로젝트가 1개 있습니다. 열고 준비되면 게시하세요.",
+        "many": "초안 프로젝트가 {count}개 있습니다. 하나를 열고 준비되면 게시하세요."
+      },
+      "live": {
+        "one": "라이브 프로젝트가 1개 있습니다. 다음 단계: 홍보, 리뷰 수집 또는 콘텐츠 제작.",
+        "many": "라이브 프로젝트가 {count}개 있습니다. 다음 단계: 홍보, 리뷰 수집 또는 콘텐츠 제작."
+      },
+      "help": "다음 단계를 고르는 데 도움이 필요하신가요? 아래에서 SignalBoost에 물어보세요.",
+      "askNext": "ASK_NEXT"
+    },
+    "ai": {
+      "currentPage": "Dashboard"
+    },
+    "prompt": {
+      "nextAction": "다음에 무엇을 해야 하나요?"
+    }
+  },
+  "builder": {
+    "ai": {
+      "currentPage": "Site Builder",
+      "userPlan": "free",
+      "taskContext": "Building a {template} website called \"{businessName}\". Description: {businessDesc}. Languages: {languages}."
+    }
+  },
+  "podcasters_page": {
+    "deliverables": {
+      "voiceover": {
+        "title": "원어민 보이스오버",
+        "desc": "하나의 에피소드를 여러 언어의 자연스러운 음성 버전으로 만드세요."
+      },
+      "clips": {
+        "title": "클립 팩토리",
+        "desc": "최고의 순간을 찾아 Shorts, Reels, TikTok으로 만드세요."
+      },
+      "captions": {
+        "title": "자막",
+        "desc": "자막, 녹취록, 소셜 캡션을 자동으로 생성하세요."
+      },
+      "website": {
+        "title": "팟캐스트 웹사이트",
+        "desc": "에피소드, 쇼 노트, 리뷰, 언어를 위한 브랜드 홈입니다."
+      },
+      "distribution": {
+        "title": "배포",
+        "desc": "YouTube, TikTok, Instagram, 이메일 등을 위한 콘텐츠를 준비하세요."
+      },
+      "growth": {
+        "title": "청취자 성장",
+        "desc": "리뷰, 추천 후기, 청중 신호를 수집하세요."
+      }
+    },
+    "how": {
+      "step1": {
+        "title": "에피소드 업로드",
+        "desc": "완성된 오디오 또는 동영상을 가져오세요."
+      },
+      "step2": {
+        "title": "출력물 선택",
+        "desc": "클립, 자막, 언어, 보이스오버, 쇼 노트."
+      },
+      "step3": {
+        "title": "AI 팀이 작업",
+        "desc": "녹취, 클립, 번역, 배포 에이전트가 자산을 준비합니다."
+      },
+      "step4": {
+        "title": "어디에나 게시",
+        "desc": "모든 채널에 맞게 콘텐츠를 다운로드하거나 준비하세요."
+      }
+    },
+    "plans": {
+      "networkEmailSubject": "SignalBoost Network Plan"
+    }
+  },
+  "singleLanguageContent": "{language} 콘텐츠",
+  "docs": {
+    "pricing": {
+      "a1": "Website: $19 / $49 / $149 · Podcast: $29 / $79 / $299 · Network starting at $299/mo"
+    }
+  },
+  "pricing_page": {
+    "free": {
+      "video": "동영상 도구 포함"
+    },
+    "starter": {
+      "video": "Starter 동영상 생성"
+    },
+    "pro": {
+      "video": "Pro 동영상 생성"
+    },
+    "business": {
+      "video": "비즈니스 동영상 생성"
+    }
+  },
+  "settings": {
+    "title": "시스템 설정",
+    "subtitle": "계정 옵션, 데이터 동기화 웹훅, 라우팅 규칙을 구성하세요.",
+    "workspace": "일반 워크스페이스 설정",
+    "platformLabel": "플랫폼 인스턴스 레이블",
+    "ingestion": "데이터 수집 채널",
+    "webhookTarget": "제휴 수집 웹훅 대상",
+    "webhookHelp": "타사 여행 및 마켓플레이스 시스템에서 들어오는 트래픽 훅을 처리하기 위한 직접 대상 주소입니다.",
+    "automation": "자동화 및 트리거",
+    "emailSummaries": "생성 요약 이메일",
+    "emailSummariesHelp": "동영상 자산 처리가 완료될 때마다 자동 활동 로그를 받습니다.",
+    "autoTopup": "컴퓨팅 자동 충전",
+    "autoTopupHelp": "잔액이 50 단위 미만으로 떨어지면 시스템 잔액 크레딧을 자동으로 충전합니다.",
+    "saving": "규칙 업데이트 중…",
+    "save": "구성 저장",
+    "saved": "시스템 구성이 저장되었습니다!"
+  },
+  "data": {
+    "title": "범용 데이터 커넥터",
+    "wikipediaReminder": "Wikipedia 안내: 콘텐츠는 CC-BY-SA 라이선스이며 출처 표시가 필요합니다.",
+    "uploadCsv": "CSV 업로드",
+    "addApi": "API 커넥터 추가",
+    "runApi": "API 가져오기 실행",
+    "addScraper": "스크레이퍼 커넥터 추가",
+    "runScraper": "스크레이퍼 가져오기 실행",
+    "importedItems": "카테고리별 가져온 항목",
+    "sourceHistory": "소스 기록",
+    "importing": "가져오는 중…",
+    "done": "완료: {count}개 삽입됨",
+    "error": "오류: {error}"
+  },
+  "sales": {
+    "title": "🧠 AI 영업 에이전트",
+    "subtitle": "AI에 잠재 고객을 입력하세요. 검토 후 보낼 수 있는 전문적인 영업 이메일 초안을 작성합니다.",
+    "prospect": "잠재 고객",
+    "company": "회사명",
+    "contact": "담당자 이름",
+    "email": "Email",
+    "website": "웹사이트",
+    "industry": "업종",
+    "notes": "이 잠재 고객에 대한 메모",
+    "drafting": "작성 중...",
+    "generate": "영업 이메일 생성",
+    "aiDraft": "AI 초안",
+    "emptyDraft": "영업 이메일이 여기에 표시됩니다.",
+    "subject": "제목",
+    "openEmail": "이메일에서 열기",
+    "pipeline": {
+      "title": "영업 파이프라인",
+      "subtitle": "잠재 고객을 발굴부터 고객 전환까지 추적하세요.",
+      "loading": "파이프라인 불러오는 중…",
+      "noLeads": "리드 없음",
+      "unnamed": "이름 없는 회사",
+      "noIndustry": "업종 없음",
+      "noCountry": "국가 없음",
+      "noEmail": "이메일 없음",
+      "draft": "초안:"
+    },
+    "status": {
+      "discovered": "검색됨",
+      "approved": "승인됨",
+      "draft_ready": "초안 준비됨",
+      "sketch_ready": "스케치 준비됨",
+      "sent": "발송됨",
+      "replied": "답장함",
+      "client": "클라이언트",
+      "draft_failed": "초안 작성 실패"
+    }
+  },
+  "orchestration.kicker": "AI 오케스트레이션"
+}

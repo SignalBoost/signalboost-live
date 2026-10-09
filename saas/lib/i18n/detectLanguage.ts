@@ -1,3 +1,5 @@
+import { normalizeSupportedLanguage } from './supportedLanguages.ts'
+
 export function detectLanguage(): string {
   if (typeof navigator === 'undefined') {
     return 'en'
@@ -10,25 +12,5 @@ export function detectLanguage(): string {
       'en'
     ).toLowerCase()
 
-  if (lang.startsWith('pt')) {
-    return 'pt'
-  }
-
-  if (lang.startsWith('es')) {
-    return 'es'
-  }
-
-  if (lang.startsWith('pl')) {
-    return 'pl'
-  }
-
-  if (lang.startsWith('ru')) {
-    return 'ru'
-  }
-
-  if (lang.startsWith('en')) {
-    return 'en'
-  }
-
-  return 'en'
+  return normalizeSupportedLanguage(lang)
 }

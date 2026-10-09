@@ -15,7 +15,7 @@ Current COS/Self-Healing facts that are easy to misreport:
 
 Key constraints (details in ONBOARD.md / AGENTS.md):
 - Prefer coherent batches of related changes so CI/Vercel do not redeploy for every tiny edit.
-- 5-language i18n (en, pt, es, pl, ru) for every user-facing string.
+- 11-language i18n (en, es, pt, pl, ru, de, fr, it, ja, ko, ar) for every user-facing string; Arabic renders right-to-left. Canonical list: `saas/lib/i18n/supportedLanguages.ts`.
 - BYOK model: user flows run on the user's own provider keys, never platform keys; keys are encrypted, never logged.
 - Owner approval gates on all dispatch/publish/spend/infrastructure/consequential actions are never skipped.
 - Never claim descriptor-only integrations are production-live merely because they appear in a catalog.

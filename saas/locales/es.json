@@ -385,7 +385,7 @@
       "analyzedSource": "Fuente analizada"
     },
     "placeholders": {
-      "sourceUrl": "https://ejemplo.com o https://github.com/org/repo",
+      "sourceUrl": "https://example.com o https://github.com/org/repo",
       "searchOptions": "Buscar opciones",
       "selectOption": "Selecciona una opción",
       "selectMany": "Selecciona una o más opciones"
@@ -638,7 +638,13 @@
       "pt": "Português",
       "es": "Español",
       "pl": "Polski",
-      "ru": "Русский"
+      "ru": "Русский",
+      "de": "Deutsch",
+      "fr": "Français",
+      "it": "Italiano",
+      "ja": "日本語",
+      "ko": "한국어",
+      "ar": "العربية"
     },
     "publicTools": {
       "label": "Herramientas públicas",
@@ -3352,7 +3358,7 @@
     "u_f45198e459f8516b": "Los usuarios gratuitos o de demostración solo obtienen una vista previa de la reproducción. Actualice para exportar.",
     "u_5fa206e85ecfbf38": "Exceso de edad:",
     "u_f1c65341b8172c5f": "minuto(s) adicional(es) en",
-    "u_d1eae51ccd25a84d": "/min. SignalBoost will open a billing session before rendering.",
+    "u_d1eae51ccd25a84d": "/min. SignalBoost abrirá una sesión de facturación antes del renderizado.",
     "u_56b564b75c7fdb48": "Plantillas",
     "u_02a92943466e7958": "Puntos de partida al estilo Canva",
     "u_6da87f3748b4df1e": "Línea de tiempo de subtítulos",
@@ -4084,7 +4090,7 @@
     "viewPricing": "Ver precios",
     "unifiedAria": "Vista previa de estructura alámbrica del panel de SaaS unificado",
     "sidebarAria": "Navegación del módulo SaaS",
-    "i18nStatus": "i18n en línea: EN · ES · PT · PL · RU",
+    "i18nStatus": "i18n en línea: EN · ES · PT · PL · RU · DE · FR · IT · JA · KO · AR",
     "kicker": "Estructuras alámbricas de cabina SaaS",
     "title": "Consola de cabina para servicios de oficina y flujos de trabajo de asistente",
     "subtitle": "Un sistema de tablero responsivo con tarjetas de telemetría, navegación fácil de usar con teclado, paneles de vidrio y vistas previas de módulos listos para su aprobación antes de la codificación de producción.",

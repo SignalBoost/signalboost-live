@@ -1,4 +1,4 @@
-export const REVIEW_LOCALES = ['en', 'es', 'pt', 'pl', 'ru'] as const
+export const REVIEW_LOCALES = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 
 export type ReviewLocale = typeof REVIEW_LOCALES[number]
 export type ReviewSentiment = 'positive' | 'neutral' | 'negative'
@@ -25,6 +25,12 @@ const localeLabels: Record<ReviewLocale, string> = {
   pt: 'Português',
   pl: 'Polski',
   ru: 'Русский',
+  de: 'Deutsch',
+  fr: 'Français',
+  it: 'Italiano',
+  ja: '日本語',
+  ko: '한국어',
+  ar: 'العربية',
 }
 
 const localeFlags: Record<ReviewLocale, string> = {
@@ -33,6 +39,12 @@ const localeFlags: Record<ReviewLocale, string> = {
   pt: '🇵🇹',
   pl: '🇵🇱',
   ru: '🇷🇺',
+  de: '🇺🇸',
+  fr: '🇺🇸',
+  it: '🇺🇸',
+  ja: '🇺🇸',
+  ko: '🇺🇸',
+  ar: '🇺🇸',
 }
 
 const localeDateFormats: Record<ReviewLocale, string> = {
@@ -41,6 +53,12 @@ const localeDateFormats: Record<ReviewLocale, string> = {
   pt: 'pt-PT',
   pl: 'pl-PL',
   ru: 'ru-RU',
+  de: 'de-DE',
+  fr: 'fr-FR',
+  it: 'it-IT',
+  ja: 'ja-JP',
+  ko: 'ko-KR',
+  ar: 'ar-SA',
 }
 
 const localeCurrencies: Record<ReviewLocale, { locale: string; currency: string }> = {
@@ -49,6 +67,12 @@ const localeCurrencies: Record<ReviewLocale, { locale: string; currency: string 
   pt: { locale: 'pt-PT', currency: 'EUR' },
   pl: { locale: 'pl-PL', currency: 'PLN' },
   ru: { locale: 'ru-RU', currency: 'RUB' },
+  de: { locale: 'de-DE', currency: 'USD' },
+  fr: { locale: 'fr-FR', currency: 'USD' },
+  it: { locale: 'it-IT', currency: 'USD' },
+  ja: { locale: 'ja-JP', currency: 'USD' },
+  ko: { locale: 'ko-KR', currency: 'USD' },
+  ar: { locale: 'ar-SA', currency: 'USD' },
 }
 
 const positiveWords = [

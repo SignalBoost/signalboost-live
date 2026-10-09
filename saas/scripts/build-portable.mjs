@@ -301,7 +301,7 @@ function cleanInstallAndAccept(archive) {
       for (const name of required) {
         if (typeof supervisor[name] !== 'function') throw new Error('missing public export: ' + name)
       }
-      const locales = ['en', 'es', 'pt', 'pl', 'ru']
+      const locales = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
       const categories = ['financial', 'destructive', 'credential_security']
       for (const locale of locales) {
         for (const category of categories) {

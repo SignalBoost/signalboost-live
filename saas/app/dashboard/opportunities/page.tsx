@@ -4,24 +4,24 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 const COPY = {
-  eyebrow:    { en: uiText('generatedUi.u_9c39bd2b9a170601'), es: 'Estratega', pt: 'Estrategista', pl: 'Strateg', ru: 'Стратег' },
-  title:      { en: uiText('generatedUi.u_5bfacdc176a5afa9'), es: 'Radar de oportunidades', pt: 'Radar de oportunidades', pl: 'Radar okazji', ru: 'Радар возможностей' },
-  subtitle:   { en: uiText('generatedUi.u_a2f665a2d38fc420'), es: 'Tu estratega IA escanea el mercado a diario en busca de movimientos de competidores, brechas y oportunidades.', pt: 'Seu estrategista IA varre o mercado diariamente em busca de movimentos de concorrentes, lacunas e oportunidades.', pl: 'Twój strateg AI codziennie skanuje rynek w poszukiwaniu ruchów konkurencji, luk i okazji.', ru: 'Ваш ИИ-стратег ежедневно сканирует рынок: действия конкурентов, ниши и партнёрства.' },
-  scanNow:    { en: uiText('generatedUi.u_cda8fe3b54175035'), es: 'Escanear ahora', pt: 'Escanear agora', pl: 'Skanuj teraz', ru: 'Сканировать сейчас' },
-  scanning:   { en: uiText('generatedUi.u_2a46b197ff653cb9'), es: 'Escaneando el mercado…', pt: 'Varrendo o mercado…', pl: 'Skanowanie rynku…', ru: 'Сканирование рынка…' },
-  empty:      { en: uiText('generatedUi.u_d2ca83465869e3c6'), es: 'Sin alertas aún. Ejecuta un escaneo para llenar el radar.', pt: 'Sem alertas ainda. Execute uma varredura para popular o radar.', pl: 'Brak alertów. Uruchom skan, aby zapełnić radar.', ru: 'Пока нет оповещений. Запустите сканирование.' },
-  what:       { en: uiText('generatedUi.u_483bd49023ae2bfb'), es: 'Qué pasó', pt: 'O que aconteceu', pl: 'Co się stało', ru: 'Что произошло' },
-  why:        { en: uiText('generatedUi.u_b8bda68d85740402'), es: 'Por qué importa', pt: 'Por que importa', pl: 'Dlaczego to ważne', ru: 'Почему это важно' },
-  action:     { en: uiText('generatedUi.u_0cdf19eece16f608'), es: 'Acción recomendada', pt: 'Ação recomendada', pl: 'Zalecane działanie', ru: 'Рекомендуемое действие' },
-  sources:    { en: uiText('generatedUi.u_caf85b0888d78f1f'), es: 'Fuentes', pt: 'Fontes', pl: 'Źródła', ru: 'Источники' },
-  reviewed:   { en: uiText('generatedUi.u_f73cf2143127e953'), es: 'Marcar revisado', pt: 'Marcar revisado', pl: 'Oznacz jako przejrzane', ru: 'Просмотрено' },
-  dismiss:    { en: uiText('generatedUi.u_48845bff334a50a5'), es: 'Descartar', pt: 'Dispensar', pl: 'Odrzuć', ru: 'Скрыть' },
-  unauthorized:{ en: uiText('generatedUi.u_9696797799f58af7'), es: 'Se requiere acceso de propietario/administrador.', pt: 'Acesso de proprietário/administrador necessário.', pl: 'Wymagany dostęp właściciela/administratora.', ru: 'Требуется доступ владельца/администратора.' },
-  loadError:  { en: uiText('generatedUi.u_e8272230a6f3b64b'), es: 'No se pudieron cargar las alertas.', pt: 'Não foi possível carregar os alertas.', pl: 'Nie udało się załadować alertów.', ru: 'Не удалось загрузить оповещения.' },
-  scanned:    { en: uiText('generatedUi.u_b62f78df03f4339c'), es: 'Escaneo completo — nuevas alertas:', pt: 'Varredura concluída — novos alertas:', pl: 'Skan zakończony — nowe alerty:', ru: 'Сканирование завершено — новых оповещений:' },
+  eyebrow:    { en: uiText('generatedUi.u_9c39bd2b9a170601'), es: 'Estratega', pt: 'Estrategista', pl: 'Strateg', ru: 'Стратег', de: 'Stratege', fr: 'Stratège', it: 'Stratega', ja: 'ストラテジスト', ko: '전략가', ar: 'الخبير الاستراتيجي' },
+  title:      { en: uiText('generatedUi.u_5bfacdc176a5afa9'), es: 'Radar de oportunidades', pt: 'Radar de oportunidades', pl: 'Radar okazji', ru: 'Радар возможностей', de: 'Chancen-Radar', fr: 'Radar des opportunités', it: 'Radar delle opportunità', ja: '機会レーダー', ko: '기회 레이더', ar: 'رادار الفرص' },
+  subtitle:   { en: uiText('generatedUi.u_a2f665a2d38fc420'), es: 'Tu estratega IA escanea el mercado a diario en busca de movimientos de competidores, brechas y oportunidades.', pt: 'Seu estrategista IA varre o mercado diariamente em busca de movimentos de concorrentes, lacunas e oportunidades.', pl: 'Twój strateg AI codziennie skanuje rynek w poszukiwaniu ruchów konkurencji, luk i okazji.', ru: 'Ваш ИИ-стратег ежедневно сканирует рынок: действия конкурентов, ниши и партнёрства.', de: 'Ihr KI-Stratege durchsucht den Markt täglich nach Wettbewerberaktivitäten, Lücken und Partnerschaftsmöglichkeiten.', fr: 'Votre stratège IA analyse le marché chaque jour pour repérer les mouvements des concurrents, les lacunes et les opportunités de partenariat.', it: 'Il tuo stratega AI analizza ogni giorno il mercato alla ricerca di mosse dei concorrenti, lacune e opportunità di partnership.', ja: 'AI ストラテジストが毎日市場をスキャンし、競合の動き、ギャップ、提携機会を見つけます。', ko: 'AI 전략가가 매일 시장을 스캔하여 경쟁사 동향, 격차, 파트너십 기회를 찾습니다.', ar: 'يفحص خبيرك الاستراتيجي بالذكاء الاصطناعي السوق يوميًا بحثًا عن تحركات المنافسين والفجوات وفرص الشراكة.' },
+  scanNow:    { en: uiText('generatedUi.u_cda8fe3b54175035'), es: 'Escanear ahora', pt: 'Escanear agora', pl: 'Skanuj teraz', ru: 'Сканировать сейчас', de: 'Scan jetzt ausführen', fr: 'Lancer l’analyse maintenant', it: 'Esegui scansione ora', ja: '今すぐスキャン', ko: '지금 스캔 실행', ar: 'تشغيل الفحص الآن' },
+  scanning:   { en: uiText('generatedUi.u_2a46b197ff653cb9'), es: 'Escaneando el mercado…', pt: 'Varrendo o mercado…', pl: 'Skanowanie rynku…', ru: 'Сканирование рынка…', de: 'Markt wird gescannt…', fr: 'Analyse du marché…', it: 'Scansione del mercato…', ja: '市場をスキャン中…', ko: '시장 스캔 중…', ar: 'جارٍ فحص السوق…' },
+  empty:      { en: uiText('generatedUi.u_d2ca83465869e3c6'), es: 'Sin alertas aún. Ejecuta un escaneo para llenar el radar.', pt: 'Sem alertas ainda. Execute uma varredura para popular o radar.', pl: 'Brak alertów. Uruchom skan, aby zapełnić radar.', ru: 'Пока нет оповещений. Запустите сканирование.', de: 'Noch keine Warnungen. Führen Sie einen Scan aus, um das Radar zu füllen.', fr: 'Aucune alerte pour le moment. Lancez une analyse pour alimenter le radar.', it: 'Nessun avviso per ora. Esegui una scansione per popolare il radar.', ja: 'アラートはまだありません。スキャンを実行してレーダーにデータを表示してください。', ko: '아직 알림이 없습니다. 스캔을 실행하여 레이더를 채우세요.', ar: 'لا توجد تنبيهات بعد. شغّل فحصًا لملء الرادار.' },
+  what:       { en: uiText('generatedUi.u_483bd49023ae2bfb'), es: 'Qué pasó', pt: 'O que aconteceu', pl: 'Co się stało', ru: 'Что произошло', de: 'Was ist passiert', fr: 'Ce qui s’est passé', it: 'Cosa è successo', ja: '発生した事象', ko: '발생한 일', ar: 'ما الذي حدث' },
+  why:        { en: uiText('generatedUi.u_b8bda68d85740402'), es: 'Por qué importa', pt: 'Por que importa', pl: 'Dlaczego to ważne', ru: 'Почему это важно', de: 'Warum es wichtig ist', fr: 'Pourquoi c\'est important', it: 'Perché è importante', ja: '重要な理由', ko: '중요한 이유', ar: 'لماذا يهم ذلك' },
+  action:     { en: uiText('generatedUi.u_0cdf19eece16f608'), es: 'Acción recomendada', pt: 'Ação recomendada', pl: 'Zalecane działanie', ru: 'Рекомендуемое действие', de: 'Empfohlene Maßnahme', fr: 'Action recommandée', it: 'Azione consigliata', ja: '推奨アクション', ko: '권장 조치', ar: 'الإجراء الموصى به' },
+  sources:    { en: uiText('generatedUi.u_caf85b0888d78f1f'), es: 'Fuentes', pt: 'Fontes', pl: 'Źródła', ru: 'Источники', de: 'Quellen', fr: 'Sources', it: 'Fonti', ja: 'ソース', ko: '출처', ar: 'المصادر' },
+  reviewed:   { en: uiText('generatedUi.u_f73cf2143127e953'), es: 'Marcar revisado', pt: 'Marcar revisado', pl: 'Oznacz jako przejrzane', ru: 'Просмотрено', de: 'Als geprüft markieren', fr: 'Marquer comme examiné', it: 'Segna come revisionato', ja: 'レビュー済みにする', ko: '검토됨으로 표시', ar: 'وضع علامة كمُراجَع' },
+  dismiss:    { en: uiText('generatedUi.u_48845bff334a50a5'), es: 'Descartar', pt: 'Dispensar', pl: 'Odrzuć', ru: 'Скрыть', de: 'Verwerfen', fr: 'Ignorer', it: 'Ignora', ja: '閉じる', ko: '닫기', ar: 'تجاهل' },
+  unauthorized:{ en: uiText('generatedUi.u_9696797799f58af7'), es: 'Se requiere acceso de propietario/administrador.', pt: 'Acesso de proprietário/administrador necessário.', pl: 'Wymagany dostęp właściciela/administratora.', ru: 'Требуется доступ владельца/администратора.', de: 'Inhaber-/Admin-Zugriff erforderlich.', fr: 'Accès propriétaire/administrateur requis.', it: 'Accesso proprietario/amministratore richiesto.', ja: 'オーナー／管理者のアクセス権が必要です。', ko: '소유자/관리자 액세스 권한이 필요합니다.', ar: 'يلزم وصول المالك/المسؤول.' },
+  loadError:  { en: uiText('generatedUi.u_e8272230a6f3b64b'), es: 'No se pudieron cargar las alertas.', pt: 'Não foi possível carregar os alertas.', pl: 'Nie udało się załadować alertów.', ru: 'Не удалось загрузить оповещения.', de: 'Warnungen konnten nicht geladen werden.', fr: 'Impossible de charger les alertes.', it: 'Impossibile caricare gli avvisi.', ja: 'アラートを読み込めませんでした。', ko: '알림을 불러올 수 없습니다.', ar: 'تعذّر تحميل التنبيهات.' },
+  scanned:    { en: uiText('generatedUi.u_b62f78df03f4339c'), es: 'Escaneo completo — nuevas alertas:', pt: 'Varredura concluída — novos alertas:', pl: 'Skan zakończony — nowe alerty:', ru: 'Сканирование завершено — новых оповещений:', de: 'Scan abgeschlossen – neue Warnungen:', fr: 'Analyse terminée — nouvelles alertes :', it: 'Scansione completata — nuovi avvisi:', ja: 'スキャン完了 — 新しいアラート：', ko: '스캔 완료 — 새 알림:', ar: 'اكتمل الفحص — تنبيهات جديدة:' },
 }
 
 const CATEGORY_STYLE: Record<string, { label: string; color: string }> = {
@@ -50,7 +50,7 @@ type Alert = {
 
 export default function OpportunitiesPage() {
   const { lang } = useI18n()
-  const l = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
+  const l = (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as Lang
 
   const [alerts, setAlerts]     = useState<Alert[]>([])
   const [loading, setLoading]   = useState(true)

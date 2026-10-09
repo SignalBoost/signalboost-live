@@ -7,7 +7,7 @@ import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 type Dictionary = Record<string, string>
 type LocaleFile = Record<string, { supervisorSoc: Dictionary }>
 
-const supportedLocales = ['en', 'es', 'pt', 'pl', 'ru'] as const
+const supportedLocales = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 const locales = JSON.parse(
   hydrateLocalizedSource(readFileSync(new URL('../lib/i18n/supervisorSocLocales.json', import.meta.url), 'utf8')),
 ) as LocaleFile

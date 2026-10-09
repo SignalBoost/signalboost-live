@@ -56,12 +56,18 @@ function languageCodeFrom(body: any): string {
   // A provenance follow-up is deterministic server output, so it cannot rely on a model to infer
   // language. Prefer strong markers in the user's actual latest message over a stale UI locale.
   const prompt = latestUserMessage(body)
+  if (/[\uAC00-\uD7AF]/u.test(prompt)) return 'ko'
+  if (/[\u3040-\u30FF]/u.test(prompt)) return 'ja'
+  if (/[\u0600-\u06FF]/u.test(prompt)) return 'ar'
   if (/[А-Яа-яЁё]/u.test(prompt)) return 'ru'
   if (/[ąćęłńóśźż]/iu.test(prompt) || /\b(?:skąd|źródł\w*|informacj\w*|odpowiedź|pokaż|który|która|które)\b/iu.test(prompt)) return 'pl'
+  if (/\b(?:woher|diese\s+information|quelle|quellen|stammt|welche[rs]?|antwort)\b/iu.test(prompt)) return 'de'
+  if (/(?:\bd['’]o[uù]\b|\bcette\s+information\b|\bprovient\b|\br[ée]ponse\b|\bquelles?\b)/iu.test(prompt)) return 'fr'
+  if (/\b(?:da\s+dove|questa\s+informazione|proviene|risposta|quale|quali|fonti)\b/iu.test(prompt)) return 'it'
   if (/\b(?:de\s+onde|essa|isso|informação|informacao|fonte|fontes|veio|qual|quais|quem|não|nao|você|voce|resposta)\b/iu.test(prompt)) return 'pt'
   if (/\b(?:de\s+d[oó]nde|esta\s+informaci[oó]n|informaci[oó]n|fuente|fuentes|vino|cu[aá]l|cu[aá]les|qui[eé]n|respuesta)\b/iu.test(prompt)) return 'es'
   const value = String(body?.context?.language || 'en').toLowerCase()
-  return ['en', 'es', 'pt', 'pl', 'ru'].includes(value) ? value : 'en'
+  return ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(value) ? value : 'en'
 }
 
 function noPriorProvenanceReply(languageCode: string): string {
@@ -69,6 +75,12 @@ function noPriorProvenanceReply(languageCode: string): string {
   if (languageCode === 'pt') return 'Não tenho um registro de proveniência real para a resposta imediatamente anterior desta conversa. Não vou reconstruí-lo nem inventá-lo depois do fato.'
   if (languageCode === 'pl') return 'Nie mam prawdziwego zapisu proweniencji bezpośrednio poprzedniej odpowiedzi w tej rozmowie. Nie będę go odtwarzać ani wymyślać po fakcie.'
   if (languageCode === 'ru') return 'У меня нет реальной записи происхождения непосредственно предыдущего ответа в этой беседе. Я не буду восстанавливать или придумывать её постфактум.'
+  if (languageCode === 'de') return 'Ich habe keinen echten Herkunftsnachweis für die unmittelbar vorangegangene Antwort in diesem Gespräch. Ich werde ihn nicht nachträglich rekonstruieren oder erfinden.'
+  if (languageCode === 'fr') return "Je n'ai pas de véritable registre de provenance pour la réponse immédiatement précédente de cette conversation. Je ne vais pas le reconstituer ni l'inventer après coup."
+  if (languageCode === 'it') return "Non ho un vero registro di provenienza per la risposta immediatamente precedente di questa conversazione. Non lo ricostruirò né lo inventerò a posteriori."
+  if (languageCode === 'ja') return 'この会話の直前の回答について、実際の出所記録はありません。後から再構成したり、捏造したりすることはしません。'
+  if (languageCode === 'ko') return '이 대화의 바로 이전 답변에 대한 실제 출처 기록이 없습니다. 사후에 재구성하거나 지어내지 않겠습니다.'
+  if (languageCode === 'ar') return 'ليس لدي سجل مصدر حقيقي للإجابة السابقة مباشرة في هذه المحادثة. لن أعيد بناءه أو أختلقه بعد وقوعه.'
   return "I don't have a real provenance record for the immediately preceding answer in this conversation. I won't reconstruct or fabricate it after the fact."
 }
 
@@ -80,6 +92,12 @@ function unverifiedProvenanceCaveat(languageCode: string): string {
   if (languageCode === 'pt') return '⚠️ Não consegui confirmar que este registro corresponde exatamente à resposta anterior (não houve correspondência precisa de conversa ou conteúdo da resposta para verificar) — mostrando o registro de proveniência mais recente desta conta. Se algo não bater, essa é a razão.'
   if (languageCode === 'pl') return '⚠️ Nie udało się potwierdzić, że ten zapis dokładnie odpowiada poprzedniej odpowiedzi (nie było precyzyjnego dopasowania rozmowy ani treści odpowiedzi do weryfikacji) — pokazuję najnowszy zapis proweniencji dla tego konta. Jeśli coś się nie zgadza, to właśnie dlatego.'
   if (languageCode === 'ru') return '⚠️ Не удалось подтвердить, что эта запись точно соответствует предыдущему ответу (не было точного совпадения беседы или содержимого ответа для проверки) — показана самая последняя запись происхождения для этого аккаунта. Если что-то не сходится, вот причина.'
+  if (languageCode === 'de') return '⚠️ Ich konnte nicht bestätigen, dass dieser Eintrag genau der unmittelbar vorangegangenen Antwort entspricht (es war keine präzise Übereinstimmung von Gespräch oder Antwortinhalt zur Überprüfung verfügbar) — angezeigt wird der neueste Herkunftsnachweis für dieses Konto. Falls etwas nicht passt, ist das der Grund.'
+  if (languageCode === 'fr') return "⚠️ Je n'ai pas pu confirmer que ce registre correspond exactement à la réponse immédiatement précédente (aucune correspondance précise de conversation ou de contenu de réponse n'était disponible pour le vérifier) — voici le registre de provenance le plus récent de ce compte. Si quelque chose ne correspond pas, c'est pour cette raison."
+  if (languageCode === 'it') return "⚠️ Non sono riuscito a confermare che questo registro corrisponda esattamente alla risposta immediatamente precedente (non era disponibile una corrispondenza precisa di conversazione o contenuto della risposta per verificarlo) — mostro il registro di provenienza più recente per questo account. Se qualcosa non torna, il motivo è questo."
+  if (languageCode === 'ja') return '⚠️ この記録が直前の回答と正確に一致するか確認できませんでした（照合に使える会話または回答内容の正確な一致がありませんでした）。このアカウントで最新の出所記録を表示しています。何か食い違いがある場合は、これが理由です。'
+  if (languageCode === 'ko') return '⚠️ 이 기록이 바로 이전 답변과 정확히 일치하는지 확인할 수 없었습니다(검증에 사용할 대화 또는 답변 내용의 정확한 일치가 없었습니다). 이 계정의 가장 최근 출처 기록을 표시합니다. 맞지 않는 부분이 있다면 이것이 그 이유입니다.'
+  if (languageCode === 'ar') return '⚠️ لم أتمكن من تأكيد أن هذا السجل يطابق الإجابة السابقة مباشرة بدقة (لم تتوفر مطابقة دقيقة للمحادثة أو لمحتوى الإجابة للتحقق منها) — أعرض أحدث سجل مصدر لهذا الحساب. إذا بدا شيء غير متطابق، فهذا هو السبب.'
   return "⚠️ I could not confirm this record matches the immediately preceding answer exactly — a precise conversation or answer-content match was not available to verify against, so this is the most recent provenance record on file for this account, not a confirmed match to the specific answer just given. If something looks off, that mismatch is why."
 }
 
@@ -88,7 +106,7 @@ function deterministicProvenance(body: any, prompt: string): RecordedTurnProvena
   const result = tryDeterministicUtility({
     prompt,
     timezone: body?.context?.timezone || body?.context?.timeZone,
-    locale: languageCode === 'pt' ? 'pt-BR' : languageCode === 'es' ? 'es' : languageCode === 'pl' ? 'pl' : languageCode === 'ru' ? 'ru' : 'en-US',
+    locale: languageCode === 'pt' ? 'pt-BR' : languageCode === 'es' ? 'es' : languageCode === 'pl' ? 'pl' : languageCode === 'ru' ? 'ru' : languageCode === 'de' ? 'de-DE' : languageCode === 'fr' ? 'fr-FR' : languageCode === 'it' ? 'it-IT' : languageCode === 'ja' ? 'ja-JP' : languageCode === 'ko' ? 'ko-KR' : languageCode === 'ar' ? 'ar-SA' : 'en-US',
     confidenceThreshold: Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72'),
   })
   return result?.executionProvenance ?? null

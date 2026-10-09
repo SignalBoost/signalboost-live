@@ -78,6 +78,12 @@ const LANGUAGE_LABELS: Record<string, string> = {
   es:      'Spanish',
   pl:      'Polish',
   ru:      'Russian',
+  de: 'German',
+  fr: 'French',
+  it: 'Italian',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ar: 'Arabic',
 }
 
 const PLATFORM_FACTS = `SIGNALBOOST — FACTUAL PRODUCT KNOWLEDGE (authoritative; never contradict or invent beyond this):
@@ -95,7 +101,7 @@ SignalBoost is TWO live platforms that work together:
 - AI Assistant
 - Outreach engine (analyze a business, generate tailored outreach messages for Email/LinkedIn/Social, and produce a partner pitch deck PDF)
 - Calendar + Spreadsheets (Cowork tools)
-- Multilingual system: English, Spanish, Portuguese, Polish, Russian
+- Multilingual system: English, Spanish, Portuguese, Polish, Russian, German, French, Italian, Japanese, Korean, Arabic
 
 One-liner: SignalBoost is both a digital AI shopping mall (commission-based affiliate network — call getAffiliateCount for the current count) and a full SaaS platform for building websites and branded content — multilingual.
 
@@ -1465,7 +1471,7 @@ return `Unknown tool: ${name}`
 // their replies are never rewritten. The check is intentionally conservative:
 // it fires on explicit completed-action claims, not on offers or descriptions.
 
-// Phrases that assert a completed owner-only action, across the 5 platform
+// Phrases that assert a completed owner-only action, across the 11 platform
 // languages. Matched case-insensitively against the reply text.
 const OWNER_ACTION_CLAIM = new RegExp(
   [
@@ -1487,6 +1493,24 @@ const OWNER_ACTION_CLAIM = new RegExp(
     // Russian
     'pr (подготовлен|создан|открыт)', 'кампани(я|ю) (создан|запущен|опубликован)', 'код (закоммичен|отправлен|зафиксирован)',
     'отправил(а)? (письмо|рассылку|пресс-?релиз)', 'переменную окружения (добавил|создал)',
+    // German
+    'pr (wurde |ist )?(bereitgestellt|vorbereitet|erstellt|geöffnet)', 'kampagne (wurde |ist )?(erstellt|gestartet|veröffentlicht)', 'code (wurde |ist )?(committet|gepusht|übertragen)',
+    '(e-?mail|pressemitteilung|nachricht) (wurde )?(gesendet|verschickt)', 'umgebungsvariable (wurde )?(hinzugefügt|erstellt)',
+    // French
+    'pr (a été )?(préparée?|créée?|ouverte?)', 'campagne (a été )?(créée|lancée|publiée)', 'code (a été )?(commité|poussé|validé)',
+    "j['’]ai envoyé (l['’]|le |la |votre )?(e-?mail|courriel|communiqué)", "variable d['’]environnement (a été )?(ajoutée|créée)",
+    // Italian
+    'pr (è stat[ao] )?(preparat|creat|apert)', 'campagna (è stata )?(creata|lanciata|pubblicata)', 'codice (è stato )?(committato|caricato|inviato)',
+    "ho inviato (l['’]|la |il |la tua |il tuo )?(e-?mail|comunicato)", "variabile d['’]ambiente (è stata )?(aggiunta|creata)",
+    // Japanese
+    'prを(準備|作成|オープン)しました', 'キャンペーンを(作成|開始|公開)しました', 'キャンペーンが(作成|開始|公開)されました', 'コードを(コミット|プッシュ)しました',
+    '(メール|プレスリリース)を送信しました', '環境変数を(追加|作成)しました',
+    // Korean
+    'pr(을|를|이|가)? ?(준비|생성|오픈)(했|되었)습니다', '캠페인(을|이)? ?(생성|시작|게시)(했|되었)습니다', '코드(를|가)? ?(커밋|푸시)(했|되었)습니다',
+    '(이메일|보도 ?자료)(을|를|가|이)? ?(발송|전송)(했|되었)습니다', '환경 ?변수(를|가)? ?(추가|생성)(했|되었)습니다',
+    // Arabic
+    'تم (إعداد|إنشاء|فتح) (طلب الدمج|pr)', 'تم (إنشاء|إطلاق|نشر) (الحملة|حملة)', 'تم (إيداع|دفع) (الكود|الشيفرة)',
+    'تم إرسال (البريد|الرسالة|البيان الصحفي)', 'تمت إضافة متغير (البيئة|بيئة)',
   ].join('|'),
   'i',
 )
@@ -1507,6 +1531,12 @@ function honestCantDo(languageCode: string): string {
     pt: "Não posso executar essa ação aqui — ela requer a sessão de Chief of Staff do proprietário autenticado. Nada foi preparado, confirmado, enviado ou alterado. Se você é o proprietário, pode estar no modo Concierge — verifique se OWNER_EMAILS na Vercel inclui seu e-mail de login exato.",
     pl: "Nie mogę wykonać tej akcji tutaj — wymaga ona zalogowanej sesji Chief of Staff właściciela. Nic nie zostało przygotowane, zatwierdzone, wysłane ani zmienione. Jeśli jesteś właścicielem, możesz być w trybie Concierge — sprawdź, czy OWNER_EMAILS w Vercel zawiera Twój dokładny adres e-mail logowania.",
     ru: "Я не могу выполнить это действие здесь — оно требует авторизованной сессии Chief of Staff владельца. Ничего не было подготовлено, зафиксировано, отправлено или изменено. Если вы владелец, возможно, вы в режиме Concierge — проверьте, что OWNER_EMAILS в Vercel содержит ваш точный адрес входа.",
+    de: "Diese Aktion kann ich hier nicht ausführen – sie erfordert die angemeldete Chief-of-Staff-Sitzung des Eigentümers. Es wurde nichts bereitgestellt, committet, gesendet oder geändert. Wenn Sie der Eigentümer sind, befinden Sie sich möglicherweise im Concierge-Modus – prüfen Sie, ob OWNER_EMAILS in Vercel genau Ihre Anmelde-E-Mail-Adresse enthält.",
+    fr: "Je ne peux pas effectuer cette action ici — elle nécessite la session Chief of Staff du propriétaire, connecté avec son propre compte. Rien n’a été préparé, validé, envoyé ni modifié. Si vous êtes le propriétaire, vous êtes peut-être en mode Concierge — vérifiez que OWNER_EMAILS dans Vercel contient exactement votre adresse e-mail de connexion.",
+    it: "Non posso eseguire questa azione qui — richiede la sessione Chief of Staff del proprietario con accesso effettuato. Nulla è stato preparato, committato, inviato o modificato. Se sei il proprietario, potresti essere in modalità Concierge — verifica che OWNER_EMAILS in Vercel includa esattamente la tua email di accesso.",
+    ja: "ここではその操作を実行できません。オーナー本人がサインインした Chief of Staff セッションが必要です。ステージング、コミット、送信、変更は一切行っていません。オーナーの方は Concierge モードになっている可能性があります。Vercel の OWNER_EMAILS にログイン用メールアドレスが正確に含まれているか確認してください。",
+    ko: "여기서는 해당 작업을 수행할 수 없습니다. 소유자 본인이 로그인한 Chief of Staff 세션이 필요합니다. 스테이징, 커밋, 전송, 변경된 항목은 없습니다. 소유자라면 Concierge 모드일 수 있습니다. Vercel의 OWNER_EMAILS에 로그인 이메일이 정확히 포함되어 있는지 확인하세요.",
+    ar: "لا يمكنني تنفيذ هذا الإجراء هنا — فهو يتطلب جلسة Chief of Staff الخاصة بالمالك بعد تسجيل دخوله. لم يتم تجهيز أي شيء أو اعتماده أو إرساله أو تغييره. إذا كنت المالك، فقد تكون في وضع الكونسيرج — تحقّق من أن OWNER_EMAILS في Vercel يتضمن بريد تسجيل الدخول الخاص بك تمامًا.",
   }
   return M[languageCode] || M.en
 }
@@ -1627,7 +1657,7 @@ export async function POST(req: NextRequest) {
     const deterministic = tryDeterministicUtility({
       prompt: latestUserMessage,
       timezone: body?.context?.timezone || body?.context?.timeZone,
-      locale: languageCode === 'pt' ? 'pt-BR' : languageCode === 'es' ? 'es' : languageCode === 'pl' ? 'pl' : languageCode === 'ru' ? 'ru' : 'en-US',
+      locale: languageCode === 'pt' ? 'pt-BR' : languageCode === 'es' ? 'es' : languageCode === 'pl' ? 'pl' : languageCode === 'ru' ? 'ru' : languageCode === 'de' ? 'de-DE' : languageCode === 'fr' ? 'fr-FR' : languageCode === 'it' ? 'it-IT' : languageCode === 'ja' ? 'ja-JP' : languageCode === 'ko' ? 'ko-KR' : languageCode === 'ar' ? 'ar-SA' : 'en-US',
       confidenceThreshold: Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72'),
     })
     if (deterministic) {
@@ -1680,6 +1710,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         reply: languageCode === 'es' ? 'No tengo un registro de procedencia real para un turno anterior en esta conversación — probablemente esta es la primera pregunta, o el turno anterior es de antes de que este seguimiento existiera. No voy a inventar una respuesta a esto.'
           : languageCode === 'pt' ? 'Não tenho um registro de proveniência real para um turno anterior nesta conversa — provavelmente esta é a primeira pergunta, ou o turno anterior é de antes deste rastreamento existir. Não vou inventar uma resposta para isso.'
+          : languageCode === 'pl' ? 'Nie mam prawdziwego zapisu pochodzenia dla wcześniejszej tury w tej rozmowie — najpewniej to pierwsze pytanie albo wcześniejsza tura pochodzi sprzed wprowadzenia tego śledzenia. Nie zamierzam wymyślać odpowiedzi na to pytanie.'
+          : languageCode === 'ru' ? 'У меня нет реальной записи происхождения для предыдущего хода в этой беседе — скорее всего, это первый вопрос, или предыдущий ход был до появления этого отслеживания. Я не буду выдумывать ответ на это.'
+          : languageCode === 'de' ? 'Ich habe keinen echten Herkunftsnachweis für einen früheren Gesprächsschritt in dieser Unterhaltung — höchstwahrscheinlich ist dies die erste Frage, oder der frühere Schritt stammt aus der Zeit vor dieser Nachverfolgung. Ich werde dazu keine Antwort erfinden.'
+          : languageCode === 'fr' ? "Je n'ai pas de véritable registre de provenance pour un tour précédent de cette conversation — il s'agit très probablement de la première question, ou le tour précédent est antérieur à ce suivi. Je ne vais pas inventer de réponse à cela."
+          : languageCode === 'it' ? "Non ho un vero registro di provenienza per un turno precedente di questa conversazione — molto probabilmente questa è la prima domanda, oppure il turno precedente risale a prima di questo tracciamento. Non inventerò una risposta."
+          : languageCode === 'ja' ? 'この会話の以前のターンについて、実際の出所記録はありません。おそらくこれが最初の質問であるか、以前のターンがこの追跡の導入前のものです。これについて回答を捏造することはしません。'
+          : languageCode === 'ko' ? '이 대화의 이전 차례에 대한 실제 출처 기록이 없습니다. 아마도 이것이 첫 질문이거나, 이전 차례가 이 추적 기능 도입 전의 것입니다. 이에 대한 답변을 지어내지 않겠습니다.'
+          : languageCode === 'ar' ? 'ليس لدي سجل مصدر حقيقي لدور سابق في هذه المحادثة — على الأرجح هذا هو السؤال الأول، أو أن الدور السابق يسبق هذا التتبع. لن أختلق إجابة على ذلك.'
           : 'I don\'t have a real provenance record for a prior turn in this conversation — most likely this is the first question, or the prior turn predates this tracking. I\'m not going to fabricate an answer to this.',
         source: 'cos-no-provenance-record',
         external_ai_invoked: false,
@@ -2155,6 +2193,12 @@ ${ev.summary}`
         pt: 'Não consegui gerar uma resposta para isso. Tente reformular ou dividir em passos menores.',
         pl: 'Nie udało mi się wygenerować odpowiedzi. Spróbuj przeformułować lub podzielić to na mniejsze kroki.',
         ru: 'Не удалось сформировать ответ. Попробуйте переформулировать или разбить на меньшие шаги.',
+        de: 'Dafür konnte ich keine Antwort erstellen. Bitte formulieren Sie die Anfrage um oder teilen Sie sie in kleinere Schritte auf.',
+        fr: 'Je n’ai pas pu produire de réponse à cette demande. Essayez de la reformuler ou de la diviser en étapes plus petites.',
+        it: 'Non sono riuscito a produrre una risposta. Prova a riformulare o a suddividere la richiesta in passaggi più piccoli.',
+        ja: 'その内容に対する回答を生成できませんでした。言い換えるか、より小さなステップに分けてお試しください。',
+        ko: '해당 요청에 대한 응답을 생성할 수 없습니다. 다르게 표현하거나 더 작은 단계로 나누어 다시 시도하세요.',
+        ar: 'تعذّر عليّ إنشاء رد على ذلك. يُرجى إعادة الصياغة أو تقسيم الطلب إلى خطوات أصغر.',
       } as Record<string, string>)[languageCode] || 'I could not produce a response for that. Please try rephrasing, or break it into smaller steps.'
     }
 
@@ -2259,6 +2303,12 @@ ${ev.summary}`
       pt: 'Tive um problema ao processar isso e não consegui terminar. Pode ter sido uma sobrecarga temporária do modelo ou um pedido grande demais — tente novamente e divida tarefas muito grandes em passos menores.',
       pl: 'Napotkałem problem i nie udało mi się dokończyć. To mogło być chwilowe przeciążenie modelu lub zbyt duże żądanie — spróbuj ponownie i podziel bardzo duże zadania na mniejsze kroki.',
       ru: 'Возникла проблема, и я не смог завершить. Возможно, это была временная перегрузка модели или слишком большой запрос — попробуйте снова и разбивайте очень большие задачи на меньшие шаги.',
+      de: 'Bei der Verarbeitung ist ein Problem aufgetreten, und ich konnte sie nicht abschließen. Möglicherweise war das Modell vorübergehend überlastet oder die Anfrage zu umfangreich – bitte versuchen Sie es erneut und teilen Sie sehr große Aufgaben in kleinere Schritte auf.',
+      fr: 'J’ai rencontré un problème lors du traitement et je n’ai pas pu terminer. Il peut s’agir d’une surcharge temporaire du modèle ou d’une demande trop volumineuse — veuillez réessayer et diviser les tâches très volumineuses en étapes plus petites.',
+      it: 'Ho riscontrato un problema durante l’elaborazione e non sono riuscito a completarla. Potrebbe trattarsi di un sovraccarico temporaneo del modello o di una richiesta troppo grande — riprova e suddividi le attività molto grandi in passaggi più piccoli.',
+      ja: '処理中に問題が発生し、完了できませんでした。モデルの一時的な過負荷、またはリクエストが大きすぎた可能性があります。もう一度お試しいただき、非常に大きなタスクは小さなステップに分割してください。',
+      ko: '처리 중 문제가 발생하여 완료하지 못했습니다. 일시적인 모델 과부하이거나 요청이 너무 컸을 수 있습니다. 다시 시도하고, 매우 큰 작업은 더 작은 단계로 나누세요.',
+      ar: 'واجهت مشكلة أثناء المعالجة ولم أتمكن من الإكمال. قد يكون السبب حِملًا زائدًا مؤقتًا على النموذج أو طلبًا كبيرًا جدًا — يُرجى المحاولة مرة أخرى وتقسيم المهام الكبيرة جدًا إلى خطوات أصغر.',
     }
     const base = GENERIC[errLangCode] || GENERIC.en
     // The owner/admin gets the real error to debug; customers never see internals.

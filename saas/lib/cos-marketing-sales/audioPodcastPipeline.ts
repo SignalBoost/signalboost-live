@@ -11,6 +11,12 @@ const HOST_NAMES: Record<CosLocale, { hostA: string; hostB: string; announcer: s
   'pt-BR': { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
   pl: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
   ru: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
+  de: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
+  fr: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
+  it: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
+  ja: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
+  ko: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
+  ar: { hostA: 'Alex', hostB: 'Maya', announcer: 'SignalBoost' },
 }
 
 const COPY: Record<CosLocale, { title: string; intro: string; explain: string; ad: string; cta: string; outro: string }> = {
@@ -54,10 +60,58 @@ const COPY: Record<CosLocale, { title: string; intro: string; explain: string; a
     cta: 'Следующий шаг простой: проверить сигнал, утвердить лучшее исправление и превратить его в outreach или улучшение для клиента.',
     outro: 'Это был короткий бриф. Рабочий процесс должен быть практичным, измеримым и утверждённым владельцем.',
   },
+  de: {
+    title: 'Fünf-Minuten-Tech-Briefing',
+    intro: 'Heute betrachten wir ein praktisches Geschäftssignal und was es für das Wachstum bedeutet.',
+    explain: 'Entscheidend ist nicht nur die Erkenntnis, sondern was der Inhaber als Nächstes tun kann, ohne Zeit zu verschwenden.',
+    ad: 'Mid-Roll: SignalBoost hilft kleinen Teams, Website-Signale, Outreach-Ideen und Optimierungserkenntnisse in freigegebene Aktionspläne zu verwandeln.',
+    cta: 'Der nächste Schritt ist einfach: Signal prüfen, die beste Korrektur freigeben und daraus Outreach oder eine kundenseitige Verbesserung machen.',
+    outro: 'Das war das Kurzbriefing. Halten Sie den Workflow praxisnah, messbar und vom Inhaber freigegeben.',
+  },
+  fr: {
+    title: 'Point tech en cinq minutes',
+    intro: 'Aujourd’hui, nous examinons un signal business concret et ce qu’il signifie pour la croissance.',
+    explain: 'L’essentiel n’est pas seulement le constat, mais ce que le dirigeant peut faire ensuite sans perdre de temps.',
+    ad: 'Mid-roll : SignalBoost aide les petites équipes à transformer les signaux de leur site, leurs idées de prospection et leurs constats d’optimisation en plans d’action approuvés.',
+    cta: 'L’étape suivante est simple : examiner le signal, approuver le meilleur correctif et le transformer en prospection ou en amélioration visible par le client.',
+    outro: 'Voilà pour ce point rapide. Gardez un workflow concret, mesurable et approuvé par le dirigeant.',
+  },
+  it: {
+    title: 'Brief tecnologico di cinque minuti',
+    intro: 'Oggi analizziamo un segnale di business concreto e cosa significa per la crescita.',
+    explain: 'L’aspetto importante non è solo la scoperta, ma cosa può fare il titolare subito dopo senza perdere tempo.',
+    ad: 'Mid-roll: SignalBoost aiuta i piccoli team a trasformare segnali del sito, idee di outreach e risultati di ottimizzazione in piani d’azione approvati.',
+    cta: 'Il passo successivo è semplice: esamina il segnale, approva la correzione migliore e trasformala in outreach o in un miglioramento per i clienti.',
+    outro: 'Questo era il brief rapido. Mantieni il flusso di lavoro pratico, misurabile e approvato dal titolare.',
+  },
+  ja: {
+    title: '5分間テックブリーフ',
+    intro: '今日は、実用的なビジネスシグナルと、それが成長にとって何を意味するかを見ていきます。',
+    explain: '重要なのは発見そのものだけでなく、オーナーが時間を無駄にせずに次に何ができるかです。',
+    ad: 'ミッドロール：SignalBoostは、小規模チームがWebサイトのシグナル、アウトリーチのアイデア、最適化の知見を承認済みのアクションプランに変えられるよう支援します。',
+    cta: '次のステップはシンプルです。シグナルを確認し、最適な修正を承認して、アウトリーチまたは顧客向けの改善につなげます。',
+    outro: '以上、クイックブリーフでした。ワークフローは実用的で測定可能、かつオーナー承認済みのものにしましょう。',
+  },
+  ko: {
+    title: '5분 기술 브리핑',
+    intro: '오늘은 실질적인 비즈니스 신호와 그것이 성장에 어떤 의미가 있는지 살펴봅니다.',
+    explain: '중요한 것은 발견 자체만이 아니라, 소유자가 시간을 낭비하지 않고 다음에 무엇을 할 수 있는가입니다.',
+    ad: '미드롤: SignalBoost는 소규모 팀이 웹사이트 신호, 아웃리치 아이디어, 최적화 결과를 승인된 실행 계획으로 전환하도록 돕습니다.',
+    cta: '다음 단계는 간단합니다. 신호를 검토하고, 최선의 수정안을 승인한 뒤, 이를 아웃리치나 고객 대상 개선으로 전환하세요.',
+    outro: '빠른 브리핑이었습니다. 워크플로를 실용적이고 측정 가능하며 소유자가 승인한 상태로 유지하세요.',
+  },
+  ar: {
+    title: 'موجز تقني في خمس دقائق',
+    intro: 'نتناول اليوم مؤشرًا عمليًا في الأعمال وما يعنيه للنمو.',
+    explain: 'المهم ليس الاكتشاف فحسب، بل ما يمكن للمالك فعله بعد ذلك دون إضاعة الوقت.',
+    ad: 'فاصل إعلاني: يساعد SignalBoost الفرق الصغيرة على تحويل مؤشرات الموقع وأفكار التواصل ونتائج التحسين إلى خطط عمل معتمدة.',
+    cta: 'الخطوة التالية بسيطة: راجع المؤشر، واعتمد أفضل إصلاح، وحوّله إلى تواصل أو تحسين يلمسه العملاء.',
+    outro: 'كان هذا هو الموجز السريع. حافظ على سير عمل عملي وقابل للقياس ومعتمد من المالك.',
+  },
 }
 
 function normalizeLocale(locale?: string): CosLocale {
-  if (locale === 'es' || locale === 'pt-BR' || locale === 'pl' || locale === 'ru') return locale
+  if (locale === 'es' || locale === 'pt-BR' || locale === 'pl' || locale === 'ru' || locale === 'de' || locale === 'fr' || locale === 'it' || locale === 'ja' || locale === 'ko' || locale === 'ar') return locale
   return 'en'
 }
 

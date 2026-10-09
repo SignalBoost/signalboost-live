@@ -138,7 +138,7 @@ test('the Audit Console displays and refreshes the real autonomous remediation l
   assert.match(dashboard, /This is the only approval/)
   assert.doesNotMatch(dashboard, /RemediationBanner|PatchPreview|Confirm & Push Pull Request|Open remediation PR/)
 
-  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     assert.match(panel, new RegExp(`\\b${lang}: \\{`))
   }
   assert.doesNotMatch(panel, /prUrl|prNumber|openPr|href=/)

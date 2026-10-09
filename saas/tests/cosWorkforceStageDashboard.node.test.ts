@@ -28,9 +28,9 @@ test('the existing Workforce section shows the stages in pipeline order', () => 
   assert.match(section, /copy\.workforceStageLabels\[worker\.stage as WorkforceStage\]/)
 })
 
-test('every stage label exists in en, es, pt, pl and ru', () => {
+test('every stage label exists in all eleven languages', () => {
   const copy = read('lib/i18n/cosUniversityTelemetryCopy.ts')
-  assert.equal(copy.match(/\n    workforceStagesExplanation: /g)?.length, 5)
-  for (const stage of STAGES) assert.equal(copy.match(new RegExp(`\\n      ${stage}: '`, 'g'))?.length, 5, stage)
+  assert.equal(copy.match(/\n    workforceStagesExplanation: /g)?.length, 11)
+  for (const stage of STAGES) assert.equal(copy.match(new RegExp(`\\n      ${stage}: '`, 'g'))?.length, 11, stage)
 })
 // end of saas/tests/cosWorkforceStageDashboard.node.test.ts (if this line is missing, the paste was cut short)

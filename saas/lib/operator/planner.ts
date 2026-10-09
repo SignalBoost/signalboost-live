@@ -22,7 +22,7 @@ function guessFileTargets(request: string): string[] {
   return Array.from(new Set(files))
 }
 
-const SUPPORTED_LANGS = ['en', 'pt', 'es', 'pl', 'ru'] as const
+const SUPPORTED_LANGS = ['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 type SupportedLang = typeof SUPPORTED_LANGS[number]
 
 function normalizeLanguage(language?: string): SupportedLang {
@@ -31,6 +31,12 @@ function normalizeLanguage(language?: string): SupportedLang {
   if (lower.startsWith('es')) return 'es'
   if (lower.startsWith('pl')) return 'pl'
   if (lower.startsWith('ru')) return 'ru'
+  if (lower.startsWith('de')) return 'de'
+  if (lower.startsWith('fr')) return 'fr'
+  if (lower.startsWith('it')) return 'it'
+  if (lower.startsWith('ja')) return 'ja'
+  if (lower.startsWith('ko')) return 'ko'
+  if (lower.startsWith('ar')) return 'ar'
   return 'en'
 }
 
@@ -76,6 +82,48 @@ const TEMPLATE_COPY: Record<SupportedLang, {
     steps: ['Понять вашу цель простым языком.', 'Проверить наиболее важные файлы страниц и переводов.', 'Подготовить визуальный план (для запросов по сайту) или сфокусированный план по функции.', 'Показать вам, что именно изменится, и запросить одобрение.', 'Применить одобренные изменения, опубликовать и сохранить возможность отката.'],
     preview: ['Понятное обновление интерфейса в вашем стиле и под вашу цель.', 'Изменения контента/кнопок/макета на нужной странице.', 'Языковые обновления для переводов, если они нужны.'],
   },
+  de: {
+    clarification: 'Welche Seite soll ich zuerst aktualisieren (zum Beispiel: Startseite, Podcaster oder Builder)?',
+    summaryVisual: 'Ich erstelle zunächst ein visuelles Konzept-Update und wende dann gezielte Inhalts- und Layout-Änderungen mit den SignalBoost-Tools an.',
+    summaryDefault: 'Ich setze ein gezieltes Produkt-Update in kleinen, sicheren Schritten um – mit Freigabe vor der Veröffentlichung.',
+    steps: ['Ihr Ziel in einfacher Sprache verstehen.', 'Die relevantesten Seiten- und Übersetzungsdateien prüfen.', 'Einen visuell orientierten Update-Plan (für Website-Anfragen) oder einen gezielten Funktionsplan erstellen.', 'Ihnen genau zeigen, was sich ändert, und um Freigabe bitten.', 'Das freigegebene Update anwenden, veröffentlichen und ein Rollback bereithalten.'],
+    preview: ['Benutzerfreundliches UI-Update, abgestimmt auf Ihren gewünschten Stil und Ihre Ziele.', 'Inhalts-/Schaltflächen-/Layout-Updates auf der relevanten Seite.', 'Sprach-Updates für übersetzte Versionen, falls gewünscht.'],
+  },
+  fr: {
+    clarification: 'Quelle page souhaitez-vous que je mette à jour en premier (par exemple : page d’accueil, podcasteurs ou builder) ?',
+    summaryVisual: 'Je vais d’abord préparer une proposition visuelle, puis appliquer des modifications ciblées du contenu et de la mise en page avec les outils SignalBoost.',
+    summaryDefault: 'J’appliquerai une mise à jour ciblée du produit par petites étapes sûres, avec approbation avant publication.',
+    steps: ['Comprendre votre objectif en langage simple.', 'Examiner les fichiers de page et de traduction les plus pertinents.', 'Préparer un plan de mise à jour axé sur le visuel (pour les demandes de site web) ou un plan de fonctionnalité ciblé.', 'Vous montrer exactement ce qui va changer et demander votre approbation.', 'Appliquer la mise à jour approuvée, la publier et garder un retour arrière prêt.'],
+    preview: ['Mise à jour conviviale de l’UI, alignée sur le style et les objectifs demandés.', 'Mises à jour du contenu, des boutons et de la mise en page sur la page concernée.', 'Mises à jour linguistiques des versions traduites sur demande.'],
+  },
+  it: {
+    clarification: 'Puoi indicarmi quale pagina vuoi che aggiorni per prima (ad esempio: homepage, podcaster o builder)?',
+    summaryVisual: 'Prima preparerò un aggiornamento del concept visivo, poi applicherò modifiche mirate a contenuti e layout con gli strumenti di SignalBoost.',
+    summaryDefault: 'Applicherò un aggiornamento mirato del prodotto in piccoli passi sicuri, con approvazione prima della pubblicazione.',
+    steps: ['Capire il tuo obiettivo in linguaggio semplice.', 'Esaminare i file di pagina e di traduzione più rilevanti.', 'Preparare un piano di aggiornamento incentrato sulla parte visiva (per le richieste relative al sito web) o un piano di funzionalità mirato.', 'Mostrarti esattamente cosa cambierà e chiedere l’approvazione.', 'Applicare l’aggiornamento approvato, pubblicarlo e tenere pronto il rollback.'],
+    preview: ['Aggiornamento dell’UI intuitivo, in linea con lo stile e gli obiettivi richiesti.', 'Aggiornamenti di contenuti/pulsanti/layout nella pagina pertinente.', 'Aggiornamenti linguistici per le versioni tradotte, se richiesti.'],
+  },
+  ja: {
+    clarification: '最初に更新するページを教えていただけますか(例:ホームページ、ポッドキャスター、ビルダー)?',
+    summaryVisual: 'まずビジュアルコンセプトの更新案を作成し、その後 SignalBoost のツールを使ってコンテンツとレイアウトを重点的に更新します。',
+    summaryDefault: '製品の重点的な更新を小さく安全なステップで適用し、公開前に承認をいただきます。',
+    steps: ['目標をわかりやすい言葉で把握します。', '最も関連性の高いページファイルと翻訳ファイルを確認します。', 'ビジュアル重視の更新プラン(ウェブサイトのリクエストの場合)または重点的な機能プランを作成します。', '変更内容を正確にお見せし、承認をお願いします。', '承認された更新を適用して公開し、ロールバックを準備しておきます。'],
+    preview: ['ご希望のスタイルと目標に沿った、使いやすい UI の更新。', '該当ページのコンテンツ/ボタン/レイアウトの更新。', 'ご要望に応じた翻訳版の言語更新。'],
+  },
+  ko: {
+    clarification: '먼저 업데이트할 페이지를 알려 주시겠어요? (예: 홈페이지, 팟캐스터, 빌더)',
+    summaryVisual: '먼저 시각적 콘셉트 업데이트를 준비한 다음, SignalBoost 도구를 사용해 콘텐츠와 레이아웃을 집중적으로 업데이트하겠습니다.',
+    summaryDefault: '작고 안전한 단계로 제품 업데이트를 집중 적용하고, 게시 전에 승인을 받겠습니다.',
+    steps: ['목표를 쉬운 말로 파악합니다.', '가장 관련성 높은 페이지 파일과 번역 파일을 검토합니다.', '시각 중심 업데이트 계획(웹사이트 요청의 경우) 또는 집중 기능 계획을 준비합니다.', '변경될 내용을 정확히 보여 드리고 승인을 요청합니다.', '승인된 업데이트를 적용하고 게시하며, 롤백을 준비해 둡니다.'],
+    preview: ['요청하신 스타일과 목표에 맞춘 사용자 친화적인 UI 업데이트.', '관련 페이지의 콘텐츠/버튼/레이아웃 업데이트.', '요청 시 번역본의 언어 업데이트.'],
+  },
+  ar: {
+    clarification: 'هل يمكنك تحديد الصفحة التي تريد أن أحدّثها أولاً (مثل: الصفحة الرئيسية أو صفحة مقدمي البودكاست أو المُنشئ)؟',
+    summaryVisual: 'سأُعدّ أولاً تحديثًا للمفهوم المرئي، ثم أطبّق تحديثات مركّزة على المحتوى والتخطيط باستخدام أدوات SignalBoost.',
+    summaryDefault: 'سأطبّق تحديثًا مركّزًا للمنتج على خطوات صغيرة وآمنة، مع الحصول على الموافقة قبل النشر.',
+    steps: ['فهم هدفك بلغة بسيطة.', 'فحص ملفات الصفحات وملفات الترجمة الأكثر صلة.', 'إعداد خطة تحديث تركّز على الجانب المرئي (لطلبات المواقع الإلكترونية) أو خطة ميزة مركّزة.', 'عرض ما سيتغير بدقة وطلب موافقتك.', 'تطبيق التحديث المعتمد ونشره مع إبقاء إمكانية التراجع جاهزة.'],
+    preview: ['تحديث سهل الاستخدام لواجهة المستخدم يتوافق مع النمط والأهداف التي طلبتها.', 'تحديثات المحتوى/الأزرار/التخطيط في الصفحة المعنية.', 'تحديثات لغوية للنسخ المترجمة عند الطلب.'],
+  },
 }
 
 // ── Real-world content detection ──────────────────────────────────────────────
@@ -92,6 +140,12 @@ const REAL_WORLD_KEYWORDS = [
   'iglesias', 'playas', 'equipos', 'ciudades', // Spanish
   'kościoły', 'muzea', 'plaże', 'drużyny', // Polish
   'церкви', 'музеи', 'пляжи', 'команды', // Russian
+  'kirchen', 'museen', 'strände', 'mannschaften', 'städte', // German
+  'églises', 'musées', 'plages', 'équipes', 'villes', // French
+  'chiese', 'musei', 'spiagge', 'squadre', 'città', // Italian
+  '教会', '博物館', '美術館', 'ビーチ', 'チーム', '都市', // Japanese
+  '교회', '박물관', '해변', '도시', // Korean
+  'كنائس', 'متاحف', 'شواطئ', 'مدن', // Arabic
 ]
 
 const CONTENT_INTENT_KEYWORDS = [
@@ -101,6 +155,12 @@ const CONTENT_INTENT_KEYWORDS = [
   'mejores', 'más', 'famosas', 'mundiales', // Spanish
   'najlepsze', 'słynne', 'światowe', // Polish
   'лучшие', 'известные', 'мировые', // Russian
+  'beste', 'berühmte', 'schönste', 'weltweit', // German
+  'meilleurs', 'meilleures', 'célèbres', 'mondiaux', // French
+  'migliori', 'famosi', 'famose', 'mondiali', // Italian
+  '最高', '有名', '世界', '人気', // Japanese
+  '최고', '유명한', '세계', '인기', // Korean
+  'أفضل', 'أشهر', 'أجمل', 'العالم', // Arabic
 ]
 
 function detectsRealWorldContent(request: string): boolean {
@@ -125,9 +185,18 @@ function extractSearchQuery(request: string): string {
     .replace(/crea[r]?\s+(un\s+)?sitio\s+(sobre|con|de)?/gi, '')
     .replace(/stwórz\s+(mi\s+)?stronę\s+(o|na|dla)?/gi, '')
     .replace(/создай\s+(мне\s+)?сайт\s+(о|про|для)?/gi, '')
+    .replace(/erstelle\s+(mir\s+)?eine\s+(website|webseite|seite)\s+(über|zu|für|mit)?/gi, '')
+    .replace(/crée[rz]?(\s*-?\s*moi)?\s+un\s+site\s+(sur|avec|de|pour)?/gi, '')
+    .replace(/crea(re|mi)?\s+un\s+sito\s+(sugli|sulle|sui|sul|su|con|di|per)?/gi, '')
+    .replace(/(について|に関する)の?(ウェブ)?サイトを(作って|作成して)(ください)?/g, '')
+    .replace(/에\s*(대한|관한)\s*(웹)?사이트를?\s*(만들어\s*줘|만들어\s*주세요)?/g, '')
+    .replace(/(أنشئ|اصنع)\s+(لي\s+)?موقع[اًا]*\s+(عن|حول)?/g, '')
     .replace(/and\s+(put|add|save|store|insert)\s+(it|them|the\s+data)?\s+(in|into|to)\s+(the\s+)?(database|db|supabase).*/gi, '')
     .replace(/coloque\s+(no|na)\s+banco\s+de\s+dados.*/gi, '')
     .replace(/coloca[r]?\s+(en|al)\s+(la\s+)?base\s+de\s+datos.*/gi, '')
+    .replace(/und\s+(speichere|lege)\s+(es|sie|die\s+daten)?\s*in\s+(der|die)\s+datenbank.*/gi, '')
+    .replace(/et\s+(mets|enregistre|ajoute)[sz]?(-les|-le)?\s+(dans|en)\s+(la\s+)?base\s+de\s+données.*/gi, '')
+    .replace(/e\s+(mettil[oie]|salval[oie]|inseriscil[oie])\s+nel\s+database.*/gi, '')
     .trim()
 
   // Return the cleaned query, falling back to the original if stripping removed too much
@@ -236,7 +305,7 @@ A user describes something they want to create or change. You produce a clear, S
 LANGUAGE (MOST IMPORTANT RULE):
 - Detect the language the user wrote their request in.
 - Write EVERY text value (summary, steps, preview, clarificationQuestion) in that SAME language.
-- If the user wrote in Portuguese, reply entirely in Brazilian Portuguese. Spanish -> Spanish. Polish -> Polish. Russian -> Russian. English -> English.
+- If the user wrote in Portuguese, reply entirely in Brazilian Portuguese. Spanish -> Spanish. Polish -> Polish. Russian -> Russian. German -> German. French -> French. Italian -> Italian. Japanese -> Japanese. Korean -> Korean. Arabic -> Modern Standard Arabic. English -> English.
 
 WHAT TO PRODUCE:
 - A real plan tailored to the user's actual idea — not a generic template. Reference what they actually described.

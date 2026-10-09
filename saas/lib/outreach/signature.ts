@@ -23,7 +23,7 @@ import { getOutreachSecret } from './social-secrets.ts'
 // SAAS_PUBLIC_URL via the portable secrets resolver.
 const DEFAULT_SAAS_LINK = 'https://itmounts.com'
 
-type OutreachLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type OutreachLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 function normalizeLocale(value?: string | null): OutreachLocale {
   const lang = String(value || '').toLowerCase()
@@ -31,6 +31,12 @@ function normalizeLocale(value?: string | null): OutreachLocale {
   if (lang.startsWith('pt')) return 'pt'
   if (lang.startsWith('pl')) return 'pl'
   if (lang.startsWith('ru')) return 'ru'
+  if (lang.startsWith('de')) return 'de'
+  if (lang.startsWith('fr')) return 'fr'
+  if (lang.startsWith('it')) return 'it'
+  if (lang.startsWith('ja')) return 'ja'
+  if (lang.startsWith('ko')) return 'ko'
+  if (lang.startsWith('ar')) return 'ar'
   return 'en'
 }
 
@@ -52,23 +58,30 @@ export function outreachContactAddress(senderKey?: string | null): string {
   return senderKey === 'saasMarketing' ? 'saasmarketing@signalboostapp.com' : 'saassales@signalboostapp.com'
 }
 
+const TEAM_NAMES: Record<OutreachLocale, { sales: string; marketing: string }> = {
+  en: { sales: 'The SignalBoost Sales Team', marketing: 'The SignalBoost Marketing Team' },
+  es: { sales: 'El equipo de ventas de SignalBoost', marketing: 'El equipo de marketing de SignalBoost' },
+  pt: { sales: 'A equipe de vendas da SignalBoost', marketing: 'A equipe de marketing da SignalBoost' },
+  pl: { sales: 'Zespół sprzedaży SignalBoost', marketing: 'Zespół marketingu SignalBoost' },
+  ru: { sales: 'Команда продаж SignalBoost', marketing: 'Команда маркетинга SignalBoost' },
+  de: { sales: 'Das SignalBoost-Vertriebsteam', marketing: 'Das SignalBoost-Marketingteam' },
+  fr: { sales: 'L’équipe commerciale SignalBoost', marketing: 'L’équipe marketing SignalBoost' },
+  it: { sales: 'Il team vendite di SignalBoost', marketing: 'Il team marketing di SignalBoost' },
+  ja: { sales: 'SignalBoost 営業チーム', marketing: 'SignalBoost マーケティングチーム' },
+  ko: { sales: 'SignalBoost 영업팀', marketing: 'SignalBoost 마케팅팀' },
+  ar: { sales: 'فريق المبيعات في SignalBoost', marketing: 'فريق التسويق في SignalBoost' },
+}
+
 export function outreachTeamName(senderKey?: string | null, locale?: string | null): string {
   const lang = normalizeLocale(locale)
   const marketing = senderKey === 'saasMarketing'
-  const names: Record<OutreachLocale, { sales: string; marketing: string }> = {
-    en: { sales: 'The SignalBoost Sales Team', marketing: 'The SignalBoost Marketing Team' },
-    es: { sales: 'El equipo de ventas de SignalBoost', marketing: 'El equipo de marketing de SignalBoost' },
-    pt: { sales: 'A equipe de vendas da SignalBoost', marketing: 'A equipe de marketing da SignalBoost' },
-    pl: { sales: 'Zespół sprzedaży SignalBoost', marketing: 'Zespół marketingu SignalBoost' },
-    ru: { sales: 'Команда продаж SignalBoost', marketing: 'Команда маркетинга SignalBoost' },
-  }
-  return marketing ? names[lang].marketing : names[lang].sales
+  return marketing ? TEAM_NAMES[lang].marketing : TEAM_NAMES[lang].sales
 }
 
 // Sign-offs a model tends to produce with a placeholder or an empty name after them.
 // Matching the sign-off AND what follows lets us replace the whole tail cleanly rather
 // than leaving "Best regards," dangling above the injected signature.
-const DANGLING_SIGNOFF = /(?:^|\n)\s*(best regards|kind regards|warm regards|regards|sincerely|best|thanks|thank you|cheers|atentamente|saludos|cordialmente|z powa[żz]aniem|pozdrawiam|с уважением)\s*,?\s*(?:\n+\s*(?:\[[^\]]{0,48}\]|\{\{[^}]{0,60}\}\}|<[^>]{0,48}>|your name|name|sender|signature)\s*)?\s*$/i
+const DANGLING_SIGNOFF = /(?:^|\n)\s*(best regards|kind regards|warm regards|regards|sincerely|best|thanks|thank you|cheers|atentamente|saludos|cordialmente|z powa[żz]aniem|pozdrawiam|с уважением|mit freundlichen gr[üu](?:ß|ss)en|freundliche gr[üu](?:ß|ss)e|viele gr[üu](?:ß|ss)e|beste gr[üu](?:ß|ss)e|cordialement|bien [àa] vous|distinti saluti|cordiali saluti|saluti|よろしくお願いいたします|よろしくお願いします|敬具|감사합니다|감사드립니다|مع خالص التحيات|مع أطيب التحيات|تحياتي|وتفضلوا بقبول فائق الاحترام)\s*,?\s*(?:\n+\s*(?:\[[^\]]{0,48}\]|\{\{[^}]{0,60}\}\}|<[^>]{0,48}>|your name|name|sender|signature)\s*)?\s*$/i
 
 // SOCIAL / SHORT-FORM VARIANT.
 //
@@ -106,13 +119,7 @@ export function applyOutreachSignature(message: string, senderKey?: string | nul
   const contact = outreachContactAddress(senderKey)
   const host = link.replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase()
 
-  const allTeamNames = [
-    'The SignalBoost Sales Team', 'The SignalBoost Marketing Team',
-    'El equipo de ventas de SignalBoost', 'El equipo de marketing de SignalBoost',
-    'A equipe de vendas da SignalBoost', 'A equipe de marketing da SignalBoost',
-    'Zespół sprzedaży SignalBoost', 'Zespół marketingu SignalBoost',
-    'Команда продаж SignalBoost', 'Команда маркетинга SignalBoost',
-  ]
+  const allTeamNames = Object.values(TEAM_NAMES).flatMap(names => [names.sales, names.marketing])
 
   const isKnownTeamLine = (value: string) => {
     const trimmed = value.trim().replace(/^[—-]\s*/, '')

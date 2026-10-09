@@ -4,7 +4,7 @@ export const VIDEO_BUCKET = 'video-jobs'
 export const RENDER_BUCKET = 'video-renders'
 export const SIGNED_URL_TTL = 60 * 60 * 6
 
-export const SUPPORTED_VIDEO_LANGS = ['en', 'pt', 'es', 'pl', 'ru'] as const
+export const SUPPORTED_VIDEO_LANGS = ['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'] as const
 export type SupportedVideoLang = (typeof SUPPORTED_VIDEO_LANGS)[number]
 export type VideoJobStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type VideoJobType = 'transcode' | 'caption_burn' | 'export'

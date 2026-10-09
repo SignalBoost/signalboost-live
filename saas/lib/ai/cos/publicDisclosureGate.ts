@@ -191,6 +191,12 @@ const IMPLEMENTATION_REPLY: Record<string, string> = {
   pt: 'O COS é a camada de raciocínio própria da SignalBoost e é ela que responde aqui. Não divulgo detalhes do modelo, do fornecedor ou da infraestrutura neste canal. Pergunte-me qualquer outra coisa e respondo diretamente.',
   pl: 'COS to własna warstwa rozumowania SignalBoost i to ona tutaj odpowiada. Nie ujawniam na tym kanale szczegółów modelu, dostawcy ani infrastruktury. Zapytaj o cokolwiek innego, a odpowiem wprost.',
   ru: 'COS — собственный слой рассуждений SignalBoost, и именно он отвечает вам здесь. Я не раскрываю на этом канале сведения о модели, поставщике или инфраструктуре. Спросите о чём угодно другом, и я отвечу прямо.',
+  de: 'COS ist die eigene Reasoning-Schicht von SignalBoost, und sie beantwortet hier Ihre Fragen. Details zum zugrunde liegenden Modell, Anbieter oder zur Infrastruktur veröffentliche ich in diesem Kanal nicht. Fragen Sie mich gern etwas anderes, und ich antworte direkt.',
+  fr: 'COS est la couche de raisonnement propre à SignalBoost, et c’est elle qui vous répond ici. Je ne publie pas de détails sur le modèle, le fournisseur ou l’infrastructure sous-jacents sur ce canal. Posez-moi toute autre question et j’y répondrai directement.',
+  it: 'COS è il livello di ragionamento proprietario di SignalBoost ed è ciò che ti risponde qui. Non pubblico dettagli sul modello, sul fornitore o sull’infrastruttura sottostanti in questo canale. Chiedimi qualsiasi altra cosa e ti risponderò direttamente.',
+  ja: 'COSはSignalBoost独自の推論レイヤーであり、ここでお答えしているのはCOSです。このチャネルでは、基盤となるモデル、プロバイダー、インフラの詳細は公開していません。その他のご質問には直接お答えします。',
+  ko: 'COS는 SignalBoost 자체의 추론 계층이며, 여기에서 답변하는 것도 COS입니다. 이 채널에서는 기반 모델, 제공업체, 인프라에 관한 세부 정보를 공개하지 않습니다. 다른 질문은 무엇이든 하시면 바로 답변해 드리겠습니다.',
+  ar: 'COS هي طبقة الاستدلال الخاصة بـ SignalBoost، وهي التي تجيبك هنا. لا أنشر تفاصيل النموذج أو المزوّد أو البنية التحتية الأساسية على هذه القناة. اسألني أي شيء آخر وسأجيبك مباشرة.',
 }
 
 /**

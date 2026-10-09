@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 function getLang(): Lang {
   if (typeof window !== 'undefined') { const s = localStorage.getItem('signalboost_language'); if (s && (s in COPY)) return s as any }
@@ -14,6 +14,12 @@ function getLang(): Lang {
   if (l === 'pt') return 'pt'
   if (l === 'pl') return 'pl'
   if (l === 'ru') return 'ru'
+  if (l === 'de') return 'de'
+  if (l === 'fr') return 'fr'
+  if (l === 'it') return 'it'
+  if (l === 'ja') return 'ja'
+  if (l === 'ko') return 'ko'
+  if (l === 'ar') return 'ar'
   return 'en'
 }
 
@@ -123,6 +129,132 @@ const COPY = {
       ['Активности', 'Превратите прибытие в впечатление.', 'Рекомендуйте туры, мероприятия, рестораны и местные впечатления по намерению и региону.'],
     ],
   },
+  de: {
+    eyebrow: 'Partner',
+    heading: 'Geordnet danach, was der Reisende als Nächstes braucht.',
+    intro: 'Statt einer flachen Partnerliste gruppiert diese Konsole das Angebot nach menschlicher Absicht: hinkommen, dort bleiben, sich verbinden, sich geschützt fühlen und etwas Unvergessliches erleben.',
+    reviewBtn: 'Partner prüfen',
+    perfTitle: 'Partnerleistung nach Absicht',
+    perfCaption: 'Filter: Zeitraum • Land • Nutzerabsicht • Partnerkategorie',
+    addBtn: 'Partner hinzufügen',
+    colIntent: 'Absicht',
+    colPartner: 'Partner',
+    colClicks: 'Klicks',
+    colStatus: 'Status',
+    empty: 'Noch keine Partnerklicks erfasst — verbinden Sie die Partnerklick-Analyse, um diese geordnete Ansicht zu füllen.',
+    intents: [
+      ['Flüge', 'Helfen Sie Reisenden, als Erste anzukommen.', 'Vergleichen Sie Flugangebote, regionale Fluggesellschaften und dringlichkeitsbasierte Reiseaktionen.'],
+      ['Hotels', 'Bieten Sie ihnen einen sicheren Ort zum Ankommen.', 'Zeigen Sie Unterkunftspartner nach Budget, Lage, Stornierungsflexibilität und Vertrauenswürdigkeit an.'],
+      ['SIM-Karten', 'Halten Sie Kunden bei ihrer Ankunft verbunden.', 'Priorisieren Sie eSIM-/SIM-Partner nach Länderpassung, klarer Einrichtung und Supportqualität.'],
+      ['Versicherung', 'Reiseangst verringern.', 'Gruppen-Kranken-, Reise- und Ausrüstungsschutz rund um Vertrauen und Compliance.'],
+      ['Aktivitäten', 'Machen Sie die Ankunft zum Erlebnis.', 'Empfehlen Sie Touren, Veranstaltungen, Gastronomie und lokale Erlebnisse nach Absicht und Region.'],
+    ],
+  },
+  fr: {
+    eyebrow: 'Partenaires',
+    heading: 'Organisé selon ce dont le voyageur a besoin ensuite.',
+    intro: 'Au lieu d’une simple liste de partenaires, cette console regroupe l’offre selon l’intention humaine : s’y rendre, y séjourner, se connecter, se sentir protégé et vivre quelque chose de mémorable.',
+    reviewBtn: 'Examiner les partenaires',
+    perfTitle: 'Performance des partenaires par intention',
+    perfCaption: 'Filtres : période • pays • intention de l\'utilisateur • catégorie de partenaire',
+    addBtn: 'Ajouter un partenaire',
+    colIntent: 'Intention',
+    colPartner: 'Partenaire',
+    colClicks: 'Clics',
+    colStatus: 'Statut',
+    empty: 'Aucun clic partenaire enregistré pour le moment — connectez l’analyse des clics partenaires pour alimenter cette vue organisée.',
+    intents: [
+      ['Vols', 'Aidez les voyageurs à arriver les premiers.', 'Comparez les offres de vols, les compagnies régionales et les promotions de voyage de dernière minute.'],
+      ['Hôtels', 'Offrez-leur un endroit sûr où atterrir.', 'Faites ressortir des partenaires d’hébergement selon le budget, l’emplacement, la flexibilité d’annulation et la fiabilité.'],
+      ['Cartes SIM', 'Gardez vos clients connectés dès leur arrivée.', 'Privilégiez les partenaires eSIM/SIM selon l’adéquation au pays, la clarté de la configuration et la qualité du support.'],
+      ['Assurance', 'Réduire l\'anxiété liée aux voyages.', 'Protection médicale, voyage et équipement pour les groupes, axée sur la confiance et la conformité.'],
+      ['Activités', 'Faites de l’arrivée une expérience.', 'Recommandez des visites, des événements, des restaurants et des expériences locales selon l’intention et la région.'],
+    ],
+  },
+  it: {
+    eyebrow: 'Partner',
+    heading: 'Organizzato in base a ciò di cui il viaggiatore ha bisogno dopo.',
+    intro: 'Invece di un semplice elenco di partner, questa console raggruppa l’offerta in base all’intenzione umana: arrivarci, soggiornare, connettersi, sentirsi protetti e vivere qualcosa di memorabile.',
+    reviewBtn: 'Rivedi i partner',
+    perfTitle: 'Prestazioni dei partner per intento',
+    perfCaption: 'Filtri: intervallo di date • paese • intento dell\'utente • categoria partner',
+    addBtn: 'Aggiungi partner',
+    colIntent: 'Intento',
+    colPartner: 'Partner',
+    colClicks: 'Clic',
+    colStatus: 'Stato',
+    empty: 'Nessun clic dei partner registrato finora — collega l’analisi dei clic dei partner per popolare questa vista organizzata.',
+    intents: [
+      ['Voli', 'Aiuta i viaggiatori ad arrivare per primi.', 'Confronta offerte di voli, compagnie regionali e promozioni di viaggio basate sull’urgenza.'],
+      ['Hotel', 'Offri loro un posto sicuro in cui approdare.', 'Mostra i partner di alloggio in base a budget, posizione, flessibilità di cancellazione e affidabilità.'],
+      ['Schede SIM', 'Mantieni i clienti connessi al loro arrivo.', 'Dai priorità ai partner eSIM/SIM in base all’idoneità per paese, alla chiarezza della configurazione e alla qualità del supporto.'],
+      ['Assicurazioni', 'Ridurre l\'ansia da viaggio.', 'Protezione sanitaria, di viaggio e dell’attrezzatura per gruppi, incentrata su fiducia e conformità.'],
+      ['Attività', 'Trasforma l’arrivo in un’esperienza.', 'Consiglia tour, eventi, ristoranti ed esperienze locali in base all’intento e alla regione.'],
+    ],
+  },
+  ja: {
+    eyebrow: 'パートナー',
+    heading: '旅行者が次に必要とするものに沿って整理されています。',
+    intro: 'このコンソールは、パートナーを単純に一覧表示するのではなく、人の目的別に供給をグループ化します：到着する、滞在する、つながる、安心する、そして思い出に残る体験をする。',
+    reviewBtn: 'パートナーを確認',
+    perfTitle: 'インテント別パートナー実績',
+    perfCaption: 'フィルター: 期間 • 国 • ユーザーの意図 • パートナーカテゴリ',
+    addBtn: 'パートナーを追加',
+    colIntent: '意図',
+    colPartner: 'パートナー',
+    colClicks: 'クリック数',
+    colStatus: 'ステータス',
+    empty: 'パートナーのクリックはまだ記録されていません — パートナークリック分析を接続すると、この整理されたビューにデータが表示されます。',
+    intents: [
+      ['フライト', '旅行者がいち早く到着できるようサポートします。', '航空券のオファー、地域航空会社、緊急度に応じた旅行プロモーションを比較します。'],
+      ['ホテル', '安心して訪れられる場所を用意しましょう。', '予算、立地、キャンセルの柔軟性、信頼性に基づいて宿泊パートナーを表示します。'],
+      ['SIM カード', '到着時からお客様をつなぎ続けましょう。', '国への適合性、セットアップのわかりやすさ、サポート品質を基準にeSIM/SIMパートナーを優先してください。'],
+      ['保険', '旅行の不安を軽減します。', '信頼とコンプライアンスを軸にした、団体向けの医療・旅行・装備の保障。'],
+      ['アクティビティ', '到着を特別な体験に。', '目的と地域に応じて、ツアー、イベント、飲食、地域体験をおすすめします。'],
+    ],
+  },
+  ko: {
+    eyebrow: '파트너',
+    heading: '여행자가 다음에 필요로 하는 것을 기준으로 정리되어 있습니다.',
+    intro: '이 콘솔은 단순한 파트너 목록 대신 사람의 의도에 따라 공급을 그룹화합니다: 도착하기, 머무르기, 연결하기, 보호받는다고 느끼기, 기억에 남는 일 하기.',
+    reviewBtn: '파트너 검토',
+    perfTitle: '의도별 파트너 성과',
+    perfCaption: '필터: 기간 • 국가 • 사용자 의도 • 파트너 카테고리',
+    addBtn: '파트너 추가',
+    colIntent: '의도',
+    colPartner: '파트너',
+    colClicks: '클릭 수',
+    colStatus: '상태',
+    empty: '아직 기록된 파트너 클릭이 없습니다 — 파트너 클릭 분석을 연결하여 이 정리된 보기를 채우세요.',
+    intents: [
+      ['항공편', '여행자가 먼저 도착할 수 있도록 도와주세요.', '항공권 제안, 지역 항공사 및 긴급도 기반 여행 프로모션을 비교하세요.'],
+      ['호텔', '안심하고 찾아올 수 있는 곳을 마련하세요.', '예산, 위치, 취소 유연성, 신뢰도를 기준으로 숙박 파트너를 표시합니다.'],
+      ['SIM 카드', '도착하는 순간부터 고객과 연결을 유지하세요.', '국가 적합성, 설정 명확성, 지원 품질을 기준으로 eSIM/SIM 파트너를 우선 선정하세요.'],
+      ['보험', '여행 불안을 줄이세요.', '신뢰와 컴플라이언스를 중심으로 한 단체 의료, 여행, 장비 보호.'],
+      ['활동', '도착을 경험으로 바꾸세요.', '의도와 지역에 따라 투어, 이벤트, 식사 및 현지 체험을 추천하세요.'],
+    ],
+  },
+  ar: {
+    eyebrow: 'الشركاء',
+    heading: 'منظّم حسب ما يحتاجه المسافر بعد ذلك.',
+    intro: 'بدلاً من قائمة شركاء مسطحة، تجمع وحدة التحكم هذه العروض حسب النية البشرية: الوصول، والإقامة، والتواصل، والشعور بالحماية، والقيام بشيء لا يُنسى.',
+    reviewBtn: 'مراجعة الشركاء',
+    perfTitle: 'أداء الشركاء حسب النية',
+    perfCaption: 'عوامل التصفية: النطاق الزمني • البلد • نية المستخدم • فئة الشريك',
+    addBtn: 'إضافة شريك',
+    colIntent: 'النية',
+    colPartner: 'شريك',
+    colClicks: 'النقرات',
+    colStatus: 'الحالة',
+    empty: 'لم تُسجَّل أي نقرات للشركاء بعد — اربط تحليلات نقرات الشركاء لتعبئة هذا العرض المنظّم.',
+    intents: [
+      ['الرحلات الجوية', 'ساعد المسافرين على الوصول أولاً.', 'قارن عروض الرحلات الجوية وشركات الطيران الإقليمية وعروض السفر القائمة على الإلحاح.'],
+      ['الفنادق', 'امنحهم مكانًا آمنًا يصلون إليه.', 'اعرض شركاء الإقامة حسب الميزانية والموقع ومرونة الإلغاء والموثوقية.'],
+      ['بطاقات SIM', 'حافظ على تواصل العملاء عند وصولهم.', 'أعطِ الأولوية لشركاء eSIM/SIM وفقًا لملاءمتهم للبلد ووضوح الإعداد وجودة الدعم.'],
+      ['التأمين', 'تقليل القلق من السفر.', 'حماية جماعية طبية وللرحلات وللمعدات تتمحور حول الثقة والامتثال.'],
+      ['الأنشطة', 'حوّل لحظة الوصول إلى تجربة.', 'اقترح الجولات والفعاليات والمطاعم والتجارب المحلية حسب النية والمنطقة.'],
+    ],
+  },
 }
 
 type PartnerRow = { intent: string; partner: string; clicks: number | null; status: string }
@@ -135,6 +267,12 @@ const STATUS_COPY: Record<Lang, Record<string, string>> = {
   pt: { Active: 'Ativo', Paused: 'Pausado', Pending: 'Pendente' },
   pl: { Active: 'Aktywny', Paused: 'Wstrzymany', Pending: 'Oczekujący' },
   ru: { Active: 'Активен', Paused: 'Приостановлен', Pending: 'Ожидание' },
+  de: { Active: 'Aktiv', Paused: 'Pausiert', Pending: 'Ausstehend' },
+  fr: { Active: 'Actif', Paused: 'En pause', Pending: 'En attente' },
+  it: { Active: 'Attivo', Paused: 'In pausa', Pending: 'In sospeso' },
+  ja: { Active: '有効', Paused: '一時停止中', Pending: '保留中' },
+  ko: { Active: '활성', Paused: '일시 중지됨', Pending: '대기 중' },
+  ar: { Active: 'نشط', Paused: 'متوقف مؤقتًا', Pending: 'قيد الانتظار' },
 }
 
 function statusLabel(status: string, lang: Lang): string {

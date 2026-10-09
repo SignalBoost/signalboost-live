@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
-type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type SupportedVideoLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type CaptionCue = {
   id: string
@@ -21,7 +21,7 @@ type JsonSafeVideoResponse<T> = {
   }
 }
 
-const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru']
+const supportedLocales: SupportedVideoLocale[] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 function json<T>(body: JsonSafeVideoResponse<T>, status = 200) {
   return NextResponse.json(body, { status })

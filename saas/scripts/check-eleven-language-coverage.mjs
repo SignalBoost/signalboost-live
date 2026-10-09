@@ -1,5 +1,5 @@
-// Complete-platform release gate. Run with --require-all before enabling six new locales.
-// Without the flag, print missing coverage but do not imply readiness.
+// Complete-platform release gate for the eleven active platform languages.
+// Fails whenever any of de/fr/it/ja/ko/ar is active and a locale store, registration or pinned list is incomplete.
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,7 +18,7 @@ function scanPinnedLanguageLists(dir) {
     if (entry.isDirectory()) {
       if (!excludedDirectories.has(entry.name)) scanPinnedLanguageLists(rel)
     } else if (sourceExt.test(entry.name) && !rel.includes('.test.') && !rel.includes('/tests/')) {
-      if (rel === 'lib/i18n/supportedLanguages.ts' || rel === 'scripts/check-five-language-platform.mjs' || rel === 'scripts/check-eleven-language-coverage.mjs' || rel === 'scripts/generated-ui-locale-utils.mjs') continue
+      if (rel === 'lib/i18n/supportedLanguages.ts' || rel === 'scripts/check-eleven-language-platform.mjs' || rel === 'scripts/check-eleven-language-coverage.mjs' || rel === 'scripts/generated-ui-locale-utils.mjs') continue
       const source = load(rel)
       if (fixedLocaleList.test(source)) issues.push(rel + ': hardcoded five-language array requires eleven-language review')
       fixedLocaleList.lastIndex = 0
@@ -38,6 +38,7 @@ const json = rel => JSON.parse(load(rel))
 for (const pattern of ['locales/{lang}.json','locales/pages.{lang}.json','lib/i18n/console.{lang}.json','lib/i18n/audit.{lang}.json']) {
   const enPath=pattern.replace('{lang}','en')
   const baseline=flatten(json(enPath))
+  const established=['es','pt','pl','ru'].filter(lang=>exists(pattern.replace('{lang}',lang))).map(lang=>flatten(json(pattern.replace('{lang}',lang))))
   for (const lang of additions) {
     const rel=pattern.replace('{lang}',lang)
     if (!exists(rel)) {issues.push(rel+': missing');continue}
@@ -45,9 +46,10 @@ for (const pattern of ['locales/{lang}.json','locales/pages.{lang}.json','lib/i1
     for (const key of Object.keys(baseline)) {
       if (!(key in catalog) || (typeof catalog[key]==='string' && !catalog[key].trim()))
         issues.push(rel+': missing/blank '+key)
-      // Identical strings are reported for linguistic review, not automatically
-      // rejected: proper nouns and fixed technical terms are legitimate.
-      else if (typeof baseline[key]==='string' && baseline[key].trim().length>30 && baseline[key]===catalog[key])
+      // Long strings left in English are untranslated unless every established language
+      // also keeps them verbatim (keys, URLs, fixed technical tokens).
+      else if (typeof baseline[key]==='string' && baseline[key].trim().length>30 && baseline[key]===catalog[key]
+        && !(established.length && established.every(store=>store[key]===baseline[key])))
         issues.push(rel+': unchanged English candidate '+key)
     }
     for (const key of Object.keys(catalog)) if (!(key in baseline)) issues.push(rel+': unexpected '+key)

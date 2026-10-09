@@ -1,0 +1,986 @@
+{
+  "tier": {
+    "core": "Essentiel",
+    "tier2": "Croissance",
+    "tier3": "Entreprise",
+    "tier4": "Interne",
+    "sidebar": {
+      "core": "Fournisseurs de niveau 1",
+      "tier2": "Fournisseurs de niveau 2",
+      "tier3": "Fournisseurs de niveau 3",
+      "tier4": "Outils de niveau 4"
+    },
+    "blurb": {
+      "core": "Infrastructure principale : cloud, paiements, données, hébergement et gestion du code source.",
+      "tier2": "Messagerie, e-mail, réseau edge et intégrations de calcul.",
+      "tier3": "Plateforme d'applications, observabilité, suivi des erreurs et réponse aux incidents.",
+      "tier4": "Coffre-fort de secrets chiffré et gouvernance d'équipe."
+    }
+  },
+  "util": {
+    "domains": "Domaines/DNS",
+    "deployments": "Déploiements",
+    "logs": "Journaux",
+    "settings": "Paramètres"
+  },
+  "sub": {
+    "ai_and_models": "IA & MODÈLES",
+    "email": "E-MAIL",
+    "transcription": "TRANSCRIPTION",
+    "cloud_infrastructure": "INFRASTRUCTURE CLOUD",
+    "cloud_platform": "PLATEFORME CLOUD",
+    "microsoft_cloud": "CLOUD MICROSOFT",
+    "payments_and_billing": "PAIEMENTS & FACTURATION",
+    "database_and_authentication": "BASE DE DONNÉES & AUTHENTIFICATION",
+    "deployments_and_networking": "DÉPLOIEMENTS & RÉSEAU",
+    "source_control": "GESTION DU CODE SOURCE",
+    "messaging_and_sms": "MESSAGERIE & SMS",
+    "transactional_email": "E-MAIL TRANSACTIONNEL",
+    "dns_cdn_and_edge": "DNS, CDN & EDGE",
+    "cloud_compute": "CALCUL CLOUD",
+    "app_platform": "PLATEFORME D'APPLICATIONS",
+    "observability": "OBSERVABILITÉ",
+    "error_monitoring": "SURVEILLANCE DES ERREURS",
+    "incident_response": "RÉPONSE AUX INCIDENTS",
+    "encrypted_secret_vault": "COFFRE-FORT DE SECRETS CHIFFRÉ",
+    "team_access_and_compliance": "ACCÈS D'ÉQUIPE & CONFORMITÉ",
+    "voice_and_audio": "VOIX & AUDIO"
+  },
+  "sec": {
+    "repositories": "Dépôts",
+    "pull_requests": "Pull requests",
+    "branches": "Branches",
+    "issues": "Tickets",
+    "activity": "Activité",
+    "secrets_and_tokens": "Secrets et jetons",
+    "models": "Modèles",
+    "files": "Fichiers",
+    "jobs": "Tâches",
+    "voices": "Voix",
+    "account": "Compte",
+    "history": "Historique",
+    "domains": "Domaines",
+    "audiences": "Audiences",
+    "broadcasts": "Diffusions",
+    "api_keys": "Clés API",
+    "transcripts": "Transcriptions",
+    "data": "Données",
+    "auth": "Authentification",
+    "storage": "Stockage",
+    "customers": "Clients",
+    "prices_and_tiers": "Prix et niveaux",
+    "catalog": "Catalogue",
+    "table_crud": "CRUD des tables",
+    "sql_engine": "Moteur SQL",
+    "users_and_access": "Utilisateurs et accès",
+    "credentials": "Identifiants",
+    "environment_variables": "Variables d’environnement",
+    "deployments": "Déploiements",
+    "networking_and_logs": "Réseau et journaux",
+    "email": "E-mail",
+    "messaging": "Messagerie",
+    "dns": "DNS",
+    "cache": "Cache",
+    "compute": "Calcul",
+    "iam": "IAM",
+    "security": "Sécurité",
+    "security_rules": "Règles de sécurité",
+    "secrets_storage": "Stockage des secrets",
+    "monitoring": "Surveillance",
+    "incidents": "Incidents",
+    "team_access": "Accès de l’équipe",
+    "compliance_and_audit": "Conformité et audit",
+    "audit": "Audit"
+  },
+  "fld": {
+    "repository": "Dépôt",
+    "pull_request": "Pull request",
+    "issue": "Ticket",
+    "branch": "Branche",
+    "model": "Modèle",
+    "voice": "Voix",
+    "table": "Table",
+    "transcript": "Transcription",
+    "title": "Titre",
+    "new_title": "Nouveau titre",
+    "description": "Description",
+    "body": "Corps",
+    "content": "Contenu",
+    "name": "Nom",
+    "message": "Message",
+    "email": "E-mail",
+    "new_email": "Nouvel e-mail",
+    "merge_method": "Méthode de fusion",
+    "region": "Région",
+    "domain": "Domaine",
+    "bucket": "Bucket",
+    "product": "Produit",
+    "price": "Prix",
+    "query": "Requête",
+    "operation": "Opération",
+    "phone_number": "Numéro de téléphone",
+    "bucket_name": "Nom du bucket",
+    "username": "Nom d'utilisateur",
+    "iam_username": "Nom d'utilisateur IAM",
+    "product_name": "Nom du produit",
+    "new_product_name": "Nouveau nom du produit",
+    "amount_usd": "Montant (USD)",
+    "price_id": "ID du prix",
+    "subscription_tier": "Niveau d'abonnement",
+    "customer": "Client",
+    "amount_cents": "Montant (centimes)",
+    "charge": "Débit",
+    "amount_in_cents": "Montant (en centimes)",
+    "sql_raw_statement": "Instruction SQL brute",
+    "migration_payload": "Charge utile de migration",
+    "json_row_object": "Objet de ligne JSON",
+    "match_column_value": "Correspondance (colonne=valeur)",
+    "new_values_json": "Nouvelles valeurs (JSON)",
+    "row": "Ligne",
+    "user_email": "E-mail de l'utilisateur",
+    "user": "Utilisateur",
+    "object_path": "Chemin de l'objet",
+    "bucket_identifier": "Identifiant du bucket",
+    "deployment_id": "ID de déploiement",
+    "build_id": "ID du build",
+    "env_variable_id": "ID de variable d'environnement",
+    "new_value": "Nouvelle valeur",
+    "target": "Cible",
+    "env_variable_key_reference": "Référence de clé de variable d'environnement",
+    "domain_address_string": "Adresse du domaine",
+    "to": "À",
+    "subject": "Objet",
+    "type": "Type",
+    "ttl_sec": "TTL (s)",
+    "proxied": "Via proxy",
+    "record_id": "ID de l'enregistrement",
+    "droplet_name": "Nom du droplet",
+    "size": "Taille",
+    "image": "Image",
+    "rules_source": "Source des règles",
+    "monitor_name": "Nom du moniteur",
+    "alert_message": "Message d'alerte",
+    "metric_query": "Requête de métrique",
+    "project_slug": "Slug du projet",
+    "issue_id": "ID du ticket",
+    "service_id": "ID du service",
+    "urgency": "Urgence",
+    "master_passphrase": "Phrase secrète principale",
+    "secret_key_reference": "Référence de clé secrète",
+    "encrypted_value": "Valeur chiffrée",
+    "key_name": "Nom de la clé",
+    "team_member_id": "ID du membre de l'équipe",
+    "target_privilege_domain_access_tier": "Niveau d'accès privilégié cible",
+    "member_id": "ID du membre",
+    "permissions_comma_separated": "Autorisations (séparées par des virgules)",
+    "scope": "Portée"
+  },
+  "opt": {
+    "open": "Ouvert",
+    "closed": "Fermé",
+    "merge_commit": "Commit de fusion",
+    "squash": "Squash",
+    "rebase": "Rebase",
+    "production": "Production",
+    "preview": "Aperçu",
+    "development": "Développement",
+    "indie_tier_9_mo": "Niveau Indie ($9/mois)",
+    "pro_tier_29_mo": "Niveau Pro ($29/mois)",
+    "growth_tier_79_mo": "Niveau Growth ($79/mois)",
+    "list_objects": "Lister les objets",
+    "upload": "Téléverser",
+    "download": "Télécharger",
+    "high": "Élevé",
+    "low": "Faible",
+    "billing_administrator": "Administrateur de facturation",
+    "platform_core_developer": "Développeur principal de la plateforme",
+    "standard_team_member": "Membre d'équipe standard",
+    "everything": "Tout",
+    "access_and_roles": "Accès et rôles",
+    "billing": "Facturation",
+    "data": "Données"
+  },
+  "ui": {
+    "execute": "Exécuter",
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "preview": "Aperçu",
+    "close": "Fermer",
+    "error": "Erreur",
+    "success": "Succès",
+    "running": "Exécution…",
+    "no_inputs": "Aucune saisie requise pour cette action.",
+    "workspace": "Espace de travail",
+    "hub_home": "Accueil du Hub",
+    "back": "Retour",
+    "tier": "Niveau",
+    "providers": "Fournisseurs",
+    "utility_views": "Vues utilitaires",
+    "review_action": "Vérifiez l'action qui sera envoyée à",
+    "cannot_undo": "Une fois confirmé, cette action est irréversible.",
+    "about_to_execute": "Vous êtes sur le point d'exécuter",
+    "on": "sur"
+  },
+  "tpl": {
+    "github": {
+      "list_repos": {
+        "label": "Voir les dépôts",
+        "desc": "Lister les dépôts visibles par le jeton d'accès configuré."
+      },
+      "list_prs": {
+        "label": "Lister les pull requests",
+        "desc": "Afficher les pull requests ouvertes d'un dépôt (les plus récentes en premier)."
+      },
+      "view_pr_files": {
+        "label": "Voir les fichiers de la PR",
+        "desc": "Lister les fichiers modifiés dans une pull request."
+      },
+      "merge_pr": {
+        "label": "Fusionner la PR",
+        "desc": "Fusionner une pull request dans sa branche de base."
+      },
+      "close_pr": {
+        "label": "Fermer la PR",
+        "desc": "Fermer une pull request sans la fusionner."
+      },
+      "list_branches": {
+        "label": "Lister les branches",
+        "desc": "Lister les branches d'un dépôt (utile pour nettoyer ai/*)."
+      },
+      "delete_branch": {
+        "label": "Supprimer la branche",
+        "desc": "Supprimer une branche par son nom (main est protégée)."
+      },
+      "list_commits": {
+        "label": "Commits récents",
+        "desc": "Afficher les commits les plus récents d'un dépôt."
+      },
+      "list_issues": {
+        "label": "Lister les tickets",
+        "desc": "Afficher les tickets ouverts d'un dépôt."
+      },
+      "open_issue": {
+        "label": "Ouvrir un ticket",
+        "desc": "Créer un nouveau ticket dans un dépôt."
+      },
+      "edit_issue": {
+        "label": "Modifier le ticket",
+        "desc": "Mettre à jour le titre ou l'état (ouvert/fermé) d'un ticket."
+      },
+      "close_issue": {
+        "label": "Fermer le ticket",
+        "desc": "Fermer un ticket ouvert."
+      },
+      "rotate_token": {
+        "label": "Faire pivoter le jeton",
+        "desc": "Faire pivoter le jeton d'accès GitHub enregistré (révoquer + réémettre)."
+      },
+      "manage_secrets": {
+        "label": "Gérer les secrets",
+        "desc": "Créer ou mettre à jour un secret Actions dans un dépôt."
+      }
+    },
+    "openai": {
+      "list_models": {
+        "label": "Voir les modèles",
+        "desc": "Lister les modèles disponibles pour la clé API configurée."
+      },
+      "retrieve_model": {
+        "label": "Détails du modèle",
+        "desc": "Afficher les détails d'un modèle spécifique."
+      },
+      "list_files": {
+        "label": "Lister les fichiers",
+        "desc": "Fichiers téléversés sur le compte OpenAI."
+      },
+      "list_fine_tunes": {
+        "label": "Tâches de fine-tuning",
+        "desc": "Tâches de fine-tuning récentes et leur statut."
+      },
+      "list_batches": {
+        "label": "Tâches par lots",
+        "desc": "Tâches par lots récentes et leur statut."
+      }
+    },
+    "elevenlabs": {
+      "list_voices": {
+        "label": "Lister les voix",
+        "desc": "Voix disponibles pour le compte."
+      },
+      "voice_details": {
+        "label": "Détails de la voix",
+        "desc": "Inspecter une voix spécifique."
+      },
+      "list_models": {
+        "label": "Lister les modèles",
+        "desc": "Modèles vocaux disponibles pour le compte."
+      },
+      "subscription": {
+        "label": "Abonnement et utilisation",
+        "desc": "Niveau du forfait et utilisation du quota de caractères."
+      },
+      "list_history": {
+        "label": "Historique des générations",
+        "desc": "Générations de synthèse vocale récentes."
+      }
+    },
+    "anthropic": {
+      "list_models": {
+        "label": "Voir les modèles",
+        "desc": "Modèles disponibles pour la clé API."
+      },
+      "retrieve_model": {
+        "label": "Détails du modèle",
+        "desc": "Détails d'un modèle spécifique."
+      }
+    },
+    "gemini": {
+      "list_models": {
+        "label": "Voir les modèles",
+        "desc": "Modèles disponibles pour la clé Gemini."
+      },
+      "model_details": {
+        "label": "Détails du modèle",
+        "desc": "Détails d'un modèle spécifique."
+      }
+    },
+    "resend": {
+      "list_domains": {
+        "label": "Lister les domaines",
+        "desc": "Domaines d'envoi et statut de vérification."
+      },
+      "list_audiences": {
+        "label": "Lister les audiences",
+        "desc": "Audiences de contacts."
+      },
+      "list_broadcasts": {
+        "label": "Lister les diffusions",
+        "desc": "Diffusions récentes."
+      },
+      "list_api_keys": {
+        "label": "Lister les clés API",
+        "desc": "Clés API du compte."
+      }
+    },
+    "assemblyai": {
+      "list_transcripts": {
+        "label": "Transcriptions récentes",
+        "desc": "Tâches de transcription les plus récentes."
+      },
+      "transcript_details": {
+        "label": "Détails de la transcription",
+        "desc": "Inspecter une tâche de transcription."
+      }
+    },
+    "supabase_mkt": {
+      "list_tables": {
+        "label": "Lister les tables",
+        "desc": "Tables publiques du projet marketing."
+      },
+      "list_rows": {
+        "label": "Lister les lignes",
+        "desc": "Lignes d'une table choisie."
+      },
+      "list_users": {
+        "label": "Lister les utilisateurs",
+        "desc": "Utilisateurs d'authentification du projet marketing."
+      },
+      "list_buckets": {
+        "label": "Lister les buckets",
+        "desc": "Buckets de stockage du projet marketing."
+      }
+    },
+    "aws": {
+      "create_s3_bucket": {
+        "label": "Créer un bucket S3",
+        "desc": "Créez un nouveau bucket S3 au nom unique au niveau mondial."
+      },
+      "list_iam_users": {
+        "label": "Lister les utilisateurs IAM",
+        "desc": "Récupérez tous les utilisateurs actuels de l'annuaire d'identités."
+      },
+      "disable_iam_user": {
+        "label": "Désactiver l'utilisateur IAM",
+        "desc": "Désactivez immédiatement les clés et identifiants de l'utilisateur."
+      },
+      "rotate_credential": {
+        "label": "Renouveler l'identifiant",
+        "desc": "Renouvelez une paire de clés d'accès IAM d'un utilisateur."
+      }
+    },
+    "gcp": {
+      "list_service_accounts": {
+        "label": "Lister les comptes de service",
+        "desc": "Récupérez tous les comptes de service d’identité système."
+      }
+    },
+    "stripe": {
+      "create_product": {
+        "label": "Créer un produit",
+        "desc": "Créez un nouveau produit Stripe et son premier prix récurrent."
+      },
+      "edit_product": {
+        "label": "Modifier le produit",
+        "desc": "Mettez à jour le nom, la description ou l’état actif d’un produit Stripe."
+      },
+      "view_products": {
+        "label": "Voir les produits",
+        "desc": "Listez les produits Stripe actifs et leurs identifiants."
+      },
+      "archive_product": {
+        "label": "Archiver le produit",
+        "desc": "Archivez un produit Stripe (le rend inactif — récupérable en le réactivant)."
+      },
+      "delete_product": {
+        "label": "Supprimer le produit",
+        "desc": "Supprimez définitivement un produit Stripe. Seuls les produits sans prix actifs peuvent être supprimés."
+      },
+      "create_price": {
+        "label": "Créer un prix",
+        "desc": "Associez un nouveau prix récurrent ou ponctuel à un produit Stripe existant."
+      },
+      "view_prices": {
+        "label": "Voir les prix",
+        "desc": "Listez les prix Stripe, éventuellement filtrés par produit."
+      },
+      "edit_price": {
+        "label": "Modifier le prix",
+        "desc": "Modifiez le libellé d’un prix ou activez/désactivez-le (les montants sont immuables dans Stripe)."
+      },
+      "archive_price": {
+        "label": "Archiver le prix",
+        "desc": "Désactivez un prix pour qu’il ne puisse plus être acheté (récupérable)."
+      },
+      "apply_tier_template": {
+        "label": "Modèles de forfait",
+        "desc": "Créez instantanément des parcours de paiement standardisés Indie, Pro ou Growth."
+      },
+      "list_customers": {
+        "label": "Vue clients",
+        "desc": "Listez les clients, les factures et les indicateurs des paiements récurrents actifs."
+      },
+      "adjust_balance": {
+        "label": "Ajuster le solde",
+        "desc": "Appliquez des modifications manuelles au registre de solde client ou des ajustements de transaction."
+      },
+      "issue_refund": {
+        "label": "Remboursement/Ajustements",
+        "desc": "Annulez le solde d’une transaction traitée ou appliquez un crédit de service manuel."
+      }
+    },
+    "supabase": {
+      "sql_editor": {
+        "label": "Éditeur SQL",
+        "desc": "Exécutez des requêtes brutes arbitraires directement sur vos tables de données."
+      },
+      "run_migration": {
+        "label": "Exécuter la migration",
+        "desc": "Exécutez des migrations de schéma de définition de données compilées via la passerelle de requêtes."
+      },
+      "insert_row": {
+        "label": "Insérer une ligne",
+        "desc": "Insérez directement des enregistrements de lignes structurés dans un schéma existant."
+      },
+      "edit_row": {
+        "label": "Modifier la ligne",
+        "desc": "Mettez à jour une ligne de table existante correspondant à une expression de filtre."
+      },
+      "archive_row": {
+        "label": "Archiver les lignes",
+        "desc": "Basculez les indicateurs de visibilité active d’un enregistrement de base de données spécifique."
+      },
+      "delete_row": {
+        "label": "Supprimer la ligne",
+        "desc": "Purgez complètement les enregistrements de lignes de la couche de stockage."
+      },
+      "invite_user": {
+        "label": "Inviter un utilisateur",
+        "desc": "Envoyez une invitation par e-mail pour provisionner un nouvel utilisateur authentifié."
+      },
+      "edit_user": {
+        "label": "Modifier l’utilisateur",
+        "desc": "Mettez à jour l’e-mail, les métadonnées ou l’état de confirmation d’un utilisateur."
+      },
+      "delete_user": {
+        "label": "Supprimer l’utilisateur",
+        "desc": "Supprimez définitivement un utilisateur authentifié et son identité."
+      },
+      "reset_password": {
+        "label": "Réinitialiser le mot de passe",
+        "desc": "Déclenchez un e-mail de récupération de mot de passe pour un compte utilisateur."
+      },
+      "rotate_service_key": {
+        "label": "Faire tourner les clés",
+        "desc": "Invalidez les jetons JSON service_role actuels et émettez de nouveaux identifiants."
+      },
+      "storage_panel": {
+        "label": "Panneau de stockage",
+        "desc": "Importez, téléchargez ou listez des objets dans un bucket de stockage."
+      },
+      "create_bucket": {
+        "label": "Créer un bucket",
+        "desc": "Créez un nouveau conteneur de stockage d’objets pour fichiers multimédias ou binaires."
+      },
+      "empty_bucket": {
+        "label": "Vider le bucket",
+        "desc": "Purgez tous les objets imbriqués sans supprimer le conteneur de ressources principal."
+      }
+    },
+    "vercel": {
+      "list_deployments": {
+        "label": "Panneau des déploiements",
+        "desc": "Inspectez les builds en cours, les enregistrements de commit et les affectations de production."
+      },
+      "trigger_rollback": {
+        "label": "Restaurer un déploiement",
+        "desc": "Redirigez instantanément les domaines de production en périphérie vers un hash de déploiement antérieur."
+      },
+      "cancel_build": {
+        "label": "Annuler le build",
+        "desc": "Interrompez un élément actif de la file de compilation directement au niveau de la passerelle."
+      },
+      "view_env": {
+        "label": "Voir les variables d’env.",
+        "desc": "Listez toutes les configurations de variables d’environnement actives de ce projet."
+      },
+      "edit_env": {
+        "label": "Modifier la variable d’env.",
+        "desc": "Mettez à jour la valeur et/ou les environnements cibles d’une variable."
+      },
+      "delete_env": {
+        "label": "Supprimer la variable d’env.",
+        "desc": "Supprimez complètement les clés de variables d’environnement du pipeline de build actif."
+      },
+      "sync_dns_domain": {
+        "label": "Domaines/DNS",
+        "desc": "Configurez les paramètres canoniques, les chemins d’alias ou déclenchez les règles de certification SSL en périphérie."
+      },
+      "logs": {
+        "label": "Visionneuse de journaux",
+        "desc": "Diffusez les événements de journal récents de la plateforme, du build et de l’exécution."
+      }
+    },
+    "twilio": {
+      "send_sms": {
+        "label": "Envoyer un SMS",
+        "desc": "Envoyez un SMS sortant depuis votre numéro Twilio."
+      },
+      "verify_number": {
+        "label": "Vérifier le numéro",
+        "desc": "Lancez la vérification du numéro de téléphone (envoie un code à usage unique)."
+      }
+    },
+    "sendgrid": {
+      "send_email": {
+        "label": "Envoyer un e-mail",
+        "desc": "Envoyez un e-mail transactionnel via SendGrid."
+      },
+      "check_domain_auth": {
+        "label": "Vérifier l’auth. du domaine",
+        "desc": "Vérifiez l’état d’authentification du domaine expéditeur (SPF/DKIM)."
+      }
+    },
+    "cloudflare": {
+      "add_dns_record": {
+        "label": "Ajouter un enregistrement DNS",
+        "desc": "Créez un enregistrement DNS dans la zone Cloudflare configurée."
+      },
+      "toggle_proxy": {
+        "label": "Basculer le proxy",
+        "desc": "Activez ou désactivez le proxy nuage orange pour un enregistrement."
+      },
+      "purge_cache": {
+        "label": "Purger le cache",
+        "desc": "Purgez tout le cache edge Cloudflare de la zone."
+      }
+    },
+    "digitalocean": {
+      "create_droplet": {
+        "label": "Créer un droplet",
+        "desc": "Provisionnez un nouveau droplet de calcul DigitalOcean."
+      },
+      "view_droplets": {
+        "label": "Voir les droplets",
+        "desc": "Listez les droplets actifs et leur état."
+      }
+    },
+    "firebase": {
+      "upload_rules": {
+        "label": "Téléverser les règles",
+        "desc": "Publiez un nouvel ensemble de règles de sécurité Firestore/Storage."
+      },
+      "view_rules": {
+        "label": "Voir les règles",
+        "desc": "Affichez l'ensemble de règles de sécurité actuellement publié."
+      }
+    },
+    "datadog": {
+      "create_monitor": {
+        "label": "Créer un moniteur",
+        "desc": "Créez un moniteur de métrique/alerte."
+      },
+      "check_metrics": {
+        "label": "Vérifier les métriques",
+        "desc": "Exécutez une requête de métrique et affichez la série la plus récente."
+      }
+    },
+    "sentry": {
+      "list_issues": {
+        "label": "Lister les tickets",
+        "desc": "Listez les problèmes non résolus d’un projet."
+      },
+      "resolve_issue": {
+        "label": "Résoudre le problème",
+        "desc": "Marquez un problème comme résolu."
+      }
+    },
+    "pagerduty": {
+      "list_incidents": {
+        "label": "Lister les incidents",
+        "desc": "Listez les incidents récents et actifs."
+      },
+      "trigger_incident": {
+        "label": "Déclencher un incident",
+        "desc": "Déclenchez manuellement un nouvel incident sur un service."
+      }
+    },
+    "vault": {
+      "unlock_vault": {
+        "label": "Déverrouiller le coffre",
+        "desc": "Saisissez votre phrase secrète principale du système pour charger les clés sensibles."
+      },
+      "seal_vault": {
+        "label": "Sceller le coffre",
+        "desc": "Purgez instantanément les couches de mémoire déchiffrées et verrouillez à nouveau toutes les opérations principales."
+      },
+      "add_secret": {
+        "label": "Ajouter un secret",
+        "desc": "Injectez des chaînes de variables chiffrées hautement sécurisées."
+      },
+      "edit_secret": {
+        "label": "Modifier la clé",
+        "desc": "Mettez à jour la valeur d’un secret existant du coffre."
+      },
+      "reveal_secret": {
+        "label": "Révéler la clé",
+        "desc": "Déchiffrez et affichez la valeur d’un secret (consigné dans l’audit)."
+      },
+      "archive_secret": {
+        "label": "Archiver la clé",
+        "desc": "Archivez un secret (masqué mais récupérable)."
+      },
+      "delete_secret": {
+        "label": "Supprimer le secret",
+        "desc": "Effacez définitivement les objets de référence de clé des blocs de stockage."
+      },
+      "view_keys": {
+        "label": "Clés du journal d’audit",
+        "desc": "Inspectez les pistes de conformité retraçant les événements de déchiffrement récents."
+      },
+      "audit_log": {
+        "label": "Journal d’audit",
+        "desc": "Consultez la piste d’audit des accès et modifications du coffre."
+      }
+    },
+    "gov": {
+      "assign_role": {
+        "label": "Attribution de rôle",
+        "desc": "Provisionnez les paramètres d’accès à la plateforme pour des groupes de personnel spécifiques de l’organisation."
+      },
+      "change_permissions": {
+        "label": "Modifier les autorisations du rôle",
+        "desc": "Ajustez l’ensemble d’autorisations associé à un membre ou à un rôle."
+      },
+      "deactivate_member": {
+        "label": "Archiver le membre",
+        "desc": "Suspendez les autorisations de l’organisation et désactivez l’accès au compte globalement."
+      },
+      "view_timeline": {
+        "label": "Chronologie des activités",
+        "desc": "Lignes de trace d’audit suivant tous les contextes d’exécution récents du cluster."
+      },
+      "run_compliance_audit": {
+        "label": "Lancer un audit de conformité",
+        "desc": "Lancez une vérification de conformité sur le périmètre sélectionné."
+      },
+      "clear_stale_sessions": {
+        "label": "Effacer les sessions",
+        "desc": "Forcez la déconnexion des jetons inactifs et actualisez les paramètres d’autorisation."
+      }
+    }
+  },
+  "domains": {
+    "err_load": "Impossible de charger les domaines",
+    "err_load2": "Erreur lors du chargement des domaines",
+    "err_add": "Impossible d'ajouter le domaine",
+    "err_add2": "Erreur lors de l'ajout du domaine",
+    "err_verify": "Échec de la vérification",
+    "err_verify2": "Erreur lors de la vérification du domaine",
+    "title": "Domaines et DNS",
+    "subtitle": "Gérez les domaines, les enregistrements DNS et les certificats SSL",
+    "add_domain": "Ajouter un domaine",
+    "add": "Ajouter",
+    "loading": "Chargement des domaines...",
+    "empty": "Aucun domaine configuré pour le moment",
+    "verified": "Vérifié",
+    "pending": "Vérification en attente",
+    "verification_required": "Vérification requise",
+    "check_verification": "Vérifier la validation",
+    "ssl_cert": "Certificat SSL",
+    "status": "Statut",
+    "expires": "Expire",
+    "nameservers": "Serveurs de noms",
+    "created": "Créé",
+    "updated": "Mis à jour"
+  },
+  "env": {
+    "title": "Ajouter une variable d'environnement",
+    "count_live": "{n} actives",
+    "type": "Type",
+    "targets": "Cibles",
+    "add": "Ajouter une variable",
+    "adding": "Ajout…",
+    "list_title": "Variables",
+    "refresh": "Actualiser",
+    "loading": "Chargement des variables…",
+    "empty": "Aucune variable pour le moment. Ajoutez-en une ci-dessus.",
+    "system": "système",
+    "edit": "Modifier",
+    "close": "Fermer",
+    "delete": "Supprimer",
+    "cancel": "Annuler",
+    "save": "Enregistrer les modifications",
+    "saving": "Enregistrement…",
+    "ph_value": "valeur",
+    "ph_new_value": "nouvelle valeur (laisser vide pour conserver l'actuelle)",
+    "err_load": "Impossible de charger les variables",
+    "err_load2": "Erreur lors du chargement des variables",
+    "err_required": "La clé et la valeur sont obligatoires",
+    "added": "{key} ajoutée",
+    "err_add": "Impossible d'ajouter la variable",
+    "err_add2": "Erreur lors de l'ajout de la variable",
+    "err_edit_required": "Définissez une nouvelle valeur ou modifiez les cibles",
+    "updated": "Variable mise à jour",
+    "err_update": "Impossible de mettre à jour la variable",
+    "err_update2": "Erreur lors de la mise à jour de la variable",
+    "confirm_delete": "Supprimer {key} ? Elle sera retirée du pipeline de build et cette action est irréversible.",
+    "deleted": "{key} supprimée",
+    "err_delete": "Impossible de supprimer la variable",
+    "err_delete2": "Erreur lors de la suppression de la variable"
+  },
+  "logs": {
+    "title": "Journaux d'audit",
+    "subtitle": "Journal d'activité en temps réel de toutes les opérations du coffre",
+    "stat_actions_24h": "Actions (24 h)",
+    "stat_success_rate": "Taux de réussite",
+    "stat_failed": "Actions échouées",
+    "stat_unique_users": "Utilisateurs uniques",
+    "filters": "Filtres",
+    "action": "Action",
+    "all_actions": "Toutes les actions",
+    "accessed": "Consulté",
+    "rotated": "Renouvelé",
+    "verified": "Vérifié",
+    "created": "Créé",
+    "deleted": "Supprimé",
+    "revoked": "Révoqué",
+    "exported": "Exporté",
+    "status": "Statut",
+    "all_statuses": "Tous les statuts",
+    "success": "Succès",
+    "failed": "Échec",
+    "pending": "En attente",
+    "secret_id": "ID du secret",
+    "ph_secret": "Filtrer par secret",
+    "user_email": "E-mail de l'utilisateur",
+    "ph_user": "Filtrer par utilisateur",
+    "export_csv": "Exporter en CSV",
+    "loading": "Chargement des journaux...",
+    "no_logs": "Aucun journal trouvé",
+    "timestamp": "Horodatage",
+    "col_user": "Utilisateur",
+    "message": "Message",
+    "previous": "Précédent",
+    "page_n": "Page {n}",
+    "next": "Suivant",
+    "err_load": "Impossible de charger les journaux",
+    "err_load2": "Erreur lors du chargement des journaux",
+    "err_export": "Échec de l'export"
+  },
+  "deploy": {
+    "err_load": "Impossible de charger les déploiements",
+    "err_load2": "Erreur lors du chargement des déploiements",
+    "confirm_rollback": "Revenir à {target} ? Cela le remet en production.",
+    "confirm_cancel": "Annuler le build {target} ? Cela interrompt le build en cours.",
+    "done_rollback": "Restauration terminée",
+    "done_cancel": "Build annulé",
+    "err_rollback": "Échec du retour arrière",
+    "err_cancel": "Échec de l'annulation",
+    "err_during_rollback": "Erreur lors du retour arrière",
+    "err_during_cancel": "Erreur lors de l'annulation",
+    "head_rollback": "Restaurer un déploiement",
+    "head_cancel": "Annuler le build",
+    "head_view": "Déploiements",
+    "sub_rollback": "Choisissez un déploiement READY antérieur à remettre en production.",
+    "sub_cancel": "Interrompre un build en cours (BUILDING, QUEUED ou INITIALIZING).",
+    "sub_view": "Historique et état récents des déploiements Vercel.",
+    "refresh": "Actualiser",
+    "loading": "Chargement des déploiements…",
+    "empty": "Aucun déploiement trouvé",
+    "deployment": "Déploiement",
+    "current": "ACTUEL",
+    "by": "par {name}",
+    "promoting": "Promotion…",
+    "roll_back_this": "Revenir à celui-ci",
+    "current_target": "cible de production actuelle",
+    "only_ready": "Seuls les déploiements READY peuvent être promus",
+    "canceling": "Annulation…",
+    "cancel_build": "Annuler le build",
+    "not_in_progress": "Aucune opération en cours — rien à annuler",
+    "live_url": "URL en ligne",
+    "git_commit": "Commit Git",
+    "deployment_id": "ID de déploiement",
+    "created": "Créé",
+    "aliases": "Alias",
+    "view_inspector": "Voir les détails du déploiement dans l'Inspecteur",
+    "just_now": "à l’instant",
+    "m_ago": "il y a {n} min",
+    "h_ago": "il y a {n} h",
+    "d_ago": "il y a {n} j"
+  },
+  "settings": {
+    "err_load": "Impossible de charger les paramètres",
+    "err_load2": "Erreur lors du chargement des paramètres",
+    "err_update": "Impossible de mettre à jour le paramètre",
+    "err_update2": "Erreur lors de la mise à jour du paramètre",
+    "loading": "Chargement des paramètres...",
+    "title": "Paramètres de la console",
+    "subtitle": "Configurez les politiques de sécurité, les approbations et les paramètres d'audit",
+    "saved": "Paramètres enregistrés",
+    "sec_security": "Sécurité",
+    "sec_automation": "Automatisation",
+    "sec_audit": "Audit et conservation",
+    "sec_notifications": "Notifications",
+    "sec_advanced": "Avancé",
+    "mfa_l": "Exiger la MFA pour déverrouiller",
+    "mfa_d": "Les utilisateurs doivent s'authentifier par TOTP avant d'accéder au coffre",
+    "rot_approval_l": "Exiger une approbation pour le renouvellement des clés",
+    "rot_approval_d": "Les renouvellements de clés doivent être approuvés avant exécution",
+    "exp_approval_l": "Exiger une approbation pour l'export",
+    "exp_approval_d": "L'export de secrets nécessite une approbation explicite",
+    "enc_l": "Chiffrement activé",
+    "enc_d": "Tous les secrets chiffrés au repos",
+    "autorot_l": "Renouvellement automatique des clés",
+    "autorot_d": "Renouveler automatiquement les clés selon un calendrier",
+    "autorot_int_l": "Intervalle de renouvellement automatique (jours)",
+    "audit_ret_l": "Conservation des journaux d'audit (jours)",
+    "audit_ret_d": "Durée de conservation des journaux d'audit",
+    "session_l": "Expiration de session (minutes)",
+    "session_d": "Délai d'inactivité avant nouvelle authentification",
+    "notify_unauth_l": "Notifier les accès non autorisés",
+    "notify_unauth_d": "Envoyer des alertes en cas d'accès non autorisé détecté",
+    "notify_rot_l": "Notifier le renouvellement des clés",
+    "notify_rot_d": "Envoyer des notifications lors du renouvellement des clés",
+    "notify_exp_l": "Notifier l'expiration des clés",
+    "notify_exp_d": "Alerter lorsque des clés arrivent bientôt à expiration",
+    "pub_l": "Autoriser les URL publiques",
+    "pub_d": "Autoriser le déploiement sur des URL publiques",
+    "last_updated": "Dernière mise à jour"
+  },
+  "pr": {
+    "title": "Pull requests ouvertes",
+    "refresh": "Actualiser",
+    "subtitle": "Modifications d'infrastructure rédigées par l'IA. Examinez les étapes prévues, puis fusionnez. Rien ne s'exécute tant que vous ne l'avez pas fait.",
+    "loading": "Chargement…",
+    "empty": "Aucune PR ouverte. Le chef de cabinet placera ici les modifications à approuver.",
+    "planned_steps": "étapes prévues (exécutées dans l'ordre lors de la fusion — rien n'a encore été déclenché)",
+    "no_steps": "Aucune étape.",
+    "risk_word": "risque",
+    "level_low": "faible",
+    "level_medium": "moyen",
+    "level_high": "élevé",
+    "needs": "nécessite {role}",
+    "steps_one": "{n} étape",
+    "steps_many": "{n} étapes",
+    "redeploys": "redéploie",
+    "redeploy_tag": "↻ redéployer",
+    "hide_payloads": "Masquer les charges utiles",
+    "inspect_payloads": "Inspecter les charges utiles",
+    "high_risk_a": "Modification à haut risque. Exécutée en direct et irréversible. Nécessite l'habilitation ",
+    "high_risk_b": " — confirmez pour continuer.",
+    "merging": "Fusion…",
+    "confirm_run": "Confirmer — exécuter en direct",
+    "merge_high": "Fusionner / Approuver (haut risque)",
+    "merge": "Fusionner / Approuver",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "history": "Historique",
+    "succeeded_one": "{ok}/{total} étape réussie.",
+    "succeeded_many": "{ok}/{total} étapes réussies.",
+    "redeploy_included": "Inclut une étape de redéploiement en production.",
+    "merged_at": "fusionnée le {date}",
+    "load_failed": "Échec du chargement",
+    "merge_failed": "Échec de la fusion"
+  },
+  "cui": {
+    "audit_log": "Journal d'audit :",
+    "audit_note": "Toutes les actions sont enregistrées à des fins de conformité.",
+    "view_log": "Voir le journal →",
+    "unknown_page": "Page inconnue.",
+    "soon": "Bientôt",
+    "soon_short": "BIENTÔT",
+    "not_available": "Pas encore disponible",
+    "coming_soon": "Bientôt disponible",
+    "workspace_title": "Espace de travail {name}",
+    "coming_soon_banner": "⏳ Les actions {name} arrivent bientôt — voici un aperçu de ce qui sera disponible.",
+    "provider_not_found": "Fournisseur introuvable : {id}",
+    "no_actions": "Aucune action disponible pour {name}",
+    "actions_for": "Actions pour {name}",
+    "available_one": "{n} action disponible",
+    "available_many": "{n} actions disponibles",
+    "confirm_action": "Confirmer l'action",
+    "executing_action": "Exécution de l'action…",
+    "back": "Retour",
+    "execute_now": "Exécuter maintenant",
+    "select_key_id": "Sélectionnez un ID de clé...",
+    "querying_vars": "Interrogation du registre des variables du cluster...",
+    "no_config_keys": "Aucune clé de configuration active trouvée.",
+    "nothing_to_select": "Rien à sélectionner pour le moment."
+  },
+  "vault": {
+    "cred_mgmt": "Gestion des identifiants",
+    "rotate_title": "Faire tourner {name}",
+    "rotate_sub": "Générez un nouvel identifiant pour {provider}.",
+    "cannot_undo": "Cette action est irréversible",
+    "current_secret": "Secret actuel",
+    "after_rotation": "Après la rotation",
+    "after_desc": "Un nouvel identifiant sera généré. L’ancien est révoqué automatiquement et synchronisé avec vos variables d’environnement Vercel.",
+    "rotate_key": "Faire tourner la clé",
+    "generating": "Génération du nouvel identifiant...",
+    "may_take": "Cela peut prendre un moment.",
+    "rotation_success": "Rotation réussie",
+    "new_secret_masked": "Nouveau secret (masqué)",
+    "chk_generated": "Nouvel identifiant généré",
+    "chk_synced": "Synchronisé avec les variables d’env. Vercel",
+    "chk_revoked": "Ancien identifiant révoqué",
+    "chk_audited": "Consigné dans l’audit",
+    "done": "Terminé",
+    "rotation_failed": "Échec de la rotation",
+    "retry": "Réessayer"
+  },
+  "admin": {
+    "eyebrow": "Console d'administration façon NASA",
+    "forecasting": "Prévisions",
+    "financialLedger": "Grand livre financier",
+    "kpiCockpit": "Cockpit KPI",
+    "marketplace": "Place de marché",
+    "saas": "SaaS",
+    "unifiedEngagement": "Indice d'engagement unifié",
+    "crmPipeline": "Pipeline CRM",
+    "filters": "Filtres : période • produit • pays • forfait • rôle",
+    "telemetryReady": "Prêt pour la télémétrie. Connectez des tables/événements d'analyse pour activer des enregistrements en direct dans ce panneau.",
+    "notTracked": "Pas encore de données",
+    "telemetrySignal": "Signal prêt pour la télémétrie",
+    "conciergeRecs": "Recommandations de la conciergerie"
+  }
+}

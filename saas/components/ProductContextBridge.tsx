@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 
 type ProductContext = {
   source?: string
@@ -24,10 +24,16 @@ const COPY: Record<Lang, { prefix: string; body: string; continue: string; dismi
   pt: { prefix: 'Você veio por', body: 'O SignalBoost lembrou este produto localmente para que seu workspace comece com contexto.', continue: 'Continuar configuração', dismiss: 'Fechar' },
   pl: { prefix: 'Przyszedłeś po', body: 'SignalBoost zapamiętał ten produkt lokalnie, aby workspace zaczął z kontekstem.', continue: 'Kontynuuj konfigurację', dismiss: 'Zamknij' },
   ru: { prefix: 'Вы пришли за', body: 'SignalBoost сохранил этот продукт локально, чтобы workspace начался с контекстом.', continue: 'Продолжить настройку', dismiss: 'Закрыть' },
+  de: { prefix: 'Sie sind hier für', body: 'SignalBoost hat sich dieses Produkt lokal gemerkt, damit Ihr Arbeitsbereich mit Kontext startet.', continue: 'Produkteinrichtung fortsetzen', dismiss: 'Verwerfen' },
+  fr: { prefix: 'Vous êtes venu pour', body: 'SignalBoost a mémorisé ce produit localement afin que votre espace de travail démarre avec du contexte.', continue: 'Poursuivre la configuration du produit', dismiss: 'Ignorer' },
+  it: { prefix: 'Sei qui per', body: 'SignalBoost ha memorizzato questo prodotto localmente, così il tuo spazio di lavoro parte già con il contesto.', continue: 'Continua la configurazione del prodotto', dismiss: 'Ignora' },
+  ja: { prefix: 'ご利用の目的', body: 'SignalBoost はこの製品をローカルに記憶したため、ワークスペースはコンテキスト付きで開始されます。', continue: '製品のセットアップを続行', dismiss: '閉じる' },
+  ko: { prefix: '방문 목적', body: 'SignalBoost가 이 제품을 로컬에 기억하여 작업 공간이 컨텍스트와 함께 시작됩니다.', continue: '제품 설정 계속', dismiss: '닫기' },
+  ar: { prefix: 'جئت إلى هنا من أجل', body: 'تذكّر SignalBoost هذا المنتج محليًا لكي تبدأ مساحة عملك بالسياق.', continue: 'متابعة إعداد المنتج', dismiss: 'تجاهل' },
 }
 
 function activeLang(lang: string): Lang {
-  return (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
+  return (['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en') as Lang
 }
 
 function readContext(): ProductContext | null {

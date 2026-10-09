@@ -8,6 +8,7 @@ import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
 import { searchVideos } from '@/lib/video/search'
+import { SUPPORTED_LANGUAGE_NAMES, normalizeSupportedLanguage } from '@/lib/i18n/supportedLanguages'
 
 export const maxDuration = 30
 
@@ -115,7 +116,7 @@ Return this exact shape:
 {
   "mode": "search" | "generate" | "caption" | "dub",
   "query": "clean search query or video description",
-  "language": "es" | "pt" | "pl" | "ru" | "en",
+  "language": "es" | "pt" | "pl" | "ru" | "en" | "de" | "fr" | "it" | "ja" | "ko" | "ar",
   "duration": 30,
   "format": "9:16",
   "explanation": "one sentence explaining what you understood and what you're doing"
@@ -182,7 +183,7 @@ async function buildGenerateResponse(intent: IntentResult, prompt: string) {
       messages: [
         {
           role: 'system',
-          content: `You are a professional video scriptwriter for social media. Write a punchy, engaging script for a ${intent.duration}-second video in ${intent.language === 'es' ? 'Spanish' : intent.language === 'pt' ? 'Portuguese' : intent.language === 'pl' ? 'Polish' : intent.language === 'ru' ? 'Russian' : 'English'}. Format: just the spoken script, no stage directions, no timestamps. Keep it under ${Math.floor((intent.duration ?? 30) * 2.5)} words.`,
+          content: `You are a professional video scriptwriter for social media. Write a punchy, engaging script for a ${intent.duration}-second video in ${SUPPORTED_LANGUAGE_NAMES[normalizeSupportedLanguage(intent.language)]}. Format: just the spoken script, no stage directions, no timestamps. Keep it under ${Math.floor((intent.duration ?? 30) * 2.5)} words.`,
         },
         { role: 'user', content: prompt },
       ],
@@ -194,12 +195,20 @@ async function buildGenerateResponse(intent: IntentResult, prompt: string) {
   const scriptData = scriptRes.ok ? await scriptRes.json() : null
   const script = scriptData?.choices?.[0]?.message?.content?.trim() ?? ''
 
+  // Sarah and Liam use the Eleven Multilingual v2 voices, so they serve languages without a dedicated avatar.
+  const MULTILINGUAL_AVATARS = [{ name: 'Sarah (multilingual)', id: 'sarah_en' }, { name: 'Liam (multilingual)', id: 'liam_en' }]
   const LANG_AVATARS: Record<string, { name: string; id: string }[]> = {
     es: [{ name: 'Sofia (ES)', id: 'sofia_es' }, { name: 'Carlos (ES)', id: 'carlos_es' }],
     pt: [{ name: 'Ana (PT)', id: 'ana_pt' }, { name: 'Pedro (BR)', id: 'pedro_br' }],
     pl: [{ name: 'Maja (PL)', id: 'maja_pl' }],
     ru: [{ name: 'Natasha (RU)', id: 'natasha_ru' }],
     en: [{ name: 'Sarah (EN)', id: 'sarah_en' }, { name: 'Liam (EN)', id: 'liam_en' }],
+    de: MULTILINGUAL_AVATARS,
+    fr: MULTILINGUAL_AVATARS,
+    it: MULTILINGUAL_AVATARS,
+    ja: MULTILINGUAL_AVATARS,
+    ko: MULTILINGUAL_AVATARS,
+    ar: MULTILINGUAL_AVATARS,
   }
 
   const avatars = LANG_AVATARS[intent.language ?? 'en'] ?? LANG_AVATARS.en

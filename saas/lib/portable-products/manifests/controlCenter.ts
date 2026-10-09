@@ -34,5 +34,5 @@ export const controlCenterManifest: PortableProductManifest = Object.freeze({
   architectureReferences: Object.freeze(['console-core', 'console-host']),
   documentationReferences: Object.freeze(['saas/docs/console/TESTING.md']),
   futureFeatures: Object.freeze(['enterprise-catalog']),
-  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru']),
+  supportedLanguages: Object.freeze(['en', 'pt', 'es', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']),
 })

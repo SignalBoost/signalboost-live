@@ -5,22 +5,22 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
-type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
 const COPY = {
-  eyebrow:     { en: uiText('generatedUi.u_37e1c775f452d695'), es: 'Pipeline', pt: 'Pipeline', pl: 'Pipeline', ru: 'Пайплайн' },
-  title:       { en: uiText('generatedUi.u_315608dbba443d6c'), es: 'Cada lead, por etapa.', pt: 'Cada lead, por etapa.', pl: 'Każdy lead według etapu.', ru: 'Каждый лид по этапу.' },
-  subtitle:    { en: uiText('generatedUi.u_9f3094181b64a341'), es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do primeiro contato ao fechamento.', pl: 'Śledź prospektów od odkrycia do zamknięcia.', ru: 'Отслеживайте потенциальных клиентов от первого контакта до закрытия.' },
-  newLead:     { en: uiText('generatedUi.u_87d381d081c06cd5'), es: '+ Descubrir nuevo lead', pt: '+ Descobrir novo lead', pl: '+ Odkryj nowy lead', ru: '+ Найти новый лид' },
-  loading:     { en: uiText('generatedUi.u_c0577197648affd1'), es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…' },
-  loadError:   { en: uiText('generatedUi.u_9692050489a4cfa5'), es: 'No se pudo cargar el pipeline.', pt: 'Não foi possível carregar o pipeline.', pl: 'Nie można załadować pipeline.', ru: 'Не удалось загрузить пайплайн.' },
-  unnamed:     { en: uiText('generatedUi.u_e504e61521948e34'), es: 'Sin nombre', pt: 'Sem nome', pl: 'Bez nazwy', ru: 'Без имени' },
-  empty:       { en: '—', es: '—', pt: '—', pl: '—', ru: '—' },
+  eyebrow:     { en: uiText('generatedUi.u_37e1c775f452d695'), es: 'Pipeline', pt: 'Pipeline', pl: 'Pipeline', ru: 'Пайплайн', de: 'Pipeline', fr: 'Pipeline', it: 'Pipeline', ja: 'パイプライン', ko: '파이프라인', ar: 'مسار العمل' },
+  title:       { en: uiText('generatedUi.u_315608dbba443d6c'), es: 'Cada lead, por etapa.', pt: 'Cada lead, por etapa.', pl: 'Każdy lead według etapu.', ru: 'Каждый лид по этапу.', de: 'Alle Leads, nach Phase.', fr: 'Tous les prospects, par étape.', it: 'Ogni lead, per fase.', ja: 'すべてのリードをステージ別に。', ko: '모든 리드를 단계별로.', ar: 'كل العملاء المحتملين، حسب المرحلة.' },
+  subtitle:    { en: uiText('generatedUi.u_9f3094181b64a341'), es: 'Sigue a los prospectos desde el descubrimiento hasta el cierre.', pt: 'Acompanhe os prospects do primeiro contato ao fechamento.', pl: 'Śledź prospektów od odkrycia do zamknięcia.', ru: 'Отслеживайте потенциальных клиентов от первого контакта до закрытия.', de: 'Verfolgen Sie Interessenten von der ersten Entdeckung bis zum Geschäftsabschluss.', fr: 'Suivez vos prospects de la première découverte jusqu’à la conclusion de l’affaire.', it: 'Segui i potenziali clienti dalla prima scoperta fino alla chiusura dell’accordo.', ja: '見込み客を最初の発見から成約まで追跡します。', ko: '잠재 고객을 최초 발견부터 거래 성사까지 추적합니다.', ar: 'تتبّع العملاء المحتملين من الاكتشاف الأول حتى إتمام الصفقة.' },
+  newLead:     { en: uiText('generatedUi.u_87d381d081c06cd5'), es: '+ Descubrir nuevo lead', pt: '+ Descobrir novo lead', pl: '+ Odkryj nowy lead', ru: '+ Найти новый лид', de: '+ Neuen Lead entdecken', fr: '+ Découvrir un nouveau prospect', it: '+ Scopri un nuovo lead', ja: '+ 新しいリードを発見', ko: '+ 새 리드 찾기', ar: '+ اكتشاف عميل محتمل جديد' },
+  loading:     { en: uiText('generatedUi.u_c0577197648affd1'), es: 'Cargando pipeline…', pt: 'Carregando pipeline…', pl: 'Ładowanie pipeline…', ru: 'Загрузка пайплайна…', de: 'Pipeline wird geladen…', fr: 'Chargement du pipeline…', it: 'Caricamento pipeline…', ja: 'パイプラインを読み込み中…', ko: '파이프라인 불러오는 중…', ar: 'جارٍ تحميل خط المعالجة…' },
+  loadError:   { en: uiText('generatedUi.u_9692050489a4cfa5'), es: 'No se pudo cargar el pipeline.', pt: 'Não foi possível carregar o pipeline.', pl: 'Nie można załadować pipeline.', ru: 'Не удалось загрузить пайплайн.', de: 'Die Pipeline konnte nicht geladen werden.', fr: 'Impossible de charger le pipeline.', it: 'Impossibile caricare la pipeline.', ja: 'パイプラインを読み込めませんでした。', ko: '파이프라인을 불러올 수 없습니다.', ar: 'تعذّر تحميل مسار المبيعات.' },
+  unnamed:     { en: uiText('generatedUi.u_e504e61521948e34'), es: 'Sin nombre', pt: 'Sem nome', pl: 'Bez nazwy', ru: 'Без имени', de: 'Unbenannt', fr: 'Sans nom', it: 'Senza nome', ja: '名前なし', ko: '이름 없음', ar: 'بلا اسم' },
+  empty:       { en: '—', es: '—', pt: '—', pl: '—', ru: '—', de: '—', fr: '—', it: '—', ja: '—', ko: '—', ar: '—' },
   stages: {
-    discovered: { en: uiText('generatedUi.u_96a5ba634bfc2ed4'), es: 'Descubierto', pt: 'Descoberto', pl: 'Odkryty', ru: 'Обнаружен' },
-    contacted:  { en: uiText('generatedUi.u_9c2e8e1786527e31'),  es: 'Contactado',  pt: 'Contactado',  pl: 'Skontaktowany', ru: 'Контакт' },
-    replied:    { en: uiText('generatedUi.u_1cd7fa936258e09c'),    es: 'Respondió',   pt: 'Respondeu',   pl: 'Odpowiedział',  ru: 'Ответил' },
-    booked:     { en: uiText('generatedUi.u_fd1331d7a6cd0309'),     es: 'Agendado',    pt: 'Agendado',    pl: 'Zarezerwowany', ru: 'Записан' },
-    closed:     { en: uiText('generatedUi.u_c21ead0614e7e1b7'),     es: 'Cerrado',     pt: 'Fechado',     pl: 'Zamknięty',     ru: 'Закрыт' },
+    discovered: { en: uiText('generatedUi.u_96a5ba634bfc2ed4'), es: 'Descubierto', pt: 'Descoberto', pl: 'Odkryty', ru: 'Обнаружен', de: 'Erkannt', fr: 'Découvert', it: 'Rilevato', ja: '検出済み', ko: '검색됨', ar: 'مُكتشَف' },
+    contacted:  { en: uiText('generatedUi.u_9c2e8e1786527e31'),  es: 'Contactado',  pt: 'Contactado',  pl: 'Skontaktowany', ru: 'Контакт', de: 'Kontaktiert', fr: 'Contacté', it: 'Contattato', ja: '連絡済み', ko: '연락함', ar: 'تم التواصل' },
+    replied:    { en: uiText('generatedUi.u_1cd7fa936258e09c'),    es: 'Respondió',   pt: 'Respondeu',   pl: 'Odpowiedział',  ru: 'Ответил', de: 'Beantwortet', fr: 'Répondu', it: 'Risposto', ja: '返信済み', ko: '답장함', ar: 'تم الرد' },
+    booked:     { en: uiText('generatedUi.u_fd1331d7a6cd0309'),     es: 'Agendado',    pt: 'Agendado',    pl: 'Zarezerwowany', ru: 'Записан', de: 'Gebucht', fr: 'Réservé', it: 'Prenotato', ja: '予約済み', ko: '예약됨', ar: 'محجوز' },
+    closed:     { en: uiText('generatedUi.u_c21ead0614e7e1b7'),     es: 'Cerrado',     pt: 'Fechado',     pl: 'Zamknięty',     ru: 'Закрыт', de: 'Geschlossen', fr: 'Fermé', it: 'Chiuso', ja: 'クローズ', ko: '닫힘', ar: 'مغلق' },
   },
 }
 
@@ -53,7 +53,7 @@ function toStage(p: Prospect): Stage {
 
 export default function OutreachPipelinePage() {
   const { lang } = useI18n()
-  const l = ['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en'
+  const l = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(lang) ? lang : 'en'
 
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading]     = useState(true)

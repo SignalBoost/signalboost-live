@@ -27,7 +27,7 @@ export default async function SupervisorProviderDiagnosticsPage() {
 
   const access = await getAccess()
   const cookieLocale = (await cookies()).get('sb_locale')?.value || 'en'
-  const locale = ['en', 'es', 'pt', 'pl', 'ru'].includes(cookieLocale.slice(0, 2).toLowerCase())
+  const locale = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'].includes(cookieLocale.slice(0, 2).toLowerCase())
     ? cookieLocale.slice(0, 2).toLowerCase()
     : 'en'
   const dict = await loadLanguage(locale)

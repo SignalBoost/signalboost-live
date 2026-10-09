@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
-const LANGS = ['en', 'es', 'pt', 'pl', 'ru']
+const LANGS = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 const failures = []
 
@@ -78,14 +78,14 @@ function validateCombinedCatalog(rel) {
   if (!parsed) return
   const present = Object.keys(parsed).filter(key => LANGS.includes(key))
   for (const lang of LANGS) if (!(lang in parsed)) fail(`${rel}: missing top-level locale ${lang}`)
-  if (present.length !== LANGS.length) fail(`${rel}: expected exactly five supported locale blocks`)
+  if (present.length !== LANGS.length) fail(`${rel}: expected exactly ${LANGS.length} supported locale blocks`)
   compareKeyParity(rel, Object.fromEntries(LANGS.map(lang => [lang, parsed[lang] || {}])))
 }
 
 function topLevelLocaleBlocks(rel) {
   const source = readText(rel)
   const found = new Set()
-  for (const match of source.matchAll(/^  (en|es|pt|pl|ru):\s*\{/gm)) found.add(match[1])
+  for (const match of source.matchAll(/^  (en|es|pt|pl|ru|de|fr|it|ja|ko|ar):\s*\{/gm)) found.add(match[1])
   for (const lang of LANGS) if (!found.has(lang)) fail(`${rel}: missing top-level ${lang} locale block`)
 }
 
@@ -100,14 +100,16 @@ for (const rel of [
   'lib/i18n/auditCenterLocales.json',
   'lib/i18n/supervisorSocLocales.json',
   'lib/i18n/homepageLocales.json',
+  'lib/i18n/supervisorAssessmentLocales.json',
+  'lib/i18n/aiKillSwitchLocales.json',
 ]) validateCombinedCatalog(rel)
 
 topLevelLocaleBlocks('lib/i18n/homepageUiLocales.ts')
 topLevelLocaleBlocks('lib/i18n/platformCopy.ts')
 
 const supported = readText('lib/i18n/supportedLanguages.ts')
-if (!/SUPPORTED_LANGUAGES\s*=\s*\['en', 'es', 'pt', 'pl', 'ru'\]/.test(supported)) {
-  fail('lib/i18n/supportedLanguages.ts must define exactly en/es/pt/pl/ru in canonical order')
+if (!/SUPPORTED_LANGUAGES\s*=\s*\['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'\]/.test(supported)) {
+  fail(`lib/i18n/supportedLanguages.ts must define exactly ${LANGS.join('/')} in canonical order`)
 }
 
 const responseLanguage = readText('lib/i18n/responseLanguage.ts')
@@ -133,7 +135,7 @@ if (/const\s+SUPPORTED_LANGUAGES\s*=/.test(suggestion)) {
 
 const loader = readText('lib/i18n/loadLanguage.ts')
 if (!loader.includes("normalizeSupportedLanguage")) {
-  fail('loadLanguage must normalize through the canonical five-language contract')
+  fail('loadLanguage must normalize through the canonical supported-language contract')
 }
 for (const lang of LANGS) {
   if (!loader.includes(`${lang}: () => import('@/locales/${lang}.json')`)) {
@@ -152,12 +154,12 @@ if (!primary.includes('resolveResponseLanguage(input,body?.context?.language)'))
 }
 
 const generatedUtils = readText('scripts/generated-ui-locale-utils.mjs')
-if (!/UI_LOCALES\s*=\s*\['en', 'es', 'pt', 'pl', 'ru'\]/.test(generatedUtils)) {
-  fail('generated UI locale tooling must target exactly en/es/pt/pl/ru')
+if (!/UI_LOCALES\s*=\s*\['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar'\]/.test(generatedUtils)) {
+  fail(`generated UI locale tooling must target exactly ${LANGS.join('/')}`)
 }
 
 const hardcodedMap = readText('lib/i18n/hardcoded-ui-copy.ts')
-for (const lang of ['es', 'pt', 'pl', 'ru']) {
+for (const lang of ['es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
   if (!hardcodedMap.includes(`  ${lang}: {`)) fail(`hardcoded UI safety net missing ${lang}`)
 }
 
@@ -175,4 +177,4 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log('[validate:i18n-platform] PASS — EN/ES/PT/PL/RU are complete and aligned across platform locale stores and runtime language routing.')
+console.log(`[validate:i18n-platform] PASS — ${LANGS.map(lang => lang.toUpperCase()).join('/')} are complete and aligned across platform locale stores and runtime language routing.`)

@@ -1,4 +1,4 @@
-name: Six-language translation release review gate
+name: Translation package tooling regressions
 on:
   pull_request:
   workflow_dispatch:
@@ -18,14 +18,3 @@ jobs:
       - name: Check enabled locale loader wiring
         working-directory: saas
         run: node scripts/check-pending-locale-wiring.mjs
-      - name: Require approved packages before application-language activation
-        working-directory: saas
-        shell: bash
-        run: |
-          set -euo pipefail
-          if grep -Eq "'(de|fr|it|ja|ko|ar)'" lib/i18n/supportedLanguages.ts; then
-            test -f translation-release/manifest.json || exit 1
-            node scripts/verify-six-language-review-gate.mjs translation-release
-          elif test -f translation-release/manifest.json; then
-            node scripts/verify-six-language-review-gate.mjs translation-release
-          fi

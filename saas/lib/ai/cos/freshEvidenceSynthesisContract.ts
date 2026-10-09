@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/freshEvidenceSynthesisContract.ts
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
+import { SUPPORTED_LANGUAGE_NAMES, normalizeSupportedLanguage } from '../../i18n/supportedLanguages.ts'
 import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
 
 export type FreshEvidenceSemanticScope = {
@@ -53,15 +54,10 @@ export const SINGLE_PROPOSITION_SOURCE_LIMIT = 2
 export const SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT = 650
 const MAX_SEMANTIC_SCOPES = 5
 const SCOPE_ID = /^[A-Za-z0-9_-]{1,32}$/
-const BINARY_LEAD = /^\s*(?:yes|no|sí|si|não|nao|tak|nie|да|нет)(?:\s|[,.!:;?—–-]|$)/iu
+const BINARY_LEAD = /^\s*(?:yes|no|sí|si|não|nao|tak|nie|да|нет|ja|nein|oui|non|sì|はい|いいえ|네|예|아니요|아니오|نعم|لا)(?:\s|[,.!:;?—–、。，-]|$)/iu
 
 function languageLabel(language: string): string {
-  const normalized = String(language || 'en').toLowerCase()
-  if (normalized === 'es') return 'Spanish'
-  if (normalized === 'pt' || normalized === 'pt-br') return 'Portuguese'
-  if (normalized === 'pl') return 'Polish'
-  if (normalized === 'ru') return 'Russian'
-  return 'English'
+  return SUPPORTED_LANGUAGE_NAMES[normalizeSupportedLanguage(language || 'en')]
 }
 
 function parseJsonObject(text: string): Record<string, unknown> | null {

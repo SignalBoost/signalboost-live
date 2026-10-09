@@ -43,6 +43,30 @@ const COPY = {
     validation: { required: 'Введите адрес сайта или репозитория GitHub.', protocol: 'Поддерживаются только URL-адреса HTTP и HTTPS.', publicUrl: 'Используйте общедоступный URL-адрес.', invalid: 'Введите корректный URL-адрес.' },
     placeholder: 'https://example.com или https://github.com/org/repo', analyzing: 'Анализ…', analyze: 'Анализировать источник', helper: 'Сервер проверит и извлечет метаданные перед использованием этого источника.',
   },
+  de: {
+    validation: { required: 'Geben Sie eine Website- oder GitHub-URL ein.', protocol: 'Nur HTTP- und HTTPS-URLs werden unterstützt.', publicUrl: 'Verwenden Sie eine öffentlich zugängliche URL.', invalid: 'Geben Sie eine gültige URL ein.' },
+    placeholder: 'https://example.com oder https://github.com/org/repo', analyzing: 'Wird analysiert…', analyze: 'Quelle analysieren', helper: 'Der Server validiert die Quelle und extrahiert Metadaten, bevor er sie verwendet.',
+  },
+  fr: {
+    validation: { required: 'Saisissez l\'URL d\'un site web ou de GitHub.', protocol: 'Seules les URL HTTP et HTTPS sont prises en charge.', publicUrl: 'Utilisez une URL accessible publiquement.', invalid: 'Saisissez une URL valide.' },
+    placeholder: 'https://example.com ou https://github.com/org/repo', analyzing: 'Analyse en cours…', analyze: 'Analyser la source', helper: 'Le serveur validera la source et en extraira les métadonnées avant de l\'utiliser.',
+  },
+  it: {
+    validation: { required: 'Inserisci un sito web o un URL GitHub.', protocol: 'Sono supportati solo URL HTTP e HTTPS.', publicUrl: 'Usa un URL accessibile pubblicamente.', invalid: 'Inserisci un URL valido.' },
+    placeholder: 'https://example.com o https://github.com/org/repo', analyzing: 'Analisi in corso…', analyze: 'Analizza fonte', helper: 'Il server convaliderà la fonte ed estrarrà i metadati prima di utilizzarla.',
+  },
+  ja: {
+    validation: { required: 'ウェブサイトまたは GitHub の URL を入力してください。', protocol: 'HTTP および HTTPS の URL のみサポートされています。', publicUrl: '公開アクセス可能なURLを使用してください。', invalid: '有効なURLを入力してください。' },
+    placeholder: 'https://example.com または https://github.com/org/repo', analyzing: '分析中…', analyze: 'ソースを分析', helper: 'サーバーはこのソースを使用する前に、検証とメタデータの抽出を行います。',
+  },
+  ko: {
+    validation: { required: '웹사이트 또는 GitHub URL을 입력하세요.', protocol: 'HTTP 및 HTTPS URL만 지원됩니다.', publicUrl: '공개적으로 접근 가능한 URL을 사용하세요.', invalid: '유효한 URL을 입력하세요.' },
+    placeholder: 'https://example.com 또는 https://github.com/org/repo', analyzing: '분석 중…', analyze: '소스 분석', helper: '서버는 이 소스를 사용하기 전에 유효성을 검사하고 메타데이터를 추출합니다.',
+  },
+  ar: {
+    validation: { required: 'أدخل موقعًا إلكترونيًا أو URL على GitHub.', protocol: 'يتم دعم عناوين URL من نوع HTTP وHTTPS فقط.', publicUrl: 'استخدم URL متاحًا للعامة.', invalid: 'أدخل URL صالحًا.' },
+    placeholder: 'https://example.com أو https://github.com/org/repo', analyzing: 'جارٍ التحليل…', analyze: 'تحليل المصدر', helper: 'سيتحقق الخادم من صحة هذا المصدر ويستخرج بياناته الوصفية قبل استخدامه.',
+  },
 } as const
 
 export function normalizeSourceUrl(value: string): string {

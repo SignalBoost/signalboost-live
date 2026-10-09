@@ -638,7 +638,13 @@
       "pt": "Português",
       "es": "Español",
       "pl": "Polski",
-      "ru": "Русский"
+      "ru": "Русский",
+      "de": "Deutsch",
+      "fr": "Français",
+      "it": "Italiano",
+      "ja": "日本語",
+      "ko": "한국어",
+      "ar": "العربية"
     },
     "publicTools": {
       "label": "Public Tools",
@@ -3756,7 +3762,7 @@
   "wireframes": {
     "unifiedAria": "Unified SaaS dashboard wireframe preview",
     "sidebarAria": "SaaS module navigation",
-    "i18nStatus": "i18n online: EN · ES · PT · PL · RU",
+    "i18nStatus": "i18n online: EN · ES · PT · PL · RU · DE · FR · IT · JA · KO · AR",
     "kicker": "SaaS cockpit wireframes",
     "title": "Cockpit console for office utilities and assistant workflows",
     "subtitle": "A responsive dashboard system with telemetry cards, keyboard-friendly navigation, glass panels, and module previews ready for approval before production coding.",

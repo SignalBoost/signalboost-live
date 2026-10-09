@@ -13,6 +13,12 @@ const LANGUAGES = [
   { code: 'pt', label: uiText('generatedUi.u_d4ada8ec276411a1') },
   { code: 'pl', label: uiText('generatedUi.u_a5989ca14f3485cc') },
   { code: 'ru', label: 'Русский' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'fr', label: 'Français' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
+  { code: 'ar', label: 'العربية' },
 ]
 
 type Settings = {

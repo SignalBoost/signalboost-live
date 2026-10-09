@@ -25,7 +25,7 @@ test('strategic project previews are visible, explicit, and multilingual', () =>
 
   assert.match(preview, /Preview only: not a claim of commercial readiness/)
   assert.match(preview, /production execution/)
-  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']) {
     assert.match(preview, new RegExp(`${language}:`))
   }
 })

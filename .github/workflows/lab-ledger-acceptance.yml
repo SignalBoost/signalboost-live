@@ -18,6 +18,7 @@ on:
       - 'saas/lib/billing/phase4CommercialWalletAudit.mjs'
       - 'saas/tests/phase4CommercialWalletAudit.node.test.mjs'
       - 'saas/tests/phase4VerifiedTestSettlementHandoff.node.test.mjs'
+      - 'saas/tests/phase4StripeTestDatabaseIntegration.node.test.mjs'
       - 'saas/tests/phase4VerifiedTestSettlementEnvelope.node.test.mjs'
       - 'saas/supabase/migrations/20261008170000_lab_commercial_credit_wallet_foundation.sql'
       - 'saas/supabase/migrations/20261008180000_lab_commercial_atomic_grant_proof.sql'
@@ -28,6 +29,7 @@ on:
       - 'saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql'
       - 'saas/supabase/migrations/20261008240000_lab_commercial_claim_reconciliation_source_binding.sql'
       - 'saas/supabase/migrations/20261009000000_lab_testmode_settlement_rate_guard.sql'
+      - 'saas/supabase/migrations/20261009210000_lab_commercial_reconciliation_usage_safe.sql'
       - 'saas/supabase/migrations/20261009170000_lab_testmode_commercial_wallet_event.sql'
   workflow_dispatch:
 
@@ -92,6 +94,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008230000_lab_testmode_atomic_stripe_settlement.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261008240000_lab_commercial_claim_reconciliation_source_binding.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261009000000_lab_testmode_settlement_rate_guard.sql
+          psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261009210000_lab_commercial_reconciliation_usage_safe.sql
           psql -v ON_ERROR_STOP=1 -f saas/supabase/migrations/20261009170000_lab_testmode_commercial_wallet_event.sql
       - name: Verify tenancy and ledger adversarial invariants
         shell: bash
@@ -186,3 +189,7 @@ jobs:
       - name: Verify test-only wallet reservation, capture and release
         shell: bash
         run: psql -v ON_ERROR_STOP=1 -f saas/tests/sql/lab-testmode-commercial-wallet-usage-acceptance.sql
+
+      - name: Verify signed Stripe test evidence through PostgreSQL settlement and usage
+        shell: bash
+        run: node --test saas/tests/phase4StripeTestDatabaseIntegration.node.test.mjs

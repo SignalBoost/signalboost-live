@@ -4,9 +4,11 @@ import { PUBLIC_COPY } from '@/lib/seo/publicCopy'
 import { PUBLIC_LOCALES, PUBLIC_LOCALE_NAMES, PUBLIC_TOPICS, publicPagePath, type PublicLocale, type PublicTopic } from '@/lib/seo/publicLocales'
 import { publicPageSchema, publicTopicCopy } from '@/lib/seo/publicSeo'
 import { writingDirection } from '@/lib/i18n/supportedLanguages'
+import { uiText } from '@/lib/i18n/uiText'
+
 
 const EU_PRIVACY_COPY: Partial<Record<PublicLocale, { heading: string; body: string; link: string }>> = {
-  en: { heading: 'Privacy, GDPR and data location', body: 'We take European data-protection requirements seriously. Where personal data is stored or processed can depend on the service and the providers you connect. Review our data-handling information and contact support for the applicable hosting region, subprocessors, international transfers, retention and your access or deletion rights before sharing sensitive data.', link: 'Data-handling information' },
+  en: { heading: uiText('generatedUi.u_2d3a14369f4bec03'), body: uiText('generatedUi.u_9d64a898bc122fa1'), link: uiText('generatedUi.u_b3dab208b45c5f3f') },
   de: { heading: 'Datenschutz, DSGVO und Datenspeicherung', body: 'Der Schutz personenbezogener Daten ist wichtig. Speicher- und Verarbeitungsorte können je nach Dienst und angebundenem Anbieter variieren. Informieren Sie sich vor der Übermittlung sensibler Daten über Hosting-Regionen, Auftragsverarbeiter, internationale Übermittlungen, Aufbewahrung sowie Auskunfts- und Löschrechte.', link: 'Informationen zur Datenverarbeitung' },
   fr: { heading: 'Confidentialité, RGPD et localisation des données', body: 'La protection des données personnelles est essentielle. Les lieux de stockage et de traitement peuvent varier selon le service et les fournisseurs connectés. Avant de transmettre des données sensibles, renseignez-vous sur les régions d’hébergement, les sous-traitants, les transferts internationaux, la conservation et vos droits d’accès et d’effacement.', link: 'Informations sur le traitement des données' },
   it: { heading: 'Privacy, GDPR e ubicazione dei dati', body: 'La protezione dei dati personali è importante. Il luogo di archiviazione e trattamento può variare in base al servizio e ai fornitori collegati. Prima di condividere dati sensibili, verifica le regioni di hosting, i responsabili del trattamento, i trasferimenti internazionali, i periodi di conservazione e i diritti di accesso e cancellazione.', link: 'Informazioni sul trattamento dei dati' },

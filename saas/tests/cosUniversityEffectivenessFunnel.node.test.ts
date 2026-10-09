@@ -16,8 +16,9 @@ import {
 } from '../lib/ai/cos/cosUniversityEffectivenessFunnel.ts'
 import { isEvaluatorInfrastructureFailure } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
 import { COS_UNIVERSITY_FUNNEL_COPY } from '../lib/i18n/cosUniversityFunnelCopy.ts'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
+const read = (relative: string) => hydrateLocalizedSource(readFileSync(new URL(relative, import.meta.url), 'utf8'))
 const H = (c: string) => c.repeat(64)
 const NOW = new Date('2026-10-04T20:00:00Z')
 
@@ -245,7 +246,7 @@ test('buyer assurance chapters fail closed when their evidence stores are unread
 })
 
 test('buyer operational explanation reuses Self-Healing health and never disguises abnormal waiting as healthy', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityEffectivenessFunnel.ts', import.meta.url), 'utf8')
+  const source = hydrateLocalizedSource(readFileSync(new URL('../lib/ai/cos/cosUniversityEffectivenessFunnel.ts', import.meta.url), 'utf8'))
   assert.match(source, /readUniversityMassDistillationHealth/)
   assert.match(source, /classification === 'expected_wait'/)
   assert.match(source, /configured concurrency/i)
@@ -253,7 +254,7 @@ test('buyer operational explanation reuses Self-Healing health and never disguis
   assert.match(source, /canonical Self-Healing health model detected/)
   assert.match(source, /causeStatus: 'unresolved'/)
   assert.match(source, /No causal explanation is invented/)
-  const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx', import.meta.url), 'utf8')
+  const panel = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx', import.meta.url), 'utf8'))
   assert.match(panel, /data-testid="operational-explanation"/)
   const operationalStart = panel.indexOf('data-testid="operational-explanation"')
   const operationalEnd = panel.indexOf('data-testid="evaluation-causal-explanations"', operationalStart)
@@ -302,11 +303,11 @@ test('evaluation failures in the window are split by the rolling authority\'s ow
 })
 
 test('buyer causal explanations disclose unresolved causality instead of inventing a root cause', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityEffectivenessFunnel.ts', import.meta.url), 'utf8')
+  const source = hydrateLocalizedSource(readFileSync(new URL('../lib/ai/cos/cosUniversityEffectivenessFunnel.ts', import.meta.url), 'utf8'))
   assert.match(source, /causeStatus: 'unresolved'/)
   assert.match(source, /report does not invent a root cause/i)
   assert.match(source, /same classifier used by production disposition/i)
-  const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx', import.meta.url), 'utf8')
+  const panel = hydrateLocalizedSource(readFileSync(new URL('../app/dashboard/cos-university-telemetry/EffectivenessFunnelPanel.tsx', import.meta.url), 'utf8'))
   assert.match(panel, /data-testid="evaluation-causal-explanations"/)
   assert.match(panel, /System response:/)
   assert.match(panel, /copy\.operationalBuyerMeaning/)

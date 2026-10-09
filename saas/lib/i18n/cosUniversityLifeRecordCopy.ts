@@ -1,7 +1,7 @@
 // saas/lib/i18n/cosUniversityLifeRecordCopy.ts
 //
 // Copy for the artifact life record (VIN lookup) block on the University telemetry page. Five languages, same keys.
-import type { CosUniversityTelemetryLanguage } from './cosUniversityTelemetryCopy'
+import type { CosUniversityTelemetryLanguage } from './cosUniversityTelemetryCopy.ts'
 
 export type CosUniversityLifeRecordCopy = Readonly<{
   title: string

@@ -8,6 +8,8 @@ on:
       - 'saas/scripts/check-eleven-language-coverage.mjs'
       - 'saas/scripts/export-eleven-language-translation-packages.mjs'
       - 'saas/scripts/check-translation-package-export.mjs'
+      - 'saas/scripts/check-translated-package-negative-fixtures.mjs'
+      - 'saas/scripts/validate-translated-packages.mjs'
       - 'saas/scripts/check-five-language-platform.mjs'
       - 'saas/components/LanguageSuggestion.tsx'
       - '.github/workflows/i18n-expansion-readiness.yml'
@@ -30,3 +32,5 @@ jobs:
         run: node scripts/check-eleven-language-coverage.mjs
       - name: Verify source translation packages for six pending languages
         run: node scripts/check-translation-package-export.mjs
+      - name: Reject incomplete and omitted locale catalogs
+        run: node scripts/check-translated-package-negative-fixtures.mjs

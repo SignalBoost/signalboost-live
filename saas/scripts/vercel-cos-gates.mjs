@@ -44,6 +44,7 @@ const tests = [
   'tests/labOwnerProvisioning.node.test.ts',
   'tests/labOwnerActivationUi.node.test.ts',
   'tests/labValidMonitoringScope.node.test.ts',
+  'tests/labMonitoringUniqueTenant.node.test.ts',
   'tests/itmountsLabEgressPolicy.node.test.ts',
   'tests/itmountsLabEgressExecution.node.test.ts',
   'tests/itmountsLabByoiScope.node.test.ts',

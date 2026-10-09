@@ -158,10 +158,30 @@ async function dispatchRepairPlanInsideHarness(
 }
 
 
+/**
+ * Commercial boundary: the Supervisor can only actuate maintenance for the
+ * platform's own verified deployment. Provider connections from customer BYOI
+ * are not a source of maintenance authority. Other providers fail closed.
+ */
+export function platformSupervisorRepairAuthorized(
+  incident: RepairIncident,
+  env: Readonly<Record<string,string|undefined>> = process.env,
+): boolean {
+  const platformProject=env.VERCEL_PROJECT_ID?.trim()
+  return Boolean(
+    platformProject && platformProject.startsWith('prj_') &&
+    incident.provider === 'Vercel' &&
+    incident.project === platformProject
+  )
+}
+
 /** Recovery actuation is never allowed to begin outside the Platform Harness. */
 export async function dispatchRepairPlan(
   options: DispatchRepairPlanOptions,
 ): Promise<DispatchRepairPlanResult> {
+  if (process.env.NODE_ENV === 'production' && !platformSupervisorRepairAuthorized(options.incident)) {
+    return {completed:false,results:[],stoppedAt:{step:0,reason:'supervisor_platform_ownership_not_verified'}}
+  }
   return withHostProductionHarnessIngress({
     objective: `Dispatch bounded Self-Healing repair for ${options.incident.incident_id}`,
     portableId: 'self-healing-supervisor',

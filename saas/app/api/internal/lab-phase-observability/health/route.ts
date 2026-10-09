@@ -2,6 +2,7 @@ import { NextRequest,NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { readTenantLabObservations } from '@/lib/ai/cos/labPhaseObservabilityRead'
+import { resolveLabMonitoringTenant } from '@/lib/ai/cos/labMonitoringTenant'
 import { dispatchLabHealthAlerts } from '@/lib/ai/cos/labPhaseSupervisorBridge'
 
 export const runtime='nodejs'
@@ -17,14 +18,13 @@ const authorized=(header:string|null,secret:string|undefined)=>{
 export async function GET(req:NextRequest){
   if(!authorized(req.headers.get('authorization'),process.env.CRON_SECRET))
     return NextResponse.json({ok:false,error:'unauthorized'},{status:401,headers})
-  const tenant=process.env.ITMOUNTS_LAB_OBSERVABILITY_TENANT_ID?.trim()
   const revision=process.env.VERCEL_GIT_COMMIT_SHA?.trim()
-  if(!tenant||!revision||!/^[a-f0-9]{7,64}$/i.test(revision))
+  if(!revision||!/^[a-f0-9]{7,64}$/i.test(revision))
     return NextResponse.json({ok:false,error:'observability_scope_not_configured'},{status:503,headers})
   try{
     const db=getAdminSupabase()
-    const {data:valid,error:scopeError}=await db.rpc('itmounts_lab_observability_scope_valid',{p_tenant_id:tenant})
-    if(scopeError||valid!==true)return NextResponse.json({ok:false,error:'observability_scope_not_authorized'},{status:503,headers})
+    const tenant=await resolveLabMonitoringTenant(db)
+    if(!tenant)return NextResponse.json({ok:false,error:'observability_scope_not_authorized'},{status:503,headers})
     const events=await readTenantLabObservations(db,tenant,revision)
     const alerts: {code:string;phase:number;signal:string;exactRevision:string;severity:string}[]=[]
     const result=await dispatchLabHealthAlerts(events,revision,Date.now(),alert=>{alerts.push(alert)})

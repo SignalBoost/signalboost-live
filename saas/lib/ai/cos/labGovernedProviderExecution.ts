@@ -31,15 +31,17 @@ export async function executeTenantProviderGoverned<T>(input: Readonly<{
     capability: input.scope.capability,
   })
   const harnessRunId = input.harnessRunId
-  const trustedInput = { ...input, scope, harnessRunId }
+  // Capture trusted host callbacks before asynchronous authorization checks.
+  const { readGrant, resolveTrustedRun, now, executeGoverned } = input
+  const trustedInput = { scope, harnessRunId, readGrant, resolveTrustedRun }
   try {
-    const first = await authorizeTenantProviderPreflight({ ...trustedInput, now: input.now() })
+    const first = await authorizeTenantProviderPreflight({ ...trustedInput, now: now() })
     if (!first.allowed) return denied
     // A network hop, lease renewal or queue delay may revoke the original approval.
     // Re-fetch the grant and Harness authority immediately before invoking the socket.
-    const fresh = await authorizeTenantProviderPreflight({ ...trustedInput, now: input.now() })
+    const fresh = await authorizeTenantProviderPreflight({ ...trustedInput, now: now() })
     if (!fresh.allowed || fresh.secretReference !== first.secretReference) return denied
-    const value = await input.executeGoverned({
+    const value = await executeGoverned({
       scope, harnessRunId,
       secretReference: fresh.secretReference!,
     })

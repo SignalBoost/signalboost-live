@@ -40,7 +40,7 @@ export async function deliverVerifiedCustomerArtifact(
     storageObjectVerified: true,
     independentlyComputedSha256: candidate.evidence.storedSha256,
   })
-  if (!preflight.allowed) return { ok: false, reason: preflight.reason }
+  if (preflight.allowed === false) return { ok: false, reason: preflight.reason }
 
   if (!candidate.evidence.artifactReady) return { ok: false, reason: 'not_ready' }
   let bytes: Uint8Array | null
@@ -55,7 +55,7 @@ export async function deliverVerifiedCustomerArtifact(
     storageObjectVerified: true,
     independentlyComputedSha256: digest,
   })
-  if (!decision.allowed) return { ok: false, reason: decision.reason }
+  if (decision.allowed === false) return { ok: false, reason: decision.reason }
   return {
     ok: true, bytes, sha256: decision.sha256,
     filename: `${decision.artifactId}.bin`,

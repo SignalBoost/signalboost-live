@@ -88,7 +88,7 @@ console.log('Total gaps: '+issues.length)
 // Any activation of a pending locale must automatically activate the strict release gate.
 // A forgotten --require-all flag must never make incomplete production locales deployable.
 const activeLine = core.match(/SUPPORTED_LANGUAGES\s*=\s*\[([^\]]+)\]/)?.[1] || ''
-const enabledCandidates = additions.filter(lang => new RegExp("['\\\"]" + lang + "['\\\"]").test(activeLine))
+const enabledCandidates = additions.filter(lang => activeLine.includes("'" + lang + "'") || activeLine.includes('"' + lang + '"'))
 if ((process.argv.includes('--require-all') || enabledCandidates.length > 0) && issues.length) {
   console.error('[eleven-language coverage] FAIL — incomplete locales cannot be activated: ' + enabledCandidates.join(', '))
   process.exit(1)

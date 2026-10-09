@@ -31,6 +31,7 @@ import { createGovernedHarnessExecutor } from '../runtime/governed-executor.ts'
 import { runHarnessWorker, type HarnessWorkerContext } from '../runtime/runner.ts'
 import type { HarnessTrajectoryVerifier } from '../verification/outcome-verifier.ts'
 import { builderLoopShape, type BuilderResidencyExactArtifactExecutor } from './builder-case-runner.ts'
+import { verifyBuilderResidencyProof } from './proof-verification.ts'
 import {
   createRunpodBuilderResidencyModelPort,
   type BuilderResidencyModelPort,
@@ -656,22 +657,7 @@ export function createLiveBuilderResidencyExecutor(input:{
               proof,
               files,
             })
-            const verified=
-              proof.exitCode===0&&!proof.timedOut
-            return Object.freeze({
-              verified,
-              verifierRef:
-                'host://builder-residency-independent-proof-v1',
-              evidenceRefs:Object.freeze([ref]),
-              ...(verified
-                ?{}
-                :{
-                  reason:proof.timedOut
-                    ?'residency_proof_timed_out'
-                    :`residency_proof_exit_${proof.exitCode}`,
-                  failureAttribution:'competency' as const,
-                }),
-            })
+            return verifyBuilderResidencyProof(proof,ref)
           }catch(error){
             return Object.freeze({
               verified:false,
@@ -698,3 +684,4 @@ export function createLiveBuilderResidencyExecutor(input:{
   })
 }
 // end of saas/platform-harness/residency/live-builder-executor.ts (if this line is missing, the paste was cut short)
+

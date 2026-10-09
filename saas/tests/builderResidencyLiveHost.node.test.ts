@@ -229,3 +229,42 @@ test('live Residency classifies exact-artifact prewarm failure as infrastructure
   assert.equal(result.authorityExpanded,false)
   assert.equal(result.productionMutationObserved,false)
 })
+
+for (const [exitCode, status] of [[137, 'infrastructure_failure'], [1, 'agent_failure']] as const) {
+  test(`live Residency independently attributes verifier exit ${exitCode} as ${status}`, async () => {
+    const practiceCase=BUILDER_RESIDENCY_CASES.find(item=>item.competencyId==='root_cause_diagnosis')!
+    const request=createBuilderResidencyHarnessRequest({
+      runId:`residency-live-proof-exit-${exitCode}`,
+      objective:practiceCase.objective,
+      tenantId:'itmounts-university',
+      portableId:'builder-residency',
+      agentId:'builder-resident',
+      artifactId:'artifact-1',
+      artifactHash:H,
+      artifactRevision:R,
+      sandboxEnvironmentId:'builder-residency-sandbox-v1',
+      requestedCapabilities:BUILDER_RESIDENCY_NATIVE_CAPABILITIES,
+      limits:{deadlineMs:180_000,maxToolCalls:60,maxConcurrency:1},
+    })
+    const baseRunner=new FixtureRunner()
+    let verifierCalls=0
+    const runner:BuilderRunnerPort={async run(input){
+      if(input.workspaceId.endsWith(':verifier')){
+        verifierCalls+=1
+        return {exitCode,stdout:'',stderr:exitCode===137?'Killed':'AssertionError',timedOut:false}
+      }
+      return baseRunner.run(input)
+    }}
+    const result=await createLiveBuilderResidencyExecutor({
+      db:{} as any,sandboxRunner:runner,modelPortFactory:scriptedModelPort,
+    }).run({request,authority:createBuilderResidencyNativeAuthority(),practiceCase,candidateId:'candidate-1'})
+    assert.equal(verifierCalls,1)
+    assert.equal(result.outcome.status,status)
+    assert.equal(result.outcome.failureCode,`residency_proof_exit_${exitCode}`)
+    assert.ok(result.trajectory.some(event=>event.kind==='observation'&&event.data?.builderOutcome==='completed'),
+      'the independent verifier must override a successful resident loop')
+    assert.equal(result.authorityExpanded,false)
+    assert.equal(result.productionMutationObserved,false)
+  })
+}
+

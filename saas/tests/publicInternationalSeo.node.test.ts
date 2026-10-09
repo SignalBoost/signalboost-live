@@ -99,3 +99,13 @@ test('rendered pages stay server authored and protected from saved application-l
     assert.match(source, /generateStaticParams/)
   }
 })
+
+
+test('localized pages retain the global navbar and footer; only share demos hide chrome', () => {
+  const gate = read('../components/layout/ShareRouteChrome.tsx')
+  assert.match(gate, /if \(isShareRoute\(pathname\)\) return null/)
+  assert.doesNotMatch(gate, /publicLocaleFromPath\(pathname\)/)
+  const root = read('../app/layout.tsx')
+  assert.match(root, /<ShareRouteChrome>\s*<Navbar \/>/)
+  assert.match(root, /<ShareRouteChrome>\s*<Footer \/>/)
+})

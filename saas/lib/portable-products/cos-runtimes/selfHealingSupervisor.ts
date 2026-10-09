@@ -1,4 +1,7 @@
 import { getVercelDeployments } from '@/lib/hub/deployments-service'
+import { getAdminSupabase } from '@/utils/supabase/server'
+import { readTenantLabObservations } from '@/lib/ai/cos/labPhaseObservabilityRead'
+import { assessLabPhaseHealth } from '@/lib/ai/cos/labAllPhasesObservability'
 import { diagnoseIncident } from '@/lib/autonomous-supervisor/diagnostic'
 import type { NormalizedIncidentPayload } from '@/lib/autonomous-supervisor/types'
 import { createSignalBoostGatewayHost, GATEWAY_POLICY } from '@/agent-gateway-host/signalboost-host.ts'
@@ -52,6 +55,14 @@ const manifest: PortableManifest = Object.freeze({
       verificationTypes: Object.freeze(['observation_returned']),
     }),
     Object.freeze({
+      capabilityId: 'supervisor.inspect_lab_health',
+      version: '1.0.0',
+      description: 'Read tenant-scoped Phase 1–5 Lab health and advisory alerts. No diagnosis or repair authorization.',
+      readOnly: true, reversible: true, requiresApproval: false, riskClass: 'read_only' as const,
+      evidenceTypes: Object.freeze(['lab_phase_health']),
+      verificationTypes: Object.freeze(['observation_returned']),
+    }),
+    Object.freeze({
       capabilityId: 'supervisor.route_latest_failed_deployment',
       version: '1.0.0',
       description: 'Diagnose the latest failed Vercel deployment and route the resulting repair plan into the Supervisor governed gateway. The gateway retains final execution authority.',
@@ -85,6 +96,34 @@ async function observeDeployments(): Promise<PortableObservation> {
   }
 }
 
+async function observeLabHealth(): Promise<PortableObservation> {
+  const tenant = process.env.ITMOUNTS_LAB_OBSERVABILITY_TENANT_ID?.trim()
+  const revision = process.env.VERCEL_GIT_COMMIT_SHA?.trim()
+  if (!tenant || tenant.length > 128 || !revision || !/^[a-f0-9]{7,64}$/i.test(revision))
+    throw Error('supervisor_lab_health_scope_unavailable')
+  const db = getAdminSupabase()
+  const events = await readTenantLabObservations(db, tenant, revision)
+  const health = assessLabPhaseHealth(events, revision, Date.now())
+  const {data:alerts,error} = await db.from('lab_phase_health_alerts')
+    .select('phase,signal,code,severity,last_seen_at')
+    .eq('tenant_id',tenant).eq('exact_revision',revision)
+    .order('last_seen_at',{ascending:false}).limit(15)
+  if(error) throw Error('supervisor_lab_alert_feed_unavailable')
+  const facts = {
+    exactRevision:revision,
+    phaseStatuses:health.phases.map(phase=>({phase:phase.phase,status:phase.status})),
+    alerts:(alerts??[]).map((a:any)=>({phase:a.phase,signal:a.signal,code:a.code,severity:a.severity})),
+    certified:false,productionAuthorized:false,repairAuthorized:false,
+  }
+  return {
+    observedAt:new Date().toISOString(),
+    summary:health.allObserved ? 'Every phase has a recent matching revision observation; none is certified by telemetry.' : 'Lab phase evidence is missing, stale, or blocked; no repair has been authorized.',
+    facts,
+    evidenceIds:[],
+    stateFingerprint:fingerprint(facts),
+  }
+}
+
 function incidentFromObservation(observation: PortableObservation): NormalizedIncidentPayload | null {
   const failed = Array.isArray((observation.facts as any)?.failed) ? (observation.facts as any).failed[0] : null
   if (!failed?.id) return null
@@ -111,11 +150,15 @@ export function createSelfHealingSupervisorPortableRuntime(): UniversalPortableR
   let lastObservation: PortableObservation | undefined
   return {
     getManifest: () => manifest,
-    async observe() {
-      lastObservation = await observeDeployments()
+    async observe({objective}: {objective:string}) {
+      lastObservation = /lab\s+(?:phase|health|observability)/i.test(objective) ? await observeLabHealth() : await observeDeployments()
       return lastObservation
     },
     async invoke({ action }: { objective: string; action: CosProposedAction }): Promise<PortableActionResult> {
+      if (action.capabilityId === 'supervisor.inspect_lab_health') {
+        lastObservation = await observeLabHealth()
+        return {actionId:action.actionId,status:'completed',summary:lastObservation.summary,evidenceIds:[]}
+      }
       if (action.capabilityId === 'supervisor.inspect_deployments') {
         lastObservation = await observeDeployments()
         return { actionId: action.actionId, status: 'completed', summary: lastObservation.summary, evidenceIds: lastObservation.evidenceIds }

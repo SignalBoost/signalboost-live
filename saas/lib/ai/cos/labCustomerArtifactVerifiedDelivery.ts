@@ -40,9 +40,7 @@ export async function deliverVerifiedCustomerArtifact(
     storageObjectVerified: true,
     independentlyComputedSha256: candidate.evidence.storedSha256,
   })
-  if (!preflight.allowed) return preflight.ok === false
-    ? { ok: false, reason: preflight.reason }
-    : { ok: false, reason: 'unauthorized' }
+  if (!preflight.allowed) return { ok: false, reason: preflight.reason }
 
   if (!candidate.evidence.artifactReady) return { ok: false, reason: 'not_ready' }
   let bytes: Uint8Array | null

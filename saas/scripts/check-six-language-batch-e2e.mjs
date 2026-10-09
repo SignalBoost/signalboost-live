@@ -40,5 +40,21 @@ globalThis.fetch=async (url, options)=>{
  assert.equal(second.status,0,second.stderr)
  assert.equal(JSON.parse(second.stdout).generatedDrafts,0,'resume must skip all completed strings')
  assert.equal(fs.readFileSync(logfile,'utf8').trim().split('\n').length,12,'resume must not incur more requests')
- console.log('PASS: 252 draft translations across six languages, 12 batched requests, review flags, zero-cost resume')
+ // Simulate a provider corrupting interpolation tokens: do not persist any part of the invalid batch.
+ const rejectedPath=path.join(dir,'de.json')
+ const pack=JSON.parse(fs.readFileSync(rejectedPath,'utf8'))
+ pack.pages.key0={source:'Hello {name}',translation:null}
+ fs.writeFileSync(rejectedPath,JSON.stringify(pack))
+ const badMock=path.join(dir,'bad-mock.mjs')
+ fs.writeFileSync(badMock,`globalThis.fetch=async (url,options)=>({
+   ok:true,status:200,json:async()=>JSON.parse(options.body).map(({text})=>({
+     translations:[{to:new URL(url).searchParams.get('to'),text:text.replace('{name}','name')}]
+   }))
+ })`)
+ const corrupted=spawnSync(process.execPath,['--import',badMock,'scripts/translate-pending-language-packages.mjs',dir,'--limit','100'],{cwd:root,encoding:'utf8',env:{...process.env,AZURE_TRANSLATOR_KEY:'test-only',AZURE_TRANSLATOR_REGION:'test-only'}})
+ assert.notEqual(corrupted.status,0,'placeholder-corrupting provider must fail closed')
+ assert.match(corrupted.stderr,/Placeholder mismatch/)
+ const afterCorruption=JSON.parse(fs.readFileSync(rejectedPath,'utf8'))
+ assert.equal(afterCorruption.pages.key0.translation,null,'failed batch must not persist invalid translation')
+ console.log('PASS: six languages, 12 batched requests, zero-cost resume, corrupted placeholder rejected without write')
 }finally{fs.rmSync(dir,{recursive:true,force:true})}

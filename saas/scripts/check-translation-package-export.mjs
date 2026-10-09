@@ -31,6 +31,19 @@ try {
   assert.equal(again.status,0,again.stderr)
   const after=JSON.parse(fs.readFileSync(example,'utf8'))
   assert.equal(after.pages[key].translation,'Übersetzungsentwurf')
+  const review=path.join(output,'de.review.json')
+  const secondKey=Object.keys(after.pages).find(k=>k!==key)
+  const initial={pages:{[key]:{status:'approved',reviewer:'test'},[secondKey]:{status:'approved',reviewer:'test'}}}
+  fs.writeFileSync(review,JSON.stringify(initial))
+  const stale=JSON.parse(fs.readFileSync(example,'utf8'))
+  stale.pages[secondKey].source='Older source revision'
+  stale.pages[secondKey].translation='Stale translation'
+  fs.writeFileSync(example,JSON.stringify(stale))
+  const resume=spawnSync(process.execPath,['scripts/export-eleven-language-translation-packages.mjs','--out',path.relative(root,output),'--resume'],{cwd:root,encoding:'utf8'})
+  assert.equal(resume.status,0,resume.stderr)
+  const decisions=JSON.parse(fs.readFileSync(review,'utf8'))
+  assert.ok(decisions.pages[key],'unchanged reviewed text stays attached')
+  assert.equal(decisions.pages[secondKey],undefined,'changed source must discard old review state')
   const unrelated=Object.keys(after.pages).find(k=>k!==key)
   assert.equal(after.pages[unrelated].translation,null)
   console.log('PASS: source key parity, new packages and resumable prior drafts verified')

@@ -56,6 +56,22 @@ for (const lang of pending) {
       }
     }
   }
+  if(resume){
+    const reviewPath=path.join(out,lang+'.review.json')
+    if(fs.existsSync(reviewPath)){
+      const reviews=JSON.parse(fs.readFileSync(reviewPath,'utf8'))
+      for(const [store,entries] of Object.entries(reviews)){
+        for(const key of Object.keys(entries)){
+          const current=packageData?.[store]?.[key]
+          const old=fs.existsSync(destination)?JSON.parse(fs.readFileSync(destination,'utf8'))?.[store]?.[key]:null
+          if(!current || !old || JSON.stringify(old.source)!==JSON.stringify(current.source) || JSON.stringify(old.translation)!==JSON.stringify(current.translation)){
+            delete reviews[store][key]
+          }
+        }
+      }
+      fs.writeFileSync(reviewPath,JSON.stringify(reviews,null,2)+'\n')
+    }
+  }
   fs.writeFileSync(destination,JSON.stringify(packageData,null,2)+'\n')
   manifest[lang] = Object.fromEntries(Object.entries(packageData).map(([store,entries]) =>
     [store,Object.keys(entries).length]))

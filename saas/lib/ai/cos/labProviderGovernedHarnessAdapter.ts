@@ -12,14 +12,16 @@ export async function executeProviderViaHarness(input: Readonly<{
   executor: GovernedHarnessExecutor
   resolveTrustedRun: BirthHarnessAuthorityResolver
 }>): Promise<HarnessActionResult | null> {
-  const { scope } = input
-  if (!input.actionId?.trim() || !input.harnessRunId?.trim() || !input.secretReference?.trim()) return null
+  // Freeze the exact authorization and dispatch identity before any host await.
+  const scope = Object.freeze({ ...input.scope })
+  const { actionId, harnessRunId, secretReference, executor, resolveTrustedRun } = input
+  if (!actionId?.trim() || !harnessRunId?.trim() || !secretReference?.trim()) return null
   try {
     // Resolve anew at the final invocation boundary; never accept a user-provided manifest.
-    const run = await input.resolveTrustedRun(input.harnessRunId)
+    const run = await resolveTrustedRun(harnessRunId)
     if (!run || run.status !== 'active' || run.authorityVerified !== true) return null
     const manifest = run.manifest
-    if (!manifest || manifest.runId !== input.harnessRunId
+    if (!manifest || manifest.runId !== harnessRunId
       || manifest.profile !== 'production' || !manifest.authorityManifestRef?.trim()
       || manifest.identity.tenantId !== scope.organizationId
       || manifest.identity.artifact?.artifactId !== scope.permanentArtifactId) return null
@@ -28,13 +30,13 @@ export async function executeProviderViaHarness(input: Readonly<{
       && c.scopes?.includes(scope.providerId) === true
       && c.scopes?.includes(scope.permanentArtifactId) === true)
     if (!cap) return null
-    return await input.executor.execute(manifest, {
-      actionId: input.actionId,
+    return await executor.execute(manifest, {
+      actionId,
       kind: 'provider.invoke',
       capabilityId: scope.capability,
       params: {
         providerId: scope.providerId, permanentArtifactId: scope.permanentArtifactId,
-        secretReference: input.secretReference,
+        secretReference,
       },
       // A provider call can have non-reversible external effects. Governed Socket
       // must enforce human approval when consequential and irreversible.

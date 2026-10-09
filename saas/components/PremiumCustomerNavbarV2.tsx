@@ -486,6 +486,15 @@ export default function PremiumCustomerNavbarV2() {
       </nav>
       {mobileOpen ? (
         <div className="sbnav-mobile">
+          <label className="sbnav-mobile-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{t('nav.languageLabel', "Language")}</span>
+            <select className="sbnav-language-mobile" value={lang}
+              aria-label={t('nav.languageLabel', "Language")}
+              onChange={event => changeLanguage(event.target.value)}
+              style={{ padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,.25)', background: '#0f172a', color: '#fff' }}>
+              {LANGUAGES.map(code => <option key={code} value={code}>{t(`nav.languages.${code}`, code.toUpperCase())}</option>)}
+            </select>
+          </label>
           {user ? <div className="sbnav-mobile-row" aria-live="polite">⚡ <span>{ownerAccess ? t('nav.credits.unlimited', "Unlimited") : (credits === null ? '…' : credits.toLocaleString())} {t('nav.credits.label', "credits")}</span></div> : null}
           <div className="sbnav-search sbnav-mobile-search">
             <input type="search" value={query} placeholder={t('nav.searchPlaceholder', "Search sections")} aria-label={t('nav.searchLabel', "Search navigation")} onFocus={() => setSearchOpen(true)} onChange={event => { setQuery(event.target.value); setSearchOpen(true) }} />

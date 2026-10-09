@@ -6,9 +6,9 @@ test('KMS transport pins key and Ed25519 signing request', async () => {
   const inputs: any[] = []
   const sdk: any = {
     KMSClient: class { async send(cmd: any) { inputs.push(cmd); return { KeyMetadata: { KeySpec: 'ECC_NIST_EDWARDS25519' } } } },
-    DescribeKeyCommand: class { constructor(readonly input: any) {} },
-    GetPublicKeyCommand: class { constructor(readonly input: any) {} },
-    SignCommand: class { constructor(readonly input: any) {} },
+    DescribeKeyCommand: class { readonly input: any; constructor(input: any) { this.input = input } },
+    GetPublicKeyCommand: class { readonly input: any; constructor(input: any) { this.input = input } },
+    SignCommand: class { readonly input: any; constructor(input: any) { this.input = input } },
   }
   const arn = 'arn:aws:kms:us-east-1:123456789012:key/test-only'
   const transport = createUniversityAwsKmsTransport({ sdk, region: 'us-east-1', keyArn: arn })

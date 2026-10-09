@@ -48,7 +48,7 @@ const scanComponents=dir=>{
  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   if(entry.isDirectory()){
    if(!excluded.has(entry.name)&&!entry.name.startsWith('_'))scanComponents(path.join(dir,entry.name))
-  }else if(/\.(tsx|jsx)$/.test(entry.name)&&!(/\.test\.|\.spec\.|\.stories\./.test(entry.name))){
+  }else if(/\.(tsx|jsx)$/.test(entry.name)&&!(/\.test\.|\.spec\.|\.stories\.|^(page|layout|template|loading|error|global-error|not-found|default)\.(tsx|jsx)$/.test(entry.name))){
    const sourceFile=path.join(dir,entry.name)
    const src=fs.readFileSync(sourceFile,'utf8')
    const found=candidates(src)

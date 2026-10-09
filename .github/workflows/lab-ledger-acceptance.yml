@@ -158,3 +158,7 @@ jobs:
       - name: Verify authoritative Stripe test-mode proof contract
         shell: bash
         run: node --test saas/tests/phase4StripeTestVerification.node.test.mjs
+
+      - name: Verify Stripe test authoritative API retrieval boundary
+        shell: bash
+        run: node --test saas/tests/phase4StripeTestRetrieval.node.test.mjs

@@ -1,2 +1,2 @@
-base_sha=5870f98d451e7b02557a603b55a756e9c69b4e4e
-branch=phase2-aws-kms-sdk-transport-20261008
+base_sha=3e9205c42337f4da159a36b981702956d6d8e6db
+branch=feat/phase4-testmode-stripe-retrieval-boundary-20261008

@@ -16,6 +16,7 @@ on:
       - 'saas/scripts/check-reviewed-package-import.mjs'
       - 'saas/scripts/translate-pending-language-packages.mjs'
       - 'saas/scripts/check-translation-engine-safety.mjs'
+      - 'saas/scripts/check-six-language-batch-e2e.mjs'
       - 'saas/scripts/check-five-language-platform.mjs'
       - 'saas/components/LanguageSuggestion.tsx'
       - 'saas/lib/i18n/pageLocales.ts'
@@ -58,3 +59,5 @@ jobs:
         run: node --test tests/sixLanguageCampaignPages.node.test.ts
       - name: Verify translator opt-in safety offline
         run: node scripts/check-translation-engine-safety.mjs
+      - name: Execute all six locale batches against offline mocked provider
+        run: node scripts/check-six-language-batch-e2e.mjs

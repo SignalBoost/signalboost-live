@@ -1,2 +1,2 @@
-base_sha=4c3ff49f94115c495311dcbff69927a348a79247
-branch=fix/phase4-stripe-test-proof-integer-guard-20261008
+base_sha=5870f98d451e7b02557a603b55a756e9c69b4e4e
+branch=phase2-aws-kms-sdk-transport-20261008

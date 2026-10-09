@@ -109,3 +109,17 @@ test('localized pages retain the global navbar and footer; only share demos hide
   assert.match(root, /<ShareRouteChrome>\s*<Navbar \/>/)
   assert.match(root, /<ShareRouteChrome>\s*<Footer \/>/)
 })
+
+test('global navbar uses route-bound translations on every public language', () => {
+  const navbar = read('../components/Navbar.tsx')
+  const localized = read('../components/seo/LocalizedPublicNavbar.tsx')
+  assert.match(navbar, /publicLocaleFromPath\(usePathname\(\)\)/)
+  assert.match(navbar, /<LocalizedPublicNavbar locale=\{locale\}/)
+  assert.match(localized, /PUBLIC_COPY\[locale\]/)
+  for (const locale of PUBLIC_LOCALES) {
+    assert.ok(PUBLIC_COPY[locale].home)
+    assert.ok(PUBLIC_COPY[locale].languages)
+    assert.ok(PUBLIC_COPY[locale].support)
+    assert.ok(PUBLIC_COPY[locale].privacy)
+  }
+})

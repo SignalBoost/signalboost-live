@@ -545,35 +545,7 @@ async function tryFreshCurrentFact(input: {
     evidence_selected: sources.length, pages_read: claimResearch.pagesRead, claims: claimResearch.claims,
   }
 
-  // Dated official TSE result snapshot. Only used if live retrieval fails during the
-  // 2026 runoff window; expires before voting closes. Never infer a winner from polls.
-  // Source: https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/flavio-bolsonaro-e-lula-vao-disputar-o-2o-turno-para-a-presidencia-da-republica
-  const brazilRunoffRequest = /(?:quem\\s+(?:ser[aá]|vai\\s+ser)\\s+(?:o\\s+)?pr[oó]ximo\\s+presidente|who\\s+will\\s+be\\s+(?:the\\s+)?next\\s+president)/iu.test(input.prompt)
-    && /(?:brasil|brazil)/iu.test(input.prompt)
-  const duringVerifiedBrazilRunoff = retrievedAt >= '2026-10-05' && retrievedAt < '2026-10-25'
-  if (brazilRunoffRequest && duringVerifiedBrazilRunoff && (!successfulResponses.length || !freshEvidenceMeetsAuthority(input.prompt, sources))) {
-    const officialUrl = 'https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/flavio-bolsonaro-e-lula-vao-disputar-o-2o-turno-para-a-presidencia-da-republica'
-    const reply = String(input.language || 'pt').startsWith('pt')
-      ? `Ainda não há vencedor definido. Flávio Bolsonaro (PL) e Luiz Inácio Lula da Silva (PT) disputarão o segundo turno da eleição presidencial brasileira em 25 de outubro de 2026, conforme o TSE. O resultado só será conhecido após a votação e a apuração oficial. Fonte: ${officialUrl}`
-      : `The next president has not been decided. Flávio Bolsonaro (PL) and Luiz Inácio Lula da Silva (PT) will contest Brazil's presidential runoff on October 25, 2026, according to the electoral authority (TSE). Source: ${officialUrl}`
-    return {
-      handled: true,
-      reply,
-      confidence: 0.99,
-      provenance: freshProvenance({
-        reasonerLabel: null,
-        localModelInvoked: false,
-        retrievedAt,
-        sources,
-        documentsAcquired,
-        responseSource: 'official_election_snapshot_fallback',
-        externalAiNecessary: false,
-        evidenceBudget: { search_result_limit: FRESH_SEARCH_RESULT_BUDGET, queries_run: queries.length, results_received: documentsAcquired, evidence_selected: sources.length, pages_read: claimResearch.pagesRead, claims: claimResearch.claims, stopping_reason: 'dated_official_election_snapshot' },
-      }) as any,
-    }
-  }
-
-  if (!successfulResponses.length || !freshEvidenceMeetsAuthority(input.prompt, sources)) {
+  if (!successfulResponses.length || !sources.length) {
     const errors = liveResponses.filter(response => !response.ok).map(response => response.error).filter(Boolean)
     const reason = errors.length
       ? `Live current-fact verification failed: ${errors.join('; ')}`
@@ -695,6 +667,7 @@ async function tryFreshCurrentFact(input: {
     }
   }
 
+  const authorityComplete = freshEvidenceMeetsAuthority(input.prompt, sources)
   const evidenceBlock = freshEvidenceGroundingBlock(input.prompt, sources, retrievedAt)
   // Labeled (2026-09-27): the live-fact answer uses the fresh-grounded lane's bounded policy instead of running
   // unlabeled on the background reasoner.
@@ -708,7 +681,9 @@ async function tryFreshCurrentFact(input: {
       'For any present/current claim, use only the server-retrieved LIVE evidence in the prompt for dates, quantities, URLs, and quoted findings.',
       'Never use pretrained memory, previous conversation facts, caches, or durable COS memory to invent a missing figure.',
       'LIVE snippets own measured figures. They do not own the question categories. Split overloaded terms before answering (raw group average vs equal-work comparison, legal rule vs outcome gap, sex vs identity, slogan vs measured residual). Write: constraint or definition first; what the cited number actually counted; what that count does not prove; then advocacy or institutional framing labelled as such. Do not let the first source headline become sentence one.',
-      'If independent sources disagree, or the evidence cannot establish the answer, say live verification is insufficient and use confidence <= 0.30.',
+      'If independent sources disagree, explain the disagreement and what each source actually supports rather than replacing the whole reply with a generic refusal. Never state an unsupported conclusion.',
+      'If only partial evidence is available, answer the supported portion with clear uncertainty and a confidence <= 0.65. If even that is unsupported, state what remains unknown and use confidence <= 0.30.',
+      authorityComplete ? 'Evidence authority gate passed.' : 'Evidence is partial or missing independent corroboration: explicitly disclose that limitation, and do not assert unsupported facts.',
       'Answer from the supplied evidence, but do not show source labels or URLs unless the user asks. Recorded provenance retains the exact sources.',
       ...QUANTITATIVE_ANSWER_POLICY,
     ].join(' '),
@@ -741,12 +716,10 @@ async function tryFreshCurrentFact(input: {
     return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any }
   }
 
-  const citesIndependentEvidence = freshEvidenceMeetsAuthority(input.prompt, sources)
+  const citesIndependentEvidence = authorityComplete
   const confidence = Math.max(0, Math.min(1, parsed.confidence))
-  if (!citesIndependentEvidence || confidence < confidenceThreshold()) {
-    const reason = !citesIndependentEvidence
-      ? 'Current-fact synthesis was rejected because it did not cite the required independent live sources.'
-      : `Current-fact synthesis confidence ${confidence.toFixed(2)} is below threshold ${confidenceThreshold().toFixed(2)}.`
+  if (confidence < confidenceThreshold() && citesIndependentEvidence) {
+    const reason = `Current-fact synthesis confidence ${confidence.toFixed(2)} is below threshold ${confidenceThreshold().toFixed(2)}.`
     return {
       handled: false,
       confidence,
@@ -755,12 +728,15 @@ async function tryFreshCurrentFact(input: {
       provenance: {
         ...provenance,
         externalAiNecessary: true,
-        escalationReasonCode: !citesIndependentEvidence ? 'citation_grounding_rejected' : 'local_synthesis_below_threshold',
+        escalationReasonCode: 'local_synthesis_below_threshold',
         escalationReason: reason,
       } as any,
     }
   }
 
+  if (!citesIndependentEvidence && confidence > 0.65) {
+    return { handled: false, confidence: 0, reason: 'Partial evidence was overclaimed by synthesis', provenance: { ...provenance, escalationReasonCode: 'partial_evidence_overclaimed' } as any }
+  }
   return { handled: true, reply: parsed.answer, confidence, provenance: { ...provenance, externalAiNecessary: false, escalationReasonCode: null, escalationReason: null } as any }
 }
 

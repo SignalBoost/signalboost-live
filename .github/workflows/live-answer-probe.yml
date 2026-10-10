@@ -1,0 +1,76 @@
+# .github/workflows/live-answer-probe.yml
+#
+# Manually dispatched probe: asks production Concierge one question exactly as the homepage does and
+# reports the reply and its provenance as run annotations, so a developer can verify live answers
+# without owner screenshots. Read-only: it sends one anonymous visitor turn and uses no secrets.
+name: Live Answer Probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      question:
+        description: Question to ask production Concierge
+        required: true
+      language:
+        description: Concierge language code
+        required: false
+        default: en
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Ask production Concierge
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Ask and report
+        env:
+          QUESTION: ${{ inputs.question }}
+          LANGUAGE: ${{ inputs.language }}
+          ORIGIN_URL: https://itmounts.com
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs')
+          const body = {
+            messages: [{ role: 'user', content: process.env.QUESTION }],
+            attachments: [],
+            context: { currentPage: '/', language: process.env.LANGUAGE || 'en', cosMode: 'silent_background_planning', timezone: 'UTC' },
+          }
+          fs.writeFileSync('payload.json', JSON.stringify(body))
+          NODE
+          started=$(date +%s)
+          code=$(curl --silent --show-error --max-time 290 --request POST "$ORIGIN_URL/api/cos-browser" \
+            --header 'Content-Type: application/json' --header 'Accept: application/json' \
+            --header 'x-signalboost-surface: concierge' \
+            --header "Origin: $ORIGIN_URL" --header "Referer: $ORIGIN_URL/" \
+            --header 'Sec-Fetch-Site: same-origin' --header 'Sec-Fetch-Mode: cors' \
+            --data-binary @payload.json --output response.json --write-out '%{http_code}' || echo 000)
+          elapsed=$(( $(date +%s) - started ))
+          HTTP_CODE="$code" ELAPSED="$elapsed" node <<'NODE'
+          const fs = require('node:fs')
+          const esc = value => String(value).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+          const notice = (title, value) => console.log(`::notice title=${title}::${esc(value)}`)
+          let raw = ''
+          try { raw = fs.readFileSync('response.json', 'utf8') } catch {}
+          let data = null
+          try { data = JSON.parse(raw) } catch {}
+          notice('status', `http=${process.env.HTTP_CODE} elapsed=${process.env.ELAPSED}s question=${process.env.QUESTION}`)
+          if (!data) { notice('raw', raw.slice(0, 1500) || '(empty body)'); process.exit(process.env.HTTP_CODE === '200' ? 0 : 1) }
+          const reply = String(data.reply || data.error || '')
+          for (let i = 0; i < Math.min(3, Math.ceil(reply.length / 1500) || 1); i++) notice(`reply ${i + 1}`, reply.slice(i * 1500, (i + 1) * 1500) || '(no reply)')
+          const p = data.execution_provenance || data.provenance || {}
+          const pick = {
+            source: data.source,
+            status: data.status,
+            responseSource: p.responseSource ?? p.response_source,
+            escalationReasonCode: p.escalationReasonCode ?? p.escalation_reason_code,
+            escalationReason: p.escalationReason ?? p.escalation_reason,
+            stopping_reason: p.evidenceBudget?.stopping_reason ?? p.evidence_budget?.stopping_reason,
+            live_sources: (data.live_evidence_sources || p.liveExternalEvidence?.sources || p.live_external_evidence?.sources || []).length,
+          }
+          notice('provenance', JSON.stringify(pick))
+          notice('keys', Object.keys(data).join(','))
+          NODE

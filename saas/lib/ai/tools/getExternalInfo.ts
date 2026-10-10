@@ -20,6 +20,7 @@ import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
 import type { ExternalSignalInput } from '@/lib/cos/external-signals'
 import { searchThroughGovernedWebKnowledge } from '@/lib/ai/tools/governedWebKnowledgeSearch'
+import { turnDeadlineRemainingMs } from '@/lib/ai/cos/cosTurnBudget'
 
 export type SearchResult = {
   title: string
@@ -216,6 +217,40 @@ function dedupeSearchResults(results: SearchResult[]): SearchResult[] {
   return out
 }
 
+// SEARCH WITHIN THE TURN BUDGET (2026-10-10). Production Concierge, "quem sera o proximo presidente do Brasil?":
+// the background turn ran past the page's 180 s wait. Model calls were already clamped to the turn deadline, but
+// web searches were not — the governed research backend has no time limit of its own — so one slow search could
+// consume the whole turn, and the single retry could double it. Each attempt is now capped, never outlives the
+// turn, and optional extra searches run only while the turn still has comfortable time.
+const SEARCH_ATTEMPT_TIMEOUT_MS = 20_000
+const SEARCH_DEADLINE_MARGIN_MS = 5_000
+const OPTIONAL_SEARCH_MIN_REMAINING_MS = 30_000
+
+function searchAttemptBudgetMs(): number {
+  const remaining = turnDeadlineRemainingMs()
+  return remaining === null ? SEARCH_ATTEMPT_TIMEOUT_MS : Math.min(SEARCH_ATTEMPT_TIMEOUT_MS, remaining - SEARCH_DEADLINE_MARGIN_MS)
+}
+
+/** True when an optional search (retry, diversity lane) still fits comfortably inside the turn. */
+function optionalSearchFits(): boolean {
+  const remaining = turnDeadlineRemainingMs()
+  return remaining === null || remaining >= OPTIONAL_SEARCH_MIN_REMAINING_MS
+}
+
+async function searchWithinBudget(query: string, count: number): Promise<SearchResult[]> {
+  const budgetMs = searchAttemptBudgetMs()
+  if (budgetMs < 1_000) throw new Error('turn_deadline_reached_before_search')
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`search_timeout_after_${budgetMs}ms`)), budgetMs)
+  })
+  try {
+    return await Promise.race([getWebSearchPort().search(query, count), timeout])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export async function getExternalInfo(
   query: string,
   requestedCount = DEFAULT_RESULT_COUNT,
@@ -274,18 +309,18 @@ export async function getExternalInfo(
     // with the plain question when the first attempt carried official-source hints, otherwise the same query
     // (a transient provider error) — before reporting failure.
     let firstError: unknown = null
-    let primaryRaw = await getWebSearchPort().search(searchQuery, count).catch((error: unknown) => { firstError = error; return [] as SearchResult[] })
-    if (!primaryRaw.length) {
+    let primaryRaw = await searchWithinBudget(searchQuery, count).catch((error: unknown) => { firstError = error; return [] as SearchResult[] })
+    if (!primaryRaw.length && optionalSearchFits()) {
       const retryQuery = clampSearchQuery(providerQuery)
-      primaryRaw = await getWebSearchPort().search(retryQuery, count).catch((error: unknown) => { firstError = firstError ?? error; return [] as SearchResult[] })
-      if (!primaryRaw.length && firstError) throw firstError
+      primaryRaw = await searchWithinBudget(retryQuery, count).catch((error: unknown) => { firstError = firstError ?? error; return [] as SearchResult[] })
     }
+    if (!primaryRaw.length && firstError) throw firstError
     let rawResults = primaryRaw
-    if (diversityQuery) {
+    if (diversityQuery && optionalSearchFits()) {
       // This second lane is evidence acquisition, not a semantic conclusion. It looks for credible
       // alternative methods/interpretations so the neural planner can decide whether divergence is
       // material. Failure of the diversity lane never discards otherwise valid primary evidence.
-      const diversityRaw = await getWebSearchPort().search(diversityQuery, Math.min(4, count)).catch(() => [])
+      const diversityRaw = await searchWithinBudget(diversityQuery, Math.min(4, count)).catch(() => [] as SearchResult[])
       const primaryUrls = new Set(primaryRaw.map(result => String(result.url || '').toLowerCase().replace(/\/$/, '')))
       const novelDiversity = diversityRaw.filter(result => !primaryUrls.has(String(result.url || '').toLowerCase().replace(/\/$/, '')))
       const reserve = Math.min(2, novelDiversity.length, Math.max(0, count - 1))

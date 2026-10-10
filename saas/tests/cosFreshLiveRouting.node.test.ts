@@ -82,7 +82,8 @@ test('high-frequency values require structured real-time data before ordinary we
   const cleanQuery = source.indexOf('structuredProviderQuery(q)')
   const structuredClass = source.indexOf('structuredLiveDataKind(structuredQuery)')
   const structuredFetch = source.indexOf('await getStructuredLiveInfo(structuredQuery, structuredKind)')
-  const ordinarySearch = source.indexOf('await getWebSearchPort().search(')
+  // 2026-10-10: ordinary search runs through the turn-budget-capped helper (see liveSearchTurnBudget.node.test.ts).
+  const ordinarySearch = source.indexOf('await searchWithinBudget(searchQuery, count)')
   assert.ok(cleanQuery >= 0, 'external lookup must remove authority-search suffixes before structured lookup')
   assert.ok(structuredClass > cleanQuery, 'structured live-data classification must use the clean query')
   assert.ok(structuredFetch > structuredClass, 'structured provider must be called after classification')

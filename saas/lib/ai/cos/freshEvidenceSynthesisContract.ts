@@ -54,7 +54,7 @@ export const SINGLE_PROPOSITION_SOURCE_LIMIT = 2
 export const SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT = 650
 const MAX_SEMANTIC_SCOPES = 5
 const SCOPE_ID = /^[A-Za-z0-9_-]{1,32}$/
-const BINARY_LEAD = /^\s*(?:yes|no|sí|si|não|nao|tak|nie|да|нет|ja|nein|oui|non|sì|はい|いいえ|네|예|아니요|아니오|نعم|لا)(?:\s|[,.!:;?—–、。，-]|$)/iu
+export const FRESH_EVIDENCE_BINARY_LEAD = /^\s*(?:yes|no|sí|si|não|nao|tak|nie|да|нет|ja|nein|oui|non|sì|はい|いいえ|네|예|아니요|아니오|نعم|لا)(?:\s|[,.!:;?—–、。，-]|$)/iu
 
 function languageLabel(language: string): string {
   return SUPPORTED_LANGUAGE_NAMES[normalizeSupportedLanguage(language || 'en')]
@@ -321,7 +321,7 @@ export function acceptFreshEvidenceSynthesis(args: {
   const answer = typeof parsed?.answer === 'string' ? parsed.answer.trim() : ''
   if (!answer || /EVIDENCE_INSUFFICIENT/i.test(answer)) return null
   if (!answerRespectsRequestedWindow(answer, args.input)) return null
-  if ((args.semanticPlan.presentationMode === 'neutral_evidence_map' || !args.semanticPlan.directBinaryAnswerSafe) && BINARY_LEAD.test(answer)) return null
+  if ((args.semanticPlan.presentationMode === 'neutral_evidence_map' || !args.semanticPlan.directBinaryAnswerSafe) && FRESH_EVIDENCE_BINARY_LEAD.test(answer)) return null
 
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
   const rawEvidenceIds = uniqueStrings(parsed?.evidenceIds)

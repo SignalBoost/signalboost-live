@@ -5,7 +5,7 @@
 // Production mutation, or broader agent authority.
 
 import { randomUUID } from 'node:crypto'
-import { searchPublicWeb } from '../../lib/ai/tools/publicWebAgent'
+import { searchPublicWeb } from '../../lib/ai/tools/publicWebAgent.ts'
 import { assessWebTrainingSource } from '../../lib/cos-core/layers/learning/webTrainingDataLayer.ts'
 import type { LearningConnectorSearch } from '../../lib/cos-core/layers/learning/connectors.ts'
 import {
@@ -260,8 +260,9 @@ export type WebKnowledgeHarnessResult =
 /**
  * Canonical Production execution path for agents that use Web Knowledge Acquisition.
  * A parent HarnessRun may delegate this read only when the parent already contains the same grant.
- * The built-in acquisition path is provider-free; paid discovery must supply its own separately
- * governed spend boundary rather than smuggling a paid call through this zero-cost native path.
+ * The built-in acquisition path is provider-free. A paid discovery key is never read here: only the
+ * host may supply one through `research` (createWebKnowledgeResearchPort options), for a lane it has
+ * authorized to spend, and each result then records its discovery_provider.
  */
 export async function runWebKnowledgeResearchProductionHarness(input: {
   query: string

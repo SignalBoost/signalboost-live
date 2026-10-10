@@ -39,6 +39,17 @@ function activeParentHasWebKnowledgeGrant(): boolean {
   ))
 }
 
+// LIVE-ANSWER DISCOVERY (2026-10-10). Before live answers were routed through this governed run, the
+// live-answer lane searched with the operator's BRAVE_SEARCH_API_KEY first. The governed run only had the
+// free HTML scrapers, which return nothing from the hosting network, so every live-fact question was refused
+// with web_knowledge_no_results. The host now supplies the same key to this user-initiated lane; the free
+// scrapers remain the fallback, and each result records its discovery_provider. Background training search is
+// unaffected and stays gated by its own COS_WEB_TRAINING_USE_BRAVE opt-in.
+function liveAnswerResearchPort(): WebKnowledgeResearchPort {
+  const braveApiKey = clean(process.env.BRAVE_SEARCH_API_KEY, 500)
+  return createWebKnowledgeResearchPort(braveApiKey ? { braveApiKey, useBrave: true } : {})
+}
+
 function defaultEvidenceSink(): HarnessEvidenceSink | null {
   const db = cosServiceDb()
   return db ? createSupervisorAuditHarnessEvidenceSink(db as any) : null
@@ -89,7 +100,7 @@ export async function searchThroughGovernedWebKnowledge(input: {
     })
   }
 
-  const research = input.research ?? createWebKnowledgeResearchPort()
+  const research = input.research ?? liveAnswerResearchPort()
   const outcome = await runWebKnowledgeResearchProductionHarness({
     query,
     purpose: 'agent_research',

@@ -43,6 +43,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - name: Install dependencies (TypeScript parser for the RTL styling guard)
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Enforce the eleven-language production contract
         run: node scripts/check-eleven-language-platform.mjs
       - name: Require complete coverage for every active language

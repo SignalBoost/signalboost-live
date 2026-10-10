@@ -17,7 +17,7 @@ export default function AgencyPricing({ copy }: AgencyPricingProps) {
             <h3 className="sb-h3">{plan.name}</h3>
             <p className="sb-body" style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>{plan.price}</p>
             <p className="sb-caption" style={{ marginBottom: 18 }}>{plan.fee}</p>
-            <ul style={{ margin: 0, paddingLeft: 18, color: 'rgba(255,255,255,.78)', display: 'grid', gap: 10 }}>
+            <ul style={{ margin: 0, paddingInlineStart: 18, color: 'rgba(255,255,255,.78)', display: 'grid', gap: 10 }}>
               {plan.features.map((feature) => <li key={feature}>{feature}</li>)}
             </ul>
           </article>

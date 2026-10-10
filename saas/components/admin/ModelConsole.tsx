@@ -498,12 +498,12 @@ export default function ModelConsole() {
         </div>
         <fieldset style={{ marginTop:16, border:'1px solid #334155', borderRadius:10 }}>
           <legend>{text.uses}</legend>
-          {uses.map(use=><label key={use} style={{ marginRight:18 }}><input type="checkbox" checked={form[use]} onChange={e=>setForm(v=>({...v,[use]:e.target.checked}))} /> {use}</label>)}
+          {uses.map(use=><label key={use} style={{ marginInlineEnd:18 }}><input type="checkbox" checked={form[use]} onChange={e=>setForm(v=>({...v,[use]:e.target.checked}))} /> {use}</label>)}
         </fieldset>
         <fieldset style={{ marginTop:12, border:'1px solid #334155', borderRadius:10 }}>
           <legend>{uiText('generatedUi.u_9460f16ac9b5171e')}</legend>
-          <label style={{ marginRight:18 }}><input type="checkbox" checked={form.structuredJson} onChange={e=>setForm(v=>({...v,structuredJson:e.target.checked}))} /> {text.json}</label>
-          <label style={{ marginRight:18 }}><input type="checkbox" checked={form.toolCalling} onChange={e=>setForm(v=>({...v,toolCalling:e.target.checked}))} /> {text.tools}</label>
+          <label style={{ marginInlineEnd:18 }}><input type="checkbox" checked={form.structuredJson} onChange={e=>setForm(v=>({...v,structuredJson:e.target.checked}))} /> {text.json}</label>
+          <label style={{ marginInlineEnd:18 }}><input type="checkbox" checked={form.toolCalling} onChange={e=>setForm(v=>({...v,toolCalling:e.target.checked}))} /> {text.tools}</label>
           <label><input type="checkbox" checked={form.streaming} onChange={e=>setForm(v=>({...v,streaming:e.target.checked}))} /> {text.streaming}</label>
         </fieldset>
         <button disabled={running==='register'} type="submit" style={{ marginTop:16, padding:'10px 16px' }}>{running==='register' ? text.saving : text.save}</button>

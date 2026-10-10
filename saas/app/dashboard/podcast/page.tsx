@@ -163,7 +163,7 @@ export default function PodcastPage() {
             ))}
           </section>
 
-          <aside style={{ minWidth: 0, borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 24 }}>
+          <aside style={{ minWidth: 0, borderInlineStart: '1px solid rgba(255,255,255,.08)', paddingInlineStart: 24 }}>
             <h2 style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-.02em', margin: '0 0 10px' }}>{tr('podcasters.host', 'Host')}</h2>
 
             <div

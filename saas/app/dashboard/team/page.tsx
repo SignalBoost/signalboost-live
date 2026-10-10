@@ -783,7 +783,7 @@ const [members, setMembers] = useState<Member[]>([])
       <section className="sb-card" style={{ padding: 18, marginTop: 22 }}>
         <h3 className="sb-h3" style={{ marginTop: 0, fontSize: 15 }}>{copy.howRolesWork}</h3>
 
-        <ul style={{ margin: '8px 0 0', paddingLeft: 18, color: 'rgba(255,255,255,.75)', fontSize: 13, lineHeight: 1.7 }}>
+        <ul style={{ margin: '8px 0 0', paddingInlineStart: 18, color: 'rgba(255,255,255,.75)', fontSize: 13, lineHeight: 1.7 }}>
           <li><strong style={{ color: ROLE_STYLE.owner.color }}>{copy.roles.owner.label}</strong> — {copy.ownerRule}</li>
           <li><strong style={{ color: ROLE_STYLE.admin.color }}>{copy.roles.admin.label}</strong> — {copy.adminRule}</li>
           <li><strong style={{ color: ROLE_STYLE.member.color }}>{copy.roles.member.label}</strong> — {copy.memberRule}</li>

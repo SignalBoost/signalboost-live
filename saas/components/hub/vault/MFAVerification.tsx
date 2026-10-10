@@ -132,7 +132,7 @@ export default function MFAVerification({
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  textAlign: 'left',
+                  textAlign: 'start',
                   display: 'flex',
                   gap: 10,
                   alignItems: 'center',

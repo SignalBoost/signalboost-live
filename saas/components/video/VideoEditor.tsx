@@ -154,7 +154,7 @@ function PresetPicker({ activePreset, onPreset, lang }: { activePreset: string; 
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{c('templates', lang)}</h2><span className="text-xs text-white/50">{c('templatesHint', lang)}</span></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {captionPresets.map((p) => (
-          <button key={p.id} type="button" onClick={() => onPreset(p)} className={`rounded-2xl border p-4 text-left transition ${activePreset === p.id ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
+          <button key={p.id} type="button" onClick={() => onPreset(p)} className={`rounded-2xl border p-4 text-start transition ${activePreset === p.id ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
             <span className="font-bold">{p.label}</span><span className="mt-1 block text-xs text-white/55">{c(p.descKey, lang)}</span>
           </button>
         ))}
@@ -177,7 +177,7 @@ function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, o
       <div className="mt-4 max-h-72 space-y-2 overflow-auto">
         {cues.length === 0 ? <p className="rounded-2xl border border-dashed border-white/15 p-4 text-sm text-white/55">{c('noCaptions', lang)}</p> : null}
         {cues.map((cu) => (
-          <button key={cu.id} type="button" onClick={() => { onSelect(cu.id); onSeek(cu.start) }} className={`w-full rounded-2xl border p-3 text-left text-sm transition ${sel?.id === cu.id || (currentTime >= cu.start && currentTime <= cu.end) ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
+          <button key={cu.id} type="button" onClick={() => { onSelect(cu.id); onSeek(cu.start) }} className={`w-full rounded-2xl border p-3 text-start text-sm transition ${sel?.id === cu.id || (currentTime >= cu.start && currentTime <= cu.end) ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
             <span className="font-mono text-xs text-[#FFD700]">{formatTime(cu.start)} → {formatTime(cu.end)}</span><br />{cu.text}
           </button>
         ))}
@@ -314,7 +314,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     return (
       <section className="border-t border-white/10 pt-5">
         <div className={`relative mx-auto h-[calc(100vh-470px)] min-h-[240px] w-auto max-w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 ${aspectClasses[aspectRatio]}`}>
-          <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2.5 py-1 font-mono text-[11px] text-white/70 ring-1 ring-white/15">{formatTime(time)} · {aspectRatio}</span>
+          <span className="pointer-events-none absolute end-2 top-2 z-10 rounded-full bg-black/70 px-2.5 py-1 font-mono text-[11px] text-white/70 ring-1 ring-white/15">{formatTime(time)} · {aspectRatio}</span>
           {videoUrl ? <video ref={videoRef} src={videoUrl} className="hidden" playsInline crossOrigin="anonymous" onLoadedMetadata={(e) => onDuration(Math.round(e.currentTarget.duration || 0))} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onTimeUpdate={(e) => { const n = e.currentTarget.currentTime; lastReportedRef.current = n; setTime(n); onTime(n) }} /> : null}
           <canvas ref={canvasRef} width={size.width} height={size.height} onPointerDown={(e) => { setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); setPos(e) }} onPointerMove={(e) => dragging && setPos(e)} onPointerUp={(e) => { setDragging(false); e.currentTarget.releasePointerCapture(e.pointerId) }} className="h-full w-full cursor-move touch-none" aria-label={uiText('generatedUi.u_c407ce3132ddb126')} />
         </div>

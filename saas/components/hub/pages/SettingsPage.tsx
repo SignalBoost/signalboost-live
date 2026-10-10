@@ -273,7 +273,7 @@ function ToggleSetting({
           position: 'relative',
           transition: 'background 0.2s',
           flexShrink: 0,
-          marginLeft: '1rem',
+          marginInlineStart: '1rem',
         }}
       >
         <div

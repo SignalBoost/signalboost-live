@@ -126,30 +126,30 @@ export default function LabExperimentPanel({ copy }: { copy: ItmountsLabExperime
       <h3 className="mt-5 font-medium">{copy.runsTitle}</h3>
       {!runs.length ? <p className="mt-1 text-sm opacity-75">{copy.noRuns}</p> : (
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-start text-xs">
             <thead className="opacity-65">
               <tr>
-                <th className="py-1 pr-3">{copy.columnSubject}</th>
-                <th className="py-1 pr-3">{copy.columnCandidate}</th>
-                <th className="py-1 pr-3">{copy.columnStarted}</th>
-                <th className="py-1 pr-3">{copy.columnWindow}</th>
-                <th className="py-1 pr-3">{copy.columnTraining}</th>
-                <th className="py-1 pr-3">{copy.columnArtifact}</th>
-                <th className="py-1 pr-3">{copy.columnResidency}</th>
-                <th className="py-1 pr-3">{copy.columnGraduate}</th>
+                <th className="py-1 pe-3">{copy.columnSubject}</th>
+                <th className="py-1 pe-3">{copy.columnCandidate}</th>
+                <th className="py-1 pe-3">{copy.columnStarted}</th>
+                <th className="py-1 pe-3">{copy.columnWindow}</th>
+                <th className="py-1 pe-3">{copy.columnTraining}</th>
+                <th className="py-1 pe-3">{copy.columnArtifact}</th>
+                <th className="py-1 pe-3">{copy.columnResidency}</th>
+                <th className="py-1 pe-3">{copy.columnGraduate}</th>
               </tr>
             </thead>
             <tbody>
               {runs.map(run => (
                 <tr key={run.grantId} className="border-t align-top">
-                  <td className="py-1 pr-3">{run.subjectId}</td>
-                  <td className="py-1 pr-3 font-mono">{run.candidateId}</td>
-                  <td className="py-1 pr-3">{stamp(run.startedAt)}</td>
-                  <td className="py-1 pr-3">{run.active ? copy.windowActive : copy.windowExpired} · {stamp(run.expiresAt)}</td>
-                  <td className="py-1 pr-3">{cell(run.trainingStage)}{run.trainingFailure ? <span className="block opacity-65">{run.trainingFailure}</span> : null}</td>
-                  <td className="py-1 pr-3">{cell(run.artifactStatus)}</td>
-                  <td className="py-1 pr-3">{cell(run.residencyStanding)}</td>
-                  <td className="py-1 pr-3">{cell(run.graduateStatus)}</td>
+                  <td className="py-1 pe-3">{run.subjectId}</td>
+                  <td className="py-1 pe-3 font-mono">{run.candidateId}</td>
+                  <td className="py-1 pe-3">{stamp(run.startedAt)}</td>
+                  <td className="py-1 pe-3">{run.active ? copy.windowActive : copy.windowExpired} · {stamp(run.expiresAt)}</td>
+                  <td className="py-1 pe-3">{cell(run.trainingStage)}{run.trainingFailure ? <span className="block opacity-65">{run.trainingFailure}</span> : null}</td>
+                  <td className="py-1 pe-3">{cell(run.artifactStatus)}</td>
+                  <td className="py-1 pe-3">{cell(run.residencyStanding)}</td>
+                  <td className="py-1 pe-3">{cell(run.graduateStatus)}</td>
                 </tr>
               ))}
             </tbody>

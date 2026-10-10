@@ -495,37 +495,37 @@ export default function CosUniversityTelemetryPage() {
           <p className="text-xs opacity-65">{copy.runsExplanation}</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
+          <table className="w-full min-w-[1100px] text-start text-sm">
             <thead className="border-b text-xs uppercase opacity-60">
               <tr>
-                <th className="pb-3 pr-4">{copy.subject}</th>
-                <th className="pb-3 pr-4">{copy.stage}</th>
-                <th className="pb-3 pr-4">{copy.teacherMix}</th>
-                <th className="pb-3 pr-4">{copy.outputs}</th>
-                <th className="pb-3 pr-4">{copy.preparation}</th>
-                <th className="pb-3 pr-4">{copy.training}</th>
-                <th className="pb-3 pr-4">{copy.campaignBudget}</th>
+                <th className="pb-3 pe-4">{copy.subject}</th>
+                <th className="pb-3 pe-4">{copy.stage}</th>
+                <th className="pb-3 pe-4">{copy.teacherMix}</th>
+                <th className="pb-3 pe-4">{copy.outputs}</th>
+                <th className="pb-3 pe-4">{copy.preparation}</th>
+                <th className="pb-3 pe-4">{copy.training}</th>
+                <th className="pb-3 pe-4">{copy.campaignBudget}</th>
                 <th className="pb-3">{copy.updated}</th>
               </tr>
             </thead>
             <tbody>
               {runs.map(run => (
                 <tr key={run.runId} className="border-b border-white/10 align-top">
-                  <td className="py-3 pr-4">
+                  <td className="py-3 pe-4">
                     <div className="font-medium">{run.subject || copy.unknownSubject}</div>
                     <div className="mt-1 font-mono text-[11px] opacity-50">{short(run.runId, 16)}</div>
                     {run.failureReason ? <div className="mt-1 max-w-sm text-xs text-red-300">{run.failureReason}</div> : null}
                   </td>
-                  <td className="py-3 pr-4">
+                  <td className="py-3 pe-4">
                     <span className={'inline-block rounded-full border px-2 py-1 text-xs ' + stageClass(run.stageBucket)}>
                       {run.stage || copy.unknownStage}
                     </span>
                   </td>
-                  <td className="py-3 pr-4 font-mono text-xs">{mixLabel(run.providerMix)}</td>
-                  <td className="py-3 pr-4 tabular-nums">{run.teacherOutputs}</td>
-                  <td className="py-3 pr-4"><JobCell job={run.preparation} /></td>
-                  <td className="py-3 pr-4"><JobCell job={run.training} /></td>
-                  <td className="py-3 pr-4 tabular-nums">
+                  <td className="py-3 pe-4 font-mono text-xs">{mixLabel(run.providerMix)}</td>
+                  <td className="py-3 pe-4 tabular-nums">{run.teacherOutputs}</td>
+                  <td className="py-3 pe-4"><JobCell job={run.preparation} /></td>
+                  <td className="py-3 pe-4"><JobCell job={run.training} /></td>
+                  <td className="py-3 pe-4 tabular-nums">
                     {money(run.campaignCommittedCostUsd)} / {money(run.campaignMaxCostUsd)}
                   </td>
                   <td className="py-3 text-xs opacity-65">{when(run.updatedAt)}</td>
@@ -694,36 +694,36 @@ export default function CosUniversityTelemetryPage() {
           <p className="text-xs opacity-65">{copy.artifactsExplanation}</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px] text-left text-sm">
+          <table className="w-full min-w-[1200px] text-start text-sm">
             <thead className="border-b text-xs uppercase opacity-60">
               <tr>
-                <th className="pb-3 pr-4">{copy.subject}</th>
-                <th className="pb-3 pr-4">{copy.artifactStatus}</th><th className="pb-3 pr-4">{uiText('generatedUi.u_91766a00731be267')}</th><th className="pb-3 pr-4">{uiText('generatedUi.u_8cd6bbc7db414796')}</th><th className="pb-3 pr-4">{uiText('generatedUi.u_365987d015f79bfb')}</th>
-                <th className="pb-3 pr-4">{copy.retentionGate}</th>
-                <th className="pb-3 pr-4">{copy.claimability}</th>
-                <th className="pb-3 pr-4">{copy.holdout}</th>
-                <th className="pb-3 pr-4">{copy.safety}</th>
-                <th className="pb-3 pr-4">{copy.transfer}</th>
-                <th className="pb-3 pr-4">{copy.retention}</th>
-                <th className="pb-3 pr-4">{copy.graduation}</th>
+                <th className="pb-3 pe-4">{copy.subject}</th>
+                <th className="pb-3 pe-4">{copy.artifactStatus}</th><th className="pb-3 pe-4">{uiText('generatedUi.u_91766a00731be267')}</th><th className="pb-3 pe-4">{uiText('generatedUi.u_8cd6bbc7db414796')}</th><th className="pb-3 pe-4">{uiText('generatedUi.u_365987d015f79bfb')}</th>
+                <th className="pb-3 pe-4">{copy.retentionGate}</th>
+                <th className="pb-3 pe-4">{copy.claimability}</th>
+                <th className="pb-3 pe-4">{copy.holdout}</th>
+                <th className="pb-3 pe-4">{copy.safety}</th>
+                <th className="pb-3 pe-4">{copy.transfer}</th>
+                <th className="pb-3 pe-4">{copy.retention}</th>
+                <th className="pb-3 pe-4">{copy.graduation}</th>
                 <th className="pb-3">{copy.updated}</th>
               </tr>
             </thead>
             <tbody>
               {artifacts.map(artifact => (
                 <tr key={artifact.candidateId + ':' + artifact.artifactHash} className="border-b border-white/10 align-top">
-                  <td className="py-3 pr-4">
+                  <td className="py-3 pe-4">
                     <div className="font-medium">{artifact.subject || copy.unknownSubject}</div>
                     <div className="mt-1 font-mono text-[11px] opacity-50">{short(artifact.candidateId, 20)}</div>
                   </td>
-                  <td className="py-3 pr-4"><span className="rounded-full border px-2 py-1 text-xs">{artifact.status || copy.unknownStage}</span></td><td className="py-3 pr-4 text-xs font-medium">{artifact.currentStage}</td><td className="py-3 pr-4 text-xs">{gateLabel(artifact.blocker)}</td><td className="py-3 pr-4 text-xs">{artifact.nextAction}</td>
-                  <td className="py-3 pr-4 text-xs">{when(artifact.retentionEligibleAt)}</td>
-                  <td className="py-3 pr-4 text-xs font-medium">{copy.claimabilityStates[artifact.claimability] || artifact.claimability}</td>
-                  <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.holdoutImproved ? copy.pass : copy.fail) : copy.pending}</td>
-                  <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.safetyPassed ? copy.pass : copy.fail) : copy.pending}</td>
-                  <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.unseenTransferPassed ? copy.pass : copy.fail) : copy.pending}</td>
-                  <td className="py-3 pr-4 text-xs">{artifact.evaluation ? (artifact.evaluation.delayedRetentionPassed ? copy.pass : copy.fail) : copy.pending}</td>
-                  <td className="py-3 pr-4 text-xs">{artifact.graduate?.status || copy.notGraduated}</td>
+                  <td className="py-3 pe-4"><span className="rounded-full border px-2 py-1 text-xs">{artifact.status || copy.unknownStage}</span></td><td className="py-3 pe-4 text-xs font-medium">{artifact.currentStage}</td><td className="py-3 pe-4 text-xs">{gateLabel(artifact.blocker)}</td><td className="py-3 pe-4 text-xs">{artifact.nextAction}</td>
+                  <td className="py-3 pe-4 text-xs">{when(artifact.retentionEligibleAt)}</td>
+                  <td className="py-3 pe-4 text-xs font-medium">{copy.claimabilityStates[artifact.claimability] || artifact.claimability}</td>
+                  <td className="py-3 pe-4 text-xs">{artifact.evaluation ? (artifact.evaluation.holdoutImproved ? copy.pass : copy.fail) : copy.pending}</td>
+                  <td className="py-3 pe-4 text-xs">{artifact.evaluation ? (artifact.evaluation.safetyPassed ? copy.pass : copy.fail) : copy.pending}</td>
+                  <td className="py-3 pe-4 text-xs">{artifact.evaluation ? (artifact.evaluation.unseenTransferPassed ? copy.pass : copy.fail) : copy.pending}</td>
+                  <td className="py-3 pe-4 text-xs">{artifact.evaluation ? (artifact.evaluation.delayedRetentionPassed ? copy.pass : copy.fail) : copy.pending}</td>
+                  <td className="py-3 pe-4 text-xs">{artifact.graduate?.status || copy.notGraduated}</td>
                   <td className="py-3 text-xs opacity-65">{when(artifact.updatedAt)}</td>
                 </tr>
               ))}

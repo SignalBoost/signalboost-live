@@ -172,7 +172,7 @@ export default function ProviderExecutionModePanel({
                     border: active ? '1px solid rgba(26,240,255,.72)' : '1px solid rgba(255,255,255,.12)',
                     background: active ? 'rgba(26,240,255,.12)' : 'rgba(255,255,255,.035)',
                     color: '#fff',
-                    textAlign: 'left',
+                    textAlign: 'start',
                     cursor: 'pointer',
                     fontSize: 12,
                     fontWeight: 700,

@@ -89,12 +89,12 @@ export default function ProviderHealthPage(_props: PageProps) {
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={labelStyle}>{t(dict, 'console.providerHealth.environment')}</span>
           {environments.map(env => <button key={env} onClick={() => setEnvironment(env)} className="hub-chip" style={{ padding: '7px 12px', borderRadius: 10, border: environment === env ? `1px solid ${TONES.gold.border}` : '1px solid rgba(255,255,255,.12)', background: environment === env ? TONES.gold.soft : 'rgba(255,255,255,.04)', color: environment === env ? '#ffc300' : 'rgba(255,255,255,.68)', fontSize: 12.5, fontWeight: 800 }}>{env}</button>)}
-          <span style={{ ...labelStyle, marginLeft: 8 }}>{t(dict, 'console.providerHealth.monitor')}</span>
+          <span style={{ ...labelStyle, marginInlineStart: 8 }}>{t(dict, 'console.providerHealth.monitor')}</span>
           {monitors.map((item, index) => <button key={item.id} onClick={() => setMonitorIndex(index)} className="hub-chip" style={{ padding: '7px 12px', borderRadius: 10, border: monitorIndex === index ? `1px solid ${TONES.blue.border}` : '1px solid rgba(255,255,255,.12)', background: monitorIndex === index ? TONES.blue.soft : 'rgba(255,255,255,.04)', color: monitorIndex === index ? '#1af0ff' : 'rgba(255,255,255,.68)', fontSize: 12.5, fontWeight: 800 }}>{item.icon} {index + 1}</button>)}
         </div>
       </section>
 
-      <main className="hub-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 8 }}>
+      <main className="hub-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingInlineEnd: 8 }}>
         <section style={{ ...cardStyle, padding: 16, marginBottom: 14 }}>
           <div style={{ fontSize: 21, fontWeight: 950 }}>{monitor.icon} {monitor.title}</div>
           <div style={{ color: 'rgba(255,255,255,.56)', fontSize: 13, marginTop: 4 }}>{monitor.subtitle}</div>
@@ -140,7 +140,7 @@ export default function ProviderHealthPage(_props: PageProps) {
                   <button
                     key={issue.id}
                     onClick={() => setSelectedIssueId(issue.id)}
-                    style={{ display: 'grid', gridTemplateColumns: '90px 90px minmax(180px,1fr) 92px', gap: 10, alignItems: 'center', padding: '11px 13px', border: active ? '1px solid rgba(255,195,0,.38)' : '1px solid rgba(255,255,255,.06)', borderLeft: 'none', borderRight: 'none', background: active ? 'rgba(255,195,0,.08)' : 'rgba(255,255,255,.02)', color: '#fff', textAlign: 'left', cursor: 'pointer' }}
+                    style={{ display: 'grid', gridTemplateColumns: '90px 90px minmax(180px,1fr) 92px', gap: 10, alignItems: 'center', padding: '11px 13px', border: active ? '1px solid rgba(255,195,0,.38)' : '1px solid rgba(255,255,255,.06)', borderInlineStart: 'none', borderInlineEnd: 'none', background: active ? 'rgba(255,195,0,.08)' : 'rgba(255,255,255,.02)', color: '#fff', textAlign: 'start', cursor: 'pointer' }}
                   >
                     <span style={{ padding: '4px 7px', borderRadius: 999, border: `1px solid ${severity.border}`, background: severity.bg, color: severity.color, fontSize: 11, fontWeight: 900 }}>{issue.severity}</span>
                     <span style={{ color: 'rgba(255,255,255,.76)', fontWeight: 800, fontSize: 12.5 }}>{issue.provider}</span>

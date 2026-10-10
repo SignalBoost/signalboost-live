@@ -28,6 +28,9 @@ on:
       - 'saas/tests/sixLanguageCampaignPages.node.test.ts'
       - 'saas/tests/navbarLanguageOptions.node.test.ts'
       - 'saas/tests/platformElevenLanguageI18n.node.test.ts'
+      - 'saas/scripts/check-rtl-logical-styles.mjs'
+      - 'saas/tests/rtlLogicalStyles.node.test.ts'
+      - 'saas/app/globals.css'
       - '.github/workflows/i18n-expansion-readiness.yml'
 jobs:
   ensure-safe-expansion:
@@ -53,6 +56,8 @@ jobs:
           name: eleven-language-structure-evidence
           path: saas/.i18n-evidence/locale-structure.json
           if-no-files-found: warn
+      - name: Require direction-aware (RTL-safe) UI styling
+        run: node scripts/check-rtl-logical-styles.mjs
       - name: Inventory actual routes for full-site localization work
         run: node scripts/inventory-app-router-i18n.mjs --report .i18n-evidence/app-route-inventory.json
       - name: Upload route inventory
@@ -63,7 +68,7 @@ jobs:
           path: saas/.i18n-evidence/app-route-inventory.json
           if-no-files-found: warn
       - name: Verify language picker, public campaign pages and platform language tests
-        run: node --test tests/navbarLanguageOptions.node.test.ts tests/sixLanguageCampaignPages.node.test.ts tests/platformElevenLanguageI18n.node.test.ts
+        run: node --test tests/navbarLanguageOptions.node.test.ts tests/sixLanguageCampaignPages.node.test.ts tests/platformElevenLanguageI18n.node.test.ts tests/rtlLogicalStyles.node.test.ts
       - name: Verify translation-package export, reviewed import and draft engine tooling
         run: |
           node scripts/check-translation-package-export.mjs

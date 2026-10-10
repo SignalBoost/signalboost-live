@@ -217,7 +217,7 @@ export default function KeyVaultV2Page({ lang }: PageProps) {
         </div>
       </section>
 {/* Main content */}
-      <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 28, paddingRight: 8 }}>
+      <main style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 28, paddingInlineEnd: 8 }}>
         {/* Provider selector */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ ...labelStyle }}>{t('console.vaultx.page.browseSecrets', "Browse Secrets")}</div>

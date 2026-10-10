@@ -197,7 +197,7 @@ export default function ProviderActionForm({
           flex: '0 0 auto',
         }}
       >
-        <span aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, background: 'linear-gradient(90deg, #ffc300, #1af0ff)' }} />
+        <span aria-hidden="true" style={{ position: 'absolute', insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, height: 2, background: 'linear-gradient(90deg, #ffc300, #1af0ff)' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
           <span style={{ width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0, background: 'rgba(26,240,255,.10)', border: '1px solid rgba(26,240,255,.28)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)' }}>{template.icon}</span>
           <div style={{ minWidth: 0 }}>
@@ -1148,7 +1148,7 @@ const keyValueRowStyle: CSSProperties = {
 const valueTextStyle: CSSProperties = {
   color: 'rgba(255,255,255,.85)',
   fontFamily: monoStyle.fontFamily,
-  textAlign: 'right',
+  textAlign: 'end',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',

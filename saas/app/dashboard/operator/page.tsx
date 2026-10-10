@@ -156,7 +156,7 @@ export default function OperatorPage() {
           </div>
 
           {/* Tips panel */}
-          <div style={{ borderLeft: '1px solid rgba(255,255,255,.08)', paddingLeft: 20 }}>
+          <div style={{ borderInlineStart: '1px solid rgba(255,255,255,.08)', paddingInlineStart: 20 }}>
             <p className="sb-eyebrow" style={{ marginBottom: 14 }}>💡 {c('hintLabel', l)}</p>
             {[c('hint1', l), c('hint2', l), c('hint3', l)].map((hint, i) => (
               <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 14 }}>
@@ -173,7 +173,7 @@ export default function OperatorPage() {
 
         {/* Generation status */}
         {(generating || steps.length > 0) && !content && (
-          <div style={{ borderTop: '1px solid rgba(26,240,255,.25)', borderLeft: '2px solid rgba(26,240,255,.4)', paddingTop: 14, paddingLeft: 14, marginBottom: 20 }}>
+          <div style={{ borderTop: '1px solid rgba(26,240,255,.25)', borderInlineStart: '2px solid rgba(26,240,255,.4)', paddingTop: 14, paddingInlineStart: 14, marginBottom: 20 }}>
             <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c('engineTitle', l)}</p>
             <div style={{ display: 'grid', gap: 8 }}>
               {steps.map((s, i) => (

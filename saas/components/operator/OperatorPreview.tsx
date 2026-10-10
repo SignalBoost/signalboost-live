@@ -100,7 +100,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
             <div key={i} style={{ background: heroBg, padding: '40px 24px', textAlign: 'center' }}>
               {eyebrow}
               {h && <div style={{ fontFamily: display, fontWeight: 900, fontSize: 30, lineHeight: 1.05, letterSpacing: '-0.02em' }}>{h}</div>}
-              {sub && <div style={{ color: muted, fontSize: 14, marginTop: 12, lineHeight: 1.5, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>{sub}</div>}
+              {sub && <div style={{ color: muted, fontSize: 14, marginTop: 12, lineHeight: 1.5, maxWidth: 420, marginInlineStart: 'auto', marginInlineEnd: 'auto' }}>{sub}</div>}
               {(s.cta || s.ctaSecondary) && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'center', flexWrap: 'wrap' }}>
                   {s.cta && <span style={{ background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff', fontWeight: 800, fontSize: 13, padding: '10px 20px', borderRadius: 10 }}>{s.cta}</span>}

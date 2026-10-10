@@ -246,8 +246,8 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                         <div className="h-2 rounded bg-current/60" style={{ width: `${born ? Math.max(pct, stage.count ? 1 : 0) : 0}%` }} />
                       </div>
                     </div>
-                    <div className="text-right font-mono tabular-nums">{stage.count}</div>
-                    <div className="text-right font-mono tabular-nums opacity-70">{stage.share === null ? '—' : `${pct}%`}</div>
+                    <div className="text-end font-mono tabular-nums">{stage.count}</div>
+                    <div className="text-end font-mono tabular-nums opacity-70">{stage.share === null ? '—' : `${pct}%`}</div>
                   </div>
                 )
               })}

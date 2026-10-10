@@ -119,7 +119,7 @@ export default function OutreachDeliveryPage() {
                   <p className="sb-caption" style={{ margin: '5px 0 0' }}>{copy.recipient}: {row.toEmail || '—'}</p>
                   <p className="sb-caption" style={{ margin: '3px 0 0' }}>{copy.sentAt}: {row.sentAt ? new Date(row.sentAt).toLocaleString() : '—'}</p>
                 </div>
-                <div style={{ textAlign: 'right' }}>
+                <div style={{ textAlign: 'end' }}>
                   <span style={{ display: 'inline-block', border: '1px solid rgba(125,211,252,.45)', borderRadius: 999, padding: '4px 10px', color: row.status === 'bounced' || row.status === 'complained' ? '#fca5a5' : '#7dd3fc', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>{row.status || copy.unknown}</span>
                   <p className="sb-caption" style={{ margin: '6px 0 0' }}>{copy.opens}: {row.openCount || 0} · {copy.clicks}: {row.clickCount || 0}</p>
                 </div>

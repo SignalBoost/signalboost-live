@@ -79,7 +79,7 @@ export default function CosaCampaignFeed({
   return (
     <div
       ref={parentRef}
-      className="h-[520px] w-full overflow-y-auto pr-2"
+      className="h-[520px] w-full overflow-y-auto pe-2"
       aria-label={ariaLabel}
     >
       <div className="relative w-full" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
@@ -93,14 +93,14 @@ export default function CosaCampaignFeed({
               key={virtualItem.key}
               data-index={virtualItem.index}
               ref={rowVirtualizer.measureElement}
-              className="absolute left-0 top-0 w-full p-1.5"
+              className="absolute start-0 top-0 w-full p-1.5"
               style={{ transform: `translateY(${virtualItem.start}px)` }}
             >
               <button
                 type="button"
                 onClick={() => onSelect?.(campaign)}
                 className={[
-                  'w-full rounded-2xl border p-4 text-left outline-none transition duration-150',
+                  'w-full rounded-2xl border p-4 text-start outline-none transition duration-150',
                   'bg-slate-900/40 shadow-xl backdrop-blur-md focus-visible:ring-2 focus-visible:ring-cyan-300',
                   selected
                     ? 'border-amber-300/60 bg-amber-300/10 shadow-amber-500/10'
@@ -132,7 +132,7 @@ export default function CosaCampaignFeed({
         })}
 
         {isFetchingNextPage && (
-          <div className="absolute bottom-0 left-0 w-full p-4 text-center text-sm text-white/45">
+          <div className="absolute bottom-0 start-0 w-full p-4 text-center text-sm text-white/45">
             {loadingMoreLabel}
           </div>
         )}

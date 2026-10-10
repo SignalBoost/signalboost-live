@@ -145,7 +145,7 @@ export default function ApprenticeWorkshopPage() {
       {/* Module grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
         {moduleItems.map(item => (
-          <Link key={item.key} href={item.href} style={{ color: '#fff', textDecoration: 'none', borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: `2px solid ${accent}55`, padding: '14px 0 14px 14px', display: 'block' }}>
+          <Link key={item.key} href={item.href} style={{ color: '#fff', textDecoration: 'none', borderTop: '1px solid rgba(255,255,255,.07)', borderInlineStart: `2px solid ${accent}55`, padding: '14px 0 14px 14px', display: 'block' }}>
             <strong style={{ fontSize: 14, fontWeight: 800, display: 'block', marginBottom: 6 }}>{c((COPY.modules as any)[item.key], l)}</strong>
             <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>{item.depth}</p>
           </Link>
@@ -166,7 +166,7 @@ export default function ApprenticeWorkshopPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
                   <div style={{ flex: 1, minWidth: 240 }}>
                     <strong style={{ fontSize: 16, fontWeight: 800, display: 'block', marginBottom: 12 }}>{c(tut.title, l)}</strong>
-                    <ol style={{ color: 'rgba(255,255,255,.7)', lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
+                    <ol style={{ color: 'rgba(255,255,255,.7)', lineHeight: 1.8, paddingInlineStart: 18, margin: 0 }}>
                       <li style={{ fontSize: 13 }}>{c(tut.step1, l)}</li>
                       <li style={{ fontSize: 13 }}>{c(tut.step2, l)}</li>
                       <li style={{ fontSize: 13 }}>{c(tut.step3, l)}</li>

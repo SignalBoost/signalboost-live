@@ -105,7 +105,7 @@ function Table({ cols, rows, mono0 }: { cols: string[]; rows: string[][]; mono0?
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
         <thead>
-          <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
+          <tr style={{ textAlign: 'start', color: 'rgba(255,255,255,.5)' }}>
             {cols.map((c, i) => <th key={i} style={{ padding: '8px 10px', fontWeight: 700, borderBottom: '1px solid rgba(255,255,255,.12)', textAlign: i === 0 ? 'left' : 'right' }}>{c}</th>)}
           </tr>
         </thead>

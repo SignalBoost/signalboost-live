@@ -213,7 +213,7 @@ function OutreachHubContent() {
       <section style={panelStyle}>
         <span className="sb-eyebrow">{copy.workflowTitle}</span>
         <h2 className="sb-h3" style={{ marginTop: 10 }}>{copy.workflowTitle}</h2>
-        <ol style={{ margin: '14px 0 0', paddingLeft: 22, lineHeight: 1.8, color: 'rgba(248,250,252,.78)' }}>
+        <ol style={{ margin: '14px 0 0', paddingInlineStart: 22, lineHeight: 1.8, color: 'rgba(248,250,252,.78)' }}>
           {copy.workflowSteps.map((step) => <li key={step}>{step}</li>)}
         </ol>
       </section>
@@ -229,7 +229,7 @@ function OutreachHubContent() {
                 href={tool.href}
                 style={{
                   ...linkCardStyle,
-                  borderLeftColor: tool.accent,
+                  borderInlineStartColor: tool.accent,
                 }}
               >
                 <span aria-hidden style={{ fontSize: 22 }}>{tool.icon}</span>
@@ -337,7 +337,7 @@ const linkCardStyle: CSSProperties = {
   maxHeight: 'none',
   overflowY: 'visible',
   border: '1px solid rgba(255,255,255,.10)',
-  borderLeft: '3px solid #1af0ff',
+  borderInlineStart: '3px solid #1af0ff',
   borderRadius: 16,
   padding: 17,
   background: 'rgba(15,23,42,.62)',
@@ -363,7 +363,7 @@ const definitionStyle: CSSProperties = {
   maxWidth: 980,
   margin: '14px 0 0',
   padding: '13px 15px',
-  borderLeft: '3px solid #a78bfa',
+  borderInlineStart: '3px solid #a78bfa',
   background: 'rgba(167,139,250,.08)',
   color: 'rgba(248,250,252,.84)',
   lineHeight: 1.65,

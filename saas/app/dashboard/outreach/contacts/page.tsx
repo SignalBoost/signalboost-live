@@ -340,12 +340,12 @@ export default function OutreachContactsPage() {
           const status = lead.status || 'pending'
           const busy = busyId === lead.id
           return (
-            <article key={lead.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)', borderLeft: `2px solid ${COLORS[status]}`, padding: '12px 0 12px 12px' }}>
+            <article key={lead.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)', borderInlineStart: `2px solid ${COLORS[status]}`, padding: '12px 0 12px 12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <h2 className="sb-h3" style={{ margin: 0 }}>
                     {lead.business_name || copy.unnamed}
-                    <span title={lead.id} style={{ marginLeft: 8, fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,.45)', fontWeight: 400 }}>#{String(lead.id).slice(0, 8)}</span>
+                    <span title={lead.id} style={{ marginInlineStart: 8, fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,.45)', fontWeight: 400 }}>#{String(lead.id).slice(0, 8)}</span>
                   </h2>
                   {lead.business_url ? <a href={lead.business_url} target="_blank" rel="noreferrer" className="sb-caption" style={{ color: '#7dd3fc' }}>{lead.business_url}</a> : null}
                   <p className="sb-caption" style={{ color: lead.contact_email ? '#1af0ff' : '#f59e0b', fontWeight: 700 }}>{lead.contact_email ? `${copy.recipient}: ${lead.contact_email}` : copy.noRecipient}</p>

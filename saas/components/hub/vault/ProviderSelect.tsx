@@ -128,8 +128,8 @@ export default function ProviderSelect({
           style={{
             position: 'absolute',
             top: '100%',
-            left: 0,
-            right: 0,
+            insetInlineStart: 0,
+            insetInlineEnd: 0,
             marginTop: 6,
             borderRadius: 10,
             border: '1px solid rgba(26,240,255,.3)',
@@ -150,7 +150,7 @@ export default function ProviderSelect({
                 display: 'block',
                 width: '100%',
                 padding: '11px 12px',
-                textAlign: 'left',
+                textAlign: 'start',
                 background:
                   idx === highlighted ? 'rgba(26,240,255,.12)' : idx === 0 ? 'rgba(26,240,255,.06)' : 'transparent',
                 border: 'none',
@@ -193,8 +193,8 @@ export default function ProviderSelect({
           style={{
             position: 'absolute',
             top: '100%',
-            left: 0,
-            right: 0,
+            insetInlineStart: 0,
+            insetInlineEnd: 0,
             marginTop: 6,
             padding: 12,
             borderRadius: 10,

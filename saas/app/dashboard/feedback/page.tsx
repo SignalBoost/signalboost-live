@@ -754,7 +754,7 @@ export default function FeedbackPage() {
                   ))}
 
                   {rating > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', marginLeft: 8, fontSize: 13, color: GOLD, fontWeight: 600 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginInlineStart: 8, fontSize: 13, color: GOLD, fontWeight: 600 }}>
                       {copy.ratings[rating]}
                     </div>
                   )}
@@ -784,7 +784,7 @@ export default function FeedbackPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 16 }}>{cat.icon}</span>
                         <span style={{ fontSize: 12.5, fontWeight: 700 }}>{cat.label}</span>
-                        {category === cat.id && <span style={{ marginLeft: 'auto', color: BLUE }}>✓</span>}
+                        {category === cat.id && <span style={{ marginInlineStart: 'auto', color: BLUE }}>✓</span>}
                       </div>
                     </div>
                   ))}
@@ -828,7 +828,7 @@ export default function FeedbackPage() {
                 </div>
               </div>
 
-              <div style={{ borderLeft: '2px solid rgba(255,195,0,0.5)', paddingLeft: 14, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>
+              <div style={{ borderInlineStart: '2px solid rgba(255,195,0,0.5)', paddingInlineStart: 14, marginBottom: 14, fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6 }}>
                 {copy.notice}
               </div>
 
@@ -910,7 +910,7 @@ export default function FeedbackPage() {
                     key={item.id}
                     style={{
                       borderTop: '1px solid rgba(255,255,255,0.07)',
-                      borderLeft: isOwn ? '2px solid rgba(59,130,246,0.6)' : '2px solid rgba(255,255,255,0.1)',
+                      borderInlineStart: isOwn ? '2px solid rgba(59,130,246,0.6)' : '2px solid rgba(255,255,255,0.1)',
                       padding: '14px 0 14px 14px',
                     }}
                   >

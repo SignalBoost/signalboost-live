@@ -128,7 +128,7 @@ export default function AuthModal({ onClose, initialMode = 'login' }: { onClose:
         }}
       >
         <button onClick={onClose}
-          style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer' }}>
+          style={{ position: 'absolute', top: 16, insetInlineEnd: 16, background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer' }}>
           x
         </button>
 

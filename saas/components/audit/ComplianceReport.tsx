@@ -96,7 +96,7 @@ export default function ComplianceReport({ data }: { data: ComplianceReportView 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
+              <tr style={{ textAlign: 'start', color: 'rgba(255,255,255,.5)' }}>
                 <Th>{t('audit.compliance.col.family', "Control family")}</Th>
                 <Th>{t('audit.compliance.col.status', "Status")}</Th>
                 <Th>{t('audit.compliance.col.findings', "Findings")}</Th>

@@ -130,7 +130,7 @@ export default function SitePreview({ content }: { content: SitePreviewContent }
                   {content.logo_url && i === 0 && <img src={content.logo_url} alt={content.logoAlt || `${content.businessName || 'Site'} logo`} style={{ width: 42, height: 42, borderRadius: 12, marginBottom: 12, objectFit: 'cover' }} />}
                   {eyebrow}
                   {h && <div style={{ fontFamily: display, fontWeight: 900, fontSize: 30, lineHeight: 1.05, letterSpacing: '-0.02em' }}>{h}</div>}
-                  {sub && <div style={{ color: muted, fontSize: 14, marginTop: 12, lineHeight: 1.5, maxWidth: 420, marginLeft: hasImage ? 0 : 'auto', marginRight: hasImage ? 0 : 'auto' }}>{sub}</div>}
+                  {sub && <div style={{ color: muted, fontSize: 14, marginTop: 12, lineHeight: 1.5, maxWidth: 420, marginInlineStart: hasImage ? 0 : 'auto', marginInlineEnd: hasImage ? 0 : 'auto' }}>{sub}</div>}
                   {(s.cta || s.ctaSecondary) && (
                     <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: hasImage ? 'flex-start' : 'center', flexWrap: 'wrap' }}>
                       {s.cta && <span style={{ background: `linear-gradient(135deg, ${primary}, ${accent})`, color: '#fff', fontWeight: 800, fontSize: 13, padding: '10px 20px', borderRadius: 10 }}>{s.cta}</span>}

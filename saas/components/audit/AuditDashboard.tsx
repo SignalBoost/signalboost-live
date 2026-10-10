@@ -348,7 +348,7 @@ export default function AuditDashboard() {
                     <span className="font-mono text-[22px] font-extrabold text-white">{pk.credits}</span>
                     <span className="text-xs font-bold text-white/60">{copy.creditsWord}</span>
                     {pk.popular && (
-                      <span className="ml-auto rounded-full border border-[#ffc300]/40 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.05em] text-[#ffc300]">
+                      <span className="ms-auto rounded-full border border-[#ffc300]/40 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.05em] text-[#ffc300]">
                         {copy.popular}
                       </span>
                     )}

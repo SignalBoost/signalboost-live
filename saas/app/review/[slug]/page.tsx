@@ -492,7 +492,7 @@ export default function PublicReviewPage({ params }: { params: Promise<{ slug: s
                 placeholder={t.reviewPlaceholder}
                 style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px', color: '#fff', fontSize: 14, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
               />
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 6, textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 6, textAlign: 'end' }}>
                 {content.length} / 2000
               </div>
             </div>

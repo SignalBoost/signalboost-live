@@ -375,7 +375,7 @@ export default function SignalHero() {
                       fontSize: 18,
                       lineHeight: 1,
                       padding: 0,
-                      marginLeft: 4,
+                      marginInlineStart: 4,
                     }}
                     aria-label={`Remove ${name}`}
                   >
@@ -394,7 +394,7 @@ export default function SignalHero() {
           alignItems: 'center',
           justifyContent: 'center',
           height: '100%',
-          borderLeft: '1px solid rgba(255,255,255,0.05)',
+          borderInlineStart: '1px solid rgba(255,255,255,0.05)',
         }}
       >
         <div style={{ position: 'relative', width: 500, height: 500 }}>

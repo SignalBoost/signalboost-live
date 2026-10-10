@@ -109,7 +109,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, s
                     style={{ 
                       padding: '5px 8px', 
                       borderRadius: 6, 
-                      textAlign: 'left', 
+                      textAlign: 'start', 
                       fontSize: 11, 
                       fontWeight: 600, 
                       cursor: runnable ? 'pointer' : 'not-allowed', 
@@ -124,7 +124,7 @@ export function ProviderConsoleCard({ provider, lang, onExpand, onRun, status, s
                   >
                     <span style={{ fontSize: 11 }}>{template.icon}</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.label}</span>
-                    {incomplete && <span style={{ marginLeft: 'auto', fontSize: 7.5, fontWeight: 800, color: '#ffc300', letterSpacing: '0.04em' }}>{t('console.cui.soon_short', "SOON")}</span>}
+                    {incomplete && <span style={{ marginInlineStart: 'auto', fontSize: 7.5, fontWeight: 800, color: '#ffc300', letterSpacing: '0.04em' }}>{t('console.cui.soon_short', "SOON")}</span>}
                   </button>
                 )
               })}
@@ -154,7 +154,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
   const needsKeys = hasBackend && statusLoaded && !configured
   const keyHint = t('console.cui.add_keys_hint', "Add {keys} to enable").replace('{keys}', missing.join(', '))
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingRight: '4px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: '100%', boxSizing: 'border-box', paddingInlineEnd: '4px' }}>
       {/* Dynamic Breadcrumb Track Navigation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
         <button onClick={onHome} style={{ background: 'none', border: 'none', color: '#1af0ff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>{uiText('generatedUi.u_e89b97e15e4163c4')}</button>
@@ -230,7 +230,7 @@ export function ProviderWorkspace({ provider, tierLabel, lang, onBack, onHome, o
                         <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{template.description}</div>
                       </div>
                     </div>
-                    <span style={{ color: incomplete ? '#ffc300' : isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255,255,255,0.25)', fontSize: incomplete ? 8 : 11, fontWeight: 800, paddingLeft: 4, flexShrink: 0, letterSpacing: incomplete ? '0.04em' : undefined }}>{incomplete ? uiText('generatedUi.u_89e764ff25c80883') : '→'}</span>
+                    <span style={{ color: incomplete ? '#ffc300' : isDestructive ? '#ef4444' : isArchive ? '#ffc300' : 'rgba(255,255,255,0.25)', fontSize: incomplete ? 8 : 11, fontWeight: 800, paddingInlineStart: 4, flexShrink: 0, letterSpacing: incomplete ? '0.04em' : undefined }}>{incomplete ? uiText('generatedUi.u_89e764ff25c80883') : '→'}</span>
                   </div>
                 )
               })}

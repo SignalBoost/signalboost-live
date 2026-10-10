@@ -145,7 +145,7 @@ export function VideoQueueClient() {
       <section className="videoBoardGrid" style={boardGrid}>
         <section style={panel}>
           <p className="sb-eyebrow" style={{ margin: 0 }}>{workflowCopy.leftPanelTitle}</p>
-          <div style={{ display: 'grid', gap: 10, marginTop: 12, maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}>
+          <div style={{ display: 'grid', gap: 10, marginTop: 12, maxHeight: 520, overflowY: 'auto', paddingInlineEnd: 4 }}>
             {campaigns.map((campaign) => (
               <button key={campaign.id} onClick={() => setSelectedId(campaign.id)} style={{ ...queueButton, border: campaign.id === selected.id ? '1px solid rgba(255,195,0,.62)' : queueButton.border }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
@@ -230,7 +230,7 @@ const workflowStrip: React.CSSProperties = { display: 'grid', gridTemplateColumn
 const stepCard: React.CSSProperties = { border: '1px solid rgba(255,195,0,.18)', borderRadius: 14, padding: 10, background: 'rgba(15,23,42,.72)', color: '#fff', display: 'grid', gap: 4, minHeight: 58 }
 const boardGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(270px,.85fr) minmax(420px,1.2fr) minmax(280px,.9fr)', gap: 12, alignItems: 'start' }
 const panel: React.CSSProperties = { border: '1px solid rgba(255,255,255,.09)', borderRadius: 18, padding: 16, background: 'rgba(15,23,42,.72)' }
-const queueButton: React.CSSProperties = { width: '100%', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 12, background: 'rgba(255,255,255,.04)', textAlign: 'left', cursor: 'pointer' }
+const queueButton: React.CSSProperties = { width: '100%', border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 12, background: 'rgba(255,255,255,.04)', textAlign: 'start', cursor: 'pointer' }
 const statusBadge: React.CSSProperties = { color: '#020617', background: GOLD, borderRadius: 999, padding: '5px 8px', fontWeight: 950, fontSize: 10, textTransform: 'uppercase' }
 const previewFrame: React.CSSProperties = { border: '1px solid rgba(255,195,0,.22)', borderRadius: 16, padding: 16, background: 'radial-gradient(circle at 20% 18%, rgba(255,195,0,.13), transparent 34%), rgba(0,0,0,.2)', marginTop: 14, minHeight: 330 }
 const metaRow: React.CSSProperties = { border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: 10, background: 'rgba(0,0,0,.16)', display: 'grid', gap: 5, color: 'rgba(255,255,255,.68)' }

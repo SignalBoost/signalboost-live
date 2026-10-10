@@ -75,9 +75,9 @@ export default function CommandConsole({
   return (
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: '#070b14', color: '#fff', position: 'relative', boxSizing: 'border-box' }}>
       {/* Sidebar */}
-      <aside style={{ width: 248, flex: '0 0 248px', background: 'linear-gradient(180deg, rgba(13,18,32,.9), rgba(8,11,20,.9))', borderRight: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', padding: '16px 12px', overflowY: 'auto', boxSizing: 'border-box' }}>
+      <aside style={{ width: 248, flex: '0 0 248px', background: 'linear-gradient(180deg, rgba(13,18,32,.9), rgba(8,11,20,.9))', borderInlineEnd: '1px solid rgba(255,255,255,.07)', display: 'flex', flexDirection: 'column', padding: '16px 12px', overflowY: 'auto', boxSizing: 'border-box' }}>
         <div style={{ padding: '4px 8px 12px' }}>
-          <button onClick={resetToHome} style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 9, color: 'rgba(255,255,255,.92)', fontWeight: 800, fontSize: 14, cursor: 'pointer', padding: 0, textAlign: 'left' }}>
+          <button onClick={resetToHome} style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: 9, color: 'rgba(255,255,255,.92)', fontWeight: 800, fontSize: 14, cursor: 'pointer', padding: 0, textAlign: 'start' }}>
             <span style={{ color: '#1af0ff' }}>≡</span>
             {tier?.sidebarTitle}
           </button>
@@ -97,7 +97,7 @@ export default function CommandConsole({
           {providers.map(p => {
             const active = focusProviderId === p.id
             return (
-              <button key={p.id} onClick={() => openProvider(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(26,240,255,.14)' : 'transparent', color: active ? '#1af0ff' : 'rgba(255,255,255,.78)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
+              <button key={p.id} onClick={() => openProvider(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(26,240,255,.14)' : 'transparent', color: active ? '#1af0ff' : 'rgba(255,255,255,.78)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'start' }}>
                 <span style={{ width: 9, height: 9, borderRadius: 3, background: p.accent, flex: '0 0 auto', boxShadow: `0 0 8px ${p.accent}66` }} />
                 {p.name}
               </button>
@@ -111,7 +111,7 @@ export default function CommandConsole({
           {signalboostConsoleUI.catalog.utilityNav.map(u => {
             const active = utilityId === u.id
             return (
-              <button key={u.id} onClick={() => openUtility(u.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(255,195,0,.12)' : 'transparent', color: active ? '#ffc300' : 'rgba(255,255,255,.7)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
+              <button key={u.id} onClick={() => openUtility(u.id)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, border: '1px solid transparent', background: active ? 'rgba(255,195,0,.12)' : 'transparent', color: active ? '#ffc300' : 'rgba(255,255,255,.7)', fontSize: 13.5, fontWeight: active ? 800 : 600, cursor: 'pointer', textAlign: 'start' }}>
                 <span style={{ fontSize: 15, flex: '0 0 auto' }}>{u.icon}</span>
                 {t(`console.util.${u.id}`, u.label)}
               </button>
@@ -178,7 +178,7 @@ export default function CommandConsole({
         const panel = signalboostConsoleUI.panelRouter[activeTemplateId]
         const isPanel = Boolean(panel)
         return (
-          <div style={{ position: 'fixed', top: 80, left: 0, right: 0, bottom: 0, zIndex: 1000, background: 'rgba(3,7,18,.72)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
+          <div style={{ position: 'fixed', top: 80, insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, zIndex: 1000, background: 'rgba(3,7,18,.72)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setActiveTemplateId(null)}>
             <div style={{ width: '100%', maxWidth: isPanel ? 1040 : 1000, height: isPanel ? 'auto' : 'calc(100vh - 120px)', maxHeight: 'calc(100vh - 120px)', overflow: 'auto', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
               {isPanel ? (
                 <div style={{ background: 'linear-gradient(160deg, rgba(15,23,42,.92), rgba(3,7,18,.96))', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '0 18px 22px', boxShadow: '0 24px 70px rgba(0,0,0,.6)' }}>

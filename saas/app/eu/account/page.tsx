@@ -33,6 +33,7 @@ export default async function EuAccountPage() {
     return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>
       <h1>{uiText('generatedUi.u_3981d43d273b483c')}</h1>
       <p>{uiText('generatedUi.u_56c6c4fa5a11004c')}</p>
+      <Link href="/eu/access">Complete European account enrollment</Link>
     </main>
   }
   return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>

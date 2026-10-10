@@ -113,3 +113,49 @@ test('web knowledge resolver fails closed when the manifest did not authorize th
   assert.equal(resolution.satisfied, false)
   assert.deepEqual(resolution.missing, [WEB_KNOWLEDGE_RESEARCH_CAPABILITY])
 })
+
+test('empty or failed first governed discovery retries a simpler query without granting training', async () => {
+  const attempted: string[] = []
+  const research = createWebKnowledgeResearchPort({
+    search: async (query) => {
+      attempted.push(query)
+      if (attempted.length === 1) throw new Error('transient_search_provider_error')
+      return [{
+        uri: 'https://example.gov/verified',
+        title: 'Verified public source',
+        text: 'Authoritative source material available on the retry.',
+        evidence: ['source_class=institutional'],
+      }]
+    },
+  })
+  const rows = await research.search({
+    query: 'Who is the current official responsible for this office?',
+    purpose: 'agent_research',
+    maxResults: 3,
+  })
+  assert.equal(attempted.length, 2)
+  assert.notEqual(attempted[0], attempted[1])
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0]?.trainingAuthorized, false)
+  assert.equal(rows[0]?.durableLearningAuthorized, false)
+})
+
+test('governed discovery retries a zero-result first attempt', async () => {
+  let calls = 0
+  const research = createWebKnowledgeResearchPort({
+    search: async () => {
+      calls++
+      return calls === 1 ? [] : [{
+        uri: 'https://example.edu/answer',
+        title: 'Second-source answer',
+        text: 'Sufficient evidence for the live answer.',
+      }]
+    },
+  })
+  const rows = await research.search({
+    query: 'What is the current public status of the requested system?',
+    purpose: 'live_reference',
+  })
+  assert.equal(calls, 2)
+  assert.equal(rows.length, 1)
+})

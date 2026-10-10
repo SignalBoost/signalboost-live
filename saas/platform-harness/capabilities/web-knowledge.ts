@@ -163,11 +163,27 @@ export function createWebKnowledgeResearchPort(
       if (!query) return Object.freeze([])
       const purpose = input.purpose
       // A second, shorter search stays inside the same governed read-only provider.
-      const first = await search(query, boundedResults(input.maxResults))
+      // An empty discovery or unreadable batch is not evidence that the public fact
+      // is unavailable. Retry with a shorter query inside the SAME governed read
+      // capability; do not bypass the Harness or fall back to model memory.
       const simplified = query.replace(/[?!.,]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 10).join(' ')
-      const rows = first.length ? first : simplified && simplified !== query
-        ? await search(simplified, boundedResults(input.maxResults))
-        : first
+      const queries = [...new Set([query, simplified].filter(Boolean))]
+      let rows: Awaited<ReturnType<LearningConnectorSearch>> = []
+      let lastError: unknown = null
+      for (const candidate of queries) {
+        try {
+          rows = await search(candidate, boundedResults(input.maxResults))
+          if (rows.length) break
+        } catch (error) {
+          lastError = error
+        }
+      }
+      if (!rows.length && lastError) {
+        console.warn('webKnowledge: governed research exhausted queries', {
+          attemptedQueries: queries.length,
+          error: lastError instanceof Error ? lastError.message.slice(0, 160) : 'search_failed',
+        })
+      }
       return Object.freeze(rows.map(row => Object.freeze({
         uri: clean(row.uri, 2_000),
         title: clean(row.title || row.uri, 300),

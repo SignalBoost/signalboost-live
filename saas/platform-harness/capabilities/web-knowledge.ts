@@ -5,6 +5,8 @@
 // Production mutation, or broader agent authority.
 
 import { randomUUID } from 'node:crypto'
+import { searchPublicWeb } from '../../lib/ai/tools/publicWebAgent'
+import { assessWebTrainingSource } from '../../lib/cos-core/layers/learning/webTrainingDataLayer.ts'
 import type { LearningConnectorSearch } from '../../lib/cos-core/layers/learning/connectors.ts'
 import {
   createWebTrainingResearchSearch,
@@ -178,10 +180,37 @@ export function createWebKnowledgeResearchPort(
           lastError = error
         }
       }
-      if (!rows.length && lastError) {
-        console.warn('webKnowledge: governed research exhausted queries', {
+      // The training-oriented crawler requires every discovered page to pass its
+      // stricter extraction path. For live public facts, a second existing
+      // provider-free reader can recover independently fetched page text.
+      // It stays INSIDE this governed read tool: no direct-search bypass,
+      // additional privilege, model-generated sources, or paid provider.
+      if (!rows.length) {
+        try {
+          const recovered = await searchPublicWeb(queries[queries.length - 1], boundedResults(input.maxResults))
+          const seenHosts = new Set<string>()
+          rows = recovered.flatMap(page => {
+            const assessment = assessWebTrainingSource(page.url, query)
+            const text = String(page.snippet || '').trim()
+            if (assessment.credibility < 0.7 || text.length < 180 || seenHosts.has(assessment.host)) return []
+            seenHosts.add(assessment.host)
+            return [{
+              uri: page.url,
+              title: page.title,
+              text,
+              observedAt: new Date().toISOString(),
+              license: 'facts_and_summary_only; fallback=public_page_read',
+              evidence: ['retrieval=public_page_read', 'source_credibility=' + assessment.credibility.toFixed(2)],
+            }]
+          })
+        } catch (error) {
+          lastError = lastError ?? error
+        }
+      }
+      if (!rows.length) {
+        console.warn('webKnowledge: governed research exhausted queries and page fallback', {
           attemptedQueries: queries.length,
-          error: lastError instanceof Error ? lastError.message.slice(0, 160) : 'search_failed',
+          error: lastError instanceof Error ? lastError.message.slice(0, 160) : 'no_readable_public_pages',
         })
       }
       return Object.freeze(rows.map(row => Object.freeze({

@@ -17,8 +17,63 @@ export type FreshEvidenceGroundingRejection =
 
 /** Interactive lane budget (ONBOARD 2026-09-27: main answer 20 s, thinking off). */
 export const FRESH_GROUNDED_ANSWER_TIMEOUT_MS = 20_000
-export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 700
+/**
+ * ~200 words. Production 2026-10-10 19:56: the one call that finished took 19.4 s for exactly 700 output tokens
+ * (finish=length) at the pod's ~36 tok/s; every other attempt timed out at 20 s on both providers. Answer length
+ * is latency (ONBOARD 2026-09-27); the length rule asks for ~150 words, the cap now matches it.
+ */
+export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 350
+/**
+ * Evidence budget for the reasoning call. The same turn carried 9,422 prompt tokens because claim research
+ * replaces each source's snippet with up to 24,000 characters of page body and all of it was sent to the
+ * model (the pod's window is 8,192 tokens, so it refused outright and the backup then timed out on prefill).
+ * The model needs the passages that bear on the question, not the page: ~1,200 chars per source, 6,000 total.
+ */
+export const FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE = 1_200
+export const FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL = 6_000
 const LIVE_CITATION = /\[(LIVE\d+)\]/g
+const EXCERPT_STOP = new Set(['about', 'after', 'again', 'because', 'before', 'being', 'between', 'could', 'current', 'during', 'every', 'first', 'former', 'from', 'have', 'into', 'latest', 'might', 'official', 'other', 'please', 'should', 'since', 'their', 'there', 'these', 'thing', 'think', 'those', 'through', 'today', 'under', 'until', 'where', 'which', 'while', 'would'])
+
+/** Question words as match stems: 'brazilian' → 'brazil', 'president' → 'presid', so inflections in the page match. */
+function questionTerms(input: string): string[] {
+  const seen = new Set<string>()
+  for (const token of String(input || '').toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || []) {
+    if (EXCERPT_STOP.has(token)) continue
+    seen.add(token.length > 6 ? token.slice(0, 6) : token)
+  }
+  return [...seen]
+}
+
+/**
+ * Keep the passages of a source that bear on the question, in document order, within a character budget.
+ * Deterministic selection of WHICH text the model sees; never a rewrite of it. A source with no matching
+ * passage keeps its opening text, so a terse official page is not emptied.
+ */
+export function excerptEvidenceForQuestion(snippet: string, input: string, budget: number): string {
+  const text = String(snippet || '').replace(/\s+/g, ' ').trim()
+  if (text.length <= budget) return text
+  const units = text.split(/(?<=[.!?])\s+(?=[\p{Lu}\p{N}"“(\[])/u).map(unit => unit.trim()).filter(Boolean)
+  const terms = questionTerms(input)
+  const picked: string[] = []
+  let used = 0
+  for (const unit of units) {
+    const lower = unit.toLowerCase()
+    if (!terms.some(term => lower.includes(term))) continue
+    const piece = unit.length > budget ? unit.slice(0, budget) : unit
+    if (used + piece.length + 1 > budget) break
+    picked.push(piece)
+    used += piece.length + 1
+  }
+  if (picked.length) return picked.join(' ')
+  return text.slice(0, budget)
+}
+
+/** The sources as the model sees them: same ids, titles, urls and dates; excerpted passages instead of pages. */
+export function compactFreshEvidenceForReasoning(sources: FreshEvidenceSource[], input: string): FreshEvidenceSource[] {
+  if (!sources.length) return []
+  const perSource = Math.max(240, Math.min(FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE, Math.floor(FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL / sources.length)))
+  return sources.map(source => ({ ...source, snippet: excerptEvidenceForQuestion(source.snippet, input, perSource) }))
+}
 
 export type FreshEvidenceGroundedPrompt = { systemPrompt: string; prompt: string }
 
@@ -44,7 +99,8 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
-  const prompt = `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nAnswer now.`
+  const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
+  const prompt = `${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nAnswer now.`
   return { systemPrompt, prompt }
 }
 

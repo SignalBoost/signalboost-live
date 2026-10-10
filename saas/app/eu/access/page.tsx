@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { proposedEnrollmentRegion } from '@/lib/security/euEnrollmentRouting'
 
@@ -16,7 +16,7 @@ export default function EuAccessPage() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (busy) return
     setBusy(true)

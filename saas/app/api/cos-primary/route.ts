@@ -47,6 +47,7 @@ import { appliedStrategyOverrides } from '@/lib/ai/cos/strategyProfile'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
 import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalSynthesis'
 import { freshFailureReply, type FreshEvidenceInternalFailureCode } from '@/lib/ai/cos/freshEvidenceFailureRecovery'
+import { hashPrompt } from '@/lib/ai/cos/turnExperienceStore'
 import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFreshEvidenceFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
@@ -864,7 +865,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
         return NextResponse.json({ok:true,reply:localSynthesis.reply,source:'cos-fresh-local-grounded',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
       }
       freshLocalFailureCode=localSynthesis.kind
-      logEscalation({event:'fresh_local_synthesis_declined',failure_code:freshLocalFailureCode,documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
+      logEscalation({event:'fresh_local_synthesis_declined',failure_code:freshLocalFailureCode,question_fingerprint:hashPrompt(lookupInput),question_chars:lookupInput.length,source_hosts:[...new Set(freshSources.map(source=>{try{return new URL(source.url).hostname}catch{return 'invalid'}}))],documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     }
     }
   }

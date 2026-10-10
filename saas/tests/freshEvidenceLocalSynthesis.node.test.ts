@@ -98,7 +98,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
 // rather than living in a separate contract-recovery module.
 test('COS researches additional live evidence before rejecting an externally grounded answer', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /localSynthesis.kind === 'citation_grounding_rejected' && Date.now\(\)-startedAt < 110_000/)
+  assert.match(route, /localSynthesis.kind === 'citation_grounding_rejected' && Date.now\(\)-startedAt < 35_000/)
   assert.match(route, /primary:web_search_recovery/)
   assert.match(route, /getExternalInfo\(recoveryQuery,8,\{bypassCache:true\}\)/)
   assert.match(route, /prepareFreshEvidenceAcrossQueries\(\[freshSources,recoverySearch.results\],8,lookupInput\)/)
@@ -108,4 +108,9 @@ test('COS researches additional live evidence before rejecting an externally gro
   assert.match(route, /fresh_grounding_research_recovery_finished/)
   assert.match(route, /recoveredSources.some\(source=>!freshSources.some\(existing=>existing.url===source.url\)\)/)
   assert.doesNotMatch(route, /recoveredSources.length > freshSources.length/)
+})
+
+test('interactive fresh evidence does not repeat a failed transport request', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /if \(!first \|\| 'error' in first\) first = await groundedAnswerCall/)
 })

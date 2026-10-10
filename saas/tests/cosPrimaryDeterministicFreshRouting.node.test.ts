@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../app/api/cos-primary/route.ts', import.me
 test('cos-primary resolves explicit direct-flight evidence before any local model synthesis', () => {
   const authorityGate = source.indexOf('if(!authoritySatisfied)')
   const deterministicResolver = source.indexOf('resolveDeterministicDirectFlight(lookupInput,freshSources)')
-  const localSynthesis = source.indexOf('const localSynthesis=await synthesizeFreshEvidenceLocally')
+  const localSynthesis = source.search(/(?:const|let) localSynthesis=await synthesizeFreshEvidenceLocally/)
 
   assert.ok(authorityGate >= 0, 'fresh authority gate must exist')
   assert.ok(deterministicResolver > authorityGate, 'deterministic resolver must run only after live authority succeeds')

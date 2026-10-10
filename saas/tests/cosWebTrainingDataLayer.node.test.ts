@@ -158,3 +158,17 @@ test('production bindings make credible web research an additional governed adap
   assert.match(cycle, /ContinuousLearningDirector/)
   assert.match(skills, /locate or request high-quality material through governed acquisition paths/i)
 })
+test('live search keeps credible links when HTML attributes are reordered', async () => {
+  const longBody = 'Public factual source with sufficiently detailed evidence. '.repeat(12)
+  const discovery = '<a href="https://www.nist.gov/research" data-testid="one" class="result__a">NIST source</a>'
+  const fetcher: typeof fetch = async (input: any) => {
+    const url = String(input)
+    if (url.startsWith('https://html.duckduckgo.com/html/')) return new Response(discovery, { status: 200 })
+    if (url === 'https://www.nist.gov/research') return new Response('<main>' + longBody + '</main>', { status: 200 })
+    return new Response('', { status: 404 })
+  }
+  const search = createWebTrainingResearchSearch({ fetcher, queryMode: 'live_reference' })
+  const results = await search('Public research question', 3)
+  assert.equal(results.length, 1)
+  assert.equal(results[0].uri, 'https://www.nist.gov/research')
+})

@@ -516,9 +516,15 @@ async function tryFreshCurrentFact(input: {
     const reason = errors.length
       ? `Live current-fact verification failed: ${errors.join('; ')}`
       : 'Live current-fact verification did not produce enough authoritative evidence.'
+    // OWNER DIAGNOSTIC (2026-10-09). On the production Concierge refusal of 2026-10-09 no persisted record of this
+    // reason could be found afterwards. The owner now sees it in the reply itself, in the same format the chat
+    // route uses; visitors never do.
+    const ownerDiagnostic = input.privileged
+      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').slice(0, 7)}\nlive search: ${queries.length} quer${queries.length === 1 ? 'y' : 'ies'} · ${successfulResponses.length} succeeded · ${documentsAcquired} results · ${sources.length} kept\nreason: ${reason}`.slice(0, 900)
+      : ''
     return {
       handled: true,
-      reply: freshVerificationUnavailable(input.language),
+      reply: freshVerificationUnavailable(input.language) + ownerDiagnostic,
       confidence: 0,
       provenance: freshProvenance({
         reasonerLabel: null,

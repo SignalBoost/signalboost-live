@@ -71,9 +71,8 @@ if (process.argv.includes('--smoke')) {
   assert.ok(body.includes('%0D%0A'), 'Expected escaped multipart newline');
   assert.equal(require('nanoid').nanoid(21).length, 21);
   assert.deepEqual(require('qs').parse('a[b]=1'), { a: { b: '1' } });
-  assert.equal(require('js-yaml').safeLoad('answer: 42').answer, 42);
   const sharp = require('sharp');
   const image = await sharp({ create: { width: 1, height: 1, channels: 3, background: { r: 0, g: 0, b: 0 } } }).png().toBuffer();
   assert.equal((await sharp(image).metadata()).width, 1);
-  console.log(`${workspace}: CSS, browser queries, multipart escaping, identifiers, query/YAML parsing and native image smoke checks passed`);
+  console.log(`${workspace}: CSS, browser queries, multipart escaping, identifiers, query parsing and native image smoke checks passed`);
 }

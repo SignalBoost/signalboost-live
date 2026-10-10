@@ -1,2 +1,2 @@
-base_sha=13c8246661238aa0e955b865474bcc73e6cc0c57
-branch=fix/phase3-postvault-rebased-20261010
+base_sha=f17203c86daf14a2cc88be8b17a29a78de7e20a9
+branch=fix/deps-jest30-tailwind-chain-20261010

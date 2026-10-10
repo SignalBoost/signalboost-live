@@ -30,14 +30,6 @@ const OFFICE_OR_EXECUTIVE_ROLE = /\b(?:president|vice\s+president|prime\s+minist
 const SPORTS_DOMAIN = /\b(?:football|soccer|futebol|fútbol|futbol|piłk\w*|футбол\w*|basketball|basquete|baloncesto|koszyk\w*|баскетбол\w*|baseball|beisebol|b[eé]isbol|hockey|h[oó]quei|cricket|rugby|r[uú]gbi|volleyball|voleibol|siatk\w*|nba|wnba|nfl|mlb|nhl|epl|premier\s+league|champions\s+league|libertadores|sudamericana|brasileir[aã]o|s[eé]rie\s+a|league|liga|campeonato|championship)\b/iu
 
 
-// Election questions about a future office-holder need election results and polling, not
-// an incumbent-office-holder lookup. Keep the query plan generic across election years.
-const FUTURE_ELECTION_QUESTION = /(?:quem\\s+(?:ser[aá]|vai\\s+ser)\\s+(?:o\\s+)?pr[oó]ximo\\s+presidente|who\\s+will\\s+be\\s+(?:the\\s+)?next\\s+president|pr[oó]xim[oa]\\s+president[ea]|next\\s+president)/iu
-const BRAZIL_ELECTION_CONTEXT = /(?:brasil|brazil(?:ian)?|brasileir[oa])/iu
-
-function isBrazilPresidentialElectionQuestion(input: string): boolean {
-  return FUTURE_ELECTION_QUESTION.test(input) && BRAZIL_ELECTION_CONTEXT.test(input)
-}
 
 const TRAVEL_TRANSPORT_SIGNAL = /\b(?:airport|transport|transit|train|rail|bus|coach|metro|tram|ferry|fare|ticket|station|public transport|airport express|lotnisk\p{L}*|transport\p{L}*|poci[aą]g\p{L}*|autobus\p{L}*|tramwaj\p{L}*|bilet\p{L}*|dworzec|aeropuerto|transporte|tren|autob[uú]s|billete|aeroporto|comboio|trem|autocarro|[oô]nibus|bilhete|аэропорт|транспорт|поезд|автобус|метро|трамва\p{L}*|билет\p{L}*)\b/iu
 const TRAVEL_ATTRACTION_SIGNAL = /\b(?:museum|museums|attraction|attractions|sight|sights|tourism|visitor|opening hours|admission|reservation|booking|ticket price|muze\p{L}*|atrakcj\p{L}*|zwiedzani\p{L}*|godzin\p{L}* otwarcia|rezerwacj\p{L}*|museo|atracci[oó]n|turismo|horario|reserva|museu|atra[cç][aã]o|turismo|hor[aá]rio|reserva|музе\p{L}*|достопримечательност\p{L}*|туризм|бронирован\p{L}*)\b/iu
@@ -184,14 +176,6 @@ function cleanEvaluationTopic(input: string): string {
  * gathers distinct evidence dimensions instead of asking the search engine for an opinion verdict.
  */
 export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
-  if (isBrazilPresidentialElectionQuestion(input)) {
-    const year = now.getUTCFullYear()
-    return [
-      `eleição presidencial Brasil ${year} segundo turno candidatos resultados TSE`,
-      `site:tse.jus.br eleições ${year} resultados presidente segundo turno`,
-      `pesquisa eleitoral presidente Brasil ${year} Datafolha AtlasIntel segundo turno data margem de erro`,
-    ]
-  }
   if (requiresLiveTravelPlanningEvidence(input)) {
     const primary = freshEvidenceSearchQuery(input, now)
     const seed = travelSearchSeed(input)
@@ -235,12 +219,6 @@ export function prepareFreshEvidenceAcrossQueries(
 }
 
 export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {
-  if (isBrazilPresidentialElectionQuestion(input)) {
-    // An official electoral result is sufficient on its own; absent that, require
-    // two independent reporting hosts before synthesizing polling or campaign status.
-    const hosts = new Set(sources.map(source => freshEvidenceHost(source.url)).filter(Boolean))
-    return sources.some(source => /(?:^|\\.)tse\\.jus\\.br$/i.test(freshEvidenceHost(source.url))) || hosts.size >= 2
-  }
   if (requiresLiveTravelPlanningEvidence(input)) {
     if (!sources.length) return false
     const needsTransport = asksTravelTransport(input)
@@ -261,16 +239,6 @@ export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenc
 /** Add a reasoning contract for subjective/evaluative sports comparisons after live retrieval. */
 export function freshEvidenceGroundingBlock(input: string, sources: FreshEvidenceSource[], retrievedAt: string): string {
   const base = baseFreshEvidenceGroundingBlock(input, sources, retrievedAt)
-  if (isBrazilPresidentialElectionQuestion(input)) return [
-    base,
-    '',
-    'PRESIDENTIAL ELECTION ANSWER CONTRACT:',
-    'Answer in the user language, directly. A future election winner is not an established fact.',
-    'State the election stage and candidates only when established by dated live evidence.',
-    'If the official result is not declared, say who is competing and when voting happens when sourced; describe dated poll figures with institute, geography and margin of error when available.',
-    'Never convert a poll lead into a predicted winner, invent a winner, or mistake the sitting president for the next elected president.',
-    'Cite the supplied evidence. Do not claim official confirmation from media reporting alone.',
-  ].join('\\n')
   if (!isSportsTeamEvaluation(input)) return base
   return [
     base,

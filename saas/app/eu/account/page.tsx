@@ -1,3 +1,4 @@
+import EuWorkspaceControls from '@/components/eu/EuWorkspaceControls'
 import EuAccountControls from '@/components/eu/EuAccountControls'
 import Link from 'next/link'
 import { euCustomerLaunchReadiness } from '@/lib/security/euCustomerLaunchReadiness.ts'
@@ -41,5 +42,6 @@ export default async function EuAccountPage() {
     <p>{uiText('generatedUi.u_1c226f074c356e7e')}</p>
     <p>{uiText('generatedUi.u_bdf2df8f973c1202')}</p>
     <EuAccountControls />
+    <EuWorkspaceControls />
   </main>
 }

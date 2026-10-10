@@ -30,9 +30,9 @@ export default function LocalizedPublicNavbar({ locale }: { locale: PublicLocale
       <details className="localized-nav-mobile" data-mobile-public-menu>
         <summary><strong>{PUBLIC_BRAND.name}</strong><span>{copy.features} ☰</span></summary>
         <nav className="localized-nav-mobile-links" aria-label={copy.features}>
-          <Link href={publicPagePath(locale)}>{copy.home}</Link>
+          <Link href={publicPagePath(locale)} aria-current={topic ? undefined : "page"}>{copy.home}</Link>
           {PUBLIC_TOPICS.map(item => (
-            <Link key={item} href={publicPagePath(locale, item)}>
+            <Link key={item} href={publicPagePath(locale, item)} aria-current={topic === item ? "page" : undefined}>
               {item === 'ai-website-builder' ? copy.websiteTitle : item === 'customer-reviews' ? copy.reviewsTitle : item === 'ai-content' ? copy.contentTitle : copy.labTitle}
             </Link>
           ))}

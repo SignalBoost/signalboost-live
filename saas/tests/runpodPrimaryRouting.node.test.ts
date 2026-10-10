@@ -121,9 +121,11 @@ test('admin probe reports configuration booleans without returning the RunPod ac
 test('fresh grounded tasks prefer owned RunPod, cap that attempt, then retain configured fallback', () => {
   const inference = source('../lib/ai/local-inference.ts')
   const workers = source('../lib/ai/cos/cosReasoningWorkers.ts')
-  const route = source('../app/api/cos-primary/route.ts')
-  assert.match(route, /feature:'cos_fresh_grounded_task'/)
-  assert.match(route, /allowConfiguredFallback:true/)
+  // 2026-10-10: the cos-primary live-fact lane runs on cos_interactive_answer (see
+  // freshEvidenceLocalSynthesis.ts); cos_fresh_grounded_task remains the label of the
+  // cosFirstAnswerCore live-fact verifier.
+  const core = source('../lib/ai/cos/cosFirstAnswerCore.ts')
+  assert.match(core, /feature: 'cos_fresh_grounded_task'/)
   assert.match(workers, /'cos_fresh_grounded_task'/)
   const interactive = inference.slice(inference.indexOf('function interactiveUserResponse'), inference.indexOf('function freshGroundedTask'))
   assert.doesNotMatch(interactive, /feature === 'cos_fresh_grounded_task'/)

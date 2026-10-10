@@ -17,8 +17,10 @@ test('completion rescue is attributed to interactive COS telemetry', () => {
   assert.match(source, /usageContext:\s*\{feature:'cos_interactive_answer',purpose:'completion_rescue'\}/)
 })
 
-test('fresh grounded answer inference carries a dedicated usage label', () => {
-  assert.match(route, /usageContext:\s*\{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'\}/)
+test('fresh grounded answer inference runs on the interactive answer lane with its own purpose', () => {
+  const synthesis = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(synthesis, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' \}/)
+  assert.doesNotMatch(route, /purpose:'fresh_grounded_task'/)
 })
 
 test('interactive travel attempts persist attributed provider usage', () => {

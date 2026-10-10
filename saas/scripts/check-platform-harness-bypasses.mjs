@@ -42,7 +42,6 @@ const directModelExecutionAllowlist = new Set([
   'lib/ai/cos/cosReasoner.ts',
   'lib/ai/cos/cosAgentDecision.ts',
   'lib/ai/cos/cosReasoningWorkers.ts',
-  'lib/ai/cos/freshEvidenceLocalSynthesis.ts',
 ])
 
 for (const abs of files) {

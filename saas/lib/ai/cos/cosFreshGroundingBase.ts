@@ -65,7 +65,7 @@ export function isPersonOrOfficeEvaluation(input: string): boolean {
   return /\b(?:worst|worse|best|greatest|most successful|least successful|rank(?:ings?)?|overrated|underrated)\b/i.test(input)
 }
 
-function requiresOfficeHolderAuthority(input: string): boolean {
+export function requiresOfficeHolderAuthority(input: string): boolean {
   if (isPersonOrOfficeEvaluation(input)) return false
   return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister|monarch|king|queen|pope)\b/i.test(input)
 }
@@ -101,7 +101,7 @@ export function constructEconomicFactsReply(
   return null
 }
 
-function requiresIndependentCorroboration(input: string): boolean {
+export function requiresIndependentCorroboration(input: string): boolean {
   return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?)\b/i.test(input)
 }
 

@@ -1,130 +1,101 @@
+// saas/tests/freshEvidenceLocalSynthesis.node.test.ts
+//
+// Single-pass grounded reasoning over live evidence (2026-10-10). Replaces the scope-plan /
+// contract / faithfulness-review state machine. Pins: the host tells the model its own citation
+// requirement; deterministic acceptance checks only what it can verify; one concrete repair.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
-  boundedFreshSynthesisAttemptTimeoutMs,
-  freshSynthesisNullIndicatesTimeout,
-  FRESH_SYNTHESIS_MAX_ATTEMPTS,
-  FRESH_SYNTHESIS_TIMEOUT_NULL_GRACE_MS,
-  runFreshSynthesisTransportAttempts,
-} from '../lib/ai/cos/freshEvidenceRetryPolicy.ts'
+  acceptFreshEvidenceGroundedAnswer,
+  freshEvidenceGroundedAnswerPrompt,
+  freshEvidenceGroundedRepairPrompt,
+  FRESH_GROUNDED_ANSWER_MAX_TOKENS,
+  FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
+} from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
+import { describeFreshCitationRequirement, freshCitationRequirement } from '../lib/ai/cos/cosFreshAuthority.ts'
+import type { FreshEvidenceSource } from '../lib/ai/cos/cosFreshGrounding.ts'
 
-test('fresh synthesis uses two attempts and caps the global 120s timeout at 35s', () => {
-  assert.equal(FRESH_SYNTHESIS_MAX_ATTEMPTS, 2)
-  assert.equal(boundedFreshSynthesisAttemptTimeoutMs(120_000, undefined), 35_000)
-  assert.equal(boundedFreshSynthesisAttemptTimeoutMs(20_000, undefined), 20_000)
-  assert.equal(boundedFreshSynthesisAttemptTimeoutMs(120_000, 90_000), 60_000)
-  assert.equal(boundedFreshSynthesisAttemptTimeoutMs(120_000, 1_000), 5_000)
+const sources: FreshEvidenceSource[] = [
+  { id: 'LIVE1', title: 'Candidate A edges Candidate B in the first round', url: 'https://en.mercopress.com/2026/10/05/first-round', snippet: 'Candidate A won around 47% of valid votes; runoff on October 25.', sourceDate: '2026-10-05' },
+  { id: 'LIVE2', title: 'Candidates head to runoff', url: 'https://www.chinadailyhk.com/article/640532', snippet: 'No candidate secured a majority; runoff on Oct 25.', sourceDate: '2026-10-05' },
+]
+const officeQuestion = 'who will be the next brazilian president?'
+const plainQuestion = 'what is the population of Lisbon?'
+const retrievedAt = '2026-10-10T08:00:00.000Z'
+
+test('the prompt states the host citation requirement the validator will enforce', () => {
+  const office = freshCitationRequirement(officeQuestion, sources)
+  assert.equal(office.minIndependentHosts, 2)
+  assert.equal(office.officialPublisherSufficient, true)
+  const prompt = freshEvidenceGroundedAnswerPrompt({ input: officeQuestion, sources, retrievedAt, language: 'en', lengthRule: 'CHAT ANSWER LENGTH: test rule' })
+  assert.match(prompt.systemPrompt, /CITATION REQUIREMENT \(enforced by the server before release\)/)
+  assert.match(prompt.systemPrompt, /at least TWO different hosts/)
+  assert.match(prompt.systemPrompt, /LIVE1=en\.mercopress\.com/)
+  assert.match(prompt.systemPrompt, /LIVE2=chinadailyhk\.com/)
+  assert.match(prompt.systemPrompt, /never answer "insufficient"/)
+  assert.match(prompt.systemPrompt, /Never turn a lead, a poll, or incumbency into a predicted or declared winner/)
+  assert.match(prompt.systemPrompt, /CHAT ANSWER LENGTH/)
+  assert.match(prompt.prompt, /CURRENT-FACT LIVE EVIDENCE — SERVER RETRIEVED/)
+  assert.match(prompt.prompt, new RegExp(`QUESTION: ${officeQuestion.replace('?', '\\?')}`))
+
+  const plain = freshCitationRequirement(plainQuestion, sources)
+  assert.equal(plain.minIndependentHosts, 1)
+  assert.match(describeFreshCitationRequirement(plain, sources), /at least one is required/)
 })
 
-test('one thrown transport timeout is retried once and can recover on the second local attempt', async () => {
-  let calls = 0
-  const retries: Array<{ attempt: number; nextAttempt: number }> = []
-  const result = await runFreshSynthesisTransportAttempts(async () => {
-    calls += 1
-    if (calls === 1) {
-      const error = new Error('This operation was aborted')
-      error.name = 'AbortError'
-      throw error
-    }
-    return 'grounded-json'
-  }, event => retries.push({ attempt: event.attempt, nextAttempt: event.nextAttempt }))
-
-  assert.equal(result.value, 'grounded-json')
-  assert.equal(result.attempts, 2)
-  assert.equal(calls, 2)
-  assert.deepEqual(retries, [{ attempt: 1, nextAttempt: 2 }])
+test('a prose answer citing two independent hosts is released with a server-built source list', () => {
+  const text = 'It is undecided: the first round on 4 October sent Candidate A (about 47%) and Candidate B to a runoff on 25 October, as reported by [LIVE1] and [LIVE2]; no official result is declared yet.'
+  const accepted = acceptFreshEvidenceGroundedAnswer({ text, input: officeQuestion, sources })
+  assert.equal(accepted.ok, true)
+  assert.equal(accepted.reason, null)
+  assert.deepEqual(accepted.citedSourceIds, ['LIVE1', 'LIVE2'])
+  assert.match(accepted.reply, /\n\nSources: \[LIVE1\] \(https:\/\/en\.mercopress\.com\/2026\/10\/05\/first-round\) and \[LIVE2\] \(https:\/\/www\.chinadailyhk\.com\/article\/640532\)$/)
 })
 
-test('the exact Production shape — null after the full 35s budget — is recognized as a swallowed timeout', () => {
-  assert.equal(FRESH_SYNTHESIS_TIMEOUT_NULL_GRACE_MS, 250)
-  assert.equal(freshSynthesisNullIndicatesTimeout(null, 35_005, 35_000), true)
-  assert.equal(freshSynthesisNullIndicatesTimeout(null, 34_900, 35_000), true)
-  assert.equal(freshSynthesisNullIndicatesTimeout(null, 34_700, 35_000), false)
-  assert.equal(freshSynthesisNullIndicatesTimeout('answer', 35_005, 35_000), false)
+test('an office answer citing only one of two reports is sent to repair with the concrete missing requirement, not silently rejected', () => {
+  const text = 'The runoff is on 25 October [LIVE1].'
+  const accepted = acceptFreshEvidenceGroundedAnswer({ text, input: officeQuestion, sources })
+  assert.equal(accepted.ok, false)
+  assert.equal(accepted.reason, 'citation_requirement_unmet')
+  const repair = freshEvidenceGroundedRepairPrompt({ input: officeQuestion, sources, retrievedAt, language: 'en', draft: accepted.answer, reason: accepted.reason! })
+  assert.match(repair.prompt, /REPAIR: Your draft was not released because it did not meet the citation requirement/)
+  assert.match(repair.prompt, /at least TWO different hosts/)
+  assert.match(repair.prompt, /PREVIOUS DRAFT \(not evidence\):\nThe runoff is on 25 October \[LIVE1\]\./)
 })
 
-test('a swallowed timeout can be converted to a retryable transport failure and recover', async () => {
-  let calls = 0
-  const elapsed = [35_005, 1_900]
-  const rawValues: Array<string | null> = [null, 'grounded-json']
-  const retries: number[] = []
-  const result = await runFreshSynthesisTransportAttempts(async () => {
-    const index = calls++
-    const value = rawValues[index]
-    if (freshSynthesisNullIndicatesTimeout(value, elapsed[index], 35_000)) {
-      throw new Error('Local inference attempt exhausted its 35000ms timeout budget')
-    }
-    return value
-  }, event => retries.push(event.attempt))
-
-  assert.equal(result.value, 'grounded-json')
-  assert.equal(result.attempts, 2)
-  assert.equal(calls, 2)
-  assert.deepEqual(retries, [1])
+test('ordinary current facts release on one cited source; invented ids are stripped, not fatal', () => {
+  const text = 'Lisbon has about 545,000 residents [LIVE1][LIVE9].'
+  const accepted = acceptFreshEvidenceGroundedAnswer({ text, input: plainQuestion, sources })
+  assert.equal(accepted.ok, true)
+  assert.deepEqual(accepted.citedSourceIds, ['LIVE1'])
+  assert.doesNotMatch(accepted.answer, /LIVE9/)
 })
 
-test('two transport failures fail closed after exactly two local attempts', async () => {
-  let calls = 0
-  await assert.rejects(
-    () => runFreshSynthesisTransportAttempts(async () => {
-      calls += 1
-      throw new Error('provider timeout')
-    }),
-    /provider timeout/,
-  )
-  assert.equal(calls, 2)
+test('an answer that cites nothing, or is empty, is not released as a live answer', () => {
+  assert.equal(acceptFreshEvidenceGroundedAnswer({ text: 'The runoff is on 25 October.', input: plainQuestion, sources }).reason, 'no_evidence_cited')
+  assert.equal(acceptFreshEvidenceGroundedAnswer({ text: '   ', input: plainQuestion, sources }).reason, 'empty_answer')
 })
 
-test('a completed fast null result is not treated as a transport failure and is not retried', async () => {
-  let calls = 0
-  const result = await runFreshSynthesisTransportAttempts(async () => {
-    calls += 1
-    const value = null
-    assert.equal(freshSynthesisNullIndicatesTimeout(value, 120, 35_000), false)
-    return value
-  })
-  assert.equal(result.value, null)
-  assert.equal(result.attempts, 1)
-  assert.equal(calls, 1)
-})
-
-test('production fresh synthesis recovers transport failures and repairable contract failures before failing closed', () => {
+test('the live-fact path is one interactive-lane call with at most one repair, and the chain is gone', () => {
   const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.match(source, /runFreshSynthesisTransportAttempts/)
-  assert.match(source, /boundedFreshSynthesisAttemptTimeoutMs/)
-  assert.match(source, /freshSynthesisNullIndicatesTimeout/)
-  assert.match(source, /attemptStartedAt = Date\.now\(\)/)
-  assert.match(source, /exhausted its.*timeout budget/)
-  assert.match(source, /cos-fresh-local-synthesis-retry/)
-  assert.match(source, /acceptFreshEvidenceSynthesis/)
-  assert.match(source, /diagnoseFreshEvidenceSemanticPlan/)
-  assert.match(source, /diagnoseFreshEvidenceSynthesis/)
-  assert.match(source, /phase: 'scope_plan_repair'/)
-  assert.match(source, /phase: 'contract_repair'/)
-  assert.match(source, /repairAnswerContract/)
-  assert.match(source, /if \(repairedContract\.kind === 'rejected'\) return \{ kind: 'citation_grounding_rejected' \}/)
-  assert.doesNotMatch(source, /if \(!accepted\) return \{ kind: 'citation_grounding_rejected' \}/)
-  assert.doesNotMatch(source, /synthesizeFreshEvidenceExternally|callCosTextDetailed|modelPreference/)
+  assert.match(source, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' \}/)
+  assert.match(source, /disableThinking: true/)
+  assert.equal(FRESH_GROUNDED_ANSWER_TIMEOUT_MS, 20_000)
+  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 700)
+  assert.match(source, /resolveCosReasoner/)
+  assert.match(source, /lengthRule: CHAT_ANSWER_LENGTH_RULE/)
+  assert.doesNotMatch(source, /jsonObject|EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
+  assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 4, 'definition + first call + transport retry + one repair')
+  const pure = readFileSync(new URL('../lib/ai/cos/freshEvidenceGroundedAnswer.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(pure, /from '@\//, 'pure module stays relative-import only so tests can load it')
+  const external = readFileSync(new URL('../lib/ai/cos/freshEvidenceExternalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(external, /acceptFreshEvidenceGroundedAnswer/)
+  assert.doesNotMatch(external, /SynthesisContract|ContractRecovery|PredicateAudit/)
 })
 
-test('malformed scope review gets one bounded retry without bypassing grounding or faithfulness', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.match(source, /event: 'unparseable_review_retry'/)
-  assert.match(source, /const retried = await boundedLocalCompletion/)
-  assert.match(source, /return recovered \? \{ kind: 'reviewed', review: recovered \} : \{ kind: 'unparseable' \}/)
-  assert.match(source, /if \(reviewed.kind === 'unparseable'\) return \{ kind: 'citation_grounding_rejected' \}/)
-  assert.match(source, /if \(finalReview.kind === 'unparseable' \|\| !finalReview.review.faithful\)/)
-})
-
-test('citation-authority repair follows universal external fact corroboration', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceContractRecovery.ts', import.meta.url), 'utf8')
-  assert.match(source, /citation_authority_rejected: the citations in evidenceIds/)
-  assert.match(source, /distinct independent source hosts/)
-  assert.match(source, /return EVIDENCE_INSUFFICIENT rather than inventing citations/)
-  assert.match(source, /replyCitesRequiredFreshEvidence/)
-})
-
+// The citation requirement is now stated to the model up front and on repair (see the first test)
+// rather than living in a separate contract-recovery module.
 test('COS researches additional live evidence before rejecting an externally grounded answer', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.match(route, /localSynthesis.kind === 'citation_grounding_rejected' && Date.now\(\)-startedAt < 110_000/)

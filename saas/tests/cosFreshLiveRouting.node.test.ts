@@ -8,7 +8,7 @@ const route = () => read('../app/api/cos-primary/route.ts')
 const externalInfo = () => read('../lib/ai/tools/getExternalInfo.ts')
 const structuredInfo = () => read('../lib/ai/tools/getStructuredLiveInfo.ts')
 const externalSynthesis = () => read('../lib/ai/cos/freshEvidenceExternalSynthesis.ts')
-const synthesisContract = () => read('../lib/ai/cos/freshEvidenceSynthesisContract.ts')
+const groundedAnswer = () => read('../lib/ai/cos/freshEvidenceGroundedAnswer.ts')
 
 test('fresh/current facts retrieve live evidence before local synthesis and any hosted fallback', () => {
   const source = route()
@@ -104,24 +104,21 @@ test('structured real-time adapter uses Brave rich callback and compact timestam
   assert.match(source, /No structured real-time callback was available/)
 })
 
-test('governed external fresh synthesis keeps the same planner, faithfulness audit and repair standard after local COS', () => {
+test('governed external fresh synthesis uses the same single-pass prompt and acceptance as local COS', () => {
   const source = externalSynthesis()
   const local = source.indexOf('await synthesizeFreshEvidenceLocally(args)')
   const hosted = source.indexOf('await callCosTextDetailed(')
   assert.ok(local >= 0)
   assert.ok(hosted > local)
-  assert.match(source, /freshEvidenceScopePlanPrompt/)
-  assert.match(source, /freshEvidenceSynthesisPrompt/)
-  assert.match(source, /freshEvidenceFaithfulnessReviewPrompt/)
-  assert.match(source, /acceptFreshEvidenceFaithfulnessReview/)
-  assert.match(source, /freshEvidenceRevisionPrompt/)
-  assert.match(source, /freshEvidenceSynthesisNeedsNeuralReview/)
+  assert.match(source, /freshEvidenceGroundedAnswerPrompt\(\{ \.\.\.args, lengthRule: CHAT_ANSWER_LENGTH_RULE \}\)/)
+  assert.match(source, /acceptFreshEvidenceGroundedAnswer/)
+  assert.match(source, /freshEvidenceGroundedRepairPrompt/)
   assert.match(source, /modelPreference:\s*'gemini'/)
+  assert.doesNotMatch(source, /ScopePlan|Faithfulness|PredicateAudit/)
 })
 
-test('fresh/current model memory is explicitly forbidden in both semantic planning and answer synthesis', () => {
-  const source = synthesisContract()
-  assert.match(source, /Use only facts present in LIVE EVIDENCE\. Your model memory is not a source of current facts\./)
-  assert.match(source, /Use ONLY facts present in LIVE EVIDENCE\. Your own memory is assumed stale and must not contribute facts\./)
-  assert.match(source, /EVIDENCE_INSUFFICIENT/)
+test('fresh/current model memory is explicitly forbidden in the grounded answer prompt', () => {
+  const source = groundedAnswer()
+  assert.match(source, /For every current-world fact, use only the evidence supplied\. Model memory is stale and must not supply dates, names, numbers, or outcomes\./)
+  assert.doesNotMatch(source, /EVIDENCE_INSUFFICIENT/)
 })

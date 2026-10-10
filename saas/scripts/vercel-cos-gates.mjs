@@ -489,17 +489,11 @@ const tests = [
 
   'tests/cosTravelPlanningFreshness.node.test.ts',
 
-  'tests/cosFreshGroundedTask.node.test.ts',
-
   'tests/listCatalogIntent.node.test.ts',
 
   'tests/cosFreshLiveRouting.node.test.ts',
 
   'tests/freshEvidenceLocalSynthesis.node.test.ts',
-
-  'tests/freshEvidenceNeuralReview.node.test.ts',
-
-  'tests/freshEvidencePredicateAmbiguity.node.test.ts',
 
   'tests/cosFreshGrounding.node.test.ts',
 

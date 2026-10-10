@@ -118,13 +118,26 @@ export type FreshEvidenceGroundedAcceptance = {
  * invented (ids that were never retrieved) are removed rather than failing the whole answer; an
  * answer that cites nothing used no evidence and is not released as a live answer.
  */
+/**
+ * A length-capped answer ends mid-sentence. Cut back to the last sentence end when that keeps most of the
+ * text; otherwise keep it as is (a short answer cut inside its first sentence is better than nothing).
+ */
+export function trimToCompleteSentence(text: string): string {
+  const value = String(text || '').trim()
+  if (!value || /[.!?…。！？]["”')\]]?$/u.test(value)) return value
+  let cut = -1
+  for (const m of value.matchAll(/[.!?…。！？]["”')\]]?(?=\s)/gu)) cut = (m.index ?? -1) + m[0].length
+  if (cut >= Math.ceil(value.length * 0.6)) return value.slice(0, cut).trim()
+  return value
+}
+
 export function acceptFreshEvidenceGroundedAnswer(args: {
   text: string
   input: string
   sources: FreshEvidenceSource[]
 }): FreshEvidenceGroundedAcceptance {
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  const raw = String(args.text || '').trim()
+  const raw = trimToCompleteSentence(String(args.text || ''))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
   const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {

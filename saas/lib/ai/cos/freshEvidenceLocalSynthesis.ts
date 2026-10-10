@@ -58,6 +58,11 @@ async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt): Promise<
       maxTokens: FRESH_GROUNDED_ANSWER_MAX_TOKENS,
       disableThinking: true,
       timeoutMs: FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
+      // Production 2026-10-10 20:34–20:35: the pod answered in 9.4–10 s every time with finish=length at the cap,
+      // and local-inference threw the text away (LOCAL_MODEL_OUTPUT_TRUNCATED), so the retry and the 20 s backup
+      // ran for nothing. A length-capped prose answer IS the answer: keep it, trim it to a complete sentence,
+      // and let acceptance judge it on its citations.
+      allowTruncatedText: true,
       allowConfiguredFallback: true,
       usageContext: { feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' },
     })

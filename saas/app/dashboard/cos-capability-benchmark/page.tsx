@@ -263,7 +263,7 @@ export default function CosCapabilityBenchmarkPage() {
       </div>
       <div className="mt-4 space-y-2 text-sm">
         {autopsy.rows.length ? autopsy.rows.slice(0,12).map(row => <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-          <span className="min-w-0 break-words"><strong>{row.primary_stage || t('cos.benchmark.autopsyAwaitingEvidence', 'awaiting evidence')}</strong> · {row.problem_class}</span>
+          <span className="min-w-0 wrap-break-word"><strong>{row.primary_stage || t('cos.benchmark.autopsyAwaitingEvidence', 'awaiting evidence')}</strong> · {row.problem_class}</span>
           <span>{row.status}{row.lesson_retained?` · ${t('cos.benchmark.autopsyLessonRetained', 'lesson retained')}`:''}</span>
           {(row.source_case_id||row.retest_case_id)&&<span className="basis-full text-xs text-text-muted">{t('cos.benchmark.autopsySource', 'Source')}: {row.source_case_id||t('cos.benchmark.autopsyProductionTurn', 'production turn')}{row.retest_case_id?` → ${t('cos.benchmark.autopsyRetest', 'retest')} ${row.retest_case_id}`:''}</span>}
         </div>) : <p className="text-text-muted">{t('cos.benchmark.autopsyEmpty', 'No poor outcome has produced an autopsy yet.')}</p>}
@@ -273,7 +273,7 @@ export default function CosCapabilityBenchmarkPage() {
     <section className="rounded-md border border-border bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold">{t('cos.benchmark.adaptiveTitle', 'Adaptive retrieval — shadow validation')}</h2>
+          <h2 className="font-semibold">{t('cos.benchmark.adaptiveTitle', 'Adaptive retrieval — shadow-sm validation')}</h2>
           <p className="mt-1 text-xs text-text-muted">{t('cos.benchmark.adaptiveDescription', 'Outcome-correlated evidence use may propose a smaller retrieval context. Each candidate must preserve quality and reduce injected context on separate controlled cases before it can be called validated.')}</p>
         </div>
         <div className="text-xs text-text-muted">{adaptive.livePolicyChanged?t('cos.benchmark.adaptiveLiveChanged', 'Live policy changed'):t('cos.benchmark.adaptiveLiveUnchanged', 'Live policy unchanged')}</div>
@@ -284,7 +284,7 @@ export default function CosCapabilityBenchmarkPage() {
         <Card label={t('cos.benchmark.adaptiveCandidateCap', 'Candidate learned-corpus cap')} value={candidateInjected==null?'—':String(candidateInjected)} />
         <Card label={t('cos.benchmark.adaptiveValidationProgress', 'Validation passes')} value={latestAdaptive?`${latestAdaptive.validation_passed||0}/${latestAdaptive.validation_required||2}`:'0/2'} />
       </div>
-      <p className="mt-3 text-xs text-text-muted">{t('cos.benchmark.adaptiveThresholdNote', 'Similarity threshold stays unchanged until item-level similarity/use telemetry has enough evidence. A validated shadow candidate is not automatic Production promotion.')}</p>
+      <p className="mt-3 text-xs text-text-muted">{t('cos.benchmark.adaptiveThresholdNote', 'Similarity threshold stays unchanged until item-level similarity/use telemetry has enough evidence. A validated shadow-sm candidate is not automatic Production promotion.')}</p>
       <div className="mt-4 space-y-2 text-sm">
         {adaptive.validations.length ? adaptive.validations.slice(0,8).map(row => <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
           <span>{row.case_domain} · {row.case_id}</span>
@@ -297,7 +297,7 @@ export default function CosCapabilityBenchmarkPage() {
 }
 
 function RunList({runs,empty,displayError,passedLabel}:{runs:Run[];empty:string;displayError:(value:unknown)=>string;passedLabel:string}) {
-  return <div className="mt-3 space-y-2 text-sm">{runs.length?runs.map(run=><div key={run.id} className="flex flex-wrap justify-between gap-2 border-b border-border pb-2"><span>{new Date(run.started_at).toLocaleString()} · {run.status}</span><span>{run.passed}/{run.attempted} {passedLabel}</span>{run.error&&<span className="basis-full break-words text-danger">{displayError(run.error)}</span>}</div>):<p className="text-text-muted">{empty}</p>}</div>
+  return <div className="mt-3 space-y-2 text-sm">{runs.length?runs.map(run=><div key={run.id} className="flex flex-wrap justify-between gap-2 border-b border-border pb-2"><span>{new Date(run.started_at).toLocaleString()} · {run.status}</span><span>{run.passed}/{run.attempted} {passedLabel}</span>{run.error&&<span className="basis-full wrap-break-word text-danger">{displayError(run.error)}</span>}</div>):<p className="text-text-muted">{empty}</p>}</div>
 }
 
-function Card({label,value}:{label:string;value:string}) { return <div className="rounded-md border border-border bg-surface p-4"><p className="text-xs text-text-muted">{label}</p><p className="mt-1 break-words text-2xl font-semibold">{value}</p></div> }
+function Card({label,value}:{label:string;value:string}) { return <div className="rounded-md border border-border bg-surface p-4"><p className="text-xs text-text-muted">{label}</p><p className="mt-1 wrap-break-word text-2xl font-semibold">{value}</p></div> }

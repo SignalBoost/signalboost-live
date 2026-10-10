@@ -81,10 +81,10 @@
     "@langchain/langgraph": "1.4.14",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/react-virtual": "^3.13.12",
     "@vercel/analytics": "^1.4.1",
     "@vercel/sandbox": "^3.2.1",
-    "autoprefixer": "^10.4.16",
     "bullmq": "^5.58.5",
     "hyparquet": "1.26.0",
     "next": "16.3.8",
@@ -95,7 +95,7 @@
     "react-dom": "19.2.6",
     "resend": "^4.0.0",
     "stripe": "^14.25.0",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.41.0",

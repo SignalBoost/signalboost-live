@@ -166,7 +166,7 @@ export default function AdmConsoleClient() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="rounded-[20px] border border-white/10 bg-gradient-to-br from-slate-900/95 to-slate-950/95 p-7 shadow-2xl shadow-black/50 backdrop-blur-md">
+      <section className="rounded-[20px] border border-white/10 bg-linear-to-br from-slate-900/95 to-slate-950/95 p-7 shadow-2xl shadow-black/50 backdrop-blur-md">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <span className="sb-eyebrow"><LocalizedText fallback={uiText('generatedUi.u_29fcbf459e7a2fa1')} /></span>

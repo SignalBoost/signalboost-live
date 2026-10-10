@@ -45,7 +45,7 @@ export default function JsonBlueprint({ blueprint }) {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
+        <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
           <h3 className="font-black text-white"><LocalizedText fallback={"Request fields"} /></h3>
           <div className="mt-4 grid gap-2">
             {requestInputs.length ? requestInputs.map(([key, value]) => (
@@ -57,7 +57,7 @@ export default function JsonBlueprint({ blueprint }) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
+        <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
           <h3 className="font-black text-white"><LocalizedText fallback={"Response mapping"} /></h3>
           <div className="mt-4 grid gap-2">
             {mappings.length ? mappings.map(([target, source]) => (
@@ -70,7 +70,7 @@ export default function JsonBlueprint({ blueprint }) {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
+        <div className="rounded-2xl border border-white/10 bg-white/3 p-5">
           <h3 className="font-black text-white">Governance</h3>
           <div className="mt-4 grid gap-3 text-sm font-bold">
             <p className="flex items-center gap-2 text-emerald-100"><span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-300/15">✓</span> Backend-only secrets</p>

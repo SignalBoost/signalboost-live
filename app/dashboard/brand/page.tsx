@@ -111,7 +111,7 @@ export default function BrandSettingsPage() {
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, [key]: e.target.value }))
               }
-              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring-2 focus:ring-yellow-400 focus:outline-none"
+              className="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring-2 focus:ring-yellow-400 focus:outline-hidden"
             />
           </div>
         ))}

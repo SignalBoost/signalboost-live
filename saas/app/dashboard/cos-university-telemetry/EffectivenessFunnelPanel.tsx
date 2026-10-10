@@ -242,8 +242,8 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                         <span>{label}</span>
                         <span className="opacity-50 font-mono text-[10px] truncate">{stage.source}</span>
                       </div>
-                      <div className="mt-0.5 h-2 w-full rounded bg-current/10">
-                        <div className="h-2 rounded bg-current/60" style={{ width: `${born ? Math.max(pct, stage.count ? 1 : 0) : 0}%` }} />
+                      <div className="mt-0.5 h-2 w-full rounded-sm bg-current/10">
+                        <div className="h-2 rounded-sm bg-current/60" style={{ width: `${born ? Math.max(pct, stage.count ? 1 : 0) : 0}%` }} />
                       </div>
                     </div>
                     <div className="text-end font-mono tabular-nums">{stage.count}</div>
@@ -287,7 +287,7 @@ export default function EffectivenessFunnelPanel({ copy, subjects }: { copy: Cos
                   <div className="mt-1 font-mono" style={{ overflowWrap: 'anywhere' }}>{copy.failuresByReason}: {counts(f.evaluationFailures.byReason)}</div>
                   <div className="mt-3 space-y-2" data-testid="evaluation-causal-explanations">
                     {f.evaluationFailures.explanations.map(item => (
-                      <div key={item.reason} className="rounded border p-2">
+                      <div key={item.reason} className="rounded-sm border p-2">
                         <div className="font-mono text-[10px]" style={{ overflowWrap: 'anywhere' }}>{item.reason} × {item.count}</div>
                         <div className="mt-1"><b>{uiText('generatedUi.u_dc3d2ce7d8a25ca4')}</b> {item.attribution} · <b>{uiText('generatedUi.u_1a39eedbb9df45e9')}</b> {item.causeStatus}</div>
                         <div><b>{uiText('generatedUi.u_ad389aa4c08e3d7c')}</b> {item.cause}</div>

@@ -425,7 +425,7 @@ export default function RequestPlanPage() {
     <main className="min-h-screen bg-slate-950 px-5 py-10 text-white">
       <section className="mx-auto max-w-4xl">
         <Link href="/" className="text-sm font-semibold text-cyan-200 hover:text-white">← {copy.back}</Link>
-        <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl shadow-cyan-950/30">
+        <div className="mt-8 rounded-3xl border border-white/10 bg-white/4 p-8 shadow-2xl shadow-cyan-950/30">
           <span className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">{copy.badge}</span>
           <h1 className="mt-5 text-4xl font-black tracking-tight text-white md:text-5xl">{signedIn ? copy.signedInTitle : copy.title}</h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">{signedIn ? copy.signedInBody : copy.body}</p>
@@ -434,7 +434,7 @@ export default function RequestPlanPage() {
           <form onSubmit={submit} className="mt-8 grid gap-4">
             <label className="grid gap-2 text-sm font-bold text-slate-200">
               <span>{copy.source}</span>
-              <select value={source} onChange={event => setSource(event.target.value as Source)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4">
+              <select value={source} onChange={event => setSource(event.target.value as Source)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-hidden ring-cyan-300/20 focus:ring-4">
                 <option value="website_optimizer">{copy.options.website_optimizer}</option>
                 <option value="repo_check">{copy.options.repo_check}</option>
                 <option value="cybersecurity_check">{copy.options.cybersecurity_check}</option>
@@ -444,22 +444,22 @@ export default function RequestPlanPage() {
 
             <label className="grid gap-2 text-sm font-bold text-slate-200">
               <span>{copy.targetUrl}</span>
-              <input value={targetUrl} onChange={event => setTargetUrl(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4" />
+              <input value={targetUrl} onChange={event => setTargetUrl(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-hidden ring-cyan-300/20 focus:ring-4" />
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-slate-200">
               <span>{copy.company} <span className="font-normal text-slate-500">({copy.optional})</span></span>
-              <input value={company} onChange={event => setCompany(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4" />
+              <input value={company} onChange={event => setCompany(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-hidden ring-cyan-300/20 focus:ring-4" />
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-slate-200">
               <span>{copy.name} <span className="font-normal text-slate-500">({copy.optional})</span></span>
-              <input value={name} onChange={event => setName(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4" />
+              <input value={name} onChange={event => setName(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-hidden ring-cyan-300/20 focus:ring-4" />
             </label>
 
             <label className="grid gap-2 text-sm font-bold text-slate-200">
               <span>{copy.email}</span>
-              <input type="email" required value={email} onChange={event => setEmail(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4" />
+              <input type="email" required value={email} onChange={event => setEmail(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-hidden ring-cyan-300/20 focus:ring-4" />
             </label>
 
             <p className="text-sm leading-6 text-slate-400">{copy.note}</p>

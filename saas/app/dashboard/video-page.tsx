@@ -31,7 +31,7 @@ const captionPresets: CaptionPreset[] = [
   { id: "hormozi", label: uiText('generatedUi.u_1a90986d0f221dc9'), description: uiText('generatedUi.u_1dd3dfc5045e0c3f'), style: { ...defaultCaptionStyle, fontFamily: "Impact, Inter, sans-serif", fontSize: 52, color: "#FFD700", backgroundColor: "rgba(0,0,0,0.86)", animation: "pop", x: 50, y: 70 } },
   { id: "minimal", label: uiText('generatedUi.u_057b5de48d7b90f1'), description: uiText('generatedUi.u_6e761c8fe00d53f0'), style: { ...defaultCaptionStyle, fontFamily: "Inter, Arial, sans-serif", fontSize: 32, color: "#ffffff", backgroundColor: "rgba(15,23,42,0.52)", animation: "fade", x: 50, y: 84 } },
 ]
-const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-[9/16] max-h-[72vh]', '1:1': 'aspect-square max-h-[72vh]', '16:9': 'aspect-video' }
+const aspectClasses: Record<AspectRatio, string> = { '9:16': 'aspect-9/16 max-h-[72vh]', '1:1': 'aspect-square max-h-[72vh]', '16:9': 'aspect-video' }
 const canvasSizes: Record<AspectRatio, { width: number; height: number }> = { '9:16': { width: 720, height: 1280 }, '1:1': { width: 1080, height: 1080 }, '16:9': { width: 1280, height: 720 } }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -227,7 +227,7 @@ function parseCaptionFile(text: string): CaptionCue[] {
 function QuotaStatusBar({ quota }: { quota: VideoQuota }) {
   const { lang } = useTranslation()
   const pct = Math.min(100, Math.round((quota.usedMinutes / Math.max(1, quota.includedMinutes)) * 100))
-  return <div className="rounded-2xl border border-white/10 bg-white/[.04] p-4">
+  return <div className="rounded-2xl border border-white/10 bg-white/4 p-4">
     <div className="flex items-center justify-between text-sm"><span>{vt(VID.quota, lang)}</span><span>{quota.usedMinutes}/{quota.includedMinutes} {vt(VID.min, lang)}</span></div>
     <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#FFD700]" style={{ width: `${pct}%` }} /></div>
     <p className="mt-2 text-xs text-white/55">{vt(VID.quotaInfo, lang)}</p>
@@ -246,7 +246,7 @@ function PresetPicker({ activePreset, onPreset }: { activePreset: string; onPres
   return <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
     <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{vt(VID.templates, lang)}</h2><span className="text-xs text-white/50">{vt(VID.presetTagline, lang)}</span></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      {captionPresets.map((p) => <button key={p.id} type="button" onClick={() => onPreset(p)} className={`rounded-2xl border p-4 text-start transition ${activePreset === p.id ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
+      {captionPresets.map((p) => <button key={p.id} type="button" onClick={() => onPreset(p)} className={`rounded-2xl border p-4 text-start transition ${activePreset === p.id ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/3 hover:border-white/25'}`}>
         <span className="font-bold">{p.label}</span><span className="mt-1 block text-xs text-white/55">{PRESET_DESC[p.id] ? vt(VID[PRESET_DESC[p.id]], lang) : p.description}</span>
       </button>)}
     </div>
@@ -261,7 +261,7 @@ function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, o
     {sel ? <label className="mt-4 block text-sm">{vt(VID.editSelected, lang)}<textarea className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-white/10 p-3" value={sel.text} onChange={(e) => onUpdateText(sel.id, e.target.value)} /><span className="mt-1 block font-mono text-xs text-[#FFD700]">{formatTime(sel.start)} → {formatTime(sel.end)}</span></label> : null}
     <div className="mt-4 max-h-72 space-y-2 overflow-auto">
       {cues.length === 0 ? <p className="rounded-2xl border border-dashed border-white/15 p-4 text-sm text-white/55">{vt(VID.emptyTimeline, lang)}</p> : null}
-      {cues.map((c) => <button key={c.id} type="button" onClick={() => { onSelect(c.id); onSeek(c.start) }} className={`w-full rounded-2xl border p-3 text-start text-sm transition ${sel?.id === c.id || (currentTime >= c.start && currentTime <= c.end) ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}><span className="font-mono text-xs text-[#FFD700]">{formatTime(c.start)} → {formatTime(c.end)}</span><br />{c.text}</button>)}
+      {cues.map((c) => <button key={c.id} type="button" onClick={() => { onSelect(c.id); onSeek(c.start) }} className={`w-full rounded-2xl border p-3 text-start text-sm transition ${sel?.id === c.id || (currentTime >= c.start && currentTime <= c.end) ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/3 hover:border-white/25'}`}><span className="font-mono text-xs text-[#FFD700]">{formatTime(c.start)} → {formatTime(c.end)}</span><br />{c.text}</button>)}
     </div>
   </section>
 }
@@ -539,13 +539,13 @@ export default function VideoEditor() {
   const updateCueText = (id: string, text: string) => setCues((items) => items.map((c) => c.id === id ? { ...c, text } : c))
 
   return <main className="min-h-screen bg-[#05070b] p-6 text-white">
-    <section className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.20),transparent_35%),linear-gradient(135deg,#101827,#05070b)] p-8">
+    <section className="rounded-4xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.20),transparent_35%),linear-gradient(135deg,#101827,#05070b)] p-8">
       <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('video.kicker', "Video Studio")}</p>
       <h1 className="mt-4 text-4xl font-black">{t('video.title', "AI caption video editor")}</h1>
       <p className="mt-3 max-w-3xl text-white/70">{t('video.subtitle', "Upload a video, generate synced AI captions, drag styled overlays on canvas, and export a captioned video file.")}</p>
     </section>
     <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_.35fr]"><QuotaStatusBar quota={quota} /><BillingBanner quota={quota} /></div>
-    <section className="mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.03] p-5 md:grid-cols-5">
+    <section className="mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/3 p-5 md:grid-cols-5">
       <label className="text-sm">{vt(VID.video, lang)}<input type="file" accept="video/*" onChange={(e) => e.target.files?.[0] && uploadVideo(e.target.files[0])} className="mt-2 w-full" /></label>
       <div className="text-sm"><span>{vt(VID.aiCaptions, lang)}</span><button type="button" onClick={generateCaptions} disabled={!storagePath || captionState.status === 'generating'} className="mt-2 w-full rounded-xl bg-[#FFD700] px-4 py-2 font-bold text-black disabled:opacity-50">{captionState.status === 'generating' ? vt(VID.transcribing, lang) : vt(VID.generateCaptions, lang)}</button></div>
       <label className="text-sm">{vt(VID.optionalSrt, lang)}<input type="file" accept=".srt,.vtt,text/vtt" onChange={(e) => e.target.files?.[0] && uploadCaptions(e.target.files[0])} className="mt-2 w-full" /></label>
@@ -564,6 +564,6 @@ export default function VideoEditor() {
         <ExportPanel canExport={quota.exportEnabled} hasSource={Boolean(videoUrl)} exportState={exportState} onExport={exportVideo} />
       </div>
     </div>
-    <footer className="mt-8 rounded-2xl border border-white/10 bg-white/[.03] p-4 text-sm text-white/60">{vt(VID.footerStatus, lang).replace('{t}', currentTime.toFixed(2)).replace('{d}', String(durationSec || 0)).replace('{n}', String(cues.length))}</footer>
+    <footer className="mt-8 rounded-2xl border border-white/10 bg-white/3 p-4 text-sm text-white/60">{vt(VID.footerStatus, lang).replace('{t}', currentTime.toFixed(2)).replace('{d}', String(durationSec || 0)).replace('{n}', String(cues.length))}</footer>
   </main>
 }

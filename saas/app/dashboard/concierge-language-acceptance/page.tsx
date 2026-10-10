@@ -143,8 +143,8 @@ export default function ConciergeLanguageAcceptancePage() {
             <div className={native === 'pass' ? 'text-green-400' : native === 'fail' ? 'text-red-400' : 'text-yellow-400'}>{c.native}: {native === 'pass' ? c.pass : native === 'fail' ? c.fail : c.pending}</div>
             <textarea className="min-h-20 w-full rounded-md border border-border bg-background p-2 text-sm" value={notes[code] ?? latest.native_review_notes?.[code] ?? ''} onChange={e => setNotes(value => ({...value,[code]:e.target.value}))} placeholder={c.notePlaceholder} />
             <div className="flex flex-wrap gap-2">
-              <button className="rounded border border-green-500/50 px-2 py-1 text-xs text-green-300 disabled:opacity-40" disabled={latest.status !== 'completed' || summary.attempted !== 5} onClick={() => void reviewLanguage(code,'pass')}>{c.reviewPass}</button>
-              <button className="rounded border border-red-500/50 px-2 py-1 text-xs text-red-300 disabled:opacity-40" disabled={latest.status !== 'completed' || summary.attempted !== 5} onClick={() => void reviewLanguage(code,'fail')}>{c.reviewFail}</button>
+              <button className="rounded-sm border border-green-500/50 px-2 py-1 text-xs text-green-300 disabled:opacity-40" disabled={latest.status !== 'completed' || summary.attempted !== 5} onClick={() => void reviewLanguage(code,'pass')}>{c.reviewPass}</button>
+              <button className="rounded-sm border border-red-500/50 px-2 py-1 text-xs text-red-300 disabled:opacity-40" disabled={latest.status !== 'completed' || summary.attempted !== 5} onClick={() => void reviewLanguage(code,'fail')}>{c.reviewFail}</button>
             </div>
           </div>
         })}
@@ -158,7 +158,7 @@ export default function ConciergeLanguageAcceptancePage() {
             <div className={item.passed ? 'text-green-400' : 'text-red-400'}>{item.passed ? c.pass : c.fail}</div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            {Object.entries(item.verdicts || {}).map(([key,value]) => <span className={`rounded border px-2 py-1 ${value ? 'border-green-500/40 text-green-300' : 'border-red-500/40 text-red-300'}`} key={key}>{VERDICT_LABELS[key as keyof Verdicts] || key}: {value ? '✓' : '✕'}</span>)}
+            {Object.entries(item.verdicts || {}).map(([key,value]) => <span className={`rounded-sm border px-2 py-1 ${value ? 'border-green-500/40 text-green-300' : 'border-red-500/40 text-red-300'}`} key={key}>{VERDICT_LABELS[key as keyof Verdicts] || key}: {value ? '✓' : '✕'}</span>)}
           </div>
           <pre className="mt-3 whitespace-pre-wrap rounded-md bg-muted/30 p-3 text-sm leading-relaxed">{item.response_excerpt}</pre>
         </article>)}

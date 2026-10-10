@@ -48,7 +48,7 @@ function TextFilePreview({ workspaceId, path }: { workspaceId: string; path: str
           {copied ? t(dict, 'concierge.copied') : t(dict, 'concierge.copyFile')}
         </button>
       </div>
-      <pre className="max-h-[34rem] overflow-auto whitespace-pre p-3 text-start font-mono text-xs leading-5 text-slate-100"><code>{content}</code></pre>
+      <pre className="max-h-136 overflow-auto whitespace-pre p-3 text-start font-mono text-xs leading-5 text-slate-100"><code>{content}</code></pre>
     </section>
   )
 }

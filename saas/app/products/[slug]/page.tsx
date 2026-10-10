@@ -71,19 +71,19 @@ export default function ProductWindowPage() {
     window.location.href = '/dashboard'
   }
 
-  if (!product) return <main className="min-h-screen bg-slate-950 px-5 py-10 text-white"><section className="mx-auto max-w-4xl"><Link href="/" className="text-sm font-semibold text-cyan-200 hover:text-white">← {copy.back}</Link><div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-8"><h1 className="text-4xl font-black">{copy.notFound}</h1><p className="mt-3 text-slate-300">{copy.notFoundBody}</p></div></section></main>
+  if (!product) return <main className="min-h-screen bg-slate-950 px-5 py-10 text-white"><section className="mx-auto max-w-4xl"><Link href="/" className="text-sm font-semibold text-cyan-200 hover:text-white">← {copy.back}</Link><div className="mt-8 rounded-3xl border border-white/10 bg-white/4 p-8"><h1 className="text-4xl font-black">{copy.notFound}</h1><p className="mt-3 text-slate-300">{copy.notFoundBody}</p></div></section></main>
 
   return (
     <main className="min-h-screen bg-slate-950 px-5 py-10 text-white">
       <section className="mx-auto max-w-5xl">
         <Link href="/" className="text-sm font-semibold text-cyan-200 hover:text-white">← {copy.back}</Link>
-        <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl shadow-cyan-950/30">
+        <div className="mt-8 rounded-3xl border border-white/10 bg-white/4 p-8 shadow-2xl shadow-cyan-950/30">
           <span className="inline-flex rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.18em]" style={{ borderColor: `${product.accent}66`, background: `${product.accent}18`, color: product.accent }}>{copy.kicker}</span>
           <div className="mt-6 flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
             <div><div className="text-5xl">{product.icon}</div><h1 className="mt-4 text-4xl font-black tracking-tight text-white md:text-6xl">{product.titles[langCode]}</h1><p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">{product.summaries[langCode]}</p></div>
             <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50 md:max-w-xs">{copy.gated}</div>
           </div>
-          <section className="mt-8 rounded-3xl border border-white/10 bg-slate-950/50 p-6"><h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">{copy.included}</h2><div className="mt-4 grid gap-4 md:grid-cols-3">{product.bullets[langCode].map((item) => <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.04] p-5"><span className="text-2xl">✓</span><p className="mt-3 text-sm font-bold leading-6 text-slate-100">{item}</p></div>)}</div></section>
+          <section className="mt-8 rounded-3xl border border-white/10 bg-slate-950/50 p-6"><h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">{copy.included}</h2><div className="mt-4 grid gap-4 md:grid-cols-3">{product.bullets[langCode].map((item) => <div key={item} className="rounded-2xl border border-white/10 bg-white/4 p-5"><span className="text-2xl">✓</span><p className="mt-3 text-sm font-bold leading-6 text-slate-100">{item}</p></div>)}</div></section>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={continueToSignalBoost} className="rounded-xl bg-cyan-300 px-5 py-3 text-center font-black text-slate-950 transition hover:bg-white">{copy.continue}</button><Link href="/pricing" className="rounded-xl border border-white/10 px-5 py-3 text-center font-black text-white transition hover:border-cyan-300/50 hover:text-cyan-100">{copy.pricing}</Link></div>
         </div>
       </section>

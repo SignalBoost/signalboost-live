@@ -457,7 +457,7 @@ export default function Concierge() {
             </div>
           )}
 
-          <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-white/[.045] px-4 py-3 backdrop-blur-md">
+          <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-white/4.5 px-4 py-3 backdrop-blur-md">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[.18em] text-cyan-300/80">{uiText('generatedUi.u_85647deec9865df5')}</div>
               <strong className="text-base text-white">{t(dict, 'concierge.title')}</strong>
@@ -469,7 +469,7 @@ export default function Concierge() {
                 onClick={() => setOpen(false)}
                 aria-label={t(dict, 'concierge.close')}
                 title={t(dict, 'concierge.close')}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg leading-none text-white outline-none transition hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-cyan-300"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg leading-none text-white outline-hidden transition hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-cyan-300"
               >
                 ×
               </button>
@@ -499,7 +499,7 @@ export default function Concierge() {
                   {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
                   {message.role === 'assistant' && message.visualPreviewUrl ? (
                     <figure className="mt-3 grid place-items-center gap-2 overflow-hidden rounded-xl border border-white/15 bg-white p-2">
-                      <img src={message.visualPreviewUrl} alt={message.content} className="max-h-[28rem] w-full object-contain" />
+                      <img src={message.visualPreviewUrl} alt={message.content} className="max-h-112 w-full object-contain" />
                       <a href={message.visualPreviewUrl} download={message.visualFilename || 'visual.png'} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-700 hover:bg-cyan-300/20">{t(dict, 'concierge.downloadVisual')}</a>
                     </figure>
                   ) : null}
@@ -551,7 +551,7 @@ export default function Concierge() {
                             placeholder={uiText('assistantFeedback.correctionPlaceholder')}
                             rows={3}
                             maxLength={4000}
-                            className="w-full resize-y rounded-lg border border-white/15 bg-slate-950/70 px-2 py-1.5 text-[11px] text-white outline-none focus:border-cyan-300/50"
+                            className="w-full resize-y rounded-lg border border-white/15 bg-slate-950/70 px-2 py-1.5 text-[11px] text-white outline-hidden focus:border-cyan-300/50"
                           />
                           <div className="flex gap-1.5">
                             <button type="button" disabled={busy || !correction.trim()} onClick={() => submitFeedback(index, message, 'correction', correction)} className="rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-2 py-1 text-[10.5px] font-bold text-cyan-200 disabled:opacity-50">{uiText('assistantFeedback.submitCorrection')}</button>
@@ -579,9 +579,9 @@ export default function Concierge() {
             {attachments.length > 0 && (
               <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
                 {attachments.map(a => (
-                  <div key={a.id} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.06] py-1 ps-1 pe-1.5">
+                  <div key={a.id} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-white/10 bg-white/6 py-1 ps-1 pe-1.5">
                     {a.isImage
-                      ? <img src={a.dataUrl} alt={a.name} className="h-7 w-7 shrink-0 rounded object-cover" />
+                      ? <img src={a.dataUrl} alt={a.name} className="h-7 w-7 shrink-0 rounded-sm object-cover" />
                       : <span className="flex h-7 w-7 shrink-0 items-center justify-center text-base">📄</span>}
                     <span className="truncate text-[11px] text-white/80">{a.name}</span>
                     <button type="button" onClick={() => removeAttachment(a.id)} aria-label={t(dict, 'concierge.removeFile')} className="shrink-0 border-0 bg-transparent p-0.5 text-xs leading-none text-white/55">✕</button>
@@ -597,14 +597,14 @@ export default function Concierge() {
                 aria-label={t(dict, 'concierge.attach')}
                 title={t(dict, 'concierge.attach')}
                 disabled={loading || attachments.length >= ATTACH_MAX_FILES}
-                className="h-[42px] w-10 shrink-0 rounded-xl border border-white/10 bg-white/[.06] text-base text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-[42px] w-10 shrink-0 rounded-xl border border-white/10 bg-white/6 text-base text-white outline-hidden transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
               >📎</button>
               <VoiceInputButton
                 lang={activeLang as 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'}
                 value={input}
                 onChange={setInput}
                 disabled={loading}
-                className="flex h-[42px] w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[.06] text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 aria-pressed:border-red-400/60 aria-pressed:bg-red-500/20 aria-pressed:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-[42px] w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/6 text-white outline-hidden transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 aria-pressed:border-red-400/60 aria-pressed:bg-red-500/20 aria-pressed:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
               />
               <textarea
                 ref={inputRef}

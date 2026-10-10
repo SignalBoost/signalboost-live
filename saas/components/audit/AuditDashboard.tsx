@@ -342,13 +342,13 @@ export default function AuditDashboard() {
               return (
                 <div
                   key={pk.id}
-                  className={`flex-1 basis-[200px] min-w-[180px] rounded-xl border p-4 ${pk.popular ? 'border-[#ffc300]/45 bg-[#ffc300]/[0.06]' : 'border-white/[0.12] bg-white/[0.03]'}`}
+                  className={`flex-1 basis-[200px] min-w-[180px] rounded-xl border p-4 ${pk.popular ? 'border-[#ffc300]/45 bg-[#ffc300]/6' : 'border-white/12 bg-white/3'}`}
                 >
                   <div className="mb-3 flex items-baseline gap-2">
                     <span className="font-mono text-[22px] font-extrabold text-white">{pk.credits}</span>
                     <span className="text-xs font-bold text-white/60">{copy.creditsWord}</span>
                     {pk.popular && (
-                      <span className="ms-auto rounded-full border border-[#ffc300]/40 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.05em] text-[#ffc300]">
+                      <span className="ms-auto rounded-full border border-[#ffc300]/40 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider text-[#ffc300]">
                         {copy.popular}
                       </span>
                     )}
@@ -358,7 +358,7 @@ export default function AuditDashboard() {
                     disabled={busy}
                     className={`w-full rounded-[10px] px-4 py-2.5 text-[13px] font-extrabold transition disabled:cursor-default ${
                       pk.popular
-                        ? `border border-[#ffc300]/50 text-[#0a0e17] ${busy ? 'bg-[#ffc300]/30' : 'bg-gradient-to-br from-[#ffc300] to-[#ffb000]'}`
+                        ? `border border-[#ffc300]/50 text-[#0a0e17] ${busy ? 'bg-[#ffc300]/30' : 'bg-linear-to-br from-[#ffc300] to-[#ffb000]'}`
                         : 'border border-[#1af0ff]/40 bg-transparent text-[#1af0ff]'
                     }`}
                   >

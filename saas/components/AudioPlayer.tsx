@@ -84,7 +84,7 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
 
       <button
         onClick={togglePlay}
-        className="w-12 h-12 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-full flex items-center justify-center font-bold text-lg shadow transition-all shrink-0"
+        className="w-12 h-12 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-sm transition-all shrink-0"
         aria-label={isPlaying ? copy.pause : copy.play}
       >
         {isPlaying ? (
@@ -101,7 +101,7 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
       <div className="flex-1 min-w-0 w-full">
         <h4 className="text-sm font-semibold truncate text-slate-100">{title}</h4>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+          <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-sm border border-blue-500/20">
             {PROVIDER_NAME} {voiceModel}
           </span>
           <span className="text-xs text-slate-400 font-mono">
@@ -116,7 +116,7 @@ export default function AudioPlayer({ audioUrl, title, voiceModel }: AudioPlayer
             max={duration || 100}
             value={currentTime}
             onChange={(e) => handleScrub(e.target.value)}
-            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none focus:ring-0"
+            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-hidden focus:ring-0"
             style={{
               background: `linear-gradient(to right, #2563eb 0%, #2563eb ${
                 duration ? (currentTime / duration) * 100 : 0

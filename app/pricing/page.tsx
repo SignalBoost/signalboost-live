@@ -123,8 +123,8 @@ export default function PricingPage() {
               key={plan.key}
               className={`flex flex-col rounded-2xl border p-6 ${
                 plan.featured
-                  ? 'border-[#FFD700]/50 bg-[#FFD700]/[.06] shadow-[0_0_40px_rgba(255,215,0,.12)]'
-                  : 'border-white/10 bg-white/[.04]'
+                  ? 'border-[#FFD700]/50 bg-[#FFD700]/6 shadow-[0_0_40px_rgba(255,215,0,.12)]'
+                  : 'border-white/10 bg-white/4'
               }`}
             >
               {plan.badge ? (
@@ -173,7 +173,7 @@ export default function PricingPage() {
           ))}
         </div>
 
-        <div className="mt-10 rounded-2xl border border-white/10 bg-white/[.03] p-6 text-center">
+        <div className="mt-10 rounded-2xl border border-white/10 bg-white/3 p-6 text-center">
           <h3 className="text-lg font-bold">
             {t('pricing.enterprise.title', 'Need custom usage or enterprise terms?')}
           </h3>

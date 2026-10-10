@@ -32,7 +32,7 @@ export default function LoginPage() {
     <main className="min-h-screen bg-black px-6 py-8 text-white md:px-10">
       <Link href="/" className="text-[#FFD700] no-underline">{t('auth.back', '← SignalBoost')}</Link>
 
-      <section className="mx-auto mt-16 max-w-xl rounded-[2rem] border border-white/10 bg-white/[.04] p-8 shadow-2xl">
+      <section className="mx-auto mt-16 max-w-xl rounded-4xl border border-white/10 bg-white/4 p-8 shadow-2xl">
         <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('auth.kicker', 'Marketing auth')}</p>
         <h1 className="mt-4 text-4xl font-black">{t('auth.title', 'Sign in to SignalBoost')}</h1>
         <p className="mt-4 text-white/65">

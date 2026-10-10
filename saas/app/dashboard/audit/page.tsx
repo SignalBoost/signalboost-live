@@ -635,7 +635,7 @@ export default function AuditCenterPage() {
                 value={prefix}
                 onChange={e => setPrefix(e.target.value)}
                 placeholder={uiText('generatedUi.u_d7606d02f5e08d7c')}
-                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-hidden focus:border-accent"
               />
               <span className="text-[10.5px] leading-snug text-text-muted/80">{copy.pathHint}</span>
             </label>
@@ -644,7 +644,7 @@ export default function AuditCenterPage() {
               <input
                 type="number" min={1} max={60} value={maxFiles}
                 onChange={e => setMaxFiles(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
-                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text outline-hidden focus:border-accent"
               />
             </label>
             <button
@@ -826,12 +826,12 @@ export default function AuditCenterPage() {
       {openReport && (
         <div
           onClick={closeReport}
-          className="fixed inset-0 z-[1000] flex justify-end transition-[background] duration-200"
+          className="fixed inset-0 z-1000 flex justify-end transition-[background] duration-200"
           style={{ background: reportEntered ? 'rgba(2,3,6,.62)' : 'rgba(2,3,6,0)', backdropFilter: reportEntered ? 'blur(4px)' : 'none', WebkitBackdropFilter: reportEntered ? 'blur(4px)' : 'none' }}
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="fixed end-0 top-0 flex h-full w-[520px] max-w-full flex-col border-s border-border bg-surface p-6 transition-transform duration-300"
+            className="fixed inset-e-0 top-0 flex h-full w-[520px] max-w-full flex-col border-s border-border bg-surface p-6 transition-transform duration-300"
             style={{ transform: reportEntered ? 'translateX(0)' : 'translateX(100%)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)' }}
           >
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -888,12 +888,12 @@ export default function AuditCenterPage() {
         return (
           <div
             onClick={() => setSelectedFinding(null)}
-            className="fixed inset-0 z-[1000] flex justify-end transition-[background] duration-200"
+            className="fixed inset-0 z-1000 flex justify-end transition-[background] duration-200"
             style={{ background: entered ? 'rgba(2,3,6,.62)' : 'rgba(2,3,6,0)', backdropFilter: entered ? 'blur(4px)' : 'none', WebkitBackdropFilter: entered ? 'blur(4px)' : 'none' }}
           >
             <div
               onClick={e => e.stopPropagation()}
-              className="fixed end-0 top-0 h-full w-[480px] max-w-full overflow-y-auto border-s border-border bg-surface p-6 transition-transform duration-300"
+              className="fixed inset-e-0 top-0 h-full w-[480px] max-w-full overflow-y-auto border-s border-border bg-surface p-6 transition-transform duration-300"
               style={{ transform: entered ? 'translateX(0)' : 'translateX(100%)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)' }}
             >
               <div className="flex items-center justify-between gap-3">

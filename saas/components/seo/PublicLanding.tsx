@@ -33,7 +33,7 @@ export default function PublicLanding({ locale, topic }: { locale: PublicLocale;
         </nav>
       </header>
       <section className="py-14 sm:py-20">
-        <h1 className="max-w-4xl text-4xl font-semibold leading-tight sm:text-6xl">{page.title}</h1>
+        <h1 className="max-w-4xl text-4xl font-semibold leading-tight sm:text-6xl sm:leading-none">{page.title}</h1>
         <p className="mt-7 max-w-3xl text-lg leading-relaxed text-slate-300">{page.description}</p>
         <Link href="/" prefetch={false} className="mt-8 inline-block rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950">{copy.start}</Link>
       </section>

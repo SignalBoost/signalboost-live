@@ -86,7 +86,7 @@ export default function ArtifactLifeRecordPanel({ copy }: { copy: CosUniversityL
           {copy.inputLabel}
           <input id="university-artifact-life-key" type="text" value={key} placeholder={copy.inputPlaceholder} spellCheck={false}
             onChange={event => setKey(event.target.value)} disabled={busy}
-            className="mt-1 block w-[28rem] max-w-full rounded-md border bg-transparent px-3 py-2 font-mono text-sm" />
+            className="mt-1 block w-md max-w-full rounded-md border bg-transparent px-3 py-2 font-mono text-sm" />
         </label>
         <button type="submit" disabled={busy || !key.trim()} className="rounded-md border px-3 py-2 text-sm disabled:opacity-50">{busy ? copy.looking : copy.lookup}</button>
       </form>
@@ -148,7 +148,7 @@ export default function ArtifactLifeRecordPanel({ copy }: { copy: CosUniversityL
                   <p className="text-xs">{r.examinations.total} {copy.examinationsSummary}: {r.examinations.passedAll}</p>
                   <div className="mt-2 space-y-2">
                     {r.examinations.runs.map(run => (
-                      <div key={run.runKey} className="rounded border p-2 text-[11px]">
+                      <div key={run.runKey} className="rounded-sm border p-2 text-[11px]">
                         <div className="font-mono opacity-70">{when(run.at)} · {short(run.evaluatorId, 36)} · {copy.examAll}: {run.passedAll ? copy.examPassed : copy.examFailed}</div>
                         <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 sm:grid-cols-4">
                           <span>{copy.examHoldout}: {score(run.holdout.baseline)} → {score(run.holdout.artifact)} · {run.holdout.improved ? copy.examPassed : copy.examFailed}</span>

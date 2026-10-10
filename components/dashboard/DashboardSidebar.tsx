@@ -44,7 +44,7 @@ export default function DashboardSidebar({
   const plan = account.effectivePlan
 
   return (
-    <aside className="border-b border-white/10 bg-black/85 p-4 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-5">
+    <aside className="border-b border-white/10 bg-black/85 p-4 backdrop-blur-sm lg:sticky lg:top-0 lg:h-screen lg:w-80 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-5">
       <div className="flex items-start justify-between gap-3 lg:block">
         <div>
           <Link href="/" className="block text-2xl font-black text-[#FFD700] no-underline">SignalBoost</Link>
@@ -55,7 +55,7 @@ export default function DashboardSidebar({
         </Link>
       </div>
 
-      <section className="mt-5 rounded-3xl border border-white/10 bg-white/[.04] p-4 shadow-2xl shadow-black/20">
+      <section className="mt-5 rounded-3xl border border-white/10 bg-white/4 p-4 shadow-2xl shadow-black/20">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#FFD700]/15 text-sm font-black text-[#FFD700]">
             {account.avatarUrl ? <img src={account.avatarUrl} alt="" className="h-full w-full object-cover" /> : account.displayName.slice(0, 2).toUpperCase()}

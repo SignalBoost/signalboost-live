@@ -54,14 +54,19 @@ console.log(`${workspace}: manifest/lock agreement and ${checked} reviewed depen
 
 if (process.argv.includes('--smoke')) {
   const require = createRequire(resolve(directory, 'package.json'));
-  for (const name of ['next', 'postcss', 'browserslist', 'form-data', 'nanoid', 'sharp']) {
+  // Smoke only what this workspace's graph contains (Tailwind 4 dropped autoprefixer/browserslist).
+  const locked = (name) => Boolean(lock.packages[`node_modules/${name}`]);
+  for (const name of ['next', 'postcss', 'browserslist', 'form-data', 'nanoid', 'sharp'].filter(locked)) {
     // Inspect the installed lockfile path, not an optional package.json export.
     const installed = readJson(resolve(directory, 'node_modules', name, 'package.json'));
     assert.equal(installed.version, lock.packages[`node_modules/${name}`].version, `${name}: installed/locked version mismatch`);
   }
-  const browsers = require('browserslist')('last 1 Chrome version');
-  assert.ok(browsers.length > 0 && browsers[0].startsWith('chrome '));
-  const css = await require('postcss')([require('autoprefixer')]).process('a { display: flex; }', { from: undefined });
+  if (locked('browserslist')) {
+    const browsers = require('browserslist')('last 1 Chrome version');
+    assert.ok(browsers.length > 0 && browsers[0].startsWith('chrome '));
+  }
+  const cssPlugins = locked('autoprefixer') ? [require('autoprefixer')] : [];
+  const css = await require('postcss')(cssPlugins).process('a { display: flex; }', { from: undefined });
   assert.match(css.css, /display:\s*flex/);
   const FormData = require('form-data');
   const form = new FormData();

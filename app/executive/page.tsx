@@ -8,7 +8,7 @@ export default function ExecutivePage() {
   return (
     <main className="min-h-screen bg-black p-8 text-white">
       <Link href="/" className="text-[#FFD700] no-underline">{t('exec.back', '← SignalBoost')}</Link>
-      <section className="mt-12 max-w-4xl rounded-[2rem] border border-white/10 bg-white/[.04] p-8">
+      <section className="mt-12 max-w-4xl rounded-4xl border border-white/10 bg-white/4 p-8">
         <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('exec.kicker', 'Executive')}</p>
         <h1 className="mt-4 text-5xl font-black">{t('exec.title', 'SignalBoost executive command.')}</h1>
         <p className="mt-5 text-xl leading-8 text-neutral-400">

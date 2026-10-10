@@ -29,3 +29,15 @@ test('English Brazilian next president question receives official electoral quer
   assert.ok(queries.some(query => query.includes('tse.jus.br') && query.includes('2026')))
   assert.ok(queries.some(query => query.includes('pesquisa eleitoral')))
 })
+
+test('future-election fallback recognizes nationality between next and president', async () => {
+  const { readFileSync } = await import('node:fs')
+  const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerCore.ts', import.meta.url), 'utf8')
+  const expression = source.match(/const asksUndecidedElectionOutcome = (\/.*?\/iu)\.test\(input\.prompt\)/)
+  assert.ok(expression, 'future election guard must exist')
+  const regex = new RegExp(expression[1].slice(1, -3), 'iu')
+  assert.equal(regex.test('who will be the next brazilian president?'), true)
+  assert.equal(regex.test('who will be the next president of Brazil?'), true)
+  assert.equal(regex.test('quem sera o proximo presidente do Brasil?'), true)
+  assert.equal(regex.test('Who is the current president of Brazil?'), false)
+})

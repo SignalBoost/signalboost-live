@@ -17,7 +17,7 @@ for (const width of [360, 375, 393, 412, 768, 1024]) {
     expect(bounds.left).toBeGreaterThanOrEqual(-2)
     expect(bounds.right).toBeLessThanOrEqual(width + 2)
     if (width <= 900) {
-      expect(bounds.columns.trim().split(/\\s+/)).toHaveLength(1)
+      expect(bounds.columns.trim().split(/\s+/)).toHaveLength(1)
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
     expect(overflow, `horizontal overflow at ${width}px`).toBeLessThanOrEqual(2)

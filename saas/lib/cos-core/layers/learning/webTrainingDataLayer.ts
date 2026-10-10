@@ -32,6 +32,7 @@ export type WebTrainingSearchOptions = Readonly<{
   maxDiscoveryResults?: number
   braveApiKey?: string
   useBrave?: boolean
+  queryMode?: 'learning' | 'live_reference'
 }>
 
 const INSTITUTIONAL_HOST = /(?:^|\.)(?:gov|gob|gouv|mil|edu)(?:\.[a-z]{2,3})?$|(?:^|\.)(?:europa\.eu|ec\.europa\.eu|un\.org|who\.int|oecd\.org|worldbank\.org|imf\.org|ilo\.org|nhs\.uk|nih\.gov|cdc\.gov|fda\.gov|ema\.europa\.eu)$|(?:^|\.)ac\.[a-z]{2}$/i
@@ -341,7 +342,8 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
   const useBrave = options.useBrave === true && Boolean(braveKey)
 
   return async (query, limit): Promise<LearningConnectorResult[]> => {
-    const plannedQuery = buildWebTrainingResearchQuery(query)
+    // Live answer retrieval must not inherit training curriculum query terms.
+    const plannedQuery = options.queryMode === 'live_reference' ? clean(query).slice(0, 380) : buildWebTrainingResearchQuery(query)
     if (!plannedQuery) return []
     let hits: SearchHit[] = []
     if (useBrave) {

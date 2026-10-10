@@ -124,3 +124,15 @@ test('citation-authority repair explicitly preserves office-holder corroboration
   assert.match(source, /return EVIDENCE_INSUFFICIENT rather than inventing citations/)
   assert.match(source, /replyCitesRequiredFreshEvidence/)
 })
+
+test('COS researches additional live evidence before rejecting an externally grounded answer', () => {
+  const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /localSynthesis.kind === 'citation_grounding_rejected' && Date.now\(\)-startedAt < 110_000/)
+  assert.match(route, /primary:web_search_recovery/)
+  assert.match(route, /getExternalInfo\(recoveryQuery,8,\{bypassCache:true\}\)/)
+  assert.match(route, /prepareFreshEvidenceAcrossQueries\(\[freshSources,recoverySearch.results\],8,lookupInput\)/)
+  assert.match(route, /freshEvidenceMeetsQuestionAuthority\(lookupInput,recoveredSources\)/)
+  assert.match(route, /securityScenarioEvidenceIsSpecific\(lookupInput,recoveredSources\)/)
+  assert.match(route, /synthesizeFreshEvidenceLocally\(\{input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language\}\)/)
+  assert.match(route, /fresh_grounding_research_recovery_finished/)
+})

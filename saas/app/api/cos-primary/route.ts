@@ -828,7 +828,29 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     if(!requestedAction){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
-      const localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})
+      let localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})
+      // Evidence-driven recovery applies to EVERY mutable external fact, not a list of topics.
+      // One bounded additional governed search can repair missing citation authority or
+      // inadequate corroboration. Re-run the SAME grounding gates on the expanded evidence.
+      // Do not retry transient model failures by pretending unverified claims are facts.
+      if(localSynthesis.kind === 'citation_grounding_rejected' && Date.now()-startedAt < 110_000){
+        const recoveryQuery=`${lookupInput.replace(/\s+/g,' ').trim().slice(0,220)} primary authoritative source corroboration independent reporting`
+        logEscalation({event:'fresh_grounding_research_recovery_started',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true})
+        const recoverySearch=await timeCosStage('primary:web_search_recovery',()=>getExternalInfo(recoveryQuery,8,{bypassCache:true}))
+        if(recoverySearch.ok && recoverySearch.results.length){
+          const expanded=prepareFreshEvidenceAcrossQueries([freshSources,recoverySearch.results],8,lookupInput)
+          const reread=await timeCosStage('primary:web_page_reads_recovery',()=>deepenClaimResearch(lookupInput,expanded,readPublicPages))
+          const recoveredSources=reread.sources
+          if(recoveredSources.length > freshSources.length
+            && freshEvidenceMeetsQuestionAuthority(lookupInput,recoveredSources)
+            && securityScenarioEvidenceIsSpecific(lookupInput,recoveredSources)){
+            freshSources=recoveredSources
+            freshRetrievedAt=new Date().toISOString()
+            localSynthesis=await synthesizeFreshEvidenceLocally({input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language})
+          }
+        }
+        logEscalation({event:'fresh_grounding_research_recovery_finished',documents_acquired:freshSources.length,recovery_outcome:localSynthesis.kind,external_ai_invoked:false,local_model_invoked:true})
+      }
       if(localSynthesis.kind === 'accepted'){
         freshLocalModel=localSynthesis.reasonerLabel
         const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:localSynthesis.reasonerLabel,confidence:1,accepted:true})

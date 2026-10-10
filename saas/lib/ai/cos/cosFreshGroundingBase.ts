@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/cosFreshGrounding.ts
 import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
-import { classifyAuthoritativeSourceNeed, rankByAuthority } from './officialSourceAuthority.ts'
+import { classifyAuthoritativeSourceNeed, isInstitutionalHost, rankByAuthority } from './officialSourceAuthority.ts'
 import { inspectUntrustedAiContent, type AiSecurityDisposition, type AiSecurityFinding } from '../../security/aiSecurityGateway.ts'
 
 export type FreshEvidenceSource = SearchResult & {
@@ -49,27 +49,10 @@ export function freshEvidenceHost(value: string): string {
   }
 }
 
-// National government publishers also use second-level registrable domains (gov.br, gob.mx,
-// gouv.fr, gov.pl, govt.nz). Without them, a country's own government site never counted.
-function isGovernmentHost(host: string): boolean {
-  return host.endsWith('.gov') || host.includes('.gov.') || /(?:^|\.)(?:gov|gob|gouv|govt)\.[a-z]{2}$/.test(host)
-}
-
-// A question about a FUTURE holder of an office (next, will be, election, candidates, polls) is
-// not a current-holder lookup: no government page states a future winner, so demanding one made
-// every such question fail closed. These questions need independent corroboration instead, and
-// the answer contract forbids converting polls into a predicted winner.
-const FORWARD_OFFICE_MARKER = /\b(?:next|upcoming|future|will\s+(?:be|win|become)|elect(?:ion|ions|ed)?|candidates?|polls?|polling|run-?off|primar(?:y|ies)|pr[oó]xim[oa]s?|ser[aá]|vai\s+ser|elei[cç][aã]o|elei[cç][oõ]es|elecci[oó]n|elecciones|candidat[oa]s?|pesquisas?|encuestas?|segundo\s+turno|segunda\s+vuelta|nast[eę]pn\p{L}*|kolejn\p{L}*|wybor\p{L}*|kandydat\p{L}*|sonda[zż]\p{L}*|следующ\p{L}*|выбор\p{L}*|кандидат\p{L}*|опрос\p{L}*|n[aä]chst\p{L}*|wahl\p{L}*|kandidat\p{L}*|umfrage\p{L}*|prochain\p{L}*|[ée]lection\p{L}*|sondage\p{L}*|prossim\p{L}*|elezion\p{L}*|sondagg\p{L}*)\b|次期|次の|選挙|候補|世論調査|다음|선거|후보|여론조사|القادم|المقبل|انتخابات|مرشح/iu
-
-export function isForwardLookingOfficeQuestion(input: string): boolean {
-  const text = String(input || '')
-  return requiresIndependentCorroboration(text) && FORWARD_OFFICE_MARKER.test(text)
-}
-
 function authorityScore(result: SearchResult): number {
   const host = freshEvidenceHost(result.url)
   let score = 0
-  if (isGovernmentHost(host)) score += 100
+  if (isInstitutionalHost(host)) score += 100
   if (host.endsWith('.mil') || host.includes('.mil.')) score += 95
   if (host.endsWith('.edu') || host.includes('.edu.')) score += 45
   if (/\bofficial\b/i.test(result.title)) score += 20
@@ -82,9 +65,25 @@ export function isPersonOrOfficeEvaluation(input: string): boolean {
   return /\b(?:worst|worse|best|greatest|most successful|least successful|rank(?:ings?)?|overrated|underrated)\b/i.test(input)
 }
 
-function requiresGovernmentAuthority(input: string): boolean {
-  if (isPersonOrOfficeEvaluation(input) || isForwardLookingOfficeQuestion(input)) return false
+function requiresOfficeHolderAuthority(input: string): boolean {
+  if (isPersonOrOfficeEvaluation(input)) return false
   return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister|monarch|king|queen|pope)\b/i.test(input)
+}
+
+/**
+ * ONE evidence rule for questions that name a public office, shared by the pre-synthesis gate and
+ * the post-synthesis citation check so they can never disagree. The office's own institutional
+ * publisher (any country's state TLD convention, not only `.gov`) is sufficient on its own.
+ * Without one, two independent reporting hosts are required: many office questions — an election
+ * outcome, a leader's statement, a succession — are never published on a state site at all, and a
+ * refusal in the face of corroborated reporting is a wrong answer, not a safe one. A single
+ * uncorroborated secondary page still fails. No forward-looking vocabulary is enumerated here; the
+ * rule is the same whether the question is about the current holder or the next one.
+ */
+export function officeHolderEvidenceSatisfied(sources: FreshEvidenceSource[]): boolean {
+  if (!sources.length) return false
+  if (sources.some(source => isInstitutionalHost(freshEvidenceHost(source.url)))) return true
+  return new Set(sources.map(source => freshEvidenceHost(source.url)).filter(Boolean)).size >= 2
 }
 
 /**
@@ -295,7 +294,7 @@ function resolveDeterministicHistoricalOfficeRoster(
 
   const fromYear = new Date().getUTCFullYear() - Number(years[1])
   for (const source of sources) {
-    if (!isGovernmentHost(freshEvidenceHost(source.url))) continue
+    if (!isInstitutionalHost(freshEvidenceHost(source.url))) continue
     const entries = [...String(source.snippet || '').matchAll(/(?:^|\n)\s*(?:\d+\.\s*)?([\p{Lu}][\p{L}.'’-]*(?:\s+[\p{Lu}][\p{L}.'’-]*){1,5})\s*\(?\s*(\d{4})\s*[–-]\s*(\d{4})?\s*\)?/gmu)]
       .map(match => ({ name: String(match[1]).trim(), start: Number(match[2]), end: match[3] ? Number(match[3]) : null }))
       .filter(entry => candidateLooksLikePerson(entry.name) && Number.isFinite(entry.start) && (entry.end === null || entry.end >= fromYear) && entry.start <= new Date().getUTCFullYear())
@@ -353,13 +352,13 @@ export function resolveDeterministicFreshOfficeHolder(
   }
 
   const ranked = [...support.entries()]
-    .filter(([, value]) => value.hosts.size >= 2 || value.sources.some(source => isGovernmentHost(freshEvidenceHost(source.url))))
+    .filter(([, value]) => officeHolderEvidenceSatisfied(value.sources))
     .sort((a, b) => b[1].hosts.size - a[1].hosts.size || b[1].sources.length - a[1].sources.length)
   if (!ranked.length) return null
   if (ranked.length > 1 && ranked[0][1].hosts.size === ranked[1][1].hosts.size) return null
 
   const [, winner] = ranked[0]
-  if (requiresGovernmentAuthority(input) && !winner.sources.some(source => isGovernmentHost(freshEvidenceHost(source.url)))) return null
+  if (requiresOfficeHolderAuthority(input) && !officeHolderEvidenceSatisfied(winner.sources)) return null
 
   const displayName = [...winner.variants.entries()]
     .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0]?.[0]
@@ -458,13 +457,8 @@ export function prepareFreshEvidenceAcrossQueries(
 
 export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {
   if (!sources.length) return false
+  if (requiresOfficeHolderAuthority(input)) return officeHolderEvidenceSatisfied(sources)
   const hosts = new Set(sources.map(source => freshEvidenceHost(source.url)).filter(Boolean))
-  // The office's own government publisher is primary authority for its current holder. A second
-  // hostname remains preferred corroboration, but must not turn a clear first-party confirmation
-  // into an abstention. Corporate roles still require independent corroboration.
-  if (requiresGovernmentAuthority(input)) {
-    return sources.some(source => isGovernmentHost(freshEvidenceHost(source.url)))
-  }
   if (requiresIndependentCorroboration(input) && hosts.size < 2) return false
   return true
 }
@@ -556,9 +550,7 @@ export function freshEvidenceGroundingBlock(input: string, sources: FreshEvidenc
     '8. The evidence does not define the question. Infer the proposition from the user’s wording, then identify what each source actually measures or establishes before using it.',
     '9. Keep materially different constructs, populations, denominators, time windows, comparison bases, and levels of control distinct. Do not promote an aggregate or associative result into a causal, individual, or controlled-comparison claim unless the evidence itself supports that stronger statement.',
     '10. Synthesize the strongest relevant evidence into the answer. Do not narrate results in retrieval order or include a source merely because it was retrieved.',
-    ...(isForwardLookingOfficeQuestion(input) ? [
-      '11. FUTURE OFFICE-HOLDER QUESTION: who will hold the office is not yet an established fact unless the evidence reports a declared official result. Do not answer "insufficient" merely because the winner is undecided. Answer directly with what the evidence establishes: the election stage, the candidates, the voting dates, declared results so far, and dated poll figures with their pollster when available. Never convert a poll lead into a predicted winner, and never present the sitting office-holder as the next one.',
-    ] : []),
+    '11. For a public office, election, or leadership change: when no cited source is the office\'s own institutional publisher, attribute the facts to the cited reporting ("as reported by …") and say they are not officially confirmed. Who will hold an office is never an established fact until the evidence reports a declared official result; do not answer "insufficient" merely because it is undecided — report the stage, candidates, dates, declared results and dated poll figures (with pollster) that the evidence establishes, and never turn a poll lead, a first-round lead, or incumbency into a predicted or declared winner.',
     '',
     evidence,
     '',
@@ -600,11 +592,7 @@ export function replyCitesIndependentFreshEvidence(reply: string, input: string,
   const text = String(reply || '')
   const citedSources = sources.filter(source => text.includes(`[${source.id}]`) && text.includes(source.url))
   const citedHosts = new Set(citedSources.map(source => freshEvidenceHost(source.url)).filter(Boolean))
-  // A cited first-party government source is enough for the current holder of that public office.
-  // Other office-holder answers still need independent corroboration.
-  if (requiresGovernmentAuthority(input)) {
-    return citedSources.some(source => isGovernmentHost(freshEvidenceHost(source.url)))
-  }
+  if (requiresOfficeHolderAuthority(input)) return officeHolderEvidenceSatisfied(citedSources)
   if (!requiresIndependentCorroboration(input)) return citedHosts.size >= 1
   return citedHosts.size >= 2
 }

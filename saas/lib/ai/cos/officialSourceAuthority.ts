@@ -144,6 +144,11 @@ export function classifyAuthoritativeSourceNeed(query: string): AuthoritativeSou
   return { required: true, entityTokens: entityTokensOf(`${raw} ${text}`), officialStatistics }
 }
 
+/** State, IGO, standards, health or academic publisher by TLD convention (any country). */
+export function isInstitutionalHost(host: string): boolean {
+  return INSTITUTIONAL_HOST.test(String(host || '').toLowerCase())
+}
+
 export function authorityTierOf(url: string, need: AuthoritativeSourceNeed): AuthorityTier {
   const host = hostOf(url)
   if (!host) return 'secondary'

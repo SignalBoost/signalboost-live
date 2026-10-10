@@ -503,6 +503,9 @@ const tests = [
 
   'tests/cosFreshGrounding.node.test.ts',
 
+  // Public-office evidence rule: institutional host (any country) or two independent hosts; gate and citation check share it.
+  'tests/officeHolderEvidenceRule.node.test.ts',
+
   'tests/cosStructuredLiveInfo.node.test.ts',
 
   'tests/cosTemporalClaimGuard.node.test.ts',

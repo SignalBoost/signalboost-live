@@ -308,14 +308,14 @@ function reportUnreadablePage(url: string, reason: string, detail: Record<string
   return ''
 }
 
-async function readTrainingPage(fetcher: FetchLike, hit: SearchHit): Promise<string> {
+async function readTrainingPage(fetcher: FetchLike, hit: SearchHit, minimumReadableChars = MIN_READABLE_PAGE_CHARS): Promise<string> {
   const { text: raw, bytes, contentType } = await requestText(fetcher, hit.url,
     { headers: { accept: 'text/html,application/xhtml+xml,application/pdf;q=0.95,text/plain;q=0.9,application/xml;q=0.7', 'user-agent': 'iTMounts-COS/1.0' } }, 12_000)
   if (/application\/pdf/i.test(contentType) || bytes.subarray(0, 5).toString('latin1') === '%PDF-') {
     const extracted = pdfBufferToText(bytes)
     if (!extracted) return reportUnreadablePage(hit.url, 'pdf_text_layer_unreadable', { contentType, rawLength: bytes.length })
-    if (extracted.length < MIN_READABLE_PAGE_CHARS) {
-      return reportUnreadablePage(hit.url, 'pdf_below_minimum_readable', { textLength: extracted.length, minimum: MIN_READABLE_PAGE_CHARS })
+    if (extracted.length < minimumReadableChars) {
+      return reportUnreadablePage(hit.url, 'pdf_below_minimum_readable', { textLength: extracted.length, minimum: minimumReadableChars })
     }
     return extracted.slice(0, MAX_RETAINED_PAGE_CHARS)
   }
@@ -326,8 +326,8 @@ async function readTrainingPage(fetcher: FetchLike, hit: SearchHit): Promise<str
   if (/\b(?:access denied|temporarily unavailable|technical difficulties|enable javascript to continue)\b/i.test(text.slice(0, 1500))) {
     return reportUnreadablePage(hit.url, 'blocked_or_js_required', { rawLength: raw.length, textLength: text.length })
   }
-  if (text.length < MIN_READABLE_PAGE_CHARS) {
-    return reportUnreadablePage(hit.url, 'below_minimum_readable', { rawLength: raw.length, textLength: text.length, minimum: MIN_READABLE_PAGE_CHARS })
+  if (text.length < minimumReadableChars) {
+    return reportUnreadablePage(hit.url, 'below_minimum_readable', { rawLength: raw.length, textLength: text.length, minimum: minimumReadableChars })
   }
   return text.slice(0, MAX_RETAINED_PAGE_CHARS)
 }
@@ -368,7 +368,7 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
 
     const pages: Array<LearningConnectorResult | null> = await Promise.all(diverse.map(async entry => {
       try {
-        const text = await readTrainingPage(fetcher, entry.hit)
+        const text = await readTrainingPage(fetcher, entry.hit, options.queryMode === 'live_reference' ? 180 : MIN_READABLE_PAGE_CHARS)
         if (!text) return null
         const credibility = entry.assessment.credibility.toFixed(2)
         return {

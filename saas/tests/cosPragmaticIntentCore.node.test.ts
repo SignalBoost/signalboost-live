@@ -9,7 +9,7 @@ const semanticIntent = readFileSync('lib/ai/cos/cosSemanticTaskIntent.ts', 'utf8
 test('route-level neural interpretation suppression remains before live freshness work', () => {
   const heuristic = route.indexOf('heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested')
   const semantic = route.indexOf('? await classifyCosSemanticTaskIntent')
-  const semanticFresh = route.indexOf('semanticRequiresFreshEvidence=Boolean(')
+  const semanticFresh = route.indexOf('semanticRequiresFreshEvidence=semanticIntentRequiresFreshness(semanticTaskIntent)')
   const baseline = route.indexOf('baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
   const finalGate = route.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
   const liveSearch = route.indexOf('freshEvidenceSearchQueries(lookupInput)')
@@ -26,7 +26,8 @@ test('route-level neural interpretation suppression remains before live freshnes
 test('shared COS core cannot re-impose freshness after neural contextual interpretation', () => {
   assert.match(core, /classifyCosSemanticTaskIntent/)
   assert.match(core, /semanticIntentSuppressesFreshness/)
-  assert.match(core, /const baselineRequiresFreshEvidence = requiresFreshExternalEvidence\(input\.prompt\)/)
+  assert.match(core, /const heuristicRequiresFreshEvidence = requiresFreshExternalEvidence\(input\.prompt\)/)
+  assert.match(core, /const baselineRequiresFreshEvidence = heuristicRequiresFreshEvidence \|\| semanticIntentRequiresFreshness\(semanticTaskIntent\)/)
   assert.match(core, /const suppressFreshnessForInterpretation = semanticIntentSuppressesFreshness\(semanticTaskIntent\)/)
   assert.match(core, /if \(baselineRequiresFreshEvidence && !suppressFreshnessForInterpretation\) \{\s*return learnFromTurn\(input, await tryFreshCurrentFact\(input\)\)/s)
   assert.match(core, /if \(!suppressFreshnessForInterpretation && classifyKnowledgeAccess\(input\.prompt\)\.mode === 'search_if_thin'\)/)
@@ -51,7 +52,10 @@ test('the Production failure phrase can only come from a freshness path that con
 })
 
 test('ordinary answerable turns do not pay a semantic-classifier round trip', () => {
-  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& !modelPlannedFreshEvidence\s*&& \(heuristicRequiresFreshEvidence \|\| requiresLiveTravelPlanningEvidence\(input\) \|\| freshConversationContext\.contextUsed\)/)
+  // 2026-10-09: an unflagged NON-English question is the one addition — the word rules recognise live facts
+  // reliably only in English, so the judge adjudicates it. Unflagged English turns still never pay the round trip.
+  assert.match(route, /const nonEnglishUnflagged=!heuristicRequiresFreshEvidence&&!conversationRecallRequested&&mayBeNonEnglish\(input,language\)/)
+  assert.match(route, /const semanticTaskIntentNeeded=!requestedAction\s*&& !modelPlannedFreshEvidence\s*&& \(heuristicRequiresFreshEvidence \|\| requiresLiveTravelPlanningEvidence\(input\) \|\| freshConversationContext\.contextUsed \|\| nonEnglishUnflagged\)/)
   const ownerFastPath = route.indexOf('if(access?.isOwner&&isPlatformSelfKnowledgePrompt(input))')
   const semanticGate = route.indexOf('const semanticTaskIntentNeeded=')
   assert.ok(ownerFastPath >= 0)

@@ -777,6 +777,13 @@ const tests = [
 
   'tests/runpodWorkerQuotaReclaim.node.test.ts',
 
+  // 2026-10-09 answer-correctness fixes: COS knows today's date, never releases an answer that narrates its
+  // own instructions, and routes live-fact questions identically in all 11 languages (210/210 live, 0/77 wrongly live).
+  'tests/cosCurrentDate.node.test.ts',
+  'tests/cosInstructionNarration.node.test.ts',
+  'tests/crossLanguageLiveIntent.node.test.ts',
+  'tests/crossLanguageLiveParity.node.test.ts',
+
 
 
 ]

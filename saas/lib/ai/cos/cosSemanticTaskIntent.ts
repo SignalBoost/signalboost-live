@@ -82,6 +82,16 @@ export function semanticIntentSuppressesFreshness(intent: CosSemanticTaskIntent 
   )
 }
 
+/** The judge's positive live-fact finding: the turn needs current outside-world facts verified live. */
+export function semanticIntentRequiresFreshness(intent: CosSemanticTaskIntent | null): boolean {
+  return Boolean(
+    intent
+      && intent.mode === 'external_fact_verification'
+      && intent.externalFactsRequired
+      && intent.confidence >= 0.72,
+  )
+}
+
 export async function classifyCosSemanticTaskIntent(args: {
   input: string
   language?: string | null

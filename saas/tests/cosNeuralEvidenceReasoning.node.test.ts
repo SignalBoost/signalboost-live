@@ -188,7 +188,7 @@ test('semantic task intent fails safe when classification is missing, malformed,
 test('primary routing lets semantic task intent decide whether a freshness signal is really a verification task', () => {
   const heuristic = primaryRoute.indexOf('heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested')
   const semantic = primaryRoute.indexOf('? await classifyCosSemanticTaskIntent')
-  const semanticFresh = primaryRoute.indexOf('semanticRequiresFreshEvidence=Boolean(')
+  const semanticFresh = primaryRoute.indexOf('semanticRequiresFreshEvidence=semanticIntentRequiresFreshness(semanticTaskIntent)')
   const baseline = primaryRoute.indexOf('baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
   const finalGate = primaryRoute.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
   assert.ok(heuristic >= 0)

@@ -79,7 +79,9 @@ export async function synthesizeFreshEvidenceLocally(args: {
 
   // One bounded transport retry on a transient failure; never a different brain.
   let first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }))
-  // The reasoner already performs governed fallback; do not replay the same timed-out request.
+  // Retry once if the primary provider and governed fallback both produce no usable text.
+  // This is a bounded recovery for transient empty responses; the normal citation repair remains separate.
+  if (!first || 'error' in first) first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }))
   if (!first) return { kind: 'local_synthesis_unparseable' }
   if ('error' in first) return { kind: 'local_synthesis_failed', error: first.error }
 

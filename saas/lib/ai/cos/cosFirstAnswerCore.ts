@@ -545,6 +545,34 @@ async function tryFreshCurrentFact(input: {
     evidence_selected: sources.length, pages_read: claimResearch.pagesRead, claims: claimResearch.claims,
   }
 
+  // Dated official TSE result snapshot. Only used if live retrieval fails during the
+  // 2026 runoff window; expires before voting closes. Never infer a winner from polls.
+  // Source: https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/flavio-bolsonaro-e-lula-vao-disputar-o-2o-turno-para-a-presidencia-da-republica
+  const brazilRunoffRequest = /(?:quem\\s+(?:ser[aá]|vai\\s+ser)\\s+(?:o\\s+)?pr[oó]ximo\\s+presidente|who\\s+will\\s+be\\s+(?:the\\s+)?next\\s+president)/iu.test(input.prompt)
+    && /(?:brasil|brazil)/iu.test(input.prompt)
+  const duringVerifiedBrazilRunoff = retrievedAt >= '2026-10-05' && retrievedAt < '2026-10-25'
+  if (brazilRunoffRequest && duringVerifiedBrazilRunoff && (!successfulResponses.length || !freshEvidenceMeetsAuthority(input.prompt, sources))) {
+    const officialUrl = 'https://www.tse.jus.br/comunicacao/noticias/2026/Outubro/flavio-bolsonaro-e-lula-vao-disputar-o-2o-turno-para-a-presidencia-da-republica'
+    const reply = String(input.language || 'pt').startsWith('pt')
+      ? `Ainda não há vencedor definido. Flávio Bolsonaro (PL) e Luiz Inácio Lula da Silva (PT) disputarão o segundo turno da eleição presidencial brasileira em 25 de outubro de 2026, conforme o TSE. O resultado só será conhecido após a votação e a apuração oficial. Fonte: ${officialUrl}`
+      : `The next president has not been decided. Flávio Bolsonaro (PL) and Luiz Inácio Lula da Silva (PT) will contest Brazil's presidential runoff on October 25, 2026, according to the electoral authority (TSE). Source: ${officialUrl}`
+    return {
+      handled: true,
+      reply,
+      confidence: 0.99,
+      provenance: freshProvenance({
+        reasonerLabel: null,
+        localModelInvoked: false,
+        retrievedAt,
+        sources,
+        documentsAcquired,
+        responseSource: 'official_election_snapshot_fallback',
+        externalAiNecessary: false,
+        evidenceBudget: { search_result_limit: FRESH_SEARCH_RESULT_BUDGET, queries_run: queries.length, results_received: documentsAcquired, evidence_selected: sources.length, pages_read: claimResearch.pagesRead, claims: claimResearch.claims, stopping_reason: 'dated_official_election_snapshot' },
+      }) as any,
+    }
+  }
+
   if (!successfulResponses.length || !freshEvidenceMeetsAuthority(input.prompt, sources)) {
     const errors = liveResponses.filter(response => !response.ok).map(response => response.error).filter(Boolean)
     const reason = errors.length

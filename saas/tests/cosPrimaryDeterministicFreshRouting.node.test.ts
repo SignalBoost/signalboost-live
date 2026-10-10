@@ -20,7 +20,7 @@ test('cos-primary resolves explicit direct-flight evidence before any local mode
 
 test('cos-primary executes every planned query and deepens thin evidence for a compound request', () => {
   assert.match(source, /freshEvidenceSearchQueries\(lookupInput\)/)
-  assert.match(source, /queries\\.map\\(async query=>\\{try\\{return await getExternalInfo/)
+  assert.ok(source.includes('queries.map(async query=>{try{return await getExternalInfo'))
   assert.match(source, /cos-live-search-query-failed/)
   assert.match(source, /prepareFreshEvidenceAcrossQueries\(liveResults\.filter/)
   assert.match(source, /deepenClaimResearch\(lookupInput,freshSources,readPublicPages\)/)

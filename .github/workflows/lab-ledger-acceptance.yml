@@ -13,6 +13,8 @@ on:
       - 'saas/tests/sql/lab-*.sql'
       - 'saas/tests/phase4StripeTestVerification.node.test.mjs'
       - 'saas/lib/billing/phase4StripeTestVerification.mjs'
+      - 'saas/lib/billing/phase4StripeTestCheckout.mjs'
+      - 'saas/tests/phase4StripeTestCheckout.node.test.mjs'
       - 'saas/lib/billing/phase4VerifiedTestSettlementEnvelope.mjs'
       - 'saas/lib/billing/phase4VerifiedTestSettlementHandoff.mjs'
       - 'saas/lib/billing/phase4CommercialWalletAudit.mjs'
@@ -193,3 +195,7 @@ jobs:
       - name: Verify signed Stripe test evidence through PostgreSQL settlement and usage
         shell: bash
         run: node --test saas/tests/phase4StripeTestDatabaseIntegration.node.test.mjs
+
+      - name: Verify closed LAB Stripe test Checkout contract
+        shell: bash
+        run: node --test saas/tests/phase4StripeTestCheckout.node.test.mjs

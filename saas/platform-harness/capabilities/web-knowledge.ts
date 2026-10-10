@@ -156,7 +156,7 @@ export function createNativeWebKnowledgeCapabilityResolver(input: {
 export function createWebKnowledgeResearchPort(
   options: WebKnowledgeResearchOptions = {},
 ): WebKnowledgeResearchPort {
-  const search = options.search ?? createWebTrainingResearchSearch(options)
+  const search = options.search ?? createWebTrainingResearchSearch({ ...options, queryMode: 'live_reference', minCredibility: 0.7 })
   return Object.freeze({
     async search(input) {
       const query = clean(input.query, 1_500)

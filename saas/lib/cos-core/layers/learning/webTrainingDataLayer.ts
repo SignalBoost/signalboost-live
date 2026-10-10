@@ -228,16 +228,31 @@ function pushUniqueHit(found: SearchHit[], seen: Set<string>, url: string, title
   found.push({ url: normalizedUrl, title: stripHtml(title).slice(0, 220) || normalizedUrl, discoveryProvider })
 }
 
+function extractSearchAnchors(html: string, className: string): Array<{ href: string; title: string }> {
+  const anchors: Array<{ href: string; title: string }> = []
+  const anchorRe = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi
+  let match: RegExpExecArray | null
+  while ((match = anchorRe.exec(html))) {
+    const attrs = match[1]
+    const classAttr = attrs.match(/\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')/i)
+    const classes = (classAttr?.[1] ?? classAttr?.[2] ?? '').split(/\s+/)
+    if (!classes.includes(className)) continue
+    const hrefAttr = attrs.match(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/i)
+    const href = hrefAttr?.[1] ?? hrefAttr?.[2]
+    if (href) anchors.push({ href, title: match[2] })
+  }
+  return anchors
+}
+
 async function discoverDuckDuckGo(fetcher: FetchLike, query: string, count: number): Promise<SearchHit[]> {
   const { text: html } = await requestText(fetcher,
     `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
     { headers: { accept: 'text/html,application/xhtml+xml', 'accept-language': 'en-US,en;q=0.8', 'user-agent': SEARCH_BROWSER_UA } }, 10_000)
   const found: SearchHit[] = []
   const seen = new Set<string>()
-  const linkRe = /<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
-  let match: RegExpExecArray | null
-  while ((match = linkRe.exec(html)) && found.length < count) {
-    pushUniqueHit(found, seen, decodeDuckHref(match[1]), match[2], count, 'duckduckgo_html')
+  for (const anchor of extractSearchAnchors(html, 'result__a')) {
+    pushUniqueHit(found, seen, decodeDuckHref(anchor.href), anchor.title, count, 'duckduckgo_html')
+    if (found.length >= count) break
   }
   return found
 }
@@ -248,10 +263,9 @@ async function discoverDuckDuckGoLite(fetcher: FetchLike, query: string, count: 
     { headers: { accept: 'text/html,application/xhtml+xml', 'accept-language': 'en-US,en;q=0.8', 'user-agent': SEARCH_BROWSER_UA } }, 10_000)
   const found: SearchHit[] = []
   const seen = new Set<string>()
-  const linkRe = /<a[^>]+class=["'][^"']*result-link[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
-  let match: RegExpExecArray | null
-  while ((match = linkRe.exec(html)) && found.length < count) {
-    pushUniqueHit(found, seen, decodeDuckHref(match[1]), match[2], count, 'duckduckgo_lite')
+  for (const anchor of extractSearchAnchors(html, 'result-link')) {
+    pushUniqueHit(found, seen, decodeDuckHref(anchor.href), anchor.title, count, 'duckduckgo_lite')
+    if (found.length >= count) break
   }
   return found
 }

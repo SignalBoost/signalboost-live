@@ -171,7 +171,7 @@ test('stale current-year assertions are rejected without banning historical cont
   assert.equal(stale.ok, false)
   const historical = acceptFreshEvidenceGroundedAnswer({
     input: question, sources,
-    text: `In ${previous}, the legislature was divided. As of the current date (${year}), current composition must be checked. [LIVE1] [LIVE2]`,
+    text: `In ${previous}, earlier election cycles had different results. As of the current date (${year}), the runoff is on 25 October, as reported by [LIVE1] and [LIVE2].`,
   })
   assert.equal(historical.ok, true)
 })

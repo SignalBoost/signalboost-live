@@ -542,19 +542,19 @@ export default function LabPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+        <div className="sb-lab-workspace-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
 
           <div>
-            <div className="fathom-glass" style={{ borderRadius: 16, padding: '32px', marginBottom: 20 }}>
+            <div className="fathom-glass sb-lab-prompt-card" style={{ borderRadius: 16, padding: '32px', marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
                 <div>
                   <h1 className="terminal-text" style={{ fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.02em', color: '#fff' }}>{t(dict, 'lab.title')}</h1>
                   <p style={{ fontSize: 14, color: '#7a90b8', marginTop: 6, lineHeight: 1.6 }}>{t(dict, 'lab.subtitle')}</p>
                 </div>
               </div>
-              <div style={{ background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: 10, padding: '8px', display: 'flex', gap: 6, alignItems: 'center', marginBottom: 20, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.5)' }}>
+              <div className="sb-lab-prompt-controls" style={{ background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: 10, padding: '8px', display: 'flex', gap: 6, alignItems: 'center', marginBottom: 20, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.5)' }}>
                 <span className="terminal-text" style={{ color: BLUE, paddingInlineStart: 12, fontWeight: 700, fontSize: 16 }}>$</span>
-                <input ref={inputRef} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && runSearch()} placeholder={t(dict, 'lab.placeholder')} className="terminal-text" style={{ flex: 1, background: 'transparent', border: 'none', padding: '12px 8px', color: '#fff', fontSize: 15, outline: 'none' }} />
+                <input ref={inputRef} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && runSearch()} placeholder={t(dict, 'lab.placeholder')} className="terminal-text" style={{ flex: 1, background: 'transparent', border: 'none', padding: '12px 8px', color: '#fff', fontSize: 16, minWidth: 0, outline: 'none' }} />
                 <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx,.txt" />
                 <button onClick={() => fileInputRef.current?.click()} className="terminal-text" style={{ padding: '10px 14px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                   📎 <span style={{ fontSize: 11 }}>{t(dict, 'lab.attach')}</span>

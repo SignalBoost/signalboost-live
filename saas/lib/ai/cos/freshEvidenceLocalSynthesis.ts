@@ -337,9 +337,29 @@ async function reviewScopeFaithfulness(args: {
     phase: 'faithfulness_review',
   })
   if (result.ok === false) return { kind: 'local_synthesis_failed', error: result.error }
-  if (!result.text?.trim()) return { kind: 'unparseable' }
-  const review = acceptFreshEvidenceFaithfulnessReview({ text: result.text, semanticPlan: args.semanticPlan })
-  return review ? { kind: 'reviewed', review } : { kind: 'unparseable' }
+  const review = result.text?.trim()
+    ? acceptFreshEvidenceFaithfulnessReview({ text: result.text, semanticPlan: args.semanticPlan })
+    : null
+  if (review) return { kind: 'reviewed', review }
+
+  // A malformed reviewer response is not a verdict about the candidate answer.
+  // Retry the review itself once; never convert an invalid review into approval.
+  console.warn('[cos-fresh-scope-faithfulness-review]', JSON.stringify({
+    at: new Date().toISOString(),
+    event: 'unparseable_review_retry',
+    scopeCount: args.semanticPlan.scopes.length,
+  }))
+  const retried = await boundedLocalCompletion({
+    prompt: freshEvidenceFaithfulnessReviewPrompt(args),
+    systemPrompt: freshEvidenceFaithfulnessReviewSystemPrompt(args.language),
+    maxTokens: FAITHFULNESS_REVIEW_MAX_TOKENS,
+    phase: 'faithfulness_review',
+  })
+  if (retried.ok === false) return { kind: 'local_synthesis_failed', error: retried.error }
+  const recovered = retried.text?.trim()
+    ? acceptFreshEvidenceFaithfulnessReview({ text: retried.text, semanticPlan: args.semanticPlan })
+    : null
+  return recovered ? { kind: 'reviewed', review: recovered } : { kind: 'unparseable' }
 }
 
 /**

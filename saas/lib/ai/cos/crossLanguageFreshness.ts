@@ -49,6 +49,13 @@ const entries: Entry[] = [
   ['qual e', 'which is'],
   ['quais', 'which'],
   ['qual', 'which'],
+  // "Capital of" must survive translation so the stable-reference rule recognises it (it routed live before).
+  ['capital da', 'capital of'],
+  ['capital do', 'capital of'],
+  ['capital de', 'capital of'],
+  ['capitale della', 'capital of'],
+  ['capitale di', 'capital of'],
+  ['столица', 'capital of'],
   ['regulamentos', 'regulations'],
   ['lei', 'law'],
   ['hoje', 'today'],
@@ -74,6 +81,11 @@ const entries: Entry[] = [
   ['рейсы', 'flights'],
   ['поезд', 'train'],
   ['поезда', 'trains'],
+  // "Last night" is a live window, unlike "yesterday"; these must win over the single-word entries below.
+  ['ontem à noite', 'last night'],
+  ['ontem a noite', 'last night'],
+  ['wczoraj wieczorem', 'last night'],
+  ['вчера вечером', 'last night'],
   ['wczoraj', 'yesterday'],
   ['ayer', 'yesterday'],
   ['ontem', 'yesterday'],
@@ -116,4 +128,32 @@ export function englishNormalizedForClassification(input: string) {
   let out = original
   for (const [pattern, english] of compiled) out = out.replace(pattern, english)
   return `${intent ? `${intent} ; ` : ''}${out} ${original}`.replace(/\s+/g, ' ').trim()
+}
+
+// Function words of the supported non-English Latin-script languages that are not English words.
+const NON_ENGLISH_FUNCTION_WORD = new RegExp(`(?<![\\p{L}\\p{M}])(?:${[
+  // Portuguese
+  'quem', 'qual', 'quais', 'quanto', 'quando', 'onde', 'como', 'est[áa]', 's[ãa]o', 'n[ãa]o', 'hoje', 'vai', 'uma', 'em', 'sobre', 'para', 'isso', 'escreva', 'explique', 'resuma',
+  // Spanish
+  'qui[eé]n', 'cu[áa]l', 'd[óo]nde', 'c[óo]mo', 'qu[ée]', 'hoy', 'el', 'los', 'las', 'del', 'escribe', 'explica',
+  // French
+  'quel(?:le)?s?', "qu['’]", "c['’]est", 'est-ce', 'o[ùu]', 'combien', 'pourquoi', 'le', 'les', 'des', 'du', 'une', 'est', 'il', 'elle', "aujourd['’]hui", 'explique', '[ée]cris',
+  // Italian
+  'chi', 'che', 'qual[eè]', 'quali', 'dove', 'perch[ée]', 'gli', 'della', 'dei', 'del', 'sono', 'oggi', 'spiega', 'scrivi', 'riassumi',
+  // German
+  'wer', 'wie', 'warum', 'wann', 'ist', 'sind', 'nicht', 'der', 'das', 'und', 'ein', 'eine', 'noch', 'heute', 'es', 'erkl[äa]re', 'schreibe',
+  // Polish
+  'kto', 'czy', 'jak', 'gdzie', 'kiedy', 'dlaczego', 'jest', 'ile', 'nie', 'si[ęe]', 'napisz', 'wyja[śs]nij',
+].join('|')})(?![\\p{L}\\p{M}])`, 'iu')
+
+/**
+ * True when the prompt is probably not English: the reply language says so, the text carries non-ASCII letters,
+ * or it uses function words of another supported language. Used to decide when the word rules alone cannot be
+ * trusted to recognise a live-fact question (2026-10-09).
+ */
+export function mayBeNonEnglish(input: string, language?: string | null): boolean {
+  const lang = String(language || '').trim().toLowerCase()
+  if (lang && !lang.startsWith('en')) return true
+  const text = String(input || '')
+  return /[^\u0000-\u007f]/.test(text.replace(/[\u2018\u2019\u201c\u201d\u2013\u2014\u2026]/g, '')) || NON_ENGLISH_FUNCTION_WORD.test(text)
 }

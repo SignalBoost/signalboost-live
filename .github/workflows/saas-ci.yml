@@ -92,7 +92,7 @@ jobs:
       - name: Verify live-first routing, authority, structured evidence, and no local-model path
         run: node --test tests/cosFreshnessPolicy.node.test.ts tests/cosFreshLiveRouting.node.test.ts tests/cosFreshGrounding.node.test.ts tests/cosStructuredLiveInfo.node.test.ts
       - name: Verify live search is clean, retried once, and bounded by the turn budget
-        run: npx --yes tsx --test tests/liveSearchQueryAndRetry.node.test.ts tests/liveSearchTurnBudget.node.test.ts
+        run: npx --yes tsx --test tests/liveSearchQueryAndRetry.node.test.ts tests/liveSearchTurnBudget.node.test.ts tests/liveFactRetrievalMode.node.test.ts
 
   cos-embedding-transport:
     needs: scope

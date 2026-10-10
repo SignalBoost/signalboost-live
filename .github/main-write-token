@@ -1,2 +1,2 @@
-base_sha=a5a2d433fbc323957d255606c6b131c566d8ce55
-branch=fix/tailwind-4-migration-20261010
+base_sha=44ec5555dddbb49ab761c6aaa3425e22466bbf45
+branch=test/live-fact-retrieval-behaviour-20261010

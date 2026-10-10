@@ -5,7 +5,7 @@
 // Production mutation, or broader agent authority.
 
 import { randomUUID } from 'node:crypto'
-import { searchPublicWeb } from '../../lib/ai/tools/publicWebAgent'
+import { searchPublicWeb } from '../../lib/ai/tools/publicWebAgent.ts'
 import { assessWebTrainingSource } from '../../lib/cos-core/layers/learning/webTrainingDataLayer.ts'
 import type { LearningConnectorSearch } from '../../lib/cos-core/layers/learning/connectors.ts'
 import {

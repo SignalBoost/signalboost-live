@@ -789,7 +789,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       // One bounded additional governed search can repair missing citation authority or
       // inadequate corroboration. Re-run the SAME grounding gates on the expanded evidence.
       // Do not retry transient model failures by pretending unverified claims are facts.
-      if(localSynthesis.kind === 'citation_grounding_rejected' && Date.now()-startedAt < 110_000){
+      if(localSynthesis.kind === 'citation_grounding_rejected' && Date.now()-startedAt < 35_000){
         const recoveryQuery=lookupInput.replace(/\s+/g,' ').trim().slice(0,220)
         logEscalation({event:'fresh_grounding_research_recovery_started',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true})
         const recoverySearch=await timeCosStage('primary:web_search_recovery',()=>getExternalInfo(recoveryQuery,8,{bypassCache:true}))

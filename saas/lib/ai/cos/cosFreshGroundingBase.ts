@@ -49,8 +49,21 @@ export function freshEvidenceHost(value: string): string {
   }
 }
 
+// National government publishers also use second-level registrable domains (gov.br, gob.mx,
+// gouv.fr, gov.pl, govt.nz). Without them, a country's own government site never counted.
 function isGovernmentHost(host: string): boolean {
-  return host.endsWith('.gov') || host.includes('.gov.') || host === 'gov.uk' || host.endsWith('.gov.uk')
+  return host.endsWith('.gov') || host.includes('.gov.') || /(?:^|\.)(?:gov|gob|gouv|govt)\.[a-z]{2}$/.test(host)
+}
+
+// A question about a FUTURE holder of an office (next, will be, election, candidates, polls) is
+// not a current-holder lookup: no government page states a future winner, so demanding one made
+// every such question fail closed. These questions need independent corroboration instead, and
+// the answer contract forbids converting polls into a predicted winner.
+const FORWARD_OFFICE_MARKER = /\b(?:next|upcoming|future|will\s+(?:be|win|become)|elect(?:ion|ions|ed)?|candidates?|polls?|polling|run-?off|primar(?:y|ies)|pr[oó]xim[oa]s?|ser[aá]|vai\s+ser|elei[cç][aã]o|elei[cç][oõ]es|elecci[oó]n|elecciones|candidat[oa]s?|pesquisas?|encuestas?|segundo\s+turno|segunda\s+vuelta|nast[eę]pn\p{L}*|kolejn\p{L}*|wybor\p{L}*|kandydat\p{L}*|sonda[zż]\p{L}*|следующ\p{L}*|выбор\p{L}*|кандидат\p{L}*|опрос\p{L}*|n[aä]chst\p{L}*|wahl\p{L}*|kandidat\p{L}*|umfrage\p{L}*|prochain\p{L}*|[ée]lection\p{L}*|sondage\p{L}*|prossim\p{L}*|elezion\p{L}*|sondagg\p{L}*)\b|次期|次の|選挙|候補|世論調査|다음|선거|후보|여론조사|القادم|المقبل|انتخابات|مرشح/iu
+
+export function isForwardLookingOfficeQuestion(input: string): boolean {
+  const text = String(input || '')
+  return requiresIndependentCorroboration(text) && FORWARD_OFFICE_MARKER.test(text)
 }
 
 function authorityScore(result: SearchResult): number {
@@ -70,7 +83,7 @@ export function isPersonOrOfficeEvaluation(input: string): boolean {
 }
 
 function requiresGovernmentAuthority(input: string): boolean {
-  if (isPersonOrOfficeEvaluation(input)) return false
+  if (isPersonOrOfficeEvaluation(input) || isForwardLookingOfficeQuestion(input)) return false
   return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister|monarch|king|queen|pope)\b/i.test(input)
 }
 
@@ -543,6 +556,9 @@ export function freshEvidenceGroundingBlock(input: string, sources: FreshEvidenc
     '8. The evidence does not define the question. Infer the proposition from the user’s wording, then identify what each source actually measures or establishes before using it.',
     '9. Keep materially different constructs, populations, denominators, time windows, comparison bases, and levels of control distinct. Do not promote an aggregate or associative result into a causal, individual, or controlled-comparison claim unless the evidence itself supports that stronger statement.',
     '10. Synthesize the strongest relevant evidence into the answer. Do not narrate results in retrieval order or include a source merely because it was retrieved.',
+    ...(isForwardLookingOfficeQuestion(input) ? [
+      '11. FUTURE OFFICE-HOLDER QUESTION: who will hold the office is not yet an established fact unless the evidence reports a declared official result. Do not answer "insufficient" merely because the winner is undecided. Answer directly with what the evidence establishes: the election stage, the candidates, the voting dates, declared results so far, and dated poll figures with their pollster when available. Never convert a poll lead into a predicted winner, and never present the sitting office-holder as the next one.',
+    ] : []),
     '',
     evidence,
     '',

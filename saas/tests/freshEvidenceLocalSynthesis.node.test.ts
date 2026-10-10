@@ -86,7 +86,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   assert.match(source, /resolveCosReasoner/)
   assert.match(source, /lengthRule: CHAT_ANSWER_LENGTH_RULE/)
   assert.doesNotMatch(source, /jsonObject|EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
-  assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 3, 'definition + first call + one repair')
+  assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 4, 'definition + first call + empty-transport retry + one citation repair')
   const pure = readFileSync(new URL('../lib/ai/cos/freshEvidenceGroundedAnswer.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(pure, /from '@\//, 'pure module stays relative-import only so tests can load it')
   const external = readFileSync(new URL('../lib/ai/cos/freshEvidenceExternalSynthesis.ts', import.meta.url), 'utf8')
@@ -110,7 +110,4 @@ test('COS researches additional live evidence before rejecting an externally gro
   assert.doesNotMatch(route, /recoveredSources.length > freshSources.length/)
 })
 
-test('interactive fresh evidence does not repeat a failed transport request', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.doesNotMatch(source, /if \(!first \|\| 'error' in first\) first = await groundedAnswerCall/)
-})
+

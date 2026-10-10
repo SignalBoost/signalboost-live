@@ -69,10 +69,10 @@ export default function EuAccountControls() {
         const link = document.createElement('a')
         const downloadUrl = URL.createObjectURL(blob)
         link.href = downloadUrl
-        link.download = 'itmounts-eu-account.json'
+        link.download = 'itmounts-eu-data.json'
         link.click()
         URL.revokeObjectURL(downloadUrl)
-        setMessage('Downloaded Frankfurt account foundation records. Connected-provider and workspace records are not included.')
+        setMessage('Downloaded Frankfurt account, projects and workspace records. Connected-provider records require separate handling.')
       } else if (type === 'save') {
         setMessage('Account preferences updated in Frankfurt.')
       } else {
@@ -91,7 +91,7 @@ export default function EuAccountControls() {
       <label><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /> Allow account AI-training consent</label>
       <button type="button" disabled={busy} onClick={() => void action('save')}>Save Frankfurt account preferences</button>
       <h2>European data rights</h2>
-      <button type="button" disabled={busy} onClick={() => void action('export')}>Download account foundation data</button>
+      <button type="button" disabled={busy} onClick={() => void action('export')}>Download Frankfurt account and workspace data</button>
       <button type="button" disabled={busy} onClick={() => void action('export-request')}>Request complete data export</button>
       <button type="button" disabled={busy} onClick={() => void action('delete-request')}>Request account deletion</button>
       <p>Requests are recorded for processing, not automatically fulfilled. Connected-provider and workspace data may require separate handling.</p>

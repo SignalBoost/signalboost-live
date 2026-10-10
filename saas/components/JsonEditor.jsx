@@ -39,7 +39,7 @@ export default function JsonEditor({ value, onChange, variables = [] }) {
   }
 
   return (
-    <section className="grid gap-4 rounded-2xl border border-white/10 bg-white/[.03] p-4">
+    <section className="grid gap-4 rounded-2xl border border-white/10 bg-white/3 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-black uppercase tracking-[.18em] text-cyan-200"><LocalizedText fallback={"Digital Request Builder"} /></p>
@@ -61,7 +61,7 @@ export default function JsonEditor({ value, onChange, variables = [] }) {
                 type="button"
                 aria-pressed={checked}
                 onClick={() => toggleVariable(variable)}
-                className={`flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition ${checked ? 'border-cyan-300/40 bg-cyan-300/10' : 'border-white/10 bg-slate-950/50 hover:bg-white/[.05]'}`}
+                className={`flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition ${checked ? 'border-cyan-300/40 bg-cyan-300/10' : 'border-white/10 bg-slate-950/50 hover:bg-white/5'}`}
               >
                 <span>
                   <span className="block font-bold text-white">{titleFor(variable)}</span>

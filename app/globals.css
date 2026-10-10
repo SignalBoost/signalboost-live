@@ -1,6 +1,39 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+  /* v4 preflight makes form fields transparent; v3 kept the browser's field background. */
+  input:where(:not([type='button'], [type='reset'], [type='submit'], [type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='image'])),
+  select,
+  textarea {
+    background-color: Field;
+  }
+  /* v3 placeholder default (gray-400); v4 uses 50% of the text color. */
+  input::placeholder,
+  textarea::placeholder {
+    opacity: 1;
+    color: #9ca3af;
+  }
+}
 
 :root {
   --bg-base: #0f1117;

@@ -12,19 +12,19 @@ export default function StagingPage() {
     <main className="min-h-screen bg-[#05070b] px-6 py-8 text-white md:px-10">
       <Link href="/" className="text-[#FFD700] no-underline">{t('staging.back', '← SignalBoost')}</Link>
 
-      <section className="mt-10 rounded-[2rem] border border-[#FFD700]/25 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.22),transparent_34%),linear-gradient(135deg,#111827,#05070b)] p-8 shadow-2xl">
+      <section className="mt-10 rounded-4xl border border-[#FFD700]/25 bg-[radial-gradient(circle_at_top_left,rgba(255,215,0,.22),transparent_34%),linear-gradient(135deg,#111827,#05070b)] p-8 shadow-2xl">
         <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('staging.kicker', 'Temporary deployment')}</p>
         <h1 className="mt-4 max-w-4xl text-4xl font-black md:text-6xl">{t('staging.title', 'Staging cockpit for SignalBoost SaaS testing.')}</h1>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-white/72">{stagingDeployment.purpose}{t('staging.leadTail', ' Use this page as the QA entry point for Marketplace, pricing, dashboard modules, and multilingual smoke checks before promoting a build.')}</p>
         <div className="mt-6 flex flex-wrap gap-3 text-sm">
-          <span className="rounded-full border border-white/10 bg-white/[.06] px-4 py-2">{t('staging.projectLabel', 'Project:')} {stagingDeployment.project}</span>
-          <span className="rounded-full border border-white/10 bg-white/[.06] px-4 py-2">{t('staging.envLabel', 'Environment:')} {stagingDeployment.environment}</span>
-          <span className="rounded-full border border-white/10 bg-white/[.06] px-4 py-2">{t('staging.releaseLabel', 'Release:')} {stagingDeployment.releaseLabel}</span>
+          <span className="rounded-full border border-white/10 bg-white/6 px-4 py-2">{t('staging.projectLabel', 'Project:')} {stagingDeployment.project}</span>
+          <span className="rounded-full border border-white/10 bg-white/6 px-4 py-2">{t('staging.envLabel', 'Environment:')} {stagingDeployment.environment}</span>
+          <span className="rounded-full border border-white/10 bg-white/6 px-4 py-2">{t('staging.releaseLabel', 'Release:')} {stagingDeployment.releaseLabel}</span>
         </div>
       </section>
 
       <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_.8fr]">
-        <article className="rounded-3xl border border-white/10 bg-white/[.04] p-6">
+        <article className="rounded-3xl border border-white/10 bg-white/4 p-6">
           <h2 className="text-2xl font-bold">{t('staging.smokeTitle', 'SaaS module smoke test matrix')}</h2>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {modules.map((module) => (

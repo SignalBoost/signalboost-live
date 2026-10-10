@@ -65,7 +65,7 @@ export default function GeneratePage() {
         </button>
 
         {result && (
-          <div className="mt-6 p-6 bg-white rounded-md shadow">
+          <div className="mt-6 p-6 bg-white rounded-md shadow-sm">
             <h2 className="text-xl font-semibold mb-2">{t("generate.result", "Result")}</h2>
             <p className="whitespace-pre-line">{result}</p>
           </div>
@@ -73,7 +73,7 @@ export default function GeneratePage() {
       </div>
 
       {/* Right: Brand Memory Panel */}
-      <aside className="w-80 bg-white shadow p-6 rounded-md h-fit">
+      <aside className="w-80 bg-white shadow-sm p-6 rounded-md h-fit">
         <h2 className="text-xl font-bold mb-4">{t("generate.brandMemory", "Brand Memory")}</h2>
 
         {brandLoading && (

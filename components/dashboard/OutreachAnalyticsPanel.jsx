@@ -64,7 +64,7 @@ function PieChart({ data }) {
   const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
   let offset = 25;
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
       <h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Traffic sources"} /></h3>
       <svg viewBox="0 0 42 42" className="mx-auto my-4 h-44 w-44 -rotate-90">
         {data.map((item, index) => {
@@ -89,7 +89,7 @@ function FunnelChart({ funnel }) {
   ];
   const max = stages[0]?.[1] || 1;
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
       <h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Campaign funnel"} /></h3>
       <div className="mt-5 space-y-4">
         {stages.map(([label, value], index) => (
@@ -109,7 +109,7 @@ function TrendLine({ trend }) {
   const max = Math.max(1, ...trend.flatMap((row) => [row.likes, row.shares, row.comments]));
   const points = (key) => trend.map((row, index) => `${(index / Math.max(1, trend.length - 1)) * (width - 40) + 20},${height - 20 - ((row[key] || 0) / max) * (height - 50)}`).join(' ');
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
       <h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Engagement trend"} /></h3>
       <svg viewBox={`0 0 ${width} ${height}`} className="mt-4 h-64 w-full">
         {[0, 1, 2, 3].map((line) => <line key={line} x1="20" x2={width - 20} y1={20 + line * 45} y2={20 + line * 45} stroke="#e2e8f0" />)}
@@ -200,10 +200,10 @@ export default function OutreachAnalyticsPanel() {
 
       {!error ? <>
         <div className="grid gap-6 lg:grid-cols-2"><FunnelChart funnel={funnel} /><PieChart data={trafficSources} /><TrendLine trend={mockEngagementTrend} />
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Views by region heatmap"} /></h3><div className="mt-4 grid gap-3">{tableRows.map((row) => <div key={row.region} className="rounded-xl p-3 text-white" style={{ background: `rgba(37, 99, 235, ${0.25 + (row.views / heatMax) * 0.75})` }}><div className="flex justify-between"><strong>{row.region}</strong><span>{numberFormat.format(row.views)} views</span></div></div>)}</div></div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"><h3 className="text-lg font-semibold text-slate-900"><LocalizedText fallback={"Views by region heatmap"} /></h3><div className="mt-4 grid gap-3">{tableRows.map((row) => <div key={row.region} className="rounded-xl p-3 text-white" style={{ background: `rgba(37, 99, 235, ${0.25 + (row.views / heatMax) * 0.75})` }}><div className="flex justify-between"><strong>{row.region}</strong><span>{numberFormat.format(row.views)} views</span></div></div>)}</div></div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><table className="w-full text-left text-sm"><thead className="bg-slate-100 text-slate-700"><tr><th className="p-3">Region</th><th className="p-3">Views</th><th className="p-3"><LocalizedText fallback={"Watch time"} /></th><th className="p-3">Clicks</th><th className="p-3">Conversions</th><th className="p-3">Likes</th><th className="p-3">Shares</th><th className="p-3">Comments</th></tr></thead><tbody>{tableRows.map((row) => <tr key={row.region} className="border-t"><td className="p-3 font-medium">{row.region}</td><td className="p-3">{numberFormat.format(row.views)}</td><td className="p-3">{numberFormat.format(row.watchTimeMinutes)}m</td><td className="p-3">{numberFormat.format(row.clicks)}</td><td className="p-3">{numberFormat.format(row.conversions)}</td><td className="p-3">{numberFormat.format(row.likes)}</td><td className="p-3">{numberFormat.format(row.shares)}</td><td className="p-3">{numberFormat.format(row.comments)}</td></tr>)}</tbody></table></div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"><table className="w-full text-left text-sm"><thead className="bg-slate-100 text-slate-700"><tr><th className="p-3">Region</th><th className="p-3">Views</th><th className="p-3"><LocalizedText fallback={"Watch time"} /></th><th className="p-3">Clicks</th><th className="p-3">Conversions</th><th className="p-3">Likes</th><th className="p-3">Shares</th><th className="p-3">Comments</th></tr></thead><tbody>{tableRows.map((row) => <tr key={row.region} className="border-t"><td className="p-3 font-medium">{row.region}</td><td className="p-3">{numberFormat.format(row.views)}</td><td className="p-3">{numberFormat.format(row.watchTimeMinutes)}m</td><td className="p-3">{numberFormat.format(row.clicks)}</td><td className="p-3">{numberFormat.format(row.conversions)}</td><td className="p-3">{numberFormat.format(row.likes)}</td><td className="p-3">{numberFormat.format(row.shares)}</td><td className="p-3">{numberFormat.format(row.comments)}</td></tr>)}</tbody></table></div>
       </> : null}
     </section>
   );

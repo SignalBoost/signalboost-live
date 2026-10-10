@@ -20,7 +20,7 @@ export default function LogsPage() {
             className="rounded-3xl border border-white/10 bg-black/40 p-6"
           >
             <h2 className="text-xl font-bold text-[#FFD700]">{event.event_id}</h2>
-            <pre className="mt-4 overflow-auto rounded-2xl bg-white/[.04] p-4 text-xs text-white/80">
+            <pre className="mt-4 overflow-auto rounded-2xl bg-white/4 p-4 text-xs text-white/80">
               {JSON.stringify(event, null, 2)}
             </pre>
           </article>

@@ -125,7 +125,7 @@ export default function TagSelector({ value = [], onChange }) {
           aria-autocomplete="list"
           aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
           autoComplete="off"
-          className="w-full bg-transparent py-1 text-white outline-none placeholder:text-slate-500"
+          className="w-full bg-transparent py-1 text-white outline-hidden placeholder:text-slate-500"
           value={query}
           onFocus={() => {
             setOpen(true)

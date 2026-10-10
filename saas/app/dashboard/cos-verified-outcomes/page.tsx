@@ -80,7 +80,7 @@ export default function CosVerifiedOutcomesPage() {
               <div className="space-y-2 pt-2">
                 <label className="block">
                   <span className="font-medium">{copy.outcome}</span>
-                  <select className="mt-1 block w-full rounded border p-2" value={draft.outcome}
+                  <select className="mt-1 block w-full rounded-sm border p-2" value={draft.outcome}
                     onChange={event => update(turn.turnId, { outcome: event.target.value === 'failure' ? 'failure' : 'success' })}>
                     <option value="success">{copy.success}</option>
                     <option value="failure">{copy.failure}</option>
@@ -88,12 +88,12 @@ export default function CosVerifiedOutcomesPage() {
                 </label>
                 <label className="block">
                   <span className="font-medium">{copy.evidence}</span>
-                  <input className="mt-1 block w-full rounded border p-2" value={draft.evidenceRef} placeholder={copy.evidenceHint}
+                  <input className="mt-1 block w-full rounded-sm border p-2" value={draft.evidenceRef} placeholder={copy.evidenceHint}
                     onChange={event => update(turn.turnId, { evidenceRef: event.target.value })} />
                 </label>
                 <label className="block">
                   <span className="font-medium">{copy.summary}</span>
-                  <textarea className="mt-1 block w-full rounded border p-2" rows={2} value={draft.summary} placeholder={copy.summaryHint}
+                  <textarea className="mt-1 block w-full rounded-sm border p-2" rows={2} value={draft.summary} placeholder={copy.summaryHint}
                     onChange={event => update(turn.turnId, { summary: event.target.value })} />
                 </label>
                 <button type="button" className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-40"

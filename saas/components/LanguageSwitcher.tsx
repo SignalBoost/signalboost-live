@@ -33,7 +33,7 @@ export default function LanguageSwitcher({
           type="button"
           onClick={() => onChange(lang.code)}
           className={[
-            "px-2 py-1 rounded text-xs border transition-colors",
+            "px-2 py-1 rounded-sm text-xs border transition-colors",
             current === lang.code
               ? "bg-[#FFD700] text-black border-[#FFD700]"
               : "bg-transparent text-white border-neutral-700 hover:border-[#FFD700]"

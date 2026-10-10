@@ -34,7 +34,7 @@ function EndpointField({ provider, value, onChange }) {
           aria-expanded={open}
           aria-autocomplete="list"
           autoComplete="off"
-          className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 font-mono text-sm text-white outline-none ring-cyan-300/40 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 font-mono text-sm text-white outline-hidden ring-cyan-300/40 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
           value={value}
           onFocus={() => {
             setQuery('')
@@ -85,7 +85,7 @@ function AuthFields({ provider, value, onChange }) {
   if (!provider) return <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-slate-400"><LocalizedText fallback={"Choose a provider to load its authentication configuration."} /></div>
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-4">
+    <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/3 p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-black text-white">Authentication</h3>
         <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-xs font-bold uppercase text-cyan-100">{provider.authType}</span>
@@ -104,7 +104,7 @@ function AuthFields({ provider, value, onChange }) {
           {field.label}
           <input
             type="text"
-            className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none"
+            className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-hidden"
             value={value[field.key] || ''}
             onChange={event => onChange({ ...value, [field.key]: event.target.value })}
             placeholder={`${provider.id}_${field.key}`}
@@ -239,8 +239,8 @@ export default function ToolBuilder() {
           <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl">
             <h2 className="mb-5 text-xl font-black"><LocalizedText fallback={"Integration Metadata"} /></h2>
             <div className="grid gap-5">
-              <label className="grid gap-2 text-sm font-bold text-slate-200"><LocalizedText fallback={"Integration Name"} /><input className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={name} onChange={event => setName(event.target.value)} /></label>
-              <label className="grid gap-2 text-sm font-bold text-slate-200">Description<textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 focus:ring-2" value={description} onChange={event => setDescription(event.target.value)} /></label>
+              <label className="grid gap-2 text-sm font-bold text-slate-200"><LocalizedText fallback={"Integration Name"} /><input className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-hidden ring-cyan-300/40 focus:ring-2" value={name} onChange={event => setName(event.target.value)} /></label>
+              <label className="grid gap-2 text-sm font-bold text-slate-200">Description<textarea className="min-h-28 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-hidden ring-cyan-300/40 focus:ring-2" value={description} onChange={event => setDescription(event.target.value)} /></label>
               <ProviderDropdown
                 providers={providers}
                 value={provider}
@@ -270,7 +270,7 @@ export default function ToolBuilder() {
           <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl">
             <h2 className="mb-5 text-xl font-black"><LocalizedText fallback={"Governance & Supervisor"} /></h2>
             <GovernancePanel value={governance} onChange={setGovernance} onTest={testIntegration} onLogs={() => setLogsOpen(true)} />
-            <p className="mt-4 rounded-2xl border border-white/10 bg-white/[.04] p-3 text-sm text-slate-300">{testStatus}</p>
+            <p className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-3 text-sm text-slate-300">{testStatus}</p>
           </div>
         </section>
 

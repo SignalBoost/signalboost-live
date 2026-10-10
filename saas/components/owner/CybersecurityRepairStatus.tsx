@@ -20,7 +20,7 @@ function tone(status: string): string {
   if (status === 'fixed' || status === 'healthy') return 'border-emerald-300/35 bg-emerald-300/10 text-emerald-50'
   if (status === 'failed' || status === 'verification_failed' || status === 'repair_unavailable' || status === 'monitoring_failed') return 'border-red-300/35 bg-red-300/10 text-red-50'
   if (ACTIVE.has(status)) return 'border-cyan-300/35 bg-cyan-300/10 text-cyan-50'
-  return 'border-white/15 bg-white/[0.05] text-slate-200'
+  return 'border-white/15 bg-white/5 text-slate-200'
 }
 
 export default function CybersecurityRepairStatus() {

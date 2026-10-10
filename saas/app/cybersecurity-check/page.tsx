@@ -134,14 +134,14 @@ export default function CybersecurityCheckPage() {
       <section className="mx-auto max-w-6xl">
         <Link href="/" className="text-sm font-semibold text-cyan-200 hover:text-white">← {copy.back}</Link>
         <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
-          <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl shadow-cyan-950/30">
+          <section className="rounded-3xl border border-white/10 bg-white/4 p-8 shadow-2xl shadow-cyan-950/30">
             <span className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">{copy.badge}</span>
             <h1 className="mt-5 text-4xl font-black tracking-tight md:text-6xl">{copy.title}</h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">{copy.subtitle}</p>
             <form onSubmit={submit} className="mt-8 rounded-2xl border border-white/10 bg-slate-900/70 p-4">
               <label className="text-sm font-bold text-slate-200" htmlFor="cyber-url">{copy.urlLabel}</label>
               <div className="mt-3 flex flex-col gap-3 md:flex-row">
-                <input id="cyber-url" value={url} onChange={event => setUrl(event.target.value)} placeholder={copy.placeholder} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4" />
+                <input id="cyber-url" value={url} onChange={event => setUrl(event.target.value)} placeholder={copy.placeholder} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-hidden ring-cyan-300/20 focus:ring-4" />
                 <button type="submit" disabled={loading} className="rounded-xl bg-cyan-300 px-5 py-3 font-black text-slate-950 hover:bg-white disabled:opacity-60">{loading ? copy.scanning : copy.scan}</button>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">{isOwner ? null : <span>{copy.hint}</span>}<button type="button" onClick={() => setUrl(PUBLIC_BRAND.siteUrl)} className="font-bold text-cyan-200 hover:text-white">{copy.trySample}</button></div>
@@ -149,21 +149,21 @@ export default function CybersecurityCheckPage() {
             {error && <div className="mt-4 rounded-xl border border-red-300/30 bg-red-400/10 p-4 text-sm font-semibold text-red-100">{error}</div>}
           </section>
 
-          <aside className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+          <aside className="rounded-3xl border border-white/10 bg-white/4 p-6">
             <div className="flex items-center justify-between gap-4"><span className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">{data ? copy.ready : copy.begin}</span></div>
             <div className="mt-6 grid grid-cols-2 gap-3">{metricRows.map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4"><p className="text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p><strong className="mt-2 block text-3xl text-cyan-100">{String(value)}</strong></div>)}</div>
           </aside>
         </div>
 
         {data && <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_.42fr]">
-          <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+          <section className="rounded-3xl border border-white/10 bg-white/4 p-6">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-100">{copy.pageChecked}</p>
             <h2 className="mt-2 break-all text-xl font-black">{target}</h2>
             <h3 className="mb-4 mt-6 text-sm font-black uppercase tracking-[0.18em] text-slate-400">{copy.topFindings}</h3>
             {findings.length === 0 ? <p className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-5 text-emerald-100">{copy.noFindings}</p> : <div className="grid gap-4">{findings.map((finding, index) => <article key={`${finding.code}-${index}`} className="rounded-2xl border border-white/10 bg-slate-950/50 p-5"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full border px-2.5 py-1 text-xs font-black uppercase ${SEVERITY_STYLES[finding.severity] || SEVERITY_STYLES.low}`}>{copy.severities[finding.severity] || finding.severity}</span><span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-300">{copy.categories[finding.category] || finding.category}</span></div><h4 className="mt-3 text-lg font-black">{finding.code.replaceAll('_', ' ')}</h4></article>)}</div>}
           </section>
           {isOwner ? null : (
-            <aside className="space-y-6"><section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"><h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">{copy.signals}</h3><div className="mt-4 grid gap-3 text-sm">{signalRows.map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4 text-slate-300"><span>{label}</span><strong>{String(value)}</strong></div>)}</div></section><section className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-6"><h3 className="text-2xl font-black">{copy.requestTitle}</h3><p className="mt-3 text-sm leading-6 text-cyan-50/80">{copy.requestBody}</p><Link href={planHref(target)} className="mt-6 inline-flex w-full justify-center rounded-xl bg-cyan-300 px-5 py-3 text-center font-black text-slate-950 hover:bg-white">{copy.requestCta}</Link><p className="mt-3 text-center text-xs text-cyan-50/70">{copy.safeNote}</p></section></aside>
+            <aside className="space-y-6"><section className="rounded-3xl border border-white/10 bg-white/4 p-6"><h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">{copy.signals}</h3><div className="mt-4 grid gap-3 text-sm">{signalRows.map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4 text-slate-300"><span>{label}</span><strong>{String(value)}</strong></div>)}</div></section><section className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-6"><h3 className="text-2xl font-black">{copy.requestTitle}</h3><p className="mt-3 text-sm leading-6 text-cyan-50/80">{copy.requestBody}</p><Link href={planHref(target)} className="mt-6 inline-flex w-full justify-center rounded-xl bg-cyan-300 px-5 py-3 text-center font-black text-slate-950 hover:bg-white">{copy.requestCta}</Link><p className="mt-3 text-center text-xs text-cyan-50/70">{copy.safeNote}</p></section></aside>
           )}
         </div>}
       </section>

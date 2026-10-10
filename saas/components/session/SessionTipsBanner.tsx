@@ -36,7 +36,7 @@ export function SessionTipsBanner({ locale = "en" }: Props) {
     return (
       <div
         role="alert"
-        className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-sm dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+        className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-xs dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
       >
         <div className="flex items-start gap-3">
           <span aria-hidden className="mt-0.5 text-lg">
@@ -61,7 +61,7 @@ export function SessionTipsBanner({ locale = "en" }: Props) {
   if (dismissed !== false) return null;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3 text-slate-800 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
+    <div className="rounded-xl border border-slate-200 bg-white/70 px-4 py-3 text-slate-800 shadow-xs backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100">
       <div className="flex items-start gap-3">
         <span aria-hidden className="mt-0.5 text-lg">
           💡

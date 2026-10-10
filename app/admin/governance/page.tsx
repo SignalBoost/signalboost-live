@@ -18,7 +18,7 @@ export default function GovernancePage() {
     <main className="min-h-screen bg-[#05070b] p-8 text-white">
       <Link href="/admin" className="text-[#FFD700] no-underline">← {t('governance.adminConsole', 'Admin Console')}</Link>
 
-      <section className="mt-8 rounded-[2rem] border border-white/10 bg-white/[.04] p-8">
+      <section className="mt-8 rounded-4xl border border-white/10 bg-white/4 p-8">
         <p className="text-xs uppercase tracking-[0.35em] text-[#FFD700]">{t('governance.adminHeader', 'Owner/Admin Governance')}</p>
         <h1 className="mt-3 text-4xl font-black">{governanceSummary.title}</h1>
         <p className="mt-4 max-w-4xl text-white/70">{governanceSummary.description}</p>
@@ -53,7 +53,7 @@ export default function GovernancePage() {
 
       <section className="mt-6 grid gap-4 md:grid-cols-2" id="ai">
         {governanceSubsystems.map((system) => (
-          <Link key={system.id} href={system.investigationHref} className="rounded-3xl border border-white/10 bg-white/[.04] p-5 no-underline hover:border-[#FFD700]/60">
+          <Link key={system.id} href={system.investigationHref} className="rounded-3xl border border-white/10 bg-white/4 p-5 no-underline hover:border-[#FFD700]/60">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xl font-bold">{system.name}</h3>
               <span className="rounded-full bg-[#FFD700]/10 px-3 py-1 text-sm text-[#FFD700]">{system.state}</span>

@@ -42,7 +42,7 @@ export default function DashboardPage() {
           <Link
             key={m.href}
             href={m.href}
-            className="group rounded-2xl border border-white/10 bg-white/[.04] p-5 no-underline transition hover:border-[#FFD700]/40 hover:bg-white/[.06]"
+            className="group rounded-2xl border border-white/10 bg-white/4 p-5 no-underline transition hover:border-[#FFD700]/40 hover:bg-white/6"
           >
             <span className="text-2xl">{m.icon}</span>
             <h2 className="mt-3 text-lg font-bold text-white group-hover:text-[#FFD700]">

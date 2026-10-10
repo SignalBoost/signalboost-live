@@ -89,7 +89,7 @@ export default function ProviderDropdown({
           aria-autocomplete="list"
           aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
           autoComplete="off"
-          className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-none ring-cyan-300/40 transition focus:ring-2"
+          className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-3 text-white outline-hidden ring-cyan-300/40 transition focus:ring-2"
           value={open ? query : value?.name || ''}
           onFocus={() => {
             setOpen(true)

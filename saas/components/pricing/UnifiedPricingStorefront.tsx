@@ -115,7 +115,7 @@ function TierCard({
             const text = feat.replace(/^\s*[✓❌]\s*/, '')
             return (
               <li key={i} className="flex items-start gap-2 text-sm leading-snug text-text-muted">
-                <span className={`mt-0.5 flex-shrink-0 font-semibold ${negative ? 'text-danger' : 'text-accent'}`} aria-hidden>
+                <span className={`mt-0.5 shrink-0 font-semibold ${negative ? 'text-danger' : 'text-accent'}`} aria-hidden>
                   {negative ? '✕' : '✓'}
                 </span>
                 <span className={negative ? 'text-text-muted' : 'text-text'}>{text}</span>

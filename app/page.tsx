@@ -64,14 +64,14 @@ export default function HomePage() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#07080c] text-[#f7f3ea] antialiased">
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute left-1/2 top-[-18rem] h-[38rem] w-[38rem] -translate-x-1/2 rounded-full bg-amber-300/20 blur-3xl" />
-        <div className="absolute right-[-12rem] top-[30rem] h-[34rem] w-[34rem] rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_70%)]" />
+        <div className="absolute left-1/2 -top-72 h-152 w-152 -translate-x-1/2 rounded-full bg-amber-300/20 blur-3xl" />
+        <div className="absolute -right-48 top-120 h-136 w-136 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-size-[72px_72px] mask-[radial-gradient(circle_at_top,black,transparent_70%)]" />
       </div>
 
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
         <Link href="/" className="group flex items-center gap-3" aria-label="SignalBoost home">
-          <span className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] shadow-2xl shadow-amber-400/10">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/6 shadow-2xl shadow-amber-400/10">
             <span className="h-4 w-4 rounded-full bg-amber-300 shadow-[0_0_24px_rgba(252,211,77,0.85)]" />
           </span>
           <span className="text-sm font-semibold uppercase tracking-[0.28em] text-white/85 transition group-hover:text-white">
@@ -86,7 +86,7 @@ export default function HomePage() {
         </nav>
         <Link
           href="/login"
-          className="rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/88 shadow-sm backdrop-blur transition hover:border-white/22 hover:bg-white/[0.1]"
+          className="rounded-full border border-white/12 bg-white/6 px-4 py-2 text-sm font-semibold text-white/88 shadow-xs backdrop-blur-sm transition hover:border-white/22 hover:bg-white/10"
         >
           {t('landing.nav.signin', 'Sign in')}
         </Link>
@@ -113,7 +113,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/[0.06] px-6 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/[0.1]"
+              className="inline-flex items-center justify-center rounded-full border border-white/12 bg-white/6 px-6 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
             >
               {t('landing.hero.ctaSecondary', 'View live cockpit')}
             </Link>
@@ -130,7 +130,7 @@ export default function HomePage() {
 
         <div className="relative lg:pl-6">
           <div className="absolute -left-6 top-14 hidden h-24 w-24 rounded-full bg-amber-300/20 blur-2xl lg:block" />
-          <div className="rounded-[2rem] border border-white/12 bg-white/[0.07] p-3 shadow-2xl shadow-black/50 backdrop-blur-xl">
+          <div className="rounded-4xl border border-white/12 bg-white/[0.07] p-3 shadow-2xl shadow-black/50 backdrop-blur-xl">
             <div className="rounded-[1.45rem] border border-white/10 bg-[#0d1018] p-4">
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div>
@@ -157,12 +157,12 @@ export default function HomePage() {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
+                  <div className="rounded-3xl border border-white/10 bg-white/6 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/38">{t('landing.preview.revenueSignal', 'Revenue signal')}</p>
-                    <p className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-white">$18.4k</p>
+                    <p className="mt-3 text-3xl font-semibold tracking-tighter text-white">$18.4k</p>
                     <p className="mt-1 text-sm text-emerald-200">{t('landing.preview.revenueDelta', '+24% from last launch')}</p>
                   </div>
-                  <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4">
+                  <div className="rounded-3xl border border-white/10 bg-white/6 p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/38">{t('landing.preview.queuedAssets', 'Queued assets')}</p>
                     <div className="mt-3 flex -space-x-2">
                       {['Ad', 'SMS', 'IG', 'LP'].map((item) => (
@@ -175,7 +175,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="mt-3 rounded-3xl border border-white/10 bg-white/[0.045] p-4">
+              <div className="mt-3 rounded-3xl border border-white/10 bg-white/4.5 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white">{t('landing.preview.planTitle', 'AI operating plan')}</p>
@@ -198,7 +198,7 @@ export default function HomePage() {
       </section>
 
       <section id="platform" className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
-        <div className="grid gap-8 rounded-[2rem] border border-white/10 bg-white/[0.045] p-5 backdrop-blur md:grid-cols-[0.86fr_1.14fr] md:p-8 lg:p-10">
+        <div className="grid gap-8 rounded-4xl border border-white/10 bg-white/4.5 p-5 backdrop-blur-sm md:grid-cols-[0.86fr_1.14fr] md:p-8 lg:p-10">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-amber-200/80">{t('landing.value.eyebrow', 'Value proposition')}</p>
             <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-4xl lg:text-5xl">
@@ -218,13 +218,13 @@ export default function HomePage() {
 
       <section id="proof" className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
         <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr]">
-          <div className="rounded-[2rem] border border-white/10 bg-[#f7f3ea] p-6 text-[#17130c] sm:p-8">
+          <div className="rounded-4xl border border-white/10 bg-[#f7f3ea] p-6 text-[#17130c] sm:p-8">
             <p className="text-sm font-black uppercase tracking-[0.24em] text-black/40">{t('landing.social.eyebrow', 'Social proof')}</p>
             <blockquote className="mt-8 text-3xl font-semibold leading-tight tracking-[-0.045em] sm:text-4xl">
               {t('landing.social.quote', '“SignalBoost feels like the missing operating layer between our ideas and actual revenue.”')}
             </blockquote>
             <div className="mt-8 flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-amber-300 to-orange-500" />
+              <div className="h-12 w-12 rounded-full bg-linear-to-br from-amber-300 to-orange-500" />
               <div>
                 <p className="font-bold">{t('landing.social.author', 'Maya Chen')}</p>
                 <p className="text-sm font-medium text-black/48">{t('landing.social.role', 'Founder, Northline Studios')}</p>
@@ -233,7 +233,7 @@ export default function HomePage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {segments.map((segment) => (
-              <div key={segment[0]} className="rounded-3xl border border-white/10 bg-white/[0.045] p-5 min-h-36">
+              <div key={segment[0]} className="rounded-3xl border border-white/10 bg-white/4.5 p-5 min-h-36">
                 <div className="h-9 w-9 rounded-2xl bg-white/10" />
                 <p className="mt-8 text-lg font-semibold tracking-[-0.03em] text-white">{t(segment[0], segment[1])}</p>
                 <p className="mt-2 text-sm leading-6 text-white/45">{t('landing.segment.blurb', 'Use SignalBoost to convert attention into booked demand.')}</p>
@@ -246,16 +246,16 @@ export default function HomePage() {
       <section id="features" className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
         <div className="max-w-3xl">
           <p className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-100/70">{t('landing.features.eyebrow', 'Features')}</p>
-          <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.05em] text-white sm:text-5xl">
+          <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-tighter text-white sm:text-5xl">
             {t('landing.features.title', 'Built around the real rhythm of growing a business.')}
           </h2>
         </div>
         <div className="mt-8 space-y-4">
           {featureStories.map((feature, index) => (
-            <article key={feature.title[0]} className="group grid gap-5 rounded-[1.75rem] border border-white/10 bg-white/[0.045] p-5 transition hover:bg-white/[0.07] md:grid-cols-[0.2fr_0.8fr_1.35fr] md:items-center md:p-6">
+            <article key={feature.title[0]} className="group grid gap-5 rounded-[1.75rem] border border-white/10 bg-white/4.5 p-5 transition hover:bg-white/[0.07] md:grid-cols-[0.2fr_0.8fr_1.35fr] md:items-center md:p-6">
               <div className="text-sm font-bold text-white/34">0{index + 1}</div>
               <div>
-                <div className={`mb-5 h-2 w-20 rounded-full bg-gradient-to-r ${feature.accent}`} />
+                <div className={`mb-5 h-2 w-20 rounded-full bg-linear-to-r ${feature.accent}`} />
                 <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/42">{t(feature.eyebrow[0], feature.eyebrow[1])}</p>
               </div>
               <div className="grid gap-3 md:grid-cols-[0.85fr_1.15fr] md:items-start">
@@ -277,7 +277,7 @@ export default function HomePage() {
                 {t('landing.cta.title', 'Give your next campaign the polish of a full growth team.')}
               </h2>
             </div>
-            <div className="rounded-[1.5rem] bg-[#17130c] p-5 text-white">
+            <div className="rounded-3xl bg-[#17130c] p-5 text-white">
               <p className="text-sm leading-6 text-white/58">{t('landing.cta.body', 'Start with one location, one offer, and one measurable outcome. SignalBoost will assemble the operating plan.')}</p>
               <Link
                 href="/signup"

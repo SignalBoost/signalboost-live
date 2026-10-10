@@ -4,7 +4,7 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 function LockedControl({ label, help }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/[.06] p-4">
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/6 p-4">
       <span>
         <span className="block font-bold text-white">{label}</span>
         <span className="text-xs text-slate-400" title={help}>{help}</span>
@@ -15,7 +15,7 @@ function LockedControl({ label, help }) {
 }
 
 function Toggle({ label, checked, onChange, help }) {
-  return <button type="button" onClick={() => onChange(!checked)} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[.04] p-4 text-left"><span><span className="block font-bold text-white">{label}</span><span className="text-xs text-slate-400" title={help}>{help}</span></span><span className={`h-7 w-12 rounded-full p-1 transition ${checked ? 'bg-cyan-300' : 'bg-slate-700'}`}><span className={`block h-5 w-5 rounded-full bg-slate-950 transition ${checked ? 'translate-x-5' : ''}`} /></span></button>
+  return <button type="button" onClick={() => onChange(!checked)} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/4 p-4 text-left"><span><span className="block font-bold text-white">{label}</span><span className="text-xs text-slate-400" title={help}>{help}</span></span><span className={`h-7 w-12 rounded-full p-1 transition ${checked ? 'bg-cyan-300' : 'bg-slate-700'}`}><span className={`block h-5 w-5 rounded-full bg-slate-950 transition ${checked ? 'translate-x-5' : ''}`} /></span></button>
 }
 
 export default function GovernancePanel({ value, onChange, onTest, onLogs }) {

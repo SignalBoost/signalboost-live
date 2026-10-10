@@ -16,7 +16,7 @@ function setup(returned: ScopedProviderGrant | null) {
 test('valid owner-only BYOI dispatch resolves credential after scope and returns only receipt',async()=>{
   const {calls,host}=setup(grant)
   assert.deepEqual(await executeLabByoi(request,host),{receiptId:'provider-receipt'})
-  assert.deepEqual(calls,['load:org-a','load:org-a','secret:vault://org-a/teacher','invoke'])
+  assert.deepEqual(calls,['load:org-a','load:org-a','secret:vault://org-a/teacher','load:org-a','invoke'])
 })
 test('org B cannot invoke org A credential even if grant store returns an A grant',async()=>{
   const {calls,host}=setup(grant)
@@ -62,7 +62,7 @@ test('provider grant lookup cannot mutate the destination tenant or artifact bet
     },
   }
   assert.deepEqual(await executeLabByoi(original,host),{receiptId:'safe'})
-  assert.deepEqual(received,['grant:org-a:artifact-a','grant:org-a:artifact-a','vault','invoke:org-a:artifact-a'])
+  assert.deepEqual(received,['grant:org-a:artifact-a','grant:org-a:artifact-a','vault','grant:org-a:artifact-a','invoke:org-a:artifact-a'])
 })
 
 test('grant, vault and provider errors are sanitized with no original secret in message or cause', async () => {
@@ -121,4 +121,19 @@ test('second grant reader failure is sanitized and never opens vault',async()=>{
   return true
  })
  assert.deepEqual(calls,['load','load'])
+})
+
+test('Phase 3: revoked grant after vault retrieval blocks provider invocation',async()=>{
+ let reads=0
+ const {host,calls}=setup(grant)
+ host.loadGrant=async()=>{calls.push('load');return ++reads===3?null:grant}
+ await assert.rejects(executeLabByoi(request,host),/lab_byoi_scope_denied/)
+ assert.deepEqual(calls,['load','load','secret:vault://org-a/teacher','load'])
+})
+test('Phase 3: post-vault grant reference switch blocks provider invocation',async()=>{
+ let reads=0
+ const {host,calls}=setup(grant)
+ host.loadGrant=async()=>{calls.push('load');return ++reads===3?{...grant,secretReference:'vault://org-a/other'}:grant}
+ await assert.rejects(executeLabByoi(request,host),/lab_byoi_scope_denied/)
+ assert.deepEqual(calls,['load','load','secret:vault://org-a/teacher','load'])
 })

@@ -37,6 +37,13 @@ export async function executeLabByoi(request: ScopedProviderRequest, host: LabBy
   try { credential = await resolveSecret(reference) }
   catch { throw new Error('lab_byoi_credential_unavailable') }
   if (!credential) throw new Error('lab_byoi_credential_unavailable')
+  // Recheck after asynchronous vault resolution and before invoking the provider.
+  let finalGrant: ScopedProviderGrant | null
+  try { finalGrant = await loadGrant(scopedRequest) }
+  catch { throw new Error('lab_byoi_grant_unavailable') }
+  if (!finalGrant || assertCustomerProviderScope(finalGrant, scopedRequest) !== reference) {
+    throw new Error('lab_byoi_scope_denied')
+  }
   let result: { receiptId: string }
   try { result = await invokeProvider({ request: scopedRequest, credential }) }
   catch { throw new Error('lab_byoi_provider_failed') }

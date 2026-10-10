@@ -162,7 +162,12 @@ export function createWebKnowledgeResearchPort(
       const query = clean(input.query, 1_500)
       if (!query) return Object.freeze([])
       const purpose = input.purpose
-      const rows = await search(query, boundedResults(input.maxResults))
+      // A second, shorter search stays inside the same governed read-only provider.
+      const first = await search(query, boundedResults(input.maxResults))
+      const simplified = query.replace(/[?!.,]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 10).join(' ')
+      const rows = first.length ? first : simplified && simplified !== query
+        ? await search(simplified, boundedResults(input.maxResults))
+        : first
       return Object.freeze(rows.map(row => Object.freeze({
         uri: clean(row.uri, 2_000),
         title: clean(row.title || row.uri, 300),
@@ -323,11 +328,11 @@ export async function runWebKnowledgeResearchProductionHarness(input: {
           && verificationInput.actionResults[0]?.status === 'executed'
           && invoked
         return Object.freeze({
-          verified: executed,
+          verified: executed && results.length > 0,
           verifierRef: 'host://web-knowledge/research-verifier-v1',
           evidenceRefs: Object.freeze(results.map(row => row.uri).slice(0, 5)),
-          ...(executed ? {} : {
-            reason: 'web_knowledge_research_not_executed',
+          ...(executed && results.length > 0 ? {} : {
+            reason: executed ? 'web_knowledge_no_results' : 'web_knowledge_research_not_executed',
             failureAttribution: 'harness' as const,
           }),
         })

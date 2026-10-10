@@ -1,2 +1,2 @@
-base_sha=f3db03f39db410dfe92acf53f4285ae3100bb3e4
-branch=fix/cos-cross-language-parity-20261009
+base_sha=7c1c55597c11ee67087e6a7e1a8cdfee4e9e4f10
+branch=fix/cos-live-search-query-retry-20261010

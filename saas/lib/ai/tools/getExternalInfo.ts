@@ -261,11 +261,25 @@ export async function getExternalInfo(
     // characters or ~50 words with HTTP 422 (observed in production 2026-08-22 — a paragraph-length
     // legal question 422'd, returned zero sources, and made the fail-closed path abstain on a
     // question the open web answers easily). No caller should need to know provider limits.
-    const searchQuery = clampSearchQuery(authorityNeed.required ? augmentQueryForOfficialSources(q, authorityNeed) : q)
+    // CLEAN PROVIDER QUERY (2026-10-09). The trailing "current official authoritative independent verification
+    // as of <date>" marker exists for COS's own bookkeeping (cache bypass, freshness classification). Sent to the
+    // search engine it is six unrelated keywords — glued onto a non-English question it matches almost nothing —
+    // so the engine receives the question alone.
+    const providerQuery = structuredProviderQuery(q)
+    const searchQuery = clampSearchQuery(authorityNeed.required ? augmentQueryForOfficialSources(providerQuery, authorityNeed) : providerQuery)
     const enforcePrimaryOfficeSources = isCurrentPublicOfficeQuery(q)
     const diversityQuery = evidenceDiversitySearchQuery(q, authorityNeed.required, enforcePrimaryOfficeSources)
 
-    const primaryRaw = await getWebSearchPort().search(searchQuery, count)
+    // ONE RETRY (2026-10-09). A single failed or empty search used to end the turn in a refusal. Retry once —
+    // with the plain question when the first attempt carried official-source hints, otherwise the same query
+    // (a transient provider error) — before reporting failure.
+    let firstError: unknown = null
+    let primaryRaw = await getWebSearchPort().search(searchQuery, count).catch((error: unknown) => { firstError = error; return [] as SearchResult[] })
+    if (!primaryRaw.length) {
+      const retryQuery = clampSearchQuery(providerQuery)
+      primaryRaw = await getWebSearchPort().search(retryQuery, count).catch((error: unknown) => { firstError = firstError ?? error; return [] as SearchResult[] })
+      if (!primaryRaw.length && firstError) throw firstError
+    }
     let rawResults = primaryRaw
     if (diversityQuery) {
       // This second lane is evidence acquisition, not a semantic conclusion. It looks for credible

@@ -416,3 +416,14 @@ html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; backgrou
 @media (max-width: 1180px) { .sb-ai-app-shell { grid-template-columns: minmax(0, 1fr) var(--sb-ai-dock-tablet-width); gap: 14px; padding-inline-end: 12px; } .sb-ai-dock, .sb-ai-dock.is-collapsed { width: var(--sb-ai-dock-tablet-width); } }
 @media (max-width: 860px) { .sb-ai-app-shell { display: block; padding-inline-end: 0; } .sb-ai-dock { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; height: auto; z-index: 80; pointer-events: none; } .sb-ai-dock.is-collapsed { width: 100%; justify-content: flex-end; padding-block: 0 12px; padding-inline: 0 12px; box-sizing: border-box; } .sb-ai-dock-tab { pointer-events: auto; width: auto; height: 48px; min-width: 88px; border-radius: 999px; writing-mode: horizontal-tb; letter-spacing: .04em; } .sb-ai-dock-panel { pointer-events: auto; height: min(78vh, 680px); max-height: calc(100vh - 88px); border-radius: 28px 28px 0 0; animation-name: sbDockSheetIn; } }
 @keyframes sbDockSheetIn { from { opacity: .88; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+
+
+/* LAB must remain operable on phone and tablet viewports. */
+.sb-lab-workspace-grid > * { min-width: 0; }
+@media (max-width: 900px) { .sb-lab-workspace-grid { grid-template-columns: minmax(0, 1fr) !important; } }
+@media (max-width: 640px) {
+  .sb-lab-prompt-card { padding: 16px !important; }
+  .sb-lab-prompt-controls { flex-wrap: wrap; }
+  .sb-lab-prompt-controls > input:not([type="file"]) { flex-basis: calc(100% - 54px) !important; min-width: 0; font-size: 16px !important; }
+  .sb-lab-prompt-controls > button { flex: 1 1 auto; min-height: 44px; }
+}

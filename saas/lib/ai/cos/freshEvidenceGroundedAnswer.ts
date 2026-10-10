@@ -143,6 +143,14 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   for (const match of answer.matchAll(LIVE_CITATION)) {
     if (!citedSourceIds.includes(match[1])) citedSourceIds.push(match[1])
   }
+  // Refuse a model answer which calls a previous year the current date on a
+  // live question. This is an explicit stale-date contradiction, not a ban on
+  // mentioning historical years as background.
+  const currentYear = new Date().getUTCFullYear()
+  const staleCurrentYear = /(?:as of (?:the )?(?:current date|today|now)\s*[,(: -]*|current (?:year|date|term)\s*(?:is|:|\()\s*)(20\d{2})/gi
+  if ([...answer.matchAll(staleCurrentYear)].some(match => Number(match[1]) !== currentYear)) {
+    return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
+  }
   if (!answer) return { ok: false, reason: 'empty_answer', reply: '', answer, citedSourceIds }
   if (hasUnsafePublicModelOutput(answer)) return { ok: false, reason: 'unsafe_public_output', reply: '', answer, citedSourceIds }
   if (!citedSourceIds.length) return { ok: false, reason: 'no_evidence_cited', reply: '', answer, citedSourceIds }

@@ -107,3 +107,12 @@ test('production fresh synthesis recovers transport failures and repairable cont
   assert.doesNotMatch(source, /if \(!accepted\) return \{ kind: 'citation_grounding_rejected' \}/)
   assert.doesNotMatch(source, /synthesizeFreshEvidenceExternally|callCosTextDetailed|modelPreference/)
 })
+
+test('malformed scope review gets one bounded retry without bypassing grounding or faithfulness', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(source, /event: 'unparseable_review_retry'/)
+  assert.match(source, /const retried = await boundedLocalCompletion/)
+  assert.match(source, /return recovered \? \{ kind: 'reviewed', review: recovered \} : \{ kind: 'unparseable' \}/)
+  assert.match(source, /if \(reviewed.kind === 'unparseable'\) return \{ kind: 'citation_grounding_rejected' \}/)
+  assert.match(source, /if \(finalReview.kind === 'unparseable' \|\| !finalReview.review.faithful\)/)
+})

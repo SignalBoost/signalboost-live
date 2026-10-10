@@ -16,6 +16,7 @@ import {
   FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL,
   compactFreshEvidenceForReasoning,
   excerptEvidenceForQuestion,
+  trimToCompleteSentence,
 } from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 import { describeFreshCitationRequirement, freshCitationRequirement } from '../lib/ai/cos/cosFreshAuthority.ts'
 import type { FreshEvidenceSource } from '../lib/ai/cos/cosFreshGrounding.ts'
@@ -85,6 +86,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
   assert.match(source, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' \}/)
   assert.match(source, /disableThinking: true/)
+  assert.match(source, /allowTruncatedText: true/, 'a length-capped answer is kept, not thrown away (prod 2026-10-10 20:35: 4/4 pod answers discarded)')
   assert.equal(FRESH_GROUNDED_ANSWER_TIMEOUT_MS, 20_000)
   assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 350)
   assert.match(source, /resolveCosReasoner/)
@@ -144,4 +146,16 @@ test('excerpting keeps short sources whole and never empties a source with no ma
   const unrelated = 'Alpha beta gamma. '.repeat(200)
   const kept = excerptEvidenceForQuestion(unrelated, officeQuestion, 300)
   assert.ok(kept.length > 0 && kept.length <= 300)
+})
+
+test('a length-capped answer is released after trimming to its last complete sentence', () => {
+  const capped = 'It is undecided: the runoff is on 25 October, as reported by [LIVE1] and [LIVE2]. The first round gave Candidate A about 47% [LIVE1]. Polling institutes published on 8 Octo'
+  const trimmed = trimToCompleteSentence(capped)
+  assert.equal(trimmed, 'It is undecided: the runoff is on 25 October, as reported by [LIVE1] and [LIVE2]. The first round gave Candidate A about 47% [LIVE1].')
+  const accepted = acceptFreshEvidenceGroundedAnswer({ text: capped, input: officeQuestion, sources })
+  assert.equal(accepted.ok, true)
+  assert.doesNotMatch(accepted.answer, /Octo$/)
+  // A complete answer is untouched; a short answer cut inside its first sentence is kept rather than emptied.
+  assert.equal(trimToCompleteSentence('Done. Really done.'), 'Done. Really done.')
+  assert.equal(trimToCompleteSentence('A very long opening sentence that was cut before any period'), 'A very long opening sentence that was cut before any period')
 })

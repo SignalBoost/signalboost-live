@@ -1,2 +1,2 @@
-base_sha=0cb2d4e14976606c0b96fcbc610e43c8bb65a978
-branch=fix/cos-future-office-authority-20261010
+base_sha=aeccca7427c085e065cf94e0ef83e03727f6522a
+branch=revert/cos-live-search-partial-failure-4124-20261010

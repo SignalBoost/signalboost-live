@@ -736,7 +736,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
     const queries=freshEvidenceSearchQueries(lookupInput)
-    const liveResults=await timeCosStage('primary:web_search',()=>Promise.all(queries.map(async query=>{try{return await getExternalInfo(query,8,{bypassCache:true})}catch(error){const message=error instanceof Error?error.message:String(error);console.warn('[cos-live-search-query-failed]',JSON.stringify({query,error:message.slice(0,200)}));return {ok:false as const,error:'Live search provider failed for this query.',results:[]}}})))
+    const liveResults=await timeCosStage('primary:web_search',()=>Promise.all(queries.map(query=>getExternalInfo(query,8,{bypassCache:true}))))
     freshError=liveResults.some(live=>live.ok)?null:liveResults.map(live=>live.ok?'':live.error||'Live search returned no usable evidence.').filter(Boolean).join(' | ')
     freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8,lookupInput)
     const claimResearch=await timeCosStage('primary:web_page_reads',()=>deepenClaimResearch(lookupInput,freshSources,readPublicPages))

@@ -548,7 +548,7 @@ async function tryFreshCurrentFact(input: {
   // Future election outcomes cannot be verified as current office-holder facts.
   // When retrieval is unavailable, answer the temporal part honestly rather than
   // issuing the generic current-fact failure. Never invent candidates or polls.
-  const asksUndecidedElectionOutcome = /(?:who\\s+will\\s+be\\s+(?:the\\s+)?next\\s+(?:president|prime\\s+minister|governor|mayor)|quem\\s+(?:ser[aá]|vai\\s+ser)\\s+(?:o\\s+)?pr[oó]xim[oa]\\s+(?:president[ea]|governador[ao]?|prefeit[oa]))/iu.test(input.prompt)
+  const asksUndecidedElectionOutcome = /(?:who\s+will\s+be\s+(?:the\s+)?next\s+(?:president|prime\s+minister|governor|mayor)|quem\s+(?:ser[aá]|vai\s+ser)\s+(?:o\s+)?pr[oó]xim[oa]\s+(?:president[ea]|governador[ao]?|prefeit[oa]))/iu.test(input.prompt)
   if (asksUndecidedElectionOutcome && (!successfulResponses.length || !sources.length)) {
     const language = String(input.language || 'en').slice(0, 2).toLowerCase()
     const reply = language === 'pt'

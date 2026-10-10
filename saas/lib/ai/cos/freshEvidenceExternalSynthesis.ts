@@ -1,34 +1,21 @@
+// saas/lib/ai/cos/freshEvidenceExternalSynthesis.ts
+//
+// Governed provider fallback for live-fact turns (reachable only when the owner enables external
+// fallback). It runs the deterministic local-place resolver, then local COS, then — only if local
+// COS could not produce a releasable answer — the SAME single-pass grounded prompt and the SAME
+// acceptance on the governed hosted provider. A provider never gets a weaker (or different)
+// release standard than COS; it only gets a different transport.
 import { resolveLocalPlaceDiscovery } from '@/lib/ai/cos/cosLocalDiscovery'
 import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalSynthesis'
-import { splitResearchClaims } from '@/lib/ai/cos/cosClaimResearch'
+import {
+  acceptFreshEvidenceGroundedAnswer,
+  freshEvidenceGroundedAnswerPrompt,
+  freshEvidenceGroundedRepairPrompt,
+  FRESH_GROUNDED_ANSWER_MAX_TOKENS,
+} from '@/lib/ai/cos/freshEvidenceGroundedAnswer'
+import { CHAT_ANSWER_LENGTH_RULE } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { callCosTextDetailed } from '@/lib/cos/textGateway'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
-import {
-  diagnoseFreshEvidenceSemanticPlan,
-  diagnoseFreshEvidenceSynthesis,
-  freshEvidenceAnswerContractRepairPrompt,
-  freshEvidenceScopePlanRepairPrompt,
-} from '@/lib/ai/cos/freshEvidenceContractRecovery'
-import {
-  acceptFreshEvidenceFaithfulnessReview,
-  acceptFreshEvidenceSemanticPlan,
-  acceptFreshEvidenceSynthesis,
-  freshEvidenceFaithfulnessReviewPrompt,
-  freshEvidenceFaithfulnessReviewSystemPrompt,
-  freshEvidenceRevisionPrompt,
-  freshEvidenceRevisionSystemPrompt,
-  freshEvidenceScopePlanPrompt,
-  freshEvidenceScopePlanSystemPrompt,
-  freshEvidenceSynthesisNeedsNeuralReview,
-  freshEvidenceSynthesisPrompt,
-  freshEvidenceSynthesisSystemPrompt,
-} from '@/lib/ai/cos/freshEvidenceSynthesisContract'
-import {
-  acceptFreshEvidencePredicateAudit,
-  applyFreshEvidencePredicateAudit,
-  freshEvidencePredicateAuditPrompt,
-  freshEvidencePredicateAuditSystemPrompt,
-} from '@/lib/ai/cos/freshEvidencePredicateAudit'
 
 export type FreshEvidenceExternalSynthesis = {
   attempted: true
@@ -39,11 +26,6 @@ export type FreshEvidenceExternalSynthesis = {
   source: 'deterministic' | 'local' | 'provider' | 'cache' | null
 }
 
-/**
- * Compatibility name retained for callers. The governed provider fallback must meet the same
- * scope-plan -> independent predicate audit -> answer -> contract repair -> faithfulness review
- * standard as local COS. A provider cannot bypass the two-key binary-release rule.
- */
 export async function synthesizeFreshEvidenceExternally(args: {
   input: string
   sources: FreshEvidenceSource[]
@@ -63,202 +45,39 @@ export async function synthesizeFreshEvidenceExternally(args: {
 
   const deterministic = resolveLocalPlaceDiscovery(args.input, args.sources, args.language)
   if (deterministic) {
-    return {
-      attempted: true,
-      accepted: true,
-      reply: deterministic.reply,
-      provider: null,
-      model: null,
-      source: 'deterministic',
-    }
+    return { attempted: true, accepted: true, reply: deterministic.reply, provider: null, model: null, source: 'deterministic' }
   }
 
   const local = await synthesizeFreshEvidenceLocally(args)
   if (local.kind === 'accepted') {
-    return {
-      attempted: true,
-      accepted: true,
-      reply: local.reply,
-      provider: 'local',
-      model: local.reasonerLabel,
-      source: 'local',
-    }
+    return { attempted: true, accepted: true, reply: local.reply, provider: 'local', model: local.reasonerLabel, source: 'local' }
   }
 
-  let planned = await callCosTextDetailed({
-    taskId: `cos-fresh-external-scope:${args.retrievedAt}`,
-    prompt: freshEvidenceScopePlanPrompt(args),
-    systemPrompt: freshEvidenceScopePlanSystemPrompt(args.language),
-    modelPreference: 'gemini',
-    maxTokens: 500,
-  }).catch(() => null)
-  if (!planned?.text) return rejected(planned)
-
-  let semanticPlan = acceptFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
-  const planDiagnosis = diagnoseFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
-  if (!semanticPlan || planDiagnosis) {
-    const diagnosis = planDiagnosis ?? { code: 'invalid_scope_shape', repairable: true } as const
-    if (!diagnosis.repairable) return rejected(planned)
-    const replanned = await callCosTextDetailed({
-      taskId: `cos-fresh-external-scope-repair:${args.retrievedAt}`,
-      prompt: freshEvidenceScopePlanRepairPrompt({
-        ...args,
-        failedPlanText: planned.text,
-        failureCode: diagnosis.code,
-      }),
-      systemPrompt: freshEvidenceScopePlanSystemPrompt(args.language),
-      modelPreference: 'gemini',
-      maxTokens: 500,
-    }).catch(() => null)
-    if (!replanned?.text) return rejected(replanned ?? planned)
-    semanticPlan = acceptFreshEvidenceSemanticPlan({ text: replanned.text, sources: args.sources })
-    if (!semanticPlan || diagnoseFreshEvidenceSemanticPlan({ text: replanned.text, sources: args.sources })) {
-      return rejected(replanned)
-    }
-    planned = replanned
-  }
-
-  const plannerPresentationMode = semanticPlan.presentationMode
-  const plannerDirectBinaryAnswerSafe = semanticPlan.directBinaryAnswerSafe
-  let predicateAudit = null
-  let auditExecution = null
-  if (plannerPresentationMode === 'direct' && plannerDirectBinaryAnswerSafe) {
-    auditExecution = await callCosTextDetailed({
-      taskId: `cos-fresh-external-predicate-audit:${args.retrievedAt}`,
-      prompt: freshEvidencePredicateAuditPrompt(args),
-      systemPrompt: freshEvidencePredicateAuditSystemPrompt(args.language),
-      modelPreference: 'gemini',
-      maxTokens: 220,
-    }).catch(() => null)
-    predicateAudit = auditExecution?.text ? acceptFreshEvidencePredicateAudit(auditExecution.text) : null
-  }
-  semanticPlan = applyFreshEvidencePredicateAudit(semanticPlan, predicateAudit)
-  console.info('[cos-fresh-external-predicate-audit]', JSON.stringify({
-    at: new Date().toISOString(),
-    auditRequired: plannerPresentationMode === 'direct' && plannerDirectBinaryAnswerSafe,
-    auditParsed: predicateAudit !== null,
-    auditBinaryVerdictSafe: predicateAudit?.binaryVerdictSafe ?? null,
-    auditRequiresNeutralEvidenceMap: predicateAudit?.requiresNeutralEvidenceMap ?? null,
-    ambiguityKinds: predicateAudit?.ambiguityKinds ?? [],
-    presentationMode: semanticPlan.presentationMode,
-    directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
-  }))
-
+  const first = freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE })
   let answered = await callCosTextDetailed({
     taskId: `cos-fresh-external-answer:${args.retrievedAt}`,
-    prompt: freshEvidenceSynthesisPrompt({ ...args, semanticPlan }),
-    systemPrompt: freshEvidenceSynthesisSystemPrompt(args.language),
+    prompt: first.prompt,
+    systemPrompt: first.systemPrompt,
     modelPreference: 'gemini',
-    maxTokens: 700,
+    maxTokens: FRESH_GROUNDED_ANSWER_MAX_TOKENS,
   }).catch(() => null)
-  if (!answered?.text) return rejected(answered ?? auditExecution ?? planned)
+  if (!answered?.text) return rejected(answered)
 
-  let accepted = acceptFreshEvidenceSynthesis({
-    text: answered.text,
-    input: args.input,
-    sources: args.sources,
-    semanticPlan,
-  })
-  if (!accepted) {
-    const diagnosis = diagnoseFreshEvidenceSynthesis({
-      text: answered.text,
-      input: args.input,
-      sources: args.sources,
-      semanticPlan,
-    }) ?? { code: 'unknown_contract_rejection', repairable: true, draftAnswer: answered.text }
-    if (!diagnosis.repairable) return rejected(answered)
-    const repairedContract = await callCosTextDetailed({
-      taskId: `cos-fresh-external-contract-repair:${args.retrievedAt}`,
-      prompt: freshEvidenceAnswerContractRepairPrompt({
-        ...args,
-        semanticPlan,
-        failedDraftText: answered.text,
-        failureCode: diagnosis.code,
-      }),
-      systemPrompt: freshEvidenceRevisionSystemPrompt(args.language),
-      modelPreference: 'gemini',
-      maxTokens: 420,
-    }).catch(() => null)
-    if (!repairedContract?.text) return rejected(repairedContract ?? answered)
-    accepted = acceptFreshEvidenceSynthesis({
-      text: repairedContract.text,
-      input: args.input,
-      sources: args.sources,
-      semanticPlan,
-    })
-    if (!accepted) return rejected(repairedContract)
-    answered = repairedContract
-  }
-
-  const singleProposition = splitResearchClaims(args.input).length === 1
-  const multiScopeReviewRequired = !semanticPlan.directBinaryAnswerSafe || semanticPlan.scopes.length > 1
-  let faithfulnessReview = null
-
-  if (multiScopeReviewRequired) {
-    const reviewed = await callCosTextDetailed({
-      taskId: `cos-fresh-external-faithfulness:${args.retrievedAt}`,
-      prompt: freshEvidenceFaithfulnessReviewPrompt({ ...args, semanticPlan, answer: accepted.answer }),
-      systemPrompt: freshEvidenceFaithfulnessReviewSystemPrompt(args.language),
-      modelPreference: 'gemini',
-      maxTokens: 220,
-    }).catch(() => null)
-    if (!reviewed?.text) return rejected(reviewed ?? answered)
-    faithfulnessReview = acceptFreshEvidenceFaithfulnessReview({ text: reviewed.text, semanticPlan })
-    if (!faithfulnessReview) return rejected(reviewed)
-  }
-
-  const densityReviewRequired = freshEvidenceSynthesisNeedsNeuralReview({
-    answer: accepted.answer,
-    citedSourceIds: accepted.citedSourceIds,
-    singleProposition,
-    semanticPlan,
-  })
-  const semanticRepairRequired = Boolean(faithfulnessReview && !faithfulnessReview.faithful)
-
-  if (densityReviewRequired || semanticRepairRequired) {
-    const revised = await callCosTextDetailed({
+  let accepted = acceptFreshEvidenceGroundedAnswer({ text: answered.text, input: args.input, sources: args.sources })
+  if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output') {
+    const repair = freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.answer, reason: accepted.reason })
+    const repaired = await callCosTextDetailed({
       taskId: `cos-fresh-external-repair:${args.retrievedAt}`,
-      prompt: freshEvidenceRevisionPrompt({
-        ...args,
-        semanticPlan,
-        draftAnswer: accepted.answer,
-        faithfulnessReview,
-      }),
-      systemPrompt: freshEvidenceRevisionSystemPrompt(args.language),
+      prompt: repair.prompt,
+      systemPrompt: repair.systemPrompt,
       modelPreference: 'gemini',
-      maxTokens: 420,
+      maxTokens: FRESH_GROUNDED_ANSWER_MAX_TOKENS,
     }).catch(() => null)
-    if (!revised?.text) return rejected(revised ?? answered)
-
-    const repaired = acceptFreshEvidenceSynthesis({
-      text: revised.text,
-      input: args.input,
-      sources: args.sources,
-      semanticPlan,
-    })
-    if (!repaired || freshEvidenceSynthesisNeedsNeuralReview({
-      answer: repaired.answer,
-      citedSourceIds: repaired.citedSourceIds,
-      singleProposition,
-      semanticPlan,
-    })) return rejected(revised)
-
-    if (multiScopeReviewRequired) {
-      const finalReviewResult = await callCosTextDetailed({
-        taskId: `cos-fresh-external-final-faithfulness:${args.retrievedAt}`,
-        prompt: freshEvidenceFaithfulnessReviewPrompt({ ...args, semanticPlan, answer: repaired.answer }),
-        systemPrompt: freshEvidenceFaithfulnessReviewSystemPrompt(args.language),
-        modelPreference: 'gemini',
-        maxTokens: 220,
-      }).catch(() => null)
-      if (!finalReviewResult?.text) return rejected(finalReviewResult ?? revised)
-      const finalReview = acceptFreshEvidenceFaithfulnessReview({ text: finalReviewResult.text, semanticPlan })
-      if (!finalReview?.faithful) return rejected(finalReviewResult)
-    }
-
-    accepted = repaired
-    answered = revised
+    if (!repaired?.text) return rejected(repaired ?? answered)
+    answered = repaired
+    accepted = acceptFreshEvidenceGroundedAnswer({ text: repaired.text, input: args.input, sources: args.sources })
   }
+  if (!accepted.ok) return rejected(answered)
 
   return {
     attempted: true,

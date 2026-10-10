@@ -267,11 +267,7 @@ function completionFirstResponse(startedAt:number,input:string,result:{reply:str
   return NextResponse.json({ok:true,reply:result.reply,source,confidence_score:result.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
 }
 
-// When live sources were retrieved but the strict single-claim evidence contract rejected the draft,
-// the request may be a TASK (plan, itinerary, comparison, recommendation) rather than one current
-// fact. COS reasons over the retrieved sources to complete the task, cites what the sources support,
-// and explicitly marks anything they do not support as unverified. The model decides whether the
-// request is a task or a bare fact claim; a bare fact claim still fails closed.
+// Travel-rescue draft sanity helpers (echo detection, minimum substance).
 function normalizeGroundedTaskText(value:string):string{
   return String(value||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim()
 }
@@ -289,48 +285,6 @@ function groundedTaskReplyIsSubstantive(input:string,reply:string,travelTask:boo
     if(reply.trim().length<Math.max(360,Math.ceil(input.trim().length*1.25)))return false
   }
   return true
-}
-
-export const FRESH_GROUNDED_TASK_TIMEOUT_MS = 40_000
-export const FRESH_GROUNDED_TASK_MAX_TOKENS = 2_000
-async function runFreshGroundedTaskCompletion(input:string,language:string,sources:FreshEvidenceSource[]):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
-  const travelTask=requiresLiveTravelPlanningEvidence(input)
-  const evidence=sources.slice(0,5).map(source=>`[${source.id}] ${String(source.title||'').slice(0,180)} — ${String(source.url||'')}${source.sourceDate?` (source date: ${source.sourceDate})`:''}\n${String(source.snippet||'').slice(0,280)}`).join('\n\n')
-  const result=await callCosReasoner({
-    temperature:.2,
-    maxTokens:FRESH_GROUNDED_TASK_MAX_TOKENS,
-    jsonObject:true,
-    disableThinking:true,
-    allowTruncatedText:travelTask,
-    timeoutMs:FRESH_GROUNDED_TASK_TIMEOUT_MS,
-    allowConfiguredFallback:true,
-    usageContext:{feature:'cos_fresh_grounded_task',purpose:'fresh_grounded_task'},
-    systemPrompt:[
-      'You are COS. Live web sources were retrieved this turn for the user request below. /no_think',
-      travelTask
-        ? 'This request is already classified as a travel-planning task. Do not reclassify it as a bare fact lookup and do not return an empty answer merely because some details are unsupported. Produce the requested itinerary from the supported evidence and clearly mark only unsupported mutable specifics as needing verification.'
-        : 'First decide what the user wants. If the request is only to confirm one specific current fact (who holds a role, a single price, a single status) and the sources do not clearly support it, return {"answer":"","confidence":0}. Otherwise complete the requested task fully.',
-      'Use the sources for specific mutable facts such as fares, routes, schedules, opening hours, ticket prices and availability, and cite them inline as [LIVE1], [LIVE2].',
-      'Any specific fact you state that the sources do not support must be clearly marked as unverified and to be checked before relying on it.',
-      'Never invent free services, discounts, businesses, venues, routes or prices. If you are not sure something exists, leave it out or say it must be checked.',
-      'Keep what the user asked for: respect their constraints (time window, budget, dates, preferences) and answer every part of the request.',
-      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-      language ? `Respond in the language the user wrote in; if unclear use ${reportLanguageName(language)}.` : 'Respond in the language the user wrote in.',
-    ].join(' '),
-    prompt:`USER REQUEST:\n${input.slice(0,8_000)}\n\nLIVE SOURCES RETRIEVED THIS TURN:\n${evidence}`,
-  }).catch(error=>{
-    console.warn('[cos-fresh-grounded-task-error]',JSON.stringify({event:'reasoner_call_failed',travelTask,reason:error instanceof Error?error.message:String(error)}))
-    return null
-  })
-  if(!result?.text)console.warn('[cos-fresh-grounded-task-error]',JSON.stringify({event:'reasoner_returned_no_text',travelTask}))
-  const parsed=result?.text?parseLocalResult(result.text):null
-  const reply=parsed?.answer?.trim()||''
-  if(!reply||hasUnsafePublicModelOutput(reply)||!groundedTaskReplyIsSubstantive(input,reply,travelTask)){
-    console.warn('[cos-fresh-grounded-task-rejected]',JSON.stringify({event:'non_substantive_grounded_task_draft',travelTask,inputChars:input.length,replyChars:reply.length}))
-    return null
-  }
-  const resolved=resolveCosReasoner()
-  return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}
 }
 
 // FAST GROUNDED TRAVEL PLAN. Travel planning is interactive but depends on mutable evidence.
@@ -733,6 +687,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   let partialFreshOfficeHolderReply:string|null=null
   let freshLocalAttempted=false,freshLocalModel:string|null=null
   let freshLocalFailureCode: FreshEvidenceInternalFailureCode | null = null
+  let freshGroundingRejection:string|null=null
   let freshMissUseLocal=false
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
@@ -865,7 +820,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
         return NextResponse.json({ok:true,reply:localSynthesis.reply,source:'cos-fresh-local-grounded',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
       }
       freshLocalFailureCode=localSynthesis.kind
-      logEscalation({event:'fresh_local_synthesis_declined',failure_code:freshLocalFailureCode,question_fingerprint:hashPrompt(lookupInput),question_chars:lookupInput.length,source_hosts:[...new Set(freshSources.map(source=>{try{return new URL(source.url).hostname}catch{return 'invalid'}}))],documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
+      freshGroundingRejection=localSynthesis.kind==='citation_grounding_rejected'?localSynthesis.reason:null
+      logEscalation({event:'fresh_local_synthesis_declined',failure_code:freshLocalFailureCode,grounding_rejection:freshGroundingRejection,question_fingerprint:hashPrompt(lookupInput),question_chars:lookupInput.length,source_hosts:[...new Set(freshSources.map(source=>{try{return new URL(source.url).hostname}catch{return 'invalid'}}))],documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     }
     }
   }
@@ -926,19 +882,6 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const freshFailureCode: FreshEvidenceInternalFailureCode | null = freshHardFail
     ? (freshLocalFailureCode ?? 'local_synthesis_unparseable')
     : null
-  if(freshHardFail&&freshRetrievedAt&&freshSources.length&&!requestedAction&&!requiresLiveTravelPlanningEvidence(lookupInput)){
-    const groundedTask=await runFreshGroundedTaskCompletion(lookupInput,language,freshSources)
-    if(groundedTask){
-      const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:groundedTask.reasonerLabel,confidence:groundedTask.confidence,accepted:true})
-      const executionProvenance=attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true})
-      ;Object.assign(executionProvenance as any,{policy:'fresh_live_data_grounded_task',assistant_text_used_for_resolution:false})
-      ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:groundedTask.reasonerLabel,grounded_at:freshRetrievedAt}
-      logEscalation({event:'fresh_grounded_task_completed',documents_acquired:freshSources.length,reasoner:groundedTask.reasonerLabel,strict_failure_code:freshFailureCode,external_ai_invoked:false,local_model_invoked:true})
-      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:groundedTask.reply,source:'local_cos_reasoning',confidence:groundedTask.confidence,provenance:freshTelemetryProvenance(true,groundedTask.reasonerLabel),externalAiInvoked:false})
-      await writeCosPrimaryProvenance(userId,groundedTask.reply,executionProvenance,'cos-fresh-grounded-task',{prompt:lookupInput,answered:true,confidence:groundedTask.confidence,branch:'fresh_grounded_task'})
-      return NextResponse.json({ok:true,reply:groundedTask.reply,source:'cos-fresh-grounded-task',confidence_score:groundedTask.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
-    }
-  }
   // OWNER-ONLY DIAGNOSTIC (Sep 21 2026): the owner cannot read Vercel logs, so for privileged turns the
   // travel-plan decision trail is appended to the failure reply he already sees. Never for public turns.
   const travelRescueDeclines:string[]=[]
@@ -974,7 +917,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback))
     const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})))
     const ownerDiagnostic=isPrivileged&&requiresFreshEvidence&&!partialFreshOfficeHolderReply&&!normativeEvidenceFallback
-      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA||'unknown').slice(0,7)}\nstrict synthesis: ${freshFailureCode??'n/a'} · sources: ${freshSources.length}\ntravel task detected: ${travelTaskDetected} · external action: ${requestedAction} · travel-plan step reached: ${travelRescueReached}${travelRescueDeclines.length?`\n${travelRescueDeclines.join('\n')}`:''}`
+      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA||'unknown').slice(0,7)}\nstrict synthesis: ${freshFailureCode??'n/a'}${freshGroundingRejection?` (${freshGroundingRejection})`:''} · sources: ${freshSources.length}\ntravel task detected: ${travelTaskDetected} · external action: ${requestedAction} · travel-plan step reached: ${travelRescueReached}${travelRescueDeclines.length?`\n${travelRescueDeclines.join('\n')}`:''}`
       : ''
     const reply=baseFailureReply+ownerDiagnostic,liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
     const completionSource=normativeEvidenceFallback?'cos-fresh-normative-evidence-map':partialCompletion?'cos-fresh-partial-grounded':'failed_closed'

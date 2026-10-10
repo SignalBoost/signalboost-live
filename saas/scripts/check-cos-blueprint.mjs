@@ -64,22 +64,27 @@ for (const required of ['live_external_evidence', 'answer_origin?.live_evidence_
   if (!publicRecordedProvenance.includes(required)) failures.push(`recorded_public_provenance_guard_missing:${required}`)
 }
 
-const freshRetryPolicy = await readFile(path.join(root, 'lib/ai/cos/freshEvidenceRetryPolicy.ts'), 'utf8')
-for (const required of ['FRESH_SYNTHESIS_MAX_ATTEMPTS = 2', 'FRESH_SYNTHESIS_DEFAULT_ATTEMPT_TIMEOUT_MS = 35_000', 'FRESH_SYNTHESIS_TIMEOUT_NULL_GRACE_MS', 'freshSynthesisNullIndicatesTimeout', 'runFreshSynthesisTransportAttempts']) {
-  if (!freshRetryPolicy.includes(required)) failures.push(`fresh_evidence_retry_guard_missing:${required}`)
-}
+// 2026-10-10: live-fact synthesis is ONE interactive-lane reasoning call over the evidence (plus at
+// most one concrete repair). The scope-plan / JSON-contract / faithfulness-review chain is gone and
+// must not come back; the host states its citation requirement to the model and verifies only that.
 const freshLocalSynthesis = await readFile(path.join(root, 'lib/ai/cos/freshEvidenceLocalSynthesis.ts'), 'utf8')
-for (const required of ['runFreshSynthesisTransportAttempts', 'boundedFreshSynthesisAttemptTimeoutMs', 'freshSynthesisNullIndicatesTimeout', 'attemptStartedAt = Date.now()', 'cos-fresh-local-synthesis-retry', 'acceptFreshEvidenceSynthesis']) {
-  if (!freshLocalSynthesis.includes(required)) failures.push(`fresh_evidence_retry_wiring_missing:${required}`)
+for (const required of ["usageContext: { feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' }", 'disableThinking: true', 'acceptFreshEvidenceGroundedAnswer', 'freshEvidenceGroundedRepairPrompt', 'lengthRule: CHAT_ANSWER_LENGTH_RULE', 'resolveCosReasoner']) {
+  if (!freshLocalSynthesis.includes(required)) failures.push(`fresh_evidence_single_pass_guard_missing:${required}`)
 }
-for (const required of ['diagnoseFreshEvidenceSemanticPlan', 'diagnoseFreshEvidenceSynthesis', "phase: 'scope_plan_repair'", "phase: 'contract_repair'", 'repairAnswerContract', "if (repairedContract.kind === 'rejected') return { kind: 'citation_grounding_rejected' }"]) {
-  if (!freshLocalSynthesis.includes(required)) failures.push(`fresh_evidence_contract_repair_guard_missing:${required}`)
+for (const forbidden of ['scope_plan', 'faithfulness', 'semanticPlan', 'EVIDENCE_INSUFFICIENT', 'jsonObject', 'callLocalModel']) {
+  if (freshLocalSynthesis.includes(forbidden)) failures.push(`fresh_evidence_chain_reintroduced:${forbidden}`)
 }
-if (freshLocalSynthesis.includes("if (!accepted) return { kind: 'citation_grounding_rejected' }")) failures.push('fresh_evidence_grounding_failure_skips_typed_contract_repair')
+const freshGroundedAnswer = await readFile(path.join(root, 'lib/ai/cos/freshEvidenceGroundedAnswer.ts'), 'utf8')
+for (const required of ['CITATION REQUIREMENT (enforced by the server before release)', 'freshCitationRequirement(args.input, args.sources)', 'replyCitesRequiredFreshEvidence(reply, args.input, args.sources)', 'hasUnsafePublicModelOutput(answer)', "'citation_requirement_unmet'"]) {
+  if (!freshGroundedAnswer.includes(required)) failures.push(`fresh_evidence_grounded_answer_guard_missing:${required}`)
+}
+for (const deleted of ['lib/ai/cos/freshEvidenceSynthesisContract.ts', 'lib/ai/cos/freshEvidenceContractRecovery.ts', 'lib/ai/cos/freshEvidencePredicateAudit.ts', 'lib/ai/cos/freshEvidenceRetryPolicy.ts']) {
+  try { await readFile(path.join(root, deleted), 'utf8'); failures.push(`fresh_evidence_chain_file_reintroduced:${deleted}`) } catch {}
+}
 
 const cosPrimaryRoute = await readFile(path.join(root, 'app/api/cos-primary/route.ts'), 'utf8')
 const deterministicFreshIndex = cosPrimaryRoute.indexOf('resolveDeterministicDirectFlight(lookupInput,freshSources)')
-const localFreshIndex = cosPrimaryRoute.indexOf('const localSynthesis=await synthesizeFreshEvidenceLocally')
+const localFreshIndex = cosPrimaryRoute.search(/(?:const|let) localSynthesis=await synthesizeFreshEvidenceLocally/)
 if (deterministicFreshIndex < 0) failures.push('cos_primary_deterministic_fresh_resolver_missing')
 if (localFreshIndex < 0 || deterministicFreshIndex < 0 || deterministicFreshIndex > localFreshIndex) failures.push('cos_primary_deterministic_fresh_must_precede_qwen')
 if (!cosPrimaryRoute.includes("event:'fresh_deterministic_resolution_accepted'")) failures.push('cos_primary_deterministic_fresh_audit_missing')

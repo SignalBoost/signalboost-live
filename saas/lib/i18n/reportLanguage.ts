@@ -7,15 +7,18 @@ export type ReportLang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' |
 const SUPPORTED: ReportLang[] = ['en', 'es', 'pt', 'pl', 'ru', 'de', 'fr', 'it', 'ja', 'ko', 'ar']
 
 export function normalizeReportLang(value?: string | null): ReportLang {
-  const lower = String(value || '').toLowerCase()
-  return SUPPORTED.find((lang) => lower.startsWith(lang)) || 'en'
+  const lower = String(value || '').trim().toLowerCase().replace(/_/g, '-')
+  const base = lower.split('-', 1)[0]
+  return SUPPORTED.find((lang) => lang === base) || 'en'
 }
 
 export function reportLangFromCookie(cookieHeader?: string | null): ReportLang {
   const cookie = String(cookieHeader || '')
   const found = cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith('signalboost_language=') || part.startsWith('site-language='))
   if (!found) return 'en'
-  return normalizeReportLang(decodeURIComponent(found.split('=').slice(1).join('=') || ''))
+  const raw = found.split('=').slice(1).join('=') || ''
+  try { return normalizeReportLang(decodeURIComponent(raw)) }
+  catch { return normalizeReportLang(raw) }
 }
 
 export function reportLanguageName(lang?: string | null): string {

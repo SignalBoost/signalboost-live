@@ -159,3 +159,19 @@ test('a length-capped answer is released after trimming to its last complete sen
   assert.equal(trimToCompleteSentence('Done. Really done.'), 'Done. Really done.')
   assert.equal(trimToCompleteSentence('A very long opening sentence that was cut before any period'), 'A very long opening sentence that was cut before any period')
 })
+
+test('stale current-year assertions are rejected without banning historical context', () => {
+  const year = new Date().getUTCFullYear()
+  const previous = year - 3
+  const question = 'Which party controls the legislature now?'
+  const stale = acceptFreshEvidenceGroundedAnswer({
+    input: question, sources,
+    text: `As of the current date (${previous}), the legislature is divided. [LIVE1] [LIVE2]`,
+  })
+  assert.equal(stale.ok, false)
+  const historical = acceptFreshEvidenceGroundedAnswer({
+    input: question, sources,
+    text: `In ${previous}, the legislature was divided. As of the current date (${year}), current composition must be checked. [LIVE1] [LIVE2]`,
+  })
+  assert.equal(historical.ok, true)
+})

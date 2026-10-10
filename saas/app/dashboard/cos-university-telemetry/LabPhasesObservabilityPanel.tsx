@@ -38,7 +38,7 @@ export default function LabPhasesObservabilityPanel() {
     </div>
     <p className="mt-2 text-xs opacity-70">{uiText('generatedUi.u_620674f8421c829c')}</p>
     {readiness?<p className="mt-3 text-xs" role="status">{uiText('generatedUi.u_54ef019f0e45b3a9')} {readiness.readyForMonitoring?uiText('generatedUi.u_3a7255695e84b1c8'):uiText('generatedUi.u_6973dddd3ef9cb6a')}{uiText('generatedUi.u_0c44e63661f33408')} {readiness.organizations}. {readiness.blockers.join(', ').replaceAll('_',' ')}.</p>:<p className="mt-3 text-xs" role="status">{uiText('generatedUi.u_f5484159f7f35567')}</p>}
-    {readiness?.organizations===0?<LabOwnerActivationPanel onActivated={()=>void refresh()} />:null}
+    {(readiness===null || readiness.organizations===0)?<LabOwnerActivationPanel onActivated={()=>void refresh()} />:null}
     {error?<p role="alert" className="mt-3 text-sm text-amber-700 dark:text-amber-300">{error} {uiText('generatedUi.u_65375e85dae2bcda')}</p>:null}
     {!error && !result?<p className="mt-3 text-sm">{uiText('generatedUi.u_6a4c268f6226a56e')}</p>:null}
     {result?<div className="mt-3 space-y-3">

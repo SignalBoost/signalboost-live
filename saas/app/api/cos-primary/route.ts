@@ -871,7 +871,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // A low confidence score is learning/calibration telemetry, not permission to throw away a
   // useful guarded answer. For ordinary non-live, non-action tasks, release the best-effort answer
   // that already survived the normal COS pipeline instead of replacing it with a generic refusal.
-  if(!requestedAction&&!requiresFreshEvidence&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()){
+  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()){
     const reply=cos.bestEffortReply.trim()
     const executionProvenance=authoritativeProvenance(cos,{invoked:false})
     ;(executionProvenance as any).completion_first={released_best_effort:true,confidence:cos.confidence,threshold:confidenceThreshold()}
@@ -883,7 +883,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // If ordinary COS could not complete a non-live, non-action turn, use neural semantic intent
   // before the generic failed-closed reply. This catches natural human requests such as “help me say
   // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
-  if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
+  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
     const rescueIntent=semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
       const semanticFast=await runFastAuthoring(input,language)
@@ -894,7 +894,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // Last ordinary-task rescue before any failed-closed path. This is intentionally broader than
   // authoring: explanation, analysis, planning, and other low-risk tasks should still receive a
   // useful answer when the primary confidence gate declined to release one.
-  if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)){
+  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)){
     const completionRescue=await timeCosStage('primary:completion_rescue',()=>runCompletionFirstRescue(input,language,cosAudience(isPrivileged)))
     if(completionRescue)return completionFirstResponse(startedAt,input,completionRescue,'cos-completion-first-rescue')
   }

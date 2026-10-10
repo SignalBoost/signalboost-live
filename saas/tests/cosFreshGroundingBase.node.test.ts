@@ -33,7 +33,7 @@ test('government sources are preferred and accepted for current government offic
   assert.equal(freshEvidenceMeetsAuthority('Who is the current President of the United States?', [sources[0]]), true)
 })
 
-test('accepted public office-holder answer must cite the authoritative government source plus an independent host', () => {
+test('accepted public office-holder answer cites an institutional source or two independent reporting hosts', () => {
   const sources = prepareFreshEvidence([
     { title: 'Official government page', url: 'https://example.gov/leader', snippet: 'The current President is Example Person.' },
     { title: 'Independent current profile', url: 'https://news.example/current-leader', snippet: 'Example Person is the current President.' },
@@ -41,11 +41,11 @@ test('accepted public office-holder answer must cite the authoritative governmen
   ])
   const input = 'Who is currently the President of Exampleland?'
 
-  const nonGovernmentOnly = `Example Person. [LIVE2] (${sources[1].url}) and [LIVE3] (${sources[2].url})`
-  assert.equal(replyCitesIndependentFreshEvidence(nonGovernmentOnly, input, sources), false)
+  const singleSecondaryOnly = `Example Person. [LIVE2] (${sources[1].url})`
+  assert.equal(replyCitesIndependentFreshEvidence(singleSecondaryOnly, input, sources), false)
 
-  const authoritative = `Example Person. [LIVE1] (${sources[0].url}) and [LIVE2] (${sources[1].url})`
-  assert.equal(replyCitesIndependentFreshEvidence(authoritative, input, sources), true)
+  const twoIndependentReports = `Example Person. [LIVE2] (${sources[1].url}) and [LIVE3] (${sources[2].url})`
+  assert.equal(replyCitesIndependentFreshEvidence(twoIndependentReports, input, sources), true)
 
   const primaryGovernmentOnly = `Example Person. [LIVE1] (${sources[0].url})`
   assert.equal(replyCitesIndependentFreshEvidence(primaryGovernmentOnly, input, sources), true)

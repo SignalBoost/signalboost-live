@@ -33,7 +33,7 @@ const SPORTS_DOMAIN = /\b(?:football|soccer|futebol|fútbol|futbol|piłk\w*|фу
 // Election questions about a future office-holder need election results and polling, not
 // an incumbent-office-holder lookup. Keep the query plan generic across election years.
 const FUTURE_ELECTION_QUESTION = /(?:quem\\s+(?:ser[aá]|vai\\s+ser)\\s+(?:o\\s+)?pr[oó]ximo\\s+presidente|who\\s+will\\s+be\\s+(?:the\\s+)?next\\s+president|pr[oó]xim[oa]\\s+president[ea]|next\\s+president)/iu
-const BRAZIL_ELECTION_CONTEXT = /(?:brasil|brazil|brasileir[oa])/iu
+const BRAZIL_ELECTION_CONTEXT = /(?:brasil|brazil(?:ian)?|brasileir[oa])/iu
 
 function isBrazilPresidentialElectionQuestion(input: string): boolean {
   return FUTURE_ELECTION_QUESTION.test(input) && BRAZIL_ELECTION_CONTEXT.test(input)

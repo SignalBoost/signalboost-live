@@ -23,3 +23,9 @@ test('electoral synthesis is explicitly instructed not to predict a winner', () 
   const grounding = freshEvidenceGroundingBlock(prompt, [], '2026-10-10T12:00:00Z')
   assert.match(grounding, /Never convert a poll lead into a predicted winner/)
 })
+
+test('English Brazilian next president question receives official electoral query plan', () => {
+  const queries = freshEvidenceSearchQueries('who will be the next brazilian president?', new Date('2026-10-10T12:00:00Z'))
+  assert.ok(queries.some(query => query.includes('tse.jus.br') && query.includes('2026')))
+  assert.ok(queries.some(query => query.includes('pesquisa eleitoral')))
+})

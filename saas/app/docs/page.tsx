@@ -114,7 +114,7 @@ export default function DocsPage() {
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, alignItems: 'start' }} className="sb-docs-grid">
 
         {/* Sidebar nav */}
-        <aside style={{ borderRight: '1px solid rgba(255,255,255,.08)', paddingRight: 20, position: 'sticky', top: 90 }}>
+        <aside style={{ borderInlineEnd: '1px solid rgba(255,255,255,.08)', paddingInlineEnd: 20, position: 'sticky', top: 90 }}>
           <p className="sb-eyebrow" style={{ marginBottom: 14 }}>{c(COPY.scanPath, l)}</p>
           <nav style={{ display: 'grid', gap: 10 }}>
             <a href="#ad-landing-pages" style={{ color: 'rgba(255,255,255,.7)', textDecoration: 'none', fontSize: 13, lineHeight: 1.5, display: 'flex', gap: 8, alignItems: 'flex-start' }}>

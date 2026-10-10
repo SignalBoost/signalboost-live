@@ -510,13 +510,13 @@ export default function FutureProjectsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 18, borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 20, marginTop: 20 }}>
           <section>
             <h3 className="sb-h3">{copy.humanTitle}</h3>
-            <ul className="sb-body" style={{ paddingLeft: 20 }}>
+            <ul className="sb-body" style={{ paddingInlineStart: 20 }}>
               {copy.humanSteps.map(step => <li key={step} style={{ marginBottom: 8 }}>{step}</li>)}
             </ul>
           </section>
           <section>
             <h3 className="sb-h3">{copy.automationTitle}</h3>
-            <ul className="sb-body" style={{ paddingLeft: 20 }}>
+            <ul className="sb-body" style={{ paddingInlineStart: 20 }}>
               {copy.automationSteps.map(step => <li key={step} style={{ marginBottom: 8 }}>{step}</li>)}
             </ul>
           </section>
@@ -551,7 +551,7 @@ export default function FutureProjectsPage() {
 
         <section style={{ borderTop: '1px solid rgba(255,255,255,.08)', paddingTop: 20, marginTop: 20 }}>
           <h3 className="sb-h3">{multiAi.firstVersionTitle}</h3>
-          <ul className="sb-body" style={{ paddingLeft: 20 }}>
+          <ul className="sb-body" style={{ paddingInlineStart: 20 }}>
             {multiAi.firstVersion.map(item => <li key={item} style={{ marginBottom: 8 }}>{item}</li>)}
           </ul>
         </section>

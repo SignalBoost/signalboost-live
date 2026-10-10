@@ -493,8 +493,8 @@ export default function Concierge() {
                   data-ai-content={message.role === 'assistant' ? 'true' : undefined}
                   data-sb-source-language={message.role === 'assistant' ? message.sourceLanguage : undefined}
                   className={message.role === 'user'
-                    ? 'max-w-[88%] self-end whitespace-pre-wrap rounded-2xl rounded-br-md border border-blue-400/35 bg-blue-500/25 px-3.5 py-2.5 text-[13px] leading-6 text-white'
-                    : 'max-w-[88%] self-start rounded-2xl rounded-bl-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}
+                    ? 'max-w-[88%] self-end whitespace-pre-wrap rounded-2xl rounded-ee-md border border-blue-400/35 bg-blue-500/25 px-3.5 py-2.5 text-[13px] leading-6 text-white'
+                    : 'max-w-[88%] self-start rounded-2xl rounded-es-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}
                 >
                   {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
                   {message.role === 'assistant' && message.visualPreviewUrl ? (
@@ -527,7 +527,7 @@ export default function Concierge() {
                       <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/55">{uiText('homepage.concierge.continue')}</div>
                       <div className="flex flex-col items-start gap-1.5">
                         {message.suggestedFollowups.map(followup => (
-                          <button key={followup} type="button" disabled={loading} onClick={() => ask(followup)} className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1.5 text-left text-[11.5px] leading-snug text-cyan-100 transition hover:bg-cyan-300/20 disabled:opacity-50">
+                          <button key={followup} type="button" disabled={loading} onClick={() => ask(followup)} className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1.5 text-start text-[11.5px] leading-snug text-cyan-100 transition hover:bg-cyan-300/20 disabled:opacity-50">
                             {followup}
                           </button>
                         ))}
@@ -579,7 +579,7 @@ export default function Concierge() {
             {attachments.length > 0 && (
               <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
                 {attachments.map(a => (
-                  <div key={a.id} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.06] py-1 pl-1 pr-1.5">
+                  <div key={a.id} className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-white/10 bg-white/[.06] py-1 ps-1 pe-1.5">
                     {a.isImage
                       ? <img src={a.dataUrl} alt={a.name} className="h-7 w-7 shrink-0 rounded object-cover" />
                       : <span className="flex h-7 w-7 shrink-0 items-center justify-center text-base">📄</span>}

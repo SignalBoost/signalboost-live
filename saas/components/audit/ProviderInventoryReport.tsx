@@ -80,7 +80,7 @@ export default function ProviderInventoryReport({ data }: { data: ProviderInvent
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
+                <tr style={{ textAlign: 'start', color: 'rgba(255,255,255,.5)' }}>
                   <Th>{t('audit.provider.col.provider', "Provider")}</Th>
                   <Th>{t('audit.provider.col.category', "Category")}</Th>
                   <Th>{t('audit.provider.col.status', "Status")}</Th>
@@ -106,7 +106,7 @@ export default function ProviderInventoryReport({ data }: { data: ProviderInvent
                       <Td>
                         <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{r.findingCount}</span>
                         {r.evidenceRequired > 0 && (
-                          <span style={{ marginLeft: 6, fontSize: 10, color: CYAN }}>
+                          <span style={{ marginInlineStart: 6, fontSize: 10, color: CYAN }}>
                             {tt("audit.provider.evidenceShort", "({n} evidence)", { n: r.evidenceRequired })}
                           </span>
                         )}

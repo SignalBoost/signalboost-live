@@ -135,7 +135,7 @@ export default function CyberActivityPanel({ activity, lang }: { activity: Cyber
           </div>
           <p className="mt-1 text-[12px] text-text-muted">{state.label}</p>
         </div>
-        <div className="text-right font-mono text-[11px] text-text-muted">
+        <div className="text-end font-mono text-[11px] text-text-muted">
           <div>{copy.progress}: {progress}%</div>
           {typeof activity.done === 'number' && typeof activity.total === 'number' && activity.total > 0 ? <div>{activity.done}/{activity.total}</div> : null}
         </div>

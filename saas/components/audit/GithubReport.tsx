@@ -101,7 +101,7 @@ export default function GithubReport({ data }: { data: GithubReportView }) {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
+                <tr style={{ textAlign: 'start', color: 'rgba(255,255,255,.5)' }}>
                   <Th>{t('audit.github.col.login', "User")}</Th>
                   <Th>{t('audit.github.col.role', "Role")}</Th>
                   <Th>{t('audit.github.col.access', "Access")}</Th>
@@ -140,7 +140,7 @@ export default function GithubReport({ data }: { data: GithubReportView }) {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
+                <tr style={{ textAlign: 'start', color: 'rgba(255,255,255,.5)' }}>
                   <Th>{t('audit.github.col.branch', "Branch")}</Th>
                   <Th>{t('audit.github.col.age', "Age (days)")}</Th>
                 </tr>
@@ -182,7 +182,7 @@ function FindingCard({ finding }: { finding: Finding }) {
   const text = resolveFinding(finding, t, interpolate)
   const color = SEV_COLOR[finding.severity] || GREY
   return (
-    <div style={{ borderLeft: `3px solid ${color}`, paddingLeft: 12 }}>
+    <div style={{ borderInlineStart: `3px solid ${color}`, paddingInlineStart: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#0a0e17', background: color, borderRadius: 999, padding: '2px 8px' }}>
           {t(`audit.severity.${finding.severity}`, finding.severity)}

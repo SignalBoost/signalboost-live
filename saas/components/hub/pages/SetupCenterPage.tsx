@@ -16,7 +16,7 @@ const steps = [
 export default function SetupCenterPage(_props: PageProps) {
   const { dict } = useI18n()
   return (
-    <div className="hub-panel" style={{ height: '100%', overflowY: 'auto', paddingRight: 8 }}>
+    <div className="hub-panel" style={{ height: '100%', overflowY: 'auto', paddingInlineEnd: 8 }}>
       <section style={{ marginBottom: 14 }}>
         <div style={labelStyle}>{uiText('generatedUi.u_b0b245993303b72a')}</div>
         <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.setup.title')}</h2>

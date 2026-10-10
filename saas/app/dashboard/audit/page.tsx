@@ -714,12 +714,12 @@ export default function AuditCenterPage() {
                     <button
                       key={r.id}
                       onClick={() => openRun(r.id)}
-                      className={`rounded-md border px-2.5 py-2 text-left transition-fast ${active ? 'border-accent bg-bg' : 'border-border bg-bg hover:border-accent'}`}
+                      className={`rounded-md border px-2.5 py-2 text-start transition-fast ${active ? 'border-accent bg-bg' : 'border-border bg-bg hover:border-accent'}`}
                     >
                       <div className="flex items-center gap-2">
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(r.status)}`} />
                         <span className={`text-[11px] font-semibold ${statusText(r.status)}`}>{statusLabel(copy, r.status)}</span>
-                        <span className={`ml-auto text-[11px] font-bold ${r.findings_count > 0 ? 'text-accent' : 'text-text-muted'}`}>{r.findings_count}</span>
+                        <span className={`ms-auto text-[11px] font-bold ${r.findings_count > 0 ? 'text-accent' : 'text-text-muted'}`}>{r.findings_count}</span>
                       </div>
                       <div className="mt-1 truncate font-mono text-[10.5px] text-text-muted">{r.prefix || '—'}</div>
                       <div className="mt-0.5 text-[10px] text-text-muted/70">{timeShort(r.created_at, lang)}</div>
@@ -800,7 +800,7 @@ export default function AuditCenterPage() {
               <button
                 key={r.key}
                 onClick={() => setOpenReportKey(r.key)}
-                className={`flex flex-col gap-2 rounded-md border bg-surface p-4 text-left transition-fast hover:border-accent ${r.mvp ? 'border-accent ring-1 ring-accent/40' : 'border-border'}`}
+                className={`flex flex-col gap-2 rounded-md border bg-surface p-4 text-start transition-fast hover:border-accent ${r.mvp ? 'border-accent ring-1 ring-accent/40' : 'border-border'}`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-lg" aria-hidden>{r.icon}</span>
@@ -831,7 +831,7 @@ export default function AuditCenterPage() {
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="fixed right-0 top-0 flex h-full w-[520px] max-w-full flex-col border-l border-border bg-surface p-6 transition-transform duration-300"
+            className="fixed end-0 top-0 flex h-full w-[520px] max-w-full flex-col border-s border-border bg-surface p-6 transition-transform duration-300"
             style={{ transform: reportEntered ? 'translateX(0)' : 'translateX(100%)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)' }}
           >
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -893,7 +893,7 @@ export default function AuditCenterPage() {
           >
             <div
               onClick={e => e.stopPropagation()}
-              className="fixed right-0 top-0 h-full w-[480px] max-w-full overflow-y-auto border-l border-border bg-surface p-6 transition-transform duration-300"
+              className="fixed end-0 top-0 h-full w-[480px] max-w-full overflow-y-auto border-s border-border bg-surface p-6 transition-transform duration-300"
               style={{ transform: entered ? 'translateX(0)' : 'translateX(100%)', boxShadow: '-20px 0 60px rgba(0,0,0,.5)' }}
             >
               <div className="flex items-center justify-between gap-3">

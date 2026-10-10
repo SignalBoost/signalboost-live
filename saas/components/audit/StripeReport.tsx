@@ -95,7 +95,7 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
+                <tr style={{ textAlign: 'start', color: 'rgba(255,255,255,.5)' }}>
                   <Th>{t('audit.stripe.col.name', "Tier")}</Th>
                   <Th>{t('audit.stripe.col.price', "Price")}</Th>
                   <Th>{t('audit.stripe.col.interval', "Interval")}</Th>
@@ -133,7 +133,7 @@ export default function StripeReport({ data }: { data: StripeReportView }) {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'rgba(255,255,255,.5)' }}>
+                <tr style={{ textAlign: 'start', color: 'rgba(255,255,255,.5)' }}>
                   <Th>{t('audit.stripe.col.endpoint', "Endpoint")}</Th>
                   <Th>{t('audit.stripe.col.whStatus', "Status")}</Th>
                   <Th>{t('audit.stripe.col.events', "Events")}</Th>
@@ -174,7 +174,7 @@ function FindingCard({ finding }: { finding: Finding }) {
   const text = resolveFinding(finding, t, interpolate)
   const color = SEV_COLOR[finding.severity] || GREY
   return (
-    <div style={{ borderLeft: `3px solid ${color}`, paddingLeft: 12 }}>
+    <div style={{ borderInlineStart: `3px solid ${color}`, paddingInlineStart: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#0a0e17', background: color, borderRadius: 999, padding: '2px 8px' }}>
           {t(`audit.severity.${finding.severity}`, finding.severity)}

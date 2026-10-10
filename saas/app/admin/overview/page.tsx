@@ -31,7 +31,7 @@ type Overview = {
 
 function Stat({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
   return (
-    <div style={{ borderLeft: '2px solid rgba(26,240,255,.4)', paddingLeft: 14 }}>
+    <div style={{ borderInlineStart: '2px solid rgba(26,240,255,.4)', paddingInlineStart: 14 }}>
       <div style={{ fontSize: 26, fontWeight: 800, color: '#9ff7ff', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', letterSpacing: '-.02em' }}>{value}</div>
       <div className="sb-caption" style={{ marginTop: 2, textTransform: 'uppercase', letterSpacing: '.1em', fontSize: 10, fontWeight: 800 }}>{label}</div>
       {sub && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.45)', marginTop: 3 }}>{sub}</div>}
@@ -95,7 +95,7 @@ export default function AdminOverviewPage() {
                 {Object.entries(data.accounts.plans).map(([plan, n]) => (
                   <div key={plan}>
                     <span style={{ fontSize: 22, fontWeight: 800, color: GOLD }}>{n}</span>
-                    <span className="sb-caption" style={{ marginLeft: 6, textTransform: 'capitalize' }}>{plan}</span>
+                    <span className="sb-caption" style={{ marginInlineStart: 6, textTransform: 'capitalize' }}>{plan}</span>
                   </div>
                 ))}
               </div>
@@ -110,7 +110,7 @@ export default function AdminOverviewPage() {
             <Stat label={c.outreachLeads} value={data.content.leads} sub={`${data.content.approvedLeads} ${c.approved}`} />
           </section>
 
-          <section style={{ borderLeft: '2px solid rgba(255,195,0,.5)', paddingLeft: 14 }}>
+          <section style={{ borderInlineStart: '2px solid rgba(255,195,0,.5)', paddingInlineStart: 14 }}>
             <h3 style={{ margin: 0, fontSize: 13, fontWeight: 900, color: '#ffc300' }}>{c.liveStatus}</h3>
             <p className="sb-caption" style={{ margin: '6px 0 0' }}>{c.liveStatusBody}</p>
           </section>

@@ -173,7 +173,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
             {siteContent.logo_url && idx === 0 && <img src={siteContent.logo_url} alt={siteContent.logoAlt || `${siteContent.businessName || 'Site'} logo`} style={{ width: 58, height: 58, borderRadius: 16, marginBottom: 20, objectFit: 'cover', boxShadow: `0 14px 34px ${withAlpha(primary, 0.24)}` }} />}
             {eyebrowEl}
             {heading && <h1 style={{ ...headingStyle, fontSize: 'clamp(40px, 7vw, 78px)', fontWeight: 900, lineHeight: 1.02 }}>{heading}</h1>}
-            {sub && <p style={{ fontSize: 'clamp(17px, 2.4vw, 23px)', color: muted, lineHeight: 1.5, margin: '20px 0 0', maxWidth: 640, marginLeft: split ? 0 : 'auto', marginRight: split ? 0 : 'auto' }}>{sub}</p>}
+            {sub && <p style={{ fontSize: 'clamp(17px, 2.4vw, 23px)', color: muted, lineHeight: 1.5, margin: '20px 0 0', maxWidth: 640, marginInlineStart: split ? 0 : 'auto', marginInlineEnd: split ? 0 : 'auto' }}>{sub}</p>}
             {(section.cta || section.ctaSecondary) && (
               <div style={{ display: 'flex', gap: 14, marginTop: 36, justifyContent: split ? 'flex-start' : 'center', flexWrap: 'wrap' }}>
                 {section.cta && (
@@ -204,7 +204,7 @@ function SectionView({ section, theme, displayFont, idx, siteContent }: { sectio
             {siteContent.logo_url && idx === 0 && <img src={siteContent.logo_url} alt={siteContent.logoAlt || `${siteContent.businessName || 'Site'} logo`} style={{ width: 58, height: 58, borderRadius: 16, marginBottom: 20, objectFit: 'cover', boxShadow: `0 14px 34px ${withAlpha(primary, 0.24)}` }} />}
             {eyebrowEl}
             {heading && <h2 style={{ ...headingStyle, fontSize: 'clamp(30px, 4.5vw, 46px)' }}>{heading}</h2>}
-            {sub && <p style={{ color: muted, fontSize: 18, marginTop: 14, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.55 }}>{sub}</p>}
+            {sub && <p style={{ color: muted, fontSize: 18, marginTop: 14, maxWidth: 620, marginInlineStart: 'auto', marginInlineEnd: 'auto', lineHeight: 1.55 }}>{sub}</p>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 22 }}>
             {section.items.map((item, j) => (

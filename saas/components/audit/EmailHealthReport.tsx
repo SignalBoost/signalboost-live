@@ -33,7 +33,7 @@ export type { EmailHealthReportView }
 function Cell({ ok, label }: { ok: boolean; label: string }) {
   return <td style={{ padding: '10px 12px', fontSize: 13 }}>
     <span style={{ color: ok ? GREEN : RED, fontWeight: 900 }}>{ok ? '✓' : '✗'}</span>
-    <span style={{ color: 'rgba(255,255,255,.7)', marginLeft: 8 }}>{label}</span>
+    <span style={{ color: 'rgba(255,255,255,.7)', marginInlineStart: 8 }}>{label}</span>
   </td>
 }
 
@@ -104,7 +104,7 @@ export default function EmailHealthReport({ data }: { data: EmailHealthReportVie
           <thead>
             <tr>
               {[t('audit.email.colDomain', "Domain"), "MX", "SPF", "DKIM", "DMARC", "Resend"].map(h =>
-                <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, color: GREY, textTransform: 'uppercase', letterSpacing: '.08em' }}>{h}</th>)}
+                <th key={h} style={{ textAlign: 'start', padding: '6px 12px', fontSize: 11, color: GREY, textTransform: 'uppercase', letterSpacing: '.08em' }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>

@@ -37,7 +37,7 @@ export default function ErrorToast({
       style={{
         position: 'fixed',
         bottom: 20,
-        right: 20,
+        insetInlineEnd: 20,
         maxWidth: 420,
         padding: '14px 16px',
         borderRadius: 12,

@@ -187,7 +187,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             style={{
               position: 'absolute',
               top: '-20%',
-              left: '-10%',
+              insetInlineStart: '-10%',
               width: '60vw',
               height: '60vw',
               background: 'radial-gradient(circle, rgba(255,195,0,0.18) 0%, rgba(255,195,0,0) 70%)',
@@ -199,7 +199,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             style={{
               position: 'absolute',
               top: '30%',
-              right: '-15%',
+              insetInlineEnd: '-15%',
               width: '55vw',
               height: '55vw',
               background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0) 70%)',

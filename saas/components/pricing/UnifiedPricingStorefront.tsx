@@ -104,7 +104,7 @@ function TierCard({
         </div>
       )}
       {copy.topup && (
-        <div className="mb-4 pl-0.5 text-xs font-medium text-text-muted">{copy.topup}</div>
+        <div className="mb-4 ps-0.5 text-xs font-medium text-text-muted">{copy.topup}</div>
       )}
 
       {/* Feature list — mark-aware: a leading ✓/❌ overrides the default check. */}

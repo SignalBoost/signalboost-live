@@ -102,7 +102,7 @@ export default function ConsoleClient() {
                   ) : null}
                 </div>
               </div>
-              <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+              <div style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
                 {r.liveUrl ? (
                   <a href={r.liveUrl} target="_blank" rel="noreferrer" style={{ color: '#1af0ff', fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>{msT(L, "viewLive")} →</a>
                 ) : null}

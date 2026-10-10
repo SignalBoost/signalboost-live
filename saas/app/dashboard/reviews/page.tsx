@@ -338,7 +338,7 @@ export default function ReviewsPage() {
               <a href={reviewLink} target="_blank" rel="noopener noreferrer">{c('openNewTab', l)} ↗</a>
             </div>
           )}
-          <div className="sb-review-submission-preview" style={{ background: 'transparent', border: 0, borderLeft: '2px solid rgba(26,240,255,.4)', borderRadius: 0, padding: '4px 0 4px 14px' }}>
+          <div className="sb-review-submission-preview" style={{ background: 'transparent', border: 0, borderInlineStart: '2px solid rgba(26,240,255,.4)', borderRadius: 0, padding: '4px 0 4px 14px' }}>
             <span className="sb-chip" style={{ marginBottom: 8 }}>{c('sampleBadge', l)}</span>
             <div className="sb-stars" aria-label={uiText('generatedUi.u_d6ad47db4d63b1b0')}>★★★★★</div>
             <p>{c('previewText', l)}</p>

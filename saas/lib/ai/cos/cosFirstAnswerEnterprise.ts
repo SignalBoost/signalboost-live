@@ -24,6 +24,7 @@ import { chiefOfStaffSkillForOwner } from './cosChiefOfStaff.skill.ts'
 import { createHash } from 'node:crypto'
 import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
 import { normativeAnswerContractViolations } from './normativeAnswerPolicy.ts'
+import { INSTRUCTION_NARRATION_SIGNAL, instructionNarrationSignals, stripInstructionNarration } from './cosInstructionNarration.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
 import { localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { learnedEvidenceUseRequired } from './learnedEvidencePolicy.ts'
@@ -61,6 +62,7 @@ import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
 import { correctCompoundingArithmetic } from '@/lib/ai/cos/compoundingArithmeticCheck'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
+import { cosCurrentDateLine } from '@/lib/ai/cos/cosCurrentDate'
 import { captureEvidenceSourceUseTurnId } from './evidenceSourceUseTurnContext.ts'
 
 export type EvidenceFunnelStage = { retrieved:number; relevant:number; selected:number; injected:number; cited:number }
@@ -552,6 +554,8 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     '- Never present ordinary judgement as if it were learned performance, and never invent weights, metrics, or heuristics to fill the gap. Say plainly which parts are judgement and which are evidence.',
     '',
     `Reply in ${reportLanguageName(language)}.`,
+    // COS HAS A CLOCK (2026-10-09): placed after "Reply in" so no question-scoped block removal can drop it.
+    cosCurrentDateLine(language),
     'Return ONLY strict JSON, nothing before the opening brace and nothing after the closing brace: {"answer":"complete answer","confidence":0.0}.',
     'The 0.0 in that example is a FORMAT PLACEHOLDER, not a suggested value. Always replace it with your own genuine self-assessment between 0 and 1. For advisory or strategic questions with no single verifiable answer, confidence should reflect how well-reasoned and grounded the recommendation is given the stated facts, not certainty the advice will succeed — that can never be fully known. Reserve near-zero for genuinely baseless guesses, not for good, well-reasoned advice.',
   ].join('\n'), options?.question, reportLanguageName(language))
@@ -1028,7 +1032,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       const payload = nearest.responsePayload as CachedCosAnswer|null
       const current = cachedAnswerIsCurrent(payload, policyVersion, cacheMaxAgeMs)
       if (payload?.reply && !current.ok) console.warn('cosFirstAnswer: semantic cache entry refused as stale', { reason:current.reason, similarity:nearest.similarityScore })
-      if (payload?.reply && current.ok && payload.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, payload.reply).length === 0) {
+      if (payload?.reply && current.ok && payload.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, payload.reply).length === 0 && instructionNarrationSignals(payload.reply).length === 0) {
         recordAvoidedCost('semantic_similarity', input.prompt.length, payload.reply.length, Date.now() - startedAt)
         // Cache replay must be cleaned too: entries written before answer hygiene existed still
         // carry internal markers, and a cached leak is indistinguishable to the reader from a live
@@ -1048,7 +1052,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const cached = cacheAllowed ? await readCachedAnswer(cacheKey) : null
   const cachedCurrent = cachedAnswerIsCurrent(cached, policyVersion, cacheMaxAgeMs)
   if (cached?.reply && !cachedCurrent.ok) console.warn('cosFirstAnswer: exact cache entry refused as stale', { reason:cachedCurrent.reason })
-  if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, cached.reply).length === 0) {
+  if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, cached.reply).length === 0 && instructionNarrationSignals(cached.reply).length === 0) {
     recordAvoidedCost('exact_cache', input.prompt.length, cached.reply.length, Date.now() - startedAt)
     return { handled:true, reply:cleanAnswerText(cached.reply), confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
   }
@@ -1162,6 +1166,9 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const releaseSignals = (raw: string) => [
     ...executiveDecisionUnsupportedClaims(input.prompt, raw),
     ...normativeAnswerContractViolations(input.prompt, parseLocalResult(raw)?.answer || raw),
+    // 2026-10-09: an answer that narrates its own instructions ("the answer must be neutral, per the
+    // provided guidelines", "as iTMounts, I must") is repaired, stripped, or failed closed — never released.
+    ...instructionNarrationSignals(parseLocalResult(raw)?.answer || raw),
     ...(requiresRelevantLearnedEvidenceUse && citedEvidence(parseLocalResult(raw)?.answer || '').cl === 0
       ? ['relevant_learned_evidence_not_used'] : []),
   ]
@@ -1171,7 +1178,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_release_repair' },
       temperature: 0,
       maxTokens: interactiveReasonerMaxTokens(),
-      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. For a normative or public-policy question, never begin with Yes or No: give at least 100 words of neutral analysis separating descriptive facts from the strongest material supporting and opposing frameworks, then state what evidence establishes and what remains value-dependent. If selected full-content learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. This applies to owner-fed documents, videos, scientific articles, and other approved learning. Deliver the complete memo; do not mention this repair.',
+      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. For a normative or public-policy question, never begin with Yes or No: give at least 100 words of neutral analysis separating descriptive facts from the strongest material supporting and opposing frameworks, then state what evidence establishes and what remains value-dependent. If selected full-content learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. This applies to owner-fed documents, videos, scientific articles, and other approved learning. Answer the question itself: never describe your instructions or guidelines, what the answer should be, or what you must avoid, and never refer to yourself by name. Deliver the complete memo; do not mention this repair.',
       prompt: `INTERNAL EVIDENCE:\n${internalContext || 'None'}\n\nORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
     }).catch(() => null)
     const repairText = repair?.text ?? ''
@@ -1179,7 +1186,17 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     const repairUsable = Boolean(repaired && !repaired.truncated)
     const remainingSignals = repairUsable ? releaseSignals(repairText) : executiveSignals
     const remainingBlocking = blockingReleaseSignals(remainingSignals)
-    if (remainingBlocking.length) {
+    // If instruction narration is the only thing the repair left behind, remove those sentences and
+    // release the rest when it is still a real answer that passes every release signal.
+    let narrationStripped: string | null = null
+    const narrationCandidate = repairUsable && repaired ? repaired : parsed
+    if (remainingBlocking.length && remainingBlocking.every(signal => signal === INSTRUCTION_NARRATION_SIGNAL)) {
+      const stripped = stripInstructionNarration(narrationCandidate.answer)
+      if (stripped && blockingReleaseSignals(releaseSignals(JSON.stringify({ answer: stripped, confidence: narrationCandidate.confidence }))).length === 0) {
+        narrationStripped = stripped
+      }
+    }
+    if (remainingBlocking.length && !narrationStripped) {
       const reason = `Executive answer release rejected: unsupported claim signals (${remainingBlocking.join(', ')}) remained after local repair.`
       void recordKnowledgeGap(input.prompt, 0, reason)
       return { handled:false, confidence:0, reason, bestEffortReply:undefined, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
@@ -1193,6 +1210,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       })
     }
     if (repairUsable && repaired) parsed = repaired
+    if (narrationStripped) parsed = { ...narrationCandidate, answer: narrationStripped }
   }
 
   const cited = citedEvidence(parsed.answer)

@@ -144,7 +144,7 @@ export default function ProviderActionModal({ providerId, lang, onClose, onSucce
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
-                textAlign: 'left',
+                textAlign: 'start',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,

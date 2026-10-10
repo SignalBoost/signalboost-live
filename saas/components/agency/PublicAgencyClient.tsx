@@ -958,7 +958,7 @@ export default function PublicAgencyClient({ copy, tenantProfile }: PublicAgency
                   </select>
                 </label>
                 <label style={{ display: 'grid', gap: 6 }}>
-                  <span className="sb-caption">{oc.byokKeyLabel}{providerConnected ? <span style={{ color: '#86efac', marginLeft: 8 }}>✓ {oc.byokConnected}</span> : null}</span>
+                  <span className="sb-caption">{oc.byokKeyLabel}{providerConnected ? <span style={{ color: '#86efac', marginInlineStart: 8 }}>✓ {oc.byokConnected}</span> : null}</span>
                   <input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={providerConnected ? '✓ ' + oc.byokConnected : (apiProvider === 'openai' ? 'sk-…' : 'sk-ant-…')} maxLength={400} style={fieldStyle} />
                 </label>
               </div>

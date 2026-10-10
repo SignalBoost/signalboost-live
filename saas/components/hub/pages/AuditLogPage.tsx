@@ -16,7 +16,7 @@ const events = [
 export default function AuditLogPage(_props: PageProps) {
   const { dict } = useI18n()
   return (
-    <div className="hub-panel" style={{ height: '100%', overflowY: 'auto', paddingRight: 8 }}>
+    <div className="hub-panel" style={{ height: '100%', overflowY: 'auto', paddingInlineEnd: 8 }}>
       <section style={{ marginBottom: 14 }}>
         <div style={labelStyle}>{uiText('generatedUi.u_93bd0e1631bfc950')}</div>
         <h2 style={{ margin: '4px 0', fontSize: 26 }}>{t(dict, 'console.auditLog.title')}</h2>

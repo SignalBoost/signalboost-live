@@ -135,7 +135,7 @@ function RiskCard({ finding, t }: { finding: Finding; t: TFn }) {
   const text = resolveFinding(finding, t, interpolate)
   const color = SEV_COLOR[finding.severity]
   return (
-    <div style={{ border: `1px solid ${color}33`, borderLeft: `3px solid ${color}`, borderRadius: 12, padding: '12px 14px', background: 'rgba(255,255,255,.02)' }}>
+    <div style={{ border: `1px solid ${color}33`, borderInlineStart: `3px solid ${color}`, borderRadius: 12, padding: '12px 14px', background: 'rgba(255,255,255,.02)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#0a0e17', background: color, borderRadius: 999, padding: '2px 9px' }}>
           {t(`audit.severity.${finding.severity}`, finding.severity)}

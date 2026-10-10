@@ -319,7 +319,7 @@ export default function SpreadsheetsPage() {
   }, [data, query])
 
   const th: React.CSSProperties = {
-    textAlign: 'left',
+    textAlign: 'start',
     padding: '10px 12px',
     position: 'sticky',
     top: 0,

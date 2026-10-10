@@ -45,7 +45,7 @@ export default function AgentActivity({ lang = 'en', compact = false, activity }
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-300" />
         </span>
         <span className="text-[13px] font-extrabold text-cyan-100">{activity?.message || copy.active}</span>
-        <span className="ml-auto font-mono text-[11px] tabular-nums text-white/45">{liveSeconds}s {copy.elapsed}</span>
+        <span className="ms-auto font-mono text-[11px] tabular-nums text-white/45">{liveSeconds}s {copy.elapsed}</span>
       </div>
       <div className={`${compact ? 'mt-2' : 'mt-3'} flex items-center gap-2 text-[11.5px] text-white/55`}>
         <span className="font-mono text-cyan-300">#{activity?.sequence || 1}</span>

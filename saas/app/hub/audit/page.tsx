@@ -58,7 +58,7 @@ export default function AuditCenterPage() {
             style={{
               ...glass, padding: 18, textDecoration: 'none', color: '#fff',
               display: 'flex', flexDirection: 'column', gap: 8,
-              borderLeft: `3px solid ${r.accent}`,
+              borderInlineStart: `3px solid ${r.accent}`,
             }}
           >
             <div style={{ fontSize: 15, fontWeight: 700 }}>

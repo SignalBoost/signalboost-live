@@ -17,7 +17,8 @@ import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyKnowledgeAccess } from '@/lib/ai/cos/knowledgeAccessPolicy'
-import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { mayBeNonEnglish } from '@/lib/ai/cos/crossLanguageFreshness'
 import {
   classifyAuthoritativeVolatileFact,
   groundAuthoritativeVolatileFact,
@@ -667,20 +668,19 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // A model capability plan is the semantic decision for this turn. Do not charge a second model
   // classifier when the first model already requested live evidence. The semantic classifier remains
   // a compatibility fallback for legacy/no-plan turns where heuristic freshness needs adjudication.
+  // CROSS-LANGUAGE LIVE FACTS (2026-10-09): the word rules recognise live-fact questions reliably only in English
+  // (measured 85/210 non-English live questions before the intent layer). A non-English question they did not flag
+  // is adjudicated by the semantic judge, which reads meaning rather than words.
+  const nonEnglishUnflagged=!heuristicRequiresFreshEvidence&&!conversationRecallRequested&&mayBeNonEnglish(input,language)
   const semanticTaskIntentNeeded=!requestedAction
     && !modelPlannedFreshEvidence
-    && (heuristicRequiresFreshEvidence || requiresLiveTravelPlanningEvidence(input) || freshConversationContext.contextUsed)
+    && (heuristicRequiresFreshEvidence || requiresLiveTravelPlanningEvidence(input) || freshConversationContext.contextUsed || nonEnglishUnflagged)
   const semanticIntentStartedAt=Date.now()
   const semanticTaskIntent=semanticTaskIntentNeeded
     ? await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     : null
   if(semanticTaskIntentNeeded)recordCosLatencyStage('primary:semantic_intent',Date.now()-semanticIntentStartedAt)
-  const semanticRequiresFreshEvidence=Boolean(
-    semanticTaskIntent
-      && semanticTaskIntent.mode==='external_fact_verification'
-      && semanticTaskIntent.externalFactsRequired
-      && semanticTaskIntent.confidence>=0.72,
-  )
+  const semanticRequiresFreshEvidence=semanticIntentRequiresFreshness(semanticTaskIntent)
   const baselineRequiresFreshEvidence=(modelPlannedFreshEvidence||heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
   // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh, the
   // semantic intent below suppresses freshness and COS answers it. (The former second fast-authoring

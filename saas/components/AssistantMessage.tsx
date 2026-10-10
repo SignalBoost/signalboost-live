@@ -140,7 +140,7 @@ function LazyMedia({ refr, title }: { refr: MediaRef; title?: string }) {
             title={title || label}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+            style={{ position: 'absolute', top: 0, insetInlineStart: 0, width: '100%', height: '100%', border: 0 }}
           />
         ) : (
           <>
@@ -149,17 +149,17 @@ function LazyMedia({ refr, title }: { refr: MediaRef; title?: string }) {
                 src={thumb!}
                 alt={title || label}
                 onError={() => setThumbErr(true)}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ position: 'absolute', top: 0, insetInlineStart: 0, width: '100%', height: '100%', objectFit: 'cover' }}
               />
             ) : (
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1af0ff', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>{label}</div>
+              <div style={{ position: 'absolute', top: 0, insetInlineStart: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1af0ff', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase' }}>{label}</div>
             )}
             {/* Play overlay */}
-            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.16)' }}>
-              <div style={{ width: 50, height: 50, borderRadius: '50%', background: 'rgba(3,7,18,.6)', border: '2px solid rgba(255,255,255,.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 17, paddingLeft: 4 }}>▶</div>
+            <div style={{ position: 'absolute', top: 0, insetInlineStart: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.16)' }}>
+              <div style={{ width: 50, height: 50, borderRadius: '50%', background: 'rgba(3,7,18,.6)', border: '2px solid rgba(255,255,255,.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 17, paddingInlineStart: 4 }}>▶</div>
             </div>
             {/* Kind badge */}
-            <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 8.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#1af0ff', background: 'rgba(3,7,18,.72)', border: '1px solid rgba(26,240,255,.4)', borderRadius: 5, padding: '2px 6px' }}>{label}</span>
+            <span style={{ position: 'absolute', top: 8, insetInlineStart: 8, fontSize: 8.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#1af0ff', background: 'rgba(3,7,18,.72)', border: '1px solid rgba(26,240,255,.4)', borderRadius: 5, padding: '2px 6px' }}>{label}</span>
           </>
         )}
       </div>
@@ -229,7 +229,7 @@ function AudioBrief({ script }: { script: string }) {
     <Card accent="#ffc300" label={c.audioBrief}>
       <p style={{ margin: '0 0 10px 0', fontSize: 12.5, lineHeight: 1.6, color: 'rgba(255,255,255,.85)' }}>{clean}</p>
       <button onClick={play} disabled={state === 'loading' || state === 'playing'} style={{ background: 'rgba(255,195,0,.14)', border: '1px solid rgba(255,195,0,.45)', color: '#ffc300', borderRadius: 8, padding: '6px 14px', fontWeight: 800, fontSize: 12, cursor: state === 'loading' || state === 'playing' ? 'default' : 'pointer', opacity: state === 'loading' ? 0.7 : 1 }}>{label}</button>
-      {state === 'error' && <span style={{ marginLeft: 10, fontSize: 11, color: '#fca5a5' }}>{c.audioError}</span>}
+      {state === 'error' && <span style={{ marginInlineStart: 10, fontSize: 11, color: '#fca5a5' }}>{c.audioError}</span>}
     </Card>
   )
 }
@@ -293,7 +293,7 @@ function renderBlocks(text: string, keyBase: string): React.ReactNode[] {
     if (!list) return
     const items = list.items
     const inner = items.map((it, j) => <li key={j} style={{ margin: '2px 0' }}>{renderInline(it, `${keyBase}-li${k}-${j}`)}</li>)
-    const sx: React.CSSProperties = { margin: '4px 0', paddingLeft: 20 }
+    const sx: React.CSSProperties = { margin: '4px 0', paddingInlineStart: 20 }
     out.push(list.ordered ? <ol key={`${keyBase}-l${k++}`} style={sx}>{inner}</ol> : <ul key={`${keyBase}-l${k++}`} style={sx}>{inner}</ul>)
     list = null
   }

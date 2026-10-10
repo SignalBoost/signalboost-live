@@ -50,7 +50,7 @@ export default function ExecutiveOperationsDashboard({ snapshot }: Props) {
           <div style={{ fontSize: 25, fontWeight: 750, marginTop: 10 }}>{c.organization} {snapshot.organizationId}</div>
           <div style={{ color: 'rgba(255,255,255,.68)', marginTop: 8 }}>{snapshot.incidents.open} {c.openSummary} · {snapshot.incidents.critical} {c.criticalSummary} · {snapshot.incidents.awaitingVerification} {c.awaitingVerification} · {snapshot.incidents.awaitingClosureApproval} {c.awaitingClosureApproval}</div>
         </div>
-        <div style={{ minWidth: 170, textAlign: 'right' }}><div style={{ color: 'rgba(255,255,255,.62)', fontSize: 13, textTransform: 'uppercase' }}>{c.operationalHealth}</div>
+        <div style={{ minWidth: 170, textAlign: 'end' }}><div style={{ color: 'rgba(255,255,255,.62)', fontSize: 13, textTransform: 'uppercase' }}>{c.operationalHealth}</div>
           <div style={{ fontSize: 42, fontWeight: 800, marginTop: 6 }}>{snapshot.health.score}</div><div style={{ color: healthColor, textTransform: 'uppercase', fontWeight: 750 }}>{healthLabel}</div>
         </div>
       </div></section>

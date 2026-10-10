@@ -382,13 +382,13 @@ export default function OutreachDiscoveryPage() {
 
       {/* Result */}
       {result && (
-        <div style={{ borderTop: '1px solid rgba(74,222,128,.35)', borderLeft: '2px solid rgba(74,222,128,.5)', paddingTop: 16, paddingLeft: 14 }}>
+        <div style={{ borderTop: '1px solid rgba(74,222,128,.35)', borderInlineStart: '2px solid rgba(74,222,128,.5)', paddingTop: 16, paddingInlineStart: 14 }}>
           <p className="sb-eyebrow" style={{ color: '#86efac' }}>✓ {copy.leadQueued}</p>
           <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.03em', margin: '8px 0 14px' }}>
             {result.business_name || result.analyzer_summary?.business_name || copy.newLead}
           </h2>
           {result.outreach_message && (
-            <div style={{ borderLeft: '2px solid rgba(255,195,0,.55)', paddingLeft: 14, marginBottom: 14 }}>
+            <div style={{ borderInlineStart: '2px solid rgba(255,195,0,.55)', paddingInlineStart: 14, marginBottom: 14 }}>
               <strong style={{ color: '#ffc300', fontSize: 13 }}>{copy.draftFirstTouch}</strong>
               <p style={{ color: 'rgba(255,255,255,.72)', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginTop: 8 }}>{result.outreach_message}</p>
             </div>

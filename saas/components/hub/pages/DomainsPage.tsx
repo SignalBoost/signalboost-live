@@ -199,7 +199,7 @@ function DomainCard({
         <div style={{ paddingTop: '1rem', display: 'grid', gap: '1rem' }}>
           {/* Verification */}
           {!domain.verified && domain.verification && (
-            <div style={{ background: '#1a1a2e', padding: '1rem', borderRadius: '4px', borderLeft: `3px solid #fbbf24` }}>
+            <div style={{ background: '#1a1a2e', padding: '1rem', borderRadius: '4px', borderInlineStart: `3px solid #fbbf24` }}>
               <div style={{ ...labelStyle, marginBottom: '0.5rem' }}>{t('console.domains.verification_required', "Verification Required")}</div>
               {domain.verification.map((v, i) => (
                 <div key={i} style={{ fontSize: '0.85rem', marginBottom: '0.5rem', fontFamily: 'monospace' }}>

@@ -348,7 +348,7 @@ export default function PodcastersPage() {
           {productions.map(item => (
             <div
               key={item.title}
-              style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(168,85,247,.45)', padding: '14px 0 14px 14px' }}
+              style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderInlineStart: '2px solid rgba(168,85,247,.45)', padding: '14px 0 14px 14px' }}
             >
               <div style={{ fontSize: 28, marginBottom: 12 }}>🎧</div>
               <h3 style={{ margin: 0, fontSize: 18 }}>{item.title}</h3>
@@ -376,7 +376,7 @@ export default function PodcastersPage() {
           {deliverables.map(item => (
             <div
               key={item.title}
-              style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderLeft: '2px solid rgba(59,130,246,.45)', padding: '16px 0 16px 14px' }}
+              style={{ borderTop: '1px solid rgba(255,255,255,.08)', borderInlineStart: '2px solid rgba(59,130,246,.45)', padding: '16px 0 16px 14px' }}
             >
               <div style={{ fontSize: 30, marginBottom: 14 }}>{item.icon}</div>
               <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{item.title}</h3>

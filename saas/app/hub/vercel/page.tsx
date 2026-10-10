@@ -29,7 +29,7 @@ export default function HubVercelEnvPage() {
           padding: '10px 0 14px',
           background: 'linear-gradient(180deg, rgba(11,18,32,.98), rgba(11,18,32,.72) 70%, transparent)',
           backdropFilter: 'blur(10px)',
-          maxWidth: 1040, marginLeft: 'auto', marginRight: 'auto',
+          maxWidth: 1040, marginInlineStart: 'auto', marginInlineEnd: 'auto',
         }}
       >
         <div>

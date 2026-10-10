@@ -205,7 +205,7 @@ export default function MyOutreachPage() {
         {drafts.map(d => {
           const status = d.status || 'pending'
           return (
-            <article key={d.id} style={{ border: '1px solid rgba(255,255,255,.1)', borderLeft: `2px solid ${STATUS_COLOR[status] || 'rgba(255,255,255,.2)'}`, borderRadius: 14, padding: '14px 16px', background: 'rgba(8,12,22,.5)' }}>
+            <article key={d.id} style={{ border: '1px solid rgba(255,255,255,.1)', borderInlineStart: `2px solid ${STATUS_COLOR[status] || 'rgba(255,255,255,.2)'}`, borderRadius: 14, padding: '14px 16px', background: 'rgba(8,12,22,.5)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 <div style={{ minWidth: 0 }}>
                   <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>{d.business_name || '—'}</h3>

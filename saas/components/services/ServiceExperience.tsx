@@ -68,7 +68,7 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 16 }}>
         <article style={panelStyle}>
           <span className="sb-eyebrow">{t(dict, 'services.workflow')}</span>
-          <ol className="sb-body" style={{ paddingLeft: 20, display: 'grid', gap: 10 }}>
+          <ol className="sb-body" style={{ paddingInlineStart: 20, display: 'grid', gap: 10 }}>
             {steps.map((step) => <li key={step}>{step}</li>)}
           </ol>
         </article>
@@ -98,7 +98,7 @@ export default function ServiceExperience({ service, mode = 'dashboard' }: Servi
 
         <article style={panelStyle}>
           <span className="sb-eyebrow">{t(dict, 'services.aiSuggestions')}</span>
-          <ul className="sb-body" style={{ paddingLeft: 18, display: 'grid', gap: 10 }}>
+          <ul className="sb-body" style={{ paddingInlineStart: 18, display: 'grid', gap: 10 }}>
             {suggestions.map((suggestion) => <li key={suggestion}>{suggestion}</li>)}
           </ul>
         </article>

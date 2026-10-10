@@ -6,7 +6,8 @@
 
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
-import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
+import { classifyCosSemanticTaskIntent, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
+import { mayBeNonEnglish } from './crossLanguageFreshness.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
 import { extractSambaSchoolNames, isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
 import { buildHonestRefusalReply } from './honestRefusalReply.ts'
@@ -515,9 +516,15 @@ async function tryFreshCurrentFact(input: {
     const reason = errors.length
       ? `Live current-fact verification failed: ${errors.join('; ')}`
       : 'Live current-fact verification did not produce enough authoritative evidence.'
+    // OWNER DIAGNOSTIC (2026-10-09). On the production Concierge refusal of 2026-10-09 no persisted record of this
+    // reason could be found afterwards. The owner now sees it in the reply itself, in the same format the chat
+    // route uses; visitors never do.
+    const ownerDiagnostic = input.privileged
+      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').slice(0, 7)}\nlive search: ${queries.length} quer${queries.length === 1 ? 'y' : 'ies'} · ${successfulResponses.length} succeeded · ${documentsAcquired} results · ${sources.length} kept\nreason: ${reason}`.slice(0, 900)
+      : ''
     return {
       handled: true,
-      reply: freshVerificationUnavailable(input.language),
+      reply: freshVerificationUnavailable(input.language) + ownerDiagnostic,
       confidence: 0,
       provenance: freshProvenance({
         reasonerLabel: null,
@@ -799,14 +806,18 @@ export async function tryCOSFirstAnswer(input: {
   // shared entrypoint used by other callers too. A second deterministic freshness classifier must
   // never override a high-confidence neural finding that the task is interpretation of supplied
   // language/context rather than verification of the outside world.
-  const baselineRequiresFreshEvidence = requiresFreshExternalEvidence(input.prompt)
-  const semanticTaskIntent = baselineRequiresFreshEvidence
+  const heuristicRequiresFreshEvidence = requiresFreshExternalEvidence(input.prompt)
+  // CROSS-LANGUAGE LIVE FACTS (2026-10-09): a non-English question the word rules did not flag is adjudicated by
+  // the semantic judge, so a live-fact question is not answered from memory merely because of its language.
+  const nonEnglishUnflagged = !heuristicRequiresFreshEvidence && mayBeNonEnglish(input.prompt, input.language)
+  const semanticTaskIntent = heuristicRequiresFreshEvidence || nonEnglishUnflagged
     ? await classifyCosSemanticTaskIntent({
         input: input.prompt,
         language: input.language,
         previousAssistant: input.previousAssistant,
       })
     : null
+  const baselineRequiresFreshEvidence = heuristicRequiresFreshEvidence || semanticIntentRequiresFreshness(semanticTaskIntent)
   const suppressFreshnessForInterpretation = semanticIntentSuppressesFreshness(semanticTaskIntent)
   if (suppressFreshnessForInterpretation) {
     console.info('[cos-core-contextual-freshness-suppressed]', JSON.stringify({

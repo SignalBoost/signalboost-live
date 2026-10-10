@@ -114,7 +114,7 @@ export default function RolesManagementPage() {
     textTransform: 'uppercase',
     color: 'rgba(255,255,255,.45)',
     padding: '12px 4px',
-    textAlign: 'left',
+    textAlign: 'start',
   }
 
   return (
@@ -137,7 +137,7 @@ export default function RolesManagementPage() {
       {loadingRoles && <p style={{ margin: '0 0 14px', fontSize: 13, color: 'rgba(255,255,255,.5)' }}>{c.loading}</p>}
 
       {message && (
-        <div style={{ borderLeft: '2px solid rgba(26,240,255,.5)', paddingLeft: 14, marginBottom: 14, fontSize: 13, color: '#fff' }}>
+        <div style={{ borderInlineStart: '2px solid rgba(26,240,255,.5)', paddingInlineStart: 14, marginBottom: 14, fontSize: 13, color: '#fff' }}>
           {message}
         </div>
       )}
@@ -148,7 +148,7 @@ export default function RolesManagementPage() {
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,.12)' }}>
               <th style={thBase}>{c.colEmail}</th>
               <th style={thBase}>{c.colRole}</th>
-              <th style={{ ...thBase, textAlign: 'right' }}>{c.colActions}</th>
+              <th style={{ ...thBase, textAlign: 'end' }}>{c.colActions}</th>
             </tr>
           </thead>
           <tbody>
@@ -160,7 +160,7 @@ export default function RolesManagementPage() {
                     {user.role}
                   </span>
                 </td>
-                <td style={{ padding: '12px 4px', fontSize: 14, textAlign: 'right' }}>
+                <td style={{ padding: '12px 4px', fontSize: 14, textAlign: 'end' }}>
                   {isOwner && user.id !== currentUser?.id && (
                     <button onClick={() => setPendingTransfer(user)} style={{ background: 'rgba(37,99,235,.85)', color: '#fff', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                       {c.transferBtn}
@@ -174,7 +174,7 @@ export default function RolesManagementPage() {
       </div>
 
       {pendingTransfer && (
-        <div onClick={() => setPendingTransfer(null)} style={{ position: 'fixed', top: 80, left: 0, right: 0, bottom: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.6)', padding: 16, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+        <div onClick={() => setPendingTransfer(null)} style={{ position: 'fixed', top: 80, insetInlineStart: 0, insetInlineEnd: 0, bottom: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.6)', padding: 16, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, padding: 24, background: 'linear-gradient(160deg, rgba(15,23,42,.96), rgba(3,7,18,.98))', border: '1px solid rgba(26,240,255,.25)', borderRadius: 20, boxShadow: '0 32px 110px rgba(0,0,0,.6)' }}>
             <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 12px', color: '#fff' }}>{c.confirmTitle}</h2>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,.85)', margin: '0 0 8px' }}>{c.confirmBody(pendingTransfer.email)}</p>

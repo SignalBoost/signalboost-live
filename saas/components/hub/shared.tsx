@@ -252,7 +252,7 @@ export function Dot({ tone }: { tone: 'green' | 'yellow' | 'red' }) {
 export function Band({ tone, icon, title, plain, sub }: { tone: Tone; icon: string; title: string; plain: string; sub: string }) {
   return (
     <div style={{ padding: `${SPACE.lg}px ${SPACE.lg}px ${SPACE.md}px`, background: `linear-gradient(135deg, ${tone.soft}, rgba(8,12,22,0) 72%)`, borderBottom: `1px solid ${LINE.soft}`, position: 'relative' }}>
-      <span aria-hidden="true" style={{ position: 'absolute', left: 0, bottom: 0, height: 2, width: 56, background: tone.strong, opacity: .85 }} />
+      <span aria-hidden="true" style={{ position: 'absolute', insetInlineStart: 0, bottom: 0, height: 2, width: 56, background: tone.strong, opacity: .85 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.md }}>
         <span style={{ width: 42, height: 42, borderRadius: RADIUS.md, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, background: tone.soft, border: `1px solid ${tone.border}`, flexShrink: 0, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)' }}>{icon}</span>
         <div style={{ minWidth: 0 }}>

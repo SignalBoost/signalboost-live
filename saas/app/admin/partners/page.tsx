@@ -363,7 +363,7 @@ export default function PartnersPage() {
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', textAlign: 'left', fontSize: '14px', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', textAlign: 'start', fontSize: '14px', borderCollapse: 'collapse' }}>
             <thead style={{ background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.6)' }}>
               <tr>
                 <th style={{ padding: '12px 20px' }}>{c.colIntent}</th>

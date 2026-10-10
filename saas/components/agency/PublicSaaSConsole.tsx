@@ -63,7 +63,7 @@ export default function PublicSaaSConsole() {
                   {services.map(service => (
                     <Link key={service.key} href={service.dashboardHref} className="group relative min-h-[230px] overflow-hidden rounded-3xl border border-white/10 bg-white/[.07] p-5 text-white no-underline shadow-xl shadow-black/20 backdrop-blur-2xl transition hover:-translate-y-1 hover:border-cyan-200/40 hover:bg-white/[.10]">
                       <div className="absolute inset-x-0 top-0 h-1" style={{ background: service.accent }} />
-                      <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-20 blur-2xl transition group-hover:opacity-40" style={{ background: service.accent }} />
+                      <div className="absolute -end-8 -top-8 h-28 w-28 rounded-full opacity-20 blur-2xl transition group-hover:opacity-40" style={{ background: service.accent }} />
                       <div className="relative flex h-full flex-col">
                         <div className="flex items-start justify-between gap-3"><span className="text-4xl">{service.icon}</span><span className="rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[11px] font-bold text-slate-300">{service.intent}</span></div>
                         <h4 className="mt-4 text-2xl font-black">{service.title}</h4>

@@ -53,7 +53,7 @@ function itemStyle(active: boolean, disabled?: boolean): CSSProperties {
     fontWeight: 850,
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? .65 : 1,
-    textAlign: 'left',
+    textAlign: 'start',
   }
 }
 

@@ -57,7 +57,7 @@ export default function FAQPage() {
         {rows.map(item => (
           <details key={item.q} style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '14px 0' }}>
             <summary style={{ cursor: 'pointer', fontWeight: 900, fontSize: 15.5, listStyle: 'none' }}>{t(dict, item.q, item.qFallback)}</summary>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: 13.5, borderLeft: '2px solid rgba(255,195,0,.5)', paddingLeft: 14, margin: '10px 0 0' }}>{t(dict, item.a, item.aFallback)}</p>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: 13.5, borderInlineStart: '2px solid rgba(255,195,0,.5)', paddingInlineStart: 14, margin: '10px 0 0' }}>{t(dict, item.a, item.aFallback)}</p>
           </details>
         ))}
         {!rows.length && (

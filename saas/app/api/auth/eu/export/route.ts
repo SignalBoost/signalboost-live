@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
     for (let page = 0; page < MAX_PAGES; page++) {
       const { data, error } = await auth.client.from(table).select('*')
         .eq('user_id', uid).eq('tenant_id', tenantId)
+        .order(table === 'eu_builder_workspace_files' ? 'workspace_id' : 'id', { ascending: true })
+        .order(table === 'eu_builder_workspace_files' ? 'path' : 'user_id', { ascending: true })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
       if (error || !data) throw new Error('eu_export_query_unavailable')
       items.push(...data)

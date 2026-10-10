@@ -6,6 +6,7 @@ type FetchLike = typeof fetch
 type SearchHit = {
   url: string
   title: string
+  snippet?: string
   sourceDate?: string
   discoveryProvider?: 'brave' | 'duckduckgo_html' | 'duckduckgo_lite' | 'bing'
 }
@@ -309,7 +310,7 @@ async function discoverBrave(fetcher: FetchLike, query: string, count: number, a
   const json = JSON.parse(text)
   const raw = Array.isArray(json?.web?.results) ? json.web.results : []
   return raw.slice(0, count).map((row: any): SearchHit => ({
-    url: clean(row?.url), title: clean(row?.title).slice(0, 220), sourceDate: clean(row?.age).slice(0, 100) || undefined,
+    url: clean(row?.url), title: clean(row?.title).slice(0, 220), snippet: clean(row?.description).replace(/<[^>]*>/g, ' ').slice(0, 900), sourceDate: clean(row?.age).slice(0, 100) || undefined,
     discoveryProvider: 'brave',
   })).filter((row: SearchHit) => isSafePublicWebTrainingUrl(row.url))
 }
@@ -383,7 +384,21 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
     const pages: Array<LearningConnectorResult | null> = await Promise.all(diverse.map(async entry => {
       try {
         const text = await readTrainingPage(fetcher, entry.hit, options.queryMode === 'live_reference' ? 180 : MIN_READABLE_PAGE_CHARS)
-        if (!text) return null
+        if (!text) {
+          // In live-reference mode, a safe search-index extract may provide
+          // limited attributed evidence when the publisher blocks full-page reads.
+          // It must never be passed off as the fetched page or training material.
+          const excerpt = clean(entry.hit.snippet).slice(0, 900)
+          if (options.queryMode !== 'live_reference' || excerpt.length < 100) return null
+          return {
+            uri: entry.hit.url,
+            title: entry.hit.title || entry.assessment.host,
+            text: excerpt,
+            observedAt: new Date().toISOString(),
+            license: 'facts_and_summary_only; web_data_layer=search_index_excerpt; not_full_page',
+            evidence: ['source_kind=search_index_excerpt', 'full_page_verified=false', `source_host=${entry.assessment.host}`],
+          }
+        }
         const credibility = entry.assessment.credibility.toFixed(2)
         return {
           uri: entry.hit.url,

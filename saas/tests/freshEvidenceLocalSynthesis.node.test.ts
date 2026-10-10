@@ -117,10 +117,10 @@ test('malformed scope review gets one bounded retry without bypassing grounding 
   assert.match(source, /if \(finalReview.kind === 'unparseable' \|\| !finalReview.review.faithful\)/)
 })
 
-test('citation-authority repair explicitly preserves office-holder corroboration', () => {
+test('citation-authority repair respects dynamic external-evidence policy for all topics', () => {
   const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceContractRecovery.ts', import.meta.url), 'utf8')
-  assert.match(source, /citation_authority_rejected: the citations in evidenceIds/)
-  assert.match(source, /at least TWO independent reporting hostnames/)
-  assert.match(source, /return EVIDENCE_INSUFFICIENT rather than inventing citations/)
+  assert.match(source, /citation_authority_rejected: the cited evidence/)
+  assert.match(source, /required first-party\/institutional authority or independent-host corroboration/)
+  assert.match(source, /return EVIDENCE_INSUFFICIENT/)
   assert.match(source, /replyCitesRequiredFreshEvidence/)
 })

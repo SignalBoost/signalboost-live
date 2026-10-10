@@ -12,6 +12,10 @@ import {
   freshEvidenceGroundedRepairPrompt,
   FRESH_GROUNDED_ANSWER_MAX_TOKENS,
   FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
+  FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE,
+  FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL,
+  compactFreshEvidenceForReasoning,
+  excerptEvidenceForQuestion,
 } from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 import { describeFreshCitationRequirement, freshCitationRequirement } from '../lib/ai/cos/cosFreshAuthority.ts'
 import type { FreshEvidenceSource } from '../lib/ai/cos/cosFreshGrounding.ts'
@@ -82,7 +86,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   assert.match(source, /usageContext: \{ feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' \}/)
   assert.match(source, /disableThinking: true/)
   assert.equal(FRESH_GROUNDED_ANSWER_TIMEOUT_MS, 20_000)
-  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 700)
+  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 350)
   assert.match(source, /resolveCosReasoner/)
   assert.match(source, /lengthRule: CHAT_ANSWER_LENGTH_RULE/)
   assert.doesNotMatch(source, /jsonObject|EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
@@ -111,3 +115,33 @@ test('COS researches additional live evidence before rejecting an externally gro
 })
 
 
+
+test('the reasoning call sees question-bearing excerpts, not pages: 8 × 24k-char sources stay inside the evidence budget', () => {
+  // Production 2026-10-10 19:56: 9,422 prompt tokens, 700 output tokens, 19.4 s, finish=length; all other attempts timed out.
+  const filler = 'The committee discussed procurement of office furniture for the regional branch and adjourned without further business. '
+  const key = 'In Brazil, Flávio Bolsonaro won 47.03% of valid votes in the first presidential round and faces Lula in a runoff on October 25, 2026. '
+  const page = (filler.repeat(120) + key + filler.repeat(110)).slice(0, 24_000)
+  const big: FreshEvidenceSource[] = Array.from({ length: 8 }, (_, index) => ({
+    id: `LIVE${index + 1}`, title: `Report ${index + 1}`, url: `https://host${index + 1}.example/brazil-election`, snippet: page, sourceDate: '2026-10-05',
+  }))
+  const compact = compactFreshEvidenceForReasoning(big, officeQuestion)
+  const evidenceChars = compact.reduce((sum, source) => sum + source.snippet.length, 0)
+  assert.ok(evidenceChars <= FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL, `evidence ${evidenceChars} > ${FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL}`)
+  for (const source of compact) {
+    assert.ok(source.snippet.length <= FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE)
+    assert.match(source.snippet, /runoff on October 25, 2026/, 'the passage that answers the question is kept')
+    assert.doesNotMatch(source.snippet, /office furniture/, 'irrelevant passages are dropped')
+  }
+  const prompt = freshEvidenceGroundedAnswerPrompt({ input: officeQuestion, sources: big, retrievedAt, language: 'en', lengthRule: 'CHAT ANSWER LENGTH: test rule' })
+  assert.ok(prompt.prompt.length < 11_000, `prompt ${prompt.prompt.length} chars`)
+  assert.ok(prompt.systemPrompt.length < 3_500, `system ${prompt.systemPrompt.length} chars`)
+  // ids, urls and dates are untouched, so citations and the Sources line still resolve
+  assert.deepEqual(compact.map(source => [source.id, source.url, source.sourceDate]), big.map(source => [source.id, source.url, source.sourceDate]))
+})
+
+test('excerpting keeps short sources whole and never empties a source with no matching passage', () => {
+  assert.equal(excerptEvidenceForQuestion('Short official notice.', officeQuestion, 1_200), 'Short official notice.')
+  const unrelated = 'Alpha beta gamma. '.repeat(200)
+  const kept = excerptEvidenceForQuestion(unrelated, officeQuestion, 300)
+  assert.ok(kept.length > 0 && kept.length <= 300)
+})

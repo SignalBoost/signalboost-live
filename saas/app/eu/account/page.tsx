@@ -1,3 +1,4 @@
+import EuAccountControls from '@/components/eu/EuAccountControls'
 import Link from 'next/link'
 import { euCustomerLaunchReadiness } from '@/lib/security/euCustomerLaunchReadiness.ts'
 import { getEuUserSupabase } from '@/lib/security/euUserSupabaseServer.ts'
@@ -12,7 +13,7 @@ export default async function EuAccountPage() {
     return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>
       <h1>{uiText('generatedUi.u_d2d3109cbacf0a41')}</h1>
       <p>{uiText('generatedUi.u_f06d45815a9c047d')}</p>
-      <Link href="/">{uiText('generatedUi.u_2af5c4957e43e5de')}</Link>
+      <Link href="/eu/access">European account sign-in</Link>
     </main>
   }
 
@@ -38,5 +39,6 @@ export default async function EuAccountPage() {
     <h1>{uiText('generatedUi.u_2d6f36be6db892d3')}</h1>
     <p>{uiText('generatedUi.u_1c226f074c356e7e')}</p>
     <p>{uiText('generatedUi.u_bdf2df8f973c1202')}</p>
+    <EuAccountControls />
   </main>
 }

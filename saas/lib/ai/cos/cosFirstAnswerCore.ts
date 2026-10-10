@@ -8,6 +8,7 @@ import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { classifyCosSemanticTaskIntent, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
 import { mayBeNonEnglish } from './crossLanguageFreshness.ts'
+import { turnDeadlineRemainingMs } from './cosTurnBudget.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
 import { extractSambaSchoolNames, isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
 import { buildHonestRefusalReply } from './honestRefusalReply.ts'
@@ -482,6 +483,19 @@ async function tryLiveNamedCatalog(input: {
   }
 }
 
+// LIVE-FACT PATH WITHIN THE TURN BUDGET (2026-10-10). Production Concierge: the background turn for a live-fact
+// question ran past the page's 180 s wait. Searches are now capped in getExternalInfo; page reading is optional
+// deepening and runs only while it fits, bounded; answer synthesis starts only with enough time left. When time
+// runs out COS returns the honest refusal before the page gives up, and the owner diagnostic shows stage timings.
+const PAGE_READ_MIN_REMAINING_MS = 45_000
+const PAGE_READ_TIMEOUT_MS = 25_000
+const PAGE_READ_DEADLINE_MARGIN_MS = 20_000
+const SYNTHESIS_MIN_REMAINING_MS = 15_000
+
+function seconds(ms: number): string {
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
 async function tryFreshCurrentFact(input: {
   prompt: string
   previousAssistant?: string | null
@@ -490,10 +504,12 @@ async function tryFreshCurrentFact(input: {
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
   const retrievedAt = new Date().toISOString()
+  const freshStartedAt = Date.now()
   const queries = freshEvidenceSearchQueries(input.prompt, new Date(retrievedAt))
   const liveResponses = await Promise.all(
     queries.map(query => getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })),
   )
+  const searchMs = Date.now() - freshStartedAt
   const successfulResponses = liveResponses.filter(response => response.ok)
   const documentsAcquired = liveResponses.reduce((count, response) => count + (response.ok ? response.results.length : 0), 0)
   // Preserve evidence coverage for every part of a compound request.
@@ -502,7 +518,25 @@ async function tryFreshCurrentFact(input: {
     FRESH_SELECTED_EVIDENCE_BUDGET,
     input.prompt,
   )
-  const claimResearch = await deepenClaimResearch(input.prompt, sources, readPublicPages)
+  const pagesStartedAt = Date.now()
+  const remainingBeforePages = turnDeadlineRemainingMs()
+  let pagesNote = ''
+  let claimResearch: Awaited<ReturnType<typeof deepenClaimResearch>> = { sources, claims: [], pagesRead: 0 }
+  if (remainingBeforePages !== null && remainingBeforePages < PAGE_READ_MIN_REMAINING_MS) {
+    pagesNote = ' (skipped: turn budget)'
+  } else {
+    const pageBudgetMs = remainingBeforePages === null
+      ? PAGE_READ_TIMEOUT_MS
+      : Math.min(PAGE_READ_TIMEOUT_MS, remainingBeforePages - PAGE_READ_DEADLINE_MARGIN_MS)
+    let pageTimer: ReturnType<typeof setTimeout> | undefined
+    const unread = claimResearch
+    claimResearch = await Promise.race([
+      deepenClaimResearch(input.prompt, sources, readPublicPages).catch(() => unread),
+      new Promise<typeof unread>(resolve => { pageTimer = setTimeout(() => { pagesNote = ' (stopped: time cap)'; resolve(unread) }, pageBudgetMs) }),
+    ]).finally(() => { if (pageTimer) clearTimeout(pageTimer) })
+  }
+  const pagesMs = Date.now() - pagesStartedAt
+  const freshTiming = (extra = '') => `timing: search ${seconds(searchMs)} · pages ${seconds(pagesMs)}${pagesNote}${extra}`
   sources = claimResearch.sources
   const baseBudget = {
     search_result_limit: FRESH_SEARCH_RESULT_BUDGET,
@@ -520,7 +554,7 @@ async function tryFreshCurrentFact(input: {
     // reason could be found afterwards. The owner now sees it in the reply itself, in the same format the chat
     // route uses; visitors never do.
     const ownerDiagnostic = input.privileged
-      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').slice(0, 7)}\nlive search: ${queries.length} quer${queries.length === 1 ? 'y' : 'ies'} · ${successfulResponses.length} succeeded · ${documentsAcquired} results · ${sources.length} kept\nreason: ${reason}`.slice(0, 900)
+      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').slice(0, 7)}\nlive search: ${queries.length} quer${queries.length === 1 ? 'y' : 'ies'} · ${successfulResponses.length} succeeded · ${documentsAcquired} results · ${sources.length} kept\n${freshTiming()}\nreason: ${reason}`.slice(0, 900)
       : ''
     return {
       handled: true,
@@ -603,6 +637,32 @@ async function tryFreshCurrentFact(input: {
         escalationReasonCode: 'local_reasoner_not_configured',
         escalationReason: reason,
         evidenceBudget: { ...baseBudget, stopping_reason: 'authoritative_evidence_ready_local_reasoner_unavailable' },
+      }) as any,
+    }
+  }
+
+  // Synthesis starts only with enough turn left; otherwise return the honest refusal before the page gives up.
+  const remainingBeforeSynthesis = turnDeadlineRemainingMs()
+  if (remainingBeforeSynthesis !== null && remainingBeforeSynthesis < SYNTHESIS_MIN_REMAINING_MS) {
+    const reason = `Live evidence was retrieved, but the turn budget ran out before answer synthesis (${seconds(Math.max(0, remainingBeforeSynthesis))} left).`
+    const ownerDiagnostic = input.privileged
+      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').slice(0, 7)}\nlive search: ${queries.length} quer${queries.length === 1 ? 'y' : 'ies'} · ${successfulResponses.length} succeeded · ${documentsAcquired} results · ${sources.length} kept\n${freshTiming(' · synthesis not started')}\nreason: ${reason}`.slice(0, 900)
+      : ''
+    return {
+      handled: true,
+      reply: freshVerificationUnavailable(input.language) + ownerDiagnostic,
+      confidence: 0,
+      provenance: freshProvenance({
+        reasonerLabel: null,
+        localModelInvoked: false,
+        retrievedAt,
+        sources,
+        documentsAcquired,
+        responseSource: 'live_verification_refusal',
+        externalAiNecessary: false,
+        escalationReasonCode: 'turn_budget_exhausted_before_synthesis',
+        escalationReason: reason,
+        evidenceBudget: { ...baseBudget, stopping_reason: 'turn_budget_exhausted_before_synthesis' },
       }) as any,
     }
   }

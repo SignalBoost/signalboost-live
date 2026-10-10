@@ -7,6 +7,7 @@ type SearchHit = {
   url: string
   title: string
   sourceDate?: string
+  snippet?: string
   discoveryProvider?: 'brave' | 'duckduckgo_html' | 'duckduckgo_lite' | 'bing'
 }
 
@@ -310,6 +311,7 @@ async function discoverBrave(fetcher: FetchLike, query: string, count: number, a
   const raw = Array.isArray(json?.web?.results) ? json.web.results : []
   return raw.slice(0, count).map((row: any): SearchHit => ({
     url: clean(row?.url), title: clean(row?.title).slice(0, 220), sourceDate: clean(row?.age).slice(0, 100) || undefined,
+    snippet: stripHtml(String(row?.description || '')).slice(0, 1200),
     discoveryProvider: 'brave',
   })).filter((row: SearchHit) => isSafePublicWebTrainingUrl(row.url))
 }
@@ -383,18 +385,21 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
     const pages: Array<LearningConnectorResult | null> = await Promise.all(diverse.map(async entry => {
       try {
         const text = await readTrainingPage(fetcher, entry.hit, options.queryMode === 'live_reference' ? 180 : MIN_READABLE_PAGE_CHARS)
-        if (!text) return null
+        if (!text && !(options.queryMode === 'live_reference' && entry.hit.discoveryProvider === 'brave' && (entry.hit.snippet?.length ?? 0) >= 160)) return null
+        const snippetOnly = !text
+        const readableText = text || entry.hit.snippet || ''
         const credibility = entry.assessment.credibility.toFixed(2)
         return {
           uri: entry.hit.url,
           title: entry.hit.title || entry.assessment.host,
-          text,
+          text: readableText,
           observedAt: new Date().toISOString(),
-          license: `facts_and_summary_only; web_data_layer=credible_training_research_v1; source_class=${entry.assessment.sourceClass}; credibility=${credibility}`,
+          license: `facts_and_summary_only; web_data_layer=credible_training_research_v1; source_class=${entry.assessment.sourceClass}; credibility=${credibility}; snippet_only=${snippetOnly}`,
           evidence: [
             'web_data_layer=credible_training_research_v1',
             `source_class=${entry.assessment.sourceClass}`,
             `source_credibility=${credibility}`,
+            ...(snippetOnly ? ['evidence_scope=search_provider_snippet_only', 'page_content_verified=false'] : []),
             `source_host=${entry.assessment.host}`,
             ...(entry.hit.discoveryProvider ? [`discovery_provider=${entry.hit.discoveryProvider}`] : []),
             ...(entry.hit.sourceDate ? [`source_date=${entry.hit.sourceDate}`] : []),
@@ -407,6 +412,18 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
           url: entry.hit.url.slice(0, 160),
           error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200),
         })
+        // A provider's attributed search excerpt may remain readable when the publisher blocks page fetches.
+        // Use it only for live factual research, never training; mark its weaker verification scope.
+        if (options.queryMode === 'live_reference' && entry.hit.discoveryProvider === 'brave' && (entry.hit.snippet?.length ?? 0) >= 160) {
+          return {
+            uri: entry.hit.url, title: entry.hit.title || entry.assessment.host,
+            text: entry.hit.snippet!, observedAt: new Date().toISOString(),
+            license: 'facts_and_summary_only; snippet_only=true; training_not_authorized',
+            evidence: [`source_credibility=${entry.assessment.credibility.toFixed(2)}`, 'discovery_provider=brave',
+              'evidence_scope=search_provider_snippet_only', 'page_content_verified=false',
+              ...(entry.hit.sourceDate ? [`source_date=${entry.hit.sourceDate}`] : [])],
+          }
+        }
         return null
       }
     }))

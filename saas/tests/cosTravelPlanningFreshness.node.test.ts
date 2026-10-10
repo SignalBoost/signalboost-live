@@ -23,7 +23,8 @@ test('semantic intent may classify travel naturally instead of a deterministic f
 
 test('completion rescue remains unavailable for fresh travel requests', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /if\(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective\(input\)\)/)
+  assert.ok(route.includes('!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)'))
+  assert.ok(route.includes('const freshHardFail=requiresFreshEvidence&&!freshMissUseLocal'))
 })
 
 

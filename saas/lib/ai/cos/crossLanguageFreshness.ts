@@ -1,3 +1,5 @@
+import { crossLanguageLiveIntent } from './crossLanguageLiveIntent.ts'
+
 type Entry = [string, string]
 
 const entries: Entry[] = [
@@ -104,9 +106,14 @@ const signal = /[\u00c0-\u024f\u0400-\u04ff]|(?:^|\s)(?:czy|jaki|jakie|który|kt
 
 export function englishNormalizedForClassification(input: string) {
   const text = String(input || '')
-  if (!text || !signal.test(text)) return text
+  if (!text) return text
+  // Live-fact intent (who holds/will hold an office, who won an election, results, latest news) is
+  // recognised in every supported language and placed first, so start-anchored English rules see it.
+  // See crossLanguageLiveIntent.ts for the production defect this closes (2026-10-09).
+  const intent = crossLanguageLiveIntent(text)
+  if (!signal.test(text)) return intent ? `${intent} ; ${text}` : text
   const original = text.toLowerCase().replace(/[¿¡]/g, ' ')
   let out = original
   for (const [pattern, english] of compiled) out = out.replace(pattern, english)
-  return `${out} ${original}`.replace(/\s+/g, ' ').trim()
+  return `${intent ? `${intent} ; ` : ''}${out} ${original}`.replace(/\s+/g, ' ').trim()
 }

@@ -15,6 +15,7 @@ export default function EuAccountControls() {
   const [requests, setRequests] = useState<RightRequest[]>([])
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deletionPreflight, setDeletionPreflight] = useState<string>('')
 
   useEffect(() => {
     let active = true
@@ -50,6 +51,18 @@ export default function EuAccountControls() {
     void load()
     return () => { active = false }
   }, [])
+
+  async function preflight() {
+    if (!access || busy) return
+    setBusy(true)
+    try {
+      const res = await fetch('/api/auth/eu/deletion-preflight', { cache: 'no-store', headers: { Authorization: 'Bearer ' + access.token } })
+      if (!res.ok) throw new Error('preflight_failed')
+      const result = await res.json()
+      setDeletionPreflight('Frankfurt records: ' + JSON.stringify(result.regionalRecords) + '. Deletion has not been executed; external processors require verification.')
+    } catch { setDeletionPreflight('Deletion preflight unavailable. No data was deleted.') }
+    finally { setBusy(false) }
+  }
 
   async function action(type: 'save' | 'export' | 'export-request' | 'delete-request') {
     if (!access || busy) return
@@ -93,6 +106,8 @@ export default function EuAccountControls() {
       <h2>European data rights</h2>
       <button type="button" disabled={busy} onClick={() => void action('export')}>Download Frankfurt account and workspace data</button>
       <button type="button" disabled={busy} onClick={() => void action('export-request')}>Request complete data export</button>
+      <button type="button" disabled={busy} onClick={() => void preflight()}>Review deletion scope</button>
+      {deletionPreflight && <p role="status">{deletionPreflight}</p>}
       <button type="button" disabled={busy} onClick={() => void action('delete-request')}>Request account deletion</button>
       <p>Requests are recorded for processing, not automatically fulfilled. Connected-provider and workspace data may require separate handling.</p>
       <h3>Recent requests</h3>

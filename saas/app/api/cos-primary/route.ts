@@ -834,14 +834,14 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       // inadequate corroboration. Re-run the SAME grounding gates on the expanded evidence.
       // Do not retry transient model failures by pretending unverified claims are facts.
       if(localSynthesis.kind === 'citation_grounding_rejected' && Date.now()-startedAt < 110_000){
-        const recoveryQuery=`${lookupInput.replace(/\s+/g,' ').trim().slice(0,220)} primary authoritative source corroboration independent reporting`
+        const recoveryQuery=lookupInput.replace(/\s+/g,' ').trim().slice(0,220)
         logEscalation({event:'fresh_grounding_research_recovery_started',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true})
         const recoverySearch=await timeCosStage('primary:web_search_recovery',()=>getExternalInfo(recoveryQuery,8,{bypassCache:true}))
         if(recoverySearch.ok && recoverySearch.results.length){
           const expanded=prepareFreshEvidenceAcrossQueries([freshSources,recoverySearch.results],8,lookupInput)
           const reread=await timeCosStage('primary:web_page_reads_recovery',()=>deepenClaimResearch(lookupInput,expanded,readPublicPages))
           const recoveredSources=reread.sources
-          if(recoveredSources.length > freshSources.length
+          if(recoveredSources.some(source=>!freshSources.some(existing=>existing.url===source.url))
             && freshEvidenceMeetsQuestionAuthority(lookupInput,recoveredSources)
             && securityScenarioEvidenceIsSpecific(lookupInput,recoveredSources)){
             freshSources=recoveredSources

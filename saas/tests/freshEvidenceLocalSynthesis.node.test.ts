@@ -117,10 +117,10 @@ test('malformed scope review gets one bounded retry without bypassing grounding 
   assert.match(source, /if \(finalReview.kind === 'unparseable' \|\| !finalReview.review.faithful\)/)
 })
 
-test('citation-authority repair explicitly preserves office-holder corroboration', () => {
+test('citation-authority repair follows universal external fact corroboration', () => {
   const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceContractRecovery.ts', import.meta.url), 'utf8')
   assert.match(source, /citation_authority_rejected: the citations in evidenceIds/)
-  assert.match(source, /at least TWO independent reporting hostnames/)
+  assert.match(source, /distinct independent source hosts/)
   assert.match(source, /return EVIDENCE_INSUFFICIENT rather than inventing citations/)
   assert.match(source, /replyCitesRequiredFreshEvidence/)
 })
@@ -135,4 +135,6 @@ test('COS researches additional live evidence before rejecting an externally gro
   assert.match(route, /securityScenarioEvidenceIsSpecific\(lookupInput,recoveredSources\)/)
   assert.match(route, /synthesizeFreshEvidenceLocally\(\{input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language\}\)/)
   assert.match(route, /fresh_grounding_research_recovery_finished/)
+  assert.match(route, /recoveredSources.some\(source=>!freshSources.some\(existing=>existing.url===source.url\)\)/)
+  assert.doesNotMatch(route, /recoveredSources.length > freshSources.length/)
 })

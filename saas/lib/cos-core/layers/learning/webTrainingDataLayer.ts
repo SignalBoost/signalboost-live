@@ -32,7 +32,20 @@ export type WebTrainingSearchOptions = Readonly<{
   maxDiscoveryResults?: number
   braveApiKey?: string
   useBrave?: boolean
+  /**
+   * LIVE CURRENT-FACT RETRIEVAL (2026-10-10). This layer was built to collect durable training corpus, and its
+   * defaults are right for that: the query is padded with "authoritative primary source official documentation
+   * university research standard", and only institutional/standards/scholarly hosts (credibility >= 0.82) pass.
+   * Production: every current-fact question in every language ("who will be the next president", prices,
+   * weather, scores, "is X still alive") came back with zero evidence, because the pages that report such facts
+   * are news and data sites, which score 0.70 here and were discarded before any page was read.
+   * In live-fact mode the query is sent as asked and the floor is the credible-secondary tier (0.70). The
+   * downstream freshness gates (independent hosts, government authority for public offices) are unchanged.
+   */
+  retrievalMode?: 'training_corpus' | 'live_fact'
 }>
+
+export const LIVE_FACT_MIN_CREDIBILITY = 0.7
 
 const INSTITUTIONAL_HOST = /(?:^|\.)(?:gov|gob|gouv|mil|edu)(?:\.[a-z]{2,3})?$|(?:^|\.)(?:europa\.eu|ec\.europa\.eu|un\.org|who\.int|oecd\.org|worldbank\.org|imf\.org|ilo\.org|nhs\.uk|nih\.gov|cdc\.gov|fda\.gov|ema\.europa\.eu)$|(?:^|\.)ac\.[a-z]{2}$/i
 const STANDARDS_HOST = /(?:^|\.)(?:ietf\.org|w3\.org|iso\.org|ieee\.org|nist\.gov)$/i
@@ -333,15 +346,17 @@ async function readTrainingPage(fetcher: FetchLike, hit: SearchHit): Promise<str
 
 export function createWebTrainingResearchSearch(options: WebTrainingSearchOptions = {}): LearningConnectorSearch {
   const fetcher = options.fetcher ?? fetch
+  const liveFact = options.retrievalMode === 'live_fact'
   const minCredibility = Number.isFinite(options.minCredibility)
-    ? Math.max(0.7, Math.min(0.99, Number(options.minCredibility))) : webTrainingMinimumCredibility()
+    ? Math.max(0.7, Math.min(0.99, Number(options.minCredibility)))
+    : liveFact ? LIVE_FACT_MIN_CREDIBILITY : webTrainingMinimumCredibility()
   const discoveryLimit = Number.isFinite(options.maxDiscoveryResults)
     ? Math.max(3, Math.min(12, Math.floor(Number(options.maxDiscoveryResults)))) : 8
   const braveKey = clean(options.braveApiKey)
   const useBrave = options.useBrave === true && Boolean(braveKey)
 
   return async (query, limit): Promise<LearningConnectorResult[]> => {
-    const plannedQuery = buildWebTrainingResearchQuery(query)
+    const plannedQuery = liveFact ? clean(query).slice(0, 380) : buildWebTrainingResearchQuery(query)
     if (!plannedQuery) return []
     let hits: SearchHit[] = []
     if (useBrave) {
@@ -374,9 +389,9 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
           title: entry.hit.title || entry.assessment.host,
           text,
           observedAt: new Date().toISOString(),
-          license: `facts_and_summary_only; web_data_layer=credible_training_research_v1; source_class=${entry.assessment.sourceClass}; credibility=${credibility}`,
+          license: `facts_and_summary_only; web_data_layer=${liveFact ? 'live_fact_research_v1' : 'credible_training_research_v1'}; source_class=${entry.assessment.sourceClass}; credibility=${credibility}`,
           evidence: [
-            'web_data_layer=credible_training_research_v1',
+            `web_data_layer=${liveFact ? 'live_fact_research_v1' : 'credible_training_research_v1'}`,
             `source_class=${entry.assessment.sourceClass}`,
             `source_credibility=${credibility}`,
             `source_host=${entry.assessment.host}`,

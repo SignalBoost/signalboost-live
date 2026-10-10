@@ -54,6 +54,8 @@ export async function searchThroughGovernedWebKnowledge(input: {
   count: number
   research?: WebKnowledgeResearchPort
   evidenceSink?: HarnessEvidenceSink
+  /** 'live_fact' answers a current-fact question from the open web; 'training_corpus' (default) keeps the strict durable-learning filter. */
+  retrievalMode?: 'training_corpus' | 'live_fact'
 }): Promise<GovernedWebSearchDecision> {
   if (!activeParentHasWebKnowledgeGrant()) {
     return Object.freeze({ handled: false, results: Object.freeze([]) })
@@ -89,7 +91,7 @@ export async function searchThroughGovernedWebKnowledge(input: {
     })
   }
 
-  const research = input.research ?? createWebKnowledgeResearchPort()
+  const research = input.research ?? createWebKnowledgeResearchPort({ retrievalMode: input.retrievalMode ?? 'training_corpus' })
   const outcome = await runWebKnowledgeResearchProductionHarness({
     query,
     purpose: 'agent_research',

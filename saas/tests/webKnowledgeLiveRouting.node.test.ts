@@ -13,7 +13,8 @@ test('COS live research is conditionally granted and routed through the Web Know
   assert.match(route, /WEB_KNOWLEDGE_RESEARCH_CAPABILITY/)
   assert.match(route, /access==='live_required'\|\|access==='search_if_thin'/)
 
-  assert.match(external, /searchThroughGovernedWebKnowledge\(\{ query, count \}\)/)
+  // 2026-10-10: the live current-fact search asks the governed harness for live-fact retrieval (see liveFactRetrievalMode.node.test.ts).
+  assert.match(external, /searchThroughGovernedWebKnowledge\(\{ query, count, retrievalMode: 'live_fact' \}\)/)
   assert.match(external, /if \(governed\.handled\)/)
   assert.match(external, /if \(governed\.ok === false\) throw new Error\(governed\.error\)/)
 

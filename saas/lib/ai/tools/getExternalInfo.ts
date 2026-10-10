@@ -120,7 +120,9 @@ let searchPort: WebSearchPort | null = null
 function defaultSearchPort(): WebSearchPort {
   return {
     async search(query: string, count: number): Promise<SearchResult[]> {
-      const governed = await searchThroughGovernedWebKnowledge({ query, count })
+      // getExternalInfo is the live current-fact search. The governed provider must use live-fact retrieval
+      // (question as asked, news/data sites admitted) rather than the durable-training filter (2026-10-10).
+      const governed = await searchThroughGovernedWebKnowledge({ query, count, retrievalMode: 'live_fact' })
       if (governed.handled) {
         if (governed.ok === false) throw new Error(governed.error)
         if (!governed.results.length) throw new Error('Governed Web Knowledge returned no usable pages.')

@@ -22,10 +22,11 @@ for (const field of ['dependencies', 'devDependencies']) {
   }
 }
 
-// Each floor is the compatible patched release verified in the September 2026 repair.
+// Each floor is the compatible patched release verified in the September 2026 repair
+// (next raised to 16.3.8 in October 2026: next/og RCE, image-optimizer SSRF, cache poisoning).
 // Check nested copies as well; removing a direct dependency cannot hide an old nested copy.
 const floors = {
-  next: '16.3.5', postcss: '8.5.23', browserslist: '4.28.7',
+  next: '16.3.8', postcss: '8.5.23', browserslist: '4.28.7',
   'baseline-browser-mapping': '2.11.0', 'form-data': '4.0.6', nanoid: '3.3.18',
   'postcss-selector-parser': '6.1.3', 'brace-expansion': '1.1.18',
   'js-yaml': '3.15.2', qs: '6.16.0', sharp: '0.35.4',

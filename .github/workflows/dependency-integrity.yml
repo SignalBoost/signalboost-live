@@ -53,6 +53,12 @@ jobs:
       # its pre-existing missing prebuild validators are not a passing build claim.
       - name: Build deployed SaaS application from the committed graph
         if: matrix.workspace == 'saas'
+        env:
+          # Same envelope as SaaS CI's "Production build": Next 16 build workers drop
+          # max-old-space-size but honour max-heap-size, and its duplicate isolated type
+          # checker is skipped because SaaS CI's Typecheck job is the mandatory type gate.
+          NODE_OPTIONS: '--max-heap-size=7168'
+          CI_NEXT_BUILD_SKIP_TYPECHECK: 'true'
         run: npm run build
       - name: Verify package manifests and lockfiles stayed unchanged
         run: git diff --exit-code -- package.json package-lock.json

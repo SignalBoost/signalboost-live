@@ -1,2 +1,2 @@
-base_sha=a5a2d433fbc323957d255606c6b131c566d8ce55
-branch=fix/tailwind-4-migration-20261010
+base_sha=063038dfbde77555d8b55686905d797704fbd0a8
+branch=fix/locked-deps-build-20261010

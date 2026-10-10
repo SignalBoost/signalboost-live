@@ -116,3 +116,11 @@ test('malformed scope review gets one bounded retry without bypassing grounding 
   assert.match(source, /if \(reviewed.kind === 'unparseable'\) return \{ kind: 'citation_grounding_rejected' \}/)
   assert.match(source, /if \(finalReview.kind === 'unparseable' \|\| !finalReview.review.faithful\)/)
 })
+
+test('citation-authority repair explicitly preserves office-holder corroboration', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceContractRecovery.ts', import.meta.url), 'utf8')
+  assert.match(source, /citation_authority_rejected: the citations in evidenceIds/)
+  assert.match(source, /at least TWO independent reporting hostnames/)
+  assert.match(source, /return EVIDENCE_INSUFFICIENT rather than inventing citations/)
+  assert.match(source, /replyCitesRequiredFreshEvidence/)
+})

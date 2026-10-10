@@ -246,7 +246,7 @@ function PresetPicker({ activePreset, onPreset }: { activePreset: string; onPres
   return <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
     <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{vt(VID.templates, lang)}</h2><span className="text-xs text-white/50">{vt(VID.presetTagline, lang)}</span></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      {captionPresets.map((p) => <button key={p.id} type="button" onClick={() => onPreset(p)} className={`rounded-2xl border p-4 text-left transition ${activePreset === p.id ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
+      {captionPresets.map((p) => <button key={p.id} type="button" onClick={() => onPreset(p)} className={`rounded-2xl border p-4 text-start transition ${activePreset === p.id ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}>
         <span className="font-bold">{p.label}</span><span className="mt-1 block text-xs text-white/55">{PRESET_DESC[p.id] ? vt(VID[PRESET_DESC[p.id]], lang) : p.description}</span>
       </button>)}
     </div>
@@ -261,7 +261,7 @@ function CaptionTimeline({ cues, currentTime, selectedCueId, onSeek, onSelect, o
     {sel ? <label className="mt-4 block text-sm">{vt(VID.editSelected, lang)}<textarea className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-white/10 p-3" value={sel.text} onChange={(e) => onUpdateText(sel.id, e.target.value)} /><span className="mt-1 block font-mono text-xs text-[#FFD700]">{formatTime(sel.start)} → {formatTime(sel.end)}</span></label> : null}
     <div className="mt-4 max-h-72 space-y-2 overflow-auto">
       {cues.length === 0 ? <p className="rounded-2xl border border-dashed border-white/15 p-4 text-sm text-white/55">{vt(VID.emptyTimeline, lang)}</p> : null}
-      {cues.map((c) => <button key={c.id} type="button" onClick={() => { onSelect(c.id); onSeek(c.start) }} className={`w-full rounded-2xl border p-3 text-left text-sm transition ${sel?.id === c.id || (currentTime >= c.start && currentTime <= c.end) ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}><span className="font-mono text-xs text-[#FFD700]">{formatTime(c.start)} → {formatTime(c.end)}</span><br />{c.text}</button>)}
+      {cues.map((c) => <button key={c.id} type="button" onClick={() => { onSelect(c.id); onSeek(c.start) }} className={`w-full rounded-2xl border p-3 text-start text-sm transition ${sel?.id === c.id || (currentTime >= c.start && currentTime <= c.end) ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-white/10 bg-white/[.03] hover:border-white/25'}`}><span className="font-mono text-xs text-[#FFD700]">{formatTime(c.start)} → {formatTime(c.end)}</span><br />{c.text}</button>)}
     </div>
   </section>
 }

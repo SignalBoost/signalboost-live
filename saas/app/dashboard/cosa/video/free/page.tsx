@@ -128,22 +128,22 @@ export default function FreeSignalBoostAiVideoPage() {
             @keyframes freeCard { 0%{transform:translateY(14px);opacity:.45} 100%{transform:translateY(0);opacity:1} }
           `}</style>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 8%, rgba(255,195,0,.24), transparent 34%), linear-gradient(180deg, #020617, #0f172a)' }} />
-          <span style={{ position: 'absolute', left: 0, right: 0, top: 126, height: 3, background: `linear-gradient(90deg, transparent, ${CYAN}, ${GOLD}, transparent)`, animation: 'freeScan 3s linear infinite' }} />
+          <span style={{ position: 'absolute', insetInlineStart: 0, insetInlineEnd: 0, top: 126, height: 3, background: `linear-gradient(90deg, transparent, ${CYAN}, ${GOLD}, transparent)`, animation: 'freeScan 3s linear infinite' }} />
 
           <div style={{ position: 'absolute', left: '50%', top: 34, transform: 'translateX(-50%) scale(.92)', zIndex: 3 }}>
             <SignalBoostGuide active={playing || speaking} />
           </div>
 
-          <div style={{ position: 'absolute', left: 18, right: 18, top: 300, zIndex: 4, textAlign: 'center' }}>
+          <div style={{ position: 'absolute', insetInlineStart: 18, insetInlineEnd: 18, top: 300, zIndex: 4, textAlign: 'center' }}>
             <div style={{ color: GOLD, fontWeight: 950, fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase' }}>{current.label}</div>
             <h2 style={{ color: '#fff', fontSize: 30, lineHeight: 1.02, margin: '8px 0 0' }}>{current.caption}</h2>
           </div>
 
-          <div style={{ position: 'absolute', left: 18, right: 18, bottom: 116, zIndex: 4, borderRadius: 20, padding: 16, background: 'rgba(2,6,23,.82)', border: '1px solid rgba(255,195,0,.28)', animation: 'freeCard .35s ease-out' }}>
+          <div style={{ position: 'absolute', insetInlineStart: 18, insetInlineEnd: 18, bottom: 116, zIndex: 4, borderRadius: 20, padding: 16, background: 'rgba(2,6,23,.82)', border: '1px solid rgba(255,195,0,.28)', animation: 'freeCard .35s ease-out' }}>
             <p style={{ color: '#fff', fontSize: 19, lineHeight: 1.28, fontWeight: 850, margin: 0 }}>{current.line}</p>
           </div>
 
-          <div style={{ position: 'absolute', left: 18, right: 18, bottom: 62, zIndex: 4, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ position: 'absolute', insetInlineStart: 18, insetInlineEnd: 18, bottom: 62, zIndex: 4, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {["Console", "Reviews", "Approvals", "Content"].map((label, itemIndex) => (
               <div key={label} style={{ borderRadius: 12, padding: 8, background: itemIndex === index % 4 ? 'rgba(255,195,0,.18)' : 'rgba(255,255,255,.06)', border: itemIndex === index % 4 ? '1px solid rgba(255,195,0,.35)' : '1px solid rgba(255,255,255,.08)', color: '#fff', fontSize: 11, fontWeight: 850 }}>
                 {label}
@@ -151,11 +151,11 @@ export default function FreeSignalBoostAiVideoPage() {
             ))}
           </div>
 
-          <div style={{ position: 'absolute', left: 18, right: 18, bottom: 18, zIndex: 5, borderRadius: 999, padding: '10px 12px', background: GOLD, color: '#020617', textAlign: 'center', fontWeight: 950, fontSize: 13 }}>
+          <div style={{ position: 'absolute', insetInlineStart: 18, insetInlineEnd: 18, bottom: 18, zIndex: 5, borderRadius: 999, padding: '10px 12px', background: GOLD, color: '#020617', textAlign: 'center', fontWeight: 950, fontSize: 13 }}>
             {SAAS_URL}
           </div>
 
-          <div style={{ position: 'absolute', left: 18, right: 18, top: 18, display: 'flex', justifyContent: 'space-between', zIndex: 4 }}>
+          <div style={{ position: 'absolute', insetInlineStart: 18, insetInlineEnd: 18, top: 18, display: 'flex', justifyContent: 'space-between', zIndex: 4 }}>
             <span style={{ color: GOLD, fontWeight: 950, fontSize: 12 }}><LocalizedText fallback={uiText('generatedUi.u_7200fc7bdc9fa562')} /></span>
             <span style={{ color: 'rgba(255,255,255,.58)', fontSize: 12 }}>{index + 1}/{scenes.length}</span>
           </div>

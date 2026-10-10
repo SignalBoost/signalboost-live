@@ -76,7 +76,7 @@ function KeyPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        style={{ ...inputStyle, textAlign: 'left', cursor: 'pointer', color: value ? '#fff' : 'rgba(255,255,255,.45)' }}
+        style={{ ...inputStyle, textAlign: 'start', cursor: 'pointer', color: value ? '#fff' : 'rgba(255,255,255,.45)' }}
       >
         {value || placeholder}
       </button>
@@ -86,7 +86,7 @@ function KeyPicker({
       ) : null}
 
       {open ? (
-        <div style={{ position: 'absolute', zIndex: 40, left: 0, right: 0, top: '100%', marginTop: 6, padding: 8, borderRadius: 12, border: '1px solid rgba(255,255,255,.15)', background: '#07111f', boxShadow: '0 18px 50px rgba(0,0,0,.45)', maxHeight: 320, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', zIndex: 40, insetInlineStart: 0, insetInlineEnd: 0, top: '100%', marginTop: 6, padding: 8, borderRadius: 12, border: '1px solid rgba(255,255,255,.15)', background: '#07111f', boxShadow: '0 18px 50px rgba(0,0,0,.45)', maxHeight: 320, overflowY: 'auto' }}>
           <input
             type="search"
             autoFocus
@@ -107,7 +107,7 @@ function KeyPicker({
                 role="option"
                 aria-selected={k === value}
                 onClick={() => pick(k)}
-                style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid transparent', background: k === value ? 'rgba(26,240,255,.12)' : 'transparent', color: '#fff', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, cursor: 'pointer' }}
+                style={{ textAlign: 'start', padding: '8px 10px', borderRadius: 8, border: '1px solid transparent', background: k === value ? 'rgba(26,240,255,.12)' : 'transparent', color: '#fff', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, cursor: 'pointer' }}
               >
                 {k}
               </button>
@@ -119,7 +119,7 @@ function KeyPicker({
               <button
                 type="button"
                 onClick={() => pick(typed)}
-                style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,195,0,.4)', background: 'rgba(255,195,0,.1)', color: GOLD, fontSize: 12.5, cursor: 'pointer' }}
+                style={{ textAlign: 'start', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,195,0,.4)', background: 'rgba(255,195,0,.1)', color: GOLD, fontSize: 12.5, cursor: 'pointer' }}
               >
                 {newLabel.replace("{key}", typed)}
               </button>
@@ -358,7 +358,7 @@ export default function EnvVarsPage() {
               <span style={{ ...labelStyle }}>{t('console.env.targets', "Targets")}</span>
               <TargetChips selected={newTargets} onToggle={(t) => toggle(newTargets, setNewTargets, t)} />
             </div>
-            <button onClick={addVar} disabled={busy === 'add'} style={{ ...btn('cyan'), marginLeft: 'auto', opacity: busy === 'add' ? 0.6 : 1 }}>
+            <button onClick={addVar} disabled={busy === 'add'} style={{ ...btn('cyan'), marginInlineStart: 'auto', opacity: busy === 'add' ? 0.6 : 1 }}>
               {busy === 'add' ? t('console.env.adding', "Adding…") : '➕ ' + t('console.env.add', "Add variable")}
             </button>
           </div>
@@ -421,7 +421,7 @@ export default function EnvVarsPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                           <span style={labelStyle}>{t('console.env.targets', "Targets")}</span>
                           <TargetChips selected={editTargets} onToggle={(t) => toggle(editTargets, setEditTargets, t)} />
-                          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                          <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8 }}>
                             <button onClick={cancelEdit} style={btn('ghost')}>{t('console.env.cancel', "Cancel")}</button>
                             <button onClick={() => saveEdit(v.id)} disabled={busy === v.id} style={{ ...btn('cyan'), opacity: busy === v.id ? 0.6 : 1 }}>
                               {busy === v.id ? t('console.env.saving', "Saving…") : t('console.env.save', "Save changes")}

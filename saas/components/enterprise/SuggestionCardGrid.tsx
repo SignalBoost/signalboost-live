@@ -31,7 +31,7 @@ export function SuggestionCardGrid({ label, suggestions, selectedId, onSelect, o
           type="button"
           aria-pressed={active}
           onClick={() => onSelect(suggestion.id)}
-          style={{ textAlign: 'left', border: active ? '1px solid #ffc300' : '1px solid rgba(255,255,255,.12)', borderRadius: 14, background: active ? 'rgba(255,195,0,.11)' : 'rgba(2,6,23,.58)', color: '#fff', padding: 14, cursor: 'pointer', boxShadow: active ? '0 0 0 2px rgba(255,195,0,.12)' : 'none' }}
+          style={{ textAlign: 'start', border: active ? '1px solid #ffc300' : '1px solid rgba(255,255,255,.12)', borderRadius: 14, background: active ? 'rgba(255,195,0,.11)' : 'rgba(2,6,23,.58)', color: '#fff', padding: 14, cursor: 'pointer', boxShadow: active ? '0 0 0 2px rgba(255,195,0,.12)' : 'none' }}
         >
           <strong style={{ display: 'block', fontSize: 14 }}>{suggestion.title}</strong>
           <span style={{ display: 'block', color: 'rgba(255,255,255,.65)', fontSize: 12, lineHeight: 1.5, marginTop: 6 }}>{suggestion.description}</span>

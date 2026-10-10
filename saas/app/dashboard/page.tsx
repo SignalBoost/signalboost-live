@@ -474,7 +474,7 @@ return (
                   {sketch.sections && sketch.sections.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {sketch.sections.map((s, i) => (
-                        <div key={i} style={{ background: 'rgba(0,0,0,0.06)', borderLeft: `4px solid ${sketchColors.primary}`, padding: '12px 14px', borderRadius: 4, fontWeight: 600, fontSize: 14 }}>
+                        <div key={i} style={{ background: 'rgba(0,0,0,0.06)', borderInlineStart: `4px solid ${sketchColors.primary}`, padding: '12px 14px', borderRadius: 4, fontWeight: 600, fontSize: 14 }}>
                           {s}
                         </div>
                       ))}

@@ -335,7 +335,7 @@ export default function AdminRevenuePage() {
       {data && (
         <>
           {!data.pricesResolved && (
-            <div style={{ borderLeft: '2px solid rgba(252,165,165,.6)', paddingLeft: 14, marginBottom: 16 }}>
+            <div style={{ borderInlineStart: '2px solid rgba(252,165,165,.6)', paddingInlineStart: 14, marginBottom: 16 }}>
               <p className="sb-caption" style={{ margin: 0, color: '#fca5a5' }}>
                 {c.stripePriceWarn}
               </p>
@@ -343,26 +343,26 @@ export default function AdminRevenuePage() {
           )}
 
           <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 22 }}>
-            <div style={{ borderLeft: '2px solid rgba(255,195,0,.55)', paddingLeft: 14 }}>
+            <div style={{ borderInlineStart: '2px solid rgba(255,195,0,.55)', paddingInlineStart: 14 }}>
               <div style={{ fontSize: 30, fontWeight: 800, color: GOLD, fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '-.02em' }}>{money(data.totals.mrr)}</div>
               <div className="sb-caption" style={{ marginTop: 2, textTransform: 'uppercase', letterSpacing: '.1em', fontSize: 10, fontWeight: 800 }}>{c.mrr}</div>
             </div>
-            <div style={{ borderLeft: '2px solid rgba(26,240,255,.4)', paddingLeft: 14 }}>
+            <div style={{ borderInlineStart: '2px solid rgba(26,240,255,.4)', paddingInlineStart: 14 }}>
               <div style={{ fontSize: 30, fontWeight: 800, color: '#9ff7ff', fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '-.02em' }}>{money(data.totals.arr)}</div>
               <div className="sb-caption" style={{ marginTop: 2, textTransform: 'uppercase', letterSpacing: '.1em', fontSize: 10, fontWeight: 800 }}>{c.arr}</div>
             </div>
-            <div style={{ borderLeft: '2px solid rgba(134,239,172,.5)', paddingLeft: 14 }}>
+            <div style={{ borderInlineStart: '2px solid rgba(134,239,172,.5)', paddingInlineStart: 14 }}>
               <div style={{ fontSize: 30, fontWeight: 800, color: '#86efac', fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '-.02em' }}>{data.totals.activeTotal}</div>
               <div className="sb-caption" style={{ marginTop: 2, textTransform: 'uppercase', letterSpacing: '.1em', fontSize: 10, fontWeight: 800 }}>{c.activeSubs}</div>
             </div>
           </section>
 
           <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 22 }}>
-            <div style={{ borderLeft: '2px solid rgba(125,211,252,.45)', paddingLeft: 14 }}>
+            <div style={{ borderInlineStart: '2px solid rgba(125,211,252,.45)', paddingInlineStart: 14 }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: '#7dd3fc', fontFamily: 'ui-monospace, Menlo, monospace' }}>{data.totals.activeWebsite}</div>
               <div className="sb-caption" style={{ textTransform: 'uppercase', letterSpacing: '.1em', fontSize: 10, fontWeight: 800 }}>{c.activeWebsite}</div>
             </div>
-            <div style={{ borderLeft: '2px solid rgba(196,181,253,.45)', paddingLeft: 14 }}>
+            <div style={{ borderInlineStart: '2px solid rgba(196,181,253,.45)', paddingInlineStart: 14 }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: '#c4b5fd', fontFamily: 'ui-monospace, Menlo, monospace' }}>{data.totals.activePodcast}</div>
               <div className="sb-caption" style={{ textTransform: 'uppercase', letterSpacing: '.1em', fontSize: 10, fontWeight: 800 }}>{c.activePodcast}</div>
             </div>
@@ -379,7 +379,7 @@ export default function AdminRevenuePage() {
                     <strong style={{ color: '#fff', textTransform: 'capitalize' }}>{b.line} · {b.plan}</strong>
                     <div className="sb-caption" style={{ marginTop: 2 }}>{b.count} {c.active}</div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div style={{ textAlign: 'end' }}>
                     <div style={{ fontSize: 18, fontWeight: 800, color: GOLD, fontFamily: 'ui-monospace, Menlo, monospace' }}>{money(b.mrr)}</div>
                     <div className="sb-caption">{c.perMonth}</div>
                   </div>

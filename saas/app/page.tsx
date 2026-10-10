@@ -402,7 +402,7 @@ export default function Home() {
                         <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/55">{c('continue')}</div>
                         <div className="flex flex-col items-start gap-1.5">
                           {turn.suggestedFollowups.map((followup) => (
-                            <button key={followup} type="button" disabled={loading} onClick={() => void ask(followup)} className="secondary-button text-left text-xs disabled:cursor-not-allowed disabled:opacity-50">
+                            <button key={followup} type="button" disabled={loading} onClick={() => void ask(followup)} className="secondary-button text-start text-xs disabled:cursor-not-allowed disabled:opacity-50">
                               {followup}
                             </button>
                           ))}

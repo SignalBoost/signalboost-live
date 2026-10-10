@@ -145,7 +145,7 @@ function Markdown({ source }: { source: string }) {
       out.push(
         <div key={key++} style={{ overflowX: 'auto', margin: '12px 0' }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
-            <thead><tr>{header.map((h, hi) => <th key={hi} style={{ textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.16)', color: '#ffc300', fontWeight: 700, whiteSpace: 'nowrap' }}>{mdInline(h, `th${key}-${hi}`)}</th>)}</tr></thead>
+            <thead><tr>{header.map((h, hi) => <th key={hi} style={{ textAlign: 'start', padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.16)', color: '#ffc300', fontWeight: 700, whiteSpace: 'nowrap' }}>{mdInline(h, `th${key}-${hi}`)}</th>)}</tr></thead>
             <tbody>{rows.map((r, ri) => <tr key={ri}>{r.map((c, ci) => <td key={ci} style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.06)', color: MD_TXT, verticalAlign: 'top' }}>{mdInline(c, `td${key}-${ri}-${ci}`)}</td>)}</tr>)}</tbody>
           </table>
         </div>
@@ -164,19 +164,19 @@ function Markdown({ source }: { source: string }) {
     if (/^\s*[-*]\s+/.test(line)) {
       const items: string[] = []
       while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-*]\s+/, '')); i++ }
-      out.push(<ul key={key++} style={{ margin: '8px 0', paddingLeft: 22, color: MD_TXT, lineHeight: 1.65 }}>{items.map((it, ii) => <li key={ii} style={{ margin: '3px 0' }}>{mdInline(it, `ul${key}-${ii}`)}</li>)}</ul>)
+      out.push(<ul key={key++} style={{ margin: '8px 0', paddingInlineStart: 22, color: MD_TXT, lineHeight: 1.65 }}>{items.map((it, ii) => <li key={ii} style={{ margin: '3px 0' }}>{mdInline(it, `ul${key}-${ii}`)}</li>)}</ul>)
       continue
     }
 
     if (/^\s*\d+\.\s+/.test(line)) {
       const items: string[] = []
       while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+\.\s+/, '')); i++ }
-      out.push(<ol key={key++} style={{ margin: '8px 0', paddingLeft: 24, color: MD_TXT, lineHeight: 1.65 }}>{items.map((it, ii) => <li key={ii} style={{ margin: '3px 0' }}>{mdInline(it, `ol${key}-${ii}`)}</li>)}</ol>)
+      out.push(<ol key={key++} style={{ margin: '8px 0', paddingInlineStart: 24, color: MD_TXT, lineHeight: 1.65 }}>{items.map((it, ii) => <li key={ii} style={{ margin: '3px 0' }}>{mdInline(it, `ol${key}-${ii}`)}</li>)}</ol>)
       continue
     }
 
     if (/^\s*>\s?/.test(line)) {
-      out.push(<blockquote key={key++} style={{ borderLeft: '3px solid #ffc300', margin: '10px 0', padding: '4px 14px', color: 'rgba(255,255,255,.72)', background: 'rgba(255,255,255,.02)' }}>{mdInline(line.replace(/^\s*>\s?/, ''), `bq${key}`)}</blockquote>)
+      out.push(<blockquote key={key++} style={{ borderInlineStart: '3px solid #ffc300', margin: '10px 0', padding: '4px 14px', color: 'rgba(255,255,255,.72)', background: 'rgba(255,255,255,.02)' }}>{mdInline(line.replace(/^\s*>\s?/, ''), `bq${key}`)}</blockquote>)
       i++; continue
     }
 

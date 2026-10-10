@@ -583,4 +583,4 @@ const muted = { color: 'rgba(255,255,255,.68)' }
 const notice = { color: '#b8ffdd', fontWeight: 700 }
 const warn = { color: '#ffd8a8', fontWeight: 700 }
 const kicker = { color: '#1af0ff', fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1 }
-const readOnlyBadge = { marginLeft: 8, border: '1px solid rgba(26,240,255,.5)', borderRadius: 999, padding: '4px 10px', color: '#8be9ff', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1 }
+const readOnlyBadge = { marginInlineStart: 8, border: '1px solid rgba(26,240,255,.5)', borderRadius: 999, padding: '4px 10px', color: '#8be9ff', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: 1 }

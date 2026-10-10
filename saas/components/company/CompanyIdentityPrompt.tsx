@@ -83,7 +83,7 @@ export default function CompanyIdentityPrompt({ onSaved }: { onSaved?: (brand: s
     return <div style={okWrap}>
       <span style={{ color: 'rgba(255,255,255,.6)', fontSize: 12 }}>{t.using} </span>
       <strong style={{ color: '#22c55e', fontSize: 13 }}>{brandName}</strong>
-      <button style={{ ...ghost, marginLeft: 10, padding: '4px 10px', fontSize: 11 }} onClick={() => setHasProfile(false)}>✎</button>
+      <button style={{ ...ghost, marginInlineStart: 10, padding: '4px 10px', fontSize: 11 }} onClick={() => setHasProfile(false)}>✎</button>
     </div>
   }
 

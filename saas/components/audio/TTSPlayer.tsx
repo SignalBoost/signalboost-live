@@ -145,7 +145,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
               style={{
                 position: "absolute",
                 top: "100%",
-                right: 0,
+                insetInlineEnd: 0,
                 marginTop: 8,
                 background: "#111118",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -179,7 +179,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                       fontSize: 13,
                       fontWeight: selected ? 700 : 500,
                       cursor: "pointer",
-                      textAlign: "left",
+                      textAlign: "start",
                     }}
                   >
                     <span style={{ fontSize: 11, fontWeight: 800, opacity: 0.7, minWidth: 28 }}>{opt.flag}</span>
@@ -233,7 +233,7 @@ export function TTSPlayer({ initialLocale = "en" }: Props) {
                     border: "1px solid " + (selected ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.07)"),
                     borderRadius: 14,
                     cursor: "pointer",
-                    textAlign: "left",
+                    textAlign: "start",
                     color: "#fff",
                   }}
                 >

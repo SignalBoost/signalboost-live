@@ -168,8 +168,8 @@ const handleGoBack = () => {
       style={{
         position: 'fixed',
         top: 80,
-        left: 0,
-        right: 0,
+        insetInlineStart: 0,
+        insetInlineEnd: 0,
         bottom: 0,
         background: 'rgba(0,0,0,.88)',
         backdropFilter: 'blur(8px)',
@@ -185,7 +185,7 @@ const handleGoBack = () => {
         style={{
           position: 'absolute',
           top: 24,
-          left: 24,
+          insetInlineStart: 24,
           padding: '10px 18px',
           background: '#ffc300',
           color: '#000',

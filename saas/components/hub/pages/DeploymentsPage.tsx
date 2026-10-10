@@ -237,7 +237,7 @@ function DeploymentCard({
           </div>
         </div>
 
-        <div style={{ fontSize: '1.25rem', color: '#666', marginLeft: '1rem' }}>
+        <div style={{ fontSize: '1.25rem', color: '#666', marginInlineStart: '1rem' }}>
           {expanded ? '▼' : '▶'}
         </div>
       </div>

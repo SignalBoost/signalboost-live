@@ -52,11 +52,11 @@ export function SearchableSelect({ label, options, value, onChange, placeholder 
         if (event.key === 'Enter' && open && filtered[activeIndex]) { event.preventDefault(); choose(filtered[activeIndex]) }
         if (event.key === 'Escape') { setOpen(false); setQuery('') }
       }}
-      style={{ width: '100%', textAlign: 'left', border: '1px solid rgba(255,255,255,.14)', background: 'rgba(2,6,23,.78)', color: selected ? '#fff' : 'rgba(255,255,255,.55)', borderRadius: 12, padding: '11px 12px', cursor: disabled ? 'not-allowed' : 'pointer' }}
+      style={{ width: '100%', textAlign: 'start', border: '1px solid rgba(255,255,255,.14)', background: 'rgba(2,6,23,.78)', color: selected ? '#fff' : 'rgba(255,255,255,.55)', borderRadius: 12, padding: '11px 12px', cursor: disabled ? 'not-allowed' : 'pointer' }}
     >
       {selected?.label || uiText('generatedUi.u_fb1cbc38fb4060f4')}
     </button>
-    {open && !disabled && <div style={{ position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%', marginTop: 6, border: '1px solid rgba(255,255,255,.15)', borderRadius: 14, padding: 8, background: '#07111f', boxShadow: '0 18px 50px rgba(0,0,0,.45)' }}>
+    {open && !disabled && <div style={{ position: 'absolute', zIndex: 30, insetInlineStart: 0, insetInlineEnd: 0, top: '100%', marginTop: 6, border: '1px solid rgba(255,255,255,.15)', borderRadius: 14, padding: 8, background: '#07111f', boxShadow: '0 18px 50px rgba(0,0,0,.45)' }}>
       <input
         type="search"
         value={query}
@@ -81,7 +81,7 @@ export function SearchableSelect({ label, options, value, onChange, placeholder 
           aria-selected={option.value === value}
           onMouseEnter={() => setActiveIndex(index)}
           onClick={() => choose(option)}
-          style={{ textAlign: 'left', border: 'none', borderRadius: 9, padding: '9px 10px', background: option.value === value ? 'rgba(255,195,0,.16)' : index === activeIndex ? 'rgba(26,240,255,.12)' : 'transparent', color: '#fff', cursor: 'pointer' }}
+          style={{ textAlign: 'start', border: 'none', borderRadius: 9, padding: '9px 10px', background: option.value === value ? 'rgba(255,195,0,.16)' : index === activeIndex ? 'rgba(26,240,255,.12)' : 'transparent', color: '#fff', cursor: 'pointer' }}
         >
           <strong style={{ display: 'block', fontSize: 13 }}>{option.label}</strong>
           {option.description && <span style={{ color: 'rgba(255,255,255,.55)', fontSize: 11 }}>{option.description}</span>}

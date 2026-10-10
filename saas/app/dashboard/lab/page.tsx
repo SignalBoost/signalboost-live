@@ -111,7 +111,7 @@ function VideoOverlay({
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
           <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 999 }} />
         </div>
-        <button onClick={handleClose} style={{ position: 'absolute', top: 16, right: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: 32, height: 32, color: '#fff', cursor: 'pointer', fontSize: 14 }} aria-label={uiText('generatedUi.u_7d9eb7acb13e2462')}>✕</button>
+        <button onClick={handleClose} style={{ position: 'absolute', top: 16, insetInlineEnd: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: 32, height: 32, color: '#fff', cursor: 'pointer', fontSize: 14 }} aria-label={uiText('generatedUi.u_7d9eb7acb13e2462')}>✕</button>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
           <div style={{ width: 220, background: '#030407', borderRadius: 32, border: '1px solid rgba(255,255,255,0.12)', overflow: 'hidden', boxShadow: '0 24px 50px -12px rgba(0,0,0,0.7)' }}>
             <div style={{ background: '#0a0b12', height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -553,7 +553,7 @@ export default function LabPage() {
                 </div>
               </div>
               <div style={{ background: 'rgba(4, 5, 11, 0.9)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: 10, padding: '8px', display: 'flex', gap: 6, alignItems: 'center', marginBottom: 20, boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.5)' }}>
-                <span className="terminal-text" style={{ color: BLUE, paddingLeft: 12, fontWeight: 700, fontSize: 16 }}>$</span>
+                <span className="terminal-text" style={{ color: BLUE, paddingInlineStart: 12, fontWeight: 700, fontSize: 16 }}>$</span>
                 <input ref={inputRef} value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && runSearch()} placeholder={t(dict, 'lab.placeholder')} className="terminal-text" style={{ flex: 1, background: 'transparent', border: 'none', padding: '12px 8px', color: '#fff', fontSize: 15, outline: 'none' }} />
                 <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx,.txt" />
                 <button onClick={() => fileInputRef.current?.click()} className="terminal-text" style={{ padding: '10px 14px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -641,13 +641,13 @@ export default function LabPage() {
                             : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, opacity: 0.15 }}>🎬</div>
                           }
                           {isRestricted && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🔒</div>}
-                          <div style={{ position: 'absolute', top: 6, left: 6 }}>
+                          <div style={{ position: 'absolute', top: 6, insetInlineStart: 6 }}>
                             <div className="terminal-text" style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 4, background: licenseBg(result.license), color: licenseColor(result.license), border: `1px solid ${licenseColor(result.license)}33` }}>{result.license.toUpperCase()}</div>
                           </div>
-                          <div style={{ position: 'absolute', top: 6, right: 6 }}>
+                          <div style={{ position: 'absolute', top: 6, insetInlineEnd: 6 }}>
                             <div className="terminal-text" style={{ fontSize: 10, padding: '3px 6px', borderRadius: 4, background: 'rgba(0,0,0,0.7)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.15)' }}>{result.source === 'youtube' ? uiText('generatedUi.u_e499a90820e464b8') : uiText('generatedUi.u_e237563d9503bb38')}</div>
                           </div>
-                          <div className="terminal-text" style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.8)', color: '#fff', fontSize: 10, padding: '3px 6px', borderRadius: 4 }}>{result.duration}</div>
+                          <div className="terminal-text" style={{ position: 'absolute', bottom: 6, insetInlineEnd: 6, background: 'rgba(0,0,0,0.8)', color: '#fff', fontSize: 10, padding: '3px 6px', borderRadius: 4 }}>{result.duration}</div>
                         </div>
                         <div style={{ padding: 10, background: 'rgba(4, 5, 11, 0.5)' }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4, marginBottom: 8, height: 33 }}>{result.title}</div>
@@ -693,8 +693,8 @@ export default function LabPage() {
                 <div className="terminal-text" style={{ fontSize: 12, color: '#7a90b8', marginBottom: 16, fontWeight: 700 }}>// {t(dict, 'lab.recipeTemplates')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {SUGGESTIONS.map(s => (
-                    <button key={s.label} onClick={() => runSearch(s.prompt)} className="terminal-text recipe-node" style={{ width: '100%', textAlign: 'left', padding: '12px 14px', borderRadius: 6, fontSize: 12, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-                      <span style={{ color: BLUE, marginRight: 6 }}>$</span> {s.label}
+                    <button key={s.label} onClick={() => runSearch(s.prompt)} className="terminal-text recipe-node" style={{ width: '100%', textAlign: 'start', padding: '12px 14px', borderRadius: 6, fontSize: 12, color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+                      <span style={{ color: BLUE, marginInlineEnd: 6 }}>$</span> {s.label}
                     </button>
                   ))}
                 </div>
@@ -702,7 +702,7 @@ export default function LabPage() {
             )}
 
             {assets.length > 0 && (
-              <div className="fathom-glass" style={{ borderRadius: 14, padding: 20, borderLeft: `3px solid ${BLUE}` }}>
+              <div className="fathom-glass" style={{ borderRadius: 14, padding: 20, borderInlineStart: `3px solid ${BLUE}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <div className="terminal-text" style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>{t(dict, 'lab.pipelineStaging')} ({assets.length})</div>
                   <button onClick={() => setAssets([])} className="terminal-text" style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{t(dict, 'lab.purgeAll')}</button>

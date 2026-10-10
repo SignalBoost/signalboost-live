@@ -24,7 +24,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col h-screen sticky top-0 border-r border-slate-800">
+    <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col h-screen sticky top-0 border-e border-slate-800">
       <div className="p-6 border-b border-slate-800 flex items-center gap-2">
         <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">S</div>
         <span className="font-bold text-lg tracking-tight">{uiText('generatedUi.u_85647deec9865df5')}</span>

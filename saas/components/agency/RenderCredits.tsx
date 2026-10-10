@@ -99,7 +99,7 @@ export default function RenderCredits() {
             <p className="sb-body" style={{ margin: '6px 0 0', maxWidth: 620, fontSize: 13 }}>{unlimited ? copy.ownerSubtitle : copy.subtitle}</p>
           </div>
           {signedIn ? (
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'end' }}>
               <div className="sb-caption">{copy.balanceLabel}</div>
               <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: unlimited ? 22 : 28, fontWeight: 900, color: '#1af0ff' }}>
                 {unlimited ? copy.unlimited : (balance ?? 0).toLocaleString()}
@@ -120,7 +120,7 @@ export default function RenderCredits() {
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
                     <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 22, fontWeight: 900, color: '#fff' }}>{pk.credits.toLocaleString()}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.6)' }}>{copy.creditsWord}</span>
-                    {pk.popular ? <span style={{ marginLeft: 'auto', borderRadius: 999, border: '1px solid rgba(255,195,0,.4)', padding: '2px 8px', fontSize: 9.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.05em', color: '#ffc300' }}>{copy.popular}</span> : null}
+                    {pk.popular ? <span style={{ marginInlineStart: 'auto', borderRadius: 999, border: '1px solid rgba(255,195,0,.4)', padding: '2px 8px', fontSize: 9.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.05em', color: '#ffc300' }}>{copy.popular}</span> : null}
                   </div>
                   <button type="button" onClick={() => startTopup(pk.id)} disabled={busy} className={pk.popular ? 'sb-button-primary' : 'sb-button-secondary'} style={{ width: '100%', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1 }}>
                     {busy ? copy.redirecting : `${copy.buyCta} ${pk.credits.toLocaleString()} ${copy.creditsWord}`}

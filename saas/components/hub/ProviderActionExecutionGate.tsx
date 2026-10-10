@@ -114,7 +114,7 @@ export default function ProviderActionExecutionGate({ templateId, children, rend
           {available.map(capability => {
             const active = capability.mode === selected.mode
             return (
-              <button key={capability.mode} type="button" role="radio" aria-checked={active} onClick={() => setSelectedMode(capability.mode)} style={{ padding: '9px 10px', borderRadius: 9, border: active ? '1px solid rgba(26,240,255,.70)' : '1px solid rgba(255,255,255,.12)', background: active ? 'rgba(26,240,255,.11)' : 'rgba(255,255,255,.03)', color: '#fff', textAlign: 'left', cursor: 'pointer', fontSize: 11, fontWeight: 750 }}>
+              <button key={capability.mode} type="button" role="radio" aria-checked={active} onClick={() => setSelectedMode(capability.mode)} style={{ padding: '9px 10px', borderRadius: 9, border: active ? '1px solid rgba(26,240,255,.70)' : '1px solid rgba(255,255,255,.12)', background: active ? 'rgba(26,240,255,.11)' : 'rgba(255,255,255,.03)', color: '#fff', textAlign: 'start', cursor: 'pointer', fontSize: 11, fontWeight: 750 }}>
                 {LABELS[capability.mode]}
               </button>
             )

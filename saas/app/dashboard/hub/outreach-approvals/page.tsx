@@ -87,7 +87,7 @@ export default function OutreachApprovalsPage() {
             <strong style={{ color: pr.risk === 'high' ? '#fb7185' : pr.risk === 'medium' ? '#facc15' : '#22d3ee' }}>{copy.risks[pr.risk]} {copy.risk}</strong>
           </div>
           <h3>{copy.steps}</h3>
-          <ol style={{ display: 'grid', gap: 12, paddingLeft: 24 }}>
+          <ol style={{ display: 'grid', gap: 12, paddingInlineStart: 24 }}>
             {(Array.isArray(pr.steps) ? pr.steps : []).map((step, index) => <li key={`${step.templateId}-${index}`}>
               <div><b>{step.label}</b></div>
               <div style={{ color: '#94a3b8' }}>{copy.provider}: <code>{step.provider}</code> · {copy.template}: <code>{step.templateId}</code></div>

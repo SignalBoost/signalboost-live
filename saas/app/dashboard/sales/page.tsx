@@ -122,7 +122,7 @@ export default function SalesPage() {
             </button>
           </section>
 
-          <section style={{ borderLeft: draft ? '2px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.08)', paddingLeft: 20, height: 'calc(100vh - 230px)', minHeight: 380, overflowY: 'auto', transition: 'border-color .3s ease' }}>
+          <section style={{ borderInlineStart: draft ? '2px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.08)', paddingInlineStart: 20, height: 'calc(100vh - 230px)', minHeight: 380, overflowY: 'auto', transition: 'border-color .3s ease' }}>
             <h2 style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-.02em', margin: '0 0 4px' }}>{t('sales.aiDraft', "AI Draft")}</h2>
 
             {!draft && (

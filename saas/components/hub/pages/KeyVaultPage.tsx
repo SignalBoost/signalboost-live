@@ -356,7 +356,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
   const fmtDate = (iso: string | null) => iso ? new Date(iso).toLocaleString(lang === 'en' ? 'en-US' : lang, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : v('never', lang)
 
   return (
-    <div className="hub-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 14, overflowY: 'auto', paddingRight: 4 }}>
+    <div className="hub-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 14, overflowY: 'auto', paddingInlineEnd: 4 }}>
 
       {/* ── SECTION 1: My Safe ─────────────────────────────────────── */}
       <section style={{ flexShrink: 0 }}>
@@ -373,13 +373,13 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
         {/* Provider dropdown: grouped by category; keys retrieved on selection */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: 440 }}>
-            <button onClick={() => setDdOpen(o => !o)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 11, fontSize: 13.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: ddOpen ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.16)', color: selProvider ? '#fff' : 'rgba(255,255,255,.5)', textAlign: 'left' }}>
+            <button onClick={() => setDdOpen(o => !o)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 11, fontSize: 13.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: ddOpen ? '1px solid rgba(26,240,255,.5)' : '1px solid rgba(255,255,255,.16)', color: selProvider ? '#fff' : 'rgba(255,255,255,.5)', textAlign: 'start' }}>
               <span style={{ fontSize: 16 }}>{selProvider ? (PROVIDERS.find(p => p.name === selProvider)?.icon || '🧩') : '🗂️'}</span>
               <span style={{ flex: 1 }}>{selProvider || v("pickProv", lang)}</span>
               <span style={{ color: 'rgba(255,255,255,.45)' }}>{ddOpen ? '▴' : '▾'}</span>
             </button>
             {ddOpen && (
-              <div className="hub-panel" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30, maxHeight: 280, overflowY: 'auto', borderRadius: 12, border: '1px solid rgba(26,240,255,.35)', background: 'linear-gradient(180deg, rgba(15,23,42,.99), rgba(3,7,18,1))', boxShadow: '0 24px 60px rgba(0,0,0,.6)', padding: 8 }}>
+              <div className="hub-panel" style={{ position: 'absolute', top: 'calc(100% + 6px)', insetInlineStart: 0, insetInlineEnd: 0, zIndex: 30, maxHeight: 280, overflowY: 'auto', borderRadius: 12, border: '1px solid rgba(26,240,255,.35)', background: 'linear-gradient(180deg, rgba(15,23,42,.99), rgba(3,7,18,1))', boxShadow: '0 24px 60px rgba(0,0,0,.6)', padding: 8 }}>
                 {provList.length === 0 && <div style={{ padding: '10px 12px', fontSize: 12.5, color: 'rgba(255,255,255,.5)' }}>{v("noProviders", lang)}</div>}
                 {CAT_ORDER.map(cat => {
                   const inCat = provList.filter(p => (CATEGORY[p.provider] || 'Other') === cat)
@@ -388,7 +388,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                     <div key={cat} style={{ marginBottom: 6 }}>
                       <div style={{ ...labelStyle, padding: '5px 8px 3px' }}>{cat}</div>
                       {inCat.map(p => (
-                        <button key={p.provider} onClick={() => retrieveKeys(p.provider)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 9, fontSize: 13, fontWeight: 600, background: selProvider === p.provider ? 'rgba(255,195,0,.12)' : 'transparent', border: '1px solid transparent', color: selProvider === p.provider ? '#ffc300' : 'rgba(255,255,255,.78)', textAlign: 'left' }}>
+                        <button key={p.provider} onClick={() => retrieveKeys(p.provider)} className="hub-chip" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 9, fontSize: 13, fontWeight: 600, background: selProvider === p.provider ? 'rgba(255,195,0,.12)' : 'transparent', border: '1px solid transparent', color: selProvider === p.provider ? '#ffc300' : 'rgba(255,255,255,.78)', textAlign: 'start' }}>
                           <span style={{ fontSize: 15 }}>{PROVIDERS.find(x => x.name === p.provider)?.icon || '🧩'}</span>
                           <span style={{ flex: 1 }}>{p.provider}</span>
                           <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)' }}>{p.count}</span>
@@ -468,7 +468,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
             <button key={f} onClick={() => setTlFilter(f)} className="hub-chip" style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11.5, fontWeight: 700, textTransform: f === 'all' ? 'none' : 'lowercase', background: tlFilter === f ? 'rgba(26,240,255,.14)' : 'rgba(255,255,255,.04)', border: tlFilter === f ? '1px solid rgba(26,240,255,.45)' : '1px solid rgba(255,255,255,.12)', color: tlFilter === f ? '#1af0ff' : 'rgba(255,255,255,.55)' }}>{f === 'all' ? v("tlAll", lang) : f}</button>
           ))}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto', paddingRight: 4 }} className="hub-panel">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto', paddingInlineEnd: 4 }} className="hub-panel">
           {audit.filter(a => tlFilter === 'all' || a.action === tlFilter).slice(0, 40).map(a => (
             <div key={a.id} style={{ ...rowStyle, gap: 12 }}>
               <span style={{ ...monoStyle, color: '#1af0ff', flexShrink: 0 }}>{fmtDate(a.created_at)}</span>
@@ -539,7 +539,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
         const soon = expT !== null && !expired && expT < Date.now() + 14 * DAY
         return createPortal(
           <div style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(3,7,18,.55)', backdropFilter: 'blur(3px)' }} onClick={() => setDrawerId(null)}>
-            <div onClick={e => e.stopPropagation()} className="hub-panel" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(420px, 92vw)', background: 'linear-gradient(200deg, rgba(15,23,42,.99), rgba(3,7,18,1))', borderLeft: `1px solid ${tone.border}`, boxShadow: '-30px 0 80px rgba(0,0,0,.55)', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
+            <div onClick={e => e.stopPropagation()} className="hub-panel" style={{ position: 'absolute', top: 0, insetInlineEnd: 0, bottom: 0, width: 'min(420px, 92vw)', background: 'linear-gradient(200deg, rgba(15,23,42,.99), rgba(3,7,18,1))', borderInlineStart: `1px solid ${tone.border}`, boxShadow: '-30px 0 80px rgba(0,0,0,.55)', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <span style={{ width: 40, height: 40, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, background: tone.soft, border: `1px solid ${tone.border}`, flexShrink: 0 }}>{icon}</span>
@@ -569,7 +569,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                     <div key={a.id} style={{ ...rowStyle, gap: 10 }}>
                       <span style={{ ...monoStyle, color: '#1af0ff', flexShrink: 0 }}>{fmtDate(a.created_at)}</span>
                       <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0, color: a.action === 'delete' ? '#fca5a5' : a.action === 'reveal' ? '#ffc300' : a.action === 'copy' ? '#1af0ff' : '#86efac' }}>{a.action}</span>
-                      <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'right' }}>{a.actor}</span>
+                      <span style={{ ...monoStyle, color: 'rgba(255,255,255,.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'end' }}>{a.actor}</span>
                     </div>
                   ))}
                   {history.length === 0 && <div style={{ ...rowStyle, color: 'rgba(255,255,255,.45)' }}>{v("noHistory", lang)}</div>}
@@ -597,7 +597,7 @@ export default function KeyVaultPage({ lang, data, loading }: PageProps) {
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', borderRadius: 10, border: '1px solid rgba(255,195,0,.55)', background: 'rgba(255,195,0,.1)', fontSize: 14, fontWeight: 800, color: '#ffc300' }}>
                     <span style={{ fontSize: 17 }}>{PROVIDERS.find(p => p.name === fProvider)?.icon || '🧩'}</span>
                     {fProvider}
-                    <span style={{ marginLeft: 'auto', color: '#86efac' }}>✓</span>
+                    <span style={{ marginInlineStart: 'auto', color: '#86efac' }}>✓</span>
                   </div>
                   <button onClick={() => { setFProvider(''); setPSearch('') }} className="hub-chip" style={{ padding: '9px 14px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.65)', flexShrink: 0 }}>{uiText('generatedUi.u_f3e2f5d6ce6e26d8')}</button>
                 </div>

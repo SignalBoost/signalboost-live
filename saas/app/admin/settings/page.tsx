@@ -286,7 +286,7 @@ export default function AdminSettingsPage() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, color: '#fff' }}>
                   {c.flags[f.key]?.label || f.label}
-                  {savingKey === f.key && <span className="sb-caption" style={{ marginLeft: 8, opacity: 0.6 }}>{c.saving}</span>}
+                  {savingKey === f.key && <span className="sb-caption" style={{ marginInlineStart: 8, opacity: 0.6 }}>{c.saving}</span>}
                 </div>
                 <div className="sb-caption" style={{ marginTop: 4 }}>{c.flags[f.key]?.desc || f.desc}</div>
               </div>

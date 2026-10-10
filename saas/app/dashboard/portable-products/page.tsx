@@ -11,7 +11,7 @@ const page = { minHeight: '100vh', padding: 32, color: '#fff', background: 'line
 const panel = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 22, padding: 20, background: 'rgba(255,255,255,.055)', marginBottom: 18 }
 const muted = { color: 'rgba(255,255,255,.68)' }
 const chip = { display: 'inline-block', margin: '2px 6px 2px 0', padding: '3px 8px', border: '1px solid rgba(26,240,255,.3)', borderRadius: 999, color: '#b8f7ff' }
-const link = { color: '#1af0ff', marginRight: 12 }
+const link = { color: '#1af0ff', marginInlineEnd: 12 }
 
 function toSearchParams(input: SearchParams): URLSearchParams {
   const result = new URLSearchParams()

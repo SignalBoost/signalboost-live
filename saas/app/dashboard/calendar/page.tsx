@@ -467,7 +467,7 @@ export default function CalendarPage() {
                 setError('')
               }}
               style={{
-                textAlign: 'left',
+                textAlign: 'start',
                 height: 'clamp(60px, calc((100vh - 330px) / 6), 118px)',
                 overflow: 'hidden',
                 padding: 6,

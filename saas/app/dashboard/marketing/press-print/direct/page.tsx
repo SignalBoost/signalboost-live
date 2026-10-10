@@ -165,5 +165,5 @@ const field: CSSProperties = { display: 'grid', gap: 8 }
 const input: CSSProperties = { width: '100%', borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(15,23,42,.76)', color: '#fff', padding: '11px 12px' }
 const primary: CSSProperties = { border: 'none', background: '#ffc300', color: '#000', borderRadius: 12, padding: '11px 14px', fontWeight: 900, cursor: 'pointer', justifySelf: 'start' }
 const refusalBox: CSSProperties = { border: '1px solid rgba(248,113,113,.45)', borderRadius: 14, padding: 14, background: 'rgba(127,29,29,.22)', display: 'grid', gap: 8 }
-const refusalList: CSSProperties = { margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }
+const refusalList: CSSProperties = { margin: 0, paddingInlineStart: 18, display: 'grid', gap: 6 }
 const refusalItem: CSSProperties = { color: 'rgba(255,255,255,.86)', lineHeight: 1.6 }

@@ -263,12 +263,12 @@ export function LogsPage() {
             >
               <thead>
                 <tr style={{ borderBottom: '1px solid #333' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.timestamp', "Timestamp")}</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.action', "Action")}</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.secret_id', "Secret ID")}</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.col_user', "User")}</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.status', "Status")}</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', color: '#888' }}>{t('console.logs.message', "Message")}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'start', color: '#888' }}>{t('console.logs.timestamp', "Timestamp")}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'start', color: '#888' }}>{t('console.logs.action', "Action")}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'start', color: '#888' }}>{t('console.logs.secret_id', "Secret ID")}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'start', color: '#888' }}>{t('console.logs.col_user', "User")}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'start', color: '#888' }}>{t('console.logs.status', "Status")}</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'start', color: '#888' }}>{t('console.logs.message', "Message")}</th>
                 </tr>
               </thead>
               <tbody>

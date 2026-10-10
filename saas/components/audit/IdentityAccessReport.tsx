@@ -119,7 +119,7 @@ function FlagPill({ label }: { label: string }) {
       border: `1px solid ${ORANGE}66`,
       borderRadius: 999,
       padding: '1px 8px',
-      marginRight: 4,
+      marginInlineEnd: 4,
       marginBottom: 2,
       whiteSpace: 'nowrap',
     }}>
@@ -306,7 +306,7 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
                     t('audit.identity.col.flags', "Flags"),
                   ].map(h => (
                     <th key={h} style={{
-                      textAlign: 'left',
+                      textAlign: 'start',
                       padding: '8px 12px',
                       fontSize: 10.5,
                       fontWeight: 800,
@@ -343,7 +343,7 @@ export default function IdentityAccessReport({ data }: { data: IdentityAccessRep
                       <td style={{ padding: '10px 12px', color: '#fff', fontWeight: 600, wordBreak: 'break-all', minWidth: 160 }}>
                         {row.principal}
                         {row.isPrivileged && (
-                          <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 800, color: GOLD, border: `1px solid ${GOLD}55`, borderRadius: 999, padding: '1px 6px' }}>{uiText('generatedUi.u_9590fc1fa43e11e3')}</span>
+                          <span style={{ marginInlineStart: 6, fontSize: 9.5, fontWeight: 800, color: GOLD, border: `1px solid ${GOLD}55`, borderRadius: 999, padding: '1px 6px' }}>{uiText('generatedUi.u_9590fc1fa43e11e3')}</span>
                         )}
                       </td>
                       <td style={{ padding: '10px 12px', color: 'rgba(255,255,255,.65)' }}>{row.provider}</td>

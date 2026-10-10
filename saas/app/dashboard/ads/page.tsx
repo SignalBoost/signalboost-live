@@ -220,7 +220,7 @@ export default function AdsCockpit() {
                     uiText('generatedUi.u_ads_colstatus'),
                     uiText('generatedUi.u_ads_colactions'),
                   ].map(head => (
-                    <th key={head} style={{ ...cell, color: 'rgba(255,255,255,.55)', fontWeight: 800, textAlign: 'left' }}>{head}</th>
+                    <th key={head} style={{ ...cell, color: 'rgba(255,255,255,.55)', fontWeight: 800, textAlign: 'start' }}>{head}</th>
                   ))}
                 </tr>
               </thead>
@@ -491,7 +491,7 @@ function AccountPicker({ platformId, value, onPick }: {
                 key={account.accountRef}
                 style={{
                   ...ghost,
-                  textAlign: 'left',
+                  textAlign: 'start',
                   fontSize: 11,
                   borderColor: value === account.accountRef ? '#ffc300' : 'rgba(255,255,255,.18)',
                 }}

@@ -255,7 +255,7 @@ export default function ProviderExpansionPage({ lang }: PageProps) {
         </div>
       </section>
 
-      <main className="hub-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 8 }}>
+      <main className="hub-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingInlineEnd: 8 }}>
         <div className="partner-grid">
           {page.partners.map(item => {
             const enabled = enabledPartners[item.name] !== false

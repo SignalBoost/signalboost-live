@@ -171,7 +171,7 @@ export default function PromotePage() {
           {error && <p role="alert" style={{ marginTop: 12, color: '#f87171', fontSize: 13 }}>{error}</p>}
         </section>
 
-        <section ref={resultRef} aria-label={uiText('generatedUi.u_37ebe9312eb00e93')} style={{ borderLeft: campaign ? '2px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.08)', paddingLeft: 20, minHeight: 480 }}>
+        <section ref={resultRef} aria-label={uiText('generatedUi.u_37ebe9312eb00e93')} style={{ borderInlineStart: campaign ? '2px solid rgba(255,195,0,.55)' : '1px solid rgba(255,255,255,.08)', paddingInlineStart: 20, minHeight: 480 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
             <strong style={{ color: GOLD, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase' }}>
               {campaign ? `✅ ${ui.success}` : t(dict, 'promote_page.preview.title')}

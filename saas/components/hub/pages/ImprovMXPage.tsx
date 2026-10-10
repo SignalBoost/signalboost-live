@@ -210,7 +210,7 @@ export default function ImprovMXPage() {
                       padding: 11,
                       borderRadius: 9,
                       cursor: 'pointer',
-                      textAlign: 'left',
+                      textAlign: 'start',
                     }}
                   >
                     <span style={{ fontFamily: 'monospace' }}>{item.domain}</span>

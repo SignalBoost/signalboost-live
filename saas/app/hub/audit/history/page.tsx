@@ -146,24 +146,24 @@ function RunsTable({ runs, t }: { runs: Run[]; t: TFn }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-text-muted">
+            <tr className="text-start text-text-muted">
               <th className="px-3 py-2 font-medium">{t('audit.history.col.date', "Date")}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.common.overallScore', "Score")}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.critical', "Critical")}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.high', "High")}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.medium', "Medium")}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('audit.severity.low', "Low")}</th>
+              <th className="px-3 py-2 text-end font-medium">{t('audit.common.overallScore', "Score")}</th>
+              <th className="px-3 py-2 text-end font-medium">{t('audit.severity.critical', "Critical")}</th>
+              <th className="px-3 py-2 text-end font-medium">{t('audit.severity.high', "High")}</th>
+              <th className="px-3 py-2 text-end font-medium">{t('audit.severity.medium', "Medium")}</th>
+              <th className="px-3 py-2 text-end font-medium">{t('audit.severity.low', "Low")}</th>
             </tr>
           </thead>
           <tbody>
             {ordered.map(r => (
               <tr key={r.id} className="border-b border-border transition-fast hover:bg-surfaceElevated">
                 <td className="px-3 py-2 font-mono text-text-muted">{fmt(r.created_at)}</td>
-                <td className="px-3 py-2 text-right font-mono font-semibold text-text">{r.score}</td>
-                <td className="px-3 py-2 text-right font-mono text-danger">{r.critical}</td>
-                <td className="px-3 py-2 text-right font-mono text-warning">{r.high}</td>
-                <td className="px-3 py-2 text-right font-mono text-accent">{r.medium}</td>
-                <td className="px-3 py-2 text-right font-mono text-text-muted">{r.low}</td>
+                <td className="px-3 py-2 text-end font-mono font-semibold text-text">{r.score}</td>
+                <td className="px-3 py-2 text-end font-mono text-danger">{r.critical}</td>
+                <td className="px-3 py-2 text-end font-mono text-warning">{r.high}</td>
+                <td className="px-3 py-2 text-end font-mono text-accent">{r.medium}</td>
+                <td className="px-3 py-2 text-end font-mono text-text-muted">{r.low}</td>
               </tr>
             ))}
           </tbody>

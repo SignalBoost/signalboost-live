@@ -183,7 +183,7 @@ export default function DataCenterOperationsPage() {
     </section>
 
     <section style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-      {scenarios.map(item => <button key={item.id} type="button" onClick={() => setScenario(item.id)} style={{ textAlign: 'left', padding: 14, borderRadius: 12, border: scenario === item.id ? '1px solid #5ce1e6' : '1px solid rgba(255,255,255,.16)', background: scenario === item.id ? 'rgba(92,225,230,.1)' : 'rgba(255,255,255,.04)', color: 'inherit', cursor: 'pointer' }}>{item.label}</button>)}
+      {scenarios.map(item => <button key={item.id} type="button" onClick={() => setScenario(item.id)} style={{ textAlign: 'start', padding: 14, borderRadius: 12, border: scenario === item.id ? '1px solid #5ce1e6' : '1px solid rgba(255,255,255,.16)', background: scenario === item.id ? 'rgba(92,225,230,.1)' : 'rgba(255,255,255,.04)', color: 'inherit', cursor: 'pointer' }}>{item.label}</button>)}
     </section>
 
     <button type="button" onClick={() => void run()} disabled={loading} style={{ marginTop: 16, padding: '11px 18px', borderRadius: 10, border: 0, fontWeight: 800, cursor: loading ? 'wait' : 'pointer' }}>{loading ? c('running') : c('run')}</button>

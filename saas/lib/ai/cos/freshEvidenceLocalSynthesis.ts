@@ -24,7 +24,6 @@ import {
   acceptFreshEvidenceGroundedAnswer,
   freshEvidenceGroundedAnswerPrompt,
   freshEvidenceGroundedRepairPrompt,
-  extractGroundedJsonAnswer,
   FRESH_GROUNDED_ANSWER_MAX_TOKENS,
   FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
   type FreshEvidenceGroundedPrompt,
@@ -57,7 +56,8 @@ async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, structure
   try {
     const result = await callCosReasoner({
       ...prompt,
-      ...(structured ? { jsonObject: true, systemPrompt: prompt.systemPrompt + '\nReturn only a JSON object containing an answer string with inline citations. No analysis.' } : {}),
+      // Narration recovery uses ordinary prose too. Forcing JSON mode on some local
+      // providers produces empty or malformed responses even when citations are available.
       temperature: FRESH_GROUNDED_ANSWER_TEMPERATURE,
       maxTokens,
       disableThinking: true,
@@ -72,17 +72,13 @@ async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, structure
     })
     if (!result?.text?.trim()) return null
     let answerText = result.text
-    if (structured) {
+    // Be tolerant of providers that return either prose or a JSON envelope.
+    // A bad JSON envelope is not grounds to throw away a usable cited answer.
+    if (structured && /^\\s*\\{/.test(answerText)) {
       try {
         const parsed = JSON.parse(answerText)
-        if (typeof parsed?.answer !== 'string' || !parsed.answer.trim()) return null
-        answerText = parsed.answer
-      } catch {
-        // A reply cut off by the token cap is unterminated JSON; its answer field still holds complete sentences.
-        // A provider that ignored JSON mode returns prose, which goes through the same release filter.
-        const cut = extractGroundedJsonAnswer(answerText)
-        if (cut?.trim()) answerText = cut
-      }
+        if (typeof parsed?.answer === 'string' && parsed.answer.trim()) answerText = parsed.answer
+      } catch { /* Preserve ordinary text for the citation release gate. */ }
     }
     return { text: answerText, label: result.reasoner?.label || 'cos-reasoner' }
   } catch (error) {
@@ -101,10 +97,14 @@ export async function synthesizeFreshEvidenceLocally(args: {
   const answerTokens = FRESH_GROUNDED_ANSWER_MAX_TOKENS
 
   // One bounded transport retry on a transient failure; never a different brain.
-  let first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }), true, answerTokens)
+  let first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }), false, answerTokens)
   // Retry once if the primary provider and governed fallback both produce no usable text.
   // This is a bounded recovery for transient empty responses; the normal citation repair remains separate.
-  if (!first || 'error' in first) first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }), true, answerTokens)
+  if (!first || 'error' in first) first = await groundedAnswerCall(
+    freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: '', reason: 'process_narration' }),
+    false,
+    answerTokens,
+  )
   if (!first) return { kind: 'local_synthesis_unparseable' }
   if ('error' in first) return { kind: 'local_synthesis_failed', error: first.error }
 

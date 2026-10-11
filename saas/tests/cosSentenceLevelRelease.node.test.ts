@@ -162,8 +162,3 @@ test('the answer is requested as a JSON field and only that field is published',
   assert.equal(extractGroundedJsonAnswer('Plain prose answer [LIVE1].'), null)
 })
 
-test('every grounded call requests the JSON answer field, and a cut-off reply is still read', () => {
-  const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.equal((transport.match(/freshEvidenceGroundedAnswerPrompt\(\{ \.\.\.args, lengthRule: CHAT_ANSWER_LENGTH_RULE \}\), true, answerTokens\)/g) || []).length, 2, 'first call and its transport retry are structured')
-  assert.match(transport, /const cut = extractGroundedJsonAnswer\(answerText\)/)
-})

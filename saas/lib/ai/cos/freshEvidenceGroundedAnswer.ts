@@ -18,12 +18,8 @@ export type FreshEvidenceGroundingRejection =
 
 /** Interactive lane budget (ONBOARD 2026-09-27: main answer 20 s, thinking off). */
 export const FRESH_GROUNDED_ANSWER_TIMEOUT_MS = 20_000
-/**
- * ~200 words. Production 2026-10-10 19:56: the one call that finished took 19.4 s for exactly 700 output tokens
- * (finish=length) at the pod's ~36 tok/s; every other attempt timed out at 20 s on both providers. Answer length
- * is latency (ONBOARD 2026-09-27); the length rule asks for ~150 words, the cap now matches it.
- */
-export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 300
+/** Transport safety ceiling, not an instruction to shorten the user-facing answer. */
+export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 1200
 /**
  * Evidence budget for the reasoning call. The same turn carried 9,422 prompt tokens because claim research
  * replaces each source's snippet with up to 24,000 characters of page body and all of it was sent to the

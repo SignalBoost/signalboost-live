@@ -164,11 +164,16 @@ const PROCESS_OPENER = /^\s*(?:[-*•–]\s*)?(?:okay|ok|alright|hmm|wait|lookin
  * what the sources say and cites them at the end ("The sources describe lessons, not a nightclub [LIVE2].")
  * is a factual answer and is kept. Replaces a fixed opener-phrase list that rejected that honest answer.
  */
+// Source inventory subjects are not user-facing conclusions, even with syntactically valid citations.
+// Keep this independent of topical nouns and of citation positioning.
+const SOURCE_INVENTORY_SUBJECT = /^\s*(?:(?:the|these|those|our)\s+)?(?:(?:strongest|best|main|key|primary|direct|available|retrieved|most\s+relevant)\s+)*(?:evidence|sources?|search\s+results?|references?|citations?)\s+(?:is|are|comes?|names?|lists?|shows?|says?|identifies?|describes?|mentions?|supports?|indicates?|suggests?)\b/i
+
 const CITATION_AS_NOUN = /\b(?:from|see|cites?|citing)\s+\[LIVE\d+\]|\[LIVE\d+\]\s+(?:(?:and|or|&)\s+\[LIVE\d+\]\s+)?(?:which|that|explicitly|clearly|only|both|each|shows?|says?|names?|lists?|mentions?|describes?|discusses?)\b/i
 
 export function isProcessNarrationUnit(unit: string): boolean {
   const text = String(unit || '')
-  return CITATION_AS_NOUN.test(text)
+  return SOURCE_INVENTORY_SUBJECT.test(text)
+    || CITATION_AS_NOUN.test(text)
     || SOURCE_SUBJECT.test(text)
     || PROCESS_OPENER.test(text)
     || TASK_REFERENCE.test(text)

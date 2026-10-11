@@ -172,7 +172,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{copy.title}</h2>
-        <select className="rounded border px-2 py-1 text-sm" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setOrgKey(next) }}>
+        <select className="rounded border px-2 py-1 text-sm" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setMessage(null); setOrgKey(next) }}>
           {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName} · {item.projectName}</option>)}
         </select>
       </header>

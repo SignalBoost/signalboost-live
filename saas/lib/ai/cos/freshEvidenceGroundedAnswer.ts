@@ -199,7 +199,12 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
   const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
   const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source|okay,?\s+let me|first,?\s+i(?:'ll| will)|so the established facts are|i(?:'ll| will) craft a concise answer|the other sources?)/i
-  if (narration.test(answer) || analysisLeak.test(answer)) {
+  // A draft enumerating LIVE sources is analysis, even when it includes valid tags
+  // and does not begin with one of the older narrow narration phrases.
+  // Reject it before citations from the analysis can be treated as an answer.
+  const sourceReview = /(?:^|\n)\s*(?:[-*]\s*)?(?:\[LIVE\d+\]\s*(?::|-|(?:is|mentions|says|shows|discusses|references|about|has|lists)\b)|(?:okay,?\s+let'?s (?:check|look at|tackle)|looking at|let'?s (?:check|look at|tackle)|i need to (?:check|review)|the (?:key )?evidence (?:is|includes)|the user (?:is asking|asks)|the (?:question|user) asks|however,? in common usage|therefore,? we (?:cannot|can)|this (?:directly )?answers the question|the (?:other )?sources? (?:include|show|say|indicate))\b/i
+  const enumeratedEvidence = /(?:\[LIVE\d+\][^\n]{0,180}(?:\n| {2,}|$)){3,}/i
+  if (narration.test(answer) || analysisLeak.test(answer) || sourceReview.test(answer) || enumeratedEvidence.test(answer)) {
     return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
   }
   if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)

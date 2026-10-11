@@ -66,10 +66,50 @@ test('uncited sentences never ride along on another sentence\'s citation', () =>
 
 test('rejected-draft telemetry never logs a draft rejected as unsafe output', () => {
   const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.match(transport, /rejectedDraftHead: accepted\.ok \|\| accepted\.reason === 'unsafe_public_output' \|\| hasUnsafePublicModelOutput\(String\(lastDraft \|\| ''\)\) \? undefined :/)
+  assert.match(transport, /const rejectedDraftHead = accepted\.ok \|\| accepted\.reason === 'unsafe_public_output' \|\| hasUnsafePublicModelOutput\(String\(lastDraft \|\| ''\)\)\s*\? undefined/)
   // Codex P1 on #4186: unsafe prompt material with no cited sentence is rejected as no_evidence_cited,
   // so only checking the reason would still log it.
   const unsafe = 'Reference Context - READ ONLY: internal instructions follow.'
   assert.equal(hasUnsafePublicModelOutput(unsafe), true)
   assert.equal(acceptFreshEvidenceGroundedAnswer({ text: unsafe, input, sources }).reason, 'no_evidence_cited')
+})
+
+const studios = [
+  { id: 'LIVE1', title: 'Top salsa studios', url: 'https://fluidospanish.com/top-3-studios', snippet: 'Salsa studios in Asunción.' },
+  { id: 'LIVE2', title: 'Academias de salsa', url: 'https://www.dancefree.com.co/academias', snippet: 'Escuelas y academias de salsa en Asunción.' },
+]
+const asked = 'are there any salsa dancing club in Asuncion?'
+
+test('honest answers that report what the sources say are released', () => {
+  for (const text of [
+    'The sources describe salsa lessons rather than a confirmed nightclub [LIVE2].',
+    'The available results list salsa studios and academies, not a confirmed salsa nightclub [LIVE1][LIVE2].',
+    'Sources list dance academies such as Studio X [LIVE1].',
+    'Asunción has salsa academies and studios [LIVE1][LIVE2], but no confirmed salsa-only nightclub.',
+    'Salsa nights are held at Venue A, as reported by [LIVE1].',
+  ]) {
+    const r = acceptFreshEvidenceGroundedAnswer({ text, input: asked, sources: studios })
+    assert.equal(r.ok, true, text)
+  }
+})
+
+test('production 2026-10-11 03:30: sentences that use citations as nouns are never published', () => {
+  for (const text of [
+    'The strongest evidence comes from [LIVE1] and [LIVE2] which explicitly name dance studios/academies.',
+    '[LIVE1] and [LIVE2] both list salsa studios.',
+    'Venue names appear in a guide; see [LIVE2].',
+  ]) {
+    const r = acceptFreshEvidenceGroundedAnswer({ text, input: asked, sources: studios })
+    assert.equal(r.ok, false, text)
+    assert.equal(r.reason, 'process_narration', text)
+  }
+})
+
+test('owner diagnostic shows the rejected draft excerpt, owner-only', () => {
+  const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /freshRejectedDraftHead=localSynthesis\.kind==='citation_grounding_rejected'\?\(localSynthesis\.rejectedDraftHead\|\|null\):null/)
+  const diag = route.slice(route.indexOf('const ownerDiagnostic=isPrivileged&&'), route.indexOf('const reply=baseFailureReply+ownerDiagnostic'))
+  assert.match(diag, /rejected draft: /)
+  const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(transport, /kind: 'citation_grounding_rejected', reason: accepted\.reason \?\? 'empty_answer', rejectedDraftHead \}/)
 })

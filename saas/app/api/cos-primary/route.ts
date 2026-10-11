@@ -691,6 +691,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   let freshLocalAttempted=false,freshLocalModel:string|null=null
   let freshLocalFailureCode: FreshEvidenceInternalFailureCode | null = null
   let freshGroundingRejection:string|null=null
+  let freshRejectedDraftHead:string|null=null
   let freshMissUseLocal=false
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
@@ -824,6 +825,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       }
       freshLocalFailureCode=localSynthesis.kind
       freshGroundingRejection=localSynthesis.kind==='citation_grounding_rejected'?localSynthesis.reason:null
+      freshRejectedDraftHead=localSynthesis.kind==='citation_grounding_rejected'?(localSynthesis.rejectedDraftHead||null):null
       logEscalation({event:'fresh_local_synthesis_declined',failure_code:freshLocalFailureCode,grounding_rejection:freshGroundingRejection,question_fingerprint:hashPrompt(lookupInput),question_chars:lookupInput.length,source_hosts:[...new Set(freshSources.map(source=>{try{return new URL(source.url).hostname}catch{return 'invalid'}}))],documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     }
     }
@@ -920,7 +922,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback))
     const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})))
     const ownerDiagnostic=isPrivileged&&requiresFreshEvidence&&!partialFreshOfficeHolderReply&&!normativeEvidenceFallback
-      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA||'unknown').slice(0,7)}\nstrict synthesis: ${freshFailureCode??'n/a'}${freshGroundingRejection?` (${freshGroundingRejection})`:''} · sources: ${freshSources.length}\ntravel task detected: ${travelTaskDetected} · external action: ${requestedAction} · travel-plan step reached: ${travelRescueReached}${travelRescueDeclines.length?`\n${travelRescueDeclines.join('\n')}`:''}`
+      ? `\n\n— Owner diagnostic (not shown to visitors) —\nbuild: ${String(process.env.VERCEL_GIT_COMMIT_SHA||'unknown').slice(0,7)}\nstrict synthesis: ${freshFailureCode??'n/a'}${freshGroundingRejection?` (${freshGroundingRejection})`:''} · sources: ${freshSources.length}${freshRejectedDraftHead?`\nrejected draft: "${freshRejectedDraftHead.slice(0,200)}"`:''}\ntravel task detected: ${travelTaskDetected} · external action: ${requestedAction} · travel-plan step reached: ${travelRescueReached}${travelRescueDeclines.length?`\n${travelRescueDeclines.join('\n')}`:''}`
       : ''
     const reply=baseFailureReply+ownerDiagnostic,liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
     const completionSource=normativeEvidenceFallback?'cos-fresh-normative-evidence-map':partialCompletion?'cos-fresh-partial-grounded':'failed_closed'

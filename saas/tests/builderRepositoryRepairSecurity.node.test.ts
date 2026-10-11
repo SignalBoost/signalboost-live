@@ -134,7 +134,10 @@ test('browser repository repair is owned only by the shared Software Specialist 
   assert.doesNotMatch(browser, /queueOwnerRepositoryRepair|ownerRepositoryRepairTarget|enqueueSignalBoostRepositoryRepairJob/)
   const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
   assert.match(specialist, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId && !sourceAttached/)
-  assert.match(specialist, /parseSignalBoostRepositoryRepairTarget\(objective\)/)
+  // Target identity must come from the original log, before prompt compaction.
+  assert.match(specialist, /const rawObjective = String\(input\.objective \|\| ''\)\.trim\(\)/)
+  assert.match(specialist, /trimObjectiveForHarness\(rawObjective\)/)
+  assert.match(specialist, /parseSignalBoostRepositoryRepairTarget\(rawObjective\)/)
   assert.match(specialist, /enqueueSignalBoostRepositoryRepairJob/)
   assert.match(specialist, /runBuilderJob\(job\.jobId/)
   const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')

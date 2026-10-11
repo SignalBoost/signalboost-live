@@ -645,6 +645,7 @@ const tests = [
   'tests/cosHarnessIngress.node.test.ts',
 
   'tests/cosSoftwareSpecialistProductionHarness.node.test.ts',
+  'tests/cosSoftwareSpecialistRecovery.node.test.ts',
 
   'tests/cosA2ASpecialistHarnessIngress.node.test.ts',
 

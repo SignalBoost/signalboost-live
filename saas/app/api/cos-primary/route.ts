@@ -17,6 +17,7 @@ import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyKnowledgeAccess } from '@/lib/ai/cos/knowledgeAccessPolicy'
+import { decodePlannerSearchQueriesHeader, liveSearchQueriesForTurn, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentRequiresFreshness, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import { mayBeNonEnglish } from '@/lib/ai/cos/crossLanguageFreshness'
 import {
@@ -614,6 +615,8 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       .filter(Boolean),
   )
   const modelPlannedFreshEvidence=agentCapabilities.has('live_web')
+  // Searches the planner wrote for live_web (cos-browser strips any client-supplied value before routing).
+  const plannerSearchQueries=modelPlannedFreshEvidence?decodePlannerSearchQueriesHeader(req.headers.get(PLANNER_SEARCH_QUERIES_HEADER)):[]
   const modelPlannedConversationRecall=agentCapabilities.has('conversation_history')
   const modelPlannedSemanticMemory=agentCapabilities.has('semantic_memory')
   const modelPlannedCreativeMemory=agentCapabilities.has('creative_memory')
@@ -691,7 +694,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   let freshMissUseLocal=false
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
-    const queries=freshEvidenceSearchQueries(lookupInput)
+    const queries=liveSearchQueriesForTurn(plannerSearchQueries,freshEvidenceSearchQueries(lookupInput))
     const liveResults=await timeCosStage('primary:web_search',()=>Promise.all(queries.map(query=>getExternalInfo(query,8,{bypassCache:true}))))
     freshError=liveResults.some(live=>live.ok)?null:liveResults.map(live=>live.ok?'':live.error||'Live search returned no usable evidence.').filter(Boolean).join(' | ')
     freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8,lookupInput)
@@ -700,7 +703,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const constructedRoster=constructDatedRoster(lookupInput,freshSources)
     const sources=freshSources
     const authoritySatisfied=freshEvidenceMeetsQuestionAuthority(lookupInput, sources)&&securityScenarioEvidenceIsSpecific(lookupInput,freshSources)
-    logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),claim_research:claimResearch.claims,pages_read:claimResearch.pagesRead,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
+    logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),planner_search_queries:plannerSearchQueries.length,documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),claim_research:claimResearch.claims,pages_read:claimResearch.pagesRead,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     if(!authoritySatisfied){
       if(!freshSources.length && !mustFailClosedWithoutAuthoritativeLiveEvidence(lookupInput)){
         freshMissUseLocal=true

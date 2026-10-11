@@ -300,3 +300,31 @@ test('process narration retry uses short independent instructions instead of rep
  assert.match(repair.systemPrompt,/Answer the exact category asked/)
  assert.match(repair.prompt,/\nRESPONSE:\s*$/)
 })
+
+
+test('generic grounded prompt keeps unrelated policy out and supports verified alternatives without inventing the requested category', () => {
+  const question = 'Are there any salsa dancing clubs in Asuncion?'
+  const evidence: FreshEvidenceSource[] = [
+    { id: 'LIVE1', title: 'Dance studios and classes', url: 'https://example.org/studios', snippet: 'Salsa lessons and studios in Asunción.' },
+    { id: 'LIVE2', title: 'Salsa workshops', url: 'https://another.example.org/workshops', snippet: 'Salsa workshops and courses.' },
+  ]
+  const prompt = freshEvidenceGroundedAnswerPrompt({ input: question, sources: evidence, retrievedAt, language: 'en' })
+  assert.doesNotMatch(prompt.systemPrompt, /which party has a majority|official certified counts/)
+  assert.match(prompt.systemPrompt, /do not confirm the requested kind/)
+  const reply = acceptFreshEvidenceGroundedAnswer({
+    text: 'I could verify salsa classes and workshops, but not a dedicated salsa nightclub from these listings. [LIVE1][LIVE2]',
+    input: question,
+    sources: evidence,
+  })
+  assert.equal(reply.ok, true)
+  assert.match(reply.reply, /not a dedicated salsa nightclub/)
+  const narration = acceptFreshEvidenceGroundedAnswer({
+    text: 'The strongest evidence comes from [LIVE1] and [LIVE2], which discuss classes.',
+    input: question,
+    sources: evidence,
+  })
+  assert.equal(narration.ok, false)
+  assert.equal(narration.reason, 'process_narration')
+  const repair = freshEvidenceGroundedRepairPrompt({ input: question, sources: evidence, retrievedAt, language: 'en', draft: '', reason: 'process_narration' })
+  assert.match(repair.systemPrompt, /Do not rename a related category as the one requested/)
+})

@@ -94,7 +94,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   assert.doesNotMatch(source, /EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
   assert.doesNotMatch(source, /jsonObject: true/, 'live-answer recovery must not force JSON mode on local providers')
   assert.match(source, /, accepted\.reason === 'process_narration', answerTokens\)/, 'structured retry is limited to narration rejections')
-  assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 4, 'definition + first call + empty-transport retry + one citation repair')
+  assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 3, 'definition + first call + optional fast citation repair')
   const pure = readFileSync(new URL('../lib/ai/cos/freshEvidenceGroundedAnswer.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(pure, /from '@\//, 'pure module stays relative-import only so tests can load it')
   const external = readFileSync(new URL('../lib/ai/cos/freshEvidenceExternalSynthesis.ts', import.meta.url), 'utf8')
@@ -104,21 +104,14 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
 
 // The citation requirement is now stated to the model up front and on repair (see the first test)
 // rather than living in a separate contract-recovery module.
-test('COS researches additional live evidence before rejecting an externally grounded answer', () => {
+test('COS avoids repeating expensive search and inference after a rejected answer', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /localSynthesis.kind === 'citation_grounding_rejected' && Date.now\(\)-startedAt < 35_000/)
-  assert.match(route, /primary:web_search_recovery/)
-  assert.match(route, /getExternalInfo\(recoveryQuery,8,\{bypassCache:true\}\)/)
-  assert.match(route, /prepareFreshEvidenceAcrossQueries\(\[freshSources,recoverySearch.results\],8,lookupInput\)/)
-  assert.match(route, /freshEvidenceMeetsQuestionAuthority\(lookupInput,recoveredSources\)/)
-  assert.match(route, /securityScenarioEvidenceIsSpecific\(lookupInput,recoveredSources\)/)
-  assert.match(route, /synthesizeFreshEvidenceLocally\(\{input:lookupInput,sources:freshSources,retrievedAt:freshRetrievedAt,language\}\)/)
-  assert.match(route, /fresh_grounding_research_recovery_finished/)
-  assert.match(route, /recoveredSources.some\(source=>!freshSources.some\(existing=>existing.url===source.url\)\)/)
-  assert.doesNotMatch(route, /recoveredSources.length > freshSources.length/)
+  assert.doesNotMatch(route, /primary:web_search_recovery|primary:web_page_reads_recovery/)
+  assert.match(route, /const sourceDigestFallback=freshHardFail/)
+  assert.match(route, /primary:web_page_reads/)
+  const local = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(local, /Date.now\(\) - startedAt < 6_000/)
 })
-
-
 
 test('the reasoning call sees question-bearing excerpts, not pages: 8 × 24k-char sources stay inside the evidence budget', () => {
   // Production 2026-10-10 19:56: 9,422 prompt tokens, 700 output tokens, 19.4 s, finish=length; all other attempts timed out.

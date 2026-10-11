@@ -107,27 +107,11 @@ export async function synthesizeFreshEvidenceLocally(args: {
   }
   if ('error' in first) return { kind: 'local_synthesis_failed', error: first.error }
 
-  let accepted = acceptFreshEvidenceGroundedAnswer({ text: first.text, input: args.input, sources: args.sources })
-  let label = first.label
-  let lastDraft = first.text
-  let repaired = false
-  // A rejected process-narration draft is not a completed answer. Give it one bounded
-  // repair attempt even when first inference crosses 12 seconds; production examples
-  // on 2026-10-11 repeatedly ended at ~12.2 seconds without any repair. Other
-  // acceptance failures retain the existing latency guard.
-  if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && Date.now() - startedAt < 6_000) {
-    console.info('[cos-fresh-grounded-repair-start]', JSON.stringify({ reason: accepted.reason, elapsedMs: Date.now() - startedAt, sources: args.sources.length }))
-    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.reason === 'process_narration' ? '' : accepted.answer, reason: accepted.reason }), accepted.reason === 'process_narration', answerTokens)
-    if (!second || 'error' in second) console.warn('[cos-fresh-grounded-repair-unavailable]', JSON.stringify({ reason: accepted.reason, errorCode: !second ? 'empty_response' : 'inference_error' }))
-    if (second && !('error' in second)) {
-      repaired = true
-      label = second.label
-      lastDraft = second.text
-      accepted = acceptFreshEvidenceGroundedAnswer({ text: second.text, input: args.input, sources: args.sources })
-    }
-  }
-
-  // Owner-only excerpt of a rejected draft, so a rejection can be read instead of guessed. Never for unsafe
+  const accepted = acceptFreshEvidenceGroundedAnswer({ text: first.text, input: args.input, sources: args.sources })
+  const label = first.label
+  const lastDraft = first.text
+  const repaired = false
+  // A rejected draft is handled by the existing source-only fallback; no second model call.\n  // Owner-only excerpt of a rejected draft, so a rejection can be read instead of guessed. Never for unsafe
   // text: the draft itself is checked, because an unsafe draft without a cited sentence is rejected earlier
   // (no_evidence_cited / empty_answer) than the unsafe-output check.
   const rejectedDraftHead = accepted.ok || accepted.reason === 'unsafe_public_output' || hasUnsafePublicModelOutput(String(lastDraft || ''))

@@ -252,11 +252,11 @@ test('narrow narration guard rejects explicit analysis preambles without blockin
  const attempted = 'Let me analyze the evidence before answering. [LIVE1] [LIVE2]'
  const accepted = acceptFreshEvidenceGroundedAnswer({text:attempted,input:officeQuestion,sources})
  assert.equal(accepted.ok,false)
- assert.equal(accepted.reason,'citation_requirement_unmet')
+ assert.equal(accepted.reason,'process_narration')
  const declarative = 'The available reports describe a runoff, not a declared winner. [LIVE1] [LIVE2]'
  assert.equal(acceptFreshEvidenceGroundedAnswer({text:declarative,input:officeQuestion,sources}).ok,true)
- const repair = freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:attempted,reason:'citation_requirement_unmet'})
- assert.match(repair.prompt,/citation requirement/)
+ const repair = freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:attempted,reason:'process_narration'})
+ assert.match(repair.prompt,/Remove all process narration/)
 })
 test('new-question prompt forbids cross-topic evidence reuse', () => {
  const prompt = freshEvidenceGroundedAnswerPrompt({input:'Who will be the next Brazilian president?',sources,retrievedAt,language:'en'})

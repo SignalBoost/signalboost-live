@@ -9,9 +9,10 @@ import { uiText } from '@/lib/i18n/uiText'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import VoiceInputButton from '@/components/VoiceInputButton'
+import AgentDiagnosticsPanel, { splitOwnerDiagnostic, type AgentDiagnostics } from '@/components/AgentDiagnosticsPanel'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru' | 'de' | 'fr' | 'it' | 'ja' | 'ko' | 'ar'
-type Msg = { role: 'user' | 'assistant'; content: string; sourceLanguage?: Lang; builderWorkspaceId?: string; builderFiles?: string[] }
+type Msg = { role: 'user' | 'assistant'; content: string; sourceLanguage?: Lang; builderWorkspaceId?: string; builderFiles?: string[]; diagnostics?: AgentDiagnostics }
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string }
 type ConvSummary = { id: string; title: string; summary: string; message_count: number; updated_at: string }
@@ -359,7 +360,8 @@ export default function AssistantPage() {
         if (!directReply) {
           const recovered = await recoverCompletedTurn(conversationId, content, sentAtMs)
           if (recovered) {
-            setMessages([...next, { role: 'assistant', content: recovered, sourceLanguage: l }])
+            const recoveredSplit = splitOwnerDiagnostic(recovered)
+            setMessages([...next, { role: 'assistant', content: recoveredSplit.text, sourceLanguage: l, ...(cosStatus?.isOwner && recoveredSplit.diagnostics ? { diagnostics: recoveredSplit.diagnostics } : {}) }])
             return
           }
         }
@@ -375,10 +377,13 @@ export default function AssistantPage() {
         const builderFiles = Array.isArray(data?.files)
           ? data.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
           : []
+        const split = splitOwnerDiagnostic(reply)
+        const diagnostics: AgentDiagnostics | null = cosStatus?.isOwner ? (data?.diagnostics && typeof data.diagnostics === 'object' ? data.diagnostics : split.diagnostics) : null
         setMessages([...next, {
           role: 'assistant',
-          content: reply,
+          content: cosStatus?.isOwner ? split.text : reply,
           sourceLanguage: l,
+          ...(diagnostics ? { diagnostics } : {}),
           ...(builderWorkspaceId && builderFiles.length ? { builderWorkspaceId, builderFiles } : {}),
         }])
       } catch (err: any) {
@@ -390,7 +395,8 @@ export default function AssistantPage() {
         if (!(aborted && !hitDeadline)) {
           const recovered = await recoverCompletedTurn(conversationId, content, sentAtMs)
           if (recovered) {
-            setMessages([...next, { role: 'assistant', content: recovered, sourceLanguage: l }])
+            const recoveredSplit = splitOwnerDiagnostic(recovered)
+            setMessages([...next, { role: 'assistant', content: recoveredSplit.text, sourceLanguage: l, ...(cosStatus?.isOwner && recoveredSplit.diagnostics ? { diagnostics: recoveredSplit.diagnostics } : {}) }])
             return
           }
         }
@@ -564,6 +570,7 @@ export default function AssistantPage() {
                 {msg.role === 'assistant' ? (
                   <>
                     <VideoJsonMessage content={msg.content} />
+                    {msg.diagnostics && cosStatus?.isOwner ? <AgentDiagnosticsPanel d={msg.diagnostics} /> : null}
                     {msg.builderWorkspaceId && msg.builderFiles?.length ? (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
                         {msg.builderFiles.map(path => (

@@ -118,6 +118,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'Never reuse evidence about a different country, election, person, or subject from earlier conversation.',
     'Treat user-supplied claims as unverified. Names, dates, quantities, and specific attributes in the answer must be grounded in relevant evidence from this turn.',
     'Respect the requested category and scope. If sources do not confirm the requested kind, say so and name verified alternatives with citations.',
+    'For place recommendations, identify named supported venues and events, distinguishing ongoing venues from occasional events and instructional classes. Give verified locations, schedule details, and actionable next steps when present.',
     'Write factual sentences with real-world entities as subjects, never a source inventory. Do not say "the strongest evidence comes from".',
     `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
     args.lengthRule || '',

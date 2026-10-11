@@ -293,7 +293,7 @@ export function freshEvidenceGroundedRepairPrompt(args: {
   }
   return {
     systemPrompt: base.systemPrompt,
-    prompt: `${base.prompt.replace(/\nANSWER:\s*$/, '')}\n\n${args.reason !== 'process_narration' && args.draft?.trim() ? `PREVIOUS DRAFT (not evidence):\n${args.draft.trim()}\n\n` : ''}REPAIR: ${instruction}\nANSWER:`,
+    prompt: `${base.prompt.replace(/\nANSWER:\s*$/, '')}\n\n${args.draft?.trim() ? `PREVIOUS DRAFT (not evidence):\n${args.draft.trim()}\n\n` : ''}REPAIR: ${instruction}\nANSWER:`,
   }
 }
 

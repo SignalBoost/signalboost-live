@@ -109,8 +109,10 @@ test('production 2026-10-11 03:30: sentences that use citations as nouns are nev
 test('owner diagnostic shows the rejected draft excerpt, owner-only', () => {
   const route = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   assert.match(route, /freshRejectedDraftHead=localSynthesis\.kind==='citation_grounding_rejected'\?\(localSynthesis\.rejectedDraftHead\|\|null\):null/)
-  const diag = route.slice(route.indexOf('const ownerDiagnostic=isPrivileged&&'), route.indexOf('const reply=baseFailureReply+ownerDiagnostic'))
-  assert.match(diag, /rejected draft: /)
+  const diag = route.slice(route.indexOf('const ownerDiagnostics=isPrivileged&&'), route.indexOf('const reply=baseFailureReply,liveTelemetry'))
+  assert.match(diag, /rejectedDraft:freshRejectedDraftHead/)
+  assert.match(route, /diagnostics:ownerDiagnostics/)
+  assert.doesNotMatch(route, /baseFailureReply\+ownerDiagnostic/)
   const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
   assert.match(transport, /kind: 'citation_grounding_rejected', reason: accepted\.reason \?\? 'empty_answer', rejectedDraftHead \}/)
 })

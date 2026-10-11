@@ -89,7 +89,8 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
   const systemPrompt = [
     'You are COS. Live web evidence was retrieved by the server moments ago for the question below. Reason over it and answer. /no_think',
     `Answer in ${reportLanguageName(args.language)} unless the question is clearly written in another language; then answer in that language.`,
-    'Answer the question directly, in prose, the way an informed person would after reading these sources. Lead with what the evidence establishes.',
+    'Answer the question directly in the first sentence. Never narrate your analysis, inspect individual LIVE sources aloud, or open with Let me analyze, First I need to, or similar process commentary.',
+    `The current UTC year is ${new Date().getUTCFullYear()}. Treat that year as the current year, not as a future date.`,
     'For every current-world fact, use only the evidence supplied. Model memory is stale and must not supply dates, names, numbers, or outcomes.',
     'Cite inline with the evidence id in square brackets, e.g. [LIVE1], immediately after each fact it supports. Do not write URLs; the server appends the source list.',
     'Distinguish plainly: what is established by an official publisher, what is reported by media (say "as reported by" and that it is not officially confirmed), and what the evidence does not settle.',
@@ -148,7 +149,12 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   // mentioning historical years as background.
   const currentYear = new Date().getUTCFullYear()
   const staleCurrentYear = /(?:as of (?:the )?(?:current date|today|now)\s*[,(: -]*|current (?:year|date|term)\s*(?:is|:|\()\s*)(20\d{2})/gi
-  if ([...answer.matchAll(staleCurrentYear)].some(match => Number(match[1]) !== currentYear)) {
+  const staleAsOf = /\bas of\s+(?:the\s+)?(?:year\s+)?(20\d{2})\b/gi
+  const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
+  const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
+  if (narration.test(answer) || [...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
+    || [...answer.matchAll(staleFutureFraming)].some(match => Number(match[1]) !== currentYear)
+    || [...answer.matchAll(staleCurrentYear)].some(match => Number(match[1]) !== currentYear)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
   }
   if (!answer) return { ok: false, reason: 'empty_answer', reply: '', answer, citedSourceIds }

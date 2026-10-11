@@ -175,3 +175,30 @@ test('stale current-year assertions are rejected without banning historical cont
   })
   assert.equal(historical.ok, true)
 })
+
+test('live answers reject exposed analysis and stale as-of framing', () => {
+  const narration = acceptFreshEvidenceGroundedAnswer({
+    input: officeQuestion, sources,
+    text: 'Let me analyze the evidence provided. [LIVE1] [LIVE2]',
+  })
+  assert.equal(narration.ok, false)
+  const stale = acceptFreshEvidenceGroundedAnswer({
+    input: officeQuestion, sources,
+    text: 'The election is still in the future (as of 2024). [LIVE1] [LIVE2]',
+  })
+  assert.equal(stale.ok, false)
+  const direct = acceptFreshEvidenceGroundedAnswer({
+    input: officeQuestion, sources,
+    text: 'The outcome is undecided; the reported runoff is October 25, 2026. [LIVE1] [LIVE2]',
+  })
+  assert.equal(direct.ok, true)
+  const upcoming = acceptFreshEvidenceGroundedAnswer({
+    input: 'Who will control Congress after the 2026 midterms?',
+    sources: [
+      { id: 'LIVE1', title: 'November 2026 midterm elections', url: 'https://example.org/us-election-guide', snippet: 'The US midterm elections are scheduled for November 3, 2026.' },
+      { id: 'LIVE2', title: 'Congress control is undecided', url: 'https://example.net/congress-outlook', snippet: 'Control of the next Congress is not yet decided ahead of the November 2026 vote.' },
+    ],
+    text: 'The November 2026 election is still upcoming as of October 2026; no future result is established. [LIVE1] [LIVE2]',
+  })
+  assert.equal(upcoming.ok, true, 'correct future election wording must not be rejected')
+})

@@ -162,7 +162,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   // "Let me analyze" phrase. Reject the content, not just the first five words.
   // Keep this narrow enough to permit normal journalistic source attribution.
   const evidenceWalkthrough = /(?:\\b(?:let me|i need to|i will|i'll)\\s+(?:carefully\\s+)?(?:analy[sz]e|examine|review|determine)\\b|\\b(?:the question asks|the question is asking|the provided evidence|each piece of evidence|\\[LIVE\\d+\\]\\s*[-–:]\\s*|this appears to be a page about|the snippet mentions|doesn't provide information about|does not provide information about)\\b)/i
-  const leakedEvidenceReview = evidenceWalkthrough.test(answer)
+  const leakedEvidenceReview = evidenceWalkthrough.test(answer) || /\[LIVE\d+\]\s*[-–:]\s*(?:this|the|it|appears|source)/i.test(answer)
   if (leakedEvidenceReview || narration.test(answer) || [...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleFutureFraming)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleCurrentYear)].some(match => Number(match[1]) !== currentYear)) {

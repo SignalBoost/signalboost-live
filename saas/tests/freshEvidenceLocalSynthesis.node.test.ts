@@ -66,8 +66,7 @@ test('an office answer citing only one of two reports is sent to repair with the
   const repair = freshEvidenceGroundedRepairPrompt({ input: officeQuestion, sources, retrievedAt, language: 'en', draft: accepted.answer, reason: accepted.reason! })
   assert.match(repair.prompt, /REPAIR: Your draft was not released because it did not meet the citation requirement/)
   assert.match(repair.prompt, /at least TWO different hosts/)
-  assert.doesNotMatch(repair.prompt, /PREVIOUS DRAFT/)
-  assert.match(repair.prompt, /Do not continue the previous reasoning/)
+  assert.match(repair.prompt, /PREVIOUS DRAFT \(not evidence\):\nThe runoff is on 25 October \[LIVE1\]\./)
 })
 
 test('ordinary current facts release on one cited source; invented ids are stripped, not fatal', () => {

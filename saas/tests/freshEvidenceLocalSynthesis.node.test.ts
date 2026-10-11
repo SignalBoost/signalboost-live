@@ -88,7 +88,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   assert.match(source, /disableThinking: true/)
   assert.match(source, /allowTruncatedText: true/, 'a length-capped answer is kept, not thrown away (prod 2026-10-10 20:35: 4/4 pod answers discarded)')
   assert.equal(FRESH_GROUNDED_ANSWER_TIMEOUT_MS, 20_000)
-  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 300)
+  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 1200)
   assert.match(source, /resolveCosReasoner/)
   assert.match(source, /lengthRule: CHAT_ANSWER_LENGTH_RULE/)
   assert.doesNotMatch(source, /EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
@@ -207,7 +207,7 @@ test('live answers reject exposed analysis and stale as-of framing', () => {
 
 
 test('grounded live-answer latency budget caps both generated prose and evidence prefill', () => {
-  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 300)
+  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 1200)
   assert.equal(FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE, 900)
   assert.equal(FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL, 4_500)
   const many = Array.from({ length: 8 }, (_, i) => ({

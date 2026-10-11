@@ -22,15 +22,15 @@ export const FRESH_GROUNDED_ANSWER_TIMEOUT_MS = 20_000
  * (finish=length) at the pod's ~36 tok/s; every other attempt timed out at 20 s on both providers. Answer length
  * is latency (ONBOARD 2026-09-27); the length rule asks for ~150 words, the cap now matches it.
  */
-export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 350
+export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 300
 /**
  * Evidence budget for the reasoning call. The same turn carried 9,422 prompt tokens because claim research
  * replaces each source's snippet with up to 24,000 characters of page body and all of it was sent to the
  * model (the pod's window is 8,192 tokens, so it refused outright and the backup then timed out on prefill).
  * The model needs the passages that bear on the question, not the page: ~1,200 chars per source, 6,000 total.
  */
-export const FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE = 1_200
-export const FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL = 6_000
+export const FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE = 900
+export const FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL = 4_500
 const LIVE_CITATION = /\[(LIVE\d+)\]/g
 const EXCERPT_STOP = new Set(['about', 'after', 'again', 'because', 'before', 'being', 'between', 'could', 'current', 'during', 'every', 'first', 'former', 'from', 'have', 'into', 'latest', 'might', 'official', 'other', 'please', 'should', 'since', 'their', 'there', 'these', 'thing', 'think', 'those', 'through', 'today', 'under', 'until', 'where', 'which', 'while', 'would'])
 

@@ -26,3 +26,14 @@ test('explicit final section can be accepted without publishing preceding analys
  assert.equal(result.ok,true)
  assert.doesNotMatch(result.reply,/We are given/)
 })
+test('harmless source attribution is removed but supported content remains', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:'Based on the live sources: Salsa social events are listed in Asuncion. [LIVE1]'})
+ assert.equal(result.ok,true)
+ assert.match(result.reply,/Salsa social events are listed/)
+ assert.doesNotMatch(result.reply,/Based on the live sources/i)
+})
+test('analysis is still rejected even after an attribution preface', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:'According to the retrieved evidence: We must analyze each source. [LIVE1]'})
+ assert.equal(result.ok,false)
+ assert.equal(result.reason,'process_narration')
+})

@@ -164,7 +164,10 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const finalMarkers = [...modelText.matchAll(/(?:^|\n)\s*(?:final answer|answer)\s*:\s*/gi)]
   const finalMarker = finalMarkers.at(-1)
   const publicText = finalMarker ? modelText.slice((finalMarker.index || 0) + finalMarker[0].length) : modelText
-  const raw = trimToCompleteSentence(normalizeLiveCitations(publicText))
+  // Harmless attribution prefaces are not internal reasoning. Remove only the
+  // introductory phrase, preserving the factual claim and its citations.
+  const cleanPublicText = publicText.replace(/^\s*(?:based on (?:the )?(?:retrieved |live )?sources?|according to (?:the )?(?:retrieved |live )?(?:sources|evidence))\s*[,.:–-]\s*/i, '')
+  const raw = trimToCompleteSentence(normalizeLiveCitations(cleanPublicText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
   const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {

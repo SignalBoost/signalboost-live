@@ -12,6 +12,7 @@ import { reportLanguageName } from '../../i18n/reportLanguage.ts'
 export type FreshEvidenceGroundingRejection =
   | 'empty_answer'
   | 'unsafe_public_output'
+  | 'process_narration'
   | 'no_evidence_cited'
   | 'citation_requirement_unmet'
 
@@ -159,7 +160,10 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const staleAsOf = /\bas of\s+(?:the\s+)?(?:year\s+)?(20\d{2})\b/gi
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
   const narration = /^(?:let me (?:carefully )?(?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:carefully )?(?:analy[sz]e|review|check) (?:the evidence|the question)|let's go through each piece of evidence|the question asks(?:\s|:))/i
-  if (narration.test(answer) || [...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
+  if (narration.test(answer)) {
+    return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
+  }
+  if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleFutureFraming)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleCurrentYear)].some(match => Number(match[1]) !== currentYear)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
@@ -187,7 +191,9 @@ export function freshEvidenceGroundedRepairPrompt(args: {
 }): FreshEvidenceGroundedPrompt {
   const base = freshEvidenceGroundedAnswerPrompt(args)
   const requirement = freshCitationRequirement(args.input, args.sources)
-  const instruction = args.reason === 'citation_requirement_unmet'
+  const instruction = args.reason === 'process_narration'
+    ? 'Your draft exposed internal analysis instead of answering. Remove all process narration, source-by-source inspection and restatement of the question. Answer directly in one or two factual sentences, citing only relevant LIVE evidence ids. Do not reuse the previous draft wording.'
+    : args.reason === 'citation_requirement_unmet'
     ? `Your draft was not released because it did not meet the citation requirement. ${describeFreshCitationRequirement(requirement, args.sources)} Rewrite the answer so that it cites evidence ids from the required number of different hosts wherever they support the same point; do not add facts the evidence does not contain.`
     : args.reason === 'no_evidence_cited'
       ? 'Your draft was not released because it cited no evidence id. Rewrite the answer citing [LIVE#] ids inline after each fact they support.'

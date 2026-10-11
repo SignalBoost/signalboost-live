@@ -93,3 +93,17 @@ test('an uncited closing statement never borrows citations from the walkthrough'
  })
  assert.equal(result.ok,false)
 })
+
+test('rejects the actual salsa club failure which narrates studio evidence instead of answering', () => {
+ const text='The strongest evidence comes from [LIVE1] and [LIVE2] which explicitly name dance studios/academies.'
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources:[...sources,{id:'LIVE2',title:'Dance academies',url:'https://example.org/academies',snippet:'Dance academies'}],text})
+ assert.equal(result.ok,false)
+ assert.equal(result.reason,'process_narration')
+ assert.equal(result.reply,'')
+})
+test('preserves an actual caveated customer answer about salsa socials', () => {
+ const text='Salsa social dancing events are listed in Asuncion, but a permanent salsa-only nightclub is not confirmed. [LIVE1]'
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text})
+ assert.equal(result.ok,true)
+ assert.match(result.reply,/Salsa social dancing events/)
+})

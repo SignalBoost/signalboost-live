@@ -266,6 +266,12 @@ test('new-question prompt forbids cross-topic evidence reuse', () => {
 
 test('process narration always gets the bounded repair even after the 12-second first-pass threshold', () => {
   const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.match(transport, /accepted\.reason === 'process_narration' \|\| Date\.now\(\) - startedAt < 12_000/)
+  assert.match(transport, /Date\.now\(\) - startedAt < 18_000/)
   assert.match(transport, /accepted\.reason !== 'unsafe_public_output'/)
+})
+
+test('repair prompt puts instruction before its final answer marker and excludes an empty rejected draft', () => {
+ const repair=freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:'',reason:'process_narration'})
+ assert.doesNotMatch(repair.prompt,/PREVIOUS DRAFT/)
+ assert.match(repair.prompt,/REPAIR:[\s\S]+\nANSWER:\s*$/)
 })

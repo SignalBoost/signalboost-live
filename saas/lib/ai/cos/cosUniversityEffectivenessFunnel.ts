@@ -981,7 +981,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
       return { certificates: new Set(certs.map(key)), graduates: new Set(grads.map(key)), resumes: new Set(resumes.map(key)) }
     }),
     chapter(async () => {
-      let assuranceQuery = db.from('cos_university_learning_assurance_events').select('authority_expanded,observed_at')
+      let assuranceQuery = db.from('cos_university_learning_assurance_events').select('evidence,observed_at')
       if (since) assuranceQuery = assuranceQuery.gte('observed_at', since)
       const assuranceRows = await exhaust(() => assuranceQuery.order('observed_at', { ascending: false }))
       let patrolQuery = db.from('security_repository_patrol_evidence').select('engagement_id,chain_index,previous_hash,entry_hash,recorded_at')
@@ -1001,7 +1001,7 @@ export async function readEffectivenessFunnel(input: { db: Db; window?: unknown;
           if (i > 0 && text(list[i].previous_hash, 64) !== text(list[i - 1].entry_hash, 64)) chainValid = false
         }
       }
-      return { authorityExpansionObserved: assuranceRows.filter((row: any) => row.authority_expanded === true).length, assuranceEvents: assuranceRows.length, repositoryEvidenceEntries: patrolRows.length, repositoryEvidenceChainValid: chainValid }
+      return { authorityExpansionObserved: assuranceRows.filter((row: any) => row.evidence?.authorityExpanded === true).length, assuranceEvents: assuranceRows.length, repositoryEvidenceEntries: patrolRows.length, repositoryEvidenceChainValid: chainValid }
     }),
     chapter(async () => ({ snapshot: await readUniversityMassDistillationHealth({ db, now }) })),
     chapter(async () => {

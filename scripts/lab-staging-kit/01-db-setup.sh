@@ -8,7 +8,7 @@ assert_staging
 psql_db -c "select version from supabase_migrations.schema_migrations order by version" > /tmp/mig.txt
 cp /tmp/mig.txt "$EVID/applied-migrations.txt"
 missing_migrations=0
-for v in 20261009001500 20261012000000 20261012010000; do
+for v in 20261009001500 20261011225542 20261012000000 20261012010000; do
   grep -qx "$v" /tmp/mig.txt && record "DB_MIGRATION_$v" passed "Migration $v is applied" applied-migrations.txt \
     || { record "DB_MIGRATION_$v" failed "Migration $v is NOT applied" applied-migrations.txt; missing_migrations=1; }
 done

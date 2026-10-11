@@ -1,3 +1,4 @@
+<!-- Customer LAB v6 integration: docs/CUSTOMER-LAB-V6-INTEGRATION.md. Database migration and real provider execution remain unverified; source integration is not end-to-end readiness. -->
 <!-- ONBOARD.md -->
 <!-- Customer LAB staging verification kit: scripts/lab-staging-kit/README.md. Operator-only tooling; local checks do not establish deployed LAB readiness. -->
 # ONBOARD.md

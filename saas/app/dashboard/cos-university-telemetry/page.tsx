@@ -7,6 +7,7 @@ import UniversitySettingsPanel from './UniversitySettingsPanel.tsx'
 import LabPhasesObservabilityPanel from './LabPhasesObservabilityPanel.tsx'
 import { COS_UNIVERSITY_SETTINGS_COPY } from '@/lib/i18n/cosUniversitySettingsCopy'
 import LabExperimentPanel from './LabExperimentPanel.tsx'
+import LabCustomerTrainingSection from './LabCustomerTrainingSection.tsx'
 import { ITMOUNTS_LAB_EXPERIMENT_COPY } from '@/lib/i18n/itmountsLabExperimentCopy'
 import ArtifactLifeRecordPanel from './ArtifactLifeRecordPanel.tsx'
 import { COS_UNIVERSITY_LIFE_RECORD_COPY } from '@/lib/i18n/cosUniversityLifeRecordCopy'
@@ -369,6 +370,9 @@ export default function CosUniversityTelemetryPage() {
       <UniversitySettingsPanel copy={settingsCopy} />
 
       <LabExperimentPanel copy={labExperimentCopy} />
+
+      <LabCustomerTrainingSection language={lang} />
+
 
       <EffectivenessFunnelPanel copy={funnelCopy} subjects={funnelSubjects} />
 

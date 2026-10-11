@@ -245,7 +245,9 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   if (!replyCitesRequiredFreshEvidence(reply, args.input, args.sources)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
   }
-  // The answer field intentionally contains only releasable prose, never a\n  // full reasoning trace. Internal analysis must not be stored as public text.\n  return { ok: true, reason: null, reply, answer, citedSourceIds }
+  // The answer field intentionally contains only releasable prose, never a
+  // full reasoning trace. Internal analysis must not be stored as public text.
+  return { ok: true, reason: null, reply, answer, citedSourceIds }
 }
 
 /** One concrete repair instruction: what was missing, in terms the model can act on. */

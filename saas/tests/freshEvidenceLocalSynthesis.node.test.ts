@@ -267,4 +267,5 @@ test('process-narration recovery prompt excludes rejected reasoning', () => {
  const repair = freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:'',reason:'process_narration'})
  assert.doesNotMatch(repair.prompt, /PREVIOUS DRAFT/)
  assert.match(repair.prompt, /Remove all process narration/)
+ assert.match(repair.prompt, /REPAIR:[\s\S]+\nANSWER:\s*$/)
 })

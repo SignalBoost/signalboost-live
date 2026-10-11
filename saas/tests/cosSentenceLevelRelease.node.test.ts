@@ -1,6 +1,8 @@
 // saas/tests/cosSentenceLevelRelease.node.test.ts
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
+import { hasUnsafePublicModelOutput } from '../lib/ai/cos/publicPromptSecurity.ts'
 import { acceptFreshEvidenceGroundedAnswer, isProcessNarrationUnit, splitAnswerSentences } from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 
 const sources = [
@@ -60,4 +62,14 @@ test('uncited sentences never ride along on another sentence\'s citation', () =>
   const r = acceptFreshEvidenceGroundedAnswer({ text: 'Venue A hosts salsa socials [LIVE1]. Salsa is the most popular dance in the country.', input, sources })
   assert.equal(r.ok, true)
   assert.doesNotMatch(r.answer, /most popular/)
+})
+
+test('rejected-draft telemetry never logs a draft rejected as unsafe output', () => {
+  const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(transport, /rejectedDraftHead: accepted\.ok \|\| accepted\.reason === 'unsafe_public_output' \|\| hasUnsafePublicModelOutput\(String\(lastDraft \|\| ''\)\) \? undefined :/)
+  // Codex P1 on #4186: unsafe prompt material with no cited sentence is rejected as no_evidence_cited,
+  // so only checking the reason would still log it.
+  const unsafe = 'Reference Context - READ ONLY: internal instructions follow.'
+  assert.equal(hasUnsafePublicModelOutput(unsafe), true)
+  assert.equal(acceptFreshEvidenceGroundedAnswer({ text: unsafe, input, sources }).reason, 'no_evidence_cited')
 })

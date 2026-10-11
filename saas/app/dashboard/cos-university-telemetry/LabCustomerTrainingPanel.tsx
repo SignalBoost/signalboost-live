@@ -69,7 +69,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       if (list[0]) setOrgKey(`${list[0].organizationId}|${list[0].experimentId}`)
       setWorkspaceLoad('ready')
     })()
-  }, [])
+  }, [copy])
 
   async function initializeWorkspace() {
     setBusy(true)
@@ -158,7 +158,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
 
   if (!orgs.length) return (
     <section className="rounded-lg border p-4 text-sm" dir={language === 'ar' ? 'rtl' : undefined}>
-      {workspaceLoad === 'loading' ? <p role="status">{copy.loadFailed.replace(/\\?\{code\}/g, '…')}</p> : null}
+      {workspaceLoad === 'loading' ? <p role="status" aria-busy="true">…</p> : null}
       {workspaceLoad === 'error' ? <p role="alert">{message?.text ?? fmt(copy.loadFailed, { code: 'network' })}</p> : null}
       {workspaceLoad === 'ready' ? <><p>{copy.noOrg}</p><button type="button" disabled={busy} onClick={() => { void initializeWorkspace() }} className="mt-3 rounded border px-3 py-2">{copy.workspaceButton}</button>{message ? <p role="alert">{message.text}</p> : null}</> : null}
     </section>

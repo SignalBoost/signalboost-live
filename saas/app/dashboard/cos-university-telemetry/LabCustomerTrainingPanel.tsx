@@ -26,6 +26,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [runs, setRuns] = useState<Run[]>([])
   const [message, setMessage] = useState<{ kind: 'status' | 'alert'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [workspaceLoad, setWorkspaceLoad] = useState<'loading' | 'ready' | 'error'>('loading')
   // key form
   const [keyKind, setKeyKind] = useState('huggingface')
   const [keyLabel, setKeyLabel] = useState('')
@@ -58,9 +59,15 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     void (async () => {
       const response = await fetch('/api/lab/experiments', { credentials: 'include', cache: 'no-store' }).catch(() => null)
       const body = await response?.json().catch(() => null)
-      const list: Org[] = body?.ok ? body.experiments : []
+      if (!response?.ok || !body?.ok || !Array.isArray(body.experiments)) {
+        setWorkspaceLoad('error')
+        setMessage({ kind: 'alert', text: fmt(copy.loadFailed, { code: body?.error || 'network' }) })
+        return
+      }
+      const list: Org[] = body.experiments
       setOrgs(list)
       if (list[0]) setOrgKey(`${list[0].organizationId}|${list[0].experimentId}`)
+      setWorkspaceLoad('ready')
     })()
   }, [])
 
@@ -72,6 +79,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       const body = await response.json()
       if (!response.ok || !body.ok) throw new Error(body.error || 'lab_request_failed')
       setOrgs([body.workspace])
+      setWorkspaceLoad('ready')
       setOrgKey(`${body.workspace.organizationId}|${body.workspace.experimentId}`)
     } catch (error) {
       setMessage({ kind: 'alert', text: fmt(copy.loadFailed, { code: error instanceof Error ? error.message : 'lab_request_failed' }) })
@@ -148,7 +156,13 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }
   const fileUrl = (runId: string, path: string) => `/api/lab/training/download?organizationId=${organizationId}&runId=${runId}&path=${encodeURIComponent(path)}`
 
-  if (!orgs.length) return <section className="rounded-lg border p-4 text-sm" dir={language === 'ar' ? 'rtl' : undefined}><p>{copy.noOrg}</p><button type="button" disabled={busy} onClick={() => { void initializeWorkspace() }} className="mt-3 rounded border px-3 py-2">{copy.workspaceButton}</button>{message ? <p role="alert">{message.text}</p> : null}</section>
+  if (!orgs.length) return (
+    <section className="rounded-lg border p-4 text-sm" dir={language === 'ar' ? 'rtl' : undefined}>
+      {workspaceLoad === 'loading' ? <p role="status">{copy.loadFailed.replace(/\\?\{code\}/g, '…')}</p> : null}
+      {workspaceLoad === 'error' ? <p role="alert">{message?.text ?? fmt(copy.loadFailed, { code: 'network' })}</p> : null}
+      {workspaceLoad === 'ready' ? <><p>{copy.noOrg}</p><button type="button" disabled={busy} onClick={() => { void initializeWorkspace() }} className="mt-3 rounded border px-3 py-2">{copy.workspaceButton}</button>{message ? <p role="alert">{message.text}</p> : null}</> : null}
+    </section>
+  )
   const teacherEntry = entry(credentials.find(item => item.id === teacherId)?.providerKind || '')
 
   return (

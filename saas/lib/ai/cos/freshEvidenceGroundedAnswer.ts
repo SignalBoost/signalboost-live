@@ -200,7 +200,8 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
   const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
   const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source|okay,?\s+let me|first,?\s+i(?:'ll| will)|so the established facts are|i(?:'ll| will) craft a concise answer|the other sources?)/i
-  if (narration.test(answer) || analysisLeak.test(answer)) {
+  const sourceListing = /(?:^|\n)\s*(?:[-*]\s*)?\[LIVE\d+\]\s*(?::|is about|discusses|mentions|says|shows)/i
+  if (narration.test(answer) || analysisLeak.test(answer) || sourceListing.test(answer)) {
     return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
   }
   if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)

@@ -110,6 +110,8 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'If sources disagree, say what each one reports instead of choosing silently.',
     'Never mention routing, verification gates, confidence scores, providers, or fallbacks. Never describe your own process.',
     'Each new question needs evidence relevant to that question. Never reuse evidence about a different country, election, person, or subject merely because it was retrieved earlier in the conversation.',
+    'User-supplied names and claims are search terms, not verified facts. Only repeat venue names and descriptions established by this turn\'s LIVE evidence.',
+    'Respect the requested category: a salsa dance club or nightclub is not the same as a dance studio, school, academy, workshop, or class. Do not claim clubs exist based only on evidence for lessons or studios; clearly state when sources only establish classes or social events.',
     `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
@@ -158,7 +160,9 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const modelText = String(args.text || '')
     .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
     .trim()
-  const finalMarker = modelText.match(/(?:^|\n)\s*(?:final answer|answer)\s*:\s*/i)
+  // The marker must start a line. A marker appearing inside a sentence is not a final answer.
+  const finalMarkers = [...modelText.matchAll(/(?:^|\n)\s*(?:final answer|answer)\s*:\s*/gi)]
+  const finalMarker = finalMarkers.at(-1)
   const publicText = finalMarker ? modelText.slice((finalMarker.index || 0) + finalMarker[0].length) : modelText
   const raw = trimToCompleteSentence(normalizeLiveCitations(publicText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
@@ -174,7 +178,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const staleAsOf = /\bas of\s+(?:the\s+)?(?:year\s+)?(20\d{2})\b/gi
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
   const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
-  const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source)/i
+  const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source|okay,?\s+let me|first,?\s+i(?:'ll| will)|so the established facts are|i(?:'ll| will) craft a concise answer|the other sources?)/i
   if (narration.test(answer) || analysisLeak.test(answer)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
   }

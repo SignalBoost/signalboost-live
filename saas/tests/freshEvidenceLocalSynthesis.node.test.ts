@@ -312,12 +312,12 @@ test('generic grounded prompt keeps unrelated policy out and supports verified a
   assert.doesNotMatch(prompt.systemPrompt, /which party has a majority|official certified counts/)
   assert.match(prompt.systemPrompt, /do not confirm the requested kind/)
   const reply = acceptFreshEvidenceGroundedAnswer({
-    text: 'I could verify salsa classes and workshops, but not a dedicated salsa nightclub from these listings. [LIVE1][LIVE2]',
+    text: 'The listings document salsa classes and workshops, but do not confirm a dedicated salsa nightclub. [LIVE1][LIVE2]',
     input: question,
     sources: evidence,
   })
   assert.equal(reply.ok, true)
-  assert.match(reply.reply, /not a dedicated salsa nightclub/)
+  assert.match(reply.reply, /do not confirm a dedicated salsa nightclub/)
   const narration = acceptFreshEvidenceGroundedAnswer({
     text: 'The strongest evidence comes from [LIVE1] and [LIVE2], which discuss classes.',
     input: question,

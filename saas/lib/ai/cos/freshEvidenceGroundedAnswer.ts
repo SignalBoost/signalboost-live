@@ -185,6 +185,19 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   if (strippedNarration && !finalText.trim()) {
     return { ok: false, reason: 'process_narration', reply: '', answer: '', citedSourceIds: [] }
   }
+  // Stage 1: The model sometimes writes a source-by-source walkthrough before
+  // giving a separately stated answer. Only the final answer is eligible for release.
+  // Removing individual analysis lines indiscriminately can splice speculative
+  // statements into an apparent answer, so use an explicit paragraph boundary.
+  //
+  // Stage 2: A recovered paragraph MUST contain its own LIVE citation. Citations
+  // in discarded lines must not be counted as support for a factual claim.
+  // Every surviving citation is checked again against the retrieved source map,
+  // and the host's existing authority policy still applies.
+  //
+  // Stage 3: If no independent, cited answer can be identified, preserve the
+  // unmodified draft for the process-narration rejection and bounded repair.
+  // Do not adopt a length threshold or publish analysis merely to avoid a 503.
   // Salvage only an independently worded final paragraph after a source inventory.
   // Source citations inside discarded reasoning never count toward acceptance.
   const inventoryLine = /^\s*(?:[-*]\s*)?\[LIVE\d+\]\s*(?::|(?:is about|discusses|mentions|says|shows|has|titled)\b)/i
@@ -201,7 +214,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   }
   const raw = trimToCompleteSentence(normalizeLiveCitations(finalText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
-  const citedSourceIds: string[] = []
+  // Build provenance from the final public answer ONLY; analysis citations are not evidence.\n  const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {
     if (!citedSourceIds.includes(match[1])) citedSourceIds.push(match[1])
   }
@@ -216,7 +229,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source|okay,?\s+let me|first,?\s+i(?:'ll| will)|so the established facts are|i(?:'ll| will) craft a concise answer|the other sources?)/i
   const sourceListing = /(?:^|\n)\s*(?:[-*]\s*)?\[LIVE\d+\]\s*(?::|is about|discusses|mentions|says|shows)/i
   const processOpener = /^(?:okay[,!]?\s+)?(?:let(?:'s| us) (?:tackle|check|review|look|analy[sz]e)|looking at the evidence|the user is asking|the key evidence is)/i
-  if (narration.test(answer) || analysisLeak.test(answer) || sourceListing.test(answer) || processOpener.test(answer)) {
+  // A non-empty candidate is not automatically a safe answer. If process\n  // narration survives salvage, return the dedicated rejection reason so the\n  // repair path receives an actionable instruction instead of citation advice.\n  if (narration.test(answer) || analysisLeak.test(answer) || sourceListing.test(answer) || processOpener.test(answer)) {
     return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
   }
   if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
@@ -232,7 +245,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   if (!replyCitesRequiredFreshEvidence(reply, args.input, args.sources)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
   }
-  return { ok: true, reason: null, reply, answer, citedSourceIds }
+  // The answer field intentionally contains only releasable prose, never a\n  // full reasoning trace. Internal analysis must not be stored as public text.\n  return { ok: true, reason: null, reply, answer, citedSourceIds }
 }
 
 /** One concrete repair instruction: what was missing, in terms the model can act on. */

@@ -193,7 +193,11 @@ test('live answers reject exposed analysis and stale as-of framing', () => {
   })
   assert.equal(direct.ok, true)
   const upcoming = acceptFreshEvidenceGroundedAnswer({
-    input: officeQuestion, sources,
+    input: 'Who will control Congress after the 2026 midterms?',
+    sources: [
+      { id: 'LIVE1', title: 'November 2026 midterm elections', url: 'https://example.org/us-election-guide', snippet: 'The US midterm elections are scheduled for November 3, 2026.' },
+      { id: 'LIVE2', title: 'Congress control is undecided', url: 'https://example.net/congress-outlook', snippet: 'Control of the next Congress is not yet decided ahead of the November 2026 vote.' },
+    ],
     text: 'The November 2026 election is still upcoming as of October 2026; no future result is established. [LIVE1] [LIVE2]',
   })
   assert.equal(upcoming.ok, true, 'correct future election wording must not be rejected')

@@ -180,7 +180,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             </select>
             <input className="rounded border px-2 py-1" placeholder={copy.keyNamePh} value={keyLabel} onChange={event => setKeyLabel(event.target.value)} />
             <input className="rounded border px-2 py-1" type="password" autoComplete="off" placeholder={copy.keyPh} value={keyValue} onChange={event => setKeyValue(event.target.value)} />
-            {keyKind === 'openai_compatible' && <input className="rounded border px-2 py-1" placeholder="https://…/chat/completions" value={keyEndpoint} onChange={event => setKeyEndpoint(event.target.value)} />}
+            {keyKind === 'openai_compatible' && <input className="rounded border px-2 py-1" placeholder={copy.endpointPh} value={keyEndpoint} onChange={event => setKeyEndpoint(event.target.value)} />}
             <p className="text-xs opacity-70 sm:col-span-2">{entry(keyKind)?.keyHelp} {entry(keyKind)?.unsupported['training.execute']}</p>
             <button className="rounded border px-3 py-1 sm:col-span-2" disabled={busy || !keyLabel || keyValue.length < 20} onClick={saveKey}>{copy.saveKey}</button>
           </div>

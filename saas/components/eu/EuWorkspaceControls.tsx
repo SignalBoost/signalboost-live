@@ -1,4 +1,6 @@
 'use client'
+import { useTranslation } from '@/lib/i18n/useTranslation'
+import { labIntegrationUiCopy } from '@/lib/i18n/labIntegrationUiCopy'
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
@@ -7,6 +9,9 @@ type Project = { id: string; name: string | null }
 type Config = { url: string; anonKey: string; cookieName: string }
 
 export default function EuWorkspaceControls() {
+  const { lang } = useTranslation()
+  const copy = labIntegrationUiCopy(lang)
+
   const [token, setToken] = useState('')
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -78,25 +83,25 @@ export default function EuWorkspaceControls() {
   }
 
   return <section style={{ display: 'grid', gap: 14, maxWidth: 720, width: '100%' }}>
-    <h2>Frankfurt Builder workspace</h2>
-    <p>Projects and files in this area use Frankfurt tenant-scoped storage. This is not the US Builder dashboard or a connected-provider execution environment.</p>
-    <label>Workspace objective <input value={objective} maxLength={500} onChange={event => setObjective(event.target.value)} /></label>
-    <button disabled={!token || busy} onClick={() => void mutate('/api/eu/workspaces','POST',{ objective })}>Create workspace</button>
-    <label>Workspace
+    <h2>{copy.u_bcd2e5f363ab}</h2>
+    <p>{copy.u_aa1a7198e2f6}</p>
+    <label>{copy.u_e678be4b6c83} <input value={objective} maxLength={500} onChange={event => setObjective(event.target.value)} /></label>
+    <button disabled={!token || busy} onClick={() => void mutate('/api/eu/workspaces','POST',{ objective })}>{copy.u_4b892277843c}</button>
+    <label>{copy.u_87bb59ba2f92}
       <select value={workspaceId} onChange={event => setWorkspaceId(event.target.value)}>
-        <option value="">Select workspace</option>
+        <option value="">{copy.u_d5cd65235324}</option>
         {workspaces.map(item => <option key={item.id} value={item.id}>{item.objective || item.id}</option>)}
       </select>
     </label>
-    <label>File path <input value={filePath} maxLength={240} onChange={event => setFilePath(event.target.value)} /></label>
-    <label>File content <textarea value={fileContent} rows={9} onChange={event => setFileContent(event.target.value)} /></label>
+    <label>{copy.u_2fb6d38632ea} <input value={filePath} maxLength={240} onChange={event => setFilePath(event.target.value)} /></label>
+    <label>{copy.u_f0ca7ef61aed} <textarea value={fileContent} rows={9} onChange={event => setFileContent(event.target.value)} /></label>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      <button disabled={!token || !workspaceId || busy} onClick={() => void readFile()}>Load file</button>
-      <button disabled={!token || !workspaceId || busy} onClick={() => void mutate('/api/eu/workspace-files','PUT',{ workspaceId, path: filePath, content: fileContent })}>Save file in Frankfurt</button>
+      <button disabled={!token || !workspaceId || busy} onClick={() => void readFile()}>{copy.u_80a09677b0c0}</button>
+      <button disabled={!token || !workspaceId || busy} onClick={() => void mutate('/api/eu/workspace-files','PUT',{ workspaceId, path: filePath, content: fileContent })}>{copy.u_95e2914982ad}</button>
     </div>
-    <h3>European projects</h3>
-    <label>Project name <input value={projectName} maxLength={160} onChange={event => setProjectName(event.target.value)} /></label>
-    <button disabled={!token || !projectName.trim() || busy} onClick={() => void mutate('/api/eu/projects','POST',{ name: projectName })}>Create project</button>
+    <h3>{copy.u_5dad693ebb18}</h3>
+    <label>{copy.u_25498193b898} <input value={projectName} maxLength={160} onChange={event => setProjectName(event.target.value)} /></label>
+    <button disabled={!token || !projectName.trim() || busy} onClick={() => void mutate('/api/eu/projects','POST',{ name: projectName })}>{copy.u_fa67e4d0dae5}</button>
     <ul>{projects.map(item => <li key={item.id}>{item.name || item.id}</li>)}</ul>
     {message && <p role="status">{message}</p>}
   </section>

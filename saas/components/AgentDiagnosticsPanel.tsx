@@ -1,4 +1,6 @@
 'use client'
+import { useTranslation } from '@/lib/i18n/useTranslation'
+import { labIntegrationUiCopy } from '@/lib/i18n/labIntegrationUiCopy'
 import { useState } from 'react'
 export type StepStatus = 'ok' | 'warn' | 'fail' | 'skipped'
 export type AgentDiagnostics = {
@@ -39,24 +41,26 @@ export function splitOwnerDiagnostic(reply: string): { text: string; diagnostics
 }
 const color: Record<StepStatus, string> = { ok: '#22c55e', warn: '#f59e0b', fail: '#ef4444', skipped: '#94a3b8' }
 export default function AgentDiagnosticsPanel({ d }: { d: AgentDiagnostics }) {
+  const { lang } = useTranslation()
+  const copy = labIntegrationUiCopy(lang)
   const [open, setOpen] = useState(d.blocked)
   return <section style={{ marginTop: 12, border: '1px dashed #64748b', borderRadius: 10, padding: 12, fontSize: 12 }}>
     <button type="button" aria-expanded={open} onClick={() => setOpen(v => !v)} style={{ background: 'transparent', border: 0, color: 'inherit', cursor: 'pointer' }}>
-      {open ? '▾' : '▸'} Diagnostics (owner/admin)
+      {open ? '▾' : '▸'} {copy.u_b12f5a4246e6}
     </button>
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
       {([['Search', d.search.status], ['Synthesis', d.synthesis.status], ['Verification', d.verification.status]] as const).map(([label,status]) =>
         <span key={label} style={{ color: color[status] }}>{label}: {status}</span>)}
     </div>
     {open && <div style={{ display: 'grid', gap: 5, marginTop: 8 }}>
-      {d.blocked && <strong>Blocked: {explainReason(d.reason) || d.reason || 'Unknown reason'}</strong>}
-      <div>Search: {d.search.sourceCount} source(s)</div>
+      {d.blocked && <strong>{copy.u_3e75b48427ec} {explainReason(d.reason) || d.reason || copy.u_8c31b7b7c7d9}</strong>}
+      <div>{copy.u_bd689c15b2ca} {d.search.sourceCount} {copy.u_1dfadd4a3ec2}</div>
       {d.search.sources?.map(s => <div key={s.id}>{s.id} — {s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.title || s.url}</a> : s.title}</div>)}
-      <div>Synthesis: {d.synthesis.code || 'accepted'} {d.synthesis.model ? '· ' + d.synthesis.model : ''}</div>
-      <div>Verification: {d.verification.code || 'passed'}</div>
-      {d.verification.rejectedDraft && <div>Rejected draft: {d.verification.rejectedDraft}</div>}
+      <div>{copy.u_24cda325f791} {d.synthesis.code || copy.u_070c160a6299} {d.synthesis.model ? '· ' + d.synthesis.model : ''}</div>
+      <div>{copy.u_5a2bb00d9b1f} {d.verification.code || copy.u_284d1e8c4918}</div>
+      {d.verification.rejectedDraft && <div>{copy.u_9ff0e96cea5b} {d.verification.rejectedDraft}</div>}
       {d.extra?.map((line,i) => <div key={i}>{line}</div>)}
-      {d.build && <div>Build: {d.build}</div>}
+      {d.build && <div>{copy.u_f9fd8a28cf11} {d.build}</div>}
     </div>}
   </section>
 }

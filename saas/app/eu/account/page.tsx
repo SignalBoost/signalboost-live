@@ -1,3 +1,4 @@
+import { LabIntegrationText } from '@/components/i18n/LabIntegrationText'
 import EuWorkspaceControls from '@/components/eu/EuWorkspaceControls'
 import EuAccountControls from '@/components/eu/EuAccountControls'
 import Link from 'next/link'
@@ -14,7 +15,7 @@ export default async function EuAccountPage() {
     return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>
       <h1>{uiText('generatedUi.u_d2d3109cbacf0a41')}</h1>
       <p>{uiText('generatedUi.u_f06d45815a9c047d')}</p>
-      <Link href="/eu/access">European account sign-in</Link>
+      <Link href="/eu/access"><LabIntegrationText id="u_4deb6d43373f" /></Link>
     </main>
   }
 
@@ -34,7 +35,7 @@ export default async function EuAccountPage() {
     return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>
       <h1>{uiText('generatedUi.u_3981d43d273b483c')}</h1>
       <p>{uiText('generatedUi.u_56c6c4fa5a11004c')}</p>
-      <Link href="/eu/access">Complete European account enrollment</Link>
+      <Link href="/eu/access"><LabIntegrationText id="u_f4ba89c99393" /></Link>
     </main>
   }
   return <main style={{ maxWidth: 640, margin: '64px auto', padding: 24 }}>

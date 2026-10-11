@@ -70,11 +70,14 @@ async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, structure
       allowConfiguredFallback: true,
       usageContext: { feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' },
     })
-    if (!result?.text?.trim()) return null
+    if (!result?.text?.trim()) {
+      console.warn('[cos-grounded-empty]', JSON.stringify({ hasResult: Boolean(result), outputLength: result?.text?.length ?? 0, structured }))
+      return null
+    }
     let answerText = result.text
     // Be tolerant of providers that return either prose or a JSON envelope.
     // A bad JSON envelope is not grounds to throw away a usable cited answer.
-    if (structured && /^\\s*\\{/.test(answerText)) {
+    if (structured && /^\s*\{/.test(answerText)) {
       try {
         const parsed = JSON.parse(answerText)
         if (typeof parsed?.answer === 'string' && parsed.answer.trim()) answerText = parsed.answer
@@ -105,7 +108,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
     false,
     answerTokens,
   )
-  if (!first) return { kind: 'local_synthesis_unparseable' }
+  if (!first) {
+    console.warn('[cos-grounded-unparseable]', JSON.stringify({ reason: 'primary_and_retry_empty', sources: args.sources.length }))
+    return { kind: 'local_synthesis_unparseable' }
+  }
   if ('error' in first) return { kind: 'local_synthesis_failed', error: first.error }
 
   let accepted = acceptFreshEvidenceGroundedAnswer({ text: first.text, input: args.input, sources: args.sources })

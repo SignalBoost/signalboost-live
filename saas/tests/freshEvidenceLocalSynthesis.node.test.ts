@@ -94,7 +94,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   assert.doesNotMatch(source, /EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
   assert.doesNotMatch(source, /jsonObject: true/, 'live-answer recovery must not force JSON mode on local providers')
   assert.match(source, /, accepted\.reason === 'process_narration', answerTokens\)/, 'structured retry is limited to narration rejections')
-  assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 3, 'definition + first call + optional fast citation repair')
+  assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 2, 'definition + one inference call')
   const pure = readFileSync(new URL('../lib/ai/cos/freshEvidenceGroundedAnswer.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(pure, /from '@\//, 'pure module stays relative-import only so tests can load it')
   const external = readFileSync(new URL('../lib/ai/cos/freshEvidenceExternalSynthesis.ts', import.meta.url), 'utf8')
@@ -110,7 +110,7 @@ test('COS avoids repeating expensive search and inference after a rejected answe
   assert.match(route, /const sourceDigestFallback=freshHardFail/)
   assert.match(route, /primary:web_page_reads/)
   const local = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.match(local, /Date.now\(\) - startedAt < 6_000/)
+  assert.doesNotMatch(local, /const second = await groundedAnswerCall/)
 })
 
 test('the reasoning call sees question-bearing excerpts, not pages: 8 × 24k-char sources stay inside the evidence budget', () => {
@@ -259,9 +259,9 @@ test('new-question prompt forbids cross-topic evidence reuse', () => {
 })
 
 
-test('process narration repair honors the six-second latency budget', () => {
+test('process narration cannot trigger a second inference call', () => {
   const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.match(transport, /accepted\.reason !== 'unsafe_public_output' && Date\.now\(\) - startedAt < 6_000/)
+  assert.doesNotMatch(transport, /const second = await groundedAnswerCall/)
   assert.doesNotMatch(transport, /accepted\.reason === 'process_narration' \|\| Date\.now\(\) - startedAt/)
 })
 

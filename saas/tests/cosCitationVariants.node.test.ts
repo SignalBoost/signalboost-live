@@ -19,8 +19,8 @@ test('normalizes explicit citation variants only', () => {
 })
 
 test('trim preserves citation attached after a period before unfinished remainder', () => {
- const input = 'A complete fact. [LIVE1] Another unfinished continuation with no complete ending'
- assert.equal(trimToCompleteSentence(input), 'A complete fact. [LIVE1]')
+ const input = 'A complete factual statement about a documented event. [LIVE1] Unfinished remainder'
+ assert.equal(trimToCompleteSentence(input), 'A complete factual statement about a documented event. [LIVE1]')
 })
 
 test('accepts cited variants but rejects uncited prose', () => {

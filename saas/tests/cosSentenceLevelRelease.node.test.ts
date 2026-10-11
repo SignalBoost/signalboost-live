@@ -3,6 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { hasUnsafePublicModelOutput } from '../lib/ai/cos/publicPromptSecurity.ts'
+import { extractGroundedJsonAnswer } from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 import { acceptFreshEvidenceGroundedAnswer, isProcessNarrationUnit, splitAnswerSentences } from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 
 const sources = [
@@ -126,3 +127,38 @@ test('source inventory with plausible citations never becomes the public answer'
   })
   assert.equal(direct.ok,true)
 })
+
+test('production 2026-10-11 04:21: a citation used inside the sentence is never published', () => {
+  for (const text of [
+    "The strongest direct evidence is [LIVE1] naming specific studios and [LIVE2]'s title about salsa academies.",
+    'Studios are listed in a guide [LIVE1] naming three schools.',
+  ]) {
+    const r = acceptFreshEvidenceGroundedAnswer({ text, input: asked, sources: studios })
+    assert.equal(r.ok, false, text)
+  }
+  for (const text of [
+    'Asunción has salsa studios [LIVE1] and salsa academies [LIVE2], but no confirmed salsa-only nightclub.',
+    'Salsa classes run at several studios [LIVE1][LIVE2].',
+  ]) assert.equal(acceptFreshEvidenceGroundedAnswer({ text, input: asked, sources: studios }).ok, true, text)
+})
+
+test('production 2026-10-11 04:15: free-text analysis with no answer is rejected', () => {
+  const draft = 'We are given a query: "are there any salsa dancing club in Asuncion?" We must use only the supplied LIVE evidence (LIVE1 to LIVE7) to answer. Let\'s analyze each piece of evidence: - LIVE1: A Harvard U'
+  const r = acceptFreshEvidenceGroundedAnswer({ text: draft, input: asked, sources: studios })
+  assert.equal(r.ok, false)
+})
+
+test('the answer is requested as a JSON field and only that field is published', () => {
+  const json = JSON.stringify({ answer: 'Asunción has salsa studios and academies [LIVE1][LIVE2], but no confirmed salsa-only nightclub.' })
+  const r = acceptFreshEvidenceGroundedAnswer({ text: json, input: asked, sources: studios })
+  assert.equal(r.ok, true)
+  assert.match(r.answer, /^Asunción has salsa studios/)
+  assert.doesNotMatch(r.reply, /"answer"/)
+  // cut off by the token cap mid-string: the complete sentence inside is still recovered
+  assert.equal(extractGroundedJsonAnswer('{"answer": "Salsa classes run at several studios [LIVE1]. Another'), 'Salsa classes run at several studios [LIVE1]. Another')
+  assert.equal(acceptFreshEvidenceGroundedAnswer({ text: '{"answer": "Salsa classes run at several studios [LIVE1]. Another', input: asked, sources: studios }).answer, 'Salsa classes run at several studios [LIVE1].')
+  // analysis placed inside the field still goes through the same filter
+  assert.equal(acceptFreshEvidenceGroundedAnswer({ text: JSON.stringify({ answer: 'We must analyze each source [LIVE1].' }), input: asked, sources: studios }).ok, false)
+  assert.equal(extractGroundedJsonAnswer('Plain prose answer [LIVE1].'), null)
+})
+

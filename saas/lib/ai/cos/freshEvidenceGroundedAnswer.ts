@@ -152,10 +152,12 @@ const FIRST_PERSON_WORDS = /(?:^|[^\p{L}'])(?:let me|let's|let us|we|we're|we'll
 const TASK_REFERENCE = /\b(?:the|this|that|my|your|their) (?:user|user's|question|query|prompt|instructions?|draft|final answer)\b|\b(?:el usuario|la pregunta|o usuário|a pergunta)\b/i
 const SOURCE_SUBJECT = /^\s*(?:[-*•–]\s*)?\[LIVE\d+\]/
 const PROCESS_OPENER = /^\s*(?:[-*•–]\s*)?(?:okay|ok|alright|hmm|wait|looking at|analy[sz]ing|checking|reviewing|scanning|going through|examining|first,? (?:i|we)\b)/i
+const SOURCE_META_CLAIM = /^(?:the\s+)?(?:strongest|best|main|key|primary|most relevant|available)\s+(?:evidence|sources?|results?|references?)\b|^(?:the\s+)?(?:evidence|sources?|results?|references?)\s+(?:comes? from|explicitly|clearly|only|merely|just|indicates?|shows?|suggests?|mentions?|lists?|names?|describes?)\b/i
 
 export function isProcessNarrationUnit(unit: string): boolean {
   const text = String(unit || '')
-  return SOURCE_SUBJECT.test(text)
+  return SOURCE_META_CLAIM.test(text)
+    || SOURCE_SUBJECT.test(text)
     || PROCESS_OPENER.test(text)
     || TASK_REFERENCE.test(text)
     || FIRST_PERSON_CASED_I.test(text)

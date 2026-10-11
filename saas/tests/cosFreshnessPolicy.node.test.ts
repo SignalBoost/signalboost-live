@@ -381,3 +381,11 @@ test('comparison, usage and purpose questions about a concept reason from COS kn
   assert.equal(requiresFreshExternalEvidence('What are the pros and cons of the best laptops today?'), true)
   assert.equal(requiresFreshExternalEvidence('What is the latest version of Kubernetes?'), true)
 })
+
+test('upcoming public officeholder lookups always use this-turn live evidence, even with malformed interrogatives', () => {
+  assert.equal(requiresFreshExternalEvidence('whose is more likely to be the next Brazilian president?'), true)
+  assert.equal(requiresFreshExternalEvidence('who will be the next brazilian president?'), true)
+  assert.equal(requiresFreshExternalEvidence('Which candidate will be the next president of Brazil?'), true)
+  assert.equal(requiresFreshExternalEvidence('What about the upcoming Canadian prime minister?'), true)
+  assert.equal(requiresFreshExternalEvidence('Who was the president of Brazil in 2010?'), false)
+})

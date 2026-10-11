@@ -185,6 +185,20 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   if (strippedNarration && !finalText.trim()) {
     return { ok: false, reason: 'process_narration', reply: '', answer: '', citedSourceIds: [] }
   }
+  // Salvage only an independently worded final paragraph after a source inventory.
+  // Source citations inside discarded reasoning never count toward acceptance.
+  const inventoryLine = /^\s*(?:[-*]\s*)?\[LIVE\d+\]\s*(?::|(?:is about|discusses|mentions|says|shows|has|titled)\b)/i
+  const processLine = /^\s*(?:looking at the evidence|the key evidence is|the user is asking|let(?:'s| us) (?:tackle|check|review)|we (?:must|need to)|the question asks)/i
+  const lines = finalText.split('\n')
+  const lastWalkthrough = lines.findLastIndex(line => inventoryLine.test(line))
+  if (lastWalkthrough >= 0) {
+    const afterInventory = lines.slice(lastWalkthrough + 1).join('\n').trim()
+    const tail = (afterInventory.split(/\n\s*\n/).at(-1) || '').trim()
+    // Never recover by length alone: require a separately cited, direct final claim.
+    if (tail && /\[LIVE\d+\]/.test(tail) && !tail.split('\n').some(line => processLine.test(line) || inventoryLine.test(line)) && !/^(?:sources?:|therefore,? we|the evidence|this means)/i.test(tail)) {
+      finalText = tail
+    }
+  }
   const raw = trimToCompleteSentence(normalizeLiveCitations(finalText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
   const citedSourceIds: string[] = []

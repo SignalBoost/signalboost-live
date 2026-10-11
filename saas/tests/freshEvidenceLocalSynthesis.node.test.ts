@@ -342,3 +342,11 @@ test('live synthesis prompts reject source inventories in favor of category-corr
   assert.equal(acceptFreshEvidenceGroundedAnswer({ text: 'The strongest evidence comes from [LIVE1], which identifies general repair services.', input, sources: localSources }).reason, 'process_narration')
   assert.equal(acceptFreshEvidenceGroundedAnswer({ text: 'The available information does not confirm specialty repair shops; general repair services are listed. [LIVE1]', input, sources: localSources }).ok, true)
 })
+
+test('narration recovery requests structured answer and validates the extracted answer through the same release gate', () => {
+  const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(transport, /structured \? \{ jsonObject: true/)
+  assert.match(transport, /typeof parsed\?\.answer !== 'string'/)
+  assert.match(transport, /accepted\.reason === 'process_narration'\)/)
+  assert.match(transport, /acceptFreshEvidenceGroundedAnswer\(\{ text: second\.text, input: args\.input, sources: args\.sources \}\)/)
+})

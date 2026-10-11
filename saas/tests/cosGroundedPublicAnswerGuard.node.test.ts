@@ -52,3 +52,16 @@ test('narration citations alone never count as a supported answer', () => {
  const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:"First, I'll scan the sources [LIVE1]. We must inspect more."})
  assert.equal(result.ok,false)
 })
+
+test('Asuncion source-by-source thinking with citations is never published', () => {
+ const draft = "Okay, let's tackle this query. The user is asking about salsa dancing clubs.\nLooking at the evidence sources:\n[LIVE1] is about salsa in social sciences.\n[LIVE2] discusses New York.\n[LIVE3] mentions studios.\nThe key evidence is LIVE3, but studios are not clubs."
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:draft})
+ assert.equal(result.ok,false)
+ assert.equal(result.reason,'process_narration')
+})
+test('Frankfurt bulleted source inventory is not a final answer', () => {
+ const draft = "The evidence retrieved includes sources about Frankfurt.\n- [LIVE1]: a paper about music.\n- [LIVE2]: salsa history.\n- [LIVE3]: a calendar of salsa events."
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:draft})
+ assert.equal(result.ok,false)
+ assert.equal(result.reason,'process_narration')
+})

@@ -8,6 +8,7 @@
 
 import { callLocalModel, callLocalModelTurn, localInferenceConfigFromEnv, type LocalModelToolDefinition } from '../local-inference.ts'
 import { extractBalancedJsonObject } from './reasonerOutput.ts'
+import { plannerSearchQueriesFromToolArguments, sanitizePlannerSearchQueries, PLANNER_SEARCH_QUERY_MAX_COUNT } from './plannerSearchQueries.ts'
 
 export const COS_AGENT_CAPABILITIES = [
   'live_web',
@@ -29,6 +30,7 @@ export type CosAgentDecision =
       answer: string
       confidence: number
       capabilities: []
+      searchQueries: []
       reason: string
       reasonerLabel: string
     }>
@@ -37,6 +39,8 @@ export type CosAgentDecision =
       answer: ''
       confidence: number
       capabilities: CosAgentCapability[]
+      /** Self-contained web searches the planner wrote for live_web; empty when it wrote none. */
+      searchQueries: string[]
       reason: string
       reasonerLabel: string
     }>
@@ -48,7 +52,7 @@ function isCosAgentCapability(value: string): value is CosAgentCapability {
 }
 
 const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
-  live_web: 'Retrieve current or mutable public-world information before answering.',
+  live_web: 'Retrieve current or mutable public-world information before answering. Pass the web searches to run in queries.',
   conversation_history: 'Retrieve this signed-in user\'s past conversation context when it is materially required.',
   internal_context: 'Retrieve private organization/project context available to the authenticated owner.',
   semantic_memory: 'Retrieve meaning-similar durable knowledge, documents, learned material, enterprise/user context, and other authorized semantic memory. This is context retrieval, not permission and not a substitute for live facts.',
@@ -58,6 +62,30 @@ const CAPABILITY_DESCRIPTIONS: Record<CosAgentCapability, string> = {
   software_specialist: 'Hand off real debugging, implementation, testing, or deployment work to the governed Software Specialist.',
   external_action: 'Request an authorized action in an external system; host policy decides whether execution is allowed.',
 }
+
+const LIVE_WEB_PARAMETERS = Object.freeze({
+  type: 'object',
+  properties: Object.freeze({
+    queries: Object.freeze({
+      type: 'array',
+      maxItems: PLANNER_SEARCH_QUERY_MAX_COUNT,
+      items: Object.freeze({ type: 'string' }),
+      description: `1-${PLANNER_SEARCH_QUERY_MAX_COUNT} self-contained web search queries that would retrieve the facts needed to answer.`,
+    }),
+  }),
+  required: Object.freeze(['queries']),
+  additionalProperties: false,
+})
+
+/**
+ * What the planner must know to decide live_web and write its searches. Shared by the native tool turn and
+ * the JSON compatibility turn so both apply one standard.
+ */
+const LIVE_WEB_PLANNING_RULES = [
+  'Request live_web whenever a correct answer depends on the present or future state of the outside world: who currently holds an office or role, elections and their candidates, polls or likely outcomes, upcoming or recent events, news, markets, prices, schedules, availability, weather, laws or rules in force, or any figure that changes over time. Stable knowledge (concepts, history, how things work) needs no tool.',
+  'A preceding assistant turn is conversation context, not evidence. Its sources and facts do not cover a new subject, a new country, or a new question; when the current request needs current facts the preceding turn does not already state, request live_web.',
+  `With live_web, write 1-${PLANNER_SEARCH_QUERY_MAX_COUNT} web search queries a skilled researcher would type: self-contained (resolve pronouns and follow-ups from the conversation into the actual subject), specific to what must be established now, naming the place, office, event and year when known, and covering the distinct facts the answer needs (for example the current state and the upcoming event). Write them in the language most likely to find authoritative sources. Never copy the user's sentence when a better search exists.`,
+].join(' ')
 
 function toolCatalog(input: { surface: 'assistant' | 'concierge'; ownerAuthenticated: boolean }): readonly LocalModelToolDefinition[] {
   const allowed: readonly CosAgentCapability[] = input.surface === 'concierge'
@@ -70,7 +98,7 @@ function toolCatalog(input: { surface: 'assistant' | 'concierge'; ownerAuthentic
     function: Object.freeze({
       name,
       description: CAPABILITY_DESCRIPTIONS[name],
-      parameters: Object.freeze({ type: 'object', properties: Object.freeze({}), additionalProperties: false }),
+      parameters: name === 'live_web' ? LIVE_WEB_PARAMETERS : Object.freeze({ type: 'object', properties: Object.freeze({}), additionalProperties: false }),
     }),
   })))
 }
@@ -98,7 +126,7 @@ export function parseCosAgentDecision(raw: string, reasonerLabel = 'unknown'): C
     if (mode === 'answer') {
       const answer = String(parsed.answer || '').trim()
       if (!answer) return null
-      return { mode: 'answer', answer, confidence: score, capabilities: [], reason, reasonerLabel }
+      return { mode: 'answer', answer, confidence: score, capabilities: [], searchQueries: [], reason, reasonerLabel }
     }
 
     if (mode === 'orchestrate') {
@@ -109,7 +137,8 @@ export function parseCosAgentDecision(raw: string, reasonerLabel = 'unknown'): C
           .filter(value => CAPABILITY_SET.has(value)),
       )] as CosAgentCapability[]
       if (!capabilities.length) return null
-      return { mode: 'orchestrate', answer: '', confidence: score, capabilities, reason, reasonerLabel }
+      const searchQueries = capabilities.includes('live_web') ? sanitizePlannerSearchQueries(parsed.queries) : []
+      return { mode: 'orchestrate', answer: '', confidence: score, capabilities, searchQueries, reason, reasonerLabel }
     }
     return null
   } catch {
@@ -179,6 +208,7 @@ export async function decideCosAgentTurn(input: {
       'A function call is a capability request, NOT authorization. The host independently checks identity, scope, permissions, safety, and action policy.',
       'Do not call tools merely because a topic is sophisticated. A conceptual software question that stable knowledge can answer needs no tool.',
       'Current/future travel details such as transport, fares, opening hours, prices, availability, schedules, weather, or other mutable facts require live_web.',
+      LIVE_WEB_PLANNING_RULES,
       'Request semantic_memory when meaning-similar durable internal context would materially improve the answer beyond stable model knowledge.',
       'Request creative_memory when a planning, writing, ideation, recommendation, transformation, or problem-solving task would materially benefit from validated prior approaches or successful answer patterns. Creative Memory guides HOW to solve/present; never use it as factual evidence.',
       'When no tool is required, do NOT write an answer. Return ONLY this exact JSON: {"mode":"answer","answer":"COS","confidence":1,"capabilities":[],"reason":"cos_answers"}.',
@@ -209,11 +239,13 @@ export async function decideCosAgentTurn(input: {
       ),
     )
     if (capabilities.length) {
+      const liveWebCall = nativeTurn.toolCalls.find(call => String(call.function.name || '').trim() === 'live_web')
       return {
         mode: 'orchestrate',
         answer: '',
         confidence: 1,
         capabilities,
+        searchQueries: liveWebCall ? plannerSearchQueriesFromToolArguments(liveWebCall.function.arguments) : [],
         reason: 'native_tool_request',
         reasonerLabel: turnReasonerLabel(nativeTurn),
       }
@@ -242,7 +274,8 @@ export async function decideCosAgentTurn(input: {
       'For this user request choose exactly one outcome: NO TOOL NEEDED, or REQUEST the minimum capabilities needed before a reliable answer/action can be completed.',
       'Return ONLY strict JSON using exactly one of these shapes (never write an answer to the user):',
       '{"mode":"answer","answer":"COS","confidence":1,"capabilities":[],"reason":"cos_answers"}',
-      '{"mode":"orchestrate","answer":"","confidence":0.0,"capabilities":["live_web"],"reason":"brief reason"}',
+      '{"mode":"orchestrate","answer":"","confidence":0.0,"capabilities":["live_web"],"queries":["self-contained web search"],"reason":"brief reason"}',
+      LIVE_WEB_PLANNING_RULES,
       'Return the no-tool JSON when the request is reliably answerable from the request itself, conversation context supplied here, and stable model knowledge. Do not request capabilities merely to improve wording or because the topic sounds sophisticated.',
       'Use mode=orchestrate whenever correctness materially depends on information or action unavailable inside the model.',
       `Allowed capabilities for this turn: ${tools.map(tool => tool.function.name).join(', ')}.`,

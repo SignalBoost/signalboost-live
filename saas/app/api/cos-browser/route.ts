@@ -34,6 +34,7 @@ import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationa
 import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { decideCosAgentTurn, stableKnowledgeQuestionNeedsNoPlanner, type CosAgentDecision } from '@/lib/ai/cos/cosAgentDecision'
+import { encodePlannerSearchQueriesHeader, PLANNER_SEARCH_QUERIES_HEADER } from '@/lib/ai/cos/plannerSearchQueries'
 import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence, requiresLiveTravelPlanningEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { isSignalBoostSpecificPublicRequest } from '@/lib/ai/cos/publicScenarioScope'
 import { mentionsPlatformConcept } from '@/lib/ai/cos/cosPlatformGlossary'
@@ -353,6 +354,8 @@ async function executeBrowserTurn(req: NextRequest) {
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')
+  // Only this turn's planner may supply search queries; never forward a client-supplied value.
+  routedHeaders.delete(PLANNER_SEARCH_QUERIES_HEADER)
   const routedBody = attachedOperationalEvidence
     ? { ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }
     : body
@@ -447,6 +450,7 @@ async function executeBrowserTurn(req: NextRequest) {
       answer: '',
       confidence: Math.max(0.55, agentDecision.confidence),
       capabilities: ['live_web'],
+      searchQueries: [],
       reason: 'host_freshness_guard',
       reasonerLabel: agentDecision.reasonerLabel,
     }
@@ -517,6 +521,9 @@ async function executeBrowserTurn(req: NextRequest) {
 
     routedHeaders.set('x-signalboost-agent-mode', 'orchestrate')
     routedHeaders.set('x-signalboost-agent-capabilities', agentDecision.capabilities.join(','))
+    // The planner's own searches for live_web. Always set (empty clears any client-supplied value) so
+    // /api/cos-primary searches only what this turn's planner wrote, or its host template when none.
+    routedHeaders.set(PLANNER_SEARCH_QUERIES_HEADER, encodePlannerSearchQueriesHeader(agentDecision.searchQueries))
     routedHeaders.set('x-signalboost-agent-confidence', String(agentDecision.confidence))
     routedRequest = new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify(routedBody) })
   }

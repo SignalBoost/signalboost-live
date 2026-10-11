@@ -14,14 +14,14 @@ test('model decision parser accepts direct answers and filters capability plans 
       '{"mode":"answer","answer":"Brasília.","confidence":0.99,"capabilities":[],"reason":"self_contained"}',
       'primary',
     ),
-    { mode:'answer', answer:'Brasília.', confidence:0.99, capabilities:[], reason:'self_contained', reasonerLabel:'primary' },
+    { mode:'answer', answer:'Brasília.', confidence:0.99, capabilities:[], searchQueries:[], reason:'self_contained', reasonerLabel:'primary' },
   )
   assert.deepEqual(
     parseCosAgentDecision(
       '{"mode":"orchestrate","answer":"","confidence":0.91,"capabilities":["live_web","live_web","bogus"],"reason":"current transport"}',
       'primary',
     ),
-    { mode:'orchestrate', answer:'', confidence:0.91, capabilities:['live_web'], reason:'current transport', reasonerLabel:'primary' },
+    { mode:'orchestrate', answer:'', confidence:0.91, capabilities:['live_web'], searchQueries:[], reason:'current transport', reasonerLabel:'primary' },
   )
 })
 

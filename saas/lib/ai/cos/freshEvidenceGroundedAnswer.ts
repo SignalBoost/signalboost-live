@@ -171,11 +171,18 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   // Never strip a bare "Let me analyze" prefix: the remainder may still be private reasoning.
   let finalText = cleanPublicText.trim()
   const narrationSentence = /^(?:okay,?\s*)?(?:let me (?:analy[sz]e|review|examine|go through|tackle|check)\b|first,?\s+i(?:'ll| will| need to)\b|we (?:are given|must|need to)\b|i(?:'ll| will) (?:analy[sz]e|review|check|scan)\b)[^\n.!?]*[.!?]\s*/i
+  let strippedNarration = false
   for (let i = 0; i < 3; i++) {
     const match = narrationSentence.exec(finalText)
     if (!match) break
+    strippedNarration = true
     // Citations belonging to discarded reasoning cannot validate the remaining answer.
     finalText = finalText.slice(match[0].length).replace(/^(?:\s*\[LIVE\d+\])+\s*/i, '').trimStart()
+  }
+  // A narration-only draft is a process leak, not merely an empty model answer.
+  // Reject it with the repair reason appropriate to the actual failure.
+  if (strippedNarration && !finalText.trim()) {
+    return { ok: false, reason: 'process_narration', reply: '', answer: '', citedSourceIds: [] }
   }
   const raw = trimToCompleteSentence(normalizeLiveCitations(finalText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()

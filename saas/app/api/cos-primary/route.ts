@@ -36,7 +36,6 @@ import {
   type FreshEvidenceSource,
 } from '@/lib/ai/cos/cosFreshGrounding'
 import { freshEvidenceMeetsQuestionAuthority } from '@/lib/ai/cos/cosFreshAuthority'
-import { mustFailClosedWithoutAuthoritativeLiveEvidence } from '@/lib/ai/cos/liveEvidenceFailClosed'
 import { resolveFreshConversationContext } from '@/lib/ai/cos/cosFreshConversationContext'
 import { writeVolatileAnswerCache } from '@/lib/ai/cos/cosVolatileAnswerCache'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
@@ -688,32 +687,41 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   let freshLocalAttempted=false,freshLocalModel:string|null=null
   let freshLocalFailureCode: FreshEvidenceInternalFailureCode | null = null
   let freshGroundingRejection:string|null=null
-  let freshMissUseLocal=false
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
     const queries=freshEvidenceSearchQueries(lookupInput)
     const liveResults=await timeCosStage('primary:web_search',()=>Promise.all(queries.map(query=>getExternalInfo(query,8,{bypassCache:true}))))
     freshError=liveResults.some(live=>live.ok)?null:liveResults.map(live=>live.ok?'':live.error||'Live search returned no usable evidence.').filter(Boolean).join(' | ')
     freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8,lookupInput)
-    const claimResearch=await timeCosStage('primary:web_page_reads',()=>deepenClaimResearch(lookupInput,freshSources,readPublicPages))
+    let claimResearch=await timeCosStage('primary:web_page_reads',()=>deepenClaimResearch(lookupInput,freshSources,readPublicPages))
     freshSources=claimResearch.sources
+    // ZERO-SOURCE MISS (2026-10-10): the augmented query can return nothing while the plain question
+    // returns plenty. One bounded retry with the plain question. If that is also empty, the turn fails
+    // closed below — a question the freshness policy marks as current is NEVER answered from model
+    // memory (the former search-miss detour to ordinary COS released "as of 2023" answers in 2026).
+    if(!freshSources.length){
+      const plainQuery=lookupInput.replace(/\s+/g,' ').trim().slice(0,220)
+      logEscalation({event:'fresh_zero_source_retry',query:plainQuery,external_ai_invoked:false,local_model_invoked:false})
+      const retry=await timeCosStage('primary:web_search_retry',()=>getExternalInfo(plainQuery,8,{bypassCache:true}))
+      if(retry.ok&&retry.results.length){
+        freshSources=prepareFreshEvidenceAcrossQueries([retry.results],8,lookupInput)
+        claimResearch=await timeCosStage('primary:web_page_reads_retry',()=>deepenClaimResearch(lookupInput,freshSources,readPublicPages))
+        freshSources=claimResearch.sources
+        freshRetrievedAt=new Date().toISOString()
+      }
+    }
     const constructedRoster=constructDatedRoster(lookupInput,freshSources)
     const sources=freshSources
     const authoritySatisfied=freshEvidenceMeetsQuestionAuthority(lookupInput, sources)&&securityScenarioEvidenceIsSpecific(lookupInput,freshSources)
     logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),claim_research:claimResearch.claims,pages_read:claimResearch.pagesRead,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     if(!authoritySatisfied){
-      if(!freshSources.length && !mustFailClosedWithoutAuthoritativeLiveEvidence(lookupInput)){
-        freshMissUseLocal=true
-      } else {
       const detail=freshError||'Live search did not return authoritative evidence required for this current fact.'
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:detail,synthesisAccepted:false})
       ;Object.assign(executionProvenance as any, {policy:'fresh_live_data_local_first', assistant_text_used_for_resolution:false})
       const reply=freshEvidenceUnavailableReply(language,lookupInput),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
       await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-unavailable',{prompt:lookupInput,answered:false,confidence:0,branch:'fresh_evidence_unavailable'})
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-unavailable',confidence_score:0,confidence_threshold:confidenceThreshold(),escalation_reason_code:'insufficient_live_authority',fresh_failure_class:'insufficient_live_authority',external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:200})
-      }
     }
-    if(!freshMissUseLocal){
     const constructedEconomics=constructEconomicFactsReply(lookupInput,freshSources)
     if(constructedEconomics){
       const reply=constructedEconomics.reply
@@ -823,7 +831,6 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       freshGroundingRejection=localSynthesis.kind==='citation_grounding_rejected'?localSynthesis.reason:null
       logEscalation({event:'fresh_local_synthesis_declined',failure_code:freshLocalFailureCode,grounding_rejection:freshGroundingRejection,question_fingerprint:hashPrompt(lookupInput),question_chars:lookupInput.length,source_hosts:[...new Set(freshSources.map(source=>{try{return new URL(source.url).hostname}catch{return 'invalid'}}))],documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     }
-    }
   }
 
   let reasoningPrompt=input
@@ -842,7 +849,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     : null
   if(conversationRecall) reasoningPrompt=`${conversationRecall}\n\nCURRENT USER REQUEST:\n${reasoningPrompt}`
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
-  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)){
+  if(!requestedAction&&!requiresFreshEvidence){
     try{recordCosLatencyStage('primary:before_cos_first',Date.now()-startedAt);cos=await timeCosStage('primary:cos_first_answer',()=>tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest||modelPlannedSemanticMemory||modelPlannedCreativeMemory}))}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';persistCosPrimaryProvenanceAfterResponse(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
@@ -850,7 +857,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // A low confidence score is learning/calibration telemetry, not permission to throw away a
   // useful guarded answer. For ordinary non-live, non-action tasks, release the best-effort answer
   // that already survived the normal COS pipeline instead of replacing it with a generic refusal.
-  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()){
+  if(!requestedAction&&!requiresFreshEvidence&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()){
     const reply=cos.bestEffortReply.trim()
     const executionProvenance=authoritativeProvenance(cos,{invoked:false})
     ;(executionProvenance as any).completion_first={released_best_effort:true,confidence:cos.confidence,threshold:confidenceThreshold()}
@@ -862,7 +869,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // If ordinary COS could not complete a non-live, non-action turn, use neural semantic intent
   // before the generic failed-closed reply. This catches natural human requests such as “help me say
   // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
-  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
+  if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
     const rescueIntent=semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
       const semanticFast=await runFastAuthoring(input,language)
@@ -873,12 +880,12 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   // Last ordinary-task rescue before any failed-closed path. This is intentionally broader than
   // authoring: explanation, analysis, planning, and other low-risk tasks should still receive a
   // useful answer when the primary confidence gate declined to release one.
-  if(!requestedAction&&(!requiresFreshEvidence||freshMissUseLocal)&&!hasAttachments&&!isCosCodingObjective(input)){
+  if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)){
     const completionRescue=await timeCosStage('primary:completion_rescue',()=>runCompletionFirstRescue(input,language,cosAudience(isPrivileged)))
     if(completionRescue)return completionFirstResponse(startedAt,input,completionRescue,'cos-completion-first-rescue')
   }
 
-  const freshHardFail=requiresFreshEvidence&&!freshMissUseLocal
+  const freshHardFail=requiresFreshEvidence
   const freshFailureCode: FreshEvidenceInternalFailureCode | null = freshHardFail
     ? (freshLocalFailureCode ?? 'local_synthesis_unparseable')
     : null

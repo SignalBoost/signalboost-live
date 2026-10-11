@@ -500,6 +500,9 @@ const tests = [
   // Public-office evidence rule: institutional host (any country) or two independent hosts; gate and citation check share it.
   'tests/officeHolderEvidenceRule.node.test.ts',
 
+  // A current-world question is never answered from model memory: zero-source search retries once, then fails closed.
+  'tests/cosFreshMissNeverMemory.node.test.ts',
+
   'tests/cosStructuredLiveInfo.node.test.ts',
 
   'tests/cosTemporalClaimGuard.node.test.ts',

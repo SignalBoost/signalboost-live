@@ -125,9 +125,12 @@ export type FreshEvidenceGroundedAcceptance = {
  */
 export function trimToCompleteSentence(text: string): string {
   const value = String(text || '').trim()
-  if (!value || /[.!?…。！？]["”')\]]?$/u.test(value)) return value
+  // Complete already: ends with sentence punctuation, optionally followed by the citations for that sentence.
+  const complete = /[.!?…。！？]["”')\]]?(?:\s*\[LIVE\d+\])*\s*$/u
+  if (!value || complete.test(value)) return value
   let cut = -1
-  for (const m of value.matchAll(/[.!?…。！？]["”')\]]?(?=\s)/gu)) cut = (m.index ?? -1) + m[0].length
+  // A sentence end followed by whitespace; trailing citation tags belong to the sentence before them.
+  for (const m of value.matchAll(/[.!?…。！？]["”')\]]?(?:\s*\[LIVE\d+\])*(?=\s)/gu)) cut = (m.index ?? -1) + m[0].length
   if (cut >= Math.ceil(value.length * 0.6)) return value.slice(0, cut).trim()
   return value
 }

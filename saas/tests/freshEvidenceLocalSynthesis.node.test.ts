@@ -155,6 +155,9 @@ test('a length-capped answer is released after trimming to its last complete sen
   const accepted = acceptFreshEvidenceGroundedAnswer({ text: capped, input: officeQuestion, sources })
   assert.equal(accepted.ok, true)
   assert.doesNotMatch(accepted.answer, /Octo$/)
+  // Citations after a sentence's period belong to that sentence and survive both the complete check and a cut.
+  assert.equal(trimToCompleteSentence('The runoff is on 25 October. [LIVE1] [LIVE2]'), 'The runoff is on 25 October. [LIVE1] [LIVE2]')
+  assert.equal(trimToCompleteSentence('The runoff between the two first-round leaders is on 25 October, as reported. [LIVE1] [LIVE2] Polling on 8 Octo'), 'The runoff between the two first-round leaders is on 25 October, as reported. [LIVE1] [LIVE2]')
   // A complete answer is untouched; a short answer cut inside its first sentence is kept rather than emptied.
   assert.equal(trimToCompleteSentence('Done. Really done.'), 'Done. Really done.')
   assert.equal(trimToCompleteSentence('A very long opening sentence that was cut before any period'), 'A very long opening sentence that was cut before any period')

@@ -98,6 +98,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'You are COS. Live web evidence was retrieved by the server moments ago for the question below. Answer the user directly without showing reasoning.',
     `Answer in ${reportLanguageName(args.language)} unless the question is clearly written in another language; then answer in that language.`,
     'Answer the question directly in the first sentence. Never expose analysis or source-by-source commentary.',
+    'Never inspect individual LIVE sources aloud or list what they contain. Do not begin with Okay let us, Looking at the evidence, From the sources, or Based on the provided evidence. Begin with the factual conclusion itself.',
     `The current UTC year is ${new Date().getUTCFullYear()}. Treat that year as the current year, not as a future date.`,
     'For every current-world fact, use only the evidence supplied. Model memory is stale and must not supply dates, names, numbers, or outcomes.',
     'Cite inline with the evidence id in square brackets, e.g. [LIVE1], immediately after each fact it supports. Do not write URLs; the server appends the source list.',
@@ -116,7 +117,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
   const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
-  const prompt = `/no_think\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nAnswer the question directly in the first sentence. Do not analyze or enumerate sources, and do not narrate your reasoning. Cite factual claims with [LIVEn] ids.\nQUESTION: ${args.input}\nANSWER:`
+  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive 1–3 short, factual sentences. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nBegin with the direct answer, not your analysis.\nANSWER:`
   return { systemPrompt, prompt }
 }
 
@@ -231,7 +232,7 @@ export function freshEvidenceGroundedRepairPrompt(args: {
   const base = freshEvidenceGroundedAnswerPrompt(args)
   const requirement = freshCitationRequirement(args.input, args.sources)
   const instruction = args.reason === 'process_narration'
-    ? 'Your draft exposed internal analysis instead of answering. Remove all process narration, source-by-source inspection and restatement of the question. Answer directly in one or two factual sentences, citing only relevant LIVE evidence ids. Do not reuse the previous draft wording.'
+    ? 'The previous draft contained process narration and cannot be published. Write a completely new answer. Start with the direct factual conclusion; add at most two supporting sentences citing [LIVEn]. Do not inspect sources aloud, summarize individual source contents, or reuse the rejected draft.'
     : args.reason === 'citation_requirement_unmet'
     ? `Your draft was not released because it did not meet the citation requirement. ${describeFreshCitationRequirement(requirement, args.sources)} Rewrite the answer so that it cites evidence ids from the required number of different hosts wherever they support the same point; do not add facts the evidence does not contain.`
     : args.reason === 'no_evidence_cited'
@@ -239,7 +240,7 @@ export function freshEvidenceGroundedRepairPrompt(args: {
       : 'Your draft was not released. Rewrite the answer from the evidence, citing [LIVE#] ids inline.'
   return {
     systemPrompt: base.systemPrompt,
-    prompt: `${base.prompt}\n\nPREVIOUS DRAFT (not evidence):\n${String(args.draft || '').trim()}\n\nREPAIR: ${instruction}`,
+    prompt: `${base.prompt.replace(/\nANSWER:\s*$/, '')}\n\n${args.reason !== 'process_narration' && args.draft?.trim() ? `PREVIOUS DRAFT (not evidence):\n${args.draft.trim()}\n\n` : ''}REPAIR: ${instruction}\nANSWER:`,
   }
 }
 

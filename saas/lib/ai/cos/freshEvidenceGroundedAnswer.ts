@@ -291,7 +291,7 @@ export function freshEvidenceGroundedRepairPrompt(args: {
         'You write only the final response to a user, never the analysis or a source inventory. /no_think',
         `Reply in ${reportLanguageName(args.language)}. Use only the supplied LIVE evidence.`,
         'Answer the exact category asked; do not turn schools into clubs or predictions into results.',
-        'If no evidence confirms the exact requested thing, say that it is unconfirmed and name only clearly supported alternatives. A dance school, a nightclub, and an event are different categories.',
+        'If no evidence confirms the exact requested thing, say that it is unconfirmed and name only clearly supported alternatives. Do not rename a related category as the one requested.',
         'Every factual sentence requires its supporting [LIVE#] citation. Never invent facts or citations.',
         `CITATION REQUIREMENT: ${describeFreshCitationRequirement(requirement, args.sources)}`,
       ].join('\n'),

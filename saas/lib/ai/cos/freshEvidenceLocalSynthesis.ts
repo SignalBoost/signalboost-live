@@ -92,6 +92,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
 
   let accepted = acceptFreshEvidenceGroundedAnswer({ text: first.text, input: args.input, sources: args.sources })
   let label = first.label
+  let lastDraft = first.text
   let repaired = false
   // A rejected process-narration draft is not a completed answer. Give it one bounded
   // repair attempt even when first inference crosses 12 seconds; production examples
@@ -104,6 +105,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
     if (second && !('error' in second)) {
       repaired = true
       label = second.label
+      lastDraft = second.text
       accepted = acceptFreshEvidenceGroundedAnswer({ text: second.text, input: args.input, sources: args.sources })
     }
   }
@@ -116,6 +118,8 @@ export async function synthesizeFreshEvidenceLocally(args: {
     citedSourceIds: accepted.citedSourceIds,
     sources: args.sources.length,
     latencyMs: Date.now() - startedAt,
+    // Owner telemetry only: the head of a rejected draft, so a rejection can be read instead of guessed.
+    rejectedDraftHead: accepted.ok ? undefined : String(lastDraft || '').replace(/\s+/g, ' ').slice(0, 300),
   }))
 
   if (!accepted.ok) return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer' }

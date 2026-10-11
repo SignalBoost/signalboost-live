@@ -121,20 +121,6 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
   return { systemPrompt, prompt }
 }
 
-/** Flat result (repo rule: tsconfig strict:false, unions do not narrow). `reason` is null when ok. */
-export type FreshEvidenceGroundedAcceptance = {
-  ok: boolean
-  reason: FreshEvidenceGroundingRejection | null
-  reply: string
-  answer: string
-  citedSourceIds: string[]
-}
-
-/**
- * Deterministic acceptance limited to what deterministic code can verify. Citations the model
- * invented (ids that were never retrieved) are removed rather than failing the whole answer; an
- * answer that cites nothing used no evidence and is not released as a live answer.
- */
 /**
  * A length-capped answer ends mid-sentence. Cut back to the last sentence end when that keeps most of the
  * text; otherwise keep it as is (a short answer cut inside its first sentence is better than nothing).
@@ -150,103 +136,123 @@ export function trimToCompleteSentence(text: string): string {
   return value
 }
 
+/**
+ * Sentence-level release filter (2026-10-11). The previous gate was a growing list of opener phrases and
+ * rejected the WHOLE draft when any line matched one, so every new way the model phrased its reasoning
+ * killed an otherwise grounded answer. Instead, each sentence or list item is classified by what it is
+ * about: the model's own process (first person, the task, the question/user, a source inventory) is never
+ * published; a sentence about the world is published only when it cites a retrieved source and carries
+ * words, not just an id. The draft is rejected only when no cited factual sentence survives.
+ */
+const LIST_ITEM = /^\s*(?:[-*•–]|\d+[.)])\s+/
+const SENTENCE_BOUNDARY = /([.!?…。！？]["”')\]]*)((?:\s*\[LIVE\d+\](?!\s*(?:[:\-–]|\p{Ll})))*)(\s+|$)/gu
+const ABBREVIATION_BEFORE = /(?:^|[\s(])\p{Lu}[\p{L}]{0,2}$/u
+const FIRST_PERSON_CASED_I = /(?:^|[^\p{L}'])I(?:'m|'ll|'ve|'d)?(?=$|[^\p{L}'])/u
+const FIRST_PERSON_WORDS = /(?:^|[^\p{L}'])(?:let me|let's|let us|we|we're|we'll|we've|our)(?=$|[^\p{L}'])/iu
+const TASK_REFERENCE = /\b(?:the|this|that|my|your|their) (?:user|user's|question|query|prompt|instructions?|draft|final answer)\b|\b(?:el usuario|la pregunta|o usuário|a pergunta)\b/i
+const SOURCE_SUBJECT = /^\s*(?:[-*•–]\s*)?\[LIVE\d+\]/
+const PROCESS_OPENER = /^\s*(?:[-*•–]\s*)?(?:okay|ok|alright|hmm|wait|looking at|analy[sz]ing|checking|reviewing|scanning|going through|examining|first,? (?:i|we)\b)/i
+
+export function isProcessNarrationUnit(unit: string): boolean {
+  const text = String(unit || '')
+  return SOURCE_SUBJECT.test(text)
+    || PROCESS_OPENER.test(text)
+    || TASK_REFERENCE.test(text)
+    || FIRST_PERSON_CASED_I.test(text)
+    || FIRST_PERSON_WORDS.test(text)
+}
+
+/** Sentences of one prose line; trailing citations stay with the sentence they support. */
+export function splitAnswerSentences(line: string): string[] {
+  const units: string[] = []
+  let start = 0
+  for (const m of line.matchAll(SENTENCE_BOUNDARY)) {
+    const index = m.index ?? 0
+    const before = line.slice(start, index)
+    if (m[1] === '.' && !m[2] && ABBREVIATION_BEFORE.test(before)) continue
+    units.push(line.slice(start, index + m[1].length + m[2].length).trim())
+    start = index + m[0].length
+  }
+  if (start < line.length) units.push(line.slice(start).trim())
+  return units.filter(Boolean)
+}
+
+function hasWords(unit: string): boolean {
+  return (unit.replace(LIVE_CITATION, ' ').match(/\p{L}{2,}/gu) || []).length >= 1
+}
+
+/** Flat result (repo rule: tsconfig strict:false, unions do not narrow). `reason` is null when ok. */
+export type FreshEvidenceGroundedAcceptance = {
+  ok: boolean
+  reason: FreshEvidenceGroundingRejection | null
+  reply: string
+  answer: string
+  citedSourceIds: string[]
+}
+
 export function acceptFreshEvidenceGroundedAnswer(args: {
   text: string
   input: string
   sources: FreshEvidenceSource[]
 }): FreshEvidenceGroundedAcceptance {
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  // Remove only explicitly delimited thinking. Undelimited analysis is rejected,
-  // never mistaken for an answer merely because it contains LIVE citations.
   const modelText = String(args.text || '')
     .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
     .trim()
-  // The marker must start a line. A marker appearing inside a sentence is not a final answer.
-  const finalMarkers = [...modelText.matchAll(/(?:^|\n)\s*(?:final answer|answer)\s*:\s*/gi)]
-  const finalMarker = finalMarkers.at(-1)
+  // An explicit final-answer marker at a line start ends the model's preamble.
+  const finalMarker = [...modelText.matchAll(/(?:^|\n)\s*(?:final answer|answer)\s*:\s*/gi)].at(-1)
   const publicText = finalMarker ? modelText.slice((finalMarker.index || 0) + finalMarker[0].length) : modelText
-  // Harmless attribution prefaces are not internal reasoning. Remove only the
-  // introductory phrase, preserving the factual claim and its citations.
+  // A harmless attribution preface is not reasoning; drop the phrase, keep the claim.
   const cleanPublicText = publicText.replace(/^\s*(?:based on (?:the )?(?:retrieved |live )?sources?|according to (?:the )?(?:retrieved |live )?(?:sources|evidence))\s*[,.:–-]\s*/i, '')
-  // Drop only whole, clearly non-answer sentences before a factual answer.
-  // Never strip a bare "Let me analyze" prefix: the remainder may still be private reasoning.
-  let finalText = cleanPublicText.trim()
-  const narrationSentence = /^(?:okay,?\s*)?(?:let me (?:analy[sz]e|review|examine|go through|tackle|check)\b|first,?\s+i(?:'ll| will| need to)\b|we (?:are given|must|need to)\b|i(?:'ll| will) (?:analy[sz]e|review|check|scan)\b)[^\n.!?]*[.!?]\s*/i
-  let strippedNarration = false
-  for (let i = 0; i < 3; i++) {
-    const match = narrationSentence.exec(finalText)
-    if (!match) break
-    strippedNarration = true
-    // Citations belonging to discarded reasoning cannot validate the remaining answer.
-    finalText = finalText.slice(match[0].length).replace(/^(?:\s*\[LIVE\d+\])+\s*/i, '').trimStart()
-  }
-  // A narration-only draft is a process leak, not merely an empty model answer.
-  // Reject it with the repair reason appropriate to the actual failure.
-  if (strippedNarration && !finalText.trim()) {
-    return { ok: false, reason: 'process_narration', reply: '', answer: '', citedSourceIds: [] }
-  }
-  // Stage 1: The model sometimes writes a source-by-source walkthrough before
-  // giving a separately stated answer. Only the final answer is eligible for release.
-  // Removing individual analysis lines indiscriminately can splice speculative
-  // statements into an apparent answer, so use an explicit paragraph boundary.
-  //
-  // Stage 2: A recovered paragraph MUST contain its own LIVE citation. Citations
-  // in discarded lines must not be counted as support for a factual claim.
-  // Every surviving citation is checked again against the retrieved source map,
-  // and the host's existing authority policy still applies.
-  //
-  // Stage 3: If no independent, cited answer can be identified, preserve the
-  // unmodified draft for the process-narration rejection and bounded repair.
-  // Do not adopt a length threshold or publish analysis merely to avoid a 503.
-  // Salvage only an independently worded final paragraph after a source inventory.
-  // Source citations inside discarded reasoning never count toward acceptance.
-  const inventoryLine = /^\s*(?:[-*]\s*)?\[LIVE\d+\]\s*(?::|(?:is about|discusses|mentions|says|shows|has|titled)\b)/i
-  const processLine = /^\s*(?:looking at the evidence|the key evidence is|the user is asking|let(?:'s| us) (?:tackle|check|review)|we (?:must|need to)|the question asks)/i
-  const lines = finalText.split('\n')
-  const lastWalkthrough = lines.findLastIndex(line => inventoryLine.test(line))
-  if (lastWalkthrough >= 0) {
-    const afterInventory = lines.slice(lastWalkthrough + 1).join('\n').trim()
-    const tail = (afterInventory.split(/\n\s*\n/).at(-1) || '').trim()
-    // Never recover by length alone: require a separately cited, direct final claim.
-    if (tail && /\[LIVE\d+\]/.test(tail) && !tail.split('\n').some(line => processLine.test(line) || inventoryLine.test(line)) && !/^(?:sources?:|therefore,? we|the evidence|this means)/i.test(tail)) {
-      finalText = tail
+  const normalized = trimToCompleteSentence(normalizeLiveCitations(cleanPublicText))
+    .replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '')
+
+  let sawNarration = false
+  const keptLines: string[] = []
+  const lines = normalized.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/[ \t]{2,}/g, ' ').trimEnd()
+    if (!line.trim()) continue
+    const units = LIST_ITEM.test(line) ? [line.trim()] : splitAnswerSentences(line)
+    const kept: string[] = []
+    for (const unit of units) {
+      if (isProcessNarrationUnit(unit)) { sawNarration = true; continue }
+      if (/\[LIVE\d+\]/.test(unit) && hasWords(unit)) kept.push(unit)
+    }
+    if (kept.length) { keptLines.push(kept.join(' ')); continue }
+    // An uncited lead-in to a cited list ("Several venues host salsa nights:") introduces facts, it is not one.
+    const nextLine = lines.slice(i + 1).find(next => next.trim())
+    if (units.length === 1 && /:\s*$/.test(line) && !isProcessNarrationUnit(line) && nextLine && LIST_ITEM.test(nextLine) && /\[LIVE\d+\]/.test(nextLine) && !isProcessNarrationUnit(nextLine)) {
+      keptLines.push(line.trim())
     }
   }
-  const raw = trimToCompleteSentence(normalizeLiveCitations(finalText))
-  const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
-  // Build provenance from the final public answer ONLY; analysis citations are not evidence.\n  const citedSourceIds: string[] = []
+  // A lead-in never stands alone.
+  while (keptLines.length && /:\s*$/.test(keptLines[keptLines.length - 1])) keptLines.pop()
+  const answer = keptLines.join('\n').trim()
+  const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {
     if (!citedSourceIds.includes(match[1])) citedSourceIds.push(match[1])
   }
-  // Refuse a model answer which calls a previous year the current date on a
-  // live question. This is an explicit stale-date contradiction, not a ban on
-  // mentioning historical years as background.
+  if (!answer) {
+    const reason: FreshEvidenceGroundingRejection = sawNarration ? 'process_narration' : /\[LIVE\d+\]/.test(normalized) || !normalized.trim() ? 'empty_answer' : 'no_evidence_cited'
+    return { ok: false, reason, reply: '', answer: '', citedSourceIds: [] }
+  }
+  // Refuse a model answer which calls a previous year the current date on a live question.
   const currentYear = new Date().getUTCFullYear()
   const staleCurrentYear = /(?:as of (?:the )?(?:current date|today|now)\s*[,(: -]*|current (?:year|date|term)\s*(?:is|:|\()\s*)(20\d{2})/gi
   const staleAsOf = /\bas of\s+(?:the\s+)?(?:year\s+)?(20\d{2})\b/gi
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
-  const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
-  const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source|okay,?\s+let me|first,?\s+i(?:'ll| will)|so the established facts are|i(?:'ll| will) craft a concise answer|the other sources?)/i
-  const sourceListing = /(?:^|\n)\s*(?:[-*]\s*)?\[LIVE\d+\]\s*(?::|is about|discusses|mentions|says|shows)/i
-  const processOpener = /^(?:okay[,!]?\s+)?(?:let(?:'s| us) (?:tackle|check|review|look|analy[sz]e)|looking at the evidence|the user is asking|the key evidence is)/i
-  // A non-empty candidate is not automatically a safe answer. If process\n  // narration survives salvage, return the dedicated rejection reason so the\n  // repair path receives an actionable instruction instead of citation advice.\n  if (narration.test(answer) || analysisLeak.test(answer) || sourceListing.test(answer) || processOpener.test(answer)) {
-    return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
-  }
   if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleFutureFraming)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleCurrentYear)].some(match => Number(match[1]) !== currentYear)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
   }
-  if (!answer) return { ok: false, reason: 'empty_answer', reply: '', answer, citedSourceIds }
   if (hasUnsafePublicModelOutput(answer)) return { ok: false, reason: 'unsafe_public_output', reply: '', answer, citedSourceIds }
-  if (!citedSourceIds.length) return { ok: false, reason: 'no_evidence_cited', reply: '', answer, citedSourceIds }
   const citations = citedSourceIds.map(id => `[${id}] (${byId.get(id)!.url})`)
   const reply = `${answer}\n\nSources: ${citations.join(' and ')}`
   if (!replyCitesRequiredFreshEvidence(reply, args.input, args.sources)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
   }
-  // The answer field intentionally contains only releasable prose, never a
-  // full reasoning trace. Internal analysis must not be stored as public text.
   return { ok: true, reason: null, reply, answer, citedSourceIds }
 }
 

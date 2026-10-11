@@ -50,14 +50,14 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt): Promise<{ text: string; label: string } | { error: string } | null> {
+async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, timeoutMs = FRESH_GROUNDED_ANSWER_TIMEOUT_MS): Promise<{ text: string; label: string } | { error: string } | null> {
   try {
     const result = await callCosReasoner({
       ...prompt,
       temperature: FRESH_GROUNDED_ANSWER_TEMPERATURE,
       maxTokens: FRESH_GROUNDED_ANSWER_MAX_TOKENS,
       disableThinking: true,
-      timeoutMs: FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
+      timeoutMs,
       // Production 2026-10-10 20:34–20:35: the pod answered in 9.4–10 s every time with finish=length at the cap,
       // and local-inference threw the text away (LOCAL_MODEL_OUTPUT_TRUNCATED), so the retry and the 20 s backup
       // ran for nothing. A length-capped prose answer IS the answer: keep it, trim it to a complete sentence,
@@ -93,9 +93,11 @@ export async function synthesizeFreshEvidenceLocally(args: {
   let accepted = acceptFreshEvidenceGroundedAnswer({ text: first.text, input: args.input, sources: args.sources })
   let label = first.label
   let repaired = false
-  // Avoid an additional full generation when the interactive time budget has elapsed.
-  if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && Date.now() - startedAt < 12_000) {
-    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.answer, reason: accepted.reason }))
+  // Production evidence: narration-only answers routinely arrive at ~12.4s, so the
+  // old 12s cutoff NEVER attempted recovery. Allow one short repair, without
+  // recycling the rejected draft's analysis into the next model prompt.
+  if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && Date.now() - startedAt < 18_000) {
+    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: '', reason: accepted.reason }), 6_000)
     if (second && !('error' in second)) {
       repaired = true
       label = second.label

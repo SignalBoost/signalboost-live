@@ -253,7 +253,7 @@ test('narrow narration guard rejects explicit analysis preambles without blockin
  const accepted = acceptFreshEvidenceGroundedAnswer({text:attempted,input:officeQuestion,sources})
  assert.equal(accepted.ok,false)
  assert.equal(accepted.reason,'citation_requirement_unmet')
- const declarative = 'The question asks which candidate will be president, but the evidence shows a runoff. [LIVE1] [LIVE2]'
+ const declarative = 'The available reports describe a runoff, not a declared winner. [LIVE1] [LIVE2]'
  assert.equal(acceptFreshEvidenceGroundedAnswer({text:declarative,input:officeQuestion,sources}).ok,true)
  const repair = freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:attempted,reason:'citation_requirement_unmet'})
  assert.match(repair.prompt,/citation requirement/)

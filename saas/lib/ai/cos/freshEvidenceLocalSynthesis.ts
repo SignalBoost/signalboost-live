@@ -98,7 +98,9 @@ export async function synthesizeFreshEvidenceLocally(args: {
   // on 2026-10-11 repeatedly ended at ~12.2 seconds without any repair. Other
   // acceptance failures retain the existing latency guard.
   if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && (accepted.reason === 'process_narration' || Date.now() - startedAt < 12_000)) {
-    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.answer, reason: accepted.reason }))
+    console.info('[cos-fresh-grounded-repair-start]', JSON.stringify({ reason: accepted.reason, elapsedMs: Date.now() - startedAt, sources: args.sources.length }))
+    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.reason === 'process_narration' ? '' : accepted.answer, reason: accepted.reason }))
+    if (!second || 'error' in second) console.warn('[cos-fresh-grounded-repair-unavailable]', JSON.stringify({ reason: accepted.reason, errorCode: !second ? 'empty_response' : 'inference_error' }))
     if (second && !('error' in second)) {
       repaired = true
       label = second.label

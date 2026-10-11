@@ -269,3 +269,10 @@ test('process narration always gets the bounded repair even after the 12-second 
   assert.match(transport, /accepted\.reason === 'process_narration' \|\| Date\.now\(\) - startedAt < 12_000/)
   assert.match(transport, /accepted\.reason !== 'unsafe_public_output'/)
 })
+
+test('grounded answer instructions are topic-neutral rather than tied to one example', () => {
+  const answerPrompt = freshEvidenceGroundedAnswerPrompt({ input: 'Are there any salsa dancing clubs in Asuncion?', sources, retrievedAt, language: 'en' })
+  assert.doesNotMatch(answerPrompt.systemPrompt, /salsa dance club|dance studio, school, academy/i)
+  assert.match(answerPrompt.systemPrompt, /Respect the requested category and scope/)
+  assert.match(answerPrompt.systemPrompt, /Names, dates, quantities, and specific attributes/)
+})

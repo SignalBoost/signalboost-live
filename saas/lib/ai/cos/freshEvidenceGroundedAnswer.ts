@@ -275,6 +275,22 @@ export function freshEvidenceGroundedRepairPrompt(args: {
     : args.reason === 'no_evidence_cited'
       ? 'Your draft was not released because it cited no evidence id. Rewrite the answer citing [LIVE#] ids inline after each fact they support.'
       : 'Your draft was not released. Rewrite the answer from the evidence, citing [LIVE#] ids inline.'
+  if (args.reason === 'process_narration') {
+    // Production runpod/Qwen keeps generating self-analysis after the long policy prompt.
+    // The retry must change the stimulus, not repeat that prompt with more prohibitions.
+    const evidence = compactFreshEvidenceForReasoning(args.sources, args.input)
+    return {
+      systemPrompt: [
+        'You write only the final response to a user, never the analysis or a source inventory. /no_think',
+        `Reply in ${reportLanguageName(args.language)}. Use only the supplied LIVE evidence.`,
+        'Answer the exact category asked; do not turn schools into clubs or predictions into results.',
+        'If the evidence does not establish the requested fact, state that directly and distinguish verified alternatives.',
+        'Every factual sentence requires its supporting [LIVE#] citation. Never invent facts or citations.',
+        `CITATION REQUIREMENT: ${describeFreshCitationRequirement(requirement, args.sources)}`,
+      ].join('\n'),
+      prompt: `/no_think\n${freshEvidenceGroundingBlock(args.input, evidence, args.retrievedAt)}\n\nQUESTION: ${args.input}\nRESPONSE:`,
+    }
+  }
   return {
     systemPrompt: base.systemPrompt,
     prompt: `${base.prompt.replace(/\nANSWER:\s*$/, '')}\n\n${args.reason !== 'process_narration' && args.draft?.trim() ? `PREVIOUS DRAFT (not evidence):\n${args.draft.trim()}\n\n` : ''}REPAIR: ${instruction}\nANSWER:`,

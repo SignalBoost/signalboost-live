@@ -1,2 +1,2 @@
-base_sha=8d7092f7fd819b0e11ab589504ef3aa33fa117ab
-branch=fix/cos-direct-elections-guardrails-20261010
+base_sha=cd0fba99fe16ef75c661d457d13c582b59654371
+branch=fix/cos-no-analysis-and-topic-drift-20261011

@@ -146,7 +146,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   sources: FreshEvidenceSource[]
 }): FreshEvidenceGroundedAcceptance {
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  const raw = trimToCompleteSentence(String(args.text || ''))
+  const raw = trimToCompleteSentence(normalizeLiveCitations(String(args.text || '')))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
   const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {

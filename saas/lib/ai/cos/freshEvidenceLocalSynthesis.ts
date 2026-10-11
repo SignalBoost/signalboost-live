@@ -67,7 +67,7 @@ async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt): Promise<
       usageContext: { feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' },
     })
     if (!result?.text?.trim()) return null
-    return { text: result.text, label: result.reasoner.label }
+    return { text: result.text, label: result.reasoner?.label || 'cos-reasoner' }
   } catch (error) {
     return { error: errorText(error) }
   }
@@ -114,11 +114,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
   }))
 
   if (!accepted.ok) return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer' }
-  const reasoner = resolveCosReasoner()
   return {
     kind: 'accepted',
     reply: accepted.reply,
-    reasonerLabel: label || reasoner.config?.label || 'cos-reasoner',
+    reasonerLabel: label || resolveCosReasoner()?.config?.label || 'cos-reasoner',
     citedSourceIds: accepted.citedSourceIds,
   }
 }

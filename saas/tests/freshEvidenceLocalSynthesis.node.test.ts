@@ -92,7 +92,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   assert.match(source, /resolveCosReasoner/)
   assert.match(source, /lengthRule: CHAT_ANSWER_LENGTH_RULE/)
   assert.doesNotMatch(source, /EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
-  assert.match(source, /structured \? \{ jsonObject: true/, 'structured output is allowed only for the bounded narration recovery')
+  assert.doesNotMatch(source, /jsonObject: true/, 'live-answer recovery must not force JSON mode on local providers')
   assert.match(source, /, accepted\.reason === 'process_narration', answerTokens\)/, 'structured retry is limited to narration rejections')
   assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 4, 'definition + first call + empty-transport retry + one citation repair')
   const pure = readFileSync(new URL('../lib/ai/cos/freshEvidenceGroundedAnswer.ts', import.meta.url), 'utf8')
@@ -347,8 +347,8 @@ test('live synthesis prompts reject source inventories in favor of category-corr
 
 test('narration recovery requests structured answer and validates the extracted answer through the same release gate', () => {
   const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.match(transport, /structured \? \{ jsonObject: true/)
-  assert.match(transport, /typeof parsed\?\.answer !== 'string'/)
+  assert.doesNotMatch(transport, /jsonObject: true/)
+  assert.match(transport, /typeof parsed\?\.answer === 'string'/)
   assert.match(transport, /, accepted\.reason === 'process_narration', answerTokens\)/)
   assert.match(transport, /acceptFreshEvidenceGroundedAnswer\(\{ text: second\.text, input: args\.input, sources: args\.sources \}\)/)
 })

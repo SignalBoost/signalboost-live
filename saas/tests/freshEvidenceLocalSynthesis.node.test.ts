@@ -175,3 +175,21 @@ test('stale current-year assertions are rejected without banning historical cont
   })
   assert.equal(historical.ok, true)
 })
+
+test('live answers reject exposed analysis and stale as-of framing', () => {
+  const narration = acceptFreshEvidenceGroundedAnswer({
+    input: officeQuestion, sources,
+    text: 'Let me analyze the evidence provided. [LIVE1] [LIVE2]',
+  })
+  assert.equal(narration.ok, false)
+  const stale = acceptFreshEvidenceGroundedAnswer({
+    input: officeQuestion, sources,
+    text: 'The election is still in the future (as of 2024). [LIVE1] [LIVE2]',
+  })
+  assert.equal(stale.ok, false)
+  const direct = acceptFreshEvidenceGroundedAnswer({
+    input: officeQuestion, sources,
+    text: 'The outcome is undecided; the reported runoff is October 25, 2026. [LIVE1] [LIVE2]',
+  })
+  assert.equal(direct.ok, true)
+})

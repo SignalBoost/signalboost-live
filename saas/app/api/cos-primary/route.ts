@@ -700,6 +700,15 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     const liveResults=await timeCosStage('primary:web_search',()=>Promise.all(queries.map(query=>getExternalInfo(query,8,{bypassCache:true}))))
     freshError=liveResults.some(live=>live.ok)?null:liveResults.map(live=>live.ok?'':live.error||'Live search returned no usable evidence.').filter(Boolean).join(' | ')
     freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8,lookupInput)
+    // Exclude known navigation-only/social-result wrappers before enrichment or synthesis.
+    // Short snippets are still useful; do not demand article-length content from a search engine.
+    const excludedHosts=new Set(['youtube.com','youtu.be','tiktok.com','instagram.com','facebook.com','twitter.com','x.com'])
+    freshSources=freshSources.filter(source=>{
+      try {
+        const host=new URL(source.url).hostname.toLowerCase().replace(/^www\./,'')
+        return ![...excludedHosts].some(excluded=>host===excluded||host.endsWith('.'+excluded))
+      } catch { return false }
+    })
     const searchOnly=freshSources
     const claimResearch=await timeCosStage('primary:web_page_reads',()=>Promise.race([
       deepenClaimResearch(lookupInput,freshSources,readPublicPages),

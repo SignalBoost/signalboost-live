@@ -180,7 +180,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
   const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source|okay,?\s+let me|first,?\s+i(?:'ll| will)|so the established facts are|i(?:'ll| will) craft a concise answer|the other sources?)/i
   if (narration.test(answer) || analysisLeak.test(answer)) {
-    return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
+    return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
   }
   if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleFutureFraming)].some(match => Number(match[1]) !== currentYear)

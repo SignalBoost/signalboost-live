@@ -239,7 +239,7 @@ export function freshEvidenceGroundedRepairPrompt(args: {
       : 'Your draft was not released. Rewrite the answer from the evidence, citing [LIVE#] ids inline.'
   return {
     systemPrompt: base.systemPrompt,
-    prompt: `${base.prompt}\n\nPREVIOUS DRAFT (not evidence):\n${String(args.draft || '').trim()}\n\nREPAIR: ${instruction}`,
+    prompt: `${base.prompt}\n\n${args.draft?.trim() ? `PREVIOUS DRAFT (not evidence):\n${args.draft.trim()}\n\n` : ''}REPAIR: ${instruction}`,
   }
 }
 

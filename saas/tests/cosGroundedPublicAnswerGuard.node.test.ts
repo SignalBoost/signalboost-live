@@ -52,3 +52,9 @@ test('narration citations alone never count as a supported answer', () => {
  const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:"First, I'll scan the sources [LIVE1]. We must inspect more."})
  assert.equal(result.ok,false)
 })
+
+test('rejects production source-by-source reasoning and preserves the rejection reason', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:'Okay, let us tackle this question. [LIVE1] is about salsa. [LIVE2] discusses dance history.'})
+ assert.equal(result.ok,false)
+ assert.equal(result.reason,'process_narration')
+})

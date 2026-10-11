@@ -1,4 +1,6 @@
 'use client'
+import { useTranslation } from '@/lib/i18n/useTranslation'
+import { labIntegrationUiCopy } from '@/lib/i18n/labIntegrationUiCopy'
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
@@ -9,6 +11,9 @@ type RightRequest = { id: string; request_type: string; status: string; created_
 
 /** All account operations stay in the Frankfurt regional API namespace. */
 export default function EuAccountControls() {
+  const { lang } = useTranslation()
+  const copy = labIntegrationUiCopy(lang)
+
   const [access, setAccess] = useState<Access | null>(null)
   const [name, setName] = useState('')
   const [consent, setConsent] = useState(false)
@@ -86,18 +91,18 @@ export default function EuAccountControls() {
   }
 
   return <section style={{ display: 'grid', gap: 18, maxWidth: 560 }}>
-    {!access ? <p><Link href="/eu/access">Sign in to your European account</Link></p> : <>
-      <label>Display name <input aria-label="Display name" value={name} maxLength={160} onChange={event => setName(event.target.value)} /></label>
-      <label><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /> Allow account AI-training consent</label>
-      <button type="button" disabled={busy} onClick={() => void action('save')}>Save Frankfurt account preferences</button>
-      <h2>European data rights</h2>
-      <button type="button" disabled={busy} onClick={() => void action('export')}>Download Frankfurt account and workspace data</button>
-      <button type="button" disabled={busy} onClick={() => void action('export-request')}>Request complete data export</button>
-      <button type="button" disabled={busy} onClick={() => void action('delete-request')}>Request account deletion</button>
-      <p>Requests are recorded for processing, not automatically fulfilled. Connected-provider and workspace data may require separate handling.</p>
-      <h3>Recent requests</h3>
+    {!access ? <p><Link href="/eu/access">{copy.u_fb78737aa9e7}</Link></p> : <>
+      <label>{copy.u_2b7f6a84de91} <input aria-label={copy.u_2b7f6a84de91} value={name} maxLength={160} onChange={event => setName(event.target.value)} /></label>
+      <label><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /> {copy.u_632c4c56f0c8}</label>
+      <button type="button" disabled={busy} onClick={() => void action('save')}>{copy.u_fb6790dc269e}</button>
+      <h2>{copy.u_1f1517b4417a}</h2>
+      <button type="button" disabled={busy} onClick={() => void action('export')}>{copy.u_ff8c9594c4b5}</button>
+      <button type="button" disabled={busy} onClick={() => void action('export-request')}>{copy.u_14eee1c9df25}</button>
+      <button type="button" disabled={busy} onClick={() => void action('delete-request')}>{copy.u_6914ba38bf46}</button>
+      <p>{copy.u_160a0f610aa6}</p>
+      <h3>{copy.u_b83a589f114a}</h3>
       <ul>{requests.map(req => <li key={req.id}>{req.request_type}: {req.status} ({new Date(req.created_at).toLocaleDateString()})</li>)}</ul>
-      <button type="button" onClick={() => void access.signOut().then(() => window.location.assign('/eu/access'))}>Sign out of European account</button>
+      <button type="button" onClick={() => void access.signOut().then(() => window.location.assign('/eu/access'))}>{copy.u_13cb6203fe3b}</button>
     </>}
     {message && <p role="status">{message}</p>}
   </section>

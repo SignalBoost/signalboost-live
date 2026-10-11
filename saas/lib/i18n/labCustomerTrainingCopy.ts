@@ -4,7 +4,7 @@
 // The non-en/es/pt strings were machine-translated like the 2026-10-09 additions and have not had native review.
 
 export type LabCustomerTrainingCopy = Readonly<{
-  title: string; workspaceButton: string; noOrg: string; loadFailed: string
+  title: string; workspaceButton: string; endpointPh: string; noOrg: string; loadFailed: string
   keysHeading: string; teacherOnly: string; remove: string; noKeys: string; keyNamePh: string; keyPh: string; saveKey: string
   keySaved: string; keyNotSaved: string; keyRemoveFailed: string
   chooseHeading: string; useExamples: string; askTeacher: string; teacherKey: string; teacherModel: string; modelPh: string
@@ -28,6 +28,7 @@ const ERR_CODES = ['lab_teacher_budget_exceeded', 'lab_teacher_budget_invalid', 
 
 const en: LabCustomerTrainingCopy = {
   workspaceButton: 'Create workspace',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'Train your own model', noOrg: 'You are not a member of any LAB organization yet.', loadFailed: 'Could not read LAB data ({code}).',
   keysHeading: '1. Your provider keys', teacherOnly: '(teacher only)', remove: 'Remove', noKeys: 'No keys saved yet.',
   keyNamePh: 'Name, e.g. Team HF account', keyPh: 'API key', saveKey: 'Save key',
@@ -68,6 +69,7 @@ type T = Omit<LabCustomerTrainingCopy, 'errors'> & { errors: Record<typeof ERR_C
 
 const es: T = {
   workspaceButton: 'Crear espacio de trabajo',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'Entrena tu propio modelo', noOrg: 'Aún no eres miembro de ninguna organización LAB.', loadFailed: 'No se pudieron leer los datos de LAB ({code}).',
   keysHeading: '1. Tus claves de proveedor', teacherOnly: '(solo profesor)', remove: 'Eliminar', noKeys: 'Aún no hay claves guardadas.',
   keyNamePh: 'Nombre, p. ej. cuenta HF del equipo', keyPh: 'Clave API', saveKey: 'Guardar clave',
@@ -106,6 +108,7 @@ const es: T = {
 
 const pt: T = {
   workspaceButton: 'Criar espaço de trabalho',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'Treine seu próprio modelo', noOrg: 'Você ainda não é membro de nenhuma organização LAB.', loadFailed: 'Não foi possível ler os dados do LAB ({code}).',
   keysHeading: '1. Suas chaves de provedor', teacherOnly: '(somente professor)', remove: 'Remover', noKeys: 'Nenhuma chave salva ainda.',
   keyNamePh: 'Nome, ex.: conta HF da equipe', keyPh: 'Chave de API', saveKey: 'Salvar chave',
@@ -144,6 +147,7 @@ const pt: T = {
 
 const pl: T = {
   workspaceButton: 'Utwórz przestrzeń roboczą',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'Wytrenuj własny model', noOrg: 'Nie należysz jeszcze do żadnej organizacji LAB.', loadFailed: 'Nie udało się odczytać danych LAB ({code}).',
   keysHeading: '1. Twoje klucze dostawców', teacherOnly: '(tylko nauczyciel)', remove: 'Usuń', noKeys: 'Brak zapisanych kluczy.',
   keyNamePh: 'Nazwa, np. konto HF zespołu', keyPh: 'Klucz API', saveKey: 'Zapisz klucz',
@@ -182,6 +186,7 @@ const pl: T = {
 
 const ru: T = {
   workspaceButton: 'Создать рабочее пространство',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'Обучите собственную модель', noOrg: 'Вы пока не состоите ни в одной организации LAB.', loadFailed: 'Не удалось загрузить данные LAB ({code}).',
   keysHeading: '1. Ваши ключи провайдеров', teacherOnly: '(только учитель)', remove: 'Удалить', noKeys: 'Ключи ещё не сохранены.',
   keyNamePh: 'Название, напр. HF-аккаунт команды', keyPh: 'API-ключ', saveKey: 'Сохранить ключ',
@@ -220,6 +225,7 @@ const ru: T = {
 
 const de: T = {
   workspaceButton: 'Arbeitsbereich erstellen',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'Eigenes Modell trainieren', noOrg: 'Du bist noch in keiner LAB-Organisation Mitglied.', loadFailed: 'LAB-Daten konnten nicht gelesen werden ({code}).',
   keysHeading: '1. Deine Anbieter-Schlüssel', teacherOnly: '(nur Lehrer)', remove: 'Entfernen', noKeys: 'Noch keine Schlüssel gespeichert.',
   keyNamePh: 'Name, z. B. Team-HF-Konto', keyPh: 'API-Schlüssel', saveKey: 'Schlüssel speichern',
@@ -258,6 +264,7 @@ const de: T = {
 
 const fr: T = {
   workspaceButton: 'Créer un espace de travail',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'Entraînez votre propre modèle', noOrg: 'Vous n’êtes encore membre d’aucune organisation LAB.', loadFailed: 'Impossible de lire les données LAB ({code}).',
   keysHeading: '1. Vos clés de fournisseur', teacherOnly: '(enseignant uniquement)', remove: 'Supprimer', noKeys: 'Aucune clé enregistrée.',
   keyNamePh: 'Nom, p. ex. compte HF de l’équipe', keyPh: 'Clé API', saveKey: 'Enregistrer la clé',
@@ -296,6 +303,7 @@ const fr: T = {
 
 const it: T = {
   workspaceButton: 'Crea spazio di lavoro',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'Addestra il tuo modello', noOrg: 'Non sei ancora membro di alcuna organizzazione LAB.', loadFailed: 'Impossibile leggere i dati LAB ({code}).',
   keysHeading: '1. Le tue chiavi dei provider', teacherOnly: '(solo insegnante)', remove: 'Rimuovi', noKeys: 'Nessuna chiave salvata.',
   keyNamePh: 'Nome, ad es. account HF del team', keyPh: 'Chiave API', saveKey: 'Salva chiave',
@@ -334,6 +342,7 @@ const it: T = {
 
 const ja: T = {
   workspaceButton: 'ワークスペースを作成',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: '独自モデルをトレーニング', noOrg: 'まだどの LAB 組織にも所属していません。', loadFailed: 'LAB データを読み込めませんでした ({code})。',
   keysHeading: '1. プロバイダーキー', teacherOnly: '(教師専用)', remove: '削除', noKeys: '保存されたキーはありません。',
   keyNamePh: '名前（例: チームの HF アカウント）', keyPh: 'API キー', saveKey: 'キーを保存',
@@ -372,6 +381,7 @@ const ja: T = {
 
 const ko: T = {
   workspaceButton: '작업 공간 만들기',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: '나만의 모델 훈련', noOrg: '아직 어떤 LAB 조직에도 속해 있지 않습니다.', loadFailed: 'LAB 데이터를 읽을 수 없습니다 ({code}).',
   keysHeading: '1. 공급자 키', teacherOnly: '(교사 전용)', remove: '삭제', noKeys: '저장된 키가 없습니다.',
   keyNamePh: '이름, 예: 팀 HF 계정', keyPh: 'API 키', saveKey: '키 저장',
@@ -410,6 +420,7 @@ const ko: T = {
 
 const ar: T = {
   workspaceButton: 'إنشاء مساحة عمل',
+  endpointPh: 'https://api.example.com/chat/completions',
   title: 'درّب نموذجك الخاص', noOrg: 'لست عضوًا في أي مؤسسة LAB بعد.', loadFailed: 'تعذّرت قراءة بيانات LAB ({code}).',
   keysHeading: '1. مفاتيح المزوّدين', teacherOnly: '(للمعلّم فقط)', remove: 'إزالة', noKeys: 'لا توجد مفاتيح محفوظة بعد.',
   keyNamePh: 'الاسم، مثل حساب HF للفريق', keyPh: 'مفتاح API', saveKey: 'حفظ المفتاح',

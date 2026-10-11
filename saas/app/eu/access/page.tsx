@@ -1,4 +1,6 @@
 'use client'
+import { useTranslation } from '@/lib/i18n/useTranslation'
+import { labIntegrationUiCopy } from '@/lib/i18n/labIntegrationUiCopy'
 import { useState, type FormEvent } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { proposedEnrollmentRegion } from '@/lib/security/euEnrollmentRouting'
@@ -8,6 +10,9 @@ type AuthMode = 'signup' | 'login'
 
 /** European account access is separate from the US application and cookies. */
 export default function EuAccessPage() {
+  const { lang } = useTranslation()
+  const copy = labIntegrationUiCopy(lang)
+
   const [mode, setMode] = useState<AuthMode>('signup')
   const [country, setCountry] = useState('')
   const [name, setName] = useState('')
@@ -81,20 +86,20 @@ export default function EuAccessPage() {
   }
 
   return <main style={{ maxWidth: 480, margin: '48px auto', padding: 24 }}>
-    <h1>European account access</h1>
-    <p>European accounts use Frankfurt authentication. The US application is not used as a fallback.</p>
+    <h1>{copy.u_a59edceb0ab5}</h1>
+    <p>{copy.u_adb7e1aa3488}</p>
     <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-      <button type="button" onClick={() => { setMode('signup'); setMessage('') }} aria-pressed={mode === 'signup'}>Register</button>
-      <button type="button" onClick={() => { setMode('login'); setMessage('') }} aria-pressed={mode === 'login'}>Sign in</button>
+      <button type="button" onClick={() => { setMode('signup'); setMessage('') }} aria-pressed={mode === 'signup'}>{copy.u_bb7234ec1245}</button>
+      <button type="button" onClick={() => { setMode('login'); setMessage('') }} aria-pressed={mode === 'login'}>{copy.u_bfd402b2f6f3}</button>
     </div>
     <form onSubmit={submit} style={{ display: 'grid', gap: 14 }}>
-      <label>Country code (EU/EEA)<input required maxLength={2} value={country} onChange={e => setCountry(e.target.value.toUpperCase())} autoComplete="country" /></label>
-      {mode === 'signup' && <label>Display name<input required maxLength={160} value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>}
-      <label>Email<input required type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
-      <label>Password<input required type="password" minLength={8} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} /></label>
-      <button type="submit" disabled={busy}>{busy ? 'Verifying…' : mode === 'signup' ? 'Create European account' : 'Sign in to European account'}</button>
+      <label>{copy.u_909d72674381}<input required maxLength={2} value={country} onChange={e => setCountry(e.target.value.toUpperCase())} autoComplete="country" /></label>
+      {mode === 'signup' && <label>{copy.u_2b7f6a84de91}<input required maxLength={160} value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>}
+      <label>{copy.u_969ccbd3cf63}<input required type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
+      <label>{copy.u_e7cf3ef4f17c}<input required type="password" minLength={8} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} /></label>
+      <button type="submit" disabled={busy}>{busy ? copy.u_63bbd08c916b : mode === 'signup' ? copy.u_4431f97b4ff8 : copy.u_9d8145919fab}</button>
     </form>
     {message && <p role="status">{message}</p>}
-    <p>Account access is disabled until regional services and data-rights workflows have passed launch verification.</p>
+    <p>{copy.u_72df4b58b924}</p>
   </main>
 }

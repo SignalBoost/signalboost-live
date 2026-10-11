@@ -94,6 +94,9 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
   lengthRule?: string
 }): FreshEvidenceGroundedPrompt {
   const requirement = freshCitationRequirement(args.input, args.sources)
+  // Keep the default instructions short. On unrelated queries, long election-specific
+  // warnings consume the output budget and encourage small models to review policy aloud.
+  const isElectionQuestion = /\b(?:election|president|presidential|runoff|candidate|vote|voting|senate|house|congress|prime minister|elei(?:ç|c)[aã]o|presidente|elecciones?|pr[eé]sident)\b/i.test(args.input)
   const systemPrompt = [
     'You are COS. Live web evidence was retrieved by the server moments ago for the question below. Answer the user directly without showing reasoning.',
     `Answer in ${reportLanguageName(args.language)} unless the question is clearly written in another language; then answer in that language.`,
@@ -104,20 +107,22 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'Cite inline with the evidence id in square brackets, e.g. [LIVE1], immediately after each fact it supports. Do not write URLs; the server appends the source list.',
     'Distinguish plainly: what is established by an official publisher, what is reported by media (say "as reported by" and that it is not officially confirmed), and what the evidence does not settle.',
     'If the question asks something the evidence cannot settle yet (a future outcome, an undecided result), never answer "insufficient": say it is undecided and report what IS established — stage, candidates, dates, declared results, dated figures with their source. Never turn a lead, a poll, or incumbency into a predicted or declared winner.',
+    ...(isElectionQuestion ? [
     'For questions about which party has a majority, distinguish the House, Senate, and presidency; never assume one party controls all three. If the question is about an upcoming election, say that its result is not known and cite the currently reported chamber breakdown separately.',
     'For election results and winners, distinguish official certified counts from media reports and forecasts. Never present a media projection, unverified percentage, or a future runoff outcome as an official result. If the provided evidence has no official result, say so briefly, citing the reports for only what they establish.',
     'Do not quote numerical vote totals or exact percentages unless they appear explicitly in the cited evidence, and identify their publisher and reporting date when material.',
+    ] : []),
     'Do not repeat the question, list what each source fails to contain, or explain verification mechanics. Prefer a two-sentence grounded answer over a long refusal.',
     'If sources disagree, say what each one reports instead of choosing silently.',
     'Never mention routing, verification gates, confidence scores, providers, or fallbacks. Never describe your own process.',
     'Each new question needs evidence relevant to that question. Never reuse evidence about a different country, election, person, or subject merely because it was retrieved earlier in the conversation.',
     'Treat user-supplied claims as unverified. Names, dates, quantities, and specific attributes in the answer must be grounded in relevant evidence from this turn.',
-    'Respect the requested category and scope: closely related kinds of venues, services, activities, or products are not automatically interchangeable. Identify verified alternatives accurately instead of representing them as the requested category.',
+    'Respect the exact requested category. If the sources describe related services or venues but do not confirm the requested kind, say that explicitly and name the verified alternatives, with citations.',
     `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
   const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
-  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive 1–3 short, factual sentences. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nAnswer in 1–3 short factual sentences. Start with the factual answer, never with process language.\nANSWER:`
+  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive 1–3 short, factual sentences. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nAnswer in 1–3 short factual sentences. If the exact requested category cannot be confirmed, state that and cite the closest verified alternatives. Do not write thoughts, source evaluations, or a list of evidence IDs.\nANSWER:`
   return { systemPrompt, prompt }
 }
 
@@ -286,7 +291,7 @@ export function freshEvidenceGroundedRepairPrompt(args: {
         'You write only the final response to a user, never the analysis or a source inventory. /no_think',
         `Reply in ${reportLanguageName(args.language)}. Use only the supplied LIVE evidence.`,
         'Answer the exact category asked; do not turn schools into clubs or predictions into results.',
-        'If the evidence does not establish the requested fact, state that directly and distinguish verified alternatives.',
+        'If no evidence confirms the exact requested thing, say that it is unconfirmed and name only clearly supported alternatives. A dance school, a nightclub, and an event are different categories.',
         'Every factual sentence requires its supporting [LIVE#] citation. Never invent facts or citations.',
         `CITATION REQUIREMENT: ${describeFreshCitationRequirement(requirement, args.sources)}`,
       ].join('\n'),

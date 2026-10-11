@@ -17,7 +17,7 @@
 // stands between evidence and answer.
 
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
-import { isActivityVenueDiscovery, type FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
+import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import { CHAT_ANSWER_LENGTH_RULE } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { hasUnsafePublicModelOutput } from '@/lib/ai/cos/publicPromptSecurity'
 import {
@@ -92,7 +92,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
 }): Promise<FreshEvidenceLocalSynthesisOutcome> {
   if (!args.sources.length) return { kind: 'local_synthesis_unparseable' }
   const startedAt = Date.now()
-  const answerTokens = isActivityVenueDiscovery(args.input) ? 650 : FRESH_GROUNDED_ANSWER_MAX_TOKENS
+  const answerTokens = FRESH_GROUNDED_ANSWER_MAX_TOKENS
 
   // One bounded transport retry on a transient failure; never a different brain.
   let first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }), false, answerTokens)

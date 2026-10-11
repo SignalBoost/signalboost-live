@@ -214,7 +214,8 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   }
   const raw = trimToCompleteSentence(normalizeLiveCitations(finalText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
-  // Build provenance from the final public answer ONLY; analysis citations are not evidence.\n  const citedSourceIds: string[] = []
+  // Build provenance from the final public answer ONLY; analysis citations are not evidence.
+  const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {
     if (!citedSourceIds.includes(match[1])) citedSourceIds.push(match[1])
   }
@@ -229,7 +230,10 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source|okay,?\s+let me|first,?\s+i(?:'ll| will)|so the established facts are|i(?:'ll| will) craft a concise answer|the other sources?)/i
   const sourceListing = /(?:^|\n)\s*(?:[-*]\s*)?\[LIVE\d+\]\s*(?::|is about|discusses|mentions|says|shows)/i
   const processOpener = /^(?:okay[,!]?\s+)?(?:let(?:'s| us) (?:tackle|check|review|look|analy[sz]e)|looking at the evidence|the user is asking|the key evidence is)/i
-  // A non-empty candidate is not automatically a safe answer. If process\n  // narration survives salvage, return the dedicated rejection reason so the\n  // repair path receives an actionable instruction instead of citation advice.\n  if (narration.test(answer) || analysisLeak.test(answer) || sourceListing.test(answer) || processOpener.test(answer)) {
+  // A non-empty candidate is not automatically a safe answer. If process
+  // narration survives salvage, return the dedicated rejection reason so the
+  // repair path receives an actionable instruction instead of citation advice.
+  if (narration.test(answer) || analysisLeak.test(answer) || sourceListing.test(answer) || processOpener.test(answer)) {
     return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
   }
   if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)

@@ -431,7 +431,7 @@ function audienceSection(audience:CosAudience|undefined):string {
 // ran 1,311-1,376 output tokens for one-line questions. At the measured ~37 tokens/s that is ~36s per answer,
 // and the main call could not finish inside its 20s interactive limit, so every question also paid the
 // rescue. Answer time is proportional to answer length; a live chat answer is short by default.
-export const CHAT_ANSWER_LENGTH_RULE = 'CHAT ANSWER LENGTH: this is a live chat and the person is waiting. By default answer in about 150 words or fewer: the direct answer or definition first, then only the most important supporting detail, in short plain paragraphs. Go longer (up to about 400 words) only when the person explicitly asks for detail, depth, a full document, a plan, code, or step-by-step instructions, or asks you to write something for them. Never pad, never repeat the question, and offer to expand instead of expanding unasked.'
+export const CHAT_ANSWER_LENGTH_RULE = 'ANSWER COMPLETENESS: Answer directly and give as much relevant, supported detail as the request needs. For recommendations, provide useful options, distinctions and practical facts; for complex tasks explain the necessary steps. Be concise where the answer is simple, but never impose an arbitrary word, paragraph or item count. Avoid padding and repetition.'
 
 export function cosIdentityPreamble(audience:CosAudience):string {
   return [

@@ -1,0 +1,18 @@
+name: LAB staging kit checks
+on:
+  pull_request:
+    paths:
+      - 'scripts/lab-staging-kit/**'
+      - '.github/workflows/lab-staging-kit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/lab-staging-kit/tests/test_safety.py

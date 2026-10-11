@@ -1,4 +1,5 @@
 <!-- ONBOARD.md -->
+<!-- Customer LAB staging verification kit: scripts/lab-staging-kit/README.md. Operator-only tooling; local checks do not establish deployed LAB readiness. -->
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint

@@ -101,6 +101,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'Do not repeat the question, list what each source fails to contain, or explain verification mechanics. Prefer a two-sentence grounded answer over a long refusal.',
     'If sources disagree, say what each one reports instead of choosing silently.',
     'Never mention routing, verification gates, confidence scores, providers, or fallbacks. Never describe your own process.',
+    'Each new question needs evidence relevant to that question. Never reuse evidence about a different country, election, person, or subject merely because it was retrieved earlier in the conversation.',
     `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
@@ -157,7 +158,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const staleCurrentYear = /(?:as of (?:the )?(?:current date|today|now)\s*[,(: -]*|current (?:year|date|term)\s*(?:is|:|\()\s*)(20\d{2})/gi
   const staleAsOf = /\bas of\s+(?:the\s+)?(?:year\s+)?(20\d{2})\b/gi
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
-  const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
+  const narration = /^(?:let me (?:carefully )?(?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:carefully )?(?:analy[sz]e|review|check) (?:the evidence|the question)|let's go through each piece of evidence|the question asks(?:\s|:))/i
   if (narration.test(answer) || [...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleFutureFraming)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleCurrentYear)].some(match => Number(match[1]) !== currentYear)) {

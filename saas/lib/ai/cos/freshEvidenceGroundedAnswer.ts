@@ -167,7 +167,16 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   // Harmless attribution prefaces are not internal reasoning. Remove only the
   // introductory phrase, preserving the factual claim and its citations.
   const cleanPublicText = publicText.replace(/^\s*(?:based on (?:the )?(?:retrieved |live )?sources?|according to (?:the )?(?:retrieved |live )?(?:sources|evidence))\s*[,.:–-]\s*/i, '')
-  const raw = trimToCompleteSentence(normalizeLiveCitations(cleanPublicText))
+  // Drop only whole, clearly non-answer sentences before a factual answer.
+  // Never strip a bare "Let me analyze" prefix: the remainder may still be private reasoning.
+  let finalText = cleanPublicText.trim()
+  const narrationSentence = /^(?:okay,?\s*)?(?:let me (?:analy[sz]e|review|examine|go through|tackle|check)\b|first,?\s+i(?:'ll| will| need to)\b|we (?:are given|must|need to)\b|i(?:'ll| will) (?:analy[sz]e|review|check|scan)\b)[^\n.!?]*[.!?]\s*/i
+  for (let i = 0; i < 3; i++) {
+    const match = narrationSentence.exec(finalText)
+    if (!match) break
+    finalText = finalText.slice(match[0].length).trimStart()
+  }
+  const raw = trimToCompleteSentence(normalizeLiveCitations(finalText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
   const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {

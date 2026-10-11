@@ -50,6 +50,7 @@ import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalS
 import { freshFailureReply, type FreshEvidenceInternalFailureCode } from '@/lib/ai/cos/freshEvidenceFailureRecovery'
 import { hashPrompt } from '@/lib/ai/cos/turnExperienceStore'
 import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFreshEvidenceFallback'
+import { buildSourceDigestFallback } from '@/lib/ai/cos/sourceDigestFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
@@ -919,8 +920,10 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       : 'Authoritative live evidence was retrieved, but the completed fresh-evidence synthesis did not satisfy the grounding contract.',synthesisAccepted:false}):baseProvenance
     if(requiresFreshEvidence)Object.assign(executionProvenance as any,{policy:'fresh_live_data_local_first',assistant_text_used_for_resolution:false})
     const normativeEvidenceFallback=freshHardFail?buildNormativeFreshEvidenceFallback({input:lookupInput,sources:freshSources,language}):null
-    const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback))
-    const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})))
+    const sourceDigestFallback=freshHardFail&&!normativeEvidenceFallback&&freshSources.length
+      ? buildSourceDigestFallback({input:lookupInput,sources:freshSources,language}) : null
+    const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback||sourceDigestFallback))
+    const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??sourceDigestFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})))
     const ownerDiagnostics=isPrivileged&&requiresFreshEvidence?{
       build:String(process.env.VERCEL_GIT_COMMIT_SHA||'unknown').slice(0,7),
       search:{status:freshSources.length?'ok':'fail',sourceCount:freshSources.length,sources:freshSources.slice(0,10).map(source=>({id:source.id,title:source.title,url:source.url}))},
@@ -929,9 +932,9 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
       blocked:!partialCompletion,reason:freshGroundingRejection||freshFailureCode||null,
       extra:[`travel task: ${travelTaskDetected}`,`external action: ${requestedAction}`,`travel-plan step: ${travelRescueReached}`,...travelRescueDeclines],
     }:undefined
-    const reply=baseFailureReply,liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
-    const completionSource=normativeEvidenceFallback?'cos-fresh-normative-evidence-map':partialCompletion?'cos-fresh-partial-grounded':'failed_closed'
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,completionSource,{prompt:requiresFreshEvidence?lookupInput:input,answered:partialCompletion,confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):0,branch:normativeEvidenceFallback?'fresh_normative_evidence_map':partialCompletion?'fresh_partial_grounded':'failed_closed'})
+    const reply=baseFailureReply,liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:sourceDigestFallback?0:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
+    const completionSource=sourceDigestFallback?'cos-fresh-source-digest':normativeEvidenceFallback?'cos-fresh-normative-evidence-map':partialCompletion?'cos-fresh-partial-grounded':'failed_closed'
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,completionSource,{prompt:requiresFreshEvidence?lookupInput:input,answered:partialCompletion,confidence:sourceDigestFallback?0:partialCompletion?(normativeEvidenceFallback?0.75:0.99):0,branch:sourceDigestFallback?'fresh_source_digest':normativeEvidenceFallback?'fresh_normative_evidence_map':partialCompletion?'fresh_partial_grounded':'failed_closed'})
     return NextResponse.json({ok:partialCompletion,reply,error:partialCompletion?undefined:reply,diagnostics:ownerDiagnostics,source:completionSource,partial_completion:partialCompletion,cos_first_attempted:requiresFreshEvidence?freshLocalAttempted:(Boolean(cos)||Boolean(localError)),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,fresh_failure_class:freshFailureCode,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:requiresFreshEvidence,live_evidence_sources:requiresFreshEvidence?freshSources.map(source=>({id:source.id,title:source.title,url:source.url})):[],live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:partialCompletion||freshFailureCode!=='local_synthesis_failed'?200:503})
   }
 

@@ -303,7 +303,7 @@ export function freshEvidenceGroundedRepairPrompt(args: {
         'Write about the real-world answer, not the sources. Format example (not a factual claim): "The available information does not confirm the requested type; it identifies related alternatives [LIVE1] [LIVE2]." Never say "the strongest evidence comes from" or enumerate which LIVE source says what.',
         `CITATION REQUIREMENT: ${describeFreshCitationRequirement(requirement, args.sources)}`,
       ].join('\n'),
-      prompt: `/no_think\n${freshEvidenceGroundingBlock(args.input, evidence, args.retrievedAt)}\n\nQUESTION: ${args.input}\nRESPONSE:`,
+      prompt: `/no_think\nTASK: Answer the user's question in one or two factual sentences, citing LIVE IDs. Output only the answer. No source-by-source analysis or planning.\nQUESTION: ${args.input}\n\n${freshEvidenceGroundingBlock(args.input, evidence, args.retrievedAt)}\n\nQUESTION: ${args.input}\nRESPONSE:`,
     }
   }
   return {

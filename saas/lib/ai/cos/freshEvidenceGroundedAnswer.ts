@@ -96,12 +96,12 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
   const requirement = freshCitationRequirement(args.input, args.sources)
   // Keep the default instructions short. On unrelated queries, long election-specific
   // warnings consume the output budget and encourage small models to review policy aloud.
-  const isElectionQuestion = /\b(?:election|president|presidential|runoff|candidate|vote|voting|senate|house|congress|prime minister|elei(?:ç|c)[aã]o|presidente|elecciones?|pr[eé]sident)\b/i.test(args.input)
+  const isElectionQuestion = /\b(?:election|president|presidential|runoff|candidate|vote|voting|senate|house|congress|majority|party|prime minister|elei(?:ç|c)[aã]o|presidente|elecciones?|pr[eé]sident)\b/i.test(args.input)
   const systemPrompt = [
     'You are COS. Live web evidence was retrieved by the server moments ago for the question below. Answer the user directly without showing reasoning.',
     `Answer in ${reportLanguageName(args.language)} unless the question is clearly written in another language; then answer in that language.`,
     'Answer the question directly in the first sentence. Never expose analysis or source-by-source commentary.',
-    'Do not inspect LIVE sources aloud. Begin with the factual conclusion. Write about the requested real-world subject, not about evidence, sources, links, the user, or the question.',
+    'Start with the factual conclusion about the real-world subject, never source analysis.',
     `The current UTC year is ${new Date().getUTCFullYear()}. Treat that year as the current year, not as a future date.`,
     'For every current-world fact, use only the evidence supplied. Model memory is stale and must not supply dates, names, numbers, or outcomes.',
     'Cite inline with the evidence id in square brackets, e.g. [LIVE1], immediately after each fact it supports. Do not write URLs; the server appends the source list.',
@@ -117,13 +117,13 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'Never mention routing, verification gates, confidence scores, providers, or fallbacks. Never describe your own process.',
     'Each new question needs evidence relevant to that question. Never reuse evidence about a different country, election, person, or subject merely because it was retrieved earlier in the conversation.',
     'Treat user-supplied claims as unverified. Names, dates, quantities, and specific attributes in the answer must be grounded in relevant evidence from this turn.',
-    'Respect the exact requested category. If the sources describe related services or venues but do not confirm the requested kind, say that explicitly and name the verified alternatives, with citations.',
-    'Write factual sentences with the real-world entities as subjects. Wrong: "The strongest evidence is [LIVE1] and [LIVE2], which describe alternatives." Right: "The available information does not confirm the requested type; it identifies related alternatives [LIVE1] [LIVE2]." This is a format example, not a factual claim.',
+    'Respect the requested category and scope. If sources do not confirm the requested kind, say so and name verified alternatives with citations.',
+    'Write factual sentences with real-world entities as subjects, never a source inventory. Do not say "the strongest evidence comes from".',
     `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
   const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
-  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive 1–3 short, factual sentences. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nAnswer in 1–3 short factual sentences. If the exact requested category cannot be confirmed, state that and cite the closest verified alternatives. Do not write thoughts, source evaluations, or a list of evidence IDs.\nANSWER:`
+  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive 1–3 short, factual sentences. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nAnswer in 1–3 short factual sentences. Start with the factual answer, never with process language.\nANSWER:`
   return { systemPrompt, prompt }
 }
 

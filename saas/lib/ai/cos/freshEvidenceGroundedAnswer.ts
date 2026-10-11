@@ -112,7 +112,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'For election results and winners, distinguish official certified counts from media reports and forecasts. Never present a media projection, unverified percentage, or a future runoff outcome as an official result. If the provided evidence has no official result, say so briefly, citing the reports for only what they establish.',
     'Do not quote numerical vote totals or exact percentages unless they appear explicitly in the cited evidence, and identify their publisher and reporting date when material.',
     ] : []),
-    'Do not repeat the question, list what each source fails to contain, or explain verification mechanics. Prefer a two-sentence grounded answer over a long refusal.',
+    'Do not repeat the question, list what each source fails to contain, or explain verification mechanics. Give a complete useful answer proportionate to the question, without padding.',
     'If sources disagree, say what each one reports instead of choosing silently.',
     'Never mention routing, verification gates, confidence scores, providers, or fallbacks. Never describe your own process.',
     'Never reuse evidence about a different country, election, person, or subject from earlier conversation.',
@@ -124,7 +124,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
   const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
-  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive 1–3 short, factual sentences. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nAnswer in 1–3 short factual sentences. Start with the factual answer, never with process language.\nANSWER:`
+  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive a complete, useful answer with appropriate detail for the request. For recommendations, name specific verified options, locations and event details when evidenced. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nAnswer at the level of detail the user's task needs. Start with the factual answer, never with process language.\nANSWER:`
   return { systemPrompt, prompt }
 }
 

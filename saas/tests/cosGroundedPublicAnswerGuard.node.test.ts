@@ -77,3 +77,19 @@ test('does not accept a source inventory without a separate factual answer', () 
  assert.equal(result.ok,false)
  assert.equal(result.reason,'process_narration')
 })
+
+test('short independently cited answers survive salvage regardless of length', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({
+  input,sources,
+  text:'[LIVE1] discusses salsa socials.\n\nYes. [LIVE1]',
+ })
+ assert.equal(result.ok,true)
+ assert.equal(result.answer,'Yes. [LIVE1]')
+})
+test('an uncited closing statement never borrows citations from the walkthrough', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({
+  input,sources,
+  text:'[LIVE1] discusses salsa socials.\n\nYes, clubs are open nightly.',
+ })
+ assert.equal(result.ok,false)
+})

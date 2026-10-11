@@ -123,6 +123,13 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
     return Object.freeze({ ok: false, runId, code: 'harness_evidence_sink_unavailable' })
   }
 
+  const limits = Object.freeze({
+    maxToolCalls: Math.min(1, input.parentManifest?.limits.maxToolCalls ?? 1),
+    maxConcurrency: Math.min(1, input.parentManifest?.limits.maxConcurrency ?? 1),
+    deadlineMs: Math.min(180_000, input.parentManifest?.limits.deadlineMs ?? 180_000),
+    ...(input.parentManifest?.limits.maxCostUsd !== undefined
+      ? { maxCostUsd: input.parentManifest.limits.maxCostUsd } : {}),
+  })
   const request = createProductionHarnessRequest({
     runId,
     objective,
@@ -132,11 +139,7 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
     role: 'software_specialist',
     environmentId: PRODUCTION_ENVIRONMENT_ID,
     requestedCapabilities: [COS_SOFTWARE_SPECIALIST_DELEGATION_CAPABILITY],
-    limits: {
-      maxToolCalls: 1,
-      maxConcurrency: 1,
-      deadlineMs: 60_000,
-    },
+    limits,
     ...(input.parentManifest
       ? {
           parent: {
@@ -149,6 +152,7 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
 
   let value!: T
   let invoked = false
+  let executionFailureCode: string | undefined
   const host: GatewayHost = Object.freeze({
     execution: Object.freeze({
       async perform(agentRequest, control) {
@@ -170,6 +174,9 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
           invoked = true
           return { ok: true, result: { delegated: true } }
         } catch (error) {
+          executionFailureCode = control?.signal?.aborted
+            ? 'harness_software_specialist_delegation_aborted'
+            : 'software_specialist_delegation_failed'
           return {
             ok: false,
             error: error instanceof Error
@@ -195,11 +202,7 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
         risk: 'write' as const,
         scopes: Object.freeze([SOFTWARE_SPECIALIST_SCOPE]),
       })]),
-      limits: Object.freeze({
-        maxToolCalls: 1,
-        maxConcurrency: 1,
-        deadlineMs: 60_000,
-      }),
+      limits,
     }),
     capabilities: exactCapabilityResolver({
       tenantId,
@@ -259,7 +262,7 @@ export async function runCosSoftwareSpecialistProductionHarness<T>(input: {
     return Object.freeze({
       ok: false,
       runId,
-      code: envelope.completed.evidence.failureCode ?? 'software_specialist_harness_not_verified',
+      code: executionFailureCode ?? envelope.completed.evidence.failureCode ?? 'software_specialist_harness_not_verified',
     })
   }
 

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { createCosProductionIngressManifest } from '../platform-harness/adapters/cos-ingress.ts'
 import {
   COS_SOFTWARE_SPECIALIST_DELEGATION_CAPABILITY,
   runCosSoftwareSpecialistProductionHarness,
@@ -56,11 +57,45 @@ test('public Software Specialist export cannot bypass the Production Harness', (
   assert.doesNotMatch(source, /export async function tryCosSoftwareSpecialistLegacy\(/)
   assert.match(source, /export async function tryCosSoftwareSpecialist\(/)
   assert.match(source, /runCosSoftwareSpecialistProductionHarness\(\{/)
-  assert.match(source, /execute: signal => tryCosSoftwareSpecialistLegacy\(input, signal\)/)
+  assert.match(source, /return await tryCosSoftwareSpecialistLegacy\(input, signal\)/)
   const exported = source.slice(source.indexOf('export async function tryCosSoftwareSpecialist('))
   assert.match(exported, /if \(!specialistRelevant\) return null/)
   assert.ok(
     exported.indexOf('if (!specialistRelevant) return null')
       < exported.indexOf('runCosSoftwareSpecialistProductionHarness({'),
   )
+})
+
+test('an existing parent without software authority is denied without execution', async () => {
+  let calls = 0
+  const parentManifest = createCosProductionIngressManifest({ objective: 'ordinary question', tenantId: 'tenant-test' })
+  const result = await runCosSoftwareSpecialistProductionHarness({
+    objective: 'fix build', tenantId: 'tenant-test', parentManifest,
+    evidenceSink: { async append() {} }, execute: async () => ++calls,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(calls, 0)
+  if (!result.ok) assert.match(result.code, /child_capability_widening_forbidden/)
+})
+
+test('an authorized parent delegates within its shorter deadline', async () => {
+  const parentManifest = createCosProductionIngressManifest({
+    objective: 'fix build', tenantId: 'tenant-test', deadlineMs: 60_000,
+    requestedCapabilities: [COS_SOFTWARE_SPECIALIST_DELEGATION_CAPABILITY],
+  })
+  const result = await runCosSoftwareSpecialistProductionHarness({
+    objective: 'fix build', tenantId: 'tenant-test', parentManifest,
+    evidenceSink: { async append() {} }, execute: async () => ({jobId: 'queued'}),
+  })
+  assert.equal(result.ok, true)
+})
+
+test('execution crashes retain execution attribution instead of the verifier placeholder', async () => {
+  const result = await runCosSoftwareSpecialistProductionHarness({
+    objective: 'fix build', tenantId: 'tenant-test',
+    evidenceSink: { async append() {} },
+    execute: async () => { throw new Error('private internal error') },
+  })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.equal(result.code, 'software_specialist_delegation_failed')
 })

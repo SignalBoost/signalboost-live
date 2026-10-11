@@ -10,6 +10,8 @@ import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
 import { isConciergeBuilderObjective, type CosCodingRoutingContext } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { trimObjectiveForHarness, runSoftwareDelegationWithSafeRetry } from '@/lib/ai/cos/softwareSpecialistRecovery'
+export { extractFailureEvidence } from '@/lib/ai/cos/softwareSpecialistRecovery'
 import { isOperationalLogEvidence } from '@/lib/ai/cos/pastedOperationalLog'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
@@ -133,7 +135,8 @@ async function tryCosSoftwareSpecialistLegacy(
   input: CosSoftwareSpecialistRequest,
   signal?: AbortSignal,
 ): Promise<NextResponse | null> {
-  let objective = String(input.objective || '').trim()
+  const rawObjective = String(input.objective || '').trim()
+  let objective = trimObjectiveForHarness(rawObjective)
   if (!objective) return null
   if (signal?.aborted) throw new Error('harness_software_specialist_delegation_aborted')
 
@@ -223,17 +226,17 @@ async function tryCosSoftwareSpecialistLegacy(
   })
 
   if (input.allowRepositoryRepair && access?.isOwner && access.userId && !sourceAttached) {
-    const operationalEvidence = isOperationalLogEvidence(objective)
-    const exactTarget = operationalEvidence ? parseSignalBoostRepositoryRepairTarget(objective) : null
+    const operationalEvidence = isOperationalLogEvidence(rawObjective)
+    const exactTarget = operationalEvidence ? parseSignalBoostRepositoryRepairTarget(rawObjective) : null
     const ownerDeveloperLogSubmission = operationalEvidence
-      && (SIGNALBOOST_OPERATIONAL_TARGET.test(objective) || input.signalBoostDeploymentContext === true)
+      && (SIGNALBOOST_OPERATIONAL_TARGET.test(rawObjective) || input.signalBoostDeploymentContext === true)
     const deployment = {
       commitSha: input.deployment?.commitSha || undefined,
       branch: input.deployment?.branch || undefined,
     }
     const target = exactTarget
-      ?? signalBoostDeployedRepairTarget(objective, deployment)
-      ?? signalBoostDeployedRepairTarget(objective, deployment, {
+      ?? signalBoostDeployedRepairTarget(rawObjective, deployment)
+      ?? signalBoostDeployedRepairTarget(rawObjective, deployment, {
         ownerDeveloperLogSubmission,
         ownerPlatformEngineeringSubmission: input.signalBoostDeploymentContext === true,
       })
@@ -425,23 +428,55 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     }, { status: 503 })
   }
 
-  const harness = await runCosSoftwareSpecialistProductionHarness({
-    objective,
-    tenantId,
-    parentManifest: existingParent,
-    execute: signal => tryCosSoftwareSpecialistLegacy(input, signal),
-  })
+  const execute = async (signal?: AbortSignal) => {
+    try {
+      return await tryCosSoftwareSpecialistLegacy(input, signal)
+    } catch (error) {
+      // Cancellation stays a Harness outcome. Never report an uncertain queued action as unstarted.
+      if (signal?.aborted) throw error
+      console.error('[cos-software-legacy-error]', error instanceof Error ? error.name : 'unknown')
+      return NextResponse.json({
+        reply: 'The Software Specialist encountered an execution error. Check History for a queued job before retrying; send the failing log excerpt and file name if no job was created.',
+        source: 'cos-software-legacy-error',
+        execution_allowed: false,
+        external_action_taken: false,
+        ...softwareSpecialistFields('software.delegate'),
+      }, { status: 200 })
+    }
+  }
+  const harness = await runSoftwareDelegationWithSafeRetry(
+    guarded => runCosSoftwareSpecialistProductionHarness({
+      objective: trimObjectiveForHarness(objective),
+      tenantId,
+      parentManifest: existingParent,
+      execute: guarded,
+    }),
+    execute,
+  )
 
   if (harness.ok === false) {
+    const why: Record<string, string> = {
+      harness_software_specialist_exact_scope_required: 'the request was not given software permission',
+      harness_evidence_sink_unavailable: 'the audit log database was unreachable',
+      software_specialist_delegation_not_executed: 'delegation could not be verified',
+      harness_software_specialist_delegation_aborted: 'the delegation deadline expired',
+    }
+    const reason = why[harness.code]
+      ?? (harness.code.startsWith('child_capability_widening_forbidden:')
+        ? 'the parent request was not given software permission'
+        : 'the execution permission or limit check failed')
+    console.error('[cos-software-harness-blocked]', harness.runId, harness.code)
     return NextResponse.json({
-      reply: 'COS Software Specialist was blocked by the Production Harness. No software work was started.',
+      reply: access?.isOwner
+        ? `The Software Specialist could not complete delegation: ${reason}. (run ${harness.runId}, code ${harness.code}) Check History before retrying.`
+        : `The Software Specialist could not complete delegation: ${reason}. Check History before retrying.`,
       source: 'cos-software-harness-blocked',
       execution_allowed: false,
       external_action_taken: false,
       harness_run_id: harness.runId,
-      harness_failure_code: harness.code,
+      ...(access?.isOwner ? { harness_failure_code: harness.code } : {}),
       ...softwareSpecialistFields('software.delegate'),
-    }, { status: 503 })
+    }, { status: 200 })
   }
 
   return harness.value

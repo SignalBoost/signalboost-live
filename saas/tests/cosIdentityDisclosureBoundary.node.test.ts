@@ -129,11 +129,10 @@ test('interactive COS answers run with hidden thinking off so they finish inside
   assert.match(rescue, /disableThinking:true,/)
 })
 
-test('chat answers are short by default in both the main COS call and the rescue lane', () => {
-  // Production 2026-09-27 02:14-02:45 ET: one-line questions produced 1,311-1,376 output tokens (~36s at
-  // ~37 tokens/s), so the main call missed its 20s limit and every answer took about a minute.
-  assert.match(enterprise, /export const CHAT_ANSWER_LENGTH_RULE = 'CHAT ANSWER LENGTH: this is a live chat/)
-  assert.match(enterprise, /about 150 words or fewer/)
+test('chat answer length is task-proportional in both the main COS call and the rescue lane', () => {
+  // Keep the shared answer-length rule wired into both paths while allowing enough detail for the task.
+  assert.match(enterprise, /export const CHAT_ANSWER_LENGTH_RULE = 'ANSWER COMPLETENESS:/)
+  assert.match(enterprise, /never impose an arbitrary word, paragraph or item count/)
   const promptAt = enterprise.indexOf('export function COS_REASONER_SYSTEM_PROMPT(')
   const prompt = enterprise.slice(promptAt, enterprise.indexOf("'SELF-KNOWLEDGE AND IMPROVEMENT BOUNDARIES:'", promptAt))
   assert.ok(promptAt > 0)

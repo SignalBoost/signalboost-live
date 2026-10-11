@@ -192,4 +192,9 @@ test('live answers reject exposed analysis and stale as-of framing', () => {
     text: 'The outcome is undecided; the reported runoff is October 25, 2026. [LIVE1] [LIVE2]',
   })
   assert.equal(direct.ok, true)
+  const upcoming = acceptFreshEvidenceGroundedAnswer({
+    input: officeQuestion, sources,
+    text: 'The November 2026 election is still upcoming as of October 2026; no future result is established. [LIVE1] [LIVE2]',
+  })
+  assert.equal(upcoming.ok, true, 'correct future election wording must not be rejected')
 })

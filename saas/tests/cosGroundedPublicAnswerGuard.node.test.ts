@@ -52,3 +52,14 @@ test('narration citations alone never count as a supported answer', () => {
  const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:"First, I'll scan the sources [LIVE1]. We must inspect more."})
  assert.equal(result.ok,false)
 })
+
+test('provided-source opener does not block a cited answer', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:'Based on the provided live sources: Salsa socials are listed in Asuncion. [LIVE1]'})
+ assert.equal(result.ok,true)
+ assert.doesNotMatch(result.reply,/Based on the provided live sources/i)
+})
+test('provided-evidence opener followed by process reasoning remains blocked', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:'According to the provided evidence: We need to analyze the question. [LIVE1]'})
+ assert.equal(result.ok,false)
+ assert.equal(result.reason,'process_narration')
+})

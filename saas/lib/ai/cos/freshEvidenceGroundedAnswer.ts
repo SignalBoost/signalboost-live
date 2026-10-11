@@ -166,7 +166,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const publicText = finalMarker ? modelText.slice((finalMarker.index || 0) + finalMarker[0].length) : modelText
   // Harmless attribution prefaces are not internal reasoning. Remove only the
   // introductory phrase, preserving the factual claim and its citations.
-  const cleanPublicText = publicText.replace(/^\s*(?:based on (?:the )?(?:retrieved |live )?sources?|according to (?:the )?(?:retrieved |live )?(?:sources|evidence))\s*[,.:–-]\s*/i, '')
+  const cleanPublicText = publicText.replace(/^\s*(?:(?:based on|according to) (?:the )?(?:(?:provided|retrieved|live) )?(?:sources|evidence)|here are (?:the )?results)\s*[,.:–-]\s*/i, '')
   // Drop only whole, clearly non-answer sentences before a factual answer.
   // Never strip a bare "Let me analyze" prefix: the remainder may still be private reasoning.
   let finalText = cleanPublicText.trim()

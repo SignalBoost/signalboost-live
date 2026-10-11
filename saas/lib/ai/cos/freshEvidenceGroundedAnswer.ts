@@ -97,7 +97,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
   const systemPrompt = [
     'You are COS. Live web evidence was retrieved by the server moments ago for the question below. Answer the user directly without showing reasoning.',
     `Answer in ${reportLanguageName(args.language)} unless the question is clearly written in another language; then answer in that language.`,
-    'Answer the question directly in the first sentence. Never narrate your analysis, inspect individual LIVE sources aloud, or open with Let me analyze, First I need to, or similar process commentary.',
+    'Answer the question directly in the first sentence. Never expose analysis or source-by-source commentary.',
     `The current UTC year is ${new Date().getUTCFullYear()}. Treat that year as the current year, not as a future date.`,
     'For every current-world fact, use only the evidence supplied. Model memory is stale and must not supply dates, names, numbers, or outcomes.',
     'Cite inline with the evidence id in square brackets, e.g. [LIVE1], immediately after each fact it supports. Do not write URLs; the server appends the source list.',
@@ -116,7 +116,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
   const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
-  const prompt = `/no_think\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nReturn ONLY the final answer in 2-4 sentences with inline [LIVEn] citations. Do not expose analysis or discuss the evidence-review process.\nANSWER:`
+  const prompt = `/no_think\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nReturn ONLY the final answer in 2-4 sentences with inline [LIVEn] citations. No analysis or source-review narration.\nANSWER:`
   return { systemPrompt, prompt }
 }
 

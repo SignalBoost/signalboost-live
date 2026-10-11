@@ -189,7 +189,7 @@ test('live answers reject exposed analysis and stale as-of framing', () => {
   assert.equal(stale.ok, false)
   const direct = acceptFreshEvidenceGroundedAnswer({
     input: officeQuestion, sources,
-    text: 'The outcome is undecided; the reported runoff is October 25, 2026. [LIVE1] [LIVE2]',
+    text: 'It is undecided: the first round on 4 October sent Candidate A (about 47%) and Candidate B to a runoff on 25 October, as reported by [LIVE1] and [LIVE2]; no official result is declared yet.',
   })
   assert.equal(direct.ok, true)
   const upcoming = acceptFreshEvidenceGroundedAnswer({

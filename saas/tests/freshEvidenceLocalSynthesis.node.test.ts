@@ -219,3 +219,18 @@ test('grounded live-answer latency budget caps both generated prose and evidence
   assert.ok(compacted.every(item => item.snippet.length <= 900))
   assert.deepEqual(compacted.map(item => item.id), many.map(item => item.id))
 })
+
+test('complete sentences retain trailing live citations instead of losing evidence', () => {
+  const complete = 'The November 2026 election is still upcoming as of October 2026; no result is established. [LIVE1] [LIVE2]'
+  assert.equal(trimToCompleteSentence(complete), complete)
+  const accepted = acceptFreshEvidenceGroundedAnswer({
+    text: complete,
+    input: 'Who will control Congress after the 2026 midterms?',
+    sources: [
+      { id: 'LIVE1', title: 'November 2026 midterm elections', url: 'https://example.org/us-election-guide', snippet: 'The US midterm elections are scheduled for November 3, 2026.' },
+      { id: 'LIVE2', title: 'Congress control is undecided', url: 'https://example.net/congress-outlook', snippet: 'Control of the next Congress is not yet decided ahead of the November 2026 vote.' },
+    ],
+  })
+  assert.equal(accepted.ok, true)
+  assert.deepEqual(accepted.citedSourceIds, ['LIVE1', 'LIVE2'])
+})

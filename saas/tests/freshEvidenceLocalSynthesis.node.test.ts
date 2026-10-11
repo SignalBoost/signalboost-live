@@ -279,8 +279,8 @@ test('grounded answer instructions are topic-neutral rather than tied to one exa
 
 test('grounded prompt repeats question directly before final answer marker', () => {
  const prompt=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
- assert.match(prompt.prompt,/QUESTION:[^\n]+\nANSWER:\s*$/)
- assert.match(prompt.prompt,/Do not analyze or enumerate sources/)
+ assert.match(prompt.prompt,/QUESTION:[^\n]+\nBegin with the direct answer, not your analysis\.\nANSWER:\s*$/)
+ assert.match(prompt.prompt,/Do not describe or enumerate the evidence sources/)
 })
 
 test('new direct-answer prompt gives question before evidence and final answer marker last', () => {

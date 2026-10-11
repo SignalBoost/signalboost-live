@@ -256,7 +256,7 @@ test('narrow narration guard rejects explicit analysis preambles without blockin
  const declarative = 'The available reports describe a runoff, not a declared winner. [LIVE1] [LIVE2]'
  assert.equal(acceptFreshEvidenceGroundedAnswer({text:declarative,input:officeQuestion,sources}).ok,true)
  const repair = freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:attempted,reason:'process_narration'})
- assert.match(repair.prompt,/process narration and cannot be published/)
+ assert.match(repair.systemPrompt,/only the final response/)
 })
 test('new-question prompt forbids cross-topic evidence reuse', () => {
  const prompt = freshEvidenceGroundedAnswerPrompt({input:'Who will be the next Brazilian president?',sources,retrievedAt,language:'en'})
@@ -289,5 +289,14 @@ test('new direct-answer prompt gives question before evidence and final answer m
  assert.match(prompt.prompt,/Answer in 1–3 short factual sentences\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
  const repair=freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:'We must review [LIVE1].',reason:'process_narration'})
  assert.doesNotMatch(repair.prompt,/PREVIOUS DRAFT/)
- assert.match(repair.prompt,/REPAIR:[\s\S]*\nANSWER:\s*$/)
+ assert.match(repair.prompt,/QUESTION:[^\n]+\nRESPONSE:\s*$/)
+})
+
+test('process narration retry uses short independent instructions instead of replaying the first prompt', () => {
+ const first=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
+ const repair=freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:'We are given a question. [LIVE1]',reason:'process_narration'})
+ assert.ok(repair.systemPrompt.length < first.systemPrompt.length)
+ assert.doesNotMatch(repair.prompt,/We are given a question|PREVIOUS DRAFT/)
+ assert.match(repair.systemPrompt,/Answer the exact category asked/)
+ assert.match(repair.prompt,/\nRESPONSE:\s*$/)
 })

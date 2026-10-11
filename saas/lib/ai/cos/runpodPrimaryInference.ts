@@ -1,3 +1,4 @@
+import { throwIfInferenceAborted } from '../inferenceCancellation.ts'
 import {
   callLocalModel,
   checkLocalInferenceHealth,
@@ -216,6 +217,7 @@ export async function tryRunpodPrimaryInference(
   args: LocalModelCallArgs,
   workload: RunpodPrimaryWorkload,
 ): Promise<RunpodPrimaryAttempt> {
+  throwIfInferenceAborted(args.signal)
   if (!runpodPrimaryEnabled()) {
     return { text: null, attempted: false, ready: false, reason: 'runpod_primary_not_configured', model: null }
   }
@@ -223,21 +225,24 @@ export async function tryRunpodPrimaryInference(
   const model = runpodPrimaryModel(workload)
   try {
     const config = await resolveReadyRunpodPrimaryConfig(workload)
+    throwIfInferenceAborted(args.signal)
     if (!config) {
       return { text: null, attempted: true, ready: false, reason: 'runpod_primary_not_ready', model }
     }
 
-    const lease = await acquireRunpodInferenceLease(config.timeoutMs)
+    const lease = await acquireRunpodInferenceLease(config.timeoutMs, args.signal)
     if (!lease) {
       console.info('[runpod-primary-busy]', JSON.stringify({ workload, model: config.model }))
       return { text: null, attempted: true, ready: true, reason: 'runpod_primary_busy', model: config.model }
     }
 
     try {
+      throwIfInferenceAborted(args.signal)
       let text: string | null = null
       try {
         text = await callLocalModel(args, config)
       } catch (error) {
+        throwIfInferenceAborted(args.signal)
         const emptyThinkingTruncation = error instanceof Error
           && error.message === LOCAL_MODEL_OUTPUT_TRUNCATED
           && (error as Error & { emptyContent?: boolean }).emptyContent === true
@@ -257,6 +262,7 @@ export async function tryRunpodPrimaryInference(
         }))
         text = await callLocalModel({ ...args, disableThinking: true }, config)
       }
+      throwIfInferenceAborted(args.signal)
       return {
         text: text?.trim() ? text : null,
         attempted: true,
@@ -270,6 +276,7 @@ export async function tryRunpodPrimaryInference(
       })
     }
   } catch (error) {
+    throwIfInferenceAborted(args.signal)
     return {
       text: null,
       attempted: true,
@@ -279,3 +286,4 @@ export async function tryRunpodPrimaryInference(
     }
   }
 }
+

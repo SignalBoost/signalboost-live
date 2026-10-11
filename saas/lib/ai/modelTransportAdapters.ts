@@ -1,3 +1,4 @@
+import { modelTransportSignal, throwIfInferenceAborted } from './inferenceCancellation.ts'
 // saas/lib/ai/modelTransportAdapters.ts
 import { requireModelCapability, type PlatformModelProfile } from './modelCapabilityRegistry.ts'
 import type {
@@ -147,6 +148,7 @@ function createOpenAiCompatibleAdapter(binding: PlatformModelTransportBinding, e
     supports: profile => profile.key === binding.profileKey && profile.transportProtocols.includes('openai_compatible'),
     health: async profile => configuredHealth(profile, binding, env, resolveCredential),
     async chat(request) {
+      throwIfInferenceAborted(request.signal)
       requestCapabilities(request)
       if (!request.profile.transportProtocols.includes('openai_compatible')) throw new Error('platform_model_transport_profile_mismatch')
       const endpoint = bindingEndpoint(binding)
@@ -157,7 +159,7 @@ function createOpenAiCompatibleAdapter(binding: PlatformModelTransportBinding, e
           'Content-Type': 'application/json',
           ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
         },
-        signal: AbortSignal.timeout(positiveInt(request.timeoutMs, binding.timeoutMs, 1_000, 300_000)),
+        signal: modelTransportSignal(positiveInt(request.timeoutMs, binding.timeoutMs, 1_000, 300_000), request.signal),
         body: JSON.stringify({
           model: request.profile.providerModelId,
           max_tokens: positiveInt(request.maxOutputTokens, 2048, 1, 65_536),
@@ -230,6 +232,7 @@ function createAnthropicAdapter(binding: PlatformModelTransportBinding, env: Env
     supports: profile => profile.key === binding.profileKey && profile.transportProtocols.includes('anthropic_messages'),
     health: async profile => configuredHealth(profile, binding, env, resolveCredential),
     async chat(request) {
+      throwIfInferenceAborted(request.signal)
       requestCapabilities(request)
       if (!request.profile.transportProtocols.includes('anthropic_messages')) throw new Error('platform_model_transport_profile_mismatch')
       const credential = await credentialFor(binding, env, resolveCredential)
@@ -243,7 +246,7 @@ function createAnthropicAdapter(binding: PlatformModelTransportBinding, env: Env
           'x-api-key': credential,
           'anthropic-version': binding.apiVersion || '2023-06-01',
         },
-        signal: AbortSignal.timeout(positiveInt(request.timeoutMs, binding.timeoutMs, 1_000, 300_000)),
+        signal: modelTransportSignal(positiveInt(request.timeoutMs, binding.timeoutMs, 1_000, 300_000), request.signal),
         body: JSON.stringify({
           model: request.profile.providerModelId,
           max_tokens: positiveInt(request.maxOutputTokens, 2048, 1, 65_536),
@@ -339,6 +342,7 @@ function createGoogleAdapter(binding: PlatformModelTransportBinding, env: Env, f
     supports: profile => profile.key === binding.profileKey && profile.transportProtocols.includes('google_generate_content'),
     health: async profile => configuredHealth(profile, binding, env, resolveCredential),
     async chat(request) {
+      throwIfInferenceAborted(request.signal)
       requestCapabilities(request)
       if (!request.profile.transportProtocols.includes('google_generate_content')) throw new Error('platform_model_transport_profile_mismatch')
       const credential = await credentialFor(binding, env, resolveCredential)
@@ -348,7 +352,7 @@ function createGoogleAdapter(binding: PlatformModelTransportBinding, env: Env, f
       const response = await fetchImpl(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': credential },
-        signal: AbortSignal.timeout(positiveInt(request.timeoutMs, binding.timeoutMs, 1_000, 300_000)),
+        signal: modelTransportSignal(positiveInt(request.timeoutMs, binding.timeoutMs, 1_000, 300_000), request.signal),
         body: JSON.stringify({
           ...(systemText(request.messages) ? { systemInstruction: { parts: [{ text: systemText(request.messages) }] } } : {}),
           contents: geminiContents(request.messages),
@@ -418,3 +422,4 @@ export function createBuiltinModelTransportAdapters(input: {
   }
   return Object.freeze(adapters)
 }
+

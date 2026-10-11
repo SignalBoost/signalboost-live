@@ -1,3 +1,4 @@
+import { throwIfInferenceAborted } from './inferenceCancellation.ts'
 // saas/lib/ai/modelRuntimeAssignment.ts
 import { allPlatformModelProfiles } from './modelCapabilityRegistry.ts'
 import { createBuiltinModelTransportAdapters } from './modelTransportAdapters.ts'
@@ -109,6 +110,7 @@ export async function tryAssignedPlatformModelTurn(
   requestedUse?: AssignableModelUse,
   options: { store?: ModelConfigurationPort; adapters?: readonly import('./modelTransportAdapter.ts').ModelTransportAdapter[] } = {},
 ): Promise<AssignedModelAttempt> {
+  throwIfInferenceAborted(args.signal)
   let store: ModelConfigurationPort
   try {
     store = options.store || createSignalBoostModelConfigurationPort()
@@ -138,7 +140,9 @@ export async function tryAssignedPlatformModelTurn(
   })
   const adapter = requireTransportForProfile(registration.profile, adapters)
 
+  throwIfInferenceAborted(args.signal)
   const harness = currentHarnessExecutionContext()
+  harness?.signal.throwIfAborted()
   if (harness?.providerCostLedger) {
     if (registration.binding.maxCallCostUsd <= 0 && registration.binding.credentialRef) {
       throw new Error('platform_model_assignment_cost_ceiling_required')
@@ -159,7 +163,10 @@ export async function tryAssignedPlatformModelTurn(
     tools: platformTools(args),
     toolChoice: toolChoice(args),
     timeoutMs: args.timeoutMs,
+    signal: args.signal && harness?.signal ? AbortSignal.any([args.signal, harness.signal]) : args.signal || harness?.signal,
   })
+  throwIfInferenceAborted(args.signal)
+  harness?.signal.throwIfAborted()
   const result: LocalModelTurnResult = Object.freeze({
     content: response.text,
     toolCalls: localToolCalls(response.toolCalls),
@@ -189,3 +196,4 @@ export async function tryAssignedPlatformModelTurn(
     assignmentId: current.assignmentId,
   })
 }
+

@@ -24,6 +24,7 @@ export type PlatformModelRequest = Readonly<{
   jsonSchema?: Readonly<Record<string, unknown>>
   tools?: readonly PlatformModelTool[]
   toolChoice?: 'auto' | 'none' | Readonly<{ name: string }>
+  signal?: AbortSignal
   timeoutMs?: number
 }>
 
@@ -74,3 +75,4 @@ export function requireTransportForProfile(
   }
   throw new Error(`platform_model_transport_unavailable:${profile.key}`)
 }
+

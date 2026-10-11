@@ -281,18 +281,30 @@ export function createGovernedBuilderAiPort(
       const remainingMs = Math.floor(deadlineAtMs - Date.now())
       if (remainingMs <= 0) throw new Error(BUILDER_TURN_TIMEOUT_ERROR)
 
+      input.signal?.throwIfAborted()
+      const controller = new AbortController()
       let timer: ReturnType<typeof setTimeout> | undefined
+      let rejectCancellation: (reason: unknown) => void = () => {}
+      const cancellation = new Promise<never>((_, reject) => { rejectCancellation = reject })
+      const abort = (reason: unknown) => {
+        controller.abort(reason)
+        rejectCancellation(reason)
+      }
+      const abortFromCaller = () => abort(input.signal?.reason)
+      input.signal?.addEventListener('abort', abortFromCaller, { once: true })
+      timer = setTimeout(() => abort(new Error(BUILDER_TURN_TIMEOUT_ERROR)), Math.max(1, remainingMs))
       try {
         const response = await Promise.race([
-          ai.generate(input),
-          new Promise<never>((_, reject) => {
-            timer = setTimeout(() => reject(new Error(BUILDER_TURN_TIMEOUT_ERROR)), Math.max(1, remainingMs))
-          }),
+          ai.generate({ ...input, signal: controller.signal }),
+          cancellation,
         ])
+        controller.signal.throwIfAborted()
         return normalizeBuilderControlOutput(response)
       } finally {
         if (timer) clearTimeout(timer)
+        input.signal?.removeEventListener('abort', abortFromCaller)
       }
     },
   })
 }
+

@@ -1,3 +1,5 @@
+import { throwIfInferenceAborted } from '../inferenceCancellation.ts'
+import { setTimeout as delay } from 'node:timers/promises'
 import { randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 
@@ -21,10 +23,6 @@ function waitMs(): number {
 function leaseMs(inferenceTimeoutMs: number): number {
   const timeout = Number.isFinite(inferenceTimeoutMs) ? Math.max(5_000, inferenceTimeoutMs) : 120_000
   return Math.min(5 * 60_000, timeout + 30_000)
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 async function tryAcquire(token: string, inferenceTimeoutMs: number): Promise<RunpodInferenceLease | null> {
@@ -79,14 +77,21 @@ async function tryAcquire(token: string, inferenceTimeoutMs: number): Promise<Ru
  * Serialize access to the single iTMounts RunPod reasoner across Vercel instances. The lease is
  * short-lived and self-expiring so a terminated serverless invocation cannot strand the GPU.
  */
-export async function acquireRunpodInferenceLease(inferenceTimeoutMs: number): Promise<RunpodInferenceLease | null> {
+export async function acquireRunpodInferenceLease(inferenceTimeoutMs: number, signal?: AbortSignal): Promise<RunpodInferenceLease | null> {
+  throwIfInferenceAborted(signal)
   const token = randomUUID()
   const deadline = Date.now() + waitMs()
   do {
+    throwIfInferenceAborted(signal)
     const lease = await tryAcquire(token, inferenceTimeoutMs)
-    if (lease) return lease
+    if (lease) {
+      if (signal?.aborted) await releaseRunpodInferenceLease(lease)
+      throwIfInferenceAborted(signal)
+      return lease
+    }
+    throwIfInferenceAborted(signal)
     if (Date.now() >= deadline) return null
-    await sleep(Math.min(POLL_MS, Math.max(1, deadline - Date.now())))
+    await delay(Math.min(POLL_MS, Math.max(1, deadline - Date.now())), undefined, { signal })
   } while (Date.now() <= deadline)
   return null
 }

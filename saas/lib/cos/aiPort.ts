@@ -1,3 +1,5 @@
+import { currentHarnessExecutionContext } from '../../platform-harness/runtime/execution-context.ts'
+import { throwIfInferenceAborted } from '../ai/inferenceCancellation.ts'
 // Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
 // existing Portables gain durable reuse and single-flight protection without owning provider logic.
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
@@ -13,7 +15,7 @@ import { deepInfraMaxCallUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
 
 export interface CosAiPort {
-  generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
+  generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider; signal?: AbortSignal }): Promise<string>
 }
 
 export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
@@ -23,19 +25,23 @@ type GraduateAttempt = Readonly<{ text: string | null; attempted: boolean }>
 /** Independently promoted active graduates remain the highest-priority iTMounts-owned workers. */
 async function tryActiveGraduate(
   role: 'primary' | 'coder',
-  input: { prompt: string; systemPrompt?: string; maxTokens?: number },
+  input: { prompt: string; systemPrompt?: string; maxTokens?: number; signal?: AbortSignal },
   options: { coding?: boolean } = {},
 ): Promise<GraduateAttempt> {
+  throwIfInferenceAborted(input.signal)
   if (currentReasoningEvaluationContext()) return { text: null, attempted: false }
   const runtimes = await activeGraduateRuntimesForRole(role, input.prompt).catch(error => {
     console.warn('[platform-graduate-routing] lookup failed closed', error instanceof Error ? error.message : String(error))
     return []
   })
+  throwIfInferenceAborted(input.signal)
   if (!runtimes.length) return { text: null, attempted: false }
 
   for (const runtime of runtimes) {
+    throwIfInferenceAborted(input.signal)
     const text = await callLocalModel({
       prompt: input.prompt,
+      signal: input.signal,
       systemPrompt: input.systemPrompt,
       maxTokens: input.maxTokens,
       ...(options.coding ? { frequencyPenalty: 0, presencePenalty: 0, jsonObject: true } : {}),
@@ -44,6 +50,7 @@ async function tryActiveGraduate(
         purpose: `${runtime.subjectId}:${role}`,
       },
     }, runtime.inference).catch(error => {
+      throwIfInferenceAborted(input.signal)
       console.warn('[platform-graduate-routing] graduate failed; lower-priority runtime remains available', JSON.stringify({
         candidateId: runtime.candidateId,
         artifactId: runtime.trainedArtifactId,
@@ -52,6 +59,7 @@ async function tryActiveGraduate(
       }))
       return null
     })
+    throwIfInferenceAborted(input.signal)
     if (text?.trim()) return { text, attempted: true }
   }
   return { text: null, attempted: true }
@@ -81,17 +89,23 @@ function requireText(result: string | null, provider: string): string {
 export function createPlatformAiPort(): CosAiPort {
   return {
     generate: async (input) => {
+      const harnessSignal = currentHarnessExecutionContext()?.signal
+      if (harnessSignal) input = { ...input, signal: input.signal ? AbortSignal.any([input.signal, harnessSignal]) : harnessSignal }
+      throwIfInferenceAborted(input.signal)
       const graduate = await tryActiveGraduate('primary', input)
+      throwIfInferenceAborted(input.signal)
       if (graduate.text) return graduate.text
 
       const runpod = currentReasoningEvaluationContext()
         ? { text: null, attempted: false }
         : await tryRunpodPrimaryInference({
             prompt: input.prompt,
+            signal: input.signal,
             systemPrompt: input.systemPrompt,
             maxTokens: input.maxTokens,
             usageContext: { feature: 'platform_runpod_primary', purpose: 'portable_text' },
           }, 'reasoner')
+      throwIfInferenceAborted(input.signal)
       if (runpod.text) return runpod.text
 
       return requireText(
@@ -114,7 +128,11 @@ export function createPlatformAiPort(): CosAiPort {
 export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {}): CosAiPort {
   return {
     generate: async (input) => {
+      const harnessSignal = currentHarnessExecutionContext()?.signal
+      if (harnessSignal) input = { ...input, signal: input.signal ? AbortSignal.any([input.signal, harnessSignal]) : harnessSignal }
+      throwIfInferenceAborted(input.signal)
       const graduate = await tryActiveGraduate('coder', input, { coding: true })
+      throwIfInferenceAborted(input.signal)
       if (graduate.text) return graduate.text
 
       // CHAT PRIORITY (2026-09-30). Background self-healing work yields the single RunPod slot while someone is
@@ -129,6 +147,7 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
         ? { text: null, attempted: false, reason: 'reasoning_evaluation_context' }
         : await tryRunpodPrimaryInference({
             prompt: input.prompt,
+            signal: input.signal,
             systemPrompt: input.systemPrompt,
             maxTokens: input.maxTokens,
             frequencyPenalty: 0,
@@ -143,14 +162,17 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
             disableThinking: builderRunpodThinkingDisabled(),
             usageContext: { feature: 'builder_runpod_primary', purpose: 'coding_harness' },
           }, 'builder')
+      throwIfInferenceAborted(input.signal)
       if (runpod.text) return runpod.text
       if (runpod.attempted && runpod.reason === 'runpod_primary_busy') {
         throw new Error('builder_runpod_primary_busy')
       }
 
+      throwIfInferenceAborted(input.signal)
       const ownedAttempted = graduate.attempted || runpod.attempted
       const assigned = await tryAssignedPlatformModelTurn({
         prompt: input.prompt,
+        signal: input.signal,
         systemPrompt: input.systemPrompt,
         maxTokens: input.maxTokens,
         frequencyPenalty: 0,
@@ -162,11 +184,13 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
         },
         maxEstimatedCostUsd: deepInfraMaxCallUsd('builder'),
       }, 'builder')
+      throwIfInferenceAborted(input.signal)
       if (assigned.attempted) return requireText(assigned.result?.content ?? null, 'assigned builder')
 
       const config = localInferenceConfigFromEnv()
       return requireText(await callLocalModel({
         prompt: input.prompt,
+        signal: input.signal,
         systemPrompt: input.systemPrompt,
         maxTokens: input.maxTokens,
         frequencyPenalty: 0,

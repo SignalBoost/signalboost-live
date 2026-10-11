@@ -48,10 +48,19 @@ export interface NativeRemediationResult {
 export async function remediateNativeIncidents(incidents: readonly SupervisorIncident[], options: { maxIncidents?: number; remediationMemory?: RemediationMemoryStore; automaticRepairAllowed?: boolean } = {}): Promise<NativeRemediationResult[]> {
   const max = Math.max(1, Math.min(options.maxIncidents ?? 4, 8))
   const remediationMemory = options.remediationMemory ?? (cosServiceDb() ? new SupabaseRemediationMemoryStore(cosServiceDb()!) : undefined)
-  const runtime = createSignalBoostSupervisorConnectorRuntime()
   const results: NativeRemediationResult[] = []
+  let runtime: ReturnType<typeof createSignalBoostSupervisorConnectorRuntime> | undefined
 
   for (const incident of incidents.slice(0, max)) {
+    // Health evidence does not establish resource ownership or authorize a model/runtime mutation.
+    // Stage before connector execution and repair planning; the cron persists the review receipt.
+    if (incident.metadata.nativeProbe === 'cos_interactive_model_health') {
+      results.push({ incidentId: incident.incidentId, diagnosisConfidence: 0,
+        diagnosis: incident.errorMessage, repairSteps: 0, outcome: 'staged',
+        message: 'Critical model/chat health evidence requires governed review; no automatic repair authority was granted.' })
+      continue
+    }
+    runtime ??= createSignalBoostSupervisorConnectorRuntime()
     const delegated = await executeCosConnectorRecipe(runtime, {
       tenantId: SIGNALBOOST_SUPERVISOR_CONNECTOR_TENANT,
       environmentId: incident.environment || 'production',
@@ -249,3 +258,4 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
   }
   return results
 }
+

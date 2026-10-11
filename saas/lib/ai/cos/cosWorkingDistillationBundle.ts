@@ -111,7 +111,7 @@ function rotate<T>(values: readonly T[], seed: string): T[] {
 /**
  * Build one cross-subject Working-COS training bundle from already sealed portable University assets.
  *
- * One newest set per subject is selected first. This deliberately prevents a subject with the largest
+ * The newest eligible set that preserves minimum subject coverage is selected per subject. This deliberately prevents a subject with the largest
  * backlog from consuming the whole bundle. If more than maxSubjects are available, rotationSeed makes
  * subject coverage deterministic but rotatable across later Working-COS cycles.
  */
@@ -151,17 +151,26 @@ export function buildWorkingCosBalancedBundle(
   const subjects = [...coreSubjects, ...remainingSubjects].slice(0, maxSubjects)
   const selected: NormalizedWorkingCosAssetSet[] = []
   let totalItems = 0
-  for (const subject of subjects) {
-    const row = bySubject.get(subject)?.[0]
+  const minimumItems = (subject: string) => Math.min(...bySubject.get(subject)!.map(row => row.itemCount))
+  for (let i = 0; i < subjects.length; i += 1) {
+    const subject = subjects[i]
+    const remaining = subjects.slice(i + 1)
+    const requiredCore = coreRequired
+      ? remaining.filter(subject => COS_WORKING_DISTILLATION_CORE_SUBJECTS.includes(subject as typeof COS_WORKING_DISTILLATION_CORE_SUBJECTS[number]))
+      : []
+    const additionalNeeded = Math.max(0, minSubjects - selected.length - 1 - requiredCore.length)
+    const optionalMinima = remaining.filter(subject => !requiredCore.includes(subject)).map(minimumItems).sort((a, b) => a - b)
+    const reserve = requiredCore.reduce((sum, subject) => sum + minimumItems(subject), 0)
+      + optionalMinima.slice(0, additionalNeeded).reduce((sum, count) => sum + count, 0)
+    const row = bySubject.get(subject)?.find(row => totalItems + row.itemCount + reserve <= maxItems)
     if (!row) continue
-    if (totalItems + row.itemCount > maxItems) continue
     selected.push(row)
     totalItems += row.itemCount
   }
 
   const blockers: WorkingCosBalancedBundleBlocker[] = []
   if (selected.length < minSubjects) blockers.push('insufficient_subject_coverage')
-  if (coreRequired && coreSubjects.length !== COS_WORKING_DISTILLATION_CORE_SUBJECTS.length) {
+  if (coreRequired && !COS_WORKING_DISTILLATION_CORE_SUBJECTS.every(subject => selected.some(row => row.subjectId === subject))) {
     blockers.push('missing_core_subject_coverage')
   }
   if (totalItems < minSubjects * COS_WORKING_DISTILLATION_MIN_SET_ITEMS) blockers.push('insufficient_training_items')
@@ -204,7 +213,7 @@ export function buildWorkingCosBalancedBundle(
     modelNeutral: true as const,
     containsPrivateProductionData: false as const,
     trainingRightsEligible: eligible,
-    sourceSelection: 'required_generalist_core_subjects_then_rotated_breadth_newest_set_per_subject' as const,
+    sourceSelection: 'required_generalist_core_subjects_then_rotated_breadth_newest_fitting_set_per_subject' as const,
     automaticTrainingAuthorized: false as const,
     automaticActivationAuthorized: false as const,
   })
@@ -248,3 +257,4 @@ export async function selectWorkingCosBalancedBundleFromVault(
     semantics: 'read_only_balanced_working_cos_bundle_selection_no_training_no_runtime_mutation' as const,
   })
 }
+

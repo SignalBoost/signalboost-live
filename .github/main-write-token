@@ -1,2 +1,2 @@
-base_sha=7f2521d8d8bff9f3edc3bbeb14edc0035a85ccb1
-branch=fix/cos-retry-process-narration-oct11
+base_sha=0a0a9f3ed3d0a9620cf67ae3bc28e6f0ff000704
+branch=fix/cos-remove-salsa-specific-answer-rule-20261011

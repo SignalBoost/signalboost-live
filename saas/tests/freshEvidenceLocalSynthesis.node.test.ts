@@ -328,3 +328,17 @@ test('generic grounded prompt keeps unrelated policy out and supports verified a
   const repair = freshEvidenceGroundedRepairPrompt({ input: question, sources: evidence, retrievedAt, language: 'en', draft: '', reason: 'process_narration' })
   assert.match(repair.systemPrompt, /Do not rename a related category as the one requested/)
 })
+
+test('live synthesis prompts reject source inventories in favor of category-correct direct answers', () => {
+  const input = 'Are there any specialty repair shops in this city?'
+  const localSources: FreshEvidenceSource[] = [
+    { id: 'LIVE1', title: 'General repair services', url: 'https://example.com/services', snippet: 'General repair services are available.', sourceDate: '2026-10-10' },
+  ]
+  const args = { input, sources: localSources, retrievedAt, language: 'en' }
+  const primary = freshEvidenceGroundedAnswerPrompt(args)
+  const repair = freshEvidenceGroundedRepairPrompt({ ...args, draft: '', reason: 'process_narration' })
+  assert.match(primary.systemPrompt, /real-world entities as subjects/)
+  assert.match(repair.systemPrompt, /Never say "the strongest evidence comes from"/)
+  assert.equal(acceptFreshEvidenceGroundedAnswer({ text: 'The strongest evidence comes from [LIVE1], which identifies general repair services.', input, sources: localSources }).reason, 'process_narration')
+  assert.equal(acceptFreshEvidenceGroundedAnswer({ text: 'The available information does not confirm specialty repair shops; general repair services are listed. [LIVE1]', input, sources: localSources }).ok, true)
+})

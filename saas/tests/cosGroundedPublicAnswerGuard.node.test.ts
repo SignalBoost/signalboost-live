@@ -58,3 +58,22 @@ test('rejects production source-by-source reasoning and preserves the rejection 
  assert.equal(result.ok,false)
  assert.equal(result.reason,'process_narration')
 })
+
+test('salvages a separately cited factual answer after source-by-source reasoning', () => {
+ const text = "Looking at the evidence sources:\n[LIVE1] discusses salsa socials in Asuncion.\nThe relevant information is in the event list.\n\nSalsa social dancing events are listed in Asuncion. [LIVE1]"
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text})
+ assert.equal(result.ok,true)
+ assert.match(result.reply,/Salsa social dancing events/)
+ assert.doesNotMatch(result.reply,/Looking at|discusses salsa|relevant information/)
+})
+test('cannot reuse a discarded source citation to validate an uncited tail', () => {
+ const text = "[LIVE1] discusses a salsa listing.\n\nSalsa dancing clubs have weekly events."
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text})
+ assert.equal(result.ok,false)
+})
+test('does not accept a source inventory without a separate factual answer', () => {
+ const text = "Looking at the evidence sources:\n[LIVE1] discusses salsa social events."
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text})
+ assert.equal(result.ok,false)
+ assert.equal(result.reason,'process_narration')
+})

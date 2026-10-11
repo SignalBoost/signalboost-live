@@ -19,6 +19,7 @@
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import { CHAT_ANSWER_LENGTH_RULE } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
+import { hasUnsafePublicModelOutput } from '@/lib/ai/cos/publicPromptSecurity'
 import {
   acceptFreshEvidenceGroundedAnswer,
   freshEvidenceGroundedAnswerPrompt,
@@ -119,8 +120,9 @@ export async function synthesizeFreshEvidenceLocally(args: {
     sources: args.sources.length,
     latencyMs: Date.now() - startedAt,
     // Owner telemetry only: the head of a rejected draft, so a rejection can be read instead of guessed.
-    // Never for a draft rejected as unsafe output — that text must not reach logs either.
-    rejectedDraftHead: accepted.ok || accepted.reason === 'unsafe_public_output' ? undefined : String(lastDraft || '').replace(/\s+/g, ' ').slice(0, 300),
+    // Never for unsafe text: the draft itself is checked, because an unsafe draft without a cited
+    // sentence is rejected earlier (no_evidence_cited / empty_answer) than the unsafe-output check.
+    rejectedDraftHead: accepted.ok || accepted.reason === 'unsafe_public_output' || hasUnsafePublicModelOutput(String(lastDraft || '')) ? undefined : String(lastDraft || '').replace(/\s+/g, ' ').slice(0, 300),
   }))
 
   if (!accepted.ok) return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer' }

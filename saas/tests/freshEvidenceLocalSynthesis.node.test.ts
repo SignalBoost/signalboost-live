@@ -234,3 +234,15 @@ test('complete sentences retain trailing live citations instead of losing eviden
   assert.equal(accepted.ok, true)
   assert.deepEqual(accepted.citedSourceIds, ['LIVE1', 'LIVE2'])
 })
+
+
+test('COS election-answer prompt distinguishes chambers, forecasts and certified counts', () => {
+  const us = freshEvidenceGroundedAnswerPrompt({input:'Which party will have the majority in the US?',sources,retrievedAt,language:'en'})
+  assert.match(us.systemPrompt,/distinguish the House, Senate, and presidency/)
+  assert.match(us.systemPrompt,/upcoming election/)
+  assert.match(us.systemPrompt,/two-sentence grounded answer/)
+  const brazil = freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
+  assert.match(brazil.systemPrompt,/official certified counts from media reports and forecasts/)
+  assert.match(brazil.systemPrompt,/Never present a media projection, unverified percentage/)
+  assert.match(brazil.systemPrompt,/exact percentages unless they appear explicitly in the cited evidence/)
+})

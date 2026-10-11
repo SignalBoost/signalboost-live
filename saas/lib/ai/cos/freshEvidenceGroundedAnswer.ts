@@ -187,14 +187,14 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   }
   // Salvage only an independently worded final paragraph after a source inventory.
   // Source citations inside discarded reasoning never count toward acceptance.
-  const inventoryLine = /^\\s*(?:[-*]\\s*)?\\[LIVE\\d+\\]\\s*(?::|(?:is about|discusses|mentions|says|shows|has|titled)\\b)/i
-  const processLine = /^\\s*(?:looking at the evidence|the key evidence is|the user is asking|let(?:'s| us) (?:tackle|check|review)|we (?:must|need to)|the question asks)/i
-  const lines = finalText.split('\\n')
+  const inventoryLine = /^\s*(?:[-*]\s*)?\[LIVE\d+\]\s*(?::|(?:is about|discusses|mentions|says|shows|has|titled)\b)/i
+  const processLine = /^\s*(?:looking at the evidence|the key evidence is|the user is asking|let(?:'s| us) (?:tackle|check|review)|we (?:must|need to)|the question asks)/i
+  const lines = finalText.split('\n')
   const lastWalkthrough = lines.findLastIndex(line => inventoryLine.test(line))
   if (lastWalkthrough >= 0) {
-    const tail = lines.slice(lastWalkthrough + 1).filter(line => !processLine.test(line) && !inventoryLine.test(line)).join('\\n').trim()
+    const tail = lines.slice(lastWalkthrough + 1).filter(line => !processLine.test(line) && !inventoryLine.test(line)).join('\n').trim()
     // Never recover by length alone: require a separately cited, direct final claim.
-    if (tail && /\\[LIVE\\d+\\]/.test(tail) && !/^(?:sources?:|therefore,? we|the evidence|this means)/i.test(tail)) {
+    if (tail && /\[LIVE\d+\]/.test(tail) && !/^(?:sources?:|therefore,? we|the evidence|this means)/i.test(tail)) {
       finalText = tail
     }
   }

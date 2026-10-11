@@ -256,7 +256,7 @@ test('narrow narration guard rejects explicit analysis preambles without blockin
  const declarative = 'The available reports describe a runoff, not a declared winner. [LIVE1] [LIVE2]'
  assert.equal(acceptFreshEvidenceGroundedAnswer({text:declarative,input:officeQuestion,sources}).ok,true)
  const repair = freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:attempted,reason:'process_narration'})
- assert.match(repair.prompt,/Remove all process narration/)
+ assert.match(repair.prompt,/process narration and cannot be published/)
 })
 test('new-question prompt forbids cross-topic evidence reuse', () => {
  const prompt = freshEvidenceGroundedAnswerPrompt({input:'Who will be the next Brazilian president?',sources,retrievedAt,language:'en'})
@@ -281,4 +281,13 @@ test('grounded prompt repeats question directly before final answer marker', () 
  const prompt=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
  assert.match(prompt.prompt,/QUESTION:[^\n]+\nANSWER:\s*$/)
  assert.match(prompt.prompt,/Do not analyze or enumerate sources/)
+})
+
+test('new direct-answer prompt gives question before evidence and final answer marker last', () => {
+ const prompt=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
+ assert.ok(prompt.prompt.indexOf('QUESTION:') < prompt.prompt.indexOf('--- LIVE EVIDENCE ---'))
+ assert.match(prompt.prompt,/Begin with the direct answer, not your analysis\.\nANSWER:\s*$/)
+ const repair=freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:'We must review [LIVE1].',reason:'process_narration'})
+ assert.doesNotMatch(repair.prompt,/PREVIOUS DRAFT/)
+ assert.match(repair.prompt,/REPAIR:[\s\S]*\nANSWER:\s*$/)
 })

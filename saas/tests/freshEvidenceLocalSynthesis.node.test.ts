@@ -88,12 +88,12 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   assert.match(source, /disableThinking: true/)
   assert.match(source, /allowTruncatedText: true/, 'a length-capped answer is kept, not thrown away (prod 2026-10-10 20:35: 4/4 pod answers discarded)')
   assert.equal(FRESH_GROUNDED_ANSWER_TIMEOUT_MS, 20_000)
-  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 300)
+  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 1200)
   assert.match(source, /resolveCosReasoner/)
   assert.match(source, /lengthRule: CHAT_ANSWER_LENGTH_RULE/)
   assert.doesNotMatch(source, /EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
   assert.match(source, /structured \? \{ jsonObject: true/, 'structured output is allowed only for the bounded narration recovery')
-  assert.match(source, /accepted\.reason === 'process_narration'\)/, 'structured retry is limited to narration rejections')
+  assert.match(source, /, accepted\.reason === 'process_narration', answerTokens\)/, 'structured retry is limited to narration rejections')
   assert.equal((source.match(/groundedAnswerCall\(/g) || []).length, 4, 'definition + first call + empty-transport retry + one citation repair')
   const pure = readFileSync(new URL('../lib/ai/cos/freshEvidenceGroundedAnswer.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(pure, /from '@\//, 'pure module stays relative-import only so tests can load it')
@@ -207,7 +207,7 @@ test('live answers reject exposed analysis and stale as-of framing', () => {
 
 
 test('grounded live-answer latency budget caps both generated prose and evidence prefill', () => {
-  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 300)
+  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 1200)
   assert.equal(FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE, 900)
   assert.equal(FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL, 4_500)
   const many = Array.from({ length: 8 }, (_, i) => ({
@@ -242,7 +242,7 @@ test('COS election-answer prompt distinguishes chambers, forecasts and certified
   const us = freshEvidenceGroundedAnswerPrompt({input:'Which party will have the majority in the US?',sources,retrievedAt,language:'en'})
   assert.match(us.systemPrompt,/distinguish the House, Senate, and presidency/)
   assert.match(us.systemPrompt,/upcoming election/)
-  assert.match(us.systemPrompt,/two-sentence grounded answer/)
+  assert.match(us.systemPrompt,/Answer the question directly in the first sentence/)
   const brazil = freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
   assert.match(brazil.systemPrompt,/official certified counts from media reports and forecasts/)
   assert.match(brazil.systemPrompt,/Never present a media projection, unverified percentage/)
@@ -281,14 +281,14 @@ test('grounded answer instructions are topic-neutral rather than tied to one exa
 
 test('grounded prompt repeats question directly before final answer marker', () => {
  const prompt=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
- assert.match(prompt.prompt,/QUESTION:[^\n]+\nAnswer in 1–3 short factual sentences\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
+ assert.match(prompt.prompt,/QUESTION:[^\n]+\nAnswer at the level of detail the user's task needs\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
  assert.match(prompt.prompt,/Do not describe or enumerate the evidence sources/)
 })
 
 test('new direct-answer prompt gives question before evidence and final answer marker last', () => {
  const prompt=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
  assert.ok(prompt.prompt.indexOf('QUESTION:') < prompt.prompt.indexOf('--- LIVE EVIDENCE ---'))
- assert.match(prompt.prompt,/Answer in 1–3 short factual sentences\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
+ assert.match(prompt.prompt,/Answer at the level of detail the user's task needs\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
  const repair=freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:'We must review [LIVE1].',reason:'process_narration'})
  assert.doesNotMatch(repair.prompt,/PREVIOUS DRAFT/)
  assert.match(repair.prompt,/QUESTION:[^\n]+\nRESPONSE:\s*$/)
@@ -349,6 +349,6 @@ test('narration recovery requests structured answer and validates the extracted 
   const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
   assert.match(transport, /structured \? \{ jsonObject: true/)
   assert.match(transport, /typeof parsed\?\.answer !== 'string'/)
-  assert.match(transport, /accepted\.reason === 'process_narration'\)/)
+  assert.match(transport, /, accepted\.reason === 'process_narration', answerTokens\)/)
   assert.match(transport, /acceptFreshEvidenceGroundedAnswer\(\{ text: second\.text, input: args\.input, sources: args\.sources \}\)/)
 })

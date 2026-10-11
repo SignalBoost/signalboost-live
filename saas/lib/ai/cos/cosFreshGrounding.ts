@@ -175,6 +175,14 @@ function cleanEvaluationTopic(input: string): string {
  * Build a bounded multi-query research plan for evaluative sports questions. The loop deliberately
  * gathers distinct evidence dimensions instead of asking the search engine for an opinion verdict.
  */
+/** Place-discovery questions need event and activity searches as well as business-category matches. */
+export function isActivityVenueDiscovery(input: string): boolean {
+  const question = String(input || '')
+  const placeIntent = /\b(?:where|places?|venues?|clubs?|bars?|nightclubs?|spots?|locales?|lugares?|sitios?|discotecas?|bares?|locais?|casas?\s+noturnas?)\b/iu.test(question)
+  const activityIntent = /\b(?:dance|dancing|music|live|karaoke|comedy|jazz|salsa|bachata|tango|socials?|parties|party|nightlife|baile|bailar|m[uú]sica|dan[cç]a|dan[cç]ar|fiestas?|festas?|noches?|noites?)\b/iu.test(question)
+  return placeIntent && activityIntent
+}
+
 export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
   if (requiresLiveTravelPlanningEvidence(input)) {
     const primary = freshEvidenceSearchQuery(input, now)
@@ -188,6 +196,11 @@ export function freshEvidenceSearchQueries(input: string, now = new Date()): str
     ].map(query => query.replace(/\s+/g, ' ').trim().slice(0, 300)).filter(Boolean))]
   }
 
+  if (isActivityVenueDiscovery(input)) {
+    const base = baseFreshEvidenceSearchQueries(input, now)
+    const subject = String(input || '').replace(/\s+/g, ' ').trim().slice(0, 130)
+    return [...new Set([...base, `${subject} social nights events parties live calendar venue hours location`, `${subject} bar club event organizer dancing tonight weekend`].map(query => query.slice(0, 260)))].slice(0, 4)
+  }
   if (!isSportsTeamEvaluation(input)) return baseFreshEvidenceSearchQueries(input, now)
 
   const primary = freshEvidenceSearchQuery(input, now)

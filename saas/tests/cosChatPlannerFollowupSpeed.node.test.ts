@@ -33,3 +33,10 @@ test('the planner never goes RunPod-first or holds the RunPod slot', () => {
   assert.match(decision, /purpose: 'agent_native_tool_choice'/)
   assert.match(decision, /\n\s+tools,\n/)
 })
+test('fresh grounded answers hedge sooner without changing other chat provider budgets', () => {
+  const source = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
+  const segment = source.slice(source.indexOf('async function runpodFirstInteractiveTurn('), source.indexOf('export async function callLocalModelTurn('))
+  assert.match(segment, /purpose \|\| ''\) === 'fresh_grounded_answer'/)
+  assert.match(segment, /!process\.env\.COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS/)
+  assert.match(segment, /\? 8_000 : interactiveManagedBackupAfterMs\(\)/)
+})

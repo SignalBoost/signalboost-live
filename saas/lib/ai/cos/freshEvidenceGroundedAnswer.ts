@@ -174,7 +174,8 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   for (let i = 0; i < 3; i++) {
     const match = narrationSentence.exec(finalText)
     if (!match) break
-    finalText = finalText.slice(match[0].length).trimStart()
+    // Citations belonging to discarded reasoning cannot validate the remaining answer.
+    finalText = finalText.slice(match[0].length).replace(/^(?:\s*\[LIVE\d+\])+\s*/i, '').trimStart()
   }
   const raw = trimToCompleteSentence(normalizeLiveCitations(finalText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()

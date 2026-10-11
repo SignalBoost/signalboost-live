@@ -135,3 +135,36 @@ test('the governed Builder deadline returns one terminal error without model ret
   if (result.ok === false) assert.equal(result.error, BUILDER_TURN_TIMEOUT_ERROR)
   assert.equal(modelCalls, 1)
 })
+
+
+
+test('deadline aborts the in-flight provider and later calls cannot enter routing', async () => {
+  let calls = 0
+  let signal: AbortSignal | undefined
+  const ai = createGovernedBuilderAiPort({ async generate(input) {
+    calls += 1
+    signal = input.signal
+    return new Promise<string>((_, reject) => input.signal?.addEventListener('abort', () => reject(input.signal?.reason), { once: true }))
+  } }, { deadlineAtMs: Date.now() + 25 })
+  await assert.rejects(ai.generate({ prompt: 'test', maxTokens: 10 }), /builder_turn_timeout/)
+  assert.equal(signal?.aborted, true)
+  await assert.rejects(ai.generate({ prompt: 'test', maxTokens: 10 }), /builder_turn_timeout/)
+  assert.equal(calls, 1)
+})
+
+test('caller cancellation reaches the provider and already cancelled input never starts it', async () => {
+  let calls = 0
+  let seen: AbortSignal | undefined
+  const ai = createGovernedBuilderAiPort({ async generate(input) {
+    calls += 1
+    seen = input.signal
+    return new Promise<string>(() => {})
+  } }, { maxElapsedMs: 1000 })
+  const controller = new AbortController()
+  const work = ai.generate({ prompt: 'test', maxTokens: 10, signal: controller.signal })
+  controller.abort(new Error('owner_cancelled'))
+  await assert.rejects(work, /owner_cancelled/)
+  assert.equal(seen?.aborted, true)
+  await assert.rejects(ai.generate({ prompt: 'test', maxTokens: 10, signal: controller.signal }), /owner_cancelled/)
+  assert.equal(calls, 1)
+})

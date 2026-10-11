@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 // saas/self-healing-host/interactive-model-health-monitoring.ts
 // INTERACTIVE MODEL & CHAT HEALTH MONITOR (2026-09-27, owner-directed observability).
 //
@@ -11,10 +12,9 @@
 // (probe_id 'api', target 'cos:interactive-model-health'). A `warning` / `critical` sample is picked up by the
 // owner executive briefing (lib/ai/cos/ownerExecutiveBriefing.ts), so degradations reach the owner without a query.
 //
-// Observation only: it returns no SupervisorIncident, so it never triggers autonomous repair. Promoting these
-// findings into governed remediation is a separate, reviewed step.
+// Critical findings enter durable Supervisor review. These observations never grant automatic repair authority.
 import type { Observer, ProviderObservationContext } from '../lib/supervisor/execution-contracts.ts'
-import type { SupervisorIncident } from '../lib/supervisor/incident-schema.ts'
+import { incidentSchema, type SupervisorIncident } from '../lib/supervisor/incident-schema.ts'
 import type { NativeMonitoringCollector } from './native-monitoring-runtime.ts'
 
 export const INTERACTIVE_MODEL_HEALTH_TARGET = 'cos:interactive-model-health'
@@ -59,6 +59,9 @@ export type ModelStat = Readonly<{
   calls: number
   failures: number
   timeouts: number
+  aborted: number
+  preflightFailures: number
+  unclassifiedFailures: number
   httpErrors: number
   lengthCuts: number
   failureRate: number
@@ -123,6 +126,38 @@ const LATENCY_STAGE_LIMITS: ReadonlyArray<{ match: (stage: string) => boolean; l
   { match: stage => stage === 'primary:cos_first_answer', limit: t => t.cosAnswerP90WarningMs },
 ]
 
+/** Missing HTTP status alone says nothing about timeout or provider availability. */
+export function classifyModelFailure(row: ModelCallRow): 'timeout' | 'aborted' | 'preflight' | 'http' | 'unclassified' {
+  if (typeof row.http_status === 'number' && (row.http_status < 200 || row.http_status >= 300)) return 'http'
+  const reason = String(row.finish_reason || '')
+  if (/^preflight:/i.test(reason)) return 'preflight'
+  if (/timeout|timed[_ ]?out|deadline/i.test(reason)) return 'timeout'
+  if (/abort|cancel/i.test(reason)) return 'aborted'
+  return 'unclassified'
+}
+
+export function interactiveHealthReviewIncidents(snapshot: InteractiveModelHealthSnapshot): SupervisorIncident[] {
+  const critical = snapshot.findings.filter(finding => finding.severity === 'critical')
+  if (!critical.length) return []
+  const window = Math.floor(Date.parse(snapshot.checkedAt) / (snapshot.windowMinutes * 60_000))
+  const digest = createHash('sha256').update(JSON.stringify(critical.map(f => [f.kind, f.key]).sort())).digest('hex')
+  const incidentId = `interactive-model-health-${window}-${digest.slice(0, 20)}`
+  return [incidentSchema.parse({
+    incidentId,
+    provider: 'signalboost-platform',
+    environment: 'production',
+    severity: 'critical',
+    detectedAt: snapshot.checkedAt,
+    source: 'cron',
+    errorCode: 'interactive_model_health_critical',
+    errorMessage: critical.map(finding => finding.summary).join('\n'),
+    affectedResource: INTERACTIVE_MODEL_HEALTH_TARGET,
+    evidence: [{ evidenceId: `${incidentId}-sample`, type: 'interactive_model_health', capturedAt: snapshot.checkedAt,
+      summary: critical.map(finding => finding.summary).join('\n'), reference: 'self_healing_native_probe_samples:cos:interactive-model-health' }],
+    metadata: { nativeProbe: 'cos_interactive_model_health', reviewOnly: true, automaticRepairAuthorized: false, authorityExpanded: false },
+  })]
+}
+
 /** Pure evaluation: rows in, snapshot out. No I/O, so it is fully testable. */
 export function evaluateInteractiveModelHealth(input: {
   calls: readonly ModelCallRow[]
@@ -150,7 +185,11 @@ export function evaluateInteractiveModelHealth(input: {
   const modelStats: ModelStat[] = [...groups.values()].map(group => {
     const calls = group.rows.length
     const failures = group.rows.filter(row => row.success !== true).length
-    const timeouts = group.rows.filter(row => row.success !== true && (row.http_status === null || row.http_status === undefined)).length
+    const failuresByKind = group.rows.filter(row => row.success !== true).map(classifyModelFailure)
+    const timeouts = failuresByKind.filter(kind => kind === 'timeout').length
+    const aborted = failuresByKind.filter(kind => kind === 'aborted').length
+    const preflightFailures = failuresByKind.filter(kind => kind === 'preflight').length
+    const unclassifiedFailures = failuresByKind.filter(kind => kind === 'unclassified').length
     const httpErrors = group.rows.filter(row => row.success !== true && typeof row.http_status === 'number' && (row.http_status < 200 || row.http_status >= 300)).length
     const lengthCuts = group.rows.filter(row => String(row.finish_reason || '') === 'length').length
     return {
@@ -159,6 +198,9 @@ export function evaluateInteractiveModelHealth(input: {
       calls,
       failures,
       timeouts,
+      aborted,
+      preflightFailures,
+      unclassifiedFailures,
       httpErrors,
       lengthCuts,
       failureRate: calls ? failures / calls : 0,
@@ -175,7 +217,7 @@ export function evaluateInteractiveModelHealth(input: {
         kind: 'model_failure_rate',
         key,
         severity: stat.failureRate >= t.failureCritical ? 'critical' : 'warning',
-        summary: `${key}: ${Math.round(stat.failureRate * 100)}% of ${stat.calls} calls failed in the last ${t.windowMinutes} min (${stat.timeouts} timeouts, ${stat.httpErrors} HTTP errors, ${stat.lengthCuts} length cuts; p90 ${stat.p90Ms ?? '?'} ms).`,
+        summary: `${key}: ${Math.round(stat.failureRate * 100)}% of ${stat.calls} calls failed in the last ${t.windowMinutes} min (${stat.timeouts} timeouts, ${stat.aborted} aborts, ${stat.preflightFailures} preflight failures, ${stat.unclassifiedFailures} unclassified failures, ${stat.httpErrors} HTTP errors, ${stat.lengthCuts} length cuts; p90 ${stat.p90Ms ?? '?'} ms).`,
       })
     } else if (stat.lengthCutRate >= t.lengthCutWarning) {
       findings.push({
@@ -280,12 +322,14 @@ async function recordHealthSample(db: any, snapshot: InteractiveModelHealthSnaps
       findings: snapshot.findings.map(f => ({ kind: f.kind, key: f.key, severity: f.severity, summary: f.summary })),
       modelStats: snapshot.modelStats.slice(0, 12).map(s => ({
         feature: s.feature, model: s.model, calls: s.calls, failures: s.failures, timeouts: s.timeouts,
+        aborted: s.aborted, preflightFailures: s.preflightFailures, unclassifiedFailures: s.unclassifiedFailures,
         httpErrors: s.httpErrors, lengthCuts: s.lengthCuts, p90Ms: s.p90Ms,
       })),
       stageStats: snapshot.stageStats.slice(0, 30).map(s => ({ stage: s.stage, samples: s.samples, p50Ms: s.p50Ms, p90Ms: s.p90Ms })),
       unlabeledCalls: snapshot.unlabeledCalls,
       budgetExceededFallbacks: snapshot.budgetExceededFallbacks,
       observationOnly: true,
+      automaticRepairAuthorized: false,
       authorityExpanded: false,
     },
   })
@@ -306,8 +350,7 @@ export class InteractiveModelHealthObserver implements Observer {
     if (snapshot.state !== 'healthy') {
       console.warn('[cos-interactive-model-health]', JSON.stringify({ state: snapshot.state, findings: snapshot.findings.map(f => f.summary) }))
     }
-    // Observation only: the probe sample is the durable signal (owner briefing reads warning/critical samples).
-    return []
+    return interactiveHealthReviewIncidents(snapshot)
   }
 }
 
@@ -318,3 +361,4 @@ export function interactiveModelHealthMonitoringCollector(input: { db: any; now?
     observer: new InteractiveModelHealthObserver(input),
   }
 }
+

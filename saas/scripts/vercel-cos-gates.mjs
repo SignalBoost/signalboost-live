@@ -358,6 +358,10 @@ const tests = [
   'tests/builderControlRecovery.node.test.ts',
 
   'tests/builderControlAdapter.node.test.ts',
+  'tests/builderCodingCancellation.node.test.ts',
+  'tests/localInferenceCancellation.node.test.ts',
+  'tests/interactiveHealthSupervisorReview.node.test.ts',
+  'tests/cosWorkingDistillationBundle.node.test.ts',
 
   'tests/builderRequestDeadline.node.test.ts',
 
@@ -812,5 +816,6 @@ if (result.error) {
 
 process.exit(result.status ?? 1)
 // end of saas/scripts/vercel-cos-gates.mjs (if this line is missing, the paste was cut short)
+
 
 

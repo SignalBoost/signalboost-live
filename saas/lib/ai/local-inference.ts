@@ -1,3 +1,4 @@
+import { throwIfInferenceAborted } from './inferenceCancellation.ts'
 import { randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
@@ -47,6 +48,7 @@ export type LocalModelTurnResult = Readonly<{
 }>
 
 export interface LocalModelCallArgs {
+  signal?: AbortSignal
   prompt: string
   systemPrompt?: string
   maxTokens?: number
@@ -422,6 +424,8 @@ function noteServedInference(provider: string, model: string): void {
 }
 
 async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
+  throwIfInferenceAborted(args.signal)
+  currentHarnessExecutionContext()?.signal.throwIfAborted()
   const startedAt = Date.now()
   const requestId = randomUUID()
   const provider = providerFor(config)
@@ -445,7 +449,9 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
   const harnessContext = currentHarnessExecutionContext()
-  const abortFromHarness = () => controller.abort()
+  const abortFromHarness = () => controller.abort(harnessContext?.signal.reason)
+  const abortFromCaller = () => controller.abort(args.signal?.reason)
+  args.signal?.addEventListener('abort', abortFromCaller, { once: true })
   if (harnessContext?.signal.aborted) controller.abort()
   else harnessContext?.signal.addEventListener('abort', abortFromHarness, { once: true })
 
@@ -463,8 +469,10 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   const timeoutMs = outerRemainingMs === null
     ? callerBoundTimeoutMs
     : Math.max(1, Math.min(callerBoundTimeoutMs, outerRemainingMs))
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  const timeout = setTimeout(() => controller.abort(new DOMException('Inference transport deadline exceeded', 'TimeoutError')), timeoutMs)
   try {
+    controller.signal.throwIfAborted()
+    if (outerRemainingMs !== null && outerRemainingMs <= 0) throw new Error('inference_deadline_expired')
     if (provider === 'deepinfra' && harnessContext?.providerCostLedger) {
       const reservation = Number(args.maxEstimatedCostUsd)
       if (!Number.isFinite(reservation) || reservation <= 0) {
@@ -472,7 +480,6 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
       }
       reserveHarnessProviderCostUsd(reservation)
     }
-    inferenceStartedAt = Date.now()
     // Independent University scoring needs a compact verdict rather than model scratch work.
     // Preserve the evaluator's one-call, strict-JSON contract even when the general reasoner is
     // configured for deeper reasoning or prose-oriented repetition penalties.
@@ -536,6 +543,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
         truncatedCharacters: contextPlan.truncatedCharacters,
       }))
     }
+    inferenceStartedAt = Date.now()
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
@@ -602,7 +610,10 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     }
   } catch (error) {
     errorText = error instanceof Error ? error.message : String(error)
-    if (httpStatus === null) transportFailure = transportFailureTag(error)
+    if (controller.signal.aborted || httpStatus === null) transportFailure = controller.signal.aborted
+      ? /timeout|deadline/i.test(controller.signal.reason instanceof Error ? `${controller.signal.reason.name}:${controller.signal.reason.message}` : String(controller.signal.reason))
+        ? 'timeout:inference_transport_deadline' : 'aborted:inference_owner_cancelled'
+      : inferenceStartedAt === null ? 'preflight:inference_rejected' : transportFailureTag(error)
     if (
       error instanceof Error
       && (
@@ -615,6 +626,7 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
   } finally {
     clearTimeout(timeout)
     harnessContext?.signal.removeEventListener('abort', abortFromHarness)
+    args.signal?.removeEventListener('abort', abortFromCaller)
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300
@@ -651,6 +663,9 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     }
   }
 
+  throwIfInferenceAborted(args.signal)
+  harnessContext?.signal.throwIfAborted()
+  if (outerRemainingMs !== null && outerRemainingMs <= 0) throw new Error('inference_deadline_expired')
   if (fatalGovernanceError) throw fatalGovernanceError
 
   if (finishReason === 'length') {
@@ -831,6 +846,10 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
 }
 
 export async function callLocalModelTurn(args: LocalModelCallArgs, config?: LocalInferenceConfig): Promise<LocalModelTurnResult | null> {
+  throwIfInferenceAborted(args.signal)
+  currentHarnessExecutionContext()?.signal.throwIfAborted()
+  const remaining = [turnDeadlineRemainingMs(), harnessDeadlineRemainingMs()].filter((value): value is number => value !== null)
+  if (remaining.some(value => value <= 0)) throw new Error('inference_deadline_expired')
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   if (config === undefined && !protectedIndependentEvaluation(args) && !feature.startsWith('university_')) {
     const assigned = await tryAssignedPlatformModelTurn(args)
@@ -879,12 +898,16 @@ export async function callLocalModelTurn(args: LocalModelCallArgs, config?: Loca
       }
     }
   } catch (error) {
+    throwIfInferenceAborted(args.signal)
+    currentHarnessExecutionContext()?.signal.throwIfAborted()
     console.warn('[runpod-primary-routing] primary unavailable; DeepInfra fallback remains bounded', JSON.stringify({
       feature: args.usageContext?.feature || 'unattributed_local_inference',
       reason: error instanceof Error ? error.message : String(error),
     }))
   }
 
+  throwIfInferenceAborted(args.signal)
+  currentHarnessExecutionContext()?.signal.throwIfAborted()
   if (args.allowConfiguredFallback === false && ownedAttempted) return null
   return callConfiguredModelTurn(args, ownedAttempted ? { ...effectiveConfig, fallbackFromOwned: true } : effectiveConfig)
 }

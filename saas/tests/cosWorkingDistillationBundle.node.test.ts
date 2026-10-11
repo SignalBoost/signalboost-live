@@ -80,7 +80,7 @@ test('Working COS bundle excludes unknown-rights and private material', () => {
 
 test('Working COS plan binds a balanced bundle to exact runtime identity but grants no traffic', () => {
   const bundle = buildWorkingCosBalancedBundle(
-    SUBJECTS.slice(0, 8).map((subject, index) => row(subject, index)),
+    COS_WORKING_DISTILLATION_CORE_SUBJECTS.map((subject, index) => row(subject, index)),
     { minSubjects: 8, maxSubjects: 8 },
   )
   const plan = buildWorkingCosDistillationPlanFromBundle({
@@ -102,7 +102,7 @@ test('Working COS plan binds a balanced bundle to exact runtime identity but gra
 
 test('Working COS plan still fails closed when the runtime model does not match the training base', () => {
   const bundle = buildWorkingCosBalancedBundle(
-    SUBJECTS.slice(0, 8).map((subject, index) => row(subject, index)),
+    COS_WORKING_DISTILLATION_CORE_SUBJECTS.map((subject, index) => row(subject, index)),
     { minSubjects: 8, maxSubjects: 8 },
   )
   const plan = buildWorkingCosDistillationPlanFromBundle({
@@ -119,7 +119,7 @@ test('Working COS plan still fails closed when the runtime model does not match 
 })
 
 test('vault selector is read-only and uses sealed model-neutral rows', async () => {
-  const data = SUBJECTS.slice(0, 8).map((subject, index) => ({
+  const data = COS_WORKING_DISTILLATION_CORE_SUBJECTS.map((subject, index) => ({
     asset_set_key: row(subject, index).assetSetKey,
     portable_manifest_hash: row(subject, index).portableManifestHash,
     subject_id: subject,
@@ -173,4 +173,29 @@ test('Working COS generalist bundle fails closed when an eight-subject rotation 
   assert.equal(bundle.eligible, false)
   assert.ok(bundle.blockers.includes('missing_core_subject_coverage'))
   assert.ok(!bundle.subjectIds.includes('Business & Operations'))
+})
+
+
+
+test('newest oversized sets cannot consume the budget reserved for eight core subjects', () => {
+  const rows = COS_WORKING_DISTILLATION_CORE_SUBJECTS.flatMap((subject, i) => [
+    { ...row(subject, i), itemCount: 20 },
+    { ...row(subject, i + 30), itemCount: 128, createdAt: '2026-10-11T00:00:00Z' },
+  ])
+  const bundle = buildWorkingCosBalancedBundle(rows, { minSubjects: 8, maxSubjects: 8, maxItems: 384 })
+  assert.equal(bundle.eligible, true)
+  assert.equal(bundle.subjectCount, 8)
+  assert.deepEqual(bundle.subjectIds, [...COS_WORKING_DISTILLATION_CORE_SUBJECTS].sort())
+  assert.ok(bundle.itemCount <= 384)
+  assert.equal(bundle.assetSets[0].itemCount, 128)
+  assert.equal(bundle.assetSets[1].itemCount, 128)
+  assert.ok(bundle.assetSets.slice(2).every(set => set.itemCount === 20))
+  assert.equal(bundle.automaticTrainingAuthorized, false)
+})
+
+test('available core subjects still fail closed if their sets cannot fit', () => {
+  const rows = COS_WORKING_DISTILLATION_CORE_SUBJECTS.map((subject, i) => ({ ...row(subject, i), itemCount: 128 }))
+  const bundle = buildWorkingCosBalancedBundle(rows, { minSubjects: 8, maxSubjects: 8, maxItems: 384 })
+  assert.equal(bundle.eligible, false)
+  assert.ok(bundle.blockers.includes('missing_core_subject_coverage'))
 })

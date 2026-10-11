@@ -1,2 +1,2 @@
-base_sha=32004d27934bbc12e25535cba0f1f457faea7e9c
-branch=fix/software-specialist-type-narrowing-20261011
+base_sha=dfe61c8dbf9db8a123e2f7ef96bd2eff51d095f0
+branch=fix/builder-cancellation-health-bundle-20261011

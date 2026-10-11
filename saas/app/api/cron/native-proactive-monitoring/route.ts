@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     ...createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes }),
     persistenceNativeMonitoringCollector({ db }),
     universityMassDistillationMonitoringCollector({ db }),
-    // Chat/model health (2026-09-27): observation-only; warning/critical samples reach the owner briefing.
+    // Chat/model health: samples reach the owner briefing; critical evidence is staged for Supervisor review.
     interactiveModelHealthMonitoringCollector({ db }),
     livePlatformHealthCollector(db),
   ]
@@ -121,7 +121,20 @@ export async function GET(req: NextRequest) {
   const confidenceIncident = configurationIncident ? null : await collectAssessmentConfidenceIncident(db).catch(() => null)
   const preventive = [configurationIncident, confidenceIncident].filter(Boolean) as typeof result.incidents
   const incidents = [...result.incidents, ...preventive]
+  const healthReviews = incidents.filter(incident => incident.metadata.nativeProbe === 'cos_interactive_model_health')
+    .map(incident => ({ event_id: `${incident.incidentId}-review`, execution_id: incident.incidentId,
+      incident_id: incident.incidentId, event_type: 'interactive_model_health_review_required',
+      occurred_at: incident.detectedAt, schema_version: 'interactive-model-health-review-v1',
+      payload: { errorCode: incident.errorCode, summary: incident.errorMessage, evidence: incident.evidence,
+        automaticRepairAuthorized: false, authorityExpanded: false } }))
+  if (healthReviews.length) {
+    const { error } = await db.from('supervisor_audit_events').upsert(healthReviews, { onConflict: 'event_id', ignoreDuplicates: true })
+    if (error) return NextResponse.json({ ok: false, error: 'interactive_health_review_persistence_failed' }, { status: 503 })
+  }
+
+
   const remediation = incidents.length ? await remediateNativeIncidents(incidents, { maxIncidents: 4 }) : []
+
 
   const supervisedSecurityRows = remediation.flatMap(item => {
     const incident = incidents.find(candidate => candidate.incidentId === item.incidentId)
@@ -163,3 +176,4 @@ export async function GET(req: NextRequest) {
   }, { status })
 }
 export async function POST(req: NextRequest) { return GET(req) }
+

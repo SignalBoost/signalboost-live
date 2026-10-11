@@ -53,7 +53,7 @@ test('a model that times out on every call is critical (the GLM week-long failur
   const snapshot = evaluateInteractiveModelHealth({
     now,
     thresholds,
-    calls: [...calls(8, { model: 'zai-org/GLM-5.3-Flash', success: false, http_status: null, finish_reason: null, latency_ms: 20000 }), ...calls(10, {})],
+    calls: [...calls(8, { model: 'zai-org/GLM-5.3-Flash', success: false, http_status: null, finish_reason: 'timeout:inference_transport_deadline', latency_ms: 20000 }), ...calls(10, {})],
     stages: [],
   })
   assert.equal(snapshot.state, 'critical')
@@ -175,7 +175,7 @@ function fakeDb(input: { calls: ModelCallRow[]; stages: StageRow[] }) {
   return { db, inserts, filters }
 }
 
-test('the collector records one observation-only probe sample and returns no incidents', async () => {
+test('the collector records a probe sample and stages critical evidence for governed review', async () => {
   const { db, inserts, filters } = fakeDb({
     calls: calls(6, { model: 'zai-org/GLM-5.3-Flash', success: false, http_status: null }),
     stages: stages('primary:cos_first_answer', [4000, 4500, 5000]),
@@ -183,7 +183,9 @@ test('the collector records one observation-only probe sample and returns no inc
   const collector = interactiveModelHealthMonitoringCollector({ db, now: () => now })
   assert.equal(collector.id, 'cos-interactive-model-health')
   const incidents = await collector.observer.observe({ provider: 'signalboost-platform', environment: 'production' } as any)
-  assert.deepEqual(incidents, [])
+  assert.equal(incidents.length, 1)
+  assert.equal(incidents[0].metadata.automaticRepairAuthorized, false)
+  assert.equal(incidents[0].errorCode, 'interactive_model_health_critical')
 
   assert.equal(inserts.length, 1)
   const sample = inserts[0]
@@ -214,4 +216,31 @@ test('the native monitoring cron runs the collector', () => {
   const source = readFileSync(new URL('../app/api/cron/native-proactive-monitoring/route.ts', import.meta.url), 'utf8')
   assert.match(source, /import \{ interactiveModelHealthMonitoringCollector \} from '@\/self-healing-host\/interactive-model-health-monitoring'/)
   assert.match(source, /interactiveModelHealthMonitoringCollector\(\{ db \}\)/)
+})
+
+
+
+test('short aborts, unknown no-status failures and preflight rejections are not provider timeouts', () => {
+  const snapshot = evaluateInteractiveModelHealth({ now, thresholds, stages: [], calls: [
+    ...calls(2, { success: false, http_status: null, finish_reason: 'error:AbortError:This operation was aborted', latency_ms: 3 }),
+    ...calls(2, { success: false, http_status: null, finish_reason: null, latency_ms: 120000 }),
+    ...calls(2, { success: false, http_status: null, finish_reason: 'preflight:inference_rejected', latency_ms: 3 }),
+    ...calls(2, { success: false, http_status: null, finish_reason: 'timeout:inference_transport_deadline', latency_ms: 120000 }),
+  ] })
+  assert.equal(snapshot.modelStats[0].timeouts, 2)
+  assert.equal(snapshot.modelStats[0].aborted, 2)
+  assert.equal(snapshot.modelStats[0].preflightFailures, 2)
+  assert.equal(snapshot.modelStats[0].unclassifiedFailures, 2)
+})
+
+test('healthy monitoring emits no incident and critical review is stable within its window', async () => {
+  const healthy = fakeDb({ calls: calls(6, {}), stages: [] })
+  assert.deepEqual(await interactiveModelHealthMonitoringCollector({ db: healthy.db, now: () => now }).observer.observe({} as any), [])
+  const critical = fakeDb({ calls: calls(6, { success: false }), stages: [] })
+  const observer = interactiveModelHealthMonitoringCollector({ db: critical.db, now: () => now }).observer
+  const first = await observer.observe({} as any)
+  const second = await observer.observe({} as any)
+  assert.equal(first[0].incidentId, second[0].incidentId)
+  assert.equal(first[0].metadata.authorityExpanded, false)
+  assert.ok(first[0].evidence.length)
 })

@@ -2053,7 +2053,7 @@ Implementation status at introduction: `saas/lib/ai/cos/cosWorkingDistillation.t
 
 Implementation progress on 2026-09-23:
 
-- `saas/lib/ai/cos/cosWorkingDistillationBundle.ts` now builds one deterministic **balanced cross-subject Working-COS education bundle** from sealed model-neutral Distillation Asset Vault sets.
+- `saas/lib/ai/cos/cosWorkingDistillationBundle.ts` now builds one deterministic **balanced cross-subject Working-COS education bundle** from sealed model-neutral Distillation Asset Vault sets. Selection chooses the newest eligible set that fits while reserving the minimum eligible item counts for the remaining required subjects; core coverage is checked on the selected bundle, not merely on the available vault subjects. Item, rights, private-data and activation gates remain unchanged.
 - Selection is breadth-first: the newest eligible set from each subject is chosen before any subject may dominate by volume. The default bundle requires at least 8 subjects and remains bounded to 384 items.
 - Eligible rights classes are `owned`, `open_license`, `contractually_permitted`, and existing governed hosted-teacher outputs. Unknown rights, private Production data, invalid manifests, undersized sets, or non-model-neutral material are excluded.
 - The selector is read-only/non-spending. It does not partition a training dataset, dispatch training, mutate a model, authorize traffic, or claim University graduation.
@@ -3017,3 +3017,13 @@ External drafts of the Lab specification circulated on 2026-10-06. Where they co
 11. Stages open on measured entry conditions, never calendar weeks, and "make the University learn from experiments" stays in the sequence.
 
 <!-- end of ONBOARD.md (if this line is missing, the paste was cut short) -->
+
+
+
+## Builder cancellation and interactive-health review — 2026-10-11
+
+Builder keeps one absolute turn deadline across model rounds. Its governed AI port now aborts the underlying request when that deadline or the caller signal expires. Cancellation passes through coder graduates, owned-primary inference and lease waiting, durable model assignments, and the built-in OpenAI-compatible, Anthropic and Google transports. Pre-aborted or expired work fails before provider routing; cancellation is terminal and cannot start another graduate or a paid fallback. A transport's own timeout remains distinct from owner cancellation. Production worker-loss recovery is a separate concern; these changes do not establish that every queued repair completes.
+
+Interactive model-health monitoring no longer infers a timeout from missing HTTP status. It uses explicit finish-reason evidence to separate timeouts, aborts, preflight rejection, HTTP errors and unclassified failures; historical generic AbortErrors remain aborts, without assigning them an unproven provider-timeout cause. Critical findings produce schema-validated review-only Supervisor incidents plus a deduplicated `interactive_model_health_review_required` audit receipt. Review-only incidents are staged before connector or repair execution. Health observations grant no ownership, model-switch, spend, merge or deployment authority. This is detection-to-review integration, not proof of automatic recovery.
+
+Regression coverage is in `builderControlAdapter`, `builderCodingCancellation`, `localInferenceCancellation`, `interactiveHealthSupervisorReview`, `modelTransportAdapters`, `cosInteractiveModelHealthMonitoring` and `cosWorkingDistillationBundle` node tests, all included in the Vercel COS release gate. A read-only replay of 1,277 eligible production vault rows reproduced four selected subjects / 348 items with the old selector and eight required subjects / 383 items with the corrected selector under the same 384-item cap. This replay proves selection only; readiness registration, training and production job completion require separate live evidence after deployment.

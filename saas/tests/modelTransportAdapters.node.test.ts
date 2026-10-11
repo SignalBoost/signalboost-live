@@ -217,3 +217,30 @@ test('custom/native/local protocols remain injectable rather than guessed by a b
   assert.equal(adapters.length, 0)
   assert.throws(() => requireTransportForProfile(p, adapters), /platform_model_transport_unavailable/)
 })
+
+
+
+for (const protocol of ['openai_compatible', 'anthropic_messages', 'google_generate_content'] as const) {
+  test(`${protocol} propagates caller cancellation and refuses pre-aborted requests`, async () => {
+    const p = profile({ key: `cancel-${protocol}`, modelId: 'test-model', protocol })
+    const [binding] = parseModelTransportBindings(JSON.stringify([{
+      profileKey: p.key, protocol, provider: 'test', endpoint: 'https://models.example.test/v1', credentialEnv: 'TEST_MODEL_CREDENTIAL',
+    }]))
+    let calls = 0
+    let seen: AbortSignal | null | undefined
+    const adapters = createBuiltinModelTransportAdapters({ profiles: [p], bindings: [binding], env: { TEST_MODEL_CREDENTIAL: 'fake-test-credential' }, fetchImpl: (async (_url, init) => {
+      calls += 1
+      seen = init?.signal
+      return new Promise<Response>((_, reject) => seen?.addEventListener('abort', () => reject(seen?.reason), { once: true }))
+    }) as typeof fetch })
+    const adapter = requireTransportForProfile(p, adapters)
+    const controller = new AbortController()
+    const work = adapter.chat({ profile: p, messages: [{ role: 'user', content: 'test' }], signal: controller.signal })
+    await new Promise(resolve => setImmediate(resolve))
+    controller.abort(new Error('owner_cancelled'))
+    await assert.rejects(work, /owner_cancelled/)
+    assert.equal(seen?.aborted, true)
+    await assert.rejects(adapter.chat({ profile: p, messages: [{ role: 'user', content: 'test' }], signal: controller.signal }), /owner_cancelled/)
+    assert.equal(calls, 1)
+  })
+}

@@ -43,7 +43,8 @@ export type FreshEvidenceLocalSynthesisOutcome =
   | FreshEvidenceLocalSynthesis
   | { kind: 'local_synthesis_failed'; error: string }
   | { kind: 'local_synthesis_unparseable' }
-  | { kind: 'citation_grounding_rejected'; reason: FreshEvidenceGroundingRejection }
+  /** rejectedDraftHead: owner-diagnostic excerpt of the rejected draft; omitted for unsafe text. */
+  | { kind: 'citation_grounding_rejected'; reason: FreshEvidenceGroundingRejection; rejectedDraftHead?: string }
 
 const FRESH_GROUNDED_ANSWER_TEMPERATURE = 0.2
 
@@ -111,6 +112,12 @@ export async function synthesizeFreshEvidenceLocally(args: {
     }
   }
 
+  // Owner-only excerpt of a rejected draft, so a rejection can be read instead of guessed. Never for unsafe
+  // text: the draft itself is checked, because an unsafe draft without a cited sentence is rejected earlier
+  // (no_evidence_cited / empty_answer) than the unsafe-output check.
+  const rejectedDraftHead = accepted.ok || accepted.reason === 'unsafe_public_output' || hasUnsafePublicModelOutput(String(lastDraft || ''))
+    ? undefined
+    : String(lastDraft || '').replace(/\s+/g, ' ').trim().slice(0, 300)
   console.info('[cos-fresh-grounded-answer]', JSON.stringify({
     at: new Date().toISOString(),
     accepted: accepted.ok,
@@ -119,13 +126,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
     citedSourceIds: accepted.citedSourceIds,
     sources: args.sources.length,
     latencyMs: Date.now() - startedAt,
-    // Owner telemetry only: the head of a rejected draft, so a rejection can be read instead of guessed.
-    // Never for unsafe text: the draft itself is checked, because an unsafe draft without a cited
-    // sentence is rejected earlier (no_evidence_cited / empty_answer) than the unsafe-output check.
-    rejectedDraftHead: accepted.ok || accepted.reason === 'unsafe_public_output' || hasUnsafePublicModelOutput(String(lastDraft || '')) ? undefined : String(lastDraft || '').replace(/\s+/g, ' ').slice(0, 300),
+    rejectedDraftHead,
   }))
 
-  if (!accepted.ok) return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer' }
+  if (!accepted.ok) return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer', rejectedDraftHead }
   return {
     kind: 'accepted',
     reply: accepted.reply,

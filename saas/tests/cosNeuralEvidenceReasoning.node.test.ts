@@ -36,7 +36,7 @@ test('live-fact synthesis is one reasoning pass that teaches evaluation method, 
   assert.doesNotMatch(groundedAnswer, legacyDiagnosticTemplateTerms)
   assert.doesNotMatch(localSynthesis, semanticTemplateTerms)
   assert.match(groundedAnswer, /Answer the user directly without showing reasoning/)
-  assert.match(groundedAnswer, /Distinguish plainly: what is established by an official publisher, what is reported by media/)
+  assert.match(groundedAnswer, /Distinguish official confirmation, attributed reporting, and unresolved claims/)
   assert.match(groundedAnswer, /If sources disagree, say what each one reports instead of choosing silently/)
   assert.match(groundedAnswer, /CITATION REQUIREMENT \(enforced by the server before release\)/)
   assert.match(groundedAnswer, /replyCitesRequiredFreshEvidence\(reply, args\.input, args\.sources\)/)

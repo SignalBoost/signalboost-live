@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const session = await customerSession()
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: noStore })
   const organizationId = req.nextUrl.searchParams.get('organizationId') || ''
-  if (!UUID_RE.test(organizationId)) return NextResponse.json({ ok: true, catalog: LAB_PROVIDER_CATALOG, credentials: [] }, { headers: noStore })
+  if (!UUID_RE.test(organizationId)) return NextResponse.json({ ok: false, error: 'lab_organization_required' }, { status: 400, headers: noStore })
   const { data, error } = await session.supabase.rpc('itmounts_lab_customer_list_credentials', { p_organization_id: organizationId })
   if (error) return NextResponse.json({ ok: false, error: rpcErrorCode(error) }, { status: 403, headers: noStore })
   return NextResponse.json({ ok: true, catalog: LAB_PROVIDER_CATALOG, credentials: data ?? [] }, { headers: noStore })

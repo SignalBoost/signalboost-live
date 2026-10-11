@@ -111,7 +111,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'Never mention routing, verification gates, confidence scores, providers, or fallbacks. Never describe your own process.',
     'Each new question needs evidence relevant to that question. Never reuse evidence about a different country, election, person, or subject merely because it was retrieved earlier in the conversation.',
     'User-supplied names and claims are search terms, not verified facts. Only repeat venue names and descriptions established by this turn\'s LIVE evidence.',
-    'Respect the requested category: a salsa dance club or nightclub is not the same as a dance studio, school, academy, workshop, or class. Do not claim clubs exist based only on evidence for lessons or studios; clearly state when sources only establish classes or social events.',
+    'Respect the requested category and scope: closely related kinds of venues, services, activities, or products are not automatically interchangeable. Identify verified alternatives accurately instead of representing them as the requested category.',
     `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
     args.lengthRule || '',
   ].filter(Boolean).join('\n')

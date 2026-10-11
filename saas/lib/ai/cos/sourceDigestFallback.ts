@@ -21,7 +21,7 @@ function excerpt(text: string, words: string[], title = ''): string {
   const hit = sentences.find(line => words.some(word => clean(line).includes(word))) || sentences[0] || ''
   return hit.length > 220 ? hit.slice(0,217).replace(/\s+\S*$/,'')+'…' : hit
 }
-const INTRO: Record<string,string> = { en: 'These search results may help with your question (the answer could not be verified):', es: 'Estos resultados de búsqueda pueden ayudar (no se pudo verificar la respuesta):', pt: 'Estes resultados da busca podem ajudar (não foi possível verificar a resposta):' }
+const INTRO: Record<string,string> = { en: 'Here is what the current search results say (not a verified conclusion):', es: 'Esto es lo que indican los resultados de búsqueda (no es una conclusión verificada):', pt: 'Veja o que indicam os resultados da busca (não é uma conclusão verificada):' }
 export function buildSourceDigestFallback(args: { input: string; sources: Source[]; language: string }): string | null {
   const terms = keywords(args.input)
   if (!terms.length) return null
@@ -36,7 +36,10 @@ export function buildSourceDigestFallback(args: { input: string; sources: Source
   const lines = results.map(({source:s}) => {
     const title = decodeEntities(String(s.title || s.url)).replace(/[\[\]<>]/g,'').replace(/\s+/g,' ').slice(0,120)
     const summary = excerpt(s.snippet || '',terms,title).replace(/[\[\]<>]/g,'')
-    return '- **['+title+']('+s.url+')**'+(summary?' — '+summary:'')
+    return '- '+(summary ? '**'+title+'**: “'+summary+'” ' : '**'+title+'** ' )+'[Read source]('+s.url+')'
   })
   return [INTRO[language] || INTRO.en,'',...lines,'','These are search excerpts, not confirmation of the exact category, hours or current availability. Check the linked pages.'].join('\n')
 }
+
+/** Source-attributed fallback; never synthesizes a conclusion unsupported by snippets. */
+export const buildSourceSummaryFallback = (question: string, sources: Source[], language = 'en'): string | null => buildSourceDigestFallback({input:question,sources,language})

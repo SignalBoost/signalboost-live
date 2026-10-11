@@ -140,7 +140,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
   const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
-  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive a complete, useful answer with appropriate detail for the request. For recommendations, name specific verified options, locations and event details when evidenced. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nAnswer at the level of detail the user's task needs. Start with the factual answer, never with process language.\nANSWER:`
+  const prompt = `/no_think\nQUESTION: ${args.input}\n\nGive a complete, useful answer with appropriate detail for the request. For recommendations, name specific verified options, locations and event details when evidenced. Do not describe or enumerate the evidence sources. Cite only [LIVEn] ids. For straightforward factual questions, use 2–4 sentences where sufficient; expand when the user needs a detailed answer. Never present polls or predictions as decided outcomes; attribute leaders and uncertainty to specific cited sources.\n\n--- LIVE EVIDENCE ---\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\nAnswer at the level of detail the user's task needs. Start with the factual answer, cite each factual claim, and express uncertainty without guessing.\nANSWER:`
   return { systemPrompt, prompt }
 }
 

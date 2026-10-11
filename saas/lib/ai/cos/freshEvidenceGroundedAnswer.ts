@@ -159,8 +159,13 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const staleCurrentYear = /(?:as of (?:the )?(?:current date|today|now)\s*[,(: -]*|current (?:year|date|term)\s*(?:is|:|\()\s*)(20\d{2})/gi
   const staleAsOf = /\bas of\s+(?:the\s+)?(?:year\s+)?(20\d{2})\b/gi
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
-  const narration = /^(?:let me (?:carefully )?(?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:carefully )?(?:analy[sz]e|review|check) (?:the evidence|the question)|let's go through each piece of evidence|the question asks(?:\s|:))/i
-  if (narration.test(answer)) {
+  const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
+  // A model can leak its entire private evidence review without using an opening
+  // "Let me analyze" phrase. Reject the content, not just the first five words.
+  // Keep this narrow enough to permit normal journalistic source attribution.
+  const evidenceWalkthrough = /(?:\\b(?:let me|i need to|i will|i'll)\\s+(?:carefully\\s+)?(?:analy[sz]e|examine|review|determine)\\b|\\b(?:the question asks|the question is asking|the provided evidence|each piece of evidence|\\[LIVE\\d+\\]\\s*[-–:]\\s*|this appears to be a page about|the snippet mentions|doesn't provide information about|does not provide information about)\\b)/i
+  const leakedEvidenceReview = evidenceWalkthrough.test(answer) || /\[LIVE\d+\]\s*[-–:]\s*(?:this|the|it|appears|source)/i.test(answer)
+  if (leakedEvidenceReview || narration.test(answer)) {
     return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
   }
   if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)

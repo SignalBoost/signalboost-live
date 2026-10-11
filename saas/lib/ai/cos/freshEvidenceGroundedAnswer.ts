@@ -146,8 +146,15 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   sources: FreshEvidenceSource[]
 }): FreshEvidenceGroundedAcceptance {
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
+  // Normalize explicit positional citations emitted by some reasoners. Source ordering
+  // is the ordering supplied in the prompt; never infer support or append citations.
+  // Only bracketed integer citations are mapped, and only when that source exists.
   const raw = trimToCompleteSentence(String(args.text || ''))
-  const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
+  const normalized = raw.replace(/\\[(\\d{1,2})\\]/g, (match, number: string) => {
+    const position = Number(number) - 1
+    return position >= 0 && position < args.sources.length ? `[${args.sources[position].id}]` : match
+  })
+  const answer = normalized.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
   const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {
     if (!citedSourceIds.includes(match[1])) citedSourceIds.push(match[1])

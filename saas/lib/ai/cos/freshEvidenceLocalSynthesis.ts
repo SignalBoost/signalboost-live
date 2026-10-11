@@ -17,7 +17,7 @@
 // stands between evidence and answer.
 
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
-import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
+import { isActivityVenueDiscovery, type FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import { CHAT_ANSWER_LENGTH_RULE } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { hasUnsafePublicModelOutput } from '@/lib/ai/cos/publicPromptSecurity'
 import {
@@ -52,13 +52,13 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, structured = false): Promise<{ text: string; label: string } | { error: string } | null> {
+async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, structured = false, maxTokens = FRESH_GROUNDED_ANSWER_MAX_TOKENS): Promise<{ text: string; label: string } | { error: string } | null> {
   try {
     const result = await callCosReasoner({
       ...prompt,
       ...(structured ? { jsonObject: true, systemPrompt: prompt.systemPrompt + '\nReturn only a JSON object containing an answer string with inline citations. No analysis.' } : {}),
       temperature: FRESH_GROUNDED_ANSWER_TEMPERATURE,
-      maxTokens: FRESH_GROUNDED_ANSWER_MAX_TOKENS,
+      maxTokens,
       disableThinking: true,
       timeoutMs: FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
       // Production 2026-10-10 20:34–20:35: the pod answered in 9.4–10 s every time with finish=length at the cap,
@@ -92,9 +92,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
 }): Promise<FreshEvidenceLocalSynthesisOutcome> {
   if (!args.sources.length) return { kind: 'local_synthesis_unparseable' }
   const startedAt = Date.now()
+  const answerTokens = isActivityVenueDiscovery(args.input) ? 650 : FRESH_GROUNDED_ANSWER_MAX_TOKENS
 
   // One bounded transport retry on a transient failure; never a different brain.
-  let first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }))
+  let first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }), false, answerTokens)
   // Retry once if the primary provider and governed fallback both produce no usable text.
   // This is a bounded recovery for transient empty responses; the normal citation repair remains separate.
   if (!first || 'error' in first) first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }))
@@ -111,7 +112,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
   // acceptance failures retain the existing latency guard.
   if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && (accepted.reason === 'process_narration' || Date.now() - startedAt < 12_000)) {
     console.info('[cos-fresh-grounded-repair-start]', JSON.stringify({ reason: accepted.reason, elapsedMs: Date.now() - startedAt, sources: args.sources.length }))
-    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.reason === 'process_narration' ? '' : accepted.answer, reason: accepted.reason }), accepted.reason === 'process_narration')
+    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.reason === 'process_narration' ? '' : accepted.answer, reason: accepted.reason }), accepted.reason === 'process_narration', answerTokens)
     if (!second || 'error' in second) console.warn('[cos-fresh-grounded-repair-unavailable]', JSON.stringify({ reason: accepted.reason, errorCode: !second ? 'empty_response' : 'inference_error' }))
     if (second && !('error' in second)) {
       repaired = true

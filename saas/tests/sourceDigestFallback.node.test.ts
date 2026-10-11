@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildSourceDigestFallback } from '../lib/ai/cos/sourceDigestFallback.ts'
+import { buildSourceDigestFallback, buildSourceSummaryFallback } from '../lib/ai/cos/sourceDigestFallback.ts'
 
 test('failed synthesis produces source-only links for relevant search results', () => {
   const digest = buildSourceDigestFallback({
@@ -14,7 +14,7 @@ test('failed synthesis produces source-only links for relevant search results', 
   })
   assert.match(digest || '', /Salsa events in Asuncion/)
   assert.doesNotMatch(digest || '', /Unrelated US university/)
-  assert.match(digest || '', /not confirmation/i)
+  assert.match(digest || '', /not a verified conclusion/i)
 })
 
 test('no overlap or no safe links leaves the original failure handling intact', () => {
@@ -38,4 +38,11 @@ test('source digest decodes HTML entities and removes navigation boilerplate', (
   assert.match(result || '', /Salsa & dance clubs/)
   assert.doesNotMatch(result || '', /Skip to content|Subscribe Menu/)
   assert.match(result || '', /https:\/\/example.org\/salsa/)
+})
+
+test('source summary reports excerpts with linked attribution, not fabricated synthesis', () => {
+ const summary=buildSourceSummaryFallback('salsa venues in Asuncion',[{id:'LIVE1',title:'Asuncion salsa venues',url:'https://example.org/venues',snippet:'Local organizers list salsa social dance events on selected Fridays in Asuncion.'}]);
+ assert.match(summary || '', /Asuncion salsa venues.*Read source/s)
+ assert.match(summary || '', /selected Fridays/)
+ assert.doesNotMatch(summary || '', /confirmed nightclub/i)
 })

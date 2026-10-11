@@ -809,7 +809,13 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       }
     },
     backup: () => callConfiguredModelTurn(args, { ...config, fallbackFromOwned: true }).catch(error => { managedError = error; return null }),
-    hedgeAfterMs: interactiveManagedBackupAfterMs(),
+    // Fresh grounded answers are latency-sensitive: the 20s generic hedge plus
+    // managed prefill was producing >35s answer calls. Start the governed backup
+    // after 8s, without cancelling a useful owned-model answer. Explicit owner
+    // configuration still takes precedence.
+    hedgeAfterMs: String(args.usageContext?.purpose || '') === 'fresh_grounded_answer'
+      && !process.env.COS_INTERACTIVE_MANAGED_BACKUP_AFTER_MS
+      ? 8_000 : interactiveManagedBackupAfterMs(),
     isUseful: usefulTurn,
   })
   console.info('[cos-interactive-provider-order]', JSON.stringify({

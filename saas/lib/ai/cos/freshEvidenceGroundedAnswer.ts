@@ -33,6 +33,13 @@ export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 300
 export const FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE = 900
 export const FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL = 4_500
 const LIVE_CITATION = /\[(LIVE\d+)\]/g
+export function normalizeLiveCitations(text: string): string {
+  return String(text || '')
+    .replace(/[【(（{]\s*(LIVE\s*\d+(?:\s*[,;/&]\s*(?:LIVE\s*)?\d+)*)\s*[】)）}]/gi, '[$1]')
+    .replace(/\[\s*(LIVE\s*\d+(?:\s*[,;/&]\s*(?:LIVE\s*)?\d+)*)\s*\]/gi, (_m, inner: string) =>
+      (inner.match(/\d+/g) || []).map(n => '[LIVE' + Number(n) + ']').join(''))
+    .replace(/(?<![\w\[])\bLIVE\s*(\d+)\b(?!\])/gi, (_m, n: string) => '[LIVE' + Number(n) + ']')
+}
 const EXCERPT_STOP = new Set(['about', 'after', 'again', 'because', 'before', 'being', 'between', 'could', 'current', 'during', 'every', 'first', 'former', 'from', 'have', 'into', 'latest', 'might', 'official', 'other', 'please', 'should', 'since', 'their', 'there', 'these', 'thing', 'think', 'those', 'through', 'today', 'under', 'until', 'where', 'which', 'while', 'would'])
 
 /** Question words as match stems: 'brazilian' → 'brazil', 'president' → 'presid', so inflections in the page match. */
@@ -135,7 +142,7 @@ export function trimToCompleteSentence(text: string): string {
   // complete sentence and must never be trimmed off as an unfinished tail.
   if (!value || /[.!?…。！？]["”')\]]?\s*(?:\[LIVE\d+\]\s*)*$/u.test(value)) return value
   let cut = -1
-  for (const m of value.matchAll(/[.!?…。！？]["”')\]]?(?=\s)/gu)) cut = (m.index ?? -1) + m[0].length
+  for (const m of value.matchAll(/[.!?…。！？]["”')\]]?(?:\s*\[LIVE\d+\])*(?=\s|$)/gu)) cut = (m.index ?? -1) + m[0].length
   if (cut >= Math.ceil(value.length * 0.6)) return value.slice(0, cut).trim()
   return value
 }
@@ -146,7 +153,7 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   sources: FreshEvidenceSource[]
 }): FreshEvidenceGroundedAcceptance {
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  const raw = trimToCompleteSentence(String(args.text || ''))
+  const raw = trimToCompleteSentence(normalizeLiveCitations(String(args.text || '')))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
   const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {

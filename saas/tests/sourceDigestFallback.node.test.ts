@@ -29,3 +29,13 @@ test('source digest remains a distinct, low-confidence partial result after fail
   assert.match(route, /cos-fresh-source-digest/)
   assert.match(route, /diagnostics:ownerDiagnostics/)
 })
+
+test('source digest decodes HTML entities and removes navigation boilerplate', () => {
+  const result = buildSourceDigestFallback({
+    input: 'salsa dance clubs in Asuncion', language: 'en',
+    sources: [{id:'LIVE3',title:'Salsa &#038; dance clubs',url:'https://example.org/salsa',snippet:'Salsa & dance clubs Skip to content Subscribe Menu. Salsa dance sessions are hosted each Friday evening in Asuncion with a local instructor.'}],
+  })
+  assert.match(result || '', /Salsa & dance clubs/)
+  assert.doesNotMatch(result || '', /Skip to content|Subscribe Menu/)
+  assert.match(result || '', /https:\/\/example.org\/salsa/)
+})

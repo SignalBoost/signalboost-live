@@ -259,10 +259,10 @@ test('new-question prompt forbids cross-topic evidence reuse', () => {
 })
 
 
-test('process narration always gets the bounded repair even after the 12-second first-pass threshold', () => {
+test('process narration repair honors the six-second latency budget', () => {
   const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  assert.match(transport, /accepted\.reason === 'process_narration' \|\| Date\.now\(\) - startedAt < 12_000/)
-  assert.match(transport, /accepted\.reason !== 'unsafe_public_output'/)
+  assert.match(transport, /accepted\.reason !== 'unsafe_public_output' && Date\.now\(\) - startedAt < 6_000/)
+  assert.doesNotMatch(transport, /accepted\.reason === 'process_narration' \|\| Date\.now\(\) - startedAt/)
 })
 
 test('grounded answer instructions are topic-neutral rather than tied to one example', () => {

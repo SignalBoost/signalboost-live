@@ -52,10 +52,11 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt): Promise<{ text: string; label: string } | { error: string } | null> {
+async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, structured = false): Promise<{ text: string; label: string } | { error: string } | null> {
   try {
     const result = await callCosReasoner({
       ...prompt,
+      ...(structured ? { jsonObject: true, systemPrompt: prompt.systemPrompt + '\nReturn only a JSON object containing an answer string with inline citations. No analysis.' } : {}),
       temperature: FRESH_GROUNDED_ANSWER_TEMPERATURE,
       maxTokens: FRESH_GROUNDED_ANSWER_MAX_TOKENS,
       disableThinking: true,
@@ -69,7 +70,15 @@ async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt): Promise<
       usageContext: { feature: 'cos_interactive_answer', purpose: 'fresh_grounded_answer' },
     })
     if (!result?.text?.trim()) return null
-    return { text: result.text, label: result.reasoner?.label || 'cos-reasoner' }
+    let answerText = result.text
+    if (structured) {
+      try {
+        const parsed = JSON.parse(answerText)
+        if (typeof parsed?.answer !== 'string' || !parsed.answer.trim()) return null
+        answerText = parsed.answer
+      } catch { return null }
+    }
+    return { text: answerText, label: result.reasoner?.label || 'cos-reasoner' }
   } catch (error) {
     return { error: errorText(error) }
   }
@@ -102,7 +111,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
   // acceptance failures retain the existing latency guard.
   if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && (accepted.reason === 'process_narration' || Date.now() - startedAt < 12_000)) {
     console.info('[cos-fresh-grounded-repair-start]', JSON.stringify({ reason: accepted.reason, elapsedMs: Date.now() - startedAt, sources: args.sources.length }))
-    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.reason === 'process_narration' ? '' : accepted.answer, reason: accepted.reason }))
+    const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.reason === 'process_narration' ? '' : accepted.answer, reason: accepted.reason }), accepted.reason === 'process_narration')
     if (!second || 'error' in second) console.warn('[cos-fresh-grounded-repair-unavailable]', JSON.stringify({ reason: accepted.reason, errorCode: !second ? 'empty_response' : 'inference_error' }))
     if (second && !('error' in second)) {
       repaired = true

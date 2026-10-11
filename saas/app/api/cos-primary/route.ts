@@ -50,7 +50,7 @@ import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalS
 import { freshFailureReply, type FreshEvidenceInternalFailureCode } from '@/lib/ai/cos/freshEvidenceFailureRecovery'
 import { hashPrompt } from '@/lib/ai/cos/turnExperienceStore'
 import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFreshEvidenceFallback'
-import { buildSourceDigestFallback } from '@/lib/ai/cos/sourceDigestFallback'
+import { buildSourceSummaryFallback } from '@/lib/ai/cos/sourceDigestFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { companyKnowledgeBlock, cosAudience, cosIdentityPreamble, type CosAudience } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
@@ -912,7 +912,7 @@ if(!input)return legacyConciergePost(new NextRequest(req.clone()))
     if(requiresFreshEvidence)Object.assign(executionProvenance as any,{policy:'fresh_live_data_local_first',assistant_text_used_for_resolution:false})
     const normativeEvidenceFallback=freshHardFail?buildNormativeFreshEvidenceFallback({input:lookupInput,sources:freshSources,language}):null
     const sourceDigestFallback=freshHardFail&&!normativeEvidenceFallback&&freshSources.length
-      ? buildSourceDigestFallback({input:lookupInput,sources:freshSources,language}) : null
+      ? buildSourceSummaryFallback(lookupInput,freshSources,language) : null
     const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback||sourceDigestFallback))
     const baseFailureReply=partialFreshOfficeHolderReply??normativeEvidenceFallback??sourceDigestFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})))
     const ownerDiagnostics=isPrivileged&&requiresFreshEvidence?{

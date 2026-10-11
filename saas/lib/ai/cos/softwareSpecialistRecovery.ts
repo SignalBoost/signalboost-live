@@ -38,6 +38,6 @@ export async function runSoftwareDelegationWithSafeRetry<T>(
   const guarded = (signal?: AbortSignal) => { started = true; return execute(signal) }
   const result = await run(guarded)
   // Audit-store admission can be retried; uncertain execution or expired authority cannot.
-  if (!result.ok && !started && result.code === 'harness_evidence_sink_unavailable') return run(guarded)
+  if (result.ok === false && !started && result.code === 'harness_evidence_sink_unavailable') return run(guarded)
   return result
 }

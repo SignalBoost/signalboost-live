@@ -37,3 +37,18 @@ test('analysis is still rejected even after an attribution preface', () => {
  assert.equal(result.ok,false)
  assert.equal(result.reason,'process_narration')
 })
+
+test('removes complete reasoning-only opener and keeps supported final answer', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:"Okay, let me tackle this question about salsa. Salsa social events are listed in Asuncion. [LIVE1]"})
+ assert.equal(result.ok,true)
+ assert.doesNotMatch(result.reply,/let me tackle/i)
+ assert.match(result.reply,/Salsa social events are listed/)
+})
+test('does not strip incomplete reasoning and expose remainder as answer', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:"Let me analyze the evidence and compare sources. [LIVE1] First, I'll inspect each source."})
+ assert.equal(result.ok,false)
+})
+test('narration citations alone never count as a supported answer', () => {
+ const result=acceptFreshEvidenceGroundedAnswer({input,sources,text:"First, I'll scan the sources [LIVE1]. We must inspect more."})
+ assert.equal(result.ok,false)
+})

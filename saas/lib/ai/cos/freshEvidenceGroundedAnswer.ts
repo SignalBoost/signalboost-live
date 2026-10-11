@@ -33,6 +33,13 @@ export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 300
 export const FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE = 900
 export const FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL = 4_500
 const LIVE_CITATION = /\[(LIVE\d+)\]/g
+export function normalizeLiveCitations(text: string): string {
+  return String(text || '')
+    .replace(/[【(（{]\s*(LIVE\s*\d+(?:\s*[,;/&]\s*(?:LIVE\s*)?\d+)*)\s*[】)）}]/gi, '[$1]')
+    .replace(/\[\s*(LIVE\s*\d+(?:\s*[,;/&]\s*(?:LIVE\s*)?\d+)*)\s*\]/gi, (_m, inner: string) =>
+      (inner.match(/\d+/g) || []).map(n => '[LIVE' + Number(n) + ']').join(''))
+    .replace(/(?<![\w\[])\bLIVE\s*(\d+)\b(?!\])/gi, (_m, n: string) => '[LIVE' + Number(n) + ']')
+}
 const EXCERPT_STOP = new Set(['about', 'after', 'again', 'because', 'before', 'being', 'between', 'could', 'current', 'during', 'every', 'first', 'former', 'from', 'have', 'into', 'latest', 'might', 'official', 'other', 'please', 'should', 'since', 'their', 'there', 'these', 'thing', 'think', 'those', 'through', 'today', 'under', 'until', 'where', 'which', 'while', 'would'])
 
 /** Question words as match stems: 'brazilian' → 'brazil', 'president' → 'presid', so inflections in the page match. */

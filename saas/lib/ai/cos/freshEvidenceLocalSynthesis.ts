@@ -93,8 +93,11 @@ export async function synthesizeFreshEvidenceLocally(args: {
   let accepted = acceptFreshEvidenceGroundedAnswer({ text: first.text, input: args.input, sources: args.sources })
   let label = first.label
   let repaired = false
-  // Avoid an additional full generation when the interactive time budget has elapsed.
-  if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && Date.now() - startedAt < 12_000) {
+  // A rejected process-narration draft is not a completed answer. Give it one bounded
+  // repair attempt even when first inference crosses 12 seconds; production examples
+  // on 2026-10-11 repeatedly ended at ~12.2 seconds without any repair. Other
+  // acceptance failures retain the existing latency guard.
+  if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && (accepted.reason === 'process_narration' || Date.now() - startedAt < 12_000)) {
     const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.answer, reason: accepted.reason }))
     if (second && !('error' in second)) {
       repaired = true

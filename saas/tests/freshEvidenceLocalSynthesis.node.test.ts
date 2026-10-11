@@ -262,3 +262,10 @@ test('new-question prompt forbids cross-topic evidence reuse', () => {
  const prompt = freshEvidenceGroundedAnswerPrompt({input:'Who will be the next Brazilian president?',sources,retrievedAt,language:'en'})
  assert.match(prompt.systemPrompt,/Never reuse evidence about a different country, election, person, or subject/)
 })
+
+
+test('process narration always gets the bounded repair even after the 12-second first-pass threshold', () => {
+  const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(transport, /accepted\.reason === 'process_narration' \|\| Date\.now\(\) - startedAt < 12_000/)
+  assert.match(transport, /accepted\.reason !== 'unsafe_public_output'/)
+})

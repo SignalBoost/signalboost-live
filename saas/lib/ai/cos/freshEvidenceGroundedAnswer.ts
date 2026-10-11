@@ -19,7 +19,7 @@ export type FreshEvidenceGroundingRejection =
 /** Interactive lane budget (ONBOARD 2026-09-27: main answer 20 s, thinking off). */
 export const FRESH_GROUNDED_ANSWER_TIMEOUT_MS = 20_000
 /** Transport safety ceiling, not an instruction to shorten the user-facing answer. */
-export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 1200
+export const FRESH_GROUNDED_ANSWER_MAX_TOKENS = 500
 /**
  * Evidence budget for the reasoning call. The same turn carried 9,422 prompt tokens because claim research
  * replaces each source's snippet with up to 24,000 characters of page body and all of it was sent to the

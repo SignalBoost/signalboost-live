@@ -85,6 +85,26 @@ export function compactFreshEvidenceForReasoning(sources: FreshEvidenceSource[],
 
 export type FreshEvidenceGroundedPrompt = { systemPrompt: string; prompt: string }
 
+/**
+ * The live model narrates its analysis in free text even with thinking switched off (production 2026-10-11
+ * 04:15: "We are given a query … Let's analyze each piece of evidence", cut off at the token cap, no answer).
+ * The transport requests a JSON object (response_format json_object) on every grounded call, so the model must
+ * put the answer itself in one field. This reads that field, including one cut off by the token cap.
+ */
+/** The answer field of a JSON reply, including a reply cut off by the token cap. null when the reply is not that JSON. */
+export function extractGroundedJsonAnswer(text: string): string | null {
+  const raw = String(text || '').replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+  if (!raw.startsWith('{')) return null
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed.answer === 'string' ? parsed.answer : null
+  } catch {
+    const cut = raw.match(/^\{\s*"answer"\s*:\s*"((?:\\.|[^"\\])*)/)
+    if (!cut) return null
+    try { return JSON.parse(`"${cut[1].replace(/\\$/, '')}"`) } catch { return cut[1] }
+  }
+}
+
 export function freshEvidenceGroundedAnswerPrompt(args: {
   input: string
   sources: FreshEvidenceSource[]
@@ -163,17 +183,16 @@ const PROCESS_OPENER = /^\s*(?:[-*•–]\s*)?(?:okay|ok|alright|hmm|wait|lookin
  * "[LIVE2] lists academies") makes the sentence about the sources, not the world. A sentence that reports
  * what the sources say and cites them at the end ("The sources describe lessons, not a nightclub [LIVE2].")
  * is a factual answer and is kept. Replaces a fixed opener-phrase list that rejected that honest answer.
+ * Generalized 2026-10-11 04:21 after "The strongest direct evidence is [LIVE3] naming specific studios and
+ * [LIVE4]'s title …" passed a fixed verb list: a citation followed by a word (other than a joining
+ * conjunction), used possessively, or as a complement ("is [LIVE3]") is part of the sentence, not its support.
+ * A subject-phrase list ("the sources describe …") is deliberately NOT used: it rejected honest answers.
  */
-// Source inventory subjects are not user-facing conclusions, even with syntactically valid citations.
-// Keep this independent of topical nouns and of citation positioning.
-const SOURCE_INVENTORY_SUBJECT = /^\s*(?:(?:the|these|those|our)\s+)?(?:(?:strongest|best|main|key|primary|direct|available|retrieved|most\s+relevant)\s+)*(?:evidence|sources?|search\s+results?|references?|citations?)\s+(?:is|are|comes?|names?|lists?|shows?|says?|identifies?|describes?|mentions?|supports?|indicates?|suggests?)\b/i
-
-const CITATION_AS_NOUN = /\b(?:from|see|cites?|citing)\s+\[LIVE\d+\]|\[LIVE\d+\]\s+(?:(?:and|or|&)\s+\[LIVE\d+\]\s+)?(?:which|that|explicitly|clearly|only|both|each|shows?|says?|names?|lists?|mentions?|describes?|discusses?)\b/i
+const CITATION_AS_NOUN = /\b(?:from|see|cites?|citing|is|are|was|were)\s+\[LIVE\d+\]|\[LIVE\d+\]['’]s\b|\[LIVE\d+\]\s+(?!(?:and|but|or|while|whereas|although|though|so|yet)\b|\[LIVE)\p{L}/iu
 
 export function isProcessNarrationUnit(unit: string): boolean {
   const text = String(unit || '')
-  return SOURCE_INVENTORY_SUBJECT.test(text)
-    || CITATION_AS_NOUN.test(text)
+  return CITATION_AS_NOUN.test(text)
     || SOURCE_SUBJECT.test(text)
     || PROCESS_OPENER.test(text)
     || TASK_REFERENCE.test(text)
@@ -215,7 +234,8 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   sources: FreshEvidenceSource[]
 }): FreshEvidenceGroundedAcceptance {
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  const modelText = String(args.text || '')
+  const jsonAnswer = extractGroundedJsonAnswer(String(args.text || '').replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, ''))
+  const modelText = String(jsonAnswer ?? args.text ?? '')
     .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
     .trim()
   // An explicit final-answer marker at a line start ends the model's preamble.

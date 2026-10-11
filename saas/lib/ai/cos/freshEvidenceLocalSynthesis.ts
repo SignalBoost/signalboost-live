@@ -24,6 +24,7 @@ import {
   acceptFreshEvidenceGroundedAnswer,
   freshEvidenceGroundedAnswerPrompt,
   freshEvidenceGroundedRepairPrompt,
+  extractGroundedJsonAnswer,
   FRESH_GROUNDED_ANSWER_MAX_TOKENS,
   FRESH_GROUNDED_ANSWER_TIMEOUT_MS,
   type FreshEvidenceGroundedPrompt,
@@ -76,7 +77,12 @@ async function groundedAnswerCall(prompt: FreshEvidenceGroundedPrompt, structure
         const parsed = JSON.parse(answerText)
         if (typeof parsed?.answer !== 'string' || !parsed.answer.trim()) return null
         answerText = parsed.answer
-      } catch { return null }
+      } catch {
+        // A reply cut off by the token cap is unterminated JSON; its answer field still holds complete sentences.
+        // A provider that ignored JSON mode returns prose, which goes through the same release filter.
+        const cut = extractGroundedJsonAnswer(answerText)
+        if (cut?.trim()) answerText = cut
+      }
     }
     return { text: answerText, label: result.reasoner?.label || 'cos-reasoner' }
   } catch (error) {
@@ -94,10 +100,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
   const startedAt = Date.now()
 
   // One bounded transport retry on a transient failure; never a different brain.
-  let first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }))
+  let first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }), true)
   // Retry once if the primary provider and governed fallback both produce no usable text.
   // This is a bounded recovery for transient empty responses; the normal citation repair remains separate.
-  if (!first || 'error' in first) first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }))
+  if (!first || 'error' in first) first = await groundedAnswerCall(freshEvidenceGroundedAnswerPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE }), true)
   if (!first) return { kind: 'local_synthesis_unparseable' }
   if ('error' in first) return { kind: 'local_synthesis_failed', error: first.error }
 

@@ -113,3 +113,16 @@ test('owner diagnostic shows the rejected draft excerpt, owner-only', () => {
   const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
   assert.match(transport, /kind: 'citation_grounding_rejected', reason: accepted\.reason \?\? 'empty_answer', rejectedDraftHead \}/)
 })
+
+
+test('source inventory with plausible citations never becomes the public answer', () => {
+  const draft = "The strongest direct evidence is [LIVE1] naming specific studios and [LIVE2]'s title about salsa academies."
+  const result = acceptFreshEvidenceGroundedAnswer({text:draft,input:asked,sources:studios})
+  assert.equal(result.ok,false)
+  assert.equal(result.reason,'process_narration')
+  const direct = acceptFreshEvidenceGroundedAnswer({
+    text:'The available listings identify salsa studios and academies, but do not establish a dedicated salsa nightclub [LIVE1] [LIVE2].',
+    input:asked,sources:studios,
+  })
+  assert.equal(direct.ok,true)
+})

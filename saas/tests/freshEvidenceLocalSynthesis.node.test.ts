@@ -88,7 +88,7 @@ test('the live-fact path is one interactive-lane call with at most one repair, a
   assert.match(source, /disableThinking: true/)
   assert.match(source, /allowTruncatedText: true/, 'a length-capped answer is kept, not thrown away (prod 2026-10-10 20:35: 4/4 pod answers discarded)')
   assert.equal(FRESH_GROUNDED_ANSWER_TIMEOUT_MS, 20_000)
-  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 350)
+  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 300)
   assert.match(source, /resolveCosReasoner/)
   assert.match(source, /lengthRule: CHAT_ANSWER_LENGTH_RULE/)
   assert.doesNotMatch(source, /jsonObject|EVIDENCE_INSUFFICIENT|scope_plan|faithfulness|semanticPlan|predicateAudit|callLocalModel/)
@@ -201,4 +201,21 @@ test('live answers reject exposed analysis and stale as-of framing', () => {
     text: 'The November 2026 election is still upcoming as of October 2026; no future result is established. [LIVE1] [LIVE2]',
   })
   assert.equal(upcoming.ok, true, 'correct future election wording must not be rejected')
+})
+
+
+test('grounded live-answer latency budget caps both generated prose and evidence prefill', () => {
+  assert.equal(FRESH_GROUNDED_ANSWER_MAX_TOKENS, 300)
+  assert.equal(FRESH_GROUNDED_EVIDENCE_CHARS_PER_SOURCE, 900)
+  assert.equal(FRESH_GROUNDED_EVIDENCE_CHARS_TOTAL, 4_500)
+  const many = Array.from({ length: 8 }, (_, i) => ({
+    id: `LIVE${i + 1}`, title: `Source ${i + 1}`,
+    url: `https://source${i + 1}.example.org/election`,
+    snippet: 'The midterm election is scheduled for November 3 2026. '.repeat(130),
+    sourceDate: '2026-10-10',
+  })) as FreshEvidenceSource[]
+  const compacted = compactFreshEvidenceForReasoning(many, 'When are the 2026 midterms?')
+  assert.ok(compacted.reduce((sum, item) => sum + item.snippet.length, 0) <= 4_500)
+  assert.ok(compacted.every(item => item.snippet.length <= 900))
+  assert.deepEqual(compacted.map(item => item.id), many.map(item => item.id))
 })

@@ -246,3 +246,20 @@ test('COS election-answer prompt distinguishes chambers, forecasts and certified
   assert.match(brazil.systemPrompt,/Never present a media projection, unverified percentage/)
   assert.match(brazil.systemPrompt,/exact percentages unless they appear explicitly in the cited evidence/)
 })
+
+
+test('rejects leaked analysis preambles before public release even with valid citations', () => {
+ const attempted = 'Let me carefully analyze the question and the provided evidence to give an accurate answer. [LIVE1] [LIVE2]'
+ const accepted = acceptFreshEvidenceGroundedAnswer({text:attempted,input:officeQuestion,sources})
+ assert.equal(accepted.ok,false)
+ assert.equal(accepted.reason,'process_narration')
+ const declarative = 'The question asks which candidate will be president, but the evidence shows a runoff. [LIVE1] [LIVE2]'
+ assert.equal(acceptFreshEvidenceGroundedAnswer({text:declarative,input:officeQuestion,sources}).reason,'process_narration')
+ const repair = freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:attempted,reason:'process_narration'})
+ assert.match(repair.prompt,/Remove all process narration/)
+ assert.match(repair.prompt,/Answer directly in one or two factual sentences/)
+})
+test('new-question prompt forbids cross-topic evidence reuse', () => {
+ const prompt = freshEvidenceGroundedAnswerPrompt({input:'Who will be the next Brazilian president?',sources,retrievedAt,language:'en'})
+ assert.match(prompt.systemPrompt,/Never reuse evidence about a different country, election, person, or subject/)
+})

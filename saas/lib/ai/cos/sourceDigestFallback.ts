@@ -6,7 +6,7 @@ const clean = (s: string) => String(s || '').toLowerCase().normalize('NFD').repl
 function keywords(input: string): string[] {
   return [...new Set(clean(input).match(/\p{L}{4,}/gu) || [])].filter(w => !STOP.has(w))
 }
-const JUNK = /\b(?:skip to (?:main )?content|subscribe|donate|sign in|log ?in|cookies?|watch live|navigation|menu)\b/gi
+const JUNK = /\b(?:skip to (?:main )?content|subscribe|donate|sign in|log ?in|entrar|publicidade|newsletter|press copyright|all rights reserved|cookies?|watch live|navigation|menu|©)\b/gi
 function decodeEntities(text: string): string {
   return String(text || '').replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(Math.min(0x10ffff,parseInt(n,16))))
     .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Math.min(0x10ffff,Number(n))))
@@ -16,7 +16,7 @@ function decodeEntities(text: string): string {
 function excerpt(text: string, words: string[], title = ''): string {
   let value = decodeEntities(text).replace(/\s+/g, ' ').trim()
   while (title && value.toLowerCase().startsWith(title.toLowerCase())) value=value.slice(title.length).trim()
-  const sentences = value.split(/(?<=[.!?])\s+/).map(line => line.replace(JUNK,'').replace(/\s{2,}/g,' ').trim())
+  const sentences = value.split(/(?<=[.!?…])\s+|\n+/).map(line => line.replace(JUNK,'').replace(/\s{2,}/g,' ').trim())
     .filter(line => line.split(/\s+/).length >= 5)
   const hit = sentences.find(line => words.some(word => clean(line).includes(word))) || sentences[0] || ''
   return hit.length > 220 ? hit.slice(0,217).replace(/\s+\S*$/,'')+'…' : hit

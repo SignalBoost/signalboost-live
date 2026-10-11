@@ -192,9 +192,10 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const lines = finalText.split('\n')
   const lastWalkthrough = lines.findLastIndex(line => inventoryLine.test(line))
   if (lastWalkthrough >= 0) {
-    const tail = lines.slice(lastWalkthrough + 1).filter(line => !processLine.test(line) && !inventoryLine.test(line)).join('\n').trim()
+    const afterInventory = lines.slice(lastWalkthrough + 1).join('\n').trim()
+    const tail = (afterInventory.split(/\n\s*\n/).at(-1) || '').trim()
     // Never recover by length alone: require a separately cited, direct final claim.
-    if (tail && /\[LIVE\d+\]/.test(tail) && !/^(?:sources?:|therefore,? we|the evidence|this means)/i.test(tail)) {
+    if (tail && /\[LIVE\d+\]/.test(tail) && !tail.split('\n').some(line => processLine.test(line) || inventoryLine.test(line)) && !/^(?:sources?:|therefore,? we|the evidence|this means)/i.test(tail)) {
       finalText = tail
     }
   }

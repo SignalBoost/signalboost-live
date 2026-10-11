@@ -142,7 +142,7 @@ export function trimToCompleteSentence(text: string): string {
   // complete sentence and must never be trimmed off as an unfinished tail.
   if (!value || /[.!?…。！？]["”')\]]?\s*(?:\[LIVE\d+\]\s*)*$/u.test(value)) return value
   let cut = -1
-  for (const m of value.matchAll(/[.!?…。！？]["”')\]]?(?=\s)/gu)) cut = (m.index ?? -1) + m[0].length
+  for (const m of value.matchAll(/[.!?…。！？]["”')\]]?(?:\s*\[LIVE\d+\])*(?=\s|$)/gu)) cut = (m.index ?? -1) + m[0].length
   if (cut >= Math.ceil(value.length * 0.6)) return value.slice(0, cut).trim()
   return value
 }

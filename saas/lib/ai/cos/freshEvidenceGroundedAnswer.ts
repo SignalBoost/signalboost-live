@@ -116,7 +116,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
   const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
-  const prompt = `/no_think\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nReturn ONLY the final answer in 2-4 sentences with inline [LIVEn] citations. No analysis or source-review narration.\nANSWER:`
+  const prompt = `/no_think\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nAnswer the question directly in the first sentence. Do not analyze or enumerate sources, and do not narrate your reasoning. Cite factual claims with [LIVEn] ids.\nQUESTION: ${args.input}\nANSWER:`
   return { systemPrompt, prompt }
 }
 

@@ -17,7 +17,7 @@ import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
 
 const TEMPORAL_LIVE_MARKER = /\b(?:current|currently|today|today's|tonight|now|still|latest|live|breaking|recent|recently|newest|updated|right now|at present|as of today|as of now|this morning|this afternoon|this evening|this week|this month|this year)\b/i
-const LOOKUP_INTENT = /^\s*(?:who|what|when|where|which|is|are|has|have|did|does|do|can|could|show|give|check|find|tell\s+me|how\s+much|how\s+many)\b/i
+const LOOKUP_INTENT = /^\s*(?:who|whose|what|when|where|which|is|are|has|have|did|does|do|can|could|show|give|check|find|tell\s+me|how\s+much|how\s+many)\b/i
 const HISTORICAL_ANCHOR = /\b(?:yesterday|last\s+(?:week|month|year)|historical(?:ly)?|formerly|previously|in\s+(?:19|20)\d{2}|as\s+of\s+(?:19|20)\d{2})\b/i
 const CONCEPTUAL_OR_CREATIVE = /^\s*(?:explain|describe|define|teach|write|draft|create|design|build|plan|recommend|suggest|how\s+(?:do|does|did|is|are|can|could|would|should)|why\s+(?:do|does|did|is|are|can|could|would|should))\b/i
 
@@ -391,6 +391,9 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   // because the underlying fact is usually stable (for example, "current capital of X").
   if (LOOKUP_INTENT.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
 
+  // Predictions about the next holder of a mutable public office require live evidence
+  // even with nonstandard question grammar (e.g. 'whose is more likely ...').
+  if (new RegExp(`\\b(?:next|upcoming|future)\\s+(?:(?:[\\p{L}.-]+\\s+){0,3})${DYNAMIC_ROLE_SOURCE}\\b`, 'iu').test(text)) return true
   if (PRESENT_TENSE_OFFICE_HOLDER.test(text)) return true
   if (TERSE_CURRENT_OFFICE_HOLDER.test(text)) return true
   if (CURRENT_LEADER.test(text)) return true

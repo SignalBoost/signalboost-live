@@ -12,6 +12,7 @@ import { reportLanguageName } from '../../i18n/reportLanguage.ts'
 export type FreshEvidenceGroundingRejection =
   | 'empty_answer'
   | 'unsafe_public_output'
+  | 'process_narration'
   | 'no_evidence_cited'
   | 'citation_requirement_unmet'
 
@@ -101,6 +102,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     'Do not repeat the question, list what each source fails to contain, or explain verification mechanics. Prefer a two-sentence grounded answer over a long refusal.',
     'If sources disagree, say what each one reports instead of choosing silently.',
     'Never mention routing, verification gates, confidence scores, providers, or fallbacks. Never describe your own process.',
+    'Each new question needs evidence relevant to that question. Never reuse evidence about a different country, election, person, or subject merely because it was retrieved earlier in the conversation.',
     `CITATION REQUIREMENT (enforced by the server before release): ${describeFreshCitationRequirement(requirement, args.sources)}`,
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
@@ -157,13 +159,16 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const staleCurrentYear = /(?:as of (?:the )?(?:current date|today|now)\s*[,(: -]*|current (?:year|date|term)\s*(?:is|:|\()\s*)(20\d{2})/gi
   const staleAsOf = /\bas of\s+(?:the\s+)?(?:year\s+)?(20\d{2})\b/gi
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
-  const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
+  const narration = /^(?:let me (?:carefully )?(?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:carefully )?(?:analy[sz]e|review|check) (?:the evidence|the question)|let's go through each piece of evidence|the question asks(?:\s|:))/i
   // A model can leak its entire private evidence review without using an opening
   // "Let me analyze" phrase. Reject the content, not just the first five words.
   // Keep this narrow enough to permit normal journalistic source attribution.
-  const evidenceWalkthrough = /(?:\\b(?:let me|i need to|i will|i'll)\\s+(?:carefully\\s+)?(?:analy[sz]e|examine|review|determine)\\b|\\b(?:the question asks|the question is asking|the provided evidence|each piece of evidence|\\[LIVE\\d+\\]\\s*[-–:]\\s*|this appears to be a page about|the snippet mentions|doesn't provide information about|does not provide information about)\\b)/i
+  const evidenceWalkthrough = /(?:\b(?:let me|i need to|i will|i'll)\s+(?:carefully\s+)?(?:analy[sz]e|examine|review|determine)\b|\b(?:the question asks|the question is asking|the provided evidence|each piece of evidence|\[LIVE\d+\]\s*[-–:]\s*|this appears to be a page about|the snippet mentions|doesn't provide information about|does not provide information about)\b)/i
   const leakedEvidenceReview = evidenceWalkthrough.test(answer) || /\[LIVE\d+\]\s*[-–:]\s*(?:this|the|it|appears|source)/i.test(answer)
-  if (leakedEvidenceReview || narration.test(answer) || [...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
+  if (leakedEvidenceReview || narration.test(answer)) {
+    return { ok: false, reason: 'process_narration', reply: '', answer, citedSourceIds }
+  }
+  if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleFutureFraming)].some(match => Number(match[1]) !== currentYear)
     || [...answer.matchAll(staleCurrentYear)].some(match => Number(match[1]) !== currentYear)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
@@ -191,7 +196,9 @@ export function freshEvidenceGroundedRepairPrompt(args: {
 }): FreshEvidenceGroundedPrompt {
   const base = freshEvidenceGroundedAnswerPrompt(args)
   const requirement = freshCitationRequirement(args.input, args.sources)
-  const instruction = args.reason === 'citation_requirement_unmet'
+  const instruction = args.reason === 'process_narration'
+    ? 'Your draft exposed internal analysis instead of answering. Remove all process narration, source-by-source inspection and restatement of the question. Answer directly in one or two factual sentences, citing only relevant LIVE evidence ids. Do not reuse the previous draft wording.'
+    : args.reason === 'citation_requirement_unmet'
     ? `Your draft was not released because it did not meet the citation requirement. ${describeFreshCitationRequirement(requirement, args.sources)} Rewrite the answer so that it cites evidence ids from the required number of different hosts wherever they support the same point; do not add facts the evidence does not contain.`
     : args.reason === 'no_evidence_cited'
       ? 'Your draft was not released because it cited no evidence id. Rewrite the answer citing [LIVE#] ids inline after each fact they support.'

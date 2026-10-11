@@ -276,3 +276,9 @@ test('grounded answer instructions are topic-neutral rather than tied to one exa
   assert.match(answerPrompt.systemPrompt, /Respect the requested category and scope/)
   assert.match(answerPrompt.systemPrompt, /Names, dates, quantities, and specific attributes/)
 })
+
+test('grounded prompt repeats question directly before final answer marker', () => {
+ const prompt=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
+ assert.match(prompt.prompt,/QUESTION:[^\n]+\nANSWER:\s*$/)
+ assert.match(prompt.prompt,/Do not analyze or enumerate sources/)
+})

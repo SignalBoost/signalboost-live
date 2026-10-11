@@ -119,7 +119,8 @@ export async function synthesizeFreshEvidenceLocally(args: {
     sources: args.sources.length,
     latencyMs: Date.now() - startedAt,
     // Owner telemetry only: the head of a rejected draft, so a rejection can be read instead of guessed.
-    rejectedDraftHead: accepted.ok ? undefined : String(lastDraft || '').replace(/\s+/g, ' ').slice(0, 300),
+    // Never for a draft rejected as unsafe output — that text must not reach logs either.
+    rejectedDraftHead: accepted.ok || accepted.reason === 'unsafe_public_output' ? undefined : String(lastDraft || '').replace(/\s+/g, ' ').slice(0, 300),
   }))
 
   if (!accepted.ok) return { kind: 'citation_grounding_rejected', reason: accepted.reason ?? 'empty_answer' }

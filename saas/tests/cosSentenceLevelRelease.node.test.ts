@@ -1,5 +1,6 @@
 // saas/tests/cosSentenceLevelRelease.node.test.ts
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { acceptFreshEvidenceGroundedAnswer, isProcessNarrationUnit, splitAnswerSentences } from '../lib/ai/cos/freshEvidenceGroundedAnswer.ts'
 
@@ -60,4 +61,9 @@ test('uncited sentences never ride along on another sentence\'s citation', () =>
   const r = acceptFreshEvidenceGroundedAnswer({ text: 'Venue A hosts salsa socials [LIVE1]. Salsa is the most popular dance in the country.', input, sources })
   assert.equal(r.ok, true)
   assert.doesNotMatch(r.answer, /most popular/)
+})
+
+test('rejected-draft telemetry never logs a draft rejected as unsafe output', () => {
+  const transport = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(transport, /rejectedDraftHead: accepted\.ok \|\| accepted\.reason === 'unsafe_public_output' \? undefined :/)
 })

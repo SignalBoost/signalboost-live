@@ -281,14 +281,14 @@ test('grounded answer instructions are topic-neutral rather than tied to one exa
 
 test('grounded prompt repeats question directly before final answer marker', () => {
  const prompt=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
- assert.match(prompt.prompt,/QUESTION:[^\n]+\nAnswer in 1–3 short factual sentences\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
+ assert.match(prompt.prompt,/QUESTION:[^\n]+\nAnswer at the level of detail the user's task needs\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
  assert.match(prompt.prompt,/Do not describe or enumerate the evidence sources/)
 })
 
 test('new direct-answer prompt gives question before evidence and final answer marker last', () => {
  const prompt=freshEvidenceGroundedAnswerPrompt({input:officeQuestion,sources,retrievedAt,language:'en'})
  assert.ok(prompt.prompt.indexOf('QUESTION:') < prompt.prompt.indexOf('--- LIVE EVIDENCE ---'))
- assert.match(prompt.prompt,/Answer in 1–3 short factual sentences\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
+ assert.match(prompt.prompt,/Answer at the level of detail the user's task needs\. Start with the factual answer, never with process language\.\nANSWER:\s*$/)
  const repair=freshEvidenceGroundedRepairPrompt({input:officeQuestion,sources,retrievedAt,language:'en',draft:'We must review [LIVE1].',reason:'process_narration'})
  assert.doesNotMatch(repair.prompt,/PREVIOUS DRAFT/)
  assert.match(repair.prompt,/QUESTION:[^\n]+\nRESPONSE:\s*$/)

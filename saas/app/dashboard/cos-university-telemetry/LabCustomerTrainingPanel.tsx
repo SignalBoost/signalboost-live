@@ -4,7 +4,7 @@
 // Keys are typed once, sent to the server, encrypted, and never shown again. No graduation is required to download.
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainingCopy'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
@@ -21,6 +21,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const explain = (code: string) => copy.errors[code] ?? fmt(copy.unknownError, { code })
   const [orgs, setOrgs] = useState<Org[]>([])
   const [orgKey, setOrgKey] = useState('')
+  const activeOrgRef = useRef('')
   const [catalog, setCatalog] = useState<CatalogEntry[]>([])
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [runs, setRuns] = useState<Run[]>([])
@@ -66,7 +67,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       }
       const list: Org[] = body.experiments
       setOrgs(list)
-      if (list[0]) setOrgKey(`${list[0].organizationId}|${list[0].experimentId}`)
+      if (list[0]) { activeOrgRef.current = list[0].organizationId; setOrgKey(`${list[0].organizationId}|${list[0].experimentId}`) }
       setWorkspaceLoad('ready')
     })()
   }, [copy])
@@ -80,6 +81,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       if (!response.ok || !body.ok) throw new Error(body.error || 'lab_request_failed')
       setOrgs([body.workspace])
       setWorkspaceLoad('ready')
+      activeOrgRef.current = body.workspace.organizationId
       setOrgKey(`${body.workspace.organizationId}|${body.workspace.experimentId}`)
     } catch (error) {
       setMessage({ kind: 'alert', text: fmt(copy.loadFailed, { code: error instanceof Error ? error.message : 'lab_request_failed' }) })
@@ -87,11 +89,12 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }
 
   const load = useCallback(async () => {
-    if (!organizationId) return
+    if (!organizationId || activeOrgRef.current !== organizationId) return
     const [providers, training] = await Promise.all([
       fetch(`/api/lab/providers?organizationId=${organizationId}`, { credentials: 'include', cache: 'no-store' }).then(r => r.json()).catch(() => null),
       fetch(`/api/lab/training?organizationId=${organizationId}`, { credentials: 'include', cache: 'no-store' }).then(r => r.json()).catch(() => null),
     ])
+    if (activeOrgRef.current !== organizationId) return
     if (providers?.ok) { setCatalog(providers.catalog); setCredentials(providers.credentials) }
     if (training?.ok) setRuns(training.runs)
     if (!providers?.ok || !training?.ok) setMessage({ kind: 'alert', text: fmt(copy.loadFailed, { code: providers?.error || training?.error || 'network' }) })
@@ -169,7 +172,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{copy.title}</h2>
-        <select className="rounded border px-2 py-1 text-sm" value={orgKey} onChange={event => setOrgKey(event.target.value)}>
+        <select className="rounded border px-2 py-1 text-sm" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setOrgKey(next) }}>
           {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName} · {item.projectName}</option>)}
         </select>
       </header>

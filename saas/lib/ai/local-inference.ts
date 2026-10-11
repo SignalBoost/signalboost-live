@@ -612,8 +612,10 @@ async function callConfiguredModelTurn(args: LocalModelCallArgs, config: LocalIn
     errorText = error instanceof Error ? error.message : String(error)
     if (controller.signal.aborted || httpStatus === null) transportFailure = controller.signal.aborted
       ? /timeout|deadline/i.test(controller.signal.reason instanceof Error ? `${controller.signal.reason.name}:${controller.signal.reason.message}` : String(controller.signal.reason))
-        ? 'timeout:inference_transport_deadline' : 'aborted:inference_owner_cancelled'
-      : inferenceStartedAt === null ? 'preflight:inference_rejected' : transportFailureTag(error)
+        ? controller.signal.reason instanceof Error && controller.signal.reason.name === 'TimeoutError'
+          ? 'timeout:inference_transport_deadline' : 'timeout:inference_owner_deadline'
+        : 'aborted:inference_owner_cancelled'
+      : inferenceStartedAt === null ? `preflight:${transportFailureTag(error)}` : transportFailureTag(error)
     if (
       error instanceof Error
       && (

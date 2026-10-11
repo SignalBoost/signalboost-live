@@ -45,6 +45,15 @@ test('local inference cancellation aborts fetch; expired work emits no phantom p
     await assert.rejects(callLocalModel({prompt:'repair'},config),/inference_deadline_expired/);
     assert.equal(state.fetches,1);
     assert.equal(state.rows.length,1);
+    state.remaining=null;
+    const deadline=new AbortController();
+    const expired=callLocalModel({prompt:'repair',signal:deadline.signal},config);
+    await new Promise(resolve=>setImmediate(resolve));
+    deadline.abort(new Error('builder_turn_timeout'));
+    await assert.rejects(expired,/builder_turn_timeout/);
+    assert.equal(state.rows.at(-1).finishReason,'timeout:inference_owner_deadline');
+    assert.equal(await callLocalModel({prompt:'repair'},{...config,timeoutMs:15}),null);
+    assert.equal(state.rows.at(-1).finishReason,'timeout:inference_transport_deadline');
   `
   assert.doesNotThrow(() => execFileSync(process.execPath, ['--input-type=module', '-e', source], { encoding: 'utf8', stdio: 'pipe' }))
 })

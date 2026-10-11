@@ -95,7 +95,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
 }): FreshEvidenceGroundedPrompt {
   const requirement = freshCitationRequirement(args.input, args.sources)
   const systemPrompt = [
-    'You are COS. Live web evidence was retrieved by the server moments ago for the question below. Reason over it and answer. /no_think',
+    'You are COS. Live web evidence was retrieved by the server moments ago for the question below. Answer the user directly without showing reasoning.',
     `Answer in ${reportLanguageName(args.language)} unless the question is clearly written in another language; then answer in that language.`,
     'Answer the question directly in the first sentence. Never narrate your analysis, inspect individual LIVE sources aloud, or open with Let me analyze, First I need to, or similar process commentary.',
     `The current UTC year is ${new Date().getUTCFullYear()}. Treat that year as the current year, not as a future date.`,
@@ -114,7 +114,7 @@ export function freshEvidenceGroundedAnswerPrompt(args: {
     args.lengthRule || '',
   ].filter(Boolean).join('\n')
   const compact = compactFreshEvidenceForReasoning(args.sources, args.input)
-  const prompt = `${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nAnswer now.`
+  const prompt = `/no_think\n${freshEvidenceGroundingBlock(args.input, compact, args.retrievedAt)}\n\nQUESTION: ${args.input}\n\nReturn ONLY the final answer in 2-4 sentences with inline [LIVEn] citations. Do not expose analysis or discuss the evidence-review process.\nANSWER:`
   return { systemPrompt, prompt }
 }
 
@@ -153,7 +153,14 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   sources: FreshEvidenceSource[]
 }): FreshEvidenceGroundedAcceptance {
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  const raw = trimToCompleteSentence(normalizeLiveCitations(String(args.text || '')))
+  // Remove only explicitly delimited thinking. Undelimited analysis is rejected,
+  // never mistaken for an answer merely because it contains LIVE citations.
+  const modelText = String(args.text || '')
+    .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+    .trim()
+  const finalMarker = modelText.match(/(?:^|\n)\s*(?:final answer|answer)\s*:\s*/i)
+  const publicText = finalMarker ? modelText.slice((finalMarker.index || 0) + finalMarker[0].length) : modelText
+  const raw = trimToCompleteSentence(normalizeLiveCitations(publicText))
   const answer = raw.replace(LIVE_CITATION, (match, id: string) => byId.has(id) ? match : '').replace(/[ \t]{2,}/g, ' ').trim()
   const citedSourceIds: string[] = []
   for (const match of answer.matchAll(LIVE_CITATION)) {
@@ -167,7 +174,8 @@ export function acceptFreshEvidenceGroundedAnswer(args: {
   const staleAsOf = /\bas of\s+(?:the\s+)?(?:year\s+)?(20\d{2})\b/gi
   const staleFutureFraming = /\b(?:still\s+)?(?:in\s+the\s+future|future\s+event)\s*\(\s*as of\s+(20\d{2})\s*\)/gi
   const narration = /^(?:let me (?:analy[sz]e|review|examine|go through)|first,? i need to|i(?:'ll| will) (?:analy[sz]e|review|check) the evidence|let's go through each piece of evidence)/i
-  if (narration.test(answer)) {
+  const analysisLeak = /(?:^|\n)\s*(?:we are given|we must|we need to|let'?s (?:go through|analy[sz]e|look)|the (?:question asks|instruction says)|\[LIVE\d+\]\s*[:\-]|(?:looking at|analy[sz]ing) (?:each|the) source)/i
+  if (narration.test(answer) || analysisLeak.test(answer)) {
     return { ok: false, reason: 'citation_requirement_unmet', reply: '', answer, citedSourceIds }
   }
   if ([...answer.matchAll(staleAsOf)].some(match => Number(match[1]) !== currentYear)

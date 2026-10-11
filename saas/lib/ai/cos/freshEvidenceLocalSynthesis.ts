@@ -93,7 +93,8 @@ export async function synthesizeFreshEvidenceLocally(args: {
   let accepted = acceptFreshEvidenceGroundedAnswer({ text: first.text, input: args.input, sources: args.sources })
   let label = first.label
   let repaired = false
-  if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output') {
+  // Avoid paying for a full second generation after the interactive time budget is spent.
+  if (!accepted.ok && accepted.reason && accepted.reason !== 'unsafe_public_output' && Date.now() - startedAt < 12_000) {
     const second = await groundedAnswerCall(freshEvidenceGroundedRepairPrompt({ ...args, lengthRule: CHAT_ANSWER_LENGTH_RULE, draft: accepted.answer, reason: accepted.reason }))
     if (second && !('error' in second)) {
       repaired = true

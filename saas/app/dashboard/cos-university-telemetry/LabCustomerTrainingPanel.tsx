@@ -188,7 +188,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{copy.title}</h2>
-        <select className="rounded border px-2 py-1 text-sm" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setMessage(null); setOrgKey(next) }}>
+        <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setMessage(null); setOrgKey(next) }}>
           {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName} · {item.projectName}</option>)}
         </select>
       </header>
@@ -208,14 +208,15 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
         </ul>
         {canManage && (
           <div className="grid gap-2 sm:grid-cols-2">
-            <select className="rounded border px-2 py-1" value={keyKind} onChange={event => setKeyKind(event.target.value)}>
+            <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={keyKind} onChange={event => setKeyKind(event.target.value)}>
+              {catalog.length === 0 ? <option value="">Providers unavailable — retry loading</option> : null}
               {catalog.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
             </select>
-            <input className="rounded border px-2 py-1" placeholder={copy.keyNamePh} value={keyLabel} onChange={event => setKeyLabel(event.target.value)} />
-            <input className="rounded border px-2 py-1" type="password" autoComplete="off" placeholder={copy.keyPh} value={keyValue} onChange={event => setKeyValue(event.target.value)} />
-            {keyKind === 'openai_compatible' && <input className="rounded border px-2 py-1" placeholder={copy.endpointPh} value={keyEndpoint} onChange={event => setKeyEndpoint(event.target.value)} />}
+            <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.keyNamePh} value={keyLabel} onChange={event => setKeyLabel(event.target.value)} />
+            <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="password" autoComplete="off" placeholder={copy.keyPh} value={keyValue} onChange={event => setKeyValue(event.target.value)} />
+            {keyKind === 'openai_compatible' && <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.endpointPh} value={keyEndpoint} onChange={event => setKeyEndpoint(event.target.value)} />}
             <p className="text-xs opacity-70 sm:col-span-2">{entry(keyKind)?.keyHelp} {entry(keyKind)?.unsupported['training.execute']}</p>
-            <button className="rounded border px-3 py-1 sm:col-span-2" disabled={busy || !keyLabel || keyValue.length < 20} onClick={saveKey}>{copy.saveKey}</button>
+            <button className="rounded border px-3 py-1 sm:col-span-2" disabled={busy || !catalog.some(item => item.kind === keyKind) || !keyLabel || keyValue.length < 20} onClick={saveKey}>{copy.saveKey}</button>
           </div>
         )}
       </div>
@@ -230,33 +231,33 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           <div className="grid gap-2 sm:grid-cols-2">
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherKey}
-              <select className="mt-1 w-full rounded border px-2 py-1" value={teacherId} onChange={event => setTeacherId(event.target.value)}>
+              <select className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} onChange={event => setTeacherId(event.target.value)}>
                 <option value="">{copy.choose}</option>
                 {teacherCredentials.map(item => <option key={item.id} value={item.id}>{entry(item.providerKind)?.name} · {item.label}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.teacherModel}
-              <input className="mt-1 w-full rounded border px-2 py-1" placeholder={teacherEntry?.kind === 'anthropic' ? 'claude-…' : copy.modelPh} value={teacherModel} onChange={event => setTeacherModel(event.target.value)} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={teacherEntry?.kind === 'anthropic' ? 'claude-…' : copy.modelPh} value={teacherModel} onChange={event => setTeacherModel(event.target.value)} />
             </label>
             </>}
             <label className="text-sm">{copy.trainingAccount}
-              <select className="mt-1 w-full rounded border px-2 py-1" value={computeId} onChange={event => setComputeId(event.target.value)}>
+              <select className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeId} onChange={event => setComputeId(event.target.value)}>
                 <option value="">{copy.choose}</option>
                 {computeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.baseModel}
-              <input className="mt-1 w-full rounded border px-2 py-1" value={baseModel} onChange={event => setBaseModel(event.target.value)} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={baseModel} onChange={event => setBaseModel(event.target.value)} />
             </label>
             <label className="text-sm">{copy.budget}
-              <input className="mt-1 w-full rounded border px-2 py-1" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => setBudget(event.target.value)} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => setBudget(event.target.value)} />
             </label>
             <label className="text-sm">{copy.hourly}
-              <input className="mt-1 w-full rounded border px-2 py-1" type="number" min="0.05" max="1" step="0.05" value={hourly} onChange={event => setHourly(event.target.value)} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.05" max="1" step="0.05" value={hourly} onChange={event => setHourly(event.target.value)} />
             </label>
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherBudget}
-              <input className="mt-1 w-full rounded border px-2 py-1" type="number" min="0.01" step="0.01" value={teacherBudget} onChange={event => setTeacherBudget(event.target.value)} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" step="0.01" value={teacherBudget} onChange={event => setTeacherBudget(event.target.value)} />
             </label>
             <span />
             <p className="text-xs opacity-70 sm:col-span-2">{copy.teacherPriceHelp}</p>

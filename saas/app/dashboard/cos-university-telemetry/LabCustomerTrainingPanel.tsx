@@ -289,7 +289,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 {teacherModels.map(model => <option key={model} value={model}>{model}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>
-              {teacherModelsError && <span className="mt-1 block text-xs text-amber-200">{copy.modelDirectoryHelp}</span>}
+              {teacherModelsError && <span role="alert" className="mt-1 block text-xs text-amber-200">{copy.modelDirectoryUnavailable}</span>}
               {teacherModelChoice === 'custom' && <input aria-label={copy.teacherModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.modelPh} value={teacherModel} onChange={event => { setTeacherModel(event.target.value); setBudgetAuthorized(false) }} />}
             </label>
             </>}

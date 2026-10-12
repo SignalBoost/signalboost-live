@@ -3,7 +3,7 @@ import type { PublicLocale } from './publicLocales.ts'
 export const UNIVERSITY_START_COPY = {
   "en": {
     "title": "Your AI University LAB",
-    "intro": "Create a workspace, connect supported tools, review your budget and manage training without accessing internal administration.",
+    "intro": "Manage your workspaces, connected providers, training runs and results.",
     "signIn": "Sign in to AI University",
     "signUp": "Create your iTMounts account",
     "name": "Full name",
@@ -27,7 +27,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "es": {
     "title": "Tu LAB de AI University",
-    "intro": "Crea un espacio, conecta herramientas compatibles, revisa el presupuesto y gestiona el entrenamiento.",
+    "intro": "Gestiona tus espacios, proveedores conectados, entrenamientos y resultados.",
     "signIn": "Iniciar sesión en AI University",
     "signUp": "Crear tu cuenta iTMounts",
     "name": "Nombre completo",
@@ -51,7 +51,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "pt": {
     "title": "Seu LAB da AI University",
-    "intro": "Crie um espaço, conecte ferramentas compatíveis, revise seu orçamento e gerencie o treinamento.",
+    "intro": "Gerencie seus espaços, provedores conectados, treinamentos e resultados.",
     "signIn": "Entrar na AI University",
     "signUp": "Criar sua conta iTMounts",
     "name": "Nome completo",
@@ -75,7 +75,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "pl": {
     "title": "Twój LAB AI University",
-    "intro": "Utwórz przestrzeń, połącz obsługiwane narzędzia, sprawdź budżet i zarządzaj treningiem.",
+    "intro": "Zarządzaj przestrzeniami, połączonymi dostawcami, treningami i wynikami.",
     "signIn": "Zaloguj się do AI University",
     "signUp": "Utwórz konto iTMounts",
     "name": "Imię i nazwisko",
@@ -99,7 +99,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "ru": {
     "title": "Ваша лаборатория AI University",
-    "intro": "Создайте рабочую область, подключите инструменты, проверьте бюджет и управляйте обучением.",
+    "intro": "Управляйте рабочими областями, подключёнными провайдерами, обучением и результатами.",
     "signIn": "Войти в AI University",
     "signUp": "Создать аккаунт iTMounts",
     "name": "Полное имя",
@@ -123,7 +123,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "de": {
     "title": "Ihr AI University LAB",
-    "intro": "Erstellen Sie einen Arbeitsbereich, verbinden Sie unterstützte Tools, prüfen Sie das Budget und verwalten Sie Training.",
+    "intro": "Verwalten Sie Arbeitsbereiche, verbundene Anbieter, Trainingsläufe und Ergebnisse.",
     "signIn": "Bei AI University anmelden",
     "signUp": "iTMounts-Konto erstellen",
     "name": "Vollständiger Name",
@@ -147,7 +147,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "fr": {
     "title": "Votre LAB AI University",
-    "intro": "Créez votre espace, connectez les outils compatibles, vérifiez votre budget et gérez l’entraînement.",
+    "intro": "Gérez vos espaces, fournisseurs connectés, entraînements et résultats.",
     "signIn": "Se connecter à AI University",
     "signUp": "Créer votre compte iTMounts",
     "name": "Nom complet",
@@ -171,7 +171,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "it": {
     "title": "Il tuo LAB AI University",
-    "intro": "Crea uno spazio, collega strumenti supportati, verifica il budget e gestisci l’addestramento.",
+    "intro": "Gestisci spazi di lavoro, fornitori collegati, addestramenti e risultati.",
     "signIn": "Accedi a AI University",
     "signUp": "Crea il tuo account iTMounts",
     "name": "Nome completo",
@@ -195,7 +195,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "ja": {
     "title": "AI University LAB",
-    "intro": "ワークスペースを作成し、対応ツールを接続して予算を確認し、モデル学習を管理します。",
+    "intro": "ワークスペース、接続済みプロバイダー、学習ジョブ、結果を管理します。",
     "signIn": "AI Universityにログイン",
     "signUp": "iTMountsアカウントを作成",
     "name": "氏名",
@@ -219,7 +219,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "ko": {
     "title": "AI University LAB",
-    "intro": "작업 공간을 만들고 지원되는 도구를 연결하여 예산과 모델 학습을 관리하세요.",
+    "intro": "작업 공간, 연결된 제공업체, 학습 실행과 결과를 관리하세요.",
     "signIn": "AI University 로그인",
     "signUp": "iTMounts 계정 만들기",
     "name": "이름",
@@ -243,7 +243,7 @@ export const UNIVERSITY_START_COPY = {
   },
   "ar": {
     "title": "مختبر AI University الخاص بك",
-    "intro": "أنشئ مساحة عمل واربط الأدوات المدعومة وراجع الميزانية وأدر تدريب النماذج.",
+    "intro": "أدر مساحات العمل والمزودين المتصلين وعمليات التدريب والنتائج.",
     "signIn": "تسجيل الدخول إلى AI University",
     "signUp": "إنشاء حساب iTMounts",
     "name": "الاسم الكامل",

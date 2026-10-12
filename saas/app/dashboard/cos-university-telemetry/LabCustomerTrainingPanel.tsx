@@ -152,10 +152,21 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }
 
   async function download(runId: string) {
-    const response = await fetch(`/api/lab/training/download?organizationId=${organizationId}&runId=${runId}`, { credentials: 'include' })
-    const json = await response.json().catch(() => ({}))
-    if (json.ok) setFiles(current => ({ ...current, [runId]: json.files }))
-    else setMessage({ kind: 'alert', text: fmt(copy.downloadUnavailable, { code: explain(json.error) }) })
+    const requestedOrg = organizationId
+    try {
+      const response = await fetch(`/api/lab/training/download?organizationId=${requestedOrg}&runId=${runId}`, { credentials: 'include', cache: 'no-store' })
+      const json = await response.json().catch(() => null)
+      if (activeOrgRef.current !== requestedOrg) return
+      if (response.ok && json?.ok && Array.isArray(json.files)) {
+        setFiles(current => ({ ...current, [runId]: json.files }))
+      } else {
+        setMessage({ kind: 'alert', text: fmt(copy.downloadUnavailable, { code: explain(json?.error || 'network') }) })
+      }
+    } catch {
+      if (activeOrgRef.current === requestedOrg) {
+        setMessage({ kind: 'alert', text: fmt(copy.downloadUnavailable, { code: explain('network') }) })
+      }
+    }
   }
   const fileUrl = (runId: string, path: string) => `/api/lab/training/download?organizationId=${organizationId}&runId=${runId}&path=${encodeURIComponent(path)}`
 

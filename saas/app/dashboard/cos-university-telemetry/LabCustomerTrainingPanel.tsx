@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainingCopy'
 import { ADD_KEY_OPTION, providerOptions, sortProviders, type ProviderOption } from '@/lib/lab/labProviderOptions'
 import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
+import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
@@ -22,7 +23,7 @@ type Run = {
 type ModelOption = { id: string; label: string }
 type TeacherModelOption = { id: string; priced: boolean }
 // Build marker shown in the header (an identifier, not translatable copy).
-const LAB_UI_VERSION = 'LAB UI v2026.10.12.8'
+const LAB_UI_VERSION = 'LAB UI v2026.10.12.9'
 // Providers whose training jobs are polled through the training route (no worker callback).
 const POLLED_TRAINING = new Set(['together', 'fireworks'])
 // Training providers whose base-model list is public, so it shows before a key is saved.
@@ -64,7 +65,11 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [teacherModelsLoading, setTeacherModelsLoading] = useState(false)
   const [teacherModelsError, setTeacherModelsError] = useState(false)
   const [prompts, setPrompts] = useState('')
-  const [source, setSource] = useState<'examples' | 'teacher'>('examples')
+  const [source, setSource] = useState<'examples' | 'teacher' | 'open_sources'>('examples')
+  // Open sources: a topic plus the sources to search (all ticked by default, so most people only type the topic).
+  const [openTopic, setOpenTopic] = useState('')
+  const [openPicked, setOpenPicked] = useState<string[]>(() => LAB_OPEN_SOURCES.map(item => item.id))
+  const [openNote, setOpenNote] = useState<{ kind: 'status' | 'alert'; text: string } | null>(null)
   const [examples, setExamples] = useState('')
   const [files, setFiles] = useState<Record<string, { path: string; size: number }[]>>({})
   const [budget, setBudget] = useState('')
@@ -121,7 +126,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const selectedTeacherCredentials = teacherCredentials.filter(item => item.providerKind === teacherProviderKind)
   const promptCount = useMemo(() => new Set(prompts.split('\n').map(line => line.trim()).filter(Boolean)).size, [prompts])
   const exampleCount = useMemo(() => examples.split('\n').filter(line => { try { const o = JSON.parse(line); return o?.prompt && o?.response } catch { return false } }).length, [examples])
-  const itemCount = source === 'examples' ? exampleCount : promptCount
+  const itemCount = source === 'teacher' ? promptCount : exampleCount
 
   useEffect(() => {
     void (async () => {
@@ -262,6 +267,21 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     catch (error: any) { if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.keyRemoveFailed, { code: explain(error.message) }) }) }
   }
 
+  async function findOpenSources() {
+    const requestedOrg = organizationId
+    setOpenNote({ kind: 'status', text: copy.openFinding })
+    try {
+      const found = await call('/api/lab/open-sources', 'POST', { organizationId, topic: openTopic, sources: openPicked })
+      if (activeOrgRef.current !== requestedOrg) return
+      setExamples(found.jsonl ?? ''); setBudgetAuthorized(false)
+      const missing = LAB_OPEN_SOURCES.filter(item => found.perSource?.[item.id] === 'unavailable').map(item => item.name)
+      const line = fmt(Number(found.count) >= 20 ? copy.openFound : copy.openTooFew, { n: Number(found.count) || 0 })
+      setOpenNote({ kind: Number(found.count) >= 20 ? 'status' : 'alert', text: missing.length ? `${line} ${fmt(copy.openUnavailableLine, { sources: missing.join(', ') })}` : line })
+    } catch (error: any) {
+      if (activeOrgRef.current === requestedOrg) setOpenNote({ kind: 'alert', text: explain(error.message) })
+    }
+  }
+
   async function startRun() {
     if (!budgetAuthorized) return
     setBudgetAuthorized(false)
@@ -269,7 +289,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     setMessage({ kind: 'status', text: copy.starting })
     try {
       await call('/api/lab/training', 'POST', {
-        action: 'start', organizationId, experimentId, source, examples, teacherCredentialId: teacherId, teacherModel,
+        action: 'start', organizationId, experimentId, source: source === 'open_sources' ? 'examples' : source, examples, teacherCredentialId: teacherId, teacherModel,
         computeCredentialId: computeId, computeProviderKind, baseModel, prompts, approvedBudgetConfirmed: budgetAuthorized, approvedBudgetUsd: Number(budget),
         maxHourlyUsd: hourlyApplies ? Number(hourly) : null,
         teacherBudgetUsd: Number(teacherBudget),
@@ -384,7 +404,30 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           <div className="flex gap-4 text-sm">
             <label><input type="radio" checked={source === 'examples'} onChange={() => { setSource('examples'); setBudgetAuthorized(false) }} /> {copy.useExamples}</label>
             <label><input type="radio" checked={source === 'teacher'} onChange={() => { setSource('teacher'); setBudgetAuthorized(false) }} /> {copy.askTeacher}</label>
+            <label><input type="radio" checked={source === 'open_sources'} onChange={() => { setSource('open_sources'); setBudgetAuthorized(false) }} /> {copy.useOpenSources}</label>
           </div>
+          {source === 'open_sources' && (
+            <div className="grid gap-2 rounded border border-white/20 p-2 sm:grid-cols-2">
+              <p className="text-xs text-slate-300 sm:col-span-2">{copy.openSourcesHelp}</p>
+              <label className="text-sm">{copy.openTopic}
+                <input aria-label={copy.openTopic} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" maxLength={120} placeholder={copy.openTopicPh} value={openTopic} onChange={event => setOpenTopic(event.target.value)} />
+              </label>
+              <fieldset className="text-sm">
+                <legend>{copy.openSourcesPick}</legend>
+                {LAB_OPEN_SOURCES.map(item => (
+                  <label key={item.id} className="me-3 inline-flex items-center gap-1">
+                    <input type="checkbox" checked={openPicked.includes(item.id)} onChange={event => setOpenPicked(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} /> {item.name}
+                  </label>
+                ))}
+              </fieldset>
+              <div className="sm:col-span-2">
+                <button className="rounded border px-3 py-1" disabled={busy || openTopic.trim().length < 3 || !openPicked.length} onClick={findOpenSources}>{copy.openFind}</button>
+                {openTopic.trim().length < 3 && <span className="ms-2 text-xs text-slate-400">{copy.errors.lab_open_sources_topic_invalid}</span>}
+                {openTopic.trim().length >= 3 && !openPicked.length && <span className="ms-2 text-xs text-slate-400">{copy.errors.lab_open_sources_none_selected}</span>}
+                {openNote && <p role={openNote.kind} className={`mt-1 text-xs ${openNote.kind === 'alert' ? 'text-amber-200' : 'text-slate-300'}`}>{openNote.text}</p>}
+              </div>
+            </div>
+          )}
           <div className="grid gap-2 sm:grid-cols-2">
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherProviderLabel}

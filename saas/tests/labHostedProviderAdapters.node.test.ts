@@ -31,3 +31,14 @@ test('training form never defaults to a specific provider or model and hides uni
   assert.doesNotMatch(ui, /Coming soon/)
   assert.doesNotMatch(ui, /useState\('Qwen\//)
 })
+
+test('section 2 requires explicit teacher, compute, model and budget choices', () => {
+  const ui = readFileSync(new URL('../app/dashboard/cos-university-telemetry/LabCustomerTrainingPanel.tsx', import.meta.url), 'utf8')
+  assert.match(ui, /aria-label=\{copy.teacherProviderLabel\}/)
+  assert.match(ui, /selectedTeacherCredentials\.map/)
+  assert.match(ui, /setTeacherProviderKind\(event.target.value\); setTeacherId\(''\); setTeacherModel\(''\)/)
+  assert.match(ui, /setComputeProviderKind\(event.target.value\); setComputeId\(''\); setBaseModel\(''\)/)
+  assert.match(ui, /const \[budget, setBudget\] = useState\(''\)/)
+  assert.match(ui, /const \[hourly, setHourly\] = useState\(''\)/)
+  assert.match(ui, /!teacherProviderKind \|\| !teacherId/)
+})

@@ -25,10 +25,11 @@ select case
 end;
 SQL
 )
+  check_id="DB_REQUIRED_RPC_$(printf '%s' "$signature" | tr -c '[:alnum:]' '_')"
   if [[ "$result" == "ready" ]]; then
-    record DB_REQUIRED_RPC passed "$signature executable by $role"
+    record "$check_id" passed "$signature executable by $role"
   else
-    record DB_REQUIRED_RPC failed "$signature: $result for $role"
+    record "$check_id" failed "$signature: $result for $role"
     exit 1
   fi
 done

@@ -791,7 +791,7 @@ async function runpodFirstInteractiveTurn(args: LocalModelCallArgs, config: Loca
       let slot: Awaited<ReturnType<typeof leases.tryAcquireRunpodInferenceLeaseNow>> | undefined
       const slotStartedAt = Date.now()
       try {
-        slot = await leases.tryAcquireRunpodInferenceLeaseNow(runpodConfig.timeoutMs)
+        slot = await leases.tryAcquireRunpodInferenceLeaseNow(runpodConfig.timeoutMs, runpodConfig.model)
         recordCosLatencyStage('runpod:slot', Date.now() - slotStartedAt)
       } catch (error) {
         console.warn('[cos-interactive-runpod-slot-unavailable]', error instanceof Error ? error.message : String(error))

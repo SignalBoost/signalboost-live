@@ -224,9 +224,11 @@ test('migration keeps customer-only access and allows only connector-backed comp
   assert.doesNotMatch(sql, /^\s*(begin|commit);/m)
 })
 
-test('dropdowns offer only providers with a saved key; non-training providers are visible but disabled', () => {
-  assert.match(panel, /trainingProviders\.map\(item => <option key=\{item\.kind\} value=\{item\.kind\}>/)
-  assert.match(panel, /teacherOnlyProviders\.map\(item => <option key=\{item\.kind\} value=\{item\.kind\} disabled>/)
+test('section 2 lists every provider alphabetically; only key-backed, capable providers are selectable', () => {
+  assert.match(panel, /teacherOptions\.map\(item => <option key=\{item\.kind\} value=\{item\.kind\} disabled=\{item\.blocked !== null\}>/)
+  assert.match(panel, /trainingOptions\.map\(item => <option key=\{item\.kind\} value=\{item\.kind\} disabled=\{item\.blocked !== null\}>/)
+  assert.match(panel, /setComputeId\(onlyAccount\(event\.target\.value\)\)/)
+  assert.match(panel, /setTeacherId\(onlyAccount\(event\.target\.value\)\)/)
   assert.match(panel, /<option key=\{model\.id\} value=\{model\.id\} disabled>/)
   assert.match(panel, /credentialId=\$\{encodeURIComponent\(computeId\)\}/)
   assert.doesNotMatch(panel, /hfOnly/)

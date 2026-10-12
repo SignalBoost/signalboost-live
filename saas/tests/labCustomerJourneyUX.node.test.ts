@@ -16,7 +16,9 @@ test('teacher, compute and model choices are explicit, dependent and legible', (
   assert.match(source, /value=\{computeProviderKind\}/)
   assert.match(source, /selectedComputeCredentials\.map/)
   assert.match(source, /value=\{modelSelection\}/)
-  assert.match(source, /setTeacherProviderKind\(event.target.value\); setBudgetAuthorized\(false\); setTeacherId\(''\)/)
+  // Changing provider resets the account, or selects it when the workspace has exactly one for that provider.
+  assert.match(source, /setTeacherProviderKind\(event.target.value\); setBudgetAuthorized\(false\); setTeacherId\(onlyAccount\(event.target.value\)\)/)
+  assert.match(source, /matches\.length === 1 \? matches\[0\]\.id : ''/)
   assert.match(source, /setComputeProviderKind\(event.target.value\); setBudgetAuthorized\(false\)/)
   assert.doesNotMatch(source, /useState\('Qwen\//)
 })

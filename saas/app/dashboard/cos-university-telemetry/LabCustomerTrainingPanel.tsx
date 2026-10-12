@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainingCopy'
+import { providerOptions, sortProviders, type ProviderOption } from '@/lib/lab/labProviderOptions'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
@@ -20,7 +21,7 @@ type Run = {
 type ModelOption = { id: string; label: string }
 type TeacherModelOption = { id: string; priced: boolean }
 // Build marker shown in the header (an identifier, not translatable copy).
-const LAB_UI_VERSION = 'LAB UI v2026.10.12.3'
+const LAB_UI_VERSION = 'LAB UI v2026.10.12.4'
 // Providers whose training jobs are polled through the training route (no worker callback).
 const POLLED_TRAINING = new Set(['together', 'fireworks'])
 const BASE_MODEL_ID: Record<string, RegExp> = {
@@ -77,9 +78,16 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const teacherCredentials = credentials.filter(item => entry(item.providerKind)?.supports['teacher.generate'])
   // Dropdowns list only providers this workspace has a saved key for, so every option can actually be used.
   const connectedKinds = new Set(credentials.map(item => item.providerKind))
-  const teacherProviders = catalog.filter(item => item.supports['teacher.generate'] && connectedKinds.has(item.kind))
-  const trainingProviders = catalog.filter(item => item.supports['training.execute'] && connectedKinds.has(item.kind))
-  const teacherOnlyProviders = catalog.filter(item => !item.supports['training.execute'] && connectedKinds.has(item.kind))
+  // Every provider is listed alphabetically ("Other" last). Only providers that can do the job AND have a saved key
+  // can be selected; the rest stay visible, disabled, with the reason, so the list never looks empty or broken.
+  const sortedCatalog = sortProviders(catalog, language)
+  const teacherOptions = providerOptions(catalog, connectedKinds, 'teacher.generate', language)
+  const trainingOptions = providerOptions(catalog, connectedKinds, 'training.execute', language)
+  const teacherProviders = teacherOptions.filter(item => !item.blocked)
+  const trainingProviders = trainingOptions.filter(item => !item.blocked)
+  const optionLabel = (item: ProviderOption) => item.blocked === 'needs_key' ? `${item.name} ${copy.addKeyFirst}` : item.blocked ? `${item.name} ${copy.teacherOnly}` : item.name
+  // Picking a provider with exactly one saved account selects that account, so the next dropdown is ready.
+  const onlyAccount = (kind: string) => { const matches = credentials.filter(item => item.providerKind === kind); return matches.length === 1 ? matches[0].id : '' }
   const hourlyApplies = computeProviderKind === 'huggingface'
   const baseModelValid = Boolean(BASE_MODEL_ID[computeProviderKind]?.test(baseModel))
   const selectedTeacherCredentials = teacherCredentials.filter(item => item.providerKind === teacherProviderKind)
@@ -295,7 +303,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           <div className="grid gap-2 sm:grid-cols-2">
             <select aria-label={copy.keysHeading} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={keyKind} onChange={event => setKeyKind(event.target.value)}>
               <option value="">{copy.choose}</option>
-              <optgroup label="Available adapters">{catalog.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}</optgroup>
+              <optgroup label="Available adapters">{sortedCatalog.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}</optgroup>
             </select>
             <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.keyNamePh} value={keyLabel} onChange={event => setKeyLabel(event.target.value)} />
             <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="password" autoComplete="off" placeholder={copy.keyPh} value={keyValue} onChange={event => setKeyValue(event.target.value)} />
@@ -316,9 +324,9 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           <div className="grid gap-2 sm:grid-cols-2">
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherProviderLabel}
-              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); setTeacherId(''); setTeacherModel(''); setTeacherModelChoice('') }}>
+              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); setTeacherId(onlyAccount(event.target.value)); setTeacherModel(''); setTeacherModelChoice('') }}>
                 <option value="">{copy.chooseTeacherProvider}</option>
-                {teacherProviders.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
+                {teacherOptions.map(item => <option key={item.kind} value={item.kind} disabled={item.blocked !== null}>{optionLabel(item)}</option>)}
               </select>
               {!teacherProviders.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectKeysFirst}</span>}
             </label>
@@ -341,10 +349,9 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             </label>
             </>}
             <label className="text-sm">{copy.trainingProviderLabel}
-              <select aria-label={copy.trainingProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); setComputeId(''); setBaseModel(''); setModelSelection('') }}>
+              <select aria-label={copy.trainingProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); setComputeId(onlyAccount(event.target.value)); setBaseModel(''); setModelSelection('') }}>
                 <option value="">{copy.chooseTrainingProvider}</option>
-                {trainingProviders.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
-                {teacherOnlyProviders.map(item => <option key={item.kind} value={item.kind} disabled>{item.name} {copy.teacherOnly}</option>)}
+                {trainingOptions.map(item => <option key={item.kind} value={item.kind} disabled={item.blocked !== null}>{optionLabel(item)}</option>)}
               </select>
               {!trainingProviders.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTrainingKey}</span>}
             </label>

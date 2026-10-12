@@ -10,6 +10,7 @@ import { assertPublicHttpUrl } from '@/lib/security/publicFetchGuard'
 import { customerSession, rpcErrorCode, UUID_RE } from '@/lib/lab/customerSession'
 import { LAB_CREDENTIAL_KINDS, sealCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
 import { LAB_PROVIDER_CATALOG } from '@/lib/ai/cos/labCustomerProviderCatalog'
+import { LAB_PROVIDER_DISCOVERY } from '@/lib/lab/providerDiscovery'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,7 @@ async function getHandler(req: NextRequest) {
   if (!UUID_RE.test(organizationId)) return NextResponse.json({ ok: false, error: 'lab_organization_required' }, { status: 400, headers: noStore })
   const { data, error } = await session.supabase.rpc('itmounts_lab_customer_list_credentials', { p_organization_id: organizationId })
   if (error) return NextResponse.json({ ok: false, error: rpcErrorCode(error) }, { status: 403, headers: noStore })
-  return NextResponse.json({ ok: true, catalog: LAB_PROVIDER_CATALOG, credentials: data ?? [] }, { headers: noStore })
+  return NextResponse.json({ ok: true, catalog: LAB_PROVIDER_CATALOG, discovery: LAB_PROVIDER_DISCOVERY, credentials: data ?? [] }, { headers: noStore })
 }
 
 async function postHandler(req: NextRequest) {

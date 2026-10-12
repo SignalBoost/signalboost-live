@@ -1,8 +1,9 @@
+import { observeLabRequest } from '@/lib/lab/observability'
 import { NextRequest, NextResponse } from 'next/server'
 import { customerSession, rpcErrorCode } from '@/lib/lab/customerSession'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export async function POST(req: NextRequest) {
+async function postHandler(req: NextRequest) {
   const origin = req.headers.get('origin')
   if (origin && origin !== req.nextUrl.origin) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
   const session = await customerSession()
@@ -13,4 +14,8 @@ export async function POST(req: NextRequest) {
   const { data, error } = await session.supabase.rpc('itmounts_lab_customer_initialize_workspace', { p_name: name })
   if (error || !data) return NextResponse.json({ ok: false, error: rpcErrorCode(error) }, { status: 503 })
   return NextResponse.json({ ok: true, workspace: data }, { headers: { 'cache-control': 'no-store' } })
+}
+
+export async function POST(req: NextRequest) {
+  return observeLabRequest('workspace.create', () => postHandler(req))
 }

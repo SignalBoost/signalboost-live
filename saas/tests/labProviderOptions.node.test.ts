@@ -30,3 +30,17 @@ test('a saved key makes exactly that provider selectable, only where it can do t
   const teacher = providerOptions(LAB_PROVIDER_CATALOG, keys, 'teacher.generate')
   assert.deepEqual(teacher.filter(o => !o.blocked).map(o => o.kind), ['anthropic', 'together'])
 })
+
+test('locked dropdowns say which step they wait for, in every language', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { LAB_CUSTOMER_TRAINING_COPY } = await import('../lib/i18n/labCustomerTrainingCopy.ts')
+  const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/LabCustomerTrainingPanel.tsx', import.meta.url), 'utf8')
+  assert.match(panel, /teacherProviderKind \? copy\.chooseTeacherAccount : copy\.chooseProviderFirst/)
+  assert.match(panel, /computeProviderKind \? copy\.chooseTrainingAccount : copy\.chooseProviderFirst/)
+  assert.match(panel, /!teacherProviderKind \? copy\.chooseProviderFirst : !teacherId \? copy\.chooseAccountFirst : copy\.choose/)
+  assert.match(panel, /!computeProviderKind \? copy\.chooseProviderFirst : !computeId \? copy\.chooseAccountFirst : copy\.choose/)
+  for (const copy of Object.values(LAB_CUSTOMER_TRAINING_COPY)) {
+    assert.ok(copy.chooseProviderFirst && copy.chooseAccountFirst)
+    assert.notEqual(copy.chooseProviderFirst, copy.chooseAccountFirst)
+  }
+})

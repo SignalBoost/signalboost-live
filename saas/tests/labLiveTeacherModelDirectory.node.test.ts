@@ -32,5 +32,5 @@ test('teacher dropdown uses credential and current workspace for live data',()=>
   assert.match(ui,/setTeacherModelsError\(true\)/)
   assert.match(ui,/teacherModels\.filter\(model => model\.priced\)\.map\(model/)
   assert.match(ui,/teacherModels\.filter\(model => !model\.priced\)\.map\(model => <option key=\{model\.id\} value=\{model\.id\} disabled>/)
-  assert.match(ui,/LAB UI v2026\.10\.12\.4/)
+  assert.match(ui,/LAB UI v2026\.10\.12\.5/)
 })

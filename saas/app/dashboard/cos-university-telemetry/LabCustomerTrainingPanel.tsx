@@ -37,6 +37,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [teacherProviderKind, setTeacherProviderKind] = useState('')
   const [teacherId, setTeacherId] = useState('')
   const [teacherModel, setTeacherModel] = useState('')
+  const [teacherModelChoice, setTeacherModelChoice] = useState('')
   const [computeId, setComputeId] = useState('')
   const [baseModel, setBaseModel] = useState('')
   const [modelSelection, setModelSelection] = useState('')
@@ -211,7 +212,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
         <h2 className="text-lg font-semibold">{copy.title}</h2>
         {orgs.length > 1 ? (
           <label className="flex flex-col gap-1 text-sm"><span>{copy.workspaceSelectorLabel}</span>
-        <select aria-label={copy.workspaceSelectorLabel} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setTeacherProviderKind(''); setTeacherModel(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
+        <select aria-label={copy.workspaceSelectorLabel} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setTeacherProviderKind(''); setTeacherModel(''); setTeacherModelChoice(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
           {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName === item.projectName ? item.organizationName : `${item.organizationName} · ${item.projectName}`}</option>)}
         </select>
           </label>
@@ -256,23 +257,28 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           <div className="grid gap-2 sm:grid-cols-2">
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherProviderLabel}
-              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); setTeacherId(''); setTeacherModel('') }}>
+              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); setTeacherId(''); setTeacherModel(''); setTeacherModelChoice('') }}>
                 <option value="">{copy.chooseTeacherProvider}</option>
                 {catalog.filter(item => item.supports['teacher.generate']).map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.teacherKey}
               <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} disabled={!teacherProviderKind} onChange={event => { setTeacherId(event.target.value); setTeacherModel('') }}>
-                <option value="">{copy.chooseTrainingAccount}</option>
+                <option value="">{copy.chooseTeacherAccount}</option>
                 {selectedTeacherCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
+              {teacherProviderKind && !selectedTeacherCredentials.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTeacherFirst}</span>}
             </label>
             <label className="text-sm">{copy.teacherModel}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={teacherEntry?.kind === 'anthropic' ? 'claude-…' : copy.modelPh} value={teacherModel} onChange={event => { setTeacherModel(event.target.value); setBudgetAuthorized(false) }} />
+              <select aria-label={copy.teacherModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherModelChoice} disabled={!teacherProviderKind || !teacherId} onChange={event => { setTeacherModelChoice(event.target.value); setTeacherModel(''); setBudgetAuthorized(false) }}>
+                <option value="">{copy.choose}</option>
+                <option value="custom">{copy.customModelLabel}</option>
+              </select>
+              {teacherModelChoice === 'custom' && <input aria-label={copy.teacherModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.modelPh} value={teacherModel} onChange={event => { setTeacherModel(event.target.value); setBudgetAuthorized(false) }} />}
             </label>
             </>}
             <label className="text-sm">{copy.trainingProviderLabel}
-              <select aria-label="Training compute provider" className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); setComputeId(''); setBaseModel(''); setModelSelection('') }}>
+              <select aria-label={copy.trainingProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); setComputeId(''); setBaseModel(''); setModelSelection('') }}>
                 <option value="">{copy.chooseTrainingProvider}</option>
                 {catalog.filter(item => item.supports['training.execute']).map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
               </select>
@@ -282,14 +288,15 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 <option value="">{copy.chooseTrainingAccount}</option>
                 {selectedComputeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
+              {computeProviderKind && !selectedComputeCredentials.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTrainingFirst}</span>}
             </label>
             <label className="text-sm">{copy.baseModel}
-              <select aria-label="Base model to train" className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind} onChange={event => { setBudgetAuthorized(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
+              <select aria-label={copy.baseModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind} onChange={event => { setBudgetAuthorized(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
                 <option value="">{modelsLoading ? copy.loadingModels : copy.choose}</option>
                 {modelSuggestions.map(model => <option key={model} value={model}>{model}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>
-              {modelSelection === 'custom' && <input aria-label="Custom base model ID" className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder="Organization/model-name" value={baseModel} onChange={event => { setBaseModel(event.target.value); setBudgetAuthorized(false) }} />}
+              {modelSelection === 'custom' && <input aria-label={copy.baseModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder="Organization/model-name" value={baseModel} onChange={event => { setBaseModel(event.target.value); setBudgetAuthorized(false) }} />}
               <span className="mt-1 block text-xs text-slate-400">{copy.modelDirectoryHelp}</span>
             </label>
             <label className="text-sm">{copy.budget}

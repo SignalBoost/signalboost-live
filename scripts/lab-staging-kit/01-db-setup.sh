@@ -11,11 +11,7 @@ assert_staging
 # and grant checks below must still pass.
 psql_db -c "select version || '|' || coalesce(name,'') from supabase_migrations.schema_migrations order by version" > "$EVID/applied-migrations.txt"
 missing_migrations=0
-for spec in \\
- '20261009001500|lab_owner_org_provisioning|lab_customer_workspace_provisioning' \\
- '20261011225542|lab_customer_workspace_provisioning|lab_customer_workspace_provisioning' \\
- '20261012000000|lab_customer_provider_credentials_and_training|lab_customer_provider_credentials_and_training' \\
- '20261012010000|lab_customer_teacher_spend|lab_customer_teacher_spend'; do
+for spec in '20261009001500|lab_owner_org_provisioning|lab_customer_workspace_provisioning' '20261011225542|lab_customer_workspace_provisioning|lab_customer_workspace_provisioning' '20261012000000|lab_customer_provider_credentials_and_training|lab_customer_provider_credentials_and_training' '20261012010000|lab_customer_teacher_spend|lab_customer_teacher_spend'; do
   version="${spec%%|*}"
   aliases="${spec#*|}"
   name="${aliases%%|*}"

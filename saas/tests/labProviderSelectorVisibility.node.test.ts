@@ -17,3 +17,10 @@ test('a missing provider catalog cannot enable Save key', () => {
   assert.match(panel, /catalog\.length === 0/)
   assert.match(panel, /!catalog\.some\(item => item\.kind === keyKind\)/)
 })
+
+test('single workspace shows a readable label without a redundant dropdown', () => {
+  assert.match(panel, /orgs\.length > 1/)
+  assert.match(panel, /Workspace: \{org\?\.organizationName/)
+  assert.match(panel, /item\.organizationName === item\.projectName/)
+  assert.match(panel, /organizationName: 'My AI University workspace'/)
+})

@@ -120,7 +120,7 @@ export async function runGovernedTeacher(input: {
           try {
             const result = await generate({
               teacher: definition as any,
-              request: { system: LAB_TEACHER_SYSTEM_PROMPT, prompt, maxOutputTokens: outB },
+              request: { system: LAB_TEACHER_SYSTEM_PROMPT, prompt, maxOutputTokens: outB, maxPriceUsdPerMTok: { input: card.inputUsdPerMTok, output: card.outputUsdPerMTok } },
               env,
               fetchImpl: (async (url: any, init: any) => {
                 await assertPublicHttpUrl(String(url))

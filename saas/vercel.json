@@ -383,6 +383,10 @@
     {
       "path": "/api/internal/lab-phase-observability/health",
       "schedule": "17 * * * *"
+    },
+    {
+      "path": "/api/cron/lab-teacher-prices",
+      "schedule": "41 * * * *"
     }
   ]
 }

@@ -5,6 +5,8 @@ export type TeacherGenerationRequest = Readonly<{
   prompt: string
   maxOutputTokens: number
   temperature?: number
+  /** Price ceiling (USD per 1M tokens). OpenRouter routes only to providers at or below it (provider.max_price). */
+  maxPriceUsdPerMTok?: Readonly<{ input: number; output: number }>
 }>
 
 export type TeacherGenerationResult = Readonly<{
@@ -160,6 +162,9 @@ async function callOpenAiCompatible(input: UniversityTeacherAdapterInput): Promi
       reasoning_effort: input.teacher.provider === 'xai' ? 'low' : undefined,
       temperature: input.request.temperature ?? 0.2,
       max_tokens: maxOutputTokens,
+      provider: input.teacher.provider === 'openrouter' && input.request.maxPriceUsdPerMTok
+        ? { max_price: { prompt: input.request.maxPriceUsdPerMTok.input, completion: input.request.maxPriceUsdPerMTok.output } }
+        : undefined,
       messages: [
         { role: 'system', content: clean(input.request.system, 20_000) },
         { role: 'user', content: clean(input.request.prompt, 100_000) },

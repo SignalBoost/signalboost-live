@@ -293,14 +293,14 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <span className="mt-1 block text-xs text-slate-400">{copy.modelDirectoryHelp}</span>
             </label>
             <label className="text-sm">{copy.budget}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => setBudget(event.target.value)} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value) }} />
             </label>
             <label className="text-sm">{copy.hourly}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.05" max="1" step="0.05" value={hourly} onChange={event => setHourly(event.target.value)} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.05" max="1" step="0.05" value={hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value) }} />
             </label>
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherBudget}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" step="0.01" value={teacherBudget} onChange={event => setTeacherBudget(event.target.value)} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" step="0.01" value={teacherBudget} onChange={event => { setBudgetAuthorized(false); setTeacherBudget(event.target.value) }} />
             </label>
             <span />
             <p className="text-xs opacity-70 sm:col-span-2">{copy.teacherPriceHelp}</p>

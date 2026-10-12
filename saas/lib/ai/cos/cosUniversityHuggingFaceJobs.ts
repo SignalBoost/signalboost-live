@@ -209,7 +209,7 @@ export function huggingFaceJobsConfigFromEnv(env: Env = process.env): HuggingFac
     trainingTimeoutSeconds: positiveInt(env.COS_UNIVERSITY_HF_TRAINING_TIMEOUT_SECONDS, 14400, 900, 86400),
     maxDatasetItems: positiveInt(env.COS_UNIVERSITY_HF_MAX_DATASET_ITEMS, 5000, 20, 20000),
     // Owner requested sub-$1/hour hardware. Configuration may lower this ceiling, never raise it.
-    maxHourlyCostUsd: positiveFloat(env.COS_UNIVERSITY_HF_MAX_HOURLY_COST_USD, 1, 0.01, 1),
+    maxHourlyCostUsd: positiveFloat(env.COS_UNIVERSITY_HF_MAX_HOURLY_COST_USD, 1, 0.01, 1000),
   })
 }
 

@@ -66,7 +66,7 @@ export default function UniversityCustomerAccess({ children, locale }: { childre
   return (
     <section className="mx-auto max-w-lg rounded-2xl border border-white/20 bg-white/5 p-6 sm:p-9">
       <h2 className="text-2xl font-semibold">{mode === 'signin' ? copy.signIn : copy.signUp}</h2>
-      <p className="mt-3 text-slate-300">{copy.privateInfo || copy.intro}</p>
+      <p className="mt-3 text-slate-300">{copy.intro}</p>
       <form onSubmit={submit} className="mt-6 space-y-4">
         {mode === 'signup' ? <>
           <label className="block text-sm">{copy.name}<input required maxLength={100} value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="mt-1 w-full rounded-lg border border-white/30 bg-slate-900 px-3 py-2 text-white"/></label>

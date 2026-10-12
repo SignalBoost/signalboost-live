@@ -27,7 +27,7 @@ import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 
 /** Routes served to people who are not signed in and are not customers yet. */
-const SHARE_ROUTES = ['/demo/supervisor']
+const SHARE_ROUTES = ['/demo/supervisor', '/university', '/en/university', '/es/university', '/pt/university', '/pl/university', '/ru/university', '/de/university', '/fr/university', '/it/university', '/ja/university', '/ko/university', '/ar/university']
 
 export function isShareRoute(pathname: string | null): boolean {
   if (!pathname) return false

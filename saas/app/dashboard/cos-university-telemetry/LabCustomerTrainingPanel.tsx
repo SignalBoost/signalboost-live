@@ -118,20 +118,24 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }
 
   async function saveKey() {
+    const requestedOrg = organizationId
     try {
       await call('/api/lab/providers', 'POST', { organizationId, providerKind: keyKind, label: keyLabel, secret: keyValue, endpoint: keyEndpoint })
+      if (activeOrgRef.current !== requestedOrg) return
       setKeyValue(''); setKeyLabel(''); setKeyEndpoint('')
       setMessage({ kind: 'status', text: copy.keySaved })
       await load()
-    } catch (error: any) { setMessage({ kind: 'alert', text: fmt(copy.keyNotSaved, { code: explain(error.message) }) }) }
+    } catch (error: any) { if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.keyNotSaved, { code: explain(error.message) }) }) }
   }
 
   async function revokeKey(credentialId: string) {
-    try { await call('/api/lab/providers', 'DELETE', { organizationId, credentialId }); await load() }
-    catch (error: any) { setMessage({ kind: 'alert', text: fmt(copy.keyRemoveFailed, { code: explain(error.message) }) }) }
+    const requestedOrg = organizationId
+    try { await call('/api/lab/providers', 'DELETE', { organizationId, credentialId }); if (activeOrgRef.current === requestedOrg) await load() }
+    catch (error: any) { if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.keyRemoveFailed, { code: explain(error.message) }) }) }
   }
 
   async function startRun() {
+    const requestedOrg = organizationId
     setMessage({ kind: 'status', text: copy.starting })
     try {
       await call('/api/lab/training', 'POST', {
@@ -139,16 +143,17 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
         computeCredentialId: computeId, baseModel, prompts, approvedBudgetUsd: Number(budget), maxHourlyUsd: Number(hourly),
         teacherBudgetUsd: Number(teacherBudget),
       })
-      setMessage({ kind: 'status', text: copy.started })
+      if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'status', text: copy.started })
     } catch (error: any) {
-      setMessage({ kind: 'alert', text: fmt(copy.notStarted, { reason: copy.errors[error.message] ?? (error.problems?.length ? error.problems.join(' ') : error.message) }) })
+      if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.notStarted, { reason: copy.errors[error.message] ?? (error.problems?.length ? error.problems.join(' ') : error.message) }) })
     }
-    await load()
+    if (activeOrgRef.current === requestedOrg) await load()
   }
 
   async function refreshRun(runId: string) {
-    try { await call('/api/lab/training', 'POST', { action: 'refresh', organizationId, runId }); await load() }
-    catch (error: any) { setMessage({ kind: 'alert', text: fmt(copy.statusFailed, { code: explain(error.message) }) }) }
+    const requestedOrg = organizationId
+    try { await call('/api/lab/training', 'POST', { action: 'refresh', organizationId, runId }); if (activeOrgRef.current === requestedOrg) await load() }
+    catch (error: any) { if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.statusFailed, { code: explain(error.message) }) }) }
   }
 
   async function download(runId: string) {

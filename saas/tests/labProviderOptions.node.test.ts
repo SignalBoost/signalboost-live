@@ -60,3 +60,19 @@ test('locked dropdowns say which step they wait for, in every language', async (
     assert.notEqual(copy.chooseProviderFirst, copy.chooseAccountFirst)
   }
 })
+
+test('Save key never looks dead: disabled reason shown, result shown next to the clicked button, server errors in words', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { LAB_CUSTOMER_TRAINING_COPY } = await import('../lib/i18n/labCustomerTrainingCopy.ts')
+  const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/LabCustomerTrainingPanel.tsx', import.meta.url), 'utf8')
+  assert.match(panel, /value\.trim\(\)\.length < 20 \|\| \/\\s\/\.test\(value\.trim\(\)\) \? copy\.keyFormNeeds/)
+  assert.match(panel, /keyFormProblem\(keyLabel, keyValue, keyEndpoint, keyKind\) !== null\} onClick=\{saveKey\}/)
+  assert.match(panel, /keyFormProblem\(inlineLabel, inlineValue, inlineEndpoint, inlineKey\.kind\) !== null\} onClick/)
+  assert.match(panel, /setKeyFeedback\(\{ where: 'section1', kind: 'alert'/)
+  assert.match(panel, /setKeyFeedback\(\{ where: target, kind: 'alert'/)
+  for (const where of ['section1', 'teacher', 'training']) assert.match(panel, new RegExp(`feedbackFor\\('${where}'\\)`))
+  for (const copy of Object.values(LAB_CUSTOMER_TRAINING_COPY)) {
+    assert.ok(copy.keyFormNeeds && copy.keyEndpointNeeded)
+    for (const code of ['lab_credential_value_invalid', 'lab_credential_vault_unavailable', 'lab_customer_credential_forbidden', 'lab_credential_request_invalid', 'lab_customer_endpoint_required']) assert.ok(copy.errors[code], code)
+  }
+})

@@ -46,7 +46,7 @@ export default function UniversityPublicPage({ locale, pricing = false }: { loca
           <span><span aria-hidden="true">🌐 </span><bdi>{PUBLIC_LOCALE_NAMES[locale]}</bdi></span>
           <span aria-hidden="true" className="text-amber-300">▾</span>
         </summary>
-        <div className="absolute left-0 z-20 mt-1 max-h-72 min-w-full overflow-y-auto rounded-lg border border-white/25 bg-slate-950 p-1 shadow-xl">
+        <div className="absolute start-0 z-20 mt-1 max-h-72 min-w-full overflow-y-auto rounded-lg border border-white/25 bg-slate-950 p-1 shadow-xl">
           {PUBLIC_LOCALES.map(language => <Link key={language} href={universityPath(language, pricing)}
             hrefLang={language} lang={language} prefetch={false} aria-current={language === locale ? 'page' : undefined}
             className={`block whitespace-nowrap rounded-md px-4 py-2 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none ${language === locale ? 'bg-amber-300 font-semibold text-slate-950 hover:bg-amber-200' : 'text-slate-100'}`}>

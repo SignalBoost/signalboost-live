@@ -15,6 +15,15 @@ type Run = {
   baseModel: string; approvedBudgetUsd: number; committedMaxCostUsd: number; hfJobUrl: string | null; artifactRepo: string | null
   artifactRevision: string | null; failureCode: string | null; createdAt: string
   teacherReservedUsd?: number; teacherSpentUsd?: number; teacherReservationState?: string | null
+  computeProviderKind?: string; tunedModelId?: string | null
+}
+type ModelOption = { id: string; label: string }
+type TeacherModelOption = { id: string; priced: boolean }
+// Providers whose training jobs are polled through the training route (no worker callback).
+const POLLED_TRAINING = new Set(['together', 'fireworks'])
+const BASE_MODEL_ID: Record<string, RegExp> = {
+  huggingface: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, together: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/,
+  fireworks: /^accounts\/[a-z0-9-]+\/models\/[A-Za-z0-9_.-]+$/,
 }
 
 export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { copy: LabCustomerTrainingCopy; language?: string }) {
@@ -41,9 +50,10 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [computeId, setComputeId] = useState('')
   const [baseModel, setBaseModel] = useState('')
   const [modelSelection, setModelSelection] = useState('')
-  const [modelSuggestions, setModelSuggestions] = useState<string[]>([])
+  const [modelSuggestions, setModelSuggestions] = useState<ModelOption[]>([])
+  const [modelsError, setModelsError] = useState(false)
   const [modelsLoading, setModelsLoading] = useState(false)
-  const [teacherModels, setTeacherModels] = useState<string[]>([])
+  const [teacherModels, setTeacherModels] = useState<TeacherModelOption[]>([])
   const [teacherModelsLoading, setTeacherModelsLoading] = useState(false)
   const [teacherModelsError, setTeacherModelsError] = useState(false)
   const [prompts, setPrompts] = useState('')
@@ -63,6 +73,13 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [computeProviderKind, setComputeProviderKind] = useState('')
   const selectedComputeCredentials = computeCredentials.filter(item => item.providerKind === computeProviderKind)
   const teacherCredentials = credentials.filter(item => entry(item.providerKind)?.supports['teacher.generate'])
+  // Dropdowns list only providers this workspace has a saved key for, so every option can actually be used.
+  const connectedKinds = new Set(credentials.map(item => item.providerKind))
+  const teacherProviders = catalog.filter(item => item.supports['teacher.generate'] && connectedKinds.has(item.kind))
+  const trainingProviders = catalog.filter(item => item.supports['training.execute'] && connectedKinds.has(item.kind))
+  const teacherOnlyProviders = catalog.filter(item => !item.supports['training.execute'] && connectedKinds.has(item.kind))
+  const hourlyApplies = computeProviderKind === 'huggingface'
+  const baseModelValid = Boolean(BASE_MODEL_ID[computeProviderKind]?.test(baseModel))
   const selectedTeacherCredentials = teacherCredentials.filter(item => item.providerKind === teacherProviderKind)
   const promptCount = useMemo(() => new Set(prompts.split('\n').map(line => line.trim()).filter(Boolean)).size, [prompts])
   const exampleCount = useMemo(() => examples.split('\n').filter(line => { try { const o = JSON.parse(line); return o?.prompt && o?.response } catch { return false } }).length, [examples])
@@ -119,27 +136,46 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     setTeacherModels([]); setTeacherModelsError(false); setTeacherModelsLoading(true)
     void fetch(`/api/lab/teacher-models?provider=${encodeURIComponent(teacherProviderKind)}&organizationId=${encodeURIComponent(organizationId)}&credentialId=${encodeURIComponent(teacherId)}`, { credentials: 'include', cache: 'no-store' })
       .then(response => response.ok ? response.json() : null)
-      .then(body => { if (!cancelled) { setTeacherModels(body?.ok && Array.isArray(body.models) ? body.models : []); setTeacherModelsError(!body?.ok || !Array.isArray(body?.models) || body.models.length === 0) } })
+      .then(body => {
+        if (cancelled) return
+        const models: TeacherModelOption[] = body?.ok && Array.isArray(body.models) ? body.models.filter((m: any) => typeof m?.id === 'string').map((m: any) => ({ id: m.id, priced: m.priced === true })) : []
+        setTeacherModels(models); setTeacherModelsError(!body?.ok || models.length === 0)
+      })
       .catch(() => { if (!cancelled) { setTeacherModels([]); setTeacherModelsError(true) } })
       .finally(() => { if (!cancelled) setTeacherModelsLoading(false) })
     return () => { cancelled = true }
   }, [organizationId, teacherProviderKind, teacherId])
   useEffect(() => {
     let cancelled = false
-    if (!computeProviderKind) { setModelSuggestions([]); return }
-    setModelsLoading(true)
-    void fetch(`/api/lab/models?provider=${encodeURIComponent(computeProviderKind)}`, { credentials: 'include', cache: 'no-store' })
+    if (!computeProviderKind || !computeId || !organizationId) { setModelSuggestions([]); setModelsError(false); return }
+    setModelSuggestions([]); setModelsError(false); setModelsLoading(true)
+    void fetch(`/api/lab/models?provider=${encodeURIComponent(computeProviderKind)}&organizationId=${encodeURIComponent(organizationId)}&credentialId=${encodeURIComponent(computeId)}`, { credentials: 'include', cache: 'no-store' })
       .then(response => response.ok ? response.json() : null)
-      .then(body => { if (!cancelled) setModelSuggestions(Array.isArray(body?.models) ? body.models : []) })
-      .catch(() => { if (!cancelled) setModelSuggestions([]) })
+      .then(body => {
+        if (cancelled) return
+        const models: ModelOption[] = body?.ok && Array.isArray(body.models) ? body.models.filter((m: any) => typeof m?.id === 'string').map((m: any) => ({ id: m.id, label: String(m.label ?? m.id) })) : []
+        setModelSuggestions(models); setModelsError(!body?.ok || models.length === 0)
+      })
+      .catch(() => { if (!cancelled) { setModelSuggestions([]); setModelsError(true) } })
       .finally(() => { if (!cancelled) setModelsLoading(false) })
     return () => { cancelled = true }
-  }, [computeProviderKind])
+  }, [organizationId, computeProviderKind, computeId])
   useEffect(() => {
-    if (!runs.some(run => !['completed', 'failed', 'cancelled'].includes(run.stage))) return
-    const timer = setInterval(() => { void load() }, 15_000)
+    const active = runs.filter(run => !['completed', 'failed', 'cancelled'].includes(run.stage))
+    if (!active.length) return
+    const timer = setInterval(() => {
+      void (async () => {
+        // Together / Fireworks jobs report back only when asked: owners and admins poll them; everyone else just reloads.
+        if (canManage) {
+          await Promise.all(active.filter(run => POLLED_TRAINING.has(run.computeProviderKind ?? '')).map(run =>
+            fetch('/api/lab/training', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ action: 'refresh', organizationId, runId: run.runId }) }).catch(() => null)))
+        }
+        await load()
+      })()
+    }, 15_000)
     return () => clearInterval(timer)
-  }, [runs, load])
+  }, [runs, load, canManage, organizationId])
 
   async function call(url: string, method: string, body: unknown) {
     setBusy(true); setMessage(null)
@@ -176,7 +212,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     try {
       await call('/api/lab/training', 'POST', {
         action: 'start', organizationId, experimentId, source, examples, teacherCredentialId: teacherId, teacherModel,
-        computeCredentialId: computeId, baseModel, prompts, approvedBudgetConfirmed: budgetAuthorized, approvedBudgetUsd: Number(budget), maxHourlyUsd: Number(hourly),
+        computeCredentialId: computeId, computeProviderKind, baseModel, prompts, approvedBudgetConfirmed: budgetAuthorized, approvedBudgetUsd: Number(budget),
+        maxHourlyUsd: hourlyApplies ? Number(hourly) : null,
         teacherBudgetUsd: Number(teacherBudget),
       })
       if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'status', text: copy.started })
@@ -223,7 +260,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   return (
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div><h2 className="text-lg font-semibold">{copy.title}</h2><span className="text-xs text-slate-400">LAB UI v2026.10.12.2</span></div>
+        <div><h2 className="text-lg font-semibold">{copy.title}</h2><span className="text-xs text-slate-400">LAB UI v2026.10.12.3</span></div>
         {orgs.length > 1 ? (
           <label className="flex flex-col gap-1 text-sm"><span>{copy.workspaceSelectorLabel}</span>
         <select aria-label={copy.workspaceSelectorLabel} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setTeacherProviderKind(''); setTeacherModel(''); setTeacherModelChoice(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
@@ -273,8 +310,9 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             <label className="text-sm">{copy.teacherProviderLabel}
               <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); setTeacherId(''); setTeacherModel(''); setTeacherModelChoice('') }}>
                 <option value="">{copy.chooseTeacherProvider}</option>
-                {catalog.filter(item => item.supports['teacher.generate']).map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
+                {teacherProviders.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
               </select>
+              {!teacherProviders.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectKeysFirst}</span>}
             </label>
             <label className="text-sm">{copy.teacherKey}
               <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} disabled={!teacherProviderKind} onChange={event => { setTeacherId(event.target.value); setTeacherModel(''); setTeacherModelChoice(''); setBudgetAuthorized(false) }}>
@@ -286,7 +324,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             <label className="text-sm">{copy.teacherModel}
               <select aria-label={copy.teacherModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherModelChoice} disabled={!teacherProviderKind || !teacherId} onChange={event => { setTeacherModelChoice(event.target.value); setTeacherModel(event.target.value === 'custom' ? '' : event.target.value); setBudgetAuthorized(false) }}>
                 <option value="">{teacherModelsLoading ? copy.loadingModels : copy.choose}</option>
-                {teacherModels.map(model => <option key={model} value={model}>{model}</option>)}
+                {teacherModels.some(model => model.priced) && <optgroup label={copy.pricedModels}>{teacherModels.filter(model => model.priced).map(model => <option key={model.id} value={model.id}>{model.id}</option>)}</optgroup>}
+                {teacherModels.some(model => !model.priced) && <optgroup label={copy.unpricedModels}>{teacherModels.filter(model => !model.priced).map(model => <option key={model.id} value={model.id} disabled>{model.id}</option>)}</optgroup>}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>
               {teacherModelsError && <span role="alert" className="mt-1 block text-xs text-amber-200">{copy.modelDirectoryUnavailable}</span>}
@@ -296,23 +335,26 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             <label className="text-sm">{copy.trainingProviderLabel}
               <select aria-label={copy.trainingProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); setComputeId(''); setBaseModel(''); setModelSelection('') }}>
                 <option value="">{copy.chooseTrainingProvider}</option>
-                {catalog.filter(item => item.supports['training.execute']).map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
+                {trainingProviders.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
+                {teacherOnlyProviders.map(item => <option key={item.kind} value={item.kind} disabled>{item.name} {copy.teacherOnly}</option>)}
               </select>
+              {!trainingProviders.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTrainingKey}</span>}
             </label>
             <label className="text-sm">{copy.trainingAccount}
-              <select className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeId} disabled={!computeProviderKind} onChange={event => { setComputeId(event.target.value); setBudgetAuthorized(false) }}>
+              <select aria-label={copy.trainingAccount} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeId} disabled={!computeProviderKind} onChange={event => { setComputeId(event.target.value); setBaseModel(''); setModelSelection(''); setBudgetAuthorized(false) }}>
                 <option value="">{copy.chooseTrainingAccount}</option>
                 {selectedComputeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
               {computeProviderKind && !selectedComputeCredentials.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTrainingFirst}</span>}
             </label>
             <label className="text-sm">{copy.baseModel}
-              <select aria-label={copy.baseModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind} onChange={event => { setBudgetAuthorized(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
+              <select aria-label={copy.baseModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind || !computeId} onChange={event => { setBudgetAuthorized(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
                 <option value="">{modelsLoading ? copy.loadingModels : copy.choose}</option>
-                {modelSuggestions.map(model => <option key={model} value={model}>{model}</option>)}
+                {modelSuggestions.map(model => <option key={model.id} value={model.id}>{model.label}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>
-              {modelSelection === 'custom' && <input aria-label={copy.baseModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder="Organization/model-name" value={baseModel} onChange={event => { setBaseModel(event.target.value); setBudgetAuthorized(false) }} />}
+              {modelsError && <span role="alert" className="mt-1 block text-xs text-amber-200">{copy.modelDirectoryUnavailable}</span>}
+              {modelSelection === 'custom' && <input aria-label={copy.baseModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={computeProviderKind === 'fireworks' ? 'accounts/fireworks/models/model-name' : 'Organization/model-name'} value={baseModel} onChange={event => { setBaseModel(event.target.value); setBudgetAuthorized(false) }} />}
               <span className="mt-1 block text-xs text-slate-400">{copy.modelDirectoryHelp}</span>
             </label>
             <label className="text-sm">{copy.budget}
@@ -325,9 +367,9 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               </select>
               {budget && !['10', '25', '100'].includes(budget) && <input aria-label={copy.customAmount} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" placeholder="USD" value={budget === 'other' ? '' : budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value || 'other'); setTeacherBudget('') }} />}
             </label>
-            <label className="text-sm">{copy.hourly}
+            {hourlyApplies && <label className="text-sm">{copy.hourly}
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" max="1000" step="0.01" value={hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value) }} />
-            </label>
+            </label>}
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherBudget}
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" step="0.01" value={teacherBudget} onChange={event => { setBudgetAuthorized(false); setTeacherBudget(event.target.value) }} />
@@ -345,9 +387,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               </label>
             )}
           </div>
-          {!computeCredentials.length && <p className="text-sm">{copy.hfOnly}</p>}
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={budgetAuthorized} onChange={event => setBudgetAuthorized(event.target.checked)} /> {copy.budgetConfirmation}</label>
-          <button className="rounded border px-3 py-1" disabled={busy || !budgetAuthorized || !(Number(budget) > 0) || !(Number(hourly) > 0) || !computeProviderKind || !computeId || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(baseModel) || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel || !(Number(teacherBudget) > 0) || !(Number(teacherBudget) < Number(budget))))} onClick={startRun}>{copy.start}</button>
+          <button className="rounded border px-3 py-1" disabled={busy || !budgetAuthorized || !(Number(budget) > 0) || (hourlyApplies && !(Number(hourly) > 0)) || !computeProviderKind || !computeId || !baseModelValid || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel || !(Number(teacherBudget) > 0) || !(Number(teacherBudget) < Number(budget))))} onClick={startRun}>{copy.start}</button>
         </div>
       )}
 
@@ -364,11 +405,12 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <div className="my-2 h-2 w-full rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${run.progressPercent}%` }} /></div>
               {run.failureCode ? <p>{explain(run.failureCode)}</p> : run.statusMessage && <p>{run.statusMessage}</p>}
               <p className="opacity-70">{fmt(copy.budgetLine, { budget: Number(run.approvedBudgetUsd).toFixed(2), reserved: Number(run.committedMaxCostUsd).toFixed(2) })}</p>
+              {run.tunedModelId && <p>{fmt(copy.tunedModelLine, { id: run.tunedModelId })}</p>}
               {Number(run.teacherReservedUsd) > 0 && <p className="opacity-70">{fmt(copy.teacherSpentLine, { spent: Number(run.teacherSpentUsd ?? 0).toFixed(4), reserved: Number(run.teacherReservedUsd).toFixed(4) })}</p>}
               <div className="mt-2 flex flex-wrap gap-3">
                 {run.hfJobUrl && <a className="underline" href={run.hfJobUrl} target="_blank" rel="noreferrer">{copy.openJob}</a>}
                 {canManage && !['completed', 'failed', 'cancelled'].includes(run.stage) && <button className="underline" disabled={busy} onClick={() => refreshRun(run.runId)}>{copy.checkStatus}</button>}
-                {run.stage === 'completed' && <button className="underline" onClick={() => download(run.runId)}>{copy.downloadModel}</button>}
+                {run.stage === 'completed' && run.artifactRepo && <button className="underline" onClick={() => download(run.runId)}>{copy.downloadModel}</button>}
               </div>
               {files[run.runId] && (
                 <ul className="mt-2 space-y-1">

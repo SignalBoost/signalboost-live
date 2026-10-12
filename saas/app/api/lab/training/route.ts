@@ -1,13 +1,13 @@
-import { observeLabRequest } from '@/lib/lab/observability'
 // saas/app/api/lab/training/route.ts
-// Customer LAB training on the customer's own Hugging Face account.
+import { observeLabRequest } from '@/lib/lab/observability'
+// Customer LAB training on the customer's own training account: Hugging Face Jobs, Together AI or Fireworks AI.
 // GET  ?organizationId=                         -> runs with stage/progress/artifact (any active member)
 // POST { action:'start', organizationId, experimentId, teacherCredentialId, teacherModel, computeCredentialId,
 //        baseModel, baseModelRevision?, source:'examples'|'teacher', examples?, prompts?, approvedBudgetUsd, maxHourlyUsd,
 //        teacherBudgetUsd?  (teacher prices come from the verified rate card in the database, never from the request) }
 // POST { action:'refresh', organizationId, runId }                                 (owner/admin)
 //
-// Spend rules: every paid Hugging Face job is RESERVED in the database (cost, callback token, job name) before it is
+// Spend rules: every paid job (Hugging Face, Together, Fireworks) is RESERVED in the database (cost, callback token, job name) before it is
 // submitted (lib/ai/cos/labCustomerTraining.ts runReservedJob). Teacher API calls are reserved in the database first and
 // executed inside the Platform Harness (lib/ai/cos/labCustomerGovernedTeacher.ts); the training job then gets only the
 // budget the database reports after settling ACTUAL teacher spend; an overrun blocks the run. Graduation/certification is never checked.
@@ -15,6 +15,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { customerSession, rpcErrorCode, UUID_RE } from '@/lib/lab/customerSession'
 import { openCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
 import { unsupportedSelection } from '@/lib/ai/cos/labCustomerProviderCatalog'
+import {
+  buildChatJsonl, findFireworksJob, isProviderTrainingKind, normalizeRateCards, prepareFireworks, prepareTogether,
+  readProviderJob, submitFireworks, submitTogether, type ProviderTrainingKind,
+} from '@/lib/ai/cos/labCustomerProviderTraining'
 import {
   buildCustomerTeacherRows, buildPrepareEnvelope, interpretJobStage, newStageToken, parsePrompts, planCustomerJob,
   rowsFromExamples, runReservedJob, type JobBookkeeping, type TeacherRow,
@@ -62,12 +66,16 @@ async function postHandler(req: NextRequest) {
   // Explicit per-run authorization is mandatory independently of any UI checkbox.
   if (body.approvedBudgetConfirmed !== true) return fail('lab_training_budget_not_authorized', 403)
   const approvedBudgetUsd = Number(body.approvedBudgetUsd)
-  const maxHourlyUsd = Number(body.maxHourlyUsd)
+  const computeKind = String(body.computeProviderKind ?? '')
+  // The hourly GPU cap only exists for Hugging Face Jobs; Together and Fireworks bill per training token.
+  const hourlyApplies = !isProviderTrainingKind(computeKind)
+  const maxHourlyUsd = hourlyApplies ? Number(body.maxHourlyUsd) : null
   // For examples mode the teacher credential is not used; the HF key stands in so the run row stays well-formed.
   if (!baseModel || baseModel.length > 200 || (source === 'teacher' && (!teacherModel || teacherModel.length > 200))) return fail('lab_training_model_invalid')
   const teacherIdForRun = source === 'teacher' ? teacherCredentialId : computeCredentialId
   if (![organizationId, experimentId, teacherIdForRun, computeCredentialId].every(id => UUID_RE.test(id))) return fail('lab_training_request_invalid')
-  if (!Number.isFinite(approvedBudgetUsd) || !Number.isFinite(maxHourlyUsd) || !(approvedBudgetUsd > 0 && approvedBudgetUsd <= 1000) || !(maxHourlyUsd > 0 && maxHourlyUsd <= 1000)) return fail('lab_training_budget_invalid')
+  if (!Number.isFinite(approvedBudgetUsd) || !(approvedBudgetUsd > 0 && approvedBudgetUsd <= 1000) ||
+      (hourlyApplies && !(Number.isFinite(maxHourlyUsd) && maxHourlyUsd > 0 && maxHourlyUsd <= 1000))) return fail('lab_training_budget_invalid')
   if (baseModelRevision && !/^[a-f0-9]{40}$/.test(baseModelRevision)) return fail('lab_base_model_revision_invalid')
 
   // Validate everything that needs no spend BEFORE the run exists.
@@ -103,6 +111,8 @@ async function postHandler(req: NextRequest) {
     teacherKind: source === 'teacher' ? created.teacher.providerKind : 'huggingface', computeKind: created.compute.providerKind,
     baseModel, promptCount: source === 'teacher' ? prompts.length : rows.length,
   })
+  // The browser's provider hint must match the account the database released; the database is authoritative.
+  if (computeKind && computeKind !== created.compute.providerKind) problems.push('The training account does not belong to the selected provider.')
   if (problems.length) {
     await record('failed', 0, problems.join(' '), { failureCode: 'lab_selection_unsupported' }).catch(() => undefined)
     return fail('lab_selection_unsupported', 400, { runId, problems })
@@ -110,7 +120,7 @@ async function postHandler(req: NextRequest) {
 
   let hfToken: string
   try { hfToken = openCustomerCredential({ organizationId, credentialId: created.compute.id, sealed: created.compute }) }
-  catch { await record('failed', 0, 'Hugging Face key could not be opened.', { failureCode: 'lab_credential_unavailable' }).catch(() => undefined); return fail('lab_credential_unavailable', 500, { runId }) }
+  catch { await record('failed', 0, 'Training key could not be opened.', { failureCode: 'lab_credential_unavailable' }).catch(() => undefined); return fail('lab_credential_unavailable', 500, { runId }) }
 
   try {
     let remainingBudgetUsd = approvedBudgetUsd
@@ -150,6 +160,10 @@ async function postHandler(req: NextRequest) {
       }
     }
 
+    if (isProviderTrainingKind(created.compute.providerKind)) {
+      return await startProviderJob({ session, organizationId, runId, kind: created.compute.providerKind, key: hfToken, baseModel, rows, datasetHash, remainingBudgetUsd, record })
+    }
+
     installHfWorkerDeliveryEnv()
     const stage = newStageToken()
     const plan = await planCustomerJob({
@@ -177,13 +191,105 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+type RecordStage = (stage: string, progress: number | null, message: string, patch?: Record<string, unknown>, cost?: number, tokenHash?: string | null) => Promise<void>
+
+// Together / Fireworks: free steps -> RESERVE the maximum cost in the database -> create the paid job -> attach its id.
+// A job whose creation cannot be proven absent keeps its reservation; "Check status" reconciles it.
+async function startProviderJob(input: {
+  session: Session; organizationId: string; runId: string; kind: ProviderTrainingKind; key: string; baseModel: string
+  rows: TeacherRow[]; datasetHash: string; remainingBudgetUsd: number; record: RecordStage
+}) {
+  const { session, organizationId, runId, kind, key, baseModel, rows, datasetHash, remainingBudgetUsd, record } = input
+  const jsonl = buildChatJsonl(rows)
+  const name = kind === 'together' ? 'Together AI' : 'Fireworks AI'
+  let maxCostUsd: number
+  let patch: Record<string, unknown>
+  let submit: () => Promise<{ jobId: string; jobUrl: string | null }>
+  let find: () => Promise<{ jobId: string; jobUrl: string | null } | null>
+  if (kind === 'together') {
+    const prepared = await prepareTogether({ key, runId, baseModel, jsonl, fetcher: fetch })
+    maxCostUsd = prepared.maxCostUsd
+    patch = { providerFileRef: prepared.fileId }
+    submit = () => submitTogether({ key, runId, baseModel, fileId: prepared.fileId, fetcher: fetch })
+    find = async () => { throw new Error('lab_provider_job_state_unknown') }
+  } else {
+    const cards = await session.supabase.rpc('itmounts_lab_customer_training_rate_cards', { p_organization_id: organizationId })
+    if (cards.error) throw new Error(rpcErrorCode(cards.error))
+    const prepared = await prepareFireworks({ key, baseModel, jsonl, cards: normalizeRateCards(cards.data), fetcher: fetch })
+    maxCostUsd = prepared.maxCostUsd
+    patch = { providerAccount: prepared.account }
+    submit = () => submitFireworks({ key, runId, account: prepared.account, baseModel, jsonl, rows: rows.length, fetcher: fetch })
+    find = () => findFireworksJob({ key, runId, account: prepared.account, fetcher: fetch })
+  }
+  if (!(maxCostUsd <= remainingBudgetUsd)) throw new Error('lab_training_budget_insufficient')
+  // RESERVE: throws -> nothing was spent.
+  await record('preparing_dataset', 35, `Reserved up to $${maxCostUsd.toFixed(2)}; creating the ${name} training job.`,
+    { ...patch, datasetHash, teacherRows: rows.length, jobSubmissionState: 'reserved' }, maxCostUsd, null)
+  let job: { jobId: string; jobUrl: string | null } | null = null
+  try {
+    job = await submit()
+  } catch (submitError) {
+    const reason = errCode(submitError)
+    if (reason !== 'lab_provider_job_rejected') {
+      try { job = await find() } catch { return fail('lab_provider_job_state_unknown', 202, { runId }) }
+    }
+    if (!job) {
+      await session.supabase.rpc('itmounts_lab_customer_release_reservation', { p_organization_id: organizationId, p_run_id: runId, p_reason: reason })
+      return fail(reason, 502, { runId })
+    }
+  }
+  try {
+    await record('training', 45, `Training on your ${name} account.`, { providerJobId: job.jobId, providerJobUrl: job.jobUrl, jobSubmissionState: 'submitted' }, 0, null)
+  } catch {
+    return fail('lab_provider_job_state_unknown', 202, { runId })
+  }
+  return NextResponse.json({ ok: true, runId, attached: true }, { headers: noStore })
+}
+
+async function refreshProviderJob(session: Session, organizationId: string, runId: string, opened: any) {
+  const kind = opened.computeProviderKind as ProviderTrainingKind
+  const record = (stage: string, progress: number | null, message: string, patch: Record<string, unknown>) => session.supabase.rpc('itmounts_lab_customer_record_stage', {
+    p_organization_id: organizationId, p_run_id: runId, p_stage: stage, p_progress: progress, p_message: message,
+    p_patch: patch, p_add_committed_cost_usd: 0, p_next_stage_token_hash: null,
+  }).then(({ error: e }) => { if (e) throw new Error(rpcErrorCode(e)) })
+  const key = openCustomerCredential({ organizationId, credentialId: opened.compute.id, sealed: opened.compute })
+  let jobId: string | null = opened.providerJobId
+  if (!jobId && opened.jobSubmissionState === 'reserved' && kind === 'fireworks' && opened.providerAccount) {
+    const found = await findFireworksJob({ key, runId, account: opened.providerAccount, fetcher: fetch })
+    if (!found) return NextResponse.json({ ok: true, stage: opened.stage, message: 'No job found yet under its reserved name.' }, { headers: noStore })
+    jobId = found.jobId
+    await record('training', 45, 'Found the submitted job on Fireworks AI.', { providerJobId: found.jobId, jobSubmissionState: 'submitted' })
+  }
+  if (!jobId) return NextResponse.json({ ok: true, stage: opened.stage }, { headers: noStore })
+  const job = await readProviderJob({ kind, key, jobId, fetcher: fetch })
+  const cost = job.reportedCostUsd === null ? {} : { providerReportedCostUsd: job.reportedCostUsd }
+  if (job.state === 'completed') {
+    await record('completed', 100, job.tunedModelId ? `Trained model ready: ${job.tunedModelId}` : 'Training finished.', { tunedModelId: job.tunedModelId, ...cost })
+    return NextResponse.json({ ok: true, stage: 'completed' }, { headers: noStore })
+  }
+  if (job.state === 'failed') {
+    await record('failed', null, `The provider job stopped (${job.detail}).`, { failureCode: 'lab_provider_job_failed', ...cost })
+    return NextResponse.json({ ok: true, stage: 'failed' }, { headers: noStore })
+  }
+  // Write only real changes: polling must not flood the run's event log.
+  if (opened.stage !== 'training' || (job.progress !== null && job.progress !== opened.progressPercent)) {
+    await record('training', job.progress, `Provider status: ${job.detail}.`, cost)
+  }
+  return NextResponse.json({ ok: true, stage: 'training', message: `Provider status: ${job.detail}.` }, { headers: noStore })
+}
+
 async function refresh(session: Session, body: any) {
   const organizationId = String(body?.organizationId ?? '')
   const runId = String(body?.runId ?? '')
   if (!UUID_RE.test(organizationId) || !UUID_RE.test(runId)) return fail('lab_training_request_invalid')
   const { data: opened, error } = await session.supabase.rpc('itmounts_lab_customer_open_run_compute', { p_organization_id: organizationId, p_run_id: runId })
   if (error || !opened) return fail(rpcErrorCode(error), 403)
-  if (!opened.hfNamespace || ['completed', 'failed', 'cancelled'].includes(opened.stage)) return NextResponse.json({ ok: true, stage: opened.stage }, { headers: noStore })
+  if (['completed', 'failed', 'cancelled'].includes(opened.stage)) return NextResponse.json({ ok: true, stage: opened.stage }, { headers: noStore })
+  if (isProviderTrainingKind(String(opened.computeProviderKind ?? ''))) {
+    try { return await refreshProviderJob(session, organizationId, runId, opened) }
+    catch (caught) { return fail(errCode(caught), 502) }
+  }
+  if (!opened.hfNamespace) return NextResponse.json({ ok: true, stage: opened.stage }, { headers: noStore })
   const record = async (stage: string, message: string, patch: Record<string, unknown>) => session.supabase.rpc('itmounts_lab_customer_record_stage', {
     p_organization_id: organizationId, p_run_id: runId, p_stage: stage, p_progress: null, p_message: message,
     p_patch: patch, p_add_committed_cost_usd: 0, p_next_stage_token_hash: stage === 'failed' ? null : 'keep',

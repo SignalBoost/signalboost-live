@@ -12,7 +12,8 @@ test('every implemented hosted API provider has a fixed HTTPS endpoint and suppo
     assert.ok(entry, kind)
     assert.equal(entry.teacherTransport, 'openai_compatible')
     assert.equal(entry.supports['teacher.generate'], true)
-    assert.equal(entry.supports['training.execute'], false)
+    // Together AI and Fireworks AI also train (labCustomerProviderTraining.ts); the rest are teacher-only.
+    assert.equal(entry.supports['training.execute'], kind === 'together' || kind === 'fireworks')
     assert.ok(entry.defaultEndpoint?.startsWith('https://'))
     const definition = customerTeacherDefinition({ kind, model: 'test-model', endpoint: null })
     assert.equal(definition.defaultEndpoint, entry.defaultEndpoint)

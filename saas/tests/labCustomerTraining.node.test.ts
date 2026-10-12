@@ -53,11 +53,17 @@ test('the database migration gives no role direct access and no service-role pat
   assert.doesNotMatch(sql.replace(/--.*$/gm, ''), /graduat|residency|certif/i)
 })
 
-test('provider-neutral catalog: any teacher, Hugging Face training, unsupported training named clearly', () => {
-  assert.deepEqual(LAB_PROVIDER_CATALOG.filter(p => p.supports['training.execute']).map(p => p.kind), ['huggingface'])
+test('provider-neutral catalog: any teacher, training only where a connector exists, unsupported training named clearly', () => {
+  assert.deepEqual(LAB_PROVIDER_CATALOG.filter(p => p.supports['training.execute']).map(p => p.kind), ['huggingface', 'together', 'fireworks'])
+  for (const p of LAB_PROVIDER_CATALOG) assert.equal(Boolean(p.trainingTransport), p.supports['training.execute'], p.kind)
   const problems = unsupportedSelection({ teacherKind: 'anthropic', computeKind: 'anthropic', baseModel: 'Qwen/Qwen2.5-0.5B-Instruct', promptCount: 30 })
   assert.equal(problems.length, 1)
-  assert.match(problems[0], /Anthropic does not offer customer training/)
+  assert.match(problems[0], /Anthropic API does not train customer models/)
+  // Each training provider accepts only its own base model id shape.
+  assert.deepEqual(unsupportedSelection({ teacherKind: 'openai', computeKind: 'together', baseModel: 'Qwen/Qwen3-8B', promptCount: 30 }), [])
+  assert.deepEqual(unsupportedSelection({ teacherKind: 'openai', computeKind: 'fireworks', baseModel: 'accounts/fireworks/models/qwen3-8b', promptCount: 30 }), [])
+  assert.equal(unsupportedSelection({ teacherKind: 'openai', computeKind: 'fireworks', baseModel: 'Qwen/Qwen3-8B', promptCount: 30 }).length, 1)
+  assert.equal(unsupportedSelection({ teacherKind: 'openai', computeKind: 'huggingface', baseModel: 'accounts/fireworks/models/qwen3-8b', promptCount: 30 }).length, 1)
   assert.deepEqual(unsupportedSelection({ teacherKind: 'openai', computeKind: 'huggingface', baseModel: 'Qwen/Qwen2.5-0.5B-Instruct', promptCount: 30 }), [])
   const def = customerTeacherDefinition({ kind: 'openai_compatible', model: 'm', endpoint: 'https://x.example/v1/chat/completions' })
   assert.equal(def.transport, 'openai_compatible')

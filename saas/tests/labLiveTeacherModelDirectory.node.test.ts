@@ -7,6 +7,8 @@ const ui=read('../app/dashboard/cos-university-telemetry/LabCustomerTrainingPane
 const sql=read('../supabase/migrations/20261012030000_lab_model_directory_credential.sql')
 
 test('model choices originate in live provider APIs and not static curated lists',()=>{
+  assert.match(api,/huggingface: \{ url: 'https:\/\/router\.huggingface\.co\/v1\/models'/)
+  assert.match(api,/itmounts_lab_customer_priced_teacher_models/)
   for(const name of ['huggingface','openai','anthropic','gemini','xai','deepseek','qwen','mistral','groq','openrouter','together','fireworks','deepinfra'])assert.match(api,new RegExp(name+': \\{ url:'))
   assert.match(api,/await fetch\(spec\.url/)
   assert.match(api,/cache: 'no-store'/)
@@ -28,6 +30,7 @@ test('teacher dropdown uses credential and current workspace for live data',()=>
   assert.match(ui,/credentialId=\$\{encodeURIComponent\(teacherId\)\}/)
   assert.match(ui,/organizationId=\$\{encodeURIComponent\(organizationId\)\}/)
   assert.match(ui,/setTeacherModelsError\(true\)/)
-  assert.match(ui,/teacherModels\.map\(model/)
-  assert.match(ui,/LAB UI v2026\.10\.12\.2/)
+  assert.match(ui,/teacherModels\.filter\(model => model\.priced\)\.map\(model/)
+  assert.match(ui,/teacherModels\.filter\(model => !model\.priced\)\.map\(model => <option key=\{model\.id\} value=\{model\.id\} disabled>/)
+  assert.match(ui,/LAB UI v2026\.10\.12\.3/)
 })

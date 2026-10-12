@@ -14,7 +14,9 @@ test('single workspace is not shown as a redundant dropdown', () => {
 test('section two separates teacher provider/account and compute provider/account', () => {
   assert.match(panel, /aria-label=\{copy.teacherProviderLabel\}/)
   assert.match(panel, /selectedTeacherCredentials\.map/)
-  assert.match(panel, /catalog\.filter\(item => item\.supports\['training.execute'\]\)/)
+  assert.match(panel, /catalog\.filter\(item => item\.supports\['training.execute'\] && connectedKinds\.has\(item\.kind\)\)/)
+  assert.match(panel, /trainingProviders\.map/)
+  assert.match(panel, /teacherProviders\.map/)
   assert.match(panel, /selectedComputeCredentials\.map/)
   assert.match(panel, /modelSuggestions\.map/)
   assert.doesNotMatch(panel, /useState\('Qwen\//)

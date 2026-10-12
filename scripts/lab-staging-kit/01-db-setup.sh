@@ -14,10 +14,23 @@ for v in 20261009001500 20261011225542 20261012000000 20261012010000; do
 done
 
 [[ "$missing_migrations" == 0 ]] || { echo "Apply the required staging migrations first." >&2; exit 1; }
-# Ensure required RPC signatures exist before disposable customer creation.
-for signature in 'public.itmounts_lab_experiment_start_options(uuid)' 'public.itmounts_lab_customer_initialize_workspace(text)' 'public.itmounts_lab_customer_list_credentials(uuid)'; do
-  installed=$(psql_db -v signature="$signature" -c "select coalesce(to_regprocedure(:'signature')::text, 'missing')")
-  [[ "$installed" != "missing" ]] && record DB_REQUIRED_RPC passed "$signature exists" || { record DB_REQUIRED_RPC failed "$signature missing"; exit 1; }
+# Verify the actual installed functions and role grants, not only migration history.
+for spec in 'public.itmounts_lab_experiment_start_options(uuid)|service_role' 'public.itmounts_lab_customer_initialize_workspace(text)|authenticated' 'public.itmounts_lab_customer_list_credentials(uuid)|authenticated'; do
+  signature="${spec%%|*}"; role="${spec##*|}"
+  result=$(psql_db -v signature="$signature" -v role="$role" <<'SQL'
+select case
+  when to_regprocedure(:'signature') is null then 'missing'
+  when not has_function_privilege(:'role', to_regprocedure(:'signature'), 'EXECUTE') then 'permission_denied'
+  else 'ready'
+end;
+SQL
+)
+  if [[ "$result" == "ready" ]]; then
+    record DB_REQUIRED_RPC passed "$signature executable by $role"
+  else
+    record DB_REQUIRED_RPC failed "$signature: $result for $role"
+    exit 1
+  fi
 done
 
 # 2. Disposable customers (A = test customer, B = other tenant for cross-tenant checks). Admin API; passwords come from your env.

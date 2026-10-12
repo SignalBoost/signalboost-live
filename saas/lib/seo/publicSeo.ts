@@ -43,6 +43,7 @@ export function publicSitemapEntries() {
   return [
     { url: PUBLIC_BRAND.siteUrl },
     { url: `${PUBLIC_BRAND.siteUrl}/university`, changeFrequency: 'weekly' as const, priority: 0.9 },
+    { url: `${PUBLIC_BRAND.siteUrl}/university/pricing`, changeFrequency: 'monthly' as const, priority: 0.7 },
     ...PUBLIC_LOCALES.flatMap(locale => [undefined, ...PUBLIC_TOPICS].map(topic => ({
       url: `${PUBLIC_BRAND.siteUrl}${publicPagePath(locale, topic)}`,
       alternates: { languages: publicAlternates(topic) },

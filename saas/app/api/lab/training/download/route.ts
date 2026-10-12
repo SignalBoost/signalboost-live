@@ -1,3 +1,4 @@
+import { observeLabRequest } from '@/lib/lab/observability'
 // saas/app/api/lab/training/download/route.ts
 // GET ?organizationId=&runId=            -> the trained model's file list (any active member)
 // GET ?organizationId=&runId=&path=...   -> streams that file
@@ -16,7 +17,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-export async function GET(req: NextRequest) {
+async function getHandler(req: NextRequest) {
   const session = await customerSession()
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   const organizationId = req.nextUrl.searchParams.get('organizationId') || ''
@@ -50,4 +51,8 @@ export async function GET(req: NextRequest) {
   } catch (caught) {
     return NextResponse.json({ ok: false, error: caught instanceof Error ? caught.message.split(':')[0] : 'lab_download_failed' }, { status: 502 })
   }
+}
+
+export async function GET(req: NextRequest) {
+  return observeLabRequest('artifact.download', () => getHandler(req))
 }

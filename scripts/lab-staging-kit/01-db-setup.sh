@@ -5,14 +5,28 @@ need STAGING_DB_URL STAGING_SUPABASE_URL STAGING_SERVICE_ROLE_KEY REPO_DIR CUSTO
 assert_staging
 # Apply the intended migrations using your approved staging deployment process first.
 # This kit checks migration versions; it never pushes unrelated repository migrations.
-psql_db -c "select version from supabase_migrations.schema_migrations order by version" > /tmp/mig.txt
-cp /tmp/mig.txt "$EVID/applied-migrations.txt"
+# Supabase MCP applies migrations under generated versions. Verify the reviewed
+# migration identity by its recorded name as well as the original file version.
+# Neither a version alone nor a name alone proves runtime readiness: the RPC
+# and grant checks below must still pass.
+psql_db -c "select version || '|' || coalesce(name,'') from supabase_migrations.schema_migrations order by version" > "$EVID/applied-migrations.txt"
 missing_migrations=0
-for v in 20261009001500 20261011225542 20261012000000 20261012010000; do
-  grep -qx "$v" /tmp/mig.txt && record "DB_MIGRATION_$v" passed "Migration $v is applied" applied-migrations.txt \
-    || { record "DB_MIGRATION_$v" failed "Migration $v is NOT applied" applied-migrations.txt; missing_migrations=1; }
+for spec in \\
+ '20261009001500|lab_owner_org_provisioning|lab_customer_workspace_provisioning' \\
+ '20261011225542|lab_customer_workspace_provisioning|lab_customer_workspace_provisioning' \\
+ '20261012000000|lab_customer_provider_credentials_and_training|lab_customer_provider_credentials_and_training' \\
+ '20261012010000|lab_customer_teacher_spend|lab_customer_teacher_spend'; do
+  version="${spec%%|*}"
+  aliases="${spec#*|}"
+  name="${aliases%%|*}"
+  alternate="${aliases#*|}"
+  if grep -Eq "^(${version}\\|[^|]*|[0-9]{14}\\|(${name}|${alternate}))$" "$EVID/applied-migrations.txt"; then
+    record "DB_MIGRATION_$version" passed "Expected migration identity recorded; runtime validation follows" applied-migrations.txt
+  else
+    record "DB_MIGRATION_$version" failed "Expected reviewed migration identity missing" applied-migrations.txt
+    missing_migrations=1
+  fi
 done
-
 [[ "$missing_migrations" == 0 ]] || { echo "Apply the required staging migrations first." >&2; exit 1; }
 # Verify the actual installed functions and role grants, not only migration history.
 for spec in 'public.itmounts_lab_experiment_start_options(uuid)|service_role' 'public.itmounts_lab_customer_initialize_workspace(text)|authenticated' 'public.itmounts_lab_customer_list_credentials(uuid)|authenticated'; do

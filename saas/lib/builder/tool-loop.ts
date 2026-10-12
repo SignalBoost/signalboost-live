@@ -339,6 +339,19 @@ function diagnose(value: unknown, knownPaths: readonly string[] = []): { failure
   if (/\bdependency\b/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   return { failureClass: 'unknown', remediation: 'Inspect the exact failure evidence before making another change.' }
 }
+/**
+ * A documentation-only edit is not a bug repair. Restrict the shortcut to an explicitly
+ * named documentation file and keep all code-file mutations under the normal repair gate.
+ */
+export function isBuilderDocumentationEditObjective(objective: string): boolean {
+  const text = objective.trim()
+  if (!/\b(?:add|append|update|edit|change|rename|create|write|extend|modify|preserve)\b/i.test(text)) return false
+  if (isRepairObjective(text)) return false
+  const files = [...text.matchAll(/\b[\w./-]+\.(?:[a-z][\w]*)\b/gi)].map(match => match[0])
+  return files.length > 0
+    && files.every(path => /(?:^|\/)(?:README|CHANGELOG|CONTRIBUTING|LICENSE)(?:\.[\w-]+)?\.md$|\.(?:md|mdx|markdown|rst|txt)$/i.test(path))
+}
+
 export class BuilderToolLoop {
   private readonly ai: BuilderAiPort
   private readonly workspace: BuilderWorkspacePort
@@ -391,7 +404,8 @@ export class BuilderToolLoop {
     let workspacePaths: string[] = initialListing.map(file => file.path)
     const documentationPaths = saved?.documentationPaths ?? input.documentationPaths ?? null
     if (documentationPaths && !validBuilderDocumentationScope(input.objective, documentationPaths)) return { ok: false, error: 'builder_documentation_scope_invalid', trace }
-    const gateObjective = documentationPaths ? '' : input.objective
+    const documentationEdit = !documentationPaths && isBuilderDocumentationEditObjective(input.objective)
+    const gateObjective = documentationPaths || documentationEdit ? '' : input.objective
     let repairObjective = saved?.repairObjective ?? isRepairObjective(gateObjective)
     const extendingProject = Boolean(documentationPaths) || Boolean(input.projectContext) && !isRepairObjective(input.objective)
       && /^(?:(?:please|now|then|also)\s+|(?:can|could|would)\s+you\s+)*(?:update|edit|modify|extend|change|refactor|add|remove|replace)\b/i.test(input.objective)
@@ -686,7 +700,7 @@ export class BuilderToolLoop {
           if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_task_incomplete', trace }
           continue
         }
-        repairObjective ||= !documentationPaths && isRepairObjective(`${input.objective}\n${action.answer}`)
+        repairObjective ||= !documentationPaths && !documentationEdit && isRepairObjective(`${input.objective}\n${action.answer}`)
         const verdict = evaluateRegressionGate(gateObjective, trace, repairObjective)
         if (verdict.satisfied && progress.satisfied) return { ok: true, answer: action.answer, trace }
         if (repairObjective) {
@@ -771,7 +785,7 @@ export class BuilderToolLoop {
           error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })
         continue
       }
-      if (mutation && initialPaths.has(toolPath(action.input)) && !extendingProject) repairObjective = true
+      if (mutation && initialPaths.has(toolPath(action.input)) && !extendingProject && !documentationEdit) repairObjective = true
       // An alternating list/read loop observes unchanged workspace state without progress.
       if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint)) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
@@ -846,6 +860,7 @@ export class BuilderToolLoop {
         }
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
           if (documentationPaths && !documentationPaths.includes(toolPath(action.input))) throw new Error('builder_documentation_scope_violation')
+          if (documentationEdit && !/\.(?:md|mdx|markdown|rst|txt)$/i.test(toolPath(action.input))) throw new Error('builder_documentation_scope_violation')
           if (action.toolId === 'write_file' && action.input.mode === 'append') {
             const path = builderFilePath(toolPath(action.input))
             if (workspacePaths.includes(path) || await this.workspace.readFile(input.workspaceId, path)) throw new Error('builder_chunk_existing_file')

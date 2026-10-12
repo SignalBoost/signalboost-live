@@ -399,3 +399,34 @@ test('Builder permits a full five-step complex repair sequence', async () => {
   assert.equal(result.ok, true)
   assert.equal(runs, 2)
 })
+
+test('an existing README can be extended and verified without a repair baseline', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:continuity', 'README.md', '# Builder Verification Test\n\nOriginal section.')
+  const runner: BuilderRunnerPort = { async run({ files }) {
+    const file = files.find(item => item.path === 'README.md')
+    return { exitCode: file?.content.includes('Workspace Continuity Test') ? 0 : 1, stdout: file?.content || '', stderr: '', timedOut: false }
+  } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"read_file","input":{"path":"README.md"}}',
+    JSON.stringify({ type: 'tool', toolId: 'edit_file', input: { path: 'README.md', search: 'Original section.', replace: 'Original section.\\n\\n## Workspace Continuity Test\\nBuilder continued the workspace.' } }),
+    '{"type":"tool","toolId":"run","input":{"command":"cat README.md"}}',
+    '{"type":"answer","answer":"Updated README.md and verified both sections."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Add a Workspace Continuity Test section to README.md.',
+    workspaceId: 'user:continuity',
+  })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  const readme = await workspace.readFile('user:continuity', 'README.md')
+  assert.match(readme?.content || '', /Original section/)
+  assert.match(readme?.content || '', /Workspace Continuity Test/)
+})
+
+test('documentation mode cannot edit source code and does not relax repair classification', async () => {
+  const { isBuilderDocumentationEditObjective } = await import('../lib/builder/tool-loop.ts')
+  assert.equal(isBuilderDocumentationEditObjective('Add a section in README.md.'), true)
+  assert.equal(isBuilderDocumentationEditObjective('Fix broken README.md tests.'), false)
+  assert.equal(isBuilderDocumentationEditObjective('Modify README.md and index.js.'), false)
+  assert.equal(isBuilderDocumentationEditObjective('Update index.js.'), false)
+})

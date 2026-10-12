@@ -16,6 +16,7 @@ import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import { cosServiceDb } from '@/lib/cos-core/storage/service-db'
 
 // ── User-scoped client: knows who is logged in (from cookies) ──
 export async function getServerSupabase() {
@@ -56,6 +57,11 @@ export async function getCurrentUser() {
 // ── Admin client: service-role, for trusted server writes only ──
 // Never import this into client components. Server routes only.
 export function getAdminSupabase() {
+  if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_GIT_COMMIT_REF === 'staging/lab-free-acceptance-20261011') {
+    const staging = cosServiceDb()
+    if (!staging) throw new Error('lab_staging_database_not_configured')
+    return staging
+  }
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

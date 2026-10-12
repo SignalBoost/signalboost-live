@@ -47,3 +47,21 @@ export function parseOpenRouterPrices(payload: unknown): TeacherPrice[] {
   }
   return [...out.values()].sort((a, b) => a.model.localeCompare(b.model))
 }
+
+export type SyncRpc = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>
+export type SyncOutcome = Readonly<{ ok: boolean; priced: number; result?: unknown; error?: string }>
+
+/**
+ * Parses an OpenRouter /models payload and hands the prices to the service-role-only sync function.
+ * Shared by the hourly job and by the teacher model list (which already holds the same payload), so prices load the
+ * first time anyone looks, even if the scheduled job has not run. `rpc` must be a service-role client.
+ */
+export async function syncOpenRouterTeacherPrices(payload: unknown, rpc: SyncRpc): Promise<SyncOutcome> {
+  const prices = parseOpenRouterPrices(payload)
+  if (prices.length < OPENROUTER_MIN_PRICED_MODELS) return { ok: false, error: 'lab_price_sync_rows_insufficient', priced: prices.length }
+  const { data, error } = await rpc('itmounts_lab_platform_sync_teacher_rate_cards', {
+    p_provider_kind: 'openrouter', p_source_url: OPENROUTER_MODELS_URL, p_rows: prices,
+  })
+  if (error) return { ok: false, error: 'lab_price_sync_failed', priced: prices.length }
+  return { ok: true, priced: prices.length, result: data }
+}

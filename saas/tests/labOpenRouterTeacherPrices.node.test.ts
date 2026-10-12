@@ -61,3 +61,35 @@ test('every OpenRouter teacher call carries the price ceiling; other providers n
   assert.deepEqual(bodies.openrouter.provider, { max_price: { prompt: 3, completion: 15 } })
   assert.equal(bodies.groq.provider, undefined)
 })
+
+test('the shared sync hands parsed prices to the service-role function, and refuses a short or failed sync', async () => {
+  const { syncOpenRouterTeacherPrices } = await import('../lib/lab/openRouterTeacherPrices.ts')
+  const text = { input_modalities: ['text'], output_modalities: ['text'] }
+  const payload = { data: Array.from({ length: 25 }, (_, i) => ({ id: `vendor/m${i}`, pricing: { prompt: '0.000001', completion: '0.000002' }, architecture: text })) }
+  const calls: any[] = []
+  const ok = await syncOpenRouterTeacherPrices(payload, async (fn, args) => { calls.push([fn, args]); return { data: { added: 25 }, error: null } })
+  assert.deepEqual(ok, { ok: true, priced: 25, result: { added: 25 } })
+  assert.equal(calls[0][0], 'itmounts_lab_platform_sync_teacher_rate_cards')
+  assert.equal(calls[0][1].p_provider_kind, 'openrouter')
+  assert.equal(calls[0][1].p_source_url, 'https://openrouter.ai/api/v1/models')
+  assert.deepEqual(calls[0][1].p_rows[0], { model: 'vendor/m0', input: 1, output: 2 })
+  const short = await syncOpenRouterTeacherPrices({ data: payload.data.slice(0, 5) }, async () => { throw new Error('must not be called') })
+  assert.deepEqual(short, { ok: false, error: 'lab_price_sync_rows_insufficient', priced: 5 })
+  const failed = await syncOpenRouterTeacherPrices(payload, async () => ({ data: null, error: { message: 'x' } }))
+  assert.deepEqual(failed, { ok: false, error: 'lab_price_sync_failed', priced: 25 })
+})
+
+test('the model list and the hourly job sync OpenRouter prices through one lease, once an hour, without blocking the list', () => {
+  const route = readFileSync(new URL('../app/api/lab/teacher-models/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /if \(provider === 'openrouter'\) await refreshOpenRouterPrices\(payload\)/)
+  assert.match(route, /syncOpenRouterPricesWithLease\(payload, 'lab-teacher-models'\)/)
+  // The priced flags are read after the sync, so the first viewer already sees the prices.
+  assert.ok(route.indexOf('refreshOpenRouterPrices(payload)') < route.indexOf("rpc('itmounts_lab_customer_priced_teacher_models'"))
+  const cron = readFileSync(new URL('../app/api/cron/lab-teacher-prices/route.ts', import.meta.url), 'utf8')
+  // Both callers go through one lease, so the hourly job and the model list can never sync at the same time.
+  assert.match(cron, /syncOpenRouterPricesWithLease\(payload, 'lab-teacher-prices-cron'\)/)
+  const lease = readFileSync(new URL('../lib/lab/openRouterPriceSyncLease.ts', import.meta.url), 'utf8')
+  assert.match(lease, /PRICE_LEASE = 'lab_openrouter_prices'/)
+  assert.match(lease, /PRICE_SYNC_COOLDOWN_SECONDS = Object\.freeze\(\{ ok: 3600, error: 300 \}\)/)
+  assert.match(lease, /if \(!\(await port\.claim\(/)
+})

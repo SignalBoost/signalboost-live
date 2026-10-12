@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainingCopy'
 import { ADD_KEY_OPTION, providerOptions, sortProviders, type ProviderOption } from '@/lib/lab/labProviderOptions'
+import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
@@ -21,7 +22,7 @@ type Run = {
 type ModelOption = { id: string; label: string }
 type TeacherModelOption = { id: string; priced: boolean }
 // Build marker shown in the header (an identifier, not translatable copy).
-const LAB_UI_VERSION = 'LAB UI v2026.10.12.7'
+const LAB_UI_VERSION = 'LAB UI v2026.10.12.8'
 // Providers whose training jobs are polled through the training route (no worker callback).
 const POLLED_TRAINING = new Set(['together', 'fireworks'])
 // Training providers whose base-model list is public, so it shows before a key is saved.
@@ -44,7 +45,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [workspaceLoad, setWorkspaceLoad] = useState<'loading' | 'ready' | 'error'>('loading')
   // key form
   const [keyKind, setKeyKind] = useState('')
-  const [keyLabel, setKeyLabel] = useState('')
+  // True while the provider was chosen from the pasted key, so a later paste may re-detect it.
+  const [keyKindDetected, setKeyKindDetected] = useState(false)
   const [keyValue, setKeyValue] = useState('')
   const [keyEndpoint, setKeyEndpoint] = useState('')
   // run form
@@ -90,7 +92,6 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const onlyAccount = (kind: string) => { const matches = credentials.filter(item => item.providerKind === kind); return matches.length === 1 ? matches[0].id : '' }
   // A key can be added right where it is needed: the account dropdown opens this inline form for its provider.
   const [inlineKey, setInlineKey] = useState<{ target: 'teacher' | 'training'; kind: string } | null>(null)
-  const [inlineLabel, setInlineLabel] = useState('')
   const [inlineValue, setInlineValue] = useState('')
   const [inlineEndpoint, setInlineEndpoint] = useState('')
   // Save results are shown next to the Save button that was clicked, not at the top of the panel.
@@ -98,9 +99,17 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const feedbackFor = (where: 'section1' | 'teacher' | 'training') => keyFeedback?.where === where &&
     <p role={keyFeedback.kind} className={`text-xs ${keyFeedback.kind === 'alert' ? 'text-amber-200' : 'text-emerald-300'}`}>{keyFeedback.text}</p>
   // Why Save is disabled, in words, so the button never looks dead.
-  const keyFormProblem = (label: string, value: string, endpoint: string, kind: string) =>
-    !label.trim() || value.trim().length < 20 || /\s/.test(value.trim()) ? copy.keyFormNeeds : kind === 'openai_compatible' && !endpoint.trim() ? copy.keyEndpointNeeded : null
-  const openInlineKey = (target: 'teacher' | 'training', kind: string) => { setInlineKey(kind ? { target, kind } : null); setInlineLabel(''); setInlineValue(''); setInlineEndpoint('') }
+  const keyFormProblem = (value: string, endpoint: string, kind: string) =>
+    !cleanPastedKey(value) ? copy.keyFormNeeds : kind === 'openai_compatible' && !endpoint.trim() ? copy.keyEndpointNeeded : null
+  const providerName = (kind: string) => entry(kind)?.name ?? kind
+  // Paste the key: if its prefix names one provider, that provider is selected (unless the person chose one by hand).
+  const onKeyPasted = (raw: string) => {
+    setKeyValue(raw)
+    const detected = detectProviderFromKey(raw)
+    if (detected && catalog.some(item => item.kind === detected) && (!keyKind || keyKindDetected)) { setKeyKind(detected); setKeyKindDetected(true) }
+  }
+  const savedText = (check: unknown) => check === 'valid' ? copy.keySaved : copy.keyUnverified
+  const openInlineKey = (target: 'teacher' | 'training', kind: string) => { setInlineKey(kind ? { target, kind } : null); setInlineValue(''); setInlineEndpoint('') }
   // Choosing a provider with no saved account opens the key form at once; with exactly one, that account is selected.
   const pickProvider = (target: 'teacher' | 'training', kind: string) => {
     const account = onlyAccount(kind)
@@ -221,10 +230,10 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     const requestedOrg = organizationId
     setKeyFeedback(null)
     try {
-      await call('/api/lab/providers', 'POST', { organizationId, providerKind: keyKind, label: keyLabel.trim(), secret: keyValue.trim(), endpoint: keyEndpoint.trim() })
+      const saved = await call('/api/lab/providers', 'POST', { organizationId, providerKind: keyKind, secret: cleanPastedKey(keyValue), endpoint: keyEndpoint.trim() })
       if (activeOrgRef.current !== requestedOrg) return
-      setKeyValue(''); setKeyLabel(''); setKeyEndpoint('')
-      setKeyFeedback({ where: 'section1', kind: 'status', text: copy.keySaved })
+      setKeyValue(''); setKeyEndpoint(''); setKeyKindDetected(false)
+      setKeyFeedback({ where: 'section1', kind: 'status', text: savedText(saved.check) })
       await load()
     } catch (error: any) { if (activeOrgRef.current === requestedOrg) setKeyFeedback({ where: 'section1', kind: 'alert', text: fmt(copy.keyNotSaved, { code: explain(error.message) }) }) }
   }
@@ -235,7 +244,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     const { target, kind } = inlineKey
     setKeyFeedback(null)
     try {
-      const saved = await call('/api/lab/providers', 'POST', { organizationId, providerKind: kind, label: inlineLabel.trim(), secret: inlineValue.trim(), endpoint: inlineEndpoint.trim() })
+      const saved = await call('/api/lab/providers', 'POST', { organizationId, providerKind: kind, secret: cleanPastedKey(inlineValue), endpoint: inlineEndpoint.trim() })
       if (activeOrgRef.current !== requestedOrg) return
       await load()
       if (activeOrgRef.current !== requestedOrg) return
@@ -243,7 +252,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       else { setComputeId(saved.credentialId); setBaseModel(''); setModelSelection('') }
       setBudgetAuthorized(false)
       openInlineKey(target, '')
-      setKeyFeedback({ where: target, kind: 'status', text: copy.keySaved })
+      setKeyFeedback({ where: target, kind: 'status', text: savedText(saved.check) })
     } catch (error: any) { if (activeOrgRef.current === requestedOrg) setKeyFeedback({ where: target, kind: 'alert', text: fmt(copy.keyNotSaved, { code: explain(error.message) }) }) }
   }
 
@@ -305,15 +314,15 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
 
   const inlineKeyForm = (target: 'teacher' | 'training') => inlineKey?.target === target && (
     <div className="mt-2 space-y-2 rounded border border-white/20 p-2">
-      <input aria-label={copy.keyNamePh} className="w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.keyNamePh} value={inlineLabel} onChange={event => setInlineLabel(event.target.value)} />
       <input aria-label={copy.keyPh} className="w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="password" autoComplete="off" placeholder={copy.keyPh} value={inlineValue} onChange={event => setInlineValue(event.target.value)} />
+      {(() => { const detected = detectProviderFromKey(inlineValue); return detected && detected !== inlineKey.kind ? <p className="text-xs text-amber-200">{fmt(copy.keyLooksLike, { name: providerName(detected) })}</p> : null })()}
       {inlineKey.kind === 'openai_compatible' && <input aria-label={copy.endpointPh} className="w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.endpointPh} value={inlineEndpoint} onChange={event => setInlineEndpoint(event.target.value)} />}
       <p className="text-xs opacity-70">{entry(inlineKey.kind)?.keyHelp}</p>
       <div className="flex gap-3">
-        <button type="button" className="rounded border px-3 py-1" disabled={busy || keyFormProblem(inlineLabel, inlineValue, inlineEndpoint, inlineKey.kind) !== null} onClick={() => { void saveInlineKey() }}>{copy.saveKey}</button>
+        <button type="button" className="rounded border px-3 py-1" disabled={busy || keyFormProblem(inlineValue, inlineEndpoint, inlineKey.kind) !== null} onClick={() => { void saveInlineKey() }}>{copy.saveKey}</button>
         <button type="button" className="underline" disabled={busy} onClick={() => openInlineKey(target, '')}>{copy.cancel}</button>
       </div>
-      {keyFormProblem(inlineLabel, inlineValue, inlineEndpoint, inlineKey.kind) && <p className="text-xs text-slate-300">{keyFormProblem(inlineLabel, inlineValue, inlineEndpoint, inlineKey.kind)}</p>}
+      {keyFormProblem(inlineValue, inlineEndpoint, inlineKey.kind) && <p className="text-xs text-slate-300">{keyFormProblem(inlineValue, inlineEndpoint, inlineKey.kind)}</p>}
     </div>
   )
 
@@ -332,7 +341,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
         <div><h2 className="text-lg font-semibold">{copy.title}</h2><span className="text-xs text-slate-400">{LAB_UI_VERSION}</span></div>
         {orgs.length > 1 ? (
           <label className="flex flex-col gap-1 text-sm"><span>{copy.workspaceSelectorLabel}</span>
-        <select aria-label={copy.workspaceSelectorLabel} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setTeacherProviderKind(''); setTeacherModel(''); setTeacherModelChoice(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
+        <select aria-label={copy.workspaceSelectorLabel} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyKindDetected(false); setKeyEndpoint(''); setTeacherId(''); setTeacherProviderKind(''); setTeacherModel(''); setTeacherModelChoice(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
           {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName === item.projectName ? item.organizationName : `${item.organizationName} · ${item.projectName}`}</option>)}
         </select>
           </label>
@@ -354,16 +363,16 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
         </ul>
         {canManage && (
           <div className="grid gap-2 sm:grid-cols-2">
-            <select aria-label={copy.keysHeading} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={keyKind} onChange={event => setKeyKind(event.target.value)}>
+            <select aria-label={copy.keysHeading} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={keyKind} onChange={event => { setKeyKind(event.target.value); setKeyKindDetected(false) }}>
               <option value="">{copy.choose}</option>
               <optgroup label="Available adapters">{sortedCatalog.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}</optgroup>
             </select>
-            <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.keyNamePh} value={keyLabel} onChange={event => setKeyLabel(event.target.value)} />
-            <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="password" autoComplete="off" placeholder={copy.keyPh} value={keyValue} onChange={event => setKeyValue(event.target.value)} />
+            <input aria-label={copy.keyPh} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="password" autoComplete="off" placeholder={copy.keyPh} value={keyValue} onChange={event => onKeyPasted(event.target.value)} />
+            {keyKindDetected && keyKind && <p className="text-xs text-emerald-300 sm:col-span-2">{fmt(copy.keyDetected, { name: providerName(keyKind) })}</p>}
             {keyKind === 'openai_compatible' && <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.endpointPh} value={keyEndpoint} onChange={event => setKeyEndpoint(event.target.value)} />}
             <p className="text-xs opacity-70 sm:col-span-2">{entry(keyKind)?.keyHelp} {entry(keyKind)?.unsupported['training.execute']}</p>
-            <button className="rounded border px-3 py-1 sm:col-span-2" disabled={busy || !catalog.some(item => item.kind === keyKind) || keyFormProblem(keyLabel, keyValue, keyEndpoint, keyKind) !== null} onClick={saveKey}>{copy.saveKey}</button>
-            {keyKind && keyFormProblem(keyLabel, keyValue, keyEndpoint, keyKind) && <p className="text-xs text-slate-300 sm:col-span-2">{keyFormProblem(keyLabel, keyValue, keyEndpoint, keyKind)}</p>}
+            <button className="rounded border px-3 py-1 sm:col-span-2" disabled={busy || !catalog.some(item => item.kind === keyKind) || keyFormProblem(keyValue, keyEndpoint, keyKind) !== null} onClick={saveKey}>{copy.saveKey}</button>
+            {keyKind && keyFormProblem(keyValue, keyEndpoint, keyKind) && <p className="text-xs text-slate-300 sm:col-span-2">{keyFormProblem(keyValue, keyEndpoint, keyKind)}</p>}
             <div className="sm:col-span-2">{feedbackFor('section1')}</div>
           </div>
         )}

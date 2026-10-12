@@ -47,10 +47,11 @@ for (const locale of PUBLIC_LOCALES) {
 
 test('sitemap contains each indexable canonical once and no private or invented locale URLs', () => {
   const entries = publicSitemapEntries()
-  assert.equal(entries.length, 57)
+  assert.equal(entries.length, 58)
   assert.ok(entries.some(entry => entry.url === 'https://itmounts.com/university'))
+  assert.ok(entries.some(entry => entry.url === 'https://itmounts.com/university/pricing'))
   assert.equal(new Set(entries.map(entry => entry.url)).size, entries.length)
-  for (const entry of entries.filter(entry => entry.url !== 'https://itmounts.com' && entry.url !== 'https://itmounts.com/university')) {
+  for (const entry of entries.filter(entry => entry.url !== 'https://itmounts.com' && entry.url !== 'https://itmounts.com/university' && entry.url !== 'https://itmounts.com/university/pricing')) {
     const parts = new URL(entry.url).pathname.split('/').slice(1)
     assert.ok(isPublicLocale(parts[0]))
     if (parts[1]) assert.ok(isPublicTopic(parts[1]))

@@ -42,7 +42,7 @@ export default function UniversityLanding() {
           iTMounts provides the LAB; your providers supply the services you choose.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/onboarding" className="rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950">Get started</Link>
+          <Link href="/university/start" className="rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950">Get started</Link>
           <Link href="#how-it-works" className="rounded-full border border-white/30 px-6 py-3 font-semibold">How it works</Link>
         </div>
         <p className="mt-5 text-sm text-slate-400">iTMounts AI University is a paid software service when paid features are used. AI teacher usage and GPU compute are separate charges from your chosen providers. Review both before starting.</p>
@@ -86,7 +86,7 @@ export default function UniversityLanding() {
           material or your own permitted data and review your budget before paid execution.
           The LAB is a workspace and tool provider, not an independent certification authority.
         </p>
-        <Link href="/onboarding" className="mt-6 inline-block rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950">Start with iTMounts</Link>
+        <Link href="/university/start" className="mt-6 inline-block rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950">Start with iTMounts</Link>
         <p className="mt-6 text-sm text-slate-400">Need help? <Link className="underline" href="/support">Contact support</Link>.</p>
       </section>
     </main>

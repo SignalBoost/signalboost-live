@@ -176,7 +176,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     try {
       await call('/api/lab/training', 'POST', {
         action: 'start', organizationId, experimentId, source, examples, teacherCredentialId: teacherId, teacherModel,
-        computeCredentialId: computeId, baseModel, prompts, approvedBudgetUsd: Number(budget), maxHourlyUsd: Number(hourly),
+        computeCredentialId: computeId, baseModel, prompts, approvedBudgetConfirmed: budgetAuthorized, approvedBudgetUsd: Number(budget), maxHourlyUsd: Number(hourly),
         teacherBudgetUsd: Number(teacherBudget),
       })
       if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'status', text: copy.started })

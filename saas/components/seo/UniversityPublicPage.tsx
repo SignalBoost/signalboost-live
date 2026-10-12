@@ -40,11 +40,20 @@ export default function UniversityPublicPage({ locale, pricing = false }: { loca
   return <main lang={locale} dir={writingDirection(locale)} className="mx-auto max-w-6xl px-5 py-12 text-white sm:px-8">
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} />
     <nav aria-label="AI University navigation" className="mb-6 flex flex-wrap items-center gap-4 border-b border-white/15 pb-4 text-sm"><Link href={universityPath(locale)} className="font-semibold text-amber-300">iTMounts AI University</Link><Link href={universityPath(locale,true)} className="underline">{c.pricing}</Link><Link href={locale === 'en' ? '/university/start' : `/${locale}/university/start`} className="underline">{c.start}</Link><Link href="/support" className="underline">{c.support}</Link></nav>
-    <nav aria-label="Languages" className="mb-8 flex flex-wrap items-center gap-3 border-b border-white/15 pb-5">
-      {PUBLIC_LOCALES.map(language => <Link key={language} href={universityPath(language, pricing)} hrefLang={language} lang={language} prefetch={false}
-        className={`rounded-full px-3 py-1 text-sm ${language === locale ? 'bg-amber-300 font-semibold text-slate-950' : 'border border-white/30 text-slate-200'}`}>
-        {PUBLIC_LOCALE_NAMES[language]}
-      </Link>)}
+    <nav aria-label="Languages" className="mb-8 border-b border-white/15 pb-5">
+      <details className="group relative inline-block text-sm">
+        <summary className="flex min-w-40 cursor-pointer list-none items-center justify-between gap-4 rounded-lg border border-white/30 bg-white/5 px-4 py-2 font-medium text-white marker:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 [&::-webkit-details-marker]:hidden">
+          <span><span aria-hidden="true">🌐 </span><bdi>{PUBLIC_LOCALE_NAMES[locale]}</bdi></span>
+          <span aria-hidden="true" className="text-amber-300">▾</span>
+        </summary>
+        <div className="absolute left-0 z-20 mt-1 max-h-72 min-w-full overflow-y-auto rounded-lg border border-white/25 bg-slate-950 p-1 shadow-xl">
+          {PUBLIC_LOCALES.map(language => <Link key={language} href={universityPath(language, pricing)}
+            hrefLang={language} lang={language} prefetch={false} aria-current={language === locale ? 'page' : undefined}
+            className={`block whitespace-nowrap rounded-md px-4 py-2 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:outline-none ${language === locale ? 'bg-amber-300 font-semibold text-slate-950 hover:bg-amber-200' : 'text-slate-100'}`}>
+            <bdi>{PUBLIC_LOCALE_NAMES[language]}</bdi>
+          </Link>)}
+        </div>
+      </details>
     </nav>
     {pricing ? <>
       <Link className="text-sm text-amber-300 underline" href={to(false)}>← {c.home}</Link>

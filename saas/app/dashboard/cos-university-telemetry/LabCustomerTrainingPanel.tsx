@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainingCopy'
-import { providerOptions, sortProviders, type ProviderOption } from '@/lib/lab/labProviderOptions'
+import { ADD_KEY_OPTION, providerOptions, sortProviders, type ProviderOption } from '@/lib/lab/labProviderOptions'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
@@ -21,9 +21,11 @@ type Run = {
 type ModelOption = { id: string; label: string }
 type TeacherModelOption = { id: string; priced: boolean }
 // Build marker shown in the header (an identifier, not translatable copy).
-const LAB_UI_VERSION = 'LAB UI v2026.10.12.5'
+const LAB_UI_VERSION = 'LAB UI v2026.10.12.6'
 // Providers whose training jobs are polled through the training route (no worker callback).
 const POLLED_TRAINING = new Set(['together', 'fireworks'])
+// Training providers whose base-model list is public, so it shows before a key is saved.
+const PUBLIC_MODEL_DIRECTORY = new Set(['huggingface'])
 const BASE_MODEL_ID: Record<string, RegExp> = {
   huggingface: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, together: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/,
   fireworks: /^accounts\/[a-z0-9-]+\/models\/[A-Za-z0-9_.-]+$/,
@@ -83,11 +85,21 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const sortedCatalog = sortProviders(catalog, language)
   const teacherOptions = providerOptions(catalog, connectedKinds, 'teacher.generate', language)
   const trainingOptions = providerOptions(catalog, connectedKinds, 'training.execute', language)
-  const teacherProviders = teacherOptions.filter(item => !item.blocked)
-  const trainingProviders = trainingOptions.filter(item => !item.blocked)
-  const optionLabel = (item: ProviderOption) => item.blocked === 'needs_key' ? `${item.name} ${copy.addKeyFirst}` : item.blocked ? `${item.name} ${copy.teacherOnly}` : item.name
+  const optionLabel = (item: ProviderOption) => item.blocked ? `${item.name} ${copy.teacherOnly}` : item.hasKey ? item.name : `${item.name} ${copy.addKeyFirst}`
   // Picking a provider with exactly one saved account selects that account, so the next dropdown is ready.
   const onlyAccount = (kind: string) => { const matches = credentials.filter(item => item.providerKind === kind); return matches.length === 1 ? matches[0].id : '' }
+  // A key can be added right where it is needed: the account dropdown opens this inline form for its provider.
+  const [inlineKey, setInlineKey] = useState<{ target: 'teacher' | 'training'; kind: string } | null>(null)
+  const [inlineLabel, setInlineLabel] = useState('')
+  const [inlineValue, setInlineValue] = useState('')
+  const [inlineEndpoint, setInlineEndpoint] = useState('')
+  const openInlineKey = (target: 'teacher' | 'training', kind: string) => { setInlineKey(kind ? { target, kind } : null); setInlineLabel(''); setInlineValue(''); setInlineEndpoint('') }
+  // Choosing a provider with no saved account opens the key form at once; with exactly one, that account is selected.
+  const pickProvider = (target: 'teacher' | 'training', kind: string) => {
+    const account = onlyAccount(kind)
+    if (target === 'teacher') setTeacherId(account); else setComputeId(account)
+    openInlineKey(target, kind && !credentials.some(item => item.providerKind === kind) ? kind : '')
+  }
   const hourlyApplies = computeProviderKind === 'huggingface'
   const baseModelValid = Boolean(BASE_MODEL_ID[computeProviderKind]?.test(baseModel))
   const selectedTeacherCredentials = teacherCredentials.filter(item => item.providerKind === teacherProviderKind)
@@ -157,9 +169,10 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }, [organizationId, teacherProviderKind, teacherId])
   useEffect(() => {
     let cancelled = false
-    if (!computeProviderKind || !computeId || !organizationId) { setModelSuggestions([]); setModelsError(false); return }
+    // Hugging Face's public model directory needs no key; Together and Fireworks list models only to a signed-in key.
+    if (!computeProviderKind || !organizationId || (!computeId && !PUBLIC_MODEL_DIRECTORY.has(computeProviderKind))) { setModelSuggestions([]); setModelsError(false); return }
     setModelSuggestions([]); setModelsError(false); setModelsLoading(true)
-    void fetch(`/api/lab/models?provider=${encodeURIComponent(computeProviderKind)}&organizationId=${encodeURIComponent(organizationId)}&credentialId=${encodeURIComponent(computeId)}`, { credentials: 'include', cache: 'no-store' })
+    void fetch(`/api/lab/models?provider=${encodeURIComponent(computeProviderKind)}&organizationId=${encodeURIComponent(organizationId)}${computeId ? `&credentialId=${encodeURIComponent(computeId)}` : ''}`, { credentials: 'include', cache: 'no-store' })
       .then(response => response.ok ? response.json() : null)
       .then(body => {
         if (cancelled) return
@@ -205,6 +218,23 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       setKeyValue(''); setKeyLabel(''); setKeyEndpoint('')
       setMessage({ kind: 'status', text: copy.keySaved })
       await load()
+    } catch (error: any) { if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.keyNotSaved, { code: explain(error.message) }) }) }
+  }
+
+  async function saveInlineKey() {
+    if (!inlineKey) return
+    const requestedOrg = organizationId
+    const { target, kind } = inlineKey
+    try {
+      const saved = await call('/api/lab/providers', 'POST', { organizationId, providerKind: kind, label: inlineLabel, secret: inlineValue, endpoint: inlineEndpoint })
+      if (activeOrgRef.current !== requestedOrg) return
+      await load()
+      if (activeOrgRef.current !== requestedOrg) return
+      if (target === 'teacher') { setTeacherId(saved.credentialId); setTeacherModel(''); setTeacherModelChoice('') }
+      else { setComputeId(saved.credentialId); setBaseModel(''); setModelSelection('') }
+      setBudgetAuthorized(false)
+      openInlineKey(target, '')
+      setMessage({ kind: 'status', text: copy.keySaved })
     } catch (error: any) { if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.keyNotSaved, { code: explain(error.message) }) }) }
   }
 
@@ -263,6 +293,19 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     }
   }
   const fileUrl = (runId: string, path: string) => `/api/lab/training/download?organizationId=${organizationId}&runId=${runId}&path=${encodeURIComponent(path)}`
+
+  const inlineKeyForm = (target: 'teacher' | 'training') => inlineKey?.target === target && (
+    <div className="mt-2 space-y-2 rounded border border-white/20 p-2">
+      <input aria-label={copy.keyNamePh} className="w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.keyNamePh} value={inlineLabel} onChange={event => setInlineLabel(event.target.value)} />
+      <input aria-label={copy.keyPh} className="w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="password" autoComplete="off" placeholder={copy.keyPh} value={inlineValue} onChange={event => setInlineValue(event.target.value)} />
+      {inlineKey.kind === 'openai_compatible' && <input aria-label={copy.endpointPh} className="w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.endpointPh} value={inlineEndpoint} onChange={event => setInlineEndpoint(event.target.value)} />}
+      <p className="text-xs opacity-70">{entry(inlineKey.kind)?.keyHelp}</p>
+      <div className="flex gap-3">
+        <button type="button" className="rounded border px-3 py-1" disabled={busy || !inlineLabel.trim() || inlineValue.length < 20 || (inlineKey.kind === 'openai_compatible' && !inlineEndpoint)} onClick={() => { void saveInlineKey() }}>{copy.saveKey}</button>
+        <button type="button" className="underline" disabled={busy} onClick={() => openInlineKey(target, '')}>{copy.cancel}</button>
+      </div>
+    </div>
+  )
 
   if (!orgs.length) return (
     <section className="rounded-lg border p-4 text-sm" dir={language === 'ar' ? 'rtl' : undefined}>
@@ -324,18 +367,19 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           <div className="grid gap-2 sm:grid-cols-2">
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherProviderLabel}
-              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); setTeacherId(onlyAccount(event.target.value)); setTeacherModel(''); setTeacherModelChoice('') }}>
+              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); pickProvider('teacher', event.target.value); setTeacherModel(''); setTeacherModelChoice('') }}>
                 <option value="">{copy.chooseTeacherProvider}</option>
                 {teacherOptions.map(item => <option key={item.kind} value={item.kind} disabled={item.blocked !== null}>{optionLabel(item)}</option>)}
               </select>
-              {!teacherProviders.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectKeysFirst}</span>}
             </label>
             <label className="text-sm">{copy.teacherKey}
-              <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} disabled={!teacherProviderKind} onChange={event => { setTeacherId(event.target.value); setTeacherModel(''); setTeacherModelChoice(''); setBudgetAuthorized(false) }}>
+              <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={inlineKey?.target === 'teacher' ? ADD_KEY_OPTION : teacherId} disabled={!teacherProviderKind} onChange={event => { if (event.target.value === ADD_KEY_OPTION) { openInlineKey('teacher', teacherProviderKind); return } openInlineKey('teacher', ''); setTeacherId(event.target.value); setTeacherModel(''); setTeacherModelChoice(''); setBudgetAuthorized(false) }}>
                 <option value="">{teacherProviderKind ? copy.chooseTeacherAccount : copy.chooseProviderFirst}</option>
                 {selectedTeacherCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                {teacherProviderKind && canManage && <option value={ADD_KEY_OPTION}>{copy.addKeyOption}</option>}
               </select>
-              {teacherProviderKind && !selectedTeacherCredentials.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTeacherFirst}</span>}
+              {teacherProviderKind && !selectedTeacherCredentials.length && inlineKey?.target !== 'teacher' && <span className="mt-1 block text-xs text-amber-200">{copy.connectTeacherFirst}</span>}
+              {inlineKeyForm('teacher')}
             </label>
             <label className="text-sm">{copy.teacherModel}
               <select aria-label={copy.teacherModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherModelChoice} disabled={!teacherProviderKind || !teacherId} onChange={event => { setTeacherModelChoice(event.target.value); setTeacherModel(event.target.value === 'custom' ? '' : event.target.value); setBudgetAuthorized(false) }}>
@@ -349,22 +393,23 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             </label>
             </>}
             <label className="text-sm">{copy.trainingProviderLabel}
-              <select aria-label={copy.trainingProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); setComputeId(onlyAccount(event.target.value)); setBaseModel(''); setModelSelection('') }}>
+              <select aria-label={copy.trainingProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); pickProvider('training', event.target.value); setBaseModel(''); setModelSelection('') }}>
                 <option value="">{copy.chooseTrainingProvider}</option>
                 {trainingOptions.map(item => <option key={item.kind} value={item.kind} disabled={item.blocked !== null}>{optionLabel(item)}</option>)}
               </select>
-              {!trainingProviders.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTrainingKey}</span>}
             </label>
             <label className="text-sm">{copy.trainingAccount}
-              <select aria-label={copy.trainingAccount} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeId} disabled={!computeProviderKind} onChange={event => { setComputeId(event.target.value); setBaseModel(''); setModelSelection(''); setBudgetAuthorized(false) }}>
+              <select aria-label={copy.trainingAccount} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={inlineKey?.target === 'training' ? ADD_KEY_OPTION : computeId} disabled={!computeProviderKind} onChange={event => { if (event.target.value === ADD_KEY_OPTION) { openInlineKey('training', computeProviderKind); return } openInlineKey('training', ''); setComputeId(event.target.value); setBaseModel(''); setModelSelection(''); setBudgetAuthorized(false) }}>
                 <option value="">{computeProviderKind ? copy.chooseTrainingAccount : copy.chooseProviderFirst}</option>
                 {selectedComputeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+                {computeProviderKind && canManage && <option value={ADD_KEY_OPTION}>{copy.addKeyOption}</option>}
               </select>
-              {computeProviderKind && !selectedComputeCredentials.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTrainingFirst}</span>}
+              {computeProviderKind && !selectedComputeCredentials.length && inlineKey?.target !== 'training' && <span className="mt-1 block text-xs text-amber-200">{copy.connectTrainingFirst}</span>}
+              {inlineKeyForm('training')}
             </label>
             <label className="text-sm">{copy.baseModel}
-              <select aria-label={copy.baseModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind || !computeId} onChange={event => { setBudgetAuthorized(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
-                <option value="">{modelsLoading ? copy.loadingModels : !computeProviderKind ? copy.chooseProviderFirst : !computeId ? copy.chooseAccountFirst : copy.choose}</option>
+              <select aria-label={copy.baseModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind || (!computeId && !PUBLIC_MODEL_DIRECTORY.has(computeProviderKind))} onChange={event => { setBudgetAuthorized(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
+                <option value="">{modelsLoading ? copy.loadingModels : !computeProviderKind ? copy.chooseProviderFirst : !computeId && !PUBLIC_MODEL_DIRECTORY.has(computeProviderKind) ? copy.chooseAccountFirst : copy.choose}</option>
                 {modelSuggestions.map(model => <option key={model.id} value={model.id}>{model.label}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>

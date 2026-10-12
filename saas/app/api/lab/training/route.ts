@@ -67,7 +67,7 @@ async function postHandler(req: NextRequest) {
   if (!baseModel || baseModel.length > 200 || (source === 'teacher' && (!teacherModel || teacherModel.length > 200))) return fail('lab_training_model_invalid')
   const teacherIdForRun = source === 'teacher' ? teacherCredentialId : computeCredentialId
   if (![organizationId, experimentId, teacherIdForRun, computeCredentialId].every(id => UUID_RE.test(id))) return fail('lab_training_request_invalid')
-  if (!Number.isFinite(approvedBudgetUsd) || !Number.isFinite(maxHourlyUsd) || !(approvedBudgetUsd > 0 && approvedBudgetUsd <= 1000) || !(maxHourlyUsd > 0 && maxHourlyUsd <= 1)) return fail('lab_training_budget_invalid')
+  if (!Number.isFinite(approvedBudgetUsd) || !Number.isFinite(maxHourlyUsd) || !(approvedBudgetUsd > 0 && approvedBudgetUsd <= 1000) || !(maxHourlyUsd > 0 && maxHourlyUsd <= 1000)) return fail('lab_training_budget_invalid')
   if (baseModelRevision && !/^[a-f0-9]{40}$/.test(baseModelRevision)) return fail('lab_base_model_revision_invalid')
 
   // Validate everything that needs no spend BEFORE the run exists.

@@ -45,6 +45,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [modelsLoading, setModelsLoading] = useState(false)
   const [teacherModels, setTeacherModels] = useState<string[]>([])
   const [teacherModelsLoading, setTeacherModelsLoading] = useState(false)
+  const [teacherModelsError, setTeacherModelsError] = useState(false)
   const [prompts, setPrompts] = useState('')
   const [source, setSource] = useState<'examples' | 'teacher'>('examples')
   const [examples, setExamples] = useState('')
@@ -114,15 +115,15 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   useEffect(() => { void load() }, [load])
   useEffect(() => {
     let cancelled = false
-    if (!teacherProviderKind || !teacherId) { setTeacherModels([]); return }
-    setTeacherModelsLoading(true)
-    void fetch(`/api/lab/teacher-models?provider=${encodeURIComponent(teacherProviderKind)}`, { credentials: 'include', cache: 'no-store' })
+    if (!teacherProviderKind || !teacherId || !organizationId) { setTeacherModels([]); setTeacherModelsError(false); return }
+    setTeacherModels([]); setTeacherModelsError(false); setTeacherModelsLoading(true)
+    void fetch(`/api/lab/teacher-models?provider=${encodeURIComponent(teacherProviderKind)}&organizationId=${encodeURIComponent(organizationId)}&credentialId=${encodeURIComponent(teacherId)}`, { credentials: 'include', cache: 'no-store' })
       .then(response => response.ok ? response.json() : null)
-      .then(body => { if (!cancelled) setTeacherModels(Array.isArray(body?.models) ? body.models : []) })
-      .catch(() => { if (!cancelled) setTeacherModels([]) })
+      .then(body => { if (!cancelled) { setTeacherModels(body?.ok && Array.isArray(body.models) ? body.models : []); setTeacherModelsError(!body?.ok || !Array.isArray(body?.models) || body.models.length === 0) } })
+      .catch(() => { if (!cancelled) { setTeacherModels([]); setTeacherModelsError(true) } })
       .finally(() => { if (!cancelled) setTeacherModelsLoading(false) })
     return () => { cancelled = true }
-  }, [teacherProviderKind, teacherId])
+  }, [organizationId, teacherProviderKind, teacherId])
   useEffect(() => {
     let cancelled = false
     if (!computeProviderKind) { setModelSuggestions([]); return }
@@ -288,6 +289,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 {teacherModels.map(model => <option key={model} value={model}>{model}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>
+              {teacherModelsError && <span className="mt-1 block text-xs text-amber-200">{copy.modelDirectoryHelp}</span>}
               {teacherModelChoice === 'custom' && <input aria-label={copy.teacherModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.modelPh} value={teacherModel} onChange={event => { setTeacherModel(event.target.value); setBudgetAuthorized(false) }} />}
             </label>
             </>}

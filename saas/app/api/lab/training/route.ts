@@ -6,6 +6,7 @@ import { observeLabRequest } from '@/lib/lab/observability'
 //        baseModel, baseModelRevision?, source:'examples'|'teacher', examples?, prompts?, approvedBudgetUsd, maxHourlyUsd,
 //        teacherBudgetUsd?  (teacher prices come from the verified rate card in the database, never from the request) }
 // POST { action:'refresh', organizationId, runId }                                 (owner/admin)
+// POST { action:'cancel',  organizationId, runId }   Together / Fireworks jobs only   (owner/admin)
 //
 // Spend rules: every paid job (Hugging Face, Together, Fireworks) is RESERVED in the database (cost, callback token, job name) before it is
 // submitted (lib/ai/cos/labCustomerTraining.ts runReservedJob). Teacher API calls are reserved in the database first and
@@ -16,7 +17,7 @@ import { customerSession, rpcErrorCode, UUID_RE } from '@/lib/lab/customerSessio
 import { openCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
 import { unsupportedSelection } from '@/lib/ai/cos/labCustomerProviderCatalog'
 import {
-  buildChatJsonl, findFireworksJob, isProviderTrainingKind, normalizeRateCards, prepareFireworks, prepareTogether,
+  buildChatJsonl, cancelProviderJob, findFireworksJob, findTogetherJob, isProviderTrainingKind, normalizeRateCards, prepareFireworks, prepareTogether,
   readProviderJob, submitFireworks, submitTogether, type ProviderTrainingKind,
 } from '@/lib/ai/cos/labCustomerProviderTraining'
 import {
@@ -52,6 +53,7 @@ async function postHandler(req: NextRequest) {
   if (!session) return fail('unauthorized', 401)
   const body = await req.json().catch(() => null)
   if (body?.action === 'refresh') return refresh(session, body)
+  if (body?.action === 'cancel') return cancel(session, body)
   if (body?.action !== 'start') return fail('lab_action_invalid')
 
   const organizationId = String(body.organizationId ?? '')
@@ -211,7 +213,7 @@ async function startProviderJob(input: {
     maxCostUsd = prepared.maxCostUsd
     patch = { providerFileRef: prepared.fileId }
     submit = () => submitTogether({ key, runId, baseModel, fileId: prepared.fileId, fetcher: fetch })
-    find = async () => { throw new Error('lab_provider_job_state_unknown') }
+    find = () => findTogetherJob({ key, runId, fileId: prepared.fileId, fetcher: fetch })
   } else {
     const cards = await session.supabase.rpc('itmounts_lab_customer_training_rate_cards', { p_organization_id: organizationId })
     if (cards.error) throw new Error(rpcErrorCode(cards.error))
@@ -232,6 +234,9 @@ async function startProviderJob(input: {
     const reason = errCode(submitError)
     if (reason !== 'lab_provider_job_rejected') {
       try { job = await find() } catch { return fail('lab_provider_job_state_unknown', 202, { runId }) }
+      // Together's job list may lag a creation it is still processing: keep the reservation; refresh reconciles it.
+      // Fireworks looks up its deterministic job id, so "not found" proves no job exists.
+      if (!job && kind === 'together') return fail('lab_provider_job_state_unknown', 202, { runId })
     }
     if (!job) {
       await session.supabase.rpc('itmounts_lab_customer_release_reservation', { p_organization_id: organizationId, p_run_id: runId, p_reason: reason })
@@ -254,11 +259,13 @@ async function refreshProviderJob(session: Session, organizationId: string, runI
   }).then(({ error: e }) => { if (e) throw new Error(rpcErrorCode(e)) })
   const key = openCustomerCredential({ organizationId, credentialId: opened.compute.id, sealed: opened.compute })
   let jobId: string | null = opened.providerJobId
-  if (!jobId && opened.jobSubmissionState === 'reserved' && kind === 'fireworks' && opened.providerAccount) {
-    const found = await findFireworksJob({ key, runId, account: opened.providerAccount, fetcher: fetch })
-    if (!found) return NextResponse.json({ ok: true, stage: opened.stage, message: 'No job found yet under its reserved name.' }, { headers: noStore })
+  if (!jobId && opened.jobSubmissionState === 'reserved') {
+    // A creation whose response was lost: look the job up by what this run recorded before spending.
+    const found = await findReservedProviderJob(key, runId, opened)
+    if (found === 'unknown') return NextResponse.json({ ok: true, stage: opened.stage }, { headers: noStore })
+    if (!found) return NextResponse.json({ ok: true, stage: opened.stage, message: 'No provider job found for this run yet.' }, { headers: noStore })
     jobId = found.jobId
-    await record('training', 45, 'Found the submitted job on Fireworks AI.', { providerJobId: found.jobId, jobSubmissionState: 'submitted' })
+    await record('training', 45, 'Found the submitted training job.', { providerJobId: found.jobId, jobSubmissionState: 'submitted' })
   }
   if (!jobId) return NextResponse.json({ ok: true, stage: opened.stage }, { headers: noStore })
   const job = await readProviderJob({ kind, key, jobId, fetcher: fetch })
@@ -276,6 +283,53 @@ async function refreshProviderJob(session: Session, organizationId: string, runI
     await record('training', job.progress, `Provider status: ${job.detail}.`, cost)
   }
   return NextResponse.json({ ok: true, stage: 'training', message: `Provider status: ${job.detail}.` }, { headers: noStore })
+}
+
+async function findReservedProviderJob(key: string, runId: string, opened: any): Promise<{ jobId: string; jobUrl: string | null } | null | 'unknown'> {
+  if (opened.computeProviderKind === 'fireworks' && opened.providerAccount) return findFireworksJob({ key, runId, account: opened.providerAccount, fetcher: fetch })
+  if (opened.computeProviderKind === 'together' && opened.providerFileRef) return findTogetherJob({ key, runId, fileId: opened.providerFileRef, fetcher: fetch })
+  return 'unknown'
+}
+
+// Stops a Together / Fireworks job at the provider and closes the run. Idempotent: a terminal run just reports its stage.
+// A reservation whose job provably does not exist is released; one that cannot be resolved stays reserved.
+async function cancel(session: Session, body: any) {
+  const organizationId = String(body?.organizationId ?? '')
+  const runId = String(body?.runId ?? '')
+  if (!UUID_RE.test(organizationId) || !UUID_RE.test(runId)) return fail('lab_training_request_invalid')
+  const { data: opened, error } = await session.supabase.rpc('itmounts_lab_customer_open_run_compute', { p_organization_id: organizationId, p_run_id: runId })
+  if (error || !opened) return fail(rpcErrorCode(error), 403)
+  if (['completed', 'failed', 'cancelled'].includes(opened.stage)) return NextResponse.json({ ok: true, stage: opened.stage }, { headers: noStore })
+  if (!isProviderTrainingKind(String(opened.computeProviderKind ?? ''))) return fail('lab_cancel_unsupported')
+  const kind = opened.computeProviderKind as ProviderTrainingKind
+  const record = (stage: string, message: string, patch: Record<string, unknown>) => session.supabase.rpc('itmounts_lab_customer_record_stage', {
+    p_organization_id: organizationId, p_run_id: runId, p_stage: stage, p_progress: null, p_message: message,
+    p_patch: patch, p_add_committed_cost_usd: 0, p_next_stage_token_hash: null,
+  }).then(({ error: e }) => { if (e) throw new Error(rpcErrorCode(e)) })
+  try {
+    const key = openCustomerCredential({ organizationId, credentialId: opened.compute.id, sealed: opened.compute })
+    let jobId: string | null = opened.providerJobId
+    if (!jobId && opened.jobSubmissionState === 'reserved') {
+      const found = await findReservedProviderJob(key, runId, opened)
+      if (found === 'unknown') return fail('lab_provider_cancel_pending', 409)
+      if (!found) {
+        const released = await session.supabase.rpc('itmounts_lab_customer_release_reservation', { p_organization_id: organizationId, p_run_id: runId, p_reason: 'lab_provider_job_cancelled' })
+        if (released.error) throw new Error(rpcErrorCode(released.error))
+        return NextResponse.json({ ok: true, stage: 'failed', message: 'No provider job existed; the reservation was released.' }, { headers: noStore })
+      }
+      jobId = found.jobId
+    }
+    if (!jobId) {
+      await record('cancelled', 'Cancelled before any provider job was created.', { failureCode: 'lab_provider_job_cancelled' })
+      return NextResponse.json({ ok: true, stage: 'cancelled' }, { headers: noStore })
+    }
+    const outcome = await cancelProviderJob({ kind, key, jobId, fetcher: fetch })
+    if (!outcome.stopped) return fail('lab_provider_cancel_pending', 409, { problems: [`Provider status: ${outcome.detail}.`] })
+    await record('cancelled', `Cancelled on the provider (${outcome.detail}).`, { providerJobId: jobId, failureCode: 'lab_provider_job_cancelled' })
+    return NextResponse.json({ ok: true, stage: 'cancelled' }, { headers: noStore })
+  } catch (caught) {
+    return fail(errCode(caught), 502)
+  }
 }
 
 async function refresh(session: Session, body: any) {

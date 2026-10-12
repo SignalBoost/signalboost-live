@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
-  buildChatJsonl, datasetTokenBound, findFireworksJob, fireworksIds, fireworksRateCard, interpretFireworksJob, interpretTogetherJob,
+  buildChatJsonl, cancelProviderJob, datasetTokenBound, findFireworksJob, findTogetherJob, fireworksIds, fireworksRateCard, interpretFireworksJob, interpretTogetherJob,
   listFireworksBaseModels, listTogetherBaseModels, normalizeRateCards, prepareFireworks, prepareTogether, readProviderJob,
   resolveFireworksAccount, submitFireworks, submitTogether, type TrainingRateCard,
 } from '../lib/ai/cos/labCustomerProviderTraining.ts'
@@ -169,6 +169,39 @@ test('provider job states map to running / completed / failed with the tuned mod
   assert.equal((await readProviderJob({ kind: 'together', key: 'k', jobId: 'ft-1', fetcher: together.fetcher })).detail, 'queued')
 })
 
+test('an unconfirmed Together creation is found again by its uploaded file and run suffix', async () => {
+  const list = fakeFetch([[/GET https:\/\/api\.together\.xyz\/v1\/fine-tunes$/, () => [200, { data: [
+    { id: 'ft-other', training_file: 'file-9', suffix: 'lab-11111111' },
+    { id: 'ft-mine', training_file: 'file-1', suffix: 'lab-11111111' },
+  ] }]]])
+  assert.deepEqual(await findTogetherJob({ key: 'k', runId: RUN, fileId: 'file-1', fetcher: list.fetcher }), { jobId: 'ft-mine', jobUrl: null })
+  const none = fakeFetch([[/fine-tunes$/, () => [200, { data: [] }]]])
+  assert.equal(await findTogetherJob({ key: 'k', runId: RUN, fileId: 'file-1', fetcher: none.fetcher }), null)
+  const down = fakeFetch([[/fine-tunes$/, () => [503, {}]]])
+  await assert.rejects(findTogetherJob({ key: 'k', runId: RUN, fileId: 'file-1', fetcher: down.fetcher }), /together_find_unavailable/)
+})
+
+test('cancel stops the job at the provider and reports stopped only on provider evidence', async () => {
+  const together = fakeFetch([
+    [/POST https:\/\/api\.together\.xyz\/v1\/fine-tunes\/ft-1\/cancel$/, () => [200, { id: 'ft-1', status: 'cancel_requested' }]],
+    [/GET https:\/\/api\.together\.xyz\/v1\/fine-tunes\/ft-1$/, () => [200, { status: 'cancelled' }]],
+  ])
+  assert.deepEqual(await cancelProviderJob({ kind: 'together', key: 'k', jobId: 'ft-1', fetcher: together.fetcher }), { stopped: true, detail: 'cancelled' })
+  const stillRunning = fakeFetch([[/cancel$/, () => [200, { status: 'running' }]], [/ft-1$/, () => [200, { status: 'running' }]]])
+  assert.equal((await cancelProviderJob({ kind: 'together', key: 'k', jobId: 'ft-1', fetcher: stillRunning.fetcher })).stopped, false)
+  const job = 'accounts/acme/supervisedFineTuningJobs/lab-1'
+  const fireworks = fakeFetch([
+    [/DELETE https:\/\/api\.fireworks\.ai\/v1\/accounts\/acme\/supervisedFineTuningJobs\/lab-1$/, () => [200, {}]],
+    [/GET https:\/\/api\.fireworks\.ai\/v1\/accounts\/acme\/supervisedFineTuningJobs\/lab-1$/, () => [404, {}]],
+  ])
+  assert.deepEqual(await cancelProviderJob({ kind: 'fireworks', key: 'k', jobId: job, fetcher: fireworks.fetcher }), { stopped: true, detail: 'deleted' })
+  assert.deepEqual(fireworks.calls.map(call => call.method), ['DELETE', 'GET'])
+  const fwRunning = fakeFetch([[/DELETE/, () => [200, {}]], [/GET/, () => [200, { state: 'JOB_STATE_RUNNING' }]]])
+  assert.equal((await cancelProviderJob({ kind: 'fireworks', key: 'k', jobId: job, fetcher: fwRunning.fetcher })).stopped, false)
+  const refused = fakeFetch([[/DELETE/, () => [500, {}]]])
+  await assert.rejects(cancelProviderJob({ kind: 'fireworks', key: 'k', jobId: job, fetcher: refused.fetcher }), /lab_provider_cancel_unavailable/)
+})
+
 const route = readFileSync(new URL('../app/api/lab/training/route.ts', import.meta.url), 'utf8')
 const sql = readFileSync(new URL('../supabase/migrations/20261012050000_lab_customer_provider_training.sql', import.meta.url), 'utf8')
 const panel = readFileSync(new URL('../app/dashboard/cos-university-telemetry/LabCustomerTrainingPanel.tsx', import.meta.url), 'utf8')
@@ -197,4 +230,14 @@ test('dropdowns offer only providers with a saved key; non-training providers ar
   assert.match(panel, /<option key=\{model\.id\} value=\{model\.id\} disabled>/)
   assert.match(panel, /credentialId=\$\{encodeURIComponent\(computeId\)\}/)
   assert.doesNotMatch(panel, /hfOnly/)
+})
+
+test('route exposes provider cancel and reconciles unconfirmed Together jobs instead of leaving them untracked', () => {
+  assert.match(route, /if \(body\?\.action === 'cancel'\) return cancel\(session, body\)/)
+  assert.match(route, /find = \(\) => findTogetherJob\(\{ key, runId, fileId: prepared\.fileId, fetcher: fetch \}\)/)
+  assert.match(route, /findTogetherJob\(\{ key, runId, fileId: opened\.providerFileRef, fetcher: fetch \}\)/)
+  assert.match(route, /if \(!outcome\.stopped\) return fail\('lab_provider_cancel_pending', 409/)
+  assert.match(sql, /'providerFileRef', r\.provider_file_ref/)
+  assert.match(sql, /'training','completed','failed','cancelled'\) then/)
+  assert.match(panel, /onClick=\{\(\) => cancelRun\(run\.runId\)\}>\{copy\.cancelTraining\}/)
 })

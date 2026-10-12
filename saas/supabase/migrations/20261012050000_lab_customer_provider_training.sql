@@ -146,9 +146,11 @@ begin
   select * into r from lab.customer_training_runs where id = p_run_id and organization_id = p_org for update;
   if not found then raise exception 'lab_customer_run_not_found'; end if;
   if r.stage in ('completed','failed','cancelled') then raise exception 'lab_customer_run_terminal'; end if;
-  if p_stage not in ('generating_teacher_data','preparing_dataset','training','completed','failed') then
+  -- 'cancelled' is recorded only after the provider itself confirmed the job stopped (customer cancel).
+  if p_stage not in ('generating_teacher_data','preparing_dataset','training','completed','failed','cancelled') then
     raise exception 'lab_customer_stage_invalid';
   end if;
+  if p_stage = 'cancelled' and coalesce(p_add_cost, 0) > 0 then raise exception 'lab_customer_stage_invalid'; end if;
   if r.spend_blocked_at is not null and coalesce(p_add_cost, 0) > 0 then raise exception 'lab_customer_spend_blocked'; end if;
   if r.committed_max_cost_usd + coalesce(p_add_cost, 0) > r.approved_budget_usd then
     raise exception 'lab_customer_budget_exceeded';
@@ -213,7 +215,7 @@ begin
   return jsonb_build_object('runId', r.id, 'organizationId', r.organization_id, 'stage', r.stage,
     'progressPercent', r.progress_percent, 'computeProviderKind', r.compute_provider_kind,
     'hfNamespace', r.hf_namespace, 'hfJobId', r.hf_job_id, 'hfPendingJobName', r.hf_pending_job_name,
-    'providerAccount', r.provider_account, 'providerJobId', r.provider_job_id,
+    'providerAccount', r.provider_account, 'providerFileRef', r.provider_file_ref, 'providerJobId', r.provider_job_id,
     'jobSubmissionState', r.job_submission_state,
     'compute', jsonb_build_object('id', c.id, 'ciphertext', c.ciphertext, 'iv', c.iv, 'tag', c.tag));
 end $$;

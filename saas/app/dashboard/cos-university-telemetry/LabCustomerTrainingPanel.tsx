@@ -231,6 +231,12 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     catch (error: any) { if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.statusFailed, { code: explain(error.message) }) }) }
   }
 
+  async function cancelRun(runId: string) {
+    const requestedOrg = organizationId
+    try { await call('/api/lab/training', 'POST', { action: 'cancel', organizationId, runId }); if (activeOrgRef.current === requestedOrg) await load() }
+    catch (error: any) { if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'alert', text: fmt(copy.cancelFailed, { code: explain(error.message) }) }) }
+  }
+
   async function download(runId: string) {
     const requestedOrg = organizationId
     try {
@@ -412,6 +418,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <div className="mt-2 flex flex-wrap gap-3">
                 {run.hfJobUrl && <a className="underline" href={run.hfJobUrl} target="_blank" rel="noreferrer">{copy.openJob}</a>}
                 {canManage && !['completed', 'failed', 'cancelled'].includes(run.stage) && <button className="underline" disabled={busy} onClick={() => refreshRun(run.runId)}>{copy.checkStatus}</button>}
+                {canManage && POLLED_TRAINING.has(run.computeProviderKind ?? '') && !['completed', 'failed', 'cancelled'].includes(run.stage) && <button className="underline" disabled={busy} onClick={() => cancelRun(run.runId)}>{copy.cancelTraining}</button>}
                 {run.stage === 'completed' && run.artifactRepo && <button className="underline" onClick={() => download(run.runId)}>{copy.downloadModel}</button>}
               </div>
               {files[run.runId] && (

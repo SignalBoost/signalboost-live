@@ -114,6 +114,16 @@ export async function submitTogether(input: { key: string; runId: string; baseMo
   return { jobId, jobUrl: null }
 }
 
+/** Finds the job created from this run's uploaded file after an unconfirmed submit. null = provably absent. */
+export async function findTogetherJob(input: { key: string; runId: string; fileId: string; fetcher: Fetcher }): Promise<{ jobId: string; jobUrl: string | null } | null> {
+  const { status, body } = await json(input.fetcher, `${TOGETHER}/fine-tunes`, { headers: auth(input.key) }, 'together_find')
+  if (status !== 200 || !Array.isArray(body?.data)) fail('together_find_unavailable')
+  const suffix = `lab-${input.runId.slice(0, 8)}`
+  const job = body.data.find((j: any) => String(j?.training_file ?? '') === input.fileId &&
+    (!j?.suffix || String(j.suffix) === suffix) && /^[\w-]{1,120}$/.test(String(j?.id ?? '')))
+  return job ? { jobId: String(job.id), jobUrl: null } : null
+}
+
 // --- Fireworks AI ------------------------------------------------------------------------------------------------
 /** The single account this API key belongs to ("accounts/<id>"). Refuses to guess when several are visible. */
 export async function resolveFireworksAccount(key: string, fetcher: Fetcher): Promise<string> {
@@ -258,6 +268,36 @@ export function interpretFireworksJob(body: any): ProviderJobState {
   if (FIREWORKS_FAILED.has(state)) return { state: 'failed', progress: null, tunedModelId: null, reportedCostUsd: cost, detail: String(body?.status?.message ?? state).slice(0, 160) }
   const percent = Number(body?.jobProgress?.percent)
   return { state: 'running', progress: Number.isFinite(percent) ? Math.max(0, Math.min(99, Math.round(percent))) : null, tunedModelId: null, reportedCostUsd: cost, detail: state.replace(/^JOB_STATE_/, '').toLowerCase() || 'unknown' }
+}
+
+// --- Cancellation ----------------------------------------------------------------------------------------------------
+export type CancelOutcome = Readonly<{ stopped: boolean; detail: string }>
+/**
+ * Asks the provider to stop the job, then reads it back: "stopped" is reported only when the provider itself shows a
+ * terminal state or no longer has the job. Safe to repeat.
+ *   Together  -> POST /v1/fine-tunes/{id}/cancel (documented cancel).
+ *   Fireworks -> DELETE the supervised fine-tuning job (its API documents delete, no separate cancel), then GET it.
+ */
+export async function cancelProviderJob(input: { kind: ProviderTrainingKind; key: string; jobId: string; fetcher: Fetcher }): Promise<CancelOutcome> {
+  if (input.kind === 'together') {
+    if (!/^[\w-]{1,120}$/.test(input.jobId)) fail('lab_provider_job_id_invalid')
+    const cancelled = await json(input.fetcher, `${TOGETHER}/fine-tunes/${input.jobId}/cancel`, { method: 'POST', headers: auth(input.key) }, 'together_cancel')
+    if (cancelled.status === 404) return { stopped: true, detail: 'not_found' }
+    if (cancelled.status !== 200 && cancelled.status !== 400) fail('lab_provider_cancel_unavailable')
+    const job = await readProviderJob(input)
+    const status = String(cancelled.body?.status ?? '')
+    if (job.state !== 'running' || status === 'cancelled') return { stopped: true, detail: job.state === 'running' ? 'cancelled' : job.detail }
+    return { stopped: false, detail: job.detail }
+  }
+  if (!/^accounts\/[a-z0-9-]+\/supervisedFineTuningJobs\/[A-Za-z0-9-]+$/.test(input.jobId)) fail('lab_provider_job_id_invalid')
+  const deleted = await json(input.fetcher, `${FIREWORKS}/${input.jobId}`, { method: 'DELETE', headers: auth(input.key) }, 'fireworks_cancel')
+  if (deleted.status !== 200 && deleted.status !== 404) fail('lab_provider_cancel_unavailable')
+  const after = await json(input.fetcher, `${FIREWORKS}/${input.jobId}`, { headers: auth(input.key) }, 'fireworks_job')
+  if (after.status === 404) return { stopped: true, detail: 'deleted' }
+  if (after.status !== 200) fail('lab_provider_status_unavailable')
+  const state = String(after.body?.state ?? '')
+  const stopped = FIREWORKS_FAILED.has(state) || state === 'JOB_STATE_COMPLETED' || state === 'JOB_STATE_DELETING' || state === 'JOB_STATE_DELETING_CLEANING_UP'
+  return { stopped, detail: state.replace(/^JOB_STATE_/, '').toLowerCase() || 'unknown' }
 }
 
 export async function readProviderJob(input: { kind: ProviderTrainingKind; key: string; jobId: string; fetcher: Fetcher }): Promise<ProviderJobState> {

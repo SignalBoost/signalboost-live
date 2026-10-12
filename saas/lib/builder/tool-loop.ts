@@ -785,7 +785,7 @@ export class BuilderToolLoop {
           error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })
         continue
       }
-      if (mutation && initialPaths.has(toolPath(action.input)) && !extendingProject) repairObjective = true
+      if (mutation && initialPaths.has(toolPath(action.input)) && !extendingProject && !documentationEdit) repairObjective = true
       // An alternating list/read loop observes unchanged workspace state without progress.
       if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint)) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })

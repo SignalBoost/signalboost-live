@@ -54,7 +54,6 @@ export default function UniversityPricingPage() {
       </section>
       <div className="mt-10 flex flex-wrap gap-4">
         <Link className="rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950" href="/university">Explore University</Link>
-        <Link className="rounded-full border border-white/30 px-6 py-3 font-semibold" href="/pricing">Other iTMounts products</Link>
       </div>
     </main>
   )

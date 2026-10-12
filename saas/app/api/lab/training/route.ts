@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
 
   const organizationId = String(body.organizationId ?? '')
   const experimentId = String(body.experimentId ?? '')
-  const source = body.source === 'teacher' ? 'teacher' : 'examples'
+  if (body.source !== 'teacher' && body.source !== 'examples') return fail('lab_training_source_invalid')
+  const source: 'teacher' | 'examples' = body.source
   const teacherCredentialId = String(body.teacherCredentialId ?? '')
   const computeCredentialId = String(body.computeCredentialId ?? '')
   const teacherModel = source === 'teacher' ? String(body.teacherModel ?? '').trim() : 'customer-examples'
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
   const teacherBudgetUsd = Number(body.teacherBudgetUsd)
   // Teacher prices are NOT accepted from the request: they come from the platform-verified rate card in the database.
   if (source === 'teacher') {
+    if (prompts.length < 20 || prompts.length > 128) return fail('lab_prompts_count_invalid')
     if (!(teacherBudgetUsd > 0 && teacherBudgetUsd < approvedBudgetUsd)) return fail('lab_teacher_budget_invalid')
   }
 

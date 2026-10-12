@@ -1,7 +1,9 @@
 import { observeLabRequest } from '@/lib/lab/observability'
 // saas/app/api/lab/providers/route.ts
 // Customer LAB provider keys. GET  ?organizationId= -> catalog + saved keys (names only, never values)
-//                              POST { organizationId, providerKind, label, secret, endpoint? } -> save (owner/admin)
+//                              POST { organizationId, providerKind, secret, label?, endpoint? } -> save (owner/admin)
+//                                The pasted key is cleaned, checked live with the provider (a key the provider rejects is
+//                                never stored), and named "<Provider> ··· last4" when no label is given.
 //                              DELETE { organizationId, credentialId } -> revoke (owner/admin)
 // Keys are encrypted here before the database sees them, bound to this organization and this key's id.
 import { NextRequest, NextResponse } from 'next/server'
@@ -9,7 +11,8 @@ import { randomUUID } from 'node:crypto'
 import { assertPublicHttpUrl } from '@/lib/security/publicFetchGuard'
 import { customerSession, rpcErrorCode, UUID_RE } from '@/lib/lab/customerSession'
 import { LAB_CREDENTIAL_KINDS, sealCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
-import { LAB_PROVIDER_CATALOG } from '@/lib/ai/cos/labCustomerProviderCatalog'
+import { LAB_PROVIDER_CATALOG, customModelsUrl, providerEntry } from '@/lib/ai/cos/labCustomerProviderCatalog'
+import { autoKeyLabel, checkProviderKey, cleanPastedKey } from '@/lib/lab/labKeyEntry'
 import { LAB_PROVIDER_DISCOVERY } from '@/lib/lab/providerDiscovery'
 
 export const runtime = 'nodejs'
@@ -32,7 +35,9 @@ async function postHandler(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const organizationId = String(body?.organizationId ?? '')
   const providerKind = String(body?.providerKind ?? '')
-  const label = String(body?.label ?? '').trim().slice(0, 80)
+  const secret = cleanPastedKey(body?.secret)
+  const entry = providerEntry(providerKind)
+  const label = (String(body?.label ?? '').trim() || (entry ? autoKeyLabel(entry.name, secret) : '')).slice(0, 80)
   const endpoint = providerKind === 'openai_compatible' ? String(body?.endpoint ?? '').trim() : ''
   if (!UUID_RE.test(organizationId) || !(LAB_CREDENTIAL_KINDS as readonly string[]).includes(providerKind) || !label) {
     return NextResponse.json({ ok: false, error: 'lab_credential_request_invalid' }, { status: 400, headers: noStore })
@@ -44,10 +49,16 @@ async function postHandler(req: NextRequest) {
     try { await assertPublicHttpUrl(endpoint) }
     catch { return NextResponse.json({ ok: false, error: 'lab_customer_endpoint_required' }, { status: 400, headers: noStore }) }
   }
+  if (!secret) return NextResponse.json({ ok: false, error: 'lab_credential_value_invalid' }, { status: 400, headers: noStore })
+  // Membership first, so this route is not a key-checking service for outsiders. The store RPC still enforces owner/admin.
+  const member = await session.supabase.rpc('itmounts_lab_customer_list_credentials', { p_organization_id: organizationId })
+  if (member.error) return NextResponse.json({ ok: false, error: rpcErrorCode(member.error) }, { status: 403, headers: noStore })
+  const check = await checkProviderKey({ kind: providerKind, key: secret, modelsUrl: customModelsUrl(endpoint), fetcher: fetch })
+  if (check === 'rejected') return NextResponse.json({ ok: false, error: 'lab_credential_rejected' }, { status: 400, headers: noStore })
   const credentialId = randomUUID()
   let sealed
   try {
-    sealed = sealCustomerCredential({ organizationId, credentialId, secret: String(body?.secret ?? '') })
+    sealed = sealCustomerCredential({ organizationId, credentialId, secret })
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'lab_credential_value_invalid' }, { status: 400, headers: noStore })
   }
@@ -56,7 +67,7 @@ async function postHandler(req: NextRequest) {
     p_endpoint: endpoint || null, p_ciphertext: sealed.ciphertext, p_iv: sealed.iv, p_tag: sealed.tag,
   })
   if (error) return NextResponse.json({ ok: false, error: rpcErrorCode(error) }, { status: 403, headers: noStore })
-  return NextResponse.json({ ok: true, credentialId }, { headers: noStore })
+  return NextResponse.json({ ok: true, credentialId, check }, { headers: noStore })
 }
 
 async function deleteHandler(req: NextRequest) {

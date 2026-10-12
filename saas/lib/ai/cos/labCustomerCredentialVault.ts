@@ -24,7 +24,8 @@ function contextFor(organizationId: string, credentialId: string): string {
 
 export function sealCustomerCredential(input: { organizationId: string; credentialId: string; secret: string }): SealedCredential {
   const secret = String(input.secret ?? '').trim()
-  if (secret.length < 20 || secret.length > 4096 || /\s/.test(secret)) throw new Error('lab_credential_value_invalid')
+  // Any non-empty key without whitespace: real keys are checked with their provider before storage, not by length.
+  if (!secret || secret.length > 4096 || /\s/.test(secret)) throw new Error('lab_credential_value_invalid')
   const sealed = vaultEncryptScoped(secret, scopeFor(input.organizationId), contextFor(input.organizationId, input.credentialId))
   if (!sealed.ok || !sealed.valueEncrypted || !sealed.iv || !sealed.tag) throw new Error('lab_credential_vault_unavailable')
   return Object.freeze({ ciphertext: sealed.valueEncrypted, iv: sealed.iv, tag: sealed.tag })

@@ -6,7 +6,7 @@
 // (single-use stage token); see migration 20261012000000.
 import { vaultDecryptScoped, vaultEncryptScoped } from '../../vault/crypto.ts'
 
-export const LAB_CREDENTIAL_KINDS = ['huggingface', 'openai', 'anthropic', 'gemini', 'openai_compatible'] as const
+export const LAB_CREDENTIAL_KINDS = ['huggingface', 'openai', 'anthropic', 'gemini', 'xai', 'deepseek', 'qwen', 'mistral', 'groq', 'openrouter', 'together', 'fireworks', 'deepinfra', 'openai_compatible'] as const
 export type LabCredentialKind = typeof LAB_CREDENTIAL_KINDS[number]
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

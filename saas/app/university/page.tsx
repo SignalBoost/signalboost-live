@@ -18,7 +18,7 @@ const steps = [
   { title: 'Create your workspace', detail: 'Sign in to iTMounts and create a private LAB workspace for your experiments.' },
   { title: 'Connect your providers', detail: 'Select a supported AI provider and a compute service. Provide your own authorized credentials; no custom adapter code is required for supported integrations.' },
   { title: 'Choose your training data', detail: 'Use permitted examples or approved source material. Review your model and training settings.' },
-  { title: 'Approve your budget', detail: 'See spending limits before requesting a paid job. No GPU rental or provider spending starts simply because you connect an account.' },
+  { title: 'Check both balances and approve your budget', detail: 'Paid operations require sufficient iTMounts platform credits and sufficient funds or quota at your selected AI and GPU providers. Review separate costs before authorization.' },
   { title: 'Monitor and retrieve', detail: 'Track supported jobs and access your completed model artifacts through the LAB.' },
 ]
 const schema = {
@@ -53,7 +53,7 @@ export default function UniversityLanding() {
           <div className="rounded-2xl border border-white/15 bg-white/5 p-6"><h3 className="text-xl font-semibold">iTMounts platform fees</h3><p className="mt-3 text-slate-300">Using paid University services incurs separate iTMounts software charges under the applicable published plan or credit pricing. Do not assume training or distillation is free because you bring your own tools.</p></div>
           <div className="rounded-2xl border border-white/15 bg-white/5 p-6"><h3 className="text-xl font-semibold">Your providers’ charges</h3><p className="mt-3 text-slate-300">AI teacher inference, model distillation inputs, hosted training and rented GPUs may be billed directly by OpenAI, Anthropic, Hugging Face or your chosen compute provider. These charges are separate from iTMounts fees.</p></div>
         </div>
-        <p className="mt-5 text-sm text-slate-300">No paid job should begin without a budget review and explicit authorization. The final iTMounts price for a feature must be shown before its paid use; no subscription price is implied here.</p>
+        <p className="mt-5 text-sm text-slate-300">Important: paid University operations cannot continue if either required balance is exhausted. Without sufficient iTMounts credits, new billable LAB work must be blocked. Without sufficient external AI or GPU provider balance/quota, the affected provider work must stop or fail safely. Replenish the relevant account before starting or resuming paid work. No paid job should begin without a budget review and explicit authorization. Exact iTMounts prices must be shown before paid use; no subscription price is implied here.</p>
         <Link href="/pricing" className="mt-4 inline-block underline text-amber-300">View iTMounts pricing</Link>
       </section>
       <section id="how-it-works" className="py-14">

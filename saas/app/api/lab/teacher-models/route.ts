@@ -7,14 +7,11 @@
 // the service-role-only price sync (at most once an hour across all instances, via a shared lease). Prices therefore
 // load the first time anyone looks, without depending on the scheduled job.
 import { NextRequest, NextResponse } from 'next/server'
-import { randomUUID } from 'node:crypto'
 import { customerSession, UUID_RE } from '@/lib/lab/customerSession'
 import { openCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
 import { LAB_PROVIDER_CATALOG, customModelsUrl } from '@/lib/ai/cos/labCustomerProviderCatalog'
 import { assertPublicHttpUrl } from '@/lib/security/publicFetchGuard'
-import { getAdminSupabase } from '@/utils/supabase/server'
-import { syncOpenRouterTeacherPrices } from '@/lib/lab/openRouterTeacherPrices'
-import { createSupabaseLearningSourceProviderLeasePort } from '@/lib/cos-core/layers/learning/providerLease'
+import { syncOpenRouterPricesWithLease } from '@/lib/lab/openRouterPriceSyncLease'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,19 +35,10 @@ const API_MODELS: Readonly<Record<string, { url: string; auth: 'bearer' | 'anthr
   deepinfra: { url: 'https://api.deepinfra.com/v1/openai/models', auth: 'bearer' },
 }
 
-// OpenRouter prices: one sync per hour across all instances; a failed sync retries after five minutes.
-const PRICE_LEASE = 'lab_openrouter_prices'
+// OpenRouter prices: synced at most once an hour across all instances (shared lease); never blocks the model list.
 async function refreshOpenRouterPrices(payload: unknown): Promise<void> {
-  try {
-    const port = createSupabaseLearningSourceProviderLeasePort()
-    const leaseId = randomUUID()
-    if (!(await port.claim({ providerId: PRICE_LEASE, leaseId, holder: 'lab-teacher-models', ttlSeconds: 30 }))) return
-    const admin = getAdminSupabase()
-    const outcome = await syncOpenRouterTeacherPrices(payload, (fn, args) => admin.rpc(fn, args))
-    await port.release({ providerId: PRICE_LEASE, leaseId, outcome: outcome.ok ? 'ok' : 'error', cooldownSeconds: outcome.ok ? 3600 : 300, error: outcome.ok ? null : outcome.error })
-  } catch {
-    // Prices then come only from what is already stored; the model list itself is unaffected.
-  }
+  try { await syncOpenRouterPricesWithLease(payload, 'lab-teacher-models') }
+  catch { /* prices then come only from what is already stored */ }
 }
 
 const clean = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length < 241 && /^[\w./:-]+$/.test(value)

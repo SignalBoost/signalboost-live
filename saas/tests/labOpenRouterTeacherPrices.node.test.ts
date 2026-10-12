@@ -79,13 +79,17 @@ test('the shared sync hands parsed prices to the service-role function, and refu
   assert.deepEqual(failed, { ok: false, error: 'lab_price_sync_failed', priced: 25 })
 })
 
-test('the OpenRouter teacher model list loads prices itself, once an hour, without blocking the list', () => {
+test('the model list and the hourly job sync OpenRouter prices through one lease, once an hour, without blocking the list', () => {
   const route = readFileSync(new URL('../app/api/lab/teacher-models/route.ts', import.meta.url), 'utf8')
   assert.match(route, /if \(provider === 'openrouter'\) await refreshOpenRouterPrices\(payload\)/)
-  assert.match(route, /PRICE_LEASE = 'lab_openrouter_prices'/)
-  assert.match(route, /cooldownSeconds: outcome\.ok \? 3600 : 300/)
+  assert.match(route, /syncOpenRouterPricesWithLease\(payload, 'lab-teacher-models'\)/)
   // The priced flags are read after the sync, so the first viewer already sees the prices.
   assert.ok(route.indexOf('refreshOpenRouterPrices(payload)') < route.indexOf("rpc('itmounts_lab_customer_priced_teacher_models'"))
   const cron = readFileSync(new URL('../app/api/cron/lab-teacher-prices/route.ts', import.meta.url), 'utf8')
-  assert.match(cron, /syncOpenRouterTeacherPrices\(payload/)
+  // Both callers go through one lease, so the hourly job and the model list can never sync at the same time.
+  assert.match(cron, /syncOpenRouterPricesWithLease\(payload, 'lab-teacher-prices-cron'\)/)
+  const lease = readFileSync(new URL('../lib/lab/openRouterPriceSyncLease.ts', import.meta.url), 'utf8')
+  assert.match(lease, /PRICE_LEASE = 'lab_openrouter_prices'/)
+  assert.match(lease, /PRICE_SYNC_COOLDOWN_SECONDS = Object\.freeze\(\{ ok: 3600, error: 300 \}\)/)
+  assert.match(lease, /if \(!\(await port\.claim\(/)
 })

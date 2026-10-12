@@ -174,11 +174,11 @@ export async function planCustomerJob(input: {
   const config = huggingFaceJobsConfigFromEnv({
     ...input.platformEnv,
     HF_TOKEN: input.customerHfToken,
-    // Only the customer LAB uses its approved hourly cap; internal COS retains independent safety defaults.
-    COS_UNIVERSITY_HF_MAX_HOURLY_COST_USD: String(input.maxHourlyUsd),
     COS_UNIVERSITY_HF_WORKER_URL: platform.workerUrl,
   })
   if (!config) throw new Error('lab_customer_hf_token_invalid')
+  // Override the customer LAB's own cap only; never change internal COS hourly limits.
+  const labConfig = { ...config, maxHourlyCostUsd: input.maxHourlyUsd }
   const callbackUrl = new URL(`${LAB_CUSTOMER_CALLBACK_PREFIX}/${input.stageToken}`, input.origin).toString()
   const operation = String(input.envelope.operation ?? '')
   const spec = buildHuggingFaceJobSpec({
@@ -186,10 +186,10 @@ export async function planCustomerJob(input: {
     callbackUrl,
     idempotencyKey: sha256(`lab-customer:${input.runId}:${operation}`),
     callbackSecret: stageCallbackSecret(input.runId, input.stageToken),
-    config,
+    config: labConfig,
   })
   const hourlyUsd = await input.ports.resolveHourlyUsd(spec.flavor, input.customerHfToken)
-  const hourlyCap = Math.min(config.maxHourlyCostUsd, input.maxHourlyUsd)
+  const hourlyCap = input.maxHourlyUsd
   if (!(hourlyUsd <= hourlyCap)) throw new Error('lab_training_hourly_cost_cap_exceeded')
   const maxCostUsd = Number((hourlyUsd * spec.timeoutSeconds / 3600).toFixed(6))
   if (!(maxCostUsd <= input.remainingBudgetUsd)) throw new Error('lab_training_budget_insufficient')

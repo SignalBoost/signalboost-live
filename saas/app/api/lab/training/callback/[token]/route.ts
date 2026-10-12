@@ -1,3 +1,4 @@
+import { observeLabRequest } from '@/lib/lab/observability'
 // saas/app/api/lab/training/callback/[token]/route.ts
 // Reports from the worker running a customer LAB job on the CUSTOMER's Hugging Face account.
 // The path token is single-use and exists only inside that job; the database stores its hash. The worker signs each
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 const reply = (status: number, body: Record<string, unknown>) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } })
 
-export async function POST(req: NextRequest, context: { params: Promise<{ token: string }> }) {
+async function postHandler(req: NextRequest, context: { params: Promise<{ token: string }> }) {
   const { token } = await context.params
   if (!/^[A-Za-z0-9_-]{40,64}$/.test(token || '')) return reply(404, { ok: false })
   const rawBody = await req.text()
@@ -103,4 +104,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ token:
     await record('preparing_dataset', 'failed', null, `Could not start training: ${code}`, { ...decision.patch, failureCode: code }, 0, null).catch(() => undefined)
     return reply(200, { ok: true, nextStage: 'failed' })
   }
+}
+
+export async function POST(req: NextRequest, context: { params: Promise<{ token: string }> }) {
+  return observeLabRequest('training.callback', () => postHandler(req, context))
 }

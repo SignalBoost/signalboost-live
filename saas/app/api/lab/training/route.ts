@@ -59,6 +59,8 @@ async function postHandler(req: NextRequest) {
   const teacherModel = source === 'teacher' ? String(body.teacherModel ?? '').trim() : 'customer-examples'
   const baseModel = String(body.baseModel ?? '').trim()
   const baseModelRevision = String(body.baseModelRevision ?? '').trim().toLowerCase() || null
+  // Explicit per-run authorization is mandatory independently of any UI checkbox.
+  if (body.approvedBudgetConfirmed !== true) return fail('lab_training_budget_not_authorized', 403)
   const approvedBudgetUsd = Number(body.approvedBudgetUsd)
   const maxHourlyUsd = Number(body.maxHourlyUsd)
   // For examples mode the teacher credential is not used; the HF key stands in so the run row stays well-formed.

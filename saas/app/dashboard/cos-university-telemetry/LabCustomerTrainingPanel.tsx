@@ -316,14 +316,80 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <span className="mt-1 block text-xs text-slate-400">{copy.modelDirectoryHelp}</span>
             </label>
             <label className="text-sm">{copy.budget}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value) }} />
+              <select aria-label={copy.budget} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={['10', '25', '100'].includes(budget) ? budget : budget ? 'custom' : ''} onChange={event => { const amount = event.target.value; setBudgetAuthorized(false); setBudget(amount === 'custom' ? 'other' : amount); setTeacherBudget('') }}>
+                <option value="">{copy.choose}</option>
+                <option value="10">$10</option><option value="25">$25</option><option value="100">$100</option>
+                <option value="custom">{copy.customAmount}</option>
+              </select>
+              {budget !== '' && !['10', '25', '100'].includes(budget) && <input aria-label={copy.customAmount} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget === 'other' ? '' : budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value || 'other'); setTeacherBudget('') }} />}
             </label>
             <label className="text-sm">{copy.hourly}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.05" max="1" step="0.05" value={hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value) }} />
+              <select aria-label={copy.hourly} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={['0.25', '0.5', '1'].includes(hourly) ? hourly : hourly ? 'custom' : ''} onChange={event => { const amount = event.target.value; setBudgetAuthorized(false); setHourly(amount === 'custom' ? 'other' : amount) }}>
+                <option value="">{copy.choose}</option>
+                <option value="0.25">$0.25/h</option><option value="0.5">$0.50/h</option><option value="1">$1.00/h</option>
+                <option value="custom">{copy.customAmount}</option>
+              </select>
+              {hourly !== '' && !['0.25', '0.5', '1'].includes(hourly) && <input aria-label={copy.customAmount} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.05" max="1" step="0.05" value={hourly === 'other' ? '' : hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value || 'other') }} />}
             </label>
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherBudget}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" step="0.01" value={teacherBudget} onChange={event => { setBudgetAuthorized(false); setTeacherBudget(event.target.value) }} />
+              <select aria-label={copy.teacherBudget} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={['1', '5', '10'].includes(teacherBudget) ? teacherBudget : teacherBudget ? 'custom' : ''} onChange={event => { setBudgetAuthorized(false); setTeacherBudget(event.target.value === 'custom' ? 'other' : event.target.value) }}>
+                <option value="">{copy.choose}</option>
+                {[1, 5, 10].filter(value => value < Number(budget)).map(value => <option key={value} value={String(value)}>{'
+            <span />
+            <p className="text-xs opacity-70 sm:col-span-2">{copy.teacherPriceHelp}</p>
+            </>}
+            {source === 'teacher' ? (
+              <label className="text-sm sm:col-span-2">{fmt(copy.prompts, { n: promptCount })}
+                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={prompts} onChange={event => { setPrompts(event.target.value); setBudgetAuthorized(false) }} />
+              </label>
+            ) : (
+              <label className="text-sm sm:col-span-2">{fmt(copy.examples, { n: exampleCount })}
+                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={examples} onChange={event => { setExamples(event.target.value); setBudgetAuthorized(false) }} />
+              </label>
+            )}
+          </div>
+          {!computeCredentials.length && <p className="text-sm">{copy.hfOnly}</p>}
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={budgetAuthorized} onChange={event => setBudgetAuthorized(event.target.checked)} /> {copy.budgetConfirmation}</label>
+          <button className="rounded border px-3 py-1" disabled={busy || !budgetAuthorized || !(Number(budget) >= 0.5 && Number(budget) <= 1000) || !(Number(hourly) >= 0.05 && Number(hourly) <= 1) || !computeProviderKind || !computeId || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(baseModel) || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel || !(Number(teacherBudget) > 0) || !(Number(teacherBudget) < Number(budget))))} onClick={startRun}>{copy.start}</button>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <h3 className="font-medium">{copy.progressHeading}</h3>
+        {!runs.length && <p className="text-sm opacity-70">{copy.noRuns}</p>}
+        <ul className="space-y-3">
+          {runs.map(run => (
+            <li key={run.runId} className="rounded border p-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <strong>{(copy.stages as Record<string, string>)[run.stage] ?? run.stage}</strong>
+                <span className="opacity-70">{run.teacherModel} → {run.baseModel} · {new Date(run.createdAt).toLocaleString(language)}</span>
+              </div>
+              <div className="my-2 h-2 w-full rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${run.progressPercent}%` }} /></div>
+              {run.failureCode ? <p>{explain(run.failureCode)}</p> : run.statusMessage && <p>{run.statusMessage}</p>}
+              <p className="opacity-70">{fmt(copy.budgetLine, { budget: Number(run.approvedBudgetUsd).toFixed(2), reserved: Number(run.committedMaxCostUsd).toFixed(2) })}</p>
+              {Number(run.teacherReservedUsd) > 0 && <p className="opacity-70">{fmt(copy.teacherSpentLine, { spent: Number(run.teacherSpentUsd ?? 0).toFixed(4), reserved: Number(run.teacherReservedUsd).toFixed(4) })}</p>}
+              <div className="mt-2 flex flex-wrap gap-3">
+                {run.hfJobUrl && <a className="underline" href={run.hfJobUrl} target="_blank" rel="noreferrer">{copy.openJob}</a>}
+                {canManage && !['completed', 'failed', 'cancelled'].includes(run.stage) && <button className="underline" disabled={busy} onClick={() => refreshRun(run.runId)}>{copy.checkStatus}</button>}
+                {run.stage === 'completed' && <button className="underline" onClick={() => download(run.runId)}>{copy.downloadModel}</button>}
+              </div>
+              {files[run.runId] && (
+                <ul className="mt-2 space-y-1">
+                  {files[run.runId].map(file => <li key={file.path}><a className="underline" href={fileUrl(run.runId, file.path)}>{file.path}</a> <span className="opacity-70">({(file.size / 1e6).toFixed(1)} {copy.mb})</span></li>)}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+ + value}</option>)}
+                <option value="custom">{copy.customAmount}</option>
+              </select>
+              {teacherBudget !== '' && !['1', '5', '10'].includes(teacherBudget) && <input aria-label={copy.customAmount} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" max={Number(budget) || undefined} step="0.01" value={teacherBudget === 'other' ? '' : teacherBudget} onChange={event => { setBudgetAuthorized(false); setTeacherBudget(event.target.value || 'other') }} />}
             </label>
             <span />
             <p className="text-xs opacity-70 sm:col-span-2">{copy.teacherPriceHelp}</p>

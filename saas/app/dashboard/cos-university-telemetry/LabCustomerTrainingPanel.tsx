@@ -21,7 +21,7 @@ type Run = {
 type ModelOption = { id: string; label: string }
 type TeacherModelOption = { id: string; priced: boolean }
 // Build marker shown in the header (an identifier, not translatable copy).
-const LAB_UI_VERSION = 'LAB UI v2026.10.12.4'
+const LAB_UI_VERSION = 'LAB UI v2026.10.12.5'
 // Providers whose training jobs are polled through the training route (no worker callback).
 const POLLED_TRAINING = new Set(['together', 'fireworks'])
 const BASE_MODEL_ID: Record<string, RegExp> = {
@@ -332,14 +332,14 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             </label>
             <label className="text-sm">{copy.teacherKey}
               <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} disabled={!teacherProviderKind} onChange={event => { setTeacherId(event.target.value); setTeacherModel(''); setTeacherModelChoice(''); setBudgetAuthorized(false) }}>
-                <option value="">{copy.chooseTeacherAccount}</option>
+                <option value="">{teacherProviderKind ? copy.chooseTeacherAccount : copy.chooseProviderFirst}</option>
                 {selectedTeacherCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
               {teacherProviderKind && !selectedTeacherCredentials.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTeacherFirst}</span>}
             </label>
             <label className="text-sm">{copy.teacherModel}
               <select aria-label={copy.teacherModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherModelChoice} disabled={!teacherProviderKind || !teacherId} onChange={event => { setTeacherModelChoice(event.target.value); setTeacherModel(event.target.value === 'custom' ? '' : event.target.value); setBudgetAuthorized(false) }}>
-                <option value="">{teacherModelsLoading ? copy.loadingModels : copy.choose}</option>
+                <option value="">{teacherModelsLoading ? copy.loadingModels : !teacherProviderKind ? copy.chooseProviderFirst : !teacherId ? copy.chooseAccountFirst : copy.choose}</option>
                 {teacherModels.some(model => model.priced) && <optgroup label={copy.pricedModels}>{teacherModels.filter(model => model.priced).map(model => <option key={model.id} value={model.id}>{model.id}</option>)}</optgroup>}
                 {teacherModels.some(model => !model.priced) && <optgroup label={copy.unpricedModels}>{teacherModels.filter(model => !model.priced).map(model => <option key={model.id} value={model.id} disabled>{model.id}</option>)}</optgroup>}
                 <option value="custom">{copy.customModelLabel}</option>
@@ -357,14 +357,14 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             </label>
             <label className="text-sm">{copy.trainingAccount}
               <select aria-label={copy.trainingAccount} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeId} disabled={!computeProviderKind} onChange={event => { setComputeId(event.target.value); setBaseModel(''); setModelSelection(''); setBudgetAuthorized(false) }}>
-                <option value="">{copy.chooseTrainingAccount}</option>
+                <option value="">{computeProviderKind ? copy.chooseTrainingAccount : copy.chooseProviderFirst}</option>
                 {selectedComputeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
               {computeProviderKind && !selectedComputeCredentials.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTrainingFirst}</span>}
             </label>
             <label className="text-sm">{copy.baseModel}
               <select aria-label={copy.baseModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind || !computeId} onChange={event => { setBudgetAuthorized(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
-                <option value="">{modelsLoading ? copy.loadingModels : copy.choose}</option>
+                <option value="">{modelsLoading ? copy.loadingModels : !computeProviderKind ? copy.chooseProviderFirst : !computeId ? copy.chooseAccountFirst : copy.choose}</option>
                 {modelSuggestions.map(model => <option key={model.id} value={model.id}>{model.label}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>

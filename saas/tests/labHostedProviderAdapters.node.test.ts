@@ -27,7 +27,7 @@ test('server persistence allows listed types, never opens training execution for
 test('training form never defaults to a specific provider or model and hides unimplemented options', () => {
   const ui = readFileSync(new URL('../app/dashboard/cos-university-telemetry/LabCustomerTrainingPanel.tsx', import.meta.url),'utf8')
   assert.match(ui, /useState\(''\)\s*\n\s*const \[modelSelection/)
-  assert.match(ui, /Training compute provider/)
+  assert.match(ui, /copy\.trainingProviderLabel/)
   assert.doesNotMatch(ui, /Coming soon/)
   assert.doesNotMatch(ui, /useState\('Qwen\//)
 })

@@ -44,5 +44,5 @@ test('cancelling a coder graduate prevents remaining graduates and paid fallback
     await assert.rejects(createBuilderCodingAiPort().generate({prompt:'repair',signal:controller.signal}),/owner_cancelled/);
     assert.equal(state.graduateCalls,1);
   `
-  assert.doesNotThrow(() => execFileSync(process.execPath, ['--input-type=module', '-e', source], { encoding: 'utf8' }))
+  assert.doesNotThrow(() => execFileSync(process.execPath, ['--input-type=module', '-e', source], { encoding: 'utf8', env: { ...process.env, BUILDER_GRADUATE_MODE: 'serve' } }))
 })

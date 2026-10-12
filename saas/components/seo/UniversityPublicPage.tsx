@@ -39,6 +39,7 @@ export default function UniversityPublicPage({ locale, pricing = false }: { loca
 
   return <main lang={locale} dir={writingDirection(locale)} className="mx-auto max-w-6xl px-5 py-12 text-white sm:px-8">
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} />
+    <nav aria-label="AI University navigation" className="mb-6 flex flex-wrap items-center gap-4 border-b border-white/15 pb-4 text-sm"><Link href={universityPath(locale)} className="font-semibold text-amber-300">iTMounts AI University</Link><Link href={universityPath(locale,true)} className="underline">{c.pricing}</Link><Link href="/university/start" className="underline">{c.start}</Link><Link href="/support" className="underline">{c.support}</Link></nav>
     <nav aria-label="Languages" className="mb-8 flex flex-wrap items-center gap-3 border-b border-white/15 pb-5">
       {PUBLIC_LOCALES.map(language => <Link key={language} href={universityPath(language, pricing)} hrefLang={language} lang={language} prefetch={false}
         className={`rounded-full px-3 py-1 text-sm ${language === locale ? 'bg-amber-300 font-semibold text-slate-950' : 'border border-white/30 text-slate-200'}`}>

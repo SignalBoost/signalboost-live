@@ -174,6 +174,8 @@ export async function planCustomerJob(input: {
   const config = huggingFaceJobsConfigFromEnv({
     ...input.platformEnv,
     HF_TOKEN: input.customerHfToken,
+    // Only the customer LAB uses its approved hourly cap; internal COS retains independent safety defaults.
+    COS_UNIVERSITY_HF_MAX_HOURLY_COST_USD: String(input.maxHourlyUsd),
     COS_UNIVERSITY_HF_WORKER_URL: platform.workerUrl,
   })
   if (!config) throw new Error('lab_customer_hf_token_invalid')

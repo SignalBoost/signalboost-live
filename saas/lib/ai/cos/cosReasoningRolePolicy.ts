@@ -44,19 +44,19 @@ export function cosRoutingObjective(prompt: string): string {
 
 const DESIGN_ARTIFACT_SIGNAL = /\b(?:website|web\s*page|landing(?:\s|-)?page|dashboard|user interface|ui|component|mockup|prototype)\b/i
 const DESIGN_REQUEST_SIGNAL = /(?:^(?:please\s+)?(?:design|build|create|make)\b|\b(?:can|could)\s+you\b|\b(?:i\s+(?:need|want|would\s+like)|give\s+me|help\s+me)\b)/i
-const CODE_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|implement|refactor|compile|write|run|execute|test)\b|\b(?:create|build|make)\s+(?:a\s+|an\s+|the\s+)?(?:file|script|function|class|component|api|endpoint|test|app|program|module)\b/i
+const CODE_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|implement|refactor|compile|write|run|execute|test|add|update|change|rename|edit|modify|remove|delete|document|create|build|make)\b/i
 const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:not\s+working|does(?:\s+not|n't)\s+work|not\s+functional|broken|failing|throws?|crashes?)\b/i
 const CODE_LANGUAGE = /\b(?:javascript|typescript|node(?:\.js)?|python|react|next(?:\.js)?|html|css|sql|bash|shell|java|c\+\+|c#|golang|go|rust|php|ruby|swift|kotlin|tsx|jsx)\b/i
-const FILE_REFERENCE = /(?:^|[\s`'"(])(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)(?=$|[\s`'"),:.])/i
-const CREATE_NAMED_FILE = /\b(?:create|make|write|build)\s+(?:a\s+|an\s+|the\s+)?(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)\b/i
+const FILE_REFERENCE = /(?:^|[\s`'"(])(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt|md|mdx|markdown|rst|txt|yaml|yml)(?=$|[\s`'"),:.])/i
+const CREATE_NAMED_FILE = /\b(?:create|make|write|build)\s+(?:a\s+|an\s+|the\s+)?(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt|md|mdx|markdown|rst|txt|yaml|yml)\b/i
 const STACK_TRACE = /\b(?:TypeError|ReferenceError|SyntaxError|RangeError|ModuleNotFoundError|Traceback \(most recent call last\)|npm ERR!|ERR_[A-Z_]+)\b|\bat\s+[^\n]+\([^\n()]+:\d+:\d+\)|\bFile\s+"[^"]+",\s+line\s+\d+/i
 const CODE_FENCE = /```(?:javascript|typescript|js|ts|tsx|jsx|python|py|sql|bash|sh|html|css|json)?\s*[\s\S]{12,}```/i
-const CODE_NOUN = /\b(?:code|function|script|class|component|endpoint|api route|test case|regular expression|regex|query)\b/i
+const CODE_NOUN = /\b(?:code|function|script|class|component|endpoint|api route|test case|regular expression|regex|query|readme|documentation|docs|changelog|repository|project|login page|login form)\b/i
 const EXPLICIT_CODE_QUESTION = /\b(?:how do i|how can i|show me how to|write|give me|create|implement)\b[\s\S]{0,100}\b(?:code|function|script|class|component|endpoint|regex|query)\b/i
-const SOURCE_ATTACHMENT = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
+const SOURCE_ATTACHMENT = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt|md|mdx|markdown|rst|txt|yaml|yml)$/i
 const NON_CODING_TOPIC = /\b(?:pay gap|gender wage|football|soccer|sports? standings?|sports? list|schools? of samba|secretar(?:y|ies) of state|who is the model|what model are you|current president)\b/i
 const TRANSCRIPT_MARKER = /\b(?:assistant|user|system|history|conversation|copy response|copy question)\s*:/gi
-const BUILDER_EXECUTION_VERB = '(?:debug|fix|repair|troubleshoot|correct|implement|refactor|compile|write|run|execute|test|create|build|make)'
+const BUILDER_EXECUTION_VERB = '(?:debug|fix|repair|troubleshoot|correct|implement|refactor|compile|write|run|execute|test|create|build|make|add|update|change|rename|edit|modify|remove|delete|document)'
 const DIRECT_BUILDER_EXECUTION = new RegExp(`^(?:please\\s+)?${BUILDER_EXECUTION_VERB}\\b`, 'i')
 const ASSISTANT_BUILDER_EXECUTION = new RegExp(`\\b(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?${BUILDER_EXECUTION_VERB}\\b|\\bi\\s+(?:need|want|would\\s+like)\\s+you\\s+to\\s+${BUILDER_EXECUTION_VERB}\\b`, 'i')
 const BROKEN_CODE_EXECUTION = /\b(?:this|the|following|attached)\s+(?:code|file|script|function|component|test|app)\b[^.!?\n]{0,120}\b(?:not\s+working|does(?:\s+not|n't)\s+work|not\s+functional|broken|failing|throws?|crashes?)\b/i
@@ -160,6 +160,7 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
   if (attachedSourceIsTheJob(prompt, context)) return true
   if (pastedSourceCode(objective)) return true
   const evidence = concreteCodeEvidence(objective, context)
+  if (CODE_ACTION.test(objective) && /\b(?:readme|documentation|docs|changelog)\b/i.test(objective)) return true
   if (DEBUG_ACTION.test(objective)) return evidence
   if (CODE_ACTION.test(objective) || CREATE_NAMED_FILE.test(objective)) return evidence || (CODE_NOUN.test(objective) && CODE_LANGUAGE.test(objective))
   return evidence && EXPLICIT_CODE_QUESTION.test(objective)

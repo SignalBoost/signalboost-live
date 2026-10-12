@@ -316,7 +316,14 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <span className="mt-1 block text-xs text-slate-400">{copy.modelDirectoryHelp}</span>
             </label>
             <label className="text-sm">{copy.budget}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value) }} />
+              <select aria-label={copy.budget} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={['10', '25', '100'].includes(budget) ? budget : budget ? 'custom' : ''} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value === 'custom' ? 'other' : event.target.value); setTeacherBudget('') }}>
+                <option value="">{copy.choose}</option>
+                <option value="10">$10</option>
+                <option value="25">$25</option>
+                <option value="100">$100</option>
+                <option value="custom">{copy.customAmount}</option>
+              </select>
+              {budget && !['10', '25', '100'].includes(budget) && <input aria-label={copy.customAmount} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" placeholder="USD" value={budget === 'other' ? '' : budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value || 'other'); setTeacherBudget('') }} />}
             </label>
             <label className="text-sm">{copy.hourly}
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" max="1000" step="0.01" value={hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value) }} />

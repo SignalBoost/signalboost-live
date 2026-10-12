@@ -12,6 +12,7 @@ const noStore = { 'cache-control': 'no-store' }
 
 // Fixed, HTTPS-only endpoints. Never follow a customer-supplied URL or redirect.
 const API_MODELS: Readonly<Record<string, { url: string; auth: 'bearer' | 'anthropic' | 'gemini' }>> = {
+  huggingface: { url: 'https://huggingface.co/api/models?pipeline_tag=text-generation&sort=downloads&direction=-1&limit=100', auth: 'bearer' },
   openai: { url: 'https://api.openai.com/v1/models', auth: 'bearer' },
   anthropic: { url: 'https://api.anthropic.com/v1/models?limit=100', auth: 'anthropic' },
   gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=100', auth: 'gemini' },
@@ -28,7 +29,7 @@ const API_MODELS: Readonly<Record<string, { url: string; auth: 'bearer' | 'anthr
 const clean = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length < 241 && /^[\w./:-]+$/.test(value)
 function collectModels(payload: unknown, provider: string): string[] {
   const obj = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
-  const rows: unknown[] = Array.isArray(obj.data) ? obj.data : Array.isArray(obj.models) ? obj.models : []
+  const rows: unknown[] = Array.isArray(payload) ? payload : Array.isArray(obj.data) ? obj.data : Array.isArray(obj.models) ? obj.models : []
   const models = rows.flatMap(row => {
     if (!row || typeof row !== 'object') return []
     const item = row as Record<string, unknown>

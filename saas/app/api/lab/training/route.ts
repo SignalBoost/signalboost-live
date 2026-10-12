@@ -1,3 +1,4 @@
+import { observeLabRequest } from '@/lib/lab/observability'
 // saas/app/api/lab/training/route.ts
 // Customer LAB training on the customer's own Hugging Face account.
 // GET  ?organizationId=                         -> runs with stage/progress/artifact (any active member)
@@ -32,7 +33,7 @@ const errCode = (caught: unknown) => (caught instanceof Error ? caught.message :
 
 type Session = NonNullable<Awaited<ReturnType<typeof customerSession>>>
 
-export async function GET(req: NextRequest) {
+async function getHandler(req: NextRequest) {
   const session = await customerSession()
   if (!session) return fail('unauthorized', 401)
   const organizationId = req.nextUrl.searchParams.get('organizationId') || ''
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, runs: data ?? [] }, { headers: noStore })
 }
 
-export async function POST(req: NextRequest) {
+async function postHandler(req: NextRequest) {
   const session = await customerSession()
   if (!session) return fail('unauthorized', 401)
   const body = await req.json().catch(() => null)
@@ -206,4 +207,12 @@ async function refresh(session: Session, body: any) {
   } catch (caught) {
     return fail(caught instanceof Error ? caught.message.split(':')[0] : 'lab_refresh_failed', 502)
   }
+}
+
+export async function GET(req: NextRequest) {
+  return observeLabRequest('training.list', () => getHandler(req))
+}
+
+export async function POST(req: NextRequest) {
+  return observeLabRequest('training.action', () => postHandler(req))
 }

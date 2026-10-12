@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { PUBLIC_COPY } from '../lib/seo/publicCopy.ts'
+import { UNIVERSITY_COPY } from '../lib/seo/universityCopy.ts'
 import { PUBLIC_LOCALES, PUBLIC_TOPICS, publicPagePath, publicLocaleFromPath, isPublicLocale, isPublicTopic } from '../lib/seo/publicLocales.ts'
 import { publicAlternates, publicMetadata, publicPageSchema, publicSitemapEntries } from '../lib/seo/publicSeo.ts'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n/supportedLanguages.ts'
@@ -47,15 +48,23 @@ for (const locale of PUBLIC_LOCALES) {
 
 test('sitemap contains each indexable canonical once and no private or invented locale URLs', () => {
   const entries = publicSitemapEntries()
-  assert.equal(entries.length, 58)
+  assert.equal(entries.length, 78)
   assert.ok(entries.some(entry => entry.url === 'https://itmounts.com/university'))
   assert.ok(entries.some(entry => entry.url === 'https://itmounts.com/university/pricing'))
   assert.equal(new Set(entries.map(entry => entry.url)).size, entries.length)
+  for (const locale of PUBLIC_LOCALES.filter(locale => locale !== 'en')) {
+    for (const subpath of ['/university', '/university/pricing']) {
+      const entry = entries.find(item => item.url === `https://itmounts.com/${locale}${subpath}`)
+      assert.ok(entry, `${locale}${subpath} must be indexed`)
+      assert.equal(entry.alternates?.languages[locale], entry.url)
+      assert.equal(entry.alternates?.languages.en, `https://itmounts.com${subpath}`)
+    }
+  }
   for (const entry of entries.filter(entry => entry.url !== 'https://itmounts.com' && entry.url !== 'https://itmounts.com/university' && entry.url !== 'https://itmounts.com/university/pricing')) {
     const parts = new URL(entry.url).pathname.split('/').slice(1)
     assert.ok(isPublicLocale(parts[0]))
-    if (parts[1]) assert.ok(isPublicTopic(parts[1]))
-    assert.deepEqual(entry.alternates?.languages, publicAlternates(parts[1] as typeof PUBLIC_TOPICS[number] | undefined))
+    if (parts[1] && parts[1] !== 'university') assert.ok(isPublicTopic(parts[1]))
+    if (parts[1] !== 'university') assert.deepEqual(entry.alternates?.languages, publicAlternates(parts[1] as typeof PUBLIC_TOPICS[number] | undefined))
     for (const alternate of Object.values(entry.alternates?.languages || {})) assert.ok(entries.some(value => value.url === alternate))
   }
   assert.equal(entries.some(entry => /dashboard|admin|api|pt-PT|pt-BR|EU/.test(entry.url)), false)
@@ -143,6 +152,19 @@ test('translated site navigation preserves each public locale and route', () => 
     }
     for (const topic of [undefined, ...PUBLIC_TOPICS]) {
       assert.equal(publicPagePath(locale, topic).split('/')[1], locale)
+    }
+  }
+})
+
+test('AI University public copy exists and is translated for all eleven locales', () => {
+  assert.deepEqual(Object.keys(UNIVERSITY_COPY).sort(), [...PUBLIC_LOCALES].sort())
+  const keys = Object.keys(UNIVERSITY_COPY.en)
+  for (const locale of PUBLIC_LOCALES) {
+    assert.deepEqual(Object.keys(UNIVERSITY_COPY[locale]).sort(), [...keys].sort())
+    for (const key of keys) {
+      const translated = UNIVERSITY_COPY[locale][key as keyof typeof UNIVERSITY_COPY.en]
+      assert.ok(translated.trim())
+      if (locale !== 'en') assert.notEqual(translated, UNIVERSITY_COPY.en[key as keyof typeof UNIVERSITY_COPY.en], locale + '.' + key)
     }
   }
 })

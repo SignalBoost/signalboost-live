@@ -1,18 +1,22 @@
+// saas/app/api/lab/teacher-models/route.ts
 // Live model-list discovery using a customer's own credential.
 // This performs read-only catalog GET requests; no inference, training, or spend.
 // Never expose, cache, or log customer secrets or raw provider payloads.
+// Each model says whether it has an active verified teacher price: only priced models can run (lab.teacher_rate_cards).
 import { NextRequest, NextResponse } from 'next/server'
 import { customerSession, UUID_RE } from '@/lib/lab/customerSession'
 import { openCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
-import { LAB_PROVIDER_CATALOG } from '@/lib/ai/cos/labCustomerProviderCatalog'
+import { LAB_PROVIDER_CATALOG, customModelsUrl } from '@/lib/ai/cos/labCustomerProviderCatalog'
+import { assertPublicHttpUrl } from '@/lib/security/publicFetchGuard'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 const noStore = { 'cache-control': 'no-store' }
 
-// Fixed, HTTPS-only endpoints. Never follow a customer-supplied URL or redirect.
+// Fixed, HTTPS-only endpoints. Never follow a redirect. The custom endpoint is derived below and guarded.
 const API_MODELS: Readonly<Record<string, { url: string; auth: 'bearer' | 'anthropic' | 'gemini' }>> = {
-  huggingface: { url: 'https://huggingface.co/api/models?pipeline_tag=text-generation&sort=downloads&direction=-1&limit=100', auth: 'bearer' },
+  // The inference router lists the models Hugging Face can actually serve, not every Hub repository.
+  huggingface: { url: 'https://router.huggingface.co/v1/models', auth: 'bearer' },
   openai: { url: 'https://api.openai.com/v1/models', auth: 'bearer' },
   anthropic: { url: 'https://api.anthropic.com/v1/models?limit=100', auth: 'anthropic' },
   gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=100', auth: 'gemini' },
@@ -26,6 +30,7 @@ const API_MODELS: Readonly<Record<string, { url: string; auth: 'bearer' | 'anthr
   fireworks: { url: 'https://api.fireworks.ai/inference/v1/models', auth: 'bearer' },
   deepinfra: { url: 'https://api.deepinfra.com/v1/openai/models', auth: 'bearer' },
 }
+
 const clean = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length < 241 && /^[\w./:-]+$/.test(value)
 function collectModels(payload: unknown, provider: string): string[] {
   const obj = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
@@ -51,7 +56,7 @@ export async function GET(req: NextRequest) {
   const org = req.nextUrl.searchParams.get('organizationId') ?? ''
   const credentialId = req.nextUrl.searchParams.get('credentialId') ?? ''
   const provider = req.nextUrl.searchParams.get('provider') ?? ''
-  if (!UUID_RE.test(org) || !UUID_RE.test(credentialId) || !API_MODELS[provider] ||
+  if (!UUID_RE.test(org) || !UUID_RE.test(credentialId) || (!API_MODELS[provider] && provider !== 'openai_compatible') ||
       !LAB_PROVIDER_CATALOG.some(p => p.kind === provider && p.supports['teacher.generate'])) {
     return NextResponse.json({ ok: false, error: 'model_directory_selection_invalid' }, { status: 400, headers: noStore })
   }
@@ -67,19 +72,30 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, error: 'model_directory_connection_unavailable' }, { status: 403, headers: noStore })
   }
-  const spec = API_MODELS[provider]
+  let spec = API_MODELS[provider]
+  if (provider === 'openai_compatible') {
+    const url = customModelsUrl(data.endpoint)
+    if (!url) return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
+    try { await assertPublicHttpUrl(url) }
+    catch { return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore }) }
+    spec = { url, auth: 'bearer' }
+  }
   const headers: Record<string,string> = { accept: 'application/json' }
   if (spec.auth === 'bearer') headers.authorization = `Bearer ${key}`
   if (spec.auth === 'anthropic') { headers['x-api-key'] = key; headers['anthropic-version'] = '2023-06-01' }
   if (spec.auth === 'gemini') headers['x-goog-api-key'] = key
+  let live: string[]
   try {
     const response = await fetch(spec.url, {
       method: 'GET', headers, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
-    const payload: unknown = await response.json()
-    return NextResponse.json({ ok: true, models: collectModels(payload, provider), source: 'live' }, { headers: noStore })
+    live = collectModels(await response.json(), provider)
   } catch {
     return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
   }
+  const priced = await session.supabase.rpc('itmounts_lab_customer_priced_teacher_models', { p_organization_id: org, p_provider_kind: provider })
+  const pricedSet = new Set<string>(!priced.error && Array.isArray(priced.data) ? priced.data.map(String) : [])
+  const models = live.map(id => ({ id, priced: pricedSet.has(id) }))
+  return NextResponse.json({ ok: true, models, pricedAvailable: !priced.error, source: 'live' }, { headers: noStore })
 }

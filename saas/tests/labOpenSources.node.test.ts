@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { LAB_OPEN_SOURCES, buildOpenSourceExamples, chunkText, cleanTopic, examplesToJsonl, type OpenSourceDocument } from '../lib/lab/labOpenSources.ts'
+import { LAB_OPEN_SOURCES, buildOpenSourceExamples, chunkText, cleanTopic, examplesToJsonl, hasTrainingRights, sourceUrl, type OpenSourceDocument } from '../lib/lab/labOpenSources.ts'
 import { rowsFromExamples } from '../lib/ai/cos/labCustomerTraining.ts'
 
 const sentence = (i: number, tag = '') => `Sentence number ${i}${tag} explains one practical point about the subject in plain words. `
@@ -16,7 +16,28 @@ const doc = (sourceId: OpenSourceDocument['sourceId'], n: number, sentences: num
 test('sources are listed alphabetically by name', () => {
   const names = LAB_OPEN_SOURCES.map(item => item.name)
   assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b)))
-  assert.equal(names.length, 5)
+  assert.deepEqual(LAB_OPEN_SOURCES.map(item => item.id), ['huggingface_datasets', 'gutenberg', 'wikipedia'])
+})
+
+test('only material whose licence allows training is used', () => {
+  assert.equal(hasTrainingRights('CC BY-SA 4.0'), true)
+  assert.equal(hasTrainingRights('public domain'), true)
+  assert.equal(hasTrainingRights('cc0 public-domain GitHub-CC0 software corpus'), true)
+  assert.equal(hasTrainingRights('research metadata mirror; catalog metadata is CC0; underlying paper training rights not asserted'), false)
+  assert.equal(hasTrainingRights('S2ORC corpus mirror (ODC-By 1.0); underlying paper rights not asserted'), false)
+  assert.equal(hasTrainingRights(''), false)
+  const docs = [doc('wikipedia', 1, 60), { ...doc('wikipedia', 2, 60), license: 'underlying paper training rights not asserted' }]
+  assert.ok(buildOpenSourceExamples('t', docs).every(example => example.uri.endsWith('/wikipedia/1')))
+})
+
+test('Hugging Face dataset references become their https dataset page; other schemes are refused', () => {
+  assert.equal(sourceUrl('hf://datasets/ethanolivertroy/nist-cybersecurity-training#train:42'), 'https://huggingface.co/datasets/ethanolivertroy/nist-cybersecurity-training')
+  assert.equal(sourceUrl('https://en.wikipedia.org/wiki/Solar_panel'), 'https://en.wikipedia.org/wiki/Solar_panel')
+  assert.equal(sourceUrl('http://example.org/x'), null)
+  assert.equal(sourceUrl('javascript:alert(1)'), null)
+  const hfOnly = buildOpenSourceExamples('t', [{ ...doc('huggingface_datasets', 1, 60), uri: 'hf://datasets/org/data#train:1' }])
+  assert.ok(hfOnly.length > 0)
+  assert.match(hfOnly[0].response, /https:\/\/huggingface\.co\/datasets\/org\/data/)
 })
 
 test('topics are one clean short line', () => {
@@ -58,6 +79,11 @@ test('the route uses no keys, checks membership, and is observed', () => {
   assert.match(route, /itmounts_lab_customer_list_credentials/)
   assert.match(route, /observeLabRequest\('openSources\.find'/)
   assert.doesNotMatch(route, /process\.env|apiKey:\s*[^}]|openCustomerCredential/)
+  // Shared cross-instance provider leases throttle every source call (and share Hugging Face's with COS).
+  assert.match(route, /createSupabaseLearningSourceProviderLeasePort/)
+  assert.match(route, /lease: 'huggingface_datasets'/)
+  // Sources without established training rights are not wired in.
+  assert.doesNotMatch(route, /OpenAlex|SemanticScholar|ArxivMetadata/)
 })
 
 test('the panel offers open sources and trains them through the examples path', () => {

@@ -2,13 +2,15 @@
 // Free training material for the customer LAB: open sources instead of a paid frontier teacher.
 // Shared by the browser (the source list) and the server (turning documents into training examples).
 // No AI model is involved: every answer is the source's own text, with its link and licence attached.
+//
+// Only material whose licence allows training is used: public domain, CC0, or CC BY-SA 4.0 (attribution is in every
+// answer). OpenAlex and Semantic Scholar are deliberately NOT offered here: their abstracts belong to the publishers
+// ("training rights not asserted"), so they may inform COS retrieval but must not be copied into a model's training set.
 
 /** Open sources, alphabetical by name. Ids are stable API values; names are proper nouns (not translated). */
 export const LAB_OPEN_SOURCES = Object.freeze([
   { id: 'huggingface_datasets', name: 'Hugging Face open datasets' },
-  { id: 'openalex', name: 'OpenAlex' },
   { id: 'gutenberg', name: 'Project Gutenberg' },
-  { id: 'semantic_scholar', name: 'Semantic Scholar' },
   { id: 'wikipedia', name: 'Wikipedia' },
 ] as const)
 export type LabOpenSourceId = (typeof LAB_OPEN_SOURCES)[number]['id']
@@ -21,6 +23,20 @@ const CHUNKS_PER_DOCUMENT = 6
 
 export type OpenSourceDocument = Readonly<{ sourceId: LabOpenSourceId; uri: string; title: string; text: string; license: string }>
 export type OpenSourceExample = Readonly<{ prompt: string; response: string; sourceId: LabOpenSourceId; uri: string }>
+
+/** True only when the record's licence explicitly allows reuse for training. "Not asserted" always fails. */
+export function hasTrainingRights(license: string): boolean {
+  const text = String(license ?? '')
+  if (/not asserted|metadata only|all rights reserved/i.test(text)) return false
+  return /\b(public[ -]domain|cc0|cc by-sa 4\.0)\b/i.test(text)
+}
+
+/** A safe https link for a record: Hugging Face dataset references (hf://datasets/...) become their dataset page. */
+export function sourceUrl(uri: string): string | null {
+  const hf = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:[#?].*)?$/.exec(uri)
+  if (hf) return `https://huggingface.co/datasets/${hf[1]}`
+  return /^https:\/\/[^\s]+$/.test(uri) ? uri : null
+}
 
 /** A topic is one short line of plain text. */
 export function cleanTopic(raw: unknown): string {
@@ -48,7 +64,8 @@ export function chunkText(text: string): string[] {
 export function buildOpenSourceExamples(topic: string, documents: readonly OpenSourceDocument[]): OpenSourceExample[] {
   const subject = cleanTopic(topic)
   const queues = documents
-    .filter(doc => /^https?:\/\//.test(doc.uri) && doc.title.trim())
+    .map(doc => ({ ...doc, uri: sourceUrl(doc.uri) ?? '' }))
+    .filter(doc => doc.uri && doc.title.trim() && hasTrainingRights(doc.license))
     .map(doc => ({ doc, chunks: chunkText(doc.text).slice(0, CHUNKS_PER_DOCUMENT) }))
     .filter(queue => queue.chunks.length)
   const out: OpenSourceExample[] = []

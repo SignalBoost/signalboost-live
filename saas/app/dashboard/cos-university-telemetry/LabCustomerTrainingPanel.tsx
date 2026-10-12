@@ -9,7 +9,6 @@ import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainin
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
-type PlannedProvider = { id: string; name: string; category: string; status: 'planned'; description: string }
 type Credential = { id: string; providerKind: string; label: string; endpoint: string | null; createdAt: string }
 type Run = {
   runId: string; stage: string; progressPercent: number; statusMessage: string | null; teacherProviderKind: string; teacherModel: string
@@ -24,7 +23,6 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [orgKey, setOrgKey] = useState('')
   const activeOrgRef = useRef('')
   const [catalog, setCatalog] = useState<CatalogEntry[]>([])
-  const [discovery, setDiscovery] = useState<PlannedProvider[]>([])
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [runs, setRuns] = useState<Run[]>([])
   const [message, setMessage] = useState<{ kind: 'status' | 'alert'; text: string } | null>(null)
@@ -39,7 +37,10 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [teacherId, setTeacherId] = useState('')
   const [teacherModel, setTeacherModel] = useState('')
   const [computeId, setComputeId] = useState('')
-  const [baseModel, setBaseModel] = useState('Qwen/Qwen2.5-0.5B-Instruct')
+  const [baseModel, setBaseModel] = useState('')
+  const [modelSelection, setModelSelection] = useState('')
+  const [modelSuggestions, setModelSuggestions] = useState<string[]>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
   const [prompts, setPrompts] = useState('')
   const [source, setSource] = useState<'examples' | 'teacher'>('examples')
   const [examples, setExamples] = useState('')
@@ -53,6 +54,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const canManage = org?.role === 'owner' || org?.role === 'admin'
   const entry = (kind: string) => catalog.find(item => item.kind === kind)
   const computeCredentials = credentials.filter(item => entry(item.providerKind)?.supports['training.execute'])
+  const [computeProviderKind, setComputeProviderKind] = useState('')
+  const selectedComputeCredentials = computeCredentials.filter(item => item.providerKind === computeProviderKind)
   const teacherCredentials = credentials.filter(item => entry(item.providerKind)?.supports['teacher.generate'])
   const promptCount = useMemo(() => new Set(prompts.split('\n').map(line => line.trim()).filter(Boolean)).size, [prompts])
   const exampleCount = useMemo(() => examples.split('\n').filter(line => { try { const o = JSON.parse(line); return o?.prompt && o?.response } catch { return false } }).length, [examples])
@@ -97,12 +100,23 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       fetch(`/api/lab/training?organizationId=${organizationId}`, { credentials: 'include', cache: 'no-store' }).then(r => r.json()).catch(() => null),
     ])
     if (activeOrgRef.current !== organizationId) return
-    if (providers?.ok) { setCatalog(providers.catalog); setDiscovery(Array.isArray(providers.discovery) ? providers.discovery : []); setCredentials(providers.credentials) }
+    if (providers?.ok) { setCatalog(providers.catalog); setCredentials(providers.credentials) }
     if (training?.ok) setRuns(training.runs)
     if (!providers?.ok || !training?.ok) setMessage({ kind: 'alert', text: fmt(copy.loadFailed, { code: providers?.error || training?.error || 'network' }) })
   }, [organizationId, copy])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let cancelled = false
+    if (!computeProviderKind) { setModelSuggestions([]); return }
+    setModelsLoading(true)
+    void fetch(`/api/lab/models?provider=${encodeURIComponent(computeProviderKind)}`, { credentials: 'include', cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(body => { if (!cancelled) setModelSuggestions(Array.isArray(body?.models) ? body.models : []) })
+      .catch(() => { if (!cancelled) setModelSuggestions([]) })
+      .finally(() => { if (!cancelled) setModelsLoading(false) })
+    return () => { cancelled = true }
+  }, [computeProviderKind])
   useEffect(() => {
     if (!runs.some(run => !['completed', 'failed', 'cancelled'].includes(run.stage))) return
     const timer = setInterval(() => { void load() }, 15_000)
@@ -190,7 +204,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{copy.title}</h2>
-        <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setDiscovery([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setMessage(null); setOrgKey(next) }}>
+        <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
           {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName} · {item.projectName}</option>)}
         </select>
       </header>
@@ -213,8 +227,6 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={keyKind} onChange={event => setKeyKind(event.target.value)}>
               {catalog.length === 0 ? <option value="">Providers unavailable — retry loading</option> : null}
               <optgroup label="Available adapters">{catalog.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}</optgroup>
-              <optgroup label="Additional providers — integration coming soon">{discovery.filter(item => item.category !== 'Universal').map(item => <option key={item.id} value={item.id} disabled>{item.name} — Coming soon</option>)}</optgroup>
-              <optgroup label="Universal fallback">{discovery.filter(item => item.category === 'Universal').map(item => <option key={item.id} value={item.id} disabled>{item.name} — Coming soon</option>)}</optgroup>
             </select>
             <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.keyNamePh} value={keyLabel} onChange={event => setKeyLabel(event.target.value)} />
             <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="password" autoComplete="off" placeholder={copy.keyPh} value={keyValue} onChange={event => setKeyValue(event.target.value)} />
@@ -244,14 +256,26 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={teacherEntry?.kind === 'anthropic' ? 'claude-…' : copy.modelPh} value={teacherModel} onChange={event => setTeacherModel(event.target.value)} />
             </label>
             </>}
+            <label className="text-sm">{copy.trainingProviderLabel}
+              <select aria-label="Training compute provider" className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setComputeId(''); setBaseModel(''); setModelSelection('') }}>
+                <option value="">{copy.chooseTrainingProvider}</option>
+                {catalog.filter(item => item.supports['training.execute']).map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
+              </select>
+            </label>
             <label className="text-sm">{copy.trainingAccount}
-              <select className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeId} onChange={event => setComputeId(event.target.value)}>
-                <option value="">{copy.choose}</option>
-                {computeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              <select className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeId} disabled={!computeProviderKind} onChange={event => setComputeId(event.target.value)}>
+                <option value="">{copy.chooseTrainingAccount}</option>
+                {selectedComputeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.baseModel}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={baseModel} onChange={event => setBaseModel(event.target.value)} />
+              <select aria-label="Base model to train" className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind} onChange={event => { const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
+                <option value="">{modelsLoading ? copy.loadingModels : copy.choose}</option>
+                {modelSuggestions.map(model => <option key={model} value={model}>{model}</option>)}
+                <option value="custom">{copy.customModelLabel}</option>
+              </select>
+              {modelSelection === 'custom' && <input aria-label="Custom base model ID" className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder="Organization/model-name" value={baseModel} onChange={event => setBaseModel(event.target.value)} />}
+              <span className="mt-1 block text-xs text-slate-400">{copy.modelDirectoryHelp}</span>
             </label>
             <label className="text-sm">{copy.budget}
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => setBudget(event.target.value)} />
@@ -277,7 +301,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             )}
           </div>
           {!computeCredentials.length && <p className="text-sm">{copy.hfOnly}</p>}
-          <button className="rounded border px-3 py-1" disabled={busy || !computeId || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherId || !teacherModel || !(Number(teacherBudget) > 0) || !(Number(teacherBudget) < Number(budget))))} onClick={startRun}>{copy.start}</button>
+          <button className="rounded border px-3 py-1" disabled={busy || !computeProviderKind || !computeId || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(baseModel) || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherId || !teacherModel || !(Number(teacherBudget) > 0) || !(Number(teacherBudget) < Number(budget))))} onClick={startRun}>{copy.start}</button>
         </div>
       )}
 

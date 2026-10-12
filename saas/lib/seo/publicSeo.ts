@@ -44,6 +44,14 @@ export function publicSitemapEntries() {
     { url: PUBLIC_BRAND.siteUrl },
     { url: `${PUBLIC_BRAND.siteUrl}/university`, changeFrequency: 'weekly' as const, priority: 0.9 },
     { url: `${PUBLIC_BRAND.siteUrl}/university/pricing`, changeFrequency: 'monthly' as const, priority: 0.7 },
+    ...PUBLIC_LOCALES.filter(locale => locale !== 'en').flatMap(locale => [false, true].map(pricing => ({
+      url: `${PUBLIC_BRAND.siteUrl}/${locale}/university${pricing ? '/pricing' : ''}`,
+      changeFrequency: pricing ? 'monthly' as const : 'weekly' as const,
+      alternates: { languages: Object.fromEntries([
+        ...PUBLIC_LOCALES.map(language => [language, `${PUBLIC_BRAND.siteUrl}${language === 'en' ? '' : '/' + language}/university${pricing ? '/pricing' : ''}`]),
+        ['x-default', `${PUBLIC_BRAND.siteUrl}/university${pricing ? '/pricing' : ''}`],
+      ]) },
+    }))),
     ...PUBLIC_LOCALES.flatMap(locale => [undefined, ...PUBLIC_TOPICS].map(topic => ({
       url: `${PUBLIC_BRAND.siteUrl}${publicPagePath(locale, topic)}`,
       alternates: { languages: publicAlternates(topic) },

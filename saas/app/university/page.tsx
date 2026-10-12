@@ -45,7 +45,16 @@ export default function UniversityLanding() {
           <Link href="/onboarding" className="rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950">Get started</Link>
           <Link href="#how-it-works" className="rounded-full border border-white/30 px-6 py-3 font-semibold">How it works</Link>
         </div>
-        <p className="mt-5 text-sm text-slate-400">A supported provider account is needed for API or cloud workloads. Some training operations are billable by your provider.</p>
+        <p className="mt-5 text-sm text-slate-400">iTMounts University is a paid software service when paid features are used. AI teacher usage and GPU compute are separate charges from your chosen providers. Review both before starting.</p>
+      </section>
+      <section aria-labelledby="university-pricing" className="py-12">
+        <h2 id="university-pricing" className="text-3xl font-semibold">Understand what you pay for</h2>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/15 bg-white/5 p-6"><h3 className="text-xl font-semibold">iTMounts platform fees</h3><p className="mt-3 text-slate-300">Using paid University services incurs separate iTMounts software charges under the applicable published plan or credit pricing. Do not assume training or distillation is free because you bring your own tools.</p></div>
+          <div className="rounded-2xl border border-white/15 bg-white/5 p-6"><h3 className="text-xl font-semibold">Your providers’ charges</h3><p className="mt-3 text-slate-300">AI teacher inference, model distillation inputs, hosted training and rented GPUs may be billed directly by OpenAI, Anthropic, Hugging Face or your chosen compute provider. These charges are separate from iTMounts fees.</p></div>
+        </div>
+        <p className="mt-5 text-sm text-slate-300">No paid job should begin without a budget review and explicit authorization. The final iTMounts price for a feature must be shown before its paid use; no subscription price is implied here.</p>
+        <Link href="/pricing" className="mt-4 inline-block underline text-amber-300">View iTMounts pricing</Link>
       </section>
       <section id="how-it-works" className="py-14">
         <h2 className="text-3xl font-semibold">How iTMounts University works</h2>

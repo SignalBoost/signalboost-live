@@ -409,7 +409,7 @@ test('an existing README can be extended and verified without a repair baseline'
   } }
   const ai = new ScriptedBuilderAi([
     '{"type":"tool","toolId":"read_file","input":{"path":"README.md"}}',
-    JSON.stringify({ type: 'tool', toolId: 'edit_file', input: { path: 'README.md', oldText: 'Original section.', newText: 'Original section.\\n\\n## Workspace Continuity Test\\nBuilder continued the workspace.' } }),
+    JSON.stringify({ type: 'tool', toolId: 'edit_file', input: { path: 'README.md', search: 'Original section.', replace: 'Original section.\\n\\n## Workspace Continuity Test\\nBuilder continued the workspace.' } }),
     '{"type":"tool","toolId":"run","input":{"command":"cat README.md"}}',
     '{"type":"answer","answer":"Updated README.md and verified both sections."}',
   ])

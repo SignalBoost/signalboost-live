@@ -2,7 +2,7 @@
 // Turns OpenRouter's public model list (https://openrouter.ai/api/v1/models) into LAB teacher prices.
 // OpenRouter documents every pricing value as "USD per token/request/unit" (string). LAB prices are USD per 1M tokens.
 // A model is priced only when its whole cost is per-token prompt + completion: no per-request fee, no conditional
-// price overrides, reasoning never dearer than completion, text in and text out. Anything else stays unpriced.
+// price overrides, reasoning never dearer than completion, cache writes never dearer than the prompt, text in and out. Anything else stays unpriced.
 // Rounding is always UP, so a stored price can only overstate the cost, never understate it.
 
 export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
@@ -36,6 +36,10 @@ export function parseOpenRouterPrices(payload: unknown): TeacherPrice[] {
     if (Array.isArray(pricing.overrides) && pricing.overrides.length > 0) continue
     const reasoning = perToken(pricing.internal_reasoning)
     if (reasoning !== null && !(reasoning >= 0 && reasoning <= completion)) continue
+    // Automatic prompt caching can bill a write above the prompt rate; settlement prices every prompt token at the
+    // stored prompt rate, so such a model could cost more than recorded. Priced only when writes never cost more.
+    const cacheWrite = perToken(pricing.input_cache_write)
+    if (cacheWrite !== null && !(cacheWrite >= 0 && cacheWrite <= prompt)) continue
     if (!listsText(row?.architecture?.input_modalities) || !listsText(row?.architecture?.output_modalities)) continue
     const input = perMillionUp(prompt), output = perMillionUp(completion)
     if (input > 1000 || output > 1000) continue

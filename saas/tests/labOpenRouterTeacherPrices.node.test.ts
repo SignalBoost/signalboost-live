@@ -24,12 +24,14 @@ test('only plain per-token text models are priced', () => {
     { id: 'vendor/per-request', pricing: { prompt: '0.000001', completion: '0.000002', request: '0.01' }, architecture: text },
     { id: 'vendor/overrides', pricing: { prompt: '0.000001', completion: '0.000002', overrides: [{ prompt: '0.000005' }] }, architecture: text },
     { id: 'vendor/dear-reasoning', pricing: { prompt: '0.000001', completion: '0.000002', internal_reasoning: '0.00001' }, architecture: text },
+    { id: 'vendor/premium-cache-write', pricing: { prompt: '0.000003', completion: '0.000015', input_cache_write: '0.00000375' }, architecture: text },
+    { id: 'vendor/cheap-cache', pricing: { prompt: '0.000001', completion: '0.000002', input_cache_read: '0.0000001', input_cache_write: '0.000001' }, architecture: text },
     { id: 'vendor/image-out', pricing: { prompt: '0.000001', completion: '0.000002' }, architecture: { input_modalities: ['text'], output_modalities: ['image'] } },
     { id: 'bad id with spaces', pricing: { prompt: '0.000001', completion: '0.000002' } },
     { id: 'vendor/garbage', pricing: { prompt: 'abc', completion: '0.000002' } },
     { id: 'vendor/plain', pricing: { prompt: '0.000003', completion: '0.000015' }, architecture: text },
   ] })
-  assert.deepEqual(prices, [{ model: 'vendor/plain', input: 3, output: 15 }])
+  assert.deepEqual(prices, [{ model: 'vendor/cheap-cache', input: 1, output: 2 }, { model: 'vendor/plain', input: 3, output: 15 }])
 })
 
 test('a broken response yields nothing, and the sync refuses short lists', () => {

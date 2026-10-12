@@ -106,3 +106,34 @@ test('logs become bounded debug evidence only when editable source files are sup
   })
   assert.equal(planDebugFileJob(objective, []), null)
 })
+
+test('Builder accepts documentation edits and common development action verbs', () => {
+  const accepted = [
+    'Fix a typo in the README',
+    'In README.md, fix the spelling mistake in the introduction',
+    'Add one comment line at the top of saas/lib/builder/builderGraduateGate.ts',
+    'Update README.md with installation instructions',
+    'Change the heading in docs/setup.md',
+    'Rename docs/old.md to docs/new.md',
+    'Create README.md describing the project',
+    'Edit the documentation in README.md',
+  ]
+  for (const objective of accepted) {
+    assert.equal(isCosCodingObjective(objective), true, objective)
+    assert.equal(isConciergeBuilderObjective(objective), true, objective)
+  }
+})
+
+test('documentation support does not grant authority to general chat or questions', () => {
+  const rejected = [
+    'What is a README?',
+    'Explain the documentation structure',
+    'Summarize README.md',
+    'Add more details about soccer standings',
+    'Fix my schedule',
+    'Tell me about a project',
+  ]
+  for (const objective of rejected) {
+    assert.equal(isConciergeBuilderObjective(objective), false, objective)
+  }
+})

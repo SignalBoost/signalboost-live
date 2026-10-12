@@ -319,7 +319,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value) }} />
             </label>
             <label className="text-sm">{copy.hourly}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.05" max="1" step="0.05" value={hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value) }} />
+              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" max="1000" step="0.01" value={hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value) }} />
             </label>
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherBudget}

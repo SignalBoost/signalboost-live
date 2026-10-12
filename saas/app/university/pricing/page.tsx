@@ -4,16 +4,16 @@ import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const canonical = `${PUBLIC_BRAND.siteUrl}/university/pricing`
 export const metadata: Metadata = {
-  title: 'University Credits & Provider Costs',
-  description: 'Understand iTMounts University credits, pay-as-you-go billing and separate costs charged by your AI and GPU providers.',
+  title: 'AI University Credits & Provider Costs',
+  description: 'Understand iTMounts AI University credits, pay-as-you-go billing and separate costs charged by your AI and GPU providers.',
   alternates: { canonical },
   robots: { index: true, follow: true },
 }
 export default function UniversityPricingPage() {
   return (
     <main className="mx-auto max-w-5xl px-5 py-12 text-white sm:px-8">
-      <Link href="/university" className="text-sm text-amber-300 underline">← iTMounts University</Link>
-      <h1 className="mt-6 text-4xl font-bold">University credits and pricing</h1>
+      <Link href="/university" className="text-sm text-amber-300 underline">← iTMounts AI University</Link>
+      <h1 className="mt-6 text-4xl font-bold">AI University credits and pricing</h1>
       <p className="mt-5 max-w-3xl text-lg text-slate-300">
         Paid University operations have two separate costs. You fund iTMounts platform usage with
         iTMounts credits and pay your connected AI and GPU providers separately, using your own accounts.
@@ -38,7 +38,7 @@ export default function UniversityPricingPage() {
           prices have not been published as approved University prices. This page does not sell or issue credits.
         </p>
         <p className="mt-3 text-slate-300">
-          Before any paid University feature is enabled, its iTMounts price, credit requirement,
+          Before any paid AI University feature is enabled, its iTMounts price, credit requirement,
           provider-side cost estimate and authorization must be presented separately and verified.
           An external GPU job may keep billing until cancellation takes effect even when a platform
           balance is depleted, so jobs require provider-side limits and cleanup.
@@ -53,7 +53,7 @@ export default function UniversityPricingPage() {
         </dl>
       </section>
       <div className="mt-10 flex flex-wrap gap-4">
-        <Link className="rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950" href="/university">Explore University</Link>
+        <Link className="rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950" href="/university">Explore AI University</Link>
       </div>
     </main>
   )

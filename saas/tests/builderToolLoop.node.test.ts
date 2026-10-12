@@ -414,7 +414,7 @@ test('an existing README can be extended and verified without a repair baseline'
     '{"type":"answer","answer":"Updated README.md and verified both sections."}',
   ])
   const result = await new BuilderToolLoop(ai, workspace, runner).run({
-    objective: 'Open existing README.md. Preserve current contents. Add a Workspace Continuity Test section and verify with cat README.md.',
+    objective: 'Add a Workspace Continuity Test section to README.md.',
     workspaceId: 'user:continuity',
   })
   assert.equal(result.ok, true, JSON.stringify(result))

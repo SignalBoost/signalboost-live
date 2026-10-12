@@ -10,7 +10,7 @@ export type LabCustomerTrainingCopy = Readonly<{
   chooseHeading: string; useExamples: string; askTeacher: string; teacherKey: string; teacherModel: string; modelPh: string
   choose: string; customAmount: string; chooseTeacherAccount: string; connectTeacherFirst: string; connectTrainingFirst: string; workspaceSelectorLabel: string; defaultWorkspaceName: string; teacherProviderLabel: string; chooseTeacherProvider: string; budgetConfirmation: string; trainingProviderLabel: string; chooseTrainingProvider: string; chooseTrainingAccount: string; customModelLabel: string; modelDirectoryHelp: string; modelDirectoryUnavailable: string; loadingModels: string; trainingAccount: string; baseModel: string; budget: string; hourly: string
   teacherBudget: string; teacherPriceHelp: string
-  prompts: string; examples: string; connectKeysFirst: string; connectTrainingKey: string; pricedModels: string; unpricedModels: string; tunedModelLine: string; cancelTraining: string; cancelFailed: string; start: string
+  prompts: string; examples: string; connectKeysFirst: string; addKeyFirst: string; connectTrainingKey: string; pricedModels: string; unpricedModels: string; tunedModelLine: string; cancelTraining: string; cancelFailed: string; start: string
   starting: string; started: string; notStarted: string
   progressHeading: string; noRuns: string; budgetLine: string; teacherSpentLine: string
   openJob: string; checkStatus: string; statusFailed: string; downloadModel: string; downloadUnavailable: string; mb: string
@@ -41,6 +41,7 @@ const en: LabCustomerTrainingCopy = {
   teacherBudget: 'Of which teacher calls may use (USD)',
   teacherPriceHelp: 'Teacher prices come from the platform\'s verified price list. The maximum possible cost is reserved before the first call; if real spending ever exceeds it, the full amount is recorded and the run stops.',
   prompts: 'Training prompts — one per line, 20 to 128 ({n})', examples: 'Examples — one per line as {"prompt": "...", "response": "..."}, 20 to 128 ({n})',
+  addKeyFirst: '(add key in section 1)',
   connectKeysFirst: 'Save a provider key in section 1 to see providers here.', connectTrainingKey: 'Save a Hugging Face, Together AI or Fireworks AI key in section 1 to train.',
   pricedModels: 'Verified price', unpricedModels: 'No verified price yet (cannot run)', tunedModelLine: 'Trained model: {id}', cancelTraining: 'Cancel training', cancelFailed: 'Could not cancel: {code}',
   start: 'Start training',
@@ -99,6 +100,7 @@ const es: T = {
   teacherBudget: 'De ello, las llamadas al profesor pueden usar (USD)',
   teacherPriceHelp: 'Los precios del profesor provienen de la lista de precios verificada de la plataforma. El costo máximo posible se reserva antes de la primera llamada; si el gasto real lo supera, se registra el importe completo y la ejecución se detiene.',
   prompts: 'Instrucciones de entrenamiento — una por línea, de 20 a 128 ({n})', examples: 'Ejemplos — uno por línea como {"prompt": "...", "response": "..."}, de 20 a 128 ({n})',
+  addKeyFirst: '(añade la clave en la sección 1)',
   connectKeysFirst: 'Guarda una clave de proveedor en la sección 1 para ver proveedores aquí.', connectTrainingKey: 'Guarda una clave de Hugging Face, Together AI o Fireworks AI en la sección 1 para entrenar.',
   pricedModels: 'Precio verificado', unpricedModels: 'Sin precio verificado (no se puede usar)', tunedModelLine: 'Modelo entrenado: {id}', cancelTraining: 'Cancelar entrenamiento', cancelFailed: 'No se pudo cancelar: {code}',
   start: 'Iniciar entrenamiento',
@@ -155,6 +157,7 @@ const pt: T = {
   teacherBudget: 'Desse total, as chamadas ao professor podem usar (USD)',
   teacherPriceHelp: 'Os preços do professor vêm da lista de preços verificada da plataforma. O custo máximo possível é reservado antes da primeira chamada; se o gasto real ultrapassá-lo, o valor total é registrado e a execução para.',
   prompts: 'Prompts de treinamento — um por linha, de 20 a 128 ({n})', examples: 'Exemplos — um por linha como {"prompt": "...", "response": "..."}, de 20 a 128 ({n})',
+  addKeyFirst: '(adicione a chave na seção 1)',
   connectKeysFirst: 'Salve uma chave de provedor na seção 1 para ver provedores aqui.', connectTrainingKey: 'Salve uma chave do Hugging Face, Together AI ou Fireworks AI na seção 1 para treinar.',
   pricedModels: 'Preço verificado', unpricedModels: 'Sem preço verificado (não pode ser usado)', tunedModelLine: 'Modelo treinado: {id}', cancelTraining: 'Cancelar treinamento', cancelFailed: 'Não foi possível cancelar: {code}',
   start: 'Iniciar treinamento',
@@ -211,6 +214,7 @@ const pl: T = {
   teacherBudget: 'Z tego wywołania nauczyciela mogą zużyć (USD)',
   teacherPriceHelp: 'Ceny nauczyciela pochodzą ze zweryfikowanego cennika platformy. Maksymalny możliwy koszt jest rezerwowany przed pierwszym wywołaniem; jeśli rzeczywiste wydatki go przekroczą, cała kwota zostaje zapisana, a przebieg zatrzymany.',
   prompts: 'Polecenia treningowe — jedno w wierszu, od 20 do 128 ({n})', examples: 'Przykłady — jeden w wierszu jako {"prompt": "...", "response": "..."}, od 20 do 128 ({n})',
+  addKeyFirst: '(dodaj klucz w sekcji 1)',
   connectKeysFirst: 'Zapisz klucz dostawcy w sekcji 1, aby zobaczyć tu dostawców.', connectTrainingKey: 'Zapisz klucz Hugging Face, Together AI lub Fireworks AI w sekcji 1, aby trenować.',
   pricedModels: 'Zweryfikowana cena', unpricedModels: 'Brak zweryfikowanej ceny (nie można użyć)', tunedModelLine: 'Wytrenowany model: {id}', cancelTraining: 'Anuluj trening', cancelFailed: 'Nie udało się anulować: {code}',
   start: 'Rozpocznij trening',
@@ -267,6 +271,7 @@ const ru: T = {
   teacherBudget: 'Из них на вызовы учителя (USD)',
   teacherPriceHelp: 'Цены учителя берутся из проверенного прайс-листа платформы. Максимально возможная стоимость резервируется до первого вызова; если реальные расходы её превысят, вся сумма записывается, а запуск останавливается.',
   prompts: 'Обучающие запросы — по одному в строке, от 20 до 128 ({n})', examples: 'Примеры — по одному в строке в виде {"prompt": "...", "response": "..."}, от 20 до 128 ({n})',
+  addKeyFirst: '(добавьте ключ в разделе 1)',
   connectKeysFirst: 'Сохраните ключ провайдера в разделе 1, чтобы увидеть провайдеров здесь.', connectTrainingKey: 'Сохраните ключ Hugging Face, Together AI или Fireworks AI в разделе 1 для обучения.',
   pricedModels: 'Проверенная цена', unpricedModels: 'Нет проверенной цены (недоступно)', tunedModelLine: 'Обученная модель: {id}', cancelTraining: 'Отменить обучение', cancelFailed: 'Не удалось отменить: {code}',
   start: 'Начать обучение',
@@ -323,6 +328,7 @@ const de: T = {
   teacherBudget: 'Davon für Lehreraufrufe (USD)',
   teacherPriceHelp: 'Die Lehrerpreise stammen aus der verifizierten Preisliste der Plattform. Die maximal mögliche Summe wird vor dem ersten Aufruf reserviert; übersteigen die echten Kosten sie, wird der volle Betrag erfasst und der Lauf gestoppt.',
   prompts: 'Trainings-Prompts — einer pro Zeile, 20 bis 128 ({n})', examples: 'Beispiele — eins pro Zeile als {"prompt": "...", "response": "..."}, 20 bis 128 ({n})',
+  addKeyFirst: '(Schlüssel in Abschnitt 1 hinzufügen)',
   connectKeysFirst: 'Speichere in Abschnitt 1 einen Anbieterschlüssel, um hier Anbieter zu sehen.', connectTrainingKey: 'Speichere in Abschnitt 1 einen Schlüssel von Hugging Face, Together AI oder Fireworks AI, um zu trainieren.',
   pricedModels: 'Verifizierter Preis', unpricedModels: 'Noch kein verifizierter Preis (nicht nutzbar)', tunedModelLine: 'Trainiertes Modell: {id}', cancelTraining: 'Training abbrechen', cancelFailed: 'Abbruch fehlgeschlagen: {code}',
   start: 'Training starten',
@@ -379,6 +385,7 @@ const fr: T = {
   teacherBudget: 'Dont les appels à l’enseignant peuvent utiliser (USD)',
   teacherPriceHelp: 'Les prix de l’enseignant proviennent de la grille tarifaire vérifiée de la plateforme. Le coût maximal possible est réservé avant le premier appel ; si la dépense réelle le dépasse, le montant total est enregistré et l’exécution s’arrête.',
   prompts: 'Consignes d’entraînement — une par ligne, de 20 à 128 ({n})', examples: 'Exemples — un par ligne sous la forme {"prompt": "...", "response": "..."}, de 20 à 128 ({n})',
+  addKeyFirst: '(ajoutez la clé dans la section 1)',
   connectKeysFirst: 'Enregistrez une clé de fournisseur dans la section 1 pour voir les fournisseurs ici.', connectTrainingKey: 'Enregistrez une clé Hugging Face, Together AI ou Fireworks AI dans la section 1 pour entraîner.',
   pricedModels: 'Prix vérifié', unpricedModels: 'Pas encore de prix vérifié (inutilisable)', tunedModelLine: 'Modèle entraîné : {id}', cancelTraining: 'Annuler l’entraînement', cancelFailed: 'Annulation impossible : {code}',
   start: 'Lancer l’entraînement',
@@ -435,6 +442,7 @@ const it: T = {
   teacherBudget: 'Di cui per le chiamate all’insegnante (USD)',
   teacherPriceHelp: 'I prezzi dell’insegnante provengono dal listino verificato della piattaforma. Il costo massimo possibile viene riservato prima della prima chiamata; se la spesa reale lo supera, l’importo completo viene registrato e l’esecuzione si ferma.',
   prompts: 'Prompt di addestramento — uno per riga, da 20 a 128 ({n})', examples: 'Esempi — uno per riga come {"prompt": "...", "response": "..."}, da 20 a 128 ({n})',
+  addKeyFirst: '(aggiungi la chiave nella sezione 1)',
   connectKeysFirst: 'Salva una chiave del fornitore nella sezione 1 per vedere qui i fornitori.', connectTrainingKey: 'Salva una chiave Hugging Face, Together AI o Fireworks AI nella sezione 1 per addestrare.',
   pricedModels: 'Prezzo verificato', unpricedModels: 'Nessun prezzo verificato (non utilizzabile)', tunedModelLine: 'Modello addestrato: {id}', cancelTraining: 'Annulla addestramento', cancelFailed: 'Impossibile annullare: {code}',
   start: 'Avvia addestramento',
@@ -491,6 +499,7 @@ const ja: T = {
   teacherBudget: 'うち教師呼び出しに使える額 (USD)',
   teacherPriceHelp: '教師の価格はプラットフォームの検証済み価格表に基づきます。最大費用は最初の呼び出し前に予約され、実際の費用がそれを超えた場合は全額が記録され、実行は停止します。',
   prompts: 'トレーニング用プロンプト — 1 行に 1 つ、20〜128 件 ({n})', examples: '例 — 1 行に 1 つ {"prompt": "...", "response": "..."} 形式、20〜128 件 ({n})',
+  addKeyFirst: '（セクション1でキーを追加）',
   connectKeysFirst: 'セクション1でプロバイダーキーを保存すると、ここにプロバイダーが表示されます。', connectTrainingKey: 'トレーニングするには、セクション1で Hugging Face、Together AI、Fireworks AI のいずれかのキーを保存してください。',
   pricedModels: '検証済み価格', unpricedModels: '検証済み価格なし（使用不可）', tunedModelLine: 'トレーニング済みモデル: {id}', cancelTraining: 'トレーニングをキャンセル', cancelFailed: 'キャンセルできませんでした: {code}',
   start: 'トレーニング開始',
@@ -547,6 +556,7 @@ const ko: T = {
   teacherBudget: '그중 교사 호출에 사용할 수 있는 금액 (USD)',
   teacherPriceHelp: '교사 가격은 플랫폼의 검증된 가격표에서 가져옵니다. 최대 가능 비용은 첫 호출 전에 예약되며, 실제 지출이 이를 넘으면 전체 금액이 기록되고 실행이 중지됩니다.',
   prompts: '훈련 프롬프트 — 한 줄에 하나, 20~128개 ({n})', examples: '예시 — 한 줄에 하나씩 {"prompt": "...", "response": "..."} 형식, 20~128개 ({n})',
+  addKeyFirst: '(섹션 1에서 키 추가)',
   connectKeysFirst: '섹션 1에 제공자 키를 저장하면 여기에 제공자가 표시됩니다.', connectTrainingKey: '훈련하려면 섹션 1에 Hugging Face, Together AI 또는 Fireworks AI 키를 저장하세요.',
   pricedModels: '검증된 가격', unpricedModels: '검증된 가격 없음(사용 불가)', tunedModelLine: '훈련된 모델: {id}', cancelTraining: '훈련 취소', cancelFailed: '취소하지 못했습니다: {code}',
   start: '훈련 시작',
@@ -603,6 +613,7 @@ const ar: T = {
   teacherBudget: 'منها لاستدعاءات المعلّم (دولار)',
   teacherPriceHelp: 'تأتي أسعار المعلّم من قائمة الأسعار المعتمدة لدى المنصة. يُحجز الحد الأقصى الممكن للتكلفة قبل أول استدعاء؛ وإذا تجاوز الإنفاق الفعلي ذلك، يُسجَّل المبلغ كاملًا ويتوقف التشغيل.',
   prompts: 'مطالبات التدريب — واحدة في كل سطر، من 20 إلى 128 ({n})', examples: 'أمثلة — واحد في كل سطر بصيغة {"prompt": "...", "response": "..."}، من 20 إلى 128 ({n})',
+  addKeyFirst: '(أضف المفتاح في القسم 1)',
   connectKeysFirst: 'احفظ مفتاح مزوّد في القسم 1 لعرض المزوّدين هنا.', connectTrainingKey: 'احفظ مفتاح Hugging Face أو Together AI أو Fireworks AI في القسم 1 للتدريب.',
   pricedModels: 'سعر موثّق', unpricedModels: 'لا يوجد سعر موثّق بعد (غير قابل للاستخدام)', tunedModelLine: 'النموذج المدرَّب: {id}', cancelTraining: 'إلغاء التدريب', cancelFailed: 'تعذّر الإلغاء: {code}',
   start: 'ابدأ التدريب',

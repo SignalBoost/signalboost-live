@@ -34,6 +34,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [keyValue, setKeyValue] = useState('')
   const [keyEndpoint, setKeyEndpoint] = useState('')
   // run form
+  const [teacherProviderKind, setTeacherProviderKind] = useState('')
   const [teacherId, setTeacherId] = useState('')
   const [teacherModel, setTeacherModel] = useState('')
   const [computeId, setComputeId] = useState('')
@@ -45,9 +46,10 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [source, setSource] = useState<'examples' | 'teacher'>('examples')
   const [examples, setExamples] = useState('')
   const [files, setFiles] = useState<Record<string, { path: string; size: number }[]>>({})
-  const [budget, setBudget] = useState('5')
-  const [hourly, setHourly] = useState('1')
-  const [teacherBudget, setTeacherBudget] = useState('1')
+  const [budget, setBudget] = useState('')
+  const [hourly, setHourly] = useState('')
+  const [teacherBudget, setTeacherBudget] = useState('')
+  const [budgetAuthorized, setBudgetAuthorized] = useState(false)
 
   const [organizationId, experimentId] = orgKey.split('|')
   const org = orgs.find(item => `${item.organizationId}|${item.experimentId}` === orgKey)
@@ -57,6 +59,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [computeProviderKind, setComputeProviderKind] = useState('')
   const selectedComputeCredentials = computeCredentials.filter(item => item.providerKind === computeProviderKind)
   const teacherCredentials = credentials.filter(item => entry(item.providerKind)?.supports['teacher.generate'])
+  const selectedTeacherCredentials = teacherCredentials.filter(item => item.providerKind === teacherProviderKind)
   const promptCount = useMemo(() => new Set(prompts.split('\n').map(line => line.trim()).filter(Boolean)).size, [prompts])
   const exampleCount = useMemo(() => examples.split('\n').filter(line => { try { const o = JSON.parse(line); return o?.prompt && o?.response } catch { return false } }).length, [examples])
   const itemCount = source === 'examples' ? exampleCount : promptCount
@@ -81,7 +84,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     setBusy(true)
     try {
       const response = await fetch('/api/lab/workspace', { method: 'POST', credentials: 'include',
-        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ organizationName: copy.title }) })
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ organizationName: 'My AI University workspace' }) })
       const body = await response.json()
       if (!response.ok || !body.ok) throw new Error(body.error || 'lab_request_failed')
       setOrgs([body.workspace])
@@ -151,6 +154,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }
 
   async function startRun() {
+    if (!budgetAuthorized) return
+    setBudgetAuthorized(false)
     const requestedOrg = organizationId
     setMessage({ kind: 'status', text: copy.starting })
     try {
@@ -204,9 +209,13 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{copy.title}</h2>
-        <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
-          {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName} · {item.projectName}</option>)}
+        {orgs.length > 1 ? (
+          <label className="flex flex-col gap-1 text-sm"><span>{copy.workspaceSelectorLabel}</span>
+        <select aria-label="Workspace and experiment" className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setTeacherProviderKind(''); setTeacherModel(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
+          {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName === item.projectName ? item.organizationName : `${item.organizationName} · ${item.projectName}`}</option>)}
         </select>
+          </label>
+        ) : <span aria-label="Current workspace" className="rounded border border-white/20 px-3 py-2 text-sm text-slate-300">{copy.workspaceSelectorLabel}: {org?.organizationName === copy.title ? 'My AI University workspace' : (org?.organizationName || 'My AI University workspace')}</span>}
       </header>
       {message && <p role={message.kind} className="text-sm">{message.text}</p>}
 
@@ -246,10 +255,16 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {source === 'teacher' && <>
+            <label className="text-sm">{copy.teacherProviderLabel}
+              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); setTeacherId(''); setTeacherModel('') }}>
+                <option value="">{copy.chooseTeacherProvider}</option>
+                {catalog.filter(item => item.supports['teacher.generate']).map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
+              </select>
+            </label>
             <label className="text-sm">{copy.teacherKey}
-              <select className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} onChange={event => setTeacherId(event.target.value)}>
-                <option value="">{copy.choose}</option>
-                {teacherCredentials.map(item => <option key={item.id} value={item.id}>{entry(item.providerKind)?.name} · {item.label}</option>)}
+              <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} disabled={!teacherProviderKind} onChange={event => { setTeacherId(event.target.value); setTeacherModel('') }}>
+                <option value="">{copy.chooseTrainingAccount}</option>
+                {selectedTeacherCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.teacherModel}
@@ -257,7 +272,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             </label>
             </>}
             <label className="text-sm">{copy.trainingProviderLabel}
-              <select aria-label="Training compute provider" className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setComputeId(''); setBaseModel(''); setModelSelection('') }}>
+              <select aria-label="Training compute provider" className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); setComputeId(''); setBaseModel(''); setModelSelection('') }}>
                 <option value="">{copy.chooseTrainingProvider}</option>
                 {catalog.filter(item => item.supports['training.execute']).map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
               </select>
@@ -301,7 +316,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             )}
           </div>
           {!computeCredentials.length && <p className="text-sm">{copy.hfOnly}</p>}
-          <button className="rounded border px-3 py-1" disabled={busy || !computeProviderKind || !computeId || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(baseModel) || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherId || !teacherModel || !(Number(teacherBudget) > 0) || !(Number(teacherBudget) < Number(budget))))} onClick={startRun}>{copy.start}</button>
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={budgetAuthorized} onChange={event => setBudgetAuthorized(event.target.checked)} /> {copy.budgetConfirmation}</label>
+          <button className="rounded border px-3 py-1" disabled={busy || !budgetAuthorized || !(Number(budget) > 0) || !(Number(hourly) > 0) || !computeProviderKind || !computeId || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(baseModel) || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel || !(Number(teacherBudget) > 0) || !(Number(teacherBudget) < Number(budget))))} onClick={startRun}>{copy.start}</button>
         </div>
       )}
 

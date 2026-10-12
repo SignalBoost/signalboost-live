@@ -54,7 +54,7 @@ export default function UniversityLanding() {
           <div className="rounded-2xl border border-white/15 bg-white/5 p-6"><h3 className="text-xl font-semibold">Your providers’ charges</h3><p className="mt-3 text-slate-300">AI teacher inference, model distillation inputs, hosted training and rented GPUs may be billed directly by OpenAI, Anthropic, Hugging Face or your chosen compute provider. These charges are separate from iTMounts fees.</p></div>
         </div>
         <p className="mt-5 text-sm text-slate-300">Important: paid University operations cannot continue if either required balance is exhausted. Without sufficient iTMounts credits, new billable LAB work must be blocked. Without sufficient external AI or GPU provider balance/quota, the affected provider work must stop or fail safely. Replenish the relevant account before starting or resuming paid work. No paid job should begin without a budget review and explicit authorization. Exact iTMounts prices must be shown before paid use; no subscription price is implied here.</p>
-        <Link href="/pricing" className="mt-4 inline-block underline text-amber-300">View iTMounts pricing</Link>
+        <Link href="/university/pricing" className="mt-4 inline-block underline text-amber-300">How University credits and provider charges work</Link>
       </section>
       <section id="how-it-works" className="py-14">
         <h2 className="text-3xl font-semibold">How iTMounts University works</h2>

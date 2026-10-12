@@ -256,26 +256,26 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={teacherEntry?.kind === 'anthropic' ? 'claude-…' : copy.modelPh} value={teacherModel} onChange={event => setTeacherModel(event.target.value)} />
             </label>
             </>}
-            <label className="text-sm">Training compute provider
+            <label className="text-sm">{copy.trainingProviderLabel}
               <select aria-label="Training compute provider" className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setComputeId(''); setBaseModel(''); setModelSelection('') }}>
-                <option value="">Choose a training provider</option>
+                <option value="">{copy.chooseTrainingProvider}</option>
                 {catalog.filter(item => item.supports['training.execute']).map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.trainingAccount}
               <select className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeId} disabled={!computeProviderKind} onChange={event => setComputeId(event.target.value)}>
-                <option value="">Choose a connected training account</option>
+                <option value="">{copy.chooseTrainingAccount}</option>
                 {selectedComputeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.baseModel}
               <select aria-label="Base model to train" className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind} onChange={event => { const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
-                <option value="">{modelsLoading ? 'Loading models…' : 'Choose a base model'}</option>
+                <option value="">{modelsLoading ? copy.loadingModels : copy.choose}</option>
                 {modelSuggestions.map(model => <option key={model} value={model}>{model}</option>)}
-                <option value="custom">Specify another compatible model ID</option>
+                <option value="custom">{copy.customModelLabel}</option>
               </select>
               {modelSelection === 'custom' && <input aria-label="Custom base model ID" className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder="Organization/model-name" value={baseModel} onChange={event => setBaseModel(event.target.value)} />}
-              <span className="mt-1 block text-xs text-slate-400">Available models depend on the chosen provider. A directory listing does not guarantee training compatibility, license or GPU availability.</span>
+              <span className="mt-1 block text-xs text-slate-400">{copy.modelDirectoryHelp}</span>
             </label>
             <label className="text-sm">{copy.budget}
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" value={budget} onChange={event => setBudget(event.target.value)} />

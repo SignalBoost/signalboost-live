@@ -152,8 +152,14 @@ async function resolveAutoMergeContext(target: ReturnType<typeof parseAutoMergeT
 
 /**
  * Merge a branch or pull request into the target branch only after explicit approval.
- * Conflicting merges are recorded with an `ours` merge commit so the target branch
- * remains authoritative while the approved source branch is marked as merged.
+ *
+ * Follows the repo's Main Write Discipline guard (.github/workflows/main-write-discipline.yml):
+ *   1. bring the source branch up to date with the target branch,
+ *   2. update .github/main-write-token on the source branch (base_sha + branch),
+ *   3. open (or reuse) a pull request,
+ *   4. merge that pull request with a real merge commit.
+ * It never writes to the target branch directly and never discards the branch's
+ * changes. Real conflicts stop the merge and are reported so they can be fixed.
  */
 export async function autoMergeOnApproval(branchOrPR: AutoMergeTarget, approve: AutoMergeApproval): Promise<AutoMergeResult> {
   const target = parseAutoMergeTarget(branchOrPR)
@@ -161,44 +167,77 @@ export async function autoMergeOnApproval(branchOrPR: AutoMergeTarget, approve: 
 
   const ctx = await resolveAutoMergeContext(target)
   if (ctx.ok === false) return logAutoMerge(ctx.result)
+  const repoUrl = `${API}/repos/${ctx.owner}/${ctx.name}`
+  const jsonHeaders = { ...ctx.headers, 'Content-Type': 'application/json' }
+  const encRef = (ref: string) => ref.split('/').map(encodeURIComponent).join('/')
   let branch = target.branch || ''
-  let headSha = ''
+  let prNumber = target.pr || ''
 
-  if (target.pr) {
-    const pr = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/pulls/${encodeURIComponent(target.pr)}`, { headers: ctx.headers })
-    if (pr.ok === false) return logAutoMerge({ ok: false, branch: target.pr, commit: '', message: 'Merge failed', error: pr.error })
+  if (prNumber) {
+    const pr = await githubJson<any>(`${repoUrl}/pulls/${encodeURIComponent(prNumber)}`, { headers: ctx.headers })
+    if (pr.ok === false) return logAutoMerge({ ok: false, branch: prNumber, commit: '', message: 'Merge failed', error: pr.error })
     branch = String(pr.data?.head?.ref || '')
-    headSha = String(pr.data?.head?.sha || '')
   }
+  if (!branch) return logAutoMerge({ ok: false, branch: '', commit: '', message: 'Merge failed', error: 'Branch or PR number is required' })
+  if (branch === ctx.targetBranch) return logAutoMerge({ ok: false, branch, commit: '', message: 'Merge failed', error: `Refusing to merge ${branch} into itself.` })
 
-  if (!branch && !headSha) return logAutoMerge({ ok: false, branch: '', commit: '', message: 'Merge failed', error: 'Branch or PR number is required' })
-
-  if (!headSha) {
-    const head = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/ref/heads/${branch.split('/').map(encodeURIComponent).join('/')}`, { headers: ctx.headers })
-    if (head.ok === false) return logAutoMerge({ ok: false, branch, commit: '', message: 'Merge failed', error: head.error })
-    headSha = String(head.data?.object?.sha || '')
-  }
-
-  const merge = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/merges`, {
-    method: 'POST', headers: { ...ctx.headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ base: ctx.targetBranch, head: headSha, commit_message: `Auto-merge ${branch} after explicit approval` }),
-  })
-  if (merge.ok === true) return logAutoMerge({ ok: true, branch, commit: String(merge.data?.sha || headSha), message: 'Merge successful', resolutionStrategy: 'github_merge' })
-  if (merge.status !== 409) return logAutoMerge({ ok: false, branch, commit: headSha, message: 'Merge failed', error: merge.error })
-
-  const base = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/ref/heads/${ctx.targetBranch}`, { headers: ctx.headers })
-  if (base.ok === false) return logAutoMerge({ ok: false, branch, commit: headSha, message: 'Merge failed', error: base.error })
+  // 1. Bring the source branch up to date with the current target branch.
+  const base = await githubJson<any>(`${repoUrl}/git/ref/heads/${encRef(ctx.targetBranch)}`, { headers: ctx.headers })
+  if (base.ok === false) return logAutoMerge({ ok: false, branch, commit: '', message: 'Merge failed', error: base.error })
   const baseSha = String(base.data?.object?.sha || '')
-  const baseCommit = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/commits/${encodeURIComponent(baseSha)}`, { headers: ctx.headers })
-  if (baseCommit.ok === false) return logAutoMerge({ ok: false, branch, commit: baseSha, message: 'Merge failed', error: baseCommit.error })
-  const created = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/commits`, {
-    method: 'POST', headers: { ...ctx.headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: `Auto-merge ${branch} after explicit approval (conflicts resolved with ours)`, tree: baseCommit.data?.tree?.sha, parents: [baseSha, headSha] }),
+  const sync = await githubJson<any>(`${repoUrl}/merges`, {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ base: branch, head: baseSha, commit_message: `Sync ${branch} with ${ctx.targetBranch}` }),
   })
-  if (created.ok === false) return logAutoMerge({ ok: false, branch, commit: baseSha, message: 'Merge failed', error: created.error, conflicts: [branch], resolutionStrategy: 'ours' })
-  const update = await githubJson<any>(`${API}/repos/${ctx.owner}/${ctx.name}/git/refs/heads/${ctx.targetBranch}`, {
-    method: 'PATCH', headers: { ...ctx.headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ sha: created.data?.sha, force: false }),
+  if (sync.ok === false && sync.status === 409) {
+    return logAutoMerge({ ok: false, branch, commit: baseSha, message: 'Merge failed', error: `${branch} conflicts with ${ctx.targetBranch}. Resolve the conflict on the branch, then approve again.`, conflicts: [branch] })
+  }
+  if (sync.ok === false && sync.status !== 204) return logAutoMerge({ ok: false, branch, commit: baseSha, message: 'Merge failed', error: sync.error })
+
+  // 2. Advance the shared serialization token on the source branch.
+  const tokenPath = '.github/main-write-token'
+  const tokenBody = `base_sha=${baseSha}\nbranch=${branch}\n`
+  const existing = await githubJson<any>(`${repoUrl}/contents/${tokenPath}?ref=${encodeURIComponent(branch)}`, { headers: ctx.headers })
+  const tokenWrite = await githubJson<any>(`${repoUrl}/contents/${tokenPath}`, {
+    method: 'PUT', headers: jsonHeaders,
+    body: JSON.stringify({
+      message: `Claim ${ctx.targetBranch} integration token for ${branch}`,
+      content: btoa(tokenBody),
+      branch,
+      ...(existing.ok === true && existing.data?.sha ? { sha: existing.data.sha } : {}),
+    }),
   })
-  if (update.ok === false) return logAutoMerge({ ok: false, branch, commit: String(created.data?.sha || ''), message: 'Merge failed', error: update.error, conflicts: [branch], resolutionStrategy: 'ours' })
-  return logAutoMerge({ ok: true, branch, commit: String(created.data?.sha || ''), message: 'Conflict resolved', conflicts: [branch], resolutionStrategy: 'ours' })
+  if (tokenWrite.ok === false) return logAutoMerge({ ok: false, branch, commit: baseSha, message: 'Merge failed', error: `Could not update ${tokenPath}: ${tokenWrite.error}` })
+
+  // 3. Open a pull request, or reuse the open one for this branch.
+  if (!prNumber) {
+    const open = await githubJson<any[]>(`${repoUrl}/pulls?state=open&base=${encodeURIComponent(ctx.targetBranch)}&head=${encodeURIComponent(`${ctx.owner}:${branch}`)}`, { headers: ctx.headers })
+    if (open.ok === true && Array.isArray(open.data) && open.data.length > 0) {
+      prNumber = String(open.data[0].number)
+    } else {
+      const created = await githubJson<any>(`${repoUrl}/pulls`, {
+        method: 'POST', headers: jsonHeaders,
+        body: JSON.stringify({ title: `Builder: merge ${branch}`, head: branch, base: ctx.targetBranch, body: 'Opened automatically by the Builder after explicit approval.' }),
+      })
+      if (created.ok === false) return logAutoMerge({ ok: false, branch, commit: '', message: 'Merge failed', error: `Could not open pull request: ${created.error}` })
+      prNumber = String(created.data?.number || '')
+    }
+  }
+
+  // 4. Merge the pull request with a real merge commit (the guard rejects squash/rebase).
+  //    GitHub needs a few seconds to compute mergeability after new commits, so retry briefly.
+  let lastError = ''
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const merged = await githubJson<any>(`${repoUrl}/pulls/${encodeURIComponent(prNumber)}/merge`, {
+      method: 'PUT', headers: jsonHeaders,
+      body: JSON.stringify({ merge_method: 'merge', commit_title: `Merge ${branch} after explicit approval (#${prNumber})` }),
+    })
+    if (merged.ok === true) return logAutoMerge({ ok: true, branch, commit: String(merged.data?.sha || ''), message: 'Merge successful', resolutionStrategy: 'github_merge' })
+    lastError = merged.error
+    if (merged.status !== 405 && merged.status !== 409) break
+    await new Promise((r) => setTimeout(r, 6000))
+  }
+  return logAutoMerge({ ok: false, branch, commit: '', message: 'Merge failed', error: `Pull request #${prNumber} is open but could not be merged yet: ${lastError}` })
 }
 
 // ---- READS ----

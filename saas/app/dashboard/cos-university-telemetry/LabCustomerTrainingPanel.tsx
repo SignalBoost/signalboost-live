@@ -78,7 +78,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     setBusy(true)
     try {
       const response = await fetch('/api/lab/workspace', { method: 'POST', credentials: 'include',
-        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ organizationName: copy.title }) })
+        headers: { 'content-type': 'application/json' }, body: JSON.stringify({ organizationName: 'My AI University workspace' }) })
       const body = await response.json()
       if (!response.ok || !body.ok) throw new Error(body.error || 'lab_request_failed')
       setOrgs([body.workspace])
@@ -190,9 +190,16 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{copy.title}</h2>
-        <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setDiscovery([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setMessage(null); setOrgKey(next) }}>
-          {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName} · {item.projectName}</option>)}
-        </select>
+        {orgs.length > 1 ? (
+          <label className="flex flex-col gap-1 text-sm">
+            <span>Workspace / experiment</span>
+            <select aria-label="Workspace and experiment" className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setDiscovery([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setMessage(null); setOrgKey(next) }}>
+              {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName === item.projectName ? item.organizationName : `${item.organizationName} · ${item.projectName}`}</option>)}
+            </select>
+          </label>
+        ) : (
+          <span className="rounded border border-white/20 bg-slate-900 px-3 py-2 text-sm text-slate-300" aria-label="Current workspace">Workspace: {org?.organizationName === copy.title ? 'My AI University workspace' : (org?.organizationName || 'My AI University workspace')}</span>
+        )>
       </header>
       {message && <p role={message.kind} className="text-sm">{message.text}</p>}
 

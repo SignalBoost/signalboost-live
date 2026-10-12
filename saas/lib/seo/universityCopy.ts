@@ -3,8 +3,8 @@ import type { PublicLocale } from './publicLocales.ts'
 // Dedicated University marketing and pricing copy, no fallback to English.
 export const UNIVERSITY_COPY = {
   "en": {
-    "hero": "Train AI models using your own tools. No GPU ownership required.",
-    "intro": "Connect supported AI providers and cloud compute, prepare permitted data and control your budget in one workspace.",
+    "hero": "Train and distill AI models using your own providers. No GPU ownership necessary.",
+    "intro": "Use supported cloud GPU providers when training requires additional computing power. GPU rental and AI-provider charges are separate from iTMounts platform credits.",
     "start": "Get started",
     "how": "How it works",
     "pricing": "AI University pricing",
@@ -19,7 +19,7 @@ export const UNIVERSITY_COPY = {
     "step5": "Track training and retrieve results",
     "available": "Supported connections",
     "current": "The current customer training executor is Hugging Face. Other compute adapters require verification before paid use.",
-    "noGpu": "No personal GPU required: use a supported cloud-compute account.",
+    "noGpu": "You do not need to own a GPU, but model training usually needs GPU compute rented through a supported provider.",
     "credits": "Credits and pricing",
     "creditPlan": "The intended iTMounts plan is pay-as-you-go credits with an optional subscription. Prices and credit purchases are not yet approved or operational.",
     "external": "Third-party AI tokens and GPU rentals are paid separately to providers using your own account.",

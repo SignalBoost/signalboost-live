@@ -43,6 +43,9 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [modelSelection, setModelSelection] = useState('')
   const [modelSuggestions, setModelSuggestions] = useState<string[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
+  const [teacherModels, setTeacherModels] = useState<string[]>([])
+  const [teacherModelsLoading, setTeacherModelsLoading] = useState(false)
+  const [teacherModelsError, setTeacherModelsError] = useState(false)
   const [prompts, setPrompts] = useState('')
   const [source, setSource] = useState<'examples' | 'teacher'>('examples')
   const [examples, setExamples] = useState('')
@@ -110,6 +113,17 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }, [organizationId, copy])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let cancelled = false
+    if (!teacherProviderKind || !teacherId || !organizationId) { setTeacherModels([]); setTeacherModelsError(false); return }
+    setTeacherModels([]); setTeacherModelsError(false); setTeacherModelsLoading(true)
+    void fetch(`/api/lab/teacher-models?provider=${encodeURIComponent(teacherProviderKind)}&organizationId=${encodeURIComponent(organizationId)}&credentialId=${encodeURIComponent(teacherId)}`, { credentials: 'include', cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(body => { if (!cancelled) { setTeacherModels(body?.ok && Array.isArray(body.models) ? body.models : []); setTeacherModelsError(!body?.ok || !Array.isArray(body?.models) || body.models.length === 0) } })
+      .catch(() => { if (!cancelled) { setTeacherModels([]); setTeacherModelsError(true) } })
+      .finally(() => { if (!cancelled) setTeacherModelsLoading(false) })
+    return () => { cancelled = true }
+  }, [organizationId, teacherProviderKind, teacherId])
   useEffect(() => {
     let cancelled = false
     if (!computeProviderKind) { setModelSuggestions([]); return }
@@ -209,7 +223,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   return (
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{copy.title}</h2>
+        <div><h2 className="text-lg font-semibold">{copy.title}</h2><span className="text-xs text-slate-400">LAB UI v2026.10.12.2</span></div>
         {orgs.length > 1 ? (
           <label className="flex flex-col gap-1 text-sm"><span>{copy.workspaceSelectorLabel}</span>
         <select aria-label={copy.workspaceSelectorLabel} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setTeacherProviderKind(''); setTeacherModel(''); setTeacherModelChoice(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
@@ -263,17 +277,19 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               </select>
             </label>
             <label className="text-sm">{copy.teacherKey}
-              <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} disabled={!teacherProviderKind} onChange={event => { setTeacherId(event.target.value); setTeacherModel('') }}>
+              <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherId} disabled={!teacherProviderKind} onChange={event => { setTeacherId(event.target.value); setTeacherModel(''); setTeacherModelChoice(''); setBudgetAuthorized(false) }}>
                 <option value="">{copy.chooseTeacherAccount}</option>
                 {selectedTeacherCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
               {teacherProviderKind && !selectedTeacherCredentials.length && <span className="mt-1 block text-xs text-amber-200">{copy.connectTeacherFirst}</span>}
             </label>
             <label className="text-sm">{copy.teacherModel}
-              <select aria-label={copy.teacherModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherModelChoice} disabled={!teacherProviderKind || !teacherId} onChange={event => { setTeacherModelChoice(event.target.value); setTeacherModel(''); setBudgetAuthorized(false) }}>
-                <option value="">{copy.choose}</option>
+              <select aria-label={copy.teacherModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherModelChoice} disabled={!teacherProviderKind || !teacherId} onChange={event => { setTeacherModelChoice(event.target.value); setTeacherModel(event.target.value === 'custom' ? '' : event.target.value); setBudgetAuthorized(false) }}>
+                <option value="">{teacherModelsLoading ? copy.loadingModels : copy.choose}</option>
+                {teacherModels.map(model => <option key={model} value={model}>{model}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>
+              {teacherModelsError && <span role="alert" className="mt-1 block text-xs text-amber-200">{copy.modelDirectoryUnavailable}</span>}
               {teacherModelChoice === 'custom' && <input aria-label={copy.teacherModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.modelPh} value={teacherModel} onChange={event => { setTeacherModel(event.target.value); setBudgetAuthorized(false) }} />}
             </label>
             </>}

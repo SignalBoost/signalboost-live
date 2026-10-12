@@ -13,6 +13,7 @@ import { chatHasRunpodPriority } from '@/lib/ai/cos/runpodInferenceLease'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
 import { deepInfraMaxCallUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
+import { builderGraduateAllowed, builderGraduateMode, builderGraduateTimeoutMs, recordBuilderGraduateResult } from '../builder/builderGraduateGate.ts'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider; signal?: AbortSignal }): Promise<string>
@@ -37,11 +38,18 @@ async function tryActiveGraduate(
   throwIfInferenceAborted(input.signal)
   if (!runtimes.length) return { text: null, attempted: false }
 
+  const builderGated = options.coding === true
+  if (builderGated && builderGraduateMode() !== 'serve') return { text: null, attempted: false }
   for (const runtime of runtimes) {
     throwIfInferenceAborted(input.signal)
+    const modelKey = runtime.trainedArtifactId || runtime.candidateId
+    if (builderGated && !builderGraduateAllowed(modelKey)) continue
+    const callSignal = builderGated
+      ? (input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(builderGraduateTimeoutMs())]) : AbortSignal.timeout(builderGraduateTimeoutMs()))
+      : input.signal
     const text = await callLocalModel({
       prompt: input.prompt,
-      signal: input.signal,
+      signal: callSignal,
       systemPrompt: input.systemPrompt,
       maxTokens: input.maxTokens,
       ...(options.coding ? { frequencyPenalty: 0, presencePenalty: 0, jsonObject: true } : {}),
@@ -60,6 +68,7 @@ async function tryActiveGraduate(
       return null
     })
     throwIfInferenceAborted(input.signal)
+    if (builderGated) recordBuilderGraduateResult(modelKey, Boolean(text?.trim()))
     if (text?.trim()) return { text, attempted: true }
   }
   return { text: null, attempted: true }
@@ -118,7 +127,7 @@ export function createPlatformAiPort(): CosAiPort {
 
 /**
  * Builder priority:
- * 1. active coder-scoped graduate;
+ * 1. active coder-scoped graduate — only when BUILDER_GRADUATE_MODE=serve (time-boxed, circuit-broken);
  * 2. RunPod primary coding/reasoning model;
  * 3. DeepSeek V4 Pro on DeepInfra as bounded fallback.
  *

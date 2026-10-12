@@ -3,11 +3,18 @@
 // This performs read-only catalog GET requests; no inference, training, or spend.
 // Never expose, cache, or log customer secrets or raw provider payloads.
 // Each model says whether it has an active verified teacher price: only priced models can run (lab.teacher_rate_cards).
+// OpenRouter's model list carries its own documented prices, so for OpenRouter the payload just read is also handed to
+// the service-role-only price sync (at most once an hour across all instances, via a shared lease). Prices therefore
+// load the first time anyone looks, without depending on the scheduled job.
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import { customerSession, UUID_RE } from '@/lib/lab/customerSession'
 import { openCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
 import { LAB_PROVIDER_CATALOG, customModelsUrl } from '@/lib/ai/cos/labCustomerProviderCatalog'
 import { assertPublicHttpUrl } from '@/lib/security/publicFetchGuard'
+import { getAdminSupabase } from '@/utils/supabase/server'
+import { syncOpenRouterTeacherPrices } from '@/lib/lab/openRouterTeacherPrices'
+import { createSupabaseLearningSourceProviderLeasePort } from '@/lib/cos-core/layers/learning/providerLease'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,6 +36,21 @@ const API_MODELS: Readonly<Record<string, { url: string; auth: 'bearer' | 'anthr
   together: { url: 'https://api.together.xyz/v1/models', auth: 'bearer' },
   fireworks: { url: 'https://api.fireworks.ai/inference/v1/models', auth: 'bearer' },
   deepinfra: { url: 'https://api.deepinfra.com/v1/openai/models', auth: 'bearer' },
+}
+
+// OpenRouter prices: one sync per hour across all instances; a failed sync retries after five minutes.
+const PRICE_LEASE = 'lab_openrouter_prices'
+async function refreshOpenRouterPrices(payload: unknown): Promise<void> {
+  try {
+    const port = createSupabaseLearningSourceProviderLeasePort()
+    const leaseId = randomUUID()
+    if (!(await port.claim({ providerId: PRICE_LEASE, leaseId, holder: 'lab-teacher-models', ttlSeconds: 30 }))) return
+    const admin = getAdminSupabase()
+    const outcome = await syncOpenRouterTeacherPrices(payload, (fn, args) => admin.rpc(fn, args))
+    await port.release({ providerId: PRICE_LEASE, leaseId, outcome: outcome.ok ? 'ok' : 'error', cooldownSeconds: outcome.ok ? 3600 : 300, error: outcome.ok ? null : outcome.error })
+  } catch {
+    // Prices then come only from what is already stored; the model list itself is unaffected.
+  }
 }
 
 const clean = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length < 241 && /^[\w./:-]+$/.test(value)
@@ -90,7 +112,9 @@ export async function GET(req: NextRequest) {
       method: 'GET', headers, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
-    live = collectModels(await response.json(), provider)
+    const payload = await response.json()
+    live = collectModels(payload, provider)
+    if (provider === 'openrouter') await refreshOpenRouterPrices(payload)
   } catch {
     return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
   }

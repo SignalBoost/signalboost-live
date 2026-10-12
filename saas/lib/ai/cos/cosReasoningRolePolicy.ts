@@ -173,6 +173,7 @@ export function isConciergeBuilderObjective(prompt: string, context?: CosCodingR
   if (attachedSourceIsTheJob(prompt, context)) return true
   if (pastedSourceCode(objective)) return pastedSourceExecutionAuthorized(objective)
   if (!executableBuilderAction(objective)) return false
+  if (CODE_ACTION.test(objective) && /\b(?:readme|documentation|docs|changelog)\b/i.test(objective)) return true
   return concreteCodeEvidence(objective, context)
 }
 

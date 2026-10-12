@@ -10,6 +10,13 @@ Status: **DESIGN + NON-EXECUTABLE STORAGE FOUNDATION ONLY; NO CUSTOMER BILLING**
 - Customers own and pay their AI providers and compute. iTMounts sells software metering, orchestration, exams, reporting, storage when explicitly charged.
 - No charge for provider GPU/teacher tokens by iTMounts in BYOI mode; surface provider-side reported spend *separately* and flag verified, estimated, delayed or unavailable state.
 
+## Dual-balance launch requirement
+- Paid University operations must require both (a) sufficient purchased/promotional iTMounts credit authorization for the platform charge and (b) sufficient quota/funds at each customer-owned external AI and compute provider used by the workload.
+- An exhausted iTMounts wallet must prevent **new** billable platform operations. Exhausted provider funds, provider 402/429 or confirmed insufficient quota must stop further dependent calls/jobs, record the reason, preserve artifacts and release unused authorized reserves where applicable.
+- Do not confuse the LAB experiment budget ledger with spendable purchased credit. Until the commercial wallet-to-authorization transaction path is live, the dual-balance runtime gate is **not verified** and paid University billing must not be presented as operational.
+- Warn customers before paid work that platform credits and external provider funds are separate; depleted accounts interrupt service. A previously submitted external job might continue billing after iTMounts credit depletion, so enforce provider-side limits, cancellation, reconciliation and cleanup instead of implying a guaranteed instantaneous stop.
+- Show the current state separately: platform balance, provider quota/credit when APIs expose it, and \'unknown—check provider\' otherwise. Never fabricate an external balance.
+
 ## Three distinct accounting domains
 1. **Commercial liability wallet** (NEW): value sold to customers as paid credits; refunds, chargebacks, purchased lots, promotional and subscription grants, source-of-truth signed payment events. All amounts integer-denominated in a versioned published denomination; avoid ambiguity with existing microcredits.
 2. **Experiment budget ledger** (EXISTING `lab.credit_*`): internal authorization reserve, capture, release, eligible platform-fault refund against tenant experiment budgets. These are NOT paid customer money and must never be interpreted as USD or a Stripe balance.

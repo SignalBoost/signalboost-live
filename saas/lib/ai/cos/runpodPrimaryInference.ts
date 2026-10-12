@@ -209,7 +209,7 @@ export async function resolveReadyRunpodPrimaryConfig(
 }
 
 /**
- * Try iTMounts-controlled RunPod first. The single physical reasoner is protected by a durable,
+ * Try iTMounts-controlled RunPod first. Each model is protected by a durable,
  * self-expiring cross-instance lease so parallel Builder/serverless work cannot create a queue that
  * pushes otherwise healthy requests past the inference timeout and into managed-provider fallback.
  */
@@ -230,7 +230,7 @@ export async function tryRunpodPrimaryInference(
       return { text: null, attempted: true, ready: false, reason: 'runpod_primary_not_ready', model }
     }
 
-    const lease = await acquireRunpodInferenceLease(config.timeoutMs, args.signal)
+    const lease = await acquireRunpodInferenceLease(config.timeoutMs, config.model, args.signal)
     if (!lease) {
       console.info('[runpod-primary-busy]', JSON.stringify({ workload, model: config.model }))
       return { text: null, attempted: true, ready: true, reason: 'runpod_primary_busy', model: config.model }

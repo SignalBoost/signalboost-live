@@ -19,6 +19,8 @@ type Run = {
 }
 type ModelOption = { id: string; label: string }
 type TeacherModelOption = { id: string; priced: boolean }
+// Build marker shown in the header (an identifier, not translatable copy).
+const LAB_UI_VERSION = 'LAB UI v2026.10.12.3'
 // Providers whose training jobs are polled through the training route (no worker callback).
 const POLLED_TRAINING = new Set(['together', 'fireworks'])
 const BASE_MODEL_ID: Record<string, RegExp> = {
@@ -260,7 +262,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   return (
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <div><h2 className="text-lg font-semibold">{copy.title}</h2><span className="text-xs text-slate-400">LAB UI v2026.10.12.3</span></div>
+        <div><h2 className="text-lg font-semibold">{copy.title}</h2><span className="text-xs text-slate-400">{LAB_UI_VERSION}</span></div>
         {orgs.length > 1 ? (
           <label className="flex flex-col gap-1 text-sm"><span>{copy.workspaceSelectorLabel}</span>
         <select aria-label={copy.workspaceSelectorLabel} className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setTeacherProviderKind(''); setTeacherModel(''); setTeacherModelChoice(''); setComputeId(''); setComputeProviderKind(''); setBaseModel(''); setModelSelection(''); setMessage(null); setOrgKey(next) }}>
@@ -365,7 +367,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
                 <option value="100">$100</option>
                 <option value="custom">{copy.customAmount}</option>
               </select>
-              {budget && !['10', '25', '100'].includes(budget) && <input aria-label={copy.customAmount} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" placeholder="USD" value={budget === 'other' ? '' : budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value || 'other'); setTeacherBudget('') }} />}
+              {budget && !['10', '25', '100'].includes(budget) && <input aria-label={copy.customAmount} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" placeholder={copy.customAmount} value={budget === 'other' ? '' : budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value || 'other'); setTeacherBudget('') }} />}
             </label>
             {hourlyApplies && <label className="text-sm">{copy.hourly}
               <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" max="1000" step="0.01" value={hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value) }} />

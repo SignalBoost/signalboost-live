@@ -1,3 +1,4 @@
+import { observeLabRequest } from '@/lib/lab/observability'
 // saas/app/api/lab/providers/route.ts
 // Customer LAB provider keys. GET  ?organizationId= -> catalog + saved keys (names only, never values)
 //                              POST { organizationId, providerKind, label, secret, endpoint? } -> save (owner/admin)
@@ -14,7 +15,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 const noStore = { 'cache-control': 'no-store' }
 
-export async function GET(req: NextRequest) {
+async function getHandler(req: NextRequest) {
   const session = await customerSession()
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: noStore })
   const organizationId = req.nextUrl.searchParams.get('organizationId') || ''
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, catalog: LAB_PROVIDER_CATALOG, credentials: data ?? [] }, { headers: noStore })
 }
 
-export async function POST(req: NextRequest) {
+async function postHandler(req: NextRequest) {
   const session = await customerSession()
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: noStore })
   const body = await req.json().catch(() => null)
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, credentialId }, { headers: noStore })
 }
 
-export async function DELETE(req: NextRequest) {
+async function deleteHandler(req: NextRequest) {
   const session = await customerSession()
   if (!session) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: noStore })
   const body = await req.json().catch(() => null)
@@ -67,4 +68,16 @@ export async function DELETE(req: NextRequest) {
   const { data, error } = await session.supabase.rpc('itmounts_lab_customer_revoke_credential', { p_organization_id: organizationId, p_credential_id: credentialId })
   if (error) return NextResponse.json({ ok: false, error: rpcErrorCode(error) }, { status: 403, headers: noStore })
   return NextResponse.json({ ok: true, revoked: data === true }, { headers: noStore })
+}
+
+export async function GET(req: NextRequest) {
+  return observeLabRequest('providers.list', () => getHandler(req))
+}
+
+export async function POST(req: NextRequest) {
+  return observeLabRequest('providers.save', () => postHandler(req))
+}
+
+export async function DELETE(req: NextRequest) {
+  return observeLabRequest('providers.revoke', () => deleteHandler(req))
 }

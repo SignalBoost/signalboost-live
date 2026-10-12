@@ -176,7 +176,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     try {
       await call('/api/lab/training', 'POST', {
         action: 'start', organizationId, experimentId, source, examples, teacherCredentialId: teacherId, teacherModel,
-        computeCredentialId: computeId, baseModel, prompts, approvedBudgetUsd: Number(budget), maxHourlyUsd: Number(hourly),
+        computeCredentialId: computeId, baseModel, prompts, approvedBudgetConfirmed: budgetAuthorized, approvedBudgetUsd: Number(budget), maxHourlyUsd: Number(hourly),
         teacherBudgetUsd: Number(teacherBudget),
       })
       if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'status', text: copy.started })
@@ -265,8 +265,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
         <div className="space-y-2">
           <h3 className="font-medium">{copy.chooseHeading}</h3>
           <div className="flex gap-4 text-sm">
-            <label><input type="radio" checked={source === 'examples'} onChange={() => setSource('examples')} /> {copy.useExamples}</label>
-            <label><input type="radio" checked={source === 'teacher'} onChange={() => setSource('teacher')} /> {copy.askTeacher}</label>
+            <label><input type="radio" checked={source === 'examples'} onChange={() => { setSource('examples'); setBudgetAuthorized(false) }} /> {copy.useExamples}</label>
+            <label><input type="radio" checked={source === 'teacher'} onChange={() => { setSource('teacher'); setBudgetAuthorized(false) }} /> {copy.askTeacher}</label>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {source === 'teacher' && <>
@@ -330,11 +330,11 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
             </>}
             {source === 'teacher' ? (
               <label className="text-sm sm:col-span-2">{fmt(copy.prompts, { n: promptCount })}
-                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={prompts} onChange={event => setPrompts(event.target.value)} />
+                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={prompts} onChange={event => { setPrompts(event.target.value); setBudgetAuthorized(false) }} />
               </label>
             ) : (
               <label className="text-sm sm:col-span-2">{fmt(copy.examples, { n: exampleCount })}
-                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={examples} onChange={event => setExamples(event.target.value)} />
+                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={examples} onChange={event => { setExamples(event.target.value); setBudgetAuthorized(false) }} />
               </label>
             )}
           </div>

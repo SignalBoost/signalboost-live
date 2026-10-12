@@ -1,0 +1,85 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
+
+const canonical = `${PUBLIC_BRAND.siteUrl}/university`
+export const metadata: Metadata = {
+  title: 'AI Model Training & Distillation University',
+  description: 'Explore iTMounts University: train, fine-tune, evaluate and download AI models using your own provider accounts and cloud GPU compute. No GPU ownership required.',
+  alternates: { canonical },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: 'iTMounts University — AI Model Training & Distillation',
+    description: 'A guided AI training LAB using your own tools, cloud compute and approved datasets.',
+    url: canonical, type: 'website', siteName: PUBLIC_BRAND.name,
+  },
+}
+const steps = [
+  { title: 'Create your workspace', detail: 'Sign in to iTMounts and create a private LAB workspace for your experiments.' },
+  { title: 'Connect your providers', detail: 'Select a supported AI provider and a compute service. Provide your own authorized credentials; no custom adapter code is required for supported integrations.' },
+  { title: 'Choose your training data', detail: 'Use permitted examples or approved source material. Review your model and training settings.' },
+  { title: 'Approve your budget', detail: 'See spending limits before requesting a paid job. No GPU rental or provider spending starts simply because you connect an account.' },
+  { title: 'Monitor and retrieve', detail: 'Track supported jobs and access your completed model artifacts through the LAB.' },
+]
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'iTMounts University',
+  url: canonical,
+  description: 'Guided AI model training and distillation using customer-controlled providers and compute.',
+  isPartOf: { '@type': 'WebSite', name: 'iTMounts', url: PUBLIC_BRAND.siteUrl },
+}
+export default function UniversityLanding() {
+  return (
+    <main className="mx-auto max-w-6xl px-5 py-12 text-white sm:px-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, '\\u003c') }} />
+      <section className="rounded-3xl border border-white/15 bg-white/5 px-6 py-12 sm:px-12">
+        <p className="text-sm font-semibold uppercase tracking-widest text-amber-300">iTMounts University</p>
+        <h1 className="mt-5 max-w-4xl text-4xl font-bold tracking-tight sm:text-6xl">Train AI models with your own tools. No GPU required.</h1>
+        <p className="mt-6 max-w-3xl text-lg leading-relaxed text-slate-300">
+          Connect supported AI and cloud-compute providers, prepare authorized training data,
+          set spending limits and manage your model-training workflow in one place.
+          iTMounts provides the LAB; your providers supply the services you choose.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link href="/onboarding" className="rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950">Get started</Link>
+          <Link href="#how-it-works" className="rounded-full border border-white/30 px-6 py-3 font-semibold">How it works</Link>
+        </div>
+        <p className="mt-5 text-sm text-slate-400">A supported provider account is needed for API or cloud workloads. Some training operations are billable by your provider.</p>
+      </section>
+      <section id="how-it-works" className="py-14">
+        <h2 className="text-3xl font-semibold">How iTMounts University works</h2>
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {steps.map((step, i) => (
+            <article key={step.title} className="rounded-2xl border border-white/15 bg-white/5 p-6">
+              <p className="text-sm font-semibold text-amber-300">Step {i + 1}</p>
+              <h3 className="mt-3 text-xl font-semibold">{step.title}</h3>
+              <p className="mt-3 leading-relaxed text-slate-300">{step.detail}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="rounded-2xl border border-white/15 bg-white/5 p-7">
+        <h2 className="text-2xl font-semibold">Plug-and-play where supported</h2>
+        <p className="mt-3 max-w-4xl leading-relaxed text-slate-300">
+          The existing LAB supports provider connections for OpenAI, Anthropic Claude,
+          Google Gemini, Hugging Face and compatible APIs. Hugging Face is the currently
+          supported customer training-execution provider. Additional model APIs, GPU clouds,
+          local connectors and development tools are planned; they must pass integration
+          and security tests before they can be used for paid workflows.
+        </p>
+        <p className="mt-4 text-slate-300">Customers do not need to own GPUs, but do need an account with a supported cloud-compute provider when a workload requires GPU training.</p>
+      </section>
+      <section className="py-14">
+        <h2 className="text-3xl font-semibold">Your accounts. Your budget. Your models.</h2>
+        <p className="mt-4 max-w-3xl leading-relaxed text-slate-300">
+          Provider credentials are encrypted for authorized LAB use. Choose approved source
+          material or your own permitted data and review your budget before paid execution.
+          The LAB is a workspace and tool provider, not an independent certification authority.
+        </p>
+        <Link href="/onboarding" className="mt-6 inline-block rounded-full bg-amber-300 px-6 py-3 font-semibold text-slate-950">Start with iTMounts</Link>
+        <p className="mt-6 text-sm text-slate-400">Need help? <Link className="underline" href="/support">Contact support</Link>.</p>
+      </section>
+    </main>
+  )
+}

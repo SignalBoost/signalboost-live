@@ -9,6 +9,7 @@ const routes = [
   ['training/route.ts', ['training.list', 'training.action']],
   ['training/download/route.ts', ['artifact.download']],
   ['training/callback/[token]/route.ts', ['training.callback']],
+  ['open-sources/route.ts', ['openSources.find']],
 ]
 test('LAB telemetry excludes user payload and credentials', () => {
   assert.match(logger, /randomUUID/)

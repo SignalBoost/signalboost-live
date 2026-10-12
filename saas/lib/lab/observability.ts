@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 
 const allowed = new Set([
   'workspace.create', 'providers.list', 'providers.save', 'providers.revoke',
-  'training.list', 'training.action', 'training.callback', 'artifact.download',
+  'training.list', 'training.action', 'training.callback', 'artifact.download', 'openSources.find',
 ])
 
 export async function observeLabRequest<T extends Response>(

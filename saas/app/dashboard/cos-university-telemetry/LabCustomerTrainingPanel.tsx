@@ -9,6 +9,7 @@ import { fmt, type LabCustomerTrainingCopy } from '@/lib/i18n/labCustomerTrainin
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
+type PlannedProvider = { id: string; name: string; category: string; status: 'planned'; description: string }
 type Credential = { id: string; providerKind: string; label: string; endpoint: string | null; createdAt: string }
 type Run = {
   runId: string; stage: string; progressPercent: number; statusMessage: string | null; teacherProviderKind: string; teacherModel: string
@@ -23,6 +24,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [orgKey, setOrgKey] = useState('')
   const activeOrgRef = useRef('')
   const [catalog, setCatalog] = useState<CatalogEntry[]>([])
+  const [discovery, setDiscovery] = useState<PlannedProvider[]>([])
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [runs, setRuns] = useState<Run[]>([])
   const [message, setMessage] = useState<{ kind: 'status' | 'alert'; text: string } | null>(null)
@@ -95,7 +97,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       fetch(`/api/lab/training?organizationId=${organizationId}`, { credentials: 'include', cache: 'no-store' }).then(r => r.json()).catch(() => null),
     ])
     if (activeOrgRef.current !== organizationId) return
-    if (providers?.ok) { setCatalog(providers.catalog); setCredentials(providers.credentials) }
+    if (providers?.ok) { setCatalog(providers.catalog); setDiscovery(Array.isArray(providers.discovery) ? providers.discovery : []); setCredentials(providers.credentials) }
     if (training?.ok) setRuns(training.runs)
     if (!providers?.ok || !training?.ok) setMessage({ kind: 'alert', text: fmt(copy.loadFailed, { code: providers?.error || training?.error || 'network' }) })
   }, [organizationId, copy])
@@ -188,7 +190,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     <section className="space-y-6 rounded-lg border p-4" lang={language} dir={language === 'ar' ? 'rtl' : undefined}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{copy.title}</h2>
-        <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setMessage(null); setOrgKey(next) }}>
+        <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-sm text-white" value={orgKey} onChange={event => { const next = event.target.value; activeOrgRef.current = next.split('|')[0]; setCredentials([]); setRuns([]); setFiles({}); setCatalog([]); setDiscovery([]); setKeyValue(''); setKeyLabel(''); setKeyEndpoint(''); setTeacherId(''); setComputeId(''); setMessage(null); setOrgKey(next) }}>
           {orgs.map(item => <option key={`${item.organizationId}|${item.experimentId}`} value={`${item.organizationId}|${item.experimentId}`}>{item.organizationName} · {item.projectName}</option>)}
         </select>
       </header>
@@ -210,7 +212,9 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           <div className="grid gap-2 sm:grid-cols-2">
             <select className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={keyKind} onChange={event => setKeyKind(event.target.value)}>
               {catalog.length === 0 ? <option value="">Providers unavailable — retry loading</option> : null}
-              {catalog.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}
+              <optgroup label="Available adapters">{catalog.map(item => <option key={item.kind} value={item.kind}>{item.name}</option>)}</optgroup>
+              <optgroup label="Additional providers — integration coming soon">{discovery.filter(item => item.category !== 'Universal').map(item => <option key={item.id} value={item.id} disabled>{item.name} — Coming soon</option>)}</optgroup>
+              <optgroup label="Universal fallback">{discovery.filter(item => item.category === 'Universal').map(item => <option key={item.id} value={item.id} disabled>{item.name} — Coming soon</option>)}</optgroup>
             </select>
             <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.keyNamePh} value={keyLabel} onChange={event => setKeyLabel(event.target.value)} />
             <input className="rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="password" autoComplete="off" placeholder={copy.keyPh} value={keyValue} onChange={event => setKeyValue(event.target.value)} />

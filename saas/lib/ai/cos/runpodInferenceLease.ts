@@ -4,6 +4,13 @@ import { randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 
 const LEASE_MISSION_ID = '__cos_runpod_primary_inference_slot__'
+
+/** Distinct models can run concurrently; each model still admits only one request. */
+export function runpodModelLeaseMissionId(model: string): string {
+  const name = model.trim()
+  if (!name || name.length > 100 || !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/.test(name)) throw new Error('runpod_invalid_lease_model')
+  return `${LEASE_MISSION_ID}:${name}`
+}
 const DEFAULT_WAIT_MS = 15_000
 const MAX_WAIT_MS = 45_000
 const POLL_MS = 500
@@ -12,6 +19,7 @@ export type RunpodInferenceLease = Readonly<{
   token: string
   acquiredAt: string
   expiresAt: string
+  missionId: string
 }>
 
 function waitMs(): number {
@@ -25,7 +33,8 @@ function leaseMs(inferenceTimeoutMs: number): number {
   return Math.min(5 * 60_000, timeout + 30_000)
 }
 
-async function tryAcquire(token: string, inferenceTimeoutMs: number): Promise<RunpodInferenceLease | null> {
+async function tryAcquire(token: string, inferenceTimeoutMs: number, model: string): Promise<RunpodInferenceLease | null> {
+  const missionId = runpodModelLeaseMissionId(model)
   const db = cosServiceDb()
   if (!db) throw new Error('runpod_primary_lease_storage_unavailable')
 
@@ -41,17 +50,17 @@ async function tryAcquire(token: string, inferenceTimeoutMs: number): Promise<Ru
 
   const read = await db.from('cos_autonomy_state')
     .select('state,updated_at')
-    .eq('mission_id', LEASE_MISSION_ID)
+    .eq('mission_id', missionId)
     .maybeSingle()
   if (read.error) throw new Error(`runpod_primary_lease_read_failed:${read.error.message}`)
 
   if (!read.data) {
     const inserted = await db.from('cos_autonomy_state').insert({
-      mission_id: LEASE_MISSION_ID,
+      mission_id: missionId,
       state,
       updated_at: acquiredAt,
     }).select('mission_id').maybeSingle()
-    if (!inserted.error && inserted.data) return Object.freeze({ token, acquiredAt, expiresAt })
+    if (!inserted.error && inserted.data) return Object.freeze({ token, acquiredAt, expiresAt, missionId })
     if (inserted.error?.code === '23505') return null
     throw new Error(`runpod_primary_lease_insert_failed:${inserted.error?.message || 'unknown'}`)
   }
@@ -65,25 +74,25 @@ async function tryAcquire(token: string, inferenceTimeoutMs: number): Promise<Ru
   const updated = await db.from('cos_autonomy_state').update({
     state,
     updated_at: acquiredAt,
-  }).eq('mission_id', LEASE_MISSION_ID)
+  }).eq('mission_id', missionId)
     .eq('updated_at', read.data.updated_at)
     .select('mission_id')
     .maybeSingle()
   if (updated.error) throw new Error(`runpod_primary_lease_update_failed:${updated.error.message}`)
-  return updated.data ? Object.freeze({ token, acquiredAt, expiresAt }) : null
+  return updated.data ? Object.freeze({ token, acquiredAt, expiresAt, missionId }) : null
 }
 
 /**
- * Serialize access to the single iTMounts RunPod reasoner across Vercel instances. The lease is
+ * Serialize inference separately for each loaded model across Vercel instances. The lease is
  * short-lived and self-expiring so a terminated serverless invocation cannot strand the GPU.
  */
-export async function acquireRunpodInferenceLease(inferenceTimeoutMs: number, signal?: AbortSignal): Promise<RunpodInferenceLease | null> {
+export async function acquireRunpodInferenceLease(inferenceTimeoutMs: number, model: string, signal?: AbortSignal): Promise<RunpodInferenceLease | null> {
   throwIfInferenceAborted(signal)
   const token = randomUUID()
   const deadline = Date.now() + waitMs()
   do {
     throwIfInferenceAborted(signal)
-    const lease = await tryAcquire(token, inferenceTimeoutMs)
+    const lease = await tryAcquire(token, inferenceTimeoutMs, model)
     if (lease) {
       if (signal?.aborted) await releaseRunpodInferenceLease(lease)
       throwIfInferenceAborted(signal)
@@ -97,19 +106,20 @@ export async function acquireRunpodInferenceLease(inferenceTimeoutMs: number, si
 }
 
 /**
- * One attempt, no waiting. Live chat must never queue behind background work on the single RunPod reasoner.
+ * One attempt, no waiting. Live chat never queues behind work on the same model.
  * null = the slot is held by other work right now.
  */
-export async function tryAcquireRunpodInferenceLeaseNow(inferenceTimeoutMs: number): Promise<RunpodInferenceLease | null> {
-  return tryAcquire(randomUUID(), inferenceTimeoutMs)
+export async function tryAcquireRunpodInferenceLeaseNow(inferenceTimeoutMs: number, model: string): Promise<RunpodInferenceLease | null> {
+  return tryAcquire(randomUUID(), inferenceTimeoutMs, model)
 }
 
 export async function releaseRunpodInferenceLease(lease: RunpodInferenceLease): Promise<void> {
   const db = cosServiceDb()
   if (!db) return
+  const missionId = lease.missionId
   const read = await db.from('cos_autonomy_state')
     .select('state,updated_at')
-    .eq('mission_id', LEASE_MISSION_ID)
+    .eq('mission_id', missionId)
     .maybeSingle()
   if (read.error || !read.data) return
   const state = read.data.state && typeof read.data.state === 'object'
@@ -126,7 +136,7 @@ export async function releaseRunpodInferenceLease(lease: RunpodInferenceLease): 
       expiresAt: releasedAt,
     },
     updated_at: releasedAt,
-  }).eq('mission_id', LEASE_MISSION_ID)
+  }).eq('mission_id', missionId)
     .eq('updated_at', read.data.updated_at)
 }
 

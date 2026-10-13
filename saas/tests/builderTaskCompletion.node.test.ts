@@ -54,6 +54,32 @@ test('repository-wide policy denial does not count as a reproduced repair failur
   if (!verdict.satisfied) assert.match(verdict.reason, /run the narrowest relevant test/)
 })
 
+test('passing targeted proof and repeated list_files ends as not reproduced', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('list-stall', 'tests/agentGateway.node.test.ts', 'test')
+  let calls = 0
+  let runs = 0
+  const result = await new BuilderToolLoop({
+    async generate() {
+      calls++
+      if (calls === 1) return action('run', { command: 'node --test tests/agentGateway.node.test.ts' })
+      return action('list_files', {})
+    },
+  }, workspace, { async run() {
+    runs++
+    return { exitCode: 0, stdout: ['# tests 9', '# pass 9', '# fail 0', ''].join(String.fromCharCode(10)), stderr: '', timedOut: false }
+  } }).run({
+    objective: 'Fix the reported failure in tests/agentGateway.node.test.ts.',
+    workspaceId: 'list-stall',
+    maxRounds: 20,
+  })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.equal(result.error, 'builder_regression_not_reproduced')
+  assert.equal(runs, 1)
+  assert.ok(calls <= 5)
+  assert.equal(result.trace.filter(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file')).length, 0)
+})
+
 test('a verified targeted proof followed by a denied repeat ends without fabricated mutation', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('passing-proof', 'tests/math.test.js', 'test')

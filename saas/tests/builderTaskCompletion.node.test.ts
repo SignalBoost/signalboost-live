@@ -59,7 +59,7 @@ test('a refused duplicate npm test cannot erase an executed successful verificat
   const contract = builderTaskContract('Run: npm test. Verify 4 tests pass.')
   const executed: BuilderToolTrace = { round: 2, toolId: 'run',
     input: { command: 'npm test' }, ok: true,
-    output: { exitCode: 0, stdout: '# tests 4\\n# pass 4\\n# fail 0\\n', stderr: '', timedOut: false } }
+    output: { exitCode: 0, stdout: ['# tests 4', '# pass 4', '# fail 0', ''].join(String.fromCharCode(10)), stderr: '', timedOut: false } }
   const refused: BuilderToolTrace = { round: 3, toolId: 'run',
     input: { command: 'npm test' }, ok: false,
     error: 'builder_repeated_tool_call:run; choose a different next step' }

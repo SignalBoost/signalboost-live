@@ -11,6 +11,7 @@ type WorkspaceSummary = { id: string; objective: string; updatedAt: string }
 type CertificationSummary = { earnedLevel: number; attempts: number }
 
 const MAX_UPLOAD_BYTES = 512 * 1024
+const ALLOWED_ATTACHMENT = /\.(?:txt|log|md|mdx|yaml|yml|json|jsonl|csv|xml|js|cjs|mjs|ts|tsx|jsx|py|html|css|sql|sh|java|cpp|go|rs|php|rb)$/i
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
 const BUILDER_LAST_JOB_KEY = 'cos-builder-last-job-v1'
 const BUILDER_JOB_POLL_ATTEMPTS = 90
@@ -121,12 +122,16 @@ export default function DeveloperPage() {
   async function addFiles(selected: FileList | null) {
     if (!selected) return
     const next: WorkspaceFile[] = []
+    const problems: string[] = []
+    if (selected.length > 20) problems.push('Select at most 20 files.')
     for (const file of Array.from(selected).slice(0, 20)) {
-      if (file.size > MAX_UPLOAD_BYTES) { setError(`${file.name} is larger than 512 KB.`); continue }
+      if (!ALLOWED_ATTACHMENT.test(file.name)) { problems.push(`${file.name}: unsupported file type.`); continue }
+      if (file.size > MAX_UPLOAD_BYTES) { problems.push(`${file.name} is larger than 512 KB. Please attach a shorter log.`); continue }
       try { next.push({ path: file.webkitRelativePath || file.name, content: await file.text() }) }
-      catch { setError(`Could not read ${file.name}.`) }
+      catch { problems.push(`Could not read ${file.name}.`) }
     }
     setFiles(current => [...current.filter(file => !next.some(item => item.path === file.path)), ...next].slice(0, 20))
+    setError(problems.join(' '))
     if (fileInput.current) fileInput.current.value = ''
   }
 
@@ -204,13 +209,13 @@ export default function DeveloperPage() {
             <textarea value={objective} onChange={event => setObjective(event.target.value)} placeholder={c('placeholder')} rows={5} maxLength={MAX_BUILDER_RAW_OBJECTIVE_CHARS} style={{ resize: 'vertical', borderRadius: 12, border: '1px solid #334155', background: '#020617', color: '#f8fafc', padding: 12, font: 'inherit' }} />
           </label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-            <input ref={fileInput} type="file" multiple onChange={event => addFiles(event.target.files)} style={{ display: 'none' }} />
-            <button type="button" onClick={() => fileInput.current?.click()} disabled={running} style={secondaryButton}>{c('addFiles')}</button>
+            <input ref={fileInput} type="file" multiple onChange={event => addFiles(event.target.files)} style={{ display: 'none' }} accept=".txt,.log,.md,.mdx,.yaml,.yml,.json,.jsonl,.csv,.xml,.js,.cjs,.mjs,.ts,.tsx,.jsx,.py,.html,.css,.sql,.sh,.java,.cpp,.go,.rs,.php,.rb" />
+            <button type="button" onClick={() => fileInput.current?.click()} disabled={running} style={secondaryButton}>📎 {lang === 'en' ? 'Attach files' : c('addFiles')}</button>
             <button type="button" onClick={reset} disabled={running} style={secondaryButton}>{c('newWorkspace')}</button>
             <button type="button" onClick={run} disabled={!objective.trim() || running} style={{ ...primaryButton, opacity: !objective.trim() || running ? .55 : 1 }}>{running ? c('working') : c('run')}</button>
           </div>
           {workspaces.length ? <details><summary style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>{c('saved').replace('{count}', String(workspaces.length))}</summary><div style={{ display: 'grid', gap: 8, marginTop: 10 }}>{workspaces.map(workspace => <button type="button" key={workspace.id} onClick={() => openWorkspace(workspace.id)} disabled={running} style={{ ...secondaryButton, textAlign: 'start' }}><strong style={{ color: '#67e8f9', marginInlineEnd: 8 }}>{workspace.id.slice(0, 8)}…</strong>{workspace.objective || interpolate('workspace', workspace.id.slice(0, 8), '{id}')} <span style={{ color: '#94a3b8' }}>· {new Date(workspace.updatedAt).toLocaleDateString()}</span></button>)}</div></details> : null}
-          {files.length ? <div style={fileListStyle}>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path}<button type="button" aria-label={interpolate('remove', file.path)} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
+          {files.length ? <div style={fileListStyle}><strong>Attached files ({files.length}/20):</strong>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path} · {(new TextEncoder().encode(file.content).length / 1024).toFixed(1)} KB<button type="button" aria-label={interpolate('remove', file.path)} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
           {error ? <p role="alert" style={{ margin: 0, color: '#fca5a5' }}>{error}</p> : null}
         </section>
         {reply || trace?.length ? <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>

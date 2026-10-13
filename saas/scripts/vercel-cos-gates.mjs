@@ -18,6 +18,7 @@ const tests = [
   'tests/labCustomerTraining.node.test.ts',
   'tests/labCustomerTrainingSpend.node.test.ts',
   'tests/labCustomerTeacherSpend.node.test.ts',
+  'tests/labCustomerGovernedTeacher.node.test.ts',
   'tests/labCustomerReviewBlockers.node.test.ts',
 
   'tests/publicInternationalSeo.node.test.ts',

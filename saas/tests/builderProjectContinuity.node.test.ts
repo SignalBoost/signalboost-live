@@ -118,3 +118,16 @@ test('continuation history never replaces fail-before/fix/pass proof for an actu
       projectContext: { previousStatus: 'failed', previousCommands: ['node total.js'] }, maxRounds: 10 })
   assert.equal(result.ok, false, 'old failed status is not a failing command in this turn')
 })
+
+test('new isolated builds ignore an explicitly retained old workspace ID', async () => {
+  const fresh = {
+    ...input,
+    requestedWorkspaceId: workspaceId,
+    objective: 'Build a complete working OrderFlow application from scratch in a new isolated workspace; fix failing tests.',
+  }
+  assert.deepEqual(await selectBuilderProject(fresh, async () => { assert.fail('new build must not access history'); return null }), {})
+  const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /const newProjectRequested = isNewBuilderProjectObjective\(objective\)/)
+  assert.match(route, /let workspaceId = newProjectRequested \? crypto\.randomUUID\(\) : requestedWorkspaceId \|\| crypto\.randomUUID\(\)/)
+  assert.match(route, /requestedWorkspaceId: newProjectRequested \? undefined : requestedWorkspaceId/)
+})

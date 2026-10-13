@@ -31,13 +31,14 @@ test('background Builder work owns a deadline below Vercel maxDuration', () => {
   assert.match(runner, /finishBuilderJob/)
 })
 
-test('browser polling is bounded to about thirty seconds and never controls execution', () => {
+test('browser polls through the five-minute Builder job window without controlling execution', () => {
   const attempts = numericConstant(boundary, 'BUILDER_JOB_POLL_ATTEMPTS')
   const delay = numericConstant(boundary, 'BUILDER_JOB_POLL_DELAY_MS')
   const pollWindow = (attempts - 1) * delay
-  assert.ok(pollWindow >= 20_000)
-  assert.ok(pollWindow <= 30_000)
+  assert.ok(pollWindow >= 290_000)
+  assert.ok(pollWindow < 300_000)
   assert.match(boundary, /method: 'GET'/)
+  assert.match(boundary, /const terminal = await pollBuilderJob\(fetchImpl, jobId, signal\)/)
   assert.match(boundary, /The page does not wait for the entire debug lifecycle/)
 })
 

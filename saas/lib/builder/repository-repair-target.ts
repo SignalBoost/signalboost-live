@@ -261,7 +261,8 @@ export function isOwnerRepairWithoutSource(input: {
   hasProjectContext: boolean
 }): boolean {
   return input.isOwner === true && !input.hasAttachedSource && !input.hasRepositoryImport
-    && !input.workspaceHasFiles && !input.hasProjectContext && isRepairObjective(input.objective)
+    && !input.workspaceHasFiles && !input.hasProjectContext
+    && !isExplicitIsolatedProjectBuild(input.objective) && isRepairObjective(input.objective)
 }
 
 export function signalBoostDeployedRepairTarget(

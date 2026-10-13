@@ -73,7 +73,7 @@ test('durable Builder polling continues past 20 checks and returns a succeeded t
   assert.match(poll, /record\.status === 'queued' \|\| record\.status === 'running' \|\| record\.status === 'paused'/)
   assert.match(poll, /return \{ payload: record, status: response\.status \}/)
   const handoff = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
-  assert.match(handoff, /const terminal = await pollBuilderJob\(fetchImpl, jobId, signal\)/)
+  assert.match(handoff, /const terminal = await pollBuilderJob\(fetchImpl, jobId\)/)
   assert.match(handoff, /if \(terminal\) \{[\s\S]*?return responseFromPayload\([\s\S]*?terminal\.payload/)
   assert.equal(200 > 20, true)
 })

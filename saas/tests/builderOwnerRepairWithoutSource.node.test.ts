@@ -72,4 +72,17 @@ test("Builder's own result report is not source", () => {
   assert.equal(hasWorkspaceSource(['notes/builder-result.txt']), true, 'only the workspace-root report is Builder output')
 })
 
+test('an isolated new application is never converted to a SignalBoost platform repair', () => {
+  const objective = [
+    'Build a complete working Node.js order management application called OrderFlow, from scratch, in a new isolated workspace.',
+    'Create products, shopping carts, orders, persistence, and 30 independent automated tests.',
+    'If a test fails, fix the relevant source and rerun it.',
+    'Do not modify the iTMounts platform repository. This is an isolated Builder workspace evaluation.',
+  ].join('\n')
+  assert.equal(routedToRepository(objective), false)
+  assert.equal(isOwnerRepairWithoutSource({ objective, ...noSource }), false)
+  assert.equal(signalBoostDeployedRepairTarget(objective, DEPLOYED, { ownerRepairWithoutSource: true }), null)
+  assert.equal(routedToRepository('Fix the Builder platform because it is broken'), true)
+})
+
 // end of saas/tests/builderOwnerRepairWithoutSource.node.test.ts (if this line is missing, the paste was cut short)

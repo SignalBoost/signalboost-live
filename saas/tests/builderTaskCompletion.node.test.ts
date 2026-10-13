@@ -38,7 +38,7 @@ const task = builderTaskContract(objective)
 test('Node test guidance rejects console.assert and requires countable fail-closed evidence', () => {
   const guidance = formatBuilderTestEvidenceGuidance('Update test.js and verify all four tests pass.')
   assert.match(guidance, /Do NOT use console.assert/)
-  assert.match(guidance, /node:assert\\/strict/)
+  assert.ok(guidance.includes('node:assert/strict'))
   assert.match(guidance, /nonzero exit/)
   assert.match(guidance, /per-test success output/)
   assert.equal(formatBuilderTestEvidenceGuidance('Update README.md only.'), '')

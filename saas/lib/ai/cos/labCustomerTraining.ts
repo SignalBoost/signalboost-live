@@ -1,5 +1,5 @@
 // Customer LAB training: teacher data → dataset preparation → training → downloadable model, on the CUSTOMER's
-// Hugging Face account with the CUSTOMER's credentials and approved budget.
+// Hugging Face account with the CUSTOMER's credentials; Hugging Face bills the customer directly.
 //
 // Pure orchestration with injected ports, so every rule here is unit-tested without network or database.
 // Graduation, Residency and certification are intentionally NOT inputs anywhere in this file.
@@ -141,19 +141,18 @@ export function buildTrainEnvelope(input: {
 }
 
 // --- Job submission on the customer's account ---------------------------------------------------------------------
-// Order is fixed and tested: PLAN (no spend) -> RESERVE in the database (cost, callback token, job name) -> SUBMIT ->
-// ATTACH job id. If submission errors, look the job up by its deterministic name before releasing anything: a job
+// Order is fixed and tested: PLAN -> RECORD in the database (callback token, deterministic job name) -> SUBMIT ->
+// ATTACH job id. The job runs on the customer's account and their provider bills them directly. If submission errors, look the job up by its deterministic name before releasing anything: a job
 // that HF accepted but whose response was lost is attached, never forgotten. If ATTACH fails, the reservation and job
 // name are already saved, so "Check status" reconciles it.
 export type HfPorts = Readonly<{
   resolveNamespace: (token: string) => Promise<string>
-  resolveHourlyUsd: (flavor: string, token: string) => Promise<number>
   submit: (namespace: string, token: string, spec: HuggingFaceJobSpec) => Promise<{ jobId: string; jobUrl: string }>
   findByName: (namespace: string, token: string, name: string) => Promise<{ jobId: string; jobUrl: string } | null>
 }>
 
 export type PlannedJob = Readonly<{
-  spec: HuggingFaceJobSpec; namespace: string; jobName: string; hourlyUsd: number; maxCostUsd: number
+  spec: HuggingFaceJobSpec; namespace: string; jobName: string
 }>
 
 export async function planCustomerJob(input: {
@@ -163,12 +162,10 @@ export async function planCustomerJob(input: {
   stageToken: string
   origin: string
   platformEnv: Record<string, string | undefined>
-  maxHourlyUsd: number
-  remainingBudgetUsd: number
   ports: HfPorts
 }): Promise<PlannedJob> {
   // The worker script is delivered by THIS deployment; its URL comes from the platform configuration.
-  // Everything cost-bearing and every write uses the customer's own token.
+  // Every job and every write uses the customer's own token.
   const platform = huggingFaceJobsConfigFromEnv(input.platformEnv)
   if (!platform) throw new Error('lab_training_worker_delivery_unconfigured')
   const config = huggingFaceJobsConfigFromEnv({
@@ -177,8 +174,6 @@ export async function planCustomerJob(input: {
     COS_UNIVERSITY_HF_WORKER_URL: platform.workerUrl,
   })
   if (!config) throw new Error('lab_customer_hf_token_invalid')
-  // Override the customer LAB's own cap only; never change internal COS hourly limits.
-  const labConfig = { ...config, maxHourlyCostUsd: input.maxHourlyUsd }
   const callbackUrl = new URL(`${LAB_CUSTOMER_CALLBACK_PREFIX}/${input.stageToken}`, input.origin).toString()
   const operation = String(input.envelope.operation ?? '')
   const spec = buildHuggingFaceJobSpec({
@@ -186,19 +181,14 @@ export async function planCustomerJob(input: {
     callbackUrl,
     idempotencyKey: sha256(`lab-customer:${input.runId}:${operation}`),
     callbackSecret: stageCallbackSecret(input.runId, input.stageToken),
-    config: labConfig,
+    config,
   })
-  const hourlyUsd = await input.ports.resolveHourlyUsd(spec.flavor, input.customerHfToken)
-  const hourlyCap = input.maxHourlyUsd
-  if (!(hourlyUsd <= hourlyCap)) throw new Error('lab_training_hourly_cost_cap_exceeded')
-  const maxCostUsd = Number((hourlyUsd * spec.timeoutSeconds / 3600).toFixed(6))
-  if (!(maxCostUsd <= input.remainingBudgetUsd)) throw new Error('lab_training_budget_insufficient')
   const namespace = await input.ports.resolveNamespace(input.customerHfToken)
-  return Object.freeze({ spec, namespace, jobName: spec.labels.name, hourlyUsd, maxCostUsd })
+  return Object.freeze({ spec, namespace, jobName: spec.labels.name })
 }
 
 export type JobBookkeeping = Readonly<{
-  /** Saves cost reservation + callback token hash + job name + namespace. Must succeed before any spend. */
+  /** Saves callback token hash + job name + namespace. Must succeed before the job is submitted. */
   reserve: (plan: PlannedJob) => Promise<void>
   attach: (job: { jobId: string; jobUrl: string }) => Promise<void>
   release: (reason: string) => Promise<void>
@@ -212,7 +202,7 @@ export type JobOutcome =
 
 export async function runReservedJob(input: { plan: PlannedJob; customerHfToken: string; ports: HfPorts; book: JobBookkeeping }): Promise<JobOutcome> {
   const { plan, customerHfToken: token, ports, book } = input
-  await book.reserve(plan) // throws -> nothing was spent, nothing to undo
+  await book.reserve(plan) // throws -> nothing was submitted, nothing to undo
   let job: { jobId: string; jobUrl: string } | null = null
   let recoveredByName = false
   try {
@@ -222,7 +212,7 @@ export async function runReservedJob(input: { plan: PlannedJob; customerHfToken:
     try {
       job = await ports.findByName(plan.namespace, token, plan.jobName)
     } catch {
-      // Cannot prove the job does not exist: keep the reservation; "Check status" reconciles by job name.
+      // Cannot prove the job does not exist: keep the recorded job name; "Check status" reconciles by it.
       return { status: 'unknown', reason }
     }
     if (!job) {
@@ -330,7 +320,7 @@ export function rowsFromExamples(raw: unknown): { rows: TeacherRow[]; invalidLin
   return { rows: byPrompt, invalidLines, datasetHash: sha256(JSON.stringify({ items: byPrompt.map(row => row.itemHash).sort() })) }
 }
 
-// Hosted-API teacher calls: see labCustomerGovernedTeacher.ts (DB reservation -> Platform Harness -> settle).
+// Hosted-API teacher calls: see labCustomerGovernedTeacher.ts (Platform Harness, customer's own key).
 
 // --- Download -----------------------------------------------------------------------------------------------------
 /** sha256 = LFS content hash; gitOid = git blob sha1 for small non-LFS files. One of them is always present. */

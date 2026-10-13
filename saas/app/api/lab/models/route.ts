@@ -3,14 +3,14 @@
 // GET ?provider=&organizationId=&credentialId=
 //   huggingface -> Hub text-generation models with safetensors weights and no license gate. The Hub list is public, so
 //                  without credentialId it is read anonymously (the dropdown works before a key is saved).
-//   together    -> the customer's Together model list, models that carry a fine-tuning price
-//   fireworks   -> Fireworks public base models that support LoRA SFT and fall in a verified price band
+//   together    -> the customer's Together model list, models Together lists as fine-tunable
+//   fireworks   -> Fireworks public base models that support LoRA SFT
 // Read-only catalog requests: no training, no spend. Keys are never returned, cached or logged.
 import { NextRequest, NextResponse } from 'next/server'
 import { customerSession, rpcErrorCode, UUID_RE } from '@/lib/lab/customerSession'
 import { openCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
 import { providerEntry } from '@/lib/ai/cos/labCustomerProviderCatalog'
-import { listFireworksBaseModels, listTogetherBaseModels, normalizeRateCards, type BaseModelOption } from '@/lib/ai/cos/labCustomerProviderTraining'
+import { listFireworksBaseModels, listTogetherBaseModels, type BaseModelOption } from '@/lib/ai/cos/labCustomerProviderTraining'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -63,11 +63,8 @@ export async function GET(req: NextRequest) {
   try {
     let models: BaseModelOption[]
     if (provider === 'together') models = await listTogetherBaseModels(key, fetch)
-    else if (provider === 'fireworks') {
-      const cards = await session.supabase.rpc('itmounts_lab_customer_training_rate_cards', { p_organization_id: organizationId })
-      if (cards.error) return NextResponse.json({ ok: false, error: rpcErrorCode(cards.error) }, { status: 403, headers: noStore })
-      models = await listFireworksBaseModels(key, normalizeRateCards(cards.data), fetch)
-    } else models = await huggingFaceBaseModels(key)
+    else if (provider === 'fireworks') models = await listFireworksBaseModels(key, fetch)
+    else models = await huggingFaceBaseModels(key)
     return NextResponse.json({ ok: true, models, source: 'live' }, { headers: noStore })
   } catch {
     return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })

@@ -2,16 +2,12 @@
 // Live model-list discovery using a customer's own credential.
 // This performs read-only catalog GET requests; no inference, training, or spend.
 // Never expose, cache, or log customer secrets or raw provider payloads.
-// Each model says whether it has an active verified teacher price: only priced models can run (lab.teacher_rate_cards).
-// OpenRouter's model list carries its own documented prices, so for OpenRouter the payload just read is also handed to
-// the service-role-only price sync (at most once an hour across all instances, via a shared lease). Prices therefore
-// load the first time anyone looks, without depending on the scheduled job.
+// Every model the customer's key can use is offered; what the provider charges is between the customer and the provider.
 import { NextRequest, NextResponse } from 'next/server'
 import { customerSession, UUID_RE } from '@/lib/lab/customerSession'
 import { openCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
 import { LAB_PROVIDER_CATALOG, customModelsUrl } from '@/lib/ai/cos/labCustomerProviderCatalog'
 import { assertPublicHttpUrl } from '@/lib/security/publicFetchGuard'
-import { syncOpenRouterPricesWithLease } from '@/lib/lab/openRouterPriceSyncLease'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,12 +29,6 @@ const API_MODELS: Readonly<Record<string, { url: string; auth: 'bearer' | 'anthr
   together: { url: 'https://api.together.xyz/v1/models', auth: 'bearer' },
   fireworks: { url: 'https://api.fireworks.ai/inference/v1/models', auth: 'bearer' },
   deepinfra: { url: 'https://api.deepinfra.com/v1/openai/models', auth: 'bearer' },
-}
-
-// OpenRouter prices: synced at most once an hour across all instances (shared lease); never blocks the model list.
-async function refreshOpenRouterPrices(payload: unknown): Promise<void> {
-  try { await syncOpenRouterPricesWithLease(payload, 'lab-teacher-models') }
-  catch { /* prices then come only from what is already stored */ }
 }
 
 const clean = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length < 241 && /^[\w./:-]+$/.test(value)
@@ -100,14 +90,9 @@ export async function GET(req: NextRequest) {
       method: 'GET', headers, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
-    const payload = await response.json()
-    live = collectModels(payload, provider)
-    if (provider === 'openrouter') await refreshOpenRouterPrices(payload)
+    live = collectModels(await response.json(), provider)
   } catch {
     return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
   }
-  const priced = await session.supabase.rpc('itmounts_lab_customer_priced_teacher_models', { p_organization_id: org, p_provider_kind: provider })
-  const pricedSet = new Set<string>(!priced.error && Array.isArray(priced.data) ? priced.data.map(String) : [])
-  const models = live.map(id => ({ id, priced: pricedSet.has(id) }))
-  return NextResponse.json({ ok: true, models, pricedAvailable: !priced.error, source: 'live' }, { headers: noStore })
+  return NextResponse.json({ ok: true, models: live.map(id => ({ id })), source: 'live' }, { headers: noStore })
 }

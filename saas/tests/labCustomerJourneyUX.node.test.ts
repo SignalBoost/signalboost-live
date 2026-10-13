@@ -17,22 +17,22 @@ test('teacher, compute and model choices are explicit, dependent and legible', (
   assert.match(source, /selectedComputeCredentials\.map/)
   assert.match(source, /value=\{modelSelection\}/)
   // Changing provider resets the account, or selects it when the workspace has exactly one for that provider.
-  assert.match(source, /setTeacherProviderKind\(event.target.value\); setBudgetAuthorized\(false\); pickProvider\('teacher', event.target.value\)/)
+  assert.match(source, /setTeacherProviderKind\(event.target.value\); setBillingConfirmed\(false\); pickProvider\('teacher', event.target.value\)/)
   assert.match(source, /if \(target === 'teacher'\) setTeacherId\(account\); else setComputeId\(account\)/)
   assert.match(source, /matches\.length === 1 \? matches\[0\]\.id : ''/)
-  assert.match(source, /setComputeProviderKind\(event.target.value\); setBudgetAuthorized\(false\)/)
+  assert.match(source, /setComputeProviderKind\(event.target.value\); setBillingConfirmed\(false\)/)
   assert.doesNotMatch(source, /useState\('Qwen\//)
 })
-test('paid work requires a distinct authorization and never preselects a provider or budget', () => {
+test('provider work requires a distinct per-run confirmation and never preselects a provider', () => {
   assert.match(source, /const \[keyKind, setKeyKind\] = useState\(''\)/)
-  assert.match(source, /const \[budget, setBudget\] = useState\(''\)/)
-  assert.match(source, /!budgetAuthorized/)
-  assert.match(source, /setBudgetAuthorized\(false\)/)
+  assert.match(source, /const \[billingConfirmed, setBillingConfirmed\] = useState\(false\)/)
+  assert.match(source, /!billingConfirmed/)
+  assert.match(source, /setBillingConfirmed\(false\)/)
 })
-test('all 11 language copies have guided selection and budget authorization', () => {
+test('all 11 language copies have guided selection and the provider billing confirmation', () => {
   assert.equal(Object.keys(LAB_CUSTOMER_TRAINING_COPY).length, 11)
   for (const entry of Object.values(LAB_CUSTOMER_TRAINING_COPY)) {
-    for (const name of ['workspaceSelectorLabel','defaultWorkspaceName','teacherProviderLabel','chooseTeacherProvider','budgetConfirmation','trainingProviderLabel']) {
+    for (const name of ['workspaceSelectorLabel','defaultWorkspaceName','teacherProviderLabel','chooseTeacherProvider','billingConfirmation','trainingProviderLabel']) {
       assert.ok(entry[name as keyof typeof entry], name)
     }
   }

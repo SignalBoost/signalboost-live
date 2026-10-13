@@ -37,8 +37,8 @@ const task = builderTaskContract(objective)
 test('plain Node scripts must prove all four requested tests before completion', () => {
   const contract = builderTaskContract('Update test.js and run node test.js. Verify all four tests pass.')
   assert.equal(contract.minimumTests, 4)
-  const stdoutTwo = 'Testing multiply function...\\nTest 1 passed: multiply(3, 4)\\nTest 2 passed: multiply(0, 5)\\nTests completed.\\n'
-  const stdoutFour = stdoutTwo + 'Test 3 passed: square(5)\\nTest 4 passed: square(0)\\n'
+  const stdoutTwo = 'Testing multiply function...\nTest 1 passed: multiply(3, 4)\nTest 2 passed: multiply(0, 5)\nTests completed.\n'
+  const stdoutFour = stdoutTwo + 'Test 3 passed: square(5)\nTest 4 passed: square(0)\n'
   const command = 'node test.js'
   assert.equal(builderTaskProgress(contract, [], [entry(command, { ...passing, stdout: stdoutTwo })]).satisfied, false)
   assert.equal(builderTaskProgress(contract, [], [entry(command, { ...passing, stdout: stdoutFour })]).satisfied, true)

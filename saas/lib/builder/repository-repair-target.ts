@@ -38,6 +38,15 @@ const PLATFORM_REPAIR_FAILURE = /\b(?:broken|failed|failing|stuck|not\s+working|
 const PLATFORM_ENGINEERING_ACTION = /\b(?:implement|build|add|create|update|change|refactor|complete|finish|wire|integrate|upgrade|extend)\b/i
 const PLATFORM_PUBLISH_INTENT = /\b(?:commit(?:\s+it)?|push|open\s+(?:a\s+)?pr|pull\s+request|merge(?:\s+it)?|commit\s+and\s+merge|ship\s+it)\b/i
 
+// An explicit new isolated project is not a request to repair this platform.
+// Later negative constraints ("do not modify the platform repository") and
+// conditional test-repair instructions must not grant Platform Engineer authority.
+export function isExplicitIsolatedProjectBuild(input: string): boolean {
+  const opening = String(input || '').trim().slice(0, 1000)
+  return /\b(?:build|create|implement|develop)\b[\s\S]{0,220}\b(?:from scratch|new isolated workspace|new workspace|new project)\b/i.test(opening)
+    && /\b(?:application|app|project|system|service|website|tool)\b/i.test(opening)
+}
+
 function isExplicitPlatformRepairObjective(input: string): boolean {
   const objective = String(input || '').trim()
   return EXPLICIT_PLATFORM_REPAIR.test(objective)
@@ -196,7 +205,7 @@ function failureEvidence(input: string): readonly string[] {
  */
 export function parseSignalBoostRepositoryRepairTarget(input: string): SignalBoostRepositoryRepairTarget | null {
   const rawLog = String(input || '').trim()
-  if (!rawLog) return null
+  if (!rawLog || isExplicitIsolatedProjectBuild(rawLog)) return null
   const analysis = analyzeOperationalLog(rawLog)
   if (!analysis.failed) return null
   const clone = CLONE_LINE.exec(rawLog)
@@ -252,7 +261,8 @@ export function isOwnerRepairWithoutSource(input: {
   hasProjectContext: boolean
 }): boolean {
   return input.isOwner === true && !input.hasAttachedSource && !input.hasRepositoryImport
-    && !input.workspaceHasFiles && !input.hasProjectContext && isRepairObjective(input.objective)
+    && !input.workspaceHasFiles && !input.hasProjectContext
+    && !isExplicitIsolatedProjectBuild(input.objective) && isRepairObjective(input.objective)
 }
 
 export function signalBoostDeployedRepairTarget(
@@ -267,7 +277,7 @@ export function signalBoostDeployedRepairTarget(
     || (options.ownerPlatformEngineeringSubmission === true
       && PLATFORM_ENGINEERING_ACTION.test(objective)
       && PLATFORM_PUBLISH_INTENT.test(objective))
-  if (!objective || (!isExplicitPlatformRepairObjective(objective) && !engineering && options.ownerDeveloperLogSubmission !== true
+  if (!objective || isExplicitIsolatedProjectBuild(objective) || (!isExplicitPlatformRepairObjective(objective) && !engineering && options.ownerDeveloperLogSubmission !== true
     && options.ownerRepairWithoutSource !== true)) return null
   if (!/^[0-9a-f]{40}$/.test(commitSha) || !SAFE_BRANCH.test(branch)) return null
   return Object.freeze({

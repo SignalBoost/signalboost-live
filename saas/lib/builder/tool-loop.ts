@@ -28,6 +28,10 @@ const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const MAX_MODEL_ROUND_ATTEMPTS = 2
 const MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS = 1
 const MAX_REPAIR_INSPECTIONS_AFTER_FAILURE = 3
+// Rejected repeats execute nothing, so they never consume a work round. Without this bound a resident that keeps
+// re-requesting unchanged work spent a model call per rejection until the time budget ran out (Production 2026-10-12:
+// 130 model calls for 1 executed command; tests/builderToolLoopPassingProofRepeat.node.test.ts).
+const MAX_CONSECUTIVE_REPEAT_REJECTIONS = 3
 /**
  * A round must not be started that the wall clock cannot finish. Reserving one model round plus a
  * command run means the loop stops with its evidence intact instead of dying inside a generation.
@@ -467,6 +471,18 @@ export class BuilderToolLoop {
       const failedRunOutput = failedRun && isRecord(failedRun.output)
         ? `${text(failedRun.output.stderr)}\n${text(failedRun.output.stdout)}`
         : ''
+      // A repair whose proof passed before any change has not reproduced the defect. Rerunning that command against
+      // the same source proves nothing new; the next useful step is a regression test that fails on the defect.
+      const passingProofBeforeChange = repairObjective && latestFailedRunIndex < 0
+        && !trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+        ? [...trace].reverse().find(item => item.toolId === 'run' && item.ok)
+        : undefined
+      let consecutiveRepeatRejections = 0
+      for (let index = trace.length - 1; index >= 0
+        && String(trace[index].error || '').startsWith('builder_repeated_tool_call:'); index -= 1) consecutiveRepeatRejections += 1
+      if (consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS) {
+        return { ok: false, error: passingProofBeforeChange ? 'builder_regression_not_reproduced' : 'builder_stalled_repeated_inspection', trace }
+      }
       const inspectedRepairPaths = new Set(repairTraceAfterFailure
         .filter(item => item.ok && item.toolId === 'read_file')
         .map(item => toolPath(item.input)))
@@ -496,7 +512,10 @@ export class BuilderToolLoop {
         : undefined
       const currentStep = repairMutationRequired
         ? 'CURRENT STEP: The defect is reproduced and the bounded diagnostic allowance is exhausted. Make the smallest justified edit/write now. Do not inspect more files and do not answer yet; verification will rerun after the mutation.'
-        : chunks.size > 0 ? formatBuilderChunks(chunks) : !repairObjective && progress.missingFiles.length > 0
+        : chunks.size > 0 ? formatBuilderChunks(chunks)
+        : passingProofBeforeChange
+          ? `CURRENT STEP: ${JSON.stringify(text(passingProofBeforeChange.input.command))} passed against the unchanged source, so it does not reproduce the reported defect; rerunning it or rereading the same files proves nothing new. Write or extend a regression test that fails on the reported defect with write_file or edit_file, then run that test. If the source shows no such defect, answer that the defect was not reproduced.`
+        : !repairObjective && progress.missingFiles.length > 0
         ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files. For large files use bounded append chunks; only final=true publishes the complete file.`
         : !repairObjective && progress.pendingCommands.length === 0 && !progress.testsSatisfied
           ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. Complete the test suite with distinct meaningful assertions covering the requested normal, edge, and failure cases. Do not duplicate empty tests or weaken the requirement. Verification will run again after the file changes.`

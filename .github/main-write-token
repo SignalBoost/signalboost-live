@@ -1,2 +1,2 @@
-base_sha=f84d9b6b717e6f823fb31af25618a9f2cfa249b7
-branch=fix/lab-gate-test-rename-20261012
+base_sha=639f5fbd78d1ebf3925491ebd65f26d1b5ec86d8
+branch=fix/builder-passing-proof-repeat-stall-20261012

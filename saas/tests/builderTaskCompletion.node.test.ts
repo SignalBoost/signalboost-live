@@ -55,6 +55,30 @@ test('plain Node scripts must prove all four requested tests before completion',
   assert.equal(builderTaskContract('Run node --test test.js and verify at least 10 tests pass.').minimumTests, 10)
 })
 
+test('a refused duplicate npm test cannot erase an executed successful verification', () => {
+  const contract = builderTaskContract('Run: npm test. Verify 4 tests pass.')
+  const executed: BuilderToolTrace = { round: 2, toolId: 'run',
+    input: { command: 'npm test' }, ok: true,
+    output: { exitCode: 0, stdout: ['# tests 4', '# pass 4', '# fail 0', ''].join(String.fromCharCode(10)), stderr: '', timedOut: false } }
+  const refused: BuilderToolTrace = { round: 3, toolId: 'run',
+    input: { command: 'npm test' }, ok: false,
+    error: 'builder_repeated_tool_call:run; choose a different next step' }
+  const progress = builderTaskProgress(contract, [], [executed, refused])
+  assert.equal(progress.satisfied, true)
+  assert.deepEqual(progress.pendingCommands, [])
+  assert.equal(progress.testsSatisfied, true)
+})
+
+test('a refused npm test with no prior execution is not verification', () => {
+  const contract = builderTaskContract('Run: npm test. Verify 4 tests pass.')
+  const refused: BuilderToolTrace = { round: 1, toolId: 'run',
+    input: { command: 'npm test' }, ok: false,
+    error: 'builder_repeated_tool_call:run; choose a different next step' }
+  const progress = builderTaskProgress(contract, [], [refused])
+  assert.equal(progress.satisfied, false)
+  assert.equal(progress.testsSatisfied, false)
+})
+
 test('explicit console.assert to node:test modernization completes after four real passing tests', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('modernize', 'test.js', "console.assert(true)\n")

@@ -67,7 +67,10 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
 export function builderTaskProgress(contract: BuilderTaskContract, paths: readonly string[], trace: readonly BuilderToolTrace[]) {
   const missingFiles = contract.files.filter(path => !paths.includes(path))
   const lastChange = trace.findLastIndex(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
-  const recent = trace.slice(lastChange + 1).filter(item => item.toolId === 'run')
+  // Denied repeat controls never executed. They cannot supersede an earlier real
+  // command result or erase its evidence when computing completion.
+  const recent = trace.slice(lastChange + 1).filter(item => item.toolId === 'run'
+    && !String(item.error || '').startsWith('builder_repeated_tool_call:'))
   const passed = (command: string) => {
     const latest = recent.findLast(item => item.input.command === command || item.input.requestedCommand === command)
     const output = latest?.output as { exitCode?: number; timedOut?: boolean } | undefined

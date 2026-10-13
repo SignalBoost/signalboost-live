@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { isOwnerRepairWithoutSource, signalBoostDeployedRepairTarget } from '../lib/builder/repository-repair-target.ts'
+import { hasWorkspaceSource, isOwnerRepairWithoutSource, signalBoostDeployedRepairTarget } from '../lib/builder/repository-repair-target.ts'
 
 const DEPLOYED = { commitSha: 'a'.repeat(40), branch: 'main' }
 const OWNER_REPAIRS = [
@@ -61,6 +61,15 @@ test('the Builder route applies the owner fallback before the empty-workspace pa
   const enqueueStandard = route.indexOf('await enqueueBuilderJob({')
   assert.ok(fallback > 0 && fallback < enqueueStandard, 'fallback runs before a standard job is queued')
   assert.match(route, /ownerRepairWithoutSource: true/)
-  assert.match(route, /listed\.length > 0, \(\) => true/, 'a storage failure never reroutes a workspace of unknown contents')
+  assert.match(route, /hasWorkspaceSource\(listed\.map\(file => file\.path\)\), \(\) => true/, 'a storage failure never reroutes a workspace of unknown contents')
 })
+// Production 2026-10-13 (workspace 502c0aa8): the retry reused the workspace of the dead-ended run, whose only file
+// was Builder's own builder-result.txt. That counted as source, so the request stayed in the empty-workspace path.
+test("Builder's own result report is not source", () => {
+  assert.equal(hasWorkspaceSource([]), false)
+  assert.equal(hasWorkspaceSource(['builder-result.txt']), false)
+  assert.equal(hasWorkspaceSource(['builder-result.txt', 'src/parser.ts']), true)
+  assert.equal(hasWorkspaceSource(['notes/builder-result.txt']), true, 'only the workspace-root report is Builder output')
+})
+
 // end of saas/tests/builderOwnerRepairWithoutSource.node.test.ts (if this line is missing, the paste was cut short)

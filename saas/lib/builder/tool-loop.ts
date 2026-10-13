@@ -549,7 +549,7 @@ export class BuilderToolLoop {
       // Only a run that executed is a failure. A run rejected as a repeat executed nothing; counting it restarted the
       // repair window, so the inspections and refusals after the real failure were forgotten every round.
       const latestFailedRunIndex = trace.reduce((latest, item, index) => (
-        item.toolId === 'run' && !item.ok && !String(item.error || '').startsWith('builder_repeated_tool_call:') ? index : latest
+        item.toolId === 'run' && !item.ok && !/^(?:builder_repeated_tool_call:|builder_repository_broad_test_blocked)/.test(String(item.error || '')) ? index : latest
       ), -1)
       const repairTraceAfterFailure = latestFailedRunIndex >= 0 ? trace.slice(latestFailedRunIndex + 1) : []
       const repairMutationAfterFailure = repairTraceAfterFailure.some(item => item.ok
@@ -863,7 +863,7 @@ export class BuilderToolLoop {
           const proofIdx = trace
             .map((item, index) => ({ item, index }))
             .filter(({ item }) => isExecutedBuilderRun(item) && text(item.input.command) === proofCommand)
-          const failedProof = proofIdx.find(({ item }) => !item.ok)
+          const failedProof = proofIdx.find(({ item }) => !item.ok && item.error !== 'builder_repository_broad_test_blocked' && !String(item.error || '').startsWith('builder_repeated_tool_call:'))
           const passedProof = proofIdx.find(({ item }) => item.ok)
           const verifiedAfterFail = failedProof
             ? proofIdx.some(({ item, index }) => item.ok && index > failedProof.index)
@@ -1096,6 +1096,19 @@ export class BuilderToolLoop {
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
         if (runFailed) {
+          const deniedBroadSuite = (output as ReturnType<typeof summarizeRun>).exitCode === 125
+            && String((output as ReturnType<typeof summarizeRun>).stderr || '').includes('builder_repository_broad_test_blocked')
+          if (deniedBroadSuite) {
+            // Exit 125 is a policy refusal, not a test failure or a reproduced defect.
+            // Do not send the resident into fail/edit/pass repair protocol for a command
+            // the host deliberately never executed.
+            completedRunsInCurrentWorkspaceState.add(fingerprint)
+            trace.push({ round, toolId: 'run', input: action.input, ok: false, output,
+              error: 'builder_repository_broad_test_blocked',
+              failureClass: 'runtime',
+              remediation: 'The repository-wide suite was not executed. Run the smallest relevant test file directly; the full suite belongs in PR CI.' })
+            continue
+          }
           if (extendingProject) repairObjective = true
           completedRunsInCurrentWorkspaceState.add(fingerprint)
           const details = diagnose(`${(output as ReturnType<typeof summarizeRun>).stderr}\n${(output as ReturnType<typeof summarizeRun>).stdout}`, workspacePaths)

@@ -81,6 +81,28 @@ test('repository proof controller refuses to edit when the pinned baseline alrea
   assert.equal((await workspace.readFile('already-green', 'app.js'))?.content, 'module.exports = "fixed"')
 })
 
+test('policy-blocked broad proof cannot authorize repository source edits', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('blocked-proof', 'app.js', 'module.exports = "unchanged"')
+  const model = new ScriptedAi([
+    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"unchanged","replace":"changed"}}',
+  ])
+  const controlled = createRepositoryRepairProofController({
+    ai: model, workspace, proofCommand: 'npm test',
+    runner: { async run() {
+      return { exitCode: 125, stdout: '',
+        stderr: 'builder_repository_broad_test_blocked: use targeted test', timedOut: false }
+    } },
+  })
+  const result = await new BuilderToolLoop(controlled.ai, controlled.workspace, controlled.runner).run({
+    objective: 'Fix a failing repository test', workspaceId: 'blocked-proof', maxRounds: 5,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(model.calls, 0)
+  assert.equal((await workspace.readFile('blocked-proof', 'app.js'))?.content, 'module.exports = "unchanged"')
+  assert.equal(result.trace.some(item => item.ok && item.toolId === 'edit_file'), false)
+})
+
 test('repository proof selection preserves the exact build and narrows explicit failing tests', () => {
   assert.equal(repositoryRepairProofCommand({
     pathHints: [],

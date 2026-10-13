@@ -70,7 +70,9 @@ test('repeated denied inspections stop before exhausting the entire model budget
     maxRounds: 96,
   })
   assert.equal(result.ok, false)
-  if (!result.ok) assert.equal(result.error, 'builder_stalled_repeated_inspection')
+  // A repair objective that keeps re-reading unchanged source is escalated to a mutation-only phase (#4273); when the
+  // model still produces no edit, the loop stops with that explicit reason instead of spending the budget.
+  if (!result.ok) assert.equal(result.error, 'builder_repair_mutation_not_produced')
   assert.ok(calls <= 15, `should stop repeated read requests, got ${calls}`)
 })
 
@@ -78,12 +80,15 @@ test('repeated blocked inspections escalate repairs to mutation-only tools', asy
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('blocked-repair', 'index.js', 'module.exports = 0')
   let calls = 0
+  let escalatedAt = 0
   const result = await new BuilderToolLoop({
     async generate(input) {
       calls++
-      if (calls === 4) {
-        assert.match(input.prompt, /mutation now/)
-        assert.match(input.prompt, /"TOOLS":\\s*\\["write_file","edit_file"\\]/)
+      // Escalation is keyed on the control phase the host announces, not on a model-call count: the host may re-ask
+      // within a round when a refused tool is chosen again.
+      if (/mutation now/.test(input.prompt)) {
+        escalatedAt ||= calls
+        assert.match(input.prompt, /TOOLS: \["write_file","edit_file"\]/)
         return action('edit_file', { path: 'index.js', search: 'module.exports = 0', replace: 'module.exports = 1' })
       }
       return action('read_file', { path: 'index.js' })
@@ -93,8 +98,10 @@ test('repeated blocked inspections escalate repairs to mutation-only tools', asy
     workspaceId: 'blocked-repair',
     maxRounds: 8,
   })
+  assert.ok(escalatedAt > 0 && escalatedAt <= 6, `mutation-only phase must start promptly, got call ${escalatedAt}`)
   assert.ok(result.trace.some(item => item.toolId === 'edit_file' && item.ok),
     JSON.stringify(result.trace.map(item => [item.toolId, item.ok, item.error])))
+  assert.equal((await workspace.readFile('blocked-repair', 'index.js'))?.content, 'module.exports = 1')
 })
 
 test('an unverifiable passing test run cannot replay indefinitely', async () => {

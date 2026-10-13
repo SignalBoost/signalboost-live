@@ -54,6 +54,32 @@ test('repository-wide policy denial does not count as a reproduced repair failur
   if (!verdict.satisfied) assert.match(verdict.reason, /run the narrowest relevant test/)
 })
 
+test('a verified targeted proof followed by a denied repeat ends without fabricated mutation', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('passing-proof', 'tests/math.test.js', 'test')
+  let calls = 0
+  let runs = 0
+  const result = await new BuilderToolLoop({
+    async generate() {
+      calls++
+      if (calls === 1) return action('run', { command: 'node --test tests/math.test.js' })
+      return action('run', { command: 'node --test tests/math.test.js' })
+    },
+  }, workspace, { async run() {
+    runs++
+    return { exitCode: 0, stdout: ['# tests 4', '# pass 4', '# fail 0', ''].join(String.fromCharCode(10)), stderr: '', timedOut: false }
+  } }).run({
+    objective: 'Fix the failing tests in tests/math.test.js.',
+    workspaceId: 'passing-proof',
+    maxRounds: 18,
+  })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.equal(result.error, 'builder_regression_not_reproduced')
+  assert.equal(runs, 1)
+  assert.ok(calls <= 4)
+  assert.equal(result.trace.filter(item => item.toolId === 'write_file' || item.toolId === 'edit_file').length, 0)
+})
+
 test('plain Node scripts must prove all four requested tests before completion', () => {
   const contract = builderTaskContract('Update test.js and run node test.js. Verify all four tests pass.')
   assert.equal(contract.minimumTests, 4)

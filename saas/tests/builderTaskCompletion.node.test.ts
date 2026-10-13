@@ -110,7 +110,7 @@ test('incomplete test proof prompts a source edit then reruns the command', asyn
     workspaceId: 'coverage-repair',
     projectContext: { kind: 'continuation' },
   })
-  assert.equal(result.ok, true)
+  assert.equal(result.ok, true, JSON.stringify({error: !result.ok ? result.error : null, trace: result.trace.map(t => [t.toolId, t.ok, t.error])}))
   assert.equal(runs, 2)
   assert.equal((await workspace.readFile('coverage-repair', 'test.js'))?.content, 'four distinct assertions')
 })
@@ -263,7 +263,7 @@ test('one passing test directs completion of the requested suite before success'
       return { ...passing, stdout: repaired ? passing.stdout : '# pass 1\n# fail 0\n' }
     },
   }).run({ objective, workspaceId: 'insufficient-tests' })
-  assert.equal(result.ok, true)
+  assert.equal(result.ok, true, JSON.stringify({error: !result.ok ? result.error : null, trace: result.trace.map(t => [t.toolId, t.ok, t.error])}))
   assert.equal(repaired, true)
   assert.equal(runs, 4)
 })

@@ -38,7 +38,7 @@ test('browser polls through the five-minute Builder job window without controlli
   assert.ok(pollWindow >= 290_000)
   assert.ok(pollWindow < 300_000)
   assert.match(boundary, /method: 'GET'/)
-  assert.match(boundary, /const terminal = await pollBuilderJob\(fetchImpl, jobId, signal\)/)
+  assert.match(boundary, /const terminal = await pollBuilderJob\(fetchImpl, jobId\)/)
   assert.match(boundary, /The page does not wait for the entire debug lifecycle/)
 })
 

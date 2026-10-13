@@ -54,6 +54,7 @@ export default function DeveloperPage() {
   const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([])
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [workspaceId, setWorkspaceId] = useState('')
+  const [workspaceSearch, setWorkspaceSearch] = useState('')
   const [reply, setReply] = useState('')
   const [trace, setTrace] = useState<BuilderReply['trace']>([])
   const [error, setError] = useState('')
@@ -62,7 +63,15 @@ export default function DeveloperPage() {
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const suggestedObjective = new URLSearchParams(window.location.search).get('objective')?.trim()
+    const params = new URLSearchParams(window.location.search)
+    const requestedWorkspace = params.get('workspaceId')?.trim() || ''
+    // Direct links work even when an older workspace is outside the latest 20.
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedWorkspace)) {
+      void loadWorkspaces()
+      void openWorkspace(requestedWorkspace)
+      return
+    }
+    const suggestedObjective = params.get('objective')?.trim()
     if (suggestedObjective) setObjective(suggestedObjective.slice(0, MAX_BUILDER_RAW_OBJECTIVE_CHARS))
     try {
       const staged = JSON.parse(sessionStorage.getItem(BUILDER_HANDOFF_FILES_KEY) || '[]')
@@ -214,7 +223,12 @@ export default function DeveloperPage() {
             <button type="button" onClick={reset} disabled={running} style={secondaryButton}>{c('newWorkspace')}</button>
             <button type="button" onClick={run} disabled={!objective.trim() || running} style={{ ...primaryButton, opacity: !objective.trim() || running ? .55 : 1 }}>{running ? c('working') : c('run')}</button>
           </div>
-          {workspaces.length ? <details><summary style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>{c('saved').replace('{count}', String(workspaces.length))}</summary><div style={{ display: 'grid', gap: 8, marginTop: 10 }}>{workspaces.map(workspace => <button type="button" key={workspace.id} onClick={() => openWorkspace(workspace.id)} disabled={running} style={{ ...secondaryButton, textAlign: 'start' }}><strong style={{ color: '#67e8f9', marginInlineEnd: 8 }}>{workspace.id.slice(0, 8)}…</strong>{workspace.objective || interpolate('workspace', workspace.id.slice(0, 8), '{id}')} <span style={{ color: '#94a3b8' }}>· {new Date(workspace.updatedAt).toLocaleDateString()}</span></button>)}</div></details> : null}
+          <div style={{ display: 'grid', gap: 8 }}>
+            <label htmlFor="builder-workspace-search" style={{ color: '#94a3b8', fontSize: 13 }}>Find a saved workspace by project description or workspace ID</label>
+            <input id="builder-workspace-search" value={workspaceSearch} onChange={event => setWorkspaceSearch(event.target.value)} placeholder="Search projects, or paste a workspace ID" style={{ border: '1px solid #334155', borderRadius: 10, background: '#020617', color: '#fff', padding: 10 }} />
+            <button type="button" disabled={running || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceSearch.trim())} onClick={() => void openWorkspace(workspaceSearch.trim())} style={secondaryButton}>Open workspace by ID (including older projects)</button>
+            {workspaces.length ? <details open><summary style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>{c('saved').replace('{count}', String(workspaces.length))}</summary><div style={{ display: 'grid', gap: 8, marginTop: 10 }}>{workspaces.filter(workspace => !workspaceSearch.trim() || (workspace.objective + ' ' + workspace.id).toLowerCase().includes(workspaceSearch.trim().toLowerCase())).map(workspace => <button type="button" key={workspace.id} onClick={() => void openWorkspace(workspace.id)} disabled={running} aria-current={workspaceId === workspace.id ? 'true' : undefined} style={{ ...secondaryButton, textAlign: 'start', borderColor: workspaceId === workspace.id ? '#67e8f9' : undefined }}><strong style={{ color: '#67e8f9', marginInlineEnd: 8 }}>{workspaceId === workspace.id ? '✓ Selected — ' : ''}</strong>{workspace.objective || interpolate('workspace', workspace.id.slice(0, 8), '{id}')} <span style={{ color: '#94a3b8' }}>· {new Date(workspace.updatedAt).toLocaleDateString()}</span></button>)}</div></details> : null}
+          </div>
           {files.length ? <div style={fileListStyle}><strong>Attached files ({files.length}/20):</strong>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path} · {(new TextEncoder().encode(file.content).length / 1024).toFixed(1)} KB<button type="button" aria-label={interpolate('remove', file.path)} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
           {error ? <p role="alert" style={{ margin: 0, color: '#fca5a5' }}>{error}</p> : null}
         </section>

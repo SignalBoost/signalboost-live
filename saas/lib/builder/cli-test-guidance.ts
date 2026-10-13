@@ -1,3 +1,15 @@
+/** Require executable, fail-closed test evidence even for small non-CLI code tasks. */
+export function formatBuilderTestEvidenceGuidance(objective: string): string {
+  if (!/\b(?:test|tests|verify|verification)\b/i.test(objective)) return ''
+  return [
+    'TEST EVIDENCE CONTRACT: A zero exit and a generic "All tests passed" string do not prove how many assertions executed.',
+    'For Node.js prefer node:test with node:assert/strict and run node --test test.js; or use node:assert/strict in a plain node test.js script, with explicitly numbered per-test success output after each assertion.',
+    'Do NOT use console.assert as a correctness gate: failed console.assert does not set a nonzero Node process exit code.',
+    'Never print an unconditional success message in lieu of assertions. Failed assertions must produce a nonzero exit. Do not invent TAP pass counts or pad tests merely to meet a minimum.',
+    'When the test suite was changed, rerun the exact requested verification command against the changed workspace before reporting completion.',
+  ].join('\\n')
+}
+
 /** Test-generation requirements; these do not manufacture execution evidence. */
 export function formatBuilderCliTestGuidance(objective: string): string {
   if (!/\b(?:CLI|command[- ]line)\b/i.test(objective) || !/\b(?:test|tests|verify|verification)\b/i.test(objective)) return ''

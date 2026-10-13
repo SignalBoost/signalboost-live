@@ -579,6 +579,13 @@ export class BuilderToolLoop {
       if (consecutiveRepeatRejections >= MAX_CONSECUTIVE_REPEAT_REJECTIONS) {
         return { ok: false, error: passingProofBeforeChange ? 'builder_regression_not_reproduced' : 'builder_stalled_repeated_inspection', trace }
       }
+      // A passing targeted proof plus a refused replay is not a reproduced defect.
+      // The host must terminate this unchanged-source diagnostic itself rather than
+      // requesting the same test again or inventing a source mutation.
+      if (passingProofBeforeChange && trace.some(item =>
+        item.toolId === 'run' && String(item.error || '').startsWith('builder_repeated_tool_call:run'))) {
+        return { ok: false, error: 'builder_regression_not_reproduced', trace }
+      }
       const inspectedRepairPaths = new Set(repairTraceAfterFailure
         .filter(item => item.ok && item.toolId === 'read_file')
         .map(item => toolPath(item.input)))

@@ -10,7 +10,7 @@ import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { builderTaskContract, builderTaskProgress } from '../lib/builder/task-contract.ts'
 import { formatBuilderTestEvidenceGuidance } from '../lib/builder/cli-test-guidance.ts'
-import { isRepairObjective } from '../lib/builder/regression-gate.ts'
+import { evaluateRegressionGate, isExecutedBuilderRun, isRepairObjective } from '../lib/builder/regression-gate.ts'
 import { formatBuilderOperatorRepairReply } from '../lib/builder/operator-narration.ts'
 import type { BuilderToolTrace } from '../lib/builder/contracts.ts'
 
@@ -42,6 +42,16 @@ test('Node test guidance rejects console.assert and requires countable fail-clos
   assert.match(guidance, /nonzero exit/)
   assert.match(guidance, /per-test success output/)
   assert.equal(formatBuilderTestEvidenceGuidance('Update README.md only.'), '')
+})
+
+test('repository-wide policy denial does not count as a reproduced repair failure', () => {
+  const denied: BuilderToolTrace = { round: 1, toolId: 'run', input: { command: 'npm test' }, ok: false,
+    output: { exitCode: 125, stdout: '', stderr: 'builder_repository_broad_test_blocked', timedOut: false },
+    error: 'builder_repository_broad_test_blocked' }
+  assert.equal(isExecutedBuilderRun(denied), false)
+  const verdict = evaluateRegressionGate('Fix failing tests', [denied], true)
+  assert.equal(verdict.satisfied, false)
+  if (!verdict.satisfied) assert.match(verdict.reason, /run the narrowest relevant test/)
 })
 
 test('plain Node scripts must prove all four requested tests before completion', () => {

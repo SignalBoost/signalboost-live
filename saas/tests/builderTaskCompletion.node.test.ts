@@ -64,6 +64,26 @@ test('repeated denied inspections stop before exhausting the entire model budget
   assert.ok(calls <= 15, `should stop repeated read requests, got ${calls}`)
 })
 
+test('an unverifiable passing test run cannot replay indefinitely', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let calls = 0
+  const result = await new BuilderToolLoop({
+    async generate() {
+      calls++
+      return action('run', { command: 'node test.js' })
+    },
+  }, workspace, {
+    async run() { return { exitCode: 0, stdout: 'All tests passed!', stderr: '', timedOut: false } },
+  }).run({
+    objective: 'Run node test.js and verify all four tests pass.',
+    workspaceId: 'unverified-four-tests',
+  })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.equal(result.error, 'builder_test_evidence_insufficient')
+  assert.ok(calls <= 3)
+  assert.equal(result.trace.filter(item => item.toolId === 'run' && item.ok).length, 1)
+})
+
 test('the reported new build is not an existing repair despite error requirements and conditional recovery', () => {
   assert.equal(isRepairObjective(objective), false)
   for (const request of ['Fix expenses.js.', 'Repair the broken CLI.', 'Create a regression test and fix the bug.', 'Fixed expenses.js.', 'The program crashes.']) assert.equal(isRepairObjective(request), true, request)

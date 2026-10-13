@@ -815,6 +815,14 @@ export class BuilderToolLoop {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
         continue
       }
+      // Replaying an unchanged passing command cannot establish missing test coverage.
+      // Return a truthful terminal result instead of repeatedly paying for the same rejected run.
+      if (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint)
+        && task.minimumTests > 0 && !progress.testsSatisfied) {
+        trace.push({ round, toolId: 'run', input: action.input, ok: false,
+          error: 'builder_test_evidence_insufficient: update the test file to execute and report the requested test count before rerunning' })
+        return { ok: false, error: 'builder_test_evidence_insufficient', trace }
+      }
       if ((mutation && completedMutations.has(fingerprint))
         || (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint))) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })

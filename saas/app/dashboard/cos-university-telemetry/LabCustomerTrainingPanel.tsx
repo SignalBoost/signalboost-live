@@ -15,15 +15,14 @@ type CatalogEntry = { kind: string; name: string; supports: Record<string, boole
 type Credential = { id: string; providerKind: string; label: string; endpoint: string | null; createdAt: string }
 type Run = {
   runId: string; stage: string; progressPercent: number; statusMessage: string | null; teacherProviderKind: string; teacherModel: string
-  baseModel: string; approvedBudgetUsd: number; committedMaxCostUsd: number; hfJobUrl: string | null; artifactRepo: string | null
+  baseModel: string; hfJobUrl: string | null; artifactRepo: string | null
   artifactRevision: string | null; failureCode: string | null; createdAt: string
-  teacherReservedUsd?: number; teacherSpentUsd?: number; teacherReservationState?: string | null
   computeProviderKind?: string; tunedModelId?: string | null
 }
 type ModelOption = { id: string; label: string }
-type TeacherModelOption = { id: string; priced: boolean }
+type TeacherModelOption = { id: string }
 // Build marker shown in the header (an identifier, not translatable copy).
-const LAB_UI_VERSION = 'LAB UI v2026.10.12.9'
+const LAB_UI_VERSION = 'LAB UI v2026.10.12.10'
 // Providers whose training jobs are polled through the training route (no worker callback).
 const POLLED_TRAINING = new Set(['together', 'fireworks'])
 // Training providers whose base-model list is public, so it shows before a key is saved.
@@ -72,10 +71,8 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   const [openNote, setOpenNote] = useState<{ kind: 'status' | 'alert'; text: string } | null>(null)
   const [examples, setExamples] = useState('')
   const [files, setFiles] = useState<Record<string, { path: string; size: number }[]>>({})
-  const [budget, setBudget] = useState('')
-  const [hourly, setHourly] = useState('')
-  const [teacherBudget, setTeacherBudget] = useState('')
-  const [budgetAuthorized, setBudgetAuthorized] = useState(false)
+  // The customer confirms on every start that their own providers bill them for this run (the platform does not price it).
+  const [billingConfirmed, setBillingConfirmed] = useState(false)
 
   const [organizationId, experimentId] = orgKey.split('|')
   const org = orgs.find(item => `${item.organizationId}|${item.experimentId}` === orgKey)
@@ -121,7 +118,6 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     if (target === 'teacher') setTeacherId(account); else setComputeId(account)
     openInlineKey(target, kind && !credentials.some(item => item.providerKind === kind) ? kind : '')
   }
-  const hourlyApplies = computeProviderKind === 'huggingface'
   const baseModelValid = Boolean(BASE_MODEL_ID[computeProviderKind]?.test(baseModel))
   const selectedTeacherCredentials = teacherCredentials.filter(item => item.providerKind === teacherProviderKind)
   const promptCount = useMemo(() => new Set(prompts.split('\n').map(line => line.trim()).filter(Boolean)).size, [prompts])
@@ -181,7 +177,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       .then(response => response.ok ? response.json() : null)
       .then(body => {
         if (cancelled) return
-        const models: TeacherModelOption[] = body?.ok && Array.isArray(body.models) ? body.models.filter((m: any) => typeof m?.id === 'string').map((m: any) => ({ id: m.id, priced: m.priced === true })) : []
+        const models: TeacherModelOption[] = body?.ok && Array.isArray(body.models) ? body.models.filter((m: any) => typeof m?.id === 'string').map((m: any) => ({ id: m.id })) : []
         setTeacherModels(models); setTeacherModelsError(!body?.ok || models.length === 0)
       })
       .catch(() => { if (!cancelled) { setTeacherModels([]); setTeacherModelsError(true) } })
@@ -255,7 +251,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
       if (activeOrgRef.current !== requestedOrg) return
       if (target === 'teacher') { setTeacherId(saved.credentialId); setTeacherModel(''); setTeacherModelChoice('') }
       else { setComputeId(saved.credentialId); setBaseModel(''); setModelSelection('') }
-      setBudgetAuthorized(false)
+      setBillingConfirmed(false)
       openInlineKey(target, '')
       setKeyFeedback({ where: target, kind: 'status', text: savedText(saved.check) })
     } catch (error: any) { if (activeOrgRef.current === requestedOrg) setKeyFeedback({ where: target, kind: 'alert', text: fmt(copy.keyNotSaved, { code: explain(error.message) }) }) }
@@ -273,7 +269,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
     try {
       const found = await call('/api/lab/open-sources', 'POST', { organizationId, topic: openTopic, sources: openPicked })
       if (activeOrgRef.current !== requestedOrg) return
-      setExamples(found.jsonl ?? ''); setBudgetAuthorized(false)
+      setExamples(found.jsonl ?? ''); setBillingConfirmed(false)
       const missing = LAB_OPEN_SOURCES.filter(item => found.perSource?.[item.id] === 'unavailable').map(item => item.name)
       const line = fmt(Number(found.count) >= 20 ? copy.openFound : copy.openTooFew, { n: Number(found.count) || 0 })
       setOpenNote({ kind: Number(found.count) >= 20 ? 'status' : 'alert', text: missing.length ? `${line} ${fmt(copy.openUnavailableLine, { sources: missing.join(', ') })}` : line })
@@ -283,16 +279,14 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
   }
 
   async function startRun() {
-    if (!budgetAuthorized) return
-    setBudgetAuthorized(false)
+    if (!billingConfirmed) return
+    setBillingConfirmed(false)
     const requestedOrg = organizationId
     setMessage({ kind: 'status', text: copy.starting })
     try {
       await call('/api/lab/training', 'POST', {
         action: 'start', organizationId, experimentId, source: source === 'open_sources' ? 'examples' : source, examples, teacherCredentialId: teacherId, teacherModel,
-        computeCredentialId: computeId, computeProviderKind, baseModel, prompts, approvedBudgetConfirmed: budgetAuthorized, approvedBudgetUsd: Number(budget),
-        maxHourlyUsd: hourlyApplies ? Number(hourly) : null,
-        teacherBudgetUsd: Number(teacherBudget),
+        computeCredentialId: computeId, computeProviderKind, baseModel, prompts, providerBillingConfirmed: billingConfirmed,
       })
       if (activeOrgRef.current === requestedOrg) setMessage({ kind: 'status', text: copy.started })
     } catch (error: any) {
@@ -402,9 +396,9 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
         <div className="space-y-2">
           <h3 className="font-medium">{copy.chooseHeading}</h3>
           <div className="flex gap-4 text-sm">
-            <label><input type="radio" checked={source === 'examples'} onChange={() => { setSource('examples'); setBudgetAuthorized(false) }} /> {copy.useExamples}</label>
-            <label><input type="radio" checked={source === 'teacher'} onChange={() => { setSource('teacher'); setBudgetAuthorized(false) }} /> {copy.askTeacher}</label>
-            <label><input type="radio" checked={source === 'open_sources'} onChange={() => { setSource('open_sources'); setBudgetAuthorized(false) }} /> {copy.useOpenSources}</label>
+            <label><input type="radio" checked={source === 'examples'} onChange={() => { setSource('examples'); setBillingConfirmed(false) }} /> {copy.useExamples}</label>
+            <label><input type="radio" checked={source === 'teacher'} onChange={() => { setSource('teacher'); setBillingConfirmed(false) }} /> {copy.askTeacher}</label>
+            <label><input type="radio" checked={source === 'open_sources'} onChange={() => { setSource('open_sources'); setBillingConfirmed(false) }} /> {copy.useOpenSources}</label>
           </div>
           {source === 'open_sources' && (
             <div className="grid gap-2 rounded border border-white/20 p-2 sm:grid-cols-2">
@@ -431,13 +425,13 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
           <div className="grid gap-2 sm:grid-cols-2">
             {source === 'teacher' && <>
             <label className="text-sm">{copy.teacherProviderLabel}
-              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBudgetAuthorized(false); pickProvider('teacher', event.target.value); setTeacherModel(''); setTeacherModelChoice('') }}>
+              <select aria-label={copy.teacherProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherProviderKind} onChange={event => { setTeacherProviderKind(event.target.value); setBillingConfirmed(false); pickProvider('teacher', event.target.value); setTeacherModel(''); setTeacherModelChoice('') }}>
                 <option value="">{copy.chooseTeacherProvider}</option>
                 {teacherOptions.map(item => <option key={item.kind} value={item.kind} disabled={item.blocked !== null}>{optionLabel(item)}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.teacherKey}
-              <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={inlineKey?.target === 'teacher' ? ADD_KEY_OPTION : teacherId} disabled={!teacherProviderKind} onChange={event => { if (event.target.value === ADD_KEY_OPTION) { openInlineKey('teacher', teacherProviderKind); return } openInlineKey('teacher', ''); setTeacherId(event.target.value); setTeacherModel(''); setTeacherModelChoice(''); setBudgetAuthorized(false) }}>
+              <select aria-label={copy.teacherKey} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={inlineKey?.target === 'teacher' ? ADD_KEY_OPTION : teacherId} disabled={!teacherProviderKind} onChange={event => { if (event.target.value === ADD_KEY_OPTION) { openInlineKey('teacher', teacherProviderKind); return } openInlineKey('teacher', ''); setTeacherId(event.target.value); setTeacherModel(''); setTeacherModelChoice(''); setBillingConfirmed(false) }}>
                 <option value="">{teacherProviderKind ? copy.chooseTeacherAccount : copy.chooseProviderFirst}</option>
                 {selectedTeacherCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
                 {teacherProviderKind && canManage && <option value={ADD_KEY_OPTION}>{copy.addKeyOption}</option>}
@@ -447,24 +441,23 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               {feedbackFor('teacher')}
             </label>
             <label className="text-sm">{copy.teacherModel}
-              <select aria-label={copy.teacherModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherModelChoice} disabled={!teacherProviderKind || !teacherId} onChange={event => { setTeacherModelChoice(event.target.value); setTeacherModel(event.target.value === 'custom' ? '' : event.target.value); setBudgetAuthorized(false) }}>
+              <select aria-label={copy.teacherModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={teacherModelChoice} disabled={!teacherProviderKind || !teacherId} onChange={event => { setTeacherModelChoice(event.target.value); setTeacherModel(event.target.value === 'custom' ? '' : event.target.value); setBillingConfirmed(false) }}>
                 <option value="">{teacherModelsLoading ? copy.loadingModels : !teacherProviderKind ? copy.chooseProviderFirst : !teacherId ? copy.chooseAccountFirst : copy.choose}</option>
-                {teacherModels.some(model => model.priced) && <optgroup label={copy.pricedModels}>{teacherModels.filter(model => model.priced).map(model => <option key={model.id} value={model.id}>{model.id}</option>)}</optgroup>}
-                {teacherModels.some(model => !model.priced) && <optgroup label={copy.unpricedModels}>{teacherModels.filter(model => !model.priced).map(model => <option key={model.id} value={model.id} disabled>{model.id}</option>)}</optgroup>}
+                {teacherModels.map(model => <option key={model.id} value={model.id}>{model.id}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>
               {teacherModelsError && <span role="alert" className="mt-1 block text-xs text-amber-200">{copy.modelDirectoryUnavailable}</span>}
-              {teacherModelChoice === 'custom' && <input aria-label={copy.teacherModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.modelPh} value={teacherModel} onChange={event => { setTeacherModel(event.target.value); setBudgetAuthorized(false) }} />}
+              {teacherModelChoice === 'custom' && <input aria-label={copy.teacherModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={copy.modelPh} value={teacherModel} onChange={event => { setTeacherModel(event.target.value); setBillingConfirmed(false) }} />}
             </label>
             </>}
             <label className="text-sm">{copy.trainingProviderLabel}
-              <select aria-label={copy.trainingProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBudgetAuthorized(false); pickProvider('training', event.target.value); setBaseModel(''); setModelSelection('') }}>
+              <select aria-label={copy.trainingProviderLabel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={computeProviderKind} onChange={event => { setComputeProviderKind(event.target.value); setBillingConfirmed(false); pickProvider('training', event.target.value); setBaseModel(''); setModelSelection('') }}>
                 <option value="">{copy.chooseTrainingProvider}</option>
                 {trainingOptions.map(item => <option key={item.kind} value={item.kind} disabled={item.blocked !== null}>{optionLabel(item)}</option>)}
               </select>
             </label>
             <label className="text-sm">{copy.trainingAccount}
-              <select aria-label={copy.trainingAccount} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={inlineKey?.target === 'training' ? ADD_KEY_OPTION : computeId} disabled={!computeProviderKind} onChange={event => { if (event.target.value === ADD_KEY_OPTION) { openInlineKey('training', computeProviderKind); return } openInlineKey('training', ''); setComputeId(event.target.value); setBaseModel(''); setModelSelection(''); setBudgetAuthorized(false) }}>
+              <select aria-label={copy.trainingAccount} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={inlineKey?.target === 'training' ? ADD_KEY_OPTION : computeId} disabled={!computeProviderKind} onChange={event => { if (event.target.value === ADD_KEY_OPTION) { openInlineKey('training', computeProviderKind); return } openInlineKey('training', ''); setComputeId(event.target.value); setBaseModel(''); setModelSelection(''); setBillingConfirmed(false) }}>
                 <option value="">{computeProviderKind ? copy.chooseTrainingAccount : copy.chooseProviderFirst}</option>
                 {selectedComputeCredentials.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
                 {computeProviderKind && canManage && <option value={ADD_KEY_OPTION}>{copy.addKeyOption}</option>}
@@ -474,47 +467,27 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               {feedbackFor('training')}
             </label>
             <label className="text-sm">{copy.baseModel}
-              <select aria-label={copy.baseModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind || (!computeId && !PUBLIC_MODEL_DIRECTORY.has(computeProviderKind))} onChange={event => { setBudgetAuthorized(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
+              <select aria-label={copy.baseModel} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={modelSelection} disabled={!computeProviderKind || (!computeId && !PUBLIC_MODEL_DIRECTORY.has(computeProviderKind))} onChange={event => { setBillingConfirmed(false); const selected = event.target.value; setModelSelection(selected); setBaseModel(selected === 'custom' ? '' : selected) }}>
                 <option value="">{modelsLoading ? copy.loadingModels : !computeProviderKind ? copy.chooseProviderFirst : !computeId && !PUBLIC_MODEL_DIRECTORY.has(computeProviderKind) ? copy.chooseAccountFirst : copy.choose}</option>
                 {modelSuggestions.map(model => <option key={model.id} value={model.id}>{model.label}</option>)}
                 <option value="custom">{copy.customModelLabel}</option>
               </select>
               {modelsError && <span role="alert" className="mt-1 block text-xs text-amber-200">{copy.modelDirectoryUnavailable}</span>}
-              {modelSelection === 'custom' && <input aria-label={copy.baseModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={computeProviderKind === 'fireworks' ? 'accounts/fireworks/models/model-name' : 'Organization/model-name'} value={baseModel} onChange={event => { setBaseModel(event.target.value); setBudgetAuthorized(false) }} />}
+              {modelSelection === 'custom' && <input aria-label={copy.baseModel} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" placeholder={computeProviderKind === 'fireworks' ? 'accounts/fireworks/models/model-name' : 'Organization/model-name'} value={baseModel} onChange={event => { setBaseModel(event.target.value); setBillingConfirmed(false) }} />}
               <span className="mt-1 block text-xs text-slate-400">{copy.modelDirectoryHelp}</span>
             </label>
-            <label className="text-sm">{copy.budget}
-              <select aria-label={copy.budget} className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" value={['10', '25', '100'].includes(budget) ? budget : budget ? 'custom' : ''} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value === 'custom' ? 'other' : event.target.value); setTeacherBudget('') }}>
-                <option value="">{copy.choose}</option>
-                <option value="10">$10</option>
-                <option value="25">$25</option>
-                <option value="100">$100</option>
-                <option value="custom">{copy.customAmount}</option>
-              </select>
-              {budget && !['10', '25', '100'].includes(budget) && <input aria-label={copy.customAmount} className="mt-2 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.5" max="1000" step="0.5" placeholder={copy.customAmount} value={budget === 'other' ? '' : budget} onChange={event => { setBudgetAuthorized(false); setBudget(event.target.value || 'other'); setTeacherBudget('') }} />}
-            </label>
-            {hourlyApplies && <label className="text-sm">{copy.hourly}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" max="1000" step="0.01" value={hourly} onChange={event => { setBudgetAuthorized(false); setHourly(event.target.value) }} />
-            </label>}
-            {source === 'teacher' && <>
-            <label className="text-sm">{copy.teacherBudget}
-              <input className="mt-1 w-full rounded border border-white/30 bg-slate-900 px-2 py-1 text-white" type="number" min="0.01" step="0.01" value={teacherBudget} onChange={event => { setBudgetAuthorized(false); setTeacherBudget(event.target.value) }} />
-            </label>
-            <span />
-            <p className="text-xs opacity-70 sm:col-span-2">{copy.teacherPriceHelp}</p>
-            </>}
             {source === 'teacher' ? (
               <label className="text-sm sm:col-span-2">{fmt(copy.prompts, { n: promptCount })}
-                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={prompts} onChange={event => { setPrompts(event.target.value); setBudgetAuthorized(false) }} />
+                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={prompts} onChange={event => { setPrompts(event.target.value); setBillingConfirmed(false) }} />
               </label>
             ) : (
               <label className="text-sm sm:col-span-2">{fmt(copy.examples, { n: exampleCount })}
-                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={examples} onChange={event => { setExamples(event.target.value); setBudgetAuthorized(false) }} />
+                <textarea className="mt-1 h-40 w-full rounded border px-2 py-1 font-mono text-xs" value={examples} onChange={event => { setExamples(event.target.value); setBillingConfirmed(false) }} />
               </label>
             )}
           </div>
-          <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={budgetAuthorized} onChange={event => setBudgetAuthorized(event.target.checked)} /> {copy.budgetConfirmation}</label>
-          <button className="rounded border px-3 py-1" disabled={busy || !budgetAuthorized || !(Number(budget) > 0) || (hourlyApplies && !(Number(hourly) > 0)) || !computeProviderKind || !computeId || !baseModelValid || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel || !(Number(teacherBudget) > 0) || !(Number(teacherBudget) < Number(budget))))} onClick={startRun}>{copy.start}</button>
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={billingConfirmed} onChange={event => setBillingConfirmed(event.target.checked)} /> {copy.billingConfirmation}</label>
+          <button className="rounded border px-3 py-1" disabled={busy || !billingConfirmed || !computeProviderKind || !computeId || !baseModelValid || itemCount < 20 || itemCount > 128 || (source === 'teacher' && (!teacherProviderKind || !teacherId || !teacherModel))} onClick={startRun}>{copy.start}</button>
         </div>
       )}
 
@@ -530,9 +503,7 @@ export default function LabCustomerTrainingPanel({ copy, language = 'en' }: { co
               </div>
               <div className="my-2 h-2 w-full rounded bg-muted"><div className="h-2 rounded bg-primary" style={{ width: `${run.progressPercent}%` }} /></div>
               {run.failureCode ? <p>{explain(run.failureCode)}</p> : run.statusMessage && <p>{run.statusMessage}</p>}
-              <p className="opacity-70">{fmt(copy.budgetLine, { budget: Number(run.approvedBudgetUsd).toFixed(2), reserved: Number(run.committedMaxCostUsd).toFixed(2) })}</p>
               {run.tunedModelId && <p>{fmt(copy.tunedModelLine, { id: run.tunedModelId })}</p>}
-              {Number(run.teacherReservedUsd) > 0 && <p className="opacity-70">{fmt(copy.teacherSpentLine, { spent: Number(run.teacherSpentUsd ?? 0).toFixed(4), reserved: Number(run.teacherReservedUsd).toFixed(4) })}</p>}
               <div className="mt-2 flex flex-wrap gap-3">
                 {run.hfJobUrl && <a className="underline" href={run.hfJobUrl} target="_blank" rel="noreferrer">{copy.openJob}</a>}
                 {canManage && !['completed', 'failed', 'cancelled'].includes(run.stage) && <button className="underline" disabled={busy} onClick={() => refreshRun(run.runId)}>{copy.checkStatus}</button>}

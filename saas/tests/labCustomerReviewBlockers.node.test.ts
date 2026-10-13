@@ -20,24 +20,24 @@ async function realPlan() {
   const built = await lab.buildCustomerTeacherRows({ teacher: { id: 't', provider: 'p', model: 'm' }, prompts, generate: async p => `A ${p}` })
   const runId = randomUUID()
   const ports = {
-    resolveNamespace: async () => 'acme', resolveHourlyUsd: async () => 0.6,
+    resolveNamespace: async () => 'acme',
     submit: async () => ({ jobId: 'j1', jobUrl: 'u1' }), findByName: async () => null,
   }
   return lab.planCustomerJob({
     runId, envelope: lab.buildPrepareEnvelope({ runId, rows: built.rows, baseModel: 'Qwen/Q', baseModelRevision: null, datasetHash: built.datasetHash }),
     customerHfToken: HF_TOKEN, stageToken: lab.newStageToken().token, origin: 'https://app.example',
     platformEnv: { HF_TOKEN: 'hf_' + 'p'.repeat(30), COS_UNIVERSITY_HF_WORKER_URL: 'https://app.example/w.py' },
-    maxHourlyUsd: 1, remainingBudgetUsd: 10, ports,
+    ports,
   } as any)
 }
 
-// ---- 1. saas/app/api/lab/training/route.ts: reservation + recoverable state saved before submission ----------------
-test('[1] start route: no submitCustomerJob; reservation, callback token and job name are written before submit', () => {
+// ---- 1. saas/app/api/lab/training/route.ts: recoverable job state saved before submission -------------------------
+test('[1] start route: no submitCustomerJob; callback token and job name are written before submit', () => {
   const src = read(START)
   assert.doesNotMatch(src, /submitCustomerJob/, 'old pre-reservation submit helper must be gone')
   assert.match(src, /runReservedJob\(/)
-  // The reserve step records cost, the next stage-token hash (callback) and the deterministic job name together.
-  assert.match(src, /reserve: p => record\('preparing_dataset'[\s\S]{0,300}hfPendingJobName: p\.jobName, jobSubmissionState: 'reserved' \}, p\.maxCostUsd, stage\.hash\)/)
+  // The record step saves the next stage-token hash (callback) and the deterministic job name together.
+  assert.match(src, /reserve: p => record\('preparing_dataset'[\s\S]{0,300}hfPendingJobName: p\.jobName, jobSubmissionState: 'reserved' \}, stage\.hash\)/)
 })
 
 test('[1] behaviour: submit is never called when the reservation write fails, and is called only after it succeeds', async () => {
@@ -56,11 +56,11 @@ test('[1] behaviour: submit is never called when the reservation write fails, an
   assert.deepEqual(log, ['reserve', 'submit', 'attach'])
 })
 
-// ---- 2. callback route: reserve before training submit, DB errors not ignored, no duplicate paid submission --------
-test('[2] callback route: record() throws on a database error and the reservation step uses it', () => {
+// ---- 2. callback route: record before training submit, DB errors not ignored, no duplicate submission -------------
+test('[2] callback route: record() throws on a database error and the record step uses it', () => {
   const src = read(CALLBACK)
   assert.match(src, /\.then\(\(\{ error: e \}: \{ error: any \}\) => \{ if \(e\) throw new Error/, 'record() must surface DB errors')
-  assert.match(src, /reserve: p => record\('preparing_dataset', 'training'[\s\S]{0,200}jobSubmissionState: 'reserved' \}, p\.maxCostUsd, next\.hash\)/)
+  assert.match(src, /reserve: p => record\('preparing_dataset', 'training'[\s\S]{0,200}jobSubmissionState: 'reserved' \}, next\.hash\)/)
   assert.match(src, /runReservedJob\(\{ plan, customerHfToken: hfToken/)
   assert.doesNotMatch(src, /submitCustomerJob|ports\.submit\(|customerHfPorts\.submit\(/)
 })
@@ -76,7 +76,7 @@ test('[2] behaviour: a callback whose record() returns { error } submits nothing
   assert.equal(submits, 0)
 })
 
-test('[2] behaviour: two concurrent deliveries of the same callback produce one paid submission', async () => {
+test('[2] behaviour: two concurrent deliveries of the same callback produce one submission', async () => {
   const plan = await realPlan()
   let stage = 'preparing_dataset'; let submits = 0
   // Mirrors itmounts_lab_worker_record_stage: row-locked compare-and-set on the expected stage.
@@ -97,18 +97,17 @@ test('[2] database: stage token is single-use and stage writes are compare-and-s
   assert.match(sql, /current_stage <> p_expected_stage then raise exception 'lab_worker_stage_conflict'/)
 })
 
-// ---- 3. teacher spend in the approved ceiling, executed through the governed Harness ------------------------------
-test('[3] start route: no direct generateWithUniversityTeacher; teacher spend reserved/settled and Harness-governed', () => {
+// ---- 3. teacher calls executed through the governed Harness, on the customer's own key ---------------------------
+test('[3] start route: no direct generateWithUniversityTeacher; teacher calls are Harness-governed, never priced', () => {
   const src = read(START)
   assert.doesNotMatch(src, /generateWithUniversityTeacher/)
   assert.match(src, /runGovernedTeacher\(/)
-  assert.match(src, /itmounts_lab_customer_reserve_teacher/)
-  assert.match(src, /itmounts_lab_customer_settle_teacher/)
-  assert.match(src, /remainingBudgetUsd = built\.settlement\.remainingUsd/, 'HF job gets only what teacher spend left')
+  assert.doesNotMatch(src, /reserve_teacher|settle_teacher|teacher_rate_card/)
   const adapter = read('../platform-harness/adapters/lab-customer-teacher.ts')
   assert.match(adapter, /from '\.\/production\.ts'/, 'uses the existing production Harness request builder')
   assert.match(adapter, /withHarnessExecutionContext/)
-  assert.match(adapter, /enforceProviderCostBudget: true/)
+  assert.match(adapter, /maxToolCalls: input\.maxCalls/)
+  assert.doesNotMatch(adapter, /maxCostUsd|enforceProviderCostBudget/)
 })
 
 // ---- 4. download route: authorized delivery, never a private HF link or CLI command -------------------------------

@@ -1,13 +1,14 @@
 // saas/lib/ai/cos/labCustomerProviderTraining.ts
 //
 // Customer LAB training on provider-hosted fine-tuning APIs, with the CUSTOMER's own key and account:
-//   Together AI  -> POST /v1/files/upload, /v1/fine-tunes/estimate-price, /v1/fine-tunes, GET /v1/fine-tunes/{id}
+//   Together AI  -> POST /v1/files/upload, /v1/fine-tunes/estimate-price (readiness only), /v1/fine-tunes, GET /v1/fine-tunes/{id}
 //   Fireworks AI -> /v1/accounts, /v1/{account}/datasets(+:upload), /v1/{account}/supervisedFineTuningJobs
 // Endpoints and fields follow each provider's own API reference (docs.together.ai, docs.fireworks.ai, read 2026-10-12).
 //
-// Spend order is the same as the Hugging Face path: everything free first (validation, upload, price), then the run's
-// maximum cost is RESERVED in the database, then the paid job is created. A job whose creation cannot be proven absent
-// keeps its reservation. Pure orchestration with an injected fetch, so every rule is unit-tested without network.
+// The provider bills the customer directly; the platform never prices the job. Order is the same as the Hugging Face
+// path: validation and upload first, then the job's identifying details are recorded in the database, then the job is
+// created. A job whose creation cannot be proven absent stays recorded so "Check status" can find it.
+// Pure orchestration with an injected fetch, so every rule is unit-tested without network.
 import type { TeacherRow } from './labCustomerTraining.ts'
 
 export type ProviderTrainingKind = 'together' | 'fireworks'
@@ -16,19 +17,13 @@ export const isProviderTrainingKind = (kind: string): kind is ProviderTrainingKi
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 export type BaseModelOption = Readonly<{ id: string; label: string }>
-/** Fireworks LoRA SFT price band, from lab.training_rate_cards (platform-maintained, provider-published prices). */
-export type TrainingRateCard = Readonly<{ id: string; providerKind: string; minParameters: number; maxParameters: number | null; usdPerMTok: number; safetyMargin: number }>
 
 const TOGETHER = 'https://api.together.xyz/v1'
 const FIREWORKS = 'https://api.fireworks.ai/v1'
 // One pass over the data. Together and Fireworks both default to LoRA when no full-training option is sent.
 const EPOCHS = 1
 const FIREWORKS_LORA_RANK = 16
-// Together publishes a minimum charge per fine-tuning job (docs.together.ai/docs/fine-tuning/pricing): never reserve less.
-const TOGETHER_MINIMUM_JOB_USD = 4
-// Headroom over the provider's own estimate for rounding/surcharges. The provider estimate itself is the price source.
-const TOGETHER_ESTIMATE_MARGIN = 1.1
-const ESTIMATE_ATTEMPTS = 8
+const READINESS_ATTEMPTS = 8
 const TIMEOUT_MS = 20_000
 
 const fail = (code: string): never => { throw new Error(code) }
@@ -48,12 +43,9 @@ async function json(fetcher: Fetcher, url: string, init: RequestInit, failure: s
 export function buildChatJsonl(rows: readonly TeacherRow[]): string {
   return rows.map(row => JSON.stringify({ messages: [{ role: 'user', content: row.prompt }, { role: 'assistant', content: row.response }] })).join('\n') + '\n'
 }
-/** UTF-8 bytes of the dataset. A tokenizer token is at least one byte and the JSON keys outweigh any chat template, so
- *  the byte count is a safe upper bound on billed training tokens per epoch. */
-export const datasetTokenBound = (jsonl: string) => Buffer.byteLength(jsonl, 'utf8')
 
 // --- Together AI -------------------------------------------------------------------------------------------------
-/** Base models with a Together fine-tuning price, from the customer's own live model list. */
+/** Base models Together lists as fine-tunable (they carry a fine-tuning entry), from the customer's own live model list. */
 export async function listTogetherBaseModels(key: string, fetcher: Fetcher): Promise<BaseModelOption[]> {
   const { status, body } = await json(fetcher, `${TOGETHER}/models`, { headers: auth(key) }, 'together_models')
   if (status !== 200 || !Array.isArray(body)) fail('together_models_unavailable')
@@ -62,8 +54,11 @@ export async function listTogetherBaseModels(key: string, fetcher: Fetcher): Pro
   return [...new Set(ids)].sort((a, b) => a.localeCompare(b)).map(id => ({ id, label: id }))
 }
 
-export type TogetherPrepared = Readonly<{ fileId: string; estimateUsd: number; maxCostUsd: number }>
-/** Free steps: confirm the model is tunable, upload the file, get Together's own price estimate. */
+export type TogetherPrepared = Readonly<{ fileId: string }>
+/**
+ * Before the job: confirm the model is tunable, upload the file, and wait until Together has validated it and says the
+ * account may proceed. Together's pre-flight endpoint is used ONLY for that readiness answer; its price is ignored.
+ */
 export async function prepareTogether(input: {
   key: string; runId: string; baseModel: string; jsonl: string; fetcher: Fetcher; sleep?: (ms: number) => Promise<void>
 }): Promise<TogetherPrepared> {
@@ -80,28 +75,25 @@ export async function prepareTogether(input: {
   const upload = await json(fetcher, `${TOGETHER}/files/upload`, { method: 'POST', headers: auth(key), body: form }, 'together_upload')
   const fileId = String(upload.body?.id ?? '')
   if (upload.status !== 200 || !fileId) fail('together_upload_failed')
-  // The estimate is only available once Together has validated the uploaded file.
-  for (let attempt = 0; attempt < ESTIMATE_ATTEMPTS; attempt++) {
-    const estimate = await json(fetcher, `${TOGETHER}/fine-tunes/estimate-price`, {
+  // Together validates an uploaded file asynchronously; its pre-flight answers only once validation is done.
+  for (let attempt = 0; attempt < READINESS_ATTEMPTS; attempt++) {
+    const preflight = await json(fetcher, `${TOGETHER}/fine-tunes/estimate-price`, {
       method: 'POST', headers: { ...auth(key), 'content-type': 'application/json' },
       body: JSON.stringify({ training_file: fileId, model: input.baseModel, n_epochs: EPOCHS }),
-    }, 'together_estimate')
-    if (estimate.status !== 200) fail('lab_provider_estimate_unavailable')
-    if (estimate.body?.estimation_available === true) {
-      const estimateUsd = Number(estimate.body.estimated_total_price)
-      if (!(estimateUsd >= 0) || !Number.isFinite(estimateUsd)) fail('lab_provider_estimate_unavailable')
-      if (estimate.body.allowed_to_proceed !== true) fail('lab_provider_funds_insufficient')
-      const maxCostUsd = Number(Math.max(estimateUsd * TOGETHER_ESTIMATE_MARGIN, TOGETHER_MINIMUM_JOB_USD).toFixed(6))
-      return Object.freeze({ fileId, estimateUsd, maxCostUsd })
+    }, 'together_preflight')
+    if (preflight.status !== 200) fail('lab_provider_not_ready')
+    if (preflight.body?.estimation_available === true) {
+      if (preflight.body.allowed_to_proceed !== true) fail('lab_provider_funds_insufficient')
+      return Object.freeze({ fileId })
     }
-    const reason = String(estimate.body?.unavailable_reason ?? '')
-    if (reason !== 'train_file_not_validated') fail(reason === 'train_file_invalid' ? 'lab_provider_dataset_invalid' : 'lab_provider_estimate_unavailable')
+    const reason = String(preflight.body?.unavailable_reason ?? '')
+    if (reason !== 'train_file_not_validated') fail(reason === 'train_file_invalid' ? 'lab_provider_dataset_invalid' : 'lab_provider_not_ready')
     await sleep(3_000)
   }
-  return fail('lab_provider_estimate_unavailable')
+  return fail('lab_provider_not_ready')
 }
 
-/** Paid step. Only called after the reservation is saved. */
+/** Creates the job. Only called after the run's job details are recorded. */
 export async function submitTogether(input: { key: string; runId: string; baseModel: string; fileId: string; fetcher: Fetcher }): Promise<{ jobId: string; jobUrl: string | null }> {
   const created = await json(input.fetcher, `${TOGETHER}/fine-tunes`, {
     method: 'POST', headers: { ...auth(input.key), 'content-type': 'application/json' },
@@ -134,32 +126,11 @@ export async function resolveFireworksAccount(key: string, fetcher: Fetcher): Pr
   return names[0]
 }
 
-/** Rows from itmounts_lab_customer_training_rate_cards, with every number checked. Malformed rows are dropped. */
-export function normalizeRateCards(raw: unknown): TrainingRateCard[] {
-  if (!Array.isArray(raw)) return []
-  return raw.flatMap((row: any) => {
-    const card = {
-      id: String(row?.id ?? ''), providerKind: String(row?.providerKind ?? ''),
-      minParameters: Number(row?.minParameters), maxParameters: row?.maxParameters === null || row?.maxParameters === undefined ? null : Number(row.maxParameters),
-      usdPerMTok: Number(row?.usdPerMTok), safetyMargin: Number(row?.safetyMargin),
-    }
-    const ok = card.id && card.providerKind && card.minParameters >= 0 && (card.maxParameters === null || card.maxParameters >= card.minParameters) &&
-      card.usdPerMTok > 0 && card.safetyMargin >= 1
-    return ok ? [Object.freeze(card)] : []
-  })
-}
-
-export function fireworksRateCard(parameters: number, cards: readonly TrainingRateCard[]): TrainingRateCard | null {
-  if (!(parameters > 0)) return null
-  return cards.find(card => card.providerKind === 'fireworks' && parameters >= card.minParameters &&
-    (card.maxParameters === null || parameters <= card.maxParameters)) ?? null
-}
-
 const fireworksParameters = (model: any) => Number(model?.baseModelDetails?.parameterCount ?? 0)
 const fireworksLoraTunable = (model: any) => model?.supervisedLoraTunable === true
 
-/** Fireworks public base models that support LoRA SFT AND fall in a priced band, read live with the customer's key. */
-export async function listFireworksBaseModels(key: string, cards: readonly TrainingRateCard[], fetcher: Fetcher): Promise<BaseModelOption[]> {
+/** Fireworks public base models that support LoRA SFT, read live with the customer's key. */
+export async function listFireworksBaseModels(key: string, fetcher: Fetcher): Promise<BaseModelOption[]> {
   const out: BaseModelOption[] = []
   let pageToken = ''
   for (let page = 0; page < 5; page++) {
@@ -169,8 +140,8 @@ export async function listFireworksBaseModels(key: string, cards: readonly Train
     for (const model of body.models) {
       const name = String(model?.name ?? '')
       const parameters = fireworksParameters(model)
-      if (!/^accounts\/fireworks\/models\/[A-Za-z0-9_.-]+$/.test(name) || !fireworksLoraTunable(model) || !fireworksRateCard(parameters, cards)) continue
-      out.push({ id: name, label: `${name.split('/').pop()} · ${(parameters / 1e9).toFixed(1)}B` })
+      if (!/^accounts\/fireworks\/models\/[A-Za-z0-9_.-]+$/.test(name) || !fireworksLoraTunable(model)) continue
+      out.push({ id: name, label: parameters > 0 ? `${name.split('/').pop()} · ${(parameters / 1e9).toFixed(1)}B` : String(name.split('/').pop()) })
     }
     pageToken = String(body.nextPageToken ?? '')
     if (!pageToken) break
@@ -178,22 +149,15 @@ export async function listFireworksBaseModels(key: string, cards: readonly Train
   return out.sort((a, b) => a.id.localeCompare(b.id))
 }
 
-export type FireworksPrepared = Readonly<{ account: string; parameters: number; rateCardId: string; tokenBound: number; maxCostUsd: number }>
-/** Free steps: find the account, confirm the base model supports LoRA SFT, price the run from its size band. */
-export async function prepareFireworks(input: {
-  key: string; baseModel: string; jsonl: string; cards: readonly TrainingRateCard[]; fetcher: Fetcher
-}): Promise<FireworksPrepared> {
+export type FireworksPrepared = Readonly<{ account: string }>
+/** Before the job: find the account and confirm the base model supports LoRA SFT. */
+export async function prepareFireworks(input: { key: string; baseModel: string; fetcher: Fetcher }): Promise<FireworksPrepared> {
   const account = await resolveFireworksAccount(input.key, input.fetcher)
   const model = await json(input.fetcher, `${FIREWORKS}/${input.baseModel}`, { headers: auth(input.key) }, 'fireworks_model')
   if (model.status === 404) fail('lab_training_base_model_unsupported')
   if (model.status !== 200) fail('fireworks_model_unavailable')
   if (!fireworksLoraTunable(model.body)) fail('lab_training_base_model_unsupported')
-  const parameters = fireworksParameters(model.body)
-  const card = fireworksRateCard(parameters, input.cards)
-  if (!card) fail('lab_training_rate_unverified')
-  const tokenBound = datasetTokenBound(input.jsonl) * EPOCHS
-  const maxCostUsd = Number((tokenBound / 1e6 * card!.usdPerMTok * card!.safetyMargin).toFixed(6))
-  return Object.freeze({ account, parameters, rateCardId: card!.id, tokenBound, maxCostUsd })
+  return Object.freeze({ account })
 }
 
 /** Deterministic resource ids, so a job whose creation response was lost can be found again. */
@@ -237,8 +201,7 @@ export async function findFireworksJob(input: { key: string; runId: string; acco
 
 // --- Status --------------------------------------------------------------------------------------------------------
 export type ProviderJobState = Readonly<{
-  state: 'running' | 'completed' | 'failed'; progress: number | null; tunedModelId: string | null
-  reportedCostUsd: number | null; detail: string
+  state: 'running' | 'completed' | 'failed'; progress: number | null; tunedModelId: string | null; detail: string
 }>
 
 const TOGETHER_FAILED = new Set(['error', 'cancelled', 'cancel_requested'])
@@ -246,28 +209,22 @@ export function interpretTogetherJob(body: any): ProviderJobState {
   const status = String(body?.status ?? '').toLowerCase()
   if (status === 'completed') {
     const tuned = String(body?.model_object_name ?? body?.model_output_name ?? '')
-    return { state: 'completed', progress: 100, tunedModelId: MODEL_ID.test(tuned) ? tuned : null, reportedCostUsd: null, detail: 'completed' }
+    return { state: 'completed', progress: 100, tunedModelId: MODEL_ID.test(tuned) ? tuned : null, detail: 'completed' }
   }
-  if (TOGETHER_FAILED.has(status)) return { state: 'failed', progress: null, tunedModelId: null, reportedCostUsd: null, detail: status }
-  return { state: 'running', progress: null, tunedModelId: null, reportedCostUsd: null, detail: status || 'unknown' }
+  if (TOGETHER_FAILED.has(status)) return { state: 'failed', progress: null, tunedModelId: null, detail: status }
+  return { state: 'running', progress: null, tunedModelId: null, detail: status || 'unknown' }
 }
 
 const FIREWORKS_FAILED = new Set(['JOB_STATE_FAILED', 'JOB_STATE_CANCELLED', 'JOB_STATE_EXPIRED', 'JOB_STATE_DELETED', 'JOB_STATE_CANCELLING'])
-const money = (value: any): number | null => {
-  if (!value || String(value.currencyCode ?? 'USD') !== 'USD') return null
-  const usd = Number(value.units ?? 0) + Number(value.nanos ?? 0) / 1e9
-  return Number.isFinite(usd) && usd >= 0 ? Number(usd.toFixed(6)) : null
-}
 export function interpretFireworksJob(body: any): ProviderJobState {
   const state = String(body?.state ?? '')
-  const cost = money(body?.estimatedCost)
   if (state === 'JOB_STATE_COMPLETED') {
     const tuned = String(body?.outputModel ?? '')
-    return { state: 'completed', progress: 100, tunedModelId: MODEL_ID.test(tuned) ? tuned : null, reportedCostUsd: cost, detail: 'completed' }
+    return { state: 'completed', progress: 100, tunedModelId: MODEL_ID.test(tuned) ? tuned : null, detail: 'completed' }
   }
-  if (FIREWORKS_FAILED.has(state)) return { state: 'failed', progress: null, tunedModelId: null, reportedCostUsd: cost, detail: String(body?.status?.message ?? state).slice(0, 160) }
+  if (FIREWORKS_FAILED.has(state)) return { state: 'failed', progress: null, tunedModelId: null, detail: String(body?.status?.message ?? state).slice(0, 160) }
   const percent = Number(body?.jobProgress?.percent)
-  return { state: 'running', progress: Number.isFinite(percent) ? Math.max(0, Math.min(99, Math.round(percent))) : null, tunedModelId: null, reportedCostUsd: cost, detail: state.replace(/^JOB_STATE_/, '').toLowerCase() || 'unknown' }
+  return { state: 'running', progress: Number.isFinite(percent) ? Math.max(0, Math.min(99, Math.round(percent))) : null, tunedModelId: null, detail: state.replace(/^JOB_STATE_/, '').toLowerCase() || 'unknown' }
 }
 
 // --- Cancellation ----------------------------------------------------------------------------------------------------

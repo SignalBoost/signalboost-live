@@ -1,13 +1,12 @@
 // Real Hugging Face ports for customer LAB runs. Every call uses the token passed in (the customer's), never HF_TOKEN.
 import {
-  fetchHuggingFaceJobLogTail, findHuggingFaceJobByName, HUGGING_FACE_JOBS_API, resolveHuggingFaceHardwareRate,
+  fetchHuggingFaceJobLogTail, findHuggingFaceJobByName, HUGGING_FACE_JOBS_API,
   resolveHuggingFaceNamespace, submitHuggingFaceJob,
 } from './cosUniversityHuggingFaceJobs.ts'
 import type { HfPorts } from './labCustomerTraining.ts'
 
 export const customerHfPorts: HfPorts = Object.freeze({
   resolveNamespace: (token: string) => resolveHuggingFaceNamespace({ token }),
-  resolveHourlyUsd: async (flavor: string, token: string) => (await resolveHuggingFaceHardwareRate({ flavor, token })).hourlyCostUsd,
   submit: (namespace, token, spec) => submitHuggingFaceJob({ namespace, token, spec }),
   findByName: async (namespace, token, name) => {
     const found = await findHuggingFaceJobByName({ namespace, token, name })

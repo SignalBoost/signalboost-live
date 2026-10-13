@@ -86,4 +86,23 @@ test('a passing baseline run before the test change still completes after the ch
   ])
   assert.equal(result.ok, true, 'error' in result ? result.error : '')
 })
+// Codex review on #4293: a passing run of another suite must not verify a changed test file it never executed.
+test('a passing run that does not execute the changed test file is not completion', async () => {
+  for (const command of ['node --test unrelated.test.js', 'npm test', 'node --test']) {
+    const { result } = await residency('Repair the test suite in test.js so it uses node:test with four independent tests. Run node --test test.js.', [
+      { type: 'tool', toolId: 'write_file', input: { path: 'test.js', content: 'not valid javascript (' } },
+      { type: 'tool', toolId: 'run', input: { command } },
+    ])
+    assert.equal(result.ok, false, command)
+  }
+})
+
+test('the changed test file may be named with a leading ./', async () => {
+  const { result } = await residency(WORDINGS[1], [
+    REWRITE_TESTS[1],
+    { type: 'tool', toolId: 'run', input: { command: 'node --test ./test.js' } },
+  ])
+  assert.equal(result.ok, true, 'error' in result ? result.error : '')
+})
+
 // end of saas/tests/builderTestOnlyCompletion.node.test.ts (if this line is missing, the paste was cut short)

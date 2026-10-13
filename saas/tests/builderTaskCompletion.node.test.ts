@@ -55,6 +55,27 @@ test('plain Node scripts must prove all four requested tests before completion',
   assert.equal(builderTaskContract('Run node --test test.js and verify at least 10 tests pass.').minimumTests, 10)
 })
 
+test('explicit console.assert to node:test modernization completes after four real passing tests', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('modernize', 'test.js', "console.assert(true)\\n")
+  const actions = [
+    action('edit_file', { path: 'test.js', search: 'console.assert(true)', replace: 'const test = require("node:test"); test("a", () => {});' }),
+    run('node --test test.js'),
+    answer,
+  ]
+  let index = 0
+  const result = await new BuilderToolLoop({
+    async generate() { return actions[index++] ?? answer },
+  }, workspace, {
+    async run() { return { exitCode: 0, stdout: 'ℹ tests 4\\nℹ pass 4\\nℹ fail 0\\n', stderr: '', timedOut: false } },
+  }).run({
+    workspaceId: 'modernize',
+    objective: 'Inspect test.js and fix the test suite. Replace console.assert with four independent tests using node:test and node:assert/strict. Run node --test test.js. Verify 4 tests passed, 0 failed.',
+    maxRounds: 8,
+  })
+  assert.equal(result.ok, true, JSON.stringify(result))
+})
+
 test('repeated denied inspections stop before exhausting the entire model budget', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('stalled-workspace', 'index.js', 'module.exports = 1')

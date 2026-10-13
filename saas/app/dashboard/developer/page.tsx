@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { MAX_BUILDER_RAW_OBJECTIVE_CHARS } from '@/lib/builder/request-contract'
+import { followBuilderJob } from '@/lib/builder/job-poll'
 import { uiText } from '@/lib/i18n/uiText'
 
 type WorkspaceFile = { path: string; content: string }
@@ -14,8 +15,6 @@ const MAX_UPLOAD_BYTES = 512 * 1024
 const ALLOWED_ATTACHMENT = /\.(?:txt|log|md|mdx|yaml|yml|json|jsonl|csv|xml|js|cjs|mjs|ts|tsx|jsx|py|html|css|sql|sh|java|cpp|go|rs|php|rb)$/i
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
 const BUILDER_LAST_JOB_KEY = 'cos-builder-last-job-v1'
-const BUILDER_JOB_POLL_ATTEMPTS = 90
-const BUILDER_JOB_POLL_DELAY_MS = 2_000
 function filename(path: string): string { return path.split('/').pop() || 'download.txt' }
 function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)) }
 
@@ -150,16 +149,19 @@ export default function DeveloperPage() {
   }
 
   async function pollBuilderJob(jobId: string): Promise<BuilderReply | null> {
-    for (let attempt = 0; attempt < BUILDER_JOB_POLL_ATTEMPTS; attempt += 1) {
-      if (attempt > 0) await sleep(BUILDER_JOB_POLL_DELAY_MS)
-      const response = await fetch(`/api/builder?jobId=${encodeURIComponent(jobId)}`, { cache: 'no-store' })
-      const data = await response.json().catch(() => ({})) as BuilderReply
-      if (response.status === 202 || data.status === 'queued' || data.status === 'running') {
-        if (data.reply) setReply(data.reply)
-        continue
-      }
-      if (!response.ok) throw new Error(data.error || 'Builder job failed.')
-      return data
+    const outcome = await followBuilderJob<BuilderReply>({
+      check: async () => {
+        const response = await fetch(`/api/builder?jobId=${encodeURIComponent(jobId)}`, { cache: 'no-store' })
+        const data = await response.json().catch(() => ({})) as BuilderReply
+        return { status: response.status, ok: response.ok, data }
+      },
+      onActive: data => { if (data.reply) setReply(data.reply) },
+      sleep,
+    })
+    if (outcome.kind === 'terminal') return outcome.data
+    if (outcome.kind === 'failed') throw new Error(outcome.error)
+    if (outcome.kind === 'unreachable') {
+      setReply(`The connection to Builder was lost while job ${jobId} was running. The job continues on the server; reopen this workspace or check History for its result.`)
     }
     return null
   }

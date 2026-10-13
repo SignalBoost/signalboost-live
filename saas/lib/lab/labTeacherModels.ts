@@ -6,7 +6,8 @@
 // What decides, in order:
 //   1. What the provider itself declares about the model (Gemini generation methods, Together model type, Mistral chat
 //      capability, OpenRouter / Hugging Face output modalities).
-//   2. Otherwise the model name: well-known non-text families (embeddings, whisper, tts, dall-e, moderation, ...).
+//   2. Otherwise the model name: well-known non-text families (embeddings, whisper, tts, dall-e, moderation, ...), plus
+//      OpenAI's tool-only models (computer-use, search-preview, deep-research).
 
 const NON_TEXT_NAME_TOKENS: ReadonlySet<string> = new Set([
   'embed', 'embedding', 'embeddings', 'bge', 'rerank', 'reranker',
@@ -16,6 +17,9 @@ const NON_TEXT_NAME_TOKENS: ReadonlySet<string> = new Set([
   // OpenAI completions-only base models: they have no chat or Responses endpoint.
   'davinci', 'babbage',
 ])
+// OpenAI models that only run with a tool turned on (computer use, web search, deep research). A teacher sends plain
+// prompts with no tools, so these fail. Other providers serve similarly named models without that requirement.
+const OPENAI_TOOL_ONLY_NAME = /^computer-use(-|$)|-deep-research(-|$)|-search-(preview|api)(-|$)/
 const TOGETHER_TEXT_TYPES: ReadonlySet<string> = new Set(['chat', 'language', 'code'])
 
 const cleanId = (value: unknown): value is string =>
@@ -35,8 +39,16 @@ function declaredNonText(item: Record<string, unknown>, provider: string): boole
   return false
 }
 
-export function isNonTextModelName(id: string): boolean {
-  return id.toLowerCase().split(/[^a-z0-9]+/).some(token => NON_TEXT_NAME_TOKENS.has(token))
+// An OpenAI fine-tune id is ft:<base>:<org>:<customer suffix>:<id>. Only the base model says what kind of model it is;
+// the suffix is the customer's own label and must not hide their model.
+function baseModelName(id: string, provider: string): string {
+  return provider === 'openai' && id.startsWith('ft:') ? id.split(':')[1] ?? '' : id
+}
+
+export function isNonTextModelName(id: string, provider = ''): boolean {
+  const name = baseModelName(id, provider).toLowerCase()
+  if (provider === 'openai' && OPENAI_TOOL_ONLY_NAME.test(name)) return true
+  return name.split(/[^a-z0-9]+/).some(token => NON_TEXT_NAME_TOKENS.has(token))
 }
 
 export function collectTeacherModels(payload: unknown, provider: string): string[] {
@@ -49,7 +61,7 @@ export function collectTeacherModels(payload: unknown, provider: string): string
     if (!cleanId(id)) return []
     // Gemini responses often use models/model-name, while generation requires model-name.
     const name = provider === 'gemini' ? id.replace(/^models\//, '') : id
-    if (!cleanId(name) || declaredNonText(item, provider) || isNonTextModelName(name)) return []
+    if (!cleanId(name) || declaredNonText(item, provider) || isNonTextModelName(name, provider)) return []
     return [name]
   })
   return [...new Set(models)].sort((a, b) => a.localeCompare(b)).slice(0, 250)

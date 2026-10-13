@@ -63,3 +63,15 @@ test('route uses the shared teacher filter',()=>{
   assert.match(api,/collectTeacherModels\(await response\.json\(\), provider\)/)
   assert.doesNotMatch(api,/function collectModels/)
 })
+
+test('OpenAI tool-only models (computer use, search, deep research) are hidden; same names elsewhere are not',()=>{
+  const openai={data:['gpt-4.1','computer-use-preview','o3-deep-research','o4-mini-deep-research','gpt-4o-search-preview','gpt-4o-mini-search-preview'].map(id=>({id}))}
+  assert.deepEqual(collectTeacherModels(openai,'openai'),['gpt-4.1'])
+  assert.equal(isNonTextModelName('perplexity/sonar-deep-research','openrouter'),false)
+  assert.equal(isNonTextModelName('o3-deep-research','openai'),true)
+})
+
+test('OpenAI fine-tunes are judged by their base model, never by the customer suffix',()=>{
+  const openai={data:['ft:gpt-4.1-mini:acme:legal-research:AbC123','ft:gpt-4o-mini:acme:image-search:Xy9','ft:davinci-002:acme:notes:Q1','gpt-4.1-mini'].map(id=>({id}))}
+  assert.deepEqual(collectTeacherModels(openai,'openai'),['ft:gpt-4.1-mini:acme:legal-research:AbC123','ft:gpt-4o-mini:acme:image-search:Xy9','gpt-4.1-mini'])
+})

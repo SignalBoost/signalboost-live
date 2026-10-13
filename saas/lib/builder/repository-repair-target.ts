@@ -1,5 +1,6 @@
 // saas/lib/builder/repository-repair-target.ts
 import { analyzeOperationalLog } from '../ai/cos/pastedOperationalLog.ts'
+import { isRepairObjective } from './regression-gate.ts'
 
 export const SIGNALBOOST_REPOSITORY = 'SignalBoost/signalboost-live' as const
 export const SIGNALBOOST_REPOSITORY_URL = 'https://github.com/SignalBoost/signalboost-live.git' as const
@@ -27,6 +28,9 @@ const SOURCE_PATH = /(?:\.\/([A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0
 const PROJECT_ROOT_DIAGNOSTIC_PATH = /\b((?:app|lib|tests|test|scripts|components|hooks|types|locales|supabase)\/[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+)(?:(?::\d+(?::\d+)?)|(?:\(\d+,\d+\)))/g
 const TEST_PATH = /\b((?:tests|test)\/[A-Za-z0-9_@.+/-]+\.test\.(?:ts|tsx|js|mjs|cjs|mts|cts))(?::\d+(?::\d+)?)?/gi
 const MAX_FAILURE_EVIDENCE = 40
+// A typed request names files plainly ("Repair lib/ai/cos/x.ts: ..."), without the "./", "saas/" or :line forms a
+// build log prints. Only an owner request without source reads these; log parsing is unchanged.
+const PROSE_PROJECT_PATH = /(?:^|[\s(`'"])((?:saas\/)?(?:app|lib|tests|test|scripts|components|hooks|types|locales|supabase|self-healing-host)\/[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+)/g
 const EXPLICIT_PLATFORM_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\b|(?:^|[\n.!?]\s*)(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\s+(?:is\s+|keeps?\s+)?(?:broken|failing|not\s+working)\b/i
 const PLATFORM_REPAIR_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|diagnose|resolve)\b/i
 const PLATFORM_REPAIR_SUBJECT = /\b(?:builder|cos|signalboost(?:\s+platform)?|repository|repo|platform)\b/i
@@ -199,10 +203,29 @@ export function parseSignalBoostRepositoryRepairTarget(input: string): SignalBoo
  * revision. This connects Builder to Platform Engineer without granting a moving branch, arbitrary
  * repository, commit, merge, deploy, or self-approval authority.
  */
+/**
+ * An owner's repair request with no source anywhere (nothing attached, no repository link, no
+ * workspace files, no continuing project) can only concern the owner's own platform. Routing it to
+ * an empty workspace dead-ended every such request with "attach your source": only phrasings like
+ * "fix the builder, it is broken" reached the repository. Reproduce-first still applies, so a
+ * request that does not reproduce on the deployed revision ends honestly as not reproduced.
+ */
+export function isOwnerRepairWithoutSource(input: {
+  objective: string
+  isOwner: boolean
+  hasAttachedSource: boolean
+  hasRepositoryImport: boolean
+  workspaceHasFiles: boolean
+  hasProjectContext: boolean
+}): boolean {
+  return input.isOwner === true && !input.hasAttachedSource && !input.hasRepositoryImport
+    && !input.workspaceHasFiles && !input.hasProjectContext && isRepairObjective(input.objective)
+}
+
 export function signalBoostDeployedRepairTarget(
   input: string,
   deployment: { commitSha?: unknown; branch?: unknown },
-  options: { ownerDeveloperLogSubmission?: boolean; ownerPlatformEngineeringSubmission?: boolean } = {},
+  options: { ownerDeveloperLogSubmission?: boolean; ownerPlatformEngineeringSubmission?: boolean; ownerRepairWithoutSource?: boolean } = {},
 ): SignalBoostRepositoryRepairTarget | null {
   const objective = String(input || '').trim()
   const commitSha = String(deployment.commitSha || '').trim().toLowerCase()
@@ -211,7 +234,8 @@ export function signalBoostDeployedRepairTarget(
     || (options.ownerPlatformEngineeringSubmission === true
       && PLATFORM_ENGINEERING_ACTION.test(objective)
       && PLATFORM_PUBLISH_INTENT.test(objective))
-  if (!objective || (!isExplicitPlatformRepairObjective(objective) && !engineering && options.ownerDeveloperLogSubmission !== true)) return null
+  if (!objective || (!isExplicitPlatformRepairObjective(objective) && !engineering && options.ownerDeveloperLogSubmission !== true
+    && options.ownerRepairWithoutSource !== true)) return null
   if (!/^[0-9a-f]{40}$/.test(commitSha) || !SAFE_BRANCH.test(branch)) return null
   return Object.freeze({
     trigger: engineering ? 'deployed_platform_engineering' : 'deployed_platform_objective',
@@ -221,7 +245,11 @@ export function signalBoostDeployedRepairTarget(
     commitSha,
     fullCommitSha: commitSha,
     projectRoot: 'saas',
-    pathHints: sourcePaths(objective),
+    pathHints: options.ownerRepairWithoutSource === true
+      ? unique([...sourcePaths(objective), ...[...objective.matchAll(PROSE_PROJECT_PATH)]
+          .map(match => match[1].replace(/[.,;:]+$/, ''))
+          .map(path => path.startsWith('saas/') ? path : `saas/${path}`)], 32)
+      : sourcePaths(objective),
     symbolHints: symbolNames(objective),
     missingModuleHints: unresolvedModulePaths(objective),
     failedCommand: analyzeOperationalLog(objective).command,

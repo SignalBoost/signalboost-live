@@ -89,7 +89,7 @@ test('Builder terminates verified four-test work without another inspection or m
   let runs = 0
   const runner: BuilderRunnerPort = { async run() {
     runs++
-    return { exitCode: 0, stdout: '# tests 4\\n# pass 4\\n# fail 0\\n', stderr: '', timedOut: false }
+    return { exitCode: 0, stdout: '# tests 4\n# pass 4\n# fail 0\n', stderr: '', timedOut: false }
   } }
   const result = await new BuilderToolLoop(ai, workspace, runner).run({
     objective: 'Create math.test.js and verify 4 tests. Run: node --test math.test.js',
@@ -109,7 +109,7 @@ test('Builder does not auto-complete when four tests include a failure', async (
     JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node --test math.test.js' } }),
   ])
   const runner: BuilderRunnerPort = { async run() {
-    return { exitCode: 1, stdout: '# tests 4\\n# pass 3\\n# fail 1\\n', stderr: '', timedOut: false }
+    return { exitCode: 1, stdout: '# tests 4\n# pass 3\n# fail 1\n', stderr: '', timedOut: false }
   } }
   const result = await new BuilderToolLoop(ai, workspace, runner).run({
     objective: 'Create math.test.js and verify 4 tests. Run: node --test math.test.js',

@@ -9,7 +9,7 @@ import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
-import { isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
+import { hasWorkspaceSource, isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import {
   isBuilderObjectiveError,
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
       const sourceWorkspace = selectedWorkspaceId ? createSupabaseBuilderWorkspace(access.userId) : null
       // A storage failure counts as "has files": never reroute a workspace whose contents are unknown.
       const workspaceHasFiles = selectedWorkspaceId
-        ? !sourceWorkspace || await sourceWorkspace.listFiles(selectedWorkspaceId).then(listed => listed.length > 0, () => true)
+        ? !sourceWorkspace || await sourceWorkspace.listFiles(selectedWorkspaceId).then(listed => hasWorkspaceSource(listed.map(file => file.path)), () => true)
         : false
       const ownerRepairTarget = isOwnerRepairWithoutSource({
         objective, isOwner: true, hasAttachedSource: false, hasRepositoryImport: false,

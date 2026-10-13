@@ -210,6 +210,14 @@ export function parseSignalBoostRepositoryRepairTarget(input: string): SignalBoo
  * "fix the builder, it is broken" reached the repository. Reproduce-first still applies, so a
  * request that does not reproduce on the deployed revision ends honestly as not reproduced.
  */
+// Builder writes its own report here after every job (job-runner, repository-repair-job). It is Builder output, not
+// source: counting it made every retry in the same workspace look like a project with files.
+const BUILDER_OWN_ARTIFACTS = new Set(['builder-result.txt'])
+
+export function hasWorkspaceSource(paths: readonly string[]): boolean {
+  return paths.some(path => !BUILDER_OWN_ARTIFACTS.has(String(path)))
+}
+
 export function isOwnerRepairWithoutSource(input: {
   objective: string
   isOwner: boolean

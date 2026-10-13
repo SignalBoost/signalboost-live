@@ -1,7 +1,7 @@
 import type { EvidenceJob, EvidenceLookup } from './execution-evidence.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const ACTION = /^(?:(?:please|now|then|also)\s+|(?:can|could|would)\s+you\s+)*(?:update|edit|modify|extend|change|fix|repair|debug|refactor|add|remove|replace|continue|run|rerun|test)\b/i
+const ACTION = /^(?:(?:please|now|then|also)\s+|(?:can|could|would)\s+you\s+)*(?:update|edit|modify|extend|change|fix|repair|debug|refactor|add|remove|replace|continue|complete|finish|verify|run|rerun|test)\b/i
 const NEW_PROJECT = /\b(?:new|another|separate|different)\s+(?:project|workspace|app|application|website|repository)\b|\bstart\s+(?:over|fresh)\b/i
 const REFERENCE = /\b(?:this|that|the|same|existing|previous|our|my)\s+(?:project|workspace|app|application|website|code|file|implementation)\b|\b(?:it|them)\b/i
 

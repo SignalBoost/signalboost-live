@@ -26,8 +26,11 @@ export async function selectBuilderProject(input: {
   hasNewSource: boolean
   repositoryImport: boolean
 }, lookup: (target: EvidenceLookup) => Promise<EvidenceJob & { objective?: string } | null>): Promise<BuilderProjectSelection> {
+  // An explicit fresh-build request must not inherit a stale selected workspace.
+  // This also covers the case where a client keeps sending its prior workspaceId.
+  if (NEW_PROJECT.test(input.objective)) return {}
   if (input.requestedWorkspaceId && UUID.test(input.requestedWorkspaceId)) return { workspaceId: input.requestedWorkspaceId }
-  if (input.hasNewSource || input.repositoryImport || NEW_PROJECT.test(input.objective) || !ACTION.test(input.objective)) return {}
+  if (input.hasNewSource || input.repositoryImport || !ACTION.test(input.objective)) return {}
   if (!input.userId || !UUID.test(input.userId) || !input.conversationId || !UUID.test(input.conversationId)) return {}
   let job
   try { job = await lookup({ userId: input.userId, conversationId: input.conversationId }) }

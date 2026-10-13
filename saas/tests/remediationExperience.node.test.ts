@@ -102,7 +102,8 @@ test('runtime repair paths are wired to operator narration instead of raw Builde
 test('Builder cannot inspect indefinitely after reproducing a repair failure', () => {
   assert.match(builderToolLoop, /MAX_REPAIR_INSPECTIONS_AFTER_FAILURE = 3/)
   assert.match(builderToolLoop, /repairMutationRequired = repairObjective && latestFailedRunIndex >= 0/)
-  assert.match(builderToolLoop, /!repairMutationRequired \|\| toolId === 'write_file' \|\| toolId === 'edit_file'/)
+  // #4273 widened the mutation-only restriction to repeated-repair stalls; the restriction itself is what is guarded.
+  assert.match(builderToolLoop, /!\(repairMutationRequired \|\| repeatedRepairStall\) \|\| toolId === 'write_file' \|\| toolId === 'edit_file'/)
   assert.match(builderToolLoop, /forcedRepairInspectionPath/)
   assert.match(builderToolLoop, /builder_repair_progress_required/)
   assert.match(builderToolLoop, /builder_repair_mutation_required/)

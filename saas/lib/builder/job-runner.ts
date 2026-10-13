@@ -24,7 +24,6 @@ import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.
 import { retrieveValidatedCognitiveSkills, type CognitiveSkillContextResult } from '@/lib/ai/cos/cognitiveSkillContext'
 import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
 import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
-import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
 import { deepInfraMaxRunUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { runWithoutTurnDeadline } from '../ai/cos/cosTurnBudget.ts'
 import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
@@ -208,15 +207,7 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
       trace: safeTrace,
     },
   })
-  await recordBuilderUniversityProductionOutcome({
-    job,
-    status: 'failure',
-    verification: 'generation_fenced_terminal_builder_failure',
-    facts: { error },
-  }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
-    jobId: job.id,
-    message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
-  }))
+  
   await recordBuilderCompetencyGap({
     jobId: job.id,
     objective: job.objective,
@@ -404,21 +395,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           && Number(payload.pull_request_number) > 0)
       if (!repositoryMergePending) {
         const repositoryCompleted = payload.merge_taken === true && typeof payload.merge_commit_sha === 'string'
-        await recordBuilderUniversityProductionOutcome({
-          job,
-          status: payload.merge_watch_outcome === 'healthy' ? 'success' : repositoryCompleted ? 'observed' : 'failure',
-          verification: payload.merge_watch_outcome === 'healthy'
-            ? 'repository_merge_and_production_deployment_healthy'
-            : repositoryCompleted ? 'repository_merged_without_healthy_production_proof' : 'generation_fenced_terminal_builder_failure',
-          facts: {
-            pullRequestNumber: payload.pull_request_number ?? null,
-            mergeCommitSha: payload.merge_commit_sha ?? null,
-            deploymentId: payload.merge_watch_deployment_id ?? null,
-          },
-        }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
-          jobId: job.id,
-          message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
-        }))
+        
       }
       return
     }
@@ -539,15 +516,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           trace,
         },
       })
-      await recordBuilderUniversityProductionOutcome({
-        job,
-        status: 'failure',
-        verification: 'generation_fenced_terminal_builder_failure',
-        facts: { error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error },
-      }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
-        jobId: job.id,
-        message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
-      }))
+      
       const terminalError = result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error
       await recordBuilderCompetencyGap({
         jobId: job.id,
@@ -591,17 +560,7 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         trace,
       },
     })
-    await recordBuilderUniversityProductionOutcome({
-      job,
-      status: verifiedBuilderCognitiveApplication(result) ? 'success' : 'observed',
-      verification: verifiedBuilderCognitiveApplication(result)
-        ? 'workspace_changed_and_host_proving_command_exit_zero'
-        : 'terminal_builder_completion_without_learning_proof',
-      facts: { successfulRuns: result.trace.filter(item => item.toolId === 'run' && item.ok).length },
-    }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
-      jobId: job.id,
-      message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
-    }))
+    
     await recordBuilderEpisode({
       job,
       outcome: 'succeeded',

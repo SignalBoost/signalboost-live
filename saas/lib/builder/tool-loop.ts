@@ -522,7 +522,7 @@ export class BuilderToolLoop {
       // Only a run that executed is a failure. A run rejected as a repeat executed nothing; counting it restarted the
       // repair window, so the inspections and refusals after the real failure were forgotten every round.
       const latestFailedRunIndex = trace.reduce((latest, item, index) => (
-        item.toolId === 'run' && !item.ok && !String(item.error || '').startsWith('builder_repeated_tool_call:') ? index : latest
+        item.toolId === 'run' && !item.ok && !/^(?:builder_repeated_tool_call:|builder_repository_broad_test_blocked)/.test(String(item.error || '')) ? index : latest
       ), -1)
       const repairTraceAfterFailure = latestFailedRunIndex >= 0 ? trace.slice(latestFailedRunIndex + 1) : []
       const repairMutationAfterFailure = repairTraceAfterFailure.some(item => item.ok
@@ -836,7 +836,7 @@ export class BuilderToolLoop {
           const proofIdx = trace
             .map((item, index) => ({ item, index }))
             .filter(({ item }) => isExecutedBuilderRun(item) && text(item.input.command) === proofCommand)
-          const failedProof = proofIdx.find(({ item }) => !item.ok)
+          const failedProof = proofIdx.find(({ item }) => !item.ok && item.error !== 'builder_repository_broad_test_blocked' && !String(item.error || '').startsWith('builder_repeated_tool_call:'))
           const passedProof = proofIdx.find(({ item }) => item.ok)
           const verifiedAfterFail = failedProof
             ? proofIdx.some(({ item, index }) => item.ok && index > failedProof.index)

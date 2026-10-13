@@ -9,7 +9,7 @@ import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
-import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
+import { isOwnerRepairWithoutSource, parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import {
   isBuilderObjectiveError,
@@ -203,6 +203,36 @@ export async function POST(request: Request) {
     }, readBuilderEvidenceJob)
     if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
     workspaceId = project.workspaceId || workspaceId
+
+    // An owner repair with no source anywhere goes to the platform repository at the deployed
+    // revision instead of an empty workspace that can only answer "attach your source".
+    if (access.isOwner && files.length === 0 && !repositoryTarget && !project.context) {
+      const selectedWorkspaceId = project.workspaceId || requestedWorkspaceId
+      const sourceWorkspace = selectedWorkspaceId ? createSupabaseBuilderWorkspace(access.userId) : null
+      // A storage failure counts as "has files": never reroute a workspace whose contents are unknown.
+      const workspaceHasFiles = selectedWorkspaceId
+        ? !sourceWorkspace || await sourceWorkspace.listFiles(selectedWorkspaceId).then(listed => listed.length > 0, () => true)
+        : false
+      const ownerRepairTarget = isOwnerRepairWithoutSource({
+        objective, isOwner: true, hasAttachedSource: false, hasRepositoryImport: false,
+        workspaceHasFiles, hasProjectContext: false,
+      })
+        ? signalBoostDeployedRepairTarget(objective, {
+            commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
+            branch: process.env.VERCEL_GIT_COMMIT_REF,
+          }, { ownerRepairWithoutSource: true })
+        : null
+      if (ownerRepairTarget) {
+        const job = await enqueueSignalBoostRepositoryRepairJob({
+          userId: access.userId,
+          conversationId,
+          objective,
+          target: ownerRepairTarget,
+        })
+        after(async () => { await runBuilderJob(job.jobId, access.userId) })
+        return noStore({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
+      }
+    }
     const routingContext = { attachmentNames: files.map(file => file.path) }
     if (!project.context && !repositoryTarget && !debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)) {
       const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'

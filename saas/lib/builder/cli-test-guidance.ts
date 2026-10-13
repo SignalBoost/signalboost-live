@@ -7,7 +7,7 @@ export function formatBuilderTestEvidenceGuidance(objective: string): string {
     'Do NOT use console.assert as a correctness gate: failed console.assert does not set a nonzero Node process exit code.',
     'Never print an unconditional success message in lieu of assertions. Failed assertions must produce a nonzero exit. Do not invent TAP pass counts or pad tests merely to meet a minimum.',
     'When the test suite was changed, rerun the exact requested verification command against the changed workspace before reporting completion.',
-  ].join('\\n')
+  ].join('\n')
 }
 
 /** Test-generation requirements; these do not manufacture execution evidence. */

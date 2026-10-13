@@ -10,7 +10,7 @@ import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { builderEngineeringGoal, formatBuilderEngineeringGoal } from './engineering-control-plane.ts'
 import { formatBuilderWorkingFiles } from './working-context.ts'
-import { formatBuilderCliTestGuidance } from './cli-test-guidance.ts'
+import { formatBuilderCliTestGuidance, formatBuilderTestEvidenceGuidance } from './cli-test-guidance.ts'
 import { appendBuilderChunk, builderFilePath, formatBuilderChunks } from './file-chunks.ts'
 import { checkpointDigest, workspaceDigest, validateBuilderCheckpoint, type BuilderLoopCheckpoint } from './checkpoint.ts'
 import { validateBuilderLock } from './dependencies.ts'
@@ -568,6 +568,7 @@ export class BuilderToolLoop {
           JSON.stringify(input.projectContext).slice(0, 16000),
         ] : []),
         formatBuilderCliTestGuidance(input.objective),
+        formatBuilderTestEvidenceGuidance(input.objective),
         `DELIVERY PROGRESS: ${safeJson(progress)}. Writes remaining: ${maxWrites - writeCount}. Create every missing file before polishing newly created files. Then run every pending command separately, preserving its exit status. A passing first command is not completion when another command or file is still pending.`,
         formatBuilderProjectContext(projectContext),
         repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',

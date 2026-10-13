@@ -41,7 +41,7 @@ test('Builder can begin a requested new implementation in an empty workspace', a
   } }
   const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
   const result = await new BuilderToolLoop(ai, workspace, runner).run({
-    objective: 'Complete and verify exactly four tests for multiply() and square().',
+    objective: 'Complete and verify exactly four tests for multiply() and square(); invalid inputs must fail.',
     workspaceId: 'user:fresh-implementation',
     maxRounds: 1,
   })

@@ -1069,6 +1069,19 @@ export class BuilderToolLoop {
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
         if (runFailed) {
+          const deniedBroadSuite = (output as ReturnType<typeof summarizeRun>).exitCode === 125
+            && String((output as ReturnType<typeof summarizeRun>).stderr || '').includes('builder_repository_broad_test_blocked')
+          if (deniedBroadSuite) {
+            // Exit 125 is a policy refusal, not a test failure or a reproduced defect.
+            // Do not send the resident into fail/edit/pass repair protocol for a command
+            // the host deliberately never executed.
+            completedRunsInCurrentWorkspaceState.add(fingerprint)
+            trace.push({ round, toolId: 'run', input: action.input, ok: false, output,
+              error: 'builder_repository_broad_test_blocked',
+              failureClass: 'runtime',
+              remediation: 'The repository-wide suite was not executed. Run the smallest relevant test file directly; the full suite belongs in PR CI.' })
+            continue
+          }
           if (extendingProject) repairObjective = true
           completedRunsInCurrentWorkspaceState.add(fingerprint)
           const details = diagnose(`${(output as ReturnType<typeof summarizeRun>).stderr}\n${(output as ReturnType<typeof summarizeRun>).stdout}`, workspacePaths)

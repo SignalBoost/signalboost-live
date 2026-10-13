@@ -500,6 +500,17 @@ export class BuilderToolLoop {
         ? workspacePaths.find(path => failedRunOutput.includes(path) && !inspectedRepairPaths.has(path)
           && !inspectedInCurrentWorkspaceState.has(`read_file:${checkpointDigest(JSON.stringify({ path }))}`))
         : undefined
+      // A repeated read or run against an unchanged workspace is a control-loop failure,
+      // not a useful diagnostic. Once source has been inspected, restrict recovery to
+      // a justified mutation instead of offering the same dead tools indefinitely.
+      const rejectedSinceChange = trace.slice(lastWorkspaceChange + 1).filter(item =>
+        String(item.error || '').startsWith('builder_repeated_tool_call:'))
+      const inspectedSinceChange = trace.slice(lastWorkspaceChange + 1).some(item =>
+        item.ok && item.toolId === 'read_file')
+      const repeatedRepairStall = repairObjective && inspectedSinceChange
+        && rejectedSinceChange.length >= 2
+        && !trace.slice(lastWorkspaceChange + 1).some(item =>
+          item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
       const repairMutationRequired = repairObjective && latestFailedRunIndex >= 0
         && !repairMutationAfterFailure
         && (repairInspectionsAfterFailure >= MAX_REPAIR_INSPECTIONS_AFTER_FAILURE
@@ -517,7 +528,9 @@ export class BuilderToolLoop {
         : undefined
       const coverageRepairRequired = task.minimumTests > 0 && !progress.testsSatisfied
         && progress.pendingCommands.length === 0 && trace.slice(lastWorkspaceChange + 1).some(item => item.toolId === 'run' && item.ok)
-      const currentStep = coverageRepairRequired
+      const currentStep = repeatedRepairStall
+        ? 'CURRENT STEP: The source has been read and repeated inspection or execution was refused against unchanged files. Choose ONE justified edit_file or write_file mutation now, based on the inspected source and actual errors. Do not request another read, run, or answer until a mutation is recorded. If no justified repair is possible, the host will fail transparently.'
+        : coverageRepairRequired
         ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. A command exited 0 but its output did not prove ${task.minimumTests} requested tests. Complete the suite with distinct meaningful assertions. Do NOT run again against unchanged files. Use read_file on the test source if not already inspected, then edit_file or write_file to add meaningful missing assertions and explicit per-test evidence. Preserve the existing passing tests. Once the file changes, the verification run can execute again.`
         : repairMutationRequired
         ? 'CURRENT STEP: The defect is reproduced and the bounded diagnostic allowance is exhausted. Make the smallest justified edit/write now. Do not inspect more files and do not answer yet; verification will rerun after the mutation.'
@@ -552,7 +565,7 @@ export class BuilderToolLoop {
         .filter(toolId => toolId !== 'browser_cli' || browserCliActions.size > 0)
         .filter(toolId => toolId !== blockedTool)
         .filter(toolId => !blockedInspectionTools.has(toolId))
-        .filter(toolId => !repairMutationRequired || toolId === 'write_file' || toolId === 'edit_file')
+        .filter(toolId => !(repairMutationRequired || repeatedRepairStall) || toolId === 'write_file' || toolId === 'edit_file')
 
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -678,7 +691,7 @@ export class BuilderToolLoop {
           ok: false,
           error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
         })
-        if (repairMutationRequired) return { ok: false, error: 'builder_repair_mutation_not_produced', trace }
+        if (repairMutationRequired || repeatedRepairStall) return { ok: false, error: 'builder_repair_mutation_not_produced', trace }
         continue
       }
       if (!action) {
@@ -697,7 +710,7 @@ export class BuilderToolLoop {
       }
 
       if (action.type === 'answer') {
-        if (repairMutationRequired) {
+        if (repairMutationRequired || repeatedRepairStall) {
           trace.push({ round, toolId: 'model_control', input: {}, ok: false,
             error: 'builder_repair_mutation_required',
             failureClass: 'test',

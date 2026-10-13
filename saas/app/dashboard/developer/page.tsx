@@ -188,6 +188,11 @@ export default function DeveloperPage() {
     <main style={{ minHeight: '100vh', background: '#020617', color: '#e2e8f0', padding: '32px clamp(18px, 5vw, 72px)', fontFamily: 'system-ui, sans-serif' }}>
       <section style={{ maxWidth: 1040, margin: '0 auto', display: 'grid', gap: 20 }}>
         <header>
+          <div style={{ marginBottom: 14, padding: '12px 14px', border: '1px solid #334155', borderRadius: 12, background: '#0f172a', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <strong style={{ color: '#67e8f9' }}>Workspace ID:</strong>
+            <code data-testid="builder-active-workspace-id" style={{ color: '#f8fafc', fontSize: 14, overflowWrap: 'anywhere' }}>{workspaceId || 'New workspace (not yet saved)'}</code>
+            {workspaceId ? <button type="button" onClick={() => void navigator.clipboard.writeText(workspaceId)} style={secondaryButton} aria-label="Copy workspace ID">Copy ID</button> : null}
+          </div>
           <p style={{ margin: 0, color: '#67e8f9', fontWeight: 800, fontSize: 12, letterSpacing: '.13em', textTransform: 'uppercase' }}>{c('eyebrow')}</p>
           <h1 style={{ margin: '8px 0', fontSize: 'clamp(28px, 5vw, 44px)' }}>{c('title')}</h1>
           <p style={{ margin: 0, maxWidth: 700, color: '#94a3b8', lineHeight: 1.55 }}>{c('intro')}</p>
@@ -204,7 +209,7 @@ export default function DeveloperPage() {
             <button type="button" onClick={reset} disabled={running} style={secondaryButton}>{c('newWorkspace')}</button>
             <button type="button" onClick={run} disabled={!objective.trim() || running} style={{ ...primaryButton, opacity: !objective.trim() || running ? .55 : 1 }}>{running ? c('working') : c('run')}</button>
           </div>
-          {workspaces.length ? <details><summary style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>{c('saved').replace('{count}', String(workspaces.length))}</summary><div style={{ display: 'grid', gap: 8, marginTop: 10 }}>{workspaces.map(workspace => <button type="button" key={workspace.id} onClick={() => openWorkspace(workspace.id)} disabled={running} style={{ ...secondaryButton, textAlign: 'start' }}>{workspace.objective || interpolate('workspace', workspace.id.slice(0, 8), '{id}')} <span style={{ color: '#94a3b8' }}>· {new Date(workspace.updatedAt).toLocaleDateString()}</span></button>)}</div></details> : null}
+          {workspaces.length ? <details><summary style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>{c('saved').replace('{count}', String(workspaces.length))}</summary><div style={{ display: 'grid', gap: 8, marginTop: 10 }}>{workspaces.map(workspace => <button type="button" key={workspace.id} onClick={() => openWorkspace(workspace.id)} disabled={running} style={{ ...secondaryButton, textAlign: 'start' }}><strong style={{ color: '#67e8f9', marginInlineEnd: 8 }}>{workspace.id.slice(0, 8)}…</strong>{workspace.objective || interpolate('workspace', workspace.id.slice(0, 8), '{id}')} <span style={{ color: '#94a3b8' }}>· {new Date(workspace.updatedAt).toLocaleDateString()}</span></button>)}</div></details> : null}
           {files.length ? <div style={fileListStyle}>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path}<button type="button" aria-label={interpolate('remove', file.path)} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
           {error ? <p role="alert" style={{ margin: 0, color: '#fca5a5' }}>{error}</p> : null}
         </section>

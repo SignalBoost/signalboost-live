@@ -59,7 +59,8 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
   const explicitCount = /\b(?:at least|minimum(?: of)?|all|verify|confirm)\s+(\d+)\s+(?:(?:meaningful|automated|unit|integration|regression)\s+)*tests?\b/i.exec(objective)
   const wordCount = /\b(?:all|verify|confirm)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+tests?\b/i.exec(objective)
   const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
-  const minimumTests = explicitCount ? Number(explicitCount[1]) : wordCount ? words[wordCount[1].toLowerCase()] : 0
+  const hasTestCommand = [...commands].some(command => /\b(?:test|spec)\b|--test\b/i.test(command)) || /\bnode\s+(?:--test\s+)?[^\s\n]*(?:test|spec)[^\s\n]*\.(?:[cm]?js|ts)\b/i.test(objective)
+  const minimumTests = hasTestCommand ? (explicitCount ? Number(explicitCount[1]) : wordCount ? words[wordCount[1].toLowerCase()] : 0) : 0
   return { files: [...files], commands: [...commands], requiresRun: commands.size > 0 || /\b(?:run|execute|test|verify)\b/i.test(objective), minimumTests }
 }
 

@@ -446,7 +446,16 @@ export class BuilderToolLoop {
     if (documentationPaths && !validBuilderDocumentationScope(input.objective, documentationPaths)) return { ok: false, error: 'builder_documentation_scope_invalid', trace }
     const documentationEdit = !documentationPaths && isBuilderDocumentationEditObjective(input.objective)
     const gateObjective = documentationPaths || documentationEdit ? '' : input.objective
-    let repairObjective = saved?.repairObjective ?? isRepairObjective(gateObjective)
+    // A request to replace non-failing, non-throwing test assertions with an executable
+    // framework is a test-suite modernization, not a reproduced failing-code repair.
+    // Require the declared tests to run after the file changes; do not invent a
+    // fail-before trace for the original console.assert implementation.
+    const testSuiteModernization = /\breplace\b[\s\S]{0,100}\bconsole\.assert\b/i.test(input.objective)
+      && /\bnode:test\b/.test(input.objective)
+      && /\bnode:assert\/strict\b/.test(input.objective)
+      && !/(?:stack trace|exit code [1-9]|(?:still|currently) failing|doesn't work|not working)/i.test(input.objective)
+
+    let repairObjective = testSuiteModernization ? false : (saved?.repairObjective ?? isRepairObjective(gateObjective))
     const extendingProject = Boolean(documentationPaths) || Boolean(input.projectContext) && !isRepairObjective(input.objective)
       && /^(?:(?:please|now|then|also)\s+|(?:can|could|would)\s+you\s+)*(?:update|edit|modify|extend|change|refactor|add|remove|replace)\b/i.test(input.objective)
     if (repairObjective && !files.length && !saved) return { ok: false, error: 'builder_source_required', trace }
@@ -792,7 +801,7 @@ export class BuilderToolLoop {
           if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_task_incomplete', trace }
           continue
         }
-        repairObjective ||= !documentationPaths && !documentationEdit && isRepairObjective(`${input.objective}\n${action.answer}`)
+        repairObjective ||= !testSuiteModernization && !documentationPaths && !documentationEdit && isRepairObjective(`${input.objective}\n${action.answer}`)
         const verdict = evaluateRegressionGate(gateObjective, trace, repairObjective)
         if (verdict.satisfied && progress.satisfied) return { ok: true, answer: action.answer, trace }
         if (repairObjective) {
@@ -877,7 +886,7 @@ export class BuilderToolLoop {
           error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })
         continue
       }
-      if (mutation && initialPaths.has(toolPath(action.input)) && !extendingProject && !documentationEdit) repairObjective = true
+      if (mutation && initialPaths.has(toolPath(action.input)) && !extendingProject && !documentationEdit && !testSuiteModernization) repairObjective = true
       // An alternating list/read loop observes unchanged workspace state without progress.
       // A read whose content is no longer in the prompt is not a repeat: refusing it left the resident unable to see
       // the source it had to edit.

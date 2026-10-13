@@ -65,7 +65,7 @@ test('transport recovery never sends a second Builder POST', () => {
   assert.match(transport, /the action was not replayed/)
 })
 
-test('durable Builder polling continues past 20 checks and returns a succeeded terminal job', () => {
+test('Builder polling helper stays bounded while the accepted durable job returns immediately', () => {
   assert.match(transport, /const BUILDER_JOB_POLL_ATTEMPTS = 200/)
   assert.match(transport, /const BUILDER_JOB_POLL_DELAY_MS = 1_500/)
   const poll = transport.slice(transport.indexOf('async function pollBuilderJob('), transport.indexOf('async function recoverBuilderFromHistory('))
@@ -74,7 +74,8 @@ test('durable Builder polling continues past 20 checks and returns a succeeded t
   assert.match(poll, /return \{ payload: record, status: response\.status \}/)
   const handoff = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
   assert.match(handoff, /return responseFromPayload\(\{[\s\S]*?status: 'running'/)
-  assert.match(handoff, /if \(terminal\) \{[\s\S]*?return responseFromPayload\([\s\S]*?terminal\.payload/)
+  assert.doesNotMatch(handoff, /await pollBuilderJob\(/)
+  assert.match(handoff, /\}, 202, 'builder-job-running'\)/)
   assert.equal(200 > 20, true)
 })
 

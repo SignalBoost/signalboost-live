@@ -74,6 +74,29 @@ test('repeated denied inspections stop before exhausting the entire model budget
   assert.ok(calls <= 15, `should stop repeated read requests, got ${calls}`)
 })
 
+test('repeated blocked inspections escalate repairs to mutation-only tools', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('blocked-repair', 'index.js', 'module.exports = 0')
+  let calls = 0
+  const result = await new BuilderToolLoop({
+    async generate(input) {
+      calls++
+      if (calls === 4) {
+        assert.match(input.prompt, /mutation now/)
+        assert.match(input.prompt, /"TOOLS":\\s*\\["write_file","edit_file"\\]/)
+        return action('edit_file', { path: 'index.js', search: 'module.exports = 0', replace: 'module.exports = 1' })
+      }
+      return action('read_file', { path: 'index.js' })
+    },
+  }, workspace, { async run() { assert.fail('no command requested') } }).run({
+    objective: 'Fix broken index.js implementation.',
+    workspaceId: 'blocked-repair',
+    maxRounds: 8,
+  })
+  assert.ok(result.trace.some(item => item.toolId === 'edit_file' && item.ok),
+    JSON.stringify(result.trace.map(item => [item.toolId, item.ok, item.error])))
+})
+
 test('an unverifiable passing test run cannot replay indefinitely', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let calls = 0

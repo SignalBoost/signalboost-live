@@ -73,7 +73,7 @@ test('durable Builder polling continues past 20 checks and returns a succeeded t
   assert.match(poll, /record\.status === 'queued' \|\| record\.status === 'running' \|\| record\.status === 'paused'/)
   assert.match(poll, /return \{ payload: record, status: response\.status \}/)
   const handoff = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
-  assert.match(handoff, /const terminal = await pollBuilderJob\(fetchImpl, jobId\)/)
+  assert.match(handoff, /return responseFromPayload\(\{[\s\S]*?status: 'running'/)
   assert.match(handoff, /if \(terminal\) \{[\s\S]*?return responseFromPayload\([\s\S]*?terminal\.payload/)
   assert.equal(200 > 20, true)
 })
@@ -82,7 +82,7 @@ test('accepted Builder jobs detach status polling from foreground AbortSignal', 
   const direct = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
   const repair = transport.slice(transport.indexOf('async function executeOperationalRepairFromConcierge('), transport.indexOf('async function executeArtifactFromConcierge('))
   for (const flow of [direct, repair]) {
-    assert.match(flow, /const terminal = await pollBuilderJob\(fetchImpl, jobId\)/)
+    assert.doesNotMatch(flow, /const terminal = await pollBuilderJob\(/)
     assert.doesNotMatch(flow, /pollBuilderJob\(fetchImpl, jobId, signal\)/)
     assert.match(flow, /const recovered = await recoverBuilderFromHistory\(fetchImpl, conversationId, objective, sentAtMs\)/)
     assert.doesNotMatch(flow, /if \(deliberateAbort\(error, signal\)\) throw error/)
@@ -98,6 +98,18 @@ test('durable Builder POST does not inherit the foreground Assistant abort signa
   assert.match(enqueue, /method: 'POST'/)
   assert.doesNotMatch(enqueue, /\bsignal\s*,/)
   assert.match(enqueue, /body: JSON\.stringify\(\{ objective, files: builderFilesFromBody\(body\), conversationId \}\)/)
-  assert.match(direct, /const terminal = await pollBuilderJob\(fetchImpl, jobId\)/)
+  assert.match(direct, /return responseFromPayload\(\{[\s\S]*?status: 'running'/)
   assert.equal((direct.match(/fetchImpl\('\/api\/builder',\s*\{/g) || []).length, 1)
+})
+
+test('accepted Builder and operational repair responses return 202 without waiting for terminal polling', () => {
+  const direct = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
+  const repair = transport.slice(transport.indexOf('async function executeOperationalRepairFromConcierge('), transport.indexOf('async function executeArtifactFromConcierge('))
+  for (const flow of [direct, repair]) {
+    assert.doesNotMatch(flow, /await pollBuilderJob\(/)
+    assert.match(flow, /status: 'running'/)
+    assert.match(flow, /\}, 202, '(?:builder-job-running|operational-repair-running)'\)/)
+  }
+  assert.doesNotMatch(direct, /builder-job-terminal/)
+  assert.doesNotMatch(repair, /operational-repair-terminal/)
 })

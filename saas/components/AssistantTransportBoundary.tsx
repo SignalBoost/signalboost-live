@@ -305,19 +305,8 @@ async function executeBuilderFromConcierge(
     }, 503, 'builder-job-id-missing')
   }
 
-  // The job has a durable ID; read-only polling must outlive the initiating request signal.
-  const terminal = await pollBuilderJob(fetchImpl, jobId)
-  if (terminal) {
-    return responseFromPayload({
-      ...terminal.payload,
-      reply: typeof terminal.payload.reply === 'string'
-        ? terminal.payload.reply
-        : `COS Builder stopped: ${String(terminal.payload.error || 'builder_job_failed')}`,
-    }, terminal.status, 'builder-job-terminal')
-  }
-
-  // The page does not wait for the entire debug lifecycle. The durable running message already
-  // exists in History and the final worker result will update that same row without another Send.
+  // POST already created a durable job and History row. Return the receipt immediately;
+  // holding Concierge open until the worker finishes causes a false client timeout.
   return responseFromPayload({
     ...payload,
     status: 'running',
@@ -362,19 +351,8 @@ async function executeOperationalRepairFromConcierge(
     return responseFromPayload(payload, response.status, 'operational-repair-backend')
   }
 
-  // The job has a durable ID; read-only polling must outlive the initiating request signal.
-  const terminal = await pollBuilderJob(fetchImpl, jobId)
-  if (terminal) {
-    return responseFromPayload({
-      ...terminal.payload,
-      reply: typeof terminal.payload.reply === 'string'
-        ? terminal.payload.reply
-        : `COS Builder stopped: ${String(terminal.payload.error || 'builder_job_failed')}`,
-    }, terminal.status, 'operational-repair-terminal')
-  }
-
-  const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
-  return recovered || responseFromPayload({
+  // Durable repair accepted: return its receipt now; History owns the final outcome.
+  return responseFromPayload({
     ...payload,
     status: 'running',
     reply: typeof payload.reply === 'string'

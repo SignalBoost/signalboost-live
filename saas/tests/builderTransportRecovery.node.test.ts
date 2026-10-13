@@ -62,7 +62,7 @@ test('Builder persists running before 202 and replaces it with the terminal resu
 test('transport recovery never sends a second Builder POST', () => {
   assert.equal((transport.match(/fetchImpl\('\/api\/builder',\s*\{/g) ?? []).length, 1)
   assert.match(transport, /Polling is read-only/)
-  assert.match(transport, /never replay the action/)
+  assert.match(transport, /the action was not replayed/)
 })
 
 test('durable Builder polling continues past 20 checks and returns a succeeded terminal job', () => {

@@ -39,7 +39,7 @@ test('browser polls through the five-minute Builder job window without controlli
   assert.ok(pollWindow < 300_000)
   assert.match(boundary, /method: 'GET'/)
   assert.doesNotMatch(boundary, /const terminal = await pollBuilderJob\(/)
-  assert.match(boundary, /The page does not wait for the entire debug lifecycle/)
+  assert.match(boundary, /POST already created a durable job and History row/)
 })
 
 

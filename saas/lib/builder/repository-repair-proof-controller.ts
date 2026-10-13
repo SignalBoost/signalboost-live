@@ -90,7 +90,11 @@ export function createRepositoryRepairProofController(input: {
       if (proofRequired) {
         provedGeneration = workspaceGeneration
         if (workspaceGeneration === 0) {
-          baselineState = result.timedOut ? 'invalid' : result.exitCode === 0 ? 'passed' : 'failed'
+          // A host policy refusal (exit 125) never executed the requested proof.
+          // It must not authorize a source mutation as though tests failed.
+          const policyDenied = result.exitCode === 125
+            && String(result.stderr || '').includes('builder_repository_broad_test_blocked')
+          baselineState = result.timedOut || policyDenied ? 'invalid' : result.exitCode === 0 ? 'passed' : 'failed'
         }
       }
       return Object.freeze({ ...result, executedCommand: result.executedCommand || command })

@@ -64,8 +64,13 @@ async function seedFallbackItems(query: string | null): Promise<number> {
 
 // ── Site design via Claude Haiku (fast) ───────────────────────────────────────
 async function callHaiku(systemPrompt: string, userContent: string): Promise<string | null> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn('Sites generate: AI provider not configured; using explicit fallback')
+    return null
+  }
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
+      signal: AbortSignal.timeout(60_000),
       method:  'POST',
       headers: {
         'Content-Type':      'application/json',

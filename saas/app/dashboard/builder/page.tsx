@@ -241,10 +241,19 @@ export default function BuilderPage() {
     if (!desc || generating) return
     setGenerating(true); setSteps([]); setContent(null); setLiveUrl(null); setMessage(''); setActiveTab('preview')
     try {
+      const watchdog = new AbortController()
+      let idleTimer: ReturnType<typeof setTimeout> | undefined
+      const armWatchdog = () => {
+        if (idleTimer) clearTimeout(idleTimer)
+        idleTimer = setTimeout(() => watchdog.abort('site_generation_stream_idle'), 90_000)
+      }
+      armWatchdog()
+      try {
       const res = await fetch('/api/sites/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: desc, language: l }),
+        signal: watchdog.signal,
       })
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({}))
@@ -255,9 +264,11 @@ export default function BuilderPage() {
       const reader  = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let receivedResult = false
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
+        armWatchdog()
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() ?? ''
@@ -268,13 +279,21 @@ export default function BuilderPage() {
           try { chunk = JSON.parse(trimmed) } catch { continue }
           if (chunk.type === 'status') setSteps(prev => [...prev, { step: chunk.step, message: chunk.message }])
           else if (chunk.type === 'result') {
+            receivedResult = true
             if (chunk.content) setContent(chunk.content)
-            if (chunk.error && !chunk.content) setMessage(chunk.error)
+            if (chunk.error) setMessage(chunk.error)
           }
         }
       }
+      if (!receivedResult) {
+        // A clean EOF without a terminal result is an interrupted job, not success.
+        setMessage('Website generation ended without a result. Please try again.')
+      }
+      } finally {
+        if (idleTimer) clearTimeout(idleTimer)
+      }
     } catch {
-      setMessage(c('errConnect', l))
+      setMessage('Website generation was interrupted or timed out. Please try again.')
     } finally {
       setGenerating(false)
     }

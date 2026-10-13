@@ -5,6 +5,10 @@ const ACTION = /^(?:(?:please|now|then|also)\s+|(?:can|could|would)\s+you\s+)*(?
 const NEW_PROJECT = /\b(?:new|another|separate|different)\s+(?:(?:isolated|fresh|clean|empty|independent)\s+)?(?:project|workspace|app|application|website|repository)\b|\bstart\s+(?:over|fresh)\b|\bfrom\s+scratch\b/i
 const REFERENCE = /\b(?:this|that|the|same|existing|previous|our|my)\s+(?:project|workspace|app|application|website|code|file|implementation|tests?|suite)\b|\b(?:it|them)\b|\btests?\b/i
 
+export function isNewBuilderProjectObjective(objective: string): boolean {
+  return NEW_PROJECT.test(objective)
+}
+
 export type BuilderProjectContext = {
   previousJobId: string
   previousObjective: string

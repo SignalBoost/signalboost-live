@@ -508,7 +508,7 @@ export class BuilderToolLoop {
       const inspectedSinceChange = trace.slice(lastWorkspaceChange + 1).some(item =>
         item.ok && item.toolId === 'read_file')
       const repeatedRepairStall = repairObjective && inspectedSinceChange
-        && rejectedSinceChange.length >= 2
+        && rejectedSinceChange.length >= 1
         && !trace.slice(lastWorkspaceChange + 1).some(item =>
           item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
       const repairMutationRequired = repairObjective && latestFailedRunIndex >= 0

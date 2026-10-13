@@ -10,7 +10,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
-import { isBuilderTestRunnerCommand } from '../lib/builder/regression-gate.ts'
+import { evaluateRegressionGate, isBuilderTestRunnerCommand } from '../lib/builder/regression-gate.ts'
 
 const OBJECTIVE = 'Fix the power stabilization release gate so the advisory diagnosis answer is correct.'
 const PROOF = 'node --experimental-strip-types --test regression/gate.node.test.ts'
@@ -87,8 +87,7 @@ test('a passing proof followed by repeated requests ends promptly as not reprodu
   assert.equal('error' in result ? result.error : '', 'builder_regression_not_reproduced')
   assert.equal(state.executed, 1, 'only the one real proof run executed')
   assert.ok(resident.prompts.length <= 10, `bounded model calls, got ${resident.prompts.length}`)
-  const trailing = result.trace.slice(-3)
-  assert.ok(trailing.every(entry => String(entry.error).startsWith('builder_repeated_tool_call:')), 'stopped on three consecutive repeats')
+  assert.ok(String(result.trace.at(-1)?.error).startsWith('builder_repeated_tool_call:'), 'stopped on a refused repeat')
 })
 
 test('after the passing proof, the resident is told the command does not reproduce the defect', async () => {
@@ -120,7 +119,9 @@ for (const diagnostic of ['node --version', 'echo test', 'rg test src', 'node sc
     } }
     const result = await run(ai, countingRunner().runner)
     assert.equal(result.ok, false)
-    assert.equal('error' in result ? result.error : '', 'builder_stalled_repeated_inspection')
+    // A read source and refused repeats escalate to mutation-only recovery (#4273); the run never claims the defect
+    // was not reproduced, because a diagnostic is no proof.
+    assert.equal('error' in result ? result.error : '', 'builder_repair_mutation_not_produced')
     assert.ok(!prompts.some(prompt => prompt.includes(NOT_REPRODUCED_STEP)), 'a diagnostic never claims the defect is unreproduced')
   })
 }
@@ -136,7 +137,7 @@ test('only commands that invoke a test runner, test file, typecheck or build cou
   }
 })
 
-test('a stall that is not a passing-proof case keeps the stalled-inspection result', async () => {
+test('a stall that is not a passing-proof case keeps the mutation-required result', async () => {
   const prompts: string[] = []
   const ai = { async generate(input: { prompt: string }) {
     prompts.push(input.prompt)
@@ -144,7 +145,43 @@ test('a stall that is not a passing-proof case keeps the stalled-inspection resu
   } }
   const result = await run(ai, countingRunner().runner)
   assert.equal(result.ok, false)
-  assert.equal('error' in result ? result.error : '', 'builder_stalled_repeated_inspection')
+  assert.equal('error' in result ? result.error : '', 'builder_repair_mutation_not_produced')
   assert.ok(prompts.length <= 12, `bounded model calls, got ${prompts.length}`)
 })
+test('after a passing proof, mutation-only recovery asks for a failing regression test, not a source edit', async () => {
+  const resident = loopingResident()
+  await run(resident.ai, countingRunner().runner)
+  const escalated = resident.prompts.find(prompt => prompt.includes('TOOLS: ["write_file","edit_file"]'))
+  assert.ok(escalated, 'recovery was escalated to mutation-only tools')
+  assert.ok(escalated.includes(NOT_REPRODUCED_STEP), 'the step names the passing proof')
+  assert.ok(!escalated.includes('based on the inspected source and actual errors'), 'no source edit is demanded without an error')
+})
+
+test('after a passing proof, an honest not-reproduced answer is accepted', async () => {
+  const prompts: string[] = []
+  const script = [
+    { type: 'tool', toolId: 'read_file', input: { path: 'lib/gate.ts' } },
+    { type: 'tool', toolId: 'run', input: { command: PROOF } },
+    { type: 'tool', toolId: 'run', input: { command: PROOF } },
+    { type: 'answer', answer: 'The defect was not reproduced: the proof passes against the current source.' },
+  ]
+  const ai = { async generate(input: { prompt: string }) { prompts.push(input.prompt); return JSON.stringify(script[prompts.length - 1] ?? script[3]) } }
+  const result = await run(ai, countingRunner().runner)
+  assert.equal(result.ok, false)
+  assert.equal('error' in result ? result.error : '', 'builder_regression_not_reproduced')
+  assert.ok(!result.trace.some(entry => entry.error === 'builder_repair_mutation_required'), 'the answer is not refused as a missing mutation')
+})
+
+test('a run refused as a repeat is never counted as a reproduced failure by the regression gate', () => {
+  const trace = [
+    { round: 1, toolId: 'run', input: { command: PROOF }, ok: true, output: { exitCode: 0, stdout: 'ok', stderr: '' } },
+    { round: 2, toolId: 'run', input: { command: PROOF }, ok: false, error: 'builder_repeated_tool_call:run; choose a different next step' },
+    { round: 3, toolId: 'edit_file', input: { path: 'lib/advisory.ts' }, ok: true, output: {} },
+    { round: 4, toolId: 'run', input: { command: PROOF }, ok: true, output: { exitCode: 0, stdout: 'ok', stderr: '' } },
+  ] as const
+  assert.equal(evaluateRegressionGate(OBJECTIVE, trace as any).satisfied, false, 'no executed run ever failed')
+  const real = [trace[0], { ...trace[1], error: 'builder_command_failed: exit 1', output: { exitCode: 1, stdout: '', stderr: 'fail' } }, trace[2], trace[3]]
+  assert.equal(evaluateRegressionGate(OBJECTIVE, real as any).satisfied, true, 'an executed failing run still counts')
+})
+
 // end of saas/tests/builderToolLoopPassingProofRepeat.node.test.ts (if this line is missing, the paste was cut short)

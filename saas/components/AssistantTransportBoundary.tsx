@@ -273,7 +273,7 @@ async function executeBuilderFromConcierge(
       method: 'POST',
       credentials: 'include',
       headers: { accept: 'application/json', 'Content-Type': 'application/json' },
-      signal,
+      // Enqueueing is durable; the foreground Assistant timeout must not cancel this POST.
       body: JSON.stringify({ objective, files: builderFilesFromBody(body), conversationId }),
     })
   } catch (error) {

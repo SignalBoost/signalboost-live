@@ -84,6 +84,37 @@ test('an unverifiable passing test run cannot replay indefinitely', async () => 
   assert.equal(result.trace.filter(item => item.toolId === 'run' && item.ok).length, 1)
 })
 
+test('incomplete test proof prompts a source edit then reruns the command', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('coverage-repair', 'test.js', 'original')
+  let calls = 0
+  let runs = 0
+  const controls = [
+    action('run', { command: 'node test.js' }),
+    action('edit_file', { path: 'test.js', search: 'original', replace: 'four distinct assertions' }),
+    action('run', { command: 'node test.js' }),
+  ]
+  const result = await new BuilderToolLoop({
+    async generate(input) {
+      if (calls === 1) assert.match(input.prompt, /output did not prove 4 requested tests/)
+      return controls[calls++] || answer
+    },
+  }, workspace, {
+    async run() {
+      runs++
+      return { exitCode: 0, stdout: runs === 1 ? 'All tests passed!' :
+        'Test 1 passed\nTest 2 passed\nTest 3 passed\nTest 4 passed\n', stderr: '', timedOut: false }
+    },
+  }).run({
+    objective: 'Update test.js with four tests. Run node test.js and verify all four tests pass.',
+    workspaceId: 'coverage-repair',
+    projectContext: { kind: 'continuation' },
+  })
+  assert.equal(result.ok, true, JSON.stringify({error: !result.ok ? result.error : null, trace: result.trace.map(t => [t.toolId, t.ok, t.error])}))
+  assert.equal(runs, 2)
+  assert.equal((await workspace.readFile('coverage-repair', 'test.js'))?.content, 'four distinct assertions')
+})
+
 test('the reported new build is not an existing repair despite error requirements and conditional recovery', () => {
   assert.equal(isRepairObjective(objective), false)
   for (const request of ['Fix expenses.js.', 'Repair the broken CLI.', 'Create a regression test and fix the bug.', 'Fixed expenses.js.', 'The program crashes.']) assert.equal(isRepairObjective(request), true, request)
@@ -232,7 +263,7 @@ test('one passing test directs completion of the requested suite before success'
       return { ...passing, stdout: repaired ? passing.stdout : '# pass 1\n# fail 0\n' }
     },
   }).run({ objective, workspaceId: 'insufficient-tests' })
-  assert.equal(result.ok, true)
+  assert.equal(result.ok, true, JSON.stringify({error: !result.ok ? result.error : null, trace: result.trace.map(t => [t.toolId, t.ok, t.error])}))
   assert.equal(repaired, true)
   assert.equal(runs, 4)
 })

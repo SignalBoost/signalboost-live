@@ -2,12 +2,14 @@
 // Live model-list discovery using a customer's own credential.
 // This performs read-only catalog GET requests; no inference, training, or spend.
 // Never expose, cache, or log customer secrets or raw provider payloads.
-// Every model the customer's key can use is offered; what the provider charges is between the customer and the provider.
+// Every text-generating model the customer's key can use is offered (embedding, speech, image and moderation models are
+// hidden: they cannot act as a teacher). What the provider charges is between the customer and the provider.
 import { NextRequest, NextResponse } from 'next/server'
 import { customerSession, UUID_RE } from '@/lib/lab/customerSession'
 import { openCustomerCredential } from '@/lib/ai/cos/labCustomerCredentialVault'
 import { LAB_PROVIDER_CATALOG, customModelsUrl } from '@/lib/ai/cos/labCustomerProviderCatalog'
 import { assertPublicHttpUrl } from '@/lib/security/publicFetchGuard'
+import { collectTeacherModels } from '@/lib/lab/labTeacherModels'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,25 +31,6 @@ const API_MODELS: Readonly<Record<string, { url: string; auth: 'bearer' | 'anthr
   together: { url: 'https://api.together.xyz/v1/models', auth: 'bearer' },
   fireworks: { url: 'https://api.fireworks.ai/inference/v1/models', auth: 'bearer' },
   deepinfra: { url: 'https://api.deepinfra.com/v1/openai/models', auth: 'bearer' },
-}
-
-const clean = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length < 241 && /^[\w./:-]+$/.test(value)
-function collectModels(payload: unknown, provider: string): string[] {
-  const obj = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
-  const rows: unknown[] = Array.isArray(payload) ? payload : Array.isArray(obj.data) ? obj.data : Array.isArray(obj.models) ? obj.models : []
-  const models = rows.flatMap(row => {
-    if (!row || typeof row !== 'object') return []
-    const item = row as Record<string, unknown>
-    const id = item.id ?? item.name
-    if (!clean(id)) return []
-    // Gemini responses often use models/model-name, while generation requires model-name.
-    const name = provider === 'gemini' ? id.replace(/^models\//, '') : id
-    if (!clean(name)) return []
-    if (provider === 'gemini' && Array.isArray(item.supportedGenerationMethods) &&
-        !item.supportedGenerationMethods.includes('generateContent')) return []
-    return [name]
-  })
-  return [...new Set(models)].sort((a,b) => a.localeCompare(b)).slice(0, 250)
 }
 
 export async function GET(req: NextRequest) {
@@ -90,7 +73,7 @@ export async function GET(req: NextRequest) {
       method: 'GET', headers, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
-    live = collectModels(await response.json(), provider)
+    live = collectTeacherModels(await response.json(), provider)
   } catch {
     return NextResponse.json({ ok: false, error: 'model_directory_provider_unavailable' }, { status: 502, headers: noStore })
   }

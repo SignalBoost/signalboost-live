@@ -50,6 +50,21 @@ test('Builder can begin a requested new implementation in an empty workspace', a
   assert.equal((await workspace.readFile('user:fresh-implementation', 'math.js'))?.content, 'export const multiply = (a, b) => a * b')
 })
 
+test('Builder does not treat its previous result receipt as project source', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:receipt-only', 'builder-result.txt', 'Previous job was incomplete.')
+  let calls = 0
+  const ai: BuilderAiPort = { async generate() { calls++; return '{"type":"tool","toolId":"list_files","input":{}}' } }
+  const runner: BuilderRunnerPort = { async run() { throw new Error('must not execute') } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Fix the failing multiply and square tests.',
+    workspaceId: 'user:receipt-only',
+  })
+  assert.equal(calls, 0)
+  assert.equal('error' in result ? result.error : '', 'builder_source_required')
+  assert.equal((await workspace.readFile('user:receipt-only', 'builder-result.txt'))?.content, 'Previous job was incomplete.')
+})
+
 test('Builder still refuses an unsupported repair in an empty workspace', async () => {
   let calls = 0
   const ai: BuilderAiPort = { async generate() { calls++; return '{"type":"answer","answer":"fixed"}' } }

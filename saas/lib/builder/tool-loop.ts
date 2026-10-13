@@ -2,7 +2,7 @@ import { validBuilderDocumentationScope } from './documentation-intent.ts'
 import { captureBuilderSource } from './source-evidence.ts'
 // saas/lib/builder/tool-loop.ts
 import type { BuilderAiPort, BuilderBrowserCliPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderMcpReadPort, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
-import { evaluateRegressionGate, isBuilderTestRunnerCommand, isRepairObjective } from './regression-gate.ts'
+import { evaluateRegressionGate, isBuilderTestRunnerCommand, isExecutedBuilderRun, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 import { formatBuilderCognitiveGuidance } from './cognitive-application.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
@@ -565,15 +565,20 @@ export class BuilderToolLoop {
         : undefined
       const coverageRepairRequired = task.minimumTests > 0 && !progress.testsSatisfied
         && progress.pendingCommands.length === 0 && trace.slice(lastWorkspaceChange + 1).some(item => item.toolId === 'run' && item.ok)
+      const passingProofStep = passingProofBeforeChange
+        ? `CURRENT STEP: ${JSON.stringify(text(passingProofBeforeChange.input.command))} passed against the unchanged source, so it does not reproduce the reported defect; rerunning it or rereading the same files proves nothing new. Write or extend a regression test that fails on the reported defect with write_file or edit_file, then run that test. If the source shows no such defect, answer that the defect was not reproduced.`
+        : ''
+      // With a passing proof there is no error to justify a source edit. Forcing one produced unsupported edits that
+      // the regression gate then rejected; the justified mutation is a failing regression test, or an honest answer.
       const currentStep = repeatedRepairStall
-        ? 'CURRENT STEP: The source has been read and repeated inspection or execution was refused against unchanged files. Choose ONE justified edit_file or write_file mutation now, based on the inspected source and actual errors. Do not request another read, run, or answer until a mutation is recorded. If no justified repair is possible, the host will fail transparently.'
+        ? passingProofStep || 'CURRENT STEP: The source has been read and repeated inspection or execution was refused against unchanged files. Choose ONE justified edit_file or write_file mutation now, based on the inspected source and actual errors. Do not request another read, run, or answer until a mutation is recorded. If no justified repair is possible, the host will fail transparently.'
         : coverageRepairRequired
         ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. A command exited 0 but its output did not prove ${task.minimumTests} requested tests. Complete the suite with distinct meaningful assertions. Do NOT run again against unchanged files. Use read_file on the test source if not already inspected, then edit_file or write_file to add meaningful missing assertions and explicit per-test evidence. Preserve the existing passing tests. Once the file changes, the verification run can execute again.`
         : repairMutationRequired
         ? 'CURRENT STEP: The defect is reproduced and the bounded diagnostic allowance is exhausted. Make the smallest justified edit/write now. Do not inspect more files and do not answer yet; verification will rerun after the mutation.'
         : chunks.size > 0 ? formatBuilderChunks(chunks)
         : passingProofBeforeChange
-          ? `CURRENT STEP: ${JSON.stringify(text(passingProofBeforeChange.input.command))} passed against the unchanged source, so it does not reproduce the reported defect; rerunning it or rereading the same files proves nothing new. Write or extend a regression test that fails on the reported defect with write_file or edit_file, then run that test. If the source shows no such defect, answer that the defect was not reproduced.`
+          ? passingProofStep
         : !repairObjective && progress.missingFiles.length > 0
         ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files. For large files use bounded append chunks; only final=true publishes the complete file.`
         : !repairObjective && progress.pendingCommands.length === 0 && !progress.testsSatisfied
@@ -733,7 +738,9 @@ export class BuilderToolLoop {
           ok: false,
           error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
         })
-        if (repairMutationRequired || repeatedRepairStall) return { ok: false, error: 'builder_repair_mutation_not_produced', trace }
+        if (repairMutationRequired || repeatedRepairStall) {
+          return { ok: false, error: passingProofBeforeChange ? 'builder_regression_not_reproduced' : 'builder_repair_mutation_not_produced', trace }
+        }
         continue
       }
       if (!action) {
@@ -752,7 +759,8 @@ export class BuilderToolLoop {
       }
 
       if (action.type === 'answer') {
-        if (repairMutationRequired || repeatedRepairStall) {
+        // A not-reproduced answer after a passing proof is honest; the answer path below records it as such.
+        if (repairMutationRequired || (repeatedRepairStall && !passingProofBeforeChange)) {
           trace.push({ round, toolId: 'model_control', input: {}, ok: false,
             error: 'builder_repair_mutation_required',
             failureClass: 'test',
@@ -793,14 +801,14 @@ export class BuilderToolLoop {
           const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
             .filter((file): file is BuilderFile => file !== null)
           const proofFile = files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
-          const observedFailedCommand = trace.find(item => item.toolId === 'run' && !item.ok)?.input.command
+          const observedFailedCommand = trace.find(item => isExecutedBuilderRun(item) && !item.ok)?.input.command
           const proofCommand = (typeof observedFailedCommand === 'string' ? observedFailedCommand : '')
             || (projectContext.manifestPath ? projectContext.recommendedTestCommand : '')
             || (proofFile ? `node --experimental-strip-types --test ${proofFile.path}` : '')
             || projectContext.recommendedTestCommand || ''
           const proofIdx = trace
             .map((item, index) => ({ item, index }))
-            .filter(({ item }) => item.toolId === 'run' && text(item.input.command) === proofCommand)
+            .filter(({ item }) => isExecutedBuilderRun(item) && text(item.input.command) === proofCommand)
           const failedProof = proofIdx.find(({ item }) => !item.ok)
           const passedProof = proofIdx.find(({ item }) => item.ok)
           const verifiedAfterFail = failedProof

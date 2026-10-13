@@ -44,6 +44,11 @@ function commandOf(trace: BuilderToolTrace): string {
   return typeof trace.input.command === 'string' ? trace.input.command : ''
 }
 
+/** A run refused as a repeat executed nothing; it is never evidence that a proof failed or passed. */
+export function isExecutedBuilderRun(item: BuilderToolTrace): boolean {
+  return item.toolId === 'run' && !String(item.error || '').startsWith('builder_repeated_tool_call:')
+}
+
 function normalizedCommand(trace: BuilderToolTrace): string {
   return commandOf(trace).trim().replace(/\s+/g, ' ')
 }
@@ -57,7 +62,7 @@ export function evaluateRegressionGate(objective: string, trace: readonly Builde
   if (!forceRepair && !isRepairObjective(objective)) return { satisfied: true }
   const proofRuns = trace
     .map((item, index) => ({ item, index, command: normalizedCommand(item) }))
-    .filter(({ item, command }) => item.toolId === 'run' && command && PROOF_COMMAND.test(command))
+    .filter(({ item, command }) => isExecutedBuilderRun(item) && command && PROOF_COMMAND.test(command))
   const failed = proofRuns.find(({ item }) => !item.ok)
   if (!failed) return { satisfied: false, reason: 'run the narrowest relevant test, typecheck, or build proof before the repair and show it fails' }
   const repair = trace.findIndex((item, index) => index > failed.index && item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))

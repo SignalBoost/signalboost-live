@@ -83,7 +83,7 @@ test('repeated blocked inspections escalate repairs to mutation-only tools', asy
       calls++
       if (calls === 3) {
         assert.match(input.prompt, /mutation now/)
-        assert.match(input.prompt, /"TOOLS":\\s*\\["write_file","edit_file"\\]/)
+        assert.match(input.prompt, /TOOLS: \["write_file","edit_file"\]/)
         return action('edit_file', { path: 'index.js', search: 'module.exports = 0', replace: 'module.exports = 1' })
       }
       return action('read_file', { path: 'index.js' })

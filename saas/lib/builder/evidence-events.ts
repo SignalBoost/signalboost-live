@@ -12,8 +12,12 @@ export function builderEvidenceEvents(trace: unknown) {
     const error = typeof entry.error === 'string' ? entry.error : ''
     const hasExit = typeof output.exitCode === 'number' && Number.isInteger(output.exitCode)
     const blocked = /^builder_(?:repeated_tool_call|verification_order_required|run_budget_exhausted)/.test(error)
+    // The host refusing a command (e.g. the repository-wide suite) returns exit 125 without executing it. That exit
+    // code is policy, not a result: reporting it as exited_nonzero told the owner a refused npm test reproduced a failure.
+    const refusedByHost = /^builder_repository_broad_test_blocked/.test(error)
     const outcome = entry.toolId === 'run'
-      ? output.timedOut === true ? 'timed_out'
+      ? refusedByHost ? 'blocked_before_execution'
+        : output.timedOut === true ? 'timed_out'
         : hasExit ? output.exitCode === 0 ? 'exited_zero' : 'exited_nonzero'
         : blocked ? 'blocked_before_execution' : 'execution_unconfirmed'
       : entry.toolId === 'edit_file' || entry.toolId === 'write_file'

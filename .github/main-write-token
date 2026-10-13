@@ -1,2 +1,2 @@
-base_sha=14e2055d1cc3ef85ef44d95d96c18243c11e8254
-branch=fix/builder-test-only-proof-runs-changed-20261013
+base_sha=3bd7fbe48f8f68ac80461ebed5590b9011e8994d
+branch=fix/builder-host-refusal-not-failure-20261013

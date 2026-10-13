@@ -95,6 +95,32 @@ function readSourceSection(trace: readonly BuilderToolTrace[], afterIndex: numbe
   }
 }
 
+const TEST_FILE = /(?:^|\/)(?:tests?|__tests__)\/|\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)tests?\.[cm]?[jt]sx?$/i
+
+/** Completion answer for a change confined to test files and verified by the requested passing run, else null. */
+function verifiedTestOnlyChange(
+  trace: readonly BuilderToolTrace[],
+  task: ReturnType<typeof builderTaskContract>,
+  progress: ReturnType<typeof builderTaskProgress>,
+): string | null {
+  const mutations = trace.map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+  if (!mutations.length || !mutations.every(({ item }) => TEST_FILE.test(toolPath(item.input)))) return null
+  // A proof that really failed before the change is a reproduced defect; that stays on the regression gate.
+  if (trace.slice(0, mutations[0].index).some(item => isExecutedBuilderRun(item) && !item.ok)) return null
+  if (!progress.satisfied || !progress.testsSatisfied) return null
+  const lastChange = mutations[mutations.length - 1].index
+  const proof = trace.slice(lastChange + 1).findLast(item => isExecutedBuilderRun(item) && item.ok
+    && isBuilderTestRunnerCommand(item.input.command) && (!task.commands.length || task.commands.some(command =>
+      item.input.command === command || item.input.requestedCommand === command)))
+  const stdout = proof && isRecord(proof.output) ? text(proof.output.stdout) : ''
+  const passed = Number(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)?.[1] || 0)
+  const failed = /(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)?.[1]
+  if (!proof || passed < Math.max(1, task.minimumTests) || failed !== '0') return null
+  const paths = [...new Set(mutations.map(({ item }) => toolPath(item.input)))]
+  return `Updated ${paths.join(', ')} (test files only) and verified with ${text(proof.input.command)}: ${passed} passed, 0 failed.`
+}
+
 const safeJson = (value: unknown, maximum = 18_000) => {
   try {
     const compact = compactJsonValue(value)
@@ -448,16 +474,7 @@ export class BuilderToolLoop {
     if (documentationPaths && !validBuilderDocumentationScope(input.objective, documentationPaths)) return { ok: false, error: 'builder_documentation_scope_invalid', trace }
     const documentationEdit = !documentationPaths && isBuilderDocumentationEditObjective(input.objective)
     const gateObjective = documentationPaths || documentationEdit ? '' : input.objective
-    // A request to replace non-failing, non-throwing test assertions with an executable
-    // framework is a test-suite modernization, not a reproduced failing-code repair.
-    // Require the declared tests to run after the file changes; do not invent a
-    // fail-before trace for the original console.assert implementation.
-    const testSuiteModernization = /\breplace\b[\s\S]{0,100}\bconsole\.assert\b/i.test(input.objective)
-      && /\bnode:test\b/.test(input.objective)
-      && /\bnode:assert\/strict\b/.test(input.objective)
-      && !/(?:stack trace|exit code [1-9]|(?:still|currently) failing|doesn't work|not working)/i.test(input.objective)
-
-    let repairObjective = testSuiteModernization ? false : (saved?.repairObjective ?? isRepairObjective(gateObjective))
+    let repairObjective = saved?.repairObjective ?? isRepairObjective(gateObjective)
     const extendingProject = Boolean(documentationPaths) || Boolean(input.projectContext) && !isRepairObjective(input.objective)
       && /^(?:(?:please|now|then|also)\s+|(?:can|could|would)\s+you\s+)*(?:update|edit|modify|extend|change|refactor|add|remove|replace)\b/i.test(input.objective)
     // A fresh workspace may legitimately be the starting point for a requested implementation.
@@ -511,6 +528,13 @@ export class BuilderToolLoop {
         && trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
         && progress.satisfied && pendingOrder.length === 0 && chunks.size === 0) {
         return { ok: true, answer: `Completed the requested files and verified at least ${task.minimumTests} tests with recorded passing command evidence.`, trace }
+      }
+      // A repair that changed only tests, with nothing failing before the change, has no source defect to reproduce:
+      // rewriting non-throwing console.assert checks can never fail first, so the fail-before gate held a finished
+      // job until it stalled. The requested run after the last change must pass and prove passing tests.
+      const testOnlyChange = repairObjective && verifiedTestOnlyChange(trace, task, progress)
+      if (testOnlyChange && pendingOrder.length === 0 && chunks.size === 0) {
+        return { ok: true, answer: testOnlyChange, trace }
       }
       // A model can alternate list_files and read_file to evade a last-tool-only
       // restriction. Keep every repeated inspection unavailable until a write/edit
@@ -819,7 +843,7 @@ export class BuilderToolLoop {
           if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_task_incomplete', trace }
           continue
         }
-        repairObjective ||= !testSuiteModernization && !documentationPaths && !documentationEdit && isRepairObjective(`${input.objective}\n${action.answer}`)
+        repairObjective ||= !documentationPaths && !documentationEdit && isRepairObjective(`${input.objective}\n${action.answer}`)
         const verdict = evaluateRegressionGate(gateObjective, trace, repairObjective)
         if (verdict.satisfied && progress.satisfied) return { ok: true, answer: action.answer, trace }
         if (repairObjective) {
@@ -904,7 +928,7 @@ export class BuilderToolLoop {
           error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })
         continue
       }
-      if (mutation && initialPaths.has(toolPath(action.input)) && !extendingProject && !documentationEdit && !testSuiteModernization) repairObjective = true
+      if (mutation && initialPaths.has(toolPath(action.input)) && !extendingProject && !documentationEdit) repairObjective = true
       // An alternating list/read loop observes unchanged workspace state without progress.
       // A read whose content is no longer in the prompt is not a repeat: refusing it left the resident unable to see
       // the source it had to edit.

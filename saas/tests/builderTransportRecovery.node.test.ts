@@ -73,7 +73,21 @@ test('durable Builder polling continues past 20 checks and returns a succeeded t
   assert.match(poll, /record\.status === 'queued' \|\| record\.status === 'running' \|\| record\.status === 'paused'/)
   assert.match(poll, /return \{ payload: record, status: response\.status \}/)
   const handoff = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
-  assert.match(handoff, /const terminal = await pollBuilderJob\(fetchImpl, jobId, signal\)/)
+  assert.match(handoff, /const terminal = await pollBuilderJob\(fetchImpl, jobId\)/)
   assert.match(handoff, /if \(terminal\) \{[\s\S]*?return responseFromPayload\([\s\S]*?terminal\.payload/)
   assert.equal(200 > 20, true)
+})
+
+test('accepted Builder jobs detach status polling from foreground AbortSignal', () => {
+  const direct = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
+  const repair = transport.slice(transport.indexOf('async function executeOperationalRepairFromConcierge('), transport.indexOf('async function executeArtifactFromConcierge('))
+  for (const flow of [direct, repair]) {
+    assert.match(flow, /const terminal = await pollBuilderJob\(fetchImpl, jobId\)/)
+    assert.doesNotMatch(flow, /pollBuilderJob\(fetchImpl, jobId, signal\)/)
+    assert.match(flow, /const recovered = await recoverBuilderFromHistory\(fetchImpl, conversationId, objective, sentAtMs\)/)
+    assert.doesNotMatch(flow, /if \(deliberateAbort\(error, signal\)\) throw error/)
+  }
+  assert.match(direct, /builder-transport-background-job/)
+  assert.match(repair, /operational-repair-transport-background-job/)
+  assert.equal((direct.match(/fetchImpl\('\/api\/builder',\s*\{/g) || []).length, 1)
 })

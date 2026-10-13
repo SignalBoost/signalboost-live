@@ -277,14 +277,13 @@ async function executeBuilderFromConcierge(
       body: JSON.stringify({ objective, files: builderFilesFromBody(body), conversationId }),
     })
   } catch (error) {
-    if (deliberateAbort(error, signal)) throw error
-    // The server may have accepted the POST before a browser transport loss. Poll durable History
-    // for 20–30 seconds, but never replay the action.
+    // The POST might have been accepted before its response transport was aborted.
+    // Recover durable History without replaying an action whose outcome is unknown.
     const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
     return recovered || responseFromPayload({
-      reply: 'The Builder request could not be confirmed. History did not show a durable running or completed job, so the action was not replayed.',
-      source: 'builder-transport-unconfirmed',
-    }, 503, 'builder-transport-unconfirmed')
+      reply: 'The Builder request may still be running. Check History for progress and the final result; the action was not replayed.',
+      source: 'builder-transport-background-job',
+    }, 202, 'builder-transport-background-job')
   }
 
   const payload = await response.json().catch(() => ({ error: 'builder_response_unavailable' })) as Record<string, unknown>
@@ -306,7 +305,8 @@ async function executeBuilderFromConcierge(
     }, 503, 'builder-job-id-missing')
   }
 
-  const terminal = await pollBuilderJob(fetchImpl, jobId, signal)
+  // The job has a durable ID; read-only polling must outlive the initiating request signal.
+  const terminal = await pollBuilderJob(fetchImpl, jobId)
   if (terminal) {
     return responseFromPayload({
       ...terminal.payload,
@@ -345,12 +345,12 @@ async function executeOperationalRepairFromConcierge(
       body: JSON.stringify(body),
     })
   } catch (error) {
-    if (deliberateAbort(error, signal)) throw error
+    // The operational repair may already be durable. Recover without replay.
     const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
     return recovered || responseFromPayload({
-      reply: 'The Builder request could not be confirmed. History did not show a durable result, so the action was not replayed.',
-      source: 'operational-repair-transport-unconfirmed',
-    }, 503, 'operational-repair-transport-unconfirmed')
+      reply: 'The repair request may still be running. Check History; the action was not replayed.',
+      source: 'operational-repair-transport-background-job',
+    }, 202, 'operational-repair-transport-background-job')
   }
   const payload = await response.json().catch(() => ({ error: 'operational_repair_response_unavailable' })) as Record<string, unknown>
 
@@ -362,7 +362,8 @@ async function executeOperationalRepairFromConcierge(
     return responseFromPayload(payload, response.status, 'operational-repair-backend')
   }
 
-  const terminal = await pollBuilderJob(fetchImpl, jobId, signal)
+  // The job has a durable ID; read-only polling must outlive the initiating request signal.
+  const terminal = await pollBuilderJob(fetchImpl, jobId)
   if (terminal) {
     return responseFromPayload({
       ...terminal.payload,

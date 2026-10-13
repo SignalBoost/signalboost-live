@@ -70,7 +70,7 @@ test('repeated denied inspections stop before exhausting the entire model budget
     maxRounds: 96,
   })
   assert.equal(result.ok, false)
-  if (!result.ok) assert.equal(result.error, 'builder_stalled_repeated_inspection')
+  if (!result.ok) assert.equal(result.error, 'builder_repair_mutation_not_produced')
   assert.ok(calls <= 15, `should stop repeated read requests, got ${calls}`)
 })
 
@@ -81,9 +81,9 @@ test('repeated blocked inspections escalate repairs to mutation-only tools', asy
   const result = await new BuilderToolLoop({
     async generate(input) {
       calls++
-      if (calls === 4) {
+      if (calls === 3) {
         assert.match(input.prompt, /mutation now/)
-        assert.match(input.prompt, /"TOOLS":\\s*\\["write_file","edit_file"\\]/)
+        assert.match(input.prompt, /TOOLS: \["write_file","edit_file"\]/)
         return action('edit_file', { path: 'index.js', search: 'module.exports = 0', replace: 'module.exports = 1' })
       }
       return action('read_file', { path: 'index.js' })

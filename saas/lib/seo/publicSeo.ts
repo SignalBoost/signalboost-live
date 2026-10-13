@@ -13,11 +13,24 @@ export function publicTopicCopy(locale: PublicLocale, topic?: PublicTopic) {
   }
 }
 
-export function publicAlternates(topic?: PublicTopic): Record<string, string> {
+// Language-neutral routes remain accessible globally; regional aliases improve market relevance.
+const PUBLIC_REGIONAL_HREFLANG: Record<PublicLocale, string> = {
+  en: 'en-US', es: 'es-ES', pt: 'pt-BR', pl: 'pl-PL', ru: 'ru-RU',
+  de: 'de-DE', fr: 'fr-FR', it: 'it-IT', ja: 'ja-JP', ko: 'ko-KR', ar: 'ar-SA',
+}
+
+function regionalAlternates(pathFor: (locale: PublicLocale) => string): Record<string, string> {
   return Object.fromEntries([
-    ...PUBLIC_LOCALES.map(locale => [locale, `${PUBLIC_BRAND.siteUrl}${publicPagePath(locale, topic)}`]),
-    ['x-default', `${PUBLIC_BRAND.siteUrl}${publicPagePath('en', topic)}`],
+    ...PUBLIC_LOCALES.flatMap(locale => [
+      [locale, `${PUBLIC_BRAND.siteUrl}${pathFor(locale)}`],
+      [PUBLIC_REGIONAL_HREFLANG[locale], `${PUBLIC_BRAND.siteUrl}${pathFor(locale)}`],
+    ]),
+    ['x-default', `${PUBLIC_BRAND.siteUrl}${pathFor('en')}`],
   ])
+}
+
+export function publicAlternates(topic?: PublicTopic): Record<string, string> {
+  return regionalAlternates(locale => publicPagePath(locale, topic))
 }
 
 export function publicMetadata(locale: PublicLocale, topic?: PublicTopic) {
@@ -47,10 +60,7 @@ export function publicSitemapEntries() {
     ...PUBLIC_LOCALES.filter(locale => locale !== 'en').flatMap(locale => [false, true].map(pricing => ({
       url: `${PUBLIC_BRAND.siteUrl}/${locale}/university${pricing ? '/pricing' : ''}`,
       changeFrequency: pricing ? 'monthly' as const : 'weekly' as const,
-      alternates: { languages: Object.fromEntries([
-        ...PUBLIC_LOCALES.map(language => [language, `${PUBLIC_BRAND.siteUrl}${language === 'en' ? '' : '/' + language}/university${pricing ? '/pricing' : ''}`]),
-        ['x-default', `${PUBLIC_BRAND.siteUrl}/university${pricing ? '/pricing' : ''}`],
-      ]) },
+      alternates: { languages: regionalAlternates(language => `${language === 'en' ? '' : '/' + language}/university${pricing ? '/pricing' : ''}`) },
     }))),
     ...PUBLIC_LOCALES.flatMap(locale => [undefined, ...PUBLIC_TOPICS].map(topic => ({
       url: `${PUBLIC_BRAND.siteUrl}${publicPagePath(locale, topic)}`,

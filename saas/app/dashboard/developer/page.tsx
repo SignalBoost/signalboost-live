@@ -54,6 +54,7 @@ export default function DeveloperPage() {
   const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([])
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [workspaceId, setWorkspaceId] = useState('')
+  const [openingWorkspace, setOpeningWorkspace] = useState(false)
   const [workspaceSearch, setWorkspaceSearch] = useState('')
   const [reply, setReply] = useState('')
   const [trace, setTrace] = useState<BuilderReply['trace']>([])
@@ -119,6 +120,9 @@ export default function DeveloperPage() {
   }
 
   async function openWorkspace(id: string) {
+    setOpeningWorkspace(true)
+    setWorkspaceId('')
+    setWorkspaceFiles([])
     setError('')
     try {
       const response = await fetch(`/api/builder?workspaceId=${encodeURIComponent(id)}`, { cache: 'no-store' })
@@ -126,6 +130,7 @@ export default function DeveloperPage() {
       if (!response.ok) throw new Error(data.error || 'Workspace could not be opened.')
       setWorkspaceId(id); setWorkspaceFiles(Array.isArray(data.files) ? data.files : []); setFiles([]); setReply(''); setTrace([])
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Workspace could not be opened.') }
+    finally { setOpeningWorkspace(false) }
   }
 
   async function addFiles(selected: FileList | null) {
@@ -161,7 +166,11 @@ export default function DeveloperPage() {
 
   async function run() {
     const task = objective.trim()
-    if (!task || running) return
+    if (!task || running || openingWorkspace) return
+    if (!workspaceId && /\b(?:existing|current|saved)\b[\s\S]{0,90}\b(?:project|workspace|files?)\b/i.test(task)) {
+      setError('Select and open an existing workspace with its files before running this task. No new workspace was created.')
+      return
+    }
     setRunning(true); setError(''); setReply(''); setTrace([])
     try {
       const response = await fetch('/api/builder', {
@@ -221,7 +230,7 @@ export default function DeveloperPage() {
             <input ref={fileInput} type="file" multiple onChange={event => addFiles(event.target.files)} style={{ display: 'none' }} accept=".txt,.log,.md,.mdx,.yaml,.yml,.json,.jsonl,.csv,.xml,.js,.cjs,.mjs,.ts,.tsx,.jsx,.py,.html,.css,.sql,.sh,.java,.cpp,.go,.rs,.php,.rb" />
             <button type="button" onClick={() => fileInput.current?.click()} disabled={running} style={secondaryButton}>📎 {lang === 'en' ? 'Attach files' : c('addFiles')}</button>
             <button type="button" onClick={reset} disabled={running} style={secondaryButton}>{c('newWorkspace')}</button>
-            <button type="button" onClick={run} disabled={!objective.trim() || running} style={{ ...primaryButton, opacity: !objective.trim() || running ? .55 : 1 }}>{running ? c('working') : c('run')}</button>
+            <button type="button" onClick={run} disabled={!objective.trim() || running || openingWorkspace} style={{ ...primaryButton, opacity: !objective.trim() || running || openingWorkspace ? .55 : 1 }}>{running ? c('working') : c('run')}</button>
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
             <label htmlFor="builder-workspace-search" style={{ color: '#94a3b8', fontSize: 13 }}>Find a saved workspace by project description or workspace ID</label>

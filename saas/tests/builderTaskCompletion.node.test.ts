@@ -106,8 +106,9 @@ test('incomplete test proof prompts a source edit then reruns the command', asyn
         'Test 1 passed\nTest 2 passed\nTest 3 passed\nTest 4 passed\n', stderr: '', timedOut: false }
     },
   }).run({
-    objective: 'Run node test.js and verify all four tests pass.',
+    objective: 'Update test.js with four tests. Run node test.js and verify all four tests pass.',
     workspaceId: 'coverage-repair',
+    projectContext: { kind: 'continuation' },
   })
   assert.equal(result.ok, true)
   assert.equal(runs, 2)

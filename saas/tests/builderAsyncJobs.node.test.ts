@@ -88,7 +88,8 @@ test('the browser sends Builder POST once and polls read-only status', () => {
 test('deliberate Stop aborts page polling but does not cancel or replay the durable job', () => {
   assert.match(boundary, /function deliberateAbort\(error: unknown, signal\?: AbortSignal\)/)
   assert.match(boundary, /signal\?\.aborted === true/)
-  assert.match(boundary, /pollBuilderJob\(fetchImpl, jobId, signal\)/)
+  assert.match(boundary, /pollBuilderJob\(fetchImpl, jobId\)/)
+  assert.doesNotMatch(boundary, /pollBuilderJob\(fetchImpl, jobId, signal\)/)
   assert.match(boundary, /signal,\n\s*\}\)/)
   assert.match(boundary, /if \(deliberateAbort\(error, signal\)\) throw error/)
   assert.match(boundary, /new DOMException\('The operation was aborted\.', 'AbortError'\)/)

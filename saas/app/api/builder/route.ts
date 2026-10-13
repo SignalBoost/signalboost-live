@@ -1,4 +1,4 @@
-import { selectBuilderProject, builderProjectBlockedReply } from '@/lib/builder/project-continuity'
+import { selectBuilderProject, builderProjectBlockedReply, isNewBuilderProjectObjective } from '@/lib/builder/project-continuity'
 import { builderRepositoryTarget, importBuilderRepository, builderRepositoryErrorReply } from '@/lib/builder/repository-import'
 // saas/app/api/builder/route.ts
 import { after, NextResponse } from 'next/server'
@@ -142,7 +142,8 @@ export async function POST(request: Request) {
     if (requestedWorkspaceId && !UUID.test(requestedWorkspaceId)) {
       return noStore({ error: 'Invalid workspace id.' }, { status: 400 })
     }
-    let workspaceId = requestedWorkspaceId || crypto.randomUUID()
+    const newProjectRequested = isNewBuilderProjectObjective(objective)
+    let workspaceId = newProjectRequested ? crypto.randomUUID() : requestedWorkspaceId || crypto.randomUUID()
 
     let files = cleanFiles(body?.files)
     const repositoryTarget = builderRepositoryTarget(objective, body?.repositoryUrl)
@@ -199,7 +200,8 @@ export async function POST(request: Request) {
     // the user pasted failure evidence into a developer workspace and asked it to debug. Logs are
     // admitted here, and only here; every other objective still faces the strict coding gate.
     const project = await selectBuilderProject({ objective, userId: access.userId, conversationId,
-      requestedWorkspaceId, hasNewSource: files.length > 0, repositoryImport: Boolean(repositoryTarget),
+      requestedWorkspaceId: newProjectRequested ? undefined : requestedWorkspaceId,
+      hasNewSource: files.length > 0, repositoryImport: Boolean(repositoryTarget),
     }, readBuilderEvidenceJob)
     if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
     workspaceId = project.workspaceId || workspaceId

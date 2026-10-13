@@ -78,6 +78,47 @@ test('Builder writes a user file, runs it, and returns only after tool evidence'
   assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'create_and_run_javascript_v1')
 })
 
+test('Builder terminates verified four-test work without another inspection or model answer', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let modelCalls = 0
+  const ai: BuilderAiPort = { async generate() {
+    modelCalls++
+    if (modelCalls === 1) return JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'math.test.js', content: '/* four test cases */' } })
+    return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node --test math.test.js' } })
+  } }
+  let runs = 0
+  const runner: BuilderRunnerPort = { async run() {
+    runs++
+    return { exitCode: 0, stdout: '# tests 4\\n# pass 4\\n# fail 0\\n', stderr: '', timedOut: false }
+  } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Create math.test.js and verify 4 tests. Run: node --test math.test.js',
+    workspaceId: 'user:verified-four',
+    maxRounds: 12,
+  })
+  assert.equal(result.ok, true)
+  assert.equal(runs, 1)
+  assert.equal(modelCalls, 2)
+  assert.deepEqual(result.trace.map(item => item.toolId), ['write_file', 'run'])
+})
+
+test('Builder does not auto-complete when four tests include a failure', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const ai = new ScriptedBuilderAi([
+    JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'math.test.js', content: '/* incomplete */' } }),
+    JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node --test math.test.js' } }),
+  ])
+  const runner: BuilderRunnerPort = { async run() {
+    return { exitCode: 1, stdout: '# tests 4\\n# pass 3\\n# fail 1\\n', stderr: '', timedOut: false }
+  } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Create math.test.js and verify 4 tests. Run: node --test math.test.js',
+    workspaceId: 'user:failed-four',
+    maxRounds: 2,
+  })
+  assert.equal(result.ok, false)
+})
+
 test('Builder supplies staged project scripts and the recommended proof command', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await workspace.writeFile('user:project-context', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))

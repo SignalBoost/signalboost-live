@@ -501,6 +501,15 @@ export class BuilderToolLoop {
       if ((staleActions < 0 ? trace.length : staleActions) >= 10) return { ok: false, error: 'builder_stalled_repeated_inspection', trace }
       const progress = builderTaskProgress(task, workspacePaths, trace)
       const pendingOrder = pendingBuilderVerificationOrder(verificationOrder, trace)
+      // Explicit multi-test creation jobs are complete when the actual, post-write
+      // runner evidence satisfies every declared deliverable and verification order.
+      // Do not need another model answer: that path could endlessly re-inspect unchanged
+      // files despite four passing tests. Existing-code repairs retain regression gates.
+      if (!repairObjective && !saved?.repairObjective && task.minimumTests > 0
+        && trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+        && progress.satisfied && pendingOrder.length === 0 && chunks.size === 0) {
+        return { ok: true, answer: `Completed the requested files and verified at least ${task.minimumTests} tests with recorded passing command evidence.`, trace }
+      }
       // A model can alternate list_files and read_file to evade a last-tool-only
       // restriction. Keep every repeated inspection unavailable until a write/edit
       // changes the workspace and resets the inspection state.

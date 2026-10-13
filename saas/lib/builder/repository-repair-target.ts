@@ -75,15 +75,40 @@ function failingSectionLines(input: string): readonly string[] {
   return lines.filter(line => /\btest at\s+(?:tests|test)\//i.test(line))
 }
 
+// Raw node:test output names a failing file in the YAML block under its "not ok" line, and a crash names it in a stack
+// frame. Neither form reached the proof controller, so a pasted failure started the repair with no test to run.
+const TAP_NOT_OK = /^not ok\s+\d+\b/i
+const TAP_BLOCK_END = /^(?:ok|not ok)\s+\d+\b|^\.\.\.$/i
+const TAP_LOCATION = /^location:\s*['"]?(.+?)['"]?\s*$/i
+const TEST_STACK_FRAME = /^at\s.*\((?:file:\/\/)?[^()]*:\d+:\d+\)\s*$/
+const FAILURE_SIGNAL = /\bAssertionError\b|\b[A-Z][A-Za-z]*Error\b|(?:^|\n)\s*not ok\s+\d+|(?:^|\n)\s*(?:#|ℹ)\s+fail\s+[1-9]|✖/
+
+function testPathsIn(line: string): string[] {
+  return [...line.matchAll(TEST_PATH)].map(match => match[1]).filter((path): path is string => Boolean(path))
+}
+
+function rawFailingTestPaths(input: string): readonly string[] {
+  const lines = normalizedLogLines(input)
+  const paths: string[] = []
+  lines.forEach((line, index) => {
+    if (!TAP_NOT_OK.test(line)) return
+    for (const next of lines.slice(index + 1, index + 16)) {
+      if (TAP_BLOCK_END.test(next)) break
+      const location = TAP_LOCATION.exec(next)
+      if (location) { paths.push(...testPathsIn(location[1])); break }
+    }
+  })
+  if (!paths.length && FAILURE_SIGNAL.test(input)) {
+    for (const line of lines) if (TEST_STACK_FRAME.test(line)) paths.push(...testPathsIn(line))
+  }
+  return paths
+}
+
 function failingTestPaths(input: string): readonly string[] {
   const paths: string[] = []
-  for (const line of failingSectionLines(input)) {
-    for (const match of line.matchAll(TEST_PATH)) {
-      const path = match[1]
-      if (path) paths.push(`saas/${path}`)
-    }
-  }
-  return unique(paths, 12)
+  for (const line of failingSectionLines(input)) paths.push(...testPathsIn(line))
+  if (!paths.length) paths.push(...rawFailingTestPaths(input))
+  return unique(paths.map(path => `saas/${path}`), 12)
 }
 
 function sourcePaths(input: string): readonly string[] {

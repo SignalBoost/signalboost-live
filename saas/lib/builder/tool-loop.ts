@@ -462,7 +462,7 @@ export class BuilderToolLoop {
     // Do not mistake "complete/implement the tests" for a repair of files that were supplied.
     // Explicit defect reports still require inspectable source before any repair claim.
     const freshImplementation = !files.length && !saved
-      && /^(?:(?:please|now)\\s+)*(?:complete|implement|create|build|write|generate)\\b/i.test(input.objective.trim())
+      && /^(?:(?:please|now)\s+)*(?:complete|implement|create|build|write|generate)\b/i.test(input.objective.trim())
       && !/(?:\\b(?:fix|repair|debug|broken|failing|failed|regression|existing)\\b|(?:error|exception|traceback)\\s*:)/i.test(input.objective)
     if (repairObjective && freshImplementation) repairObjective = false
     if (repairObjective && !files.length && !saved) return { ok: false, error: 'builder_source_required', trace }

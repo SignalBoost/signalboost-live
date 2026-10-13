@@ -826,7 +826,7 @@ export class BuilderToolLoop {
         trace.push({ round, toolId: 'run', input: action.input, ok: false,
           error: 'builder_test_evidence_insufficient: update the test file to execute and report the requested test count before rerunning' })
         // Permit a bounded repair round, with run unavailable until a source change.
-        if (++gateNudges > 2) return { ok: false, error: 'builder_test_evidence_insufficient', trace }
+        if (++gateNudges > 1) return { ok: false, error: 'builder_test_evidence_insufficient', trace }
         continue
       }
       if ((mutation && completedMutations.has(fingerprint))

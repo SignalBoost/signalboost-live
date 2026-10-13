@@ -1,2 +1,2 @@
-base_sha=639f5fbd78d1ebf3925491ebd65f26d1b5ec86d8
-branch=fix/builder-passing-proof-repeat-stall-20261012
+base_sha=6b6ed571f51dcb885374f5bd6daf36b23c1b7704
+branch=fix/builder-passing-proof-proving-command-20261012

@@ -109,6 +109,19 @@ test('a resident that follows the step reproduces the defect, repairs it, and pa
   assert.ok(!result.trace.some(entry => String(entry.error || '').startsWith('builder_repeated_tool_call:')))
 })
 
+test('a passing diagnostic command is not proof that the defect was not reproduced', async () => {
+  const prompts: string[] = []
+  const ai = { async generate(input: { prompt: string }) {
+    prompts.push(input.prompt)
+    if (prompts.length === 1) return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node --version' } })
+    return JSON.stringify({ type: 'tool', toolId: 'read_file', input: { path: prompts.length % 2 ? 'lib/gate.ts' : 'lib/advisory.ts' } })
+  } }
+  const result = await run(ai, countingRunner().runner)
+  assert.equal(result.ok, false)
+  assert.equal('error' in result ? result.error : '', 'builder_stalled_repeated_inspection')
+  assert.ok(!prompts.some(prompt => prompt.includes(NOT_REPRODUCED_STEP)), 'a version check never claims the defect is unreproduced')
+})
+
 test('a stall that is not a passing-proof case keeps the stalled-inspection result', async () => {
   const prompts: string[] = []
   const ai = { async generate(input: { prompt: string }) {

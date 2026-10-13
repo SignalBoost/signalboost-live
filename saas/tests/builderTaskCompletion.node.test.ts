@@ -45,6 +45,25 @@ test('plain Node scripts must prove all four requested tests before completion',
   assert.equal(builderTaskContract('Run node --test test.js and verify at least 10 tests pass.').minimumTests, 10)
 })
 
+test('repeated denied inspections stop before exhausting the entire model budget', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('stalled-workspace', 'index.js', 'module.exports = 1')
+  let calls = 0
+  const result = await new BuilderToolLoop({
+    async generate() {
+      calls++
+      return action('read_file', { path: 'index.js' })
+    },
+  }, workspace, { async run() { assert.fail('should not run') } }).run({
+    objective: 'Inspect index.js and fix the failing implementation.',
+    workspaceId: 'stalled-workspace',
+    maxRounds: 96,
+  })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.equal(result.error, 'builder_stalled_repeated_inspection')
+  assert.ok(calls <= 15, `should stop repeated read requests, got ${calls}`)
+})
+
 test('the reported new build is not an existing repair despite error requirements and conditional recovery', () => {
   assert.equal(isRepairObjective(objective), false)
   for (const request of ['Fix expenses.js.', 'Repair the broken CLI.', 'Create a regression test and fix the bug.', 'Fixed expenses.js.', 'The program crashes.']) assert.equal(isRepairObjective(request), true, request)

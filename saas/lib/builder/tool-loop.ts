@@ -110,15 +110,18 @@ function verifiedTestOnlyChange(
   if (trace.slice(0, mutations[0].index).some(item => isExecutedBuilderRun(item) && !item.ok)) return null
   if (!progress.satisfied || !progress.testsSatisfied) return null
   const lastChange = mutations[mutations.length - 1].index
+  const changedTests = [...new Set(mutations.map(({ item }) => toolPath(item.input)))]
+  // The passing run must execute every changed test file: a passing run of some other suite proves nothing about it.
   const proof = trace.slice(lastChange + 1).findLast(item => isExecutedBuilderRun(item) && item.ok
-    && isBuilderTestRunnerCommand(item.input.command) && (!task.commands.length || task.commands.some(command =>
+    && isBuilderTestRunnerCommand(item.input.command)
+    && changedTests.every(path => text(item.input.command).split(/\s+/).some(arg => arg.replace(/^\.\//, '') === path))
+    && (!task.commands.length || task.commands.some(command =>
       item.input.command === command || item.input.requestedCommand === command)))
   const stdout = proof && isRecord(proof.output) ? text(proof.output.stdout) : ''
   const passed = Number(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)?.[1] || 0)
   const failed = /(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)?.[1]
   if (!proof || passed < Math.max(1, task.minimumTests) || failed !== '0') return null
-  const paths = [...new Set(mutations.map(({ item }) => toolPath(item.input)))]
-  return `Updated ${paths.join(', ')} (test files only) and verified with ${text(proof.input.command)}: ${passed} passed, 0 failed.`
+  return `Updated ${changedTests.join(', ')} (test files only) and verified with ${text(proof.input.command)}: ${passed} passed, 0 failed.`
 }
 
 const safeJson = (value: unknown, maximum = 18_000) => {

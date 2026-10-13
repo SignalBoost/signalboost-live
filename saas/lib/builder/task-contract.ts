@@ -56,11 +56,12 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
     if (runList && /^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command) && command.length <= 2_000) commands.add(command)
     else if (line && !/^```/.test(line)) runList = false
   }
-  // Only Node's test runner has a summary parser here; other runtimes retain command proof.
-  const count = [...commands].some(command => /^node\s+.*--test\b/.test(command))
-    ? /\b(?:at least|minimum(?: of)?)\s+(\d+)\s+(?:(?:meaningful|automated|unit|integration|regression)\s+)*tests\b/i.exec(objective)
-    : null
-  return { files: [...files], commands: [...commands], requiresRun: commands.size > 0 || /\b(?:run|execute|test|verify)\b/i.test(objective), minimumTests: count ? Number(count[1]) : 0 }
+  const explicitCount = /\b(?:at least|minimum(?: of)?|all|verify|confirm)\s+(\d+)\s+(?:(?:meaningful|automated|unit|integration|regression)\s+)*tests?\b/i.exec(objective)
+  const wordCount = /\b(?:all|verify|confirm)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+tests?\b/i.exec(objective)
+  const words: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 }
+  const hasTestCommand = [...commands].some(command => /\b(?:test|spec)\b|--test\b/i.test(command)) || /\bnode\s+(?:--test\s+)?[^\s\n]*(?:test|spec)[^\s\n]*\.(?:[cm]?js|ts)\b/i.test(objective)
+  const minimumTests = hasTestCommand ? (explicitCount ? Number(explicitCount[1]) : wordCount ? words[wordCount[1].toLowerCase()] : 0) : 0
+  return { files: [...files], commands: [...commands], requiresRun: commands.size > 0 || /\b(?:run|execute|test|verify)\b/i.test(objective), minimumTests }
 }
 
 export function builderTaskProgress(contract: BuilderTaskContract, paths: readonly string[], trace: readonly BuilderToolTrace[]) {
@@ -80,7 +81,11 @@ export function builderTaskProgress(contract: BuilderTaskContract, paths: readon
     const stdout = output.stdout || ''
     const passes = /(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)
     const failures = /(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)
-    return Number(passes?.[1] || 0) >= contract.minimumTests && failures?.[1] === '0'
+    if (passes) return Number(passes[1]) >= contract.minimumTests && failures?.[1] === '0'
+    // A plain node test.js may print one success line per assertion rather than a TAP summary.
+    // Count distinct numbered assertions; a zero exit alone cannot prove four requested tests.
+    const numbered = new Set([...stdout.matchAll(/(?:^|\n)\s*(?:test\s*#?\s*(\d+)\s*(?:passed|ok)|(?:ok|passed)\s+test\s*#?\s*(\d+))\b/gi)].map(m => m[1] || m[2]))
+    return numbered.size >= contract.minimumTests
   })
   return {
     missingFiles,

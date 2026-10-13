@@ -34,6 +34,17 @@ const passing = { exitCode: 0, stdout: '# tests 10\n# pass 10\n# fail 0\n', stde
 const entry = (command: string, output = passing): BuilderToolTrace => ({ round: 1, toolId: 'run', input: { command }, ok: output.exitCode === 0, output })
 const task = builderTaskContract(objective)
 
+test('plain Node scripts must prove all four requested tests before completion', () => {
+  const contract = builderTaskContract('Update test.js and run node test.js. Verify all four tests pass.')
+  assert.equal(contract.minimumTests, 4)
+  const stdoutTwo = 'Testing multiply function...\nTest 1 passed: multiply(3, 4)\nTest 2 passed: multiply(0, 5)\nTests completed.\n'
+  const stdoutFour = stdoutTwo + 'Test 3 passed: square(5)\nTest 4 passed: square(0)\n'
+  const command = 'node test.js'
+  assert.equal(builderTaskProgress(contract, [], [entry(command, { ...passing, stdout: stdoutTwo })]).satisfied, false)
+  assert.equal(builderTaskProgress(contract, [], [entry(command, { ...passing, stdout: stdoutFour })]).satisfied, true)
+  assert.equal(builderTaskContract('Run node --test test.js and verify at least 10 tests pass.').minimumTests, 10)
+})
+
 test('the reported new build is not an existing repair despite error requirements and conditional recovery', () => {
   assert.equal(isRepairObjective(objective), false)
   for (const request of ['Fix expenses.js.', 'Repair the broken CLI.', 'Create a regression test and fix the bug.', 'Fixed expenses.js.', 'The program crashes.']) assert.equal(isRepairObjective(request), true, request)

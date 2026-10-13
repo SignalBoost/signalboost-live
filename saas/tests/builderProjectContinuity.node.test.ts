@@ -63,6 +63,18 @@ test('new projects, uploads, imports and ordinary questions cannot silently reus
   assert.deepEqual(await selectBuilderProject({ ...input, objective: 'Add a calendar event' }, async () => job), {})
 })
 
+test('complete and verify existing tests reuses the prior workspace instead of creating an empty one', async () => {
+  const previous = { ...job, status: 'failed', result: { files: ['math.test.ts'], trace: [] } }
+  const selected = await selectBuilderProject({
+    ...input, objective: 'Complete and verify exactly four tests for multiply() and square().',
+  }, async target => {
+    assert.deepEqual(target, { userId, conversationId })
+    return previous
+  })
+  assert.equal(selected.workspaceId, workspaceId)
+  assert.equal(selected.context?.previousJobId, job.id)
+})
+
 test('history cannot cross owners, conversations or the platform repository boundary', async () => {
   for (const candidate of [
     { ...job, userId: workspaceId }, { ...job, conversationId: workspaceId },

@@ -9,6 +9,7 @@ import { stripTypeScriptTypes } from 'node:module'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { builderTaskContract, builderTaskProgress } from '../lib/builder/task-contract.ts'
+import { formatBuilderTestEvidenceGuidance } from '../lib/builder/cli-test-guidance.ts'
 import { isRepairObjective } from '../lib/builder/regression-gate.ts'
 import { formatBuilderOperatorRepairReply } from '../lib/builder/operator-narration.ts'
 import type { BuilderToolTrace } from '../lib/builder/contracts.ts'
@@ -33,6 +34,15 @@ const answer = JSON.stringify({ type: 'answer', answer: 'Complete.' })
 const passing = { exitCode: 0, stdout: '# tests 10\n# pass 10\n# fail 0\n', stderr: '', timedOut: false }
 const entry = (command: string, output = passing): BuilderToolTrace => ({ round: 1, toolId: 'run', input: { command }, ok: output.exitCode === 0, output })
 const task = builderTaskContract(objective)
+
+test('Node test guidance rejects console.assert and requires countable fail-closed evidence', () => {
+  const guidance = formatBuilderTestEvidenceGuidance('Update test.js and verify all four tests pass.')
+  assert.match(guidance, /Do NOT use console.assert/)
+  assert.ok(guidance.includes('node:assert/strict'))
+  assert.match(guidance, /nonzero exit/)
+  assert.match(guidance, /per-test success output/)
+  assert.equal(formatBuilderTestEvidenceGuidance('Update README.md only.'), '')
+})
 
 test('plain Node scripts must prove all four requested tests before completion', () => {
   const contract = builderTaskContract('Update test.js and run node test.js. Verify all four tests pass.')

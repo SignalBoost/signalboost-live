@@ -101,3 +101,15 @@ test('durable Builder POST does not inherit the foreground Assistant abort signa
   assert.match(direct, /return responseFromPayload\(\{[\s\S]*?status: 'running'/)
   assert.equal((direct.match(/fetchImpl\('\/api\/builder',\s*\{/g) || []).length, 1)
 })
+
+test('accepted Builder and operational repair responses return 202 without waiting for terminal polling', () => {
+  const direct = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
+  const repair = transport.slice(transport.indexOf('async function executeOperationalRepairFromConcierge('), transport.indexOf('async function executeArtifactFromConcierge('))
+  for (const flow of [direct, repair]) {
+    assert.doesNotMatch(flow, /await pollBuilderJob\(/)
+    assert.match(flow, /status: 'running'/)
+    assert.match(flow, /\}, 202, '(?:builder-job-running|operational-repair-running)'\)/)
+  }
+  assert.doesNotMatch(direct, /builder-job-terminal/)
+  assert.doesNotMatch(repair, /operational-repair-terminal/)
+})

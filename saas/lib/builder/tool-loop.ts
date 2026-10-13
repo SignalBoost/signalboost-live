@@ -418,7 +418,9 @@ export class BuilderToolLoop {
     if (saved && (saved.version !== 1 || saved.workspaceId !== input.workspaceId || saved.objectiveDigest !== checkpointDigest(input.objective))) {
       return { ok: false, error: 'builder_checkpoint_scope_mismatch', trace: [] }
     }
-    const initialListing = await this.workspace.listFiles(input.workspaceId)
+    // A previous job's human-readable receipt is not executable project source.
+    const initialListing = (await this.workspace.listFiles(input.workspaceId))
+      .filter(file => file.path !== 'builder-result.txt')
     const files = (await Promise.all(initialListing.map(file => this.workspace.readFile(input.workspaceId, file.path))))
       .filter((file): file is BuilderFile => file !== null)
     if (saved) {
@@ -924,12 +926,15 @@ export class BuilderToolLoop {
       workRounds += 1
       try {
         let output: unknown
-        if (action.toolId === 'list_files') output = await this.workspace.listFiles(input.workspaceId)
+        if (action.toolId === 'list_files') output = (await this.workspace.listFiles(input.workspaceId))
+          .filter(file => file.path !== 'builder-result.txt')
         if (action.toolId === 'search_files') {
           if (typeof this.workspace.searchFiles !== 'function') throw new Error('builder_search_unavailable')
           output = await this.workspace.searchFiles(input.workspaceId, text(action.input.query))
         }
         if (action.toolId === 'read_file') {
+          // Job receipts must not masquerade as source or consume coding inspection rounds.
+          if (toolPath(action.input) === 'builder-result.txt') throw new Error('builder_result_artifact_not_source')
           const file = await this.workspace.readFile(input.workspaceId, toolPath(action.input))
           if (!file) throw new Error('builder_file_not_found')
           const start = action.input.startLine === undefined ? 1 : Number(action.input.startLine)

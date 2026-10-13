@@ -35,7 +35,8 @@ for (const locale of PUBLIC_LOCALES) {
       assert.equal(metadata.twitter.description, metadata.description)
       assert.equal(metadata.robots.index, true)
       assert.equal(metadata.alternates.languages[locale], url)
-      assert.equal(Object.keys(metadata.alternates.languages).length, 12)
+      assert.equal(Object.keys(metadata.alternates.languages).length, 23)
+      assert.equal(metadata.alternates.languages[({ en:'en-US', es:'es-ES', pt:'pt-BR', pl:'pl-PL', ru:'ru-RU', de:'de-DE', fr:'fr-FR', it:'it-IT', ja:'ja-JP', ko:'ko-KR', ar:'ar-SA' } as Record<string,string>)[locale]], url)
       for (const alternate of PUBLIC_LOCALES) {
         assert.equal(metadata.alternates.languages[alternate], publicMetadata(alternate, topic).alternates.canonical)
         assert.deepEqual(metadata.alternates.languages, publicMetadata(alternate, topic).alternates.languages)

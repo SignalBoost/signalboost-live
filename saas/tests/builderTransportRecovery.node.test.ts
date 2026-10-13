@@ -91,3 +91,13 @@ test('accepted Builder jobs detach status polling from foreground AbortSignal', 
   assert.match(repair, /operational-repair-transport-background-job/)
   assert.equal((direct.match(/fetchImpl\('\/api\/builder',\s*\{/g) || []).length, 1)
 })
+
+test('durable Builder POST does not inherit the foreground Assistant abort signal', () => {
+  const direct = transport.slice(transport.indexOf('async function executeBuilderFromConcierge('), transport.indexOf('async function executeOperationalRepairFromConcierge('))
+  const enqueue = direct.slice(direct.indexOf("fetchImpl('/api/builder'"), direct.indexOf('  } catch (error) {'))
+  assert.match(enqueue, /method: 'POST'/)
+  assert.doesNotMatch(enqueue, /\bsignal\s*,/)
+  assert.match(enqueue, /body: JSON\.stringify\(\{ objective, files: builderFilesFromBody\(body\), conversationId \}\)/)
+  assert.match(direct, /const terminal = await pollBuilderJob\(fetchImpl, jobId\)/)
+  assert.equal((direct.match(/fetchImpl\('\/api\/builder',\s*\{/g) || []).length, 1)
+})

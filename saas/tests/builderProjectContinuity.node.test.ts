@@ -55,6 +55,8 @@ test('continued project reads current source, preserves it and produces fresh No
 test('new projects, uploads, imports and ordinary questions cannot silently reuse history', async () => {
   for (const request of [
     { ...input, objective: 'Create a new project with total.js' },
+    { ...input, objective: 'Build a complete working order management application from scratch in a new isolated workspace; fix failing tests and verify the app.' },
+    { ...input, objective: 'Create a fresh isolated project with total.js and tests' },
     { ...input, objective: 'Update a different app' },
     { ...input, objective: 'Explain total.js' },
     { ...input, hasNewSource: true }, { ...input, repositoryImport: true },

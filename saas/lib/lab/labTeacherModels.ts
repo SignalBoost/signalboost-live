@@ -19,7 +19,7 @@ const NON_TEXT_NAME_TOKENS: ReadonlySet<string> = new Set([
 ])
 // OpenAI models that only run with a tool turned on (computer use, web search, deep research). A teacher sends plain
 // prompts with no tools, so these fail. Other providers serve similarly named models without that requirement.
-const OPENAI_TOOL_ONLY_NAME_TOKENS: ReadonlySet<string> = new Set(['computer', 'search', 'research'])
+const OPENAI_TOOL_ONLY_NAME = /^computer-use(-|$)|-deep-research(-|$)|-search-(preview|api)(-|$)/
 const TOGETHER_TEXT_TYPES: ReadonlySet<string> = new Set(['chat', 'language', 'code'])
 
 const cleanId = (value: unknown): value is string =>
@@ -39,9 +39,16 @@ function declaredNonText(item: Record<string, unknown>, provider: string): boole
   return false
 }
 
+// An OpenAI fine-tune id is ft:<base>:<org>:<customer suffix>:<id>. Only the base model says what kind of model it is;
+// the suffix is the customer's own label and must not hide their model.
+function baseModelName(id: string, provider: string): string {
+  return provider === 'openai' && id.startsWith('ft:') ? id.split(':')[1] ?? '' : id
+}
+
 export function isNonTextModelName(id: string, provider = ''): boolean {
-  return id.toLowerCase().split(/[^a-z0-9]+/).some(token =>
-    NON_TEXT_NAME_TOKENS.has(token) || (provider === 'openai' && OPENAI_TOOL_ONLY_NAME_TOKENS.has(token)))
+  const name = baseModelName(id, provider).toLowerCase()
+  if (provider === 'openai' && OPENAI_TOOL_ONLY_NAME.test(name)) return true
+  return name.split(/[^a-z0-9]+/).some(token => NON_TEXT_NAME_TOKENS.has(token))
 }
 
 export function collectTeacherModels(payload: unknown, provider: string): string[] {

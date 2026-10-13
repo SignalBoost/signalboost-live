@@ -515,7 +515,11 @@ export class BuilderToolLoop {
         ? progress.pendingCommands.find(command => !trace.slice(lastWorkspaceChange + 1)
           .some(item => item.toolId === 'run' && (item.input.command === command || item.input.requestedCommand === command)))
         : undefined
-      const currentStep = repairMutationRequired
+      const coverageRepairRequired = task.minimumTests > 0 && !progress.testsSatisfied
+        && progress.pendingCommands.length === 0 && trace.some(item => item.toolId === 'run' && item.ok)
+      const currentStep = coverageRepairRequired
+        ? `CURRENT STEP: A command exited 0 but its output did not prove ${task.minimumTests} requested tests. Do NOT run again against unchanged files. Use read_file on the test source if not already inspected, then edit_file or write_file to add meaningful missing assertions and explicit per-test evidence. Preserve the existing passing tests. Once the file changes, the verification run can execute again.`
+        : repairMutationRequired
         ? 'CURRENT STEP: The defect is reproduced and the bounded diagnostic allowance is exhausted. Make the smallest justified edit/write now. Do not inspect more files and do not answer yet; verification will rerun after the mutation.'
         : chunks.size > 0 ? formatBuilderChunks(chunks)
         : passingProofBeforeChange
@@ -549,6 +553,7 @@ export class BuilderToolLoop {
         .filter(toolId => toolId !== blockedTool)
         .filter(toolId => !blockedInspectionTools.has(toolId))
         .filter(toolId => !repairMutationRequired || toolId === 'write_file' || toolId === 'edit_file')
+        .filter(toolId => !coverageRepairRequired || toolId !== 'run')
 
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -821,7 +826,9 @@ export class BuilderToolLoop {
         && task.minimumTests > 0 && !progress.testsSatisfied) {
         trace.push({ round, toolId: 'run', input: action.input, ok: false,
           error: 'builder_test_evidence_insufficient: update the test file to execute and report the requested test count before rerunning' })
-        return { ok: false, error: 'builder_test_evidence_insufficient', trace }
+        // Permit a bounded repair round, with run unavailable until a source change.
+        if (++gateNudges > 2) return { ok: false, error: 'builder_test_evidence_insufficient', trace }
+        continue
       }
       if ((mutation && completedMutations.has(fingerprint))
         || (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint))) {

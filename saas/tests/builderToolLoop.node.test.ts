@@ -98,7 +98,8 @@ test('Builder terminates verified four-test work without another inspection or m
   })
   assert.equal(result.ok, true)
   assert.equal(runs, 1)
-  assert.equal(modelCalls, 2)
+  // The host runs the declared proof once files exist; the model need not request it.
+  assert.equal(modelCalls, 1)
   assert.deepEqual(result.trace.map(item => item.toolId), ['write_file', 'run'])
 })
 

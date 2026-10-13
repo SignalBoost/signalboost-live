@@ -46,7 +46,7 @@ function commandOf(trace: BuilderToolTrace): string {
 
 /** A run refused as a repeat executed nothing; it is never evidence that a proof failed or passed. */
 export function isExecutedBuilderRun(item: BuilderToolTrace): boolean {
-  return item.toolId === 'run' && !String(item.error || '').startsWith('builder_repeated_tool_call:')
+  return item.toolId === 'run' && !/^(?:builder_repeated_tool_call:|builder_repository_broad_test_blocked)/.test(String(item.error || ''))
 }
 
 function normalizedCommand(trace: BuilderToolTrace): string {

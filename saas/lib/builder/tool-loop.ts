@@ -2,7 +2,7 @@ import { validBuilderDocumentationScope } from './documentation-intent.ts'
 import { captureBuilderSource } from './source-evidence.ts'
 // saas/lib/builder/tool-loop.ts
 import type { BuilderAiPort, BuilderBrowserCliPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderMcpReadPort, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
-import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
+import { evaluateRegressionGate, isBuilderTestRunnerCommand, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 import { formatBuilderCognitiveGuidance } from './cognitive-application.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
@@ -479,7 +479,8 @@ export class BuilderToolLoop {
       // the same source proves nothing new; the next useful step is a regression test that fails on the defect.
       const passingProofBeforeChange = repairObjective && latestFailedRunIndex < 0
         && !trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
-        ? [...trace].reverse().find(item => item.toolId === 'run' && item.ok)
+        // Only a proving command (test, typecheck, build) can show the defect is absent; `node --version` cannot.
+        ? [...trace].reverse().find(item => item.toolId === 'run' && item.ok && isBuilderTestRunnerCommand(item.input.command))
         : undefined
       let consecutiveRepeatRejections = 0
       for (let index = trace.length - 1; index >= 0

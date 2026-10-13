@@ -10,6 +10,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
+import { isBuilderTestRunnerCommand } from '../lib/builder/regression-gate.ts'
 
 const OBJECTIVE = 'Fix the power stabilization release gate so the advisory diagnosis answer is correct.'
 const PROOF = 'node --experimental-strip-types --test regression/gate.node.test.ts'
@@ -107,6 +108,32 @@ test('a resident that follows the step reproduces the defect, repairs it, and pa
     'run:true', 'write_file:true', 'run:false', 'edit_file:true', 'run:true',
   ])
   assert.ok(!result.trace.some(entry => String(entry.error || '').startsWith('builder_repeated_tool_call:')))
+})
+
+for (const diagnostic of ['node --version', 'echo test', 'rg test src', 'node scripts/print-env.js']) {
+  test(`a passing diagnostic (${diagnostic}) is not proof that the defect was not reproduced`, async () => {
+    const prompts: string[] = []
+    const ai = { async generate(input: { prompt: string }) {
+      prompts.push(input.prompt)
+      if (prompts.length === 1) return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: diagnostic } })
+      return JSON.stringify({ type: 'tool', toolId: 'read_file', input: { path: prompts.length % 2 ? 'lib/gate.ts' : 'lib/advisory.ts' } })
+    } }
+    const result = await run(ai, countingRunner().runner)
+    assert.equal(result.ok, false)
+    assert.equal('error' in result ? result.error : '', 'builder_stalled_repeated_inspection')
+    assert.ok(!prompts.some(prompt => prompt.includes(NOT_REPRODUCED_STEP)), 'a diagnostic never claims the defect is unreproduced')
+  })
+}
+
+test('only commands that invoke a test runner, test file, typecheck or build count as a passing proof', () => {
+  for (const command of [PROOF, 'node --test', 'node --import ./scripts/test-alias-loader.mjs --test tests/a.node.test.ts',
+    'node slug.test.js', 'npx vitest run', 'npm test', 'pnpm run typecheck', 'npx tsc --noEmit', 'next build']) {
+    assert.equal(isBuilderTestRunnerCommand(command), true, command)
+  }
+  for (const command of ['node --version', 'echo test', 'rg test src', 'node scripts/print-env.js', 'git status',
+    'cat src/a.test.ts', 'node scripts/print-env.js --test']) {
+    assert.equal(isBuilderTestRunnerCommand(command), false, command)
+  }
 })
 
 test('a stall that is not a passing-proof case keeps the stalled-inspection result', async () => {

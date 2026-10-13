@@ -9,6 +9,15 @@ export function isBuilderProvingCommand(command: unknown): boolean {
   return PROOF_COMMAND.test(String(command || '').trim())
 }
 
+// Stricter than PROOF_COMMAND: the command itself must invoke a test runner, a test file, a typecheck or a build.
+// A passing run of this form is the only evidence that can say a defect is absent; `echo test`, `rg test src` or
+// `node scripts/print-env.js` say nothing about it.
+const TEST_RUNNER_COMMAND = /^(?:node(?:\s+(?:--(?:import|require|loader|experimental-loader)[=\s]\S+|-[\w-]+(?:=\S+)?))*\s+(?:--test\b|[\w./-]+\.(?:test|spec)\.[cm]?[jt]sx?(?:\s|$))|(?:npx\s+)?(?:vitest|jest|mocha|tap|tsc)\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|typecheck|type-check|build)\b|(?:npx\s+)?next\s+build\b)/i
+
+export function isBuilderTestRunnerCommand(command: unknown): boolean {
+  return TEST_RUNNER_COMMAND.test(String(command || '').trim())
+}
+
 const REPAIR_WORDS = /\b(?:fix(?:es|ed|ing)?|repair(?:s|ed|ing)?|correct(?:s|ed|ing)?|debug|bug|bugs|error|errors|failure|failures|broken|regression|regressions|crash(?:es|ed|ing)?|fail(?:s|ed|ing)?|defect|defects|misbehav(?:es|ing)?|malfunction(?:s|ing)?)\b/i
 
 const CREATION_DIRECTIVE = /^(?:please\s+|can\s+you\s+|could\s+you\s+|i\s+need\s+(?:you\s+to\s+)?|i\s+want\s+(?:you\s+to\s+)?|help\s+me\s+)*(?:build|create|write|implement|generate|scaffold|produce|make|design)\b/i

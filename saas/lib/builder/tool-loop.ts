@@ -458,6 +458,13 @@ export class BuilderToolLoop {
     let repairObjective = testSuiteModernization ? false : (saved?.repairObjective ?? isRepairObjective(gateObjective))
     const extendingProject = Boolean(documentationPaths) || Boolean(input.projectContext) && !isRepairObjective(input.objective)
       && /^(?:(?:please|now|then|also)\s+|(?:can|could|would)\s+you\s+)*(?:update|edit|modify|extend|change|refactor|add|remove|replace)\b/i.test(input.objective)
+    // A fresh workspace may legitimately be the starting point for a requested implementation.
+    // Do not mistake "complete/implement the tests" for a repair of files that were supplied.
+    // Explicit defect reports still require inspectable source before any repair claim.
+    const freshImplementation = !files.length && !saved
+      && /^(?:(?:please|now)\\s+)*(?:complete|implement|create|build|write|generate)\\b/i.test(input.objective.trim())
+      && !/(?:\\b(?:fix|repair|debug|broken|failing|failed|regression|existing)\\b|(?:error|exception|traceback)\\s*:)/i.test(input.objective)
+    if (repairObjective && freshImplementation) repairObjective = false
     if (repairObjective && !files.length && !saved) return { ok: false, error: 'builder_source_required', trace }
     let writeCount = saved?.writeCount || 0, runCount = saved?.runCount || 0, gateNudges = saved?.gateNudges || 0
     let browserCliStepCount = 0

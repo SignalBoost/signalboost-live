@@ -32,6 +32,36 @@ class ScriptedBuilderAi implements BuilderAiPort {
   async generate() { return this.actions[this.cursor++] ?? null }
 }
 
+test('Builder can begin a requested new implementation in an empty workspace', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let calls = 0
+  const ai: BuilderAiPort = { async generate() {
+    calls++
+    return JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'math.js', content: 'export const multiply = (a, b) => a * b' } })
+  } }
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Complete and verify exactly four tests for multiply() and square(); invalid inputs must fail.',
+    workspaceId: 'user:fresh-implementation',
+    maxRounds: 1,
+  })
+  assert.equal(calls, 1)
+  assert.notEqual('error' in result ? result.error : '', 'builder_source_required')
+  assert.equal((await workspace.readFile('user:fresh-implementation', 'math.js'))?.content, 'export const multiply = (a, b) => a * b')
+})
+
+test('Builder still refuses an unsupported repair in an empty workspace', async () => {
+  let calls = 0
+  const ai: BuilderAiPort = { async generate() { calls++; return '{"type":"answer","answer":"fixed"}' } }
+  const runner: BuilderRunnerPort = { async run() { throw new Error('must not execute') } }
+  const result = await new BuilderToolLoop(ai, new InMemoryBuilderWorkspace(), runner).run({
+    objective: 'Fix the broken tests and repair the failing multiply implementation.',
+    workspaceId: 'user:missing-repair-source',
+  })
+  assert.equal(calls, 0)
+  assert.equal('error' in result ? result.error : '', 'builder_source_required')
+})
+
 test('Builder writes a user file, runs it, and returns only after tool evidence', async () => {
   const workspace = new InMemoryBuilderWorkspace(() => 1)
   const runner: BuilderRunnerPort = { async run(input) { assert.equal(input.workspaceId, 'user:1'); assert.equal(input.files[0]?.path, 'hello.js'); return { exitCode: 0, stdout: 'hello\n', stderr: '', timedOut: false } } }

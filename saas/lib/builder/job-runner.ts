@@ -311,9 +311,28 @@ async function runBuilderPlaywrightCliCanary(job: BuilderJobRecord): Promise<voi
 async function runBuilderJobInsideHarness(jobId: string, userId: string): Promise<void> {
   let job: BuilderJobRecord | null = null
   let lastTrace: readonly BuilderToolTrace[] = []
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   try {
     job = await claimBuilderJob(jobId, userId)
     if (!job) return
+    // Fenced observability writes never extend the existing six-minute execution lease.
+    // The worker remains authoritative for its lifecycle, regardless of telemetry health.
+    const activeJob = job
+    const db = getAdminSupabase()
+    const heartbeat = async () => {
+      const { error } = await db.rpc('heartbeat_builder_job', {
+        p_job_id: activeJob.id, p_user_id: activeJob.userId, p_generation: activeJob.claimGeneration,
+      })
+      if (error) console.warn('[builder_job_heartbeat_failed]', { jobId, code: error.code })
+    }
+    await db.from('builder_jobs').update({
+      last_started_at: new Date().toISOString(), last_heartbeat_at: new Date().toISOString(),
+    }).eq('id', jobId).eq('user_id', userId).eq('claim_generation', job.claimGeneration)
+      .eq('status', 'running').then(({ error }) => {
+        if (error) console.warn('[builder_job_start_telemetry_failed]', { jobId, code: error.code })
+      })
+    heartbeatTimer = setInterval(() => { void heartbeat().catch(() => undefined) }, 30_000)
+    heartbeatTimer.unref?.()
 
     if (job.claimGeneration === 1 && typeof job.metadata.approvedProposalFingerprint === 'string'
       && await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) !== job.metadata.approvedProposalFingerprint) {
@@ -611,6 +630,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         })
       })
     }
+  } finally {
+    if (heartbeatTimer) clearInterval(heartbeatTimer)
   }
 }
 

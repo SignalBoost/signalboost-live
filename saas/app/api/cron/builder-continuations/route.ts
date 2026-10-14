@@ -118,7 +118,37 @@ export async function GET(request: Request) {
   // that one GPU, pushed healthy requests past the 120s timeout, and converted queueing into paid
   // DeepInfra fallback. Execute one durable continuation per scheduler tick; later jobs remain queued.
   const selected = jobs[0] || null
-  if (selected) await runBuilderJob(selected.id, selected.userId)
+  let execution: { jobId: string; status: string; durationMs: number; errorCode: string | null } | null = null
+  if (selected) {
+    const startedAt = Date.now()
+    const context = { jobId: selected.id, userId: selected.userId, candidates: jobs.length }
+    // Emit structured lifecycle records without changing the atomic claim or queue ordering.
+    console.info('[builder.continuation.selected]', context)
+    console.info('[builder.continuation.started]', { ...context, startedAt: new Date(startedAt).toISOString() })
+    try {
+      await runBuilderJob(selected.id, selected.userId)
+      // A worker may pause/requeue or finish; returning from runBuilderJob does not imply success.
+      const { data, error } = await admin.from('builder_jobs')
+        .select('status,error,claim_generation,updated_at')
+        .eq('id', selected.id).eq('user_id', selected.userId).maybeSingle()
+      if (error) throw new Error('builder_continuation_status_read_failed')
+      const status = String(data?.status || 'unknown')
+      const errorCode = typeof data?.error === 'string' ? data.error.slice(0, 160) : null
+      execution = { jobId: selected.id, status, durationMs: Date.now() - startedAt, errorCode }
+      const details = { ...context, ...execution, claimGeneration: data?.claim_generation, updatedAt: data?.updated_at }
+      if (status === 'failed') console.error('[builder.continuation.failed]', details)
+      else console.info('[builder.continuation.completed]', details)
+    } catch (error) {
+      const errorCode = error instanceof Error ? error.message.slice(0, 160) : 'unknown'
+      console.error('[builder.continuation.failed]', {
+        ...context, durationMs: Date.now() - startedAt, errorCode,
+      })
+      // Surface an unsuccessful scheduler tick so monitoring can alert; never mark the job
+      // failed here because its durable status is owned by the fenced job lifecycle.
+      return NextResponse.json({ ok: false, error: 'builder_continuation_execution_failed',
+        selectedJobId: selected.id, durationMs: Date.now() - startedAt }, { status: 500 })
+    }
+  }
 
   return NextResponse.json({
     ok: true,
@@ -126,6 +156,7 @@ export async function GET(request: Request) {
     competencyFailuresScanned: competencyReconciliation.scanned,
     competencyGapsFiled: competencyReconciliation.filed,
     executed: selected ? 1 : 0,
+    selectedJob: execution,
     deferred: Math.max(0, jobs.length - (selected ? 1 : 0)),
     productionRecoveryQueued: ownedRepairs.some(job => job.kind === 'production-recovery'),
     ownedSiteRepairQueued: ownedRepairs.some(job => job.kind === 'site'),

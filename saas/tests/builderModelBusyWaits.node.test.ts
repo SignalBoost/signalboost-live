@@ -48,6 +48,23 @@ test('a model still busy when the slice ends reports busy WITH this slice\'s pro
   assert.deepEqual((await workspace.listFiles('busy-pause')).map(file => file.path), ['hello.js'])
 })
 
+test('a timed-out model round also hands this slice\'s progress to the capacity re-queue and resumes by verifying', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let calls = 0
+  const ai = { async generate() {
+    calls += 1
+    if (calls === 1) return write('hello.js', "console.log('hi')\n")
+    throw new Error('builder_model_round_timeout')
+  } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: OBJECTIVE, workspaceId: 'timeout', shouldPause: () => false })
+  assert.equal(result.ok === false ? result.error : '', 'builder_model_round_timeout')
+  const checkpoint = result.ok === false ? result.checkpoint : undefined
+  assert.ok(checkpoint, 'Codex review of #4321: a null checkpoint would erase the earlier progress')
+  assert.equal(checkpoint.attempt, 1)
+  assert.equal(checkpoint.verificationPending, true, '#4323: completed writes are verified first on resume')
+  assert.deepEqual(checkpoint.trace.filter(item => item.toolId === 'write_file').map(item => item.input.path), ['hello.js'])
+})
+
 test('the saved progress resumes and the build continues after the model frees up', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let pauseNow = false
@@ -92,12 +109,14 @@ test('capacity is re-queued with the current progress before a work slice is spe
   const pause = runnerSource.indexOf('if (result.ok === false && result.checkpoint && job.claimGeneration < 4) {')
   assert.ok(requeue > 0 && pause > requeue, 're-queue for capacity comes before the ordinary pause')
   assert.equal(runnerSource.split('await deferSelfHealingCapacity(job, result.error, trace').length - 1, 1, 'one capacity re-queue on the tool-loop result path')
+  // No migration: the slice's checkpoint is stored on this exact running claim, then the existing
+  // four-argument deferral function re-queues the job (Production still runs that function).
   const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
-  assert.match(store, /p_checkpoint: input\.checkpoint \?\? null/)
-  const migration = readFileSync(new URL('../supabase/migrations/20261014020000_builder_capacity_deferral_keeps_progress.sql', import.meta.url), 'utf8')
-  assert.match(migration, /p_checkpoint jsonb default null/)
-  assert.match(migration, /checkpoint = p_checkpoint,/)
-  assert.match(migration, /drop function if exists public\.defer_builder_job_capacity\(uuid, uuid, integer, text\)/)
+  const defer = store.slice(store.indexOf('export async function deferBuilderJobForCapacity('), store.indexOf('export async function reconcileStaleBuilderJobs('))
+  assert.match(defer, /\.update\(\{ checkpoint: input\.checkpoint \?\? null \}\)/)
+  assert.match(defer, /\.eq\('status', 'running'\)\.eq\('claim_generation', input\.job\.claimGeneration\)/)
+  assert.ok(defer.indexOf('.update({ checkpoint') < defer.indexOf("db.rpc('defer_builder_job_capacity'"), 'progress is stored before the re-queue')
+  assert.doesNotMatch(defer, /p_checkpoint/, 'the RPC call matches the deployed four-argument function')
 })
 
 test('RunPod busy attempts assigned fallback before durable queueing', () => {

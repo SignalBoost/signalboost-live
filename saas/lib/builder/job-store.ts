@@ -30,7 +30,9 @@ export type BuilderJobRecord = Readonly<{
 export const BUILDER_JOB_STALE_AFTER_MS = 6 * 60 * 1000
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const JOB_SELECT = 'id,workspace_id,user_id,conversation_id,objective,job_kind,metadata,owner_authorized,status,result,error,history_message_id,created_at,started_at,finished_at,updated_at,claim_generation,checkpoint'
+// Status polls run every 2 s: never load the checkpoint (up to 4 MB) here. The verifying status reads the small
+// result.verificationPending flag the runner writes on pause (2026-10-14: #4324 added checkpoint, failing the deploy gate).
+const JOB_SELECT = 'id,workspace_id,user_id,conversation_id,objective,job_kind,metadata,owner_authorized,status,result,error,history_message_id,created_at,started_at,finished_at,updated_at,claim_generation'
 
 function serviceClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
@@ -162,17 +164,27 @@ export async function deferBuilderJobForCapacity(input: {
   job: BuilderJobRecord
   reason: 'builder_runpod_primary_busy' | 'builder_turn_timeout' | 'builder_model_round_timeout'
   // The progress of the slice that hit capacity. Null clears an older checkpoint: files written after it would make the
-  // resumed job fail with builder_checkpoint_workspace_changed (migration 20261014020000).
+  // resumed job fail with builder_checkpoint_workspace_changed.
   checkpoint?: BuilderLoopCheckpoint | null
 }): Promise<boolean> {
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
+  // Store this slice's progress first, fenced to this exact running claim, then re-queue through the existing
+  // deferral function. No database migration is needed: Production 2026-10-14 still ran the four-argument function,
+  // so a checkpoint argument made every capacity re-queue fail. If the re-queue is refused, the caller pauses or
+  // finishes the job and overwrites the checkpoint itself.
+  const { data: stored, error: storeError } = await db.from('builder_jobs')
+    .update({ checkpoint: input.checkpoint ?? null })
+    .eq('id', input.job.id).eq('user_id', input.job.userId)
+    .eq('status', 'running').eq('claim_generation', input.job.claimGeneration)
+    .select('id')
+  if (storeError) throw new Error(`builder_job_capacity_checkpoint: ${storeError.message}`)
+  if (!Array.isArray(stored) || stored.length !== 1) return false
   const { data, error } = await db.rpc('defer_builder_job_capacity', {
     p_job_id: input.job.id,
     p_user_id: input.job.userId,
     p_generation: input.job.claimGeneration,
     p_reason: input.reason,
-    p_checkpoint: input.checkpoint ?? null,
   })
   if (error) throw new Error(`builder_job_capacity_defer: ${error.message}`)
   return data === true

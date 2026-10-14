@@ -493,7 +493,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         ? 'Files written — verifying changes. Builder will continue automatically.'
         : 'Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)
       await pauseBuilderJob({ job, checkpoint: result.checkpoint, reply,
-        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
+        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace,
+          verificationPending: result.checkpoint.verificationPending === true } })
       return
     }
     const shouldExplain = Boolean(plan) || isRepairObjective(job.objective) || typeof job.metadata.proposalSourceJobId === 'string'

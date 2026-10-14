@@ -514,6 +514,17 @@ export class BuilderToolLoop {
       if (Buffer.byteLength(JSON.stringify(checkpoint)) > 4_000_000) return { ok: false, error: 'builder_checkpoint_too_large', trace }
       return { ok: false, error: 'builder_job_paused', trace, checkpoint }
     }
+    // Model capacity (a busy slot or a timed-out round) is not work: hand this slice's progress to the job runner's
+    // capacity re-queue so the resumed job continues from here. The round produced nothing and is not counted.
+    const capacityStop = async (reason: 'builder_runpod_primary_busy' | 'builder_model_round_timeout'): Promise<BuilderLoopResult> => {
+      attempt = Math.max(0, attempt - 1)
+      // #4323: after completed writes a timed-out round resumes by verifying the saved files first.
+      if (reason === 'builder_model_round_timeout' && writeCount > 0) verificationPending = true
+      const paused = await pause()
+      return paused.ok === false && paused.checkpoint ? { ...paused, error: reason } : paused
+    }
+    const capacityReason = (error: unknown): 'builder_runpod_primary_busy' | 'builder_model_round_timeout' | null =>
+      error instanceof Error && (error.message === 'builder_runpod_primary_busy' || error.message === 'builder_model_round_timeout') ? error.message : null
     const deadlineAtMs = Number(input.deadlineAtMs)
     const outOfTime = (): boolean => Number.isFinite(deadlineAtMs)
       && deadlineAtMs - Date.now() <= ROUND_RESERVE_MS
@@ -805,21 +816,14 @@ export class BuilderToolLoop {
               // The round produced nothing: it is redone after the wait or on resume, never counted as work.
               // Still busy when the slice ends: report busy with this slice's progress, so the job runner re-queues it
               // for capacity (bounded, outside the work-slice budget) and the resumed job continues from here.
-              if (input.shouldPause() || outOfTime()) {
-                attempt -= 1
-                const paused = await pause()
-                return paused.ok === false && paused.checkpoint ? { ...paused, error: 'builder_runpod_primary_busy' } : paused
-              }
+              if (input.shouldPause() || outOfTime()) return capacityStop('builder_runpod_primary_busy')
               await new Promise(resolve => setTimeout(resolve, MODEL_BUSY_RETRY_MS))
             }
           }
         } catch (error) {
           if (input.shouldPause && error instanceof Error && error.message === 'builder_turn_timeout') return pause()
-          if (input.shouldPause && error instanceof Error && error.message === 'builder_model_round_timeout' && writeCount > 0) {
-            verificationPending = true
-            attempt = Math.max(0, attempt - 1)
-            return pause()
-          }
+          const capacity = input.shouldPause ? capacityReason(error) : null
+          if (capacity) return capacityStop(capacity)
           if (!isOutputTruncation(error)) {
             return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
           }
@@ -827,6 +831,8 @@ export class BuilderToolLoop {
             response = await generateControl(controlBudget * 2, 'OUTPUT LIMIT RECOVERY: The previous response was truncated and NOTHING from it was written. Do not repeat a whole large file. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset and final:false; continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
           } catch (retryError) {
             if (input.shouldPause && retryError instanceof Error && retryError.message === 'builder_turn_timeout') return pause()
+            const retryCapacity = input.shouldPause ? capacityReason(retryError) : null
+            if (retryCapacity) return capacityStop(retryCapacity)
             if (isOutputTruncation(retryError)) return { ok: false, error: 'builder_model_output_limit', trace }
             return { ok: false, error: retryError instanceof Error ? retryError.message : 'builder_model_call_failed', trace }
           }

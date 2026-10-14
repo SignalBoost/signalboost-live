@@ -86,7 +86,7 @@ export async function GET(request: Request) {
           status: job.status,
           reply: job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'
-            : job.status === 'paused' && job.checkpoint?.verificationPending === true
+            : job.status === 'paused' && job.result?.verificationPending === true
               ? 'Files written — verifying changes. Builder will continue automatically.'
             : job.status === 'paused' ? 'Builder saved its progress and will continue automatically. Verification is not complete yet.' : runningReply(job.id),
         }, { status: 202 })

@@ -1,2 +1,2 @@
-base_sha=bc82e66ca6d01f640620ff28f7bb973f53019d6f
-branch=fix/builder-capacity-not-work-20261014
+base_sha=98ea6863f254617656260fabac612837bf161fa7
+branch=fix/builder-poll-window-tests-20261014

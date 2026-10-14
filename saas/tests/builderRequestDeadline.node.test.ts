@@ -31,12 +31,14 @@ test('background Builder work owns a deadline below Vercel maxDuration', () => {
   assert.match(runner, /finishBuilderJob/)
 })
 
-test('browser polls through the five-minute Builder job window without controlling execution', () => {
+// #4338 (2026-10-14): jobs now continue across many work slices, so the chat follows one durable job for about
+// eight minutes: at least one full 300 s worker window, still bounded, and never in control of execution.
+test('browser polls through at least one Builder worker window, bounded, without controlling execution', () => {
   const attempts = numericConstant(boundary, 'BUILDER_JOB_POLL_ATTEMPTS')
   const delay = numericConstant(boundary, 'BUILDER_JOB_POLL_DELAY_MS')
   const pollWindow = (attempts - 1) * delay
   assert.ok(pollWindow >= 290_000)
-  assert.ok(pollWindow < 300_000)
+  assert.ok(pollWindow <= 480_000)
   assert.match(boundary, /method: 'GET'/)
   assert.doesNotMatch(boundary, /const terminal = await pollBuilderJob\(/)
   assert.match(boundary, /POST already created a durable job and History row/)

@@ -501,8 +501,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     // Reaching a productive-slice ceiling is not a source failure. Atomically reset the
     // claim generation for a bounded continuation cycle while retaining the same job,
     // objective, workspace, trace and checkpoint. The database enforces age/cycle caps.
-    if (result.ok === false && result.checkpoint && builderSliceMadeProgress(job.checkpoint, result.checkpoint)
-      && job.claimGeneration >= 24) {
+    if (result.ok === false && result.checkpoint && job.claimGeneration >= 24
+      && (builderSliceMadeProgress(job.checkpoint, result.checkpoint)
+        || result.error === 'builder_runpod_primary_busy'
+        || result.error === 'builder_model_round_timeout')) {
       const reply = historyReply('Builder saved its work and is automatically continuing verification and remaining files.', job.workspaceId, files)
       if (await requeueBuilderContinuationCycle({ job, checkpoint: result.checkpoint, reply,
         result: { jobId: job.id, workspaceId: job.workspaceId, status: 'queued', reply, files, trace } })) return

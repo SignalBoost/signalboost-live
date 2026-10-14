@@ -22,13 +22,15 @@ function bounded(value: unknown, max = 120): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
-export function browserDiagnosticSummary(action: 'console' | 'requests', output: string): { clear: boolean; count: number } {
+export function browserDiagnosticSummary(action: 'console' | 'requests', output: string): { clear: boolean; count: number; complete: boolean } {
+  // The sandbox CLI caps stdout to 16 KiB; a full buffer may omit later failures.
+  const complete = output.length < 16_000
   const lines = output.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
   // CLI emits headings and an explicit no-events marker; do not treat headings as failures.
   const entries = lines.filter(line => action === 'console'
     ? /^(?:\[?error\]?\s*[:\-]|\[console\.error\]|(?:\d+\s+)?error\s*[:\-])/i.test(line)
     : /(?:\b(?:net::ERR_[A-Z_]+|HTTP\s+[45]\d\d|status\s*[:=]\s*[45]\d\d|\b[45]\d\d\s+(?:GET|POST|PUT|PATCH|DELETE)\b)\b)/i.test(line))
-  return { clear: entries.length === 0, count: entries.length }
+  return { clear: complete && entries.length === 0, count: entries.length, complete }
 }
 
 function observationDetail(result: {
@@ -84,14 +86,14 @@ export async function runBuilderPlaywrightCliLiveAcceptance(input: { targetUrl?:
       checks.push(Object.freeze({
         name: 'console_diagnostics',
         passed: consoleResult.ok && browserDiagnosticSummary('console', consoleResult.stdout).clear,
-        detail: `${observationDetail(consoleResult)}; observedErrors=${browserDiagnosticSummary('console', consoleResult.stdout).count}`,
+        detail: `${observationDetail(consoleResult)}; observedErrors=${browserDiagnosticSummary('console', consoleResult.stdout).count}; complete=${browserDiagnosticSummary('console', consoleResult.stdout).complete}`,
       }))
 
       const requests = await port.invoke({ action: 'requests' })
       checks.push(Object.freeze({
         name: 'network_diagnostics',
         passed: requests.ok && browserDiagnosticSummary('requests', requests.stdout).clear,
-        detail: `${observationDetail(requests)}; observedFailures=${browserDiagnosticSummary('requests', requests.stdout).count}`,
+        detail: `${observationDetail(requests)}; observedFailures=${browserDiagnosticSummary('requests', requests.stdout).count}; complete=${browserDiagnosticSummary('requests', requests.stdout).complete}`,
       }))
 
       const closed = await port.invoke({ action: 'close' })

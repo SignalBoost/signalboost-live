@@ -1218,6 +1218,7 @@ export class BuilderToolLoop {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: message, ...diagnose(message, workspacePaths) })
       }
     }
+    if (workRounds >= maxRounds && input.shouldPause) return pause()
     return { ok: false, error: workRounds >= maxRounds ? 'builder_round_budget_exhausted' : 'builder_stalled_repeated_inspection', trace }
   }
 }

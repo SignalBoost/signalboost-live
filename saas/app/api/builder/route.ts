@@ -94,7 +94,7 @@ export async function GET(request: Request) {
             modelTimeoutDeferrals: Number(job.metadata.builderCapacityDeferrals || 0),
             queueReason: typeof job.metadata.builderCapacityDeferredReason === 'string'
               ? job.metadata.builderCapacityDeferredReason : null,
-            lastTest: [...(job.checkpoint?.trace || [])].reverse().find(item => item.toolId === 'run')?.output ?? null,
+            lastTest: (() => { const run = [...(job.checkpoint?.trace || [])].reverse().find(item => item.toolId === 'run'); const output = run?.output as { exitCode?: number; stdout?: string } | undefined; const stdout = output?.stdout || ''; return run ? { passed: run.ok, exitCode: output?.exitCode ?? null, testsPassed: Number(/(?:^|\n)\s*(?:#|ℹ)\s+pass\s+(\d+)/.exec(stdout)?.[1] || 0), testsFailed: Number(/(?:^|\n)\s*(?:#|ℹ)\s+fail\s+(\d+)/.exec(stdout)?.[1] || 0) } : null })(),
           },
           reply: job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'

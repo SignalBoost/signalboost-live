@@ -137,8 +137,9 @@ test('Builder primary timeout is shorter than full model round and preserves con
   assert.match(port, /BUILDER_RUNPOD_PROBE_MS = 22_000/)
   assert.match(port, /AbortSignal\.any\(\[input\.signal, AbortSignal\.timeout\(BUILDER_RUNPOD_PROBE_MS\)\]\)/)
   assert.match(port, /throwIfInferenceAborted\(input\.signal\)[\s\S]*builder_runpod_primary_deadline/)
-  assert.match(port, /BUILDER_RUNPOD_BREAKER_FAILURES = 2/)
-  assert.match(port, /BUILDER_RUNPOD_BREAKER_COOLDOWN_MS = 120_000/)
+  // The breaker is shared through recorded usage rows, not per-instance memory (tests/builderRunpodSharedHealth).
+  assert.match(port, /const primaryInCooldown = !currentReasoningEvaluationContext\(\) && await builderRunpodRecentlyTimingOut\(\)/)
+  assert.doesNotMatch(port, /builderRunpodBlockedUntil|builderRunpodConsecutiveTimeouts/)
   assert.match(port, /tryAssignedPlatformModelTurn/)
   assert.match(port, /callLocalModel\(\{/)
   assert.match(runner, /modelRoundTimeoutMs: 55_000/)

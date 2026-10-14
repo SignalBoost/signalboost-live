@@ -10,6 +10,7 @@ import { activeGraduateRuntimesForRole } from '@/lib/ai/cos/cosUniversityGraduat
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { tryRunpodPrimaryInference } from '@/lib/ai/cos/runpodPrimaryInference'
 import { chatHasRunpodPriority, markChatRunpodDemand } from '@/lib/ai/cos/runpodInferenceLease'
+import { BUILDER_RUNPOD_HEALTH_WINDOW_MS, builderRunpodRecentlyTimingOut } from '@/lib/ai/localInferenceUsage'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
 import { deepInfraMaxCallUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
@@ -82,10 +83,6 @@ export function builderRunpodThinkingDisabled(): boolean {
 // Bound primary inference separately from the complete Builder control-round deadline.
 // This leaves room for assigned/DeepInfra fallback after a slow or unresponsive RunPod.
 const BUILDER_RUNPOD_PROBE_MS = 22_000
-const BUILDER_RUNPOD_BREAKER_FAILURES = 2
-const BUILDER_RUNPOD_BREAKER_COOLDOWN_MS = 120_000
-let builderRunpodConsecutiveTimeouts = 0
-let builderRunpodBlockedUntil = 0
 
 /** Existing DeepInfra Builder model remains the emergency/fallback coding model. */
 export function builderCodingModelFromEnv(): string {
@@ -164,7 +161,8 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
       // Only the job runner states this; Self-Healing repository repairs call without options and never claim priority.
       if (options.yieldToChat === false) await markChatRunpodDemand()
 
-      const primaryInCooldown = Date.now() < builderRunpodBlockedUntil
+      // Shared across serverless instances through the recorded usage rows (see builderRunpodRecentlyTimingOut).
+      const primaryInCooldown = !currentReasoningEvaluationContext() && await builderRunpodRecentlyTimingOut()
       const primarySignal = input.signal
         ? AbortSignal.any([input.signal, AbortSignal.timeout(BUILDER_RUNPOD_PROBE_MS)])
         : AbortSignal.timeout(BUILDER_RUNPOD_PROBE_MS)
@@ -195,19 +193,7 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
             return { text: null, attempted: true, reason: 'builder_runpod_primary_deadline' }
           })
       throwIfInferenceAborted(input.signal)
-      const primaryTimedOut = !primaryInCooldown && (primarySignal.aborted && !input.signal?.aborted
-        || runpod.reason === 'builder_runpod_primary_deadline'
-        || runpod.reason === 'inference_owner_deadline')
-      if (primaryTimedOut) {
-        builderRunpodConsecutiveTimeouts += 1
-        if (builderRunpodConsecutiveTimeouts >= BUILDER_RUNPOD_BREAKER_FAILURES) {
-          builderRunpodBlockedUntil = Date.now() + BUILDER_RUNPOD_BREAKER_COOLDOWN_MS
-          console.warn('[builder-runpod-circuit-open]', { cooldownMs: BUILDER_RUNPOD_BREAKER_COOLDOWN_MS })
-        }
-      } else if (runpod.text) {
-        builderRunpodConsecutiveTimeouts = 0
-        builderRunpodBlockedUntil = 0
-      }
+      if (primaryInCooldown) console.info('[builder-runpod-circuit-open]', { windowMs: BUILDER_RUNPOD_HEALTH_WINDOW_MS })
       if (runpod.text) return runpod.text
       // A saturated shared RunPod slot must not bypass the configured assigned-model
       // fallback. Attempt it once; if unavailable, retain the busy reason so the durable

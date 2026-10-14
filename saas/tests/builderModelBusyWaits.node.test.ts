@@ -184,3 +184,9 @@ test('unfinished suite retains exact diagnostics and yields a durable continuati
   assert.match(runner, /if \(unresolvedSuite && job\.claimGeneration < 24\)/)
   assert.match(runner, /await pauseBuilderJob\(\{ job, checkpoint: result\.checkpoint!, reply/)
 })
+
+test('new multi-file build hides redundant list_files after a successful listing', () => {
+  const src = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.match(src, /toolId !== 'list_files' \|\| repairObjective \|\| task\.files\.length === 0/)
+  assert.match(src, /progress\.missingFiles\.length === 0 \|\| !trace\.some\(item => item\.toolId === 'list_files' && item\.ok\)/)
+})

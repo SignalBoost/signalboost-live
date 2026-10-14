@@ -1,2 +1,2 @@
-base_sha=f259391c40e61ca22534a4678e47f94c1ea7d28f
-branch=fix/builder-playwright-acceptance-failure-classification-20261014
+base_sha=0edc2136c9270763f86dda584c1f4dc64203222a
+branch=fix/builder-playwright-diagnostic-evidence-20261014

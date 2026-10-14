@@ -22,6 +22,15 @@ function bounded(value: unknown, max = 120): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
+export function browserDiagnosticSummary(action: 'console' | 'requests', output: string): { clear: boolean; count: number } {
+  const lines = output.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+  // CLI emits headings and an explicit no-events marker; do not treat headings as failures.
+  const entries = lines.filter(line => action === 'console'
+    ? /^(?:\[?error\]?\s*[:\-]|\[console\.error\]|(?:\d+\s+)?error\s*[:\-])/i.test(line)
+    : /(?:\b(?:net::ERR_[A-Z_]+|HTTP\s+[45]\d\d|status\s*[:=]\s*[45]\d\d|\b[45]\d\d\s+(?:GET|POST|PUT|PATCH|DELETE)\b)\b)/i.test(line))
+  return { clear: entries.length === 0, count: entries.length }
+}
+
 function observationDetail(result: {
   exitCode: number
   timedOut: boolean
@@ -74,15 +83,15 @@ export async function runBuilderPlaywrightCliLiveAcceptance(input: { targetUrl?:
       const consoleResult = await port.invoke({ action: 'console', level: 'error' })
       checks.push(Object.freeze({
         name: 'console_diagnostics',
-        passed: consoleResult.ok,
-        detail: observationDetail(consoleResult),
+        passed: consoleResult.ok && browserDiagnosticSummary('console', consoleResult.stdout).clear,
+        detail: `${observationDetail(consoleResult)}; observedErrors=${browserDiagnosticSummary('console', consoleResult.stdout).count}`,
       }))
 
       const requests = await port.invoke({ action: 'requests' })
       checks.push(Object.freeze({
         name: 'network_diagnostics',
-        passed: requests.ok,
-        detail: observationDetail(requests),
+        passed: requests.ok && browserDiagnosticSummary('requests', requests.stdout).clear,
+        detail: `${observationDetail(requests)}; observedFailures=${browserDiagnosticSummary('requests', requests.stdout).count}`,
       }))
 
       const closed = await port.invoke({ action: 'close' })

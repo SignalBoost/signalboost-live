@@ -174,3 +174,13 @@ test('Builder terminal success requires full verification after the latest sourc
   assert.match(source, /builder_verification_incomplete/)
   assert.ok(source.indexOf('builder_verification_incomplete') < source.indexOf('if (verifiedBuilderCognitiveApplication(result))'))
 })
+
+test('unfinished suite retains exact diagnostics and yields a durable continuation', () => {
+  const loop = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(loop, /const targetedFailureGuidance = latestFailedVerification/)
+  assert.match(loop, /failingTestNames/)
+  assert.match(loop, /targetedFailureGuidance,\s+currentStep/)
+  assert.match(runner, /if \(unresolvedSuite && job\.claimGeneration < 24\)/)
+  assert.match(runner, /await pauseBuilderJob\(\{ job, checkpoint: result\.checkpoint!, reply/)
+})

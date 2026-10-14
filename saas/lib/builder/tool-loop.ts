@@ -1034,13 +1034,6 @@ export class BuilderToolLoop {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
         continue
       }
-      // Once a command has failed on the current source revision, repeating it cannot change the
-      // outcome. Read the implicated source, resolve contradictory assertions, then edit it.
-      if (action.toolId === 'run' && observedFailureSinceChange) {
-        trace.push({ round, toolId: 'run', input: action.input, ok: false,
-          error: 'builder_failed_command_unchanged: inspect failed assertions and edit the source or tests before rerunning' })
-        continue
-      }
       // Replaying an unchanged passing command cannot establish missing test coverage.
       // Return a truthful terminal result instead of repeatedly paying for the same rejected run.
       if (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint)

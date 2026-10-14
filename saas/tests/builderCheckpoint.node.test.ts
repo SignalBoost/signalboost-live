@@ -121,7 +121,7 @@ test('scheduler accepts only its secret and resumes only server-owned paused job
   assert.match(store, /\.eq\('status', 'paused'\)/)
   assert.match(store, /\.lt\('claim_generation', 4\)/)
   assert.match(store, /p_generation: input.claimGeneration/)
-  assert.doesNotMatch(store.match(/const JOB_SELECT = .*/)?.[0] || '', /checkpoint/)
+  assert.match(store.match(/const JOB_SELECT = .*/)?.[0] || '', /,checkpoint'/)
   const config = JSON.parse(read('../vercel.json'))
   assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/builder-continuations').schedule, '1,6,11,16,21,26,31,36,41,46,51,56 * * * *')
 })

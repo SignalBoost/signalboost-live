@@ -130,3 +130,16 @@ test('RunPod busy attempts assigned fallback before durable queueing', () => {
   assert.doesNotMatch(port.slice(busyIndex, assignedIndex), /throw new Error\('builder_runpod_primary_busy'\)/)
 })
 // end of saas/tests/builderModelBusyWaits.node.test.ts (if this line is missing, the paste was cut short)
+
+test('Builder primary timeout is shorter than full model round and preserves configured fallback', () => {
+  const port = readFileSync(new URL('../lib/cos/aiPort.ts', import.meta.url), 'utf8')
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(port, /BUILDER_RUNPOD_PROBE_MS = 22_000/)
+  assert.match(port, /AbortSignal\.any\(\[input\.signal, AbortSignal\.timeout\(BUILDER_RUNPOD_PROBE_MS\)\]\)/)
+  assert.match(port, /throwIfInferenceAborted\(input\.signal\)[\s\S]*builder_runpod_primary_deadline/)
+  assert.match(port, /BUILDER_RUNPOD_BREAKER_FAILURES = 2/)
+  assert.match(port, /BUILDER_RUNPOD_BREAKER_COOLDOWN_MS = 120_000/)
+  assert.match(port, /tryAssignedPlatformModelTurn/)
+  assert.match(port, /callLocalModel\(\{/)
+  assert.match(runner, /modelRoundTimeoutMs: 55_000/)
+})

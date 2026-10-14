@@ -36,9 +36,14 @@ export async function acceptBuilderProductionRepair(input: {
     return Object.freeze({ outcome: 'unresolved', detail: 'Builder Production verifier could not execute. No rollback was attempted.' })
   }
 
-  const runtimeFailure = acceptance.checks.some(check => check.name === 'runtime' && !check.passed)
-  if (runtimeFailure) {
-    return Object.freeze({ outcome: 'unresolved', detail: 'Builder Production verifier infrastructure failed. No rollback was attempted.' })
+  // A failed browser tool, missing diagnostic or cleanup failure is not evidence that
+  // production regressed. Roll back only on an observed, completed page assertion.
+  const requiredChecks = ['owner_builder_cli_capability', 'itmounts_open', 'live_snapshot', 'console_diagnostics', 'network_diagnostics', 'browser_close']
+  const checks = Array.isArray(acceptance.checks) ? acceptance.checks : []
+  const infrastructureFailure = requiredChecks.some(name => !checks.some(check => check.name === name))
+    || checks.some(check => check.name !== 'live_snapshot' && !check.passed)
+  if (infrastructureFailure) {
+    return Object.freeze({ outcome: 'unresolved', detail: 'Builder Production browser verification was incomplete or its infrastructure failed. No rollback was attempted.' })
   }
 
   if (acceptance.ok) {

@@ -1,2 +1,2 @@
-base_sha=0edc2136c9270763f86dda584c1f4dc64203222a
-branch=fix/builder-playwright-diagnostic-evidence-20261014
+base_sha=a43428fc64a292e99ced86e8ef25c12569a272c6
+branch=fix/builder-playwright-truncated-diagnostics-20261014

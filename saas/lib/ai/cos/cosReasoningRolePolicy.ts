@@ -169,7 +169,7 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
 // Long structured application specifications may put filenames after the 2,000-character
 // routing preview. Accept only explicit executable build requests backed by concrete
 // source paths or a named runtime; general product descriptions remain non-executable.
-function structuredApplicationBuild(prompt: string): boolean {
+export function structuredApplicationBuild(prompt: string): boolean {
   const body = String(prompt || '').slice(0, 12_000)
   return /\b(?:build|create|implement)\b[\s\S]{0,200}\b(?:application|app|project|system)\b/i.test(body)
     && /\b(?:required files|file structure|project structure|create all|create the following files)\b/i.test(body)

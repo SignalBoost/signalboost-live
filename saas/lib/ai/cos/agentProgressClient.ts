@@ -1,4 +1,4 @@
-import { isConciergeBuilderObjective } from './cosReasoningRolePolicy.ts'
+import { isConciergeBuilderObjective, structuredApplicationBuild } from './cosReasoningRolePolicy.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
@@ -194,8 +194,10 @@ export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builde
     }
   } else {
     const pasted = pastedConciergeSourceFile(objective)
-    if (!pasted) return null
-    files.push(pasted)
+    // A from-scratch application specification has no source file yet. It must
+    // create an empty Builder workspace, not silently fall through to COS chat.
+    if (!pasted && !structuredApplicationBuild(objective)) return null
+    if (pasted) files.push(pasted)
   }
 
   const conversationId = typeof record.context?.conversationId === 'string' ? record.context.conversationId : ''

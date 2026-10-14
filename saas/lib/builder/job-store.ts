@@ -264,6 +264,20 @@ export async function listBuilderContinuations(): Promise<Array<{ id: string; us
   return (data || []).map(row => ({ id: row.id, userId: row.user_id }))
 }
 
+/** A bounded new claim cycle on the same durable job; never recreates workspace files. */
+export async function requeueBuilderContinuationCycle(input: {
+  job: BuilderJobRecord; checkpoint: BuilderLoopCheckpoint; reply: string; result: Record<string, unknown>
+}): Promise<boolean> {
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.rpc('requeue_builder_continuation_cycle', {
+    p_job_id: input.job.id, p_user_id: input.job.userId, p_generation: input.job.claimGeneration,
+    p_checkpoint: input.checkpoint, p_reply: input.reply, p_result: input.result,
+  })
+  if (error) throw new Error(`builder_continuation_requeue_failed: ${error.message}`)
+  return data === true
+}
+
 export async function pauseBuilderJob(input: {
   job: BuilderJobRecord; checkpoint: BuilderLoopCheckpoint; reply: string; result: Record<string, unknown>
 }): Promise<void> {

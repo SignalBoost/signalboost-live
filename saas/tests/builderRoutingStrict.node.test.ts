@@ -158,7 +158,7 @@ test('long structured OrderFlow application specification is executable coding w
     'node --test test/*.test.js',
     'node index.js',
     'Preserve checkpoints and finish without manual continue.',
-  ].join('\\n')
+  ].join('\n')
   assert.equal(isConciergeBuilderObjective(spec), true)
   assert.equal(isConciergeBuilderObjective('Describe an order management application with catalogs and carts.'), false)
   assert.equal(isConciergeBuilderObjective('What is the purpose of npm test in an application?'), false)

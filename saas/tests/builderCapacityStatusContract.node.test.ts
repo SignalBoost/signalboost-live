@@ -10,7 +10,7 @@ test('durable capacity deferral is exposed as queued rather than terminal error'
   assert.match(route, /Queued — waiting for model capacity/)
   assert.match(route, /job\.status === 'queued' \|\| job\.status === 'running' \|\| job\.status === 'paused'/)
   assert.match(sql, /set status = 'queued', error = null/)
-  assert.match(runner, /await deferSelfHealingCapacity\(job, result\.error, trace\)\) return/)
+  assert.match(runner, /await deferSelfHealingCapacity\(job, result\.error, trace, result\.checkpoint \?\? null\)\) return/)
 })
 test('accepted Builder POST releases foreground and never replays action', () => {
   assert.match(route, /status: 'queued'/)

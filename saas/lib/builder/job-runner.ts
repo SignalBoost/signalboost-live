@@ -1,3 +1,4 @@
+import type { BuilderLoopCheckpoint } from './checkpoint.ts'
 import { withHostProductionHarnessIngress } from '../../platform-harness/runtime/host-ingress.ts'
 import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
@@ -58,11 +59,11 @@ function capacityDeferrable(job: BuilderJobRecord, error: string | null): error 
   return metadataCount(job, 'builderExecutionTimeoutDeferrals') < MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS
 }
 
-async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | null, trace: readonly unknown[]): Promise<boolean> {
+async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | null, trace: readonly unknown[], checkpoint: BuilderLoopCheckpoint | null = null): Promise<boolean> {
   const standardBusy = job.jobKind === 'standard' && (error === 'builder_runpod_primary_busy' || error === 'builder_model_round_timeout')
     && metadataCount(job, 'builderCapacityDeferrals') < MAX_STANDARD_CAPACITY_DEFERRALS
   if (!standardBusy && (!selfHealingCapacityJob(job) || !capacityDeferrable(job, error))) return false
-  const deferred = await deferBuilderJobForCapacity({ job, reason: error })
+  const deferred = await deferBuilderJobForCapacity({ job, reason: error, checkpoint })
   if (deferred) {
     console.info('[builder_self_healing_capacity_deferred]', {
       jobId: job.id,
@@ -484,6 +485,9 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     lastTrace = result.trace
     const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
     const trace = publicTrace(result.trace)
+    // Model capacity is not work: re-queue with this slice's progress before spending one of the four work slices.
+    if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout')
+      && await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return
     if (result.ok === false && result.checkpoint && job.claimGeneration < 4) {
       const reply = historyReply('Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)
       await pauseBuilderJob({ job, checkpoint: result.checkpoint, reply,
@@ -500,8 +504,6 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           ai, fallback, deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
         })
       : `${fallback}\n\n${formatBuilderExecutionEvidence(trace)}`
-    if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout')
-      && await deferSelfHealingCapacity(job, result.error, trace)) return
     if (result.ok === false) {
       const reply = historyReply(await initialReply(`${repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace)}\n\n${builderNextAction(result.error, result.trace)}`, 'failed'), job.workspaceId, files)
       await finishBuilderJob({

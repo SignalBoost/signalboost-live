@@ -322,6 +322,8 @@ const tests = [
   'tests/builderRepairClassification.node.test.ts',
   'tests/builderTitledBuildRequest.node.test.ts',
   'tests/builderModelBusyWaits.node.test.ts',
+  'tests/builderStandardCapacityRecovery.node.test.ts',
+  'tests/builderCapacityStatusContract.node.test.ts',
 
   'tests/builderProjectContext.node.test.ts',
 

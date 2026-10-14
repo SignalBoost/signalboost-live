@@ -28,7 +28,8 @@ const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const MAX_MODEL_ROUND_ATTEMPTS = 2
 // One GPU serves Builder. Production 2026-10-13 (workspace b756499e): an owner's OrderFlow build ended permanently on
 // builder_runpod_primary_busy after two writes because another job held the model slot. A busy model is a wait, not a
-// failure: a durable job retries the same round after this pause and, when its slice ends first, saves its progress.
+// failure: a durable job retries the same round after this pause and, when its slice ends first, hands its progress to
+// the capacity re-queue.
 const MODEL_BUSY_RETRY_MS = 5_000
 const MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS = 1
 const MAX_REPAIR_INSPECTIONS_AFTER_FAILURE = 3
@@ -766,7 +767,13 @@ export class BuilderToolLoop {
             } catch (busyError) {
               if (!input.shouldPause || !(busyError instanceof Error) || busyError.message !== 'builder_runpod_primary_busy') throw busyError
               // The round produced nothing: it is redone after the wait or on resume, never counted as work.
-              if (input.shouldPause() || outOfTime()) { attempt -= 1; return pause() }
+              // Still busy when the slice ends: report busy with this slice's progress, so the job runner re-queues it
+              // for capacity (bounded, outside the work-slice budget) and the resumed job continues from here.
+              if (input.shouldPause() || outOfTime()) {
+                attempt -= 1
+                const paused = await pause()
+                return paused.ok === false && paused.checkpoint ? { ...paused, error: 'builder_runpod_primary_busy' } : paused
+              }
               await new Promise(resolve => setTimeout(resolve, MODEL_BUSY_RETRY_MS))
             }
           }

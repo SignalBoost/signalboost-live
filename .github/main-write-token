@@ -1,2 +1,2 @@
-base_sha=60cdd2f0f91c5fce716f029ca35927208a20cee7
-branch=fix/builder-model-busy-waits-20261013
+base_sha=152d9212fabe0e1aaf0e0a8cf01577838454ecb9
+branch=fix/builder-busy-keeps-progress-20261013

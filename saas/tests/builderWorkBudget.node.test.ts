@@ -83,3 +83,17 @@ test('the database ceiling matches the code and the migration runs through the H
   assert.doesNotMatch(runner, /claimGeneration < 4/)
 })
 // end of saas/tests/builderWorkBudget.node.test.ts (if this line is missing, the paste was cut short)
+
+test('productive work at slice ceiling requeues same job and checkpoint through bounded database cycle', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../supabase/migrations/20261014153000_builder_continuation_cycles.sql', import.meta.url), 'utf8')
+  assert.match(runner, /builderSliceMadeProgress\(job\.checkpoint, result\.checkpoint\)/)
+  assert.match(runner, /requeueBuilderContinuationCycle/)
+  assert.match(store, /requeue_builder_continuation_cycle/)
+  assert.match(migration, /status = 'paused', claim_generation = 0, checkpoint = p_checkpoint/)
+  assert.match(migration, /'continuationCycles',v_cycles \+ 1/)
+  assert.match(migration, /v_cycles >= 2/)
+  assert.match(migration, /90 minutes/)
+  assert.match(migration, /p_checkpoint->>'workspaceId' is distinct from v_job.workspace_id::text/)
+})

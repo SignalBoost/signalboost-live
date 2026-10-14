@@ -1,2 +1,2 @@
-base_sha=0c4517efc444bd6c496d25611f010e238ca3dcd2
-branch=fix/builder-no-unchanged-reverify-20261014
+base_sha=4e8fb7597b36fc29f9d2d058897700e5e5575b4f
+branch=fix/builder-unclaimed-queue-worker-lost-20261014

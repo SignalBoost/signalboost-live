@@ -34,17 +34,17 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
   let runList = false
   for (const raw of objective.split(/\r?\n/)) {
     const line = raw.trim()
-    if (/^run(?:\s+(?:these|the following)\s+commands)?\s*:\s*$/i.test(line)) {
+    if (/^run(?:\s+(?:these|the following)\s+commands)?\s*:\s*$/i.test(line) || /^execute\s+(?:these|the following)\s+commands(?:\s+in\s+the\s+builder\s+workspace)?\s*:\s*$/i.test(line)) {
       runList = true
       fileList = false
       continue
     }
-    if (/^(?:create|write|deliver|provide)(?:\s+(?:these|the|following|files|all))*\s*:\s*$/i.test(line)) {
+    if (/^(?:(?:create|write|deliver|provide)(?:\s+(?:these|the|following|files|all|at least))*|(?:required\s+)?(?:project\s+)?(?:file\s+)?structure)\s*:\s*$/i.test(line) || /^create\s+at\s+least\s+(?:these|the|following)\s+files\s*:\s*$/i.test(line)) {
       fileList = true
       continue
     }
     if (fileList && line) {
-      const path = clean(line)
+      const path = clean(line).replace(/^\d+[.)]\s*/, '')
       if (FILE.test(path) && !path.split('/').includes('..')) files.add(path)
       else fileList = false
     }

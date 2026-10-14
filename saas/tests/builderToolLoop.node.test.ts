@@ -152,7 +152,7 @@ test('Builder supplies staged project scripts and the recommended proof command'
   assert.match(prompt, /"recommendedTestCommand":"npm test"/)
 })
 
-test('Builder retries one transient model-round timeout before failing the turn', async () => {
+test('Builder fails a timed-out model round without immediate identical retry', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let calls = 0
   const ai: BuilderAiPort = {
@@ -169,8 +169,9 @@ test('Builder retries one transient model-round timeout before failing the turn'
     maxRounds: 1,
     modelRoundTimeoutMs: 1,
   })
-  assert.equal(result.ok, true)
-  assert.equal(calls, 2)
+  assert.equal(result.ok, false)
+  assert.equal(result.error, 'builder_model_round_timeout')
+  assert.equal(calls, 1)
 })
 
 test('Production Builder lanes allow a valid slow local control round without becoming unbounded', () => {

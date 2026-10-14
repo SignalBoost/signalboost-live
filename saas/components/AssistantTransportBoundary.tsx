@@ -19,8 +19,8 @@ type AssistantRequestBody = {
 }
 
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
-const BUILDER_JOB_POLL_ATTEMPTS = 200
-const BUILDER_JOB_POLL_DELAY_MS = 1_500
+const BUILDER_JOB_POLL_ATTEMPTS = 240
+const BUILDER_JOB_POLL_DELAY_MS = 2_000
 const BUILDER_HISTORY_POLL_ATTEMPTS = 11
 const BUILDER_HISTORY_POLL_DELAY_MS = 2_500
 

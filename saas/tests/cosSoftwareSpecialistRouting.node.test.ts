@@ -342,7 +342,7 @@ test('self-contained writing bypasses public identity, Software Specialist and v
 
 
 test('Concierge routes a from-scratch multi-file application build to durable Builder without source attachments', () => {
-  const objective = 'OrderFlow — End-to-End Builder Acceptance Test\\nBuild a complete, working OrderFlow application using Node.js and JavaScript.\\nRequired files: create all 15 files: package.json index.js src/catalog.js src/cart.js src/orders.js test/orders.test.js.\\nAutomated tests: npm test and node --test test/*.test.js; run these commands and verify zero failures.'
+  const objective = 'OrderFlow — End-to-End Builder Acceptance Test\nBuild a complete, working OrderFlow application using Node.js and JavaScript.\nRequired files: create all 15 files: package.json index.js src/catalog.js src/cart.js src/orders.js test/orders.test.js.\nAutomated tests: npm test and node --test test/*.test.js; run these commands and verify zero failures.'
   const routed = conciergeBuilderRequest({
     messages: [{ role: 'user', content: objective }],
     context: { conversationId: 'd1fa901d-7f0b-4ebd-9ca4-cf983955c8cd' },

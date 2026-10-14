@@ -673,7 +673,15 @@ export class BuilderToolLoop {
       // exist, execute the user's explicit Run list before asking for any more edits.
       // A failed command is attempted only once per file revision, then returned to the
       // model for diagnosis; no blind execution retries or additional command authority.
-      const verificationCommand = chunks.size === 0 && !repairObjective && writeCount > 0 && task.files.length > 0 && progress.missingFiles.length === 0
+      const requiredImplementationReady = task.files.filter(path => !/(?:^|\/)(?:test|tests)\/|(?:\.test\.|\.spec\.)|(?:^|\/)README\.md$/i.test(path))
+        .every(path => workspacePaths.includes(path))
+      const stagedTestsExist = workspacePaths.some(path => /(?:^|\/)(?:test|tests)\/.*\.(?:test|spec)\.[cm]?js$/i.test(path))
+      // Start host testing as soon as all mandatory implementation files and one test exist.
+      // Remaining suites and documentation stay mandatory for the final acceptance gate.
+      const partialTestProofReady = requiredImplementationReady && stagedTestsExist
+        && task.commands.some(command => /\b(?:--test|npm test)\b/.test(command))
+      const verificationCommand = chunks.size === 0 && !repairObjective && writeCount > 0 && task.files.length > 0
+        && (progress.missingFiles.length === 0 || partialTestProofReady)
         ? progress.pendingCommands.find(command => !trace.slice(lastWorkspaceChange + 1)
           .some(item => item.toolId === 'run' && (item.input.command === command || item.input.requestedCommand === command)))
         : undefined
@@ -729,6 +737,9 @@ export class BuilderToolLoop {
         input.workingKnowledge || '',
         BUILDER_REASONING_GUIDANCE,
         formatBuilderEngineeringGoal(engineeringGoal),
+        saved && !repairObjective
+          ? 'RESUMED WORKSPACE: Inspect existing files first. Never recreate completed files. Preserve the existing scaffold. If the required implementation files and a test exist, run the targeted test command now; use actual failed output to edit only affected files. Otherwise create the next missing test file before documentation. Maintain the original required-file checklist and do not claim completion before every requested command succeeds.'
+          : '',
         documentationPaths ? `DOCUMENTATION-ONLY TASK: mutations are restricted to ${JSON.stringify(documentationPaths)}. Inspect relevant code, update the requested documentation, and run the requested verification. Existing error behavior being documented does not require a failing baseline. Do not modify implementation, tests or configuration.` : '',
         verificationOrderGuidance(pendingOrder),
         `OBJECTIVE:\n${input.objective}`,

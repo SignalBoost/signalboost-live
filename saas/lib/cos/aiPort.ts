@@ -176,9 +176,10 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
           }, 'builder')
       throwIfInferenceAborted(input.signal)
       if (runpod.text) return runpod.text
-      if (runpod.attempted && runpod.reason === 'runpod_primary_busy') {
-        throw new Error('builder_runpod_primary_busy')
-      }
+      // A saturated shared RunPod slot must not bypass the configured assigned-model
+      // fallback. Attempt it once; if unavailable, retain the busy reason so the durable
+      // Builder job can enter its bounded capacity queue without rerunning prior writes.
+      const runpodBusy = runpod.attempted && runpod.reason === 'runpod_primary_busy'
 
       throwIfInferenceAborted(input.signal)
       const ownedAttempted = graduate.attempted || runpod.attempted
@@ -198,6 +199,7 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
       }, 'builder')
       throwIfInferenceAborted(input.signal)
       if (assigned.attempted) return requireText(assigned.result?.content ?? null, 'assigned builder')
+      if (runpodBusy) throw new Error('builder_runpod_primary_busy')
 
       const config = localInferenceConfigFromEnv()
       return requireText(await callLocalModel({

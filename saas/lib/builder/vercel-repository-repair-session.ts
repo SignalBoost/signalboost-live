@@ -188,19 +188,25 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
       // The private repository fetch is authenticated by the host for this fixed bootstrap command only.
       // The token is never placed in Sandbox.create env, persistent git config, the checked-out tree, or
       // any model-visible workspace. After dependency bootstrap, network is denied before model execution.
+      const fetchStartedAtMs = Date.now()
       const githubAuthArgs = githubFetchAuthArgs()
       await session.requireSetupSuccess('git', [...githubAuthArgs, '-C', REPOSITORY_ROOT, 'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', fullCommitSha], '/tmp')
       await session.requireSetupSuccess('git', ['-C', REPOSITORY_ROOT, 'checkout', '--quiet', '--detach', 'FETCH_HEAD'], '/tmp')
       await session.assertPinnedRevision()
+      const gitFetchMs = Date.now() - fetchStartedAtMs
 
       // The dependency graph is pinned by package-lock.json. Install scripts are disabled during
       // bootstrap; repair proof should prefer the narrowest relevant test or typecheck command.
+      const npmStartedAtMs = Date.now()
       await session.requireSetupSuccess(
         'npm',
         ['ci', '--ignore-scripts', '--no-audit', '--no-fund'],
         PROJECT_ROOT,
         SETUP_TIMEOUT_MS,
       )
+
+      const npmInstallMs = Date.now() - npmStartedAtMs
+      console.info('[builder_repository_bootstrap_timing]', { gitFetchMs, npmInstallMs })
 
       await withinAbsoluteDeadline(sandbox.update({ networkPolicy: 'deny-all' }), deadlineAtMs)
       session.networkLocked = true

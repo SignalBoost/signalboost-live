@@ -7,7 +7,8 @@ import { followBuilderJob } from '@/lib/builder/job-poll'
 import { uiText } from '@/lib/i18n/uiText'
 
 type WorkspaceFile = { path: string; content: string }
-type BuilderReply = { jobId?: string; workspaceId?: string; status?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
+type BuilderReply = { progress?: BuilderProgress; jobId?: string; workspaceId?: string; status?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
+type BuilderProgress = { phase?: string; lastActivityAt?: string; claimGeneration?: number; filesWritten?: number | null; workRounds?: number | null; modelTimeoutDeferrals?: number; queueReason?: string | null; lastTest?: { passed?: boolean; exitCode?: number | null; testsPassed?: number; testsFailed?: number } | null }
 type WorkspaceSummary = { id: string; objective: string; updatedAt: string }
 type CertificationSummary = { earnedLevel: number; attempts: number }
 
@@ -60,7 +61,11 @@ export default function DeveloperPage() {
   const [error, setError] = useState('')
   const [certification, setCertification] = useState<CertificationSummary>({ earnedLevel: 0, attempts: 0 })
   const [running, setRunning] = useState(false)
+  const [liveProgress, setLiveProgress] = useState<BuilderProgress | null>(null)
+  const [activeJobId, setActiveJobId] = useState('')
+  const [activitySeconds, setActivitySeconds] = useState(0)
   const fileInput = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (!running) return; const interval = window.setInterval(() => setActivitySeconds(value => value + 1), 1000); return () => window.clearInterval(interval) }, [running])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -92,6 +97,8 @@ export default function DeveloperPage() {
 
   async function restoreJob(jobId: string) {
     setRunning(true)
+    setActiveJobId(jobId)
+    setActivitySeconds(0)
     try {
       const terminal = await pollBuilderJob(jobId)
       if (terminal) {
@@ -171,7 +178,7 @@ export default function DeveloperPage() {
         const data = await response.json().catch(() => ({})) as BuilderReply
         return { status: response.status, ok: response.ok, data }
       },
-      onActive: data => { if (data.reply) setReply(data.reply) },
+      onActive: data => { if (data.reply) setReply(data.reply); if (data.progress) setLiveProgress(data.progress) },
       sleep,
     })
     if (outcome.kind === 'terminal') return outcome.data
@@ -189,7 +196,7 @@ export default function DeveloperPage() {
       setError('The selected workspace has no source files. Open the original project and confirm its files are listed before running. No new job was created.')
       return
     }
-    setRunning(true); setError(''); setReply(''); setTrace([])
+    setRunning(true); setError(''); setReply(''); setTrace([]); setLiveProgress(null); setActivitySeconds(0); setActiveJobId('')
     try {
       const response = await fetch('/api/builder', {
         method: 'POST',
@@ -204,6 +211,7 @@ export default function DeveloperPage() {
       setReply(data.reply || 'Builder completed without a final report.')
 
       if (response.status === 202 && data.jobId) {
+        setActiveJobId(data.jobId)
         try { localStorage.setItem(BUILDER_LAST_JOB_KEY, JSON.stringify({ jobId: data.jobId, workspaceId: data.workspaceId || workspaceId })) } catch { /* ignore */ }
         const terminal = await pollBuilderJob(data.jobId)
         if (terminal) {
@@ -259,6 +267,19 @@ export default function DeveloperPage() {
           {files.length ? <div style={fileListStyle}><strong>Attached files ({files.length}/20):</strong>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path} · {(new TextEncoder().encode(file.content).length / 1024).toFixed(1)} KB<button type="button" aria-label={interpolate('remove', file.path)} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
           {error ? <p role="alert" style={{ margin: 0, color: '#fca5a5' }}>{error}</p> : null}
         </section>
+        {running ? <section aria-label="Builder live activity" aria-live="polite" style={{ border: '1px solid #334155', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 12 }}>
+          <strong style={{ color: '#e2e8f0' }}>Builder activity · {Math.floor(activitySeconds / 60)}m {String(activitySeconds % 60).padStart(2, '0')}s elapsed</strong>
+          <div role="progressbar" aria-label="Builder is processing" aria-valuetext={liveProgress?.phase || 'Connecting to Builder'} style={{ width: '100%', height: 9, borderRadius: 8, background: '#334155', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: '35%', background: '#22d3ee', animation: 'builder-activity 1.8s ease-in-out infinite alternate', borderRadius: 8 }} />
+          </div>
+          <style>{`@keyframes builder-activity { from { transform: translateX(-100%) } to { transform: translateX(290%) } }`}</style>
+          <span style={{ color: '#cbd5e1', fontSize: 14 }}>Phase: {liveProgress?.phase === 'queued' ? 'Queued for worker' : liveProgress?.phase === 'verification' ? 'Verifying saved changes' : liveProgress?.phase === 'checkpointed' ? 'Checkpoint saved; awaiting continuation' : liveProgress?.phase === 'model' ? 'Generating or inspecting code' : 'Connecting to job status'}</span>
+          <span style={{ color: '#94a3b8', fontSize: 13 }}>Files saved: {liveProgress?.filesWritten ?? 'not reported'} · Work rounds: {liveProgress?.workRounds ?? 'not reported'} · Model deferrals: {liveProgress?.modelTimeoutDeferrals ?? 0}</span>
+          {liveProgress?.lastTest ? <span style={{ color: '#cbd5e1', fontSize: 13 }}>Last test: {liveProgress.lastTest.passed ? 'passed' : 'failed'} · {liveProgress.lastTest.testsPassed ?? 0} passing / {liveProgress.lastTest.testsFailed ?? 0} failing</span> : null}
+          {liveProgress?.lastActivityAt ? <span style={{ color: '#94a3b8', fontSize: 12 }}>Last saved activity: {new Date(liveProgress.lastActivityAt).toLocaleTimeString()}</span> : null}
+          {activeJobId ? <span style={{ color: '#64748b', fontSize: 12 }}>Job: {activeJobId}</span> : null}
+          <span style={{ color: '#64748b', fontSize: 12 }}>Activity is based on durable status updates. The animated indicator does not imply continuous model execution.</span>
+        </section> : null}
         {reply || trace?.length ? <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>
           <h2 style={{ margin: 0, fontSize: 20 }}>{c('result')}</h2>
           {reply ? <pre style={{ margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: '#e2e8f0', font: 'inherit', lineHeight: 1.55 }}>{reply}</pre> : null}

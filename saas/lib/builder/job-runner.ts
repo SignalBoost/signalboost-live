@@ -34,6 +34,7 @@ const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
 const SELF_HEALING_REPOSITORY_BUDGET_MS = 285_000
 const MAX_SELF_HEALING_EXECUTION_TIMEOUT_DEFERRALS = 3
+const MAX_STANDARD_CAPACITY_DEFERRALS = 3
 
 function selfHealingCapacityJob(job: BuilderJobRecord): boolean {
   return job.ownerAuthorized && (
@@ -58,10 +59,12 @@ function capacityDeferrable(job: BuilderJobRecord, error: string | null): error 
 }
 
 async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | null, trace: readonly unknown[]): Promise<boolean> {
-  if (!selfHealingCapacityJob(job) || !capacityDeferrable(job, error)) return false
+  const standardBusy = job.jobKind === 'standard' && error === 'builder_runpod_primary_busy'
+    && metadataCount(job, 'builderCapacityDeferrals') < MAX_STANDARD_CAPACITY_DEFERRALS
+  if (!standardBusy && (!selfHealingCapacityJob(job) || !capacityDeferrable(job, error))) return false
   const deferred = await deferBuilderJobForCapacity({ job, reason: error })
   if (deferred) {
-    console.info('[builder_self_healing_capacity_deferred]', {
+    console.info('[builder_capacity_deferred]', {
       jobId: job.id,
       claimGeneration: job.claimGeneration,
       reason: error,
@@ -497,6 +500,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
           ai, fallback, deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
         })
       : `${fallback}\n\n${formatBuilderExecutionEvidence(trace)}`
+    if (result.ok === false && result.error === 'builder_runpod_primary_busy'
+      && await deferSelfHealingCapacity(job, result.error, trace)) return
     if (result.ok === false) {
       const reply = historyReply(await initialReply(`${repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace)}\n\n${builderNextAction(result.error, result.trace)}`, 'failed'), job.workspaceId, files)
       await finishBuilderJob({

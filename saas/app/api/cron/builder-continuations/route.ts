@@ -35,6 +35,23 @@ async function queuedOwnedRepair(
     : null
 }
 
+// Only retry a previously deferred standard job, never an arbitrary queued POST.
+// A cooldown avoids repeatedly contending for the same busy RunPod slot.
+async function queuedCapacityRecovery(): Promise<{ id: string; userId: string } | null> {
+  const db = getAdminSupabase()
+  const cutoff = new Date(Date.now() - 60_000).toISOString()
+  const { data, error } = await db.from('builder_jobs').select('id,user_id')
+    .eq('status', 'queued').eq('job_kind', 'standard')
+    .not('metadata->>builderCapacityDeferredReason', 'is', null)
+    .lte('updated_at', cutoff)
+    .order('updated_at', { ascending: true }).limit(1).maybeSingle()
+  if (error) {
+    console.warn('[builder_capacity_queue_read_failed]', { message: error.message })
+    return null
+  }
+  return data?.id && data?.user_id ? { id: String(data.id), userId: String(data.user_id) } : null
+}
+
 async function queuedOwnedSelfHealingRepairs(): Promise<QueuedOwnedRepair[]> {
   const [productionRecovery, site, audit, university] = await Promise.all([
     queuedOwnedRepair('selfHealingProductionRecovery', 'production-recovery'),
@@ -69,15 +86,16 @@ export async function GET(request: Request) {
     retryFailedOwnedAuditEngineRepair(admin),
     retryFailedUniversityDistillationRepair(admin),
   ])
-  const [ownedRepairs, playwrightCliCanary] = await Promise.all([
+  const [ownedRepairs, playwrightCliCanary, capacityRecovery] = await Promise.all([
     queuedOwnedSelfHealingRepairs(),
     queuedOwnedRepair('builderPlaywrightCliCanary', 'playwright-cli-canary'),
+    queuedCapacityRecovery(),
   ])
   const unique = new Map<string, { id: string; userId: string }>()
   // Preserve paused Builder continuations first. A deliberately queued owner acceptance canary is
   // next so a large Self-Healing backlog cannot starve explicit production proof indefinitely.
   // The canary consumes at most one scheduler tick; no repair job is removed or reclassified.
-  for (const job of [...continuations, ...(playwrightCliCanary ? [playwrightCliCanary] : []), ...ownedRepairs]) {
+  for (const job of [...continuations, ...(playwrightCliCanary ? [playwrightCliCanary] : []), ...(capacityRecovery ? [capacityRecovery] : []), ...ownedRepairs]) {
     unique.set(job.id, { id: job.id, userId: job.userId })
   }
   const jobs = [...unique.values()]

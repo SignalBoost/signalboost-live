@@ -134,7 +134,7 @@ test('scheduler accepts only its secret and resumes only server-owned paused job
   assert.match(route, /!secret \|\| request.headers.get\('authorization'\) !== `Bearer \$\{secret\}`/)
   assert.ok(route.indexOf('status: 401') < route.indexOf('await listBuilderContinuations'))
   assert.doesNotMatch(route, /request\.json|searchParams|enqueueBuilderJob/)
-  assert.match(route, /const selected = jobs\[0\] \|\| null/)
+  assert.match(route, /const selected = blockedByActiveClaim \? null : jobs\[0\] \|\| null/)
   assert.doesNotMatch(route, /Promise\.all\(jobs\.map/)
   const store = read('../lib/builder/job-store.ts')
   assert.match(store, /\.eq\('status', 'paused'\)/)

@@ -489,7 +489,9 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout')
       && await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return
     if (result.ok === false && result.checkpoint && job.claimGeneration < 4) {
-      const reply = historyReply('Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)
+      const reply = historyReply(result.checkpoint.verificationPending
+        ? 'Files written — verifying changes. Builder will continue automatically.'
+        : 'Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)
       await pauseBuilderJob({ job, checkpoint: result.checkpoint, reply,
         result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
       return

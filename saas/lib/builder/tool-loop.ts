@@ -838,10 +838,12 @@ export class BuilderToolLoop {
           // Production 2026-10-14 (OrderFlow job 7cc550aa): 69 of 110 Builder model calls hit the ~55s round deadline and
           // returned nothing; the longest completed output was 1,630 tokens. A response the deadline cannot finish is
           // retried once, while the slice has time, with an instruction whose output fits the deadline.
-          const roundTimeout = error instanceof Error && error.message === 'builder_model_round_timeout'
-            && !input.shouldPause?.() && !outOfTime()
+          // A timed-out model call has produced no control and is not useful work.
+          // Never immediately launch an identical expensive model call inside this slice:
+          // persist the checkpoint and defer to the next capacity-scheduled attempt.
+          const roundTimeout = false
           const capacity = input.shouldPause ? capacityReason(error) : null
-          if (capacity && !roundTimeout) return capacityStop(capacity)
+          if (capacity) return capacityStop(capacity)
           if (!isOutputTruncation(error) && !roundTimeout) {
             return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
           }

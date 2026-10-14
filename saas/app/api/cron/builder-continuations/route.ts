@@ -155,7 +155,23 @@ export async function GET(request: Request) {
   // A single RunPod reasoner serves Builder. Running several continuations in Promise.all overloaded
   // that one GPU, pushed healthy requests past the 120s timeout, and converted queueing into paid
   // DeepInfra fallback. Execute one durable continuation per scheduler tick; later jobs remain queued.
-  const selected = jobs[0] || null
+  // Admission gate across invocations: a scheduler tick must not start another
+  // RunPod-bound job while an unexpired durable worker claim remains running.
+  // Fail closed on database errors rather than treating an unknown count as idle.
+  const { count: activeRunningClaims, error: activeClaimsError } = await admin
+    .from('builder_jobs').select('id', { count: 'exact', head: true })
+    .eq('status', 'running')
+  if (activeClaimsError) {
+    console.error('[builder.continuation.admission_read_failed]', { code: activeClaimsError.code })
+    return NextResponse.json({ ok: false, error: 'builder_continuation_admission_unavailable' }, { status: 503 })
+  }
+  const blockedByActiveClaim = (activeRunningClaims ?? 0) > 0
+  if (blockedByActiveClaim && jobs.length) console.info('[builder.continuation.admission_deferred]', {
+    activeRunningClaims, pendingCandidates: jobs.length,
+  })
+  // Existing generation-fenced claims remain authoritative. This admission check
+  // reduces overlap but is not an atomic global lease; concurrent ticks can race.
+  const selected = blockedByActiveClaim ? null : jobs[0] || null
   let execution: { jobId: string; status: string; durationMs: number; errorCode: string | null } | null = null
   if (selected) {
     const startedAt = Date.now()
@@ -192,6 +208,8 @@ export async function GET(request: Request) {
     ok: true,
     candidates: jobs.length,
     pendingCheckpointedJobs: backlogError ? null : pendingContinuationCount,
+    activeRunningClaims,
+    admissionDeferred: blockedByActiveClaim && jobs.length > 0,
     competencyFailuresScanned: competencyReconciliation.scanned,
     overdueRunningJobs: overdueJobs?.length || 0,
     competencyGapsFiled: competencyReconciliation.filed,

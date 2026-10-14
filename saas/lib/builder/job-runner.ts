@@ -31,6 +31,7 @@ import { runWithoutTurnDeadline } from '../ai/cos/cosTurnBudget.ts'
 import { workingAgentKnowledgeBlock } from '@/lib/ai/cos/workingAgentKnowledge'
 import { formatBuilderEpisodesForPrompt, recordBuilderEpisode, retrieveBuilderEpisodes } from './episodic-memory.ts'
 import { recordBuilderCompetencyGap } from './competency-gap.ts'
+import { getAdminSupabase } from '@/utils/supabase/server'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000

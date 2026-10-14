@@ -1012,7 +1012,11 @@ export class BuilderToolLoop {
         if (++gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_verification_order_required', trace }
         continue
       }
-      if (mutation && !repairObjective && progress.missingFiles.length > 0
+      const observedFailureSinceChange = trace.slice(lastWorkspaceChange + 1).some(item =>
+        item.toolId === 'run' && !item.ok
+        && (item.output as { exitCode?: number } | undefined)?.exitCode !== 0
+        && !String(item.error || '').startsWith('builder_repeated_tool_call:'))
+      if (mutation && !repairObjective && !observedFailureSinceChange && progress.missingFiles.length > 0
         && action.input.mode !== 'append' && workspacePaths.includes(toolPath(action.input)) && !initialPaths.has(toolPath(action.input))) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false,
           error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })

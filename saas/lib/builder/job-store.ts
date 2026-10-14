@@ -251,6 +251,15 @@ export async function finishBuilderJob(input: {
     p_error: input.error || null,
   })
   if (error) throw new Error(`builder_job_finish: ${error.message}`)
+  // Best-effort terminal telemetry. Status is owned by the generation-fenced RPC above.
+  const { error: telemetryError } = await db.from('builder_jobs').update({
+    last_finished_at: new Date().toISOString(),
+    last_error: input.error || null,
+  }).eq('id', input.jobId).eq('user_id', input.userId)
+    .eq('claim_generation', input.claimGeneration).eq('status', input.status)
+  if (telemetryError) console.warn('[builder_job_terminal_telemetry_failed]', {
+    jobId: input.jobId, code: telemetryError.code,
+  })
 }
 
 /** Only server-owned paused checkpoints are eligible; running/uncertain work is never replayed. */

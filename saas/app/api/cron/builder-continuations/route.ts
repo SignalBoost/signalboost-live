@@ -103,6 +103,23 @@ export async function GET(request: Request) {
       return { scanned: 0, filed: 0 }
     })
   const admin = getAdminSupabase()
+  // A heartbeat is progress telemetry, not a lease renewal. The existing stale
+  // recovery contract stays authoritative; this signal is for operators.
+  const heartbeatCutoff = new Date(Date.now() - 120_000).toISOString()
+  const { data: overdueJobs, error: heartbeatScanError } = await admin.from('builder_jobs')
+    .select('id,user_id,claim_generation,last_heartbeat_at,started_at')
+    .eq('status', 'running')
+    .lt('last_heartbeat_at', heartbeatCutoff)
+    .limit(20)
+  if (heartbeatScanError) console.warn('[builder_heartbeat_scan_failed]', { code: heartbeatScanError.code })
+  for (const overdue of overdueJobs || []) {
+    console.error('[builder.continuation.heartbeat_overdue]', {
+      jobId: overdue.id, userId: overdue.user_id,
+      claimGeneration: overdue.claim_generation,
+      lastHeartbeatAt: overdue.last_heartbeat_at,
+      thresholdSeconds: 120,
+    })
+  }
   const [auditRetry, universityRetry] = await Promise.all([
     retryFailedOwnedAuditEngineRepair(admin),
     retryFailedUniversityDistillationRepair(admin),
@@ -161,6 +178,7 @@ export async function GET(request: Request) {
     ok: true,
     candidates: jobs.length,
     competencyFailuresScanned: competencyReconciliation.scanned,
+    overdueRunningJobs: overdueJobs?.length || 0,
     competencyGapsFiled: competencyReconciliation.filed,
     executed: selected ? 1 : 0,
     selectedJob: execution,

@@ -48,17 +48,17 @@ test('a slice made progress only when it saved a file or raised the passing-test
   assert.equal(builderSliceMadeProgress(null, checkpoint([write('a.js')])), true)
 })
 
-test('every job keeps its first 4 slices; slices 5-12 must each make progress; 12 is the ceiling', () => {
+test('every job keeps its first 4 slices; slices 5-24 must each make progress; 24 is the ceiling', () => {
   const progressed = checkpoint([write('a.js'), write('b.js')])
   const stalled = checkpoint([write('a.js'), failedRead('a.js')])
   const previous = checkpoint([write('a.js')])
   assert.equal(BASE_WORK_SLICES, 4)
-  assert.equal(MAX_WORK_SLICES, 12)
+  assert.equal(MAX_WORK_SLICES, 24)
   assert.equal(builderMayContinue({ claimGeneration: 2, checkpoint: previous }, stalled), true, 'the first slices are unconditional')
   assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: previous }, progressed), true)
-  assert.equal(builderMayContinue({ claimGeneration: 11, checkpoint: previous }, progressed), true)
+  assert.equal(builderMayContinue({ claimGeneration: 23, checkpoint: previous }, progressed), true)
   assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: previous }, stalled), false, 'a stuck job still stops')
-  assert.equal(builderMayContinue({ claimGeneration: 12, checkpoint: previous }, progressed), false)
+  assert.equal(builderMayContinue({ claimGeneration: 24, checkpoint: previous }, progressed), false)
 })
 
 test('a stop reports how many required files exist and which are missing', () => {
@@ -72,9 +72,9 @@ test('a stop reports how many required files exist and which are missing', () =>
 })
 
 test('the database ceiling matches the code and the migration runs through the Hub (no BEGIN/COMMIT)', () => {
-  const migration = readFileSync(new URL('../supabase/migrations/20261014060000_builder_progress_work_slices.sql', import.meta.url), 'utf8')
-  assert.match(migration, /status = 'paused' and claim_generation < 12 and checkpoint is not null/)
-  assert.match(migration, /claim_generation = p_generation and claim_generation < 12/)
+  const migration = readFileSync(new URL('../supabase/migrations/20261014130000_builder_auto_continue_productive_slices.sql', import.meta.url), 'utf8')
+  assert.match(migration, /status = 'paused' and claim_generation < 24 and checkpoint is not null/)
+  assert.match(migration, /claim_generation = p_generation and claim_generation < 24/)
   assert.doesNotMatch(migration, /^\s*(?:begin|commit)\s*;\s*$/im, 'hub_exec_sql cannot execute transaction commands')
   const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
   assert.match(store, /\.lt\('claim_generation', MAX_WORK_SLICES\)/)

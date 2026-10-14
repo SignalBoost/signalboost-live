@@ -9,7 +9,7 @@ import type { BuilderJobRecord } from './job-store.ts'
 import { builderContractObjective, builderTaskContract } from './task-contract.ts'
 
 export const BASE_WORK_SLICES = 4
-export const MAX_WORK_SLICES = 12
+export const MAX_WORK_SLICES = 24
 
 const passCount = (item: { toolId?: string; output?: unknown }): number => {
   if (item.toolId !== 'run') return 0

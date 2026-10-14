@@ -7,7 +7,7 @@ const sql = readFileSync(new URL('../supabase/migrations/20261013225000_builder_
 
 test('ordinary standard jobs defer busy RunPod with bounded retries before terminal failure', () => {
   assert.match(runner, /MAX_STANDARD_CAPACITY_DEFERRALS = 3/)
-  assert.match(runner, /job\.jobKind === 'standard' && error === 'builder_runpod_primary_busy'/)
+  assert.match(runner, /job\.jobKind === 'standard' && \(error === 'builder_runpod_primary_busy' \|\| error === 'builder_model_round_timeout'\)/)
   assert.match(runner, /metadataCount\(job, 'builderCapacityDeferrals'\) < MAX_STANDARD_CAPACITY_DEFERRALS/)
   assert.match(runner, /result\.error === 'builder_runpod_primary_busy'[\s\S]*await deferSelfHealingCapacity\(job, result\.error, trace\)/)
   assert.match(runner, /if \(await deferSelfHealingCapacity\(job, message, trace\)/)

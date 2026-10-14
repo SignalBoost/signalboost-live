@@ -128,3 +128,10 @@ test('six-file application preserves manifests and data in the Builder transport
   assert.equal(JSON.parse(files[0].content).dependencies['is-number'], '7.0.0')
   assert.equal(JSON.parse(files[4].content).length, 4)
 })
+
+test('owner Assistant polls a single accepted Builder job for eight minutes without replaying POST', () => {
+  const transport = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
+  assert.match(transport, /const BUILDER_JOB_POLL_ATTEMPTS = 240/)
+  assert.match(transport, /const BUILDER_JOB_POLL_DELAY_MS = 2_000/)
+  assert.match(transport, /\/api\/builder\?jobId=/)
+})

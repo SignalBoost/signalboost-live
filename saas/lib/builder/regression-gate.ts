@@ -34,11 +34,15 @@ function openingDirective(objective: string): string {
   return line ? line.trim() : ''
 }
 
+// A hypothetical clause describes procedure, not a defect that exists now. Production 2026-10-13: the OrderFlow build
+// said "If a test fails, identify the defect…", and "the defect" turned the whole build into a repair with no source.
+const HYPOTHETICAL_CLAUSE = /(?:^|(?<=[.!?:;\n]))[ \t]*(?:[-*>]\s+)?(?:if|unless|in case|should (?:a|an|the|any)\b)\b[^.!?\n]*[.!?]?/gim
+
 export function isRepairObjective(objective: string): boolean {
   const value = String(objective || '')
   // Pasted failure evidence is a repair request on its own: a stack trace carries no
   // repair vocabulary ("TypeError" contains no word-boundary "error").
-  if (SUPPLIED_FAILURE_EVIDENCE.test(value)) return true
+  if (SUPPLIED_FAILURE_EVIDENCE.test(value.replace(HYPOTHETICAL_CLAUSE, ' '))) return true
   if (!REPAIR_WORDS.test(value)) return false
   // A creation directive owns the objective: acceptance criteria that mention fixing,
   // errors or failures describe the artifact to be built, not an existing defect.

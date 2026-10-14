@@ -24,8 +24,13 @@ const CREATION_DIRECTIVE = /^(?:please\s+|can\s+you\s+|could\s+you\s+|i\s+need\s
 
 const SUPPLIED_FAILURE_EVIDENCE = /(?:^|\n)\s*(?:[A-Z][A-Za-z]*Error\b|Traceback\b|npm ERR!|error TS\d+)|\bexit code [1-9]\b|\bstack trace\b|\b(?:still|again|keeps?|currently|now)\s+(?:fail(?:s|ing)?|break(?:s|ing)?|broken|crash(?:es|ing)?|erroring)\b|\b(?:this|that|the|my|our)\s+(?:bug|crash|regression|defect)\b|\bdoes(?:n't| not)\s+work\b|\bnot working\b/i
 
+// A title or divider is not the instruction. Production 2026-10-13: "# COS Builder Advanced Stress Test — OrderFlow"
+// above "Build a complete … application … from scratch" hid the build directive, so acceptance criteria that mention
+// errors and failing tests turned a new build into a repair with no source.
+const TITLE_OR_DIVIDER = /^\s*(?:#{1,6}(?:\s|$)|(?:[-*_=]\s*){3,}$)/
+
 function openingDirective(objective: string): string {
-  const line = String(objective || '').split(/\r?\n/).find(item => item.trim().length > 0)
+  const line = String(objective || '').split(/\r?\n/).find(item => item.trim().length > 0 && !TITLE_OR_DIVIDER.test(item))
   return line ? line.trim() : ''
 }
 

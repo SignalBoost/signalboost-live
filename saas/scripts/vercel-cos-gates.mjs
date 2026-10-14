@@ -320,6 +320,7 @@ const tests = [
   'tests/runpodPrimaryRouting.node.test.ts',
 
   'tests/builderRepairClassification.node.test.ts',
+  'tests/builderTitledBuildRequest.node.test.ts',
 
   'tests/builderProjectContext.node.test.ts',
 

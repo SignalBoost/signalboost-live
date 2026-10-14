@@ -67,7 +67,7 @@ test('transport recovery never sends a second Builder POST', () => {
 
 test('Builder polling helper stays bounded while the accepted durable job returns immediately', () => {
   assert.match(transport, /const BUILDER_JOB_POLL_ATTEMPTS = 240/)
-  assert.match(transport, /const BUILDER_JOB_POLL_DELAY_MS = 1_500/)
+  assert.match(transport, /const BUILDER_JOB_POLL_DELAY_MS = 2_000/)
   const poll = transport.slice(transport.indexOf('async function pollBuilderJob('), transport.indexOf('async function recoverBuilderFromHistory('))
   assert.match(poll, /attempt < BUILDER_JOB_POLL_ATTEMPTS/)
   assert.match(poll, /record\.status === 'queued' \|\| record\.status === 'running' \|\| record\.status === 'paused'/)

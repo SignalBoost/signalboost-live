@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  githubFetchAuthArgs,
   repositoryDependencyCandidates,
   safeRepositoryChangedPath,
   safeRepositoryWorkspacePath,
@@ -205,3 +206,19 @@ test('Platform Engineer public evidence preserves bounded Playwright observation
   assert.doesNotMatch(block, /input\.url/)
 })
 
+
+test('public repository bootstrap does not require a GitHub token', () => {
+  const before = process.env.GITHUB_TOKEN
+  try {
+    delete process.env.GITHUB_TOKEN
+    assert.deepEqual(githubFetchAuthArgs(), [])
+    process.env.GITHUB_TOKEN = 'test-only-token'
+    const args = githubFetchAuthArgs()
+    assert.equal(args[0], '-c')
+    assert.match(args[1], /^http\.https:\/\/github\.com\/\.extraheader=AUTHORIZATION: basic /)
+    assert.equal(Buffer.from(args[1].split('basic ')[1], 'base64').toString(), 'x-access-token:test-only-token')
+  } finally {
+    if (before === undefined) delete process.env.GITHUB_TOKEN
+    else process.env.GITHUB_TOKEN = before
+  }
+})

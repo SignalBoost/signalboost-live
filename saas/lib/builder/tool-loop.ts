@@ -494,6 +494,7 @@ export class BuilderToolLoop {
     if (repairObjective && freshImplementation) repairObjective = false
     if (repairObjective && !files.length && !saved) return { ok: false, error: 'builder_source_required', trace }
     let writeCount = saved?.writeCount || 0, runCount = saved?.runCount || 0, gateNudges = saved?.gateNudges || 0
+    let verificationPending = saved?.verificationPending === true
     let browserCliStepCount = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 64, 96))
     let workRounds = saved?.workRounds || 0
@@ -501,6 +502,7 @@ export class BuilderToolLoop {
     const pause = async (): Promise<BuilderLoopResult> => {
       const checkpoint: BuilderLoopCheckpoint = {
         version: 1, workspaceId: input.workspaceId, objectiveDigest: checkpointDigest(input.objective),
+        verificationPending,
         workspaceDigest: await workspaceDigest(this.workspace, input.workspaceId), initialPaths: [...initialPaths],
         // Remote MCP payloads are turn-local evidence. They are deliberately not persisted in a
         // checkpoint; a resumed job must re-read live evidence through the governed port.
@@ -516,6 +518,40 @@ export class BuilderToolLoop {
     const outOfTime = (): boolean => Number.isFinite(deadlineAtMs)
       && deadlineAtMs - Date.now() <= ROUND_RESERVE_MS
     while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {
+      // A persisted model timeout with completed writes resumes with host verification,
+      // not another speculative model generation. Consume the flag before execution:
+      // a later pause cannot execute this same verification continuation twice.
+      if (verificationPending) {
+        verificationPending = false
+        const proof = projectContext.recommendedTestCommand
+        if (proof && projectContext.testFiles.length > 0) {
+          if (runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
+          try {
+            const currentFiles = [...workingFiles.values()]
+            const output = { ...summarizeRun(await this.runner.run({
+              workspaceId: input.workspaceId, command: proof, files: currentFiles,
+            })), sourceSnapshot: captureBuilderSource(currentFiles) }
+            const failed = output.exitCode !== 0
+            trace.push({
+              round: workRounds, toolId: 'run',
+              input: { command: output.executedCommand || proof, ...(output.executedCommand ? { requestedCommand: proof } : {}) },
+              ok: !failed, output,
+              ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
+            })
+            runCount += 1
+            completedRunsInCurrentWorkspaceState.add(proof)
+            // A failing test remains grounded evidence for the next repair round.
+            // A passing subset alone does not satisfy the complete task contract.
+            if (!failed && builderTaskProgress(task, workspacePaths, trace).satisfied
+              && evaluateRegressionGate(gateObjective, trace, repairObjective).satisfied) {
+              return { ok: true, answer: 'Builder verified the saved workspace using the recorded test command.', trace }
+            }
+          } catch (error) {
+            return { ok: false, error: `builder_verification_continuation_failed:${error instanceof Error ? error.message : 'unknown'}`, trace }
+          }
+        }
+      }
+
       if (outOfTime()) return input.shouldPause ? pause() : { ok: false, error: 'builder_time_budget_reached', trace }
       if (input.shouldPause?.()) return pause()
       if (input.deadlineAtMs && input.deadlineAtMs - Date.now() < (input.minimumStepMs ?? 110_000)) return pause()
@@ -779,6 +815,11 @@ export class BuilderToolLoop {
           }
         } catch (error) {
           if (input.shouldPause && error instanceof Error && error.message === 'builder_turn_timeout') return pause()
+          if (input.shouldPause && error instanceof Error && error.message === 'builder_model_round_timeout' && writeCount > 0) {
+            verificationPending = true
+            attempt = Math.max(0, attempt - 1)
+            return pause()
+          }
           if (!isOutputTruncation(error)) {
             return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
           }

@@ -1,2 +1,2 @@
-base_sha=dd80cbe621db9ff4b0fb64ae01998c41aad310f9
-branch=feat/builder-shared-runpod-health-20261014
+base_sha=588f67646e64cccfe0b95ff46d800b1b90717841
+branch=fix/builder-unclaimed-recovery-rpc-rebased-20261014

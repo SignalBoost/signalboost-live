@@ -143,3 +143,10 @@ test('Builder primary timeout is shorter than full model round and preserves con
   assert.match(port, /callLocalModel\(\{/)
   assert.match(runner, /modelRoundTimeoutMs: 55_000/)
 })
+
+test('model round timeouts enter durable capacity handling without a same-slice retry', () => {
+  const source = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.match(source, /if \(capacity\) return capacityStop\(capacity\)/)
+  assert.doesNotMatch(source, /TIME LIMIT RECOVERY:/)
+  assert.match(source, /OUTPUT LIMIT RECOVERY:/)
+})

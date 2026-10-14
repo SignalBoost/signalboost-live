@@ -37,19 +37,33 @@ async function queuedOwnedRepair(
 
 // Only retry a previously deferred standard job, never an arbitrary queued POST.
 // A cooldown avoids repeatedly contending for the same busy RunPod slot.
+export function builderCapacityRetryDelayMs(deferrals: number): number {
+  // Persisted deferral count and updated_at form a durable backoff clock. Never spin
+  // within a single cron invocation when the only model is unavailable.
+  const attempts = Math.max(1, Math.min(8, Math.floor(Number(deferrals) || 1)))
+  return Math.min(15 * 60_000, 30_000 * 2 ** (attempts - 1))
+}
+
+// Only retry a previously deferred standard job after its durable backoff expires.
+// Selection is read-only; claim_builder_job_slice remains the concurrency fence.
 async function queuedCapacityRecovery(): Promise<{ id: string; userId: string } | null> {
   const db = getAdminSupabase()
-  const cutoff = new Date(Date.now() - 60_000).toISOString()
-  const { data, error } = await db.from('builder_jobs').select('id,user_id')
+  const { data, error } = await db.from('builder_jobs')
+    .select('id,user_id,updated_at,metadata')
     .eq('status', 'queued').eq('job_kind', 'standard')
     .not('metadata->>builderCapacityDeferredReason', 'is', null)
-    .lte('updated_at', cutoff)
-    .order('updated_at', { ascending: true }).limit(1).maybeSingle()
+    .order('updated_at', { ascending: true }).limit(30)
   if (error) {
     console.warn('[builder_capacity_queue_read_failed]', { message: error.message })
     return null
   }
-  return data?.id && data?.user_id ? { id: String(data.id), userId: String(data.user_id) } : null
+  const now = Date.now()
+  const due = (data || []).find(job => {
+    const deferredAt = Date.parse(String(job.updated_at || ''))
+    const attempts = Number(job.metadata?.builderCapacityDeferrals || 1)
+    return Number.isFinite(deferredAt) && now - deferredAt >= builderCapacityRetryDelayMs(attempts)
+  })
+  return due?.id && due?.user_id ? { id: String(due.id), userId: String(due.user_id) } : null
 }
 
 async function queuedOwnedSelfHealingRepairs(): Promise<QueuedOwnedRepair[]> {

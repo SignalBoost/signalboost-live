@@ -50,3 +50,10 @@ test('accepted requests expose verifying status without a second POST', () => {
   assert.match(runner, /result\.checkpoint\.verificationPending/)
   assert.match(source, /\}, \{ status: 202 \}\)/)
 })
+
+test('job reads include the checkpoint column so verifying status is reachable', () => {
+  const source = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
+  const select = source.match(/const JOB_SELECT = '([^']*)'/)?.[1] ?? ''
+  assert.ok(select.split(',').includes('checkpoint'),
+    'JOB_SELECT must include checkpoint or the paused verifying status is unreachable')
+})

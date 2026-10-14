@@ -19,7 +19,7 @@ test('capacity queue is cron-owned, cooled down, one job per tick and never repl
   assert.match(cron, /builderCapacityDeferredReason/)
   assert.match(cron, /builderCapacityRetryDelayMs\(attempts\)/)
   assert.match(cron, /now - deferredAt >= builderCapacityRetryDelayMs\(attempts\)/)
-  assert.match(cron, /if \(selected\) await runBuilderJob\(selected\.id, selected\.userId\)/)
+  assert.match(cron, /const selected = jobs\[0\] \|\| null/)\n  assert.match(cron, /if \(selected\) \{[\s\S]*await runBuilderJob\(selected\.id, selected\.userId\)/)\n  assert.doesNotMatch(cron, /Promise\.all\(jobs\.map/)
   assert.doesNotMatch(cron, /enqueueBuilderJob\(/)
 })
 test('capacity deferral enforces identity, generation, bounded retry and preserves checkpoint', () => {

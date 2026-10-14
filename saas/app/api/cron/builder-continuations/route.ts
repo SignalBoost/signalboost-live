@@ -95,6 +95,20 @@ export async function GET(request: Request) {
   })
   if (staleRecoveryError) console.warn('[builder_stale_claim_requeue_failed]', { message: staleRecoveryError.message })
   const continuations = await listBuilderContinuations()
+  // Reconciliation visibility: the scheduler deliberately executes only one job per
+  // tick. Report the remaining durable backlog rather than implying a quiet tick
+  // means all approved work has completed.
+  const { count: pendingContinuationCount, error: backlogError } = await db
+    .from('builder_jobs').select('id', { count: 'exact', head: true })
+    .eq('status', 'paused').eq('job_kind', 'standard')
+    .not('checkpoint', 'is', null)
+  if (backlogError) console.warn('[builder.continuation.backlog_read_failed]', { code: backlogError.code })
+  else if ((pendingContinuationCount ?? 0) > 0) console.info('[builder.continuation.backlog]', {
+    pending: pendingContinuationCount,
+    selectedCandidates: continuations.length,
+    // Some checkpointed jobs may be exhausted or waiting on a customer decision.
+    // Never claim they are runnable just because the checkpoint exists.
+  })
   const competencyReconciliation = await reconcileBuilderCompetencyGaps({ lookbackHours: 72, limit: 50 })
     .catch(error => {
       console.warn('[builder_competency_gap_reconciliation_failed]', {
@@ -177,6 +191,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     candidates: jobs.length,
+    pendingCheckpointedJobs: backlogError ? null : pendingContinuationCount,
     competencyFailuresScanned: competencyReconciliation.scanned,
     overdueRunningJobs: overdueJobs?.length || 0,
     competencyGapsFiled: competencyReconciliation.filed,

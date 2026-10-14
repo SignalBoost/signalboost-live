@@ -112,3 +112,28 @@ export async function recordLocalInferenceUsage(record: LocalInferenceUsageRecor
   const result = await db.from('provider_inference_usage').insert(row)
   if (result.error) throw result.error
 }
+
+/**
+ * Builder RunPod health shared by every serverless instance. Production 2026-10-14 (OrderFlow job 4eb4a2e5): an
+ * in-memory breaker lives in one instance, so each new instance probed a failing RunPod again — 80 of 98 Builder RunPod
+ * calls timed out (17.5-52s each, no output) before the configured fallback answered in ~8s. The recorded usage rows are
+ * the shared state: when the two most recent Builder RunPod calls in the last two minutes both timed out, skip RunPod
+ * and use the fallback the timeout would reach anyway. With no new RunPod rows the window drains and RunPod is probed again.
+ */
+export const BUILDER_RUNPOD_HEALTH_WINDOW_MS = 120_000
+
+export function builderRunpodRowsTimedOut(rows: ReadonlyArray<{ success?: unknown; finish_reason?: unknown }>): boolean {
+  return rows.length >= 2 && rows.slice(0, 2).every(row => row.success === false && String(row.finish_reason || '').startsWith('timeout:'))
+}
+
+export async function builderRunpodRecentlyTimingOut(nowMs = Date.now()): Promise<boolean> {
+  const db = serviceDb()
+  if (!db) return false
+  const { data, error } = await db.from('provider_inference_usage').select('success,finish_reason')
+    .eq('feature', 'builder_runpod_primary')
+    .gte('created_at', new Date(nowMs - BUILDER_RUNPOD_HEALTH_WINDOW_MS).toISOString())
+    .order('created_at', { ascending: false }).limit(2)
+  // An unreadable health record never blocks the owned model: probe it as before.
+  if (error || !data) return false
+  return builderRunpodRowsTimedOut(data)
+}

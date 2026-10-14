@@ -165,3 +165,12 @@ test('failed host verification does not spend successful run budget', () => {
   assert.match(src, /if \(!failed\) runCount \+= 1\s+continue/)
   assert.match(src, /if \(!failed\) runCount \+= 1\s+if \(!failed && evaluateRegressionGate/)
 })
+
+test('Builder terminal success requires full verification after the latest source change', () => {
+  const source = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(source, /builderTaskProgress\(contract, files, result\.trace\)/)
+  assert.match(source, /const latestSourceChange = result\.trace\.findLastIndex/)
+  assert.match(source, /latestSuite\.ok !== true/)
+  assert.match(source, /builder_verification_incomplete/)
+  assert.ok(source.indexOf('builder_verification_incomplete') < source.indexOf('if (verifiedBuilderCognitiveApplication(result))'))
+})

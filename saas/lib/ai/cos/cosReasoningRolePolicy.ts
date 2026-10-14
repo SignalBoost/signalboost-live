@@ -166,10 +166,22 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
   return evidence && EXPLICIT_CODE_QUESTION.test(objective)
 }
 
+// Long structured application specifications may put filenames after the 2,000-character
+// routing preview. Accept only explicit executable build requests backed by concrete
+// source paths or a named runtime; general product descriptions remain non-executable.
+function structuredApplicationBuild(prompt: string): boolean {
+  const body = String(prompt || '').slice(0, 12_000)
+  return /\b(?:build|create|implement)\b[\s\S]{0,200}\b(?:application|app|project|system)\b/i.test(body)
+    && /\b(?:required files|file structure|project structure|create all|create the following files)\b/i.test(body)
+    && /(?:^|[\s`'"(])(?:src|test|tests)\/[\w.-]+\.(?:[cm]?js|tsx?|jsx|py)\b/m.test(body)
+    && /\b(?:npm test|node --test|run these commands|automated tests|test runner)\b/i.test(body)
+}
+
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
+  if (structuredApplicationBuild(prompt)) return true
   if (attachedSourceIsTheJob(prompt, context)) return true
   if (pastedSourceCode(objective)) return pastedSourceExecutionAuthorized(objective)
   if (!executableBuilderAction(objective)) return false

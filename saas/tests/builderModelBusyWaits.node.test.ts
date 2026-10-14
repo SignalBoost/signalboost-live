@@ -84,3 +84,14 @@ test('a Builder job a person started claims GPU priority; background Self-Healin
   assert.match(runnerSource, /createBuilderCodingAiPort\(\{ yieldToChat: selfHealingCapacityJob\(job\) \}\)/)
 })
 // end of saas/tests/builderModelBusyWaits.node.test.ts (if this line is missing, the paste was cut short)
+
+test('RunPod busy attempts assigned fallback before durable queueing', () => {
+  const source = readFileSync(new URL('../lib/cos/aiPort.ts', import.meta.url), 'utf8')
+  const port = source.slice(source.indexOf('export function createBuilderCodingAiPort('), source.indexOf('export function createLocalApplianceAiPort('))
+  const busyIndex = port.indexOf("const runpodBusy = runpod.attempted && runpod.reason === 'runpod_primary_busy'")
+  const assignedIndex = port.indexOf('await tryAssignedPlatformModelTurn(', busyIndex)
+  const queueIndex = port.indexOf("if (runpodBusy) throw new Error('builder_runpod_primary_busy')", assignedIndex)
+  assert.ok(busyIndex >= 0 && assignedIndex > busyIndex && queueIndex > assignedIndex)
+  assert.match(port.slice(assignedIndex, queueIndex), /if \(assigned\.attempted\) return requireText/)
+  assert.doesNotMatch(port.slice(busyIndex, assignedIndex), /throw new Error\('builder_runpod_primary_busy'\)/)
+})

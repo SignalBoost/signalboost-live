@@ -66,6 +66,25 @@ async function queuedCapacityRecovery(): Promise<{ id: string; userId: string } 
   return due?.id && due?.user_id ? { id: String(due.id), userId: String(due.user_id) } : null
 }
 
+// Reconcile queued customer work whose initial after() worker never claimed it.
+// Only dispatch preexisting server-stored jobs; never reconstruct or replay a POST.
+// Wait at least six minutes to avoid racing healthy initial dispatches.
+async function queuedUnclaimedBuilderJob(): Promise<{ id: string; userId: string } | null> {
+  const db = getAdminSupabase()
+  const { data, error } = await db.from('builder_jobs')
+    .select('id,user_id')
+    .eq('status', 'queued').eq('job_kind', 'standard')
+    .eq('claim_generation', 0)
+    .lt('created_at', new Date(Date.now() - 6 * 60_000).toISOString())
+    .order('created_at', { ascending: true }).limit(1)
+  if (error) {
+    console.error('[builder_unclaimed_queue_read_failed]', { code: error.code })
+    return null
+  }
+  const job = data?.[0]
+  return job?.id && job?.user_id ? { id: String(job.id), userId: String(job.user_id) } : null
+}
+
 async function queuedOwnedSelfHealingRepairs(): Promise<QueuedOwnedRepair[]> {
   const [productionRecovery, site, audit, university] = await Promise.all([
     queuedOwnedRepair('selfHealingProductionRecovery', 'production-recovery'),
@@ -138,16 +157,17 @@ export async function GET(request: Request) {
     retryFailedOwnedAuditEngineRepair(admin),
     retryFailedUniversityDistillationRepair(admin),
   ])
-  const [ownedRepairs, playwrightCliCanary, capacityRecovery] = await Promise.all([
+  const [ownedRepairs, playwrightCliCanary, capacityRecovery, unclaimedRecovery] = await Promise.all([
     queuedOwnedSelfHealingRepairs(),
     queuedOwnedRepair('builderPlaywrightCliCanary', 'playwright-cli-canary'),
     queuedCapacityRecovery(),
+    queuedUnclaimedBuilderJob(),
   ])
   const unique = new Map<string, { id: string; userId: string }>()
   // Preserve paused Builder continuations first. A deliberately queued owner acceptance canary is
   // next so a large Self-Healing backlog cannot starve explicit production proof indefinitely.
   // The canary consumes at most one scheduler tick; no repair job is removed or reclassified.
-  for (const job of [...continuations, ...(playwrightCliCanary ? [playwrightCliCanary] : []), ...(capacityRecovery ? [capacityRecovery] : []), ...ownedRepairs]) {
+  for (const job of [...continuations, ...(playwrightCliCanary ? [playwrightCliCanary] : []), ...(capacityRecovery ? [capacityRecovery] : []), ...(unclaimedRecovery ? [unclaimedRecovery] : []), ...ownedRepairs]) {
     unique.set(job.id, { id: job.id, userId: job.userId })
   }
   const jobs = [...unique.values()]
@@ -221,6 +241,7 @@ export async function GET(request: Request) {
     ownedAuditRepairQueued: ownedRepairs.some(job => job.kind === 'audit'),
     universityDistillationRepairQueued: ownedRepairs.some(job => job.kind === 'university'),
     playwrightCliCanaryQueued: playwrightCliCanary !== null,
+    unclaimedRecoveryQueued: unclaimedRecovery !== null,
     ownedAuditRepairRetried: auditRetry.retried,
     ownedAuditRepairRetryAttempt: auditRetry.attempt,
     universityDistillationRepairRetried: universityRetry.retried,

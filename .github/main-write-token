@@ -1,2 +1,2 @@
-base_sha=a43428fc64a292e99ced86e8ef25c12569a272c6
-branch=fix/builder-playwright-truncated-diagnostics-20261014
+base_sha=efe5d7863fe8a41e625a376f6eba1c9eaf7c8777
+branch=test/builder-integrated-synthetic-acceptance-20261014

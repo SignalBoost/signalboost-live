@@ -78,7 +78,7 @@ test('the browser sends Builder POST once and polls read-only status', () => {
   assert.match(boundary, /method: 'POST'/)
   assert.match(boundary, /`\/api\/builder\?jobId=\$\{encodeURIComponent\(jobId\)\}`/)
   assert.match(boundary, /method: 'GET'/)
-  assert.match(boundary, /BUILDER_JOB_POLL_ATTEMPTS = 20/)
+  assert.match(boundary, /BUILDER_JOB_POLL_ATTEMPTS = 240/)
   assert.match(boundary, /BUILDER_JOB_POLL_DELAY_MS = 1_500/)
   assert.match(boundary, /BUILDER_HISTORY_POLL_ATTEMPTS = 11/)
   assert.match(boundary, /BUILDER_HISTORY_POLL_DELAY_MS = 2_500/)

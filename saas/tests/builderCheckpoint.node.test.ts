@@ -72,6 +72,25 @@ test('checkpoint rejects changed scope and changed files without model or execut
   assert.equal(result.error, 'builder_checkpoint_workspace_changed')
 })
 
+test('malformed checkpoint collections are rejected before model or tools execute', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('corrupt', 'existing.js', 'console.log(1)')
+  const blocked = { async generate(): Promise<string> { assert.fail('no model call') } }
+  const runner = { async run(): Promise<never> { assert.fail('no execution') } }
+  const initial = await new BuilderToolLoop(blocked, workspace, runner).run({
+    objective, workspaceId: 'corrupt', shouldPause: () => true,
+  })
+  if (initial.ok || !initial.checkpoint) assert.fail('expected checkpoint')
+  for (const field of ['workingFiles', 'initialPaths', 'inspections', 'mutations', 'runs', 'chunks', 'documentationPaths'] as const) {
+    const checkpoint = { ...initial.checkpoint, [field]: 'invalid checkpoint collection' }
+    const result = await new BuilderToolLoop(blocked, workspace, runner).run({
+      objective, workspaceId: 'corrupt', checkpoint: checkpoint as typeof initial.checkpoint,
+    })
+    assert.equal(result.ok, false, field)
+    if (!result.ok) assert.equal(result.error, 'builder_checkpoint_invalid', field)
+  }
+})
+
 test('creation resumes with original file classification and does not rerun a completed proof', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const objective = 'Create:\n- first.js\n- second.js\nRun:\nnode first.js\nnode second.js'

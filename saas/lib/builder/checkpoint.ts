@@ -47,5 +47,12 @@ export async function validateBuilderCheckpoint(value: BuilderLoopCheckpoint, wo
   if ([value.writeCount, value.runCount, value.workRounds, value.attempt, value.gateNudges]
     .some(count => !Number.isSafeInteger(count) || count < 0 || count > 200)
     || !Array.isArray(value.trace) || value.trace.length > 200
+    || !Array.isArray(value.workingFiles) || value.workingFiles.length > 200
+    || !Array.isArray(value.initialPaths) || value.initialPaths.length > 200
+    || !Array.isArray(value.inspections) || value.inspections.length > 200
+    || !Array.isArray(value.mutations) || value.mutations.length > 200
+    || !Array.isArray(value.runs) || value.runs.length > 200
+    || (value.chunks !== undefined && (!Array.isArray(value.chunks) || value.chunks.length > 200))
+    || (value.documentationPaths !== undefined && (!Array.isArray(value.documentationPaths) || value.documentationPaths.length > 200))
     || Buffer.byteLength(JSON.stringify(value)) > 4_000_000) throw new Error('builder_checkpoint_invalid')
 }

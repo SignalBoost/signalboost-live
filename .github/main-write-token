@@ -1,2 +1,2 @@
-base_sha=588f67646e64cccfe0b95ff46d800b1b90717841
-branch=fix/builder-unclaimed-recovery-rpc-rebased-20261014
+base_sha=9e018e7aff1ec1eccbfeedb8db10923a5146ef8d
+branch=fix/concierge-orderflow-fixture-ci-20261014

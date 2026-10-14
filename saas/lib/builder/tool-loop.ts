@@ -725,7 +725,7 @@ export class BuilderToolLoop {
         !String(item.error || '').startsWith('builder_repeated_tool_call:'))
       const failingTestOutput = latestFailedVerification && isRecord(latestFailedVerification.output)
         ? String(latestFailedVerification.output.stdout || latestFailedVerification.output.stderr || '') : ''
-      const failingTestNames = [...failingTestOutput.matchAll(/^\\s*[✖×]\\s+(.+)$/gm)]
+      const failingTestNames = [...failingTestOutput.matchAll(/^\s*[✖×]\s+(.+)$/gm)]
         .map(match => match[1].trim()).filter(name => name && !name.startsWith('failing tests:'))
       const targetedFailureGuidance = latestFailedVerification
         ? `UNRESOLVED FULL-SUITE FAILURE: The previous required test command exited nonzero. A passing smoke run is not proof. Failing test names: ${JSON.stringify([...new Set(failingTestNames)].slice(0, 12))}. Failure assertions and stack traces: ${failingTestOutput.slice(-9000)}. Inspect the implicated implementation and tests, edit the minimal source needed, run a focused test, then rerun the original full suite after the edit. Do not re-run unchanged failing tests or claim completion.`

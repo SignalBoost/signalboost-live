@@ -24,3 +24,6 @@ tsbuildinfo
 
 # Generated QA reports
 qa/*.md
+
+# Private Cursor REA evidence: never commit inspected application data
+rea-local-results/

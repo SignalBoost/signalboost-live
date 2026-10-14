@@ -1,2 +1,2 @@
-base_sha=63e80e95c39c74808c991d65b20176afaaebccac
-branch=fix/builder-cron-running-claim-admission-20261014
+base_sha=04c89416e31aa65ada4967e34b1ce0899d92f422
+branch=fix/builder-gate-stale-timeout-contracts-20261014

@@ -841,16 +841,13 @@ export class BuilderToolLoop {
           // A timed-out model call has produced no control and is not useful work.
           // Never immediately launch an identical expensive model call inside this slice:
           // persist the checkpoint and defer to the next capacity-scheduled attempt.
-          const roundTimeout = false
           const capacity = input.shouldPause ? capacityReason(error) : null
           if (capacity) return capacityStop(capacity)
-          if (!isOutputTruncation(error) && !roundTimeout) {
+          if (!isOutputTruncation(error)) {
             return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
           }
           try {
-            response = roundTimeout
-              ? await generateControl(controlBudget, 'TIME LIMIT RECOVERY: The previous response did not finish within the model time limit and NOTHING from it was written. Keep this response short. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset (final:true only on the last chunk); continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
-              : await generateControl(controlBudget * 2, 'OUTPUT LIMIT RECOVERY: The previous response was truncated and NOTHING from it was written. Do not repeat a whole large file. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset and final:false; continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
+            response = await generateControl(controlBudget * 2, 'OUTPUT LIMIT RECOVERY: The previous response was truncated and NOTHING from it was written. Do not repeat a whole large file. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset and final:false; continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
           } catch (retryError) {
             if (input.shouldPause && retryError instanceof Error && retryError.message === 'builder_turn_timeout') return pause()
             const retryCapacity = input.shouldPause ? capacityReason(retryError) : null

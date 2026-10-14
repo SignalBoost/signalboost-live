@@ -795,7 +795,16 @@ export class BuilderToolLoop {
         formatContractOscillation(detectContractOscillation(trace)),
         targetedFailureGuidance,
         currentStep,
-        'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; search_files => {"type":"tool","toolId":"search_files","input":{"query":"exact text or symbol"}}; mcp_read => {"type":"tool","toolId":"mcp_read","input":{"providerId":"provider-id","capabilityId":"exact-capability-id","args":{}}}; browser_cli => {"type":"tool","toolId":"browser_cli","input":{"action":"open|goto|snapshot|find|console|requests|close","url":"https://allowed.example/path","query":"optional search/filter","target":"optional snapshot target","level":"error|warning|info|debug"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
+        'TOOL INPUT SCHEMAS: ' + ([
+          ['list_files', '{"type":"tool","toolId":"list_files","input":{}}'],
+          ['read_file', '{"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}'],
+          ['search_files', '{"type":"tool","toolId":"search_files","input":{"query":"exact text or symbol"}}'],
+          ['mcp_read', '{"type":"tool","toolId":"mcp_read","input":{"providerId":"provider-id","capabilityId":"exact-capability-id","args":{}}}'],
+          ['browser_cli', '{"type":"tool","toolId":"browser_cli","input":{"action":"open|goto|snapshot|find|console|requests|close","url":"https://allowed.example/path","query":"optional search/filter","target":"optional snapshot target","level":"error|warning|info|debug"}}'],
+          ['write_file', '{"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}'],
+          ['edit_file', '{"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}'],
+          ['run', '{"type":"tool","toolId":"run","input":{"command":"command"}}'],
+        ] as const).filter(([toolId]) => availableTools.includes(toolId)).map(([, schema]) => schema).join('; '),
         'LARGE NEW FILES: write_file accepts {path, mode:"append", offset:0, content:"first chunk", final:false}. Continue with the returned offset (JavaScript string length), chunks of at most 2000 characters (the storage limit is 12000, but the JSON output token budget is smaller), and final:true on the last chunk. Assembly publishes one complete file only at final=true. Append is for new files only; never use it to overwrite existing source. read_file accepts optional startLine/endLine for large files (1-based, at most 200 lines per read). A read returns whole lines up to about 7,500 characters; when nextStartLine is present, read from it to see the rest of the file.',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
         availableTools.includes('read_file')

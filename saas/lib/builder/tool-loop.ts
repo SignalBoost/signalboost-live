@@ -1012,7 +1012,11 @@ export class BuilderToolLoop {
         if (++gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_verification_order_required', trace }
         continue
       }
-      if (mutation && !repairObjective && progress.missingFiles.length > 0
+      const observedFailureSinceChange = trace.slice(lastWorkspaceChange + 1).some(item =>
+        item.toolId === 'run' && !item.ok
+        && (item.output as { exitCode?: number } | undefined)?.exitCode !== 0
+        && !String(item.error || '').startsWith('builder_repeated_tool_call:'))
+      if (mutation && !repairObjective && !observedFailureSinceChange && progress.missingFiles.length > 0
         && action.input.mode !== 'append' && workspacePaths.includes(toolPath(action.input)) && !initialPaths.has(toolPath(action.input))) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false,
           error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })
@@ -1028,6 +1032,13 @@ export class BuilderToolLoop {
           && readFingerprint(item.input) === fingerprint)
       if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint) && !rereadOfHiddenSource) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
+        continue
+      }
+      // Once a command has failed on the current source revision, repeating it cannot change the
+      // outcome. Read the implicated source, resolve contradictory assertions, then edit it.
+      if (action.toolId === 'run' && observedFailureSinceChange) {
+        trace.push({ round, toolId: 'run', input: action.input, ok: false,
+          error: 'builder_failed_command_unchanged: inspect failed assertions and edit the source or tests before rerunning' })
         continue
       }
       // Replaying an unchanged passing command cannot establish missing test coverage.

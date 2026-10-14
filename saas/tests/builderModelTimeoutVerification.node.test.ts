@@ -42,6 +42,33 @@ test('writes then model timeout saves a verification-first continuation, not a f
   assert.ok(modelSawVerification || second.ok, 'a passing proof may complete directly; otherwise model sees proof')
   assert.equal(second.ok, true)
 })
+test('a timeout after files were already tested does not re-run the tests on unchanged files (job 4eb4a2e5)', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const executions: string[] = []
+  const runner = { async run(input: { command: string }) {
+    executions.push(input.command)
+    return { executedCommand: input.command, exitCode: 1, stdout: 'ℹ tests 1\nℹ pass 0\nℹ fail 1\n', stderr: '', timedOut: false }
+  } }
+  let calls = 0
+  const first = await new BuilderToolLoop({ async generate() {
+    calls += 1
+    if (calls === 1) return action('app.js', "module.exports = () => 41;\n")
+    if (calls === 2) return action('app.test.js', "const { test } = require('node:test'); const assert = require('node:assert/strict'); test('value', () => assert.equal(require('./app')(), 42));\n")
+    if (calls === 3) return JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node --test app.test.js' } })
+    throw new Error('builder_model_round_timeout')
+  } }, workspace, runner).run({ objective, workspaceId: 'tested-then-timeout', shouldPause: () => false })
+  const checkpoint = first.ok === false ? first.checkpoint : undefined
+  assert.ok(checkpoint)
+  const testedBeforeTimeout = executions.length
+  assert.ok(testedBeforeTimeout >= 1, 'the saved files were already tested in the first slice')
+  let executionsAtModelCall = -1
+  await new BuilderToolLoop({ async generate() {
+    executionsAtModelCall = executions.length
+    throw new Error('test_stops_here')
+  } }, workspace, runner).run({ objective, workspaceId: 'tested-then-timeout', checkpoint, shouldPause: () => false })
+  assert.equal(executionsAtModelCall, testedBeforeTimeout, 'no repeated test run before the model resumes the repair')
+})
+
 test('accepted requests expose verifying status without a second POST', () => {
   const source = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')

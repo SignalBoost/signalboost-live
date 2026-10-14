@@ -313,9 +313,13 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
   let job: BuilderJobRecord | null = null
   let lastTrace: readonly BuilderToolTrace[] = []
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  const executionStartedAt = Date.now()
+  let claimGeneration: number | null = null
   try {
     job = await claimBuilderJob(jobId, userId)
     if (!job) return
+    claimGeneration = job.claimGeneration
+    console.info('[builder_job_lifecycle]', { phase: 'claimed', jobId, claimGeneration, workspaceId: job.workspaceId, jobKind: job.jobKind })
     // Fenced observability writes never extend the existing six-minute execution lease.
     // The worker remains authoritative for its lifecycle, regardless of telemetry health.
     const activeJob = job
@@ -633,6 +637,10 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     }
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer)
+    // Correlate job slices without logging objectives, prompts, secrets or file contents.
+    if (claimGeneration !== null) console.info('[builder_job_lifecycle]', {
+      phase: 'slice_finished', jobId, claimGeneration, elapsedMs: Date.now() - executionStartedAt,
+    })
   }
 }
 

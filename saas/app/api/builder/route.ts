@@ -84,6 +84,18 @@ export async function GET(request: Request) {
           jobId: job.id,
           workspaceId: job.workspaceId,
           status: job.status,
+          progress: {
+            phase: job.checkpoint?.verificationPending === true ? 'verification'
+              : job.status === 'queued' ? 'queued' : job.status === 'paused' ? 'checkpointed' : 'model',
+            lastActivityAt: job.updatedAt,
+            claimGeneration: job.claimGeneration,
+            filesWritten: job.checkpoint?.workingFiles?.length ?? null,
+            workRounds: job.checkpoint?.workRounds ?? null,
+            modelTimeoutDeferrals: Number(job.metadata.builderCapacityDeferrals || 0),
+            queueReason: typeof job.metadata.builderCapacityDeferredReason === 'string'
+              ? job.metadata.builderCapacityDeferredReason : null,
+            lastTest: [...(job.checkpoint?.trace || [])].reverse().find(item => item.toolId === 'run')?.output ?? null,
+          },
           reply: job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
             ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'
             : job.status === 'paused' && job.checkpoint?.verificationPending === true

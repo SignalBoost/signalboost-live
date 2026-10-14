@@ -557,7 +557,7 @@ export class BuilderToolLoop {
               ok: !failed, output,
               ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
             })
-            runCount += 1
+            if (!failed) runCount += 1
             completedRunsInCurrentWorkspaceState.add(proof)
             // A failing test remains grounded evidence for the next repair round.
             // A passing subset alone does not satisfy the complete task contract.
@@ -985,7 +985,7 @@ export class BuilderToolLoop {
               output,
               ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
             })
-            runCount += 1
+            if (!failed) runCount += 1
             continue
           }
           if (proofCommand && failedProof && edited && !verifiedAfterFail) {
@@ -1001,7 +1001,7 @@ export class BuilderToolLoop {
               output,
               ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
             })
-            runCount += 1
+            if (!failed) runCount += 1
             if (!failed && evaluateRegressionGate(gateObjective, trace, true).satisfied && builderTaskProgress(task, workspacePaths, trace).satisfied) return { ok: true, answer: action.answer, trace }
             continue
           }

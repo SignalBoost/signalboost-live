@@ -29,3 +29,13 @@ test('capacity deferral enforces identity, generation, bounded retry and preserv
   assert.doesNotMatch(sql, /checkpoint = null/)
   assert.doesNotMatch(sql, /delete from public\.builder_workspace_files/i)
 })
+
+test('ordinary model-round timeouts retain the same durable job for bounded queue recovery', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261013231500_builder_standard_model_timeout_deferral.sql', import.meta.url), 'utf8')
+  assert.match(runner, /error === 'builder_runpod_primary_busy' \|\| error === 'builder_model_round_timeout'/)
+  assert.match(runner, /result\.error === 'builder_runpod_primary_busy' \|\| result\.error === 'builder_model_round_timeout'/)
+  assert.match(migration, /p_reason not in \('builder_runpod_primary_busy', 'builder_model_round_timeout'\)/)
+  assert.match(migration, /builderCapacityDeferredReason' in \('builder_runpod_primary_busy', 'builder_model_round_timeout'\)/)
+  assert.match(migration, /v_timeout_deferrals >= 3/)
+  assert.doesNotMatch(migration, /checkpoint = null|delete from public\.builder_workspace_files/i)
+})

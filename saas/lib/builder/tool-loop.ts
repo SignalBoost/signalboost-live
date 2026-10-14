@@ -749,7 +749,7 @@ export class BuilderToolLoop {
         // A full listing is already in the recorded trace. On a new multi-file build,
         // requesting it again instead of writing the next missing file wastes a
         // model inference round (observed OrderFlow 3cba0358, claim 3).
-        .filter(toolId => toolId !== 'list_files' || repairObjective || task.files.length === 0 ||
+        .filter(toolId => toolId !== 'list_files' || repairObjective || task.files.length <= 1 ||
           progress.missingFiles.length === 0 || !trace.some(item => item.toolId === 'list_files' && item.ok))
         .filter(toolId => toolId !== 'search_files' || typeof this.workspace.searchFiles === 'function')
         .filter(toolId => toolId !== 'mcp_read' || mcpCapabilities.length > 0)

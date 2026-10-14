@@ -26,6 +26,10 @@ const MAX_BROWSER_CLI_STEPS_PER_TURN = 20
 const MAX_GATE_NUDGES = 3
 const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const MAX_MODEL_ROUND_ATTEMPTS = 2
+// One GPU serves Builder. Production 2026-10-13 (workspace b756499e): an owner's OrderFlow build ended permanently on
+// builder_runpod_primary_busy after two writes because another job held the model slot. A busy model is a wait, not a
+// failure: a durable job retries the same round after this pause and, when its slice ends first, saves its progress.
+const MODEL_BUSY_RETRY_MS = 5_000
 const MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS = 1
 const MAX_REPAIR_INSPECTIONS_AFTER_FAILURE = 3
 // Rejected repeats execute nothing, so they never consume a work round. Without this bound a resident that keeps
@@ -755,7 +759,17 @@ export class BuilderToolLoop {
         // retry the same round once with double the room, and never parse the fragment.
         let response: string | null
         try {
-          response = await generateControl(controlBudget)
+          for (;;) {
+            try {
+              response = await generateControl(controlBudget)
+              break
+            } catch (busyError) {
+              if (!input.shouldPause || !(busyError instanceof Error) || busyError.message !== 'builder_runpod_primary_busy') throw busyError
+              // The round produced nothing: it is redone after the wait or on resume, never counted as work.
+              if (input.shouldPause() || outOfTime()) { attempt -= 1; return pause() }
+              await new Promise(resolve => setTimeout(resolve, MODEL_BUSY_RETRY_MS))
+            }
+          }
         } catch (error) {
           if (input.shouldPause && error instanceof Error && error.message === 'builder_turn_timeout') return pause()
           if (!isOutputTruncation(error)) {

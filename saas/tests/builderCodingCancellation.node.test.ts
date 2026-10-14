@@ -15,7 +15,7 @@ test('cancelling a coder graduate prevents remaining graduates and paid fallback
       '@/lib/ai/cos/cosUniversityGraduateRuntime': 'export async function activeGraduateRuntimesForRole(){return [{inference:{}},{inference:{}}]}',
       '@/lib/ai/cos/reasoningEvaluationContext': 'export function currentReasoningEvaluationContext(){return null}',
       '@/lib/ai/cos/runpodPrimaryInference': 'export function tryRunpodPrimaryInference(){throw Error("unexpected primary")}',
-      '@/lib/ai/cos/runpodInferenceLease': 'export async function chatHasRunpodPriority(){return false}',
+      '@/lib/ai/cos/runpodInferenceLease': 'export async function chatHasRunpodPriority(){return false}; export async function markChatRunpodDemand(){}',
       '@/lib/visuals/freshGeneration': 'export function freshVisualPrompt(x){return x}',
       '@/lib/ai/modelRuntimeAssignment': 'export function tryAssignedPlatformModelTurn(){throw Error("unexpected assigned fallback")}',
     };

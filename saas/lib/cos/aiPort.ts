@@ -9,7 +9,7 @@ import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { activeGraduateRuntimesForRole } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { tryRunpodPrimaryInference } from '@/lib/ai/cos/runpodPrimaryInference'
-import { chatHasRunpodPriority } from '@/lib/ai/cos/runpodInferenceLease'
+import { chatHasRunpodPriority, markChatRunpodDemand } from '@/lib/ai/cos/runpodInferenceLease'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
 import { deepInfraMaxCallUsd } from '../ai/cos/deepInfraSpendPolicy.ts'
 import { tryAssignedPlatformModelTurn } from '@/lib/ai/modelRuntimeAssignment'
@@ -151,6 +151,9 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
         console.info('[builder-yields-runpod-to-chat]', JSON.stringify({ at: new Date().toISOString() }))
         throw new Error('builder_runpod_primary_busy')
       }
+      // A Builder job a person started is live demand like chat: background self-healing work yields the GPU to it
+      // through the same priority window (2026-10-13: an owner build lost the slot to queued self-healing jobs).
+      if (options.yieldToChat !== true) await markChatRunpodDemand()
 
       const runpod = currentReasoningEvaluationContext()
         ? { text: null, attempted: false, reason: 'reasoning_evaluation_context' }

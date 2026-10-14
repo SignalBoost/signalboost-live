@@ -33,16 +33,16 @@ test('a busy model mid-build is a wait: the same round is retried and the build 
   assert.equal(calls, 4)
 })
 
-test('a model that stays busy until the slice ends saves progress instead of failing; the lost round is not counted', async () => {
+test('a model still busy when the slice ends reports busy WITH this slice\'s progress; the lost round is not counted', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let pauseNow = false
   const replies: Array<() => string> = [() => write('hello.js', "console.log('hi')\n"), () => { pauseNow = true; return busy() }]
   const ai = { async generate() { return replies.shift()!() } }
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: OBJECTIVE, workspaceId: 'busy-pause', shouldPause: () => pauseNow })
   assert.equal(result.ok, false)
-  assert.equal(result.ok === false ? result.error : '', 'builder_job_paused')
+  assert.equal(result.ok === false ? result.error : '', 'builder_runpod_primary_busy', 'the job runner re-queues it for capacity')
   const checkpoint = result.ok === false ? result.checkpoint : undefined
-  assert.ok(checkpoint, 'progress was saved for the automatic continuation')
+  assert.ok(checkpoint, 'progress travels with the re-queue')
   assert.equal(checkpoint.attempt, 1, 'only the productive round is counted')
   assert.deepEqual(checkpoint.trace.filter(item => item.toolId === 'write_file').map(item => item.input.path), ['hello.js'])
   assert.deepEqual((await workspace.listFiles('busy-pause')).map(file => file.path), ['hello.js'])
@@ -74,16 +74,31 @@ test('other model failures still end the job; a run with no saved-progress suppo
   assert.equal(unpausable.ok === false ? unpausable.error : '', 'builder_runpod_primary_busy')
 })
 
-test('a Builder job a person started claims GPU priority; background Self-Healing work does not', () => {
+test('only a Builder job a person started claims GPU priority; Self-Healing and repository repairs never do', () => {
   const source = readFileSync(new URL('../lib/cos/aiPort.ts', import.meta.url), 'utf8')
   const port = source.slice(source.indexOf('export function createBuilderCodingAiPort'), source.indexOf('tryRunpodPrimaryInference({', source.indexOf('export function createBuilderCodingAiPort')))
-  assert.match(port, /if \(options\.yieldToChat !== true\) await markChatRunpodDemand\(\)/)
-  // Self-Healing jobs (yieldToChat) still step aside while that demand is recent.
+  assert.match(port, /if \(options\.yieldToChat === false\) await markChatRunpodDemand\(\)/)
   assert.match(port, /options\.yieldToChat === true && await chatHasRunpodPriority\(\)/)
   const runnerSource = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   assert.match(runnerSource, /createBuilderCodingAiPort\(\{ yieldToChat: selfHealingCapacityJob\(job\) \}\)/)
+  // Self-Healing repository repairs build their port without options, so they never mark live demand.
+  const repairSource = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(repairSource, /createBuilderCodingAiPort\(\)/)
 })
-// end of saas/tests/builderModelBusyWaits.node.test.ts (if this line is missing, the paste was cut short)
+
+test('capacity is re-queued with the current progress before a work slice is spent', () => {
+  const runnerSource = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const requeue = runnerSource.indexOf("await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return")
+  const pause = runnerSource.indexOf('if (result.ok === false && result.checkpoint && job.claimGeneration < 4) {')
+  assert.ok(requeue > 0 && pause > requeue, 're-queue for capacity comes before the ordinary pause')
+  assert.equal(runnerSource.split('await deferSelfHealingCapacity(job, result.error, trace').length - 1, 1, 'one capacity re-queue on the tool-loop result path')
+  const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
+  assert.match(store, /p_checkpoint: input\.checkpoint \?\? null/)
+  const migration = readFileSync(new URL('../supabase/migrations/20261014020000_builder_capacity_deferral_keeps_progress.sql', import.meta.url), 'utf8')
+  assert.match(migration, /p_checkpoint jsonb default null/)
+  assert.match(migration, /checkpoint = p_checkpoint,/)
+  assert.match(migration, /drop function if exists public\.defer_builder_job_capacity\(uuid, uuid, integer, text\)/)
+})
 
 test('RunPod busy attempts assigned fallback before durable queueing', () => {
   const source = readFileSync(new URL('../lib/cos/aiPort.ts', import.meta.url), 'utf8')
@@ -95,3 +110,4 @@ test('RunPod busy attempts assigned fallback before durable queueing', () => {
   assert.match(port.slice(assignedIndex, queueIndex), /if \(assigned\.attempted\) return requireText/)
   assert.doesNotMatch(port.slice(busyIndex, assignedIndex), /throw new Error\('builder_runpod_primary_busy'\)/)
 })
+// end of saas/tests/builderModelBusyWaits.node.test.ts (if this line is missing, the paste was cut short)

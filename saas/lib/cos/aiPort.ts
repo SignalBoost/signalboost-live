@@ -153,7 +153,8 @@ export function createBuilderCodingAiPort(options: { yieldToChat?: boolean } = {
       }
       // A Builder job a person started is live demand like chat: background self-healing work yields the GPU to it
       // through the same priority window (2026-10-13: an owner build lost the slot to queued self-healing jobs).
-      if (options.yieldToChat !== true) await markChatRunpodDemand()
+      // Only the job runner states this; Self-Healing repository repairs call without options and never claim priority.
+      if (options.yieldToChat === false) await markChatRunpodDemand()
 
       const runpod = currentReasoningEvaluationContext()
         ? { text: null, attempted: false, reason: 'reasoning_evaluation_context' }

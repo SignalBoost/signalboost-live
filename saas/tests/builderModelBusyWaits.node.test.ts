@@ -106,7 +106,7 @@ test('only a Builder job a person started claims GPU priority; Self-Healing and 
 test('capacity is re-queued with the current progress before a work slice is spent', () => {
   const runnerSource = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   const requeue = runnerSource.indexOf("await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return")
-  const pause = runnerSource.indexOf('if (result.ok === false && result.checkpoint && job.claimGeneration < 4) {')
+  const pause = runnerSource.indexOf('if (result.ok === false && result.checkpoint && builderMayContinue(job, result.checkpoint)) {')
   assert.ok(requeue > 0 && pause > requeue, 're-queue for capacity comes before the ordinary pause')
   assert.equal(runnerSource.split('await deferSelfHealingCapacity(job, result.error, trace').length - 1, 1, 'one capacity re-queue on the tool-loop result path')
   // No migration: the slice's checkpoint is stored on this exact running claim, then the existing

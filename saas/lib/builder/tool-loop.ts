@@ -7,7 +7,7 @@ import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 import { formatBuilderCognitiveGuidance } from './cognitive-application.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
-import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
+import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { builderEngineeringGoal, formatBuilderEngineeringGoal } from './engineering-control-plane.ts'
 import { formatBuilderWorkingFiles } from './working-context.ts'
 import { formatBuilderCliTestGuidance, formatBuilderTestEvidenceGuidance } from './cli-test-guidance.ts'
@@ -469,7 +469,7 @@ export class BuilderToolLoop {
     const completedRunsInCurrentWorkspaceState = new Set<string>(saved?.runs || [])
     const projectContext = discoverBuilderProjectContext(files)
     const initialPaths = new Set(saved?.initialPaths || initialListing.map(file => file.path))
-    const task = builderTaskContract(input.objective)
+    const task = builderTaskContract(builderContractObjective(input.objective, input.projectContext))
     const engineeringGoal = builderEngineeringGoal(input.objective)
     const mcpCapabilities = this.mcp ? await this.mcp.capabilities().catch(() => []) : []
     const mcpCapabilityKeys = new Set(mcpCapabilities.map(item => `${item.providerId}:${item.capabilityId}`))

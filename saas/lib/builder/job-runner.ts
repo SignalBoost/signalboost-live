@@ -9,6 +9,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './contr
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
+import { builderMayContinue, builderWorkLimitReport } from './work-budget.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
 import { isRepairObjective } from './regression-gate.ts'
@@ -485,16 +486,15 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     lastTrace = result.trace
     const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
     const trace = publicTrace(result.trace)
-    // Model capacity is not work: re-queue with this slice's progress before spending one of the four work slices.
+    // Model capacity is not work: re-queue with this slice's progress before spending a work slice.
     if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout')
       && await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return
-    if (result.ok === false && result.checkpoint && job.claimGeneration < 4) {
+    if (result.ok === false && result.checkpoint && builderMayContinue(job, result.checkpoint)) {
       const reply = historyReply(result.checkpoint.verificationPending
         ? 'Files written — verifying changes. Builder will continue automatically.'
         : 'Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)
       await pauseBuilderJob({ job, checkpoint: result.checkpoint, reply,
-        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace,
-          verificationPending: result.checkpoint.verificationPending === true } })
+        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
       return
     }
     const shouldExplain = Boolean(plan) || isRepairObjective(job.objective) || typeof job.metadata.proposalSourceJobId === 'string'
@@ -508,7 +508,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         })
       : `${fallback}\n\n${formatBuilderExecutionEvidence(trace)}`
     if (result.ok === false) {
-      const reply = historyReply(await initialReply(`${repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace)}\n\n${builderNextAction(result.error, result.trace)}`, 'failed'), job.workspaceId, files)
+      const workLimit = result.checkpoint ? builderWorkLimitReport(job, files) : ''
+      const reply = historyReply(await initialReply(`${repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace)}${workLimit ? `\n\n${workLimit}` : ''}\n\n${builderNextAction(result.error, result.trace)}`, 'failed'), job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id,
         userId: job.userId,

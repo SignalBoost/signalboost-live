@@ -113,3 +113,9 @@ test('productive work at slice ceiling requeues same job and checkpoint through 
   assert.match(migration, /90 minutes/)
   assert.match(migration, /p_checkpoint->>'workspaceId' is distinct from v_job.workspace_id::text/)
 })
+
+test('work limit never instructs the customer to type continue', () => {
+  const source = readFileSync(new URL('../lib/builder/work-budget.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /Reply \\"continue\\" in this workspace/)
+  assert.match(source, /resume an eligible checkpoint automatically/)
+})

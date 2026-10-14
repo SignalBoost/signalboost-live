@@ -1,2 +1,2 @@
-base_sha=0735be79806490df63a793093780d0155fc28f03
-branch=fix/builder-model-deadline-chunks-20261014
+base_sha=f259391c40e61ca22534a4678e47f94c1ea7d28f
+branch=fix/builder-playwright-acceptance-failure-classification-20261014

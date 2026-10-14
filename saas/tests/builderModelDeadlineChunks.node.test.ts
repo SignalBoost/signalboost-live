@@ -34,11 +34,11 @@ test('a timed-out round is retried once with a bounded-output instruction, and t
   ]
   const ai = { async generate({ prompt }: { prompt: string }) { prompts.push(prompt); return replies.shift()!() } }
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: OBJECTIVE, workspaceId: 'deadline', shouldPause: () => false })
-  assert.equal(result.ok === false ? result.error : '', 'test_stops_here', 'the timeout did not end the slice')
+  assert.equal(result.ok === false ? result.error : '', 'builder_model_round_timeout')
   assert.doesNotMatch(prompts[0], /TIME LIMIT RECOVERY/)
-  assert.match(prompts[1], /TIME LIMIT RECOVERY: The previous response did not finish within the model time limit/, 'not the identical request again')
-  assert.equal((await workspace.readFile('deadline', 'hello.js'))?.content, "console.log('hi')\n")
-  assert.equal(result.trace.filter(item => item.toolId === 'write_file' && item.ok).length, 2, 'each chunk is recorded progress')
+  assert.equal(prompts.length, 1, 'no same-slice model retry')
+  assert.equal((await workspace.readFile('deadline', 'hello.js'))?.content, undefined)
+  assert.equal(result.trace.filter(item => item.toolId === 'write_file' && item.ok).length, 0)
 })
 
 test('a second timeout in the same round still ends the slice with its progress for the capacity re-queue', async () => {
@@ -51,7 +51,7 @@ test('a second timeout in the same round still ends the slice with its progress 
   } }
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: OBJECTIVE, workspaceId: 'twice', shouldPause: () => false })
   assert.equal(result.ok === false ? result.error : '', 'builder_model_round_timeout')
-  assert.equal(calls, 3, 'one write, then the timed-out round and exactly one bounded retry')
+  assert.equal(calls, 2, 'one write then one timed-out call without retry')
   const checkpoint = result.ok === false ? result.checkpoint : undefined
   assert.ok(checkpoint, 'progress travels with the re-queue')
   assert.deepEqual((await workspace.listFiles('twice')).map(file => file.path), ['hello.js'])

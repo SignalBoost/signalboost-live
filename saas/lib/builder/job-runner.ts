@@ -489,7 +489,8 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
     // Model capacity is not work: re-queue with this slice's progress before spending a work slice.
     if (result.ok === false && (result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout')
       && await deferSelfHealingCapacity(job, result.error, trace, result.checkpoint ?? null)) return
-    if (result.ok === false && result.checkpoint && builderMayContinue(job, result.checkpoint)) {
+    if (result.ok === false && result.checkpoint && builderMayContinue(job, result.checkpoint,
+      result.error === 'builder_runpod_primary_busy' || result.error === 'builder_model_round_timeout')) {
       const reply = historyReply(result.checkpoint.verificationPending
         ? 'Files written — verifying changes. Builder will continue automatically.'
         : 'Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)

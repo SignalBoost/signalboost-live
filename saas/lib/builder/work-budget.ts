@@ -27,9 +27,22 @@ export function builderSliceMadeProgress(previous: BuilderLoopCheckpoint | null 
   return Math.max(0, ...fresh.map(passCount)) > Math.max(0, ...earlier.map(passCount))
 }
 
-export function builderMayContinue(job: Pick<BuilderJobRecord, 'claimGeneration' | 'checkpoint'>, checkpoint: BuilderLoopCheckpoint): boolean {
-  return job.claimGeneration < BASE_WORK_SLICES
-    || (job.claimGeneration < MAX_WORK_SLICES && builderSliceMadeProgress(job.checkpoint, checkpoint))
+/**
+ * Waiting for the model is not work. Production 2026-10-14 (jobs 3df9cd5b, 031432d4, 63cc435e, 50f71674): every pick-up
+ * counts as a claim, including the 3 capacity re-queues, so OrderFlow builds spent their free slices waiting for the GPU,
+ * then ended a slice still waiting (no file saved) and were judged "no progress" with 8-10 of 15 files written.
+ * Free slices count only work slices (claims minus capacity re-queues), and a slice that ended waiting for the model is
+ * never a verdict on the job. The total claim ceiling still bounds everything.
+ */
+export function builderMayContinue(
+  job: Pick<BuilderJobRecord, 'claimGeneration' | 'checkpoint' | 'metadata'>,
+  checkpoint: BuilderLoopCheckpoint,
+  endedWaitingForModel = false,
+): boolean {
+  if (job.claimGeneration >= MAX_WORK_SLICES) return false
+  const capacityRequeues = Number(job.metadata?.builderCapacityDeferrals)
+  const workSlices = job.claimGeneration - (Number.isInteger(capacityRequeues) && capacityRequeues > 0 ? capacityRequeues : 0)
+  return workSlices < BASE_WORK_SLICES || endedWaitingForModel || builderSliceMadeProgress(job.checkpoint, checkpoint)
 }
 
 /** "X of Y required files written" when a build stops at its work limit, so the stop is never a silent dead end. */

@@ -10,6 +10,7 @@ import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
 import { builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport } from './work-budget.ts'
+import { builderContractObjective, builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
 import { isRepairObjective } from './regression-gate.ts'
@@ -578,6 +579,28 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         summary: reply,
         evidence: { error: terminalError, files, verification: 'generation_fenced_terminal_builder_failure' },
       }).catch(() => console.warn('[builder_episode_write_failed]', { jobId }))
+      return
+    }
+
+    // A smoke command cannot override an unsuccessful required test suite.
+    // Verify against the last source revision, not an older passing run.
+    const contract = builderTaskContract(builderContractObjective(job.objective, job.metadata.projectContext))
+    const verification = builderTaskProgress(contract, files, result.trace)
+    const latestSourceChange = result.trace.findLastIndex(item => item.ok &&
+      (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+    const latestSuite = result.trace.slice(latestSourceChange + 1).filter(item =>
+      item.toolId === 'run' && /(?:npm test|node --test|pnpm test|yarn test)/.test(String(item.input.command || ''))).at(-1)
+    const suiteUnverified = contract.commands.some(command =>
+      /(?:npm test|node --test|pnpm test|yarn test)/.test(command)) &&
+      (!latestSuite || latestSuite.ok !== true || (latestSuite.output as { exitCode?: number } | undefined)?.exitCode !== 0)
+    if (verification.pendingCommands.length > 0 || suiteUnverified || !verification.testsSatisfied) {
+      const reply = historyReply('Builder has not passed the required full verification after the latest changes. Saved workspace and diagnostics remain available.', job.workspaceId, files)
+      await finishBuilderJob({
+        jobId: job.id, userId: job.userId, claimGeneration: job.claimGeneration,
+        status: 'failed', reply, error: 'builder_verification_incomplete',
+        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'failed',
+          error: 'builder_verification_incomplete', reply, files, trace },
+      })
       return
     }
 

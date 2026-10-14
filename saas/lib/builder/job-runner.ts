@@ -64,7 +64,7 @@ async function deferSelfHealingCapacity(job: BuilderJobRecord, error: string | n
   if (!standardBusy && (!selfHealingCapacityJob(job) || !capacityDeferrable(job, error))) return false
   const deferred = await deferBuilderJobForCapacity({ job, reason: error })
   if (deferred) {
-    console.info('[builder_capacity_deferred]', {
+    console.info('[builder_self_healing_capacity_deferred]', {
       jobId: job.id,
       claimGeneration: job.claimGeneration,
       reason: error,

@@ -154,6 +154,6 @@ test('model round timeouts enter durable capacity handling without a same-slice 
 test('new application builds must enter edit-only recovery after repeated unchanged failed tests', () => {
   const src = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
   assert.match(src, /const repairMutationRequired = latestFailedRunIndex >= 0/)
-  assert.match(src, /const repeatedRepairStall = latestFailedRunIndex < 0/)
+  assert.match(src, /const repeatedRepairStall = \(repairObjective \|\| task\.files\.length > 0\) && latestFailedRunIndex < 0/)
   assert.match(src, /\!\(repairMutationRequired \|\| repeatedRepairStall\) \|\| toolId === 'write_file' \|\| toolId === 'edit_file'/)
 })

@@ -113,3 +113,9 @@ test('productive work at slice ceiling requeues same job and checkpoint through 
   assert.match(migration, /90 minutes/)
   assert.match(migration, /p_checkpoint->>'workspaceId' is distinct from v_job.workspace_id::text/)
 })
+
+test('model capacity timeout at final claim cycles instead of exhausting job', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(runner, /job\.claimGeneration >= 24[\s\S]*result\.error === 'builder_model_round_timeout'/)
+  assert.match(runner, /requeueBuilderContinuationCycle/)
+})

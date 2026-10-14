@@ -200,7 +200,13 @@ export async function executeSignalBoostRepositoryRepair(input: {
   let session: VercelRepositoryRepairSession | null = null
   const browserCli = createBuilderPlaywrightCliPort({ ownerAuthorized: input.ownerAuthorized })
   try {
+    const setupStartedAtMs = Date.now()
     session = await VercelRepositoryRepairSession.create(target, { deadlineAtMs })
+    const setupDurationMs = Date.now() - setupStartedAtMs
+    console.info('[builder_repository_setup_timing]', {
+      setupDurationMs,
+      remainingExecutionMs: Math.max(0, deadlineAtMs - Date.now() - REPOSITORY_RESULT_RESERVE_MS),
+    })
     const aiDeadlineAtMs = deadlineAtMs - REPOSITORY_RESULT_RESERVE_MS
     if (Date.now() >= aiDeadlineAtMs) {
       return failedPayload({

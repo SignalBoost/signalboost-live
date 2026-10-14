@@ -666,11 +666,11 @@ export class BuilderToolLoop {
         String(item.error || '').startsWith('builder_repeated_tool_call:'))
       const inspectedSinceChange = trace.slice(lastWorkspaceChange + 1).some(item =>
         item.ok && item.toolId === 'read_file')
-      const repeatedRepairStall = repairObjective && latestFailedRunIndex < 0 && inspectedSinceChange
+      const repeatedRepairStall = latestFailedRunIndex < 0 && inspectedSinceChange
         && rejectedSinceChange.length >= 1
         && !trace.slice(lastWorkspaceChange + 1).some(item =>
           item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
-      const repairMutationRequired = repairObjective && latestFailedRunIndex >= 0
+      const repairMutationRequired = latestFailedRunIndex >= 0
         && !repairMutationAfterFailure
         && (repairInspectionsAfterFailure >= MAX_REPAIR_INSPECTIONS_AFTER_FAILURE
           || (repairInspectionsAfterFailure > 0 && repairProgressRefusalsAfterFailure > 0)

@@ -215,7 +215,9 @@ export async function getBuilderJobForUser(jobId: string, userId: string): Promi
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
   const job = await readBuilderJob(db, jobId, userId)
-  if (!job || !stale(job)) return job
+  // Queued jobs have not acquired an execution lease. Never classify an
+  // unclaimed queue wait as a lost worker merely because six minutes elapsed.
+  if (!job || job.status === 'queued' || !stale(job)) return job
 
   try {
     await reconcileStaleBuilderJobs({ userId, jobId })

@@ -34,9 +34,11 @@ function bounded(value: string, maximum = 16_000): string {
   return String(value || '').slice(0, maximum)
 }
 
-function githubFetchAuthArgs(): readonly string[] {
+export function githubFetchAuthArgs(): readonly string[] {
   const token = String(process.env.GITHUB_TOKEN || '').trim()
-  if (!token) throw new Error('builder_repository_github_credential_unavailable')
+  // Public GitHub repositories can be fetched anonymously. Private repositories still
+  // require host-supplied credentials and fail naturally if GitHub denies access.
+  if (!token) return Object.freeze([])
   const basic = Buffer.from(`x-access-token:${token}`, 'utf8').toString('base64')
   return Object.freeze(['-c', `http.https://github.com/.extraheader=AUTHORIZATION: basic ${basic}`])
 }

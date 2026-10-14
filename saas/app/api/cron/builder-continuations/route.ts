@@ -87,6 +87,13 @@ export async function GET(request: Request) {
   // Preserve the established Builder continuation contract first; the production gate verifies that
   // authentication completes before this explicit continuation read. Owned Self-Healing recovery lanes
   // are then evaluated separately so they cannot weaken or obscure the normal continuation path.
+  // Reconcile expired claims before selecting checkpointed jobs. Fenced recovery cannot
+  // replay POST or allow a delayed worker to commit under its expired generation.
+  const db = getAdminSupabase()
+  const { error: staleRecoveryError } = await db.rpc('requeue_stale_builder_claims', {
+    p_cutoff: new Date(Date.now() - 6 * 60_000).toISOString(),
+  })
+  if (staleRecoveryError) console.warn('[builder_stale_claim_requeue_failed]', { message: staleRecoveryError.message })
   const continuations = await listBuilderContinuations()
   const competencyReconciliation = await reconcileBuilderCompetencyGaps({ lookbackHours: 72, limit: 50 })
     .catch(error => {

@@ -746,6 +746,11 @@ export class BuilderToolLoop {
       const availableTools = tools
         // Offered only when the workspace can actually answer it. A tool named in TOOLS that the
         // backing store cannot serve teaches the model to request a dead capability.
+        // A full listing is already in the recorded trace. On a new multi-file build,
+        // requesting it again instead of writing the next missing file wastes a
+        // model inference round (observed OrderFlow 3cba0358, claim 3).
+        .filter(toolId => toolId !== 'list_files' || repairObjective || task.files.length === 0 ||
+          progress.missingFiles.length === 0 || !trace.some(item => item.toolId === 'list_files' && item.ok))
         .filter(toolId => toolId !== 'search_files' || typeof this.workspace.searchFiles === 'function')
         .filter(toolId => toolId !== 'mcp_read' || mcpCapabilities.length > 0)
         .filter(toolId => toolId !== 'browser_cli' || browserCliActions.size > 0)

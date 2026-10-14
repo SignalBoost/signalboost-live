@@ -120,15 +120,31 @@ export default function DeveloperPage() {
 
   async function openWorkspace(id: string) {
     setOpeningWorkspace(true)
-    setWorkspaceId('')
-    setWorkspaceFiles([])
     setError('')
     try {
-      const response = await fetch(`/api/builder?workspaceId=${encodeURIComponent(id)}`, { cache: 'no-store' })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Workspace could not be opened.')
-      setWorkspaceId(id); setWorkspaceFiles(Array.isArray(data.files) ? data.files : []); setFiles([]); setReply(''); setTrace([])
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Workspace could not be opened.') }
+      let lastFailure: unknown = null
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const response = await fetch(`/api/builder?workspaceId=${encodeURIComponent(id)}`, { cache: 'no-store' })
+          const data = await response.json()
+          if (!response.ok) {
+            if (response.status >= 500 && attempt === 0) continue
+            throw new Error(data.error || 'Workspace could not be opened.')
+          }
+          setWorkspaceId(id); setWorkspaceFiles(Array.isArray(data.files) ? data.files : []); setFiles([]); setReply(''); setTrace([])
+          return
+        } catch (cause) {
+          lastFailure = cause
+          if (attempt === 0 && cause instanceof TypeError) continue
+          break
+        }
+      }
+      throw lastFailure || new Error('Workspace could not be opened.')
+    } catch (cause) {
+      setError(cause instanceof TypeError
+        ? 'Could not connect to Builder workspace storage. Your saved workspace is unchanged; retry Open workspace.'
+        : cause instanceof Error ? cause.message : 'Workspace could not be opened.')
+    }
     finally { setOpeningWorkspace(false) }
   }
 

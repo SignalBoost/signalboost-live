@@ -48,6 +48,22 @@ test('a model still busy when the slice ends reports busy WITH this slice\'s pro
   assert.deepEqual((await workspace.listFiles('busy-pause')).map(file => file.path), ['hello.js'])
 })
 
+test('a timed-out model round also hands this slice\'s progress to the capacity re-queue instead of clearing it', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let calls = 0
+  const ai = { async generate() {
+    calls += 1
+    if (calls === 1) return write('hello.js', "console.log('hi')\n")
+    throw new Error('builder_model_round_timeout')
+  } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: OBJECTIVE, workspaceId: 'timeout', shouldPause: () => false })
+  assert.equal(result.ok === false ? result.error : '', 'builder_model_round_timeout')
+  const checkpoint = result.ok === false ? result.checkpoint : undefined
+  assert.ok(checkpoint, 'Codex review of #4321: a null checkpoint would erase the earlier progress')
+  assert.equal(checkpoint.attempt, 1)
+  assert.deepEqual(checkpoint.trace.filter(item => item.toolId === 'write_file').map(item => item.input.path), ['hello.js'])
+})
+
 test('the saved progress resumes and the build continues after the model frees up', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let pauseNow = false

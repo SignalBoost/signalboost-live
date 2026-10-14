@@ -157,3 +157,10 @@ test('new application builds must enter edit-only recovery after repeated unchan
   assert.match(src, /const repeatedRepairStall = repairObjective && latestFailedRunIndex < 0/)
   assert.match(src, /\!\(repairMutationRequired \|\| repeatedRepairStall\) \|\| toolId === 'write_file' \|\| toolId === 'edit_file'/)
 })
+
+test('failed host verification does not spend successful run budget', () => {
+  const src = readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8')
+  assert.match(src, /if \(!failed\) runCount \+= 1\s+completedRunsInCurrentWorkspaceState\.add\(proof\)/)
+  assert.match(src, /if \(!failed\) runCount \+= 1\s+continue/)
+  assert.match(src, /if \(!failed\) runCount \+= 1\s+if \(!failed && evaluateRegressionGate/)
+})

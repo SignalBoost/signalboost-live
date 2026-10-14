@@ -537,7 +537,13 @@ export class BuilderToolLoop {
       if (verificationPending) {
         verificationPending = false
         const proof = projectContext.recommendedTestCommand
-        if (proof && projectContext.testFiles.length > 0) {
+        // Re-verify only files that changed since the last executed test run. Production 2026-10-14 (OrderFlow job
+        // 4eb4a2e5): every model timeout re-ran `npm test` on unchanged files (64 pass / 2 fail, three times), spending
+        // the slice and the run budget without new evidence.
+        const lastChange = trace.findLastIndex(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file')
+          && (item.output as { pending?: boolean } | undefined)?.pending !== true)
+        const lastTestRun = trace.findLastIndex(item => isExecutedBuilderRun(item) && isBuilderTestRunnerCommand(item.input.command))
+        if (proof && projectContext.testFiles.length > 0 && lastChange > lastTestRun) {
           if (runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
           try {
             const currentFiles = [...workingFiles.values()]

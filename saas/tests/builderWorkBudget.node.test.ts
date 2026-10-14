@@ -83,7 +83,7 @@ test('a stop reports how many required files exist and which are missing', () =>
   for (const missing of ['index.js', 'README.md', 'test/orders.test.js', 'test/discounts.test.js', 'test/storage.test.js', 'test/integration.test.js']) {
     assert.ok(report.includes(missing), missing)
   }
-  assert.match(report, /Reply "continue"/)
+  assert.match(report, /resume an eligible checkpoint automatically/)
   assert.equal(builderWorkLimitReport({ objective: 'Fix the login bug', metadata: {} }, WRITTEN), '', 'no checklist, no file count')
 })
 

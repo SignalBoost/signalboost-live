@@ -523,6 +523,22 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
         result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
       return
     }
+    // A recorded failing full-suite run is an actionable continuation state, not
+    // a completion verdict. Allow a bounded next claim even if this slice only
+    // inspected the two failing assertions; the existing generation-fenced RPC
+    // and MAX_WORK_SLICES cap prevent unbounded replay.
+    const unresolvedSuite = result.ok === false && result.checkpoint &&
+      result.trace.some((item, index, events) => item.toolId === 'run' && !item.ok &&
+        /(?:npm test|node --test|pnpm test|yarn test)/.test(String(item.input.command || '')) &&
+        !events.slice(index + 1).some(next => next.ok &&
+          (next.toolId === 'write_file' || next.toolId === 'edit_file' ||
+            (next.toolId === 'run' && /(?:npm test|node --test|pnpm test|yarn test)/.test(String(next.input.command || ''))))))
+    if (unresolvedSuite && job.claimGeneration < 24) {
+      const reply = historyReply('Builder identified failing tests and saved the diagnostic evidence. Automatically continuing focused repair; full-suite verification remains required.', job.workspaceId, files)
+      await pauseBuilderJob({ job, checkpoint: result.checkpoint!, reply,
+        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
+      return
+    }
     // Reaching a productive-slice ceiling is not a source failure. Atomically reset the
     // claim generation for a bounded continuation cycle while retaining the same job,
     // objective, workspace, trace and checkpoint. The database enforces age/cycle caps.

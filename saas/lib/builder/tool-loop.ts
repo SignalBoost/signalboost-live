@@ -716,6 +716,20 @@ export class BuilderToolLoop {
         : trace.slice(lastWorkspaceChange + 1).some(item => item.toolId === 'run' && !item.ok)
           ? 'CURRENT STEP: Use the recorded command failures to repair the source. Read the failing file if needed. If a newly created file is incomplete, replace it with complete source rather than repeatedly patching a fragment. Do not claim success or weaken tests.'
           : 'CURRENT STEP: Follow the objective and use tools for any remaining work; report only recorded evidence.'
+      // Carry the precise last failed test evidence into the next model round,
+      // including after a checkpoint resume. Later successful smoke commands must
+      // not erase an unresolved suite failure from the current source revision.
+      const latestFailedVerification = trace.slice(lastWorkspaceChange + 1).findLast(item =>
+        item.toolId === 'run' && !item.ok &&
+        /(?:npm test|node --test|pnpm test|yarn test)/.test(String(item.input.command || '')) &&
+        !String(item.error || '').startsWith('builder_repeated_tool_call:'))
+      const failingTestOutput = latestFailedVerification && isRecord(latestFailedVerification.output)
+        ? String(latestFailedVerification.output.stdout || latestFailedVerification.output.stderr || '') : ''
+      const failingTestNames = [...failingTestOutput.matchAll(/^\\s*[✖×]\\s+(.+)$/gm)]
+        .map(match => match[1].trim()).filter(name => name && !name.startsWith('failing tests:'))
+      const targetedFailureGuidance = latestFailedVerification
+        ? `UNRESOLVED FULL-SUITE FAILURE: The previous required test command exited nonzero. A passing smoke run is not proof. Failing test names: ${JSON.stringify([...new Set(failingTestNames)].slice(0, 12))}. Failure assertions and stack traces: ${failingTestOutput.slice(-9000)}. Inspect the implicated implementation and tests, edit the minimal source needed, run a focused test, then rerun the original full suite after the edit. Do not re-run unchanged failing tests or claim completion.`
+        : ''
       const blockedInspectionTools = new Set(trace
         .slice(lastWorkspaceChange + 1)
         .filter(item => (item.toolId === 'list_files' || item.toolId === 'read_file' || item.toolId === 'search_files' || item.toolId === 'mcp_read')
@@ -779,6 +793,7 @@ export class BuilderToolLoop {
         readSource.section,
         formatBuilderWorkingFiles([...workingFiles.values()]),
         formatContractOscillation(detectContractOscillation(trace)),
+        targetedFailureGuidance,
         currentStep,
         'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; search_files => {"type":"tool","toolId":"search_files","input":{"query":"exact text or symbol"}}; mcp_read => {"type":"tool","toolId":"mcp_read","input":{"providerId":"provider-id","capabilityId":"exact-capability-id","args":{}}}; browser_cli => {"type":"tool","toolId":"browser_cli","input":{"action":"open|goto|snapshot|find|console|requests|close","url":"https://allowed.example/path","query":"optional search/filter","target":"optional snapshot target","level":"error|warning|info|debug"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
         'LARGE NEW FILES: write_file accepts {path, mode:"append", offset:0, content:"first chunk", final:false}. Continue with the returned offset (JavaScript string length), chunks of at most 2000 characters (the storage limit is 12000, but the JSON output token budget is smaller), and final:true on the last chunk. Assembly publishes one complete file only at final=true. Append is for new files only; never use it to overwrite existing source. read_file accepts optional startLine/endLine for large files (1-based, at most 200 lines per read). A read returns whole lines up to about 7,500 characters; when nextStartLine is present, read from it to see the rest of the file.',

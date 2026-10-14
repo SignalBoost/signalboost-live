@@ -191,7 +191,9 @@ async function generateWithRetry(ai: BuilderAiPort, input: Parameters<BuilderAiP
       if (modelAttempt === MAX_MODEL_ROUND_ATTEMPTS) throw error
       if (error instanceof Error && error.message === 'builder_model_output_limit') {
         request = { ...request, maxTokens: Math.min(8_192, request.maxTokens * 2) }
-      } else if (!(error instanceof Error && error.message === 'builder_model_round_timeout')) throw error
+      // A timed-out round is not retried unchanged here: the identical request times out again. The loop retries it
+      // once with a bounded-output instruction instead (TIME LIMIT RECOVERY).
+      } else throw error
     }
   }
   throw lastError instanceof Error ? lastError : new Error('builder_model_call_failed')
@@ -702,7 +704,7 @@ export class BuilderToolLoop {
         : passingProofBeforeChange
           ? passingProofStep
         : !repairObjective && progress.missingFiles.length > 0
-        ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files. For large files use bounded append chunks; only final=true publishes the complete file.`
+        ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file mode:"append" chunks of at most 2000 characters: offset 0 first, then the returned offset, and final:true on the last chunk (a short file is one chunk with final:true). Other deliverables and verification are subsequent steps. Do not rewrite earlier files.`
         : !repairObjective && progress.pendingCommands.length === 0 && !progress.testsSatisfied
           ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. Complete the test suite with distinct meaningful assertions covering the requested normal, edge, and failure cases. Do not duplicate empty tests or weaken the requirement. Verification will run again after the file changes.`
         : trace.slice(lastWorkspaceChange + 1).some(item => item.toolId === 'run' && !item.ok)
@@ -833,13 +835,20 @@ export class BuilderToolLoop {
           }
         } catch (error) {
           if (input.shouldPause && error instanceof Error && error.message === 'builder_turn_timeout') return pause()
+          // Production 2026-10-14 (OrderFlow job 7cc550aa): 69 of 110 Builder model calls hit the ~55s round deadline and
+          // returned nothing; the longest completed output was 1,630 tokens. A response the deadline cannot finish is
+          // retried once, while the slice has time, with an instruction whose output fits the deadline.
+          const roundTimeout = error instanceof Error && error.message === 'builder_model_round_timeout'
+            && !input.shouldPause?.() && !outOfTime()
           const capacity = input.shouldPause ? capacityReason(error) : null
-          if (capacity) return capacityStop(capacity)
-          if (!isOutputTruncation(error)) {
+          if (capacity && !roundTimeout) return capacityStop(capacity)
+          if (!isOutputTruncation(error) && !roundTimeout) {
             return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
           }
           try {
-            response = await generateControl(controlBudget * 2, 'OUTPUT LIMIT RECOVERY: The previous response was truncated and NOTHING from it was written. Do not repeat a whole large file. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset and final:false; continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
+            response = roundTimeout
+              ? await generateControl(controlBudget, 'TIME LIMIT RECOVERY: The previous response did not finish within the model time limit and NOTHING from it was written. Keep this response short. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset (final:true only on the last chunk); continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
+              : await generateControl(controlBudget * 2, 'OUTPUT LIMIT RECOVERY: The previous response was truncated and NOTHING from it was written. Do not repeat a whole large file. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset and final:false; continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
           } catch (retryError) {
             if (input.shouldPause && retryError instanceof Error && retryError.message === 'builder_turn_timeout') return pause()
             const retryCapacity = input.shouldPause ? capacityReason(retryError) : null

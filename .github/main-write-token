@@ -1,2 +1,2 @@
-base_sha=bc82e66ca6d01f640620ff28f7bb973f53019d6f
-branch=fix/builder-capacity-not-work-20261014
+base_sha=0735be79806490df63a793093780d0155fc28f03
+branch=fix/builder-model-deadline-chunks-20261014

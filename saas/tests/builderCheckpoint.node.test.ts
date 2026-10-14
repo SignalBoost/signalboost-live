@@ -119,7 +119,8 @@ test('scheduler accepts only its secret and resumes only server-owned paused job
   assert.doesNotMatch(route, /Promise\.all\(jobs\.map/)
   const store = read('../lib/builder/job-store.ts')
   assert.match(store, /\.eq\('status', 'paused'\)/)
-  assert.match(store, /\.lt\('claim_generation', 4\)/)
+  // Resume is bounded by the shared work-slice ceiling (work-budget.ts, migration 20261014060000).
+  assert.match(store, /\.lt\('claim_generation', MAX_WORK_SLICES\)/)
   assert.match(store, /p_generation: input.claimGeneration/)
   assert.match(store.match(/const JOB_SELECT = .*/)?.[0] || '', /,checkpoint'/)
   const config = JSON.parse(read('../vercel.json'))

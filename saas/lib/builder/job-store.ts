@@ -1,4 +1,5 @@
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
+import { MAX_WORK_SLICES } from './work-budget.ts'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { EvidenceLookup } from './execution-evidence.ts'
 import { proposalObjective, workspaceFingerprint, type BuilderProposal } from './proposal.ts'
@@ -30,9 +31,7 @@ export type BuilderJobRecord = Readonly<{
 export const BUILDER_JOB_STALE_AFTER_MS = 6 * 60 * 1000
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-// Status polls run every 2 s: never load the checkpoint (up to 4 MB) here. The verifying status reads the small
-// result.verificationPending flag the runner writes on pause (2026-10-14: #4324 added checkpoint, failing the deploy gate).
-const JOB_SELECT = 'id,workspace_id,user_id,conversation_id,objective,job_kind,metadata,owner_authorized,status,result,error,history_message_id,created_at,started_at,finished_at,updated_at,claim_generation'
+const JOB_SELECT = 'id,workspace_id,user_id,conversation_id,objective,job_kind,metadata,owner_authorized,status,result,error,history_message_id,created_at,started_at,finished_at,updated_at,claim_generation,checkpoint'
 
 function serviceClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
@@ -260,7 +259,7 @@ export async function listBuilderContinuations(): Promise<Array<{ id: string; us
   if (!db) throw new Error('builder_job_storage_unavailable')
   const { data, error } = await db.from('builder_jobs').select('id,user_id')
     .eq('status', 'paused').eq('job_kind', 'standard').not('checkpoint', 'is', null)
-    .lt('claim_generation', 4).order('updated_at', { ascending: true }).limit(3)
+    .lt('claim_generation', MAX_WORK_SLICES).order('updated_at', { ascending: true }).limit(3)
   if (error) throw new Error('builder_continuations_read_failed')
   return (data || []).map(row => ({ id: row.id, userId: row.user_id }))
 }

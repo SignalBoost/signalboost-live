@@ -26,6 +26,17 @@ function inlineCommands(line: string): string[] {
   return result
 }
 
+/**
+ * The request whose checklist a job must satisfy. A "continue" in the same project keeps the original request's
+ * required files and commands; otherwise a resumed build would have an empty checklist and could stop early.
+ */
+export function builderContractObjective(objective: string, projectContext?: unknown): string {
+  const previous = projectContext && typeof projectContext === 'object'
+    ? (projectContext as { previousObjective?: unknown }).previousObjective : undefined
+  return /^\s*(?:please\s+)?continue\b/i.test(objective) && typeof previous === 'string' && previous.trim()
+    ? `${previous}\n\n${objective}` : objective
+}
+
 /** Extract explicit deliverables only; references elsewhere in the request are not output files. */
 export function builderTaskContract(objective: string): BuilderTaskContract {
   const files = new Set<string>()

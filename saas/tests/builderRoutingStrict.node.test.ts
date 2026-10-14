@@ -137,3 +137,29 @@ test('documentation support does not grant authority to general chat or question
     assert.equal(isConciergeBuilderObjective(objective), false, objective)
   }
 })
+
+test('long structured OrderFlow application specification is executable coding work', () => {
+  const spec = [
+    '# OrderFlow — End-to-End Builder Acceptance Test',
+    'Build a complete, working OrderFlow application using Node.js and JavaScript.',
+    'Functional requirements: product catalog, shopping cart, discounts, orders, storage.',
+    'Create all 15 required files.',
+    'Required files:',
+    'package.json',
+    'index.js',
+    'README.md',
+    'src/catalog.js',
+    'src/cart.js',
+    'src/orders.js',
+    'test/catalog.test.js',
+    'test/integration.test.js',
+    'Automated tests:',
+    'npm test',
+    'node --test test/*.test.js',
+    'node index.js',
+    'Preserve checkpoints and finish without manual continue.',
+  ].join('\\n')
+  assert.equal(isConciergeBuilderObjective(spec), true)
+  assert.equal(isConciergeBuilderObjective('Describe an order management application with catalogs and carts.'), false)
+  assert.equal(isConciergeBuilderObjective('What is the purpose of npm test in an application?'), false)
+})

@@ -1,2 +1,2 @@
-base_sha=bc82e66ca6d01f640620ff28f7bb973f53019d6f
-branch=fix/builder-capacity-not-work-20261014
+base_sha=2ee634795b58fc30e1d4003ef80f470a6b70b2cc
+branch=feat/builder-heartbeat-observability-20261014

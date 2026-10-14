@@ -54,11 +54,27 @@ test('every job keeps its first 4 slices; slices 5-24 must each make progress; 2
   const previous = checkpoint([write('a.js')])
   assert.equal(BASE_WORK_SLICES, 4)
   assert.equal(MAX_WORK_SLICES, 24)
-  assert.equal(builderMayContinue({ claimGeneration: 2, checkpoint: previous }, stalled), true, 'the first slices are unconditional')
-  assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: previous }, progressed), true)
-  assert.equal(builderMayContinue({ claimGeneration: 23, checkpoint: previous }, progressed), true)
-  assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: previous }, stalled), false, 'a stuck job still stops')
-  assert.equal(builderMayContinue({ claimGeneration: 24, checkpoint: previous }, progressed), false)
+  assert.equal(builderMayContinue({ claimGeneration: 2, checkpoint: previous, metadata: {} }, stalled), true, 'the first slices are unconditional')
+  assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: previous, metadata: {} }, progressed), true)
+  assert.equal(builderMayContinue({ claimGeneration: 23, checkpoint: previous, metadata: {} }, progressed), true)
+  assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: previous, metadata: {} }, stalled), false, 'a stuck job still stops')
+  assert.equal(builderMayContinue({ claimGeneration: 24, checkpoint: previous, metadata: {} }, progressed), false)
+})
+
+test('waiting for the model never spends the free slices or ends a job (production jobs 3df9cd5b, 031432d4, 63cc435e, 50f71674)', () => {
+  const previous = checkpoint([write('a.js')])
+  const waited = checkpoint([write('a.js')]) // the slice ended still waiting for the GPU: nothing new saved
+  const requeued3 = { builderCapacityDeferrals: 3 }
+  // Production: 5-6 claims, 3 of them capacity re-queues -> only 2-3 work slices had run.
+  assert.equal(builderMayContinue({ claimGeneration: 5, checkpoint: previous, metadata: requeued3 }, waited), true, '2 work slices: still free')
+  assert.equal(builderMayContinue({ claimGeneration: 6, checkpoint: previous, metadata: requeued3 }, waited), true, '3 work slices: still free')
+  // Past the free slices, a slice that ended waiting for the model is not a verdict on the job.
+  assert.equal(builderMayContinue({ claimGeneration: 9, checkpoint: previous, metadata: requeued3 }, waited, true), true)
+  // A real stall (no wait, no progress) past the free slices still stops; the ceiling still holds.
+  assert.equal(builderMayContinue({ claimGeneration: 9, checkpoint: previous, metadata: requeued3 }, waited, false), false)
+  assert.equal(builderMayContinue({ claimGeneration: MAX_WORK_SLICES, checkpoint: previous, metadata: requeued3 }, waited, true), false)
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(runner, /builderMayContinue\(job, result\.checkpoint,\s*result\.error === 'builder_runpod_primary_busy' \|\| result\.error === 'builder_model_round_timeout'\)/)
 })
 
 test('a stop reports how many required files exist and which are missing', () => {
@@ -79,7 +95,7 @@ test('the database ceiling matches the code and the migration runs through the H
   const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
   assert.match(store, /\.lt\('claim_generation', MAX_WORK_SLICES\)/)
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  assert.match(runner, /result\.checkpoint && builderMayContinue\(job, result\.checkpoint\)/)
+  assert.match(runner, /result\.checkpoint && builderMayContinue\(job, result\.checkpoint,/)
   assert.doesNotMatch(runner, /claimGeneration < 4/)
 })
 // end of saas/tests/builderWorkBudget.node.test.ts (if this line is missing, the paste was cut short)

@@ -84,7 +84,9 @@ export async function GET(request: Request) {
           jobId: job.id,
           workspaceId: job.workspaceId,
           status: job.status,
-          reply: job.status === 'paused' ? 'Builder saved its progress and will continue automatically. Verification is not complete yet.' : runningReply(job.id),
+          reply: job.status === 'queued' && job.metadata.builderCapacityDeferredReason === 'builder_runpod_primary_busy'
+            ? 'Queued — waiting for model capacity. Builder will resume this saved job automatically.'
+            : job.status === 'paused' ? 'Builder saved its progress and will continue automatically. Verification is not complete yet.' : runningReply(job.id),
         }, { status: 202 })
       }
       return noStore({

@@ -9,7 +9,7 @@ test('ordinary standard jobs defer busy RunPod with bounded retries before termi
   assert.match(runner, /MAX_STANDARD_CAPACITY_DEFERRALS = 3/)
   assert.match(runner, /job\.jobKind === 'standard' && \(error === 'builder_runpod_primary_busy' \|\| error === 'builder_model_round_timeout'\)/)
   assert.match(runner, /metadataCount\(job, 'builderCapacityDeferrals'\) < MAX_STANDARD_CAPACITY_DEFERRALS/)
-  // The re-queue carries the slice's current checkpoint (20261014020000), never a stale earlier one.
+  // The re-queue carries the slice's current checkpoint, never a stale earlier one.
   assert.match(runner, /result\.error === 'builder_runpod_primary_busy'[\s\S]*await deferSelfHealingCapacity\(job, result\.error, trace, result\.checkpoint \?\? null\)/)
   assert.match(runner, /if \(await deferSelfHealingCapacity\(job, message, trace\)/)
 })

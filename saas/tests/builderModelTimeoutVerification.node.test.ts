@@ -45,15 +45,16 @@ test('writes then model timeout saves a verification-first continuation, not a f
 test('accepted requests expose verifying status without a second POST', () => {
   const source = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
   const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-  assert.match(source, /job\.checkpoint\?\.verificationPending === true/)
+  assert.match(source, /job\.result\?\.verificationPending === true/)
   assert.match(source, /Files written — verifying changes/)
   assert.match(runner, /result\.checkpoint\.verificationPending/)
   assert.match(source, /\}, \{ status: 202 \}\)/)
 })
 
-test('job reads include the checkpoint column so verifying status is reachable', () => {
-  const source = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
-  const select = source.match(/const JOB_SELECT = '([^']*)'/)?.[1] ?? ''
-  assert.ok(select.split(',').includes('checkpoint'),
-    'JOB_SELECT must include checkpoint or the paused verifying status is unreachable')
+test('the verifying status is reachable without loading the checkpoint on every status poll', () => {
+  const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
+  const select = store.match(/const JOB_SELECT = '([^']*)'/)?.[1] ?? ''
+  assert.ok(select.split(',').includes('result') && !select.split(',').includes('checkpoint'))
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(runner, /verificationPending: result\.checkpoint\.verificationPending === true/)
 })

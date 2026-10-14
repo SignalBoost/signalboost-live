@@ -52,5 +52,5 @@ export function builderWorkLimitReport(job: Pick<BuilderJobRecord, 'objective' |
   const missing = required.filter(path => !files.includes(path))
   return `${required.length - missing.length} of ${required.length} required files are written.`
     + (missing.length ? ` Missing: ${missing.join(', ')}.` : '')
-    + ' Reply "continue" in this workspace to resume from the saved files with the same checklist.'
+    + ' The saved workspace remains available. The platform must resume an eligible checkpoint automatically; if the job is terminal, show the actual blocker and preserve these files rather than asking the customer to resubmit.'
 }

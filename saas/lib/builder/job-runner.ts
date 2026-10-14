@@ -8,8 +8,8 @@ import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
-import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
-import { builderMayContinue, builderWorkLimitReport } from './work-budget.ts'
+import { finishBuilderJob, claimBuilderJob, deferBuilderJobForCapacity, pauseBuilderJob, requeueBuilderContinuationCycle, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
+import { builderMayContinue, builderSliceMadeProgress, builderWorkLimitReport } from './work-budget.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
 import { isRepairObjective } from './regression-gate.ts'
@@ -496,6 +496,15 @@ async function runBuilderJobInsideHarness(jobId: string, userId: string): Promis
       await pauseBuilderJob({ job, checkpoint: result.checkpoint, reply,
         result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
       return
+    }
+    // Reaching a productive-slice ceiling is not a source failure. Atomically reset the
+    // claim generation for a bounded continuation cycle while retaining the same job,
+    // objective, workspace, trace and checkpoint. The database enforces age/cycle caps.
+    if (result.ok === false && result.checkpoint && builderSliceMadeProgress(job.checkpoint, result.checkpoint)
+      && job.claimGeneration >= 24) {
+      const reply = historyReply('Builder saved its work and is automatically continuing verification and remaining files.', job.workspaceId, files)
+      if (await requeueBuilderContinuationCycle({ job, checkpoint: result.checkpoint, reply,
+        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'queued', reply, files, trace } })) return
     }
     const shouldExplain = Boolean(plan) || isRepairObjective(job.objective) || typeof job.metadata.proposalSourceJobId === 'string'
       || trace.some(item => item.toolId === 'run' && !item.ok)

@@ -59,7 +59,7 @@ test('an absent deadline preserves the previous unbounded-clock behaviour', asyn
   assert.equal(result.ok, true)
 })
 
-test('model-round timeout aborts abandoned provider work before retrying', async () => {
+test('model-round timeout aborts abandoned provider work without an identical immediate retry', async () => {
   let calls = 0
   let aborts = 0
   const ai: BuilderAiPort = {
@@ -80,9 +80,9 @@ test('model-round timeout aborts abandoned provider work before retrying', async
   })
   assert.equal(result.ok, false)
   assert.equal(result.error, 'builder_model_round_timeout')
-  assert.equal(calls, 2, 'the bounded retry still runs once')
+  assert.equal(calls, 1, 'a timed-out provider call must not immediately retry unchanged')
   await new Promise(resolve => setTimeout(resolve, 0))
-  assert.equal(aborts, 2, 'each abandoned provider attempt is cancelled')
+  assert.equal(aborts, 1, 'the abandoned provider attempt is cancelled')
 })
 
 test('the durable job passes its own deadline down and no longer caps rounds at a low constant', () => {

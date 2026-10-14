@@ -1,2 +1,2 @@
-base_sha=152d9212fabe0e1aaf0e0a8cf01577838454ecb9
-branch=fix/builder-busy-keeps-progress-20261013
+base_sha=42db3738776ab65c141d45094db0e453990fc447
+branch=fix/builder-timeout-keeps-progress-20261014

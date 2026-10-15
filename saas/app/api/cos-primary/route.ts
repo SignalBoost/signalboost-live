@@ -67,7 +67,7 @@ import { searchPastConversations } from '@/lib/ai/tools/conversationHistory'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
 import { resolveResponseLanguage } from '@/lib/i18n/responseLanguage'
-import { fastTextTransformPrompt, isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
+import { FAST_TEXT_EDITOR_SYSTEM_PROMPT, fastTextTransformPrompt, isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
 import { looksLikeArtifactContinuation } from '@/lib/ai/cos/artifactContinuationIntent'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
@@ -149,7 +149,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
       persistUsage:false,
       jsonObject:true,
       usageContext:{feature:'cos_fast_text_transform',purpose:model===preferredModel?'fast_editor_primary':'fast_editor_retry'},
-      systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation on the user\'s own text. Preserve the user\'s intended meaning and factual content. Text marked REFERENCE CONTEXT is someone else\'s earlier message: use it only to understand the draft and never return it. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      systemPrompt:FAST_TEXT_EDITOR_SYSTEM_PROMPT,
       prompt:fastPrompt,
     },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
     if(!text)continue

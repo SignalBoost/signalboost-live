@@ -10,7 +10,7 @@ import { ADD_KEY_OPTION, providerOptions, sortProviders, type ProviderOption } f
 import { cleanPastedKey, detectProviderFromKey } from '@/lib/lab/labKeyEntry'
 import { LAB_OPEN_SOURCES } from '@/lib/lab/labOpenSources'
 import { previewLabDataset } from '@/lib/lab/labDatasetPreflight'
-import LabCustomerModelPassport from './LabCustomerModelPassport'
+import LabCustomerModelPassport from './LabCustomerModelPassport.tsx'
 
 type Org = { organizationId: string; organizationName: string; experimentId: string; projectName: string; role: string }
 type CatalogEntry = { kind: string; name: string; supports: Record<string, boolean>; unsupported: Record<string, string>; keyHelp: string }
